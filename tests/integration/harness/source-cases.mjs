@@ -218,10 +218,17 @@ reusable = true
   },
 
   {
-    name: 'COMPANION-002 every scenario declares its Companion turn',
+    name: 'COMPANION-002 every non-Student scenario declares its Companion turn',
     fn: () => {
       const missing = walk(SCENARIO_ROOT, ['.toml']).filter(
-        (file) => !readFileSync(file, 'utf8').includes('# Write the dense work-log continuation now'),
+        (file) => {
+          const source = readFileSync(file, 'utf8');
+          return (
+            !source.includes('# Write the dense work-log continuation now') &&
+            !source.includes('agent = "fast-student"') &&
+            !source.includes('agent = "deep-student"')
+          );
+        },
       );
 
       assertEq(missing.length, 0, `no Companion turn declared in: ${missing.join(', ')}`);

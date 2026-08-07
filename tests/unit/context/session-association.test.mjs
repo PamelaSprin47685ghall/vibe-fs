@@ -44,14 +44,18 @@ test('HOST_008_linking_records_both_directions_at_once', () => {
   assert.deepEqual(assoc.entry('ses_x', state), {
     kind: 'WorkSession',
     mainSessionId: undefined,
+    satelliteKind: undefined,
     blogger: 'ses_y',
+    teacher: undefined,
     parent: undefined,
   })
 
   assert.deepEqual(assoc.entry('ses_y', state), {
-    kind: 'CompanionSession',
+    kind: 'SatelliteSession',
     mainSessionId: 'ses_x',
+    satelliteKind: 'Companion',
     blogger: undefined,
+    teacher: undefined,
     parent: 'ses_x',
   })
 

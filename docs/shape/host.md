@@ -19,27 +19,37 @@ type HostSignal =
 ```fsharp
 type ManagedSessionKind =
     | WorkSession
-    | CompanionSession of mainSessionId: SessionId
+    | SatelliteSession of ownerSessionId: SessionId * kind: SatelliteKind
+
+type SatelliteKind =
+    | Companion
+    | Teacher
 
 type SessionAssociation =
     { SessionId: SessionId
       Kind: ManagedSessionKind
       BloggerSessionId: SessionId option
-      ParentSessionId: SessionId option
-      Role: AgentRole }
+      TeacherSessionId: SessionId option
+      ParentSessionId: SessionId option }
 ```
 
 不变量：
 
 ```text
 每个 WorkSession 恰好一个 CompanionSession
-每个 CompanionSession 恰好属于一个 WorkSession
-CompanionSession.BloggerSessionId = None   // Y 不递归
-SessionId ≠ BloggerSessionId
+Student WorkSession 在学习任务期间恰好一个 Teacher Satellite
+每个 SatelliteSession 恰好属于一个 WorkSession
+SatelliteSession.BloggerSessionId = None
+SatelliteSession.TeacherSessionId = None   // Satellite 不递归
+Companion 与 Teacher SessionId 均不等于 owner，也彼此不同
 ```
 
-关联由 **Session 种类** 决定，不由 Role / Tier / 工具面 / Logical Run / Authority / Fallback 决定。  
-优先存宿主 metadata；重启复用同一 Blogger，不向空白 Y 发历史 delta。
+关联由 **Session 种类** 决定，不由 Role / Tier / 工具面 / Logical Run / Authority / Fallback 临时决定。
+`SatelliteRuntime` 是两类 Satellite 的唯一创建、恢复、注册、级联取消与 retire owner；Companion 与 Teacher
+只能提供各自的 payload/terminal 策略，不得复制 Session 所有权框架。
+
+优先存宿主 metadata 并以 Journal 关联做 durable keyed lookup。重启时：Host 证明原 Satellite 存在则复用；
+Host 证明永久丢失则按该 kind 的恢复合同 Replacement；Host 查询失败、重复候选或归属冲突则 fail closed。
 
 ## HOST-011：Tool 身份的两个半边
 
@@ -66,6 +76,9 @@ Host 按 directory 实例化插件；worktree 触发第二实例。跨实例因�
 ```
 
 新增跨实例状态必须同时登记共享清单与 `PluginRuntimeScope` 初始化，否则第二实例静默失配。
+
+Student/Teacher run、QA writer 与 Satellite flight 是每插件实例状态；durable association 与 Host child
+metadata 用于重建，不得把自然语言问题、回答或 QA 正文放进共享表。
 
 ### 并发与同步契约 (C2 并发安全)
 - 共享表的并发所有者是单一 Node.js event loop，不假定不存在的跨线程 CAS。

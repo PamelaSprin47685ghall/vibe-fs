@@ -59,6 +59,8 @@
     <Compile Include="Domain/ReviewWitness.fs"/>
     <Compile Include="Domain/ReviewChallenge.fs"/>
     <Compile Include="Domain/ManagedAgentCatalog.fs"/>
+    <Compile Include="Domain/StudentTeacher.fs"/>
+    <Compile Include="Domain/StudentTeacherPrompt.fs"/>
     <Compile Include="Domain/PromptAuthority.fs"/>
     <Compile Include="Domain/PromptAuthorityRun.fs"/>
     <Compile Include="Domain/AttemptPlanner.fs"/>
@@ -155,6 +157,8 @@
     <Compile Include="Infrastructure/OpenCode/Host/SessionSnapshotPort.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/OpenCodePort.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Sessions.fs"/>
+    <Compile Include="Session/SatelliteRuntime.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/StudentQaStore.fs"/>
     <Compile Include="Application/Prompting/PromptDispatcher.fs"/>
     <Compile Include="Application/Prompting/PromptDispatcherSend.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/PromptIngressCodec.fs"/>
@@ -162,6 +166,7 @@
     <Compile Include="Application/Reconciliation/CompletedTurnClassifier.fs"/>
     <Compile Include="Application/Reconciliation/XTraceCapture.fs"/>
     <Compile Include="Application/Prompting/PromptIngress.fs"/>
+    <Compile Include="Session/StudentTeacherRuntime.fs"/>
     <Compile Include="Application/Reconciliation/PromptRecovery.fs"/>
     <Compile Include="Session/HostPendingRun.fs"/>
     <Compile Include="Session/HostForkBusyNudge.fs"/>
@@ -237,6 +242,7 @@
     <Compile Include="Infrastructure/OpenCode/Tools/FinalityController.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FinalityTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FileMutationTools.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Tools/StudentTeacherTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ToolRegistry.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginHost.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/ManagerConfig.fs"/>

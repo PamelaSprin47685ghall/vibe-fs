@@ -1,5 +1,5 @@
 /**
- * gate-cold-boundary-cases.mjs — the seal has exactly two declared exceptions.
+ * gate-cold-boundary-cases.mjs — every declared seal exception is explicit.
  *
  * ARCH-004 / VERIFY-003. The property is not "cold boundaries work" but "a break the
  * scenario did not declare is fatal, and a declaration that never fires is fatal too".
@@ -36,6 +36,13 @@ const SIDE_SWITCHED_AND_REWRITTEN = body('test-model-b', [SYSTEM, user('DIFFEREN
 
 /** COMPANION-009: the prefix is replaced by a companion-memory head. */
 const EPOCH_REBASED = body('test-model', [SYSTEM, user('[companion memory]'), user('Round 2')]);
+
+/** AGENT-020/PROMPT-012: transcript grows while the typed request changes tools. */
+const REQUEST_KIND_SWITCHED = body(
+  'test-model',
+  [SYSTEM, user('Round 1'), assistant('r1'), user('Compile')],
+  ['read', 'write', 'return'],
+);
 
 const decide = (previous, next, boundary = null) =>
   sealDecision({ previousWire: previous === null ? null : wireOf(previous), body: next, boundary });
@@ -191,6 +198,33 @@ export const coldBoundaryCases = [
     },
   },
 
+  // ── AGENT-020 / PROMPT-012: typed Student request-kind switch ────────────
+
+  {
+    name: 'PROMPT-012 a Student request-kind switch changes only tools',
+    fn: () => {
+      assertEq(
+        decide(FIRST, REQUEST_KIND_SWITCHED, at('request-kind-switch')).resealed,
+        'request-kind-switch',
+      );
+    },
+  },
+
+  {
+    name: 'PROMPT-012 a request-kind switch may not rewrite the message prefix',
+    fn: () => {
+      const rewritten = body('test-model', [SYSTEM, user('DIFFERENT'), user('Compile')], [
+        'read',
+        'write',
+        'return',
+      ]);
+      assertEq(
+        decide(FIRST, rewritten, at('request-kind-switch')).broken,
+        'request-kind-switch-rewrote-prefix',
+      );
+    },
+  },
+
   // ── a declaration that never fires is also fatal ─────────────────────────
 
   {
@@ -271,11 +305,13 @@ export const coldBoundaryCases = [
   // ── load-time validation ─────────────────────────────────────────────────
 
   {
-    name: 'ARCH-004 only the three named kinds exist',
+    name: 'ARCH-004 only the named boundary kinds exist',
     fn: () => {
       assertEq(validateBoundary(at('epoch-switch')).length, 0);
       assertEq(validateBoundary(at('fallback-side')).length, 0);
       assertEq(validateBoundary(at('prefix-probe')).length, 0);
+      assertEq(validateBoundary(at('frame-commit')).length, 0);
+      assertEq(validateBoundary(at('request-kind-switch')).length, 0);
 
       // Every rejected name below is a sniffed exemption from the old matcher or a
       // capacity-driven switch CTX-001/CTX-002 forbid outright. `prefix-reset` is the

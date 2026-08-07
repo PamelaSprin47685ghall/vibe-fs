@@ -23,6 +23,8 @@ const ROLES = [
   'Browser',
   'Meditator',
   'Reviewer',
+  'Student',
+  'Teacher',
   'DevOps',
   'Executor',
   'Blogger',
@@ -94,7 +96,7 @@ const mergedRules = (config, name) => [...hostDefaults(), ...rulesOf(config.agen
 
 const allowList = (config, name) => {
   const rules = mergedRules(config, name)
-  const tools = ['bash', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'inspector', 'executor', 'coder', 'fork', 'fork-manager', 'fork-pty', 'join', 'list', 'network', 'verdict', 'blog', 'suicide']
+  const tools = ['bash', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'inspector', 'executor', 'coder', 'fork', 'fork-manager', 'fork-pty', 'join', 'list', 'network', 'verdict', 'blog', 'teacher', 'return', 'suicide']
   return tools.filter((tool) => evaluate(rules, tool, '*').action === 'allow')
 }
 
@@ -107,6 +109,8 @@ const ROLE_ALLOW = {
   Browser: ['read', 'glob', 'grep', 'network'],
   Meditator: ['read', 'glob', 'grep', 'inspector'],
   Reviewer: ['read', 'glob', 'grep', 'verdict'],
+  Student: ['teacher'],
+  Teacher: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'inspector', 'executor', 'coder', 'network', 'return'],
   DevOps: ['read', 'glob', 'grep', 'inspector', 'executor', 'coder', 'join', 'list', 'fork-pty'],
   Executor: [],
   Blogger: ['blog'],
@@ -229,6 +233,8 @@ test('roles.permissions_agree_with_the_host_schema_matrix', () => {
       network: 'Network',
       verdict: 'Verdict',
       blog: 'Blog',
+      teacher: 'Teacher',
+      return: 'Return',
       suicide: 'Finality',
     })[toolName]
   for (const role of ROLES) {

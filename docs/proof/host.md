@@ -32,3 +32,14 @@
 Work↔Companion 深度 1；关联非 Role（HOST-008、COMPANION-001/002）。
 
 代表：`tests/unit/plugin/host-hooks.test.mjs`、host-compaction unit、e2e compaction/reanchor 路径。
+
+## Satellite 与 Student/Teacher
+
+| 证明 | 期望 | 条款 |
+|------|------|------|
+| kind 投影 | Work/Companion/Teacher 双向 O(1)；Satellite 无子 Satellite | HOST-008 |
+| Host children 恢复 | 1 个复用、0 个 Replacement、多于 1 个/查询失败 fail closed | HOST-008、HOST-014 |
+| Teacher 三轮调用 | 同一 Teacher SessionId；普通正文不完成父工具 | HOST-014、AGENT-020 |
+| Teacher return | 文本只成为父 `teacher` 结果；abort 后 Session 可继续 | HOST-014 |
+| Student final return | QA 删除先于最终 Assistant completion；message 成为最终回复 | HOST-014、EXEC-027 |
+| 非 Student 回归 | provider schema、hooks、Companion 行为字节/语义不变 | HOST-014 |

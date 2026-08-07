@@ -63,21 +63,37 @@ const tryFromProvenTerminal =
  */
 const promptedWaiters = new Map()
 
-const stubClient = (createdIds, prompts, messages) => {
+const stubClient = (createdIds, prompts, messages, abortedIds) => {
   let counter = 0
+  const childSessions = []
   // PROMPT-011 physical-message store: family recovery（`PromptRecovery.reconcile`
   // → `findPhysical`）读子会话消息来证明 PromptClaim。旧 fixture 对所有 session 返回
   // 同一个空数组，子会话的认领永远 StillPending → join RECOVERY_BLOCKED
   // （`pending claim unknown ...`）。
   const messagesBySession = new Map() // sessionId -> message[]
   return {
+    __pushHostMessage: (sessionId, message) => {
+      const perSession = messagesBySession.get(sessionId) ?? []
+      perSession.push(message)
+      messagesBySession.set(sessionId, perSession)
+      messages.push(message)
+    },
     session: {
-      create: async () => {
+      create: async (args) => {
         counter += 1
         const id = `host-child-${counter}`
         createdIds.push(id)
+        childSessions.push({
+          id,
+          parentID: args?.body?.parentID,
+          agent: args?.body?.agent,
+          title: args?.body?.title,
+        })
         return { data: { id } }
       },
+      children: async (args) => ({
+        data: childSessions.filter((child) => child.parentID === args?.path?.id),
+      }),
       messages: async (args) => {
         // SessionSnapshotPort.GetMessages payload: { path: { id }, query, headers }。
         const id = args?.path?.id ?? args?.sessionID ?? args?.sessionId
@@ -128,7 +144,10 @@ const stubClient = (createdIds, prompts, messages) => {
         return {}
       },
       delete: async () => ({}),
-      abort: async () => ({}),
+      abort: async (args) => {
+        abortedIds.push(args?.path?.id)
+        return {}
+      },
     },
   }
 }
@@ -158,10 +177,12 @@ export const withExecutablePlugin = async (body) => {
   try {
     execFileSync('git', ['init', '--quiet', directory])
     const createdIds = []
+    const abortedIds = []
     const prompts = []
     const messages = []
+    const client = stubClient(createdIds, prompts, messages, abortedIds)
     const hooks = await initSpikePlugin({
-      client: stubClient(createdIds, prompts, messages),
+      client,
       directory,
       events: { listen: () => () => {} },
     })
@@ -181,6 +202,8 @@ export const withExecutablePlugin = async (body) => {
         handles: new Map(),
         prompts,
         messages,
+        abortedIds,
+        pushHostMessage: client.__pushHostMessage,
       }
       // EXEC-004's completion cell is claimed by `HostForkRuntime.Complete`
       // (Session/HostForkRuntime.fs:121-145), which lives behind the private
@@ -252,6 +275,44 @@ export const withExecutablePlugin = async (body) => {
       await hooks.dispose()
     }
   } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+}
+
+/**
+ * Two or more real plugin incarnations over one Git-private journal and one
+ * persistent Host double. Used for restart recovery contracts that cannot be
+ * proved by rebuilding only an in-memory runtime object.
+ */
+export const withRestartablePlugin = async (body) => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-plugin-restart-'))
+  const liveHooks = []
+  try {
+    execFileSync('git', ['init', '--quiet', directory])
+    const createdIds = []
+    const abortedIds = []
+    const prompts = []
+    const messages = []
+    const client = stubClient(createdIds, prompts, messages, abortedIds)
+    const start = async () => {
+      const hooks = await initSpikePlugin({
+        client,
+        directory,
+        events: { listen: () => () => {} },
+      })
+      liveHooks.push(hooks)
+      return hooks
+    }
+
+    await body(start, directory, {
+      createdIds,
+      abortedIds,
+      prompts,
+      messages,
+      pushHostMessage: client.__pushHostMessage,
+    })
+  } finally {
+    for (const hooks of liveHooks.reverse()) await hooks.dispose()
     rmSync(directory, { recursive: true, force: true })
   }
 }

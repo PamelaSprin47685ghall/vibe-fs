@@ -33,7 +33,7 @@ import {
   activateLife,
 } from '../../unit/plugin/plugin-fixture.mjs'
 
-/** AGENT-002: the twenty managed agents, exactly as the Host-final config names them. */
+/** AGENT-002: the twenty-four managed agents, exactly as the Host-final config names them. */
 const ROLE_NAMES = [
   'orchestrator',
   'manager',
@@ -43,6 +43,8 @@ const ROLE_NAMES = [
   'browser',
   'meditator',
   'reviewer',
+  'student',
+  'teacher',
   'blogger',
   'executor',
 ]
@@ -83,7 +85,9 @@ const EXPECTED_ARGUMENTS = {
   list: {},
   mv: { source: 'required', destination: 'required' },
   rm: { path: 'required' },
+  return: { message: 'required' },
   suicide: { last_words: 'required' },
+  teacher: { message: 'required' },
   verdict: { verdict: 'required' },
 }
 
@@ -165,6 +169,8 @@ const KNOWN_TOOL_KEYS = [
   'network',
   'verdict',
   'blog',
+  'teacher',
+  'return',
   'suicide',
 ]
 
@@ -178,6 +184,8 @@ const ALLOWED_TOOLS = {
   browser: ['read', 'glob', 'grep', 'network'],
   meditator: ['read', 'glob', 'grep', 'inspector'],
   reviewer: ['read', 'glob', 'grep', 'verdict'],
+  student: ['teacher'],
+  teacher: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'inspector', 'coder', 'executor', 'network', 'return'],
   // ENFORCER-010: Blogger's tool set is exactly { blog }.
   blogger: ['blog'],
   executor: [],
@@ -217,6 +225,8 @@ const FACADE_ROLE_CASES = {
   browser: 'Browser',
   meditator: 'Meditator',
   reviewer: 'Reviewer',
+  student: 'Student',
+  teacher: 'Teacher',
   blogger: 'Blogger',
   executor: 'Executor',
 }
@@ -347,7 +357,28 @@ const PROMPT_CLAUSES = {
     forbidden: [],
   },
 
-  // AGENT-008: internal agents hold no tools, and their prompts say so.
+  'fast-student': {
+    required: [
+      /你是 Student/,
+      /学习阶段你只有 teacher 工具/,
+      /最终苏格拉底反证/,
+      /主动结束当前 turn 并进入 idle/,
+    ],
+    forbidden: [],
+  },
+
+  'fast-teacher': {
+    required: [
+      /你是 Teacher/,
+      /同一个 Student 会在持续 Session 中反复向你学习/,
+      /调查真实情况/,
+      /必须通过 return 工具返回/,
+    ],
+    forbidden: [],
+  },
+
+  // AGENT-008: Executor holds no tools; Blogger/Teacher are also internal but
+  // have their dedicated private tool surfaces.
   'fast-executor': {
     required: [/Command Output Summarizer/, /AgentRole\.Executor/, /Tool Capability: \[\] \(NONE\)/],
     forbidden: [],
@@ -430,7 +461,7 @@ test('AGENT_004_006_010_config_gains_a_prompt_and_the_whole_permission_matrix', 
     const config = hostFinalConfig()
     hooks.config(config)
 
-    // AGENT-006: one whole-object comparison per agent. Twenty of them, because
+    // AGENT-006: one whole-object comparison per agent. Twenty-four of them, because
     // AGENT-010 makes fast and deep hold the same tools and a per-tier divergence has
     // to be visible rather than assumed.
     const permissions = {}

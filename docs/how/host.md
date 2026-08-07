@@ -73,6 +73,19 @@ plugin start
 → dispose: cancel Tasks, kill PTY/process, dispose sessions
 ```
 
+Satellite 创建统一走：
+
+```text
+query owner children
+→ 0 个匹配：create child → append SatelliteLinked
+→ 1 个匹配：核对 kind/agent/owner → 复用（缺 link 时补 link）
+→ 多个、查询失败或归属冲突：fail closed
+```
+
+Companion 和 Teacher 都必须先登记 `ManagedSessionKind.SatelliteSession`，再发送首个 prompt。Transform
+先查 Session kind；任何 Satellite 都跳过 Companion 创建。owner 删除/取消时由 SatelliteRuntime 级联
+abort/retire，不进入公开 Handle/list/join。
+
 ---
 
 ## 多实例状态初始化与并发隔离机制（HOST-012）
@@ -178,6 +191,23 @@ in-flight `msg` 已落盘但不在输入里；绑定时经 SDK 读会话（会�
 每进程全局严格递增；新创建的即最大，且在 `handle.process` 完成前无人再建更大者。
 
 **并发前提与 fail-closed。** 唯一性要求单 actor 写 assistant（managed Session 单 flight，HOST-004）。
+
+---
+
+## Student / Teacher source canary（OpenCode v1.18.14）
+
+生产依赖 `opencode-ai=1.18.14`，证据读取 `../opencode` 的同名 tag：
+
+- `session/prompt.ts:createUserMessage`：`plugin.trigger("chat.message")` 位于 message/part 持久化前。
+- `session/prompt.ts:PromptInput`：`tools` 进入 Session permission；`session/llm/request.ts:resolveTools`
+  以 Agent + Session permission 裁剪每个 provider request。
+- `session/processor.ts`：普通 tool result 后返回 `continue`；`session/prompt.ts:runLoop` 在后续无 tool-call
+  的 Assistant finish 才退出。
+- `client.session.abort` 只停止当前 processing；Session 记录保留，可接受下一次 `prompt_async`。
+- `client.session.children` 返回 `id/parentID/agent/title`，可证明 Teacher 复用、永久丢失或歧义。
+
+这些锚点必须有安装版本 gate 与真实 Host e2e；仅源码存在不替代 provider-visible schema、return 路由和
+同 Session 三轮复用 canary。
 任一条不满足（经 SDK 读到 0 或 ≥2 未完成 assistant；或突变窗口读到旧快照）→ 不写 seal，
 Review 只见 PendingIdentity/Rejected（REVIEW-010）。开裂侧安全：宁缺 seal 不赌同一身。
 

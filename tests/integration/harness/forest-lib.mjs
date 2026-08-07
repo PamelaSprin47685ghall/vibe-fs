@@ -259,6 +259,7 @@ export function deriveRequests(scenario) {
   const requests = [];
   let previousSessionId = null;
   let previousTools = null;
+  let previousMessages = null;
 
   turnGroups(scenario).forEach((group, groupIndex) => {
     const first = group.entries[0];
@@ -276,7 +277,10 @@ export function deriveRequests(scenario) {
     // (production decides them), and a boundary turn MUST keep the fixed parts of the
     // previous request byte-identical for the probe admission to hold.
     const declaredTools = (first.tools ?? []).map((name) => ({ type: 'function', function: { name } }));
-    const tools = continued && previousTools !== null ? previousTools : declaredTools;
+    const requestKindSwitch = group.entries.some(
+      (entry) => boundaryAt(scenario, entry)?.kind === 'request-kind-switch',
+    );
+    const tools = continued && previousTools !== null && !requestKindSwitch ? previousTools : declaredTools;
     previousTools = tools;
 
     // The conversation this session accumulates. Growing it in place is what keeps every
@@ -291,7 +295,11 @@ export function deriveRequests(scenario) {
     // rewrote the fixed parts. Title requests keep their marker shape (the seal does
     // not compare them).
     const messages =
-      first.kind === 'title' ? [user(TITLE_MARKER), user(text)] : [systemMessage(), user(text)];
+      requestKindSwitch && previousMessages !== null
+        ? [...previousMessages, user(text)]
+        : first.kind === 'title'
+          ? [user(TITLE_MARKER), user(text)]
+          : [systemMessage(), user(text)];
 
     for (const entry of group.entries) {
       for (let delivery = 0; delivery < deliveryCount(scenario, entry); delivery += 1) {
@@ -308,6 +316,7 @@ export function deriveRequests(scenario) {
       }
       messages.push(assistant(`declared step ${entry.step} of ${entry.turnId}`));
     }
+    previousMessages = messages;
   });
 
   const misclassified = requests.filter(

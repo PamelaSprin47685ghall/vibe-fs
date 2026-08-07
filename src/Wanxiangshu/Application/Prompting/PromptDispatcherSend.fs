@@ -109,7 +109,7 @@ module PromptDispatcherSend =
         /// the key derivation because neither exists yet — this send is what creates
         /// them. Substituting empty strings would make "no run yet" and "a run named
         /// empty" derive the same key.
-        member this.SendAgentOwnerRoot
+        member private this.SendAgentOwnerRootCore
             (port: ISessionHostPort)
             (sessionId: SessionId)
             (text: string)
@@ -117,6 +117,7 @@ module PromptDispatcherSend =
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (tools: Map<string, bool> option)
             : Task<Result<PromptKey, string>> =
             task {
                 let payloadDigest = HostDigest.sha256Hex text
@@ -151,7 +152,8 @@ module PromptDispatcherSend =
                             { Model = None
                               Agent = Some agent
                               Directory = directory
-                              Metadata = Some(this.Metadata key (PromptDispatcher.originLabel origin) None) }
+                              Metadata = Some(this.Metadata key (PromptDispatcher.originLabel origin) None)
+                              Tools = tools }
 
                         let! outcome = port.SendPrompt(sessionId, text, options)
 
@@ -160,6 +162,29 @@ module PromptDispatcherSend =
                                 this.AcceptPhysicalAgentOwnerRoot key sessionId physicalId agent
                                 |> Result.map ignore)
             }
+
+        member this.SendAgentOwnerRoot
+            (port: ISessionHostPort)
+            (sessionId: SessionId)
+            (text: string)
+            (agent: string)
+            (directory: string option)
+            (awaitMode: PromptDispatcher.AwaitMode)
+            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            : Task<Result<PromptKey, string>> =
+            this.SendAgentOwnerRootCore port sessionId text agent directory awaitMode onAccepted None
+
+        member this.SendAgentOwnerRootWithTools
+            (port: ISessionHostPort)
+            (sessionId: SessionId)
+            (text: string)
+            (agent: string)
+            (directory: string option)
+            (awaitMode: PromptDispatcher.AwaitMode)
+            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (tools: Map<string, bool>)
+            : Task<Result<PromptKey, string>> =
+            this.SendAgentOwnerRootCore port sessionId text agent directory awaitMode onAccepted (Some tools)
 
         /// PROMPT-003: a continuation of an existing Logical Run.
         ///
@@ -182,6 +207,7 @@ module PromptDispatcherSend =
             (directory: string option)
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (tools: Map<string, bool> option)
             : Task<Result<PromptKey, string>> =
             task {
                 let origin = PromptAuthority.PromptOrigin.Continuation continuation
@@ -219,7 +245,8 @@ module PromptDispatcherSend =
                         { Model = None
                           Agent = Some effectiveAgent
                           Directory = directory
-                          Metadata = Some(this.Metadata key originLabel (Some profile.LogicalRunId)) }
+                          Metadata = Some(this.Metadata key originLabel (Some profile.LogicalRunId))
+                          Tools = tools }
 
                     let! outcome = port.SendPrompt(sessionId, text, options)
 
@@ -250,6 +277,32 @@ module PromptDispatcherSend =
                 directory
                 awaitMode
                 onAccepted
+                None
+
+        member this.SendContinuationWithTools
+            (port: ISessionHostPort)
+            (sessionId: SessionId)
+            (text: string)
+            (continuation: PromptAuthority.ContinuationKind)
+            (profile: PromptAuthority.AuthorityExecutionProfile)
+            (effectiveAgent: string)
+            (directory: string option)
+            (awaitMode: PromptDispatcher.AwaitMode)
+            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (tools: Map<string, bool>)
+            : Task<Result<PromptKey, string>> =
+            this.SendContinuationWithDigest
+                port
+                sessionId
+                text
+                (HostDigest.sha256Hex text)
+                continuation
+                profile
+                effectiveAgent
+                directory
+                awaitMode
+                onAccepted
+                (Some tools)
 
         /// FALLBACK-008: the one interaction repair an unusable terminal earns.
         ///
@@ -284,3 +337,4 @@ module PromptDispatcherSend =
                 directory
                 awaitMode
                 onAccepted
+                None

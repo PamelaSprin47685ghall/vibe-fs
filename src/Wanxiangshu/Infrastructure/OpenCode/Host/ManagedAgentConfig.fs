@@ -177,12 +177,17 @@ module ManagedAgentConfig =
                                     | Role.Browser -> StaticTools.browserAgentConfig ()
                                     | Role.Meditator -> StaticTools.meditatorAgentConfig ()
                                     | Role.Reviewer -> StaticTools.reviewerAgentConfig ()
+                                    | Role.Student -> StaticTools.studentAgentConfig ()
+                                    | Role.Teacher -> StaticTools.teacherAgentConfig ()
                                     | Role.Blogger -> StaticTools.bloggerAgentConfig ()
                                     | Role.Executor -> StaticTools.executorAgentConfig ()
 
                                 // Copy Wanxiangshu-owned keys without touching model.
                                 entry?mode <- owned?mode
                                 entry?permission <- owned?permission
+
+                                if not (isNull owned?hidden) then
+                                    entry?hidden <- owned?hidden
 
                                 if not (isNull owned?prompt) then
                                     entry?prompt <- owned?prompt

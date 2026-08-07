@@ -10,7 +10,8 @@ Canonical Role 决定工具权限与 system prompt。
 ```fsharp
 type Role =
     | Orchestrator | Manager | Coder | Inspector | DevOps
-    | Browser | Meditator | Reviewer | Blogger | Executor
+    | Browser | Meditator | Reviewer | Student | Teacher
+    | Blogger | Executor
 
 type AgentTier = Fast | Deep
 ```
@@ -19,7 +20,7 @@ Tier **只**改变模型绑定。fast-ROLE 与 deep-ROLE 的 system prompt、工
 
 Canonical Role **不**决定 Companion 资格（COMPANION-001/002）。
 
-## AGENT-002：必须存在的 20 个 Agent
+## AGENT-002：必须存在的 24 个 Agent
 
 ```text
 fast-orchestrator     deep-orchestrator
@@ -30,6 +31,8 @@ fast-devops           deep-devops
 fast-browser          deep-browser
 fast-meditator        deep-meditator
 fast-reviewer         deep-reviewer
+fast-student          deep-student
+fast-teacher          deep-teacher
 fast-blogger          deep-blogger
 fast-executor         deep-executor
 ```
@@ -72,12 +75,14 @@ reviewer-fast, fast_reviewer
 | Browser | `read`, `glob`, `grep`, network tools |
 | Meditator | `read`, `glob`, `grep`, `inspector` |
 | Reviewer | `read`, `glob`, `grep`, `verdict` |
+| Student | 由 AGENT-020 的 request kind 决定 |
+| Teacher | 普通执行工具全集 + `return`；不含 `fork-agent` / `fork-manager` / `join` / `list` / `fork-pty` |
 | Blogger | `blog` |
 | Executor | 无工具 |
 
 ## AGENT-008：内部 Agent 不可见
 
-Blogger、Executor 不得出现在任何模型可见的 enum、schema 或工具参数提示中。
+Blogger、Executor、Teacher 不得出现在任何模型可见的 enum、schema 或工具参数提示中。
 
 ## AGENT-009：示踪面可见集合
 
@@ -132,3 +137,24 @@ POSIX `mv`：参数 `source`、`destination`；目标存在则覆盖；目录/�
 ## AGENT-018：rm 语义
 
 POSIX `rm`，但**禁止删非空目录**：文件与空目录可删，非空目录拒绝。参数 `path`。
+
+## AGENT-020：Student / Teacher
+
+`fast-student` / `deep-student` 是公开、只能由 HumanRoot 显式选择的主动学习 Agent；不得做
+意图识别、自动路由或从其它角色自动升级。`fast-teacher` / `deep-teacher` 是内部 Agent，只能由
+Student 的 `teacher` 工具创建或恢复。
+
+Student 与 Teacher 的 tier 固定相同；两者都由 Agent 配置解析 model，发送时始终
+`Agent = Some effectiveAgent`、`Model = None`。Teacher 是叶子 Satellite：无 Companion，不进入
+fork/list/join catalog，不创建新的 Satellite。
+
+Student 工具面由同一 `AttemptExecutionProfile.RequestKind` 原子决定：
+
+```text
+StudentLearn   → { teacher }
+StudentCompile → { read, glob, grep, write, edit, return }
+```
+
+学习面不得出现文件、执行、委派或最终 `return`；编译面不得出现 `teacher`、委派、PTY 或网络工具。
+Teacher 的 `return` 只把自由文本交还等待中的 `teacher` 工具，普通正文、reasoning、idle 或工具流
+都不是回答。Student 的最终 `return` 只在编译面可执行。

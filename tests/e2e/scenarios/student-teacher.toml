@@ -1,0 +1,62 @@
+scenario = "student-teacher"
+description = "Student learns through one private Teacher, compiles a SKILL, and returns through the same Host loop"
+session = { agent = "fast-student", bind = ["student-title", "fast-student"] }
+prompt = { agent = "fast-student", text = "Learn the canary topic and compile a reusable skill." }
+
+must = ["student-title", "student-learn", "teacher-answer", "student-compile"]
+
+flow = [
+  { prompt = { agent = "fast-student", text = "Learn the canary topic and compile a reusable skill." } },
+  { wait = "student-learn" },
+  { wait = "teacher-answer" },
+  { wait = "student-compile" },
+]
+
+[[turn]]
+id = "student-title"
+lane = "student-title"
+kind = "title"
+user = "Learn the canary topic and compile a reusable skill."
+
+  [[turn.step]]
+  respond = { type = "title", text = "Student Teacher Canary" }
+
+[[turn]]
+id = "student-learn"
+lane = "fast-student"
+user = "Learn the canary topic and compile a reusable skill."
+tools = ["teacher"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "teacher", args = { message = "What is the smallest sufficient principle for this canary topic?" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "The learning phase has converged." }
+
+[[turn]]
+id = "teacher-answer"
+internal = true
+user = "# Answer the Student's current question"
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "return", args = { message = "The smallest sufficient principle is to preserve one proven causal chain." } }
+
+[[turn]]
+id = "student-compile"
+internal = true
+user = "# 你已经结束向 Teacher 提问"
+tools = ["read", "glob", "grep", "write", "edit", "return"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "write", args = { filePath = ".agent/skills/student-canary/SKILL.md", content = "# Student canary\n\nPreserve one proven causal chain.\n" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "return", args = { message = "Created .agent/skills/student-canary/SKILL.md." } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "provider paraphrase that must be replaced" }
+
+[[epoch]]
+turn = "student-compile"
+step = 0
+kind = "request-kind-switch"

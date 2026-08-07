@@ -44,6 +44,7 @@ module SpikePlugin =
             | Error err -> return raise (InvalidOperationException err)
             | Ok(eventPort, sessionPort, snapshotOpt, terminalKey, sharedTerminalPort) ->
                 scope.AttachSharedTerminal(terminalKey, sharedTerminalPort)
+                scope.AttachSatelliteRuntime(SatelliteRuntime sessionPort)
 
                 for KeyValue(childId, parentId) in scope.SessionParents do
                     scope.OwnedSessions.Add childId |> ignore
@@ -65,6 +66,28 @@ module SpikePlugin =
                     SharedState.RootWorkspace <- workspaceDirectory
 
                 let! wired = HostSignalBootstrap.wire sessionPort eventPort snapshotOpt journal gitTreePort scope input
+
+                match journal, workspaceDirectory with
+                | Some durable, Some directory ->
+                    match StudentQaStore.Create directory with
+                    | Error error -> scope.MarkStudentTeacherUnavailable error
+                    | Ok qaStore ->
+                        let studentTeacher =
+                            StudentTeacherRuntime(
+                                sessionPort,
+                                scope.Satellites,
+                                PromptDispatcher.forJournal durable,
+                                durable,
+                                qaStore,
+                                directory,
+                                fun teacherId _agent ->
+                                    wired.RegisterOwned(SessionId.value teacherId)
+                                    wired.BindActiveRun teacherId Role.Teacher (Some directory)
+                            )
+
+                        scope.AttachStudentTeacherRuntime studentTeacher
+                | None, _ -> scope.MarkStudentTeacherUnavailable "Student requires the durable journal"
+                | _, None -> scope.MarkStudentTeacherUnavailable "Student requires a Git workspace directory"
 
                 // GREEN-4: mandatory SessionRecoveryPorts. Real RestoreHandles/RecoverJobs.
                 // Missing journal or snapshot → leave ports unattached (RequireFamilyRecovery
@@ -369,7 +392,27 @@ module SpikePlugin =
                           // one vetoable synthetic-turn injection point, and leaving it
                           // unanswered relies on an upstream default staying harmless.
                           "experimental.compaction.autocontinue",
-                          box (pairedHook (box HostCompactionGate.onCompactionAutoContinue)) ]
+                          box (pairedHook (box HostCompactionGate.onCompactionAutoContinue))
+                          "experimental.text.complete",
+                          box (
+                              pairedHook (
+                                  box (fun (textInput: obj) (textOutput: obj) ->
+                                      scope.StudentTeacherRuntime
+                                      |> Option.iter (fun runtime -> runtime.TextComplete(textInput, textOutput)))
+                              )
+                          )
+                          "tool.execute.before",
+                          box (
+                              pairedHook (
+                                  box (fun (toolInput: obj) (toolOutput: obj) ->
+                                      match scope.StudentTeacherRuntime with
+                                      | None -> ()
+                                      | Some runtime ->
+                                          match runtime.ValidateTool(toolInput, toolOutput) with
+                                          | Ok() -> ()
+                                          | Error error -> raise (InvalidOperationException error))
+                              )
+                          ) ]
 
                 hooks?event <- box wired.ObserveEvent
 

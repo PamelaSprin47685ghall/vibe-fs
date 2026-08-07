@@ -1583,8 +1583,11 @@ export const sessionAssociation = (() => {
     'empty',
     'tryFind',
     'isCompanion',
+    'isTeacher',
+    'isSatellite',
     'tryMainSessionOf',
     'tryBloggerOf',
+    'tryTeacherOf',
     'link',
     'unlink',
     'describe',
@@ -1594,6 +1597,8 @@ export const sessionAssociation = (() => {
     empty: m.empty,
 
     isCompanion: (id, current) => m.isCompanion(sessionId(id), current),
+    isTeacher: (id, current) => m.isTeacher(sessionId(id), current),
+    isSatellite: (id, current) => m.isSatellite(sessionId(id), current),
 
     mainSessionOf: (id, current) => {
       const main = unwrapOption(m.tryMainSessionOf(sessionId(id), current))
@@ -1614,8 +1619,10 @@ export const sessionAssociation = (() => {
 
       return {
         kind,
-        mainSessionId: kind === 'CompanionSession' ? idValue.session(payloadOf(found.Kind)) : undefined,
+        mainSessionId: kind === 'SatelliteSession' ? idValue.session(found.Kind.fields[0]) : undefined,
+        satelliteKind: kind === 'SatelliteSession' ? caseOf(found.Kind.fields[1]) : undefined,
         blogger: isNone(found.BloggerSessionId) ? undefined : idValue.session(found.BloggerSessionId),
+        teacher: isNone(found.TeacherSessionId) ? undefined : idValue.session(found.TeacherSessionId),
         parent: isNone(found.ParentSessionId) ? undefined : idValue.session(found.ParentSessionId),
       }
     },

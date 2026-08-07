@@ -2,6 +2,16 @@
 
 行为见 `what/architecture.md`，边界见 `shape/architecture.md`，实现要点见 `how/architecture.md`。
 
+## Student / Teacher
+
+| 证明 | 条款 |
+|------|------|
+| 无 QA 内容解析、问卷、coverage/decision 旁路状态 | ARCH-011、ARCH-013 |
+| Teacher/Companion 共用 Satellite create/recover/cancel/retire owner | ARCH-013、HOST-008、EXEC-026 |
+| 控制字段不进 QA；QA 正文不进 Journal/log/Companion/XTrace | ARCH-013、PERSIST-011 |
+| 只用公开 hook/SDK；源码版本 canary | ARCH-003、HOST-014 |
+| 非 Student Agent 的 profile、schema、transform 与 runtime 无变化 | ARCH-013、HOST-014 |
+
 ## 层 0（无产物即可跑）
 
 | 检查 | 命令 / 位置 | 守住的条款 |

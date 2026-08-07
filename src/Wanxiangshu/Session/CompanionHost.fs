@@ -20,7 +20,8 @@ type CompanionHost
         ?onBloggerCreated: SessionId -> unit,
         ?restoredBloggerId: string,
         ?journal: AgentJournal,
-        ?bloggerDirectory: string
+        ?bloggerDirectory: string,
+        ?satelliteRuntime: SatelliteRuntime
     ) =
     let companion = Companion(?durable = durable, ?sessionId = Some primaryId)
     let gate = obj ()
@@ -51,54 +52,84 @@ type CompanionHost
             match bloggerCreateTask with
             | Some task -> task
             | None ->
-                // Restore is one-shot. Dead restored child fails send; next material
-                // creates a new child. Request semantics always use durable frames +
-                // X gap via typed context (no full-X reset replay).
-                match restoredBloggerIdOpt, bloggerId with
-                | Some id, None ->
-                    let sid = SessionId.create id
-                    bloggerId <- Some sid
-                    bloggerCreateFailed <- false
-                    bloggerCreated sid
-                    restoredBloggerIdOpt <- None
-                    let t = Task.FromResult(sid)
-                    bloggerCreateTask <- Some t
-                    t
-                | _ ->
-                    let task =
+                let task =
+                    match satelliteRuntime with
+                    | Some runtime ->
+                        task {
+                            let spec =
+                                { Kind = SatelliteKind.Companion
+                                  Agent = bloggerEffectiveAgent
+                                  Title = bloggerEffectiveAgent
+                                  Directory = bloggerDirectory
+                                  RestoredSessionId = restoredBloggerIdOpt |> Option.map SessionId.create
+                                  Link =
+                                    fun owner id agent ->
+                                        let result =
+                                            durable
+                                            |> Option.map (fun port -> port.LinkBlogger(owner, id, agent))
+                                            |> Option.defaultValue (Ok())
+
+                                        result |> Result.map (fun () -> companion.RecordBloggerLinked id)
+                                  Close =
+                                    fun owner ->
+                                        durable
+                                        |> Option.map (fun port -> port.CloseBlogger owner)
+                                        |> Option.defaultValue (Ok()) }
+
+                            match! runtime.Ensure(primaryId, spec) with
+                            | Error error ->
+                                bloggerCreateFailed <- true
+                                bloggerId <- None
+                                return raise (InvalidOperationException error)
+                            | Ok lease ->
+                                bloggerId <- Some lease.SessionId
+                                bloggerCreateFailed <- false
+                                restoredBloggerIdOpt <- None
+                                bloggerCreated lease.SessionId
+                                return lease.SessionId
+                        }
+                    | None ->
                         task {
                             try
-                                let! created =
-                                    sessions.CreateChildSession(
-                                        primaryId,
-                                        { Title = Some bloggerEffectiveAgent
-                                          Agent = Some bloggerEffectiveAgent
-                                          Directory = bloggerDirectory }
-                                    )
-
-                                match created with
-                                | Ok id ->
-                                    bloggerId <- Some id
+                                match restoredBloggerIdOpt, bloggerId with
+                                | Some id, None ->
+                                    let sid = SessionId.create id
+                                    bloggerId <- Some sid
                                     bloggerCreateFailed <- false
+                                    bloggerCreated sid
+                                    restoredBloggerIdOpt <- None
+                                    return sid
+                                | _ ->
+                                    let! created =
+                                        sessions.CreateChildSession(
+                                            primaryId,
+                                            { Title = Some bloggerEffectiveAgent
+                                              Agent = Some bloggerEffectiveAgent
+                                              Directory = bloggerDirectory }
+                                        )
 
-                                    bloggerCreated id
+                                    match created with
+                                    | Ok id ->
+                                        bloggerId <- Some id
+                                        bloggerCreateFailed <- false
+                                        bloggerCreated id
 
-                                    durable
-                                    |> Option.iter (fun port ->
-                                        port.LinkBlogger(primaryId, id, bloggerEffectiveAgent) |> ignore)
+                                        durable
+                                        |> Option.iter (fun port ->
+                                            port.LinkBlogger(primaryId, id, bloggerEffectiveAgent) |> ignore)
 
-                                    companion.RecordBloggerLinked id
+                                        companion.RecordBloggerLinked id
 
-                                    return id
-                                | Error error -> return raise (InvalidOperationException error)
+                                        return id
+                                    | Error error -> return raise (InvalidOperationException error)
                             with ex ->
                                 bloggerCreateFailed <- true
                                 bloggerId <- None
                                 return raise ex
                         }
 
-                    bloggerCreateTask <- Some task
-                    task)
+                bloggerCreateTask <- Some task
+                task)
 
     member private this.BloggerDeps: CompanionHostBlogger.BloggerDeps =
         { Sessions = sessions
@@ -137,6 +168,9 @@ type CompanionHost
     /// Next material creates a fresh Blogger; never keep Parked after fail.
     member this.InvalidateBloggerCache() : unit =
         lock gate (fun () ->
+            satelliteRuntime
+            |> Option.iter (fun runtime -> runtime.Invalidate(primaryId, SatelliteKind.Companion))
+
             bloggerCreateTask <- None
             bloggerId <- None
             bloggerCreateFailed <- true
@@ -199,21 +233,42 @@ type CompanionHost
             match taskOpt with
             | Some task ->
                 let! childId = task
-                let! aborted = sessions.AbortSession(childId)
 
-                match aborted with
-                | Ok() -> ()
-                | Error error -> raise (InvalidOperationException error)
+                match satelliteRuntime with
+                | Some runtime ->
+                    let spec =
+                        { Kind = SatelliteKind.Companion
+                          Agent = bloggerEffectiveAgent
+                          Title = bloggerEffectiveAgent
+                          Directory = bloggerDirectory
+                          RestoredSessionId = Some childId
+                          Link = fun _ _ _ -> Ok()
+                          Close =
+                            fun owner ->
+                                durable
+                                |> Option.map (fun port -> port.CloseBlogger owner)
+                                |> Option.defaultValue (Ok()) }
 
-                durable |> Option.iter (fun port -> port.CloseBlogger primaryId |> ignore)
+                    match! runtime.Retire(primaryId, spec) with
+                    | Ok() -> ()
+                    | Error error -> raise (InvalidOperationException error)
+                | None ->
+                    let! aborted = sessions.AbortSession(childId)
+
+                    match aborted with
+                    | Ok() -> ()
+                    | Error error -> raise (InvalidOperationException error)
+
+                    durable |> Option.iter (fun port -> port.CloseBlogger primaryId |> ignore)
+
                 companion.RecordBloggerClosed()
             | None -> ()
         }
 
     interface IDisposable with
         member this.Dispose() =
-            // C6: cancel in-memory child cache even if CloseBloggerAsync races.
+            // Plugin disposal is not owner deletion: preserve the durable link
+            // and Host child so the next plugin instance can prove and reuse it.
+            // IDisposable is synchronous, so it must not launch an unobserved
+            // retire task that can outlive the journal writer.
             this.InvalidateBloggerCache()
-
-            if bloggerCreateTask.IsSome || bloggerId.IsSome then
-                this.CloseBloggerAsync() |> ignore

@@ -422,6 +422,16 @@ module Fact =
         /// fresh one rather than reviving this session.
         | CompanionBloggerClosed of {| SessionId: SessionId |}
 
+        /// HOST-008 / AGENT-020: Student's private Teacher Satellite. This carries
+        /// only control identity; all learning text remains exclusively in QA.md.
+        | StudentTeacherLinked of
+            {| SessionId: SessionId
+               TeacherSessionId: SessionId
+               TeacherAgent: string |}
+
+        /// The Teacher was cancelled, lost or retired after completion.
+        | StudentTeacherClosed of {| SessionId: SessionId |}
+
         // ── lifecycle work record (HOST-005) ───────────────────────────────────────
 
         /// COMPANION-003: the Session's opening task prompt, captured verbatim at
@@ -718,6 +728,12 @@ module Fact =
 
         let inline CompanionBloggerClosed payload =
             AgentFact.Companion(CompanionFactCases.CompanionBloggerClosed payload)
+
+        let inline StudentTeacherLinked payload =
+            AgentFact.Companion(CompanionFactCases.StudentTeacherLinked payload)
+
+        let inline StudentTeacherClosed payload =
+            AgentFact.Companion(CompanionFactCases.StudentTeacherClosed payload)
 
         let inline OpeningPromptCaptured payload =
             AgentFact.Companion(CompanionFactCases.OpeningPromptCaptured payload)

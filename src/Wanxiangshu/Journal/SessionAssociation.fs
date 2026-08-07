@@ -15,11 +15,16 @@ open Wanxiangshu.Kernel.Identity
 /// `WorkSession → BloggerSessionId` would force a scan of every session to discover
 /// whether a given id is somebody's Y.
 [<RequireQualifiedAccess>]
+type SatelliteKind =
+    | Companion
+    | Teacher
+
+[<RequireQualifiedAccess>]
 type ManagedSessionKind =
     /// A session that can issue ordinary provider requests. Has exactly one Y.
     | WorkSession
-    /// A Companion Blogger session. A leaf: never has a Y of its own.
-    | CompanionSession of mainSessionId: SessionId
+    /// HOST-008: every internal child is a leaf owned by one WorkSession.
+    | SatelliteSession of ownerSessionId: SessionId * kind: SatelliteKind
 
 /// HOST-008: the durable Work ↔ Companion relation for one session.
 type SessionAssociation =
@@ -30,6 +35,8 @@ type SessionAssociation =
         /// `None` for a Companion session. The invariant is enforced by
         /// `SessionAssociationProjection.link`, not left to callers.
         BloggerSessionId: SessionId option
+        /// AGENT-020: one Teacher while a Student learning task is active.
+        TeacherSessionId: SessionId option
         ParentSessionId: SessionId option
     }
 
@@ -46,6 +53,8 @@ type AssociationRejection =
     | AlreadyLinkedToOther of existing: SessionId * proposed: SessionId
     /// The proposed Y is already the Companion of a different Work session.
     | CompanionClaimedByOther of owner: SessionId * proposed: SessionId
+    /// A child already has the other Satellite kind or the requested owner/kind differs.
+    | SatelliteKindConflict of proposed: SessionId
 
 /// HOST-008. One map, keyed lookup, no scan (PERSIST-008).
 ///
@@ -67,23 +76,42 @@ module SessionAssociationProjection =
     /// prompt, so a Y always has a record by the time a transform can fire for it.
     let isCompanion (sessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
         match tryFind sessionId current with
-        | Some { Kind = ManagedSessionKind.CompanionSession _ } -> true
+        | Some { Kind = ManagedSessionKind.SatelliteSession(_, SatelliteKind.Companion) } -> true
+        | _ -> false
+
+    let isTeacher (sessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
+        match tryFind sessionId current with
+        | Some { Kind = ManagedSessionKind.SatelliteSession(_, SatelliteKind.Teacher) } -> true
+        | _ -> false
+
+    let isSatellite (sessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
+        match tryFind sessionId current with
+        | Some { Kind = ManagedSessionKind.SatelliteSession _ } -> true
         | _ -> false
 
     /// COMPANION-002: the main session a Companion belongs to.
     let tryMainSessionOf (sessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
         match tryFind sessionId current with
-        | Some { Kind = ManagedSessionKind.CompanionSession main } -> Some main
+        | Some { Kind = ManagedSessionKind.SatelliteSession(main, SatelliteKind.Companion) } -> Some main
+        | _ -> None
+
+    let tryOwnerOf (sessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
+        match tryFind sessionId current with
+        | Some { Kind = ManagedSessionKind.SatelliteSession(owner, _) } -> Some owner
         | _ -> None
 
     /// COMPANION-003: the Y this Work session already has, so a restart reuses it.
     let tryBloggerOf (sessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
         tryFind sessionId current |> Option.bind (fun entry -> entry.BloggerSessionId)
 
-    let private workSession sessionId parent blogger =
+    let tryTeacherOf (sessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
+        tryFind sessionId current |> Option.bind (fun entry -> entry.TeacherSessionId)
+
+    let private workSession sessionId parent blogger teacher =
         { SessionId = sessionId
           Kind = ManagedSessionKind.WorkSession
           BloggerSessionId = blogger
+          TeacherSessionId = teacher
           ParentSessionId = parent }
 
     /// HOST-008: record one Work ↔ Companion link, both directions at once.
@@ -95,42 +123,106 @@ module SessionAssociationProjection =
     ///
     /// Idempotent for the same pair: re-linking X to the same Y is what restart
     /// recovery does, and refusing it would turn recovery into a startup failure.
-    let link
+    let linkSatellite
+        (kind: SatelliteKind)
         (mainSessionId: SessionId)
-        (bloggerSessionId: SessionId)
+        (satelliteSessionId: SessionId)
         (parentOfMain: SessionId option)
         (current: Map<SessionId, SessionAssociation>)
         : Result<Map<SessionId, SessionAssociation>, AssociationRejection> =
-        if mainSessionId = bloggerSessionId then
+        if mainSessionId = satelliteSessionId then
             Error(AssociationRejection.SelfLink mainSessionId)
-        elif isCompanion mainSessionId current then
+        elif isSatellite mainSessionId current then
             Error(AssociationRejection.CompanionWouldRecurse mainSessionId)
         else
-            let existingBlogger = tryBloggerOf mainSessionId current
-            let existingOwner = tryMainSessionOf bloggerSessionId current
+            let existingSatellite =
+                match kind with
+                | SatelliteKind.Companion -> tryBloggerOf mainSessionId current
+                | SatelliteKind.Teacher -> tryTeacherOf mainSessionId current
 
-            match existingBlogger, existingOwner with
-            | Some existing, _ when existing <> bloggerSessionId ->
-                Error(AssociationRejection.AlreadyLinkedToOther(existing, bloggerSessionId))
+            let existingOwner = tryOwnerOf satelliteSessionId current
+
+            match existingSatellite, existingOwner with
+            | Some existing, _ when existing <> satelliteSessionId ->
+                Error(AssociationRejection.AlreadyLinkedToOther(existing, satelliteSessionId))
             | _, Some owner when owner <> mainSessionId ->
-                Error(AssociationRejection.CompanionClaimedByOther(owner, bloggerSessionId))
+                Error(AssociationRejection.CompanionClaimedByOther(owner, satelliteSessionId))
+            | _, Some _ ->
+                match tryFind satelliteSessionId current with
+                | Some { Kind = ManagedSessionKind.SatelliteSession(_, existingKind) } when existingKind <> kind ->
+                    Error(AssociationRejection.SatelliteKindConflict satelliteSessionId)
+                | _ ->
+                    let owner = tryFind mainSessionId current
+
+                    let parent =
+                        parentOfMain
+                        |> Option.orElse (owner |> Option.bind (fun e -> e.ParentSessionId))
+
+                    let blogger = owner |> Option.bind (fun e -> e.BloggerSessionId)
+                    let teacher = owner |> Option.bind (fun e -> e.TeacherSessionId)
+
+                    let nextBlogger =
+                        if kind = SatelliteKind.Companion then
+                            Some satelliteSessionId
+                        else
+                            blogger
+
+                    let nextTeacher =
+                        if kind = SatelliteKind.Teacher then
+                            Some satelliteSessionId
+                        else
+                            teacher
+
+                    Ok(
+                        current
+                        |> Map.add mainSessionId (workSession mainSessionId parent nextBlogger nextTeacher)
+                        |> Map.add
+                            satelliteSessionId
+                            { SessionId = satelliteSessionId
+                              Kind = ManagedSessionKind.SatelliteSession(mainSessionId, kind)
+                              BloggerSessionId = None
+                              TeacherSessionId = None
+                              ParentSessionId = Some mainSessionId }
+                    )
             | _ ->
+                let owner = tryFind mainSessionId current
+
                 let parent =
                     parentOfMain
-                    |> Option.orElse (tryFind mainSessionId current |> Option.bind (fun e -> e.ParentSessionId))
+                    |> Option.orElse (owner |> Option.bind (fun e -> e.ParentSessionId))
+
+                let blogger = owner |> Option.bind (fun e -> e.BloggerSessionId)
+                let teacher = owner |> Option.bind (fun e -> e.TeacherSessionId)
+
+                let nextBlogger =
+                    if kind = SatelliteKind.Companion then
+                        Some satelliteSessionId
+                    else
+                        blogger
+
+                let nextTeacher =
+                    if kind = SatelliteKind.Teacher then
+                        Some satelliteSessionId
+                    else
+                        teacher
 
                 Ok(
                     current
-                    |> Map.add mainSessionId (workSession mainSessionId parent (Some bloggerSessionId))
+                    |> Map.add mainSessionId (workSession mainSessionId parent nextBlogger nextTeacher)
                     |> Map.add
-                        bloggerSessionId
-                        { SessionId = bloggerSessionId
-                          Kind = ManagedSessionKind.CompanionSession mainSessionId
-                          // COMPANION-002: a leaf. Structurally `None`, not a value a
-                          // caller supplies and could get wrong.
+                        satelliteSessionId
+                        { SessionId = satelliteSessionId
+                          Kind = ManagedSessionKind.SatelliteSession(mainSessionId, kind)
                           BloggerSessionId = None
+                          TeacherSessionId = None
                           ParentSessionId = Some mainSessionId }
                 )
+
+    let link mainSessionId bloggerSessionId parentOfMain current =
+        linkSatellite SatelliteKind.Companion mainSessionId bloggerSessionId parentOfMain current
+
+    let linkTeacher mainSessionId teacherSessionId parentOfMain current =
+        linkSatellite SatelliteKind.Teacher mainSessionId teacherSessionId parentOfMain current
 
     /// The Companion child was aborted. The Work session keeps its record and loses
     /// its Y, so the next transform creates a fresh one.
@@ -147,9 +239,24 @@ module SessionAssociationProjection =
             let parent =
                 tryFind mainSessionId current |> Option.bind (fun e -> e.ParentSessionId)
 
+            let teacher =
+                tryFind mainSessionId current |> Option.bind (fun e -> e.TeacherSessionId)
+
             current
             |> Map.remove blogger
-            |> Map.add mainSessionId (workSession mainSessionId parent None)
+            |> Map.add mainSessionId (workSession mainSessionId parent None teacher)
+
+    let unlinkTeacher (mainSessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
+        match tryTeacherOf mainSessionId current with
+        | None -> current
+        | Some teacher ->
+            let owner = tryFind mainSessionId current
+            let parent = owner |> Option.bind (fun e -> e.ParentSessionId)
+            let blogger = owner |> Option.bind (fun e -> e.BloggerSessionId)
+
+            current
+            |> Map.remove teacher
+            |> Map.add mainSessionId (workSession mainSessionId parent blogger None)
 
     let describe (rejection: AssociationRejection) =
         match rejection with
@@ -167,3 +274,5 @@ module SessionAssociationProjection =
                 "Companion %s already belongs to work session %s (HOST-008)"
                 (SessionId.value proposed)
                 (SessionId.value owner)
+        | AssociationRejection.SatelliteKindConflict proposed ->
+            sprintf "Satellite %s is already linked with a different kind (HOST-008)" (SessionId.value proposed)

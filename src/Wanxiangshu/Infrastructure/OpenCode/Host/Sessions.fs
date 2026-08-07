@@ -25,6 +25,7 @@ type ISessionHostPort =
     abstract AbortSession: sessionId: SessionId -> Task<Result<unit, string>>
     abstract AbortChildren: parentId: SessionId -> Task
     abstract CreateChildSession: parentId: SessionId * options: OpenCodeChildOptions -> Task<Result<SessionId, string>>
+    abstract ListChildren: parentId: SessionId -> Task<Result<OpenCodeChildInfo list, string>>
 
 type InjectedSessionPort
     (
@@ -164,7 +165,11 @@ type InjectedSessionPort
         member me.CreateChildSession(parentId, options) =
             task {
                 let rootId = familyRoot parentId
-                let hostParentId = rootId
+                // Preserve the physical direct parent. Recovery must prove an
+                // exact owner/agent/title tuple; flattening every child onto the
+                // family root destroys that evidence when two work sessions use
+                // the same satellite agent.
+                let hostParentId = parentId
 
                 match underlyingPort with
                 | Some port ->
@@ -181,3 +186,8 @@ type InjectedSessionPort
                     // that every later operation silently no-ops against.
                     return Error "No Host transport: cannot create a child session"
             }
+
+        member _.ListChildren(parentId) =
+            match underlyingPort with
+            | Some port -> port.ListChildren parentId
+            | None -> Task.FromResult(Error "No Host transport: cannot list child sessions")

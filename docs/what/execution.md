@@ -76,3 +76,28 @@ schemaVersion=2；finality 仅 `completed|failed`。
 
 `HandleFalseCompletionRejected` → 确定性 replacement → parent correction。  
 禁止把历史假 abort 洗成成功。
+
+## EXEC-027：Student 学习与编译程序
+
+只有显式 Student HumanRoot 启动本程序；其它 Agent 零副作用。
+
+```text
+HumanRoot 原文先写 QA
+→ StudentLearn（工具严格 {teacher}）
+→ teacher(message)：问题先写 QA，再发同一 Teacher
+→ Teacher return：回答先写 QA，再交付 Student
+→ Student learning idle：发送 StudentCompile continuation
+→ StudentCompile（读 QA，写一个或多个 .agent/skills，工具含最终 return）
+→ return(message)：删除 QA 并确认不存在
+→ 同一 Host loop 的 Assistant completion 显示 message，Student Run 终止
+```
+
+Teacher 未 return 的 idle 只 nudge 同一 Teacher；自动恢复预算耗尽后父 `teacher` 失败，绝不从普通正文
+截取答案。Student compile 未 return 的 idle 只发 compilation nudge；第一版不返回学习。
+
+同一 Student Run 同时最多一个 teacher 调用、一个 Teacher provider run、一个 QA 写入和一个 compile
+continuation。异常并发明确拒绝。用户取消时 abort Student/Teacher、删除 QA、retire Teacher 关联；删除
+失败保留文件并报告清理错误。
+
+最终 `return` 删除失败时不提交 terminal、不显示完成说明；不存在视为删除成功，重试幂等。最终 message
+只简述生成/修改了哪些 SKILL，不自动附带 QA/path。

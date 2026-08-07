@@ -35,6 +35,14 @@ module PromptAuthority =
         /// GLORY-053: a suicide was rejected; the reviewer's canonical work
         /// record is the feedback body.
         | FinalityRejected
+        /// PROMPT-012: another natural-language question to the same Teacher run.
+        | TeacherQuestion
+        /// PROMPT-012: Teacher became idle without calling return.
+        | TeacherIdleNudge
+        /// PROMPT-012: same Student run switches to its compile request kind.
+        | StudentCompile
+        /// PROMPT-012: compile turn became idle without final return.
+        | StudentCompileNudge
 
     type PromptOrigin =
         | AuthorityRoot of RootAuthorityKind
@@ -197,6 +205,10 @@ module PromptAuthority =
         | Continuation ManagerWorkActivation -> "ManagerWorkActivation"
         | Continuation ManagerIdleEncouragement -> "ManagerIdleEncouragement"
         | Continuation FinalityRejected -> "FinalityRejected"
+        | Continuation TeacherQuestion -> "TeacherQuestion"
+        | Continuation TeacherIdleNudge -> "TeacherIdleNudge"
+        | Continuation StudentCompile -> "StudentCompile"
+        | Continuation StudentCompileNudge -> "StudentCompileNudge"
         | HostInternal -> "HostInternal"
         | UnknownOrigin -> "UnknownOrigin"
 
@@ -212,6 +224,10 @@ module PromptAuthority =
         | "ManagerWorkActivation" -> Some ManagerWorkActivation
         | "ManagerIdleEncouragement" -> Some ManagerIdleEncouragement
         | "FinalityRejected" -> Some FinalityRejected
+        | "TeacherQuestion" -> Some TeacherQuestion
+        | "TeacherIdleNudge" -> Some TeacherIdleNudge
+        | "StudentCompile" -> Some StudentCompile
+        | "StudentCompileNudge" -> Some StudentCompileNudge
         | _ -> None
 
     /// Labels and tier/role tables live in `ManagedAgentCatalog` (AGENT-001…004).
@@ -447,6 +463,24 @@ module PromptAuthority =
     /// (AGENT-010) would stop being structurally guaranteed.
     let systemPromptIdFor (role: Role) : SystemPromptId = SystemPromptId.create (roleLabel role)
 
+    /// AGENT-020/021: request-specific tools are part of the immutable attempt,
+    /// not a mutable Student stage. Invalid role/kind pairs fail closed.
+    let toolCapabilitiesFor (role: Role) (requestKind: ProviderRequestKind) : Set<ToolPermission> =
+        match role, requestKind with
+        | Role.Student, ProviderRequestKind.StudentLearn -> set [ ToolPermission.Teacher ]
+        | Role.Student, ProviderRequestKind.StudentCompile ->
+            set
+                [ ToolPermission.Read
+                  ToolPermission.Glob
+                  ToolPermission.Grep
+                  ToolPermission.Write
+                  ToolPermission.Edit
+                  ToolPermission.Return ]
+        | Role.Student, _ -> Set.empty
+        | _, ProviderRequestKind.StudentLearn
+        | _, ProviderRequestKind.StudentCompile -> Set.empty
+        | _ -> Roles.permissions role
+
     /// The ONLY way to build an AttemptExecutionProfile (PROMPT-008).
     ///
     /// Everything a provider request needs is derived here from two inputs: the
@@ -479,7 +513,7 @@ module PromptAuthority =
           Origin = origin
           EffectiveAgent = effectiveAgentFor authority cursor
           SystemPromptId = systemPromptIdFor authority.CanonicalRole
-          ToolCapabilitySet = Roles.permissions authority.CanonicalRole
+          ToolCapabilitySet = toolCapabilitiesFor authority.CanonicalRole requestKind
           RequestKind = requestKind
           ProjectionChoice =
             if ProviderRequestKind.mayCarryProbe requestKind then

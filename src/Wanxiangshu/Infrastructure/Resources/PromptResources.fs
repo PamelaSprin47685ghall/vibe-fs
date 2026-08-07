@@ -12,7 +12,9 @@ type PromptCatalog =
       MeditatorSystemPrompt: string
       OrchestratorSystemPrompt: string
       ExecutorSystemPrompt: string
-      BloggerSystemPrompt: string }
+      BloggerSystemPrompt: string
+      StudentSystemPrompt: string
+      TeacherSystemPrompt: string }
 
 module PromptResources =
 
@@ -29,4 +31,6 @@ module PromptResources =
           MeditatorSystemPrompt = loadPrompt "meditator-system.md"
           OrchestratorSystemPrompt = loadPrompt "orchestrator-system.md"
           ExecutorSystemPrompt = loadPrompt "executor-system.md"
-          BloggerSystemPrompt = loadPrompt "blogger-system.md" }
+          BloggerSystemPrompt = loadPrompt "blogger-system.md"
+          StudentSystemPrompt = loadPrompt "student-system.md"
+          TeacherSystemPrompt = loadPrompt "teacher-system.md" }

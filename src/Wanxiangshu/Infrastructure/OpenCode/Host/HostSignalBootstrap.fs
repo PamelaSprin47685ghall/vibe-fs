@@ -110,22 +110,28 @@ module HostSignalBootstrap =
 
                         XWire.reconcileAttempt journal scope turn
 
-                        do!
-                            TurnCompletionProgram.applyWithContinuation
-                                sessionPort
-                                eventPort
-                                journal
-                                managerGitTreePort
-                                scope.VerdictSessions
-                                scope.NudgeSent
-                                scope.ManagerGuardNudges
-                                scope.JoinGuardNudges
-                                scope.SessionParents
-                                scope.DisposeExecutorRuntime
-                                scope.HasLivePty
-                                scope.AbortedSessions
-                                (Some scope.LoopSensor)
-                                turn
+                        let! studentTeacherHandled =
+                            match scope.StudentTeacherRuntime with
+                            | Some runtime -> runtime.HandleTurn turn
+                            | None -> Task.FromResult false
+
+                        if not studentTeacherHandled then
+                            do!
+                                TurnCompletionProgram.applyWithContinuation
+                                    sessionPort
+                                    eventPort
+                                    journal
+                                    managerGitTreePort
+                                    scope.VerdictSessions
+                                    scope.NudgeSent
+                                    scope.ManagerGuardNudges
+                                    scope.JoinGuardNudges
+                                    scope.SessionParents
+                                    scope.DisposeExecutorRuntime
+                                    scope.HasLivePty
+                                    scope.AbortedSessions
+                                    (Some scope.LoopSensor)
+                                    turn
                 }
 
             /// HOST-006 containment: observe every reconciled snapshot for compaction
@@ -216,6 +222,10 @@ module HostSignalBootstrap =
                 | ProviderFailure _ -> reconciler.Signal signal
                 | SessionDeleted sessionId ->
                     scope.LoopSensor.DropSession sessionId
+
+                    scope.StudentTeacherRuntime
+                    |> Option.iter (fun runtime -> runtime.CancelSession sessionId |> ignore)
+
                     scope.DisposeSession(SessionId.value sessionId)
                     reconciler.Signal signal
 
@@ -334,13 +344,21 @@ module HostSignalBootstrap =
                     | Some bloggerId ->
                         BloggerCoordinator.reactivateAfterNewRoot (scope :> IParkedTransformHost) bloggerId root
 
-            let chatMessageHook =
+            let promptIngressHook =
                 PromptIngress.createHook
                     journal
                     bindUserMessage
                     bindContinuationMessage
                     registerOwned
                     (Some onAuthorityRoot)
+
+            let chatMessageHook =
+                fun (input: obj) (output: obj) ->
+                    promptIngressHook input output
+
+                    match PromptIngressCodec.decode input output |> scope.ObserveStudentMessage with
+                    | Ok() -> ()
+                    | Error error -> raise (InvalidOperationException error)
 
             let cancelSignals (ids: SessionId seq) =
                 ids

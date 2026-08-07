@@ -71,8 +71,39 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     /// LOOP-006: process-local LoopKillArmed lives inside the sensor.
     /// Optional until HostSignalBootstrap wires abort + ownership.
     let mutable loopSensor: LoopSensor option = None
+    let mutable satelliteRuntime: SatelliteRuntime option = None
+    let mutable studentTeacherRuntime: StudentTeacherRuntime option = None
+    let mutable studentTeacherUnavailable: string option = None
 
     member _.Journal = journal
+
+    member _.AttachSatelliteRuntime(runtime: SatelliteRuntime) = satelliteRuntime <- Some runtime
+
+    member _.Satellites =
+        match satelliteRuntime with
+        | Some runtime -> runtime
+        | None -> invalidOp "SatelliteRuntime has not been attached"
+
+    member _.AttachStudentTeacherRuntime(runtime: StudentTeacherRuntime) =
+        studentTeacherRuntime <- Some runtime
+        studentTeacherUnavailable <- None
+
+    member _.MarkStudentTeacherUnavailable(reason: string) =
+        studentTeacherUnavailable <- Some reason
+
+    member _.StudentTeacherRuntime = studentTeacherRuntime
+
+    member _.ObserveStudentMessage(message: PromptIngressCodec.DecodedMessage) =
+        match studentTeacherRuntime with
+        | Some runtime -> runtime.ObserveChatMessage message
+        | None ->
+            match
+                message.ExplicitAgent
+                |> Option.bind (PromptAuthority.parseAgentName >> Result.toOption)
+            with
+            | Some(_, Role.Student, _, _) ->
+                Error(defaultArg studentTeacherUnavailable "Student–Teacher runtime is unavailable")
+            | _ -> Ok()
     // HOST-012: 跨实例共享（模块级单例）——worktree 独立插件实例的 fork→verdict
     // 链必须读写同一份。每实例独有状态（OwnedSessions、UserMessageBindings、
     // Companions 等）保持 per-instance。

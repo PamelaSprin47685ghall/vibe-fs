@@ -336,7 +336,11 @@ test('DSL_OWNERSHIP_control_state_class_is_a_program_counter', () => {
 test('DSL_OWNERSHIP_host_boundary_open_is_not_gate_red', () => {
   const source = ['module Sample', 'open Wanxiangshu.OpenCode', 'open Wanxiangshu.Process'].join('\n')
   assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('HostForkRuntime.fs'))
+  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('SatelliteRuntime.fs'))
+  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('StudentTeacherRuntime.fs'))
   assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Session/HostForkRuntime.fs'), true)
+  assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Session/SatelliteRuntime.fs'), true)
+  assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Session/StudentTeacherRuntime.fs'), true)
   assert.deepEqual(scanText(source, 'src/Wanxiangshu/Session/HostForkRuntime.fs'), [])
   assert.ok(
     scanText(source, 'src/Wanxiangshu/Session/BloggerCoordinator.fs').some((h) => h.gate === 'infrastructure-leak'),

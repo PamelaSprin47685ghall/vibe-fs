@@ -69,3 +69,20 @@ ContextReanchored
 禁止引入：`PrefixProbeRolledBack`、`OverflowDetected`、`ContextNearLimit`、`SquashReason` 等——失败不分类（CTX-005），容量不观察（CTX-001）。  
 失败的 X probe 不产生事实（CTX-010）。  
 Projection 只从 Journal fold 派生 Y 有效 frames，不读物理 Y transcript 当历史源。
+
+## PERSIST-011：Student QA 权威文件
+
+每个 Student Logical Run 恰有一个私有 `QA.md`；存在期间它是学习知识的唯一权威状态。Journal、Host
+metadata、共享表和日志只能保存 Session/attempt/路径摘要等控制身份，禁止保存问题、回答、推测阶段、
+置信度、知识分支或 QA 正文。
+
+QA 是 UTF-8 自然语言字节流，只按真实发生顺序包含：用户原始请求、Student 问题、Teacher return。
+框架只插入防粘连换行；不得添加标题、角色标签、分隔线、JSON/TOML 字段或旁路 Journal。完整尾部字节
+等于待追加项时幂等去重；无法证明重复时宁可保留。
+
+每次更新必须原子且 durable：旧完整文件或新完整文件，不得出现半段 UTF-8。用户请求先于 Student
+provider effect；Student 问题先于 Teacher send；Teacher return 先于交付 Student。UTF-8 损坏、读取失败
+或原子提交不确定均 fail closed，保留原文件，不跳过坏字节。
+
+最终 return 与明确取消删除 QA 及空任务目录；删除失败不宣称完成。插件重启只按 Session/LogicalRun
+确定路径，不解析正文；任务终态无法证明时保留，不自动删除。
