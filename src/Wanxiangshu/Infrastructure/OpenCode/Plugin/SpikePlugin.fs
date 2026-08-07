@@ -73,7 +73,7 @@ module SpikePlugin =
                     | Error error -> scope.MarkStudentTeacherUnavailable error
                     | Ok qaStore ->
                         let studentTeacher =
-                            StudentTeacherRuntime(
+                            new StudentTeacherRuntime(
                                 sessionPort,
                                 scope.Satellites,
                                 PromptDispatcher.forJournal durable,

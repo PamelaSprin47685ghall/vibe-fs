@@ -31,7 +31,7 @@
 
 - Reconciler 因果重读属 A 类：有界，≤3 次（HOST-004）；不得以墙钟退避推进。
 - Executor 定向等待属 B 类：permit-gated、Journal-authoritative；TCS/Pulse 仅作唤醒。
-- SSE 心跳属 C 类：one-shot silence deadline，非周期扫描。
+- SSE 心跳属 C 类 one-shot silence deadline，经 Node timer 实现（语义等价 ITimerPort `nodeTimerPort` 的 ref/unref policy），因 F# `ITimerPort` 无法在 `emitJsExpr` 内可靠调用；`ITimerPort` 注入面由 `PtyTiming` 虚拟时钟 + `timer-port.test.mjs` 契约测试覆盖。
 
 ## Algorithm
 

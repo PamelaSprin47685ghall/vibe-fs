@@ -416,6 +416,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                 (companion :> IDisposable).Dispose()
 
             this.Companions.Clear()
+            studentTeacherRuntime |> Option.iter (fun st -> st.Dispose())
+            studentTeacherRuntime <- None
             SharedAgentJournal.release journal
             SharedTerminalBus.release sharedTerminalKey sharedTerminalPort
             sharedTerminalKey <- None

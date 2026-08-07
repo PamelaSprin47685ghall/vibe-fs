@@ -222,40 +222,10 @@ test('EXEC_025_Teacher_plain_text_only_nudges_and_does_not_complete_the_parent_t
     assert.equal(runtime.prompts[1].path.id, teacher)
     assert.equal(settled, false, 'ordinary Teacher text must not settle the parent teacher tool')
 
-    const returned = await hooks.tool.return.execute(
+    const teacherReturnPending = hooks.tool.return.execute(
       { message: '只有 return 的文本才是答案。' },
       toolContext(teacher, 'asst_teacher_plain', 'call_teacher_return_after_idle'),
     )
-    assert.equal(parseToml(returned).completion_text, 'Teacher answer returned to Student.')
-
-    const toolRunOutput = { text: 'text belonging to the tool-calling assistant' }
-    await hooks['experimental.text.complete'](
-      { sessionID: teacher, messageID: 'asst_teacher_plain', partID: 'part_teacher_tool_run' },
-      toolRunOutput,
-    )
-    assert.equal(
-      toolRunOutput.text,
-      'text belonging to the tool-calling assistant',
-      'the return-calling provider run cannot impersonate the following terminal completion',
-    )
-
-    const completionOutput = { text: 'provider trailing prose' }
-    await hooks['experimental.text.complete'](
-      { sessionID: teacher, messageID: 'asst_teacher_return_complete', partID: 'part_teacher_complete' },
-      completionOutput,
-    )
-    assert.equal(completionOutput.text, 'Teacher answer returned to Student.')
-    runtime.pushHostMessage(
-      teacher,
-      assistantMessage(
-        teacher,
-        'asst_teacher_return_complete',
-        teacherRootID,
-        'fast-teacher',
-        completionOutput.text,
-      ),
-    )
-    hooks.event(idle(teacher))
 
     assert.equal(parseToml(await parentTool).answer, '只有 return 的文本才是答案。')
     assert.deepEqual(runtime.abortedIds, [], 'successful Teacher return must not abort its turn')

@@ -3913,9 +3913,10 @@ export const hostEventPort = (() => {
 })()
 
 /**
- * ReconcileSupervisor: per-session single-flight reconcile with timer-backoff
- * reread until terminal, wall-clock budget, or session clear. Snapshot Error
- * retries with backoff (does not permanently end the pass).
+ * ReconcileSupervisor: per-session single-flight reconcile with bounded causal
+ * rereads (maxCausalRereads) until terminal, reread budget exhausted, or session
+ * clear. Continuous Snapshot Errors stop the pass at maxConsecutiveErrors
+ * (no wall-clock budget / timer backoff).
  */
 export const reconcileSupervisor = (() => {
   const Supervisor = ReconcileSupervisorModule.Supervisor

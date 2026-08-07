@@ -1,11 +1,47 @@
-// tests/unit/Execution/executor-summarize.test.mjs — EXECUTOR-001 the map/reduce prompt composers.
+// tests/unit/Execution/executor-summarize.test.mjs — EXECUTOR-001 prompt composers
+// + EXEC-023/024 targeted AwaitAgentWithPermit contract for summarizeSpool.
 //
 // The prompt is the plain intent only; the chunk/combined content is carried
 // by the fork envelope's `content` field (FORK_CHILD_PAYLOAD_payload_renders_as_content).
+//
+// Proof plan #3: ordered/out-of-order agent completion only returns the target
+// agent; each chunk awaits once (no stash skip); TimedOut/NotFound fail the
+// chunk and cancelOwned without corrupting sibling targeted awaits.
 
 import assert from 'node:assert/strict'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
-import { executorSummarize } from '../support/domain.mjs'
+import { ForkError } from '../../../dist/Session/ForkTypes.js'
+import {
+  agentCompletion,
+  errorResult,
+  executorSummarize,
+  executorSummarizeRuntime,
+  okResult,
+} from '../support/domain.mjs'
+
+/** Spool.ChunkSizeBytes — multi-chunk files need size > n-1 full chunks. */
+const SPOOL_CHUNK_BYTES = 204_800
+
+function writeSpoolWithChunks(chunkCount) {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-sum-await-'))
+  const spoolPath = join(dir, 'spool.bin')
+  const size = (chunkCount - 1) * SPOOL_CHUNK_BYTES + 64
+  writeFileSync(spoolPath, Buffer.alloc(size, 0x61))
+  return { dir, spoolPath }
+}
+
+function completedOk(agentId) {
+  return okResult(
+    agentCompletion.completedRun({
+      runId: `run-${agentId}`,
+      agentId,
+      workRecord: `summary-for-${agentId}`,
+    }),
+  )
+}
 
 test('EXECUTOR_SUMMARIZE_summarize_chunk_prompt_is_plain_intent', () => {
   assert.equal(
@@ -27,4 +63,178 @@ test('EXECUTOR_SUMMARIZE_index_varies_in_chunk_prompt', () => {
 
 test('EXECUTOR_SUMMARIZE_level_varies_in_reduce_prompt', () => {
   assert.ok(executorSummarize.reduceBatchPrompt(5).startsWith('Reduce level-5 command-output summaries into one dense report.'))
+})
+
+test('EXEC_summarize_spool_targeted_await_one_call_per_agent_no_stash', async () => {
+  const { dir, spoolPath } = writeSpoolWithChunks(3)
+  const forked = []
+  const awaitCalls = []
+
+  const { runtime } = executorSummarizeRuntime.fake({
+    fork: (agentId) => {
+      forked.push(agentId)
+      return executorSummarizeRuntime.forkOk(agentId)
+    },
+    awaitAgent: (agentId, timeoutMs) => {
+      awaitCalls.push({ agentId, timeoutMs })
+      return completedOk(agentId)
+    },
+  })
+
+  const summary = await executorSummarizeRuntime.summarizeSpool(runtime, spoolPath)
+
+  assert.ok(typeof summary === 'string' && summary.length > 0)
+  assert.ok(forked.length >= 3, `expected ≥3 forks (3 map ± reduce), got ${forked.length}`)
+  assert.equal(awaitCalls.length, forked.length, 'each fork gets exactly one AwaitAgentWithPermit (no stash skip)')
+
+  for (const id of forked) {
+    const hits = awaitCalls.filter((c) => c.agentId === id)
+    assert.equal(hits.length, 1, `agent ${id} awaited exactly once; hits=${hits.length}`)
+  }
+
+  const awaitIds = awaitCalls.map((c) => c.agentId)
+  assert.deepEqual([...awaitIds].sort(), [...forked].sort(), 'await targets equal forked set (no cross-agent await)')
+
+  rmSync(dir, { recursive: true, force: true })
+})
+
+test('EXEC_summarize_spool_targeted_await_out_of_order_returns_own_agent', async () => {
+  const { dir, spoolPath } = writeSpoolWithChunks(3)
+  const forked = []
+  const awaitCalls = []
+  let mapSeq = 0
+
+  const { runtime } = executorSummarizeRuntime.fake({
+    fork: (agentId) => {
+      forked.push(agentId)
+      return executorSummarizeRuntime.forkOk(agentId)
+    },
+    awaitAgent: (agentId, timeoutMs) => {
+      const seq = mapSeq++
+      awaitCalls.push({ agentId, timeoutMs, seq })
+      // Later-started map agents resolve first → out-of-order completion.
+      const delayMs = Math.max(0, 30 - seq * 10)
+      return new Promise((resolve) => {
+        setTimeout(() => resolve(completedOk(agentId)), delayMs)
+      })
+    },
+  })
+
+  const summary = await executorSummarizeRuntime.summarizeSpool(runtime, spoolPath)
+
+  assert.ok(typeof summary === 'string' && summary.length > 0)
+  assert.ok(!/partial|raw tail/i.test(summary), 'out-of-order success must not degrade to partial')
+  assert.ok(forked.length >= 3)
+  assert.equal(awaitCalls.length, forked.length, 'each fork awaited once under out-of-order resolve')
+
+  for (const id of forked) {
+    const hits = awaitCalls.filter((c) => c.agentId === id)
+    assert.equal(hits.length, 1, `targeted await for ${id} exactly once (no cross-agent / stash)`)
+  }
+
+  rmSync(dir, { recursive: true, force: true })
+})
+
+test('EXEC_summarize_spool_await_timeout_fails_chunk_cancels_owned_siblings_still_await', async () => {
+  const { dir, spoolPath } = writeSpoolWithChunks(3)
+  const forked = []
+  const awaitCalls = []
+  let mapForkIndex = 0
+  /** Fail the second map agent only (index 1). */
+  let failAgentId = null
+
+  const { runtime, cancelled } = executorSummarizeRuntime.fake({
+    fork: (agentId) => {
+      if (mapForkIndex < 3) {
+        if (mapForkIndex === 1) failAgentId = agentId
+        mapForkIndex += 1
+      }
+      forked.push(agentId)
+      return executorSummarizeRuntime.forkOk(agentId)
+    },
+    awaitAgent: (agentId, timeoutMs) => {
+      awaitCalls.push({ agentId, timeoutMs })
+      if (agentId === failAgentId) return executorSummarizeRuntime.timedOut()
+      return completedOk(agentId)
+    },
+  })
+
+  const summary = await executorSummarizeRuntime.summarizeSpool(runtime, spoolPath)
+
+  assert.ok(typeof summary === 'string')
+  assert.match(summary, /partial|raw tail/i, 'map failure yields partial summary, not throw')
+
+  const mapAgentIds = forked.slice(0, 3)
+  assert.equal(mapAgentIds.length, 3)
+  for (const id of mapAgentIds) {
+    const hits = awaitCalls.filter((c) => c.agentId === id)
+    assert.equal(hits.length, 1, `map agent ${id} still gets one targeted await (siblings not skipped)`)
+  }
+
+  assert.ok(failAgentId, 'second map agent identified')
+  assert.ok(cancelled.length >= 1, 'cancelOwned runs on map failure')
+  for (const id of forked) {
+    assert.ok(cancelled.includes(id), `owned agent ${id} cancelled after failure`)
+  }
+
+  rmSync(dir, { recursive: true, force: true })
+})
+
+test('EXEC_summarize_spool_await_not_found_hard_fail_collects_failure', async () => {
+  const { dir, spoolPath } = writeSpoolWithChunks(2)
+  const forked = []
+  const awaitCalls = []
+  let firstMapId = null
+
+  const { runtime, cancelled } = executorSummarizeRuntime.fake({
+    fork: (agentId) => {
+      if (firstMapId === null) firstMapId = agentId
+      forked.push(agentId)
+      return executorSummarizeRuntime.forkOk(agentId)
+    },
+    awaitAgent: (agentId, timeoutMs) => {
+      awaitCalls.push({ agentId, timeoutMs })
+      // FamilyBlocked / hard fail → NotFound (requirePermit path).
+      if (agentId === firstMapId) return errorResult(new ForkError(4, [`blocked:${agentId}`]))
+      return completedOk(agentId)
+    },
+  })
+
+  const summary = await executorSummarizeRuntime.summarizeSpool(runtime, spoolPath)
+
+  assert.ok(typeof summary === 'string')
+  assert.match(summary, /partial|raw tail/i, 'NotFound hard fail collects failure, no throw-out')
+  assert.equal(
+    awaitCalls.filter((c) => c.agentId === firstMapId).length,
+    1,
+    'failed agent still awaited once',
+  )
+  assert.ok(cancelled.length >= 1, 'cancelOwned after hard fail')
+
+  rmSync(dir, { recursive: true, force: true })
+})
+
+test('EXEC_summarize_spool_family_waiting_timed_out_not_reported_as_success', async () => {
+  const { dir, spoolPath } = writeSpoolWithChunks(2)
+  const awaitCalls = []
+
+  const { runtime, cancelled } = executorSummarizeRuntime.fake({
+    fork: (agentId) => executorSummarizeRuntime.forkOk(agentId),
+    // FamilyWaiting / RECOVERY_WAITING maps to TimedOut — wait-not-hard-error at
+    // runtime boundary; summarizeSpool must not treat it as Ok completion.
+    awaitAgent: (agentId, timeoutMs) => {
+      awaitCalls.push({ agentId, timeoutMs })
+      return executorSummarizeRuntime.timedOut()
+    },
+  })
+
+  const summary = await executorSummarizeRuntime.summarizeSpool(runtime, spoolPath)
+
+  assert.ok(typeof summary === 'string')
+  assert.match(summary, /partial|raw tail|unavailable/i, 'TimedOut (FamilyWaiting) must not report full success')
+  assert.ok(!summary.includes('summary-for-'), 'no fabricated success work records')
+  assert.ok(awaitCalls.length >= 2, 'each map chunk still triggers AwaitAgentWithPermit')
+  assert.ok(cancelled.length >= 1, 'cancelOwned after map failures')
+
+  rmSync(dir, { recursive: true, force: true })
 })

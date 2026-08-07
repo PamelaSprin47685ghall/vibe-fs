@@ -25,8 +25,7 @@ module private StudentTeacherPath =
 
 type private PendingTeacherReturn =
     { ToolRun: ProviderRunIdentity
-      Answer: string
-      mutable CompletionRun: ProviderRunIdentity option }
+      NextQuestionWaiter: TaskCompletionSource<Result<string, string>> }
 
 type private StudentRunCell =
     { SessionId: SessionId
@@ -268,19 +267,17 @@ type StudentTeacherRuntime
             match tryCell student with
             | None -> return Error "teacher rejected: no active Student run"
             | Some cell ->
-                let claimed =
+                let stateOk, pendingOpt =
                     lock gate (fun () ->
-                        if
-                            cell.State = StudentTeacher.RunState.LearnReady
-                            && cell.Waiter.IsNone
-                            && cell.PendingTeacherReturn.IsNone
-                        then
+                        if cell.State = StudentTeacher.RunState.LearnReady && cell.Waiter.IsNone then
+                            let pending = cell.PendingTeacherReturn
+                            cell.PendingTeacherReturn <- None
                             cell.State <- StudentTeacher.RunState.TeacherWaiting
-                            true
+                            true, pending
                         else
-                            false)
+                            false, None)
 
-                if not claimed then
+                if not stateOk then
                     return Error "teacher rejected: another Student operation is in flight"
                 else
                     match qa.Append(cell.SessionId, cell.LogicalRunId, question) with
@@ -306,17 +303,30 @@ type StudentTeacherRuntime
 
                             onTeacherReady lease.SessionId (teacherAgent cell)
 
-                            match! sendTeacherPrompt cell lease question with
-                            | Error error ->
-                                lock gate (fun () ->
-                                    cell.Waiter <- None
-                                    cell.State <- StudentTeacher.RunState.LearnReady)
+                            match pendingOpt with
+                            | Some pending ->
+                                let prompt =
+                                    StudentTeacherPrompt.teacherQuestion
+                                        question
+                                        (lease.Origin = SatelliteOrigin.Replacement)
 
-                                return Error error
-                            | Ok _ ->
+                                AsyncSupport.trySetResult pending.NextQuestionWaiter (Ok prompt) |> ignore
+
                                 match! waiter.Task with
                                 | Error error -> return Error error
                                 | Ok answer -> return Ok(StudentTeacherPrompt.teacherAnswerResult answer)
+                            | None ->
+                                match! sendTeacherPrompt cell lease question with
+                                | Error error ->
+                                    lock gate (fun () ->
+                                        cell.Waiter <- None
+                                        cell.State <- StudentTeacher.RunState.LearnReady)
+
+                                    return Error error
+                                | Ok _ ->
+                                    match! waiter.Task with
+                                    | Error error -> return Error error
+                                    | Ok answer -> return Ok(StudentTeacherPrompt.teacherAnswerResult answer)
         }
 
     member _.Return
@@ -338,22 +348,27 @@ type StudentTeacherRuntime
                     | Some _, Some _, _ -> return Error "return rejected: Teacher return completion is already pending"
                     | Some _, None, None ->
                         return Error "return rejected: Host provided no Teacher provider-run identity"
-                    | Some _, None, Some toolRun ->
+                    | Some parentWaiter, None, Some toolRun ->
                         match qa.Append(cell.SessionId, cell.LogicalRunId, message) with
                         | Error error -> return Error error
                         | Ok _ ->
+                            let nextQuestionWaiter =
+                                TaskCompletionSource<Result<string, string>>(
+                                    TaskCreationOptions.RunContinuationsAsynchronously
+                                )
+
                             lock gate (fun () ->
+                                cell.Waiter <- None
+                                cell.State <- StudentTeacher.RunState.LearnReady
+
                                 cell.PendingTeacherReturn <-
                                     Some
                                         { ToolRun = toolRun
-                                          Answer = message
-                                          CompletionRun = None })
+                                          NextQuestionWaiter = nextQuestionWaiter }
 
-                            // Blogger-style deferred completion: the tool commits
-                            // its payload, while the following normal assistant
-                            // terminal releases the parent waiter. Never abort a
-                            // successful Teacher turn.
-                            return Ok StudentTeacherPrompt.teacherReturnResult
+                                AsyncSupport.trySetResult parentWaiter (Ok message) |> ignore)
+
+                            return! nextQuestionWaiter.Task
 
             | Some profile when profile.CanonicalRole = Role.Student ->
                 match tryCell sessionId, providerRunId with
@@ -394,23 +409,7 @@ type StudentTeacherRuntime
                 // next provider text completion is therefore the terminal slot.
                 | Some(_, finalMessage) -> output?text <- finalMessage
                 | _ -> ()
-            | None ->
-                match tryOwner sessionId |> Option.bind tryCell with
-                | None -> ()
-                | Some cell ->
-                    let completionRun = ProviderRunIdentity.create (unbox<string> input?messageID)
-
-                    let ownsCompletion =
-                        lock gate (fun () ->
-                            match cell.PendingTeacherReturn with
-                            | Some pending when pending.CompletionRun.IsNone && completionRun <> pending.ToolRun ->
-                                pending.CompletionRun <- Some completionRun
-                                true
-                            | Some pending when pending.CompletionRun = Some completionRun -> true
-                            | _ -> false)
-
-                    if ownsCompletion then
-                        output?text <- StudentTeacherPrompt.TeacherReturnCompletion
+            | None -> ()
 
     member _.ValidateTool(input: obj, output: obj) : Result<unit, string> =
         if isNull input || isNull input?sessionID || isNull input?tool then
@@ -469,14 +468,10 @@ type StudentTeacherRuntime
             | Some profile when profile.CanonicalRole = Role.Teacher ->
                 let allowed = Roles.permissions Role.Teacher |> Set.map StaticTools.toolName
 
-                match tryOwner sessionId |> Option.bind tryCell with
-                | Some cell when cell.PendingTeacherReturn.IsSome ->
-                    Error "Teacher tool rejected: return completion is already expected"
-                | _ ->
-                    if Set.contains tool allowed then
-                        Ok()
-                    else
-                        Error(sprintf "Tool '%s' is outside the Teacher execution profile" tool)
+                if Set.contains tool allowed then
+                    Ok()
+                else
+                    Error(sprintf "Tool '%s' is outside the Teacher execution profile" tool)
             | _ -> Ok()
 
     member _.HandleTurn(turn: ReconciledTurn) : Task<bool> =
@@ -491,6 +486,17 @@ type StudentTeacherRuntime
                         let finalText = CompletedTurnClassifier.partsText turn.Parts
 
                         if finalText = expected then
+                            let pending =
+                                lock gate (fun () ->
+                                    let p = cell.PendingTeacherReturn
+                                    cell.PendingTeacherReturn <- None
+                                    p)
+
+                            pending
+                            |> Option.iter (fun p ->
+                                AsyncSupport.trySetResult p.NextQuestionWaiter (Error "Teacher session closed")
+                                |> ignore)
+
                             let! _ = satellites.Retire(cell.SessionId, teacherSpec cell)
                             cell.State <- StudentTeacher.RunState.Closed
                             lock gate (fun () -> runs.Remove(sessionKey cell.SessionId) |> ignore)
@@ -498,6 +504,19 @@ type StudentTeacherRuntime
                         return true
                     | ReconcileProgram.TurnCompleted, None, StudentTeacher.RunState.LearnReady ->
                         cell.State <- StudentTeacher.RunState.CompileDispatching
+
+                        let pending =
+                            lock gate (fun () ->
+                                let p = cell.PendingTeacherReturn
+                                cell.PendingTeacherReturn <- None
+                                p)
+
+                        pending
+                        |> Option.iter (fun p ->
+                            AsyncSupport.trySetResult p.NextQuestionWaiter (Error "Teacher session closed")
+                            |> ignore)
+
+                        let! _ = satellites.Retire(cell.SessionId, teacherSpec cell)
 
                         match! sendCompile cell false with
                         | Ok _ -> cell.State <- StudentTeacher.RunState.CompileReady
@@ -508,6 +527,17 @@ type StudentTeacherRuntime
                         let! _ = sendCompile cell true
                         return true
                     | ReconcileProgram.TurnAborted _, _, _ ->
+                        let pending =
+                            lock gate (fun () ->
+                                let p = cell.PendingTeacherReturn
+                                cell.PendingTeacherReturn <- None
+                                p)
+
+                        pending
+                        |> Option.iter (fun p ->
+                            AsyncSupport.trySetResult p.NextQuestionWaiter (Error "Student run aborted")
+                            |> ignore)
+
                         let! _ = satellites.Retire(cell.SessionId, teacherSpec cell)
                         qa.Delete(cell.SessionId, cell.LogicalRunId) |> ignore
                         lock gate (fun () -> runs.Remove(sessionKey cell.SessionId) |> ignore)
@@ -518,49 +548,38 @@ type StudentTeacherRuntime
                 match tryOwner turn.SessionId |> Option.bind tryCell with
                 | None -> return true
                 | Some cell ->
-                    let pendingReturn, waiter =
-                        lock gate (fun () -> cell.PendingTeacherReturn, cell.Waiter)
+                    match turn.Outcome with
+                    | ReconcileProgram.TurnCompleted ->
+                        let pendingReturn, waiter =
+                            lock gate (fun () -> cell.PendingTeacherReturn, cell.Waiter)
 
-                    match turn.Outcome, pendingReturn, waiter with
-                    | ReconcileProgram.TurnCompleted, Some pending, Some parentWaiter ->
-                        let finalText = CompletedTurnClassifier.partsText turn.Parts
+                        match pendingReturn, waiter with
+                        | None, Some _ ->
+                            let! _ = sendTeacherNudge cell turn.SessionId
+                            return true
+                        | _ -> return true
+                    | ReconcileProgram.TurnFailed error
+                    | ReconcileProgram.TurnAborted error ->
+                        let parentWaiter, pendingReturn =
+                            lock gate (fun () ->
+                                let w = cell.Waiter
+                                let p = cell.PendingTeacherReturn
+                                cell.Waiter <- None
+                                cell.PendingTeacherReturn <- None
+                                cell.State <- StudentTeacher.RunState.LearnReady
+                                w, p)
 
-                        let completedExpectedRun =
-                            pending.CompletionRun = Some turn.ProviderRun
-                            && finalText = StudentTeacherPrompt.TeacherReturnCompletion
+                        parentWaiter
+                        |> Option.iter (fun w ->
+                            AsyncSupport.trySetResult w (Error(sprintf "Teacher run failed: %s" error))
+                            |> ignore)
 
-                        lock gate (fun () ->
-                            cell.PendingTeacherReturn <- None
-                            cell.Waiter <- None
-                            cell.State <- StudentTeacher.RunState.LearnReady)
-
-                        if completedExpectedRun then
-                            AsyncSupport.trySetResult parentWaiter (Ok pending.Answer) |> ignore
-                        else
+                        pendingReturn
+                        |> Option.iter (fun p ->
                             AsyncSupport.trySetResult
-                                parentWaiter
-                                (Error "Teacher return completion did not match the pending provider run")
-                            |> ignore
-
-                        return true
-                    | ReconcileProgram.TurnCompleted, None, Some _ ->
-                        let! _ = sendTeacherNudge cell turn.SessionId
-                        return true
-                    | ReconcileProgram.TurnFailed error, _, Some parentWaiter
-                    | ReconcileProgram.TurnAborted error, _, Some parentWaiter ->
-                        lock gate (fun () ->
-                            cell.PendingTeacherReturn <- None
-                            cell.Waiter <- None
-                            cell.State <- StudentTeacher.RunState.LearnReady)
-
-                        AsyncSupport.trySetResult parentWaiter (Error(sprintf "Teacher run failed: %s" error))
-                        |> ignore
-
-                        return true
-                    | ReconcileProgram.TurnCompleted, Some _, None ->
-                        lock gate (fun () ->
-                            cell.PendingTeacherReturn <- None
-                            cell.State <- StudentTeacher.RunState.LearnReady)
+                                p.NextQuestionWaiter
+                                (Error(sprintf "Teacher run failed: %s" error))
+                            |> ignore)
 
                         return true
                     | _ -> return true
@@ -572,17 +591,23 @@ type StudentTeacherRuntime
             match tryCell sessionId with
             | None -> return Ok()
             | Some cell ->
-                let waiter =
+                let waiter, pendingReturn =
                     lock gate (fun () ->
-                        let pending = cell.Waiter
+                        let w = cell.Waiter
+                        let p = cell.PendingTeacherReturn
                         cell.Waiter <- None
                         cell.PendingTeacherReturn <- None
                         cell.State <- StudentTeacher.RunState.Closed
-                        pending)
+                        w, p)
 
                 waiter
                 |> Option.iter (fun pending ->
                     AsyncSupport.trySetResult pending (Error "Student run was cancelled") |> ignore)
+
+                pendingReturn
+                |> Option.iter (fun p ->
+                    AsyncSupport.trySetResult p.NextQuestionWaiter (Error "Student run was cancelled")
+                    |> ignore)
 
                 let deleteResult = qa.Delete(cell.SessionId, cell.LogicalRunId)
                 let! retireResult = satellites.Retire(cell.SessionId, teacherSpec cell)
@@ -595,3 +620,22 @@ type StudentTeacherRuntime
                 | Ok(), Error retireError -> return Error retireError
                 | Error deleteError, Error retireError -> return Error(sprintf "%s; %s" deleteError retireError)
         }
+
+    member me.Dispose() =
+        lock gate (fun () ->
+            for cell in runs.Values do
+                cell.Waiter
+                |> Option.iter (fun waiter ->
+                    AsyncSupport.trySetResult waiter (Error "Student–Teacher runtime disposed")
+                    |> ignore)
+
+                cell.PendingTeacherReturn
+                |> Option.iter (fun pending ->
+                    AsyncSupport.trySetResult pending.NextQuestionWaiter (Error "Student–Teacher runtime disposed")
+                    |> ignore)
+
+            runs.Clear()
+            teacherOwners.Clear())
+
+    interface IDisposable with
+        member me.Dispose() = me.Dispose()
