@@ -245,19 +245,35 @@ module HostSignalSubscribe =
     /// plugin input carries the Host's dead fallback address, a subscription
     /// connects to nothing and the SDK retries forever without yielding; the
     /// heartbeat watchdog then trips a reconnect every ~45s. The one reliable
-    /// discriminator is a live request: a real listener answers the health
-    /// endpoint, the fallback refuses.
-    [<Emit("""((url, path, timeoutMs) => new Promise((resolve) => {
-          const c = new AbortController();
-          const t = setTimeout(() => { try { c.abort(); } catch {} }, timeoutMs);
-          let target = null;
-          try { target = new URL(path, url).toString(); } catch {}
-          if (target === null) { clearTimeout(t); resolve(false); return; }
-          fetch(target, { signal: c.signal, method: 'GET' })
-            .then((r) => { clearTimeout(t); resolve(r.ok); })
-            .catch(() => { clearTimeout(t); resolve(false); });
-        }))($0, $1, $2)""")>]
-    let private probeServer (url: string) (path: string) (timeoutMs: int) : Task<bool> = jsNative
+    /// discriminator is a live request: a real OpenCode listener answers the health
+    /// endpoint with a valid health JSON payload (`healthy: true` or numeric `pid`);
+    /// random non-OpenCode servers or dead fallbacks refuse.
+    [<Emit("""((url, timeoutMs) => new Promise((resolve) => {
+          const check = (path) => new Promise((res) => {
+            const c = new AbortController();
+            const t = setTimeout(() => { try { c.abort(); } catch {} }, timeoutMs);
+            let target = null;
+            try { target = new URL(path, url).toString(); } catch {}
+            if (target === null) { clearTimeout(t); res(false); return; }
+            fetch(target, { signal: c.signal, method: 'GET' })
+              .then((r) => {
+                clearTimeout(t);
+                if (!r.ok) { res(false); return; }
+                return r.json()
+                  .then((data) => {
+                    const valid = data && (data.healthy === true || typeof data.pid === 'number');
+                    res(Boolean(valid));
+                  })
+                  .catch(() => res(false));
+              })
+              .catch(() => { clearTimeout(t); res(false); });
+          });
+          check('/api/health').then((ok1) => {
+            if (ok1) resolve(true);
+            else check('/global/health').then((ok2) => resolve(ok2));
+          });
+        }))($0, $1)""")>]
+    let private probeServer (url: string) (timeoutMs: int) : Task<bool> = jsNative
 
     let trySubscribe
         (input: obj)
@@ -323,7 +339,7 @@ module HostSignalSubscribe =
                 // verdict (hard error when no transport remains).
                 return subscribeGlobalOrLocal ()
             | Some url ->
-                let! reachable = probeServer url "/global/health" ServerProbeTimeoutMs
+                let! reachable = probeServer url ServerProbeTimeoutMs
 
                 if reachable then
                     return subscribeGlobalOrLocal ()

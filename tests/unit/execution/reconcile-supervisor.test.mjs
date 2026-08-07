@@ -371,7 +371,9 @@ const withFetch = async (impl, fn) => {
 const refused = async () => {
   throw new Error('ECONNREFUSED')
 }
-const answers = async () => ({ ok: true })
+const answers = async () => ({ ok: true, json: async () => ({ healthy: true }) })
+const answersV2 = async () => ({ ok: true, json: async () => ({ healthy: true, pid: 1 }) })
+const answersNonOpencode = async () => ({ ok: true, json: async () => ({ status: 'ok', app: 'random' }) })
 
 test('HOST_signal_subscribe_embedded_fallback_degrades_to_local_event_hook', async () => {
   const result = await withFetch(refused, () =>
@@ -382,6 +384,17 @@ test('HOST_signal_subscribe_embedded_fallback_degrades_to_local_event_hook', asy
   const [subscription, source] = decoded.value
   assert.ok(isNone(subscription), 'no SSE subscription against a dead fallback address')
   assert.equal(source, 'local-event-hook', 'local signals arrive through the Host event hook')
+})
+
+test('HOST_signal_subscribe_non_opencode_server_degrades_to_local_event_hook', async () => {
+  const result = await withFetch(answersNonOpencode, () =>
+    hostSignalSubscribe.trySubscribe({ serverUrl: 'http://localhost:4096', client: null }, () => {}),
+  )
+  const decoded = resultOf(result)
+  assert.equal(decoded.ok, true, 'random non-OpenCode HTTP listener must degrade to local hook')
+  const [subscription, source] = decoded.value
+  assert.ok(isNone(subscription), 'no SSE subscription against a non-OpenCode HTTP server')
+  assert.equal(source, 'local-event-hook')
 })
 
 test('HOST_signal_subscribe_embedded_uses_legacy_listen_when_present', async () => {
@@ -402,6 +415,16 @@ test('HOST_signal_subscribe_embedded_uses_legacy_listen_when_present', async () 
 test('HOST_signal_subscribe_real_server_url_keeps_global_sse', async () => {
   // Serve mode — a real listener answers the probe on whatever port it picked.
   const result = await withFetch(answers, () =>
+    hostSignalSubscribe.trySubscribe({ serverUrl: 'http://127.0.0.1:4096', client: null }, () => {}),
+  )
+  const decoded = resultOf(result)
+  assert.equal(decoded.ok, false, 'no client.global → hard error, not silent degradation')
+  assert.ok(decoded.error.includes('OPENCODE-SIGNAL-SUBSCRIBE'), decoded.error)
+})
+
+test('HOST_signal_subscribe_v2_server_url_keeps_global_sse', async () => {
+  // OpenCode v2 serve mode — /api/health returns pid + healthy: true.
+  const result = await withFetch(answersV2, () =>
     hostSignalSubscribe.trySubscribe({ serverUrl: 'http://127.0.0.1:4096', client: null }, () => {}),
   )
   const decoded = resultOf(result)

@@ -54,7 +54,7 @@ module NodeProcessWait =
     /// fired. If the process is still not exited when this elapses, return
     /// TimedOut with ExitCode=-1 (unknown), never fake a successful exit.
     /// Plain `let` so layer-1 tests can read the export (same pattern as Deadline.MaxTimerWaitMs).
-    let KillAckGraceMs = 5_000
+    let KillAckGraceMs = 1_000
 
     /// One race among process exit, timer, and cancellation.
     /// Does not Kill — only reports which signal arrived first.
