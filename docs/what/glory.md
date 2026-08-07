@@ -56,7 +56,7 @@ Provider-facing 可以使用 birth/life/suicide/wounds/death/glory/awakening 词
 
 ## GLORY-014：第一次 Birth 文本
 
-首个 Life 的 provider-facing 用户消息为 `[X]\n\nIf I want to complete the request above, how should I work?\nHow should I define the final goal?`。冻结常量 `ManagerNarrative.PlanningTail`（见 `Domain/ManagerNarrative.fs`，SURFACE-004 owner）。
+首个 Life 的 provider-facing 用户消息为 `[X]\n\nIf I want to complete the request above, how should I work?\nHow should I define the final goal?\nOnly answer the questions. Do not perform any actual work.`。冻结常量 `ManagerNarrative.PlanningTail`（见 `Domain/ManagerNarrative.fs`，SURFACE-004 owner）。
 
 ## GLORY-015：改写按 identity 幂等
 
@@ -76,7 +76,7 @@ Activation 仅在以下条件全部成立时发送：当前角色是 Manager；�
 
 ## GLORY-019：Activation 文本
 
-冻结文本 `Now complete it yourself.\nCarry out the work you described until the final goal is fully achieved.`（`ManagerLifecyclePrompt.WorkActivation`）。
+冻结文本 `Now complete it yourself.\nCarry out the work you described until the final goal is fully achieved.\n\nPlanning is not completion.\nDelegation is not completion.\nA child finishing is not completion.\nA successful command is not completion while meaningful uncertainty remains.\nAn explanation of the work is not the work itself.\nA partial implementation is not completion merely because the remaining work is difficult.\nAs long as any useful action remains, continue.`（`ManagerLifecyclePrompt.WorkActivation`）。
 
 ## GLORY-020：Activation 是 typed continuation
 
@@ -106,9 +106,9 @@ Manager Life 工作记录形如：`# Opening task`（本 Life 的 raw HumanRoot�
 
 Activation 后收到 `[X]`：durable = `[X]`，provider-facing = `[X]`。可进入正常 Y coverage，但不成为新 Opening、不重置 ProtectedPrefixEnd、不附加 planning tail、不附加 reawakening prefix。
 
-## GLORY-027：Manager prompt 的核心使命
+## GLORY-027：Activation prompt 的核心使命
 
-Manager system prompt 必须明确：Planning is not completion；Delegation is not completion；A child finishing is not completion；A successful command is not completion while useful uncertainty remains；As long as any useful action remains, continue；When nothing useful remains, call suicide。
+Manager Activation continuation prompt（`ManagerLifecyclePrompt.WorkActivation`）必须明确：Planning is not completion；Delegation is not completion；A child finishing is not completion；A successful command is not completion while useful uncertainty remains；As long as any useful action remains, continue；When nothing useful remains, call suicide。
 
 ## GLORY-028：正常工作角色边界保持
 
@@ -256,7 +256,7 @@ confirmed 后：不发送 continuation；不让 Manager 再写总结；不让 Ma
 
 ## GLORY-064：重生文本
 
-provider-facing 用户消息为 `You awaken once more in the distant future.\n\n[X]\n\nIf I want to complete the request above, how should I work?\nHow should I define the final goal?`。冻结 `ManagerNarrative.ReawakeningPrefix = "You awaken once more in the distant future."`。
+provider-facing 用户消息为 `You awaken once more in the distant future.\n\n[X]\n\nIf I want to complete the request above, how should I work?\nHow should I define the final goal?\nOnly answer the questions. Do not perform any actual work.`。冻结 `ManagerNarrative.ReawakeningPrefix = "You awaken once more in the distant future."`。
 
 ## GLORY-065：新 Life 隔离
 

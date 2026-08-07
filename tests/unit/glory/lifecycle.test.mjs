@@ -249,7 +249,7 @@ test('GLORY_014_first_birth_golden_bytes', async () => {
   const { managerNarrative } = await import('../support/glory.mjs')
   assert.equal(
     managerNarrative.firstBirth('Fix the retry race.'),
-    'Fix the retry race.\n\nIf I want to complete the request above, how should I work?\nHow should I define the final goal?',
+    'Fix the retry race.\n\nIf I want to complete the request above, how should I work?\nHow should I define the final goal?\nOnly answer the questions. Do not perform any actual work.',
   )
 })
 
@@ -257,7 +257,7 @@ test('GLORY_064_reawakening_golden_bytes', async () => {
   const { managerNarrative } = await import('../support/glory.mjs')
   assert.equal(
     managerNarrative.reawakening('Add Windows support.'),
-    'You awaken once more in the distant future.\n\nAdd Windows support.\n\nIf I want to complete the request above, how should I work?\nHow should I define the final goal?',
+    'You awaken once more in the distant future.\n\nAdd Windows support.\n\nIf I want to complete the request above, how should I work?\nHow should I define the final goal?\nOnly answer the questions. Do not perform any actual work.',
   )
 })
 
@@ -265,7 +265,7 @@ test('GLORY_019_activation_golden_bytes', async () => {
   const { managerLifecyclePrompt } = await import('../support/glory.mjs')
   assert.equal(
     managerLifecyclePrompt.workActivation(),
-    'Now complete it yourself.\nCarry out the work you described until the final goal is fully achieved.',
+    'Now complete it yourself.\nCarry out the work you described until the final goal is fully achieved.\n\nPlanning is not completion.\nDelegation is not completion.\nA child finishing is not completion.\nA successful command is not completion while meaningful uncertainty remains.\nAn explanation of the work is not the work itself.\nA partial implementation is not completion merely because the remaining work is difficult.\nAs long as any useful action remains, continue.',
   )
 })
 

@@ -28,7 +28,7 @@ const textOf = (messages, id) => {
   return part?.text
 }
 
-const ACTIVATION = 'Now complete it yourself.\nCarry out the work you described until the final goal is fully achieved.'
+const ACTIVATION = 'Now complete it yourself.\nCarry out the work you described until the final goal is fully achieved.\n\nPlanning is not completion.\nDelegation is not completion.\nA child finishing is not completion.\nA successful command is not completion while meaningful uncertainty remains.\nAn explanation of the work is not the work itself.\nA partial implementation is not completion merely because the remaining work is difficult.\nAs long as any useful action remains, continue.'
 
 test('GLORY_015_opening_rewrite_is_byte_identical_across_requests', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
