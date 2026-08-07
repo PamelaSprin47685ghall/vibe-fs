@@ -17,21 +17,21 @@
 scenario = "enforcer-repair-persist"
 description = "ENFORCER-153 interaction-repair synthetic message survives into the next provider request"
 pass = "Injected interaction-repair message visible in a later provider request"
-session = { agent = "fast-manager", bind = ["manager-title", "manager"] }
-prompt = { agent = "fast-manager", text = "Start repair persistence check." }
+session = { agent = "fast-coder", bind = ["coder-title", "coder"] }
+prompt = { agent = "fast-coder", text = "Start repair persistence check." }
 
-must = ["manager-title", "manager", "blogger", "blogger-repair"]
+must = ["coder-title", "coder", "blogger", "blogger-repair"]
 
 flow = [
-  { prompt = { text = "Start repair persistence check." } },
+  { wait = "coder" },
   { wait = "blogger-repair.0" },
   { custom = "assertRepairPersisted" },
   { abort = true },
 ]
 
 [[turn]]
-id = "manager-title"
-lane = "manager-title"
+id = "coder-title"
+lane = "coder-title"
 kind = "title"
 user = "Start repair persistence check."
 
@@ -39,19 +39,12 @@ user = "Start repair persistence check."
   respond = { type = "title", text = "E2E Repair Persist" }
 
 [[turn]]
-id = "manager"
-lane = "manager"
+id = "coder"
+lane = "fast-coder"
 user = "Start repair persistence check."
-tools = ["fork", "join", "list"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Repair persist paragraph.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Second blogger material.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Manager settled." }
+  respond = { type = "text", text = "Coder settled." }
 
 # Blogger child session, production-composed prompt (same as manager-companion).
 # Step 0: a blog tool call with EMPTY text → ENFORCER-061 empty-text cycle →
@@ -74,17 +67,6 @@ user = "# Protocol repair"
 
   [[turn.step]]
   respond = { type = "text", text = "Repair acknowledged." }
-
-# Host may inject a review-guard continuation after the manager turn settles
-# (RuntimeNudge.managerReviewGuard). Production-composed → internal.
-[[turn]]
-id = "manager-guard"
-internal = true
-user = ["# Review is required before completion.", "# Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."]
-tools = ["fork", "join", "list"]
-
-  [[turn.step]]
-  respond = { type = "text", text = "Manager review guard acknowledged." }
 
 # The repair injection rebuilds the Blogger provider view (synthetic
 # interaction-repair user message appended to the reconstructed history): the
