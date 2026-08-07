@@ -432,8 +432,7 @@ module FinalityController =
                                         reviewerId
                                         barrierId
                                         requestTree
-                            | None ->
-                                return Undecided ManagerLifecyclePrompt.FinalityUndecidable
+                            | None -> return Undecided ManagerLifecyclePrompt.FinalityUndecidable
                 with ex ->
                     // Exception boundary: never leak an exception out of
                     // the tool call that accepted the suicide.

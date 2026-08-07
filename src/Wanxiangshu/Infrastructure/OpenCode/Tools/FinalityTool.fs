@@ -199,8 +199,7 @@ module FinalityTool =
 
                                             match outcome with
                                             | FinalityController.FinalityOutcome.Rejected prompt
-                                            | FinalityController.FinalityOutcome.Undecided prompt ->
-                                                return prompt
+                                            | FinalityController.FinalityOutcome.Undecided prompt -> return prompt
                                             | FinalityController.FinalityOutcome.Confirmed msg ->
                                                 return ToolHostCodec.tomlObjectWithInstructions [ msg ] []
                                         else
@@ -281,8 +280,7 @@ module FinalityTool =
 
                                                 match outcome with
                                                 | FinalityController.FinalityOutcome.Rejected prompt
-                                                | FinalityController.FinalityOutcome.Undecided prompt ->
-                                                    return prompt
+                                                | FinalityController.FinalityOutcome.Undecided prompt -> return prompt
                                                 | FinalityController.FinalityOutcome.Confirmed msg ->
                                                     return ToolHostCodec.tomlObjectWithInstructions [ msg ] []
                             }
