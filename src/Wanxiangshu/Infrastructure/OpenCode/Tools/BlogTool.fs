@@ -37,13 +37,11 @@ module BlogTool =
         else
             Ok trimmed
 
-    /// Live cycle gate: physical flight ownership (HasFlight); peek is dual-write fallback.
+    /// Live cycle gate: physical flight ownership only (HasFlight).
     let hasLiveCycle (parkedHost: IParkedTransformHost option) (sessionId: string) : bool =
         match parkedHost with
         | None -> false
-        | Some host ->
-            host.HasFlight sessionId
-            || host.TryPeekCurrentRequest sessionId |> Option.isSome
+        | Some host -> host.HasFlight sessionId
 
     let private enforcerRules () =
         RuntimeResources.current().EnforcerRules

@@ -223,11 +223,11 @@ module BloggerCoordinator =
         (host: CompanionHost)
         (journal: AgentJournal option)
         (key: string)
-        (cell: BloggerRuntimeCell)
         (ctx: BloggerRequestContext)
         : Task<DecisionEffect> =
         task {
-            // Order (C2/C5): materialize durable → flight ownership (SetCurrentRequest dual-writes State shadow) → send.
+            // Order (C2/C5): materialize durable → flight ownership (SetCurrentRequest) → send.
+            // No cell.State write: physical flight registry is the busy authority.
             let mainId = BloggerRequestContext.mainSessionId ctx
 
             match journal with
@@ -248,7 +248,6 @@ module BloggerCoordinator =
                             forceSealRuntime scope key
                             return DecisionEffect.Sealed
                         else
-                            scope.SetBloggerRuntime(key, cell)
                             scope.SetCurrentRequest(key, ctx)
 
                             let! sent = host.StartFromContext(ctx)
@@ -262,11 +261,6 @@ module BloggerCoordinator =
                                 match materializeRequest j ctx (Some promptKey) with
                                 | Error reason ->
                                     abandonRequest journal ctx reason
-
-                                    match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
-                                    | Ok failed -> scope.SetBloggerRuntime(key, failed)
-                                    | Error _ -> ()
-
                                     scope.ClearCurrentRequest key
                                     host.InvalidateBloggerCache()
                                     return DecisionEffect.StartFailed reason
@@ -276,11 +270,6 @@ module BloggerCoordinator =
                                     | BloggerRequestContext.Main _ -> return DecisionEffect.Started
                             | Error reason ->
                                 abandonRequest journal ctx reason
-
-                                match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
-                                | Ok failed -> scope.SetBloggerRuntime(key, failed)
-                                | Error _ -> ()
-
                                 scope.ClearCurrentRequest key
                                 host.InvalidateBloggerCache()
                                 return DecisionEffect.StartFailed reason
@@ -294,7 +283,6 @@ module BloggerCoordinator =
         (bloggerSessionId: SessionId)
         (observedEpoch: PrefixEpochId)
         (key: string)
-        (cell: BloggerRuntimeCell)
         (blog: BlogProjectionState)
         : Task<DecisionEffect option> =
         task {
@@ -317,18 +305,13 @@ module BloggerCoordinator =
                     with
                     | None -> return None
                     | Some squashCtx ->
-                        match BloggerRuntime.onMaterial (scope.HasParked key) cell squashCtx with
-                        | Ok(nextCell, BloggerRuntime.Decision.Start startCtx)
-                        | Ok(nextCell, BloggerRuntime.Decision.Offer startCtx) ->
-                            let! effect = startFrozen scope host journal key nextCell startCtx
+                        // Physical facts only: parked waiter + flight ownership (decideMaterial).
+                        match BloggerRuntime.decideMaterial (scope.HasParked key) (scope.HasFlight key) squashCtx with
+                        | BloggerRuntime.Decision.Start startCtx
+                        | BloggerRuntime.Decision.Offer startCtx ->
+                            let! effect = startFrozen scope host journal key startCtx
                             return Some effect
-                        | Ok(nextCell, BloggerRuntime.Decision.Skip) ->
-                            scope.SetBloggerRuntime(key, nextCell)
-                            return Some DecisionEffect.SkippedInFlight
-                        | Ok(nextCell, _) ->
-                            scope.SetBloggerRuntime(key, nextCell)
-                            return Some DecisionEffect.NoMaterial
-                        | Error _ -> return Some DecisionEffect.SkippedInFlight
+                        | BloggerRuntime.Decision.Skip -> return Some DecisionEffect.SkippedInFlight
         }
 
     /// Unique production entry for main-session material → Blogger lifecycle.
@@ -365,13 +348,13 @@ module BloggerCoordinator =
                 // Busy = physical flight ownership, not cell.State match.
                 return DecisionEffect.SkippedInFlight
             else
-                let cell = scope.GetBloggerRuntime key
                 // No sealed mirror: blocksNew above already applied the durable
                 // seal (DecisionEffect.Sealed) before this point.
+                // No cell: decideMaterial routes from HasParked + HasFlight only.
                 let blog, xTrace, observedEpoch = loadProjections journal mainSessionId host
 
                 let! squashEffect =
-                    tryStartSquash scope host journal mainSessionId bloggerSessionId observedEpoch key cell blog
+                    tryStartSquash scope host journal mainSessionId bloggerSessionId observedEpoch key blog
 
                 match squashEffect with
                 | Some effect -> return effect
@@ -388,20 +371,12 @@ module BloggerCoordinator =
                     with
                     | None -> return DecisionEffect.NoMaterial
                     | Some ctx ->
-                        match BloggerRuntime.onMaterial (scope.HasParked key) (scope.GetBloggerRuntime key) ctx with
-                        | Ok(nextCell, BloggerRuntime.Decision.Start startCtx) ->
-                            return! startFrozen scope host journal key nextCell startCtx
-                        | Ok(nextCell, BloggerRuntime.Decision.Offer offerCtx) ->
-                            scope.SetBloggerRuntime(key, nextCell)
+                        match BloggerRuntime.decideMaterial (scope.HasParked key) (scope.HasFlight key) ctx with
+                        | BloggerRuntime.Decision.Start startCtx -> return! startFrozen scope host journal key startCtx
+                        | BloggerRuntime.Decision.Offer offerCtx ->
                             let resumed = scope.SetPendingOffer(key, offerCtx)
                             return DecisionEffect.OfferedParked resumed
-                        | Ok(nextCell, BloggerRuntime.Decision.Skip) ->
-                            scope.SetBloggerRuntime(key, nextCell)
-                            return DecisionEffect.SkippedInFlight
-                        | Ok(nextCell, _) ->
-                            scope.SetBloggerRuntime(key, nextCell)
-                            return DecisionEffect.NoMaterial
-                        | Error _ -> return DecisionEffect.SkippedInFlight
+                        | BloggerRuntime.Decision.Skip -> return DecisionEffect.SkippedInFlight
         }
 
     /// AABB: rebuild Main context from latest projection at the same prev ingest.

@@ -17,9 +17,8 @@ module internal ParkedTransformInterop =
 /// Parking + dual request slots (ENFORCER-047/050/160).
 ///
 /// CurrentRequest ownership = physical flight registry (HasFlight / TryGetFlight).
-/// BloggerRuntimeState.InFlight is dual-write shadow for transition-cell compat —
-/// busy decisions must prefer HasFlight, not cell.State.
 /// PendingOffer = the next Main material staged only while Parked (own slot).
+/// Drain window = physical drain slot (GetDrainWindow / SetDrainWindow / IsDrainOpen).
 type IParkedTransformHost =
     abstract ParkTransform: string * TimeSpan -> Task<bool>
     abstract ResumeParked: string -> bool
@@ -34,8 +33,10 @@ type IParkedTransformHost =
     /// Stage PendingOffer. Returns true when a parked waiter was resumed.
     abstract SetPendingOffer: string * BloggerRequestContext -> bool
     abstract TryTakePendingOffer: string -> BloggerRequestContext option
-    abstract GetBloggerRuntime: string -> BloggerRuntimeCell
-    abstract SetBloggerRuntime: string * BloggerRuntimeCell -> unit
+    /// Physical drain-window slot.
+    abstract GetDrainWindow: string -> DrainWindow
+    abstract SetDrainWindow: string * DrainWindow -> unit
+    abstract IsDrainOpen: string -> bool
 
 /// One parkable transform wait for one session (ENFORCER-160).
 type ParkedTransform(sessionId: string, lifetime: TimeSpan) as this =

@@ -825,12 +825,7 @@ module EnforcerHost =
 
             match openReq with
             | None -> None
-            | Some req ->
-                match tryReloadRequestContext journal req with
-                | None -> None
-                | Some ctx ->
-                    match scope.GetBloggerRuntime(key).State with
-                    | _ -> Some ctx
+            | Some req -> tryReloadRequestContext journal req
 
     let private tryOpenByBlogger
         (journal: AgentJournal)
@@ -1126,7 +1121,7 @@ module EnforcerHost =
     /// ENFORCER-153 / DSL-003: the recovery stage probe, injected by the caller
     /// (Application layer owns the derivation; Session cannot reference it by
     /// compile order). Derived from the durable repair claim + provider-visible
-    /// transcript on every read — `BloggerRuntimeCell` carries no Recovery
+    /// transcript on every read — recovery is never stored on a runtime cell
     /// mirror, and this module must never grow one.
     type RecoveryStageProbe = BloggerRequestContext -> BloggerToolRecovery
 
@@ -1193,10 +1188,6 @@ module EnforcerHost =
 
                     BloggerAbandon.openRequest durable owner bloggerSessionId currentCtx reason
 
-                    match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
-                    | Ok next -> scope.SetBloggerRuntime(key, next)
-                    | Error _ -> ()
-
                     scope.ClearCurrentRequest key
                     project rawMessages
 
@@ -1205,11 +1196,9 @@ module EnforcerHost =
                 /// Not used on first pure-prose (that is InteractionNudge). Used for: nudge
                 /// hard-fail, second pure prose, interrupted tool, ENFORCER-061 empty text.
                 let aabbRepair (ctx: BloggerRequestContext) (reason: string) =
-                    let cell = scope.GetBloggerRuntime key
-
                     if
                         AgentProjection.mainSealedForBlogger owner (AgentJournal.snapshot durable).AgentProjections
-                        && not (BloggerRuntime.isDrainOpen cell)
+                        && not (scope.IsDrainOpen key)
                     then
                         BloggerRuntimeHost.forceSealRuntime scope key
                         project rawMessages
@@ -1254,17 +1243,6 @@ module EnforcerHost =
                                 |> Option.defaultValue ctx
 
                             scope.SetCurrentRequest(key, fresh)
-
-                            match scope.GetBloggerRuntime key with
-                            | c ->
-                                match c.State with
-                                | BloggerRuntimeState.InFlight _ ->
-                                    scope.SetBloggerRuntime(
-                                        key,
-                                        { c with
-                                            State = BloggerRuntimeState.InFlight fresh }
-                                    )
-                                | _ -> ()
 
                             Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
                             let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId fresh)
@@ -1418,17 +1396,14 @@ module EnforcerHost =
 
                         match tryRefreshMainContextFromJournal scope durable mainSessionId bloggerSessionId with
                         | Some ctx ->
-                            match BloggerRuntime.adoptPendingAsCurrent (scope.GetBloggerRuntime key) ctx with
-                            | Ok cell ->
-                                scope.SetBloggerRuntime(key, cell)
+                            if scope.HasFlight key then
+                                ()
+                            else
                                 scope.SetCurrentRequest(key, ctx)
-                            | Error _ -> ()
 
                             project (resumeWithContext ctx)
                         | None ->
                             // Caught up. Durable seal ends reactivation permanently.
-                            let cell = scope.GetBloggerRuntime key
-
                             if
                                 AgentProjection.mainSealedForBlogger
                                     mainSessionId
@@ -1436,12 +1411,7 @@ module EnforcerHost =
                             then
                                 BloggerRuntimeHost.forceSealCellDropOffer scope key
                             else
-                                match cell.State with
-                                | BloggerRuntimeState.InFlight _ ->
-                                    match BloggerRuntime.onCycleCommitted cell with
-                                    | Ok parked -> scope.SetBloggerRuntime(key, parked)
-                                    | Error _ -> ()
-                                | _ -> ()
+                                scope.ClearCurrentRequest key
 
                             stopPhysicalRun rawMessages fallback caughtUpReason
 
@@ -1481,10 +1451,6 @@ module EnforcerHost =
 
                         BloggerAbandon.openRequest durable mainSessionId bloggerSessionId liveCtx reason
 
-                        match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
-                        | Ok cell -> scope.SetBloggerRuntime(key, cell)
-                        | Error _ -> ()
-
                         scope.ClearCurrentRequest key
 
                     let unexpectedEnd (reason: string) = fatalEnd reason
@@ -1496,10 +1462,6 @@ module EnforcerHost =
                         Diagnostic.emit "enforcer-cycle-stale" [ "session_id", key; "result", reason ]
 
                         BloggerAbandon.openRequest durable mainSessionId bloggerSessionId liveCtx reason
-
-                        match BloggerRuntime.onFail (scope.GetBloggerRuntime key) with
-                        | Ok cell -> scope.SetBloggerRuntime(key, cell)
-                        | Error _ -> ()
 
                         scope.ClearCurrentRequest key
                         disposition <- CycleDisposition.AbandonThenCatchUp
@@ -1530,17 +1492,6 @@ module EnforcerHost =
                             disposition <- CycleDisposition.InjectRepair freshCtx
                             scope.SetCurrentRequest(key, freshCtx)
 
-                            match scope.GetBloggerRuntime key with
-                            | c ->
-                                match c.State with
-                                | BloggerRuntimeState.InFlight _ ->
-                                    scope.SetBloggerRuntime(
-                                        key,
-                                        { c with
-                                            State = BloggerRuntimeState.InFlight freshCtx }
-                                    )
-                                | _ -> ()
-
                             Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
                     | Error reason ->
                         if isEmptyTextCycleFailure reason && aabbConsumed () then
@@ -1555,11 +1506,6 @@ module EnforcerHost =
                             with
                             | CycleCommitOutcome.KnownCommitted ->
                                 disposition <- CycleDisposition.Committed None
-
-                                match BloggerRuntime.onSquashCommitted (scope.GetBloggerRuntime key) None with
-                                | Ok(cell, _) -> scope.SetBloggerRuntime(key, cell)
-                                | Error _ -> ()
-
                                 scope.ClearCurrentRequest key
                             | CycleCommitOutcome.KnownNotCommitted reason -> abandonStaleCycle reason
                             | CycleCommitOutcome.CommitUnknown reason ->
@@ -1598,19 +1544,14 @@ module EnforcerHost =
                                 | CycleCommitOutcome.KnownCommitted ->
                                     disposition <- CycleDisposition.Committed None
 
-                                    match BloggerRuntime.onCycleCommitted (scope.GetBloggerRuntime key) with
-                                    | Ok cell ->
-                                        // Handle may have sealed during the cycle.
-                                        if
-                                            AgentProjection.mainSealedForBlogger
-                                                mainSessionId
-                                                (AgentJournal.snapshot durable).AgentProjections
-                                            && not (BloggerRuntime.isDrainOpen cell)
-                                        then
-                                            BloggerRuntimeHost.forceSealCellDropOffer scope key
-                                        else
-                                            scope.SetBloggerRuntime(key, cell)
-                                    | Error _ -> ()
+                                    // Handle may have sealed during the cycle.
+                                    if
+                                        AgentProjection.mainSealedForBlogger
+                                            mainSessionId
+                                            (AgentJournal.snapshot durable).AgentProjections
+                                        && not (scope.IsDrainOpen key)
+                                    then
+                                        BloggerRuntimeHost.forceSealCellDropOffer scope key
 
                                     scope.ClearCurrentRequest key
                                 | CycleCommitOutcome.KnownNotCommitted reason -> abandonStaleCycle reason
@@ -1687,17 +1628,14 @@ module EnforcerHost =
                                     tryRefreshMainContextFromJournal scope durable mainSessionId bloggerSessionId
                                     |> Option.defaultValue ctx
 
-                                match BloggerRuntime.adoptPendingAsCurrent (scope.GetBloggerRuntime key) ctx with
-                                | Ok cell ->
-                                    scope.SetBloggerRuntime(key, cell)
+                                if scope.HasFlight key then
+                                    ()
+                                else
                                     scope.SetCurrentRequest(key, ctx)
-                                | Error _ -> ()
 
                                 return project (resumeWithContext ctx)
                             | None, None ->
                                 // Caught up now. Durable seal closes DrainWindow permanently.
-                                let cell = scope.GetBloggerRuntime key
-
                                 if
                                     AgentProjection.mainSealedForBlogger
                                         mainSessionId
@@ -1707,12 +1645,7 @@ module EnforcerHost =
                                     scope.ClearCurrentRequest key
                                     return stop "main-sealed-caught-up"
                                 else
-                                    match cell.State with
-                                    | BloggerRuntimeState.InFlight _ ->
-                                        match BloggerRuntime.onCycleCommitted cell with
-                                        | Ok parked -> scope.SetBloggerRuntime(key, parked)
-                                        | Error _ -> ()
-                                    | _ -> ()
+                                    scope.ClearCurrentRequest key
 
                                     let! resumed = scope.ParkTransform(key, ParkedTransformLifetime)
 
@@ -1721,7 +1654,7 @@ module EnforcerHost =
                                             BloggerRuntimeHost.forceSealRuntime scope key
                                             return stop "park-ended-main-sealed"
                                         else
-                                            // Re-check gap: InFlight wake may have arrived after last refresh.
+                                            // Re-check gap: flight wake may have arrived after last refresh.
                                             match
                                                 tryRefreshMainContextFromJournal
                                                     scope
@@ -1730,15 +1663,10 @@ module EnforcerHost =
                                                     bloggerSessionId
                                             with
                                             | Some ctx ->
-                                                match
-                                                    BloggerRuntime.adoptPendingAsCurrent
-                                                        (scope.GetBloggerRuntime key)
-                                                        ctx
-                                                with
-                                                | Ok next ->
-                                                    scope.SetBloggerRuntime(key, next)
+                                                if scope.HasFlight key then
+                                                    ()
+                                                else
                                                     scope.SetCurrentRequest(key, ctx)
-                                                | Error _ -> ()
 
                                                 return project (resumeWithContext ctx)
                                             | None ->
@@ -1759,17 +1687,10 @@ module EnforcerHost =
                                             if mainBlocks () then
                                                 BloggerRuntimeHost.forceSealRuntime scope key
                                                 return stop "park-resumed-main-sealed"
+                                            else if scope.HasFlight key then
+                                                return project (resumeWithContext ctx)
                                             else
-                                                match
-                                                    BloggerRuntime.adoptPendingAsCurrent
-                                                        (scope.GetBloggerRuntime key)
-                                                        ctx
-                                                with
-                                                | Ok next ->
-                                                    scope.SetBloggerRuntime(key, next)
-                                                    scope.SetCurrentRequest(key, ctx)
-                                                | Error _ -> ()
-
+                                                scope.SetCurrentRequest(key, ctx)
                                                 return project (resumeWithContext ctx)
                                         | None -> return project rawMessages
             | _ ->

@@ -18,8 +18,8 @@ open Wanxiangshu.Session
 /// receipts. No TOML reverse parse, no guess from latest X, no log strings.
 ///
 /// Live in-process: materialize → EnsureRecoveryDone may run before/during the
-/// first provider step. Never abandon or stomp CurrentRequest when the runtime
-/// cell is already InFlight with a real context.
+/// first provider step. Never abandon or stomp CurrentRequest when the host
+/// already holds physical flight ownership (HasFlight).
 module BloggerCrashRecovery =
 
     /// Must match EnforcerHost interactionNudge repairKind (ENFORCER-066 claim scope).
@@ -28,16 +28,16 @@ module BloggerCrashRecovery =
 
     [<RequireQualifiedAccess>]
     type WindowOutcome =
-        /// A: Host session gone after materialize → abandon, Idle.
+        /// A: Host session gone after materialize → abandon, clear flight.
         | AbandonedUnsent of BloggerRequestId
-        /// C: tool results present, no receipt → restore InFlight for re-entry.
+        /// C: tool results present, no receipt → restore physical flight for re-entry.
         | Recommitted of ProviderRunIdentity
         /// D: receipt present, no waiter → nothing to restore; next material
         /// flows through startFrozen and the drain re-checks receipts.
         | ReceiptedIdle of SessionId
         /// E: Parked, new material exists → leave for next coordinator offer.
         | PendingMaterial of SessionId
-        /// Still open and Host still running — restore InFlight in memory.
+        /// Still open and Host still running — restore physical flight in memory.
         | RestoredInFlight of SessionId
         /// Live process already owns the request; recovery is a no-op.
         | AlreadyLive of SessionId
@@ -74,18 +74,25 @@ module BloggerCrashRecovery =
         else
             Some(WindowOutcome.RestoredInFlight(SessionId.create "decision"))
 
+    /// Rebuild or clear physical flight ownership. Drain stays Closed.
+    /// Does not match cell.State: SetCurrentRequest / ClearCurrentRequest are
+    /// the flight authority; SetDrainWindow keeps the physical drain slot closed
+    /// without re-authoring any shadow state.
     let private restoreRuntime
         (host: IParkedTransformHost)
         (bloggerSessionId: SessionId)
-        (state: BloggerRuntimeState)
+        (flight: BloggerRequestContext option)
         : unit =
         let key = SessionId.value bloggerSessionId
 
-        host.SetBloggerRuntime(
-            key,
-            { State = state
-              Drain = DrainWindow.Closed }
-        )
+        match flight with
+        | Some ctx ->
+            host.SetCurrentRequest(key, ctx)
+            // Keep Drain Closed without re-authoring ownership via State match.
+            host.SetDrainWindow(key, DrainWindow.Closed)
+        | None ->
+            host.ClearCurrentRequest key
+            host.SetDrainWindow(key, DrainWindow.Closed)
 
     /// C5: one reload path — EnforcerHost.tryReloadRequestContext (full cutoff/digest).
     let private tryReloadMainContext
@@ -106,7 +113,8 @@ module BloggerCrashRecovery =
             | Some durable ->
                 let results = ResizeArray<WindowOutcome>()
 
-                // Window D: receipt present, no open request, no parked waiter → Parked.
+                // Window D: receipt present, no open request, no parked waiter.
+                // Busy authority = HasFlight, not cell.State.
                 for mainSessionId, session in (AgentJournal.snapshot durable).AgentProjections.Sessions |> Map.toList do
                     match session.BloggerCycles, session.Companion with
                     | Some cycles, Some companion ->
@@ -116,34 +124,30 @@ module BloggerCrashRecovery =
                             let key = SessionId.value bloggerId
                             let hasOpen = Map.containsKey bloggerId cycles.OpenByBlogger
                             let hasAnyReceipt = not (Map.isEmpty cycles.ByProviderRun)
-                            let live = host.GetBloggerRuntime key
 
-                            match live.State with
-                            | BloggerRuntimeState.InFlight _ -> ()
-                            | BloggerRuntimeState.Idle when hasAnyReceipt && not hasOpen && not (host.HasParked key) ->
+                            if host.HasFlight key then
+                                ()
+                            elif hasAnyReceipt && not hasOpen && not (host.HasParked key) then
                                 // Cycle already receipted → NoRecovery (ENFORCER-063 success path).
                                 //
                                 // Nothing to restore: forcing `Parked` here would stage the next
                                 // material as a PendingOffer with no ParkedTransform to resume it
                                 // (arming is NotArmed after restart, so no squash path starts
                                 // either) — the session would stall on its next material. Leaving
-                                // the cell Idle lets the material flow through startFrozen, and
+                                // flight clear lets the material flow through startFrozen, and
                                 // the drain path after its commit re-checks receipts via
                                 // tryRefreshMainContextFromJournal.
                                 results.Add(WindowOutcome.ReceiptedIdle bloggerId)
-                            | BloggerRuntimeState.Idle -> ()
                     | _ -> ()
 
                 for mainSessionId, openReq in openRequests durable do
                     let bloggerKey = SessionId.value openReq.BloggerSessionId
-                    let live = host.GetBloggerRuntime bloggerKey
-                    let liveCurrent = host.TryPeekCurrentRequest bloggerKey
 
                     // Live process already owns this request: do not stomp.
-                    match live.State, liveCurrent with
-                    | BloggerRuntimeState.InFlight _, Some _ ->
+                    // Physical flight registry is the authority (not cell.State).
+                    if host.HasFlight bloggerKey then
                         results.Add(WindowOutcome.AlreadyLive openReq.BloggerSessionId)
-                    | _ ->
+                    else
                         match snapshotOpt with
                         | None -> results.Add(WindowOutcome.Unreadable(openReq.BloggerSessionId, "no snapshot port"))
                         | Some snapshot ->
@@ -152,9 +156,7 @@ module BloggerCrashRecovery =
                                 // Cold crash: Host session unreadable → abandon window A.
                                 abandon durable openReq (sprintf "crash-window-A: host snapshot error: %s" reason)
 
-                                restoreRuntime host openReq.BloggerSessionId BloggerRuntimeState.Idle
-
-                                host.ClearCurrentRequest bloggerKey
+                                restoreRuntime host openReq.BloggerSessionId None
                                 results.Add(WindowOutcome.AbandonedUnsent openReq.RequestId)
                             | Ok messages ->
                                 let hasCompletedBlog =
@@ -174,10 +176,7 @@ module BloggerCrashRecovery =
                                         WindowOutcome.Unreadable(openReq.BloggerSessionId, "context blob unreadable")
                                     )
                                 | Some ctx ->
-                                    restoreRuntime host openReq.BloggerSessionId (BloggerRuntimeState.InFlight ctx)
-
-                                    if liveCurrent.IsNone then
-                                        host.SetCurrentRequest(bloggerKey, ctx)
+                                    restoreRuntime host openReq.BloggerSessionId (Some ctx)
 
                                     if hasCompletedBlog then
                                         results.Add(

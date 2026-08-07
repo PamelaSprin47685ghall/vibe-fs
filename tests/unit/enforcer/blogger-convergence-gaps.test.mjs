@@ -46,20 +46,54 @@ const rel = (abs) => abs.slice(ROOT.length)
 
 // ── production authority ────────────────────────────────────────────────────
 
-test('C0_BloggerRuntime_onMaterial_has_production_call_site', () => {
-  // Pure module + pure tests exist; production lifecycle must call it.
-  const callers = filesContaining(/BloggerRuntime\.onMaterial\b/)
+test('C0_blogger_lifecycle_authority_is_physical_ownership', () => {
+  // PR7 (Blogger runtime) migration is complete: the lifecycle authority is the
+  // pure router decideMaterial (parked waiter + physical flight ownership), NOT
+  // the transition cell. onMaterial having zero production callers is the
+  // correct, expected direction — it locks the deletion of the transition DU.
+  // 1. The pure router decideMaterial MUST be the production lifecycle authority.
+  const routerCallers = filesContaining(/BloggerRuntime\.decideMaterial\b/)
     .map(rel)
     .filter((path) => !path.endsWith('Session/BloggerRuntimeState.fs'))
   assert.ok(
-    callers.length > 0,
-    'BloggerRuntime.onMaterial has zero production call sites — runtime state is not the lifecycle authority',
+    routerCallers.length > 0,
+    'BloggerRuntime.decideMaterial has zero production call sites — the pure router is not the lifecycle authority',
+  )
+  // 2. The transition API onMaterial must have ZERO production callers outside
+  //    BloggerRuntimeState.fs (its own definition + comment). This is the
+  //    correct assertion now that the migration is done; it locks the deletion
+  //    direction for the transition module.
+  const transitionCallers = filesContaining(/BloggerRuntime\.onMaterial\b/)
+    .map(rel)
+    .filter((path) => !path.endsWith('Session/BloggerRuntimeState.fs'))
+  assert.equal(
+    transitionCallers.length,
+    0,
+    `BloggerRuntime.onMaterial still has production callers: ${transitionCallers.join(', ')} — lifecycle authority must be physical ownership, not the transition cell`,
+  )
+  // 3. The coordinator must route via decideMaterial and must not reference the
+  //    shadow state (Get/SetBloggerRuntime, BloggerRuntimeState, cell .State).
+  const coordinator = prodText('src/Wanxiangshu/Session/BloggerCoordinator.fs')
+  assert.match(coordinator, /BloggerRuntime\.decideMaterial/,
+    'BloggerCoordinator must route via decideMaterial')
+  assert.equal(
+    /GetBloggerRuntime|SetBloggerRuntime|BloggerRuntimeState\b/.test(coordinator),
+    false,
+    'BloggerCoordinator must not reference the shadow BloggerRuntime state API',
+  )
+  const codeStateRefs = coordinator.split('\n').filter(
+    (line) => /\.State\b/.test(line) && !line.trim().startsWith('//'),
+  )
+  assert.equal(
+    codeStateRefs.length,
+    0,
+    `BloggerCoordinator must not reference cell .State in code: ${codeStateRefs.join('; ')}`,
   )
 })
 
-test('C0_BloggerRuntimeState_is_the_only_busy_definition', () => {
-  // Companion send Task must not decide busy. Production busy is host HasFlight
-  // (physical ownership); State.InFlight remains dual-write shadow (PR7 PARTIAL).
+test('C0_physical_HasFlight_is_the_only_busy_definition', () => {
+  // Companion send Task must not decide busy. Production busy is host HasFlight only.
+  // PR7 D6: BloggerRuntimeState/Cell deleted — zero residual shadow ownership.
   const companion = prodText('src/Wanxiangshu/Session/Companion.fs')
   assert.equal(
     /mutable inFlightTask/.test(companion),
@@ -75,13 +109,18 @@ test('C0_BloggerRuntimeState_is_the_only_busy_definition', () => {
   assert.match(
     coordinator,
     /scope\.HasFlight key/,
-    'onMainMaterial busy must prefer HasFlight over cell.State match',
+    'onMainMaterial busy must use HasFlight',
   )
+  const runtimeSrc = prodText('src/Wanxiangshu/Session/BloggerRuntimeState.fs')
+  assert.doesNotMatch(runtimeSrc, /BloggerRuntimeState\b/, 'BloggerRuntimeState DU must be deleted')
+  assert.doesNotMatch(runtimeSrc, /BloggerRuntimeCell\b/, 'BloggerRuntimeCell must be deleted')
+  const scope = prodText('src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs')
+  assert.doesNotMatch(scope, /GetBloggerRuntime|SetBloggerRuntime/, 'scope must not expose cell Get/Set')
 })
 
 test('C0_CurrentRequest_and_PendingOffer_are_separate_slots', () => {
   // Dual slots: PendingOffer dictionary + flight ownership registry.
-  // Forbidden: a drifted `currentRequest` dict that is not dual-written with State.
+  // Forbidden: a second `currentRequest` dict or InFlight shadow fallback.
   const scope = prodText('src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs')
   assert.equal(/parkedOffer/.test(scope), false, 'parkedOffer single-slot is forbidden')
   assert.match(scope, /pendingOffer/, 'PendingOffer dictionary required')
@@ -91,12 +130,17 @@ test('C0_CurrentRequest_and_PendingOffer_are_separate_slots', () => {
     false,
     'CurrentRequest must not be a second dictionary named currentRequest',
   )
-  assert.match(
+  assert.doesNotMatch(
     scope,
-    /BloggerRuntime\.inFlightContext|inFlightContext \(this\.GetBloggerRuntimeUnlocked/,
-    'TryPeekCurrentRequest must still fall back to InFlight shadow',
+    /BloggerRuntime\.inFlightContext|inFlightContext \(this\.GetBloggerRuntimeUnlocked|GetBloggerRuntimeUnlocked/,
+    'TryPeekCurrentRequest must not fall back to InFlight shadow / GetBloggerRuntime',
   )
   assert.match(scope, /HasFlight/, 'HasFlight ownership API required')
+  assert.match(
+    scope,
+    /bloggerFlights\.TryGetValue/,
+    'TryPeekCurrentRequest / TryGetFlight must read bloggerFlights only',
+  )
 })
 
 test('C0_commit_uses_live_InFlight_only_not_open_heal', () => {

@@ -24,7 +24,6 @@ import {
   idValue,
   bloggerRequestContext,
   parkedTransform,
-  bloggerRuntime,
   fold,
   runtimeResources,
   promptDispatcher,
@@ -149,12 +148,9 @@ const withHarness = async (fn, { portMode = 'ok' } = {}) => {
     nextDigest: 'd1',
     deltaDigest: digestForToml(toml),
   })
-  // InFlight + CurrentRequest: owned cycle. Without InFlight cell, commit still
-  // peeks CurrentRequest, but runtime transitions need a real cell.
-  const started = bloggerRuntime.onMaterial(false, bloggerRuntime.idle, ctx)
-  assert.equal(started.ok, true)
-  parkedTransform.setRuntime(scope, BLOG, started.state)
+  // Physical flight ownership: CurrentRequest is the sole live-cycle authority.
   parkedTransform.setCurrentRequest(scope, BLOG, ctx)
+  assert.equal(parkedTransform.hasFlight(scope, BLOG), true)
 
   const capturedSends = []
   const sessionPort =
@@ -387,7 +383,8 @@ const assertNonEmptyMessages = (outcome, label = 'messages') => {
   return msgs
 }
 
-const runtimeTag = (scope) => caseOf(scope.GetBloggerRuntime(BLOG).State)
+/** Physical flight ownership (PR7 D6): hasFlight replaces State.InFlight/Idle. */
+const hasFlight = (scope) => parkedTransform.hasFlight(scope, BLOG)
 
 // DSL-003: the cell carries no Recovery field. The repair stage is inferred
 // from observable evidence, exactly what BloggerRecoveryProbe.repairState reads.
@@ -452,10 +449,9 @@ test('ENFORCER_blog_tool_without_CurrentRequest_rejects_not_ok', async () => {
 
   await withHarness(async ({ scope }) => {
     parkedTransform.clearCurrentRequest(scope, BLOG)
-    parkedTransform.setRuntime(scope, BLOG, bloggerRuntime.idle)
-    assert.equal(BlogTool.hasLiveCycle(scope, BLOG), false, 'Idle without CurrentRequest')
+    assert.equal(BlogTool.hasLiveCycle(scope, BLOG), false, 'no flight without CurrentRequest')
 
-    // withHarness starts InFlight + CurrentRequest before fn; re-arm.
+    // withHarness starts with CurrentRequest before fn; re-arm physical ownership.
     const toml = 'work'
     const ctx = bloggerRequestContext.main({
       requestId: 'req-live-gate',
@@ -469,11 +465,8 @@ test('ENFORCER_blog_tool_without_CurrentRequest_rejects_not_ok', async () => {
       nextDigest: 'd1',
       deltaDigest: digestForToml(toml),
     })
-    const started = bloggerRuntime.onMaterial(false, bloggerRuntime.idle, ctx)
-    assert.equal(started.ok, true)
-    parkedTransform.setRuntime(scope, BLOG, started.state)
     parkedTransform.setCurrentRequest(scope, BLOG, ctx)
-    assert.equal(BlogTool.hasLiveCycle(scope, BLOG), true, 'InFlight CurrentRequest authorises blog')
+    assert.equal(BlogTool.hasLiveCycle(scope, BLOG), true, 'CurrentRequest flight authorises blog')
   })
 })
 
@@ -485,7 +478,7 @@ test('ENFORCER_061_empty_text_injects_repair_once_keeps_inflight', async () => {
 
     assert.equal(hasRepairMessage(out), true, 'must inject RepairInstruction (not fake spent-only)')
     assert.equal(isAabb(messagesOf(out)), true)
-    assert.equal(runtimeTag(scope), 'InFlight', 'repair must not clear InFlight')
+    assert.equal(hasFlight(scope), true, 'repair must not clear InFlight')
     assert.notEqual(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
     assert.equal(fatals.length, 0, 'expected repair is silent')
   })
@@ -497,7 +490,7 @@ test('ENFORCER_061_second_empty_text_exhausts_repair_and_fatals', async () => {
     const out = await run(liveBlog('asst-2', 'c2', { text: '   ' }))
 
     assert.equal(hasRepairMessage(out), false)
-    assert.equal(runtimeTag(scope), 'Idle')
+    assert.equal(hasFlight(scope), false)
     assert.equal(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
     assert.equal(fatals.length, 1, 'second empty text is coverage/protocol stall → fatal')
     assert.equal(lastFatal()?.operation, 'enforcer-cycle-failed')
@@ -513,7 +506,7 @@ test('ENFORCER_061_completed_empty_blog_with_live_request_is_aabb_not_silent_ign
 
     assert.equal(hasRepairMessage(out), true, 'owned empty cycle must repair once')
     assert.equal(isAabb(messagesOf(out)), true)
-    assert.equal(runtimeTag(scope), 'InFlight')
+    assert.equal(hasFlight(scope), true)
     assert.equal(fatals.length, 0)
   })
 })
@@ -521,13 +514,12 @@ test('ENFORCER_061_completed_empty_blog_with_live_request_is_aabb_not_silent_ign
 test('ENFORCER_061_unowned_completed_empty_blog_is_not_repair', async () => {
   await withHarness(async ({ journal, scope, fatals, run }) => {
     parkedTransform.clearCurrentRequest(scope, BLOG)
-    parkedTransform.setRuntime(scope, BLOG, bloggerRuntime.idle)
 
     const out = await run(historicalBlog('asst-orphan-hist', 'c-hist', { text: '' }))
 
     assert.equal(hasRepairMessage(out), false)
     assert.equal(isNoRecovery(journal, messagesOf(out)), true)
-    assert.equal(runtimeTag(scope), 'Idle')
+    assert.equal(hasFlight(scope), false)
     assert.equal(fatals.length, 0)
   })
 })
@@ -541,7 +533,7 @@ test('ENFORCER_060_pure_prose_first_issues_interaction_nudge_not_aabb', async ()
     assert.equal(hasRepairMessage(out), false, 'first pure prose must not inject AABB transcript repair')
     assert.equal(isNudgeFromJournal(journal), true, 'stage = InteractionNudgeIssued')
     assert.equal(isAabb(messagesOf(out)), false)
-    assert.equal(runtimeTag(scope), 'InFlight')
+    assert.equal(hasFlight(scope), true)
     assert.equal(capturedSends.length, 1, 'exactly one durable InteractionRepair send')
     assert.match(String(capturedSends[0].text), /blog tool exactly once|Protocol repair/)
     assert.equal(fatals.length, 0)
@@ -633,7 +625,7 @@ test('ENFORCER_060_pure_prose_after_aabb_fatals', async () => {
     const out = await run(pureProse('asst-p3', 'third'))
 
     assert.equal(hasRepairMessage(out), false)
-    assert.equal(runtimeTag(scope), 'Idle')
+    assert.equal(hasFlight(scope), false)
     assert.equal(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
     assert.equal(fatals.length, 1, 'AABB exhausted pure prose is fatal')
     assert.equal(lastFatal()?.operation, 'enforcer-cycle-failed')
@@ -646,7 +638,7 @@ test('ENFORCER_060_nudge_dispatch_hard_fail_triggers_aabb', async () => {
       const out = await run(pureProse('asst-fail-nudge', 'prose'))
       assert.equal(hasRepairMessage(out), true, 'dispatch failure → immediate AABB')
       assert.equal(isAabb(messagesOf(out)), true)
-      assert.equal(runtimeTag(scope), 'InFlight')
+      assert.equal(hasFlight(scope), true)
       assert.equal(fatals.length, 0)
     },
     { portMode: 'fail' },
@@ -672,7 +664,7 @@ test('ENFORCER_060_pending_blog_is_not_pure_prose_repair', async () => {
     assert.equal(hasRepairMessage(out), false)
     assert.equal(isNoRecovery(journal, messagesOf(out)), true)
     assert.equal(capturedSends.length, 0)
-    assert.equal(runtimeTag(scope), 'InFlight')
+    assert.equal(hasFlight(scope), true)
     assert.equal(fatals.length, 0)
   })
 })
@@ -684,7 +676,7 @@ test('ENFORCER_060_outbound_assistant_shell_is_not_pure_prose_repair', async () 
     assert.equal(hasRepairMessage(out), false, 'must not inject Protocol repair on outbound shell')
     assert.equal(isNoRecovery(journal, messagesOf(out)), true)
     assert.equal(capturedSends.length, 0)
-    assert.equal(runtimeTag(scope), 'InFlight', 'keep live request; session content remains')
+    assert.equal(hasFlight(scope), true, 'keep live request; session content remains')
     assert.notEqual(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
     assert.equal(fatals.length, 0)
     assert.equal(outcomeTag(out), 'ProjectMessages')
@@ -703,7 +695,7 @@ test('ENFORCER_060_host_interrupted_blog_is_aabb_once_not_pure_prose', async () 
     assert.equal(hasRepairMessage(out), true, 'first interrupt uses AABB repair')
     assert.equal(isAabb(messagesOf(out)), true)
     assert.equal(capturedSends.length, 0, 'interrupt must not send InteractionNudge')
-    assert.equal(runtimeTag(scope), 'InFlight')
+    assert.equal(hasFlight(scope), true)
     assert.equal(fatals.length, 0)
   })
 })
@@ -719,7 +711,7 @@ test('ENFORCER_060_completed_interrupted_tail_with_inflight_uses_aabb_once', asy
     assert.equal(hasRepairMessage(out), true)
     assert.equal(isAabb(messagesOf(out)), true)
     assert.equal(capturedSends.length, 0)
-    assert.equal(runtimeTag(scope), 'InFlight')
+    assert.equal(hasFlight(scope), true)
     assert.equal(fatals.length, 0)
   })
 })
@@ -727,7 +719,7 @@ test('ENFORCER_060_completed_interrupted_tail_with_inflight_uses_aabb_once', asy
 test('ENFORCER_060_completed_prose_without_inflight_stops_no_repair', async () => {
   await withHarness(async ({ journal, scope, fatals, run, capturedSends }) => {
     parkedTransform.clearCurrentRequest(scope, BLOG)
-    assert.equal(runtimeTag(scope), 'Idle')
+    assert.equal(hasFlight(scope), false)
 
     const out = await run(pureProse('asst-orphan', 'old prose'))
 
@@ -738,7 +730,7 @@ test('ENFORCER_060_completed_prose_without_inflight_stops_no_repair', async () =
     assert.match(String(stopReasonOf(out)), /unowned/)
     assert.equal(isNoRecovery(journal, messagesOf(out)), true)
     assert.equal(capturedSends.length, 0)
-    assert.equal(runtimeTag(scope), 'Idle')
+    assert.equal(hasFlight(scope), false)
     assert.equal(fatals.length, 0)
   })
 })
@@ -748,7 +740,7 @@ test('ENFORCER_060_interrupted_blog_without_live_request_stops_no_repair', async
     // P0 AbortSession residue: interrupted blog parts remain after stop, but CurrentRequest
     // is gone. Must not re-derive durable open and inject # Protocol repair.
     parkedTransform.clearCurrentRequest(scope, BLOG)
-    assert.equal(runtimeTag(scope), 'Idle')
+    assert.equal(hasFlight(scope), false)
 
     const out = await run(interruptedBlog('asst-orphan-killed', 'hang'))
 
@@ -767,7 +759,7 @@ test('ENFORCER_historical_completed_blog_after_idle_is_noop', async () => {
   await withHarness(async ({ scope, fatals, run }) => {
     await run(liveBlog('a1', 'c1', { text: '' }))
     await run(liveBlog('a2', 'c2', { text: '' }))
-    assert.equal(runtimeTag(scope), 'Idle')
+    assert.equal(hasFlight(scope), false)
     // Second empty is fatal under the new policy; clear for historical-tail check.
     const fatalCount = fatals.length
     assert.ok(fatalCount >= 1)
@@ -775,7 +767,7 @@ test('ENFORCER_historical_completed_blog_after_idle_is_noop', async () => {
     const out = await run(historicalBlog('a3', 'c3', { text: 'late work after abandon' }))
 
     assert.equal(hasRepairMessage(out), false)
-    assert.equal(runtimeTag(scope), 'Idle')
+    assert.equal(hasFlight(scope), false)
     assert.equal(parkedTransform.peekCurrentRequest(scope, BLOG), undefined)
     assert.equal(fatals.length, fatalCount, 'historical tail must not emit extra fatals')
   })
@@ -788,7 +780,7 @@ test('ENFORCER_live_blog_without_CurrentRequest_and_without_open_is_fatal', asyn
   // materialization means the plugin never owned this step — programmer gap.
   await withHarness(async ({ scope, fatals, lastFatal, run }) => {
     parkedTransform.clearCurrentRequest(scope, BLOG)
-    assert.equal(runtimeTag(scope), 'Idle')
+    assert.equal(hasFlight(scope), false)
 
     await run(liveBlog('asst-orphan-live', 'c-orphan', { text: 'work' }))
 
@@ -813,9 +805,6 @@ test('ENFORCER_delta_digest_mismatch_is_fatal', async () => {
       nextDigest: 'd1',
       deltaDigest: 'sha-NOT-matching-toml',
     })
-    const started = bloggerRuntime.onMaterial(false, bloggerRuntime.idle, bad)
-    assert.equal(started.ok, true)
-    parkedTransform.setRuntime(scope, BLOG, started.state)
     parkedTransform.setCurrentRequest(scope, BLOG, bad)
 
     await run(liveBlog('asst-bad', 'c-bad', { text: 'entry' }))
@@ -823,7 +812,7 @@ test('ENFORCER_delta_digest_mismatch_is_fatal', async () => {
     assert.equal(fatals.length, 1)
     assert.equal(lastFatal()?.operation, 'enforcer-cycle-failed')
     assert.equal(lastFatal()?.result, 'delta digest mismatch')
-    assert.equal(runtimeTag(scope), 'Idle')
+    assert.equal(hasFlight(scope), false)
   })
 })
 
@@ -877,14 +866,13 @@ test('ENFORCER_host_completed_blog_with_live_request_commits_and_advances_covera
     assert.equal(session.Enforcement?.ByProviderRun?.size ?? 0, 1, 'enforcement receipt by ProviderRun')
     assert.equal(parkedTransform.peekCurrentRequest(scope, BLOG), undefined, 'CurrentRequest cleared on commit')
     // After cancel of empty park, cell stays Idle (caught-up, waiting material).
-    assert.equal(runtimeTag(scope), 'Idle')
+    assert.equal(hasFlight(scope), false)
   })
 })
 
 test('ENFORCER_host_completed_blog_without_live_request_is_noop_not_commit', async () => {
   await withHarness(async ({ journal, scope, fatals, run }) => {
     parkedTransform.clearCurrentRequest(scope, BLOG)
-    parkedTransform.setRuntime(scope, BLOG, bloggerRuntime.idle)
 
     const out = await run(historicalBlog('asst-unowned', 'call-u1', { text: 'should not commit' }))
 
@@ -896,7 +884,7 @@ test('ENFORCER_host_completed_blog_without_live_request_is_noop_not_commit', asy
     assert.match(String(stopReasonOf(out)), /unowned-completed-blog/)
     const session = fold.session(AgentJournalModule_snapshot(journal), MAIN)
     assert.equal(session?.Blog, undefined, 'unowned completed blog must not invent BlogEntryCommitted')
-    assert.equal(runtimeTag(scope), 'Idle')
+    assert.equal(hasFlight(scope), false)
   })
 })
 
@@ -939,9 +927,6 @@ test('ENFORCER_host_completed_blog_second_window_advances_coverage_not_resend', 
       nextDigest: 'd2',
       deltaDigest: digestForToml(toml2),
     })
-    const started2 = bloggerRuntime.onMaterial(false, bloggerRuntime.idle, ctx2)
-    assert.equal(started2.ok, true)
-    parkedTransform.setRuntime(scope, BLOG, started2.state)
     parkedTransform.setCurrentRequest(scope, BLOG, ctx2)
 
     await runOwnedCommit(scope, run, historicalBlog('asst-w2', 'call-w2', { text: 'window-two-body' }))
@@ -969,18 +954,17 @@ test('ENFORCER_resolveCycleContext_prefers_live_inflight_request', async () => {
 
     // Clear InFlight without open materialization → None (not a silent invent).
     parkedTransform.clearCurrentRequest(scope, BLOG)
-    assert.equal(runtimeTag(scope), 'Idle')
+    assert.equal(hasFlight(scope), false)
     const missing = resolveCycleContext(scope, journal, main, blog)
     assert.equal(missing, undefined)
   })
 })
 
 // ── Recovery stage is derived, not stored (ENFORCER-153 / DSL-003) ────────────
-// `BloggerRuntimeCell` no longer carries a `Recovery` field and exposes no
-// mark* transition writers. The stage is the observable evidence the hot path
+// No BloggerRuntimeCell/State. The stage is the observable evidence the hot path
 // reads: a durable InteractionRepair claim (nudge) and an injected AABB repair
 // message on the transcript. Those evidence paths are asserted by the turn
-// trajectory tests above, so there is no cell-level state machine left to unit.
+// trajectory tests above; flight ownership is hasFlight / CurrentRequest only.
 
 test('ENFORCER_RepairInstruction_is_stable_minimal_protocol_text', () => {
   assert.match(RepairInstruction, /Protocol repair/)

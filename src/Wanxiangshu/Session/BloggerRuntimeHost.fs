@@ -4,8 +4,8 @@ open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
-/// Shared Host-side side effects around BloggerRuntime cells (P1-1).
-/// Pure transitions stay in BloggerRuntime; material CE stays in BloggerCoordinator;
+/// Shared Host-side side effects around Blogger physical slots (flight + drain).
+/// Pure routing stays in BloggerRuntime; material CE stays in BloggerCoordinator;
 /// continuation CE stays in EnforcerHost. Seal/block recipes are not duplicated.
 module BloggerRuntimeHost =
 
@@ -14,26 +14,30 @@ module BloggerRuntimeHost =
         | None -> false
         | Some j -> AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot j).AgentProjections
 
-    /// Durable handle sealed + cell not in drain window → block new Y work.
+    /// Durable handle sealed + drain closed → block new Y work.
+    /// Busy uses physical flight ownership (`HasFlight`).
+    /// Drain uses the physical drain slot (`IsDrainOpen`).
     let blocksNew
         (journal: AgentJournal option)
         (mainSessionId: SessionId)
         (scope: IParkedTransformHost)
         (bloggerKey: string)
         : bool =
-        let cell = scope.GetBloggerRuntime bloggerKey
-        BloggerRuntime.blocksNewRequest (durableSealed journal mainSessionId) cell
+        BloggerRuntime.blocksNewRequest
+            (durableSealed journal mainSessionId)
+            (scope.HasFlight bloggerKey)
+            (scope.IsDrainOpen bloggerKey)
 
-    /// Force sealed cell + clear CurrentRequest/PendingOffer + cancel park waiter.
+    /// Close drain + clear CurrentRequest/PendingOffer + cancel park waiter.
     let forceSealRuntime (scope: IParkedTransformHost) (bloggerKey: string) : unit =
-        scope.SetBloggerRuntime(bloggerKey, BloggerRuntime.forceSeal (scope.GetBloggerRuntime bloggerKey))
+        scope.SetDrainWindow(bloggerKey, DrainWindow.Closed)
         scope.ClearCurrentRequest bloggerKey
         scope.TryTakePendingOffer bloggerKey |> ignore
         scope.CancelParked bloggerKey
 
-    /// Seal only the cell + drop pending offer (keep CurrentRequest until caller clears).
+    /// Close drain + drop pending offer (keep CurrentRequest until caller clears).
     let forceSealCellDropOffer (scope: IParkedTransformHost) (bloggerKey: string) : unit =
-        scope.SetBloggerRuntime(bloggerKey, BloggerRuntime.forceSeal (scope.GetBloggerRuntime bloggerKey))
+        scope.SetDrainWindow(bloggerKey, DrainWindow.Closed)
         scope.TryTakePendingOffer bloggerKey |> ignore
 
     /// New Authority Root: reopen the drain window for next material. The root
@@ -45,6 +49,4 @@ module BloggerRuntimeHost =
         (root: AuthorityRootUserMessageId)
         : unit =
         let key = SessionId.value bloggerSessionId
-        let cell = scope.GetBloggerRuntime key
-
-        scope.SetBloggerRuntime(key, BloggerRuntime.onReactivate cell root)
+        scope.SetDrainWindow(key, BloggerRuntime.openDrain root)

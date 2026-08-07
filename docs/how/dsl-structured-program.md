@@ -1,6 +1,6 @@
 # DSL 结构化程序规则 — 实现姿态
 
-行为见 `what/dsl-structured-program.md`（`DSL-001..007`）；边界见 `shape/dsl-structured-program.md`；证明见 `proof/dsl-structured-program.md`。本文是 PR 1 的教学样板与迁移记录（**迁移为 PARTIAL，见下文状态标注**）。
+行为见 `what/dsl-structured-program.md`（`DSL-001..007`）；边界见 `shape/dsl-structured-program.md`；证明见 `proof/dsl-structured-program.md`。本文是 PR 1 的教学样板与迁移记录（**PR 1–9 已全部落地，2026-08-07**）。
 
 ## CE 风格指南（七个符号）
 
@@ -48,31 +48,31 @@ let runRecovery (ports: Ports) (claim: RepairClaim) (coverage: Coverage) : Task<
 - 多布尔循环（`let mutable a = false` ×2 + `while`）——`bool-loop` 门。
 - 重复 DU case 集——`dup-cases` 门；豁免须登记 `DUP_CASES_EXEMPT` 并附理由。
 
-## 迁移记录（PARTIAL — gap 仍开）
+## 迁移记录（已全部落地）
 
-> **当前状态（2026-08-07）**：proposal 登记的偏离仅部分消除，**不可**表述为「已全部消除」。下表逐项标注真实落地状态。已通过验收的部分为 PR 3/4/5/8、PR 2（cancellation 三态 + 行为测试）、PR 6（`RecoveryArming` → TCS waiter）、PR 9（门禁豁免收紧）；仍阻断的部分为 PR 7（`BloggerRuntimeState` 状态 DU）。
+> **当前状态（2026-08-07）**：proposal 登记的偏离 **已全部消除**。PR 1–9 闭环；`status/dsl-structured-program-gap.md` 已删除（GOV 对齐后删除）。正式规范见 `what/shape/how/proof/why/dsl-structured-program.md`。验证：`npm run lint` + `build` + unit 1000 + integration 271 绿。
 
-1. `Process/NodeProcessWait.fs`：两段等待 + 顶层 `task`（`waitForExit`），阶段即当前函数；仅剩计时器资源所有权 mutable（bounded scratch 豁免）。**已落地**：`waitForSignal` 已以三态 `WaitSignal = ProcessExited | TimerElapsed | Cancelled` 区分三事件；`awaitExitOrDeadline` 把 `Cancelled` 解释为 `WaitCancelled` 而非 `ProcessExited`；顶层 `waitForExit` 对 `WaitCancelled` 显式 `child.Kill()` 并传播 `OperationCanceledException`。`tests/unit/execution/process-wait.test.mjs` 已新增 A–D 四行为测试（A 自然退出、B deadline/Kill、C kill-ack 超时、D 等待中 cancellation 不挂 `Exit.Task`）。
-2. `Session/Companion.fs`：恢复槽。**已落地**：`RecoveryArming`（`NotArmed`/`Armed`）DU 与 `let mutable arming` 已删除，改为 `recoveryWaiter: TaskCompletionSource<unit> option`（`// DSL-MUTABLE: resource`）；`StartRecoveryOpportunity` 注册一次性物理 waiter，`OfferRecoveryMaterial` 唤醒一次，重启留 `None`；`ArmRecoverySlot`/`IsRecoveryArmed`/`DisarmRecoverySlot` 已删除。机会存在性由 Task 存活与否承载，不再写业务状态。
-3. `Session/BloggerRuntimeState.fs`：`Recovery` 由 `BloggerRecoveryProbe` 从 durable claim + transcript 推导（ENFORCER-153）；`PendingOffer` 交 host dictionary；`Sealed` 为 durable projection 查询；`Parked` 已删。**PARTIAL**：cell 确实只剩 `InFlight`/`Idle` 二态，`onMaterial` 以显式 `hasParkedWaiter` 读取 host waiter 事实；已引入 `bloggerFlights` 物理 flight ownership（`// DSL-MUTABLE: single-flight`，`HasFlight`/`TryGetFlight` 优先作 busy 判据），但 **`BloggerRuntimeState`（`Idle`/`InFlight`）仍在生产**，经 `BloggerRuntimeCell` 由 `Dictionary<string, BloggerRuntimeCell>` 持有，`InFlight` 仍作双写 shadow 保留——尚未被 single-flight Task ownership 完全替代。
-4. `Session/BloggerRuntimeState.fs`：`BloggerToolRecovery` 不再入 cell；恢复阶段由 `BloggerCrashRecovery.liveRecovery` 推导。**已落地**（evidence-derived result，非长期 cell 状态）。
-5. `Domain/SessionRecovery.fs`：trace 解释器删除；`FamilyRecoveryPermit` 私有构造器保证恢复后业务入口持证。**已落地**。
+1. `Process/NodeProcessWait.fs`：两段等待 + 顶层 `task`（`waitForExit`），阶段即当前函数；仅剩计时器资源所有权 mutable（bounded scratch 豁免）。**已落地**：`waitForSignal` 三态 `WaitSignal = ProcessExited | TimerElapsed | Cancelled`；`awaitExitOrDeadline` 把 `Cancelled` 解释为 `WaitCancelled`；顶层对 `WaitCancelled` 显式 `child.Kill()` 并传播 `OperationCanceledException`。`process-wait.test.mjs` A–D。
+2. `Session/Companion.fs`：恢复槽。**已落地**：`RecoveryArming` 与 `let mutable arming` 已删，改为 `recoveryWaiter: TaskCompletionSource<unit> option`（`// DSL-MUTABLE: resource`）；`StartRecoveryOpportunity` / `OfferRecoveryMaterial`；机会 = Task 存活。
+3. `Session/BloggerRuntimeState.fs`（模块名保留；无 State DU）。**PR 7 已落地（2026-08-07）**：删除 `BloggerRuntimeState`（`Idle`/`InFlight`）、`BloggerRuntimeCell`、全部 transition API 与 dual-write shadow。权威 = `PluginRuntimeScope.bloggerFlights`（`// DSL-MUTABLE: single-flight`，`HasFlight`/`TryGetFlight`）+ `drainWindows`（`GetDrainWindow`/`SetDrainWindow`/`IsDrainOpen`）+ 纯路由 `decideMaterial(hasParked, hasFlight, ctx)` + `blocksNewRequest(durableSealed, hasFlight, drainOpen)`。`Recovery` 由 `BloggerRecoveryProbe` 从 durable claim + transcript 推导；`PendingOffer` 交 parked waiter；`Sealed` 为 durable projection 查询。**5 slices + D1–D8**：①删 `onSquashCommitted` 死分支 + `Decision.Ignore`；②`blocksNewRequest` → `HasFlight` 布尔组合；③`BloggerCrashRecovery` 重建物理 flight + C5；④D1 Drain 槽、D2 `decideMaterial`、D3 `BloggerCoordinator`、D4 `EnforcerHost`、D5 CrashRecovery Drain、D6 定义删除、D7 测试物理 API 迁移、D8 门禁/文档复核（本步）。Slice 5 并入 D2。
+4. `BloggerToolRecovery` 不再入 cell；恢复阶段由 transcript/claim 推导。**已落地**。
+5. `Domain/SessionRecovery.fs`：trace 解释器删除；`FamilyRecoveryPermit` 私有构造器。**已落地**。
 6. `TurnOutcome`：`Domain/ReconcileProgram.TurnOutcome` 唯一。**已落地**。
-7. `Role`：`Kernel.Role` 唯一（`AgentRole` 已删，`AgentRoleIdentity` 为转换模块）。**已落地**。
-8. `Journal/AgentFact`：54-case 拆为 7 个 bounded-context family（`*FactCases`），wire 逐字节兼容。**已落地**（阶段 A）。
-9. `scripts/checks/dsl-ownership.mjs`：**PR 9 门禁已收紧（2026-08-07）**。`mutable` 由目录整体豁免改为**声明式豁免**：Domain/Session/Application/Process/`Kernel/Parallel.fs` 的 `let mutable` 必须在前 1–2 行带 `// DSL-MUTABLE: <resource|algorithm-scratch|single-flight|buffer|subscription|cancellation>` 声明，无声明即红；Agent/其余 Kernel 仍 fail-closed。`Process/` 不再整体豁免 `bool-loop`。`dup-cases` 改为**跨文件全局比对**（排序 case-set 相同即红，wire/DTO 走 `DUP_CASES_EXEMPT`）。`scanLargeDus` 由 report-only 改为 **CI fail**（≥10 case 无 `/// DSL-class:` 即红）。`/// DSL-class: ControlState` 字段直接判 `program-counter`。**未实施（诚实标注）**：record-DU 字段缺少 DSL-class 的自动检测、组合状态（双状态型 DU 字段）结构检测——两者需类型解析，暂以声明要求 + ControlState 硬判为最小可靠方案。
+7. `Role`：`Kernel.Role` 唯一。**已落地**。
+8. `Journal/AgentFact`：分 7 个 bounded-context family，wire 兼容。**已落地**（阶段 A）。
+9. `scripts/checks/dsl-ownership.mjs`：**PR 9 已落地**。声明式 `// DSL-MUTABLE: <resource|algorithm-scratch|single-flight|buffer|subscription|cancellation>`；`Process/` 不豁免 `bool-loop`；跨文件 `dup-cases`；large-DU CI fail；`/// DSL-class: ControlState` 硬判 `program-counter`。第 3 项「组合状态结构检测」**Reject**（需类型解析，存量 Cell 已删，ControlState 硬判 + review 足够）。第 5 项「ControlState 须附 CE 不可表达理由」**Closed-as-forbidden**（直接硬失败、`CONTROL_STATE_EXEMPT` 空集、无豁免）。
 
-## 迁移顺序（历史 — 标注真实状态）
+## 迁移顺序（历史 — 全部已落地）
 
 ```text
-PR 2 NodeProcessWait      → 已落地（三态 WaitSignal + process-wait.test.mjs A–D 行为测试）
+PR 2 NodeProcessWait      → 已落地（三态 WaitSignal + process-wait.test.mjs A–D）
 PR 3 TurnOutcome + Role   → 已落地
 PR 4 RecoveryTrace        → 已落地（permit 替代解释器）
 PR 5 BloggerToolRecovery  → 已落地（推导化）
-PR 6 Companion 恢复槽     → 已落地（RecoveryArming → TCS waiter，无 Armed flag）
-PR 7 BloggerRuntimeCell   → PARTIAL（已缩为二态 + 物理 flight ownership，但 BloggerRuntimeState 仍在生产）
+PR 6 Companion 恢复槽     → 已落地（RecoveryArming → TCS waiter）
+PR 7 BloggerRuntimeCell   → 已落地（删 Idle/InFlight/Cell/transition；bloggerFlights + drainWindows + decideMaterial；Slice 1–5 + D1–D8）
 PR 8 AgentFact            → 已落地（family 拆分）
-PR 9 dsl-ownership        → 已落地（声明式豁免 + 跨文件 dup-cases + large-DU CI fail）
+PR 9 dsl-ownership        → 已落地（声明式豁免 + 跨文件 dup-cases + large-DU CI fail；第 3 项 Reject / 第 5 项 Closed-as-forbidden）
 ```
 
 ## 三种可直接照抄的 CE 模板

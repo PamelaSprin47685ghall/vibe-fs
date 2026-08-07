@@ -12,7 +12,7 @@ open Wanxiangshu.Session
 ///
 /// The stage of the one repair budget (nudge once, then one AABB) is a pure
 /// function of the durable InteractionRepair claim and the provider-visible
-/// transcript. `BloggerRuntimeCell` carries no Recovery mirror: the hot path
+/// transcript. Recovery is never stored on a runtime cell: the hot path
 /// (EnforcerHost.handleContinuation) reads `repairState`, and the crash window
 /// (BloggerCrashRecovery.reconcile) reads `rejudgeToolRecovery`. A restart
 /// re-derives the same stage from the same evidence, so the budget cannot be

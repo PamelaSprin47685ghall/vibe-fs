@@ -182,14 +182,16 @@ test('ENFORCER_153_claim_with_missing_terminal_in_transcript_keeps_nudge_not_aab
   assert.equal(caseOf(out), 'InteractionNudgeIssued')
 })
 
-test('ENFORCER_153_cell_carries_no_recovery_mirror', () => {
-  // DSL-003: the recovery stage is derived on every read (BloggerRecoveryProbe),
-  // so BloggerRuntimeCell must not carry a Recovery field and BloggerRuntime must
-  // not expose mark* transition writers for it.
+test('ENFORCER_153_runtime_carries_no_recovery_mirror', () => {
+  // DSL-003: the recovery stage is derived on every read (BloggerRecoveryProbe).
+  // BloggerRuntimeState.fs must not define a cell/State DU or mark* writers;
+  // restoreRuntime does not store rejudged recovery.
   const runtimeSrc = readFileSync(
     join(ROOT, 'src/Wanxiangshu/Session/BloggerRuntimeState.fs'),
     'utf8',
   )
+  assert.doesNotMatch(runtimeSrc, /BloggerRuntimeState\b/, 'no BloggerRuntimeState DU')
+  assert.doesNotMatch(runtimeSrc, /BloggerRuntimeCell\b/, 'no BloggerRuntimeCell')
   assert.doesNotMatch(runtimeSrc, /Recovery: BloggerToolRecovery/)
   assert.doesNotMatch(runtimeSrc, /markInteractionNudgeIssued/)
   assert.doesNotMatch(runtimeSrc, /markAabbRepairConsumed/)
@@ -281,7 +283,7 @@ test('C5_window_D_never_forces_parked_without_a_waiter', () => {
   // DSL-003: forcing `Parked` at restore with no ParkedTransform and
   // NotArmed arming stages the next material as an un-resumable PendingOffer
   // (mayRecover is false after restart, so no squash path starts) — the
-  // session stalls. Window D must leave the cell Idle; receipts are re-checked
+  // session stalls. Window D must leave flight clear; receipts are re-checked
   // by the drain path after the next commit.
   const windowD = recoverySrc.slice(
     recoverySrc.indexOf('hasAnyReceipt && not hasOpen'),
@@ -298,5 +300,35 @@ test('C5_window_D_never_forces_parked_without_a_waiter', () => {
   assert.ok(
     !/BloggerRuntimeState\.Parked/.test(windowD),
     'window D must not mention Parked at all',
+  )
+})
+
+test('C5_crash_recovery_reads_HasFlight_not_cell_State', () => {
+  // PR7 Slice 3: window windows use physical flight ownership.
+  // Forbidden: match live.State / BloggerRuntimeState.InFlight as restore authority.
+  assert.doesNotMatch(
+    recoverySrc,
+    /match live\.State/,
+    'reconcile must not match live.State for window decisions',
+  )
+  assert.doesNotMatch(
+    recoverySrc,
+    /BloggerRuntimeState\.(InFlight|Idle)/,
+    'restoreRuntime must not take BloggerRuntimeState; write flight via SetCurrentRequest/ClearCurrentRequest',
+  )
+  assert.match(
+    recoverySrc,
+    /host\.HasFlight/,
+    'window busy / AlreadyLive must prefer HasFlight',
+  )
+  assert.match(
+    recoverySrc,
+    /host\.SetCurrentRequest/,
+    'restore InFlight rebuilds physical flight via SetCurrentRequest',
+  )
+  assert.match(
+    recoverySrc,
+    /host\.ClearCurrentRequest/,
+    'abandon / clear path uses ClearCurrentRequest',
   )
 })

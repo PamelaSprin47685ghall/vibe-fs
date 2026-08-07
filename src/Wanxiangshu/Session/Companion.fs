@@ -62,7 +62,7 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
         restoredMemory |> Option.bind (fun m -> m.BloggerSessionId)
 
     // Physical send Task is not the Blogger busy authority (ENFORCER-047).
-    // Busy = host flight ownership (HasFlight); State.InFlight is dual-write shadow.
+    // Busy = host flight ownership (HasFlight) only.
     // Keep a fire-and-forget handle only for WaitInFlightAsync diagnostics.
     // DSL-MUTABLE: single-flight — fire-and-forget send task handle
     let mutable lastSendTask: Task<unit> option = None

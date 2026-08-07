@@ -4536,81 +4536,28 @@ export const bloggerRequestContext = (() => {
 })()
 
 export const bloggerRuntime = (() => {
-  const stateCase = unionCase(BloggerRuntimeModule.BloggerRuntimeState, 'BloggerRuntimeState')
+  // PR7 Slice 4 D6: BloggerRuntimeState/Cell + transition API deleted.
+  // Facade: pure routing + drain helpers. Flight ownership lives on parkedTransform.
   const m = bind(BloggerRuntimeModule, 'BloggerRuntime', [
-    'empty',
-    'ofState',
-    'onMaterial',
-    'onCycleCommitted',
-    'onSquashCommitted',
-    'onFail',
-    'forceSeal',
-    'onReactivate',
-    'inFlightContext',
     'blocksNewRequest',
-
-    'adoptPendingAsCurrent',
+    'decideMaterial',
+    'openDrain',
   ])
-
-  const recoveryOf = (cell) => {
-    const tag = caseOf(cell.Recovery)
-    if (tag === 'InteractionNudgeIssued') {
-      return { tag, run: cell.Recovery.fields?.[0] }
-    }
-    return { tag }
-  }
+  const DrainWindow =
+    BloggerRuntimeModule.DrainWindow ?? BloggerRuntimeModule.BloggerRuntime_DrainWindow
 
   return {
-    idle: m.ofState(stateCase('Idle', [])),
-    empty: m.empty,
-    inFlight: (ctx) => m.ofState(stateCase('InFlight', [ctx])),
-    onMaterial: (hasParked, cell, ctx) => {
-      const r = resultOf(m.onMaterial(hasParked, cell, ctx))
-      if (!r.ok) return { ok: false, error: caseOf(r.error) }
-      const pair = r.value
-      return {
-        ok: true,
-        state: pair[0],
-        decision: caseOf(pair[1]),
-        reactivated: caseOf(pair[0].Drain) === 'Open',
-      }
+    blocksNewRequest: (durableSealed, hasFlight, drainOpen) =>
+      m.blocksNewRequest(durableSealed, hasFlight, drainOpen),
+    decideMaterial: (hasParked, hasFlight, ctx) => caseOf(m.decideMaterial(hasParked, hasFlight, ctx)),
+    openDrain: (root) => m.openDrain(root),
+    /** Physical forceSeal target: DrainWindow.Closed (no cell). */
+    closedDrain: () => {
+      if (DrainWindow?.Closed !== undefined) return DrainWindow.Closed
+      if (typeof DrainWindow === 'function') return new DrainWindow(0, [])
+      throw new Error('bloggerRuntime.closedDrain: DrainWindow.Closed missing from dist')
     },
-    onCycleCommitted: (cell) => {
-      const r = resultOf(m.onCycleCommitted(cell))
-      return r.ok
-        ? {
-            ok: true,
-            state: r.value,
-            reactivated: caseOf(r.value.Drain) === 'Open',
-          }
-        : { ok: false, error: caseOf(r.error) }
-    },
-    onSquashCommitted: (cell, pendingMain) => {
-      const r = resultOf(m.onSquashCommitted(cell, pendingMain === undefined ? undefined : pendingMain))
-      if (!r.ok) return { ok: false, error: caseOf(r.error) }
-      const pair = r.value
-      return {
-        ok: true,
-        state: pair[0],
-        decision: caseOf(pair[1]),
-        reactivated: caseOf(pair[0].Drain) === 'Open',
-      }
-    },
-    onFail: (cell) => {
-      const r = resultOf(m.onFail(cell))
-      if (!r.ok) return { ok: false, error: caseOf(r.error) }
-      return {
-        ok: true,
-        state: r.value,
-        reactivated: caseOf(r.value.Drain) === 'Open',
-      }
-    },
-    forceSeal: (cell) => m.forceSeal(cell),
-    onReactivate: (cell, root) => m.onReactivate(cell, root),
-    inFlightContext: (cell) => unwrapOption(m.inFlightContext(cell)),
-    blocksNewRequest: (durableSealed, cell) => m.blocksNewRequest(durableSealed, cell),
-    stateOf: (cell) => caseOf(cell.State),
-    reactivatedOf: (cell) => caseOf(cell.Drain) === 'Open',
+    drainOpenOf: (window) => caseOf(window) === 'Open',
   }
 })()
 
@@ -4688,12 +4635,13 @@ export const parkedTransform = (() => {
     setCurrentRequest: (scope, sessionId, context) => scope.SetCurrentRequest(sessionId, context),
     peekCurrentRequest: (scope, sessionId) => projectContext(scope.TryPeekCurrentRequest(sessionId)),
     clearCurrentRequest: (scope, sessionId) => scope.ClearCurrentRequest(sessionId),
-    getRuntime: (scope, sessionId) => scope.GetBloggerRuntime(sessionId),
-    setRuntime: (scope, sessionId, cell) => scope.SetBloggerRuntime(sessionId, cell),
+    // Physical drain-window slot (PR7 Slice 4 D6: cell dual-write removed).
+    getDrainWindow: (scope, sessionId) => scope.GetDrainWindow(sessionId),
+    setDrainWindow: (scope, sessionId, window) => scope.SetDrainWindow(sessionId, window),
+    isDrainOpen: (scope, sessionId) => scope.IsDrainOpen(sessionId),
     dispose: (scope) => scope.Dispose(),
   }
 })()
-
 const SessionRecoveryModule = await prod('Domain/SessionRecovery')
 
 export const sessionRecovery = (() => {

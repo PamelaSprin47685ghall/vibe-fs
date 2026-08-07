@@ -141,7 +141,7 @@ why（设计理由与被拒方案；不直接约束实现）
 
 | Proposal | 候选范围 |
 |------|------|
-| [ChatGPT-F# DSL 规范问题.md](proposal/ChatGPT-F# DSL 规范问题.md) | F# 结构化流程 DSL 迁移分析与痛点候选 |
+| [ChatGPT-F# DSL 规范问题.md](proposal/ChatGPT-F# DSL 规范问题.md) | F# 结构化流程 DSL（PR1–9 **CLOSED / 已落地** 2026-08-07；历史对话与裁决证据，正式规范见 `dsl-structured-program` 五层） |
 | [strength.md](proposal/strength.md) | Predict & Reduce Strength 旁路投机执行 |
 | [student-teacher.md](proposal/student-teacher.md) | Student / Teacher 知识生产流程 |
 | [waitfact-causal-renewal.md](proposal/waitfact-causal-renewal.md) | waitFact 续期显式归因：背景 journal 事实只记录、不续期 |

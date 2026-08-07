@@ -1,4 +1,5 @@
 // Blogger seal after join/return + Authority Root reactivation.
+// Drain = physical slot (setDrainWindow / isDrainOpen / openDrain); busy = hasFlight.
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
@@ -9,8 +10,10 @@ import {
   handleId,
   sessionId,
   roles,
+  parkedTransform,
 } from '../support/domain.mjs'
 
+const KEY = 'ses-blog'
 const ctx = () =>
   bloggerRequestContext.main({
     requestId: 'req-1',
@@ -59,71 +62,80 @@ test('HANDLE_lifecycle_Abandoned_seals_blogger', () => {
 
 test('BLOGGER_RUNTIME_cell_has_no_sealed_mirror_durable_is_truth', () => {
   // DSL-003: handle seal is a durable journal fact read at every entry
-  // (blocksNew in the Coordinator), so the cell has no Sealed case. forceSeal
-  // only closes the in-memory drain window; a cell mirror could only duplicate
-  // — and drift from — the journal.
-  const idle = bloggerRuntime.forceSeal(bloggerRuntime.idle)
-  assert.equal(bloggerRuntime.stateOf(idle), 'Idle', 'forceSeal leaves the state alone')
-  assert.equal(bloggerRuntime.blocksNewRequest(true, idle), true, 'durable seal blocks')
-  assert.equal(bloggerRuntime.blocksNewRequest(false, idle), false, 'no mirror: unsealed durable unblocks')
+  // (blocksNew in the Coordinator). forceSeal only closes the physical drain
+  // window; busy is physical HasFlight.
+  // blocksNewRequest is pure over (durableSealed, hasFlight, drainOpen).
+  const scope = parkedTransform.scope()
+  parkedTransform.setDrainWindow(scope, KEY, bloggerRuntime.closedDrain())
+  assert.equal(parkedTransform.isDrainOpen(scope, KEY), false, 'forceSeal leaves drain closed')
+  assert.equal(bloggerRuntime.blocksNewRequest(true, false, false), true, 'durable seal blocks')
+  assert.equal(bloggerRuntime.blocksNewRequest(false, false, false), false, 'no mirror: unsealed durable unblocks')
+  assert.equal(
+    bloggerRuntime.blocksNewRequest(true, true, false),
+    false,
+    'hasFlight does not block via this gate (SkippedInFlight path)',
+  )
 
-  const live = bloggerRuntime.onReactivate(idle, authorityRoot('root-r1'))
-  assert.equal(bloggerRuntime.stateOf(live), 'Idle')
-  assert.equal(bloggerRuntime.reactivatedOf(live), true)
-  assert.equal(bloggerRuntime.blocksNewRequest(true, live), false, 'drain window lets the cycle through')
-  // The drain window holds an unforgeable DrainPermit (module-private
-  // constructor): no caller can mint an open window for an arbitrary root, so
-  // the recorded root is guaranteed by the type, not asserted by value.
-  assert.equal(bloggerRuntime.reactivatedOf(live), true)
+  parkedTransform.setDrainWindow(scope, KEY, bloggerRuntime.openDrain(authorityRoot('root-r1')))
+  assert.equal(parkedTransform.isDrainOpen(scope, KEY), true)
+  assert.equal(
+    bloggerRuntime.blocksNewRequest(true, false, true),
+    false,
+    'drain window lets the cycle through',
+  )
+  // openDrain mints an unforgeable DrainPermit (module-private constructor).
+  assert.equal(bloggerRuntime.drainOpenOf(parkedTransform.getDrainWindow(scope, KEY)), true)
 
-  const started = bloggerRuntime.onMaterial(false, live, ctx())
-  assert.equal(started.ok, true)
-  assert.equal(started.decision, 'Start')
-  assert.equal(bloggerRuntime.stateOf(started.state), 'InFlight')
+  assert.equal(bloggerRuntime.decideMaterial(false, false, ctx()), 'Start')
+  parkedTransform.setCurrentRequest(scope, KEY, ctx())
+  assert.equal(parkedTransform.hasFlight(scope, KEY), true)
 })
 
 test('BLOGGER_RUNTIME_durable_seal_blocks_idle_unless_reactivated', () => {
-  const idle = bloggerRuntime.idle
-  assert.equal(bloggerRuntime.blocksNewRequest(false, idle), false)
-  assert.equal(bloggerRuntime.blocksNewRequest(true, idle), true)
+  assert.equal(bloggerRuntime.blocksNewRequest(false, false, false), false)
+  assert.equal(bloggerRuntime.blocksNewRequest(true, false, false), true)
 
-  const reactivated = bloggerRuntime.onReactivate(idle, authorityRoot('root-r1'))
-  assert.equal(bloggerRuntime.stateOf(reactivated), 'Idle')
-  assert.equal(bloggerRuntime.blocksNewRequest(true, reactivated), false)
+  const scope = parkedTransform.scope()
+  parkedTransform.setDrainWindow(scope, KEY, bloggerRuntime.openDrain(authorityRoot('root-r1')))
+  assert.equal(parkedTransform.hasFlight(scope, KEY), false)
+  assert.equal(parkedTransform.isDrainOpen(scope, KEY), true)
+  assert.equal(bloggerRuntime.blocksNewRequest(true, false, true), false)
 })
 
-test('BLOGGER_RUNTIME_parked_waiter_survives_onReactivate_so_offer_not_start', () => {
+test('BLOGGER_RUNTIME_parked_waiter_survives_reactivate_so_offer_not_start', () => {
   // Authority Root on main must not demote the waiter fact. Idle + parked
-  // waiter = Start (new prompt_async) only when nothing waits; with a waiter
-  // the material Offer-resumes it (ENFORCER-050). The cell itself stays Idle —
-  // the waiter is the host dictionary's physical fact.
-  const reactivated = bloggerRuntime.onReactivate(bloggerRuntime.idle, authorityRoot('root-r1'))
-  assert.equal(bloggerRuntime.stateOf(reactivated), 'Idle')
-  assert.equal(bloggerRuntime.reactivatedOf(reactivated), true)
+  // waiter = Start only when nothing waits; with a waiter the material
+  // Offer-resumes it (ENFORCER-050). Drain open does not register flight.
+  const scope = parkedTransform.scope()
+  parkedTransform.setDrainWindow(scope, KEY, bloggerRuntime.openDrain(authorityRoot('root-r1')))
+  assert.equal(parkedTransform.hasFlight(scope, KEY), false)
+  assert.equal(parkedTransform.isDrainOpen(scope, KEY), true)
 
-  const offered = bloggerRuntime.onMaterial(true, reactivated, ctx())
-  assert.equal(offered.ok, true)
-  assert.equal(offered.decision, 'Offer')
-  assert.equal(bloggerRuntime.stateOf(offered.state), 'Idle')
+  assert.equal(bloggerRuntime.decideMaterial(true, false, ctx()), 'Offer')
+  assert.equal(parkedTransform.hasFlight(scope, KEY), false)
 })
 
 test('BLOGGER_RUNTIME_reactivated_catchup_forceSeal_blocks_again', () => {
   // Durable handle sealed + DrainWindow.Open lets one drain window through;
   // once caught up, host forceSeal must permanently re-block.
-  const reactivated = bloggerRuntime.onReactivate(bloggerRuntime.forceSeal(bloggerRuntime.idle), authorityRoot('root-r1'))
-  assert.equal(bloggerRuntime.blocksNewRequest(true, reactivated), false)
+  // Gate is pure booleans: hasFlight + drainOpen.
+  const scope = parkedTransform.scope()
+  parkedTransform.setDrainWindow(scope, KEY, bloggerRuntime.closedDrain())
+  parkedTransform.setDrainWindow(scope, KEY, bloggerRuntime.openDrain(authorityRoot('root-r1')))
+  assert.equal(parkedTransform.isDrainOpen(scope, KEY), true)
+  assert.equal(bloggerRuntime.blocksNewRequest(true, false, true), false)
 
-  const started = bloggerRuntime.onMaterial(false, reactivated, ctx())
-  assert.equal(started.decision, 'Start')
-  const committed = bloggerRuntime.onCycleCommitted(started.state)
-  assert.equal(committed.ok, true)
-  assert.equal(bloggerRuntime.stateOf(committed.state), 'Idle')
+  assert.equal(bloggerRuntime.decideMaterial(false, false, ctx()), 'Start')
+  parkedTransform.setCurrentRequest(scope, KEY, ctx())
+  assert.equal(parkedTransform.hasFlight(scope, KEY), true)
+  parkedTransform.clearCurrentRequest(scope, KEY)
+  assert.equal(parkedTransform.hasFlight(scope, KEY), false)
   // Flag still true after commit — host must forceSeal when tryRefresh returns None.
-  assert.equal(bloggerRuntime.reactivatedOf(committed.state), true)
-  assert.equal(bloggerRuntime.blocksNewRequest(true, committed.state), false)
+  assert.equal(parkedTransform.isDrainOpen(scope, KEY), true)
+  assert.equal(bloggerRuntime.blocksNewRequest(true, false, true), false)
 
-  const sealed = bloggerRuntime.forceSeal(committed.state)
-  assert.equal(bloggerRuntime.stateOf(sealed), 'Idle', 'forceSeal only closes the drain window')
-  assert.equal(bloggerRuntime.reactivatedOf(sealed), false)
-  assert.equal(bloggerRuntime.blocksNewRequest(true, sealed), true, 'durable seal re-blocks after catch-up')
+  parkedTransform.setDrainWindow(scope, KEY, bloggerRuntime.closedDrain())
+  assert.equal(parkedTransform.hasFlight(scope, KEY), false, 'forceSeal only closes the drain window')
+  assert.equal(parkedTransform.isDrainOpen(scope, KEY), false)
+  assert.equal(bloggerRuntime.blocksNewRequest(true, false, false), true, 'durable seal re-blocks after catch-up')
 })
