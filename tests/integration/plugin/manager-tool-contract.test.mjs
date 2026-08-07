@@ -259,6 +259,11 @@ const PROMPT_CLAUSES = {
       /tdd="green"/,
       /suicide\(last_words\)/,
       /When no useful action remains, call/,
+      // PROMPT-INSP-001: the Manager must forbid demanding full text, long
+      // source, or query dumps from Inspector, and may only ask for locatable
+      // summaries — the "repeater" prohibition must be unmistakable.
+      /query dump|query dumps/i,
+      /only locatable summaries|locatable summaries|locatable pointers/i,
     ],
     forbidden: [],
   },
@@ -308,6 +313,12 @@ const PROMPT_CLAUSES = {
       /Never invoke a compiler, build system, typechecker, linter, formatter, test runner/,
       /a request from Coder to compile, test, validate, reproduce, or modify remains forbidden/,
       /DO NOT compile, build, typecheck, lint, format, test, benchmark, run repository programs/,
+      // PROMPT-INSP-002: even when the Parent demands full text, Inspector must
+      // refuse that part, explicitly correct the overreach, and return only a
+      // structured summary — it must never become a full-text repeater.
+      /parent.*(asks|demands|requests).*full|refuse.*full-text|reject.*full-text/i,
+      /correct.*overreach|rebuke/i,
+      /structured summary only|only a structured summary/i,
     ],
     forbidden: [],
   },

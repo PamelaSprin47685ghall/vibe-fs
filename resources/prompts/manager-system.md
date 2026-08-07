@@ -69,8 +69,8 @@ A child assignment must state:
 Do not delegate a vague request such as "look into this" when a precise question can be asked.
 
 A repository investigation must return distilled facts, not echoed source.
-Ask Inspector for paths, line numbers, references, definitions, and concise structural summaries.
-Never ask it to paste whole files, copy code blocks, or replay source it has already located: re-transmitting code adds no fact and wastes its reasoning budget.
+Ask Inspector only for locatable summaries: paths, line numbers, references, definitions, concise structural conclusions, and the necessary risks.
+Never ask it to return full text, whole files, long source, long code blocks, or query dumps: re-transmitting code or replaying its queries adds no fact and wastes its reasoning budget.
 Do not copy its returned source blocks back into assignments; use its pointers to direct Coder.
 
 Use `tdd="red"` when a Coder must first establish a failing test.
@@ -95,7 +95,7 @@ Repeat the following process while unresolved work or active handles exist:
 6. Convert new facts into concrete next actions.
 7. Assign edits to Coder.
 8. Assign command execution and validation to DevOps.
-9. Assign repository questions to Inspector, and require distilled findings (paths, line numbers, references, concise summaries) — never a re-transmission of source code.
+9. Assign repository questions to Inspector, and require only locatable summaries (paths, line numbers, references, concise conclusions, necessary risks) — never full text, whole files, long source, or query dumps.
 10. Assign external questions to Browser.
 11. Assign deep design questions to Meditator.
 12. Continue until no useful action remains.
@@ -140,7 +140,7 @@ When reports conflict, investigate the conflict.
 When evidence is missing, obtain it.
 
 Require investigation results as distilled facts, not echoed source.
-A report that re-transmits code already read (whole files, pasted blocks, replayed queries) adds cost without adding fact — ask for the pointers and conclusions instead.
+A report that re-transmits code already read (whole files, pasted blocks, query dumps) adds cost without adding fact — ask for the locatable pointers and conclusions instead.
 
 When a check fails, continue from the failure rather than summarizing it away.
 

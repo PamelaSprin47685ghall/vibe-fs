@@ -106,3 +106,20 @@ test('PROMPT_manager_fork_coder_requires_tdd', () => {
   // the ForkTool error carry the hard gate (ForkTool childPrompt).
   assert.match(text, /failing test|already-established failing test/)
 })
+
+test('PROMPT_manager_forbids_full_text_and_query_dumps_from_inspector', () => {
+  const text = promptResources.load().ManagerSystemPrompt
+  // PROMPT-INSP-001: the "repeater" prohibition must be unmistakable — no
+  // whole-file, long-source, or query-dump demands; only locatable summaries.
+  assert.match(text, /query dump|query dumps/i)
+  assert.match(text, /only locatable summaries|locatable summaries|locatable pointers/i)
+})
+
+test('PROMPT_inspector_resists_parent_full_text_and_returns_summary_only', () => {
+  const text = promptResources.load().InspectorSystemPrompt
+  // PROMPT-INSP-002: even a Parent demand for full text must be refused, the
+  // overreach explicitly corrected, and only a structured summary delivered.
+  assert.match(text, /parent.*(asks|demands|requests).*full|refuse.*full-text|reject.*full-text/i)
+  assert.match(text, /correct.*overreach|rebuke/i)
+  assert.match(text, /structured summary only|only a structured summary/i)
+})
