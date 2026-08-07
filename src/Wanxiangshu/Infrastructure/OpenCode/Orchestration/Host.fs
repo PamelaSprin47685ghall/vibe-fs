@@ -13,6 +13,8 @@ open Wanxiangshu.Orchestrator
 /// runtime, and supplies `ManagerPort` to the pure publish program.
 type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let worktrees = Dictionary<string, string>()
+    let joinGate = obj ()
+    let mutable joinInFlight = false
 
     let gitPort = GitOperations.createWithRepo deps.RepoPath OrchestratorGit.run
 
@@ -301,12 +303,26 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     member _.JoinPublishedAvailable
         (maxCount: int, interrupt: Task<unit>)
         : Task<Result<JoinWaitOutcome<OrchestratorVerdict>, string>> =
-        task {
-            match! engine () with
-            | Error reason -> return Error reason
-            | Ok engine ->
-                let! outcome = engine.JoinPublishedBatch(maxCount, interrupt)
-                return Ok outcome
-        }
+        let acquired =
+            lock joinGate (fun () ->
+                if joinInFlight then
+                    false
+                else
+                    joinInFlight <- true
+                    true)
+
+        if not acquired then
+            Task.FromResult(Error "JOIN_IN_PROGRESS: another join call is already waiting for this session")
+        else
+            task {
+                try
+                    match! engine () with
+                    | Error reason -> return Error reason
+                    | Ok engine ->
+                        let! outcome = engine.JoinPublishedBatch(maxCount, interrupt)
+                        return Ok outcome
+                finally
+                    lock joinGate (fun () -> joinInFlight <- false)
+            }
 
     member _.Cancel() = runtime.Cancel()

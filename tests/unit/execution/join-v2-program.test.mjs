@@ -5,6 +5,11 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const ROOT = join(fileURLToPath(new URL('../../../', import.meta.url)))
 import {
   handleId,
   handleProjection,
@@ -13,6 +18,18 @@ import {
   sessionId,
 } from '../support/domain.mjs'
 
+test('EXEC_021_duplicate_join_is_fail_closed_before_waiting', () => {
+  const runtime = readFileSync(join(ROOT, 'src/Wanxiangshu/Session/HostForkRuntime.fs'), 'utf8')
+  const orchestrator = readFileSync(
+    join(ROOT, 'src/Wanxiangshu/Infrastructure/OpenCode/Orchestration/Host.fs'),
+    'utf8',
+  )
+  assert.match(runtime, /let mutable joinInFlight = false/)
+  assert.match(runtime, /ForkError\.JoinInProgress/)
+  assert.match(runtime, /finally[\s\S]*joinInFlight <- false/)
+  assert.match(orchestrator, /let joinGate = obj \(\)/)
+  assert.match(orchestrator, /JOIN_IN_PROGRESS/)
+})
 test('EXEC_018_join_ops_publish_permit_gated_entrypoints', () => {
   assert.equal(typeof joinProgram.joinAny, 'function')
   assert.equal(typeof joinProgram.joinAvailable, 'function')

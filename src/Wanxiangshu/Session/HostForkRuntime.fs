@@ -50,6 +50,8 @@ type HostForkRuntime
     // DSL-MUTABLE: resource — most recent PTY id (survives a parent-provider restart)
     let mutable lastPtyId: string option = None
     let gate = obj ()
+    // DSL-MUTABLE: single-flight — duplicate joins fail before waiting
+    let mutable joinInFlight = false
 
     let directoryOf = defaultArg directoryFor (fun _ -> None)
     let childCreated = defaultArg onChildCreated (fun _ _ _ -> ())
@@ -396,8 +398,30 @@ type HostForkRuntime
                                 | CompletionMayBeAvailable -> return! loop ()
             }
 
-        // GREEN-4: JoinAvailable does not start recovery; permit path already recovered.
-        loop ()
+        // A tool turn may contain duplicate join calls. Only one waiter may own the
+        // runtime wake channels; a second waiter would otherwise consume no fact and
+        // remain parked after the first waiter consumes the sole wake.
+        let acquired =
+            lock gate (fun () ->
+                if joinInFlight then
+                    false
+                else
+                    joinInFlight <- true
+                    true)
+
+        if not acquired then
+            Task.FromResult(Error ForkError.JoinInProgress)
+        elif cap <= 0 then
+            lock gate (fun () -> joinInFlight <- false)
+            Task.FromResult(Error ForkError.Empty)
+        else
+            // GREEN-4: JoinAvailable does not start recovery; permit path already recovered.
+            task {
+                try
+                    return! loop ()
+                finally
+                    lock gate (fun () -> joinInFlight <- false)
+            }
 
     /// Compatibility single-result join (Executor map/reduce agent path).
     /// None is unbounded; Some is an explicit internal waiter budget.

@@ -230,6 +230,7 @@ module JoinResultRenderer =
             | ForkError.NothingToJoin -> "NOTHING_TO_JOIN", None
             | ForkError.Cancelled -> "CANCELLED", None
             | ForkError.Empty -> "EMPTY", None
+            | ForkError.JoinInProgress -> "JOIN_IN_PROGRESS", None
             | ForkError.Abandoned(id, reason) -> "ABANDONED:" + id + ":" + reason, Some id
             | ForkError.NotFound id -> "NOT_FOUND:" + id, Some id
             | ForkError.TimedOut -> "TIMED_OUT", None

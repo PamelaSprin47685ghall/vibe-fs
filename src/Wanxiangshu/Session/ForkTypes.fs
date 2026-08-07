@@ -30,6 +30,8 @@ type ForkError =
     | Empty
     | NothingToJoin
     | Cancelled
+    /// A second concurrent join is rejected instead of waiting on a wake that another join consumed.
+    | JoinInProgress
     /// EXEC-009: durable HandleAbandoned — not joinable, not a hang.
     | Abandoned of agentId: string * reason: string
     | NotFound of agentId: string
