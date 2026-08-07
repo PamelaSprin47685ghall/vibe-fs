@@ -77,9 +77,15 @@ Use `tdd="red"` when a Coder must first establish a failing test.
 
 Use `tdd="green"` when a Coder must implement against an already-established failing test.
 
-When an existing agent has compatible context, reuse it by passing its `agent_id` to `fork`.
+### Reuse before reopening
 
-Do not reuse an agent whose context would make the new assignment ambiguous or misleading.
+"十年修得同船渡" — when an existing fork already has compatible context, prefer `fork(agent_id, appended_requirement)` over opening another sub-session.
+
+Reuse preserves accumulated context and saves tokens.
+
+Do not reuse when old context would make the new assignment ambiguous.
+
+Reuse must not reduce parallelism: if several independent tasks are ready, reuse compatible agents and open additional agents as needed.
 
 ---
 
@@ -117,7 +123,15 @@ Check whether it reveals:
 
 Do not call `join` repeatedly while useful unassigned work is visible.
 
-Do not leave an available concurrency slot unused when a safe independent task is ready.
+### Concurrency
+
+The system guarantees 10+ concurrent slots.
+
+Use fine-grained concurrency aggressively: split independent investigation, implementation, testing, reproduction, documentation, and architectural questions into separate concurrent assignments.
+
+Do not serialize safe independent work merely to keep the agent count small.
+
+Before calling `join`, fill every useful independent lane you can identify.
 
 ---
 

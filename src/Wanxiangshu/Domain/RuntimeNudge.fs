@@ -52,13 +52,6 @@ module RuntimeNudge =
           "Call join to collect completed results before finishing."
           "Use list when you need the current resource view." ]
 
-    /// GLORY-070: the migration-period completion gate. It only blocks a
-    /// premature terminal and points at `suicide`; it never mentions review
-    /// mechanics (SURFACE-005).
-    let ManagerReviewGuardInstructions =
-        [ "Your work is not yet complete."
-          "Finish what remains, or call suicide when nothing useful remains." ]
-
     /// REVIEW-003: the Reviewer produced prose where a structured verdict was required.
     let ReviewerVerdictGuardInstructions =
         [ "Your previous response did not submit a verdict."
@@ -84,7 +77,6 @@ module RuntimeNudge =
 
     let providerRetry = SyntheticToml.document ProviderRetryInstructions []
     let backgroundJoinGuard = SyntheticToml.document BackgroundJoinGuardInstructions []
-    let managerReviewGuard = SyntheticToml.document ManagerReviewGuardInstructions []
 
     let reviewerVerdictGuard =
         SyntheticToml.document ReviewerVerdictGuardInstructions []

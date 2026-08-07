@@ -8,6 +8,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Session
 
 /// Runtime owner for ManagerJob resources. Every job runs the sequential
 /// direct-CE OrchestratorProgram workflow; the mailbox contains only final post-FF verdicts.
@@ -204,6 +205,31 @@ type Orchestrator
               TargetRef = record.TargetRef
               Worktree = worktree }
 
+    /// GLORY-068: reuse an active ManagerJob — the SAME worktree and the SAME
+    /// Manager session continue with an appended requirement ("十年修得同船渡").
+    /// Refuses terminal jobs; a finished job never revives.
+    member this.ContinueManager(jobId: ManagerJobId, prompt: string) : Task<Result<WorktreePath, string>> =
+        task {
+            let projection = snapshot ()
+
+            match OrchestratorProjection.tryFind jobId projection.AgentProjections.Orchestrator with
+            | None -> return Error(sprintf "Unknown manager job: %s" (ManagerJobId.value jobId))
+            | Some record ->
+                match record.Progress with
+                | JobProgress.Published _
+                | JobProgress.Failed _
+                | JobProgress.Abandoned ->
+                    return Error(sprintf "Manager job is no longer active: %s" (ManagerJobId.value jobId))
+                | JobProgress.ManagerStarted
+                | JobProgress.CandidateReady _
+                | JobProgress.ConflictPending _
+                | JobProgress.RebasedCandidateReady _
+                | JobProgress.PublishClaimed _ ->
+                    match! manager.ResumeManager record.ManagerJobId record.WorktreePath prompt with
+                    | Error error -> return Error error
+                    | Ok() -> return Ok record.WorktreePath
+        }
+
     /// Compatibility single-result join (Empty when idle).
     member _.JoinPublished() =
         task {
@@ -213,5 +239,5 @@ type Orchestrator
         }
 
     /// EXEC-019: bounded FIFO batch with local interrupt (≠ lifecycle Cancel).
-    member _.JoinPublishedBatch(maxCount: int, interrupt: Task<unit>) =
+    member _.JoinPublishedBatch(maxCount: int, interrupt: Task<JoinInterruptReason>) =
         mailbox.JoinAvailable(maxCount, interrupt)

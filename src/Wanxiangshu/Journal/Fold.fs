@@ -493,6 +493,7 @@ module Fold =
                             payload.ChildSessionId
                             payload.TargetAgent
                             payload.CanonicalRole
+                            payload.Ownership
                             (Option.defaultValue HandleProjection.empty session.Handles)
                         |> Result.map (fun updated -> { session with Handles = Some updated }))
                     projection
@@ -1008,9 +1009,9 @@ module Fold =
                 | ManagerLifecycleFact.LifeOpened payload -> payload.SessionId
                 | ManagerLifecycleFact.WorkActivated payload -> payload.SessionId
                 | ManagerLifecycleFact.FinalityRequested payload -> payload.SessionId
-                | ManagerLifecycleFact.FinalityReviewStarted payload -> payload.SessionId
+                | ManagerLifecycleFact.FinalityReviewerEnlisted payload -> payload.SessionId
                 | ManagerLifecycleFact.FinalityRejected payload -> payload.SessionId
-                | ManagerLifecycleFact.FinalityConfirmed payload -> payload.SessionId
+                | ManagerLifecycleFact.FinalityBlessed payload -> payload.SessionId
                 | ManagerLifecycleFact.FinalityUndecided payload -> payload.SessionId
                 | ManagerLifecycleFact.LifeCompleted payload -> payload.SessionId
 

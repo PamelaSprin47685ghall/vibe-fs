@@ -245,10 +245,17 @@ module Reconciler =
                             let decision = ReconcileProgram.decideStep rereadsRemaining evidence
 
                             match decision with
-                            | ReconcileProgram.ReconcileDecision.Publish ->
+                            | ReconcileProgram.ReconcileDecision.Publish
+                            | ReconcileProgram.ReconcileDecision.RepairMissingFinalReport ->
+                                // RepairMissingFinalReport publishes the observed
+                                // Unknown turn as-is; TurnCompletionProgram turns it
+                                // into the missing-final-report repair (GLORY-070).
                                 let publishable =
                                     match evidence with
                                     | ReconcileProgram.ReconcileEvidence.Terminal observed -> observed.PublishTurn
+                                    | ReconcileProgram.ReconcileEvidence.Unknown(Some observed) ->
+                                        observed.PublishTurn
+                                    | ReconcileProgram.ReconcileEvidence.Provisional observed -> observed.PublishTurn
                                     | _ -> candidate
 
                                 do! publishIfAllowed sessionId generation maps publishable observedTurns (Some messages)

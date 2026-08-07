@@ -115,7 +115,6 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member val CompanionGate = obj ()
     member val VerdictSessions = SharedState.VerdictSessions
     member val NudgeSent = HashSet<string>()
-    member val ManagerGuardNudges = HashSet<string>()
     member val JoinGuardNudges = HashSet<string>()
     member val AbortedSessions = HashSet<string>()
     member val RecoveryArming = Dictionary<string, SlotArming>()

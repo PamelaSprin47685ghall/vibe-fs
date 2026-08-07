@@ -124,7 +124,6 @@ module HostSignalBootstrap =
                                     managerGitTreePort
                                     scope.VerdictSessions
                                     scope.NudgeSent
-                                    scope.ManagerGuardNudges
                                     scope.JoinGuardNudges
                                     scope.SessionParents
                                     scope.DisposeExecutorRuntime

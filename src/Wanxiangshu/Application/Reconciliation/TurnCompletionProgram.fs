@@ -134,7 +134,6 @@ module TurnCompletionProgram =
         (gitTreePort: GitTreePort option)
         (verdictSessions: HashSet<string>)
         (nudgeSent: HashSet<string>)
-        (managerGuardNudges: HashSet<string>)
         (joinGuardNudges: HashSet<string>)
         (sessionParents: Dictionary<string, string>)
         (disposeExecutorRuntime: string -> unit)
@@ -246,7 +245,11 @@ module TurnCompletionProgram =
             && ReviewerGuardState.isConfirmedReviewer journal sessionKey
 
         match turn.Outcome with
-        | ReconcileProgram.TurnUnknown -> AsyncSupport.completedTask ()
+        | ReconcileProgram.TurnUnknown ->
+            // GLORY-070: a stable idle that never produced a final report is
+            // repaired exactly once (the reconcile maps dedupe the turn token);
+            // it must never silently stop.
+            sendRepair sessionPort eventPort journal turn RuntimeNudge.missingFinalReport "missing-final-report"
         | ReconcileProgram.TurnInProgress when reviewerAlreadyConfirmed ->
             // A second PERFECT is frequently a tool-only provider step. Once the
             // witness is Confirmed, finish the physical reviewer run so
@@ -333,30 +336,16 @@ module TurnCompletionProgram =
         | ReconcileProgram.TurnFailed error -> continueAfterOrdinaryFailure sessionPort eventPort journal turn error
         | ReconcileProgram.TurnCompleted ->
             // EXEC-016 first: join-capable roles with outstanding background work
-            // must join before Review Guard / terminal Completed.
+            // must join before any completion decision.
             let joinOutstanding =
                 TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId
-
-            // REVIEW-003/007 synchronize before completion: a reviewer awaiting
-            // PERFECT confirmation and a manager whose current tree lacks a witness
-            // are still running. Reporting Completed here lets join/AwaitManager return
-            // before confirmation, racing publish and worktree release.
-            let managerGuard =
-                if joinOutstanding then
-                    None
-                else
-                    match turn.Role with
-                    | Some Role.Manager when TerminalPolicy.isTopLevelManager sessionParents journal sessionKey ->
-                        Some(HostReviewGuard.missingTree journal gitTreePort sessionKey)
-                    | _ -> None
 
             // GLORY-018: a legal planning terminal does not complete the Manager.
             // The Host sends exactly one ManagerWorkActivation continuation
             // instead; the completion stays deferred until the Life is activated.
             let managerPlanning =
                 match turn.Role with
-                | Some Role.Manager when TerminalPolicy.isTopLevelManager sessionParents journal sessionKey ->
-                    ManagerLifecycleGate.shouldActivate journal turn
+                | Some Role.Manager -> ManagerLifecycleGate.shouldActivate journal turn
                 | _ -> false
 
             // GLORY-041: a suicide was accepted — the Manager's completion is
@@ -373,9 +362,43 @@ module TurnCompletionProgram =
                         |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
                         |> Option.exists (fun life ->
                             match life.ActiveFinality with
-                            | Some request -> not request.Rejected && not request.Confirmed
+                            | Some request -> ManagerLifecycleProjection.isOpen request
                             | None -> false)
                     | None -> false
+                | _ -> false
+
+            // ORCH-006: once the Orchestrator has taken the job over, the Manager
+            // has no work left and its run may complete (the Orchestrator's
+            // barrier owns the review).
+            let managerJobHandedOff =
+                match turn.Role with
+                | Some Role.Manager ->
+                    match journal with
+                    | Some durable ->
+                        let snapshot = AgentJournal.snapshot durable
+
+                        OrchestratorProjection.tryFindByManagerSession
+                            turn.SessionId
+                            snapshot.AgentProjections.Orchestrator
+                        |> Option.exists (fun job ->
+                            match job.Progress with
+                            | JobProgress.ManagerStarted
+                            | JobProgress.ConflictPending _ -> false
+                            | JobProgress.CandidateReady _
+                            | JobProgress.RebasedCandidateReady _
+                            | JobProgress.PublishClaimed _
+                            | JobProgress.Published _
+                            | JobProgress.Failed _
+                            | JobProgress.Abandoned -> true)
+                    | None -> false
+                | _ -> false
+
+            // GLORY-070: an active Manager (any Life state except completed)
+            // keeps working until suicide. Its completion is deferred and the
+            // ordinary idle earns GLORY-029's encouragement — never a review guard.
+            let managerShouldContinue =
+                match turn.Role with
+                | Some Role.Manager -> not managerJobHandedOff
                 | _ -> false
 
             let completionDeferred =
@@ -385,14 +408,12 @@ module TurnCompletionProgram =
                     true
                 elif managerPlanning then
                     true
+                elif managerShouldContinue then
+                    true
                 else
-                    match managerGuard with
-                    | Some(HostReviewGuard.ReviewGuardMissing _)
-                    | Some(HostReviewGuard.ReviewGuardUnavailable _) -> true
-                    | _ ->
-                        turn.Role = Some Role.Reviewer
-                        && not reviewerAlreadyConfirmed
-                        && ReviewerGuardState.pendingConfirmation journal sessionKey
+                    turn.Role = Some Role.Reviewer
+                    && not reviewerAlreadyConfirmed
+                    && ReviewerGuardState.pendingConfirmation journal sessionKey
 
             let wasAborted, terminalValid =
                 if completionDeferred then
@@ -481,38 +502,56 @@ module TurnCompletionProgram =
                         | Ok _ -> ()
                     }
                     :> Task
-                | Some Role.Manager when TerminalPolicy.isTopLevelManager sessionParents journal sessionKey ->
-                    match managerGuard with
-                    | Some(HostReviewGuard.ReviewGuardMissing treeHash) ->
+                | Some Role.Manager when managerJobHandedOff ->
+                    // ORCH-006: the job is out of the Manager's hands; this run
+                    // may complete so the Orchestrator's AwaitManager returns.
+                    completeReviewerOrAssistant false |> ignore
+                    AsyncSupport.completedTask ()
+                | Some Role.Manager ->
+                    // GLORY-029/070: ordinary Labor idle. The Manager is never
+                    // reviewed by a guard; it continues until suicide. Exactly one
+                    // encouragement per idle terminal (dedupe: pending claim + run).
+                    let encouragementKey =
+                        sprintf
+                            "manager-idle:%s:%s"
+                            sessionKey
+                            (ProviderRunIdentity.value turn.ProviderRun)
+
+                    let idleAlreadyClaimed =
+                        match journal with
+                        | Some durable ->
+                            AgentProjection.tryFind turn.SessionId (AgentJournal.snapshot durable).AgentProjections
+                            |> Option.bind (fun session -> session.PromptAuthority)
+                            |> Option.exists (fun authority ->
+                                authority.PendingClaims
+                                |> Map.exists (fun _ claim ->
+                                    match claim.Origin with
+                                    | PromptAuthority.PromptOrigin.Continuation
+                                        PromptAuthority.ContinuationKind.ManagerIdleEncouragement -> true
+                                    | _ -> false))
+                        | None -> false
+
+                    if nudgeSent.Contains encouragementKey || idleAlreadyClaimed then
+                        AsyncSupport.completedTask ()
+                    else
+                        nudgeSent.Add encouragementKey |> ignore
+
                         task {
-                            // Same deferred-completion fail closed as the reviewer branch.
                             let! outcome =
-                                HostReviewGuard.nudgeManager
+                                HostSessionNudge.sendContinuationResult
                                     sessionPort
-                                    journal
-                                    managerGuardNudges
                                     turn.SessionId
-                                    treeHash
+                                    ManagerLifecyclePrompt.IdleEncouragement
+                                    PromptAuthority.ContinuationKind.ManagerIdleEncouragement
+                                    turn.Directory
+                                    journal
+                                    PromptDispatcher.AwaitMode.Detached
+                                    None
 
                             match outcome with
-                            | HostReviewGuard.GuardNudgeOutcome.NoLongerRequired ->
-                                completeReviewerOrAssistant false |> ignore
-                            | HostReviewGuard.GuardNudgeOutcome.Failed reason ->
-                                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
-                                |> ignore
-                            | _ -> ()
+                            | Error error ->
+                                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
+                            | Ok _ -> ()
                         }
                         :> Task
-                    | Some(HostReviewGuard.ReviewGuardUnavailable reason) ->
-                        // ORCH-008 / REVIEW-007 fail closed: an unavailable guard must not
-                        // let a Manager finish unreviewed. Reported as a terminal failure
-                        // rather than raised, because raising here escapes into whichever
-                        // Host callback happens to be on the stack.
-                        eventPort.NotifyTerminal
-                            turn.SessionId
-                            (TerminalOutcome.Failed(sprintf "Review guard unavailable: %s" reason))
-                        |> ignore
-
-                        AsyncSupport.completedTask ()
-                    | _ -> AsyncSupport.completedTask ()
                 | _ -> AsyncSupport.completedTask ()

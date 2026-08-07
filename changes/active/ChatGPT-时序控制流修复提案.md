@@ -4167,3 +4167,102 @@ CohortStillJudging    ❌ 若用于驱动下一步就是 PC
 
 ---
 Powered by [ChatGPT Exporter](https://www.chatgptexporter.com)
+
+---
+
+## Active work
+
+> 本文件是变更工作记录，不是当前产品规范。当前产品语义仅以 `docs/` 正式层为准。
+> Original proposal 已冻结；本段只追加实施状态。以最终讨论收敛结果（回复二 §1–21）为准。
+
+**Work origin:** 用户 2026-08-07 明确启动本 Proposal；文件自 `changes/proposed/` 移入 `active/`。
+
+### 实施状态（代码先行，docs/测试随后）
+
+以下已实现并通过 `npm run build`（Fable 编译全绿）：
+
+1. **Facts / Projection（GLORY-009/010/011）**
+   - `ManagerLifecycleFact`：新增 `FinalityReviewerEnlisted`（ReviewerOrdinal/IsNewReviewer）、
+     `FinalityBlessed`（WorkRecordBundleRef/Digest）；`FinalityRejected` 改
+     `RejectingReviewerSessionId`；删除 `FinalityReviewStarted`、`FinalityConfirmed`。
+   - `FinalityRequestProjection`：`Members: Map<SessionId, ReviewMemberRef>` +
+     `Resolution = Open | Rejected | Blessed | Undecided`；删除 Rejected/Confirmed bool。
+   - `LifeProjection`：新增 `EnlistedReviewers`（跨 request 累积 roster 源）与
+     `LastBlessing`（BlessingEvidence 携带 RequestId）。
+   - `HandleOwnership = DurableParentHandle | HostOwnedHidden`（P0-A）：HandleLinked 事实、
+     HandleRecord、FactCodec 旧行迁移（注入 DurableParentHandle）、Fold、HandleController.link、
+     HostForkRestart/RecoveryClosure/JoinDrain 过滤；HostForkRuntime 线程化 ownership。
+   - 新 `Journal/FinalityReviewCohort.fs`：`rosterOf`（未毕业历史 Reviewer + 恰好 1 新，
+     崩溃重入不重复造新）、`graduatedReviewer`（由 enlistment + confirmed witness 派生）、
+     `ReviewerOutcome`、`CohortSlot`、稳定 `agentIdOfReviewer`。
+
+2. **2N Finality cohort（GLORY-040/042/044/045/055/057/060/061/062）**
+   - `FinalityController` 重写：`enlistMember`（隐藏 session → durable enlist → barrier →
+     assignment，首 prompt 不早于 barrier）、`driveMember`（复用 HostReviewProgram.reverify，
+     可取消）、`concurrentAllOrShortCircuit`（REVISE 立即短路，其余 driver 停止下一次效果，
+     不 Dispose session）、`concludeRejection` / `concludeBlessing`（ordinal 稳定排序 bundle +
+     GLORY-059 tree 重验）/ `concludeUndecided`。运行时 ownership=HostOwnedHidden。
+   - `FinalityTool`：Blessed Life 的第二次 suicide → `completeBlessedLife`（GLORY-037 资源安全、
+     不读 tree/不建 Reviewer、新 last_words 成 terminal、`rest in peace` 冻结文本）；
+     `FinalityOutcome.Blessed` 分支。
+   - `FinalityPrompt.blessed`（minor-work continuation）。
+   - `HostForkAgent.Fork` 新增 `?ownership` / `?deferSend` + `SendDeferredFirstPrompt`；
+     `HostForkRuntime.AdoptChild`（跨 request 复用旧 Reviewer session）。
+
+3. **Manager completion owner（GLORY-029/070，删旧 Manager Review Guard）**
+   - `TurnCompletionProgram`：删除 managerGuard（missingTree/nudgeManager/ManagerGuard）；
+     TurnCompleted 分支 = joinOutstanding → JoinGuard；finalityOutstanding → deferred；
+     managerPlanning → Activation；managerJobHandedOff → 完成；其余 → `ManagerIdleEncouragement`
+     （pending claim + nudge key 去重）。
+   - `HostReviewGuard` 删除 Manager 面（missingTree/nudgeManager/ManagerGuard 分支），保留
+     reviewer 部分；`RuntimeNudge.managerReviewGuard`、`ManagerGuardNudges` 删除。
+
+4. **Join typed interruption（EXEC-017 rev.2）**
+   - `JoinInterruptReason = OperatorAbort | DeadlineExpired`；`JoinWaitOutcome =
+     ResultsAvailable | Interrupted of reason`；`MailboxWakeReason.LocalInterrupt`；
+     `JoinInterrupt` 携带 reason；WaitForSignal/JoinAvailable/JoinTool/ManagerJob
+     JoinAvailable 全链更新；wire：`status=interrupted, reason=operator_abort`；
+     DevOps 超时 → `TIMED_OUT`。用户消息不再进入 Join race。
+
+5. **Fork surface（GLORY-031/032）**
+   - `ManagedAgentCatalog.managerForkableRoles/Names`（无 Reviewer）；ForkTool schema 用之；
+     隐藏 target 统一 generic `Unknown or unavailable managed agent.`。
+
+6. **Orchestrator fork-manager reuse（GLORY-068）**
+   - `Orchestrator.ContinueManager(jobId, prompt)` + `OrchestratorHost.ContinueManagerJob`；
+     `ForkTool.executeOrchestrator` 接受 existing job id（`reused=true`）。
+
+7. **Reconcile 黑洞修复（GLORY-070 / HOST-004 rev.2，P0）**
+   - `ReconcileDecision.RepairMissingFinalReport`；`decideStep`：Unknown 耗尽 →
+     RepairMissingFinalReport，Provisional 耗尽 → Publish（F1：TurnNeedsContinuation 修复
+     分支不再死代码）；Reconciler 发布 Unknown turn；`TurnCompletionProgram.TurnUnknown` →
+     missing-final-report repair。稳定 idle 不再有静默 StopPass 出口。
+
+8. **Prompts**
+   - `manager-system.md`：十年修得同船渡 + 10+ 并发。
+   - `orchestrator-system.md`：fork-manager reuse API 成真 + 10+ 并发。
+
+### Remaining work（未完成）
+
+1. `reviewer-system.md` 补「不泄漏机制」条款（GLORY-047）。
+2. 静态门禁与文档同步：`scripts/checks/*`（spec-rules / dsl-ownership / p0-recovery-join /
+   architecture）如引用旧符号需更新；`docs/what/{execution,agent,orchestrator,review}.md`、
+   `docs/shape|how|proof/{glory,review,host,execution,flow,agent,orchestrator}.md` 对齐新语义。
+3. 单元测试更新：`tests/unit/glory/lifecycle.test.mjs`（新 projection 形状）、
+   `tests/unit/support/domain.mjs` 导出、reconcile-program 测试（decideStep 新分支）、
+   join-v2-mailbox/wire 测试、dsl-ownership-ratchet 基线。
+4. e2e：`manager-unhappy-path` 按一笔画（13 笔）重写；补 combinator law 测试
+   （concurrentAllOrShortCircuit / ensureX / awaitProjection 精神）。
+5. 全量验证：`npm run lint`、`npm test`、`npm run test:integration`、`npm run test:e2e`。
+6. 追加 `Final outcome` 并移动至 `changes/completed/`。
+
+### Blockers
+
+无客观 blocker。剩余工作量大（文档 + 测试 + 全量验证），今日未完成。
+
+### Completion criteria（收尾判据）
+
+- `npm run lint` / build / unit / integration / e2e 全绿。
+- 验收条件按 proposal §43 第 1–33 条逐项成立（2N roster、REVISE 立即生效、Blessed 第二
+  suicide rest in peace、隐藏 Reviewer 不进 list/join/guard、join 无 user-message 中断、
+  稳定 idle 无静默 StopPass、Manager 面零 review 泄漏、fork-manager reuse 真实可执行）。

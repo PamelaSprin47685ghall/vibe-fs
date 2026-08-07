@@ -289,6 +289,18 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 | Ok handle -> return Ok(WorktreePath.value handle.WorktreePath)
         }
 
+    /// GLORY-068: `fork-manager(existing_job_id, prompt)` — continue the SAME
+    /// Manager job (same worktree, same session) with an appended requirement.
+    member _.ContinueManagerJob(jobId: ManagerJobId, prompt: string) : Task<Result<string, string>> =
+        task {
+            match! engine () with
+            | Error reason -> return Error reason
+            | Ok engine ->
+                match! engine.ContinueManager(jobId, prompt) with
+                | Error error -> return Error error
+                | Ok path -> return Ok(WorktreePath.value path)
+        }
+
     /// Compatibility single-result join (stringified Empty/verdict). Prefer JoinPublishedAvailable.
     member _.JoinPublished() : Task<string> =
         task {
@@ -301,7 +313,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     /// EXEC-019: FIFO batch + local interrupt (JoinTool renders wire).
     member _.JoinPublishedAvailable
-        (maxCount: int, interrupt: Task<unit>)
+        (maxCount: int, interrupt: Task<JoinInterruptReason>)
         : Task<Result<JoinWaitOutcome<OrchestratorVerdict>, string>> =
         let acquired =
             lock joinGate (fun () ->

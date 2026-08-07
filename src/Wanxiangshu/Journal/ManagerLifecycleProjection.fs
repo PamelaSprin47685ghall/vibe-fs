@@ -5,11 +5,48 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 
+/// GLORY-011: one cohort member inside a FinalityRequest. A real identity
+/// (session + stable ordinal + the request's barrier), not a program counter.
+type ReviewMemberRef =
+    { ReviewerSessionId: SessionId
+      ReviewerOrdinal: int
+      BarrierId: ReviewBarrierId
+      IsNewReviewer: bool }
+
+/// GLORY-045: a Reviewer's accumulated standing inside one Life. Accumulated
+/// from `FinalityReviewerEnlisted` facts (every request's enlistment survives);
+/// graduation is DERIVED from the reviewer's confirmed witness on one of these
+/// barriers, never stored as a bool.
+type ReviewerStanding =
+    { ReviewerOrdinal: int
+      Barriers: ReviewBarrierId list }
+
+/// GLORY-011: the rejecting member's evidence. Only durable facts — the
+/// canonical work record blob — never a decision.
+type RejectionEvidence =
+    { RejectingReviewer: SessionId
+      WorkRecordRef: BlobRef
+      WorkRecordDigest: BlobDigest }
+
+/// GLORY-060/062: the minor-work evidence handed to the Manager after the
+/// whole cohort confirmed. The stable-ordinal canonical LWR bundle plus the
+/// request that produced it (the second suicide completes THAT request).
+type BlessingEvidence =
+    { RequestId: FinalityRequestId
+      WorkRecordBundleRef: BlobRef
+      WorkRecordBundleDigest: BlobDigest }
+
+/// GLORY-011: how an open FinalityRequest resolved. This is world state
+/// derived from facts — not the interpreter's next step (ARCH-001). A closed
+/// request may be replaced by a new `FinalityRequested` (GLORY-055).
+[<RequireQualifiedAccess>]
+type FinalityResolution =
+    | Open
+    | Rejected of RejectionEvidence
+    | Blessed of BlessingEvidence
+    | Undecided
+
 /// GLORY-011: one FinalityRequest's derived view inside a Life.
-///
-/// `Rejected` and `Confirmed` mark a closed request: a rejected request may be
-/// replaced by a new `FinalityRequested` (GLORY-055); a confirmed request is
-/// consumed by `LifeCompleted`.
 type FinalityRequestProjection =
     { RequestId: FinalityRequestId
       GitTreeHash: GitTreeHash
@@ -17,15 +54,13 @@ type FinalityRequestProjection =
       LastWordsDigest: BlobDigest
       ProviderRun: ProviderRunIdentity
       ToolCallId: ToolCallId
-      ReviewerSessionId: SessionId option
-      BarrierId: ReviewBarrierId option
-      Rejected: bool
-      Confirmed: bool }
+      Members: Map<SessionId, ReviewMemberRef>
+      Resolution: FinalityResolution }
 
 /// GLORY-011: one Manager Life's derived view. Answers "who is the current
 /// Life, is it activated, where is the compression floor, is a suicide active,
-/// what was the last rejection, is the Life complete". It never answers "what
-/// runs next" (ARCH-001).
+/// what was the last rejection, is there a blessing, is the Life complete". It
+/// never answers "what runs next" (ARCH-001).
 type LifeProjection =
     { LifeId: ManagerLifeId
       OpeningUserMessageId: PhysicalUserMessageId
@@ -34,7 +69,11 @@ type LifeProjection =
       OpeningCursor: XTraceCursor
       ProtectedPrefixEnd: XTraceCursor option
       ActiveFinality: FinalityRequestProjection option
+      /// Every Reviewer this Life ever enlisted, across all requests
+      /// (GLORY-045 roster source). Never pruned.
+      EnlistedReviewers: Map<SessionId, ReviewerStanding>
       LastRejectedWorkRecord: BlobRef option
+      LastBlessing: BlessingEvidence option
       CompletedTerminal: BlobRef option
       Completed: bool }
 
@@ -91,7 +130,9 @@ module ManagerLifecycleProjection =
                           OpeningCursor = { Sequence = payload.OpeningCursorSequence }
                           ProtectedPrefixEnd = None
                           ActiveFinality = None
+                          EnlistedReviewers = Map.empty
                           LastRejectedWorkRecord = None
+                          LastBlessing = None
                           CompletedTerminal = None
                           Completed = false }
                         state
@@ -119,9 +160,9 @@ module ManagerLifecycleProjection =
             match state.CurrentLife with
             | Some life when life.LifeId = payload.LifeId ->
                 match life.ActiveFinality with
-                // GLORY-055: a rejected (or consumed) request is closed; a new
-                // suicide opens a new request.
-                | Some request when not request.Rejected && not request.Confirmed ->
+                // GLORY-055: a closed request (rejected/blessed/undecided) may
+                // be replaced; an open one may not.
+                | Some { Resolution = FinalityResolution.Open } ->
                     Error ManagerLifeFoldRejection.FinalityAlreadyActive
                 | _ ->
                     Ok(
@@ -135,29 +176,50 @@ module ManagerLifecycleProjection =
                                           LastWordsDigest = payload.LastWordsDigest
                                           ProviderRun = payload.ProviderRun
                                           ToolCallId = payload.ToolCallId
-                                          ReviewerSessionId = None
-                                          BarrierId = None
-                                          Rejected = false
-                                          Confirmed = false } }
+                                          Members = Map.empty
+                                          Resolution = FinalityResolution.Open } }
                             state
                     )
             | _ -> Error ManagerLifeFoldRejection.LifeUnknown
 
-        | ManagerLifecycleFact.FinalityReviewStarted payload ->
+        | ManagerLifecycleFact.FinalityReviewerEnlisted payload ->
             match state.CurrentLife with
             | Some life when life.LifeId = payload.LifeId ->
                 match life.ActiveFinality with
                 | Some request when request.RequestId = payload.RequestId ->
-                    Ok(
-                        withLife
-                            { life with
-                                ActiveFinality =
-                                    Some
-                                        { request with
-                                            ReviewerSessionId = Some payload.ReviewerSessionId
-                                            BarrierId = Some payload.BarrierId } }
-                            state
-                    )
+                    match request.Resolution with
+                    | FinalityResolution.Open ->
+                        let memberRef =
+                            { ReviewerSessionId = payload.ReviewerSessionId
+                              ReviewerOrdinal = payload.ReviewerOrdinal
+                              BarrierId = payload.BarrierId
+                              IsNewReviewer = payload.IsNewReviewer }
+
+                        // Replay of the same enlistment is idempotent.
+                        match Map.tryFind payload.ReviewerSessionId request.Members with
+                        | Some existing when existing.BarrierId = payload.BarrierId -> Ok state
+                        | _ ->
+                            let standing =
+                                match Map.tryFind payload.ReviewerSessionId life.EnlistedReviewers with
+                                | Some previous ->
+                                    { previous with
+                                        Barriers = payload.BarrierId :: previous.Barriers }
+                                | None ->
+                                    { ReviewerOrdinal = payload.ReviewerOrdinal
+                                      Barriers = [ payload.BarrierId ] }
+
+                            Ok(
+                                withLife
+                                    { life with
+                                        EnlistedReviewers =
+                                            Map.add payload.ReviewerSessionId standing life.EnlistedReviewers
+                                        ActiveFinality =
+                                            Some
+                                                { request with
+                                                    Members = Map.add payload.ReviewerSessionId memberRef request.Members } }
+                                    state
+                            )
+                    | _ -> Error ManagerLifeFoldRejection.UnknownRequest
                 | _ -> Error ManagerLifeFoldRejection.UnknownRequest
             | _ -> Error ManagerLifeFoldRejection.LifeUnknown
 
@@ -166,27 +228,49 @@ module ManagerLifecycleProjection =
             | Some life when life.LifeId = payload.LifeId ->
                 match life.ActiveFinality with
                 | Some request when request.RequestId = payload.RequestId ->
-                    Ok(
-                        withLife
-                            { life with
-                                ActiveFinality = Some { request with Rejected = true }
-                                LastRejectedWorkRecord = Some payload.WorkRecordRef }
-                            state
-                    )
+                    match request.Resolution with
+                    | FinalityResolution.Open ->
+                        Ok(
+                            withLife
+                                { life with
+                                    ActiveFinality =
+                                        Some
+                                            { request with
+                                                Resolution =
+                                                    FinalityResolution.Rejected
+                                                        { RejectingReviewer = payload.RejectingReviewerSessionId
+                                                          WorkRecordRef = payload.WorkRecordRef
+                                                          WorkRecordDigest = payload.WorkRecordDigest } }
+                                    LastRejectedWorkRecord = Some payload.WorkRecordRef }
+                                state
+                        )
+                    | _ -> Error ManagerLifeFoldRejection.UnknownRequest
                 | _ -> Error ManagerLifeFoldRejection.UnknownRequest
             | _ -> Error ManagerLifeFoldRejection.LifeUnknown
 
-        | ManagerLifecycleFact.FinalityConfirmed payload ->
+        | ManagerLifecycleFact.FinalityBlessed payload ->
             match state.CurrentLife with
             | Some life when life.LifeId = payload.LifeId ->
                 match life.ActiveFinality with
                 | Some request when request.RequestId = payload.RequestId ->
-                    Ok(
-                        withLife
-                            { life with
-                                ActiveFinality = Some { request with Confirmed = true } }
-                            state
-                    )
+                    match request.Resolution with
+                    | FinalityResolution.Open ->
+                        let blessing =
+                            { RequestId = payload.RequestId
+                              WorkRecordBundleRef = payload.WorkRecordBundleRef
+                              WorkRecordBundleDigest = payload.WorkRecordBundleDigest }
+
+                        Ok(
+                            withLife
+                                { life with
+                                    ActiveFinality =
+                                        Some
+                                            { request with
+                                                Resolution = FinalityResolution.Blessed blessing }
+                                    LastBlessing = Some blessing }
+                                state
+                        )
+                    | _ -> Error ManagerLifeFoldRejection.UnknownRequest
                 | _ -> Error ManagerLifeFoldRejection.UnknownRequest
             | _ -> Error ManagerLifeFoldRejection.LifeUnknown
 
@@ -197,12 +281,18 @@ module ManagerLifecycleProjection =
             | Some life when life.LifeId = payload.LifeId ->
                 match life.ActiveFinality with
                 | Some request when request.RequestId = payload.RequestId ->
-                    Ok(
-                        withLife
-                            { life with
-                                ActiveFinality = Some { request with Rejected = true } }
-                            state
-                    )
+                    match request.Resolution with
+                    | FinalityResolution.Open ->
+                        Ok(
+                            withLife
+                                { life with
+                                    ActiveFinality =
+                                        Some
+                                            { request with
+                                                Resolution = FinalityResolution.Undecided } }
+                                state
+                        )
+                    | _ -> Error ManagerLifeFoldRejection.UnknownRequest
                 | _ -> Error ManagerLifeFoldRejection.UnknownRequest
             | _ -> Error ManagerLifeFoldRejection.LifeUnknown
 
@@ -221,3 +311,11 @@ module ManagerLifecycleProjection =
                             state
                     )
             | _ -> Error ManagerLifeFoldRejection.LifeUnknown
+
+    /// GLORY-011: an open request is still awaiting its cohort resolution.
+    let isOpen (request: FinalityRequestProjection) =
+        match request.Resolution with
+        | FinalityResolution.Open -> true
+        | FinalityResolution.Rejected _
+        | FinalityResolution.Blessed _
+        | FinalityResolution.Undecided -> false

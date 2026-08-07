@@ -82,14 +82,15 @@ module ManagedAgentCatalog =
 
     let allRoles: Role list = allPublicRoles @ allInternalRoles
 
-    /// Public Manager fork-agent enum (AGENT-009): no orchestrator/manager/blogger/executor.
-    let publicForkableRoles: Role list =
+    /// Manager fork-agent enum (AGENT-009 / GLORY-031): the Reviewer is
+    /// Host-owned and does not exist on the Manager's surface. No
+    /// orchestrator/manager/blogger/executor either.
+    let managerForkableRoles: Role list =
         [ Role.Coder
           Role.Inspector
           Role.DevOps
           Role.Browser
-          Role.Meditator
-          Role.Reviewer ]
+          Role.Meditator ]
 
     let private namesFor (roles: Role list) : string list =
         roles
@@ -98,7 +99,7 @@ module ManagedAgentCatalog =
     /// AGENT-002: the required 24 managed agent names.
     let requiredNames: string list = namesFor allRoles
 
-    let publicForkableNames: string list = namesFor publicForkableRoles
+    let managerForkableNames: string list = namesFor managerForkableRoles
 
     let orchestratorForkableNames: string list =
         [ nameOf AgentTier.Fast Role.Manager; nameOf AgentTier.Deep Role.Manager ]

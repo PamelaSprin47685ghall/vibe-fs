@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Journal
@@ -10,22 +11,59 @@ open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 
-/// GLORY-003/040/042: the Manager Finality workflow, driven by the Host after a
-/// legal `suicide`.
+/// GLORY-003/040/042/044/045/060/061: the Manager Finality workflow, driven by
+/// the Host after a legal `suicide`.
 ///
-/// Ownership: the hidden Reviewer is forked on a private `HostForkRuntime`
-/// (parent = the Manager session, but never registered into the Manager's own
-/// fork surface), so `list`/`join` never see it (GLORY-002). The workflow
-/// writes `FinalityReviewStarted`, runs the shared `HostReviewProgram`, then
-/// lands one of: `FinalityRejected` + work-record tool result (GLORY-052/053),
-/// `FinalityConfirmed` + `LifeCompleted` + last_words terminal (GLORY-060/061),
-/// or `FinalityUndecided` + undecidable tool result (GLORY-057).
+/// One FinalityRequest enlists a cohort = every still-ungraduated historical
+/// Reviewer of this Life + exactly one new Reviewer (GLORY-045). Every member
+/// gets a fresh barrier on the request tree and must produce its own fresh
+/// dual-PERFECT. Any REVISE closes the request immediately (`FinalityRejected`,
+/// GLORY-044/055); only when ALL members have causally confirmed does the
+/// request land `FinalityBlessed` with the stable-ordinal canonical
+/// work-record bundle (GLORY-060). The Life stays open — the Manager keeps
+/// working on minor problems until its second suicide (GLORY-061/062).
 module FinalityController =
 
     type FinalityOutcome =
-        | Confirmed of message: string
         | Rejected of prompt: string
+        | Blessed of prompt: string
         | Undecided of prompt: string
+
+    /// One enlisted cohort member with the durable identities the driver needs.
+    type EnlistedMember =
+        { ReviewerSessionId: SessionId
+          BarrierId: ReviewBarrierId
+          ReviewerOrdinal: int
+          AgentId: string }
+
+    /// Cooperative cancellation for sibling drivers on a REVISE short-circuit:
+    /// stops their NEXT effect, never touches their durable sessions.
+    type CancelToken() =
+        let tcs =
+            TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+        member _.Task = tcs.Task
+        member _.IsCancelled = tcs.Task.IsCompleted
+        member _.Cancel() = tcs.TrySetResult() |> ignore
+
+    let private raceWithCancel (cancel: CancelToken) (work: Task<'a>) : Task<'a option> =
+        task {
+            let taggedWork: Task<obj> =
+                emitJsExpr work "$0.then(function (r) { return { kind: 0, r: r }; })"
+
+            let taggedCancel: Task<obj> =
+                emitJsExpr cancel.Task "$0.then(function () { return { kind: 1 }; })"
+
+            let! winner =
+                emitJsExpr (taggedWork, taggedCancel) "Promise.race([$0, $1])": Task<obj>
+
+            let kind: int = emitJsExpr winner "$0.kind"
+
+            if kind = 0 then
+                return Some(emitJsExpr winner "$0.r": 'a)
+            else
+                return None
+        }
 
     let private appendLifecycle (journal: AgentJournal) (fact: ManagerLifecycleFact) =
         let sessionId =
@@ -33,9 +71,9 @@ module FinalityController =
             | ManagerLifecycleFact.LifeOpened payload -> payload.SessionId
             | ManagerLifecycleFact.WorkActivated payload -> payload.SessionId
             | ManagerLifecycleFact.FinalityRequested payload -> payload.SessionId
-            | ManagerLifecycleFact.FinalityReviewStarted payload -> payload.SessionId
+            | ManagerLifecycleFact.FinalityReviewerEnlisted payload -> payload.SessionId
             | ManagerLifecycleFact.FinalityRejected payload -> payload.SessionId
-            | ManagerLifecycleFact.FinalityConfirmed payload -> payload.SessionId
+            | ManagerLifecycleFact.FinalityBlessed payload -> payload.SessionId
             | ManagerLifecycleFact.FinalityUndecided payload -> payload.SessionId
             | ManagerLifecycleFact.LifeCompleted payload -> payload.SessionId
 
@@ -46,16 +84,41 @@ module FinalityController =
             ))
         |> ignore
 
-    /// The hidden Reviewer's completion as the HostReviewProgram await result.
-    let private awaitReviewer (timeoutMs: int) (runtime: HostForkRuntime) (agentId: string) =
+    /// GLORY-049: the member's canonical LWR (includeOpening=false). `None`
+    /// means the LWR is unavailable — an infrastructure failure, never a wound
+    /// record (GLORY-051/056).
+    let private workRecordOf (journal: AgentJournal) (reviewerSessionId: SessionId) =
+        match XTraceCapture.lifecycleWorkRecord (Some journal) reviewerSessionId false with
+        | Some record when not (System.String.IsNullOrWhiteSpace record) -> Some record
+        | _ -> None
+
+    let private readOutcome
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (barrierId: ReviewBarrierId)
+        (reviewerSessionId: SessionId)
+        (tree: GitTreeHash)
+        : Result<HostReviewProgram.HostReviewOutcome, HostReviewProgram.HostReviewFailure> =
+        match OrchestratorReviewRead.read (Some journal) reviewerSessionId tree with
+        | OrchestratorReviewRead.Confirmed ->
+            Ok(HostReviewProgram.HostReviewOutcome.Confirmed(reviewerSessionId, barrierId, tree))
+        | OrchestratorReviewRead.RevisionRequired ->
+            match workRecordOf journal reviewerSessionId with
+            | Some record ->
+                Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired(reviewerSessionId, barrierId, tree, record))
+            | None -> Error HostReviewProgram.HostReviewFailure.WorkRecordUnavailable
+        | OrchestratorReviewRead.PendingConfirmation -> Error HostReviewProgram.HostReviewFailure.ConfirmationUnproven
+        | OrchestratorReviewRead.NeedsReview -> Error HostReviewProgram.HostReviewFailure.ReviewerProducedNoVerdict
+
+    /// The hidden Reviewer's completion as the driver's await result.
+    let private awaitReviewer (timeoutMs: int) (cancel: CancelToken) (runtime: HostForkRuntime) (agentId: string) =
         task {
-            match!
-                runtime.AwaitAgent(
-                    agentId,
-                    ?timeoutMs = Some timeoutMs
-                ) with
-            | Error error -> return Error error
-            | Ok run ->
+            let! awaited = raceWithCancel cancel (runtime.AwaitAgent(agentId, ?timeoutMs = Some timeoutMs))
+
+            match awaited with
+            | None -> return Error "review attempt cancelled"
+            | Some(Error error) -> return Error error
+            | Some(Ok run) ->
                 match run.Outcome with
                 | AgentCompleted _ -> return Ok()
                 | AgentFailed payload -> return Error payload.Message
@@ -102,7 +165,7 @@ module FinalityController =
         }
 
     /// GLORY-058/059: re-read the tree and require byte equality with the
-    /// request's tree before any confirmation lands.
+    /// request's tree before any blessing lands.
     let private treeUnchanged (scope: ToolRuntimeScope) (managerSessionId: SessionId) (expected: GitTreeHash) =
         try
             match scope.TreePortFor(SessionId.value managerSessionId) with
@@ -113,203 +176,350 @@ module FinalityController =
         with _ ->
             false
 
-    let private abortReviewer (scope: ToolRuntimeScope) (reviewerSessionId: SessionId) =
-        scope.Sessions.AbortSession reviewerSessionId |> ignore
-        scope.SessionParents.Remove(SessionId.value reviewerSessionId) |> ignore
-
-    /// The Glory path (GLORY-059/060/061): revalidate the tree, confirm, complete
-    /// the Life with last_words as the user-visible terminal, finish the Manager.
-    let private concludeGlory
+    /// One member's whole protocol on the shared HostReviewProgram: fork ports
+    /// are stubs (the cohort already enlisted), the await port is cancellable
+    /// (REVISE short-circuit), the continue port checks the cancel token before
+    /// every send so a rejected request never drives a sibling further.
+    let private driveMember
         (scope: ToolRuntimeScope)
+        (journal: AgentJournal)
+        (cancel: CancelToken)
+        (runtime: HostForkRuntime)
         (managerSessionId: SessionId)
-        (lifeId: ManagerLifeId)
-        (requestId: FinalityRequestId)
-        (reviewerSessionId: SessionId)
-        (barrierId: ReviewBarrierId)
-        (requestTree: GitTreeHash)
-        (lastWordsRef: BlobRef)
-        (lastWordsDigest: BlobDigest)
-        (providerRun: ProviderRunIdentity)
-        : Task<FinalityOutcome> =
+        (memberInfo: EnlistedMember)
+        (tree: GitTreeHash)
+        (timeoutMs: int)
+        : Task<Result<HostReviewProgram.HostReviewOutcome, HostReviewProgram.HostReviewFailure>> =
+        HostReviewProgram.reverify
+            (Some journal)
+            (fun () -> Task.FromResult(Ok memberInfo.ReviewerSessionId))
+            (fun () -> awaitReviewer timeoutMs cancel runtime memberInfo.AgentId)
+            (fun prompt ->
+                task {
+                    if cancel.IsCancelled then
+                        return Error "review attempt cancelled"
+                    else
+                        return! continueReviewer scope journal memberInfo.ReviewerSessionId prompt
+                })
+            managerSessionId
+            memberInfo.BarrierId
+            tree
+
+    /// GLORY-044: concurrent fan-out with immediate REVISE short-circuit. All
+    /// drivers start together; the first Revision result wins the race and the
+    /// remaining drivers are told to stop before their next effect. Durable
+    /// Reviewer sessions are never disposed here (GLORY-055).
+    let private concurrentAllOrShortCircuit
+        (isShortCircuit: 'a -> bool)
+        (tasks: Task<'a> list)
+        : Task<Choice<'a, 'a list>> =
         task {
-            if not (treeUnchanged scope managerSessionId requestTree) then
-                // GLORY-059: the tree moved under the confirmed witness; this
-                // success is void. Close the request fail-closed without a wound
-                // record (GLORY-057).
-                match scope.Journal with
-                | Some journal ->
-                    appendLifecycle
-                        journal
-                        (ManagerLifecycleFact.FinalityUndecided
-                            {| SessionId = managerSessionId
-                               LifeId = lifeId
-                               RequestId = requestId
-                               ReviewerSessionId = reviewerSessionId
-                               BarrierId = barrierId
-                               GitTreeHash = requestTree |})
-                | None -> ()
+            let tcs =
+                TaskCompletionSource<Choice<'a, 'a list>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-                abortReviewer scope reviewerSessionId
-                return Undecided ManagerLifecyclePrompt.FinalityUndecidable
-            else
-                match scope.Journal with
-                | None ->
-                    abortReviewer scope reviewerSessionId
-                    return Undecided ManagerLifecyclePrompt.FinalityUndecidable
-                | Some journal ->
-                    // GLORY-062/067 idempotence: the XTrace terminal is a single
-                    // per-session slot (GLORY-067 compatibility layer), and
-                    // LifeCompleted archives the Life. A replay of this path (crash
-                    // between LifeCompleted and terminal publish, or a later Life's
-                    // glory) must neither append a second TerminalOutputCaptured
-                    // (Fold rejects it → journal poison) nor re-complete.
-                    let alreadyCompleted =
-                        AgentProjection.tryFind managerSessionId (AgentJournal.snapshot journal).AgentProjections
-                        |> Option.bind (fun session -> session.ManagerLife)
-                        |> Option.exists (fun lifecycle ->
-                            (lifecycle.CurrentLife
-                             |> Option.exists (fun life -> life.LifeId = lifeId && life.Completed))
-                            || lifecycle.CompletedLives |> List.exists (fun life -> life.LifeId = lifeId))
+            let remaining = ref (List.length tasks)
+            let results = ResizeArray<'a>()
 
-                    let terminalRecorded =
-                        AgentProjection.tryFind managerSessionId (AgentJournal.snapshot journal).AgentProjections
-                        |> Option.bind (fun session -> session.XTrace)
-                        |> Option.exists (fun state -> state.Terminal.IsSome)
+            let decide (result: 'a) =
+                if isShortCircuit result then
+                    tcs.TrySetResult(Choice1Of2 result) |> ignore
+                else
+                    results.Add result
+                    remaining.Value <- remaining.Value - 1
 
-                    if not alreadyCompleted then
-                        let lastWords =
-                            journal.Writer.BlobWriter.Read lastWordsRef
-                            |> Result.toOption
-                            |> Option.defaultValue ""
+                    if remaining.Value = 0 then
+                        tcs.TrySetResult(Choice2Of2(List.ofSeq results)) |> ignore
 
-                        appendLifecycle
-                            journal
-                            (ManagerLifecycleFact.FinalityConfirmed
-                                {| SessionId = managerSessionId
-                                   LifeId = lifeId
-                                   RequestId = requestId
-                                   ReviewerSessionId = reviewerSessionId
-                                   BarrierId = barrierId
-                                   GitTreeHash = requestTree |})
+            tasks
+            |> List.iter (fun work ->
+                async {
+                    let! result = Async.AwaitTask work
+                    decide result
+                }
+                |> Async.StartImmediate)
 
-                        // GLORY-060: LifeCompleted BEFORE the terminal is published.
-                        appendLifecycle
-                            journal
-                            (ManagerLifecycleFact.LifeCompleted
-                                {| SessionId = managerSessionId
-                                   LifeId = lifeId
-                                   RequestId = requestId
-                                   TerminalRef = lastWordsRef
-                                   TerminalDigest = lastWordsDigest |})
-
-                        // The last_words blob IS the terminal segment (GLORY-061).
-                        // Only the FIRST Life may occupy the single XTrace terminal
-                        // slot; later Lives' terminals live in LifeCompleted only.
-                        if not terminalRecorded then
-                            AgentJournal.appendAgent
-                                (StreamId.Session managerSessionId)
-                                (Some providerRun)
-                                (CompanionFact.TerminalOutputCaptured
-                                    {| SessionId = managerSessionId
-                                       TextRef = lastWordsRef
-                                       TextDigest = lastWordsDigest
-                                       ProviderRun = providerRun |})
-                                journal
-                            |> ignore
-
-                        match scope.EventPort with
-                        | Some eventPort ->
-                            let runResult: AgentRunResult =
-                                { SessionId = managerSessionId
-                                  AuthorityRootUserMessageId =
-                                    PromptAuthorityLedger.activeProfile
-                                        managerSessionId
-                                        (AgentJournal.snapshot journal).AgentProjections
-                                    |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
-                                    |> Option.defaultValue (AuthorityRootUserMessageId.create "")
-                                  ProviderRun = providerRun
-                                  Role = Role.Manager
-                                  Directory = scope.DirectoryFor(SessionId.value managerSessionId)
-                                  TerminalText = lastWords
-                                  TurnFormalText = lastWords }
-
-                            eventPort.NotifyTerminal managerSessionId (TerminalOutcome.Completed runResult)
-                            |> ignore
-                        | None -> ()
-
-                    abortReviewer scope reviewerSessionId
-                    return Confirmed "Your final words have been received."
-        }
-
-    /// The wound path (GLORY-051/052/053): the reviewer's canonical LWR becomes
-    /// the FinalityRejected suicide tool result; the same Life continues.
-    let private concludeRejection
-        (scope: ToolRuntimeScope)
-        (managerSessionId: SessionId)
-        (lifeId: ManagerLifeId)
-        (requestId: FinalityRequestId)
-        (reviewerSessionId: SessionId)
-        (barrierId: ReviewBarrierId)
-        (requestTree: GitTreeHash)
-        (workRecord: string)
-        : Task<FinalityOutcome> =
-        task {
-            match scope.Journal with
-            | None ->
-                abortReviewer scope reviewerSessionId
-                return Undecided ManagerLifecyclePrompt.FinalityUndecidable
-            | Some journal ->
-                match journal.WriteBlob workRecord with
-                | Error _ ->
-                    abortReviewer scope reviewerSessionId
-                    return Undecided ManagerLifecyclePrompt.FinalityUndecidable
-                | Ok blob ->
-                    appendLifecycle
-                        journal
-                        (ManagerLifecycleFact.FinalityRejected
-                            {| SessionId = managerSessionId
-                               LifeId = lifeId
-                               RequestId = requestId
-                               ReviewerSessionId = reviewerSessionId
-                               BarrierId = barrierId
-                               GitTreeHash = requestTree
-                               WorkRecordRef = blob.BlobRef
-                               WorkRecordDigest = blob.BlobDigest |})
-
-                    abortReviewer scope reviewerSessionId
-                    return Rejected(FinalityPrompt.rejected workRecord)
+            return! tcs.Task
         }
 
     /// GLORY-057: infrastructure failure — no verdict, no wound record.
     let private concludeUndecided
         (scope: ToolRuntimeScope)
+        (journal: AgentJournal)
         (managerSessionId: SessionId)
         (lifeId: ManagerLifeId)
         (requestId: FinalityRequestId)
+        (requestTree: GitTreeHash)
         (reviewerSessionId: SessionId)
         (barrierId: ReviewBarrierId)
-        (requestTree: GitTreeHash)
         : Task<FinalityOutcome> =
         task {
-            match scope.Journal with
-            | None -> ()
-            | Some journal ->
-                appendLifecycle
-                    journal
-                    (ManagerLifecycleFact.FinalityUndecided
-                        {| SessionId = managerSessionId
-                           LifeId = lifeId
-                           RequestId = requestId
-                           ReviewerSessionId = reviewerSessionId
-                           BarrierId = barrierId
-                           GitTreeHash = requestTree |})
+            appendLifecycle
+                journal
+                (ManagerLifecycleFact.FinalityUndecided
+                    {| SessionId = managerSessionId
+                       LifeId = lifeId
+                       RequestId = requestId
+                       ReviewerSessionId = reviewerSessionId
+                       BarrierId = barrierId
+                       GitTreeHash = requestTree |})
 
-            abortReviewer scope reviewerSessionId
             return Undecided ManagerLifecyclePrompt.FinalityUndecidable
         }
 
+    /// The wound path (GLORY-051/052/053): the rejecting reviewer's canonical
+    /// LWR becomes the FinalityRejected suicide tool result; the same Life
+    /// continues. The reviewer stays ungraduated and its session is preserved.
+    let private concludeRejection
+        (scope: ToolRuntimeScope)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        (rejectingReviewer: SessionId)
+        (barrierId: ReviewBarrierId)
+        (requestTree: GitTreeHash)
+        (workRecord: string)
+        : Task<FinalityOutcome> =
+        task {
+            match journal.WriteBlob workRecord with
+            | Error _ -> return Undecided ManagerLifecyclePrompt.FinalityUndecidable
+            | Ok blob ->
+                appendLifecycle
+                    journal
+                    (ManagerLifecycleFact.FinalityRejected
+                        {| SessionId = managerSessionId
+                           LifeId = lifeId
+                           RequestId = requestId
+                           RejectingReviewerSessionId = rejectingReviewer
+                           BarrierId = barrierId
+                           GitTreeHash = requestTree
+                           WorkRecordRef = blob.BlobRef
+                           WorkRecordDigest = blob.BlobDigest |})
+
+                return Rejected(FinalityPrompt.rejected workRecord)
+        }
+
+    /// GLORY-060/061: every member confirmed. Re-validate the tree, materialize
+    /// the stable-ordinal canonical LWR bundle, append `FinalityBlessed`, and
+    /// hand the Manager the minor-work continuation. NO LifeCompleted, NO
+    /// NotifyTerminal: the Life continues until the second suicide.
+    let private concludeBlessing
+        (scope: ToolRuntimeScope)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        (members: EnlistedMember list)
+        (requestTree: GitTreeHash)
+        : Task<FinalityOutcome> =
+        task {
+            if not (treeUnchanged scope managerSessionId requestTree) then
+                // GLORY-059: the tree moved under the confirmed witnesses; this
+                // success is void. Close the request fail-closed.
+                let reviewer, barrier =
+                    match members with
+                    | first :: _ -> first.ReviewerSessionId, first.BarrierId
+                    | [] -> managerSessionId, ReviewBarrierId.create (Guid.NewGuid().ToString("N"))
+
+                return!
+                    concludeUndecided
+                        scope
+                        journal
+                        managerSessionId
+                        lifeId
+                        requestId
+                        requestTree
+                        reviewer
+                        barrier
+            else
+                // GLORY-050/060: one canonical LWR per member, ordered by the
+                // stable ReviewerOrdinal, concatenated into one bundle blob.
+                let orderedRecords =
+                    members
+                    |> List.sortBy (fun m -> m.ReviewerOrdinal)
+                    |> List.map (fun m ->
+                        match workRecordOf journal m.ReviewerSessionId with
+                        | Some record -> Some(m.ReviewerOrdinal, record)
+                        | None -> None)
+                    |> List.filter Option.isSome
+                    |> List.map Option.get
+
+                if List.length orderedRecords <> List.length members then
+                    let reviewer, barrier =
+                        match members with
+                        | first :: _ -> first.ReviewerSessionId, first.BarrierId
+                        | [] -> managerSessionId, ReviewBarrierId.create (Guid.NewGuid().ToString("N"))
+
+                    return!
+                        concludeUndecided
+                            scope
+                            journal
+                            managerSessionId
+                            lifeId
+                            requestId
+                            requestTree
+                            reviewer
+                            barrier
+                else
+                    let bundle =
+                        orderedRecords
+                        |> List.map (fun (ordinal, record) ->
+                            sprintf "# Work log %d\n%s" (ordinal + 1) (SyntheticToml.normalizeNewlines record))
+                        |> String.concat "\n\n"
+                    match journal.WriteBlob bundle with
+                    | Error _ -> return Undecided ManagerLifecyclePrompt.FinalityUndecidable
+                    | Ok blob ->
+                        appendLifecycle
+                            journal
+                            (ManagerLifecycleFact.FinalityBlessed
+                                {| SessionId = managerSessionId
+                                   LifeId = lifeId
+                                   RequestId = requestId
+                                   GitTreeHash = requestTree
+                                   WorkRecordBundleRef = blob.BlobRef
+                                   WorkRecordBundleDigest = blob.BlobDigest |})
+
+                        // Graduated members may release their physical sessions;
+                        // ungraduated ones stay alive for the next request.
+                        for m in members do
+                            scope.Sessions.AbortSession m.ReviewerSessionId |> ignore
+
+                        return Blessed(FinalityPrompt.blessed bundle)
+        }
+
+    /// GLORY-040: enlist one cohort member in the forced causal order —
+    /// hidden session → durable enlist → barrier → first assignment. Every
+    /// step is an idempotent `ensure` (GLORY-057): a crash between steps
+    /// re-enters the same CE and continues from the first missing fact.
+    let private enlistMember
+        (scope: ToolRuntimeScope)
+        (journal: AgentJournal)
+        (runtime: HostForkRuntime)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        (requestTree: GitTreeHash)
+        (reviewerAgentName: string)
+        (slot: FinalityReviewCohort.CohortSlot)
+        : Task<Result<EnlistedMember, string>> =
+        task {
+            let snapshot = (AgentJournal.snapshot journal).AgentProjections
+
+            let lifecycle =
+                AgentProjection.tryFind managerSessionId snapshot
+                |> Option.bind (fun session -> session.ManagerLife)
+                |> Option.defaultValue ManagerLifecycleProjection.empty
+
+            let request =
+                lifecycle.CurrentLife
+                |> Option.bind (fun life -> life.ActiveFinality)
+                |> Option.filter (fun r -> r.RequestId = requestId)
+
+            // Barrier: the durable one when this member already enlisted
+            // (crash re-entry), else a fresh one.
+            let existingMember =
+                request
+                |> Option.bind (fun r ->
+                    slot.ReviewerSessionId
+                    |> Option.bind (fun sid -> Map.tryFind sid r.Members))
+
+            let barrierId =
+                match existingMember with
+                | Some memberRef -> memberRef.BarrierId
+                | None -> ReviewBarrierId.create (Guid.NewGuid().ToString("N"))
+
+            // Step 1+2: hidden session + durable enlist (reuse for old).
+            let! sessionResult =
+                match slot.ReviewerSessionId with
+                | Some existing ->
+                    runtime.AdoptChild(slot.AgentId, existing)
+                    Task.FromResult(Ok(existing, false))
+                | None ->
+                    // New reviewer: fork with deferred send — the session is
+                    // created now, the first prompt waits for the barrier.
+                    task {
+                        let! forkResult =
+                            runtime.Fork(
+                                slot.AgentId,
+                                Role.Reviewer,
+                                reviewerAgentName,
+                                HostReviewPrompt.OpeningAssignment,
+                                None,
+                                ownership = Fact.HandleOwnership.HostOwnedHidden,
+                                deferSend = true
+                            )
+
+                        match forkResult with
+                        | Error error -> return Error error
+                        | Ok _ ->
+                            match runtime.TryChildSession slot.AgentId with
+                            | None -> return Error "reviewer session was not created"
+                            | Some childId -> return Ok(childId, true)
+                    }
+
+            match sessionResult with
+            | Error error -> return Error error
+            | Ok(reviewerSessionId, isNew) ->
+                if existingMember.IsNone then
+                    appendLifecycle
+                        journal
+                        (ManagerLifecycleFact.FinalityReviewerEnlisted
+                            {| SessionId = managerSessionId
+                               LifeId = lifeId
+                               RequestId = requestId
+                               ReviewerSessionId = reviewerSessionId
+                               ReviewerOrdinal = slot.ReviewerOrdinal
+                               BarrierId = barrierId
+                               GitTreeHash = requestTree
+                               IsNewReviewer = isNew |})
+
+                // Step 3: barrier — durable, before any assignment byte.
+                match ReviewBarrier.openBarrier (Some journal) managerSessionId reviewerSessionId barrierId requestTree with
+                | Error error -> return Error error
+                | Ok() ->
+                    // Step 4: first assignment (GLORY-040: never before the barrier).
+                    let! assignment =
+                        if isNew then
+                            task {
+                                let! sent = runtime.SendDeferredFirstPrompt slot.AgentId
+
+                                match sent with
+                                | Error error -> return Error error
+                                | Ok() -> return Ok()
+                            }
+                        else
+                            // Reused session: Fork's existing-child path installs
+                            // the fresh run and sends the same envelope the child
+                            // would get as a new session (idempotent claim key).
+                            task {
+                                let! forked =
+                                    runtime.Fork(
+                                        slot.AgentId,
+                                        Role.Reviewer,
+                                        reviewerAgentName,
+                                        HostReviewPrompt.OpeningAssignment,
+                                        None
+                                    )
+
+                                match forked with
+                                | Error error -> return Error error
+                                | Ok _ -> return Ok()
+                            }
+
+                    match assignment with
+                    | Error error -> return Error error
+                    | Ok() ->
+                        return
+                            Ok
+                                { ReviewerSessionId = reviewerSessionId
+                                  BarrierId = barrierId
+                                  ReviewerOrdinal = slot.ReviewerOrdinal
+                                  AgentId = slot.AgentId }
+        }
+
     /// GLORY-040 step 6: start the Finality workflow after a legal suicide was
-    /// accepted. Synchronous execution: every outcome lands on the journal before any side effect.
+    /// accepted. Synchronous execution: every outcome lands on the journal
+    /// before any side effect.
     let start
         (scope: ToolRuntimeScope)
         (managerSessionId: SessionId)
@@ -326,155 +536,190 @@ module FinalityController =
             | None -> return Undecided ManagerLifecyclePrompt.FinalityUndecidable
             | Some journal ->
                 try
-                    // GLORY-002: a private runtime; the reviewer never enters the
-                    // Manager's Children map, so list/join cannot see it.
-                    let runtime =
-                        HostForkRuntime(
-                            managerSessionId,
-                            scope.Sessions,
-                            ?journal = scope.Journal,
-                            onChildCreated =
-                                (fun _ _ childId ->
-                                    scope.SessionParents.[SessionId.value childId] <- SessionId.value managerSessionId),
-                            onChildCreatedDir =
-                                (fun _ childId directory ->
-                                    directory
-                                    |> Option.iter (fun path -> scope.RegisterDirectory(SessionId.value childId, path))),
-                            directoryFor = (fun _ -> scope.DirectoryFor(SessionId.value managerSessionId)),
-                            onRunStarted = scope.RunStarted,
-                            parentWorkRecordFor =
-                                (fun _ -> XTraceCapture.lifecycleWorkRecord (Some journal) managerSessionId true),
-                            childWorkRecordFor = (fun _ -> None),
-                            ?sessionSnapshot = scope.Snapshot,
-                            managerOpensReviewBarrier = false
-                        )
+                    let snapshot = AgentJournal.snapshot journal
 
-                    let managerProfile = scope.ActiveProfileFor managerSessionId
+                    let lifecycle =
+                        AgentProjection.tryFind managerSessionId snapshot.AgentProjections
+                        |> Option.bind (fun session -> session.ManagerLife)
+                        |> Option.defaultValue ManagerLifecycleProjection.empty
 
-                    let reviewerTier =
-                        managerProfile
-                        |> Option.map (fun profile -> profile.SelectedTier)
-                        |> Option.defaultValue AgentTier.Deep
+                    let life =
+                        lifecycle.CurrentLife
+                        |> Option.filter (fun life -> life.LifeId = lifeId)
 
-                    let reviewerAgentName = ManagedAgent.nameOf reviewerTier Role.Reviewer
+                    match life with
+                    | None -> return Undecided ManagerLifecyclePrompt.FinalityUndecidable
+                    | Some life ->
+                        let request =
+                            life.ActiveFinality
+                            |> Option.filter (fun r -> r.RequestId = requestId)
 
-                    let reviewerAgentId = sprintf "finality-%s" (FinalityRequestId.value requestId)
+                        match request with
+                        | None -> return Undecided ManagerLifecyclePrompt.FinalityUndecidable
+                        | Some request ->
+                            let slots = FinalityReviewCohort.rosterOf snapshot.AgentProjections life request
 
-                    let! forkResult =
-                        runtime.Fork(
-                            reviewerAgentId,
-                            Role.Reviewer,
-                            reviewerAgentName,
-                            HostReviewPrompt.OpeningAssignment,
-                            None
-                        )
+                            // GLORY-002: a private runtime whose handles are
+                            // HostOwnedHidden — the Reviewer never enters the
+                            // Manager's list/join/guard or parent recovery.
+                            let runtime =
+                                HostForkRuntime(
+                                    managerSessionId,
+                                    scope.Sessions,
+                                    ?journal = scope.Journal,
+                                    onChildCreated =
+                                        (fun _ _ childId ->
+                                            scope.SessionParents.[SessionId.value childId] <-
+                                                SessionId.value managerSessionId),
+                                    onChildCreatedDir =
+                                        (fun _ childId directory ->
+                                            directory
+                                            |> Option.iter (fun path ->
+                                                scope.RegisterDirectory(SessionId.value childId, path))),
+                                    directoryFor = (fun _ -> scope.DirectoryFor(SessionId.value managerSessionId)),
+                                    onRunStarted = scope.RunStarted,
+                                    parentWorkRecordFor =
+                                        (fun _ -> XTraceCapture.lifecycleWorkRecord (Some journal) managerSessionId true),
+                                    childWorkRecordFor = (fun _ -> None),
+                                    ?sessionSnapshot = scope.Snapshot,
+                                    managerOpensReviewBarrier = false,
+                                    ownership = Fact.HandleOwnership.HostOwnedHidden
+                                )
 
-                    match forkResult, runtime.TryChildSession reviewerAgentId with
-                    | Error _, _
-                    | Ok _, None ->
-                        // GLORY-056/057: the Reviewer could not be created — an
-                        // infrastructure failure. Close the request so the Manager
-                        // may seek its end again; never fabricate a wound record.
-                        let closureBarrier = ReviewBarrierId.create (Guid.NewGuid().ToString("N"))
+                            let managerProfile = scope.ActiveProfileFor managerSessionId
 
-                        appendLifecycle
-                            journal
-                            (ManagerLifecycleFact.FinalityUndecided
-                                {| SessionId = managerSessionId
-                                   LifeId = lifeId
-                                   RequestId = requestId
-                                   // No reviewer session exists; the closure is
-                                   // addressed by the Manager session + barrier.
-                                   ReviewerSessionId = managerSessionId
-                                   BarrierId = closureBarrier
-                                   GitTreeHash = requestTree |})
+                            let reviewerTier =
+                                managerProfile
+                                |> Option.map (fun profile -> profile.SelectedTier)
+                                |> Option.defaultValue AgentTier.Deep
 
-                        return Undecided ManagerLifecyclePrompt.FinalityUndecidable
-                    | Ok _, Some reviewerSessionId ->
-                        // GLORY-040: the barrier opens only now — the reviewer
-                        // session exists (REVIEW-008).
-                        let barrierId = ReviewBarrierId.create (Guid.NewGuid().ToString("N"))
+                            let reviewerAgentName = ManagedAgent.nameOf reviewerTier Role.Reviewer
 
-                        appendLifecycle
-                            journal
-                            (ManagerLifecycleFact.FinalityReviewStarted
-                                {| SessionId = managerSessionId
-                                   LifeId = lifeId
-                                   RequestId = requestId
-                                   ReviewerSessionId = reviewerSessionId
-                                   BarrierId = barrierId
-                                   GitTreeHash = requestTree |})
+                            let! enlisted =
+                                slots
+                                |> List.fold
+                                    (fun (acc: Task<Result<EnlistedMember list, string>>) slot ->
+                                        task {
+                                            let! previous = acc
 
-                        let! outcome =
-                            HostReviewProgram.reverify
-                                (Some journal)
-                                (fun () -> Task.FromResult(Ok reviewerSessionId))
-                                (fun () -> awaitReviewer reviewerTimeoutMs runtime reviewerAgentId)
-                                (continueReviewer scope journal reviewerSessionId)
-                                managerSessionId
-                                barrierId
-                                requestTree
+                                            match previous with
+                                            | Error error -> return Error error
+                                            | Ok members ->
+                                                let! next =
+                                                    enlistMember
+                                                        scope
+                                                        journal
+                                                        runtime
+                                                        managerSessionId
+                                                        lifeId
+                                                        requestId
+                                                        requestTree
+                                                        reviewerAgentName
+                                                        slot
 
-                        match outcome with
-                        | Ok(HostReviewProgram.HostReviewOutcome.Confirmed(reviewerId, barrier, _tree)) ->
-                            return!
-                                concludeGlory
-                                    scope
-                                    managerSessionId
-                                    lifeId
-                                    requestId
-                                    reviewerId
-                                    barrier
-                                     requestTree
-                                     lastWordsRef
-                                     lastWordsDigest
-                                     providerRun
-                        | Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired(reviewerId, barrier, _tree, record)) ->
-                            return!
-                                concludeRejection
-                                    scope
-                                    managerSessionId
-                                    lifeId
-                                    requestId
-                                    reviewerId
-                                    barrier
-                                    requestTree
-                                    record
-                        | Error failure ->
-                            match
-                                (match failure with
-                                 | HostReviewProgram.HostReviewFailure.CannotCreateReviewer _
-                                 | HostReviewProgram.HostReviewFailure.CannotOpenBarrier _
-                                 | HostReviewProgram.HostReviewFailure.CannotSendPrompt _
-                                 | HostReviewProgram.HostReviewFailure.CannotAwaitReviewer _
-                                 | HostReviewProgram.HostReviewFailure.ReviewerProducedNoVerdict
-                                 | HostReviewProgram.HostReviewFailure.ConfirmationUnproven
-                                 | HostReviewProgram.HostReviewFailure.WorkRecordUnavailable
-                                 | HostReviewProgram.HostReviewFailure.JournalFailure _
-                                 | HostReviewProgram.HostReviewFailure.CannotReadTree _ ->
-                                     try
-                                         let reviewerId = runtime.TryChildSession reviewerAgentId
+                                                match next with
+                                                | Error error -> return Error error
+                                                | Ok enlistedMember -> return Ok(members @ [ enlistedMember ])
+                                        })
+                                    (Task.FromResult(Ok []))
 
-                                         match reviewerId with
-                                         | Some reviewerId -> Some reviewerId
-                                         | None -> None
-                                     with _ ->
-                                         None)
-                            with
-                            | Some reviewerId ->
+                            match enlisted with
+                            | Error error ->
+                                let reviewer, barrier =
+                                    match slots with
+                                    | first :: _ when first.ReviewerSessionId.IsSome ->
+                                        first.ReviewerSessionId.Value,
+                                        ReviewBarrierId.create (Guid.NewGuid().ToString("N"))
+                                    | _ ->
+                                        managerSessionId,
+                                        ReviewBarrierId.create (Guid.NewGuid().ToString("N"))
+
                                 return!
                                     concludeUndecided
                                         scope
+                                        journal
                                         managerSessionId
                                         lifeId
                                         requestId
-                                        reviewerId
-                                        barrierId
                                         requestTree
-                            | None -> return Undecided ManagerLifecyclePrompt.FinalityUndecidable
+                                        reviewer
+                                        barrier
+                            | Ok members ->
+                                let cancel = CancelToken()
+
+                                let memberTasks =
+                                    members
+                                    |> List.map (fun memberInfo ->
+                                        driveMember
+                                            scope
+                                            journal
+                                            cancel
+                                            runtime
+                                            managerSessionId
+                                            memberInfo
+                                            requestTree
+                                            reviewerTimeoutMs)
+
+                                let! outcome =
+                                    concurrentAllOrShortCircuit
+                                        (function
+                                            | Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired _) -> true
+                                            | Ok(HostReviewProgram.HostReviewOutcome.Confirmed _) -> false
+                                            | Error _ -> false)
+                                        memberTasks
+
+                                // GLORY-055: a REVISE closes the request now; the
+                                // sibling drivers stop before their next effect.
+                                cancel.Cancel()
+
+                                match outcome with
+                                | Choice1Of2(Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired
+                                    (reviewerId, barrier, _tree, record))) ->
+                                    return!
+                                        concludeRejection
+                                            scope
+                                            journal
+                                            managerSessionId
+                                            lifeId
+                                            requestId
+                                            reviewerId
+                                            barrier
+                                            requestTree
+                                            record
+                                | Choice2Of2 results
+                                    when List.forall
+                                        (function
+                                            | Ok(HostReviewProgram.HostReviewOutcome.Confirmed _) -> true
+                                            | _ -> false)
+                                        results ->
+                                    return!
+                                        concludeBlessing
+                                            scope
+                                            journal
+                                            managerSessionId
+                                            lifeId
+                                            requestId
+                                            members
+                                            requestTree
+                                | _ ->
+                                    let reviewer, barrier =
+                                        match members with
+                                        | first :: _ -> first.ReviewerSessionId, first.BarrierId
+                                        | [] -> managerSessionId, ReviewBarrierId.create (Guid.NewGuid().ToString("N"))
+
+                                    return!
+                                        concludeUndecided
+                                            scope
+                                            journal
+                                            managerSessionId
+                                            lifeId
+                                            requestId
+                                            requestTree
+                                            reviewer
+                                            barrier
                 with ex ->
-                    // Exception boundary: never leak an exception out of
-                    // the tool call that accepted the suicide.
+                    // Exception boundary: never leak an exception out of the
+                    // tool call that accepted the suicide.
                     Diagnostic.emit "finality" [ "session_id", SessionId.value managerSessionId; "error", ex.Message ]
                     return Undecided ManagerLifecyclePrompt.FinalityUndecidable
         }

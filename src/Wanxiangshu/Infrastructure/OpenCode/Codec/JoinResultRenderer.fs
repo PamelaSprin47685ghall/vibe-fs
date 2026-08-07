@@ -25,12 +25,14 @@ module JoinResultRenderer =
     let private completedDocument (headerFields: string list) (entries: string list) : string =
         String.concat "\n" headerFields + "\n\n" + String.concat "\n" entries + "\n"
 
-    /// EXEC-017: interrupt is not ForkError / failed / aborted.
+    /// EXEC-017 rev.2: a local operator abort (Esc) interrupts the join wait.
+    /// A queued user message never interrupts join. `interrupted` is not
+    /// ForkError / failed / aborted.
     let renderInterrupted () : string =
         joinBlocks
             [ field "status" (str "interrupted")
-              field "reason" (str "new_user_message")
-              field "action" (str "handle_latest_user_message") ]
+              field "reason" (str "operator_abort")
+              field "message" (str "join interrupted") ]
 
     /// One [[result]] block; optional leading LWR comment lines (agent completed only).
     let private resultEntry

@@ -58,23 +58,20 @@ module ForkTool =
         else
             ManagedAgent.tryParse record.Agent
 
-    /// GLORY-032: provider-facing denial for a Manager trying to reach a
-    /// Reviewer. Narrative, no mechanism leak.
-    let ReviewerForkDeniedText =
-        "That path is not yours to command. Continue your own work, or call suicide when nothing useful remains."
+    /// GLORY-032: provider-facing denial for any target the Manager cannot
+    /// reach (the Host-owned Reviewer among them). Generic — it must not prove
+    /// the hidden target exists.
+    let HiddenTargetDeniedText =
+        "Unknown or unavailable managed agent."
 
     let private forbiddenManagerRole (managed: ManagedAgent) =
         match managed.Role with
         | Role.Executor
         | Role.Blogger
         | Role.Orchestrator
-        | Role.Manager -> true
+        | Role.Manager
+        | Role.Reviewer -> true
         | _ -> false
-
-    /// GLORY-031/032: a Manager must never create, reuse or nudge a Reviewer —
-    /// the Reviewer is Host-owned (GLORY-002/003). The denial is role-based
-    /// (durable/canonical Role), never string-based.
-    let private reviewerForkDenied (managed: ManagedAgent) = managed.Role = Role.Reviewer
 
     let private TddSchemaDescription =
         "Optional TDD phase. Use red to establish a failing behavior test and green to implement the smallest production change that makes the established test pass. Required by prompt when forking a coder role; omit for other roles."
@@ -105,10 +102,11 @@ module ForkTool =
                         | _, None ->
                             match runtime.TryFindAgent request.Agent with
                             | Some record ->
-                                // GLORY-031: reuse of a Reviewer agent id is denied by
-                                // its durable role, before any nudge is sent.
+                                // GLORY-031/032: reuse of a hidden target (the
+                                // Host-owned Reviewer among them) is denied by its
+                                // durable role, before any nudge is sent.
                                 match managedForRecord record with
-                                | Some managed when reviewerForkDenied managed -> return error ReviewerForkDeniedText
+                                | Some managed when forbiddenManagerRole managed -> return error HiddenTargetDeniedText
                                 | _ ->
                                     // Reuse / busy nudge: no first-prompt envelope — keep composed assignment text.
                                     match! runtime.Reuse(request.Agent, assignment) with
@@ -125,17 +123,10 @@ module ForkTool =
                                                       ToolHostCodec.TString(record.Role.ToString().ToLowerInvariant()) ]
                             | None ->
                                 match ManagedAgent.tryParse request.Agent with
-                                | Some managed when reviewerForkDenied managed -> return error ReviewerForkDeniedText
-                                | Some managed when forbiddenManagerRole managed ->
-                                    return
-                                        error (
-                                            sprintf
-                                                "Manager may not fork role '%s'"
-                                                (ManagedAgent.roleName managed.Role)
-                                        )
+                                | Some managed when forbiddenManagerRole managed -> return error HiddenTargetDeniedText
                                 | Some managed when
                                     managed.Visibility = AgentVisibility.Public
-                                    && List.contains managed.Name ManagedAgent.publicForkableNames
+                                    && List.contains managed.Name ManagedAgent.managerForkableNames
                                     ->
                                     let role = AgentRoleIdentity.ofManaged managed
                                     // PENDING 7: the Manager fork owns the first-prompt payload for
@@ -168,6 +159,8 @@ module ForkTool =
                                     with
                                     | Ok result -> return forkPayload result.AgentId managed []
                                     | Error forkError -> return error forkError
+                                | Some managed when forbiddenManagerRole managed ->
+                                    return error HiddenTargetDeniedText
                                 | Some managed ->
                                     return
                                         error (
@@ -197,7 +190,25 @@ module ForkTool =
                                 [ "worktree", ToolHostCodec.TString worktree ]
                     | Error forkError -> return error forkError
                 | Some _ -> return error "Orchestrator may only fork fast-manager or deep-manager"
-                | None -> return error (unknownAgentError request.Agent)
+                | None ->
+                    // GLORY-068: reuse an existing ManagerJob — the same worktree
+                    // and session continue with the appended requirement.
+                    if ToolHostCodec.looksLikeHandleId request.Agent then
+                        let host = scope.OrchestratorHostFor context.SessionId
+                        let jobId = ManagerJobId.create request.Agent
+
+                        match! host.ContinueManagerJob(jobId, request.Prompt) with
+                        | Ok worktree ->
+                            return
+                                ToolHostCodec.tomlObject
+                                    [ "agent_id", ToolHostCodec.TString request.Agent
+                                      "agent", ToolHostCodec.TString "fast-manager"
+                                      "role", ToolHostCodec.TString "manager"
+                                      "worktree", ToolHostCodec.TString worktree
+                                      "reused", ToolHostCodec.TString "true" ]
+                        | Error reuseError -> return error reuseError
+                    else
+                        return error (unknownAgentError request.Agent)
         }
 
     let managerSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
@@ -205,15 +216,16 @@ module ForkTool =
           Description =
             "Create a managed agent, or reuse/nudge an existing agent by passing its agent_id. Prefer reuse when the existing sub-session has compatible context. Optional tdd=red|green; required by prompt when forking a coder role."
           Arguments =
-            [ "agent", ToolHostCodec.managedOrHandleSchema ManagedAgent.publicForkableNames factory
+            [ "agent", ToolHostCodec.managedOrHandleSchema ManagedAgent.managerForkableNames factory
               "prompt", ToolHostCodec.optionalStringSchema factory
               "tdd", ToolHostCodec.optionalEnumSchemaDescribed [ "red"; "green" ] TddSchemaDescription factory ]
           Execute = fun args context -> executeManager scope (decode args) context }
 
     let orchestratorSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "fork-manager"
-          Description = "Fork a manager job"
+          Description =
+            "Fork a manager job, or reuse an existing manager job by passing its job id to append a requirement."
           Arguments =
-            [ "agent", ToolHostCodec.enumSchema ManagedAgent.orchestratorForkableNames factory
+            [ "agent", ToolHostCodec.managedOrHandleSchema ManagedAgent.orchestratorForkableNames factory
               "prompt", ToolHostCodec.stringSchema factory ]
           Execute = fun args context -> executeOrchestrator scope (decode args) context }

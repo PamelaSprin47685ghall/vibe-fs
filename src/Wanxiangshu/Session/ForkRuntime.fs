@@ -145,8 +145,9 @@ type ForkRuntime
         | Some ms -> mailbox.Join(timeoutMs = ms)
         | None -> mailbox.Join()
 
-    /// EXEC-018: wait for completion/cancel signal or local user interrupt.
-    member _.WaitForSignal(interrupt: Task<unit>) : Task<MailboxWakeReason> = mailbox.WaitForSignal interrupt
+    /// EXEC-018: wait for completion/cancel signal or typed local interrupt.
+    member _.WaitForSignal(interrupt: Task<JoinInterruptReason>) : Task<MailboxWakeReason> =
+        mailbox.WaitForSignal interrupt
 
     /// Wake on Publish/Pulse/Cancel only. Outer layer races journal + user interrupt.
     member _.WaitForWake() : Task<MailboxWakeReason> = mailbox.WaitForWake()

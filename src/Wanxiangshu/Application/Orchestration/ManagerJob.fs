@@ -131,8 +131,8 @@ type VerdictMailbox() =
         }
 
     /// EXEC-017 / EXEC-019: drain-first → race wait/interrupt → re-drain.
-    /// InterruptedByUserMessage is not a publish failure.
-    member this.JoinAvailable(maxCount: int, interrupt: Task<unit>) : Task<JoinWaitOutcome<OrchestratorVerdict>> =
+    /// A local operator abort is not a publish failure.
+    member this.JoinAvailable(maxCount: int, interrupt: Task<JoinInterruptReason>) : Task<JoinWaitOutcome<OrchestratorVerdict>> =
         let cap = min (max 0 maxCount) JoinBatch.Max
         let ready = this.DrainAvailable cap
 
@@ -151,24 +151,28 @@ type VerdictMailbox() =
                     waiters.Enqueue waiter)
 
             // Race arms as int tags — no nested task{} (dsl-ownership raw-task budget).
-            let waitTask: Task<int> =
-                emitJsExpr waiter.Task "$0.then(function () { return 0; })"
+            let waitTask: Task<obj> =
+                emitJsExpr waiter.Task "$0.then(function () { return { kind: 0 }; })"
 
-            let interruptTask: Task<int> =
-                emitJsExpr interrupt "$0.then(function () { return 1; })"
+            let interruptTask: Task<obj> =
+                emitJsExpr interrupt "$0.then(function (r) { return { kind: 1, reason: r }; })"
 
             task {
-                let! winner = emitJsExpr (waitTask, interruptTask) "Promise.race([$0, $1])": Task<int>
+                let! winner = emitJsExpr (waitTask, interruptTask) "Promise.race([$0, $1])": Task<obj>
 
                 // Always re-drain first (EXEC-018).
                 let after = this.DrainAvailable cap
 
                 match NonEmptyBatch.tryOfList after with
                 | Some batch -> return ResultsAvailable batch
-                | None when winner = 0 ->
-                    // Idle wake with empty queue → Empty sentinel (legacy JoinPublished).
-                    return ResultsAvailable(NonEmptyBatch.ofHeadTail OrchestratorVerdict.Empty [])
                 | None ->
-                    this.dropWaiter waiter
-                    return InterruptedByUserMessage
+                    let kind: int = emitJsExpr winner "$0.kind"
+
+                    if kind = 0 then
+                        // Idle wake with empty queue → Empty sentinel (legacy JoinPublished).
+                        return ResultsAvailable(NonEmptyBatch.ofHeadTail OrchestratorVerdict.Empty [])
+                    else
+                        this.dropWaiter waiter
+                        let reason: JoinInterruptReason = emitJsExpr winner "$0.reason"
+                        return Interrupted reason
             }

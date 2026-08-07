@@ -41,7 +41,11 @@ type HostForkRuntime
         /// open the barrier. `None` for a directory with no readable tree: the
         /// Reviewer's verdict then fails closed under REVIEW-008, which is the
         /// correct outcome for a review without a tree.
-        ?treeHashFor: string -> GitTreeHash option
+        ?treeHashFor: string -> GitTreeHash option,
+        /// GLORY-002 / SURFACE-006: ownership of every handle this runtime forks.
+        /// The hidden Finality workflow passes `HostOwnedHidden` so its Reviewer
+        /// never enters the Manager's list/join/guard or parent recovery.
+        ?ownership: Fact.HandleOwnership
     ) as this =
     let runtime = ForkRuntime()
     let children = Dictionary<string, SessionId>()
@@ -53,6 +57,11 @@ type HostForkRuntime
     // DSL-MUTABLE: single-flight — duplicate joins fail before waiting
     let mutable joinInFlight = false
 
+    // DSL-MUTABLE: resource — first prompts deferred until the review barrier
+    // has durably opened (GLORY-040: barrier before assignment).
+    let deferredFirstPrompts =
+        Dictionary<string, {| ChildId: SessionId; AgentName: string; Prompt: string |}>()
+
     let directoryOf = defaultArg directoryFor (fun _ -> None)
     let childCreated = defaultArg onChildCreated (fun _ _ _ -> ())
     let childCreatedDir = defaultArg onChildCreatedDir (fun _ _ _ -> ())
@@ -63,6 +72,7 @@ type HostForkRuntime
 
     let ptyPortInstance = defaultArg ptyPort (PtyBackend.createPort ())
     let parentKey = SessionId.value parentId
+    let handleOwnership = defaultArg ownership Fact.HandleOwnership.DurableParentHandle
 
     let sendChildPrompt =
         HostForkRunLifecycle.childPromptSender sessions parentId journal directoryOf
@@ -88,6 +98,44 @@ type HostForkRuntime
     member internal _.Children = children
     member internal _.PendingRuns = pendingRuns
     member internal _.PtyRuns = ptyRuns
+    member internal _.HandleOwnership = handleOwnership
+    member internal _.DeferredFirstPrompts = deferredFirstPrompts
+
+    /// GLORY-045: re-enlist a still-ungraduated historical Reviewer into this
+    /// runtime before Fork, so Fork's existing-child path reuses the SAME Host
+    /// session (X/Y context preserved) instead of creating a second one.
+    member internal _.AdoptChild(agentId: string, childId: SessionId) : unit =
+        lock gate (fun () -> children.[agentId] <- childId)
+
+    /// GLORY-040: deliver a first prompt that was deferred until its review
+    /// barrier had durably opened. Idempotent per agent id: a second call with
+    /// nothing pending is a no-op success.
+    member this.SendDeferredFirstPrompt(agentId: string) : Task<Result<unit, string>> =
+        task {
+            let pendingOpt =
+                lock gate (fun () ->
+                    match deferredFirstPrompts.TryGetValue agentId with
+                    | true, pending -> Some pending
+                    | false, _ -> None)
+
+            match pendingOpt with
+            | None -> return Ok()
+            | Some pending ->
+                let! sent =
+                    HostForkAgentOwner.sendFirstPrompt
+                        this.Sessions
+                        this.Journal
+                        pending.ChildId
+                        pending.AgentName
+                        (this.DirectoryOf agentId)
+                        pending.Prompt
+
+                match sent with
+                | Ok _ ->
+                    lock gate (fun () -> deferredFirstPrompts.Remove agentId |> ignore)
+                    return Ok()
+                | Error err -> return Error err
+        }
 
     /// 最近创建的 PTY id。fork-pty 写/读/signal 无 agent 时作用于它
     /// （canary DSL 的「最近创建」语义；`TryPty ""` 的解析目标）。
@@ -303,18 +351,18 @@ type HostForkRuntime
     /// GREEN-4: validate permit then drain; does not start RestoreHandles.
     /// Batch carries JoinItem so PtyAborted survives to renderer (EXEC-020).
     member this.JoinAvailableWithPermit
-        (permit: FamilyRecoveryPermit, maxCount: int, interrupt: Task<unit>)
+        (permit: FamilyRecoveryPermit, maxCount: int, interrupt: Task<JoinInterruptReason>)
         : Task<Result<JoinWaitOutcome<JoinItem>, ForkError>> =
         match this.validatePermit permit with
         | Error e -> Task.FromResult(Error e)
         | Ok() -> this.JoinAvailable(maxCount, interrupt)
 
-    /// EXEC-017 / EXEC-018: bounded batch join with local interrupt (≠ runtime.Cancel).
-    /// GREEN-5: agent facts from Journal; agent mailbox channel is wake-only.
-    /// PTY facts from PTY mailbox channel as PtyJoinItem (EXEC-015 / EXEC-020).
-    /// journal=None agent join fails closed.
+    /// EXEC-017 / EXEC-018: bounded batch join with typed local interrupt
+    /// (≠ runtime.Cancel). GREEN-5: agent facts from Journal; agent mailbox
+    /// channel is wake-only. PTY facts from PTY mailbox channel as PtyJoinItem
+    /// (EXEC-015 / EXEC-020). journal=None agent join fails closed.
     member this.JoinAvailable
-        (maxCount: int, interrupt: Task<unit>)
+        (maxCount: int, interrupt: Task<JoinInterruptReason>)
         : Task<Result<JoinWaitOutcome<JoinItem>, ForkError>> =
         let cap = min (max 0 maxCount) JoinBatch.Max
 
@@ -331,7 +379,7 @@ type HostForkRuntime
                    || not (List.isEmpty (HandleProjection.reportableAbandoned p))
                    || not (List.isEmpty (HandleProjection.activeHandles p))
 
-        /// Outer race arms: mailbox wake | journal change | user interrupt.
+        /// Outer race arms: mailbox wake | journal change | local interrupt.
         /// PulseWake after race so a losing WaitForWake waiter never piles up.
         let rec loop () : Task<Result<JoinWaitOutcome<JoinItem>, ForkError>> =
             task {
@@ -362,11 +410,15 @@ type HostForkRuntime
                                         (durable.AwaitChangeFrom fromRev)
                                         "$0.then(function () { return { kind: 1 }; })"
 
-                                let userTask: Task<obj> =
-                                    emitJsExpr interrupt "$0.then(function () { return { kind: 2 }; })"
+                                let interruptTask: Task<obj> =
+                                    emitJsExpr
+                                        interrupt
+                                        "$0.then(function (r) { return { kind: 2, reason: r }; })"
 
                                 let! winner =
-                                    emitJsExpr (wakeTask, changeTask, userTask) "Promise.race([$0, $1, $2])": Task<obj>
+                                    emitJsExpr
+                                        (wakeTask, changeTask, interruptTask)
+                                        "Promise.race([$0, $1, $2])": Task<obj>
 
                                 runtime.PulseWake()
 
@@ -381,9 +433,10 @@ type HostForkRuntime
                                         match reason with
                                         | MailboxCancelled -> return Error ForkError.Cancelled
                                         | CompletionMayBeAvailable
-                                        | UserInterrupted -> return! loop ()
+                                        | LocalInterrupt _ -> return! loop ()
                                     elif kind = 2 then
-                                        return Ok InterruptedByUserMessage
+                                        let interruptReason: JoinInterruptReason = emitJsExpr winner "$0.reason"
+                                        return Ok(Interrupted interruptReason)
                                     else
                                         return! loop ()
                         | None ->
@@ -394,7 +447,7 @@ type HostForkRuntime
                             | None ->
                                 match signal with
                                 | MailboxCancelled -> return Error ForkError.Cancelled
-                                | UserInterrupted -> return Ok InterruptedByUserMessage
+                                | LocalInterrupt reason -> return Ok(Interrupted reason)
                                 | CompletionMayBeAvailable -> return! loop ()
             }
 
@@ -455,23 +508,27 @@ type HostForkRuntime
             | PtyItem item -> PtyJoinItem.toRunCompletion item
 
         task {
-            let interrupt =
+            let interrupt: Task<JoinInterruptReason> =
                 match budgetMs with
-                | Some milliseconds -> PtyTiming.timerTask milliseconds
+                | Some milliseconds ->
+                    let timerTask = PtyTiming.timerTask milliseconds
+                    emitJsExpr timerTask "$0.then(function () { return 'DeadlineExpired'; })"
                 | None ->
-                    TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-                        .Task
+                    let tcs =
+                        TaskCompletionSource<JoinInterruptReason>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+                    tcs.Task
 
             let! outcome = this.JoinAvailable(1, interrupt)
 
             match outcome with
             | Error e -> return Error e
-            | Ok InterruptedByUserMessage ->
+            | Ok(Interrupted _) ->
                 // Timer interrupt under legacy Join API → TimedOut after final drain.
                 match this.tryDrainAvailable 1 with
                 | Some(Ok(ResultsAvailable batch)) -> return Ok(headAsRunCompletion batch)
                 | Some(Error e) -> return Error e
-                | Some(Ok InterruptedByUserMessage)
+                | Some(Ok(Interrupted _))
                 | None -> return Error ForkError.TimedOut
             | Ok(ResultsAvailable batch) -> return Ok(headAsRunCompletion batch)
         }

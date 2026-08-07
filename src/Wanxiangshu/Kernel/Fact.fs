@@ -244,6 +244,18 @@ module Fact =
                SecondProviderInputDigest: SealDigest
                SecondToolCallId: ToolCallId |}
 
+    /// Who owns a forked child handle (GLORY-002 / SURFACE-006).
+    ///
+    /// A `DurableParentHandle` is an ordinary child: it appears in the parent's
+    /// `list` / `join` / background guard and is restored into the parent's
+    /// runtime after a restart. A `HostOwnedHidden` handle belongs to a
+    /// Host-owned workflow (the hidden Finality Reviewer): it stays out of every
+    /// parent-visible surface and is never restored into a parent runtime.
+    [<RequireQualifiedAccess>]
+    type HandleOwnership =
+        | DurableParentHandle
+        | HostOwnedHidden
+
     type ExecutionFactCases =
 
         // Three facts, three states: active, completed-awaiting-join, retired.
@@ -269,7 +281,8 @@ module Fact =
                ChildSessionId: SessionId
                Handle: HandleId
                TargetAgent: string
-               CanonicalRole: Role |}
+               CanonicalRole: Role
+               Ownership: HandleOwnership |}
 
         /// `CompletionRef` / `CompletionDigest` locate the durable join payload
         /// (EXEC-009). Written before the fact. `Cancelled` carries `None`: parent
@@ -768,8 +781,9 @@ module Fact =
     // ── Manager lifecycle (docs/what/glory.md GLORY-010) ────────────────────────────────
     //
     // One Manager Life: LifeOpened → WorkActivated → FinalityRequested →
-    // (FinalityRejected loop) → FinalityConfirmed → LifeCompleted. Every fact
-    // is an event that HAPPENED; no fact carries a next step (ARCH-001).
+    // (FinalityReviewerEnlisted…, FinalityRejected loop) → FinalityBlessed →
+    // LifeCompleted. Every fact is an event that HAPPENED; no fact carries a
+    // next step (ARCH-001).
 
     /// GLORY-010: the Manager lifecycle fact algebra.
     [<RequireQualifiedAccess>]
@@ -805,41 +819,50 @@ module Fact =
                ProviderRun: ProviderRunIdentity
                ToolCallId: ToolCallId |}
 
-        /// HostReviewProgram forked the reviewer and opened the barrier
-        /// (GLORY-003).
-        | FinalityReviewStarted of
+        /// One reviewer was enlisted into the request's cohort (GLORY-003/040/
+        /// 045). `ReviewerOrdinal` is the member's stable position within the
+        /// Life (used to order the blessing bundle); `IsNewReviewer` records
+        /// whether this request created the session or re-enlisted a
+        /// still-ungraduated historical reviewer.
+        | FinalityReviewerEnlisted of
             {| SessionId: SessionId
                LifeId: ManagerLifeId
                RequestId: FinalityRequestId
                ReviewerSessionId: SessionId
+               ReviewerOrdinal: int
                BarrierId: ReviewBarrierId
-               GitTreeHash: GitTreeHash |}
+               GitTreeHash: GitTreeHash
+               IsNewReviewer: bool |}
 
-        /// REVISE: the reviewer's canonical work record is the wound record
-        /// (GLORY-004/051). Blob-addressed; digest verified at write.
+        /// REVISE: the rejecting reviewer's canonical work record is the wound
+        /// record (GLORY-004/051). Blob-addressed; digest verified at write.
+        /// The request closes immediately; the reviewer stays ungraduated.
         | FinalityRejected of
             {| SessionId: SessionId
                LifeId: ManagerLifeId
                RequestId: FinalityRequestId
-               ReviewerSessionId: SessionId
+               RejectingReviewerSessionId: SessionId
                BarrierId: ReviewBarrierId
                GitTreeHash: GitTreeHash
                WorkRecordRef: BlobRef
                WorkRecordDigest: BlobDigest |}
 
-        /// Confirmed dual PERFECT on the request tree, revalidated at read
-        /// (GLORY-059/060).
-        | FinalityConfirmed of
+        /// Every current member confirmed with fresh dual-PERFECT evidence; the
+        /// stable-ordinal canonical work-record bundle is the minor-work
+        /// evidence (GLORY-059/060). The Life is NOT completed here — the
+        /// Manager keeps working until its second suicide (GLORY-061/062).
+        | FinalityBlessed of
             {| SessionId: SessionId
                LifeId: ManagerLifeId
                RequestId: FinalityRequestId
-               ReviewerSessionId: SessionId
-               BarrierId: ReviewBarrierId
-               GitTreeHash: GitTreeHash |}
+               GitTreeHash: GitTreeHash
+               WorkRecordBundleRef: BlobRef
+               WorkRecordBundleDigest: BlobDigest |}
 
         /// GLORY-057: infrastructure failure closed the request without a verdict.
         /// Closes the request so a new suicide is possible; never fabricates a
-        /// wound record.
+        /// wound record. `ReviewerSessionId` is the member whose attempt failed
+        /// (or the Manager session when no reviewer exists yet).
         | FinalityUndecided of
             {| SessionId: SessionId
                LifeId: ManagerLifeId

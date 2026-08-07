@@ -44,6 +44,10 @@ type HandleRecord =
         ChildSessionId: SessionId
         TargetAgent: string
         CanonicalRole: Role
+        /// Who owns this handle (Fact.HandleOwnership). HostOwnedHidden handles
+        /// are excluded from every parent-visible surface and from parent
+        /// recovery (GLORY-002 / SURFACE-006).
+        Ownership: Fact.HandleOwnership
         Lifecycle: HandleLifecycle
         /// EXEC-018: handle create order (HandleLinked fold sequence). Additive;
         /// derived from link order, not a fact-schema field. Stable sort key #2.
@@ -92,6 +96,7 @@ module HandleProjection =
         (childSessionId: SessionId)
         (targetAgent: string)
         (role: Role)
+        (ownership: Fact.HandleOwnership)
         (current: AgentLinkageProjection)
         : Result<AgentLinkageProjection, HandleTransitionRejection> =
         match Map.tryFind handle current.Handles with
@@ -106,6 +111,7 @@ module HandleProjection =
                             ChildSessionId = childSessionId
                             TargetAgent = targetAgent
                             CanonicalRole = role
+                            Ownership = ownership
                             Lifecycle = Active }
                         current.Handles
                   NextCreationOrder = current.NextCreationOrder }
@@ -120,6 +126,7 @@ module HandleProjection =
                           ChildSessionId = childSessionId
                           TargetAgent = targetAgent
                           CanonicalRole = role
+                          Ownership = ownership
                           Lifecycle = Active
                           CreationOrder = order
                           LastCompletion = None }
@@ -226,27 +233,39 @@ module HandleProjection =
     let private recordsWhere predicate (current: AgentLinkageProjection) =
         current.Handles |> Map.toList |> List.map snd |> List.filter predicate
 
+    /// GLORY-002 / SURFACE-006: a HostOwnedHidden handle (the hidden Finality
+    /// Reviewer) is invisible to its nominal parent. Every parent-visible
+    /// surface — list, join, background guard, cancellation — filters it out.
+    /// The record itself stays durable for audit and for the Host-owned
+    /// workflow's own recovery.
+    let private parentVisible (record: HandleRecord) =
+        match record.Ownership with
+        | Fact.HandleOwnership.DurableParentHandle -> true
+        | Fact.HandleOwnership.HostOwnedHidden -> false
+
     /// EXEC-005: `list` shows running, busy and completed-awaiting-join, never
     /// retired or abandoned.
     let listable (current: AgentLinkageProjection) =
         current
         |> recordsWhere (fun record ->
-            match record.Lifecycle with
-            | Retired
-            | Abandoned _ -> false
-            | Active
-            | CompletedAwaitingJoin _ -> true)
+            parentVisible record
+            && (match record.Lifecycle with
+                | Retired
+                | Abandoned _ -> false
+                | Active
+                | CompletedAwaitingJoin _ -> true))
 
     /// EXEC-004: what `join` may consume as completion cells. Abandoned is not
     /// a completion cell — see `reportableAbandoned` for EXEC-009 batch items.
     let joinable (current: AgentLinkageProjection) =
         current
         |> recordsWhere (fun record ->
-            match record.Lifecycle with
-            | CompletedAwaitingJoin _ -> true
-            | Active
-            | Abandoned _
-            | Retired -> false)
+            parentVisible record
+            && (match record.Lifecycle with
+                | CompletedAwaitingJoin _ -> true
+                | Active
+                | Abandoned _
+                | Retired -> false))
 
     /// EXEC-009: Abandoned handles that join must include in the next `[[result]]`
     /// batch (explicit status, not Completed). After report, consume retires them
@@ -254,22 +273,25 @@ module HandleProjection =
     let reportableAbandoned (current: AgentLinkageProjection) =
         current
         |> recordsWhere (fun record ->
-            match record.Lifecycle with
-            | Abandoned _ -> true
-            | Active
-            | CompletedAwaitingJoin _
-            | Retired -> false)
+            parentVisible record
+            && (match record.Lifecycle with
+                | Abandoned _ -> true
+                | Active
+                | CompletedAwaitingJoin _
+                | Retired -> false))
 
     /// EXEC-009: parent abort cancels every owned resource individually, so the
-    /// caller needs the actual handles rather than a count.
+    /// caller needs the actual handles rather than a count. Host-owned hidden
+    /// handles are not the parent's resources to cancel.
     let activeHandles (current: AgentLinkageProjection) =
         current
         |> recordsWhere (fun record ->
-            match record.Lifecycle with
-            | Active -> true
-            | CompletedAwaitingJoin _
-            | Abandoned _
-            | Retired -> false)
+            parentVisible record
+            && (match record.Lifecycle with
+                | Active -> true
+                | CompletedAwaitingJoin _
+                | Abandoned _
+                | Retired -> false))
 
     /// The handle driving a child session, retired ones included.
     ///

@@ -138,7 +138,8 @@ module JoinDrain =
                                ChildSessionId = record.ChildSessionId
                                Handle = replacement
                                TargetAgent = record.TargetAgent
-                               CanonicalRole = record.CanonicalRole |}))
+                               CanonicalRole = record.CanonicalRole
+                               Ownership = record.Ownership |}))
                 |> Result.bind (fun () ->
                     appendFact
                         durable

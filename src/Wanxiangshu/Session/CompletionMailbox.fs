@@ -32,31 +32,42 @@ module NonEmptyBatch =
 
     let map (f: 'a -> 'b) (NonEmptyBatch(head, tail)) = NonEmptyBatch(f head, List.map f tail)
 
-/// EXEC-017 / EXEC-018: join wait finishes with results or user-message interrupt.
-/// InterruptedByUserMessage is not a ForkError.
+/// EXEC-017 / EXEC-018: why a join wait ended without results. Typed local
+/// interruption only — a queued user message is NOT an interrupt (GLORY-007 /
+/// EXEC-017 rev.2): the Host queues it and join keeps waiting.
+[<RequireQualifiedAccess>]
+type JoinInterruptReason =
+    /// The current tool call was aborted locally (Esc / tool-call abort).
+    | OperatorAbort
+    /// The DevOps join budget elapsed without a completion.
+    | DeadlineExpired
+
+/// EXEC-017 / EXEC-018: join wait finishes with results or a typed local
+/// interrupt. Interrupted is not a ForkError.
 type JoinWaitOutcome<'item> =
     | ResultsAvailable of NonEmptyBatch<'item>
-    | InterruptedByUserMessage
+    | Interrupted of JoinInterruptReason
 
 /// Wake reason for CompletionMailbox.WaitForSignal (EXEC-018).
 type MailboxWakeReason =
     | CompletionMayBeAvailable
-    | UserInterrupted
+    | LocalInterrupt of JoinInterruptReason
     | MailboxCancelled
 
 /// Local interrupt for one join tool-call (EXEC-017).
-/// tool-call abort → Signal only; never runtime.Cancel / mailbox.Cancel.
+/// tool-call abort → Signal OperatorAbort only; never runtime.Cancel /
+/// mailbox.Cancel.
 type JoinInterrupt =
-    { Wait: Task<unit>
-      Signal: unit -> unit }
+    { Wait: Task<JoinInterruptReason>
+      Signal: JoinInterruptReason -> unit }
 
 module JoinInterrupt =
     let create () : JoinInterrupt =
         let tcs =
-            TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            TaskCompletionSource<JoinInterruptReason>(TaskCreationOptions.RunContinuationsAsynchronously)
 
         { Wait = tcs.Task
-          Signal = fun () -> AsyncSupport.trySetResult tcs () |> ignore }
+          Signal = fun reason -> AsyncSupport.trySetResult tcs reason |> ignore }
 
 /// Dual-channel completion mailbox (GREEN-5 / ARCH-002).
 /// Agent channel: wake-only (HandleMayHaveChanged) — Journal is agent fact source.
@@ -119,15 +130,16 @@ type CompletionMailbox(gate: obj, hasActive: unit -> bool) =
         | Choice1Of2 reason -> Task.FromResult reason
         | Choice2Of2 waiter -> waiter.Task
 
-    /// EXEC-018: wait for completion signal, user interrupt, or permanent cancel.
-    member this.WaitForSignal(interrupt: Task<unit>) : Task<MailboxWakeReason> =
+    /// EXEC-018: wait for completion signal, typed local interrupt, or
+    /// permanent cancel.
+    member this.WaitForSignal(interrupt: Task<JoinInterruptReason>) : Task<MailboxWakeReason> =
         // Race wake vs interrupt without nested task{} (dsl-ownership raw-task budget).
-        // kind=0 + reason = wake; kind=1 = user interrupt.
+        // kind=0 + reason = wake; kind=1 + reason = local interrupt.
         let wakeTask: Task<obj> =
             emitJsExpr (this.WaitForWake()) "$0.then(function (r) { return { kind: 0, reason: r }; })"
 
         let interruptTask: Task<obj> =
-            emitJsExpr interrupt "$0.then(function () { return { kind: 1 }; })"
+            emitJsExpr interrupt "$0.then(function (r) { return { kind: 1, reason: r }; })"
 
         task {
             let! winner = emitJsExpr (wakeTask, interruptTask) "Promise.race([$0, $1])": Task<obj>
@@ -137,9 +149,10 @@ type CompletionMailbox(gate: obj, hasActive: unit -> bool) =
             if kind = 0 then
                 return emitJsExpr winner "$0.reason": MailboxWakeReason
             else
-                // Drop mailbox waiter if still pending (user interrupt won).
+                // Drop mailbox waiter if still pending (local interrupt won).
                 this.PulseWake()
-                return UserInterrupted
+                let reason: JoinInterruptReason = emitJsExpr winner "$0.reason"
+                return LocalInterrupt reason
         }
 
     /// Drain agent wake tokens (no payload). Callers re-read Journal after wake.
@@ -189,7 +202,13 @@ type CompletionMailbox(gate: obj, hasActive: unit -> bool) =
                     elif remainingMs <= 0 then
                         return Error ForkError.TimedOut
                     else
-                        let interrupt = Wanxiangshu.Process.PtyTiming.timerTask remainingMs
+                        let timerTask = Wanxiangshu.Process.PtyTiming.timerTask remainingMs
+
+                        let interrupt: Task<JoinInterruptReason> =
+                            emitJsExpr
+                                timerTask
+                                "$0.then(function () { return 'DeadlineExpired'; })"
+
                         let started = System.DateTimeOffset.UtcNow
                         let! reason = this.WaitForSignal interrupt
                         let elapsed = int (System.DateTimeOffset.UtcNow - started).TotalMilliseconds
@@ -197,7 +216,7 @@ type CompletionMailbox(gate: obj, hasActive: unit -> bool) =
 
                         match reason with
                         | MailboxCancelled -> return Error ForkError.Cancelled
-                        | UserInterrupted ->
+                        | LocalInterrupt _ ->
                             ignore (this.DrainAgentWakes JoinBatch.Max)
 
                             match this.DrainPtyCompletions 1 with

@@ -55,6 +55,7 @@ module HandleController =
         (childSessionId: SessionId)
         (targetAgent: string)
         (role: Role)
+        (ownership: Fact.HandleOwnership)
         : Result<unit, string> =
         match journal with
         | None -> Ok()
@@ -67,7 +68,8 @@ module HandleController =
                        ChildSessionId = childSessionId
                        Handle = agentHandle agentId
                        TargetAgent = targetAgent
-                       CanonicalRole = AgentRoleIdentity.toRole role |})
+                       CanonicalRole = AgentRoleIdentity.toRole role
+                       Ownership = ownership |})
 
     /// EXEC-004 / P0-RECOVERY-JOIN-001: claim the single-assignment completion cell
     /// only with a proven `JoinableCompletion` (Succeeded | Failed finality).

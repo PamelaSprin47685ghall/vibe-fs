@@ -81,6 +81,7 @@
     <Compile Include="Journal/EnforcementProjection.fs"/>
     <Compile Include="Journal/BloggerCycleProjection.fs"/>
     <Compile Include="Journal/AgentProjection.fs"/>
+    <Compile Include="Journal/FinalityReviewCohort.fs"/>
     <Compile Include="Journal/RecoveryClosureProjection.fs"/>
     <Compile Include="Journal/PromptAuthorityLedger.fs"/>
     <Compile Include="Journal/Boot.fs"/>

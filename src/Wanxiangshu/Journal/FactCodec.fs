@@ -174,11 +174,65 @@ module FactCodec =
                         let piece = if needsComma then "," + insert else insert
                         before + piece + after
 
+    /// GLORY-002 / SURFACE-006: `HandleLinked` gained `Ownership`. Old lines
+    /// lack the key; inject `DurableParentHandle` so replay keeps the pre-change
+    /// meaning (every legacy handle was parent-visible).
+    let private migrateHandleOwnership (json: string) : string =
+        if json.IndexOf("\"HandleLinked\"", StringComparison.Ordinal) < 0 then
+            json
+        elif json.IndexOf("\"Ownership\"", StringComparison.Ordinal) >= 0 then
+            json
+        else
+            let marker = "\"HandleLinked\""
+            let start = json.IndexOf(marker, StringComparison.Ordinal)
+
+            if start < 0 then
+                json
+            else
+                let brace = json.IndexOf('{', start)
+
+                if brace < 0 then
+                    json
+                else
+                    let rec findClose (i: int) (depth: int) =
+                        if i >= json.Length then
+                            -1
+                        else
+                            match json.[i] with
+                            | '{' -> findClose (i + 1) (depth + 1)
+                            | '}' when depth = 1 -> i
+                            | '}' -> findClose (i + 1) (depth - 1)
+                            | '"' ->
+                                let rec skipString j =
+                                    if j >= json.Length then j
+                                    elif json.[j] = '\\' then skipString (j + 2)
+                                    elif json.[j] = '"' then j + 1
+                                    else skipString (j + 1)
+
+                                findClose (skipString (i + 1)) depth
+                            | _ -> findClose (i + 1) depth
+
+                    match findClose (brace + 1) 1 with
+                    | -1 -> json
+                    | close ->
+                        let insert = "\"Ownership\":\"DurableParentHandle\""
+                        let before = json.Substring(0, close)
+                        let after = json.Substring(close)
+                        let needsComma =
+                            let trimmed = before.TrimEnd()
+
+                            trimmed.Length > 0
+                            && trimmed.[trimmed.Length - 1] <> '{'
+                            && trimmed.[trimmed.Length - 1] <> ','
+
+                        let piece = if needsComma then "," + insert else insert
+                        before + piece + after
+
     let deserializeFact (json: string) : Result<Fact, string> =
         if containsLegacyFallbackFields json then
             Error pre050MigrationMessage
         elif containsLegacyScoreVectorEntry json then
             Error tipV2CleanBreakMessage
         else
-            Decode.Auto.fromString<Fact> (migrateHandleCompleted json, extra = extra)
+            Decode.Auto.fromString<Fact> (json |> migrateHandleCompleted |> migrateHandleOwnership, extra = extra)
             |> Result.map pinToUtc

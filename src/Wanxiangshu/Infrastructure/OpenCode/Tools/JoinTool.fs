@@ -74,7 +74,7 @@ module JoinTool =
                                     tString "family recovery incomplete: wait for FamilyReady before join drain" ] ]
                 | FamilyRecovery.FamilyReady permit ->
                     let interrupt = JoinInterrupt.create ()
-                    let detachAbort = context.AttachAbort interrupt.Signal
+                    let detachAbort = context.AttachAbort (fun () -> interrupt.Signal JoinInterruptReason.OperatorAbort)
 
                     use _cleanup =
                         { new IDisposable with
@@ -91,7 +91,7 @@ module JoinTool =
                             return
                                 ToolHostCodec.tomlObject
                                     [ "error", ToolHostCodec.TString(sprintf "Orchestrator init failed: %s" reason) ]
-                        | Ok InterruptedByUserMessage -> return JoinResultRenderer.renderInterrupted ()
+                        | Ok(Interrupted _) -> return JoinResultRenderer.renderInterrupted ()
                         | Ok(ResultsAvailable batch) -> return JoinResultRenderer.renderOrchestratorBatch batch
                     else
                         match scope.RuntimeFor context with
@@ -100,21 +100,25 @@ module JoinTool =
                         | Ok runtime ->
                             let isDevOps = scope.IsRole(context, Role.DevOps)
 
-                            let waitTask: Task<unit> =
+                            let waitTask: Task<JoinInterruptReason> =
                                 if isDevOps then
                                     let timerTask = PtyTiming.timerTask DevOpsJoinTimeoutMs
-                                    emitJsExpr (interrupt.Wait, timerTask) "Promise.race([$0, $1])"
+
+                                    emitJsExpr
+                                        (interrupt.Wait,
+                                         emitJsExpr timerTask "$0.then(function () { return 'DeadlineExpired'; })")
+                                        "Promise.race([$0, $1])"
                                 else
                                     interrupt.Wait
 
                             let! joined = Join.joinAvailable runtime permit JoinBatch.Max waitTask
 
                             match joined with
-                            | Ok InterruptedByUserMessage ->
-                                if isDevOps && not interrupt.Wait.IsCompleted then
+                            | Ok(Interrupted reason) ->
+                                match reason with
+                                | JoinInterruptReason.OperatorAbort -> return JoinResultRenderer.renderInterrupted ()
+                                | JoinInterruptReason.DeadlineExpired ->
                                     return JoinResultRenderer.renderForkError ForkError.TimedOut
-                                else
-                                    return JoinResultRenderer.renderInterrupted ()
                             | Ok(ResultsAvailable batch) ->
                                 return
                                     JoinResultRenderer.renderJoinItemBatch

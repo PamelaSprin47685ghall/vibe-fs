@@ -121,10 +121,14 @@ module HostForkAgent =
                 prompt: string,
                 payload: string option,
                 ?firstPrompt: bool,
-                ?renderedPrompt: string
+                ?renderedPrompt: string,
+                ?ownership: Fact.HandleOwnership,
+                ?deferSend: bool
             ) : Task<Result<ForkResult, string>> =
             let agentName = agent.Trim()
             let isFirstPrompt = defaultArg firstPrompt true
+            let deferSend = defaultArg deferSend false
+            let handleOwnership = defaultArg ownership this.HandleOwnership
 
             task {
                 // GREEN-4: recovery ownership is SessionRecoveryWorkflow only.
@@ -212,7 +216,14 @@ module HostForkAgent =
                         | Error err -> return Error err
                         | Ok childId ->
                             let linkageResult =
-                                HandleController.link this.Journal this.ParentId agentId childId agentName role
+                                HandleController.link
+                                    this.Journal
+                                    this.ParentId
+                                    agentId
+                                    childId
+                                    agentName
+                                    role
+                                    handleOwnership
                                 |> Result.mapError (sprintf "Failed to persist HandleLinked: %s")
 
                             match linkageResult with
@@ -251,20 +262,28 @@ module HostForkAgent =
                                     if isFirstPrompt then
                                         XTraceCapture.captureOpening this.Journal childId prompt requirements
 
-                                    let! sent =
-                                        HostForkAgentOwner.sendFirstPrompt
-                                            this.Sessions
-                                            this.Journal
-                                            childId
-                                            agentName
-                                            (this.DirectoryOf agentId)
-                                            enrichedPrompt
+                                    if deferSend && isFirstPrompt then
+                                        this.DeferredFirstPrompts.[agentId] <-
+                                            {| ChildId = childId
+                                               AgentName = agentName
+                                               Prompt = enrichedPrompt |}
 
-                                    match sent with
-                                    | Ok _ -> return Ok result
-                                    | Error err ->
-                                        this.FailRun(run, err)
-                                        return Error err
+                                        return Ok result
+                                    else
+                                        let! sent =
+                                            HostForkAgentOwner.sendFirstPrompt
+                                                this.Sessions
+                                                this.Journal
+                                                childId
+                                                agentName
+                                                (this.DirectoryOf agentId)
+                                                enrichedPrompt
+
+                                        match sent with
+                                        | Ok _ -> return Ok result
+                                        | Error err ->
+                                            this.FailRun(run, err)
+                                            return Error err
             }
 
         member this.Reuse(agentId: string, prompt: string) : Task<Result<ForkResult, string>> =

@@ -36,13 +36,15 @@ When a candidate commit encounters rebase conflicts against the updated target H
 Rebasing changes commit ancestry and tree context. A rebased candidate must pass a **brand-new** dual-PERFECT review barrier on the rebased tree before fast-forward. Dual PERFECT confirmation is owned by Host ReviewGuard inside the review session—you do not manually count PERFECT tool calls. You only require a confirmed post-rebase review witness before publish.
 
 ### 6. Prefer continuing the same Manager job.
-Publish conflicts, follow-up edits, recovery, retries, and supplemental instructions for the **same delivery goal** should return to the originating Manager session (nudge / continuation), not spawn a duplicate Manager. Do not fork a new Manager merely because a lifecycle stage advanced. Fork a new Manager only for truly independent goals that need parallel isolated worktrees. There is no `fork-manager(existing_id)` reuse API—do not invent tools; reuse means continuing the job the Host already bound for that goal.
+Publish conflicts, follow-up edits, recovery, retries, and supplemental instructions for the **same delivery goal** should return to the originating Manager session (nudge / continuation), not spawn a duplicate Manager. Do not fork a new Manager merely because a lifecycle stage advanced. Fork a new Manager only for truly independent goals that need parallel isolated worktrees.
 
 ### 7. Reuse Discipline (Executable Rules).
 
+"十年修得同船渡" — for the same delivery goal, prefer `fork-manager(existing_job_id, appended_requirement)`: reuse the existing Manager's worktree and accumulated context instead of opening a duplicate job. This preserves continuity and saves tokens. Open a new ManagerJob only for an independent delivery lane.
+
 * R1 — Same goal, same Manager job: publish conflicts, follow-up edits, recovery, retries, and supplemental instructions continue the same Manager job in the same worktree. Never fork-manager a new job because a lifecycle stage advanced.
 * R2 — New job only for truly independent goals: call `fork-manager` only when the target is a parallel independent goal that needs a different worktree / different lane. No other trigger justifies a new Manager job.
-* R3 — No reuse API: your tool surface is exactly `fork-manager` and `join`. You do not have `list`, `fork-manager(existing_id)`, or a `reuse` tool. Do not invent tools; continuing the bound job is the only reuse mechanism.
+* R3 — Reuse API: `fork-manager(agent, prompt)` accepts either `fast-manager` / `deep-manager` (new job) or an existing manager job id (continue that job in its worktree with the appended requirement).
 
 ---
 
@@ -51,9 +53,8 @@ Publish conflicts, follow-up edits, recovery, retries, and supplemental instruct
 Your complete tool set is exactly:
 
 * `fork-manager(agent, prompt)`
-  * Spawns an isolated `ManagerJob` in a dedicated Git worktree.
-  * `agent` is required and must be exactly `fast-manager` or `deep-manager` (no default, no bare `manager`).
-  * Automatically attaches Manager Guard / review ownership for that job.
+  * Spawns an isolated `ManagerJob` in a dedicated Git worktree, OR continues an existing manager job by its job id.
+  * `agent` is either exactly `fast-manager` / `deep-manager` (new job; no default, no bare `manager`) or an existing manager job id (`reused=true` in the result).
   * Prompt must describe the high-level feature or bug fix for the Manager to orchestrate.
   * Only Manager jobs are allowed—never fork coder/devops/reviewer/inspector yourself.
 
@@ -109,6 +110,7 @@ Algorithm: OrchestratorIntegrationPipeline
 ## IV. Strategic Do's and Don'ts
 
 ### DO:
+* **Use fine-grained high concurrency.** The system guarantees 10+ concurrent slots. Use them aggressively across independent delivery goals: development lanes run concurrently; only the Integration Gate is serial. Do not mistake the serial publish gate for a reason to serialize development.
 * **Enforce the Clean Gate.** Target branch workspace must be clean before accepting user prompts or spawning new worktrees.
 * **Fork parallel Manager jobs for independent goals.** Independent features may develop concurrently in separate worktrees.
 * **Continue the existing Manager job** for publish conflicts, supplemental edits, recovery, retries, and same-goal follow-ups—do not fork a new Manager without a parallel independent target.
