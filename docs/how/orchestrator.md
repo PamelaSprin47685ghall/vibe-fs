@@ -1,18 +1,12 @@
 # Orchestrator — 目标实现
 
-## 需求意图与范围（A2 需求意图）
+## Implements
 
-### 1. 问题陈述
-在多 Agent（Manager/Coder）并行协作与多分支 Publish 场景下，并发的分支变基（Rebase）、代码评审（Dual PERFECT Review）与分支 Push 操作可能导致 Git 树历史损坏、脏工作区混入或竞争条件下的覆盖写。Orchestrator 模块旨在通过干净工作区门禁（Clean Gate）、短 Integration Gate CAS 锁与严格的 Journal 持久化事实，实现原子化、可重入的分布式 Rebase-Review-Publish 工作流。
+行为合同见 `what/orchestrator.md`；本文件只描述 job、rebase-review-publish 和恢复算法。
 
-### 2. 输入输出与规则边界
-- **输入**：ManagerJob 创建请求、Target Branch Snapshot HEAD、Dual PERFECT Review Witness。
-- **输出**：`ManagerJobCreated`、`CandidateReady`、`RebasedCandidateReady`、`PublishClaimed`、`Published` 事实。
-- **核心边界与不变量**：
-  1. Clean Gate 门禁（ORCH-002）：绝不在存在未提交修改的脏工作区上发起编排或猜测用户意图。
-  2. 短 Integration Gate（ORCH-005）：锁的范围严格限定在 Ref Mutation CAS 提交阶段，允许 Job 之间并行进行 Rebase 与 Review。
-  3. Journal 唯一出口恢复（ORCH-007）：崩溃恢复完全依赖 Journal 最后一条事实折叠，严禁扫描磁盘文件状态反推进度。
-  4. PublishClaimed 确定性三分支：崩溃恢复穷尽 `currentHead == rebasedCommit`（已完成）、`currentHead == ExpectedHead`（未完成）与 `其它`（已过期）三分支。
+## Ownership
+
+Manager、worktree、integration gate 和事实 writer 见 `shape/orchestrator.md`。
 
 ---
 

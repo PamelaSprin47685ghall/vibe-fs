@@ -5,7 +5,6 @@ open Wanxiangshu.Kernel
 /// Sole identity directory for managed agents (AGENT-001…004).
 ///
 /// Name, tier, role, peer, role groupings, and legacy rejection all derive here.
-/// Student/Teacher names live outside this catalog (LEARN-016).
 [<RequireQualifiedAccess>]
 module ManagedAgentCatalog =
 

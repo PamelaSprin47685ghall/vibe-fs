@@ -5,18 +5,23 @@
 //   1. Clause IDs defined once under docs/{why,what,shape,how,proof}
 //   2. Formal/fluid/README references must resolve (including slash lists/range endpoints)
 //   3. Prefix ownership (PREFIX_OWNER → relative path under docs/)
-//   4. docs/README.md navigates every formal file that defines clauses
-//   5. status/ and proposal/ must not define Clause IDs
+//   4. docs/README.md navigates every formal Markdown file
+//   5. status/ and proposal/ must not define Clause-shaped headings
 //   6. clause-looking references use a known exact PREFIX-NNN (no pseudo suffixes)
 //   7. docs/README.md covers the exact active status and proposal file sets
+//   8. AGENTS.md and docs/README.md do not define formal Clause headings
+//   9. production/resources/tests do not depend on Proposal IDs or paths
 //
 // Usage: node scripts/checks/spec.mjs
 
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import {
+  clauseDefinitionHeadings,
   clauseReferences,
   fluidNavigationProblems,
+  markdownLocalLinks,
+  proposalDependencyReferences,
   statusNavigationProblems,
   unknownClauseReferences,
 } from './spec-rules.mjs'
@@ -25,6 +30,7 @@ const DOCS = 'docs'
 const FORMAL_DIRS = ['why', 'what', 'shape', 'how', 'proof']
 const FLUID_DIRS = ['status', 'proposal']
 const NAV_FILE = join(DOCS, 'README.md')
+const AGENTS_FILE = 'AGENTS.md'
 const STATUS_DIR = join(DOCS, 'status')
 const PROPOSAL_DIR = join(DOCS, 'proposal')
 
@@ -109,6 +115,17 @@ const walkMarkdown = (dir, acc = []) => {
   return acc
 }
 
+const walkFiles = (dir, acc = []) => {
+  if (!existsSync(dir)) return acc
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name)
+    const st = statSync(full)
+    if (st.isDirectory()) walkFiles(full, acc)
+    else acc.push(full)
+  }
+  return acc
+}
+
 const formalFiles = FORMAL_DIRS.flatMap((d) => walkMarkdown(join(DOCS, d)))
 const fluidFiles = FLUID_DIRS.flatMap((d) => walkMarkdown(join(DOCS, d)))
 
@@ -165,10 +182,8 @@ for (const file of fluidFiles) {
   const text = readFileSync(file, 'utf8')
   const key = relDocs(file)
   collectReferences(key, text)
-  for (const match of text.matchAll(DEFINITION_RE)) {
-    const id = match[1]
-    const line = text.slice(0, match.index).split('\n').length
-    fail(key, line, `流动面禁止定义条款：${id}`)
+  for (const { id, line } of clauseDefinitionHeadings(text)) {
+    fail(key, line, `流动面禁止定义 Clause 形标题：${id}`)
   }
 }
 
@@ -180,21 +195,40 @@ if (!navigation) {
   collectReferences('README.md', navigation)
 }
 
+const agents = existsSync(AGENTS_FILE) ? readFileSync(AGENTS_FILE, 'utf8') : ''
+if (agents) {
+  rejectUnknownClauseLikeReferences('../AGENTS.md', agents)
+  collectReferences('../AGENTS.md', agents)
+}
+
+for (const [key, text] of [
+  ['README.md', navigation],
+  ['../AGENTS.md', agents],
+]) {
+  for (const { id, line } of clauseDefinitionHeadings(text)) {
+    if (Object.keys(PREFIX_OWNER).some((prefix) => id.startsWith(`${prefix}-`))) {
+      fail(key, line, `路由文件禁止定义正式 Clause 标题：${id}`)
+    }
+  }
+}
+
 for (const { id, file, line } of references) {
   if (!definitions.has(id)) {
     fail(file, line, `悬空条款引用：${id} 无定义`)
   }
 }
 
-const formalWithDefinitions = new Set([...definitions.values()].map((d) => d.file))
-for (const file of formalWithDefinitions) {
-  const needle = file.replace(/\\/g, '/')
-  if (!navigation.includes(needle) && !navigation.includes(`](${needle})`)) {
-    // also accept link text without path if basename listed in table cells
-    const base = needle.split('/').pop()
-    if (!navigation.includes(base.replace(/\.md$/, ''))) {
-      fail('README.md', 0, `导航索引缺少正式文件 docs/${needle}`)
-    }
+for (const directory of FORMAL_DIRS) {
+  const expected = formalFiles
+    .map(relDocs)
+    .filter((file) => file.startsWith(`${directory}/`))
+    .sort()
+  const problems = fluidNavigationProblems(navigation, directory, expected)
+  for (const file of problems.missing) {
+    fail('README.md', 0, `导航索引缺少正式文件 docs/${file}`)
+  }
+  for (const { file, line } of problems.stale) {
+    fail('README.md', line, `导航引用不存在的正式文件 docs/${file}`)
   }
 }
 
@@ -227,6 +261,38 @@ for (const file of proposalProblems.missing) {
 }
 for (const { file, line } of proposalProblems.stale) {
   fail('README.md', line, `导航引用不存在的 proposal：docs/${file}`)
+}
+
+for (const file of [AGENTS_FILE, NAV_FILE, ...formalFiles, ...fluidFiles]) {
+  if (!existsSync(file)) continue
+  const text = readFileSync(file, 'utf8')
+  for (const { target, line } of markdownLocalLinks(text)) {
+    if (!existsSync(resolve(dirname(file), target))) {
+      const key = file === AGENTS_FILE ? '../AGENTS.md' : relDocs(file)
+      fail(key, line, `本地 Markdown 链接不存在：${target}`)
+    }
+  }
+}
+
+const knownPrefixes = new Set(Object.keys(PREFIX_OWNER))
+const candidateIds = new Set()
+for (const file of walkMarkdown(PROPOSAL_DIR)) {
+  const text = readFileSync(file, 'utf8')
+  for (const match of text.matchAll(/\b([A-Z][A-Z0-9]*-\d{3}(?:[A-Z]|-[A-Z0-9-]+)?)\b/g)) {
+    const prefix = match[1].split('-')[0]
+    if (!knownPrefixes.has(prefix) && match[1] !== 'SHA-256') candidateIds.add(match[1])
+  }
+}
+
+for (const root of ['src', 'resources', 'tests']) {
+  for (const file of walkFiles(root)) {
+    if (file.endsWith('.xml')) continue
+    if (file === join('tests', 'unit', 'verify', 'spec-rules.test.mjs')) continue
+    const text = readFileSync(file, 'utf8')
+    for (const { token, line } of proposalDependencyReferences(text, candidateIds)) {
+      fail(`../${file}`, line, `实现或证明面禁止依赖 Proposal：${token}`)
+    }
+  }
 }
 
 const definedCount = definitions.size

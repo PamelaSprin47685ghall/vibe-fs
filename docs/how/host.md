@@ -1,17 +1,12 @@
 # Host — 目标实现
 
-## 需求意图与范围（A2 需求意图）
+## Implements
 
-### 1. 问题陈述
-OpenCode Host 提供了非阻断式 Hook 与 SDK 事件流，但在多实例、并发 Hook 与流式中断场景下存在数据竞争、身份缺失与取消信号混淆问题。Host 子模块必须在零修改 OpenCode 本体（ARCH-003）的硬性约束下，将 Host 的弱类型、流式、不确定性事件转化为强类型、原子化的领域事实（`HostSignal` 与 `ReconciledTurn`），并提供多 Worktree 插件实例间的严格并发隔离与共享数据同步机制。
+行为合同见 `what/host.md`；本文件只描述 hook 收敛、snapshot reconcile 和共享运行时算法。
 
-### 2. 输入输出与规则边界
-- **输入**：OpenCode 原始 SDK 消息事件、transform hook 输入、tool execute 阶段回调、会话生命周期事件。
-- **输出**：强类型 `HostSignal` 领域信号、`ReconciledTurn` snapshot 分类、`ProviderInputSealed` 身份封印事实。
-- **核心边界与不变量**：
-  1. 不得改动 Host 源码或引入专用魔改接口（ARCH-003）。
-  2. Reconciler 保留 provider-turn `TurnAborted` 分类；消费边界再检查 `LoopKillArmed`：命中时走失败/Fallback，未命中时只清理 turn，绝不构造 Agent `RunCompletion`（LOOP-006 / EXEC-020）。
-  3. 跨 Worktree 实例共享表的操作必须在同一 Node.js event loop 上、且不跨 `await` 的同步片段内完成（HOST-012）。
+## Ownership
+
+Host 适配、信号和共享状态边界见 `shape/host.md`。
 
 ---
 

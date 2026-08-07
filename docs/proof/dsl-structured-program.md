@@ -1,34 +1,31 @@
 # DSL 结构化程序规则 — 证明
 
-行为见 `what/dsl-structured-program.md`；边界见 `shape/dsl-structured-program.md`；实现见 `how/dsl-structured-program.md`。
+行为见 `what/dsl-structured-program.md`；边界见 `shape/dsl-structured-program.md`；
+算法见 `how/dsl-structured-program.md`；活跃差距见 `status/dsl-structured-program-gap.md`。
 
-## 静态门禁
+## 静态义务
 
-| 门 | 要求 |
+| 门 | 必须判红的反例 |
 |---|---|
-| `scripts/checks/dsl-ownership.mjs --threshold=0` | 声明式 `DSL-MUTABLE`、跨文件 `dup-cases`、large-DU（≥10 case 无 `/// DSL-class:`）fail、`/// DSL-class: ControlState` 硬判 `program-counter`、Process 不再整目录豁免 `bool-loop`。组合状态结构检测 **Reject**（不实施；存量 `BloggerRuntimeCell` 已删，靠 ControlState 硬判 + review） |
-| `npm run lint` | format + spec + architecture + dsl-ownership + p0-recovery-join |
-| 架构检查 `architecture.mjs` | 无旧路径、fsproj 完整、无 `.gen.fs`、Domain 不引用上层 |
+| `scripts/checks/dsl-ownership.mjs --threshold=0` | 业务 Interpreter/Command-Reply 第二运行时、程序计数字段、未声明 mutable、跨文件同构 DU、未分类的大 DU、未登记 Infrastructure leak |
+| `scripts/checks/architecture.mjs` | Domain 向上层依赖、源码根/fsproj 不一致、资源越界读取 |
+| `scripts/checks/spec.mjs` | DSL Clause 重复、悬空或流动面伪定义 |
 
-## 动态证明
+每项新增静态规则必须有永久 fixture，并曾用故意反例证明仓库入口会失败。
 
-| 层 | 证明什么 | 落点 |
-|---|---|---|
-| 单元 | 新 CE 行为等价于旧状态机 | `tests/unit/execution/process-wait.test.mjs` **已新增**——四行为测试 A–D：A 进程先退出（返回真实 code、不 Kill）；B deadline 先到（Kill 恰好一次、随后 exit、`TimedOut=true`）；C kill 后一直无 exit（有限时间结束、`ExitCode=-1`、`TimedOut=true`）；D **等待中 cancellation**（Kill 恰好一次、以 `OperationCanceledException` 结束、不无限等 `Exit.Task`）。其余：`tests/unit/enforcer/blogger-runtime.test.mjs` 扩展；`tests/unit/context/session-recovery.test.mjs` 扩展；`tests/unit/context/companion-projection.test.mjs` 扩展 |
-| 集成 | Journal fold / projection 不变 | `tests/integration/harness/cases.mjs` 中对应 case |
-| Canary | Host 真实行为不变 | `tests/e2e/cases/process-stress.test.mjs`；`tests/e2e/cases/companion.test.mjs`；`tests/e2e/cases/blogger-quiet-stop.test.mjs`；`tests/e2e/cases/manager-companion.test.mjs` |
-| 门禁自身 | 故意破坏门禁应变红 | `tests/unit/verify/dsl-ownership.test.mjs` 含声明式 mutable / 跨文件 dup-cases / 门禁注册门用例（已落地）。组合状态结构检测 Reject，无对应 fixture；改名/声明类 canary 保留 |
-| Blogger 物理所有权 | busy = `HasFlight`；无 State DU | `tests/unit/enforcer/blogger-convergence-gaps.test.mjs`（C0 物理权威）、`blogger-crash-recovery.test.mjs`（C5）、`blogger-runtime` / `blogger-seal-reactivate` / `enforcer-cycle-protocol` 等物理 Slot 断言 |
+## 动态义务
 
-## 完成定义（CLOSED / 已落地）
+- 进程等待分别覆盖自然退出、deadline、kill acknowledgement 超时和等待中取消。
+- Companion 恢复机会覆盖注册、单次消费、无机会 no-op 与重启不恢复 waiter。
+- Blogger single-flight 覆盖 busy、parked、完成、取消与恢复，不从流程位置字段推断事实。
+- Journal recovery 覆盖 evidence 不足时 fail closed，并证明重入公共 workflow。
+- family fold 与迁移前 wire/Journal 兼容性按对应领域 proof 证明。
 
-> **当前状态（2026-08-07）**：PR 1–9 **全部闭环**。生产路径无 `BloggerRuntimeState` / `BloggerRuntimeCell` / dual-write shadow；busy 权威 = `bloggerFlights`（`HasFlight`）。proposal 标 **CLOSED**，可作为 release evidence。验证：`npm run lint` + `build` + unit 1000 + integration 271 绿（`check:release` / canary 未在本闭环强制）。
+测试必须走公共契约面并断言可观察结果或端口调用；不得只断言内部 tag。
 
-已满足：
+## 完成判据
 
-- 生产路径无重复 `TurnOutcome` / `Role`（已收敛到 `ReconcileProgram.TurnOutcome` 与 `Kernel.Role`）。
-- `AgentFact` 已完成阶段 A 分 family 所有权（7 个 bounded-context family + 顶层分派）。
-- **`NodeProcessWait` cancellation 三态已落地**：`WaitSignal = ProcessExited | TimerElapsed | Cancelled`；`process-wait.test.mjs` A–D。
-- **`RecoveryArming` → TCS waiter**：`Companion.fs` 的 `recoveryWaiter`（`// DSL-MUTABLE: resource`）；`StartRecoveryOpportunity` / `OfferRecoveryMaterial`。
-- **`BloggerRuntime` 物理所有权（PR 7）**：删除 `BloggerRuntimeState` DU / `BloggerRuntimeCell` / transition API；`bloggerFlights` + `drainWindows` + `decideMaterial`；测试断言迁物理 Slot。
-- **`dsl-ownership` 门禁已收紧**：声明式 `DSL-MUTABLE`；`Process/` 不豁免 `bool-loop`；跨文件 `dup-cases`；large-DU CI fail；`ControlState` 硬判。PR 9 第 3 项 Reject / 第 5 项 Closed-as-forbidden。
+1. `status/dsl-structured-program-gap.md` 所列物理差距关闭并删除。
+2. 静态门禁无阈值上调或永久豁免逃逸。
+3. 相关 unit、integration 与 canary 按 `proof/verify.md` 通过。
+4. 删除旧状态后不存在双写、adapter facade 或仅为旧测试保留的旁路。

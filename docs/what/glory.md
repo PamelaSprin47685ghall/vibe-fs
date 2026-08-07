@@ -1,7 +1,6 @@
 # Glory：Born with Task, Suicide with Glory（what 层）
 
-> 本文件是 GLORY- 与 SURFACE- 条款的正式定义处（裁决自 `docs/proposal/glory.md`，原稿已移至 `docs/status/glory.md` 作为实现差距跟踪）。
-> 核心叙事：Manager 诞生时带着任务；它只为完成该任务而活；当没有有用的工作剩余时调用 `suicide`；若工作不完整，死亡拒绝它并返回其伤口记录（Reviewer 工作记录）；若工作完整，它带着荣耀死去（`last_words` 成为用户答案）；当遥远未来出现新任务时，它再次醒来（新 Life 重新 Birth）。
+本文件是 `GLORY-` 与 `SURFACE-` 条款的唯一正式定义处。边界、实现、证明和理由见同名分层文档。
 
 ## GLORY-001：Manager 专属终结工具
 

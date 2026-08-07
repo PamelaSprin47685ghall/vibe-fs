@@ -16,7 +16,7 @@ armed 必须合取「紧邻失败」与奇数槽：仅看 Offset 奇偶会在成
 
 **成功写归零事实 vs 成功不写。** 拒写：多一个 `FallbackCursorAdvanced` 变体会引入第二写入口（VERIFY-005 单一写入口），且归零可从 Host snapshot 的 Completed 派生。选派生：cursor 事实只记录「失败推进」这一物理真实事件，成功态是积分结果不是事件。
 
-**侧循环判死 vs 预算判死。** 拒侧上限：换侧是合法恢复策略，循环本身不构成错误。真正要防的是无限烧钱，故判死收敛到有界预算（AutoRecoveryBudget=12）落 `FallbackExhausted`；侧循环保持无界。
+**侧循环判死 vs 预算判死。** 拒侧上限：换侧是合法恢复策略，循环本身不构成错误。真正要防的是无限烧钱，故判死收敛到 FALLBACK-005 的有界预算；侧循环保持无界。
 
 **Host Attempt 计数 vs 领域连续失败计数。** 拒混用：Attempt 是传输层序号，可被 Host 重置/重复，与「连续失败」不同量纲，混用会在重启时错误清零或错误耗尽。领域计数只在确认失败的 `ProviderRunIdentity` 上推进（FALLBACK-010）。
 

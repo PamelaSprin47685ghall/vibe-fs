@@ -16,7 +16,7 @@
 |------|------|
 | JoinGuard 优先 Review | EXEC-016 |
 | 中断 = interrupted 非 error | EXEC-017 |
-| MaxJoinBatch=32、稳定排序、CAS | EXEC-018 |
+| EXEC-018 的批次上限、稳定排序、CAS | EXEC-018 |
 | blob v2；LegacyFalseAbort 永不 completion | EXEC-021 |
 | 假 completion 补偿路径 | EXEC-022 |
 

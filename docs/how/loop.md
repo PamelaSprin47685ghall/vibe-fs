@@ -1,18 +1,12 @@
 # LOOP — 目标实现
 
-## 需求意图与范围（A2 需求意图）
+## Implements
 
-### 1. 问题陈述
-LLM 在流式文本生成过程中偶发进入低多样性退化循环（单字符、短语或长句子重复）。若任由其运行至自然结束，会浪费大量 Provider Token、污染历史 Transcript 尾部并推迟系统进入自动恢复槽。LOOP 模块旨在提供一个 O(1) 时间与空间复杂度的流式传感器，在不修改 Host 本体（ARCH-003）与不上报碎片事实（ARCH-002）的前提下，尽早识别退化流、物理强杀请求，并精确桥接至 FallbackController 触发自动恢复。
+行为合同见 `what/loop.md`；本文件只描述流式统计、判定和强杀桥接算法。
 
-### 2. 输入输出与规则边界
-- **输入**：OpenCode 流式 `message.part.delta` 文本增量（field=text）。
-- **输出**：`Evaluation` 快照决策（`IsLoop`）、`LoopKillArmed` 进程内局部标志与物理 `AbortSession` 动作。
-- **核心边界与不变量**：
-  1. 不估算 Token 或上下文窗口容量（CTX-001）。
-  2. 不将 delta 文本拼装为领域事实或透传给 Reconciler（ARCH-002）。
-  3. 单线程事件泵串行投递假设：每个 provider attempt 对应单事件循环，`LoopDetector` 可变状态物理封入 attempt 内部，严禁跨线程或跨 attempt 复用。
-  4. 强杀与 Fallback 桥接：Host 返回 `TurnAborted` 且 `LoopKillArmed` 命中时，必须进入与 provider failure 相同的恢复函数，并唯一通过 `FallbackController.recordConfirmedFailure` 推进恢复槽；不得改写或删除原始 provider-turn 分类。
+## Ownership
+
+attempt 内传感器与 Host 边界见 `shape/loop.md`。
 
 ---
 

@@ -2,24 +2,16 @@
 
 未裁决候选。不是当前规范，不得直接据此修改生产代码。
 
-## Problem
+## Current baseline
 
 `tests/e2e/support/scenario-driver.mjs` 的 `awaitFactBarrier` 当前把两类观察都当成阻塞车道进展：
 
 1. 被等待事实的计数增长；
 2. journal 任意事实增长。
 
-第二类通过未指定 `blocking` 的 `watchdog.advance` 调用继承默认值 `true`。同一 Blogger 信号在其它入口却明确属于背景车道：provider expectation 使用 `blocking=false`，`VERIFY-004` 也规定「背景进展（非阻塞车道，例如 blogger sidecar）必须被记录但不得续期」。因此 waitFact 将背景 journal 事实重新分类为阻塞进展，与现行门禁语义冲突。
-
-本候选不把该冲突解释为当前 release 用时过长的根因。已有失败证据显示：
-
-- `manager-full-loop` 两次均在最后一次 `manager.4` 后静默 5000ms 被 watchdog 收割；Blogger 被记录为 `none of them renewals`；
-- `fallback-aabb-trace` 在 `FallbackCursorAdvanced=3` 后静默 5000ms，被已修复的 Fable `TrySetCanceled` 运行时错误阻断；
-- 90–127 秒是并行套件总墙钟，不是单个 waitFact 的失败延迟。
-
-所以这是独立的因果归因缺口，不是调低超时的性能提案。
-
-## Current baseline
+第二类通过未指定 `blocking` 的 `watchdog.advance` 调用继承默认值 `true`。VERIFY-004
+把背景车道定义为“记录但不续期”，因此 waitFact 将任意 journal append 当作阻塞进展，
+与正式 proof 语义冲突。这是因果归因候选，不是调低超时的性能提案。
 
 `awaitFactBarrier` 每 500ms 读取一次 journal：
 
@@ -29,11 +21,10 @@
 无事实增长        → 不 advance
 ```
 
-`tests/integration/harness/timeout-cases.mjs` 当前第二个 waitFact 子用例持续追加 `UnrelatedProgressFact`，并要求它让 barrier 跨过多个静默窗口。该用例把「durable append」直接等同于「被等待因果链前进」，保护了上述冲突。
+当前 integration fixture 把 `UnrelatedProgressFact` 当作续期源，保护了上述旧行为；
+`tests/e2e/support/watchdog.js` 与 VERIFY-004 的背景车道定义则要求相反分类。
 
-同时，`tests/e2e/support/watchdog.js` 与 `docs/proof/verify.md` 的 VERIFY-004 已明确把 Blogger sidecar 定义为背景车道：记录但不得重置静默计时器。
-
-## Goal
+## Proposed delta
 
 让 waitFact 的续期依据由剧本显式表达，不从「journal 有任何写入」反推因果：
 
@@ -50,7 +41,7 @@
 5. `WAIT_FACT_WINDOW_MS` 保留为持续进展但不收敛时的总兜底；本候选不修改任何时间值。
 6. `renewOn` 是 proof 剧本声明，不进入生产事实、Journal envelope 或运行时配置。
 
-## Non-goals
+### Non-goals
 
 - 不静默、限流或重写 Blogger。
 - 不把 Blogger commit、provider 流量或 Session 类型硬编码成全局黑名单。
@@ -99,3 +90,8 @@ CleanBreak
 ## Decision owner
 
 Wanxiangshu 项目 Owner。
+
+## Admission blockers
+
+- Decision Owner 需要确认这是 VERIFY-004 的纠错，而非为 waitFact 建立例外。
+- 迁移前必须从现有 scenario 证据识别真正跨静默窗口的 barrier；不得预填 speculative `renewOn`。

@@ -13,11 +13,10 @@
 
 ## 写入口
 
-- 产品行为变更：遵循 GOV-006（先 proposal，禁止未经用户同意删除未实现 proposal → 依序更新规范面 → 移 proposal 至 status 记差距 → 代码实现 → 检查 proof → 删 status 中的 proposal）  
+- 产品行为变更：生命周期由 GOV-006 定义；本层只要求每个受影响主题明确行为、边界、算法和证明的写入口。
 - 条款定义：每个 ID 恰好一处 `## ID` 标题  
 - 导航：`docs/README.md` 与 `scripts/checks/spec.mjs` 同步  
 
 ## 与工程入口
 
-`AGENTS.md` / 根 README 指向分域文档，不指向已废止 `spec/`。  
-`AGENTS.md` 是工作流，不替代 what/shape/how 合同。
+`AGENTS.md` 只拥有 Agent 工作协议；`docs/README.md` 只拥有文档导航。两者不得成为正式条款 writer。

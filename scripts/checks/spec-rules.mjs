@@ -1,5 +1,6 @@
-const CLAUSE_LIKE_RE = /\b([A-Z][A-Z0-9]*-\d{3}(?:-[A-Z0-9-]+)?)\b/g
+const CLAUSE_LIKE_RE = /\b([A-Z][A-Z0-9]*-\d{3}(?:[A-Z]|-[A-Z0-9-]+)?)\b/g
 const NON_CLAUSE_IDENTIFIERS = new Set(['SHA-256'])
+const CLAUSE_HEADING_RE = /^#{1,6}\s+([A-Z][A-Z0-9]*-\d{3}(?:[A-Z]|-[A-Z0-9-]+)?)\b/gm
 
 const escapedAlternation = (prefixes) =>
   prefixes.map((prefix) => prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
@@ -21,6 +22,54 @@ export const unknownClauseReferences = (text, prefixes) => {
       }
     }
   })
+
+  return findings
+}
+
+/** Return every Clause-shaped Markdown heading, independent of known prefixes. */
+export const clauseDefinitionHeadings = (text) => {
+  const findings = []
+  for (const match of text.matchAll(CLAUSE_HEADING_RE)) {
+    findings.push({ id: match[1], line: text.slice(0, match.index).split('\n').length })
+  }
+  return findings
+}
+
+/** Return references that make implementation/proof files depend on a Proposal. */
+export const proposalDependencyReferences = (text, candidateIds) => {
+  const candidates = new Set(candidateIds)
+  const findings = []
+
+  text.split('\n').forEach((content, index) => {
+    const line = index + 1
+    for (const match of content.matchAll(CLAUSE_LIKE_RE)) {
+      if (candidates.has(match[1])) findings.push({ token: match[1], line })
+    }
+    if (/(?:^|[^A-Za-z])docs\/proposal\//.test(content)) {
+      findings.push({ token: 'docs/proposal/', line })
+    }
+  })
+
+  return findings
+}
+
+/** Return relative Markdown link targets; URL schemes and document-local anchors are excluded. */
+export const markdownLocalLinks = (text) => {
+  const findings = []
+  const link = /\]\((?:<([^>]+)>|([^\s)]+))\)/g
+
+  for (const match of text.matchAll(link)) {
+    const raw = match[1] ?? match[2]
+    if (!raw || raw.startsWith('#') || /^[a-z][a-z0-9+.-]*:/i.test(raw)) continue
+    const withoutFragment = raw.split('#')[0].split('?')[0]
+    let target = withoutFragment
+    try {
+      target = decodeURIComponent(withoutFragment)
+    } catch {
+      // Invalid URI escaping remains a filesystem miss in the caller.
+    }
+    findings.push({ target, line: text.slice(0, match.index).split('\n').length })
+  }
 
   return findings
 }

@@ -1,18 +1,12 @@
 # Journal — 目标实现
 
-## 需求意图与范围（A2 需求意图）
+## Implements
 
-### 1. 问题陈述
-在系统崩溃、进程硬杀或硬件断电场景下，如果允许先修改内存状态再异步刷盘，或者在读取日志时静默跳过损坏行，会导致恢复后的投影看见未落盘的“虚幻未来”或建立在破坏基础上的矛盾事实。Journal 子模块提供 NDJSON append-only 日志、内容寻址 BlobRef 存储，以及两相 `Requested → Accepted` 外部副作用持久化协议。
+行为合同见 `what/persist.md`；本文件只描述 append、blob、fold 和 durable effect 算法。
 
-### 2. 输入输出与规则边界
-- **输入**：领域事件事实、外部副作用请求、大正文 Blob 字节流。
-- **输出**：持久化的 NDJSON 事实行、`BlobRef` 写入收据、`Requested` / `Accepted` 事实时序。
-- **核心边界与不变量**：
-  1. 写盘优先于内存修改（PERSIST-002/003）：只有 `Committed` 后才能替换内存权威状态；`CommitUnknown` 必须进入 fail-closed reconcile，不能当作“命令未发生”重试。
-  2. 尾部截断与 Fail-Closed（PERSIST-004）：只允许截断最后一条不完整 envelope；中间损坏必须拒绝启动，绝对禁止截断后把后续事实当作不存在。
-  3. 内容寻址 BlobRef（PERSIST-007）：大文本正文按 SHA-256 摘要存为只读 Blob，同字节产生同 BlobRef（写入幂等）；载荷绝对不可变，更新必须产出新 BlobRef。
-  4. 两相副作用契约（PERSIST-009）：外部副作用走 `Requested → 幂等执行/核对 → Accepted`；崩溃后仅有 Requested 表示结局未知，必须先按效果身份核对，不能假定未发生或盲目重试。
+## Ownership
+
+Journal、blob 与 projection 边界见 `shape/persist.md`。
 
 ---
 

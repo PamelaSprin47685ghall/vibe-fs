@@ -1,18 +1,12 @@
 # Companion — 目标实现
 
-## 需求意图与范围（A2 需求意图）
+## Implements
 
-### 1. 问题陈述
-在长对话与复杂任务推进中，主工作会话（WorkSession X）的原生 Transcript 会随着大量工具调用与中间推理快速膨胀。如果直接将所有中间细节保存在主会话中，会导致前缀缓存高频失效与上下文溢出。Companion 子模块旨在为每个 WorkSession X 配备且仅配备一个专属的 Sidecar Blogger 会话（CompanionSession Y），专门记录稠密、可压缩的 `BlogFrame` 工作日志，并与主会话的历史渲染彻底解耦。
+行为合同见 `what/companion.md`；本文件只描述 frame 投影、squash 和运行时协调算法。
 
-### 2. 输入输出与规则边界
-- **输入**：WorkSession X 产生的新材料（Material）、Blogger System Prompt、`blog` 工具提交。
-- **输出**：`BlogFrame` 结构（`Entry` | `Squash`）、`BlogFrame` 投影序列、低信任上下文呈现。
-- **核心边界与不变量**：
-  1. 关联依 Session 种类决定（COMPANION-001/002）：每个 WorkSession 恰好一个 CompanionSession，Y 严禁递归（CompanionSession 的 BloggerSessionId 为 None）。
-  2. 仅从 Durable Frames 重建（COMPANION-005）：Provider-visible 历史严格由持久化的 `BlogFrame` 序列与 typed 上下文重建，绝对禁止直接抓取/追加原始物理 Transcript。
-  3. Coverage 严格分型（COMPANION-003）：`RecordCoverage`（管 LWR 缺口）与 `PrefixCoverage`（管前缀证明）不得混用。
-  4. 事实驱动 Epoch 切换（COMPANION-009）：Epoch 切换仅允许由已提交的 Probe 提升或 Compaction 重锚事实驱动，绝对禁止根据 Token 容量估算切换（CTX-001）。
+## Ownership
+
+会话、frame 与 writer 边界见 `shape/companion.md`。
 
 ---
 
