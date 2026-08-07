@@ -762,3 +762,47 @@ resources/prompts/blogger-system.md
 - `tests/unit/verify/dsl-ownership*.test.mjs`
 - `CHANGELOG.md`
 
+---
+
+## Active work
+
+**Started**: 2026-08-07  
+**Approved scope**: Per §0–§16 of this frozen Proposal. Semantic alignment + documentation reconstruction on baseline 0.5.4 + Unreleased. Do not redefine formal `ENFORCER-*` clauses inside this Change file. Do not revive score / throttle / Main overlay / Runtime State DU. Do not change wire/journal production semantics under the guise of documentation rebase.
+
+**Remaining close conditions**:
+1. Fix Gap A — `docs/how/enforcer.md` ENFORCER-025 multi-call tip selection: document PartOrdinal-first only (match `EnforcerCycle.fs` + unit tests); remove catalog-ordinal secondary sort.
+2. Fix Gap B — `docs/shape/enforcer.md`: replace `BloggerRuntime | 纯 cell 转移` with physical ownership axes (`HasFlight` / `HasParked` / `PendingOffer` / `DrainWindow` / recovery evidence) and keep component responsibilities accurate.
+3. Strengthen `docs/proof/enforcer.md` so §13 verification contract is explicit (catalog/codec, cycle PartOrdinal-first, atomic commit/recovery, RecentTips bound 8, runtime ownership, repair/fallback, no score path).
+4. Confirm `docs/what` / `docs/why` need no residual score/throttle/Main-overlay fixes (already clean if still true).
+5. `npm run lint` passes after doc changes; run relevant `tests/unit/enforcer/*` if proof references require it.
+6. Append `Final outcome` and move this file to `changes/completed/`.
+
+**Blockers**: None. Gaps are documentation; implementation already PartOrdinal-first and physical-ownership.
+
+**Out of scope**: Restoring score-vector, throttle math, NudgeAnchored/NudgeConsumed, Main fake-user engineering overlay, or BloggerRuntimeState DU.
+
+---
+
+## Final outcome
+
+**Completed**: 2026-08-07
+
+**Outcome**: Fully closed. Rebase intent from this Proposal is reflected in the formal five-layer docs and verified against the existing 0.5.4 implementation. No wire/journal production semantics were changed under this Change. Old score/throttle/Main-overlay/Runtime State DU mechanisms were not restored.
+
+**Docs delivered**:
+- `docs/how/enforcer.md` — ENFORCER-025 multi-call tip selection is PartOrdinal-first only (Gap A closed).
+- `docs/shape/enforcer.md` — physical ownership axes (`HasFlight` / `HasParked` / `PendingOffer` / `DrainWindow` / recovery evidence); no pure cell-transfer program counter (Gap B closed).
+- `docs/proof/enforcer.md` — rebased §13 verification contract with real test/module evidence (catalog/codec, cycle, atomic commit/recovery, RecentTips=8, runtime ownership, repair/fallback, tombstones).
+- `docs/what/enforcer.md` / `docs/why/enforcer.md` — confirmed already aligned; no residual score/throttle/Main-overlay product semantics requiring edit.
+
+**Validation**:
+- `npm run lint` — pass (exit 0)
+- `npm run build` — pass (exit 0; required for unit tests via dist)
+- `node --test tests/unit/enforcer/*.test.mjs` — 139/139 pass (exit 0), including PartOrdinal-first multi-call tip, RecentTips cap 8, physical HasFlight busy, throttle/nudge tombstones, catalog 120 rules.
+
+**Limitations**:
+- Full monorepo integration/e2e suites were not re-run under this Change (out of scope for documentation rebase).
+- Implementation was already tip-v2 / physical-ownership; this Change closed documentation drift and proof inventory, not a new runtime feature.
+
+**Close conditions**: All Active work close conditions 1–6 satisfied.
+
