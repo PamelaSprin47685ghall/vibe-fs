@@ -403,6 +403,38 @@ user = "go"
     },
   },
 
+  {
+    name: 'VERIFY-003 turn and step ids cannot share one wait signal',
+    fn: () => {
+      rejects(
+        `scenario = "p"
+flow = [
+  { prompt = { text = "plan" } },
+  { prompt = { text = "activate" } },
+]
+
+[[turn]]
+id = "manager"
+user = "plan"
+
+  [[turn.step]]
+  respond = { type = "text", text = "first" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "second" }
+
+[[turn]]
+id = "manager.1"
+user = "activate"
+
+  [[turn.step]]
+  respond = { type = "text", text = "activated" }
+`,
+        "signal id 'manager.1'",
+      );
+    },
+  },
+
   // ── dead edges: the check only a static whole allows ─────────────────────
 
   {
