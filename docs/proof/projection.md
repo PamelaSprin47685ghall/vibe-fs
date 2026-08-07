@@ -20,7 +20,7 @@
 |------|------|
 | 无 ProjectionProgram AST + Interpreter | PROJ-001、FLOW-001 |
 | 三层 Coordinator / Planner / Renderer | PROJ-004 |
-| 迁移顺序与 digest 对齐后删 Legacy | PROJ-008 |
+| 迁移顺序与 digest 对齐后删 Legacy | [PROJ-008](../how/projection.md#proj-008迁移顺序) |
 
 代表：`tests/unit/context/companion-projection.test.mjs`、provider projection 相关 facade 测试。  
 Seal 用 Wire；剧本键用 Semantic（VERIFY-003/007）——混用必须红。

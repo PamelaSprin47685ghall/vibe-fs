@@ -10,10 +10,11 @@
 - DSL-006
 - DSL-007
 
+另见 shape 层所有权条款：DSL-008、DSL-009、DSL-010、DSL-011（定义见 [`../shape/dsl-structured-program.md`](../shape/dsl-structured-program.md)）。本文件不把上述 shape-only 条款伪造成 how 实现算法。
+
 ## Ownership
 
-分层、模块和测试边界见 `shape/dsl-structured-program.md`。当前未对齐实现只见
-[`changes/active/dsl-structured-program-gap.md`](../../changes/active/dsl-structured-program-gap.md)。
+分层、模块和测试边界见 `shape/dsl-structured-program.md`。
 
 ## Algorithm
 

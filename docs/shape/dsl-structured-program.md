@@ -1,7 +1,6 @@
 # DSL 结构化程序规则 — 边界
 
-行为不变量见 `what/dsl-structured-program.md`；相关未闭环工作见
-[`changes/active/dsl-structured-program-gap.md`](../../changes/active/dsl-structured-program-gap.md)。
+行为不变量见 `what/dsl-structured-program.md`。
 
 ## DSL-008：分层所有权
 

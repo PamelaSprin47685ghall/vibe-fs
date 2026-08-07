@@ -37,3 +37,9 @@
 ### Blockers
 
 当前没有外部 blocker。
+
+### Progress notes
+
+- 已完成 PROJ-008 迁移第 1–2 步（`KeepPhysicalPrefix` / `ActivatePrefixEpoch` + PrefixProbe；测试 `projection-algebra.test.mjs`）。
+- 第 3–6 步与六个 intent case 仍未实现；旧消息直改路径仍存在。
+- Remaining work 全部保持未完成；本记录不做功能实现。

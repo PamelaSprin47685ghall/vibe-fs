@@ -43,3 +43,18 @@ SemanticEventTree
 DSL 只负责不可变快照 → 确定性 provider-visible projection。
 
 DSL 不负责：启动或等待任何 Agent/provider、执行工具、写 Journal、恢复 Prompt、管理 ProviderRunIdentity、推进生命周期状态、控制器在线更新。
+
+## 相关条款定义位置
+
+以下条款按 GOV-011 定义于 shape/how，本表仅为导航，不重复定义。
+
+| 条款 | 定义位置 |
+|---|---|
+| PROJ-001 | 本文件 |
+| PROJ-002 | 本文件 |
+| PROJ-003 | 本文件 |
+| PROJ-004 | [`shape/projection.md`](../shape/projection.md)（PROJ-004：三层结构） |
+| PROJ-005 | [`shape/projection.md`](../shape/projection.md)（PROJ-005：ProjectionIntent） |
+| PROJ-006 | [`shape/projection.md`](../shape/projection.md)（PROJ-006：合并与冲突） |
+| PROJ-007 | 本文件 |
+| PROJ-008 | [`how/projection.md`](../how/projection.md#proj-008迁移顺序) |

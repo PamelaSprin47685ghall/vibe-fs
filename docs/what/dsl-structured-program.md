@@ -55,3 +55,21 @@ F# 调用栈就是流程栈。禁止把「程序下一步去哪」编码为可�
 - 物理 Task / Dictionary / TaskCompletionSource / CancellationTokenRegistration / 锁对象。
 
 禁止用 `mutable` 表达业务阶段、`slotArmed`、行为 bool 等控制流状态。
+
+## 相关条款定义位置
+
+以下条款按 GOV-011 定义于 shape，本表仅为导航，不重复定义。
+
+| 条款 | 定义位置 |
+|---|---|
+| DSL-001 | 本文件 |
+| DSL-002 | 本文件 |
+| DSL-003 | 本文件 |
+| DSL-004 | 本文件 |
+| DSL-005 | 本文件 |
+| DSL-006 | 本文件 |
+| DSL-007 | 本文件 |
+| DSL-008 | [`shape/dsl-structured-program.md`](../shape/dsl-structured-program.md)（DSL-008：分层所有权） |
+| DSL-009 | [`shape/dsl-structured-program.md`](../shape/dsl-structured-program.md)（DSL-009：模块与职责） |
+| DSL-010 | [`shape/dsl-structured-program.md`](../shape/dsl-structured-program.md)（DSL-010：Host 边界白名单） |
+| DSL-011 | [`shape/dsl-structured-program.md`](../shape/dsl-structured-program.md)（DSL-011：测试可见面） |
