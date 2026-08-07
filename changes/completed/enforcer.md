@@ -798,18 +798,20 @@ resources/prompts/blogger-system.md
 **Validation**:
 - `npm run lint` — pass (exit 0)
 - `npm run build` — pass (exit 0; required for unit tests via dist)
-- `node --test tests/unit/enforcer/*.test.mjs` — 143/143 pass (exit 0), including PartOrdinal-first multi-call tip, RecentTips cap 8, physical HasFlight busy, throttle/nudge tombstones, catalog 120 rules, and `bounds.test.mjs` 4 pass locking the §13.2 size/count fail-closed bounds (`MaxMergedToolCalls=32` / text 512KiB / evidence 128KiB).
+- `node --test tests/unit/enforcer/*.test.mjs` — 146/146 pass (exit 0) including PartOrdinal-first multi-call tip, RecentTips cap 8, physical HasFlight busy, throttle/nudge tombstones, catalog 120 rules, `bounds.test.mjs` 4 pass locking the §13.2 size/count fail-closed bounds (`MaxMergedToolCalls=32` / text 512KiB / evidence 128KiB), plus `identity-fail-closed.test.mjs` (3 cases) locking ENFORCER-043 duplicate/empty-id fail-closed and ENFORCER-042 multi-call commit path.
 
 **Commits**:
 - `dec23fcb` — docs close `how` / `shape` / `proof` (Gap A PartOrdinal-first, Gap B physical ownership axes, §13 proof inventory).
 - `fa9c8f07` — `CHANGELOG.md` Unreleased entry documenting the Enforcer rebase docs close.
 - `646140ac` — `bounds.test.mjs` permanent regression + `docs/proof/enforcer.md` §13.2 bounds rows + CHANGELOG/lifecycle test-count sync to 143/143.
+- (this commit) — `identity-fail-closed.test.mjs` permanent regressions (ENFORCER-043 duplicate/empty-id fail-closed, ENFORCER-042 multi-call commit) + `Diagnostic.fs` whitelist `call_count` (ENFORCER-042 protocol-violation emit) + `docs/proof/enforcer.md` §13.2 identity/multi-call rows + ctx014 positive case. Test count 146/146.
 
 **Tests**:
 - lint — pass
 - build — pass
-- enforcer unit suite — 143/143 pass
+- enforcer unit suite — 146/146 pass
 - bounds — 4/4 pass
+- identity-fail-closed — 3/3 pass (ENFORCER-043 ×2 fail-closed, ENFORCER-042 multi-call commit)
 
 **Limitations**:
 - Full monorepo integration/e2e suites were not re-run under this Change (out of scope for documentation rebase).
