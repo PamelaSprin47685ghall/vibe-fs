@@ -1,18 +1,12 @@
 # Enforcer — 目标实现
 
-## 需求意图与范围（A2 需求意图）
+## Implements
 
-### 1. 问题陈述
-在 Companion / Blogger 运行过程中，模型必须在其单轮响应中精准调用 `blog` 工具并提交符合规范的 `tip` 标签与工作记录。如果模型忘记调用工具（NoToolCall）、提供了非法 tip（InvalidTip）或输出了空文本（EmptyText），系统必须能够捕获该异常，发起有界的补救提醒（InteractionNudge / InteractionRepair），并在补救失败后干净切入 Fallback 控制器，防止破坏 Blogger 主会话的物理 Transcript。
+行为合同见 `what/enforcer.md`；本文件只描述规则装载、canonical call 选择和补救算法。
 
-### 2. 输入输出与规则边界
-- **输入**：Provider Run 物理响应、`blog` 工具调用参数、`resources/enforcer/catalog.json` 静态规则表。
-- **输出**：`BlogEntryCommitted` 事实、`InteractionNudge` Continuation Prompt、基于物理 attempt 证据的恢复决策。
-- **核心边界与不变量**：
-  1. 规则载体（ENFORCER-001/030）：规则是静态数据（`catalog.json`），禁止代码内定义 Fallback Catalog 或硬编码 F# 评分算法。
-  2. 多调用防御性归并（ENFORCER-025）：同 Run 多个 `blog` 调用按 Rule 优先级与 PartOrdinal 确定性归并为唯一 Canonical Call。
-  3. 有界 Nudge（ENFORCER-067）：每个逻辑请求最多产生 1 次有身份的 Nudge；相同 terminal run 重入幂等等待，新的 terminal run 仍无效才切入 FallbackController。不保存 Nudge 计数器。
-  4. 规则表决策（ENFORCER-068）：`Evidence → Decision` 完全由有限表决定，绝对禁止根据 Provider 错误散文文字分叉或保存程序阶段。
+## Ownership
+
+规则、协调器和 host 侧效边界见 `shape/enforcer.md`。
 
 ---
 

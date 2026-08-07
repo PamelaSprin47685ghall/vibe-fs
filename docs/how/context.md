@@ -1,17 +1,12 @@
 # 上下文恢复 — 目标实现
 
-## 需求意图与范围（A2 需求意图）
+## Implements
 
-### 1. 问题陈述
-在长对话或多轮工具调用中，模型上下文窗口可能发生溢出。传统方案依赖 Token 估算与预测式压缩，但估算值极易受模型/分词器影响漂移，且在失败前压缩会提前毁坏 KV-Cache 前缀稳定性。上下文恢复模块必须在绝对禁止 Token 估算（CTX-001）与绝对禁止失败前压缩（CTX-002）的硬性约束下，完全由真实 Physical Attempt 失败驱动恢复，通过 Attempt-local Prefix Probe 与 Y-Squash 重新定位有效的 Prefix Epoch。
+行为合同见 `what/context.md`；本文件只描述 probe、squash、delta 与恢复槽算法。
 
-### 2. 输入输出与规则边界
-- **输入**：Reconciler 确认的真实物理失败（Outcome = Failed）、待探针测量的 X 前缀候选、Blogger 未压缩 Blog 帧。
-- **输出**：`PrefixRebaseCommitted` / `BlogSquashCommitted` 事实，以及彼此独立的 `ActivePrefixEpoch` / `FrameEpoch` 投影。
-- **核心边界与不变量**：
-  1. 失败驱动（CTX-001/002）：恢复动作的前提是一次真实物理失败；绝对禁止在失败前主动压缩或估算 Token 窗口。
-  2. 尝试局域化（CTX-010）：X Probe 候选仅写入 Attempt-local 的 `ProjectionChoice`；Probe 成功才提交写盘，Probe 失败丢弃候选且**绝对不写恢复/回滚事实**。
-  3. 失败不分类（CTX-005）：不按 Provider 错误散文文字分叉，统一视作 Outcome = Failed 驱动。
+## Ownership
+
+恢复数据和端口边界见 `shape/context.md`。
 
 ---
 

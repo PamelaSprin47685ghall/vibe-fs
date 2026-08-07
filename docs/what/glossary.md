@@ -89,16 +89,16 @@
 
 | 术语 | 指向 |
 |------|------|
-| Large Gate | EXEC-013：SemaphoreSlim(1,1) |
+| Large Gate | EXEC-013 的大输出并发门 |
 | LegacyFalseAbort | EXEC-021 / EXEC-022：历史 status/finality=aborted blob；永不 agent RunCompletion |
-| MaxJoinBatch | EXEC-018：单次 join 最多返回 32 个完成项 |
+| MaxJoinBatch | EXEC-018 定义的单次 join 批次上限 |
 | LifecycleWorkRecord | COMPANION-003：跨 Session 工作记录；raw tool 禁止；`includeOpening` 父→子 true、子→父 false |
 | Logical Run | PROMPT-002：一个 Authority Root 引发的完整对话序列 |
 | LoopDetector | LOOP-005：滑动 4-gram + 慢指数核 + 代码先验，O(1)/字符 |
 | LoopKillArmed | LOOP-006：进程内局部强杀标记，崩溃丢失 |
 | LoopSensor | LOOP-002：边沿传感器，只读文本增量，不进业务层 |
-| LOOP_HHI | LOOP-004：1/140；与 LOOP_EFFECTIVE_COUNT=140 等价（N_eff 中点，统一按过滤空白后的代码） |
-| LOOP_EFFECTIVE_COUNT | LOOP-004：N_eff 触发阈值 140 = (256+24)/2 |
+| LOOP_HHI | LOOP-004 定义的 HHI 检测阈值 |
+| LOOP_EFFECTIVE_COUNT | LOOP-004 定义的等效 4-gram 数阈值 |
 | N_eff | LOOP-003：inverse Simpson 等效 4-gram 数（物理量；阈值在此空间取中点） |
 
 ## M
@@ -107,7 +107,7 @@
 |------|------|
 | ManagedSessionKind | HOST-008：WorkSession / CompanionSession |
 | Manager Guard | REVIEW-007：Manager terminal 时必须检查 witness |
-| Managed Agent | AGENT-002：当前 catalog 中的 fast-ROLE 或 deep-ROLE |
+| Managed Agent | AGENT-002 定义的受管 Agent 身份 |
 | manual compaction | HOST-006：官方支持的用户动作，效果 best effort |
 
 ## P

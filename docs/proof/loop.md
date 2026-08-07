@@ -5,8 +5,8 @@
 第 1 层（纯函数）：
 
 ```text
-新建检测器：state=NORMAL，N_eff≈256，HHI≈1/256
-过滤后不足 4 有效字符：保持 NORMAL 先验
+新建检测器：匹配 LOOP-004 的 NORMAL 先验
+过滤后不足 LOOP-004 所定 n-gram 大小：保持 NORMAL 先验
 纯被忽略字符流（空白 / `-`）：不推进 step，保持 NORMAL 先验
 单字符长循环：最终 LOOP
 高多样性文本：保持 NORMAL
@@ -33,25 +33,5 @@ armed 后 recordConfirmedFailure 前进 cursor 一次；同 ProviderRun 去重
 | 强杀后 Fallback 推进 | 与 `tests/unit/fallback/*`、host-turn reconcile 路径交叉 |
 | 门禁纪律 | VERIFY-004（`docs/proof/verify.md`） |
 
-新增阈值或忽略字符集必须改 LOOP-004 定义 + 上表 unit，禁止只改代码。
-
----
-
-## 设计摘要
-
-```text
-流式字符
-  → 丢弃 ' ' / '\t' / '\r' / '\n' / '-'
-  → 重叠 4-gram
-  → 慢衰减 3 指数核（半衰期 8/64/512）+ 正常代码先验（N_eff=256）
-  → N_eff ≤ 140（HHI ≥ 1/140）
-     // (N_good + N_bad) / 2 = (256 + 24) / 2
-  → AbortSession + LoopKillArmed
-  → Reconciler 产出 TurnAborted
-  → TurnCompletionProgram 命中 LoopKillArmed 后桥接到 provider failure 路径
-  → FallbackController 推进 AABB
-  → ProviderRetryAttempt:
-       "Continue from the interruption without repeating already produced content."
-```
-
-传感器在边沿，恢复在 AABB，预算在 Fallback，压缩在 CTX。四者边界不得粘连。
+新增阈值或忽略字符集必须改 LOOP-004 定义及对应 unit，禁止只改代码。
+算法与边界只见 `how/loop.md` 和 `shape/loop.md`。

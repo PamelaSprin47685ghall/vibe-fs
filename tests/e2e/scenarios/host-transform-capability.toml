@@ -1,4 +1,4 @@
-# host-transform-capability — STRENGTH-078 C-01..C-10 / ENFORCER-180 step 0.
+# host-transform-capability — ENFORCER-180 step 0.
 #
 # The Blogger chain is the real production carrier for the Host capability
 # proof: the blog tool returns "OK" without suspending (step 0.1), the Host's
@@ -11,10 +11,10 @@
 # The temporal assertions live in the driver: the second Blogger request must
 # happen AFTER the second main turn (a failed park would send it immediately,
 # consuming step 1 early), and a parallel coder session must complete while the
-# Blogger transform is parked (STRENGTH-078 C-04, ENFORCER-161).
+# Blogger transform is parked (ENFORCER-161).
 
 scenario = "host-transform-capability"
-description = "STRENGTH-078 C-01..C-10 / ENFORCER-180 step 0: blog OK, continuation transform, park/resume, cross-session isolation"
+description = "ENFORCER-180 step 0: blog OK, continuation transform, park/resume, cross-session isolation"
 session = { agent = "fast-coder", bind = ["coder-title", "fast-coder"] }
 prompt = { agent = "fast-coder", text = "First coder turn." }
 must = ["coder.0", "inspector.0", "blogger.0", "coder2.0", "coder3.0", "coder-title", "inspector-title"]

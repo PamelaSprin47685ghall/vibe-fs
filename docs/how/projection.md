@@ -1,17 +1,12 @@
 # Projection — 目标实现
 
-## 需求意图与范围（A2 需求意图）
+## Implements
 
-### 1. 问题陈述
-在多 Agent 对话、上下文恢复（X Trace / Prefix Probe）、Blogger delta 插入与 skeptical challenge 等复杂场景下，如果允许各个功能模块直接操作或就地（in-place）修改 `Message List`，会导致前缀缓存断裂、Canonical Digest 误算以及 Review Seal 失效。Projection 模块旨在引入纯代数投影体系（Projection Algebra），将功能逻辑与消息渲染彻底解耦：功能模块仅声明强类型的 `ProjectionIntent` 意图，由纯函数 Planner 完成冲突判定与排序，最后由 Canonical Renderer 统一输出双型投影结果。
+行为合同见 `what/projection.md`；本文件只描述 snapshot、planner、intent 排序和 renderer 算法。
 
-### 2. 输入输出与规则边界
-- **输入**：Effectful Coordinator 提供的只读 `ProjectionSnapshot`（完整 Host snapshot）。
-- **输出**：`ProviderSemanticProjection`（去 ID，语义相等，Canonical Digest 唯一来源）与 `ProviderWireProjection`（含 ID，字节相等，用于 Seal 与前缀缓存）。
-- **核心边界与不变量**：
-  1. 禁令（PROJ-001/007）：功能模块禁止直接接收、改写或追加 Message 列表；Renderer 不包含任何生命周期驱动逻辑。
-  2. 冲突判定 Fail-Closed：互斥 Intent 组合（如 `keepPhysicalPrefix` × `activatePrefixEpoch`）必须返回 `ProjectionConflict` 并触发 Fail-Closed reconcile，严禁凭注册顺序隐式选边。
-  3. 双型严格隔离（VERIFY-007）：Semantic 投影与 Wire 投影属于不同类型，禁止隐式互转或用 Wire 投影反向解析为 Semantic Digest。
+## Ownership
+
+Coordinator、Planner 与 Renderer 边界见 `shape/projection.md`。
 
 ---
 

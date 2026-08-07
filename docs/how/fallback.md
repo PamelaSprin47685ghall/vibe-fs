@@ -1,17 +1,12 @@
 # Fallback — 目标实现
 
-## 需求意图与范围（A2 需求意图）
+## Implements
 
-### 1. 问题陈述
-在 LLM 对话中，当 SelectedAgent 遇到模型偶发故障、超时或输出退化时，系统需要在**不重新选举 Authority** 的前提下，自动在 SelectedAgent 与 PeerAgent 之间按 Modulo-4 Cursor 顺序轮换重试（AABB 策略），同时在达到指定连续失败上限后安全熔断（`FallbackExhausted`），防止无限消耗 Token 与预算。Fallback 模块必须保证该轮换过程具备严格的强类型防错、单一写入口与 Fail-Closed 恢复能力。
+行为合同见 `what/fallback.md`；本文件只描述 fold、attempt 协调和恢复算法。
 
-### 2. 输入输出与规则边界
-- **输入**：Reconciler 交付的 provider `TurnOutcome`、`HostSignal` 唤醒信号与物理尝试身份 `FallbackAttemptIdentity`。只有已确认 `Failed` 推进 cursor；`Completed` 清零连续失败数；`Aborted` 仅在 LOOP-006 命中 `LoopKillArmed` 后走等价失败路径。
-- **输出**：`FallbackCursorAdvanced` 与 `FallbackExhausted` 领域事实、`RecoveryVerdict`（`MayContinue` | `Exhausted`）。
-- **核心边界与不变量**：
-  1. 单一写入口：`FallbackController` 为提交 cursor 变更事实的唯一写入口（FALLBACK-003）。
-  2. Modulo-4 强类型 DU：`FallbackOffset` 只能为 `Fork0 | Fork1 | Fork2 | Fork3`；反序列化非法字节返回 typed decode error，Journal 加载拒绝该损坏 envelope，严禁抛出异常或伪装成 Append `CommitUnknown`。
-  3. `armedByFailure` 内存隔离：`armed` 标志必须仅在紧邻物理 attempt 失败时为 `true`，崩溃后归零，严禁仅凭奇数 Offset 自动触发 squash（FALLBACK-012）。
+## Ownership
+
+cursor、writer 和端口边界见 `shape/fallback.md`。
 
 ---
 
@@ -71,16 +66,18 @@ if ConsecutiveFailureCount >= AutoRecoveryBudget
 ## FALLBACK-006：序列示例
 
 ```text
-SelectedAgent=fast-coder, PeerAgent=deep-coder, AutoRecoveryBudget=12
+SelectedAgent=fast-coder, PeerAgent=deep-coder, AutoRecoveryBudget=B
 
 attempt 1  Offset 0 → fast-coder 失败 → Offset 1, count 1
 attempt 2  Offset 1 → fast-coder 失败 → Offset 2, count 2
 attempt 3  Offset 2 → deep-coder 失败 → Offset 3, count 3
 attempt 4  Offset 3 → deep-coder 失败 → Offset 0, count 4
 ...
-attempt 12 Offset 3 → deep-coder 失败 → Offset 0, count 12 → FallbackExhausted
-→ 无自动 attempt 13
+attempt B 失败 → count B → FallbackExhausted
+→ 无自动 attempt B+1
 ```
+
+`B` 的默认值和配置合同由 FALLBACK-005 唯一定义。
 
 成功中断：
 
