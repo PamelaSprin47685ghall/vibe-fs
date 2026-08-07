@@ -282,9 +282,8 @@ test('GLORY_052_finality_rejection_renders_the_record_as_data', async () => {
   const record = '# Work log\n- defect A at src/a.ts\n- missing test for B'
   const rendered = finalityPrompt.rejected(record)
   assert.ok(rendered.startsWith('# Your ending has not accepted you.'), rendered)
-  assert.ok(rendered.includes('unfinished_work_record'), rendered)
-  // The record bytes survive verbatim inside the synthetic TOML.
-  assert.ok(rendered.includes(record), rendered)
+  assert.ok(!rendered.includes('unfinished_work_record'), rendered)
+  assert.ok(rendered.includes('# - defect A at src/a.ts'), rendered)
 })
 
 test('SURFACE_005_manager_surface_has_no_forbidden_words', async () => {

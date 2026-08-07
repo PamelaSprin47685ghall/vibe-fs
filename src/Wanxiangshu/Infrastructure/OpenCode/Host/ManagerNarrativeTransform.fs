@@ -132,8 +132,12 @@ module ManagerNarrativeTransform =
                     message.Parts
                     |> List.exists (function
                         | WireToolCall(_callId, name, _args) -> name = "suicide"
-                        | WireToolResult(_callId, result) -> result.Contains("Your final words have been received")
-                        | WireText text -> text.Contains("Your final words have been received")
+                        | WireToolResult(_callId, result) ->
+                            result.Contains("Your final words have been received")
+                            || result.Contains("Your ending has not accepted you")
+                        | WireText text ->
+                            text.Contains("Your final words have been received")
+                            || text.Contains("Your ending has not accepted you")
                         | _ -> false)
                 | None -> false)
 

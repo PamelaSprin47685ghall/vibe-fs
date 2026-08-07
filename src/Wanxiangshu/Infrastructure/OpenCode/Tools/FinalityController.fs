@@ -17,10 +17,15 @@ open Wanxiangshu.Session
 /// (parent = the Manager session, but never registered into the Manager's own
 /// fork surface), so `list`/`join` never see it (GLORY-002). The workflow
 /// writes `FinalityReviewStarted`, runs the shared `HostReviewProgram`, then
-/// lands one of: `FinalityRejected` + work-record continuation (GLORY-052/053),
+/// lands one of: `FinalityRejected` + work-record tool result (GLORY-052/053),
 /// `FinalityConfirmed` + `LifeCompleted` + last_words terminal (GLORY-060/061),
-/// or `FinalityUndecided` + undecidable continuation (GLORY-057).
+/// or `FinalityUndecided` + undecidable tool result (GLORY-057).
 module FinalityController =
+
+    type FinalityOutcome =
+        | Confirmed of message: string
+        | Rejected of prompt: string
+        | Undecided of prompt: string
 
     let private appendLifecycle (journal: AgentJournal) (fact: ManagerLifecycleFact) =
         let sessionId =
@@ -69,22 +74,6 @@ module FinalityController =
         scope.Sessions.AbortSession reviewerSessionId |> ignore
         scope.SessionParents.Remove(SessionId.value reviewerSessionId) |> ignore
 
-    let private sendContinuation
-        (scope: ToolRuntimeScope)
-        (managerSessionId: SessionId)
-        (prompt: string)
-        (kind: PromptAuthority.ContinuationKind)
-        =
-        HostSessionNudge.sendContinuationResult
-            scope.Sessions
-            managerSessionId
-            prompt
-            kind
-            (scope.DirectoryFor(SessionId.value managerSessionId))
-            scope.Journal
-            PromptDispatcher.AwaitMode.Detached
-            None
-
     /// The Glory path (GLORY-059/060/061): revalidate the tree, confirm, complete
     /// the Life with last_words as the user-visible terminal, finish the Manager.
     let private concludeGlory
@@ -98,7 +87,7 @@ module FinalityController =
         (lastWordsRef: BlobRef)
         (lastWordsDigest: BlobDigest)
         (providerRun: ProviderRunIdentity)
-        =
+        : Task<FinalityOutcome> =
         task {
             if not (treeUnchanged scope managerSessionId requestTree) then
                 // GLORY-059: the tree moved under the confirmed witness; this
@@ -117,17 +106,13 @@ module FinalityController =
                                GitTreeHash = requestTree |})
                 | None -> ()
 
-                let! _ =
-                    sendContinuation
-                        scope
-                        managerSessionId
-                        ManagerLifecyclePrompt.FinalityUndecidable
-                        PromptAuthority.ContinuationKind.FinalityRejected
-
                 abortReviewer scope reviewerSessionId
+                return Undecided ManagerLifecyclePrompt.FinalityUndecidable
             else
                 match scope.Journal with
-                | None -> abortReviewer scope reviewerSessionId
+                | None ->
+                    abortReviewer scope reviewerSessionId
+                    return Undecided ManagerLifecyclePrompt.FinalityUndecidable
                 | Some journal ->
                     // GLORY-062/067 idempotence: the XTrace terminal is a single
                     // per-session slot (GLORY-067 compatibility layer), and
@@ -210,10 +195,11 @@ module FinalityController =
                         | None -> ()
 
                     abortReviewer scope reviewerSessionId
+                    return Confirmed "Your final words have been received."
         }
 
     /// The wound path (GLORY-051/052/053): the reviewer's canonical LWR becomes
-    /// the FinalityRejected continuation body; the same Life continues.
+    /// the FinalityRejected suicide tool result; the same Life continues.
     let private concludeRejection
         (scope: ToolRuntimeScope)
         (managerSessionId: SessionId)
@@ -223,13 +209,17 @@ module FinalityController =
         (barrierId: ReviewBarrierId)
         (requestTree: GitTreeHash)
         (workRecord: string)
-        =
+        : Task<FinalityOutcome> =
         task {
             match scope.Journal with
-            | None -> abortReviewer scope reviewerSessionId
+            | None ->
+                abortReviewer scope reviewerSessionId
+                return Undecided ManagerLifecyclePrompt.FinalityUndecidable
             | Some journal ->
                 match journal.WriteBlob workRecord with
-                | Error _ -> abortReviewer scope reviewerSessionId
+                | Error _ ->
+                    abortReviewer scope reviewerSessionId
+                    return Undecided ManagerLifecyclePrompt.FinalityUndecidable
                 | Ok blob ->
                     appendLifecycle
                         journal
@@ -243,16 +233,8 @@ module FinalityController =
                                WorkRecordRef = blob.BlobRef
                                WorkRecordDigest = blob.BlobDigest |})
 
-                    // GLORY-052: feedback via SyntheticToml; the record is
-                    // opaque evidence, never cleaned (GLORY-048).
-                    let! _ =
-                        sendContinuation
-                            scope
-                            managerSessionId
-                            (FinalityPrompt.rejected workRecord)
-                            PromptAuthority.ContinuationKind.FinalityRejected
-
                     abortReviewer scope reviewerSessionId
+                    return Rejected(FinalityPrompt.rejected workRecord)
         }
 
     /// GLORY-057: infrastructure failure — no verdict, no wound record.
@@ -264,7 +246,7 @@ module FinalityController =
         (reviewerSessionId: SessionId)
         (barrierId: ReviewBarrierId)
         (requestTree: GitTreeHash)
-        =
+        : Task<FinalityOutcome> =
         task {
             match scope.Journal with
             | None -> ()
@@ -279,14 +261,8 @@ module FinalityController =
                            BarrierId = barrierId
                            GitTreeHash = requestTree |})
 
-            let! _ =
-                sendContinuation
-                    scope
-                    managerSessionId
-                    ManagerLifecyclePrompt.FinalityUndecidable
-                    PromptAuthority.ContinuationKind.FinalityRejected
-
             abortReviewer scope reviewerSessionId
+            return Undecided ManagerLifecyclePrompt.FinalityUndecidable
         }
 
     /// GLORY-040 step 6: start the Finality workflow after a legal suicide was
@@ -300,10 +276,10 @@ module FinalityController =
         (lastWordsRef: BlobRef)
         (lastWordsDigest: BlobDigest)
         (providerRun: ProviderRunIdentity)
-        : Task =
+        : Task<FinalityOutcome> =
         task {
             match scope.Journal with
-            | None -> ()
+            | None -> return Undecided ManagerLifecyclePrompt.FinalityUndecidable
             | Some journal ->
                 try
                     // GLORY-002: a private runtime; the reviewer never enters the
@@ -360,14 +336,7 @@ module FinalityController =
                                    BarrierId = closureBarrier
                                    GitTreeHash = requestTree |})
 
-                        let! _ =
-                            sendContinuation
-                                scope
-                                managerSessionId
-                                ManagerLifecyclePrompt.FinalityUndecidable
-                                PromptAuthority.ContinuationKind.FinalityRejected
-
-                        ()
+                        return Undecided ManagerLifecyclePrompt.FinalityUndecidable
                     | Ok _, Some reviewerSessionId ->
                         // GLORY-040: the barrier opens only now — the reviewer
                         // session exists (REVIEW-008).
@@ -464,16 +433,10 @@ module FinalityController =
                                         barrierId
                                         requestTree
                             | None ->
-                                let! _ =
-                                    sendContinuation
-                                        scope
-                                        managerSessionId
-                                        ManagerLifecyclePrompt.FinalityUndecidable
-                                        PromptAuthority.ContinuationKind.FinalityRejected
-
-                                ()
+                                return Undecided ManagerLifecyclePrompt.FinalityUndecidable
                 with ex ->
                     // Exception boundary: never leak an exception out of
                     // the tool call that accepted the suicide.
                     Diagnostic.emit "finality" [ "session_id", SessionId.value managerSessionId; "error", ex.Message ]
+                    return Undecided ManagerLifecyclePrompt.FinalityUndecidable
         }

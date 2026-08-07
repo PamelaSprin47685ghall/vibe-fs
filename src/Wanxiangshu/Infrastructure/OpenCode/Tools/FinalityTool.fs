@@ -186,7 +186,7 @@ module FinalityTool =
                                         // fold keeps the request open until the
                                         // restart lands a terminal fact.
                                         if request.ReviewerSessionId.IsNone then
-                                            do!
+                                            let! outcome =
                                                 FinalityController.start
                                                     scope
                                                     sid
@@ -197,9 +197,16 @@ module FinalityTool =
                                                     request.LastWordsDigest
                                                     request.ProviderRun
 
-                                        return
-                                            ToolHostCodec.tomlObject
-                                                [ "error", tString "Your ending is already in motion." ]
+                                            match outcome with
+                                            | FinalityController.FinalityOutcome.Rejected prompt
+                                            | FinalityController.FinalityOutcome.Undecided prompt ->
+                                                return prompt
+                                            | FinalityController.FinalityOutcome.Confirmed msg ->
+                                                return ToolHostCodec.tomlObjectWithInstructions [ msg ] []
+                                        else
+                                            return
+                                                ToolHostCodec.tomlObject
+                                                    [ "error", tString "Your ending is already in motion." ]
                                 | other ->
                                     if String.IsNullOrWhiteSpace lastWords then
                                         return ToolHostCodec.tomlObject [ "error", tString "Final words are required." ]
@@ -261,7 +268,7 @@ module FinalityTool =
                                                     ))
                                                 |> ignore
 
-                                                do!
+                                                let! outcome =
                                                     FinalityController.start
                                                         scope
                                                         sid
@@ -272,12 +279,12 @@ module FinalityTool =
                                                         blob.BlobDigest
                                                         context.ProviderRunId.Value
 
-                                                // GLORY-041: the Manager sees only the
-                                                // narrative; the physical run stops here.
-                                                return
-                                                    ToolHostCodec.tomlObjectWithInstructions
-                                                        [ "Your final words have been received." ]
-                                                        []
+                                                match outcome with
+                                                | FinalityController.FinalityOutcome.Rejected prompt
+                                                | FinalityController.FinalityOutcome.Undecided prompt ->
+                                                    return prompt
+                                                | FinalityController.FinalityOutcome.Confirmed msg ->
+                                                    return ToolHostCodec.tomlObjectWithInstructions [ msg ] []
                             }
 
                         match effectiveLife with

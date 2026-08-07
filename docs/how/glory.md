@@ -30,8 +30,8 @@
 2. `ToolRegistry.rolePredicate` 加 `"suicide" -> fun r -> r = Role.Manager`；`baseSpecs` 加 `FinalityTool.spec factory runtime`。
 3. `FinalityTool.execute`（GLORY-034/035/037-041）：
    - 前置条件 1-16 按序检查，失败返回 GLORY-038/039 或对应拒绝文本（禁止泄漏内部细节）；
-   - 合法受理：`gitTreePort.GetTreeHash()` → journal `WriteBlob last_words` → append `FinalityRequested` → `scope.MarkVerdictSubmitted`-式停靠（deferred completion 由 TurnCompletionProgram 的 FinalityRequested gate 保证）→ 启动 `HostReviewProgram` 流程（同步等待 Reviewer 返回）；
-   - tool result：`# Your final words have been received.`（golden fixture 6）。
+   - 合法受理：`gitTreePort.GetTreeHash()` → journal `WriteBlob last_words` → append `FinalityRequested` → 启动 `HostReviewProgram` 流程（同步等待 Reviewer 返回）；
+   - tool result：被拒时直接返回 `FinalityPrompt.rejected` 格式的拒绝 prompt（全注释块，不含 TOML 数据块）；成功时返回 `# Your final words have been received.`（golden fixture 6）。
 4. `ForkTool.executeManager`：解析 `agent` 为 `Role.Reviewer` 时（读 durable/canonical role，GLORY-031）返回 `That path is not yours to command. Continue your own work, or call suicide when nothing useful remains.`；`ToolRuntimeScope.RuntimeFor` 创建 `HostForkRuntime` 时 `managerOpensReviewBarrier` 置 false（GLORY-033），`HostForkAgent.fork` 的 `ManagerOpensReviewBarrier && role = Role.Reviewer` 分支随之成为死代码，删除。
 5. 自动 Reviewer 隐藏：HostReviewProgram 使用独立 `HostForkRuntime`（同 OrchestratorHost 模式，不注册进 Manager 的 `Children`），其 completion 不进 Manager `join`/`list`（GLORY-002）。
 
@@ -57,7 +57,7 @@ let reverify
 
 ## Slice E：失败反馈
 
-1. `FinalityRejected` 流程（受理后由 HostReviewProgram 驱动）：`RevisionRequired` → LWR 读取 → journal `WriteBlob` → append `FinalityRejected` → 发送 `FinalityRejected` continuation（`FinalityPrompt.rejected`，SyntheticToml.document 渲染，GLORY-052/053）→ 标记旧 request 关闭（投影从 `ActiveFinality` 移除）→ 清理 Reviewer session（`scope.DisposeSession`）。
+1. `FinalityRejected` 流程（受理后由 HostReviewProgram 驱动）：`RevisionRequired` → LWR 读取 → journal `WriteBlob` → append `FinalityRejected` → 直接将 `FinalityPrompt.rejected` 渲染的拒绝 prompt（纯注释块，不含 TOML 数据块）作为 `suicide` 工具的返回值（GLORY-052/053，无需额外发送 continuation 消息）→ 标记旧 request 关闭（投影从 `ActiveFinality` 移除）→ 清理 Reviewer session（`scope.DisposeSession`）。
 2. dedupe：continuation claim scope 由 `PromptAuthority.claimScopeDigest` 天然覆盖（GLORY-053）。
 3. 基础设施失败（GLORY-056/057）：按序尝试恢复；无法恢复时发送 `ManagerLifecyclePrompt.FinalityUndecidable` 并关闭 request，不伪造 work record。
 

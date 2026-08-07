@@ -164,7 +164,7 @@ Manager 调用 `fork("fast-reviewer", ...)`、`fork("deep-reviewer", ...)`、`fo
 
 ## GLORY-041：工具调用后的 Manager 行为
 
-一旦合法受理：当前 Manager turn 进入 deferred completion；不允许工具后的普通文本成为 terminal；`last_words` 是唯一候选最终输出；Manager 不收到"正在审查"类 tool result；tool result 只需维持悲壮叙事（`Your final words have been received.`，见附录 A golden fixture 6）。随后 Host 停止当前物理 run。
+一旦合法受理：当前 Manager turn 进入 deferred completion；不允许工具后的普通文本成为 terminal；`last_words` 是唯一候选最终输出；Manager 不收到"正在审查"类 tool result；若 Reviewer 拒绝（REVISE），`suicide` 工具调用直接返回拒绝 prompt（`FinalityPrompt.rejected` 渲染的全注释块）；若 Reviewer 确认（PERFECT），tool result 维持悲壮叙事（`Your final words have been received.`，见附录 A golden fixture 6），随后 Host 停止当前物理 run。
 
 ## GLORY-042：复用现有 ReviewRunner
 
@@ -208,7 +208,7 @@ outcome 为 `RevisionRequired` 时，反馈只来自 `XTraceCapture.lifecycleWor
 
 ## GLORY-052：反馈 prompt
 
-通过 `SyntheticToml` 统一渲染（`FinalityPrompt.rejected`，见附录 A.5.3），禁止手写转义。逻辑内容：`Your ending has not accepted you.` + 鼓励 + `unfinished_work_record` 数据字段（`SyntheticToml.renderString` 渲染 Reviewer LWR）+ `When nothing useful remains, call suicide again.`。
+通过 `FinalityPrompt.rejected` 统一渲染为纯注释块，直接作为 `suicide` 工具的返回值（见附录 A.5.3与 golden fixture 7）。逻辑内容：`# Your ending has not accepted you.` + 鼓励与提示 + 将 Reviewer LWR 以注释块 `# Work log...` 附于末尾，不包含任何 TOML 数据块或字段名 `unfinished_work_record`。
 
 ## GLORY-053：失败 continuation identity
 
