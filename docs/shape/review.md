@@ -39,3 +39,8 @@ Guard **不**替 Manager 选 coder/reviewer，**不**读 todo。只问：当前 
 禁止退回 same-root 或 physical-message 猜测。
 
 Seal 类型与绑定流程见 `how/review.md`。
+
+## REVIEW-012：Reviewer 提示词资源权威来源
+
+Reviewer 角色的系统提示词由 `resources/prompts/reviewer-system.md` 静态资源权威承载，在 Session 加载时作为 Reviewer 系统的 System Prompt，负责向模型灌输 REVIEW-011 的 8 大代码质量支柱、工具规范与双 PERFECT 流程。
+

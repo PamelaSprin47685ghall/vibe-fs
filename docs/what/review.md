@@ -50,3 +50,19 @@ Post-rebase 必须全新双 PERFECT（即使 tree hash 碰巧相同）。
 ## REVIEW-009：Orchestrator 复审
 
 Rebase 后旧 witness 无效，必须重新获得双 PERFECT，再允许 ff publish。
+
+## REVIEW-011：8 大代码质量支柱与评估报告
+
+Reviewer 在给出 `verdict` 前，必须在其 formal text report 中根据 8 大代码质量支柱进行评估：
+
+1. **Language & Algorithmic Mastery**（语言与算法）
+2. **Radical Simplicity**（极致简洁）
+3. **Structural Elegance**（结构优雅）
+4. **Bounded Granularity**（有界粒度）
+5. **Imperative Test Coverage**（必要测试覆盖）
+6. **Flawless Logic & Best Practices**（无瑕逻辑与最佳实践）
+7. **Caller Ergonomics**（调用方与用户体验）
+8. **Uncompromised Completeness**（完整性）
+
+发现任何质量维度不达标或缺陷时必须提出 `verdict("REVISE")` ；仅当 8 维全部无瑕且需求完全满足时方可调用 `verdict("PERFECT")`。
+
