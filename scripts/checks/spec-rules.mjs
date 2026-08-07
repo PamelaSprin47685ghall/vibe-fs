@@ -35,19 +35,37 @@ export const clauseDefinitionHeadings = (text) => {
   return findings
 }
 
-/** Return references that make implementation/proof files depend on a Proposal. */
-export const proposalDependencyReferences = (text, candidateIds) => {
-  const candidates = new Set(candidateIds)
+/** Return formal Clause headings while allowing non-product Change IDs such as CHG-NNN. */
+export const formalClauseDefinitionHeadings = (text, prefixes) => {
+  const known = new Set(prefixes)
+  return clauseDefinitionHeadings(text).filter(({ id }) => known.has(id.split('-')[0]))
+}
+
+/** Return references to the retired workflow directories under docs. */
+export const legacyWorkflowPathReferences = (text) => {
   const findings = []
 
   text.split('\n').forEach((content, index) => {
     const line = index + 1
-    for (const match of content.matchAll(CLAUSE_LIKE_RE)) {
-      if (candidates.has(match[1])) findings.push({ token: match[1], line })
-    }
-    if (/(?:^|[^A-Za-z])docs\/proposal\//.test(content)) {
+    if (/(?:^|[^A-Za-z])docs\/proposal(?:\/|\b)/.test(content))
       findings.push({ token: 'docs/proposal/', line })
-    }
+    if (/(?:^|[^A-Za-z])docs\/status(?:\/|\b)/.test(content))
+      findings.push({ token: 'docs/status/', line })
+  })
+
+  return findings
+}
+
+/** Return forbidden implementation/spec dependencies on lifecycle history. */
+export const changeDependencyReferences = (text) => {
+  const findings = []
+
+  text.split('\n').forEach((content, index) => {
+    const line = index + 1
+    if (/(?:^|[^A-Za-z])changes\/proposed(?:\/|\b)/.test(content))
+      findings.push({ token: 'changes/proposed/', line })
+    if (/(?:^|[^A-Za-z])changes\/completed\/[^`)\n>]+\.md(?:\b|#)/.test(content))
+      findings.push({ token: 'changes/completed/<file>.md', line })
   })
 
   return findings
@@ -112,8 +130,8 @@ export const clauseReferences = (text, prefixes) => {
   return findings
 }
 
-/** Compare README links for one fluid directory with its exact Markdown file set. */
-export const fluidNavigationProblems = (navigation, directory, files) => {
+/** Compare README links for one directory with its exact Markdown file set. */
+export const navigationProblems = (navigation, directory, files) => {
   const expected = new Set(files)
   const linked = new Map()
   const escapedDirectory = directory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -132,7 +150,3 @@ export const fluidNavigationProblems = (navigation, directory, files) => {
       .sort((a, b) => a.file.localeCompare(b.file)),
   }
 }
-
-/** Backward-compatible specialization used by callers and pure tests. */
-export const statusNavigationProblems = (navigation, statusFiles) =>
-  fluidNavigationProblems(navigation, 'status', statusFiles)

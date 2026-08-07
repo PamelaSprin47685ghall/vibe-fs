@@ -1,6 +1,6 @@
 # Glory：目标实现与算法（how 层）
 
-条款正文见 `docs/what/glory.md`；本文件描述实现切片的算法与触发点。实现差距跟踪见 `docs/status/glory.md`。
+条款正文见 `docs/what/glory.md`；本文件描述实现切片的算法与触发点。
 
 ## 事实与投影
 
@@ -87,7 +87,7 @@ let reverify
 | LifeOpened 缺 → provider request 前 | 无害；下个 transform 重开 | ✅ transform 幂等 |
 | LifeOpened 有 → 无 WorkActivated | 幂等改写 + Activation 逻辑继续 | ✅ transform + TurnCompletionProgram |
 | FinalityRequested 无 FinalityReviewStarted | FinalityTool「in motion」分支重启同一 request 的 FinalityController | ✅ |
-| REVISE 已存在但无 FinalityRejected | materialize 同一 Reviewer LWR | 🔶 未实现（reviewer 结果在内存，崩溃后需重跑 review；缺口见 status/glory.md） |
+| REVISE 已存在但无 FinalityRejected | 从 durable evidence 重建同一 Reviewer LWR；证据不足时 fail closed，不以当前快照改写目标算法 | 目标算法 |
 | confirmed witness 存在但无 FinalityConfirmed/LifeCompleted | concludeGlory 幂等（Life 已完成/terminal 已记录则跳过） | ✅ |
 | LifeCompleted 存在但 terminal 未发布 | concludeGlory 幂等重放 | ✅ |
 | XTrace terminal 单槽冲突（第二 Life） | 首个 Life 后跳过 TerminalOutputCaptured（terminal 只记录于 LifeCompleted） | ✅ |

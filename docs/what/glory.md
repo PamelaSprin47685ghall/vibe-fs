@@ -318,4 +318,4 @@ provider-facing 用户消息为 `You awaken once more in the distant future.\n\n
 
 # 冻结文本与黄金字节
 
-附录 A 的冻结文本（含两个 system prompt 全文、Birth/Reawakening/Activation/idle/rejection/undecidable、Reviewer opening/challenge、suicide/verdict 工具 schema 与 tool results、golden byte fixtures 1-8）由 `docs/status/glory.md` 保留下述 owner 引用，权威字节分别落在 `resources/prompts/*.md` 与 `src/Wanxiangshu/Domain/` 各 owner 模块。实现与测试以 owner 模块和资源文件为唯一字节来源。
+附录 A 的冻结文本（含两个 system prompt 全文、Birth/Reawakening/Activation/idle/rejection/undecidable、Reviewer opening/challenge、suicide/verdict 工具 schema 与 tool results、golden byte fixtures 1-8）的权威字节分别落在 `resources/prompts/*.md` 与 `src/Wanxiangshu/Domain/` 各 owner 模块。实现与测试以这些 owner 模块和资源文件为唯一字节来源。

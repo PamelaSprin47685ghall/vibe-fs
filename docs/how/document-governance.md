@@ -13,71 +13,78 @@
 
 ## Ownership
 
-写入口与层边界见 `shape/document-governance.md`。本文件只规定执行顺序；不定义产品行为。
+目录与 writer 边界见 `shape/document-governance.md`。本文件只规定 Agent 的执行顺序。
 
-## 阅读与修改顺序
+## 普通实现任务
 
 ```text
-what → shape → how → status → code/resources → proof
+确认用户是否指定 Active Change
+→ what
+→ shape
+→ how
+→ 相关 Active 的工作来源、Remaining work、Completion criteria
+→ code/resources
+→ proof
 ```
 
-先从 `docs/README.md` 找到主题，再读取相关正式层与活跃差距。`why` 用于理解理由；
-只有评审候选变化时才读取 `proposal`。禁止从 Proposal 或单独从 what 直接修改实现面。
+没有相关 Active 时按正式 docs 直接完成普通小修改；不得为每项任务自动创建 Change。
+Active 只限制批准范围和关闭条件，不替代正式规范。
 
-## 行为变更程序
+## 启动 Proposed Change
 
-1. 在 `proposal/` 写候选 Delta，并填写基线、影响图、兼容性、证明计划、Decision Owner 和准入阻塞。
-2. 按 GOV-007 检查当前正式层是否可接纳；未解决的正式语义冲突由 Decision Owner 裁决。
-3. 接受时，在同一变更内把知识分发到适当正式层：长期理由进 why，行为进 what，所有权进 shape，算法进 how，证明义务进 proof。
-4. 若实现尚未对齐，把剩余物理差距转换为最小 status 条目；不得复制 Proposal 正文或已完成历史。
-5. 读取相关实现，按 `what → shape → how` 修改 code/resources。
-6. 执行 proof；完全对齐后删除对应 status。
+用户明确要求实施 `changes/proposed/<file>.md` 时：
 
-拒绝时，仅把有长期价值的理由写入 why。未经用户同意，不删除仍未实现的 Proposal。
+1. 读取用户指定的文件，不扫描其它 Proposed，不重新裁决。
+2. 将同一文件移动到 `changes/active/`。
+3. 将移动时已有正文整体视为 Original proposal 并冻结，不修改其字节或实质内容。
+4. 只在文件末尾追加 `Active work`，记录 Specification impact、有限 Remaining work、
+   Completion criteria 和当前客观 Blockers。
+5. 按批准范围更新正式 why/what/shape/how/proof，再修改实现。
+6. 不创建独立 Status、Decision 或 Outcome 文件。
 
-## Proposal 最小结构
+Proposal 中缺少 Accepted、Decision Owner 或 Admission 信息不构成 blocker；进入 Proposed 已证明批准。
 
-- Current baseline
-- Proposed delta
-- Impact map
-- Alternatives
-- Migration / cutover
-- Compatibility disposition
-- Proof plan
-- Decision owner
-- Admission blockers
+## Active 实施
 
-Proposal 只描述相对当前正式规范的 Delta。正式条款只用 Clause ID 和链接引用，不复制正文；
-研究笔记、聊天导出、实现进度和完整基线不进入 Proposal。
+实施期间只在以下时点更新 Active：启动、用户明确修改批准范围、出现 blocker、关闭。
+不记录每日进展、每个 commit、完成百分比或大段代码快照。
 
-## Status 最小结构
+用户明确修改批准范围时，只追加 Amendment：日期、Requested by、Change、Reason。Agent 不自行批准修订，
+也不回写 Original proposal。
 
-- Target clauses
-- Active physical gap
-- Evidence / blocker
+发现不可实施条件时，按 GOV-009 更新 Blockers 并报告用户；其它不受影响的工作可以继续。
 
-Status 不定义 Clause、不提出新设计、不保留完成项、日期快照、提交列表或完成百分比。
+## 关闭 Change
 
-## Clause 搬移
+关闭前确认：
 
-1. 保留原 ID 和语义。
-2. 在最适合回答核心问题的正式层建立唯一标题。
-3. 删除旧定义，将引用改到新位置。
-4. 同步 `scripts/checks/spec.mjs` 的前缀归属和 `docs/README.md` 导航。
-5. 运行规范门禁，确认无重复、悬空或越权定义。
+1. 批准范围已实现；
+2. 正式 docs 内部一致；
+3. 实现与 how 对齐，旧路径/旧行为按批准范围清除；
+4. proof、测试和门禁通过；
+5. 没有未解决 blocker。
 
-## 失败处理
+然后在同一文件追加 Final outcome：Outcome、Final specification、Implementation result、Verification、
+References。清理无长期价值的临时实施笔记后，把同一文件移动到 `changes/completed/`。
+Original proposal 和用户批准的 Amendments 不得删除、压缩或美化。
 
-发现正式语义冲突时停止产品语义修改。记录冲突位置、影响范围、可选裁决和 Decision Owner；
-不得为了让门禁变绿而选边。可独立确定的导航、重复副本和快照污染仍可继续修复。
+## 旧 Status 迁移
+
+- 有真实未完成工作：转为 Active，保留有效问题背景和关闭条件。
+- 没有独立 Proposal：写明 Work origin，不伪造 Original proposal。
+- 已完成且证据充分：保留背景，追加 Final outcome 后移入 Completed。
+- 完成状态无法确定：移入 Active，在报告中列出确认需求，不猜测 Completed。
+- 与同一 Proposal 属于同一工作：合并为一个文件；Original proposal 保持原文，Status 只转成 Active work。
+
+## Clause 与路径维护
+
+正式 Clause 搬移时保留 ID，删除旧定义并更新引用、前缀 owner 和 `docs/README.md`。
+Change 文件只引用正式 Clause；`CHG-NNN` 不进入产品前缀表。
+
+原 docs 下的 Proposal 与 Status 路径不得出现在当前导航、实现或检查配置中。
+迁入 Changes 的冻结历史原文可以保留旧措辞；其生命周期含义以目录和 `changes/README.md` 为准。
 
 ## Verification
 
-先运行 `node scripts/checks/spec.mjs`，再运行 `npm run lint`。新增门禁时必须：
-
-1. 提交永久的纯规则回归；
-2. 临时引入目标反例并确认仓库门禁判红；
-3. 恢复反例；
-4. 重新运行正式检查。
-
-影响更大时按 `proof/verify.md` 追加相应验证。
+先运行 `node scripts/checks/spec.mjs`，再运行 `npm run lint`。新增门禁必须有永久回归，并用受控反例
+证明仓库入口会判红；恢复反例后重新执行正式检查。

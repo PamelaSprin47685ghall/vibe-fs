@@ -126,7 +126,8 @@ Executor、Blogger 等由编排路径调用，不作为单独“安装角色”�
 ```text
 src/         生产源码
 resources/   随包运行时资源
-docs/        分域规范 why/what/shape/how/proof + status/proposal
+docs/        当前有效的分域规范 why/what/shape/how/proof
+changes/     已批准变更的 proposed/active/completed 生命周期记录
 tests/       unit / integration / e2e
 scripts/     构建与少量仓库检查
 dist/        最终编译输出，不提交
@@ -134,7 +135,7 @@ artifacts/   中间产物与本地发布产物，不提交
 ```
 
 - 生产 F# 唯一根：`src/Wanxiangshu/`
-- 规范导航 [docs/README.md](docs/README.md)；词汇表 `docs/what/glossary.md`；未裁决设计在 `docs/proposal/`；实现差距在 `docs/status/`
+- 规范导航 [docs/README.md](docs/README.md)；词汇表 `docs/what/glossary.md`；变更工作流见 [changes/README.md](changes/README.md)
 - 测试：`tests/unit/`、`tests/integration/`（resources / journal / plugin / package / harness）、`tests/e2e/`（`scenarios/` + `cases/`）
 - 脚本：`scripts/build.mjs`、`scripts/check.mjs`、`scripts/checks/*`、`scripts/lib/walk.mjs`
 
@@ -188,8 +189,9 @@ npm run check:release
 
 - **行为 / 边界 / 目标实现 / 证明**：`docs/what` · `docs/shape` · `docs/how` · `docs/proof`（条款 ID 稳定寻址）。
 - **理由**：`docs/why/`（含 Kolmogorov 工程纪律）。
-- **未裁决候选**：`docs/proposal/`（如 strength、student-teacher）— 非当前规范。
-- **实现差距**：`docs/status/`（对齐后删除）。
+- **变更记录**：`changes/proposed/` 保存用户管理、已批准且等待启动的工作；
+  `changes/active/` 保存已启动但未闭环的工作；`changes/completed/` 保存完成历史。
+- `changes/` 不定义当前产品语义；Active Change 也不能代替正式文档。
 - 测试直接引用条款 ID。规范不跟踪实现进度。
 
 导航：[docs/README.md](docs/README.md)。治理：[docs/what/document-governance.md](docs/what/document-governance.md) · [docs/how/document-governance.md](docs/how/document-governance.md)。
