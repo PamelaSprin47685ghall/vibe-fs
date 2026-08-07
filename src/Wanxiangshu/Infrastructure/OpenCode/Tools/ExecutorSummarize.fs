@@ -101,12 +101,7 @@ module ExecutorSummarize =
 
         runExecutorPrompt runtime forkedIds rootDigest 0 index index prompt (Some content)
 
-    let reduceBatch
-        (runtime: IExecutorRuntime)
-        (forkedIds: ResizeArray<string>)
-        (level: int)
-        (batch: string list)
-        =
+    let reduceBatch (runtime: IExecutorRuntime) (forkedIds: ResizeArray<string>) (level: int) (batch: string list) =
         let combined = String.concat "\n" batch
 
         let prompt = reduceBatchPrompt level

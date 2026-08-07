@@ -17,8 +17,7 @@ module ExecutorSummarizeRuntime =
         /// Agent join: require fresh permit → HostForkRuntime.JoinWithPermit. No bare Join.
         abstract JoinWithPermit: timeoutMs: int option -> Task<Result<RunCompletion, ForkError>>
         /// Targeted agent await: fresh permit → HostForkRuntime.AwaitAgentWithPermit.
-        abstract AwaitAgentWithPermit:
-            agentId: string * timeoutMs: int option -> Task<Result<RunCompletion, ForkError>>
+        abstract AwaitAgentWithPermit: agentId: string * timeoutMs: int option -> Task<Result<RunCompletion, ForkError>>
         /// Cancel one owned map/reduce agent without tearing down the runtime.
         abstract CancelAgent: agentId: string -> unit
 
