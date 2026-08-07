@@ -152,7 +152,7 @@ Manager 调用 `fork("fast-reviewer", ...)`、`fork("deep-reviewer", ...)`、`fo
 
 ## GLORY-038：尚有后台工作
 
-前置条件 11-13 失败时 Provider-facing 返回 `Your work still walks the world.\nGather what remains before seeking your end.`。不写 `FinalityRequested`。
+前置条件 11-13 失败时 Provider-facing 返回 `Your work still walks the world.\nCall join to gather what remains before seeking your end.`。不写 `FinalityRequested`。
 
 ## GLORY-039：Activation 前调用
 

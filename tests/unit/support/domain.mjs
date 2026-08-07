@@ -1900,15 +1900,68 @@ export const xPrefix = (() => {
 
 /** PROJ-005: a `ProjectionIntent`, built by case name. */
 export const projectionIntent = (() => {
-  const build = unionCase(ProjectionAlgebraModule.ProjectionIntent, 'ProjectionIntent')
+  // Resolved at call time so a missing step-3a case fails the test that needs it,
+  // not the whole facade import for stage 1–2 tests.
+  const build = (caseName, fields = []) =>
+    unionCase(ProjectionAlgebraModule.ProjectionIntent, 'ProjectionIntent')(caseName, fields)
 
   return {
-    keepPhysicalPrefix: build('KeepPhysicalPrefix', []),
+    get keepPhysicalPrefix() {
+      return build('KeepPhysicalPrefix', [])
+    },
     activatePrefixEpoch: (activation) => build('ActivatePrefixEpoch', [activation]),
+    /**
+     * PROJ-008 step 3: Y frames from Snapshot.BlogFrames + Companion rebuild payload.
+     * Defaults keep step-3a algebra smokes working (empty session/tips/delta → frames only
+     * or empty no-op when Snapshot.BlogFrames is empty).
+     */
+    insertBlogFrames: (
+      intent = {
+        RequestKind: 'normal',
+        SquashFrameCount: 0,
+        BloggerSessionId: 'ses_blogger',
+        FrameEpoch: 0,
+        PhysicalDelta: undefined,
+        PreviousTips: [],
+      },
+    ) => {
+      const payload = {
+        RequestKind: intent.RequestKind ?? 'normal',
+        SquashFrameCount: intent.SquashFrameCount ?? 0,
+        BloggerSessionId: intent.BloggerSessionId ?? 'ses_blogger',
+        FrameEpoch: intent.FrameEpoch ?? 0,
+        PhysicalDelta:
+          intent.PhysicalDelta === undefined || intent.PhysicalDelta === null
+            ? undefined
+            : Array.isArray(intent.PhysicalDelta)
+              ? intent.PhysicalDelta
+              : [intent.PhysicalDelta.messageId ?? intent.PhysicalDelta[0], intent.PhysicalDelta.toml ?? intent.PhysicalDelta[1]],
+        PreviousTips: toList(
+          (intent.PreviousTips ?? []).map((t) =>
+            Array.isArray(t) ? t : [t.field ?? t[0], t.cycleId ?? t[1]],
+          ),
+        ),
+      }
+      return build('InsertBlogFrames', [payload])
+    },
+    /** PROJ-008 step 4: InteractionRepair instruction. */
+    insertRepair: (intent) => build('InsertRepair', [intent]),
+    /** COMPANION-012: drop message ids listed in Snapshot.TransportMessages. */
+    get suppressTransportOnly() {
+      return build('SuppressTransportOnly', [])
+    },
+    /** PROJ-008 step 5: REVIEW-003 skeptical challenge. */
+    appendReviewChallenge: (intent = { TextVersion: 1 }) => build('AppendReviewChallenge', [intent]),
+    /** PROJ-008 step 5 / HOST-013: pair-programming thought markers. */
+    insertPairProgrammingThought: (intent = { SessionId: undefined }) =>
+      build('InsertPairProgrammingThought', [intent]),
+    /** PROJ-008 step 6: Host compaction reanchor (renderer no-op on wire bytes). */
+    get reanchorAfterCompaction() {
+      return build('ReanchorAfterCompaction', [])
+    },
     nameOf: (intent) => caseOf(intent),
   }
 })()
-
 /**
  * PROJ-004/006: the pure planner and canonical renderer of the projection DSL.
  *
@@ -1918,7 +1971,30 @@ export const projectionIntent = (() => {
  */
 export const projectionAlgebra = (() => {
   const planner = bind(ProjectionAlgebraModule, 'ProjectionPlanner', ['plan'])
+  // Stage 1–2 members only at load: step-3a APIs resolve lazily so a missing
+  // production export fails the step-3a tests rather than the whole facade import.
   const renderer = bind(ProjectionAlgebraModule, 'ProjectionRenderer', ['renderPrefix', 'renderMessages', 'cutoffDigest'])
+
+  const wireViewOf = (messages) =>
+    listItems(messages).map((message) => ({
+      role: message.Role,
+      parts: listItems(message.Parts).map((part) => {
+        const kind = caseOf(part)
+        const payload = payloadOf(part)
+        if (kind === 'WireText' || kind === 'WireReasoning') {
+          return { kind, text: payload }
+        }
+        if (kind === 'WireToolResult') {
+          const [callId, result] = Array.isArray(payload) ? payload : [undefined, payload]
+          return { kind, callId, text: result }
+        }
+        if (kind === 'WireToolCall') {
+          const [callId, name, args] = Array.isArray(payload) ? payload : [undefined, undefined, payload]
+          return { kind, callId, name, text: args }
+        }
+        return { kind, payload }
+      }),
+    }))
 
   const renderOf = (rendered) => {
     const name = caseOf(rendered)
@@ -1935,14 +2011,21 @@ export const projectionAlgebra = (() => {
         return { ok: true, intents: listItems(result.value).map((intent) => caseOf(intent)) }
       }
 
-      const [first, second] = payloadOf(result.error)
+      const error = result.error
+      const conflict = caseOf(error)
+      const payload = payloadOf(error)
 
-      return {
-        ok: false,
-        conflict: caseOf(result.error),
-        first: caseOf(first),
-        second: caseOf(second),
+      // Prefix conflicts carry two intents; other conflicts may be unit-like.
+      if (Array.isArray(payload) && payload.length === 2 && payload[0]?.cases) {
+        return {
+          ok: false,
+          conflict,
+          first: caseOf(payload[0]),
+          second: caseOf(payload[1]),
+        }
       }
+
+      return { ok: false, conflict }
     },
 
     renderPrefix: (intents) => renderOf(renderer.renderPrefix(toList(intents))),
@@ -1959,14 +2042,16 @@ export const projectionAlgebra = (() => {
     })(),
 
     /** wire view: digest-ready description of the rendered bytes. */
-    renderMessages: (messages, rendered) =>
-      listItems(renderer.renderMessages(messages, rendered)).map((message) => ({
-        role: message.Role,
-        parts: listItems(message.Parts).map((part) => ({
-          kind: caseOf(part),
-          text: payloadOf(part),
-        })),
-      })),
+    renderMessages: (messages, rendered) => wireViewOf(renderer.renderMessages(messages, rendered)),
+
+    /**
+     * PROJ-008 step 3a: fold ordered intents over base wire messages against a
+     * ProjectionSnapshot. Lazy: missing production export fails only callers.
+     */
+    renderMessagesWithIntents: (snapshot, baseWireMessages, orderedIntents) => {
+      const render = member(ProjectionAlgebraModule, 'ProjectionRenderer', 'renderMessagesWithIntents')
+      return wireViewOf(render(snapshot, toList(baseWireMessages), toList(orderedIntents)))
+    },
 
     renderedOf: renderOf,
 
@@ -1978,7 +2063,49 @@ export const projectionAlgebra = (() => {
   }
 })()
 
-/** CTX-010: the two prefix choices, built by case name. */
+/**
+ * PROJ-002 step 3a snapshot fields (consumer-driven): BlogFrames,
+ * TransportMessages, HostReanchor. Stage-1 fields remain CurrentProjection /
+ * CommittedPrefix. Domain mirrors frame kinds as ProjectionBlogFrameKind
+ * (not Journal.BlogFrameKind) without Journal dependency.
+ *
+ * Kind resolution is lazy: missing Domain cases fail step-3a tests only.
+ */
+export const projectionSnapshot = {
+  /** Domain ResolvedBlogFrame (digest as hex string). */
+  blogFrame: ({ kind = 'Entry', digest = 'frame-digest', body = 'frame body' } = {}) => {
+    const kindUnion =
+      ProjectionAlgebraModule.ProjectionBlogFrameKind ??
+      ProjectionAlgebraModule.BlogFrameKind ??
+      ProjectionAlgebraModule.ResolvedBlogFrameKind
+    if (kindUnion === undefined) {
+      throw new Error(
+        'ProjectionAlgebra exports neither ProjectionBlogFrameKind nor BlogFrameKind (PROJ-008 step 3a)',
+      )
+    }
+    const resolvedKind =
+      typeof kind === 'string' ? unionCase(kindUnion, 'ProjectionBlogFrameKind')(kind, []) : kind
+    return { Kind: resolvedKind, Digest: digest, Body: body }
+  },
+  hostReanchor: ({ previous = 'epoch-0', next = 'epoch-1', run = 'compact-1' } = {}) => ({
+    PreviousEpochId: previous,
+    NextEpochId: next,
+    ObservedCompactionRunId: run,
+  }),
+  of: ({
+    currentProjection,
+    committedPrefix = undefined,
+    blogFrames = [],
+    transportMessages = [],
+    hostReanchor = undefined,
+  }) => ({
+    CurrentProjection: currentProjection,
+    CommittedPrefix: committedPrefix,
+    BlogFrames: toList(blogFrames),
+    TransportMessages: stringSet(transportMessages),
+    HostReanchor: hostReanchor,
+  }),
+}/** CTX-010: the two prefix choices, built by case name. */
 export const projectionChoice = (() => {
   const build = unionCase(PrefixCandidateModule.XProjectionChoice, 'XProjectionChoice')
 

@@ -164,7 +164,10 @@ module XWire =
                                     // decision (requiredBlob / forChoice).
                                     let snapshot =
                                         { CurrentProjection = current
-                                          CommittedPrefix = prefix.Snapshot }
+                                          CommittedPrefix = prefix.Snapshot
+                                          BlogFrames = []
+                                          TransportMessages = Set.empty
+                                          HostReanchor = None }
 
                                     let mayRecover =
                                         RecoverySlot.mayRecover

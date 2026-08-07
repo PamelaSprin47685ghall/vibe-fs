@@ -39,12 +39,17 @@ module FinalityTool =
 
     /// GLORY-037.11-13: any outstanding child work blocks the ending.
     let private outstandingWork (scope: ToolRuntimeScope) (context: HostToolContext) =
-        match scope.RuntimeFor context with
-        | Ok runtime ->
-            runtime.PendingRunCount > 0
-            || runtime.PendingCompletionCount > 0
-            || scope.HasLivePty context.SessionId
-        | Error _ -> scope.HasLivePty context.SessionId
+        let sid = SessionId.create context.SessionId
+
+        let durableOutstanding =
+            TerminalPolicy.outstandingBackground scope.Journal scope.HasLivePty (Some Role.Manager) sid
+
+        let runtimeOutstanding =
+            match scope.RuntimeFor context with
+            | Ok runtime -> runtime.PendingRunCount > 0
+            | Error _ -> false
+
+        durableOutstanding || runtimeOutstanding
 
     /// GLORY-068/069: an AgentOwnerRoot Manager (an Orchestrator's ManagerJob)
     /// has no HumanRoot and therefore no Life. Its ending still goes through
@@ -214,7 +219,7 @@ module FinalityTool =
                                             ToolHostCodec.tomlObject
                                                 [ "error",
                                                   tString
-                                                      "Your work still walks the world.\nGather what remains before seeking your end." ]
+                                                      "Your work still walks the world.\nCall join to gather what remains before seeking your end." ]
                                     else
                                         // GLORY-037.14/15: the tree must be readable.
                                         match treeOf scope sessionId with

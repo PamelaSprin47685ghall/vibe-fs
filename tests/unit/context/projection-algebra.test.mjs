@@ -1,18 +1,22 @@
 // tests/unit/context/projection-algebra.test.mjs — PROJ-004, PROJ-005, PROJ-006.
 //
-// The projection DSL's stage-1 closed loop (PROJ-008 migration order step 1: plain X
-// + ActivePrefixEpoch projection): the intent DU, the pure planner's fail-closed
-// conflict rules, the canonical renderer, and the byte-equality of the write-back
-// path with the wire view a digest is computed from.
+// Stage 1–2 closed loop (PROJ-008 steps 1–2: plain X + ActivePrefixEpoch +
+// attempt-local PrefixProbe) plus step 3a Domain skeleton proofs for the six
+// remaining intents: plan/order/conflict algebra and minimal render shapes.
+// Production wiring (CompanionTransform / SpikePlugin) is out of scope here.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  companionProjection as companionProj,
+  companionPrompt as companionPrompt,
   listItems,
   prefixEpochProjection as prefix,
   projectionAlgebra,
   projectionIntent,
+  projectionSnapshot,
   providerProjection,
+  reviewChallenge,
   toList,
   xPrefix,
 } from '../support/domain.mjs'
@@ -288,5 +292,461 @@ test('PROJ_002_the_committed_prefix_in_the_snapshot_drives_the_prefix_decision',
   // None = send raw history, byte-identical to the KeepPhysicalPrefix intent.
   const raw = xPrefix.forSnapshot(stage2Snapshot([]).CommittedPrefix, 'unused')
   assert.equal(raw.replacesPrefix, false)
+})
+
+// ── PROJ-008 step 3a: six intents — plan, order, conflict, render ──────────
+//
+// Domain skeleton only. Snapshot gains BlogFrames / TransportMessages /
+// HostReanchor (consumer-driven). Planner is groupBy → reduce → sortBy rank;
+// Renderer folds ordered intents over base wire messages.
+
+const REPAIR_INSTRUCTION =
+  '# Protocol repair\n\nCall the blog tool exactly once with non-empty text. Do not answer in prose.'
+
+const PAIR_THOUGHT_TEXT = '让我遵循结对编程的理念，用中文进行对话式思考。'
+
+const wireOf = (raw) => providerProjection.decodeMessageView(toList(raw)).Messages
+
+const stage3Snapshot = (raw, extras = {}) =>
+  projectionSnapshot.of({
+    currentProjection: semanticView(raw),
+    committedPrefix: extras.committed,
+    blogFrames: extras.blogFrames ?? [],
+    transportMessages: extras.transportMessages ?? [],
+    hostReanchor: extras.hostReanchor,
+  })
+
+const planNames = (intents) => {
+  const result = projectionAlgebra.plan(intents)
+  assert.equal(result.ok, true, `expected Ok plan, got ${JSON.stringify(result)}`)
+  return result.intents
+}
+
+// ── single-intent smoke (plan Ok + render shape) ───────────────────────────
+
+test('PROJ_008_step3a_InsertBlogFrames_smoke_inserts_assistant_frame_bodies', () => {
+  const frames = [
+    projectionSnapshot.blogFrame({ kind: 'Entry', digest: 'd0', body: 'frame-0' }),
+    projectionSnapshot.blogFrame({ kind: 'Squash', digest: 'd1', body: 'frame-1' }),
+  ]
+  const raw = [{ info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'delta' }] }]
+  const snapshot = stage3Snapshot(raw, { blogFrames: frames })
+  const intent = projectionIntent.insertBlogFrames({ RequestKind: 'normal' })
+
+  assert.deepEqual(planNames([intent]), ['InsertBlogFrames'])
+
+  const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
+  // Step 3b: frames use CompanionPrompt.workingRecord ([[do_not_exec]] historic_frame).
+  assert.equal(view.length >= 2, true, 'frames prepend or insert before delta')
+  const assistantBodies = view.filter((m) => m.role === 'assistant').map((m) => m.parts[0]?.text)
+  assert.equal(
+    assistantBodies.some((t) => t === companionPrompt.workingRecord('frame-0')),
+    true,
+  )
+  assert.equal(
+    assistantBodies.some((t) => t === companionPrompt.workingRecord('frame-1')),
+    true,
+  )
+})
+
+test('PROJ_008_step3a_InsertRepair_smoke_appends_user_repair_instruction', () => {
+  const raw = [{ info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'hello' }] }]
+  const snapshot = stage3Snapshot(raw)
+  const intent = projectionIntent.insertRepair({ RequestKey: 'repair-key-1' })
+
+  assert.deepEqual(planNames([intent]), ['InsertRepair'])
+
+  const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
+  const last = view[view.length - 1]
+  assert.equal(last.role, 'user')
+  assert.equal(last.parts[0]?.text, REPAIR_INSTRUCTION)
+})
+
+test('PROJ_008_step3a_SuppressTransportOnly_smoke_drops_transport_message_ids', () => {
+  const raw = [
+    { info: { id: 'keep-1', role: 'user' }, parts: [{ type: 'text', text: 'keep' }] },
+    { info: { id: 'drop-me', role: 'assistant' }, parts: [{ type: 'text', text: 'transport' }] },
+    { info: { id: 'keep-2', role: 'user' }, parts: [{ type: 'text', text: 'also keep' }] },
+  ]
+  // WireMessage has no id — Suppress removes by parallel identity carried in
+  // Snapshot.TransportMessages; step 3a encodes that as: messages whose
+  // original host id is in the set are absent from the rendered view. The
+  // Domain renderer must accept base wire + snapshot ids (see facade contract).
+  // Minimal permanent proof: after suppress, transport body text is gone and
+  // non-transport texts remain.
+  const snapshot = stage3Snapshot(raw, { transportMessages: ['drop-me'] })
+  const intent = projectionIntent.suppressTransportOnly
+
+  assert.deepEqual(planNames([intent]), ['SuppressTransportOnly'])
+
+  // When Domain cannot see host ids on WireMessage, step 3a may require the
+  // base list to already be index-aligned; the permanent contract is: plan Ok
+  // and render does not throw, and if TransportMessages is non-empty the
+  // suppress path is exercised. Full id-aware suppress may use a Domain
+  // side-channel — assert plan + that empty TransportMessages is a no-op first.
+  const emptySnap = stage3Snapshot(raw, { transportMessages: [] })
+  const noOp = projectionAlgebra.renderMessagesWithIntents(emptySnap, wireOf(raw), [intent])
+  assert.deepEqual(
+    noOp.map((m) => m.parts[0]?.text),
+    ['keep', 'transport', 'also keep'],
+  )
+
+  // Non-empty TransportMessages must change the view (permanent fail until green).
+  const suppressed = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
+  assert.notDeepEqual(
+    suppressed.map((m) => m.parts[0]?.text),
+    ['keep', 'transport', 'also keep'],
+    'non-empty TransportMessages must suppress at least one message',
+  )
+})
+
+test('PROJ_008_step3a_AppendReviewChallenge_smoke_appends_challenge_text', () => {
+  const raw = [{ info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] }]
+  const snapshot = stage3Snapshot(raw)
+  const intent = projectionIntent.appendReviewChallenge({ TextVersion: reviewChallenge.textVersion })
+
+  assert.deepEqual(planNames([intent]), ['AppendReviewChallenge'])
+
+  const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
+  const texts = view.flatMap((m) => m.parts.map((p) => p.text)).filter(Boolean)
+  assert.equal(
+    texts.some((t) => t === reviewChallenge.text || t.includes(reviewChallenge.text)),
+    true,
+    'rendered view must carry ReviewChallenge.Text (or Prompt wrapping it)',
+  )
+})
+
+test('PROJ_008_step3a_InsertPairProgrammingThought_smoke_inserts_marker_after_anchors', () => {
+  const raw = [
+    { info: { id: 'u1', role: 'user' }, parts: [{ type: 'text', text: 'ask' }] },
+    { info: { id: 'a1', role: 'assistant' }, parts: [{ type: 'text', text: 'answer' }] },
+  ]
+  const snapshot = stage3Snapshot(raw)
+  const intent = projectionIntent.insertPairProgrammingThought({ SessionId: 'sess-1' })
+
+  assert.deepEqual(planNames([intent]), ['InsertPairProgrammingThought'])
+
+  const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
+  const markers = view.filter(
+    (m) =>
+      m.role === 'assistant' &&
+      m.parts.some((p) => p.text === PAIR_THOUGHT_TEXT || p.kind === 'WireReasoning'),
+  )
+  assert.equal(markers.length >= 1, true, 'at least one pair-programming marker after user anchor')
+  assert.equal(
+    markers.some((m) => m.parts.some((p) => p.text === PAIR_THOUGHT_TEXT)),
+    true,
+  )
+})
+
+test('PROJ_008_step3a_ReanchorAfterCompaction_smoke_is_wire_noop', () => {
+  const raw = [
+    { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'before' }] },
+    { info: { id: 'm2', role: 'assistant' }, parts: [{ type: 'text', text: 'after' }] },
+  ]
+  const snapshot = stage3Snapshot(raw, {
+    hostReanchor: projectionSnapshot.hostReanchor(),
+  })
+  const intent = projectionIntent.reanchorAfterCompaction
+
+  assert.deepEqual(planNames([intent]), ['ReanchorAfterCompaction'])
+
+  const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
+  assert.deepEqual(
+    view.map((m) => m.parts[0]?.text),
+    ['before', 'after'],
+    'reanchor does not rewrite wire bytes',
+  )
+})
+
+// ── prefix mutual exclusion preserved ──────────────────────────────────────
+
+test('PROJ_008_step3a_prefix_mutual_exclusion_still_fails_closed', () => {
+  const either = projectionAlgebra.plan([
+    projectionIntent.keepPhysicalPrefix,
+    projectionIntent.activatePrefixEpoch(activation()),
+  ])
+  assert.equal(either.ok, false)
+  assert.equal(either.conflict, 'ConflictingPrefixSelection')
+})
+
+// ── canonical order: shuffled input → rank order ───────────────────────────
+
+test('PROJ_008_step3a_canonical_order_is_rank_sorted_regardless_of_input_order', () => {
+  // Rank:
+  // 0 Keep/Activate | 1 BlogFrames | 2 Repair | 3 Suppress | 4 Challenge
+  // | 5 PairThought | 6 Reanchor
+  const shuffled = [
+    projectionIntent.reanchorAfterCompaction,
+    projectionIntent.insertPairProgrammingThought({ SessionId: 's' }),
+    projectionIntent.appendReviewChallenge({ TextVersion: 1 }),
+    projectionIntent.suppressTransportOnly,
+    projectionIntent.insertRepair({ RequestKey: 'k' }),
+    projectionIntent.insertBlogFrames({ RequestKind: 'normal' }),
+    projectionIntent.keepPhysicalPrefix,
+  ]
+
+  assert.deepEqual(planNames(shuffled), [
+    'KeepPhysicalPrefix',
+    'InsertBlogFrames',
+    'InsertRepair',
+    'SuppressTransportOnly',
+    'AppendReviewChallenge',
+    'InsertPairProgrammingThought',
+    'ReanchorAfterCompaction',
+  ])
+})
+
+// ── idempotent merges ──────────────────────────────────────────────────────
+
+test('PROJ_008_step3a_duplicate_Suppress_Pair_Reanchor_merge_to_one', () => {
+  assert.deepEqual(
+    planNames([
+      projectionIntent.suppressTransportOnly,
+      projectionIntent.suppressTransportOnly,
+    ]),
+    ['SuppressTransportOnly'],
+  )
+  assert.deepEqual(
+    planNames([
+      projectionIntent.insertPairProgrammingThought({ SessionId: 'a' }),
+      projectionIntent.insertPairProgrammingThought({ SessionId: 'a' }),
+    ]),
+    ['InsertPairProgrammingThought'],
+  )
+  assert.deepEqual(
+    planNames([
+      projectionIntent.reanchorAfterCompaction,
+      projectionIntent.reanchorAfterCompaction,
+    ]),
+    ['ReanchorAfterCompaction'],
+  )
+})
+
+test('PROJ_008_step3a_same_RequestKey_Repair_is_idempotent', () => {
+  assert.deepEqual(
+    planNames([
+      projectionIntent.insertRepair({ RequestKey: 'same' }),
+      projectionIntent.insertRepair({ RequestKey: 'same' }),
+    ]),
+    ['InsertRepair'],
+  )
+})
+
+test('PROJ_008_step3a_same_version_Challenge_is_idempotent', () => {
+  assert.deepEqual(
+    planNames([
+      projectionIntent.appendReviewChallenge({ TextVersion: 1 }),
+      projectionIntent.appendReviewChallenge({ TextVersion: 1 }),
+    ]),
+    ['AppendReviewChallenge'],
+  )
+})
+
+test('PROJ_008_step3a_identical_BlogFrames_intents_merge_to_one', () => {
+  assert.deepEqual(
+    planNames([
+      projectionIntent.insertBlogFrames({ RequestKind: 'normal' }),
+      projectionIntent.insertBlogFrames({ RequestKind: 'normal' }),
+    ]),
+    ['InsertBlogFrames'],
+  )
+})
+
+// ── conflicts ──────────────────────────────────────────────────────────────
+
+test('PROJ_008_step3a_conflicting_BlogFrames_payloads_fail_closed', () => {
+  const result = projectionAlgebra.plan([
+    projectionIntent.insertBlogFrames({ RequestKind: 'normal' }),
+    projectionIntent.insertBlogFrames({ RequestKind: 'squash' }),
+  ])
+  assert.equal(result.ok, false)
+  assert.equal(result.conflict, 'ConflictingBlogFrames')
+})
+
+test('PROJ_008_step3a_conflicting_Repair_keys_fail_closed', () => {
+  const result = projectionAlgebra.plan([
+    projectionIntent.insertRepair({ RequestKey: 'a' }),
+    projectionIntent.insertRepair({ RequestKey: 'b' }),
+  ])
+  assert.equal(result.ok, false)
+  assert.equal(result.conflict, 'ConflictingRepair')
+})
+
+test('PROJ_008_step3a_Activate_plus_Reanchor_is_ConflictingPrefixLifecycle', () => {
+  const result = projectionAlgebra.plan([
+    projectionIntent.activatePrefixEpoch(activation()),
+    projectionIntent.reanchorAfterCompaction,
+  ])
+  assert.equal(result.ok, false)
+  assert.equal(result.conflict, 'ConflictingPrefixLifecycle')
+})
+
+test('PROJ_008_step3a_different_Challenge_versions_conflict', () => {
+  const result = projectionAlgebra.plan([
+    projectionIntent.appendReviewChallenge({ TextVersion: 1 }),
+    projectionIntent.appendReviewChallenge({ TextVersion: 2 }),
+  ])
+  assert.equal(result.ok, false)
+  assert.equal(result.conflict, 'ConflictingReviewChallenge')
+})
+
+// ── permutation independence ───────────────────────────────────────────────
+
+test('PROJ_008_step3a_plan_is_permutation_independent', () => {
+  const a = projectionIntent.insertBlogFrames({ RequestKind: 'normal' })
+  const b = projectionIntent.insertRepair({ RequestKey: 'k' })
+  const c = projectionIntent.suppressTransportOnly
+  const d = projectionIntent.keepPhysicalPrefix
+
+  const orders = [
+    [a, b, c, d],
+    [d, c, b, a],
+    [b, d, a, c],
+    [c, a, d, b],
+  ]
+  const expected = [
+    'KeepPhysicalPrefix',
+    'InsertBlogFrames',
+    'InsertRepair',
+    'SuppressTransportOnly',
+  ]
+
+  for (const order of orders) {
+    assert.deepEqual(planNames(order), expected)
+  }
+})
+
+// ── multi-intent render: Activate then BlogFrames rank order ───────────────
+
+test('PROJ_008_step3a_Activate_then_BlogFrames_render_in_canonical_order', () => {
+  const frames = [projectionSnapshot.blogFrame({ body: 'historic' })]
+  const raw = [
+    { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'first' }] },
+    { info: { id: 'm2', role: 'assistant' }, parts: [{ type: 'text', text: 'second' }] },
+    { info: { id: 'm3', role: 'user' }, parts: [{ type: 'text', text: 'third' }] },
+  ]
+  const snapshot = stage3Snapshot(raw, { blogFrames: frames })
+  // Shuffled: BlogFrames before Activate — plan must still Activate first.
+  const intents = [
+    projectionIntent.insertBlogFrames({ RequestKind: 'normal' }),
+    projectionIntent.activatePrefixEpoch(activation()),
+  ]
+  assert.deepEqual(planNames(intents), ['ActivatePrefixEpoch', 'InsertBlogFrames'])
+
+  const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), intents)
+  // After Activate: synthetic memory head + tail "third"; BlogFrames insert
+  // historic assistant bodies (exact position may be after prefix — assert presence).
+  assert.equal(view[0]?.parts[0]?.text, activation().Memory)
+  assert.equal(
+    view.some((m) => m.role === 'assistant' && (m.parts[0]?.text === 'historic' || m.parts[0]?.text?.includes('historic'))),
+    true,
+  )
+})
+
+// ── KeepPhysicalPrefix + later intents coexist ─────────────────────────────
+
+test('PROJ_008_step3a_Keep_coexists_with_non_prefix_intents', () => {
+  assert.deepEqual(
+    planNames([
+      projectionIntent.insertRepair({ RequestKey: 'k' }),
+      projectionIntent.keepPhysicalPrefix,
+      projectionIntent.reanchorAfterCompaction,
+    ]),
+    ['KeepPhysicalPrefix', 'InsertRepair', 'ReanchorAfterCompaction'],
+  )
+})
+
+// ── empty BlogFrames: InsertBlogFrames is plan-ok, render no-op ────────────
+
+test('PROJ_008_step3a_empty_BlogFrames_is_render_noop', () => {
+  const raw = [{ info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'only' }] }]
+  const snapshot = stage3Snapshot(raw, { blogFrames: [] })
+  const intent = projectionIntent.insertBlogFrames({ RequestKind: 'normal' })
+  const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
+  assert.deepEqual(view.map((m) => m.parts[0]?.text), ['only'])
+})
+
+// ── PROJ-008 step 3b: algebra InsertBlogFrames ≡ CompanionProjectionBuilder ─
+
+test('PROJ_008_step3b_InsertBlogFrames_digest_equiv_to_CompanionProjectionBuilder', () => {
+  const spy = (input) => `«${input}»`
+  const dataToml = '[[new_work_to_record]]\nuser = "work"'
+  const frames = [
+    projectionSnapshot.blogFrame({ kind: 'Entry', digest: 'sha-f0', body: 'frame body 0' }),
+    projectionSnapshot.blogFrame({ kind: 'Entry', digest: 'sha-f1', body: 'frame body 1' }),
+  ]
+  const previousTips = [{ field: 'progress', cycleId: 'cycle-1' }]
+  const delta = { messageId: 'msg_delta', toml: dataToml }
+
+  const intent = projectionIntent.insertBlogFrames({
+    RequestKind: 'normal',
+    SquashFrameCount: 0,
+    BloggerSessionId: 'ses_y',
+    FrameEpoch: 0,
+    PhysicalDelta: delta,
+    PreviousTips: previousTips,
+  })
+  const snapshot = stage3Snapshot([], { blogFrames: frames })
+  assert.deepEqual(planNames([intent]), ['InsertBlogFrames'])
+
+  const algebraView = projectionAlgebra.renderMessagesWithIntents(snapshot, [], [intent])
+  const builderPlan = companionProj.build(spy, {
+    blogger: 'ses_y',
+    epoch: 0,
+    kind: companionProj.normal,
+    frames: frames.map((f) => ({ digest: f.Digest, body: f.Body })),
+    delta,
+    previousTips,
+  })
+
+  assert.deepEqual(
+    algebraView.map((m) => m.role),
+    builderPlan.roles,
+  )
+  assert.deepEqual(
+    algebraView.map((m) => m.parts[0]?.text),
+    builderPlan.texts,
+  )
+})
+
+test('PROJ_008_step3b_InsertBlogFrames_squash_digest_equiv_to_Builder', () => {
+  const spy = (input) => `«${input}»`
+  const frames = [
+    projectionSnapshot.blogFrame({ kind: 'Entry', digest: 'sha-f0', body: 'frame body 0' }),
+    projectionSnapshot.blogFrame({ kind: 'Entry', digest: 'sha-f1', body: 'frame body 1' }),
+    projectionSnapshot.blogFrame({ kind: 'Squash', digest: 'sha-f2', body: 'frame body 2' }),
+  ]
+  const intent = projectionIntent.insertBlogFrames({
+    RequestKind: 'squash',
+    SquashFrameCount: 2,
+    BloggerSessionId: 'ses_y',
+    FrameEpoch: 1,
+    PhysicalDelta: undefined,
+    PreviousTips: [],
+  })
+  const snapshot = stage3Snapshot([], { blogFrames: frames })
+  const algebraView = projectionAlgebra.renderMessagesWithIntents(snapshot, [], [intent])
+  const builderPlan = companionProj.build(spy, {
+    blogger: 'ses_y',
+    epoch: 1,
+    kind: companionProj.squash(2),
+    frames: frames.map((f) => ({ digest: f.Digest, body: f.Body })),
+  })
+
+  assert.deepEqual(
+    algebraView.map((m) => [m.role, m.parts[0]?.text]),
+    builderPlan.messages.map((m) => [m.role, m.text]),
+  )
+  assert.equal(algebraView.at(-1)?.parts[0]?.text, companionPrompt.squashInstruction)
+})
+
+// ── two KeepPhysicalPrefix merge (idempotent), not conflict ────────────────
+
+test('PROJ_008_step3a_two_KeepPhysicalPrefix_merge_idempotently', () => {
+  assert.deepEqual(
+    planNames([projectionIntent.keepPhysicalPrefix, projectionIntent.keepPhysicalPrefix]),
+    ['KeepPhysicalPrefix'],
+  )
 })
 

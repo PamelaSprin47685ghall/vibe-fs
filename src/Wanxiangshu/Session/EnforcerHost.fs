@@ -517,10 +517,11 @@ module EnforcerHost =
 
     /// C6: unique fail-closed loader for effective BlogFrames.
     /// Silent List.choose drop of bad frames is forbidden.
+    /// Kind is preserved so ProjectionSnapshot.BlogFrames can carry ProjectionBlogFrameKind.
     let loadEffectiveFrames
         (journal: AgentJournal)
         (mainSessionId: SessionId)
-        : Result<(BlobDigest * string) list * FrameEpochId, FrameLoadError> =
+        : Result<ResolvedBlogFrame list * FrameEpochId, FrameLoadError> =
         let projections = AgentJournal.snapshot journal
 
         match SessionAssociationProjection.tryBloggerOf mainSessionId projections.AgentProjections.Associations with
@@ -544,11 +545,22 @@ module EnforcerHost =
                                 if HostDigest.sha256Hex text <> BlobDigest.value frame.Digest then
                                     Error(FrameLoadError.DigestMismatch(BlobDigest.value frame.Digest))
                                 else
-                                    load rest ((frame.Digest, text) :: acc)
+                                    let kind =
+                                        match frame.Kind with
+                                        | BlogFrameKind.Entry -> ProjectionBlogFrameKind.Entry
+                                        | BlogFrameKind.Squash -> ProjectionBlogFrameKind.Squash
+
+                                    let resolved: ResolvedBlogFrame =
+                                        { Kind = kind
+                                          Digest = BlobDigest.value frame.Digest
+                                          Body = text }
+
+                                    load rest (resolved :: acc)
 
                     load blog.Frames []
 
-    /// ENFORCER-051: rebuild the full provider view from durable frames + context.
+    /// ENFORCER-051 / PROJ-008 step 3b: rebuild via Projection Algebra.
+    /// Snapshot → InsertBlogFrames → Planner → Builder-shaped Host messages.
     /// Missing association / frame load → None so the caller keeps rawMessages.
     /// Never return an empty list: that blanks the Host transcript (mock lastUser=null).
     let private tryRebuildFromContext
@@ -572,20 +584,16 @@ module EnforcerHost =
             | Error(FrameLoadError.MissingFrameBlob _)
             | Error(FrameLoadError.DigestMismatch _)
             | Error FrameLoadError.EpochMismatch -> None
-            | Ok(frameBodies, frameEpoch) ->
-                let kind =
-                    match ctx with
-                    | BloggerRequestContext.Main _ -> CompanionRequestKind.Normal
-                    | BloggerRequestContext.Squash squash -> CompanionRequestKind.Squash squash.CoveredFrameCount
-
-                let delta =
+            | Ok(resolvedFrames, frameEpoch) ->
+                let requestKind, squashCount, delta =
                     match ctx with
                     | BloggerRequestContext.Main main ->
                         let messageId =
                             CompanionIdentity.newWorkMessageId HostDigest.sha256Hex bloggerSessionId main.DeltaDigest
 
-                        Some(messageId, main.Toml)
-                    | BloggerRequestContext.Squash _ -> None
+                        "normal", 0, Some(messageId, main.Toml)
+                    | BloggerRequestContext.Squash squash ->
+                        "squash", squash.CoveredFrameCount, None
 
                 // ENFORCER-070/071: RecentTips from main session (oldest → newest).
                 // Same source for normal / squash / restart / recovery / compaction rebuilds.
@@ -598,38 +606,99 @@ module EnforcerHost =
                         |> List.map (fun tip -> tip.FieldName, tip.CycleId)
                     | None -> []
 
-                let plan =
-                    CompanionProjectionBuilder.build
-                        HostDigest.sha256Hex
-                        bloggerSessionId
-                        frameEpoch
-                        kind
-                        frameBodies
-                        delta
-                        previousTips
+                let blogFramesIntent: BlogFramesIntent =
+                    { RequestKind = requestKind
+                      SquashFrameCount = squashCount
+                      BloggerSessionId = SessionId.value bloggerSessionId
+                      FrameEpoch = FrameEpochId.value frameEpoch
+                      PhysicalDelta = delta
+                      PreviousTips = previousTips }
 
-                // C6: rebuild frames/instruction are synthetic projections, not new
-                // user authority. New Work delta is marked physical for diagnostics;
-                // HOST-010 still binds authority pre-transform.
-                plan.Messages
-                |> List.map (fun msg ->
-                    createObj
-                        [ "info",
-                          box (
-                              createObj
-                                  [ "id", box msg.MessageId
-                                    "role", box msg.Role
-                                    "synthetic", box (not msg.IsPhysical)
-                                    "source",
-                                    box (
-                                        if msg.IsPhysical then
-                                            "physical-delta"
-                                        else
-                                            "synthetic-projection"
-                                    ) ]
-                          )
-                          "parts", box [| createObj [ "type", box "text"; "text", box msg.Text ] |] ])
-                |> Some
+                let emptyCurrent: ProviderProjection.ProviderSemanticProjection =
+                    { ProviderId = None
+                      ModelId = None
+                      Variant = None
+                      Tools = []
+                      System = []
+                      Messages = [] }
+
+                let snapshot: ProjectionSnapshot =
+                    { CurrentProjection = emptyCurrent
+                      CommittedPrefix = None
+                      BlogFrames = resolvedFrames
+                      TransportMessages = Set.empty
+                      HostReanchor = None }
+
+                let intents = [ ProjectionIntent.InsertBlogFrames blogFramesIntent ]
+
+                match ProjectionPlanner.plan intents with
+                | Error _ -> None
+                | Ok ordered ->
+                    // Algebra wire view (Role+Text). MessageId lives only on Host obj.
+                    let wire =
+                        ProjectionRenderer.renderMessagesWithIntents snapshot [] ordered
+
+                    // Single shape source for Host ids: same Builder applyBlogFrames uses.
+                    // Real sha256 so COMPANION-013 ids stay stable across rebuilds.
+                    let kind =
+                        match ctx with
+                        | BloggerRequestContext.Main _ -> CompanionRequestKind.Normal
+                        | BloggerRequestContext.Squash squash -> CompanionRequestKind.Squash squash.CoveredFrameCount
+
+                    let frameBodies =
+                        resolvedFrames
+                        |> List.map (fun frame -> BlobDigest.create frame.Digest, frame.Body)
+
+                    let plan =
+                        CompanionProjectionBuilder.build
+                            HostDigest.sha256Hex
+                            bloggerSessionId
+                            frameEpoch
+                            kind
+                            frameBodies
+                            delta
+                            previousTips
+
+                    // Fail closed if algebra text sequence drifts from Builder (digest source of truth).
+                    let wireTexts =
+                        wire
+                        |> List.map (fun msg ->
+                            let text =
+                                msg.Parts
+                                |> List.tryPick (function
+                                    | ProviderProjection.WireText t -> Some t
+                                    | _ -> None)
+                                |> Option.defaultValue ""
+
+                            msg.Role, text)
+
+                    let planTexts = plan.Messages |> List.map (fun msg -> msg.Role, msg.Text)
+
+                    if wireTexts <> planTexts then
+                        None
+                    else
+                        // C6: rebuild frames/instruction are synthetic projections, not new
+                        // user authority. New Work delta is marked physical for diagnostics;
+                        // HOST-010 still binds authority pre-transform.
+                        plan.Messages
+                        |> List.map (fun msg ->
+                            createObj
+                                [ "info",
+                                  box (
+                                      createObj
+                                          [ "id", box msg.MessageId
+                                            "role", box msg.Role
+                                            "synthetic", box (not msg.IsPhysical)
+                                            "source",
+                                            box (
+                                                if msg.IsPhysical then
+                                                    "physical-delta"
+                                                else
+                                                    "synthetic-projection"
+                                            ) ]
+                                  )
+                                  "parts", box [| createObj [ "type", box "text"; "text", box msg.Text ] |] ])
+                        |> Some
 
     /// Dead-code hygiene: never default a rebuild miss to []. Callers that still
     /// need a list must pass the Host rawMessages as fallback.

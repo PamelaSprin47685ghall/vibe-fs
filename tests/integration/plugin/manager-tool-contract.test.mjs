@@ -1093,3 +1093,25 @@ test('GLORY_034_suicide_tool_executes_synchronously', async () => {
     assert.equal(preActivation.error, 'Your work has not yet begun.\nContinue.\n')
   })
 })
+
+test('GLORY_038_suicide_with_outstanding_child_prompts_to_join', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    acceptAuthorityRoot(runtime, 'manager-suicide-outstanding', 'fast-manager')
+    activateLife(runtime, 'manager-suicide-outstanding')
+    const context = { sessionID: 'manager-suicide-outstanding', agent: 'fast-manager' }
+
+    // Fork a child agent so there is an active child handle
+    await hooks.tool.fork.execute(
+      { agent: 'fast-coder', prompt: 'Do work', tdd: 'green' },
+      context,
+    )
+
+    const result = parseToml(
+      await hooks.tool.suicide.execute({ last_words: 'Finished.' }, context),
+    )
+    assert.equal(
+      result.error,
+      'Your work still walks the world.\nCall join to gather what remains before seeking your end.',
+    )
+  })
+})
