@@ -5,8 +5,9 @@
 // by the fork envelope's `content` field (FORK_CHILD_PAYLOAD_payload_renders_as_content).
 //
 // Proof plan #3: ordered/out-of-order agent completion only returns the target
-// agent; each chunk awaits once (no stash skip); TimedOut/NotFound fail the
-// chunk and cancelOwned without corrupting sibling targeted awaits.
+// agent; each chunk awaits once when Ready (no stash skip); FamilyWaiting
+// (TimedOut) retries until Ready within budget; FamilyBlocked (NotFound) hard
+// fails the chunk and cancelOwned without corrupting sibling targeted awaits.
 
 import assert from 'node:assert/strict'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
@@ -154,7 +155,8 @@ test('EXEC_summarize_spool_await_timeout_fails_chunk_cancels_owned_siblings_stil
     },
     awaitAgent: (agentId, timeoutMs) => {
       awaitCalls.push({ agentId, timeoutMs })
-      if (agentId === failAgentId) return executorSummarizeRuntime.timedOut()
+      // Real join timeout / hard fail → NotFound (not TimedOut/Waiting retry).
+      if (agentId === failAgentId) return executorSummarizeRuntime.notFound(agentId)
       return completedOk(agentId)
     },
   })
@@ -214,27 +216,75 @@ test('EXEC_summarize_spool_await_not_found_hard_fail_collects_failure', async ()
   rmSync(dir, { recursive: true, force: true })
 })
 
+test('EXEC_summarize_spool_family_waiting_then_ready_succeeds', async () => {
+  const { dir, spoolPath } = writeSpoolWithChunks(1)
+  const awaitCalls = []
+  const attemptsByAgent = new Map()
+
+  const { runtime } = executorSummarizeRuntime.fake({
+    fork: (agentId) => executorSummarizeRuntime.forkOk(agentId),
+    // FamilyWaiting / RECOVERY_WAITING → TimedOut: transient wait. Ready after
+    // two waits → completedRun. Production must retry (throttled) until Ready.
+    awaitAgent: (agentId, timeoutMs) => {
+      awaitCalls.push({ agentId, timeoutMs })
+      const n = (attemptsByAgent.get(agentId) ?? 0) + 1
+      attemptsByAgent.set(agentId, n)
+      if (n <= 2) return executorSummarizeRuntime.timedOut()
+      return completedOk(agentId)
+    },
+  })
+
+  const summary = await executorSummarizeRuntime.summarizeSpool(runtime, spoolPath)
+
+  assert.ok(typeof summary === 'string' && summary.length > 0)
+  assert.ok(
+    !/partial|raw tail|unavailable/i.test(summary),
+    'FamilyWaiting→Ready must yield full summary, not partial',
+  )
+  assert.ok(
+    summary.includes('summary-for-'),
+    'Ready completion work record must appear in full summary',
+  )
+  assert.ok(
+    awaitCalls.length >= 3,
+    `AwaitAgentWithPermit retried after Waiting; expected ≥3 calls, got ${awaitCalls.length}`,
+  )
+  const targetId = awaitCalls[0]?.agentId
+  assert.ok(targetId, 'map agent id recorded')
+  assert.ok(
+    awaitCalls.filter((c) => c.agentId === targetId).length >= 3,
+    `target agent ${targetId} awaited ≥3 times (2×TimedOut/Waiting then Ready)`,
+  )
+
+  rmSync(dir, { recursive: true, force: true })
+})
+
 test('EXEC_summarize_spool_family_waiting_timed_out_not_reported_as_success', async () => {
   const { dir, spoolPath } = writeSpoolWithChunks(2)
   const awaitCalls = []
 
   const { runtime, cancelled } = executorSummarizeRuntime.fake({
     fork: (agentId) => executorSummarizeRuntime.forkOk(agentId),
-    // FamilyWaiting / RECOVERY_WAITING maps to TimedOut — wait-not-hard-error at
-    // runtime boundary; summarizeSpool must not treat it as Ok completion.
+    // FamilyBlocked hard fail → ForkError.NotFound (requirePermit path).
+    // Instant fail → partial + cancelOwned. Must not hang on Waiting retry budget
+    // (always-TimedOut would spin until AwaitAgentTimeoutMs once Waiting retries).
     awaitAgent: (agentId, timeoutMs) => {
       awaitCalls.push({ agentId, timeoutMs })
-      return executorSummarizeRuntime.timedOut()
+      return errorResult(new ForkError(4, [`blocked:${agentId}`]))
     },
   })
 
   const summary = await executorSummarizeRuntime.summarizeSpool(runtime, spoolPath)
 
   assert.ok(typeof summary === 'string')
-  assert.match(summary, /partial|raw tail|unavailable/i, 'TimedOut (FamilyWaiting) must not report full success')
+  assert.match(
+    summary,
+    /partial|raw tail|unavailable/i,
+    'FamilyBlocked (NotFound) hard fail must not report full success',
+  )
   assert.ok(!summary.includes('summary-for-'), 'no fabricated success work records')
   assert.ok(awaitCalls.length >= 2, 'each map chunk still triggers AwaitAgentWithPermit')
-  assert.ok(cancelled.length >= 1, 'cancelOwned after map failures')
+  assert.ok(cancelled.length >= 1, 'cancelOwned after hard fail')
 
   rmSync(dir, { recursive: true, force: true })
 })

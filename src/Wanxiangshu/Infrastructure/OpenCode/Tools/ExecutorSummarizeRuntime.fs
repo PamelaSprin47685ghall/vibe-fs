@@ -35,8 +35,8 @@ module ExecutorSummarizeRuntime =
                 task {
                     match! requirePermit () with
                     | Error msg when msg.StartsWith("RECOVERY_WAITING:", System.StringComparison.Ordinal) ->
-                        // Incomplete recovery: wait-not-hard-error. Surface TimedOut so
-                        // caller may retry requirePermit until Ready or wall budget.
+                        // FamilyWaiting: surface TimedOut (wait-not-hard-error). Hard
+                        // FamilyBlocked / other permit errors → NotFound below.
                         return Error ForkError.TimedOut
                     | Error msg -> return Error(ForkError.NotFound msg)
                     | Ok permit ->
@@ -49,8 +49,8 @@ module ExecutorSummarizeRuntime =
                 task {
                     match! requirePermit () with
                     | Error msg when msg.StartsWith("RECOVERY_WAITING:", System.StringComparison.Ordinal) ->
-                        // Incomplete recovery: wait-not-hard-error. Surface TimedOut so
-                        // caller may retry requirePermit until Ready or wall budget.
+                        // FamilyWaiting → TimedOut. ExecutorSummarize.awaitAgentWithPermit
+                        // throttle-retries within AwaitAgentTimeoutMs; NotFound is hard fail.
                         return Error ForkError.TimedOut
                     | Error msg -> return Error(ForkError.NotFound msg)
                     | Ok permit ->

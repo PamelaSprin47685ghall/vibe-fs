@@ -4109,6 +4109,8 @@ export const executorSummarizeRuntime = (() => {
     /** Ok(ForkResult.Created agentId) */
     forkOk: (agentId) => okResult(new ForkResult(0, [agentId])),
     timedOut: () => errorResult(ForkError.TimedOut),
+    /** Hard fail: FamilyBlocked / real join timeout → ForkError.NotFound (no Waiting retry). */
+    notFound: (agentId = 'missing') => errorResult(new ForkError(4, [agentId])),
     /**
      * Fake IExecutorRuntime. JoinWithPermit / AwaitAgentWithPermit return Promise of Result.
      * Default → TimedOut so await fails after fork.

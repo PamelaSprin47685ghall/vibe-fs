@@ -47,21 +47,31 @@ module ExecutorSummarize =
     let AwaitAgentTimeoutMs = 600_000
 
     /// Permit-gated targeted await (Journal-authoritative via HostForkRuntime).
+    /// FamilyWaiting → ForkError.TimedOut: throttle-retry within remainingMs budget.
+    /// FamilyBlocked / real join timeout → ForkError.NotFound: hard fail, no retry.
     let awaitAgentWithPermit (runtime: IExecutorRuntime) (agentId: string) =
-        task {
-            let! joined = runtime.AwaitAgentWithPermit(agentId, Some AwaitAgentTimeoutMs)
+        let rec loop (remainingMs: int) =
+            task {
+                let! joined = runtime.AwaitAgentWithPermit(agentId, Some remainingMs)
 
-            match joined with
-            | Error ForkError.TimedOut ->
-                return
-                    raise (
-                        InvalidOperationException(
-                            sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
+                match joined with
+                | Ok completion -> return completion
+                | Error ForkError.TimedOut when remainingMs > 0 ->
+                    // FamilyWaiting (RECOVERY_WAITING): B-class wait, not hard fail.
+                    let delayMs = min 100 remainingMs
+                    do! PtyTiming.timerTask delayMs
+                    return! loop (remainingMs - delayMs)
+                | Error ForkError.TimedOut ->
+                    return
+                        raise (
+                            InvalidOperationException(
+                                sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
+                            )
                         )
-                    )
-            | Error error -> return raise (InvalidOperationException(error.ToString()))
-            | Ok completion -> return completion
-        }
+                | Error error -> return raise (InvalidOperationException(error.ToString()))
+            }
+
+        loop AwaitAgentTimeoutMs
 
     let runExecutorPrompt
         (runtime: IExecutorRuntime)
