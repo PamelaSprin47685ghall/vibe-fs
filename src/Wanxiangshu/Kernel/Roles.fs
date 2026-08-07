@@ -87,7 +87,6 @@ module Roles =
                 [ ToolPermission.Read
                   ToolPermission.Glob
                   ToolPermission.Grep
-                  ToolPermission.Inspector
                   ToolPermission.Verdict ]
         | Role.DevOps ->
             set
@@ -168,7 +167,7 @@ module RoleDefinitions =
     /// loaded into OpenCode AgentConfig.prompt (host system prompt).
     let reviewerPrompt =
         "Reviewer system prompt SSOT: prompts/reviewer-system.md\n"
-        + "Tools: read / glob / grep / inspector / verdict.\n"
+        + "Tools: read / glob / grep / verdict.\n"
         + "Read-only. Re-inspect the current tree; PERFECT only for flawless work and REVISE for any defect."
 
     let all =

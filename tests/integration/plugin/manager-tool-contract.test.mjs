@@ -177,7 +177,7 @@ const ALLOWED_TOOLS = {
   devops: ['fork-pty', 'join', 'list', 'read', 'glob', 'grep', 'inspector', 'coder', 'executor'],
   browser: ['read', 'glob', 'grep', 'network'],
   meditator: ['read', 'glob', 'grep', 'inspector'],
-  reviewer: ['read', 'glob', 'grep', 'inspector', 'verdict'],
+  reviewer: ['read', 'glob', 'grep', 'verdict'],
   // ENFORCER-010: Blogger's tool set is exactly { blog }.
   blogger: ['blog'],
   executor: [],
@@ -710,13 +710,13 @@ test('AGENT_007_unresolved_role_denies_all_tools', async () => {
 
 test('EXEC_002_one_shot_tools_return_the_managed_agent_and_the_turn_formal_text', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
-    // Reviewer (AGENT-014) may hold inspector; DevOps (AGENT-015) may hold coder.
-    acceptAuthorityRoot(runtime, 'reviewer-contract', 'fast-reviewer')
+    // Meditator may hold inspector; DevOps (AGENT-015) may hold coder.
+    acceptAuthorityRoot(runtime, 'meditator-contract', 'fast-meditator')
     acceptAuthorityRoot(runtime, 'devops-contract', 'fast-devops')
 
     const inspectorResultP = hooks.tool.inspector.execute(
       { agent: 'fast-inspector', prompts: ['git status'] },
-      { sessionID: 'reviewer-contract', agent: 'fast-reviewer' },
+      { sessionID: 'meditator-contract', agent: 'fast-meditator' },
     )
     // 订阅在 prompt 之前安装（OneShotAgentTool.fs:115 → send）：promptAsync 被调用即
     // terminal 订阅就绪。此前直接 notify 与 execute 内部安装竞态——通知被丢弃则 execute

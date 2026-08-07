@@ -71,7 +71,7 @@ reviewer-fast, fast_reviewer
 | DevOps | `fork-pty`, `executor`, `read`, `glob`, `grep`, `inspector`, `coder`, `join`, `list` |
 | Browser | `read`, `glob`, `grep`, network tools |
 | Meditator | `read`, `glob`, `grep`, `inspector` |
-| Reviewer | `read`, `glob`, `grep`, `inspector`, `verdict` |
+| Reviewer | `read`, `glob`, `grep`, `verdict` |
 | Blogger | `blog` |
 | Executor | 无工具 |
 

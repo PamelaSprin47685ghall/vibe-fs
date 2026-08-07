@@ -22,7 +22,7 @@
 ### 第 2 层（资源契约，`tests/integration/`）
 
 - `resources/prompts/manager-system.md` 与 `reviewer-system.md` 与 golden fixtures 字节一致（附录 A.2/A.3）。
-- Manager 工具 schema 精确四工具（fork/join/list/suicide）；Reviewer 精确五工具（read/glob/grep/inspector/verdict）。
+- Manager 工具 schema 精确四工具（fork/join/list/suicide）；Reviewer 精确四工具（read/glob/grep/verdict）。
 
 ### 第 3 层（Fake Host 轨迹）
 

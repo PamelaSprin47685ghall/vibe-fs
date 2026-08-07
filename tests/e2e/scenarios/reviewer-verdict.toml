@@ -107,7 +107,7 @@ tools = ["fork", "join", "list", "suicide"]
 id = "reviewer-nudge"
 lane = "reviewer-nudge"
 user = "Review the tree but do not submit a verdict."
-tools = ["read", "glob", "grep", "inspector", "verdict"]
+tools = ["read", "glob", "grep", "verdict"]
 
   [[turn.step]]
   respond = { type = "text", text = "I reviewed the tree and it is fine." }

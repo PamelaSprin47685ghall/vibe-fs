@@ -106,7 +106,7 @@ const ROLE_ALLOW = {
   Inspector: ['read', 'glob', 'grep', 'executor'],
   Browser: ['read', 'glob', 'grep', 'network'],
   Meditator: ['read', 'glob', 'grep', 'inspector'],
-  Reviewer: ['read', 'glob', 'grep', 'inspector', 'verdict'],
+  Reviewer: ['read', 'glob', 'grep', 'verdict'],
   DevOps: ['read', 'glob', 'grep', 'inspector', 'executor', 'coder', 'join', 'list', 'fork-pty'],
   Executor: [],
   Blogger: ['blog'],

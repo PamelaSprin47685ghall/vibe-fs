@@ -79,7 +79,7 @@ Executor、Blogger 等由编排路径调用，不作为单独“安装角色”�
 | DevOps | `fork-pty`, `executor`, 检索与 `inspector` 等 | 进程与环境 |
 | Browser | 检索与网络相关工具 | 浏览类任务 |
 | Meditator | 检索与 `inspector` | 分析类任务 |
-| Reviewer | 检索、`inspector`、`verdict` | 审阅与裁决 |
+| Reviewer | 检索、`verdict` | 审阅与裁决 |
 | Executor | 无工具 | 内部执行/摘要 |
 | Blogger | `blog` | Companion 叶子，写认知上下文 |
 

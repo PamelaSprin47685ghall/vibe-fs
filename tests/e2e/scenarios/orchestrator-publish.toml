@@ -155,7 +155,7 @@ tools = ["write"]
 id = "barrier-reviewer"
 internal = true
 user = "# Review the current worktree for correctness. Submit your verdict with the verdict tool."
-tools = ["glob", "grep", "inspector", "read", "verdict"]
+tools = ["glob", "grep", "read", "verdict"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
