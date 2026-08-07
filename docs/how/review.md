@@ -73,9 +73,11 @@ PhysicalBound 未完成时禁止 same-root 猜测成功。
 ## 端到端顺序
 
 ```text
-PERFECT1 → challenge tool result
+检查工作树并对照 8 大质量支柱（REVIEW-011）生成评估报告
+→ PERFECT1 → challenge tool result
 → ReviewConfirmation 启动下一 request
 → transform 生成 seal（含 challenge digest）
+→ 第二次检查工作树并验证不变性
 → PERFECT2 查 seal → ConfirmedReviewWitness
 → Manager Guard 只认有效 witness
 ```

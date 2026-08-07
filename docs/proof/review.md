@@ -11,6 +11,9 @@
 | 同 ProviderRun 额外 PERFECT | 不计数 | REVIEW-004 |
 | REVISE | 清未完成 PERFECT | REVIEW-002 |
 | tree 变化 | pending 拒绝；confirmed 对 Guard 无效 | REVIEW-008 |
+| 8 大代码质量支柱评估 | Reviewer 必须在 formal report 给出 8 维评估且通过方可 PERFECT | REVIEW-011 |
+| Reviewer 提示词权威资源 | `resources/prompts/reviewer-system.md` 包含 8 维质量支柱与双 PERFECT 流程 | REVIEW-012 |
+
 
 ## Seal / Witness
 
