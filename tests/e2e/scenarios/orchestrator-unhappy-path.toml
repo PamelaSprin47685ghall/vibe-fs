@@ -1,0 +1,699 @@
+# orchestrator-unhappy-path — one-stroke Orchestrator unhappy traversal.
+#
+# Mirrors manager-unhappy-path: one HumanRoot chain walks every ORCH pit that the
+# production CE can hit without leaving the publish job, then lands on exactly-once
+# Published. Restart-after-claim lives in orchestrator-restart-publish*; this
+# scenario owns the conflict/resume trajectory itself (ORCH-003/004/005/006/007).
+#
+# Strokes:
+#   1. fork-manager → ManagerJobCreated (one Job · one worktree · one Manager)
+#   2. Manager dual-suicide Finality + coder write candidate
+#   3. target diverges after manager.0 (gitConflictProof) → ConflictDetected
+#   4. same Manager session receives CONFLICT RESUMPTION (no task restart)
+#   5. barrier dual PERFECT → Published eq 1
+#   6. orch joins; worktree clean; ManagerAgent identity preserved
+
+scenario = "orchestrator-unhappy-path"
+description = "ORCH-003/004/005/006/007 one-stroke: conflicted rebase resumes same Manager and publishes exactly once"
+pass = "Orchestrator unhappy path canary passed: conflict → same-Manager resume → exactly-once publish."
+
+setup = { strict = true, project = { files = { "AGENTS.md" = "- orchestrator unhappy path canary\n", "README.md" = "# orchestrator-unhappy-path project\n" } } }
+session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
+prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch." }
+
+must = [
+  "orch.0",
+  "manager.0",
+  "coder.0",
+  "manager.2",
+  "conflict-resume.0",
+  "coder-resolve.0",
+  "barrier-reviewer.0",
+  "orch.2",
+]
+
+flow = [
+  # Stroke 3: diverge target AFTER the manager worktree exists (see conflict canary).
+  { afterExpectation = { id = "manager.0", gitConflictProof = true } },
+
+  # Stroke 1
+  { wait = "orch.0" },
+  { waitFact = { name = "ManagerJobCreated", eq = 1 } },
+  { wait = "manager.0" },
+  { wait = "coder.0" },
+  { wait = "coder.1" },
+  { wait = "manager.1" },
+  { wait = "manager.2" },
+
+  # Stroke 2: Host-owned Finality (may interleave with barrier work)
+  { wait = "manager-finality-reviewer.0", timeoutMs = 30000 },
+  { wait = "manager-finality-reviewer.1", timeoutMs = 30000 },
+  { wait = "manager.3", timeoutMs = 30000 },
+
+  # Stroke 3/4: conflict durable, same Manager resumes, Coder resolves file
+  { waitFact = { name = "ConflictDetected", gte = 1 }, timeoutMs = 60000 },
+  { wait = "conflict-resume.0", timeoutMs = 60000 },
+  { wait = "coder-resolve.0", timeoutMs = 60000 },
+  { wait = "coder-resolve.1", timeoutMs = 60000 },
+  { wait = "conflict-resume.1", timeoutMs = 60000 },
+  { wait = "conflict-resume.2", timeoutMs = 60000 },
+  { custom = "afterConflictResume" },
+
+  # Stroke 5: integration review + exactly-once publish
+  { wait = "barrier-reviewer.0", timeoutMs = 60000 },
+  { wait = "barrier-reviewer.1", timeoutMs = 60000 },
+  { wait = "barrier-reviewer.2", timeoutMs = 60000 },
+  { waitFact = { name = "Published", eq = 1 }, timeoutMs = 90000 },
+
+  # Stroke 6: Orchestrator harvest
+  { wait = "orch.2", timeoutMs = 60000 },
+  { awaitTerminal = true, requireAssistantTerminal = false },
+  { assertFacts = { name = "Published", eq = 1 } },
+  { assertFile = { path = "publish_proof.txt", equals = "Published by orchestrator canary\n" } },
+  { assertWorktreeClean = true },
+  { custom = "finalOracle" },
+  { expectSatisfied = true },
+]
+
+[[turn]]
+id = "orch"
+lane = "fast-orchestrator"
+user = "Ship publish_proof.txt to the target branch."
+tools = ["fork-manager", "join"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork-manager", args = { agent = "fast-manager", prompt = "Ship publish_proof.txt to the target branch." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Publish completed after conflict resume." }
+
+[[turn]]
+id = "manager"
+lane = "fast-manager"
+user = "# Ship publish_proof.txt to the target branch."
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Write publish_proof.txt." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  # Host-owned Finality for AgentOwnerRoot ManagerJob (GLORY-068/069).
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager rest in peace." }
+
+[[turn]]
+id = "manager-guard"
+internal = true
+optional = true
+user = ["You are doing well.", "You have plenty of time.", "You can continue.", "When nothing useful remains, call suicide."]
+tools = ["fork", "join", "list", "suicide"]
+
+  # GLORY-029/070: ordinary activated idle — ManagerIdleEncouragement only.
+  [[turn.step]]
+  respond = { type = "text", text = "Manager continues." }
+
+# `src/Wanxiangshu/Application/Orchestration/Orchestrator.Prompts.fs:23`. The prompt embeds the conflicted file list, so the
+# declaration is a prefix of it — and production composes the whole thing, hence `internal`.
+#
+# The clause it carries is the load-bearing part: "You are RESUMING an in-progress rebase in
+# this same session — do NOT restart the original task."
+
+[[turn]]
+id = "conflict-resume"
+internal = true
+user = "[CONFLICT RESUMPTION] An in-progress rebase hit conflicts. Conflicted files:"
+tools = ["fork", "join", "list", "suicide"]
+
+  # Manager cannot edit files (AGENT tools: fork/join/list/suicide). Resolve via
+  # Coder write of the canonical candidate content, then join so finalizeWorktree
+  # can git add -A + rebase --continue (GitAdapter.finalizeWorktree).
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Resolve the conflicted publish_proof.txt so it contains exactly: Published by orchestrator canary" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Conflict resolved; rebase can continue." }
+
+[[turn]]
+id = "coder-resolve"
+lane = "fast-coder"
+user = [
+  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
+  "# Resolve the conflicted publish_proof.txt so it contains exactly: Published by orchestrator canary",
+]
+tools = ["write"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "write", args = { filePath = "publish_proof.txt", content = "Published by orchestrator canary\n" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Conflict file resolved." }
+
+[[turn]]
+id = "coder"
+lane = "fast-coder"
+user = [
+  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
+  "# Write publish_proof.txt.",
+]
+tools = ["write"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "write", args = { filePath = "publish_proof.txt", content = "Published by orchestrator canary\n" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Coder finished." }
+
+[[turn]]
+id = "manager-finality-reviewer"
+internal = true
+user = "# Review the current worktree against all authoritative user requirements."
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager finality reviewer confirmed." }
+
+[[turn]]
+id = "barrier-reviewer"
+internal = true
+user = "# Review the current worktree for correctness. Submit your verdict with the verdict tool."
+tools = ["glob", "grep", "read", "verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Barrier reviewer completed the double PERFECT." }
+
+[[turn]]
+id = "reviewer-confirm"
+internal = true
+user = "# Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Reviewer confirmed the tree." }
+
+[[turn]]
+id = "blogger"
+internal = true
+user = "# Write the dense work-log continuation now"
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Session background.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Session background continued.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 2.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 3.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 4.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 5.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 6.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 7.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 8.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 9.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 10.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 11.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 12.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 13.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 14.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 15.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 16.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 17.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 18.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 19.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 20.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 21.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 22.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 23.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 24.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 25.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 26.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 27.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 28.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 29.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 30.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 31.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 32.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 33.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 34.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 35.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 36.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 37.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 38.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 39.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 40.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 41.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 42.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 43.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 44.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 45.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 46.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 47.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 48.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 49.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 50.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 51.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 52.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 53.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 54.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 55.", tip = "primitive-obsession" } }
+
+
+# Missing-final-report repair on a blogger child (HOST-004). Optional.
+[[turn]]
+id = "blogger-repair"
+internal = true
+optional = true
+user = "#"
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Session background after repair.", tip = "primitive-obsession" } }
+
+
+[[epoch]]
+turn = "blogger-repair"
+step = 0
+reason = "prefix-probe"
+
+[[epoch]]
+turn = "blogger"
+step = 0
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 1
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 2
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 3
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 4
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 5
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 6
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 7
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 8
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 9
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 10
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 11
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 12
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 13
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 14
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 15
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 16
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 17
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 18
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 19
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 20
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 21
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 22
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 23
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 24
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 25
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 26
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 27
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 28
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 29
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 30
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 31
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 32
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 33
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 34
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 35
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 36
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 37
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 38
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 39
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 40
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 41
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 42
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 43
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 44
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 45
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 46
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 47
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 48
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 49
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 50
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 51
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 52
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 53
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 54
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 55
+reason = "frame-commit"
+
+[[turn]]
+id = "title"
+lane = "title"
+kind = "title"
+user = "Ship publish_proof.txt to the target branch."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }

@@ -254,7 +254,21 @@ module XWire =
                                     Wanxiangshu.Session.HostMessageProjection.replaceMessagesInPlace output transformed
 
                                     scope.RecordAttemptPlan sessionId providerRun plan
-                                    scope.ClearRecovery sessionId
+
+                                    // FALLBACK-012 / CTX-011: arming is a one-shot
+                                    // recovery opportunity. Consume it only when a
+                                    // probe was actually selected, OR when recovery
+                                    // was not possible for a durable reason. Temporary
+                                    // NoCoverage (blog frames still catching up) must
+                                    // keep arming so a later main can still probe —
+                                    // otherwise a retry that races the first BlogEntry
+                                    // burns the armed slot and PrefixRebase never lands.
+                                    match AttemptPlanner.probeOf plan with
+                                    | Some _ -> scope.ClearRecovery sessionId
+                                    | None ->
+                                        match plan.NoProbeReason with
+                                        | Some NoCandidateReason.NoCoverage -> ()
+                                        | _ -> scope.ClearRecovery sessionId
                                 | _ ->
                                     raise (
                                         InvalidOperationException
@@ -266,42 +280,46 @@ module XWire =
     let reconcileAttempt (journal: AgentJournal option) (scope: PluginRuntimeScope) (turn: ReconciledTurn) : unit =
         match journal, scope.TryAttemptPlan turn.SessionId turn.ProviderRun with
         | Some durable, Some plan ->
-            let outcome =
-                match turn.Outcome with
-                | ReconcileProgram.TurnCompleted -> AttemptOutcome.Completed
-                | ReconcileProgram.TurnFailed _ -> AttemptOutcome.Failed
-                | ReconcileProgram.TurnAborted _ -> AttemptOutcome.Aborted
-                | ReconcileProgram.TurnNeedsContinuation _
-                | ReconcileProgram.TurnInProgress
-                | ReconcileProgram.TurnUnknown -> AttemptOutcome.CompletedInvalid
+            // Keep the plan across provisional / unknown rereads of the SAME
+            // provider run. A first idle wake often sees finish=None (Unknown) or
+            // a needs-continuation race before the terminal finish lands; clearing
+            // here made the subsequent TurnCompleted promote with TryAttemptPlan=None
+            // (measured: FallbackCursorAdvanced without PrefixRebaseCommitted).
+            match turn.Outcome with
+            | ReconcileProgram.TurnCompleted ->
+                match AttemptPlanner.promotableProbe plan AttemptOutcome.Completed with
+                | Some probe ->
+                    let projections = AgentJournal.snapshot durable
 
-            match AttemptPlanner.promotableProbe plan outcome with
-            | Some probe ->
-                let projections = AgentJournal.snapshot durable
+                    let epoch =
+                        AgentProjection.tryFind turn.SessionId projections.AgentProjections
+                        |> Option.bind (fun state -> state.PrefixEpoch)
+                        |> Option.defaultValue PrefixEpochProjection.empty
 
-                let epoch =
-                    AgentProjection.tryFind turn.SessionId projections.AgentProjections
-                    |> Option.bind (fun state -> state.PrefixEpoch)
-                    |> Option.defaultValue PrefixEpochProjection.empty
+                    let fact =
+                        ContextFact.PrefixRebaseCommitted
+                            {| SessionId = turn.SessionId
+                               PreviousEpochId = probe.BasedOnEpochId
+                               NextEpochId = PrefixEpochId.next probe.BasedOnEpochId
+                               FrozenRecordPrefixRef = probe.Candidate.FrozenRecordPrefixRef
+                               FrozenRecordPrefixDigest = probe.Candidate.FrozenRecordPrefixDigest
+                               CutoffExclusive = probe.Candidate.CutoffExclusive
+                               CoveredPrefixDigest = probe.Candidate.CoveredPrefixDigest
+                               SealRoot = probe.Candidate.SealRoot
+                               SyntheticMessageId = probe.Candidate.SyntheticMessageId
+                               ProbeId = probe.ProbeId
+                               SolvingProviderRun = turn.ProviderRun |}
 
-                let fact =
-                    ContextFact.PrefixRebaseCommitted
-                        {| SessionId = turn.SessionId
-                           PreviousEpochId = probe.BasedOnEpochId
-                           NextEpochId = PrefixEpochId.next probe.BasedOnEpochId
-                           FrozenRecordPrefixRef = probe.Candidate.FrozenRecordPrefixRef
-                           FrozenRecordPrefixDigest = probe.Candidate.FrozenRecordPrefixDigest
-                           CutoffExclusive = probe.Candidate.CutoffExclusive
-                           CoveredPrefixDigest = probe.Candidate.CoveredPrefixDigest
-                           SealRoot = probe.Candidate.SealRoot
-                           SyntheticMessageId = probe.Candidate.SyntheticMessageId
-                           ProbeId = probe.ProbeId
-                           SolvingProviderRun = turn.ProviderRun |}
+                    if epoch.EpochId = probe.BasedOnEpochId then
+                        AgentJournal.appendAgent (StreamId.Session turn.SessionId) (Some turn.ProviderRun) fact durable
+                        |> ignore
+                | None -> ()
 
-                if epoch.EpochId = probe.BasedOnEpochId then
-                    AgentJournal.appendAgent (StreamId.Session turn.SessionId) (Some turn.ProviderRun) fact durable
-                    |> ignore
-            | None -> ()
-
-            scope.ClearAttemptPlan turn.SessionId turn.ProviderRun
+                scope.ClearAttemptPlan turn.SessionId turn.ProviderRun
+            | ReconcileProgram.TurnFailed _
+            | ReconcileProgram.TurnAborted _ ->
+                scope.ClearAttemptPlan turn.SessionId turn.ProviderRun
+            | ReconcileProgram.TurnNeedsContinuation _
+            | ReconcileProgram.TurnInProgress
+            | ReconcileProgram.TurnUnknown -> ()
         | _ -> ()

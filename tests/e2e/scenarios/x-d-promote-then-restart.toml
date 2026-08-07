@@ -29,8 +29,9 @@ flow = [
   { wait = "after-restart", timeoutMs = 15000 },
   { awaitEvent = { type = "session.idle", session = "self" }, timeoutMs = 15000 },
 
-  # No reanchor. Promote count is asserted in oracle (may be 0 under probe race).
+  # No reanchor. Promote is a hard X-D fact, not an optional race outcome.
   { assertFacts = { name = "ContextReanchored", eq = 0 } },
+  { assertFacts = { name = "PrefixRebaseCommitted", eq = 1 } },
   { assertDeliveries = { id = "continue.0", eq = 1 } },
   { custom = "oracle" },
   { expectSatisfied = true },

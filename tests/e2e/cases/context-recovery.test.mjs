@@ -287,38 +287,44 @@ async function oracleXd(scenario, ctx) {
   const after = snapshotCoverage(workDir);
 
   assertNoReanchor(workDir, 'X-D');
-  // Promote must not regress. A probe→promote race may leave preRestart at 0;
-  // require after >= pre and never multi-promote.
-  assert.ok(after.prefixRebase >= ctx.preRestart.prefixRebase, 'X-D: promote count must not regress');
-  assert.ok(after.prefixRebase <= 1, `X-D: re-promote (count > 1); after=${after.prefixRebase}`);
+  // X-D's contract is that promote is durable before restart. Softening to
+  // "0 is fine under probe race" was masking the production bug where
+  // provisional TurnUnknown cleared AttemptPlan before TurnCompleted promote.
+  assert.equal(
+    after.prefixRebase,
+    1,
+    `X-D: PrefixRebaseCommitted must be exactly 1 after promote+restart (got ${after.prefixRebase}; preRestart=${ctx.preRestart.prefixRebase})`,
+  );
+  assert.ok(
+    ctx.preRestart.prefixRebase <= 1,
+    `X-D: pre-restart promote count must be 0 or 1 (got ${ctx.preRestart.prefixRebase})`,
+  );
   assertXTraceSurvives(ctx.preRestart, after, 'X-D');
   assertRecordCoverageHolds(ctx.preRestart, after, 'X-D');
 
-  if (after.prefixRebase === 1) {
-    const rebases = runtimeFacts(workDir, 'PrefixRebaseCommitted');
-    assert.equal(rebases.length, 1, 'X-D: single promote envelope');
-    const nextEpochs = fieldValues(rebases, 'NextEpochId');
-    const prevEpochs = fieldValues(rebases, 'PreviousEpochId');
-    assert.ok(nextEpochs.length >= 1, 'X-D: NextEpochId present on PrefixRebaseCommitted');
-    assert.ok(prevEpochs.length >= 1, 'X-D: PreviousEpochId present on PrefixRebaseCommitted');
-    const solvingRuns = [...new Set(fieldValues(rebases, 'SolvingProviderRun'))];
-    assert.equal(
-      solvingRuns.length,
-      1,
-      `HOST-010: PrefixRebaseCommitted.SolvingProviderRun unique non-empty (got ${solvingRuns.length})`,
-    );
-    assert.ok(
-      typeof solvingRuns[0] === 'string' && solvingRuns[0].length > 0,
-      `HOST-010: SolvingProviderRun must be non-empty string (got ${JSON.stringify(solvingRuns[0])})`,
-    );
-    assert.equal(
-      scenario.provider.matchCount('continue.0'),
-      1,
-      'X-D: no second physical probe for the same promote',
-    );
-    assertFrozenPrefixExcludesRawGap(workDir, 'X-D');
-    assertFrameProbeIndependent(workDir, 'X-D', ctx.preRestart);
-  }
+  const rebases = runtimeFacts(workDir, 'PrefixRebaseCommitted');
+  assert.equal(rebases.length, 1, 'X-D: single promote envelope');
+  const nextEpochs = fieldValues(rebases, 'NextEpochId');
+  const prevEpochs = fieldValues(rebases, 'PreviousEpochId');
+  assert.ok(nextEpochs.length >= 1, 'X-D: NextEpochId present on PrefixRebaseCommitted');
+  assert.ok(prevEpochs.length >= 1, 'X-D: PreviousEpochId present on PrefixRebaseCommitted');
+  const solvingRuns = [...new Set(fieldValues(rebases, 'SolvingProviderRun'))];
+  assert.equal(
+    solvingRuns.length,
+    1,
+    `HOST-010: PrefixRebaseCommitted.SolvingProviderRun unique non-empty (got ${solvingRuns.length})`,
+  );
+  assert.ok(
+    typeof solvingRuns[0] === 'string' && solvingRuns[0].length > 0,
+    `HOST-010: SolvingProviderRun must be non-empty string (got ${JSON.stringify(solvingRuns[0])})`,
+  );
+  assert.equal(
+    scenario.provider.matchCount('continue.0'),
+    1,
+    'X-D: no second physical probe for the same promote',
+  );
+  assertFrozenPrefixExcludesRawGap(workDir, 'X-D');
+  assertFrameProbeIndependent(workDir, 'X-D', ctx.preRestart);
 }
 
 const CUSTOMS = {

@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
@@ -46,6 +47,61 @@ module TurnCompletionProgram =
         }
         :> Task
 
+    /// CTX-006 hasMaterial for X: BlogEntryCommitted coverage on the main session.
+    let private sessionHasCoverage (durable: AgentJournal) (sessionId: SessionId) =
+        AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections
+        |> Option.bind (fun state -> state.Blog)
+        |> Option.map BlogProjection.hasCoverage
+        |> Option.defaultValue false
+
+    /// True when a Companion Blogger is linked — only then is waiting for coverage
+    /// meaningful. Sessions without a blogger never grow coverage; waiting would
+    /// only burn the A′ budget on a clock.
+    let private expectsCoverage (durable: AgentJournal) (sessionId: SessionId) =
+        SessionAssociationProjection.tryBloggerOf
+            sessionId
+            (AgentJournal.snapshot durable).AgentProjections.Associations
+        |> Option.isSome
+
+    /// Bound: after a confirmed failure, the next A′/B′ ProviderRetry is the only
+    /// recovery slot that may probe (CTX-006/010). Blog frames often land a few
+    /// tens of ms after the failed main turn's companion request — racing the
+    /// continue send made hasMaterial=false, so AttemptPlanner skipped the probe
+    /// and ClearRecovery burned the armed slot (measured: FallbackCursorAdvanced
+    /// + ProviderRetryAttempt with PrefixRebaseCommitted=0).
+    ///
+    /// Wait on journal folds until coverage exists or the budget expires. Fail
+    /// open: timeout still sends the ordinary main (CTX-011 no-candidate path).
+    let private awaitCoverageBeforeRetry (durable: AgentJournal) (sessionId: SessionId) : Task =
+        task {
+            if not (expectsCoverage durable sessionId) || sessionHasCoverage durable sessionId then
+                return ()
+            else
+                let budgetMs = 2000
+                let sliceMs = 25
+                let deadline = DateTimeOffset.UtcNow.AddMilliseconds(float budgetMs)
+
+                let rec loop () =
+                    task {
+                        if sessionHasCoverage durable sessionId then
+                            return ()
+                        elif DateTimeOffset.UtcNow >= deadline then
+                            return ()
+                        else
+                            let fromRev = AgentJournal.revision durable
+                            // Fable Task has no WhenAny export; race journal wake vs slice.
+                            do!
+                                emitJsExpr
+                                    (AgentJournal.awaitChangeFrom fromRev durable,
+                                     Wanxiangshu.Process.PtyTiming.timerTask sliceMs)
+                                    "Promise.race([$0, $1]).then(function () { return undefined; })": Task
+
+                            return! loop ()
+                    }
+
+                return! loop ()
+        }
+
     /// FALLBACK-003 + FALLBACK-004: a settled failed turn.
     ///
     /// The reconciled snapshot is what proves the attempt failed (HOST-004), so
@@ -85,6 +141,10 @@ module TurnCompletionProgram =
                     // no further automatic physical request may be issued.
                     fail error
                 | Ok _ ->
+                    // CTX-006: give the linked Blogger a chance to commit coverage
+                    // before the armed A′/B′ continue is planned (XWire.applyTransform).
+                    do! awaitCoverageBeforeRetry durable turn.SessionId
+
                     let! continuation =
                         HostSessionNudge.sendContinuationResult
                             sessionPort
