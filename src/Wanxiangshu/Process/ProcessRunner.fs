@@ -80,6 +80,7 @@ module ProcessRunner =
             match validateEstimate estimate with
             | Error e -> return Error e
             | Ok() ->
+                // DSL-MUTABLE: resource — LargeGate permit ownership flag (release-on-exit)
                 let mutable gateHeld = false
 
                 try

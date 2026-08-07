@@ -40,6 +40,7 @@ type VerdictMailbox() =
     let gate = obj ()
     let verdicts = Queue<OrchestratorVerdict>()
     let waiters = Queue<TaskCompletionSource<unit>>()
+    // DSL-MUTABLE: single-flight — count of in-flight manager jobs under the gate
     let mutable active = 0
 
     /// Wake one waiter (signal only). Fact source remains the verdicts queue.
@@ -62,6 +63,7 @@ type VerdictMailbox() =
             []
         else
             lock gate (fun () ->
+                // DSL-MUTABLE: algorithm-scratch — drain-loop counter
                 [ let mutable n = 0
 
                   while n < maxCount && verdicts.Count > 0 do

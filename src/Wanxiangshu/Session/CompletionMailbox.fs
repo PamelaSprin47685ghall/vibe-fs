@@ -65,6 +65,7 @@ type CompletionMailbox(gate: obj, hasActive: unit -> bool) =
     let agentWakes = Queue<AgentHandleId>()
     let ptyCompletions = Queue<PtyJoinItem>()
     let waiters = Queue<TaskCompletionSource<MailboxWakeReason>>()
+    // DSL-MUTABLE: cancellation — mailbox cancelled latch
     let mutable cancelled = false
 
     let wakeAll (reason: MailboxWakeReason) =
@@ -147,6 +148,7 @@ type CompletionMailbox(gate: obj, hasActive: unit -> bool) =
             []
         else
             lock gate (fun () ->
+                // DSL-MUTABLE: algorithm-scratch — agent-wake drain counter
                 [ let mutable n = 0
 
                   while n < maxCount && agentWakes.Count > 0 do
@@ -159,6 +161,7 @@ type CompletionMailbox(gate: obj, hasActive: unit -> bool) =
             []
         else
             lock gate (fun () ->
+                // DSL-MUTABLE: algorithm-scratch — pty-completion drain counter
                 [ let mutable n = 0
 
                   while n < maxCount && ptyCompletions.Count > 0 do

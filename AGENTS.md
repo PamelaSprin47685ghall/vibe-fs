@@ -228,7 +228,7 @@ Domain   = 事实 / 证据 / 决策 / 值对象
 |----|------|
 | second-runtime-protocol / business-interpreter | 业务路径禁止 |
 | program-counter / behaviour-bool | 禁止（领域 evidence 名 allowlist） |
-| mutable | **合法**：Domain / Session / Application / `Kernel/Parallel.fs`；**fail-closed**：Agent / 其余 Kernel |
+| mutable | **声明式豁免**：Domain / Session / Application / Process / `Kernel/Parallel.fs` 的 `let mutable` 必须在前 1–2 行带 `// DSL-MUTABLE: <resource\|algorithm-scratch\|single-flight\|buffer\|subscription\|cancellation>` 声明；无声明即红。**fail-closed**：Agent / 其余 Kernel（声明也不能豁免） |
 | infrastructure-leak | **合法 open**：仅 `HOST_BOUNDARY_OPEN_BASENAMES`（10 个 HostFork*/CompanionHost*）；其余 Session/Application fail-closed |
 
 新增 Host 边界文件要 `open OpenCode/Process` 时：先登记 basename，再写 `open`。长期可把端口/扩展方法上移以缩小白名单。

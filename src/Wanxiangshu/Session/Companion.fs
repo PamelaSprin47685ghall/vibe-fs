@@ -10,29 +10,19 @@ open Wanxiangshu.Journal
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ProviderProjection
 
-/// A single recovery opportunity. Never re-armed: a real failure creates one,
-/// and the next material either consumes it or a cancellation/loss disarms it.
-///
-/// A plain physical signal, not a waiter: the production consumer decides at
-/// the material boundary (`maySquash` reads `IsRecoveryArmed`) and clears the
-/// slot when a squash starts (`DisarmRecoverySlot`). A `TaskCompletionSource`
-/// here would be a dead tail — nothing in production ever awaits it, and
-/// cancelling an un-awaited promise rejects it into an unhandled rejection.
-[<RequireQualifiedAccess>]
-type RecoveryArming =
-    | NotArmed
-    | Armed
-
 /// Companion state wrapper with a single mutable in-flight Task gate.
 type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort, ?sessionId: SessionId) =
     let lockObj = obj ()
 
-    /// CTX-006 / FALLBACK-012: whether this slot was reached by a real failure.
+    /// CTX-006 / FALLBACK-012: one-shot recovery material waiter.
     ///
-    /// One-shot physical waiter, not a control-flow boolean. A restart leaves it
-    /// `NotArmed` (`RecoverySlot.afterRestart`), which is the safe side: the worst
-    /// case is one missed compression opportunity.
-    let mutable arming = RecoveryArming.NotArmed
+    /// Physical possession only — presence means a recovery Task is waiting for
+    /// the next main material. Not a business stage: failure registers the waiter
+    /// via `StartRecoveryOpportunity`; material offers complete it once via
+    /// `OfferRecoveryMaterial`. A restart leaves `None` (safe: at most one missed
+    /// compression opportunity, matching `RecoverySlot.afterRestart`).
+    // DSL-MUTABLE: resource — one-shot recovery material waiter
+    let mutable recoveryWaiter: TaskCompletionSource<unit> option = None
 
     let restoredMemory =
         match initialMemory with
@@ -45,16 +35,19 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
                 | Error error -> raise (InvalidOperationException error)
             | _ -> None
 
+    // DSL-MUTABLE: resource — in-memory blog projection mirror (durable-backed)
     let mutable blogProjection: BlogProjectionState =
         restoredMemory
         |> Option.map (fun m -> m.Blog)
         |> Option.defaultValue BlogProjection.empty
 
+    // DSL-MUTABLE: resource — in-memory X-trace projection mirror (durable-backed)
     let mutable xTraceProjection: XTraceProjectionState =
         restoredMemory
         |> Option.map (fun m -> m.XTrace)
         |> Option.defaultValue XTraceProjection.empty
 
+    // DSL-MUTABLE: resource — last effective blog frames cache
     let mutable latestB: BlogText option =
         restoredMemory |> Option.bind (fun m -> m.EffectiveFrames)
 
@@ -64,12 +57,14 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     /// owns the create/abort decision and writes the fact through
     /// `ICompanionDurablePort`, then tells this cache. Restored on construction so a
     /// restart reuses the same Y instead of creating a second one.
+    // DSL-MUTABLE: resource — cached companion Blogger session id
     let mutable bloggerSessionId: SessionId option =
         restoredMemory |> Option.bind (fun m -> m.BloggerSessionId)
 
     // Physical send Task is not the Blogger busy authority (ENFORCER-047).
-    // Busy = BloggerRuntimeState.InFlight on the coordinator cell.
+    // Busy = host flight ownership (HasFlight); State.InFlight is dual-write shadow.
     // Keep a fire-and-forget handle only for WaitInFlightAsync diagnostics.
+    // DSL-MUTABLE: single-flight — fire-and-forget send task handle
     let mutable lastSendTask: Task<unit> option = None
 
     let startAsTask (work: Async<unit>) : Task<unit> =
@@ -109,37 +104,44 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     member _.RefreshXTrace(state: XTraceProjectionState) : unit =
         lock lockObj (fun () -> xTraceProjection <- state)
 
-    /// FALLBACK-012 / CTX-006: create a one-shot recovery slot after a real failure.
+    /// FALLBACK-012 / CTX-006: open a one-shot recovery opportunity after a real failure.
     ///
-    /// One writer, one scope: this is the Y half of `PluginRuntimeScope.ArmRecovery`.
-    /// The Companion's single-flight gate guarantees the slot sequence is linear, so
-    /// arming cannot race a concurrent squash decision. An existing waiter is left
-    /// untouched: a second failure while the first has not been consumed is not a
-    /// second recovery opportunity (the slot already exists).
-    member _.ArmRecoverySlot() : unit =
-        lock lockObj (fun () ->
-            match arming with
-            | RecoveryArming.Armed -> ()
-            | RecoveryArming.NotArmed -> arming <- RecoveryArming.Armed)
+    /// Registers a physical waiter Task. Opportunity exists while the Task is unfinished.
+    /// A second call while the first waiter is unconsumed reuses it (one opportunity).
+    member _.StartRecoveryOpportunity() : Task =
+        let waiter =
+            lock lockObj (fun () ->
+                match recoveryWaiter with
+                | Some existing -> existing
+                | None ->
+                    let created =
+                        TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-    /// Clear an unconsumed recovery slot (squash started, opportunity spent).
-    member _.DisarmRecoverySlot() : unit =
-        lock lockObj (fun () ->
-            match arming with
-            | RecoveryArming.Armed -> arming <- RecoveryArming.NotArmed
-            | RecoveryArming.NotArmed -> ())
+                    recoveryWaiter <- Some created
+                    created)
 
-    /// True when a real failure has created an unconsumed recovery slot.
-    member _.IsRecoveryArmed: bool =
-        lock lockObj (fun () ->
-            match arming with
-            | RecoveryArming.Armed -> true
-            | RecoveryArming.NotArmed -> false)
+        waiter.Task :> Task
+
+    /// Material boundary: complete the pending recovery waiter if any.
+    /// Returns true when a waiter was taken (recovery path may consume this material).
+    /// Second offer with no registered waiter is a no-op.
+    member _.OfferRecoveryMaterial() : bool =
+        let waiter =
+            lock lockObj (fun () ->
+                let current = recoveryWaiter
+                recoveryWaiter <- None
+                current)
+
+        match waiter with
+        | Some tcs ->
+            AsyncSupport.trySetResult tcs () |> ignore
+            true
+        | None -> false
 
     member this.Snapshot: CompanionMemory = this.Memory
     member this.GetMemory() : CompanionMemory = this.Memory
 
-    /// Diagnostic only — not the busy definition (see BloggerRuntimeState).
+    /// Diagnostic only — not the busy definition (busy = host HasFlight).
     member _.LastSendTask: Task<unit> option = lock lockObj (fun () -> lastSendTask)
 
     member this.WaitInFlightAsync() : Task =

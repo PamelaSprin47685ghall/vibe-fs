@@ -37,12 +37,14 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     /// dictionary entry is the guard that makes the invariant structural).
     let parkedGate = obj ()
     let parked = Dictionary<string, ParkedTransform>()
-    // ENFORCER-047/050: dual slots without dual storage.
-    // CurrentRequest = BloggerRuntimeState.InFlight payload (sole authority).
+    // ENFORCER-047/050: dual slots without dual storage for PendingOffer.
+    // CurrentRequest ownership = physical flight registry (entry = in-flight).
+    // BloggerRuntimeState.InFlight is dual-write shadow for transition-cell compat;
+    // production busy reads prefer HasFlight / TryGetFlight.
     // PendingOffer = separate dictionary for the next Main material while Parked.
-    // A second dictionary mirroring InFlight dual-wrote and drifted into
-    // "missing CurrentRequest" while the cell still held typed context.
     let pendingOffer = Dictionary<string, BloggerRequestContext>()
+    // DSL-MUTABLE: single-flight — physical Blogger request ownership registry
+    let bloggerFlights = Dictionary<string, BloggerRequestContext>()
     let bloggerRuntime = Dictionary<string, BloggerRuntimeCell>()
 
     /// HOST-006: the first compaction setting the config hook could not establish.
@@ -194,6 +196,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                 | false, _ -> ()
 
                 pendingOffer.Remove sessionId |> ignore
+                bloggerFlights.Remove sessionId |> ignore
                 // Park cancel/timeout leaves the logical Blogger idle, not disposed.
                 // Seal is durable: park cancel always clears to Idle; the
                 // next entry's durable check re-blocks when still sealed.
@@ -207,9 +210,20 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         member this.HasParked(sessionId: string) : bool =
             lock parkedGate (fun () -> parked.ContainsKey sessionId)
 
-        // ENFORCER-047: CurrentRequest IS the InFlight payload. No parallel dict.
+        // Physical flight ownership (PR7 knife 1): entry present = single-flight request.
+        member this.HasFlight(sessionId: string) : bool =
+            lock parkedGate (fun () -> bloggerFlights.ContainsKey sessionId)
+
+        member this.TryGetFlight(sessionId: string) : BloggerRequestContext option =
+            lock parkedGate (fun () ->
+                match bloggerFlights.TryGetValue sessionId with
+                | true, ctx -> Some ctx
+                | false, _ -> None)
+
+        // Dual-write: flight registry (authority) + State.InFlight shadow.
         member this.SetCurrentRequest(sessionId: string, context: BloggerRequestContext) : unit =
             lock parkedGate (fun () ->
+                bloggerFlights.[sessionId] <- context
                 let cell = this.GetBloggerRuntimeUnlocked sessionId
 
                 match cell.State with
@@ -224,12 +238,18 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                             State = BloggerRuntimeState.InFlight context })
 
         member this.TryPeekCurrentRequest(sessionId: string) : BloggerRequestContext option =
-            lock parkedGate (fun () -> BloggerRuntime.inFlightContext (this.GetBloggerRuntimeUnlocked sessionId))
+            // Prefer flight ownership; fall back to shadow InFlight for dual-write window.
+            lock parkedGate (fun () ->
+                match bloggerFlights.TryGetValue sessionId with
+                | true, ctx -> Some ctx
+                | false, _ -> BloggerRuntime.inFlightContext (this.GetBloggerRuntimeUnlocked sessionId))
 
         member this.ClearCurrentRequest(sessionId: string) : unit =
-            // Success path already moved the cell to Idle via onCycleCommitted/onFail.
-            // If still InFlight (abandon / timeout without transition), drop to Idle.
+            // Remove physical flight; success path may already have Idle shadow via
+            // onCycleCommitted/onFail. If still InFlight (abandon / timeout), drop to Idle.
             lock parkedGate (fun () ->
+                bloggerFlights.Remove sessionId |> ignore
+
                 match bloggerRuntime.TryGetValue sessionId with
                 | true, cell ->
                     match cell.State with
@@ -263,7 +283,13 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             lock parkedGate (fun () -> this.GetBloggerRuntimeUnlocked sessionId)
 
         member this.SetBloggerRuntime(sessionId: string, cell: BloggerRuntimeCell) : unit =
-            lock parkedGate (fun () -> bloggerRuntime.[sessionId] <- cell)
+            // Keep flight registry dual-written with State shadow during PR7 transition.
+            lock parkedGate (fun () ->
+                bloggerRuntime.[sessionId] <- cell
+
+                match cell.State with
+                | BloggerRuntimeState.InFlight ctx -> bloggerFlights.[sessionId] <- ctx
+                | BloggerRuntimeState.Idle -> bloggerFlights.Remove sessionId |> ignore)
 
     member private _.GetBloggerRuntimeUnlocked(sessionId: string) : BloggerRuntimeCell =
         match bloggerRuntime.TryGetValue sessionId with
@@ -359,7 +385,9 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         for key in cancelKeys do
             (this :> IParkedTransformHost).CancelParked key
 
-            lock parkedGate (fun () -> bloggerRuntime.Remove key |> ignore)
+            lock parkedGate (fun () ->
+                bloggerRuntime.Remove key |> ignore
+                bloggerFlights.Remove key |> ignore)
 
             this.AttemptPlans.Keys
             |> Seq.filter (fun planKey -> planKey.StartsWith(key + "\u001f", StringComparison.Ordinal))
@@ -381,6 +409,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
                 parked.Clear()
                 pendingOffer.Clear()
+                bloggerFlights.Clear()
                 bloggerRuntime.Clear())
 
             lock toolRuntimeGate (fun () ->

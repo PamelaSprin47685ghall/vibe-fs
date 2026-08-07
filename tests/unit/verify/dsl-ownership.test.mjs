@@ -61,12 +61,6 @@ const NEGATIVES = [
   },
   {
     gate: 'dup-cases',
-    file: 'Agent/Negative_dup_cases.fs',
-    source: ['module Sample', 'type Alpha =', '    | First', '    | Second', 'type Beta =', '    | First', '    | Second'].join('\n'),
-    line: 2,
-  },
-  {
-    gate: 'dup-cases',
     file: 'Session/ChildRecovery.fs',
     source: ['module Sample', 'type Alpha =', '    | First', '    | Second', 'type ChildResolution =', '    | First', '    | Second'].join('\n'),
     line: 2,
@@ -120,6 +114,77 @@ test('DSL_OWNERSHIP_large_du_with_class_annotation_is_clean', () => {
   assert.deepEqual(scanLargeDus(src, 'Agent/Large.fs'), [])
 })
 
+test('DSL_OWNERSHIP_large_du_class_annotation_across_attribute_is_clean', () => {
+  // Roles.fs shape: `/// DSL-class:` separated from `type` by a
+  // `[<RequireQualifiedAccess>]` attribute must still be matched (the lookback
+  // skips attribute/blank lines while collecting `///` doc lines).
+  const src = [
+    'module Sample',
+    '/// DSL-class: Vocabulary — fixed catalog.',
+    '[<RequireQualifiedAccess>]',
+    'type Big =',
+    '    | C01',
+    '    | C02',
+    '    | C03',
+    '    | C04',
+    '    | C05',
+    '    | C06',
+    '    | C07',
+    '    | C08',
+    '    | C09',
+    '    | C10',
+  ].join('\n')
+  assert.deepEqual(scanLargeDus(src, 'Agent/Large.fs'), [])
+})
+
+test('DSL_OWNERSHIP_large_du_class_annotation_across_attribute_and_blank_is_clean', () => {
+  // Attribute plus blank lines between doc and `type` are skipped too.
+  const src = [
+    'module Sample',
+    '',
+    '/// DSL-class: Vocabulary — fixed catalog.',
+    '[<RequireQualifiedAccess>]',
+    '',
+    'type Big =',
+    '    | C01',
+    '    | C02',
+    '    | C03',
+    '    | C04',
+    '    | C05',
+    '    | C06',
+    '    | C07',
+    '    | C08',
+    '    | C09',
+    '    | C10',
+  ].join('\n')
+  assert.deepEqual(scanLargeDus(src, 'Agent/Large.fs'), [])
+})
+
+test('DSL_OWNERSHIP_large_du_unclassified_still_reported_behind_attribute', () => {
+  // A large DU with no DSL-class annotation is still reported even when an
+  // attribute sits between the doc area and the type declaration.
+  const src = [
+    'module Sample',
+    '/// A doc comment that is not a DSL-class annotation.',
+    '[<RequireQualifiedAccess>]',
+    'type Big =',
+    '    | C01',
+    '    | C02',
+    '    | C03',
+    '    | C04',
+    '    | C05',
+    '    | C06',
+    '    | C07',
+    '    | C08',
+    '    | C09',
+    '    | C10',
+  ].join('\n')
+  const reported = scanLargeDus(src, 'Agent/Large.fs')
+  assert.equal(reported.length, 1)
+  assert.equal(reported[0].name, 'Big')
+  assert.equal(reported[0].cases, 10)
+})
+
 test('DSL_OWNERSHIP_small_du_is_never_reported', () => {
   const src = ['module Sample', 'type Small =', '    | A', '    | B'].join('\n')
   assert.deepEqual(scanLargeDus(src, 'Agent/Small.fs'), [])
@@ -156,9 +221,7 @@ for (const sample of NEGATIVES.filter((s) => s.gate === 'bool-loop' || s.gate ==
   test(`DSL_OWNERSHIP_negative_${sample.gate}_goes_red`, () => {
     const hits = scanFiles([{ file: sample.file, text: sample.source }])
     const ofGate = hits.filter((v) => v.gate === sample.gate)
-    if (sample.file.startsWith('Process/') || sample.file.includes('/Process/')) {
-      assert.equal(ofGate.length, 0, 'Process physical paths are exempt from bool-loop')
-    } else if (sample.file.endsWith('ChildRecovery.fs')) {
+    if (sample.file.endsWith('ChildRecovery.fs')) {
       // DUP_CASES_EXEMPT registers ChildRecovery.fs:ChildResolution; a DU with
       // that exact basename:name must not fire.
       assert.equal(ofGate.length, 0, 'registered exemption does not fire')
@@ -209,13 +272,64 @@ test('DSL_OWNERSHIP_scanFiles_aggregates_entries', () => {
 })
 
 
-test('DSL_OWNERSHIP_physical_and_domain_mutable_are_not_gate_red', () => {
-  const source = ['module Sample', 'let scratch () =', '    let mutable acc = 0', '    acc'].join('\n')
-  assert.deepEqual(scanText(source, 'src/Wanxiangshu/Domain/Sample.fs'), [])
-  assert.deepEqual(scanText(source, 'src/Wanxiangshu/Session/Sample.fs'), [])
-  assert.deepEqual(scanText(source, 'src/Wanxiangshu/Application/Sample.fs'), [])
-  assert.ok(scanText(source, 'src/Wanxiangshu/Agent/Sample.fs').some((h) => h.gate === 'mutable'))
-  assert.ok(scanText(source, 'src/Wanxiangshu/Kernel/Outcome.fs').some((h) => h.gate === 'mutable'))
+test('DSL_OWNERSHIP_mutable_requires_dsl_mutable_declaration', () => {
+  // Domain/Session/Application/Process/Kernel.Parallel: a bare `let mutable`
+  // is a violation; the preceding 1-2 lines must carry `// DSL-MUTABLE:`.
+  const bare = ['module Sample', 'let scratch () =', '    let mutable acc = 0', '    acc'].join('\n')
+  for (const path of [
+    'src/Wanxiangshu/Domain/Sample.fs',
+    'src/Wanxiangshu/Session/Sample.fs',
+    'src/Wanxiangshu/Application/Sample.fs',
+    'src/Wanxiangshu/Process/Sample.fs',
+    'src/Wanxiangshu/Kernel/Parallel.fs',
+  ]) {
+    assert.ok(scanText(bare, path).some((h) => h.gate === 'mutable'), `bare mutable must fire in ${path}`)
+  }
+
+  // A DSL-MUTABLE declaration legalizes a mutable on an allowed path.
+  const declared = [
+    'module Sample',
+    'let scratch () =',
+    '    // DSL-MUTABLE: algorithm-scratch — loop accumulator',
+    '    let mutable acc = 0',
+    '    acc',
+  ].join('\n')
+  for (const path of [
+    'src/Wanxiangshu/Domain/Sample.fs',
+    'src/Wanxiangshu/Session/Sample.fs',
+    'src/Wanxiangshu/Application/Sample.fs',
+    'src/Wanxiangshu/Process/Sample.fs',
+    'src/Wanxiangshu/Kernel/Parallel.fs',
+  ]) {
+    assert.deepEqual(scanText(declared, path), [], `declared mutable must stay green in ${path}`)
+  }
+
+  // Agent and non-Parallel Kernel stay fully fail-closed: even a declaration
+  // cannot legalize a mutable there.
+  assert.ok(scanText(declared, 'src/Wanxiangshu/Agent/Sample.fs').some((h) => h.gate === 'mutable'))
+  assert.ok(scanText(declared, 'src/Wanxiangshu/Kernel/Outcome.fs').some((h) => h.gate === 'mutable'))
+})
+
+test('DSL_OWNERSHIP_unknown_mutable_category_is_rejected', () => {
+  const source = [
+    'module Sample',
+    'let scratch () =',
+    '    // DSL-MUTABLE: mystery — not a registered category',
+    '    let mutable acc = 0',
+    '    acc',
+  ].join('\n')
+  assert.ok(scanText(source, 'src/Wanxiangshu/Domain/Sample.fs').some((h) => h.gate === 'mutable'))
+})
+
+test('DSL_OWNERSHIP_control_state_class_is_a_program_counter', () => {
+  const source = [
+    'module Sample',
+    '/// DSL-class: ControlState',
+    'type Mode =',
+    '    | A',
+    '    | B',
+  ].join('\n')
+  assert.ok(scanText(source, 'src/Wanxiangshu/Session/Sample.fs').some((h) => h.gate === 'program-counter'))
 })
 
 
@@ -242,4 +356,47 @@ test('DSL_OWNERSHIP_threshold_freeze_semantics', () => {
   assert.equal(evaluateThreshold(318, 317).ok, false)
   assert.equal(evaluateThreshold(317, 317).reason, 'within-threshold')
   assert.equal(evaluateThreshold(318, 317).reason, 'exceeds-threshold')
+})
+
+test('DSL_OWNERSHIP_cross_file_duplicate_case_set_is_violation', () => {
+  const hits = scanFiles([
+    {
+      file: 'src/Wanxiangshu/Domain/Alpha.fs',
+      text: ['module Sample', 'type OutcomeA =', '    | Started', '    | Finished'].join('\n'),
+    },
+    {
+      file: 'src/Wanxiangshu/Application/Beta.fs',
+      text: ['module Sample', 'type OutcomeB =', '    | Finished', '    | Started'].join('\n'),
+    },
+  ])
+  const dup = hits.filter((v) => v.gate === 'dup-cases')
+  assert.ok(dup.length >= 1, 'cross-file duplicate case set must fire')
+})
+
+test('DSL_OWNERSHIP_single_file_duplicate_case_set_is_not_cross_file', () => {
+  // dup-cases is a cross-file gate (PR 9 E): the global case-set map is keyed
+  // across files, and each DU is flushed when the next `type` begins (or at
+  // end of file). Two DUs in the SAME file, even with an identical case set,
+  // are not the cross-file duplication the gate targets.
+  const hits = scanFiles([
+    {
+      file: 'src/Wanxiangshu/Domain/Alpha.fs',
+      text: ['module Sample', 'type Alpha =', '    | First', '    | Second', 'type Beta =', '    | First', '    | Second'].join('\n'),
+    },
+  ])
+  assert.ok(!hits.some((v) => v.gate === 'dup-cases'))
+})
+
+test('DSL_OWNERSHIP_cross_file_duplicate_case_set_exemption_stays_clean', () => {
+  const hits = scanFiles([
+    {
+      file: 'src/Wanxiangshu/Domain/PromptAuthority.fs',
+      text: ['module Sample', 'type AgentNameRejection =', '    | LegacyAgentName', '    | UnknownManagedAgent', '    | Malformed'].join('\n'),
+    },
+    {
+      file: 'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ManagedAgent.fs',
+      text: ['module Sample', 'type ManagedAgentParseError =', '    | UnknownManagedAgent', '    | LegacyAgentName', '    | Malformed'].join('\n'),
+    },
+  ])
+  assert.ok(!hits.some((v) => v.gate === 'dup-cases'))
 })

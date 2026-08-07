@@ -12,18 +12,22 @@ type BloggerToolRecovery =
     | InteractionNudgeIssued of ProviderRunIdentity
     | AabbRepairConsumed
 
-/// ENFORCER-047: single Blogger coordinator state.
+/// ENFORCER-047: Blogger coordinator cell (PARTIAL shadow — PR7 knife 1–2).
 ///
-/// InFlight = provider still working on an uncommitted request (the only busy definition).
-/// Idle = no request running. Whether a parked transform waits for the next
-/// material is the host dictionary's physical fact
-/// (`IParkedTransformHost.HasParked`), passed into `onMaterial` explicitly — the
-/// cell carries no mirror of it.
+/// Physical busy ownership is the host flight registry (`IParkedTransformHost.HasFlight`):
+/// dictionary entry present = a single-flight request owns the session.
+/// `InFlight ctx` / `Idle` remain as dual-write shadow so transition APIs and tests
+/// keep compiling; production busy checks must prefer HasFlight, not cell.State.
+/// Whether a parked transform waits for the next material is the host dictionary's
+/// physical fact (`IParkedTransformHost.HasParked`), passed into `onMaterial`
+/// explicitly — the cell carries no mirror of it.
 /// There is deliberately NO Sealed case: handle seal is a durable journal fact
 /// (AgentProjection.mainSealedForBlogger), read on every decision — a sealed cell
 /// mirror would only ever duplicate it and drift stale on reactivation.
 /// The next-Main-material slot lives in the host dictionary (ENFORCER-050), not on
 /// the cell — the cell never carries a PendingOffer mirror.
+/// TODO (later knife): delete this DU once all busy reads use flight ownership and
+/// Task finally removes the flight without onCycleCommitted/onFail transitions.
 [<RequireQualifiedAccess>]
 type BloggerRuntimeState =
     | Idle
@@ -44,11 +48,13 @@ type DrainWindow =
     | Closed
     | Open of DrainPermit
 
-/// Host-owned cell: state + drain window. CurrentRequest lives in the InFlight
-/// payload; the next-Main-material slot is the host dictionary (ENFORCER-050).
-/// Recovery is derived, never stored (ENFORCER-153).
+/// Host-owned cell: State (shadow) + drain window.
+/// CurrentRequest authority = flight ownership on the host; State.InFlight is
+/// dual-written for transition-cell compat. PendingOffer is host dictionary
+/// (ENFORCER-050). Recovery is derived, never stored (ENFORCER-153).
 type BloggerRuntimeCell =
     {
+        /// Shadow of flight presence for transition APIs; not the busy authority.
         State: BloggerRuntimeState
         /// Durable handle sealed + new Authority Root may open one drain window.
         Drain: DrainWindow

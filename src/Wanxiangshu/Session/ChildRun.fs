@@ -15,6 +15,7 @@ type CompletionCell<'a>() =
     let tcs =
         TaskCompletionSource<'a>(TaskCreationOptions.RunContinuationsAsynchronously)
 
+    // DSL-MUTABLE: resource — one-shot completion signal + stored value
     let mutable completed = false
     let mutable stored: 'a option = None
     let gate = obj ()

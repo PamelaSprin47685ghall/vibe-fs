@@ -16,9 +16,9 @@ Infrastructure Host hooks / codec / resource — 不解释业务命令
 
 ## DSL-009：模块与职责
 
-- `NodeProcessWait`：进程等待生命周期拆分为 `awaitExitOrDeadline`/`killAndAwaitAcknowledgement`/`waitForProcess`。
+- `NodeProcessWait`：进程等待生命周期拆分为 `awaitExitOrDeadline`/`awaitKillAcknowledgement`/`waitForExit`；`waitForSignal` 以三态 `WaitSignal = ProcessExited | TimerElapsed | Cancelled` 区分自然退出/业务超时/取消，`Cancelled` 绝不解释为退出。
 - `BloggerRuntime`：单一入口 `onMainMaterial`；`BloggerRuntimeState` 只有 `InFlight`（payload 即 CurrentRequest 唯一权威）与 `Idle` 二态；「有 parked waiter」由 `IParkedTransformHost.HasParked` 物理事实经 `onMaterial` 显式 `hasParkedWaiter` 参数传入；`Sealed` 由 durable projection 查询表示；无 `Parked`/`Disposed` case。
-- `Companion`：恢复槽是一次性物理信号，`ArmRecoverySlot`（真实失败置位）/`IsRecoveryArmed`（squash 决策查询）/`DisarmRecoverySlot`（squash 启动清位）；无 `TaskCompletionSource` waiter、无 `TryConsumeRecoverySlot`。
+- `Companion`：恢复槽是一次性物理 waiter，`recoveryWaiter: TaskCompletionSource<unit> option`（`// DSL-MUTABLE: resource`）；机会 = waiter 未完成。`StartRecoveryOpportunity`（真实失败后注册，复用未消费 waiter）启动恢复 Task，`OfferRecoveryMaterial`（material 边界唤醒并消费一次，未注册即 no-op）驱动它；重启留 `None`。诚实注：X 侧 `PluginRuntimeScope.RecoveryArming: Dictionary<_, SlotArming>` 仍存在，属 session 级 attempt/XWire 证据路径，**不是** Companion Y 侧 Armed PC，勿混写。
 - `AgentFact`：拆分为 7 个 bounded-context family（`PromptFactCases` / `ReviewFactCases` / `ExecutionFactCases` / `OrchestratorFactCases` / `CompanionFactCases` 等），`AgentFact` 为 7-case 分派联合，外层 `match` 一次分派后进入 family 纯 fold，不构造解释器。
 
 ## DSL-010：Host 边界白名单

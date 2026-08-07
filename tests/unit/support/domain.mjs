@@ -232,7 +232,13 @@ const [
   prod('Infrastructure/OpenCode/Signals/HostSignalSubscribe'),
   prod('Infrastructure/OpenCode/Host/ManagedAgentConfig'),
 ])
-    
+
+const [NodeProcessWaitModule, NodeProcessHostModule, FableTask, FableTypes] = await Promise.all([
+  prod('Process/NodeProcessWait'),
+  prod('Process/NodeProcessHost'),
+  lib('Task.js'),
+  lib('Types.js'),
+])
 
 // ── the one Fable naming convention ──────────────────────────────────────────
 //
@@ -3835,6 +3841,63 @@ export const parallel = {
 export const liveToken = () => new AsyncBuilder.CancellationToken(false)
 export const cancelledToken = () => new AsyncBuilder.CancellationToken(true)
 
+/**
+ * EXEC-011 process wait surface. Mock ChildProcess only — never touches real OS spawn.
+ *
+ * Fable shapes absorbed here: ChildProcess record fields, FSharpRef.contents for Exited,
+ * TaskCompletionSource.get_Task / SetResult, OnExited as a JS array (ResizeArray).
+ */
+export const processWait = (() => {
+  const waitForExitFn = NodeProcessWaitModule.waitForExit
+  if (typeof waitForExitFn !== 'function') {
+    throw new Error('NodeProcessWait.waitForExit missing from dist — run npm run build')
+  }
+  const notifyExitedFn = NodeProcessHostModule.notifyExited
+  if (typeof notifyExitedFn !== 'function') {
+    throw new Error('NodeProcessHost.notifyExited missing from dist — run npm run build')
+  }
+  const ChildProcess = NodeProcessHostModule.ChildProcess
+  if (typeof ChildProcess !== 'function') {
+    throw new Error('NodeProcessHost.ChildProcess missing from dist — run npm run build')
+  }
+
+  return {
+    killAckGraceMs: NodeProcessWaitModule.KillAckGraceMs,
+    /** Business wait entry: ChildProcess → Deadline → CancellationToken → Promise<WaitOutcome>. */
+    waitForExit: (child, dl, ct) => waitForExitFn(child, dl, ct),
+    /**
+     * In-memory child: Kill is a counter; exit is explicit via `exit(code)`.
+     * Optional `onKill` runs after each Kill (e.g. schedule a delayed real exit).
+     */
+    mockChild: ({ onKill } = {}) => {
+      const exitTcs = new FableTask.TaskCompletionSource()
+      const exited = new FableTypes.FSharpRef(false)
+      const onExited = []
+      let killCount = 0
+      const child = new ChildProcess(
+        null,
+        exitTcs,
+        () => {
+          killCount += 1
+          if (typeof onKill === 'function') onKill()
+        },
+        exited,
+        onExited,
+      )
+      return {
+        child,
+        killCount: () => killCount,
+        /** Mark exited + complete Exit.Task + fire OnExited waiters (same order as Host). */
+        exit: (code) => {
+          exited.contents = true
+          exitTcs.SetResult(code | 0)
+          notifyExitedFn(child)
+        },
+      }
+    },
+  }
+})()
+
 // ── outcomes ─────────────────────────────────────────────────────────────────
 
 export const outcome = {
@@ -4506,6 +4569,8 @@ export const parkedTransform = (() => {
     // Back-compat alias used by parked-transform tests (PendingOffer path).
     offerParked: (scope, sessionId, context) => scope.SetPendingOffer(sessionId, context),
     hasParked: (scope, sessionId) => scope.HasParked(sessionId),
+    hasFlight: (scope, sessionId) => scope.HasFlight(sessionId),
+    tryGetFlight: (scope, sessionId) => projectContext(scope.TryGetFlight(sessionId)),
     consumeStaged: (scope, sessionId) => projectContext(scope.TryTakePendingOffer(sessionId)),
     setCurrentRequest: (scope, sessionId, context) => scope.SetCurrentRequest(sessionId, context),
     peekCurrentRequest: (scope, sessionId) => projectContext(scope.TryPeekCurrentRequest(sessionId)),

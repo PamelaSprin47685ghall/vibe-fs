@@ -266,6 +266,7 @@ module XTraceCapture =
             let recorded =
                 existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
 
+            // DSL-MUTABLE: algorithm-scratch — monotone projection cursor advanced by the fold
             let mutable cursor = XTraceProjection.headSequence existing
 
             projection.Messages

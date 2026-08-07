@@ -47,6 +47,7 @@ type HostForkRuntime
     let children = Dictionary<string, SessionId>()
     let pendingRuns = Dictionary<string, PendingHostRun>()
     let ptyRuns = HashSet<string>()
+    // DSL-MUTABLE: resource — most recent PTY id (survives a parent-provider restart)
     let mutable lastPtyId: string option = None
     let gate = obj ()
 

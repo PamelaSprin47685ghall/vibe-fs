@@ -12,7 +12,9 @@ module ParallelHelpers =
     let defer<'T> (work: unit -> Task<'T>) : Task<'T> = jsNative
 
 type private JsTcs<'T>() =
+    // DSL-MUTABLE: resource — one-shot promise completion flag
     let mutable completed = false
+    // DSL-MUTABLE: resource — pending promise resolver, written once at construct
     let mutable resolveFn: ('T -> unit) option = None
 
     let p =
@@ -41,6 +43,7 @@ type private JsTcs<'T>() =
             | None -> false
 
 type private AsyncSemaphore(maxCount: int) =
+    // DSL-MUTABLE: resource — remaining permit count of the semaphore
     let mutable count = maxCount
     let waiters = System.Collections.Generic.Queue<JsTcs<unit>>()
     let lockObj = obj ()

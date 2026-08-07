@@ -1473,6 +1473,7 @@ module EnforcerHost =
                     // staged cycle then rebuild from live journal coverage. Must NOT
                     // resumeWithContext(liveCtx) — that freezes PreviousIngestedThrough
                     // at the pre-crash cursor and loops KnownNotCommitted forever.
+                    // DSL-MUTABLE: algorithm-scratch — mutable cycle-disposition accumulator
                     let mutable disposition = CycleDisposition.Working
 
                     let fatalEnd (reason: string) =

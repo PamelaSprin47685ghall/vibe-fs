@@ -194,6 +194,7 @@ module BloggerCrashRecovery =
         (journal: AgentJournal option, host: IParkedTransformHost, snapshotOpt: ISessionSnapshotPort option) =
 
         let gate = obj ()
+        // DSL-MUTABLE: single-flight — memoized reconcile task (latch, not a stage)
         let mutable pass: Task<WindowOutcome list> option = None
 
         member _.EnsureDone() : Task =

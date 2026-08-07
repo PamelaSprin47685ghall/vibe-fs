@@ -1,12 +1,10 @@
 /**
- * CTX-006 / FALLBACK-012: Companion recovery slot is a one-shot physical signal.
+ * CTX-006 / FALLBACK-012: Companion recovery opportunity is a one-shot physical waiter.
  *
- * The slot is the Y half of HostSignalBootstrap.ArmRecovery: a real failure
- * arms it, the squash decision reads `IsRecoveryArmed`, starting a squash
- * clears it. It is deliberately NOT a Task waiter — nothing in production
- * awaits it, and cancelling an un-awaited promise would reject it into an
- * unhandled rejection. A restart leaves it NotArmed. These tests walk the
- * public dist surface (Companion class) — no runtime tag, no internals.
+ * Failure opens `StartRecoveryOpportunity` (registers a TCS). Material offers via
+ * `OfferRecoveryMaterial` consume that waiter once. No Armed/NotArmed program
+ * counter — opportunity exists while the waiter Task is unfinished. A fresh
+ * Companion has no residual opportunity (restart-safe).
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -16,33 +14,34 @@ const Companion = await import('../../../dist/Session/Companion.js')
 
 const make = () => Companion.Companion_$ctor_Z79B603FF(undefined, undefined, sessionId('ses-main'))
 
-test('CTX_006_recovery_slot_starts_not_armed', () => {
+const startOpportunity = (c) => Companion.Companion__StartRecoveryOpportunity(c)
+const offerMaterial = (c) => Companion.Companion__OfferRecoveryMaterial(c)
+
+test('CTX_006_fresh_companion_has_no_recovery_opportunity', () => {
   const c = make()
-  assert.equal(Companion.Companion__get_IsRecoveryArmed(c), false)
+  assert.equal(offerMaterial(c), false, 'no register → offer is no-op')
 })
 
-test('CTX_006_arm_is_a_one_shot_signal_disarm_clears_it', () => {
+test('CTX_006_start_then_offer_consumes_waiter_once', async () => {
   const c = make()
-  Companion.Companion__ArmRecoverySlot(c)
-  assert.equal(Companion.Companion__get_IsRecoveryArmed(c), true)
-
-  Companion.Companion__DisarmRecoverySlot(c)
-  assert.equal(Companion.Companion__get_IsRecoveryArmed(c), false, 'disarm clears atomically')
+  const opportunity = startOpportunity(c)
+  assert.equal(offerMaterial(c), true, 'first offer takes the waiter')
+  await opportunity
+  assert.equal(offerMaterial(c), false, 'second offer no longer consumed')
 })
 
-test('CTX_006_second_failure_does_not_create_second_opportunity', () => {
-  // A second failure while the first slot is unconsumed is not a second
-  // recovery opportunity: arming is idempotent, one disarm fully clears it.
+test('CTX_006_second_start_reuses_single_opportunity', async () => {
   const c = make()
-  Companion.Companion__ArmRecoverySlot(c)
-  Companion.Companion__ArmRecoverySlot(c)
-  assert.equal(Companion.Companion__get_IsRecoveryArmed(c), true)
-  Companion.Companion__DisarmRecoverySlot(c)
-  assert.equal(Companion.Companion__get_IsRecoveryArmed(c), false)
+  const first = startOpportunity(c)
+  const second = startOpportunity(c)
+  // Same one-shot waiter: two starts share one opportunity.
+  assert.equal(offerMaterial(c), true)
+  await Promise.all([first, second])
+  assert.equal(offerMaterial(c), false)
 })
 
-test('CTX_006_disarm_when_not_armed_is_a_noop', () => {
+test('CTX_006_offer_without_register_is_noop', () => {
   const c = make()
-  Companion.Companion__DisarmRecoverySlot(c)
-  assert.equal(Companion.Companion__get_IsRecoveryArmed(c), false)
+  assert.equal(offerMaterial(c), false)
+  assert.equal(offerMaterial(c), false)
 })

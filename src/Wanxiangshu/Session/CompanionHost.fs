@@ -28,11 +28,15 @@ type CompanionHost
 
     let bloggerEffectiveAgent = ManagedAgent.nameOf AgentTier.Fast Role.Blogger
 
+    // DSL-MUTABLE: single-flight — memoized blogger create task
     let mutable bloggerCreateTask: Task<SessionId> option = None
+    // DSL-MUTABLE: resource — resolved blogger session id
     let mutable bloggerId: SessionId option = None
+    // DSL-MUTABLE: resource — create-failure latch, cleared on retry
     let mutable bloggerCreateFailed = false
     let bloggerRequestKind = ref ProviderRequestKind.BloggerMain
     let bloggerSquashFrameCount = ref None
+    // DSL-MUTABLE: resource — one-shot restored-blogger id consumption
     let mutable restoredBloggerIdOpt = restoredBloggerId
 
     let ensureBlogger () =
@@ -138,12 +142,12 @@ type CompanionHost
             bloggerCreateFailed <- true
             companion.RecordBloggerClosed())
 
-    /// CTX-006 / FALLBACK-012: arm this Companion's next recovery slot.
-    member this.ArmRecoverySlot() = companion.ArmRecoverySlot()
+    /// CTX-006 / FALLBACK-012: open a one-shot recovery opportunity (physical waiter).
+    member this.StartRecoveryOpportunity() : Task = companion.StartRecoveryOpportunity()
 
-    member this.IsRecoveryArmed: bool = companion.IsRecoveryArmed
-
-    member this.DisarmRecoverySlot() = companion.DisarmRecoverySlot()
+    /// Material boundary: offer main material to a pending recovery waiter.
+    /// True when a waiter was taken (recovery path may consume this material).
+    member this.OfferRecoveryMaterial() : bool = companion.OfferRecoveryMaterial()
 
     /// CTX-006: primary session fallback cursor Offset (durable, not cached).
     /// FALLBACK-002: the offset leaves this boundary as the closed DU.
