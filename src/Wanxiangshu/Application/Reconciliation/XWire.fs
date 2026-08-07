@@ -162,12 +162,27 @@ module XWire =
                                     // PROJ-002: the attempt-local projection snapshot is built once
                                     // and feeds both the probe proof (cutoffDigest) and the prefix
                                     // decision (requiredBlob / forChoice).
+                                    // PROJ-008 Step6: reanchor 后 CommittedPrefix=None 且声明
+                                    // ReanchorAfterCompaction（wire no-op）。若 epoch 仍有 snapshot，
+                                    // 则走既有 Activate/Keep 路径。HostReanchor 由 Coordinator 填充。
+                                    let hostReanchor: HostReanchorFact option =
+                                        match prefix.Snapshot, Set.isEmpty prefix.ReanchoredRuns with
+                                        | None, false ->
+                                            // 最近一次 reanchor 观察：集合有元素但无 snapshot。
+                                            // 生产路径不重放 observed run id 到 wire；仅作事实侧。
+                                            Some
+                                                { PreviousEpochId =
+                                                    string (max 0L (PrefixEpochId.value prefix.EpochId - 1L))
+                                                  NextEpochId = string (PrefixEpochId.value prefix.EpochId)
+                                                  ObservedCompactionRunId = "" }
+                                        | _ -> None
+
                                     let snapshot =
                                         { CurrentProjection = current
                                           CommittedPrefix = prefix.Snapshot
                                           BlogFrames = []
                                           TransportMessages = Set.empty
-                                          HostReanchor = None }
+                                          HostReanchor = hostReanchor }
 
                                     let mayRecover =
                                         RecoverySlot.mayRecover
@@ -206,14 +221,25 @@ module XWire =
                                             | Ok body -> body
                                             | Error reason -> raise (InvalidOperationException reason)
 
-                                    let intent =
+                                    let prefixIntent =
                                         XPrefixProjection.forChoice
                                             plan.Profile.ProjectionChoice
                                             snapshot.CommittedPrefix
                                             frozenRecordPrefixBody
 
+                                    // reanchor 后：prefix intent 已是 KeepPhysicalPrefix（Snapshot=None）；
+                                    // 再声明 ReanchorAfterCompaction 表达 HOST-006 投影语义（wire no-op）。
+                                    // Activate + Reanchor 同批 → ConflictingPrefixLifecycle（fail-closed）。
+                                    // hostReanchor 仅在 Snapshot=None 时填充 → prefixIntent 必为 Keep。
+                                    // Activate + Reanchor 冲突由 plan fail-closed 覆盖（unit 已证明）。
+                                    let intents =
+                                        match hostReanchor with
+                                        | Some _ ->
+                                            [ prefixIntent; ProjectionIntent.ReanchorAfterCompaction ]
+                                        | None -> [ prefixIntent ]
+
                                     let transformed =
-                                        match ProjectionPlanner.plan [ intent ] with
+                                        match ProjectionPlanner.plan intents with
                                         | Error conflict ->
                                             raise (
                                                 InvalidOperationException(
@@ -221,6 +247,8 @@ module XWire =
                                                 )
                                             )
                                         | Ok ordered ->
+                                            // ReanchorAfterCompaction 是 wire no-op；prefix 写回仍用
+                                            // applyRenderedPrefix（与既有 Host id 字节合同一致）。
                                             let rendered = ProjectionRenderer.renderPrefix ordered
                                             Projection.applyRenderedPrefix rawMessages rendered
 

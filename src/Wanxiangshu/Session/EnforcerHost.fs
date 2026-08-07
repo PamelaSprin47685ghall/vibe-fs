@@ -90,8 +90,8 @@ module EnforcerHost =
         ContinuationOutcome.StopPhysicalRun(ensureNonEmpty messages fallback, reason)
 
     /// Item 15: stable minimal repair instruction (no dynamic context resend).
-    let RepairInstruction =
-        "# Protocol repair\n\nCall the blog tool exactly once with non-empty text. Do not answer in prose."
+    /// Domain 单源 — `ProjectionConstants.RepairInstruction`（PROJ-008 Step4）。
+    let RepairInstruction = ProjectionConstants.RepairInstruction
 
     let private classifyAppendFailure (failure: JournalAppendFailure) : CycleCommitOutcome =
         match failure with
@@ -999,26 +999,72 @@ module EnforcerHost =
             else
                 None
 
-    /// ENFORCER-060/061: stable InteractionRepair user message (item 15 — fixed text only).
+    /// ENFORCER-060/061: InteractionRepair via Projection algebra (PROJ-008 Step4).
+    ///
+    /// 消息正文 / 顺序来自 `InsertRepair` → plan → renderMessagesWithIntents。
+    /// Host `createObj` 只写回 id / source / requestKey 侧信道；id 规则保持
+    /// `enforcer-repair-` + sha256(requestKey + "|" + RepairInstruction).Substring(0, 24)。
     let private withRepairInstruction (rawMessages: obj list) (requestKey: string) : obj list =
-        let msgId =
-            "enforcer-repair-"
-            + (HostDigest.sha256Hex (requestKey + "|" + RepairInstruction)).Substring(0, 24)
+        let baseWire =
+            rawMessages
+            |> List.choose Projection.decodeMessage
 
-        let repairMsg =
-            createObj
-                [ "info",
-                  box (
-                      createObj
-                          [ "id", box msgId
-                            "role", box "user"
-                            "synthetic", box true
-                            "source", box "interaction-repair"
-                            "requestKey", box requestKey ]
-                  )
-                  "parts", box [| createObj [ "type", box "text"; "text", box RepairInstruction ] |] ]
+        let emptyCurrent: ProviderProjection.ProviderSemanticProjection =
+            { ProviderId = None
+              ModelId = None
+              Variant = None
+              Tools = []
+              System = []
+              Messages = [] }
 
-        rawMessages @ [ repairMsg ]
+        let snapshot: ProjectionSnapshot =
+            { CurrentProjection = emptyCurrent
+              CommittedPrefix = None
+              BlogFrames = []
+              TransportMessages = Set.empty
+              HostReanchor = None }
+
+        let intents =
+            [ ProjectionIntent.InsertRepair { RequestKey = requestKey } ]
+
+        match ProjectionPlanner.plan intents with
+        | Error _ ->
+            // fail-closed: 不注入手写 list；返回未改 raw（调用方仍 project 原视图）
+            rawMessages
+        | Ok ordered ->
+            let wire =
+                ProjectionRenderer.renderMessagesWithIntents snapshot baseWire ordered
+
+            let msgId =
+                "enforcer-repair-"
+                + (HostDigest.sha256Hex (requestKey + "|" + ProjectionConstants.RepairInstruction))
+                    .Substring(0, 24)
+
+            // InsertRepair 只追加：前缀保留原始 raw（含 id）；尾部正文来自 algebra。
+            let repairText =
+                wire
+                |> List.tryLast
+                |> Option.bind (fun msg ->
+                    msg.Parts
+                    |> List.tryPick (function
+                        | ProviderProjection.WireText t -> Some t
+                        | _ -> None))
+                |> Option.defaultValue ProjectionConstants.RepairInstruction
+
+            let repairMsg =
+                createObj
+                    [ "info",
+                      box (
+                          createObj
+                              [ "id", box msgId
+                                "role", box "user"
+                                "synthetic", box true
+                                "source", box "interaction-repair"
+                                "requestKey", box requestKey ]
+                      )
+                      "parts", box [| createObj [ "type", box "text"; "text", box repairText ] |] ]
+
+            rawMessages @ [ repairMsg ]
 
     let private isEmptyTextCycleFailure (reason: string) : bool =
         reason.IndexOf("merged text is empty", StringComparison.Ordinal) >= 0

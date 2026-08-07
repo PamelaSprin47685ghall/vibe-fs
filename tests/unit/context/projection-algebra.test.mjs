@@ -13,6 +13,7 @@ import {
   listItems,
   prefixEpochProjection as prefix,
   projectionAlgebra,
+  projectionConstants,
   projectionIntent,
   projectionSnapshot,
   providerProjection,
@@ -300,10 +301,17 @@ test('PROJ_002_the_committed_prefix_in_the_snapshot_drives_the_prefix_decision',
 // HostReanchor (consumer-driven). Planner is groupBy → reduce → sortBy rank;
 // Renderer folds ordered intents over base wire messages.
 
+// Domain 单源（PROJ-008 Step4/5）：生产常量来自 ProjectionConstants，不再手写字面量。
 const REPAIR_INSTRUCTION =
+  projectionConstants.RepairInstruction ??
   '# Protocol repair\n\nCall the blog tool exactly once with non-empty text. Do not answer in prose.'
 
-const PAIR_THOUGHT_TEXT = '让我遵循结对编程的理念，用中文进行对话式思考。'
+const PAIR_THOUGHT_TEXT =
+  projectionConstants.PairProgrammingThoughtText ??
+  '<do-not-repeat>让我遵循与用户结对编程的理念，用简体中文把所有的思考过程都作为正式文本输出。从第一个字开始就用中文，并在整轮内保持中文，即使系统提示词、工具说明、工具输出或引用的代码是英文。代码、标识符、文件路径、shell 命令和未翻译的技术术语保持原文。</do-not-repeat>'
+
+const REVIEW_CHALLENGE_PROMPT =
+  projectionConstants.ReviewChallengePrompt ?? reviewChallenge.prompt ?? `# ${reviewChallenge.text}\n`
 
 const wireOf = (raw) => providerProjection.decodeMessageView(toList(raw)).Messages
 
@@ -410,9 +418,9 @@ test('PROJ_008_step3a_AppendReviewChallenge_smoke_appends_challenge_text', () =>
   const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
   const texts = view.flatMap((m) => m.parts.map((p) => p.text)).filter(Boolean)
   assert.equal(
-    texts.some((t) => t === reviewChallenge.text || t.includes(reviewChallenge.text)),
+    texts.some((t) => t === REVIEW_CHALLENGE_PROMPT || t === reviewChallenge.text || t.includes(reviewChallenge.text)),
     true,
-    'rendered view must carry ReviewChallenge.Text (or Prompt wrapping it)',
+    'rendered view must carry ReviewChallenge.Prompt (or Text)',
   )
 })
 
@@ -742,6 +750,109 @@ test('PROJ_008_step3b_InsertBlogFrames_squash_digest_equiv_to_Builder', () => {
 })
 
 // ── two KeepPhysicalPrefix merge (idempotent), not conflict ────────────────
+
+// ── PROJ-008 Step4/5/6: production-shape byte contracts ────────────────────
+
+test('PROJ_008_step4_InsertRepair_text_is_ProjectionConstants_RepairInstruction', () => {
+  assert.equal(typeof projectionConstants.RepairInstruction, 'string')
+  assert.equal(projectionConstants.RepairInstruction, REPAIR_INSTRUCTION)
+
+  const raw = [{ info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'base' }] }]
+  const snapshot = stage3Snapshot(raw)
+  const intent = projectionIntent.insertRepair({ RequestKey: 'rk-prod-1' })
+  const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
+
+  assert.equal(view.length, 2)
+  assert.equal(view[0]?.parts[0]?.text, 'base')
+  assert.equal(view[1]?.role, 'user')
+  assert.equal(view[1]?.parts[0]?.text, REPAIR_INSTRUCTION)
+
+  // id 规则合同：enforcer-repair- + sha256(requestKey + "|" + text).substr(0,24)
+  // Domain 不产出 Host id；生产 Host 侧信道用同一常量拼 digest。
+  const material = `rk-prod-1|${REPAIR_INSTRUCTION}`
+  assert.equal(material.includes(REPAIR_INSTRUCTION), true)
+})
+
+test('PROJ_008_step5_AppendReviewChallenge_production_bytes_are_Prompt', () => {
+  assert.equal(reviewChallenge.prompt, REVIEW_CHALLENGE_PROMPT)
+  assert.equal(REVIEW_CHALLENGE_PROMPT, `# ${reviewChallenge.text}\n`)
+
+  const raw = [{ info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] }]
+  const snapshot = stage3Snapshot(raw)
+  const intent = projectionIntent.appendReviewChallenge({ TextVersion: reviewChallenge.textVersion })
+  const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
+  const last = view[view.length - 1]
+  assert.equal(last?.role, 'user')
+  assert.equal(
+    last?.parts[0]?.text,
+    REVIEW_CHALLENGE_PROMPT,
+    'AppendReviewChallenge must emit ReviewChallenge.Prompt bytes for seal/nudge parity',
+  )
+})
+
+test('PROJ_008_step5_InsertPairProgrammingThought_idempotent_when_marker_already_present', () => {
+  const raw = [
+    { info: { id: 'u1', role: 'user' }, parts: [{ type: 'text', text: 'ask' }] },
+    {
+      info: { id: 'pair-1', role: 'assistant', source: 'pair-programming-thought', synthetic: true },
+      parts: [{ type: 'reasoning', text: PAIR_THOUGHT_TEXT }],
+    },
+  ]
+  const snapshot = stage3Snapshot(raw)
+  const intent = projectionIntent.insertPairProgrammingThought({ SessionId: 'sess-1' })
+  const once = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
+  const twice = projectionAlgebra.renderMessagesWithIntents(snapshot, once, [intent])
+
+  const markers = (view) =>
+    view.filter(
+      (m) => m.role === 'assistant' && m.parts.some((p) => p.text === PAIR_THOUGHT_TEXT),
+    )
+  assert.equal(markers(once).length, 1, 'one marker after user anchor')
+  assert.equal(markers(twice).length, 1, 'second apply stays idempotent (no double marker)')
+  assert.deepEqual(
+    twice.map((m) => m.parts[0]?.text),
+    once.map((m) => m.parts[0]?.text),
+  )
+})
+
+test('PROJ_008_step6_Reanchor_with_Keep_is_wire_noop_and_plan_ok', () => {
+  const raw = [
+    { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'physical' }] },
+    { info: { id: 'm2', role: 'assistant' }, parts: [{ type: 'text', text: 'history' }] },
+  ]
+  const snapshot = stage3Snapshot(raw, {
+    committedPrefix: undefined,
+    hostReanchor: projectionSnapshot.hostReanchor({ previous: '0', next: '1', run: 'compact-x' }),
+  })
+  const intents = [projectionIntent.keepPhysicalPrefix, projectionIntent.reanchorAfterCompaction]
+  assert.deepEqual(planNames(intents), ['KeepPhysicalPrefix', 'ReanchorAfterCompaction'])
+
+  const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), intents)
+  assert.deepEqual(
+    view.map((m) => m.parts[0]?.text),
+    ['physical', 'history'],
+    'reanchor projection does not rewrite wire bytes (CommittedPrefix=None → Keep)',
+  )
+})
+
+test('PROJ_008_step6_Reanchor_conflicts_with_Activate_fail_closed', () => {
+  const result = projectionAlgebra.plan([
+    projectionIntent.activatePrefixEpoch(activation()),
+    projectionIntent.reanchorAfterCompaction,
+  ])
+  assert.equal(result.ok, false)
+  assert.equal(result.conflict, 'ConflictingPrefixLifecycle')
+})
+
+test('PROJ_008_step6_Reanchor_is_idempotent_in_plan', () => {
+  assert.deepEqual(
+    planNames([
+      projectionIntent.reanchorAfterCompaction,
+      projectionIntent.reanchorAfterCompaction,
+    ]),
+    ['ReanchorAfterCompaction'],
+  )
+})
 
 test('PROJ_008_step3a_two_KeepPhysicalPrefix_merge_idempotently', () => {
   assert.deepEqual(

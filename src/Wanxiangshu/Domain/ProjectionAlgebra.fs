@@ -119,20 +119,29 @@ type ProjectionConflict =
     /// `ActivatePrefixEpoch` 与 `ReanchorAfterCompaction` 同批出现。
     | ConflictingPrefixLifecycle
 
-/// PROJ-008 step 3a：Domain 侧冻结常量（与 Session/Infra/ReviewChallenge 文案对齐）。
-/// ReviewChallenge 在 fsproj 中后于本文件编译，故在此镜像 Text 字节而非交叉引用模块。
+/// PROJ-008：Domain 侧冻结常量。
+///
+/// `ReviewChallenge` 在 fsproj 中后于本文件编译，故在此镜像 Text / Prompt 字节而非
+/// 交叉引用模块。`EnforcerHost.RepairInstruction` 与
+/// `PairProgrammingThoughtTransform.text` 必须引用此处，禁止第二处字面量。
 [<RequireQualifiedAccess>]
 module ProjectionConstants =
-    /// 与 `EnforcerHost.RepairInstruction` 字节一致。
+    /// InteractionRepair 协议修复指令（ENFORCER-060/061）。Domain 单源。
     let RepairInstruction =
         "# Protocol repair\n\nCall the blog tool exactly once with non-empty text. Do not answer in prose."
 
-    /// 与 `PairProgrammingThoughtTransform.text` 字节一致（HOST-013）。
-    let PairProgrammingThoughtText = "让我遵循结对编程的理念，用中文进行对话式思考。"
+    /// HOST-013 pair-programming marker 正文。Domain 单源。
+    let PairProgrammingThoughtText =
+        "<do-not-repeat>让我遵循与用户结对编程的理念，用简体中文把所有的思考过程都作为正式文本输出。从第一个字开始就用中文，并在整轮内保持中文，即使系统提示词、工具说明、工具输出或引用的代码是英文。代码、标识符、文件路径、shell 命令和未翻译的技术术语保持原文。</do-not-repeat>"
 
-    /// 与 `ReviewChallenge.Text` 字节一致（REVIEW-003）。
+    /// 与 `ReviewChallenge.Text` 字节一致（REVIEW-003 bare sentence）。
     let ReviewChallengeText =
         "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
+
+    /// 与 `ReviewChallenge.Prompt` 字节一致：ARCH-010 指令注释形式（`# Text\n`）。
+    /// seal / tool-result / nudge 的可见字节是 Prompt，不是 bare Text。
+    /// 经 SyntheticToml.document 生成，避免与 ReviewChallenge 历史字节漂移。
+    let ReviewChallengePrompt = SyntheticToml.document [ ReviewChallengeText ] []
 
 [<RequireQualifiedAccess>]
 module ProjectionPlanner =
@@ -444,6 +453,15 @@ module ProjectionRenderer =
                 | [] -> companionWires
                 | head :: tail -> head :: companionWires @ tail
 
+    let private isPairMarker (message: ProviderProjection.WireMessage) : bool =
+        message.Role = "assistant"
+        && message.Parts
+           |> List.exists (function
+               | ProviderProjection.WireReasoning text when text = ProjectionConstants.PairProgrammingThoughtText ->
+                   true
+               | _ -> false)
+
+    /// HOST-013：每个锚点后插一条 marker；已有 marker 则字节保持（幂等）。
     let private applyPairThought (messages: ProviderProjection.WireMessage list) : ProviderProjection.WireMessage list =
         let anchorIndexes =
             messages
@@ -457,8 +475,11 @@ module ProjectionRenderer =
             // 从后往前插，保持先出现的锚点索引稳定。
             (messages, List.rev anchorIndexes)
             ||> List.fold (fun acc anchorIndex ->
-                let marker = reasoningMessage ProjectionConstants.PairProgrammingThoughtText
-                List.take (anchorIndex + 1) acc @ (marker :: List.skip (anchorIndex + 1) acc))
+                match List.tryItem (anchorIndex + 1) acc with
+                | Some next when isPairMarker next -> acc
+                | _ ->
+                    let marker = reasoningMessage ProjectionConstants.PairProgrammingThoughtText
+                    List.take (anchorIndex + 1) acc @ (marker :: List.skip (anchorIndex + 1) acc))
 
     let private applyOne
         (snapshot: ProjectionSnapshot)
@@ -474,9 +495,10 @@ module ProjectionRenderer =
             messages @ [ textMessage "user" ProjectionConstants.RepairInstruction ]
         | ProjectionIntent.SuppressTransportOnly -> applySuppress snapshot messages
         | ProjectionIntent.AppendReviewChallenge _ ->
-            // REVIEW-003：携带 Challenge 原文（或 Prompt 包裹）；step 3a 用 Text 即可。
-            messages @ [ textMessage "user" ProjectionConstants.ReviewChallengeText ]
+            // REVIEW-003 生产可见字节 = Prompt（`# Text\n`），与 tool-result / nudge / seal 一致。
+            messages @ [ textMessage "user" ProjectionConstants.ReviewChallengePrompt ]
         | ProjectionIntent.InsertPairProgrammingThought _ -> applyPairThought messages
+        // wire no-op：CommittedPrefix=None 的语义由 Coordinator 填 Snapshot；此处不改字节。
         | ProjectionIntent.ReanchorAfterCompaction -> messages
 
     /// PROJ-008 step 3a：按 canonical rank 折叠有序意图到 base wire messages。

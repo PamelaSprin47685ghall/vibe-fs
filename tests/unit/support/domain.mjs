@@ -2050,7 +2050,21 @@ export const projectionAlgebra = (() => {
      */
     renderMessagesWithIntents: (snapshot, baseWireMessages, orderedIntents) => {
       const render = member(ProjectionAlgebraModule, 'ProjectionRenderer', 'renderMessagesWithIntents')
-      return wireViewOf(render(snapshot, toList(baseWireMessages), toList(orderedIntents)))
+      const toWirePart = (p) => {
+        if (p.kind === 'WireText') return new ProviderProj.WirePart(0, [p.text])
+        if (p.kind === 'WireReasoning') return new ProviderProj.WirePart(1, [p.text])
+        if (p.kind === 'WireToolCall') return new ProviderProj.WirePart(2, [p.callId, p.name, p.text])
+        if (p.kind === 'WireToolResult') return new ProviderProj.WirePart(3, [p.callId, p.text])
+        return p
+      }
+      const toWireMsg = (m) => {
+        if (m.Role !== undefined) return m
+        const parts = toList((m.parts || []).map(toWirePart))
+        return new ProviderProj.WireMessage(m.role, parts)
+      }
+      const items = Array.isArray(baseWireMessages) ? baseWireMessages : listItems(baseWireMessages)
+      const encoded = toList(items.map(toWireMsg))
+      return wireViewOf(render(snapshot, encoded, toList(orderedIntents)))
     },
 
     renderedOf: renderOf,
@@ -2071,6 +2085,23 @@ export const projectionAlgebra = (() => {
  *
  * Kind resolution is lazy: missing Domain cases fail step-3a tests only.
  */
+/**
+ * PROJ-008 Domain constants (ProjectionConstants). Single source for repair /
+ * pair / challenge text; Host modules must reference these rather than literals.
+ */
+export const projectionConstants = (() => {
+  const names = ['RepairInstruction', 'PairProgrammingThoughtText', 'ReviewChallengeText', 'ReviewChallengePrompt']
+  const out = {}
+  for (const name of names) {
+    try {
+      out[name] = ProjectionAlgebraModule['ProjectionConstants_' + name] ?? member(ProjectionAlgebraModule, 'ProjectionConstants', name)
+    } catch {
+      out[name] = undefined
+    }
+  }
+  return out
+})()
+
 export const projectionSnapshot = {
   /** Domain ResolvedBlogFrame (digest as hex string). */
   blogFrame: ({ kind = 'Entry', digest = 'frame-digest', body = 'frame body' } = {}) => {
@@ -2490,10 +2521,12 @@ export const reviewChallenge = (() => {
   // Resolved through `bind` rather than read off the module directly. `Text`
   // emits as `Text$` (Fable escapes a reserved name), so `Challenge.Text` was
   // `undefined` — a clause constant that silently became nothing.
-  const m = bind(Challenge, 'ReviewChallenge', ['Text', 'TextVersion', 'contentDigest'])
+  const m = bind(Challenge, 'ReviewChallenge', ['Text', 'TextVersion', 'Prompt', 'contentDigest'])
 
   return {
     text: m.Text,
+    /** ARCH-010 instruction form (`# Text\\n`); seal / nudge / algebra AppendReviewChallenge. */
+    prompt: m.Prompt,
     textVersion: m.TextVersion,
     contentDigest: (sha256) => m.contentDigest(sha256),
 

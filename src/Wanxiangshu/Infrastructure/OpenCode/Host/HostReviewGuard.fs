@@ -266,10 +266,42 @@ module HostReviewGuard =
     /// makes the Host start the next provider request; the confirmation itself comes
     /// from the second run's input seal proving it consumed the challenge.
     ///
-    /// The prompt text IS `ReviewChallenge.Prompt`. It is not spelled again here
-    /// because the digest of that exact TOML string is what the seal is searched for —
-    /// a second copy that drifted by one character would fail every confirmation
-    /// while looking like correct fail-closed behaviour.
+    /// PROJ-008 Step5：可见字节经 `AppendReviewChallenge` → plan → render 归一，再取
+    /// 尾部正文发送。生产路径与 algebra / `ReviewChallenge.Prompt` 必须字节一致；
+    /// seal 搜索的仍是同一 Prompt digest。
+    let private reviewChallengeVisibleBytes () : string =
+        let emptyCurrent: ProviderProjection.ProviderSemanticProjection =
+            { ProviderId = None
+              ModelId = None
+              Variant = None
+              Tools = []
+              System = []
+              Messages = [] }
+
+        let snapshot: ProjectionSnapshot =
+            { CurrentProjection = emptyCurrent
+              CommittedPrefix = None
+              BlogFrames = []
+              TransportMessages = Set.empty
+              HostReanchor = None }
+
+        let intents =
+            [ ProjectionIntent.AppendReviewChallenge { TextVersion = ReviewChallenge.TextVersion } ]
+
+        match ProjectionPlanner.plan intents with
+        | Error _ -> ReviewChallenge.Prompt
+        | Ok ordered ->
+            let wire = ProjectionRenderer.renderMessagesWithIntents snapshot [] ordered
+
+            wire
+            |> List.tryLast
+            |> Option.bind (fun msg ->
+                msg.Parts
+                |> List.tryPick (function
+                    | ProviderProjection.WireText t -> Some t
+                    | _ -> None))
+            |> Option.defaultValue ReviewChallenge.Prompt
+
     let requestPerfectConfirmation
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
@@ -284,5 +316,5 @@ module HostReviewGuard =
             sessionId
             (ProviderRunIdentity.value triggerProviderRun)
             "confirm-perfect"
-            ReviewChallenge.Prompt
+            (reviewChallengeVisibleBytes ())
             "reviewer"

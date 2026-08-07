@@ -19,13 +19,14 @@ module ReviewChallenge =
     /// so a layer 1 test could not read the value it must pin.
     let TextVersion = 1
 
-    let Text =
-        "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
+    /// Domain 单源：`ProjectionConstants.ReviewChallengeText`（PROJ-008 Step5）。
+    let Text = ProjectionConstants.ReviewChallengeText
 
     /// The final ARCH-010 form of the challenge as both a `verdict` tool result
     /// and a reviewer nudge prompt: an instruction-only TOML comment, exactly the
     /// bytes the second run's input seal will be searched for.
-    let Prompt = SyntheticToml.document [ Text ] []
+    /// Domain 单源：`ProjectionConstants.ReviewChallengePrompt`（与 algebra 渲染字节一致）。
+    let Prompt = ProjectionConstants.ReviewChallengePrompt
 
     /// The digest recorded in `PerfectChallengeIssued` and searched for in the
     /// second run's seal.
