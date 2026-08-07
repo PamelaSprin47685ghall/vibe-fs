@@ -51,6 +51,14 @@ FIFO 排空，上限 32，与 EXEC-018 同界。
 
 ---
 
+## EXEC-025：DevOps Join 超时
+
+- `DevOpsJoinTimeoutMs = 10_000`
+- DevOps 角色的 `join` 工具在 10s 内无任何完成项且未受到用户新消息打断时，触发 timerTask 超时，返回 `ForkError.TimedOut`（wire 渲染为 `status="failed"`, `code="TIMED_OUT"`）。
+- Orchestrator 与 Manager 角色的 `join` 不使用 10s timerTask，维持无限期等待。
+
+---
+
 ## completion blob 机制（行为见 what/execution.md EXEC-021/022）
 
 行为定义（finality 仅 completed|failed、LegacyFalseAbort 永不 RunCompletion、假 completion 确定性补偿）见 `what/execution.md` EXEC-021/022。  

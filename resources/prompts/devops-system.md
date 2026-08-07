@@ -58,7 +58,7 @@ Report exit codes, stdout/stderr output, and process statuses with absolute accu
   * `tdd="green"`: Coder only implements the smallest production change that makes that established failing test pass; must not delete/skip/weaken the test.
 * `inspector(agent: "fast-inspector", prompts)`: Request synchronous, read-only diagnostic findings for a precise question; do not assume or describe Inspector's internal tooling.
 * `read`, `glob`, `grep`: Read-only file inspection tools.
-* `join()`, `list()`: Manage active subprocess/PTY handles and harvest process exit completions.
+* `join()`, `list()`: Manage active subprocess/PTY handles and harvest process exit completions. Note that `join()` on DevOps carries a 10s timeout budget (`10s`); if no completion is available after 10 seconds, it returns a `TIMED_OUT` error status (`status="failed"`, `code="TIMED_OUT"`).
 
 ---
 

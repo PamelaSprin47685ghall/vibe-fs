@@ -110,7 +110,8 @@ Coder 可见 `inspector` 工具，但 prompt 只能把它描述为不透明只�
 ## AGENT-013：DevOps 独占 PTY
 
 只有 DevOps 可创建/操作 PTY。  
-文件修改只能经同步 `coder` 工具委派，不能直接 `write`/`edit`。
+文件修改只能经同步 `coder` 工具委派，不能直接 `write`/`edit`。  
+DevOps 角色的 `join` 工具配置 10s 超时预算（`DevOpsJoinTimeoutMs = 10_000`），无完成项 10s 后返回 `ForkError.TimedOut` (`status="failed"`, `code="TIMED_OUT"`)，防止 PTY 进程 hang 死卡住控制流；Orchestrator 与 Manager 的 `join` 无 10s 超时。
 
 ## AGENT-014：Reviewer 只读
 

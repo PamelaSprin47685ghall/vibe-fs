@@ -36,7 +36,7 @@ const { AgentJournalModule_runtimeId } = await import('../../../dist/Journal/Age
 const { forJournal, Runtime__AcceptHumanRoot, Runtime__AcceptAgentOwnerRoot } = await import(
   '../../../dist/Application/Prompting/PromptDispatcher.js'
 )
-const { SessionIdModule_create, PhysicalUserMessageIdModule_create, PromptKeyModule_create } = await import(
+const { SessionIdModule_create, PhysicalUserMessageIdModule_create, PromptKeyModule_create, ManagerLifeIdModule_create, BlobDigestModule_create, BlobRefModule_create } = await import(
   '../../../dist/Kernel/Identity.js'
 )
 const { TerminalOutcome } = await import('../../../dist/Infrastructure/OpenCode/Host/Events.js')
@@ -46,6 +46,9 @@ const {
   HandleController_agentHandle: agentHandle,
 } = await import('../../../dist/Session/HandleController.js')
 const ChildRecovery = await import('../../../dist/Domain/ChildRecovery.js')
+const { ManagerLifecycleFact } = await import('../../../dist/Kernel/Fact.js')
+const { StreamId } = await import('../../../dist/Journal/Envelope.js')
+const { AgentJournalModule_appendManagerLifecycle } = await import('../../../dist/Journal/AgentJournal.js')
 const terminalEvidenceCompleted =
   ChildRecovery.TerminalEvidenceModule_completed ?? ChildRecovery.TerminalEvidence_completed
 const terminalEvidenceFailed =
@@ -285,6 +288,34 @@ export const acceptChildAgentOwnerRoot = (runtime, childSessionId, promptKey) =>
       `AcceptAgentOwnerRoot(${childSessionId}, ${promptKey}) rejected: ${result.fields?.[0]}`,
     )
   }
+}
+
+export const activateLife = (runtime, sessionId) => {
+  const sid = SessionIdModule_create(sessionId)
+  const lifeId = ManagerLifeIdModule_create(`life-${sessionId}`)
+  const stream = new StreamId(1, [sid])
+  AgentJournalModule_appendManagerLifecycle(
+    stream,
+    new ManagerLifecycleFact(0, [{
+      LifeId: lifeId,
+      OpeningCursorSequence: 0n,
+      OpeningTextDigest: BlobDigestModule_create('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'),
+      OpeningTextRef: BlobRefModule_create('blob-ref'),
+      OpeningUserMessageId: PhysicalUserMessageIdModule_create(`root-${sessionId}`),
+      SessionId: sid,
+    }]),
+    runtime.journal,
+  )
+  AgentJournalModule_appendManagerLifecycle(
+    stream,
+    new ManagerLifecycleFact(1, [{
+      ActivationPromptKey: PromptKeyModule_create(''),
+      LifeId: lifeId,
+      ProtectedPrefixEndSequence: 1n,
+      SessionId: sid,
+    }]),
+    runtime.journal,
+  )
 }
 
 /**

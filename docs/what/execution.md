@@ -27,6 +27,7 @@ Join 批次、blob、进程预算见 `how/execution.md`。
 ## EXEC-004：Join 语义
 
 Join 消费当前 owner 可用 completion，有界批次 wire（status/count/`[[result]]`）；agent 完成项 entry-local LWR 注释（`includeOpening=false`），禁止字段式 `work_record`。  
+DevOps 角色的 `join` 在无完成项时包含 10s 超时预算（`DevOpsJoinTimeoutMs = 10_000`）；若 10s 内无 completion，返回超时错误 `ForkError.TimedOut`（`status="failed"`, `code="TIMED_OUT"`）。Orchestrator 与 Manager 角色的 `join` 维持无 10s 超时规则。  
 用户消息中断 → `status=interrupted`，不是 error（EXEC-017）。
 
 ## EXEC-005：List 语义

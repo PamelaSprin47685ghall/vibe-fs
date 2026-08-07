@@ -1,18 +1,24 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open System.Threading.Tasks
+open Fable.Core.JsInterop
 
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Process
 open Wanxiangshu.Session
 
 /// join() waits for the owning runtime's next physical completion batch.
 /// Orchestrator join routes to ManagerJob verdict mailbox by authority role.
 /// P0-RECOVERY-JOIN-001: FamilyReady permit → Join.joinAvailable (no bare Join, no AST).
 /// EXEC-017: tool abort → JoinInterrupt.Signal only (≠ runtime.Cancel).
+/// DevOps join: 10s timeout budget (PtyTiming.timerTask 10000). Orch/Manager join remains untimed.
 module JoinTool =
+
+    [<Literal>]
+    let DevOpsJoinTimeoutMs = 10_000
 
     let private recoveryBlocked (blocks: NonEmpty<RecoveryBlock>) =
         let head = blocks.Head
@@ -92,10 +98,23 @@ module JoinTool =
                         | Error runtimeError ->
                             return ToolHostCodec.tomlObject [ "error", ToolHostCodec.TString runtimeError ]
                         | Ok runtime ->
-                            let! joined = Join.joinAvailable runtime permit JoinBatch.Max interrupt.Wait
+                            let isDevOps = scope.IsRole(context, Role.DevOps)
+
+                            let waitTask: Task<unit> =
+                                if isDevOps then
+                                    let timerTask = PtyTiming.timerTask DevOpsJoinTimeoutMs
+                                    emitJsExpr (interrupt.Wait, timerTask) "Promise.race([$0, $1])"
+                                else
+                                    interrupt.Wait
+
+                            let! joined = Join.joinAvailable runtime permit JoinBatch.Max waitTask
 
                             match joined with
-                            | Ok InterruptedByUserMessage -> return JoinResultRenderer.renderInterrupted ()
+                            | Ok InterruptedByUserMessage ->
+                                if isDevOps && not interrupt.Wait.IsCompleted then
+                                    return JoinResultRenderer.renderForkError ForkError.TimedOut
+                                else
+                                    return JoinResultRenderer.renderInterrupted ()
                             | Ok(ResultsAvailable batch) ->
                                 return
                                     JoinResultRenderer.renderJoinItemBatch
