@@ -1,44 +1,28 @@
 #!/usr/bin/env node
-// Normative docs pure-text contract checks (GOV-005 / GOV-003).
-//
-// Checks:
-//   1. Clause IDs defined once under docs/{why,what,shape,how,proof}
-//   2. Formal/fluid/README references must resolve (including slash lists/range endpoints)
-//   3. Prefix ownership (PREFIX_OWNER → relative path under docs/)
-//   4. docs/README.md navigates every formal Markdown file
-//   5. status/ and proposal/ must not define Clause-shaped headings
-//   6. clause-looking references use a known exact PREFIX-NNN (no pseudo suffixes)
-//   7. docs/README.md covers the exact active status and proposal file sets
-//   8. AGENTS.md and docs/README.md do not define formal Clause headings
-//   9. production/resources/tests do not depend on Proposal IDs or paths
-//
-// Usage: node scripts/checks/spec.mjs
+// Document-governance contract checks (GOV-003 / GOV-005 / GOV-006 / GOV-010).
 
-import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import {
+  changeDependencyReferences,
   clauseDefinitionHeadings,
   clauseReferences,
-  fluidNavigationProblems,
+  formalClauseDefinitionHeadings,
+  legacyWorkflowPathReferences,
   markdownLocalLinks,
-  proposalDependencyReferences,
-  statusNavigationProblems,
+  navigationProblems,
   unknownClauseReferences,
 } from './spec-rules.mjs'
 
 const DOCS = 'docs'
+const CHANGES = 'changes'
 const FORMAL_DIRS = ['why', 'what', 'shape', 'how', 'proof']
-const FLUID_DIRS = ['status', 'proposal']
+const CHANGE_DIRS = ['proposed', 'active', 'completed']
 const NAV_FILE = join(DOCS, 'README.md')
+const CHANGE_NAV_FILE = join(CHANGES, 'README.md')
 const AGENTS_FILE = 'AGENTS.md'
-const STATUS_DIR = join(DOCS, 'status')
-const PROPOSAL_DIR = join(DOCS, 'proposal')
 
-/**
- * Active prefix → owning formal file (path relative to docs/).
- * Hard-coded by design: part of the contract.
- * A prefix may only be defined in its owner file.
- */
+/** Active prefix → owning formal file, relative to docs/. */
 const PREFIX_OWNER = {
   GOV: 'what/document-governance.md',
   ARCH: 'shape/architecture.md',
@@ -62,7 +46,7 @@ const PREFIX_OWNER = {
   SURFACE: 'what/glory.md',
 }
 
-/** Prefixes allowed to split definitions across listed files (still unique IDs). */
+/** Prefixes allowed to split definitions across listed files; individual IDs remain unique. */
 const PREFIX_SPLIT_OWNERS = {
   ARCH: ['what/architecture.md', 'shape/architecture.md'],
   AGENT: ['what/agent.md', 'shape/agent.md'],
@@ -98,22 +82,11 @@ const PREFIX_SPLIT_OWNERS = {
   SURFACE: ['what/glory.md'],
 }
 
-const PREFIX_ALTERNATION = Object.keys(PREFIX_OWNER).join('|')
+const PREFIXES = Object.keys(PREFIX_OWNER)
+const PREFIX_ALTERNATION = PREFIXES.join('|')
 const DEFINITION_RE = new RegExp(`^##\\s+((?:${PREFIX_ALTERNATION})-\\d{3})\\b`, 'gm')
-
 const failures = []
 const fail = (file, line, msg) => failures.push({ file, line, msg })
-
-const walkMarkdown = (dir, acc = []) => {
-  if (!existsSync(dir)) return acc
-  for (const name of readdirSync(dir)) {
-    const full = join(dir, name)
-    const st = statSync(full)
-    if (st.isDirectory()) walkMarkdown(full, acc)
-    else if (name.endsWith('.md')) acc.push(full)
-  }
-  return acc
-}
 
 const walkFiles = (dir, acc = []) => {
   if (!existsSync(dir)) return acc
@@ -126,33 +99,33 @@ const walkFiles = (dir, acc = []) => {
   return acc
 }
 
-const formalFiles = FORMAL_DIRS.flatMap((d) => walkMarkdown(join(DOCS, d)))
-const fluidFiles = FLUID_DIRS.flatMap((d) => walkMarkdown(join(DOCS, d)))
+const walkMarkdown = (dir) => walkFiles(dir).filter((file) => file.endsWith('.md'))
+const formalFiles = FORMAL_DIRS.flatMap((dir) => walkMarkdown(join(DOCS, dir)))
+const changeFilesByDir = Object.fromEntries(
+  CHANGE_DIRS.map((dir) => [dir, walkMarkdown(join(CHANGES, dir))]),
+)
+const changeFiles = CHANGE_DIRS.flatMap((dir) => changeFilesByDir[dir])
+const relDocs = (file) => relative(DOCS, file).replace(/\\/g, '/')
+const display = (file) => file.replace(/\\/g, '/')
 
 /** @type {Map<string, {file: string, line: number}>} */
 const definitions = new Map()
 /** @type {{id: string, file: string, line: number}[]} */
 const references = []
-const sources = new Map()
-
-const relDocs = (abs) => relative(DOCS, abs).replace(/\\/g, '/')
 
 const rejectUnknownClauseLikeReferences = (key, text) => {
-  for (const { token, line } of unknownClauseReferences(text, Object.keys(PREFIX_OWNER))) {
+  for (const { token, line } of unknownClauseReferences(text, PREFIXES))
     fail(key, line, `未知或伪条款引用：${token}`)
-  }
 }
 
 const collectReferences = (key, text) => {
-  for (const { id, line } of clauseReferences(text, Object.keys(PREFIX_OWNER))) {
+  for (const { id, line } of clauseReferences(text, PREFIXES))
     references.push({ id, file: key, line })
-  }
 }
 
 for (const file of formalFiles) {
   const text = readFileSync(file, 'utf8')
   const key = relDocs(file)
-  sources.set(key, text)
   rejectUnknownClauseLikeReferences(key, text)
   collectReferences(key, text)
 
@@ -168,143 +141,122 @@ for (const file of formalFiles) {
 
     const prefix = id.split('-')[0]
     const allowed = PREFIX_SPLIT_OWNERS[prefix] ?? [PREFIX_OWNER[prefix]]
-    if (allowed && !allowed.includes(key)) {
-      fail(
-        key,
-        line,
-        `条款 ${id} 定义在 docs/${key}，但 PREFIX 归属允许：${allowed.map((p) => `docs/${p}`).join(', ')}`,
-      )
-    }
+    if (!allowed.includes(key))
+      fail(key, line, `条款 ${id} 定义位置越权；允许：${allowed.map((p) => `docs/${p}`).join(', ')}`)
   }
 }
 
-for (const file of fluidFiles) {
+for (const dir of CHANGE_DIRS) {
+  const path = join(CHANGES, dir)
+  if (!existsSync(path)) fail('../changes/README.md', 0, `缺少生命周期目录 ${path}/`)
+}
+if (!existsSync(CHANGE_NAV_FILE)) fail('../changes/README.md', 0, '缺少 changes/README.md')
+
+for (const file of changeFiles) {
   const text = readFileSync(file, 'utf8')
-  const key = relDocs(file)
-  collectReferences(key, text)
-  for (const { id, line } of clauseDefinitionHeadings(text)) {
-    fail(key, line, `流动面禁止定义 Clause 形标题：${id}`)
-  }
+  collectReferences(`../${display(file)}`, text)
+  for (const { id, line } of formalClauseDefinitionHeadings(text, PREFIXES))
+    fail(`../${display(file)}`, line, `Change 文件禁止定义正式 Clause 标题：${id}`)
 }
 
 const navigation = existsSync(NAV_FILE) ? readFileSync(NAV_FILE, 'utf8') : ''
-if (!navigation) {
-  fail('README.md', 0, '缺少 docs/README.md 导航')
-} else {
+const agents = existsSync(AGENTS_FILE) ? readFileSync(AGENTS_FILE, 'utf8') : ''
+if (!navigation) fail('README.md', 0, '缺少 docs/README.md 导航')
+else {
   rejectUnknownClauseLikeReferences('README.md', navigation)
   collectReferences('README.md', navigation)
 }
-
-const agents = existsSync(AGENTS_FILE) ? readFileSync(AGENTS_FILE, 'utf8') : ''
 if (agents) {
   rejectUnknownClauseLikeReferences('../AGENTS.md', agents)
   collectReferences('../AGENTS.md', agents)
 }
 
-for (const [key, text] of [
-  ['README.md', navigation],
-  ['../AGENTS.md', agents],
-]) {
-  for (const { id, line } of clauseDefinitionHeadings(text)) {
-    if (Object.keys(PREFIX_OWNER).some((prefix) => id.startsWith(`${prefix}-`))) {
-      fail(key, line, `路由文件禁止定义正式 Clause 标题：${id}`)
-    }
-  }
+for (const [key, text] of [['README.md', navigation], ['../AGENTS.md', agents]]) {
+  for (const { id, line } of formalClauseDefinitionHeadings(text, PREFIXES))
+    fail(key, line, `路由文件禁止定义正式 Clause 标题：${id}`)
 }
 
 for (const { id, file, line } of references) {
-  if (!definitions.has(id)) {
-    fail(file, line, `悬空条款引用：${id} 无定义`)
-  }
+  if (!definitions.has(id)) fail(file, line, `悬空条款引用：${id} 无定义`)
 }
 
 for (const directory of FORMAL_DIRS) {
-  const expected = formalFiles
-    .map(relDocs)
-    .filter((file) => file.startsWith(`${directory}/`))
-    .sort()
-  const problems = fluidNavigationProblems(navigation, directory, expected)
-  for (const file of problems.missing) {
-    fail('README.md', 0, `导航索引缺少正式文件 docs/${file}`)
-  }
-  for (const { file, line } of problems.stale) {
+  const expected = formalFiles.map(relDocs).filter((file) => file.startsWith(`${directory}/`)).sort()
+  const problems = navigationProblems(navigation, directory, expected)
+  for (const file of problems.missing) fail('README.md', 0, `导航索引缺少正式文件 docs/${file}`)
+  for (const { file, line } of problems.stale)
     fail('README.md', line, `导航引用不存在的正式文件 docs/${file}`)
+}
+
+for (const prefix of PREFIXES) {
+  if (!navigation.includes(`${prefix}-`)) fail('README.md', 0, `导航索引缺少条款前缀 ${prefix}-`)
+}
+
+for (const legacy of [join(DOCS, 'proposal'), join(DOCS, 'status')]) {
+  if (existsSync(legacy)) fail('README.md', 0, `废止目录不得存在：${legacy}/`)
+}
+
+const lifecycleOwners = new Map()
+for (const dir of CHANGE_DIRS) {
+  for (const file of changeFilesByDir[dir]) {
+    const key = relative(join(CHANGES, dir), file).replace(/\\/g, '/')
+    const previous = lifecycleOwners.get(key)
+    if (previous) fail(`../${display(file)}`, 0, `同一工作项同时存在于 ${previous}/ 与 ${dir}/：${key}`)
+    else lifecycleOwners.set(key, dir)
   }
 }
 
-for (const prefix of Object.keys(PREFIX_OWNER)) {
-  if (!navigation.includes(`\`${prefix}-\``) && !navigation.includes(`\`${prefix}\``)) {
-    // README uses `ARCH-` style in table
-    if (!navigation.includes(`${prefix}-`)) {
-      fail('README.md', 0, `导航索引缺少条款前缀 ${prefix}-`)
-    }
-  }
-}
-
-const statusFiles = existsSync(STATUS_DIR)
-  ? walkMarkdown(STATUS_DIR).map(relDocs).sort()
-  : []
-const statusProblems = statusNavigationProblems(navigation, statusFiles)
-for (const file of statusProblems.missing) {
-  fail('README.md', 0, `活跃 status 未进入导航：docs/${file}`)
-}
-for (const { file, line } of statusProblems.stale) {
-  fail('README.md', line, `导航引用不存在的 status：docs/${file}`)
-}
-
-const proposalFiles = existsSync(PROPOSAL_DIR)
-  ? walkMarkdown(PROPOSAL_DIR).map(relDocs).sort()
-  : []
-const proposalProblems = fluidNavigationProblems(navigation, 'proposal', proposalFiles)
-for (const file of proposalProblems.missing) {
-  fail('README.md', 0, `未裁决 proposal 未进入导航：docs/${file}`)
-}
-for (const { file, line } of proposalProblems.stale) {
-  fail('README.md', line, `导航引用不存在的 proposal：docs/${file}`)
-}
-
-for (const file of [AGENTS_FILE, NAV_FILE, ...formalFiles, ...fluidFiles]) {
+for (const file of [AGENTS_FILE, NAV_FILE, CHANGE_NAV_FILE, ...formalFiles, ...changeFiles]) {
   if (!existsSync(file)) continue
   const text = readFileSync(file, 'utf8')
   for (const { target, line } of markdownLocalLinks(text)) {
-    if (!existsSync(resolve(dirname(file), target))) {
-      const key = file === AGENTS_FILE ? '../AGENTS.md' : relDocs(file)
-      fail(key, line, `本地 Markdown 链接不存在：${target}`)
-    }
+    if (!existsSync(resolve(dirname(file), target)))
+      fail(file === AGENTS_FILE ? '../AGENTS.md' : display(file), line, `本地 Markdown 链接不存在：${target}`)
   }
 }
 
-const knownPrefixes = new Set(Object.keys(PREFIX_OWNER))
-const candidateIds = new Set()
-for (const file of walkMarkdown(PROPOSAL_DIR)) {
+const TEXT_EXTENSIONS = new Set(['.md', '.mjs', '.js', '.fs', '.fsproj', '.json', '.yml', '.yaml', '.toml'])
+const isTextFile = (file) => TEXT_EXTENSIONS.has(file.slice(file.lastIndexOf('.')))
+const legacyScanFiles = [
+  AGENTS_FILE,
+  'README.md',
+  'CHANGELOG.md',
+  'package.json',
+  ...formalFiles,
+  ...['src', 'resources', 'tests', 'scripts', '.github'].flatMap((root) => walkFiles(root)).filter(isTextFile),
+]
+const scanExclusions = new Set([
+  join('scripts', 'checks', 'spec.mjs'),
+  join('scripts', 'checks', 'spec-rules.mjs'),
+  join('tests', 'unit', 'verify', 'spec-rules.test.mjs'),
+])
+for (const file of new Set(legacyScanFiles)) {
+  if (!existsSync(file) || scanExclusions.has(file)) continue
   const text = readFileSync(file, 'utf8')
-  for (const match of text.matchAll(/\b([A-Z][A-Z0-9]*-\d{3}(?:[A-Z]|-[A-Z0-9-]+)?)\b/g)) {
-    const prefix = match[1].split('-')[0]
-    if (!knownPrefixes.has(prefix) && match[1] !== 'SHA-256') candidateIds.add(match[1])
-  }
+  for (const { token, line } of legacyWorkflowPathReferences(text))
+    fail(file.startsWith(`${DOCS}/`) ? relDocs(file) : `../${display(file)}`, line, `引用废止工作流路径：${token}`)
 }
 
-for (const root of ['src', 'resources', 'tests']) {
-  for (const file of walkFiles(root)) {
-    if (file.endsWith('.xml')) continue
-    if (file === join('tests', 'unit', 'verify', 'spec-rules.test.mjs')) continue
-    const text = readFileSync(file, 'utf8')
-    for (const { token, line } of proposalDependencyReferences(text, candidateIds)) {
-      fail(`../${file}`, line, `实现或证明面禁止依赖 Proposal：${token}`)
-    }
-  }
+const dependencyFiles = [
+  ...formalFiles.filter((file) => !file.endsWith('document-governance.md')),
+  ...['src', 'resources', 'tests'].flatMap((root) => walkFiles(root)).filter(isTextFile),
+]
+for (const file of dependencyFiles) {
+  if (file === join('tests', 'unit', 'verify', 'spec-rules.test.mjs')) continue
+  const text = readFileSync(file, 'utf8')
+  for (const { token, line } of changeDependencyReferences(text))
+    fail(file.startsWith(`${DOCS}/`) ? relDocs(file) : `../${display(file)}`, line, `当前规范或实现禁止依赖 Change 历史：${token}`)
 }
 
-const definedCount = definitions.size
 if (failures.length === 0) {
+  const counts = Object.fromEntries(CHANGE_DIRS.map((dir) => [dir, changeFilesByDir[dir].length]))
   console.log(
-    `spec-check: OK — ${definedCount} 条款，${references.length} 处引用，${formalFiles.length} 个正式文件，${statusFiles.length} 个活跃 status，${proposalFiles.length} 个未裁决 proposal`,
+    `spec-check: OK — ${definitions.size} 条款，${references.length} 处正式引用，${formalFiles.length} 个正式文件，` +
+      `${counts.proposed} proposed / ${counts.active} active / ${counts.completed} completed changes`,
   )
   process.exit(0)
 }
 
 console.error(`spec-check: ${failures.length} 处问题`)
-for (const { file, line, msg } of failures) {
-  console.error(`  docs/${file}:${line}  ${msg}`)
-}
+for (const { file, line, msg } of failures) console.error(`  docs/${file}:${line}  ${msg}`)
 process.exit(1)

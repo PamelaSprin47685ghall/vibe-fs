@@ -13,7 +13,7 @@
 ## Ownership
 
 分层、模块和测试边界见 `shape/dsl-structured-program.md`。当前未对齐实现只见
-`status/dsl-structured-program-gap.md`。
+[`changes/active/dsl-structured-program-gap.md`](../../changes/active/dsl-structured-program-gap.md)。
 
 ## Algorithm
 

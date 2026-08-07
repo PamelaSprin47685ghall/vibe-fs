@@ -12,16 +12,16 @@
 | [`shape/`](shape/) | 所有权、唯一 writer、边界与依赖方向 |
 | [`how/`](how/) | 已裁决目标算法、控制流与数据转换 |
 | [`proof/`](proof/) | 证明义务、门禁、测试与反例 |
-| [`status/`](status/) | 实现相对正式规范的活跃差距 |
-| [`proposal/`](proposal/) | 未裁决候选 Delta；不是当前规范 |
 
 按任务读取：
 
 ```text
-what → shape → how → status → code/resources → proof
+what → shape → how → code/resources → proof
 ```
 
-`why` 用于理解理由；Proposal 只在评审候选变化时读取。治理主题的五层入口：
+`why` 用于理解理由。已批准变更的启动、实施和完成历史位于
+[`changes/`](../changes/README.md)，不属于正式规范；用户指定 Active Change 时，在读取
+`how` 后读取该工作项，再进入代码。治理主题的五层入口：
 [what](what/document-governance.md) · [shape](shape/document-governance.md) ·
 [how](how/document-governance.md) · [proof](proof/document-governance.md) ·
 [why](why/document-governance.md)。
@@ -55,13 +55,3 @@ what → shape → how → status → code/resources → proof
 | Security 边界 | [shape](shape/security.md) |
 | Kolmogorov 原则 | [why](why/kolmogorov.md) |
 
-## 活跃实现差距
-
-- [Projection Algebra](status/projection-algebra-gap.md)
-
-## 未裁决候选
-
-- [F# DSL 治理候选](proposal/fsharp-dsl-governance.md)
-- [Strength](proposal/strength.md)
-- [Student / Teacher](proposal/student-teacher.md)
-- [waitFact causal renewal](proposal/waitfact-causal-renewal.md)

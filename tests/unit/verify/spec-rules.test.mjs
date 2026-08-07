@@ -2,12 +2,13 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  changeDependencyReferences,
   clauseDefinitionHeadings,
   clauseReferences,
-  fluidNavigationProblems,
+  formalClauseDefinitionHeadings,
+  legacyWorkflowPathReferences,
   markdownLocalLinks,
-  proposalDependencyReferences,
-  statusNavigationProblems,
+  navigationProblems,
   unknownClauseReferences,
 } from '../../../scripts/checks/spec-rules.mjs'
 
@@ -26,37 +27,37 @@ test('spec gate rejects unknown and suffixed clause-looking references', () => {
   )
 })
 
-test('spec gate requires exact README coverage of active status files', () => {
+test('spec gate requires exact README coverage of formal files', () => {
   const navigation = [
-    '[kept](status/kept.md)',
-    '[stale](status/stale.md)',
+    '[kept](what/kept.md)',
+    '[stale](what/stale.md)',
   ].join('\n')
 
   assert.deepEqual(
-    statusNavigationProblems(navigation, ['status/kept.md', 'status/missing.md']),
+    navigationProblems(navigation, 'what', ['what/kept.md', 'what/missing.md']),
     {
-      missing: ['status/missing.md'],
-      stale: [{ file: 'status/stale.md', line: 2 }],
+      missing: ['what/missing.md'],
+      stale: [{ file: 'what/stale.md', line: 2 }],
     },
   )
 })
 
-test('spec gate covers proposal links with spaces and hash characters exactly', () => {
+test('spec gate covers links with spaces and hash characters exactly', () => {
   const navigation = [
-    '[kept](proposal/kept.md)',
-    '[research](<proposal/research # note.md>)',
-    '[stale](proposal/stale.md)',
+    '[kept](why/kept.md)',
+    '[research](<why/research # note.md>)',
+    '[stale](why/stale.md)',
   ].join('\n')
 
   assert.deepEqual(
-    fluidNavigationProblems(navigation, 'proposal', [
-      'proposal/research # note.md',
-      'proposal/kept.md',
-      'proposal/missing.md',
+    navigationProblems(navigation, 'why', [
+      'why/research # note.md',
+      'why/kept.md',
+      'why/missing.md',
     ]),
     {
-      missing: ['proposal/missing.md'],
-      stale: [{ file: 'proposal/stale.md', line: 3 }],
+      missing: ['why/missing.md'],
+      stale: [{ file: 'why/stale.md', line: 3 }],
     },
   )
 })
@@ -94,16 +95,42 @@ test('spec gate finds Clause-shaped headings for any prefix and heading depth', 
   )
 })
 
-test('spec gate detects implementation dependencies on Proposal IDs and paths', () => {
+test('spec gate distinguishes formal Clause headings from Change IDs', () => {
   assert.deepEqual(
-    proposalDependencyReferences([
-      '// FUTURE-001 is treated as a contract',
-      '// docs/proposal/future.md',
-      '// ARCH-001 is formal',
-    ].join('\n'), ['FUTURE-001']),
+    formalClauseDefinitionHeadings([
+      '# CHG-001: lifecycle identity',
+      '## ARCH-001: forbidden shadow definition',
+      '### FUTURE-001: non-product candidate',
+    ].join('\n'), PREFIXES),
+    [{ id: 'ARCH-001', line: 2 }],
+  )
+})
+
+test('spec gate detects retired workflow paths', () => {
+  assert.deepEqual(
+    legacyWorkflowPathReferences([
+      'read docs/proposal/future.md',
+      'read docs/status/gap.md',
+      'session.status is unrelated',
+    ].join('\n')),
     [
-      { token: 'FUTURE-001', line: 1 },
-      { token: 'docs/proposal/', line: 2 },
+      { token: 'docs/proposal/', line: 1 },
+      { token: 'docs/status/', line: 2 },
+    ],
+  )
+})
+
+test('spec gate rejects proposed and specific completed dependencies but allows active scope', () => {
+  assert.deepEqual(
+    changeDependencyReferences([
+      '// changes/proposed/future.md is not current',
+      '// changes/active/current.md may scope work',
+      '// changes/completed/history.md is not current',
+      '// changes/completed/ is a generic lifecycle directory',
+    ].join('\n')),
+    [
+      { token: 'changes/proposed/', line: 1 },
+      { token: 'changes/completed/<file>.md', line: 3 },
     ],
   )
 })
@@ -112,15 +139,15 @@ test('spec gate extracts local Markdown links without treating URLs or anchors a
   assert.deepEqual(
     markdownLocalLinks([
       '[plain](what/agent.md)',
-      '[space](<proposal/research note.md>)',
-      '[encoded](proposal/research%20note.md#section)',
+      '[space](<notes/research note.md>)',
+      '[encoded](notes/research%20note.md#section)',
       '[anchor](#local)',
       '[web](https://example.com/doc.md)',
     ].join('\n')),
     [
       { target: 'what/agent.md', line: 1 },
-      { target: 'proposal/research note.md', line: 2 },
-      { target: 'proposal/research note.md', line: 3 },
+      { target: 'notes/research note.md', line: 2 },
+      { target: 'notes/research note.md', line: 3 },
     ],
   )
 })
