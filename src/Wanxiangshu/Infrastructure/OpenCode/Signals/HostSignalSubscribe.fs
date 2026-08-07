@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Process
 
 /// Subscribes coarse host signals from exactly one source per plugin instance:
 /// global SSE preferred; local events.listen as fallback for older hosts.
@@ -60,15 +61,32 @@ module HostSignalSubscribe =
           LastError = error
           ReconnectAttempts = attempts }
 
-    let private disposeState (state: obj) : unit =
+    let private disposeState (state: obj) (port: ITimerPort) : unit =
         if not (unbox state?disposed) then
             state?disposed <- true
 
-            let timer = state?heartbeatTimer
+            // Cancel heartbeat + reconnect handles, unblock reconnect await, dispose port.
+            emitJsExpr
+                state
+                """
+                ((state) => {
+                  if (state.heartbeatHandle) {
+                    state.heartbeatHandle.Cancel();
+                    state.heartbeatHandle = null;
+                  }
+                  if (state.reconnectHandle) {
+                    state.reconnectHandle.Cancel();
+                    state.reconnectHandle = null;
+                  }
+                  if (state.reconnectResolve) {
+                    const resolve = state.reconnectResolve;
+                    state.reconnectResolve = null;
+                    resolve();
+                  }
+                })($0)
+                """
 
-            if not (isNull timer) then
-                emitJsExpr timer "clearTimeout($0)"
-                state?heartbeatTimer <- null
+            port.Dispose()
 
             let connAbort = state?connAbort
 
@@ -113,6 +131,7 @@ module HostSignalSubscribe =
     let private subscribeGlobalEvent
         (client: obj)
         (onSignalEvent: obj -> unit)
+        (?timerPort: ITimerPort)
         : Result<HostSignalSubscription, string> =
         if isNull client then
             Error "OPENCODE-SIGNAL-SUBSCRIBE: no client for global event"
@@ -124,6 +143,8 @@ module HostSignalSubscribe =
             else
                 try
                     let onEvent = box onSignalEvent
+                    // Timers via ITimerPort injection (prod=nodeTimerPort, test=virtualTimerPort).
+                    let port = defaultArg timerPort (PtyTiming.nodeTimerPort ())
 
                     // Mutable transport state shared with the emitJsExpr loop.
                     // lastEventMs seeded at subscribe time → 30s grace before first
@@ -136,23 +157,28 @@ module HostSignalSubscribe =
                               "lastError", box null
                               "reconnectAttempts", box 0
                               "connAbort", box null
-                              "heartbeatTimer", box null ]
+                              "heartbeatHandle", box null
+                              "reconnectHandle", box null
+                              "reconnectResolve", box null ]
 
                     // One-shot silence deadline (VERIFY-004 / C class): each event
-                    // clears + re-arms a single setTimeout(timeoutMs). No period scan.
-                    // Reconnect delay keeps Node setTimeout with nodeTimerPort-equivalent
-                    // unref policy; F# ITimerPort is not reliably callable inside emitJsExpr.
+                    // Cancels + re-arms port.Delay(timeoutMs). No period scan.
+                    // Heartbeat + reconnect timers via ITimerPort injection
+                    // (production=nodeTimerPort, test=virtualTimerPort).
                     emitJsExpr
-                        (globalApi, onEvent, state, HeartbeatTimeoutMs, onHeartbeatTimeout)
+                        (globalApi, onEvent, state, HeartbeatTimeoutMs, onHeartbeatTimeout, port)
                         """
-                        ((globalApi, onEvent, state, timeoutMs, onHeartbeatTimeout) => {
+                        ((globalApi, onEvent, state, timeoutMs, onHeartbeatTimeout, port) => {
                           const armHeartbeat = () => {
                             if (state.disposed) return;
-                            if (state.heartbeatTimer != null) {
-                              clearTimeout(state.heartbeatTimer);
-                              state.heartbeatTimer = null;
+                            if (state.heartbeatHandle) {
+                              state.heartbeatHandle.Cancel();
+                              state.heartbeatHandle = null;
                             }
-                            const hb = setTimeout(() => {
+                            const handle = port.Delay(timeoutMs);
+                            state.heartbeatHandle = handle;
+                            // handle.Delay is a getter (Task/Promise), not a method.
+                            handle.Delay.then(() => {
                               if (state.disposed) return;
                               const silent = Date.now() - state.lastEventMs;
                               // Heartbeat is the causal watchdog for this SSE link: a
@@ -161,12 +187,10 @@ module HostSignalSubscribe =
                               // cannot be reconnected into existence, and a reconnect
                               // loop over a dead link only manufactures noise. One
                               // timeout reports and kills the process (Diagnostic.fatal);
-                              // one-shot clearTimeout + nulling prevents re-fire.
+                              // Cancel + nulling prevents re-fire.
                               onHeartbeatTimeout(silent);
-                              state.heartbeatTimer = null;
-                            }, timeoutMs);
-                            if (typeof hb.unref === 'function') hb.unref();
-                            state.heartbeatTimer = hb;
+                              state.heartbeatHandle = null;
+                            });
                           };
 
                           // Initial seed: 30s grace after subscribe with no events.
@@ -212,22 +236,31 @@ module HostSignalSubscribe =
                               state.connAbort = null;
                               if (state.disposed) break;
                               const delay = Math.min(1000 * 2 ** attempt, 10000);
-                              // Same Node timer + unref policy as PtyTiming.nodeTimerPort.
-                              await new Promise(r => {
-                                const t = setTimeout(r, delay);
-                                if (typeof t.unref === 'function') t.unref();
+                              // ITimerPort backoff; Cancel + reconnectResolve unblocks dispose mid-wait
+                              // (Cancel alone leaves Delay pending forever by contract).
+                              const h = port.Delay(delay);
+                              state.reconnectHandle = h;
+                              await new Promise((resolve) => {
+                                state.reconnectResolve = resolve;
+                                h.Delay.then(() => {
+                                  if (state.reconnectResolve === resolve) {
+                                    state.reconnectResolve = null;
+                                    resolve();
+                                  }
+                                });
                               });
+                              state.reconnectHandle = null;
                               if (state.disposed) break;
                               attempt++;
                               state.reconnectAttempts = attempt;
                             }
                           })();
-                        })($0, $1, $2, $3, $4)
+                        })($0, $1, $2, $3, $4, $5)
                         """
 
                     Ok
                         { Health = fun () -> readHealth state
-                          Dispose = fun () -> disposeState state }
+                          Dispose = fun () -> disposeState state port }
                 with ex ->
                     Error(sprintf "OPENCODE-SIGNAL-SUBSCRIBE: %s" ex.Message)
 
@@ -291,6 +324,7 @@ module HostSignalSubscribe =
     let trySubscribe
         (input: obj)
         (onSignalEvent: obj -> unit)
+        (?timerPort: ITimerPort)
         : Task<Result<HostSignalSubscription option * string, string>> =
         task {
             let listenTarget =
@@ -314,7 +348,7 @@ module HostSignalSubscribe =
             // for older hosts without /global/event, and hard-fail only when no
             // transport remains at all.
             let subscribeGlobalOrLocal () =
-                match subscribeGlobalEvent client onSignalEvent with
+                match subscribeGlobalEvent client onSignalEvent ?timerPort = timerPort with
                 | Ok sub ->
                     logInfo "OPENCODE-SIGNAL-SOURCE" "global.event"
                     Ok(Some sub, "global.event")
