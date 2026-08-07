@@ -81,7 +81,7 @@ module XWire =
     let private candidate
         (journal: AgentJournal)
         (sessionId: SessionId)
-        (current: ProviderSemanticProjection)
+        (snapshot: ProjectionSnapshot)
         (state: SessionAgentProjection)
         (requestCutoff: int)
         : Result<PrefixProbe, NoCandidateReason> =
@@ -99,17 +99,13 @@ module XWire =
                     HostDigest.sha256Hex
                     sessionId
                     prefix.EpochId
-                    (prefix.Snapshot)
+                    snapshot.CommittedPrefix
                     blog.Coverage.CoverableTurnCutoffExclusive
                     blog.Coverage.CoveredPrefixDigest
                     requestCutoff
                     blob.BlobRef
                     blob.BlobDigest
-                    (fun cutoff ->
-                        current.Messages
-                        |> List.truncate cutoff
-                        |> fun messages -> ProviderProjection.renderSemantic { current with Messages = messages }
-                        |> HostDigest.sha256Hex)
+                    (ProjectionRenderer.cutoffDigest HostDigest.sha256Hex snapshot)
 
     let applyTransform
         (snapshot: ISessionSnapshotPort option)
@@ -157,10 +153,18 @@ module XWire =
 
                                     let cutoff = requestStartCutoff physical rawMessages
                                     let blog = state.Blog |> Option.defaultValue BlogProjection.empty
+                                    let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
                                     // Reuse the arming bound before the snapshot await: a session
                                     // deleted inside that window would otherwise make a second
                                     // TryRecoveryArming return None and Option.get throw (TOCTOU).
                                     let arming = arming
+
+                                    // PROJ-002: the attempt-local projection snapshot is built once
+                                    // and feeds both the probe proof (cutoffDigest) and the prefix
+                                    // decision (requiredBlob / forChoice).
+                                    let snapshot =
+                                        { CurrentProjection = current
+                                          CommittedPrefix = prefix.Snapshot }
 
                                     let mayRecover =
                                         RecoverySlot.mayRecover
@@ -169,7 +173,7 @@ module XWire =
                                             (BlogProjection.hasCoverage blog)
 
                                     let selectProbe () =
-                                        candidate durable sessionId current state cutoff
+                                        candidate durable sessionId snapshot state cutoff
 
                                     let plan =
                                         AttemptPlanner.plan
@@ -183,15 +187,15 @@ module XWire =
                                             mayRecover
                                             selectProbe
 
-                                    let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
-
                                     // `requiredBlob` is the single answer to "which blob does
                                     // this choice need" — the adapter reads, never guesses
                                     // (CTX-010: reading the COMMITTED blob for a probe attempt
                                     // would inject the old prefix under the candidate's id).
                                     let frozenRecordPrefixBody =
                                         match
-                                            XPrefixProjection.requiredBlob plan.Profile.ProjectionChoice prefix.Snapshot
+                                            XPrefixProjection.requiredBlob
+                                                plan.Profile.ProjectionChoice
+                                                snapshot.CommittedPrefix
                                         with
                                         | None -> ""
                                         | Some blobRef ->
@@ -202,7 +206,7 @@ module XWire =
                                     let intent =
                                         XPrefixProjection.forChoice
                                             plan.Profile.ProjectionChoice
-                                            prefix.Snapshot
+                                            snapshot.CommittedPrefix
                                             frozenRecordPrefixBody
 
                                     let transformed =

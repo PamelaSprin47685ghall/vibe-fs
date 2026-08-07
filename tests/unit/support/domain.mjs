@@ -1918,7 +1918,7 @@ export const projectionIntent = (() => {
  */
 export const projectionAlgebra = (() => {
   const planner = bind(ProjectionAlgebraModule, 'ProjectionPlanner', ['plan'])
-  const renderer = bind(ProjectionAlgebraModule, 'ProjectionRenderer', ['renderPrefix', 'renderMessages'])
+  const renderer = bind(ProjectionAlgebraModule, 'ProjectionRenderer', ['renderPrefix', 'renderMessages', 'cutoffDigest'])
 
   const renderOf = (rendered) => {
     const name = caseOf(rendered)
@@ -1969,6 +1969,12 @@ export const projectionAlgebra = (() => {
       })),
 
     renderedOf: renderOf,
+
+    /**
+     * CTX-011 step 5: the digest proof of X's current prefix at the candidate
+     * cutoff (PROJ-008 stage 2 — attempt-local probe projection).
+     */
+    cutoffDigest: (sha256, snapshot, cutoff) => renderer.cutoffDigest(sha256, snapshot, cutoff),
   }
 })()
 

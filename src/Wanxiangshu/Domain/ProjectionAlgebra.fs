@@ -13,6 +13,25 @@ type PrefixActivation =
       Memory: string
       DropLeading: int }
 
+/// PROJ-002（阶段 2 字段）：一次 attempt 的只读投影快照——DSL 核心输入（PROJ-002）。
+///
+/// attempt-local：字段覆盖一次 provider attempt 的投影输入。阶段 2 落地
+/// 「attempt-local PrefixProbe projection」（PROJ-008 迁移顺序第 2 步）所需字段；
+/// 后续阶段按迁移顺序追加（BlogFrames / HostReanchor / LocalPendingParts /
+/// TransportMessages 等），每个新字段必须有消费者才落地（DSL-003）。
+///
+/// `CommittedPrefix` 是 Journal `ActivePrefixEpoch.Snapshot` 的 Domain 形态——
+/// `ActivePrefixEpoch` 整体（EpochId / ReanchoredRuns / fold 校验）留在 Journal，
+/// Domain 只取可表达的 `PrefixSnapshot`（与 `PrefixProbeSelection` 相同的拆分）。
+type ProjectionSnapshot =
+    {
+        /// X 当前 provider-visible 语义投影（transform 边界 `decodeMessageView |> toSemantic`）。
+        CurrentProjection: ProviderProjection.ProviderSemanticProjection
+        /// 已提交前缀快照。`None` = 从未提交，或 reanchor 已退休（HOST-006）——
+        /// 两者都是「发送物理历史」，与 `KeepPhysicalPrefix` 同义。
+        CommittedPrefix: PrefixSnapshot option
+    }
+
 /// PROJ-005：功能模块对投影的唯一合法表达。
 ///
 /// 功能模块只声明意图，不得直接接收/改写 `Message list`（PROJ-001）。意图交给
@@ -90,3 +109,19 @@ module ProjectionRenderer =
             { Role = "user"
               Parts = [ ProviderProjection.WireText activation.Memory ] }
             :: List.skip activation.DropLeading messages
+
+    /// CTX-011 step 5：候选 cutoff 处 X 当前前缀的 digest 证明。
+    ///
+    /// attempt-local（PROJ-008 迁移顺序第 2 步）：只对本次 attempt 的当前投影做
+    /// cutoff 截断后计算语义 digest。这是「功能模块声明意图、渲染器负责投影」的
+    /// 边界落点——调用方不再直接 `List.truncate` 消息列表（PROJ-001）。
+    ///
+    /// `List.truncate` 语义：cutoff 越界时返回全量消息（不报错），与
+    /// `PrefixProbeSelection` 的 `candidateCutoff = min coverableCutoff requestStartCutoff`
+    /// 组合后不会产生非法 cutoff。
+    let cutoffDigest (sha256: string -> string) (snapshot: ProjectionSnapshot) (cutoff: int) : string =
+        let truncated =
+            { snapshot.CurrentProjection with
+                Messages = snapshot.CurrentProjection.Messages |> List.truncate cutoff }
+
+        sha256 (ProviderProjection.renderSemantic truncated)
