@@ -501,7 +501,7 @@ test('EXEC_fork_runtime_await_agent_timeout', async () => {
 test('EXEC_executor_summarize_cancel_owned_on_failure', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-sum-'))
   const spoolPath = join(dir, 'spool.bin')
-  // One small chunk → one map agent; Join TimedOut → map failure → cancelOwned.
+   // One small chunk → one map agent; Join NotFound → map failure → cancelOwned.
   writeFileSync(spoolPath, Buffer.from('chunk-body-for-summarize'))
 
   const forked = []
@@ -510,7 +510,7 @@ test('EXEC_executor_summarize_cancel_owned_on_failure', async () => {
       forked.push(agentId)
       return executorSummarizeRuntime.forkOk(agentId)
     },
-    join: () => executorSummarizeRuntime.timedOut(),
+     join: () => executorSummarizeRuntime.notFound(),
   })
 
   const summary = await executorSummarizeRuntime.summarizeSpool(runtime, spoolPath)
