@@ -87,6 +87,7 @@ const [
   CompanionBuilderModule,
   ProbeSelectionModule,
   XPrefixModule,
+  ProjectionAlgebraModule,
   AttemptPlannerModule,
   ExecutorSummarize,
   Authority,
@@ -177,6 +178,7 @@ const [
   prod('Domain/CompanionProjectionBuilder'),
   prod('Domain/PrefixProbeSelection'),
   prod('Domain/XPrefixProjection'),
+  prod('Domain/ProjectionAlgebra'),
   prod('Domain/AttemptPlanner'),
   prod('Infrastructure/OpenCode/Tools/ExecutorSummarize'),
   prod('Domain/PromptAuthority'),
@@ -1845,36 +1847,128 @@ export const managedAgentCatalog = (() => {
 })()
 
 /**
- * COMPANION-009 / CTX-010: which prefix X sends, as a plan over message positions.
+ * COMPANION-009 / CTX-010: which prefix X sends, as a `ProjectionIntent` (PROJ-005).
  *
  * `frozenBBody` is supplied by the caller because the snapshot carries a `BlobRef`,
  * never the body (PERSIST-007). Passing it here is the same split `ResolvedPrefixMemory`
  * makes in production: the journal records where the body is, and only a resolved copy
  * reaches the transform boundary.
+ *
+ * The facade flattens the intent into the plan-shaped view the legacy `XPrefixPlan`
+ * exposed, so tests keep asserting the same business facts (drop leading count,
+ * synthetic id reuse, low-trust memory block, replace-or-not) without learning the
+ * union wire shape.
  */
 export const xPrefix = (() => {
-  const m = bind(XPrefixModule, 'XPrefixProjection', ['forSnapshot', 'forChoice', 'requiredBlob', 'replacesPrefix'])
+  const m = bind(XPrefixModule, 'XPrefixProjection', ['forSnapshot', 'forChoice', 'requiredBlob'])
 
-  const planOf = (plan) => {
-    const memory = unwrapOption(plan.CompanionMemory)
+  const intentOf = (intent) => {
+    const name = caseOf(intent)
+
+    if (name === 'KeepPhysicalPrefix') {
+      return {
+        intent: name,
+        replacesPrefix: false,
+        dropLeading: 0,
+        memoryId: undefined,
+        memoryText: undefined,
+      }
+    }
+
+    const activation = payloadOf(intent)
 
     return {
-      dropLeading: plan.DropLeading,
-      replacesPrefix: m.replacesPrefix(plan),
-      memoryId: isNone(memory) ? undefined : memory[0],
-      memoryText: isNone(memory) ? undefined : memory[1],
+      intent: name,
+      replacesPrefix: true,
+      dropLeading: activation.DropLeading,
+      memoryId: activation.SyntheticMessageId,
+      memoryText: activation.Memory,
     }
   }
 
   return {
-    forSnapshot: (snapshot, frozenBBody = '') => planOf(m.forSnapshot(snapshot, frozenBBody)),
-    forChoice: (choice, committed, frozenBBody = '') => planOf(m.forChoice(choice, committed, frozenBBody)),
+    forSnapshot: (snapshot, frozenBBody = '') => intentOf(m.forSnapshot(snapshot, frozenBBody)),
+    forChoice: (choice, committed, frozenBBody = '') => intentOf(m.forChoice(choice, committed, frozenBBody)),
 
     /** `undefined` when the plan needs no blob read. */
     requiredBlob: (choice, committed) => {
       const ref = unwrapOption(m.requiredBlob(choice, committed))
       return isNone(ref) ? undefined : idValue.blobRef(ref)
     },
+  }
+})()
+
+/** PROJ-005: a `ProjectionIntent`, built by case name. */
+export const projectionIntent = (() => {
+  const build = unionCase(ProjectionAlgebraModule.ProjectionIntent, 'ProjectionIntent')
+
+  return {
+    keepPhysicalPrefix: build('KeepPhysicalPrefix', []),
+    activatePrefixEpoch: (activation) => build('ActivatePrefixEpoch', [activation]),
+    nameOf: (intent) => caseOf(intent),
+  }
+})()
+
+/**
+ * PROJ-004/006: the pure planner and canonical renderer of the projection DSL.
+ *
+ * The renderer's wire view (`renderMessages`) is what a digest is computed from —
+ * byte-equal to the Host's decode of the written-back message list, so tests can
+ * assert the DSL's bytes without touching Host objects.
+ */
+export const projectionAlgebra = (() => {
+  const planner = bind(ProjectionAlgebraModule, 'ProjectionPlanner', ['plan'])
+  const renderer = bind(ProjectionAlgebraModule, 'ProjectionRenderer', ['renderPrefix', 'renderMessages'])
+
+  const renderOf = (rendered) => {
+    const name = caseOf(rendered)
+    if (name === 'PhysicalPrefix') return { name, activation: undefined }
+    return { name, activation: payloadOf(rendered) }
+  }
+
+  return {
+    /** Result<ProjectionIntent list, ProjectionConflict>. */
+    plan: (intents) => {
+      const result = resultOf(planner.plan(toList(intents)))
+
+      if (result.ok) {
+        return { ok: true, intents: listItems(result.value).map((intent) => caseOf(intent)) }
+      }
+
+      const [first, second] = payloadOf(result.error)
+
+      return {
+        ok: false,
+        conflict: caseOf(result.error),
+        first: caseOf(first),
+        second: caseOf(second),
+      }
+    },
+
+    renderPrefix: (intents) => renderOf(renderer.renderPrefix(toList(intents))),
+
+    /** A `RenderedPrefix`, built by case name (for write-back tests). */
+    rendered: (() => {
+      const build = unionCase(ProjectionAlgebraModule.RenderedPrefix, 'RenderedPrefix')
+
+      return {
+        physical: build('PhysicalPrefix', []),
+        synthetic: (activation) => build('SyntheticPrefix', [activation]),
+        nameOf: (rendered) => caseOf(rendered),
+      }
+    })(),
+
+    /** wire view: digest-ready description of the rendered bytes. */
+    renderMessages: (messages, rendered) =>
+      listItems(renderer.renderMessages(messages, rendered)).map((message) => ({
+        role: message.Role,
+        parts: listItems(message.Parts).map((part) => ({
+          kind: caseOf(part),
+          text: payloadOf(part),
+        })),
+      })),
+
+    renderedOf: renderOf,
   }
 })()
 
@@ -2365,6 +2459,9 @@ export const providerProjection = {
   // OpenCode/Projection: Host-assembled message view (1.18.10 `tool-<tool>`
   // parts live on assistant messages; see HOST-012 tool-part test).
   decodeMessageView: (rawMessages) => ProjectionModule.decodeMessageView(rawMessages),
+  // PROJ-004: the one write-back adapter of the projection DSL's prefix stage.
+  applyRenderedPrefix: (rawMessages, rendered) =>
+    listItems(ProjectionModule.applyRenderedPrefix(rawMessages, rendered)),
 }
 
 // ── host signals (docs/what/host.md) ───────────────────────────────────────────────────

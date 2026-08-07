@@ -48,11 +48,6 @@ module XWire =
         |> Option.defaultWith (fun () ->
             raise (InvalidOperationException "X-wire cannot bind the physical user message to the transform snapshot"))
 
-    let private rawWithPrefix (rawMessages: obj list) (plan: XPrefixPlan) =
-        match plan.CompanionMemory with
-        | None -> rawMessages
-        | Some(syntheticId, memory) -> Projection.prependCompanionMemory rawMessages syntheticId memory plan.DropLeading
-
     /// COMPANION-009 / CTX-011: FrozenRecordPrefix = Opening + coverable Y frame
     /// prefix. RawGap never participates — it has no Y coverage proof.
     let private materializeFrozenRecordPrefix
@@ -173,16 +168,8 @@ module XWire =
                                             fallback.Cursor.Offset
                                             (BlogProjection.hasCoverage blog)
 
-                                    let selectedProbe = ref None
-
                                     let selectProbe () =
-                                        let selected = candidate durable sessionId current state cutoff
-
-                                        match selected with
-                                        | Ok probe ->
-                                            selectedProbe.Value <- Some probe
-                                            Ok probe
-                                        | Error reason -> Error reason
+                                        candidate durable sessionId current state cutoff
 
                                     let plan =
                                         AttemptPlanner.plan
@@ -198,38 +185,37 @@ module XWire =
 
                                     let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
 
+                                    // `requiredBlob` is the single answer to "which blob does
+                                    // this choice need" — the adapter reads, never guesses
+                                    // (CTX-010: reading the COMMITTED blob for a probe attempt
+                                    // would inject the old prefix under the candidate's id).
                                     let frozenRecordPrefixBody =
-                                        match plan.Profile.ProjectionChoice with
-                                        | XProjectionChoice.UseCommittedEpoch ->
-                                            match prefix.Snapshot with
-                                            | None -> ""
-                                            | Some committed ->
-                                                match
-                                                    durable.Writer.BlobWriter.Read committed.FrozenRecordPrefixRef
-                                                with
-                                                | Ok body -> body
-                                                | Error reason -> raise (InvalidOperationException reason)
-                                        | XProjectionChoice.UsePrefixProbe _ ->
-                                            match selectedProbe.Value with
-                                            | Some probe ->
-                                                match
-                                                    durable.Writer.BlobWriter.Read probe.Candidate.FrozenRecordPrefixRef
-                                                with
-                                                | Ok body -> body
-                                                | Error reason -> raise (InvalidOperationException reason)
-                                            | None ->
-                                                raise (
-                                                    InvalidOperationException
-                                                        "X-wire planner selected a probe without a materialised candidate"
-                                                )
+                                        match
+                                            XPrefixProjection.requiredBlob plan.Profile.ProjectionChoice prefix.Snapshot
+                                        with
+                                        | None -> ""
+                                        | Some blobRef ->
+                                            match durable.Writer.BlobWriter.Read blobRef with
+                                            | Ok body -> body
+                                            | Error reason -> raise (InvalidOperationException reason)
 
-                                    let prefixPlan =
+                                    let intent =
                                         XPrefixProjection.forChoice
                                             plan.Profile.ProjectionChoice
                                             prefix.Snapshot
                                             frozenRecordPrefixBody
 
-                                    let transformed = rawWithPrefix rawMessages prefixPlan
+                                    let transformed =
+                                        match ProjectionPlanner.plan [ intent ] with
+                                        | Error conflict ->
+                                            raise (
+                                                InvalidOperationException(
+                                                    sprintf "X-wire projection conflict: %A" conflict
+                                                )
+                                            )
+                                        | Ok ordered ->
+                                            let rendered = ProjectionRenderer.renderPrefix ordered
+                                            Projection.applyRenderedPrefix rawMessages rendered
 
                                     Wanxiangshu.Session.HostMessageProjection.replaceMessagesInPlace output transformed
 

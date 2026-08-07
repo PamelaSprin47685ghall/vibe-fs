@@ -3,25 +3,16 @@ namespace Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
-/// COMPANION-009 / CTX-010: which prefix X sends, as a plan over message positions.
+/// COMPANION-009 / CTX-010: which prefix X sends, as a `ProjectionIntent` (PROJ-005).
 ///
 /// Pure and index-based. The Host message objects live at the adapter boundary; what
-/// is decided here is how many leading messages the companion memory replaces and what
-/// that synthetic message contains, so both can be tested without a Host (VERIFY-008).
-type XPrefixPlan =
-    {
-        /// `None` means send raw history: no snapshot committed, or a reanchor retired it
-        /// (HOST-006). Both are the same instruction, which is why one field carries both.
-        CompanionMemory: (string * string) option
-        /// How many leading provider-visible messages the memory replaces. Zero when
-        /// there is no memory.
-        DropLeading: int
-    }
-
+/// is decided here is the intent: whether the companion memory replaces the physical
+/// prefix, and what that synthetic message contains (PROJ-001 — the caller declares
+/// the intent, the renderer applies it).
 [<RequireQualifiedAccess>]
 module XPrefixProjection =
 
-    /// COMPANION-009: the plan for one request.
+    /// COMPANION-009: the intent for one request.
     ///
     /// `frozenRecordPrefixBody` is the FrozenRecordPrefix text, already read from the blob the snapshot
     /// references. The snapshot carries a `BlobRef` plus digest and never the body —
@@ -36,17 +27,16 @@ module XPrefixProjection =
     /// id was fixed when the candidate was built and is what the provider has already
     /// seen for this epoch; deriving it again here would be a second construction site
     /// for one identity, and any drift becomes a cold boundary on every later request.
-    let forSnapshot (snapshot: PrefixSnapshot option) (frozenRecordPrefixBody: string) : XPrefixPlan =
+    let forSnapshot (snapshot: PrefixSnapshot option) (frozenRecordPrefixBody: string) : ProjectionIntent =
         match snapshot with
-        | None ->
-            { CompanionMemory = None
-              DropLeading = 0 }
+        | None -> ProjectionIntent.KeepPhysicalPrefix
         | Some value ->
-            { CompanionMemory =
-                Some(value.SyntheticMessageId, CompanionPrompt.companionMemoryBlock frozenRecordPrefixBody)
-              DropLeading = value.CutoffExclusive }
+            ProjectionIntent.ActivatePrefixEpoch
+                { SyntheticMessageId = value.SyntheticMessageId
+                  Memory = CompanionPrompt.companionMemoryBlock frozenRecordPrefixBody
+                  DropLeading = value.CutoffExclusive }
 
-    /// CTX-010: the plan this attempt's profile calls for.
+    /// CTX-010: the intent this attempt's profile calls for.
     ///
     /// One function for both cases on purpose. A probe is not a different kind of
     /// request — it is the same request with a candidate prefix — so building it through
@@ -56,7 +46,7 @@ module XPrefixProjection =
         (choice: XProjectionChoice)
         (committed: PrefixSnapshot option)
         (frozenRecordPrefixBody: string)
-        : XPrefixPlan =
+        : ProjectionIntent =
         match choice with
         | XProjectionChoice.UseCommittedEpoch -> forSnapshot committed frozenRecordPrefixBody
         | XProjectionChoice.UsePrefixProbe probe -> forSnapshot (Some probe.Candidate) frozenRecordPrefixBody
@@ -72,6 +62,3 @@ module XPrefixProjection =
         | XProjectionChoice.UseCommittedEpoch ->
             committed |> Option.map (fun snapshot -> snapshot.FrozenRecordPrefixRef)
         | XProjectionChoice.UsePrefixProbe probe -> Some probe.Candidate.FrozenRecordPrefixRef
-
-    /// Does this plan replace anything.
-    let replacesPrefix (plan: XPrefixPlan) = Option.isSome plan.CompanionMemory

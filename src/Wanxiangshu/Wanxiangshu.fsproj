@@ -49,6 +49,7 @@
     <Compile Include="Domain/ForkChildPayload.fs"/>
     <Compile Include="Domain/BloggerToml.fs"/>
     <Compile Include="Domain/CompanionPrompt.fs"/>
+    <Compile Include="Domain/ProjectionAlgebra.fs"/>
     <Compile Include="Domain/BloggerDelta.fs"/>
     <Compile Include="Domain/CompanionIdentity.fs"/>
     <Compile Include="Domain/CompanionProjectionBuilder.fs"/>

@@ -247,6 +247,17 @@ module Projection =
 
         head :: List.skip dropLeading rawMessages
 
+    /// PROJ-004: apply a rendered prefix to the Host message view — the one write-back
+    /// adapter for the projection DSL's prefix stage. Business modules declare intents
+    /// (PROJ-005) and never assemble messages themselves; this function turns the
+    /// renderer's instruction into the Host object list, preserving the untouched tail
+    /// verbatim so byte equality with what the provider saw is never re-derived.
+    let applyRenderedPrefix (rawMessages: obj list) (rendered: Wanxiangshu.Domain.RenderedPrefix) : obj list =
+        match rendered with
+        | Wanxiangshu.Domain.RenderedPrefix.PhysicalPrefix -> rawMessages
+        | Wanxiangshu.Domain.RenderedPrefix.SyntheticPrefix activation ->
+            prependCompanionMemory rawMessages activation.SyntheticMessageId activation.Memory activation.DropLeading
+
     /// The Host's own message id.
     ///
     /// Not part of either projection: an id identifies a message, it is not
