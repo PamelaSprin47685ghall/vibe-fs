@@ -15,11 +15,11 @@ setup = { strict = true, project = { files = { "AGENTS.md" = "manager full loop 
 session = { agent = "fast-manager", bind = ["manager-title", "fast-manager"] }
 prompt = { agent = "fast-manager", text = "Run full manager loop: fork inspector, browser, meditator in parallel, join three reports, fork a coder, then finish with suicide when nothing useful remains." }
 
-must = ["manager.0", "manager.1", "finality-reviewer.0", "finality-reviewer.1"]
+must = ["manager.0", "manager-activation", "finality-reviewer.0", "finality-reviewer.1"]
 
 flow = [
   { wait = "manager.0" },
-  { wait = "manager.1" },
+  { wait = "manager-activation" },
   { bindChild = { agent = "deep-reviewer", bind = ["deep-reviewer"] } },
   { wait = "finality-reviewer.0" },
   { wait = "finality-reviewer.1" },
@@ -129,7 +129,7 @@ tools = ["fork", "join", "list"]
   respond = { type = "text", text = "Manager review guard acknowledged." }
 
 [[turn]]
-id = "manager.1"
+id = "manager-activation"
 internal = true
 user = ["Now complete it yourself.", "Carry out the work you described until the final goal is fully achieved."]
 tools = ["fork", "join", "list", "suicide"]

@@ -45,6 +45,7 @@ flow = [
   { afterExpectation = { id = "conflict-resume.0", restart = true } },
 
   { wait = "orch.0" },
+  { waitFact = { name = "ManagerJobCreated", eq = 1 } },
   { wait = "manager.0" },
   { wait = "coder.0" },
   { wait = "coder.1" },

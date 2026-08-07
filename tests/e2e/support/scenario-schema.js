@@ -352,6 +352,29 @@ const responseDigest = (respond) => JSON.stringify(respond ?? null);
  * naturally. Under (lane, turn, step) keying a recurring nudge has several steps, so a
  * true duplicate is debris — both cases reject, and the message says which fix applies.
  */
+const signalIdentifierCollisions = (turns, entries) => {
+  const owners = new Map();
+
+  turns.forEach((turn, index) => {
+    const claims = owners.get(turn.id) ?? [];
+    claims.push(`turn[${index}]`);
+    owners.set(turn.id, claims);
+  });
+  entries.forEach((entry) => {
+    const claims = owners.get(entry.id) ?? [];
+    claims.push(`turn[${entry.turnIndex}].step[${entry.step}]`);
+    owners.set(entry.id, claims);
+  });
+
+  return [...owners]
+    .filter(([, claims]) => claims.length > 1)
+    .map(
+      ([id, claims]) =>
+        `signal id '${id}' is claimed by ${claims.join(' and ')}; ` +
+        'turn and step waits share one signal namespace',
+    );
+};
+
 const duplicateDeclarations = (entries) => {
   const problems = [];
 
@@ -624,6 +647,7 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
     ...providerErrorProblems(raw),
     ...conflictingFaults(entries, raw),
     ...trajectoryProblems(entries, raw),
+    ...signalIdentifierCollisions(turns, entries),
     ...duplicateDeclarations(entries),
     ...danglingReferences(entries, raw),
     ...deadEdges(turns, entries, raw),

@@ -48,6 +48,7 @@ flow = [
 
   { wait = "orch.0" },
   { wait = "title" },
+  { waitFact = { name = "ManagerJobCreated", eq = 1 } },
   { wait = "manager.0" },
   { wait = "coder.0" },
   { wait = "coder.1" },
