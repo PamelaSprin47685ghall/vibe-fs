@@ -131,7 +131,7 @@ module HostSignalSubscribe =
     let private subscribeGlobalEvent
         (client: obj)
         (onSignalEvent: obj -> unit)
-        (?timerPort: ITimerPort)
+        (timerPort: ITimerPort option)
         : Result<HostSignalSubscription, string> =
         if isNull client then
             Error "OPENCODE-SIGNAL-SUBSCRIBE: no client for global event"
@@ -324,7 +324,7 @@ module HostSignalSubscribe =
     let trySubscribe
         (input: obj)
         (onSignalEvent: obj -> unit)
-        (?timerPort: ITimerPort)
+        (timerPort: ITimerPort option)
         : Task<Result<HostSignalSubscription option * string, string>> =
         task {
             let listenTarget =
@@ -348,7 +348,7 @@ module HostSignalSubscribe =
             // for older hosts without /global/event, and hard-fail only when no
             // transport remains at all.
             let subscribeGlobalOrLocal () =
-                match subscribeGlobalEvent client onSignalEvent ?timerPort = timerPort with
+                match subscribeGlobalEvent client onSignalEvent timerPort with
                 | Ok sub ->
                     logInfo "OPENCODE-SIGNAL-SOURCE" "global.event"
                     Ok(Some sub, "global.event")

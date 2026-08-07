@@ -3614,7 +3614,10 @@ export const timerPort = (() => {
         throw new Error('timerPort: createVirtualTimerPort shape unexpected')
       }
       return {
+        /** Wrapped test surface (delay/cancel/dispose). */
         port: wrapPort(vt.Port),
+        /** Raw Fable ITimerPort for inject into HostSignalSubscribe.trySubscribe. */
+        rawPort: vt.Port,
         advance: (ms) => vt.Advance(ms | 0),
         nowMs: () => (typeof vt.NowMs === 'function' ? vt.NowMs() : vt.NowMs),
       }
@@ -4139,15 +4142,22 @@ export const executorSummarizeRuntime = (() => {
 /** Structural markers for HostSignalSubscribe reconnect + heartbeat (emitJsExpr body). */
 export const hostSignalSubscribe = (() => {
   const sourcePath = join(BUILD_ROOT, 'Infrastructure/OpenCode/Signals/HostSignalSubscribe.js')
+  const trySubscribeFn = bind(HostSignalSubscribeModule, 'HostSignalSubscribe', ['trySubscribe']).trySubscribe
   return {
     source: () => readFileSync(sourcePath, 'utf8'),
-    trySubscribe: bind(HostSignalSubscribeModule, 'HostSignalSubscribe', ['trySubscribe']).trySubscribe,
+    /**
+     * @param {object} input plugin input (client / serverUrl / events)
+     * @param {(event: unknown) => void} onSignalEvent
+     * @param {object} [timerPort] optional raw ITimerPort (vt.Port); Fable Option = null|port
+     */
+    trySubscribe: (input, onSignalEvent, timerPort) =>
+      trySubscribeFn(input, onSignalEvent, timerPort === undefined ? null : timerPort),
     reconnectMarkers: ['2 **', '10000', 'stream ended normally'],
     heartbeatMarkers: [
       'onHeartbeatTimeout',
-      'setTimeout',
-      'clearTimeout',
-      'state.heartbeatTimer',
+      'port.Delay',
+      'state.heartbeatHandle',
+      '.Cancel',
       'state.lastEventMs',
     ],
   }

@@ -108,6 +108,7 @@ type ToolRuntimeScope
         match journal with
         | Some durable ->
             let projections = (AgentJournal.snapshot durable).AgentProjections
+
             PromptAuthorityLedger.activeProfile sessionId projections
             |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile sessionId projections)
         | None -> None

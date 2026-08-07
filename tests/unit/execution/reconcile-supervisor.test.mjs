@@ -445,9 +445,12 @@ test('HOST_signal_subscribe_heartbeat_timeout_is_fatal_not_reconnect', () => {
   // One timeout kills the process once via Diagnostic.fatal (SIGKILL) — no
   // abort + exponential-backoff noise loop over a dead link.
   assert.ok(src.includes('onHeartbeatTimeout(silent)'), 'heartbeat timeout must invoke the fatal path')
-  assert.ok(src.includes('clearTimeout'), 'one-shot silence deadline cancels via clearTimeout')
+  assert.ok(src.includes('port.Delay'), 'silence deadline armed via ITimerPort.Delay')
+  assert.ok(src.includes('heartbeatHandle'), 'one-shot handle stored on state.heartbeatHandle')
+  assert.ok(src.includes('.Cancel'), 're-arm/dispose cancels via ITimerHandle.Cancel')
   assert.ok(!src.includes('setInterval'), 'period scan removed; one-shot deadline only')
   assert.ok(!src.includes('clearInterval'), 'period scan removed; one-shot deadline only')
+  assert.ok(!src.includes('state.heartbeatTimer'), 'legacy heartbeatTimer name is gone')
   assert.ok(!src.includes('heartbeat timeout recurring'), 'reconnect throttling noise is gone')
   assert.ok(!src.includes('heartbeatTimeouts'), 'consecutive-timeout throttle state is gone')
   assert.ok(!src.includes('state.connAbort.abort'), 'heartbeat no longer forces its own abort')

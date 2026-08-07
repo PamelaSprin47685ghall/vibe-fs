@@ -242,7 +242,7 @@ module HostSignalBootstrap =
             let signalRouter =
                 HostSignalRouter(scope.OwnedSessions, onSignal, onLoopEvent = loopSensor.Observe)
 
-            let! subscriptionResult = HostSignalSubscribe.trySubscribe input signalRouter.ObserveGlobal
+            let! subscriptionResult = HostSignalSubscribe.trySubscribe input signalRouter.ObserveGlobal None
 
             let subscription: IDisposable option =
                 match subscriptionResult with
