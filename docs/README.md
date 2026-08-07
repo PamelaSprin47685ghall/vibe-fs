@@ -95,6 +95,7 @@ why（设计理由与被拒方案；不直接约束实现）
 | Blogger / Enforcer | [enforcer](what/enforcer.md) | [enforcer](shape/enforcer.md) | [enforcer](how/enforcer.md) | [enforcer](proof/enforcer.md) | [enforcer](why/enforcer.md) |
 | Projection Algebra | [projection](what/projection.md) | [projection](shape/projection.md) | [projection](how/projection.md) | [projection](proof/projection.md) | [projection](why/projection.md) |
 | 循环检测 | [loop](what/loop.md) | [loop](shape/loop.md) | [loop](how/loop.md) | [loop](proof/loop.md) | [loop](why/loop.md) |
+| Glory 生命周期 | [glory](what/glory.md) | [glory](shape/glory.md) | [glory](how/glory.md) | [glory](proof/glory.md) | [glory](why/glory.md) |
 | 词汇表 | [glossary](what/glossary.md) | — | — | — | — |
 
 ---
@@ -121,6 +122,8 @@ why（设计理由与被拒方案；不直接约束实现）
 | `PROJ-` | `what/projection.md` / `shape/projection.md` / `how/projection.md` |
 | `LOOP-` | `what/loop.md` / `shape/loop.md` / `how/loop.md` / `proof/loop.md` |
 | `DSL-` | `what/dsl-structured-program.md` / `shape/dsl-structured-program.md` / `how/dsl-structured-program.md` / `proof/dsl-structured-program.md` / `why/dsl-structured-program.md` |
+| `GLORY-` | `what/glory.md` / `shape/glory.md` / `how/glory.md` / `proof/glory.md` / `why/glory.md` |
+| `SURFACE-` | `what/glory.md` |
 
 检查器以全文唯一 `## PREFIX-NNN` 定义为准；上表为导航，不复制条款正文。
 
@@ -131,6 +134,7 @@ why（设计理由与被拒方案；不直接约束实现）
 | 差距记录文件 | 主题与消除目标 |
 |------|------|
 | [projection-algebra-gap.md](status/projection-algebra-gap.md) | 收敛 Legacy 拼接到纯 Projection Planner，并覆盖现行投影 intent |
+| [glory.md](status/glory.md) | Born with Task, Suicide with Glory：Manager 生命周期、隐藏 Reviewer、Finality 与 Reawakening（GLORY-001..071 / SURFACE-001..006） |
 
 ---
 
@@ -139,9 +143,11 @@ why（设计理由与被拒方案；不直接约束实现）
 | Proposal | 候选范围 |
 |------|------|
 | [ChatGPT-F# DSL 规范问题.md](proposal/ChatGPT-F# DSL 规范问题.md) | F# 结构化流程 DSL 迁移分析与痛点候选 |
-| [glory.md](proposal/glory.md) | Manager 全生命周期「生于任务，终于荣耀」提示词与工具重写候选 |
 | [strength.md](proposal/strength.md) | Predict & Reduce Strength 旁路投机执行 |
 | [student-teacher.md](proposal/student-teacher.md) | Student / Teacher 知识生产流程 |
+| [waitfact-causal-renewal.md](proposal/waitfact-causal-renewal.md) | waitFact 续期显式归因：背景 journal 事实只记录、不续期 |
+
+> 注：glory 提案已裁决（见 `status/glory.md`），原始设计稿归档于 `docs/archive/glory-proposal-original.md`。
 
 Proposal 仅供讨论，不是实现依据。裁决流程与最小模板见 [document-governance](how/document-governance.md)。
 

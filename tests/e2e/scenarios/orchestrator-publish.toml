@@ -45,17 +45,10 @@ flow = [
   { wait = "manager.1" },
   { wait = "manager.2" },
 
-  # Pre-rebase review: the guard nudges the Manager (fast-reviewer path) and the
-  # Orchestrator raises its own review barrier (deep-reviewer path, ORCH-006). Both
-  # reviewers exist; the barrier one is forked by the Orchestrator directly.
-  { wait = "manager-guard.0" },
+  # ORCH-006: the Orchestrator raises its own review barrier with a deep
+  # Reviewer; the Manager is a job worker (AgentOwnerRoot) and its review is the
+  # barrier's, never the top-level guard's.
   { bindChild = { agent = "deep-reviewer", bind = ["deep-reviewer"] } },
-  { bindChild = { agent = "fast-reviewer", bind = ["fast-reviewer"] } },
-  { wait = "reviewer.0" },
-  { wait = "reviewer.1" },
-  { wait = "reviewer.2" },
-  { wait = "manager-guard.1" },
-  { wait = "manager-guard.2" },
   # The reviewer's second request carries a grown `parent_work_record` (the parent
   # chain's work record advances as the Manager's Blogger submits), so its wire
   # prefix is not an append-only continuation of the first — a real ARCH-004 break
@@ -66,24 +59,21 @@ flow = [
   # Both reviewers submit their second PERFECT in the next provider run. The
   # resulting durable witnesses—not a separate confirmation prompt—are the
   # REVIEW-003 criterion.
-  # Two witnesses exist by the time the pre-rebase barrier closes: the Manager
-  # guard's fast-reviewer and the Orchestrator's deep-reviewer (ORCH-006). The
-  # pre-0.5.0 `OrchestratorPreRebaseReviewConfirmed` fact no longer exists — the
+  # One witness exists by the time the pre-rebase barrier closes: the
+  # Orchestrator's deep-reviewer (ORCH-006). The pre-0.5.0
+  # `OrchestratorPreRebaseReviewConfirmed` fact no longer exists — the
   # confirmation is `ConfirmedReviewWitness` per barrier.
-  { waitFact = { name = "ConfirmedReviewWitness", gte = 2 } },
+  { waitFact = { name = "ConfirmedReviewWitness", gte = 1 } },
 
   # Post-rebase review: a second fork, so a second child session bound to the same lane.
   # Its step counter restarts at 0 because it is a fresh conversation — which is why the
   # eight `reviewer-perfect-N` edges of the JSON form are one declaration here.
-  { waitFact = { name = "ConfirmedReviewWitness", gte = 3 } },
+  { waitFact = { name = "ConfirmedReviewWitness", gte = 2 } },
   { waitFact = { name = "Published", eq = 1 } },
 
   { wait = "orch.2" },
   { awaitTerminal = true, requireAssistantTerminal = true },
   { assertFile = { path = "publish_proof.txt", equals = "Published by orchestrator canary\n" } },
-  # The dirty tree needs one guard review; finalization may expose the committed tree
-  # to one later terminal (REVIEW-008). A third delivery is the old self-sustaining loop.
-  { assertDeliveries = { id = "manager-guard.0", gte = 1, lte = 2 } },
   { assertWorktreeClean = true },
   { expectSatisfied = true },
 ]
@@ -127,15 +117,11 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "manager-guard"
 internal = true
-user = ["# Review is required before completion.", "# Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts."]
+user = ["# Your work is not yet complete.", "# Finish what remains, or call suicide when nothing useful remains."]
 tools = ["fork", "join", "list"]
 
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-reviewer", prompt = "Review the current worktree for correctness" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "join" }
-
+  # GLORY-031/032: the Manager ends the guard by prose — a Reviewer cannot be
+  # created, reused or nudged by a Manager (the Reviewer is Host-owned).
   [[turn.step]]
   respond = { type = "text", text = "Manager finished." }
 
@@ -161,49 +147,13 @@ tools = ["write"]
 # retired substring predicate could not tell them apart, and these two scenarios together
 # now pin one each.
 
-[[turn]]
-id = "reviewer"
-lane = "fast-reviewer"
-user = "# Review the current worktree for correctness"
-tools = ["verdict"]
-
-  # REVIEW-003 dual PERFECT: the first verdict's tool result IS the challenge
-  # (ReviewChallenge.Text), and the second verdict in the NEXT provider run
-  # confirms it. A prose reply instead of the second verdict would trip the
-  # ReviewerVerdictGuard nudge — a third request this scenario does not declare.
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "The second independent PERFECT was accepted for this tree." }
-
-# The challenge may also arrive as a guard NUDGE — a NEW user message composed by
-# production (`HostReviewGuard.requestPerfectConfirmation`), e.g. when the Host goes
-# idle instead of continuing after the tool result. `reviewer-challenge` below covers
-# that fallback (production-composed, internal).
-
-[[turn]]
-id = "reviewer-challenge"
-internal = true
-user = "# Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
-tools = ["verdict"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "The second independent PERFECT was accepted for this tree." }
-
 # ORCH-006: the Orchestrator raises its own review barrier with a deep Reviewer
 # (`OrchestratorHostReview.DeepReviewerAgent`), independent of the Manager's guard
 # path. Its assignment is the barrier's review request, and its verdict tool call
 # is the barrier's first PERFECT; the second comes through `reviewer-confirm`.
 [[turn]]
 id = "barrier-reviewer"
-lane = "deep-reviewer"
+internal = true
 user = "# Review the current worktree for correctness. Submit your verdict with the verdict tool."
 tools = ["glob", "grep", "inspector", "read", "verdict"]
 

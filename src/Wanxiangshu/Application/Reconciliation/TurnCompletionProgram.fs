@@ -350,8 +350,40 @@ module TurnCompletionProgram =
                         Some(HostReviewGuard.missingTree journal gitTreePort sessionKey)
                     | _ -> None
 
+            // GLORY-018: a legal planning terminal does not complete the Manager.
+            // The Host sends exactly one ManagerWorkActivation continuation
+            // instead; the completion stays deferred until the Life is activated.
+            let managerPlanning =
+                match turn.Role with
+                | Some Role.Manager when TerminalPolicy.isTopLevelManager sessionParents journal sessionKey ->
+                    ManagerLifecycleGate.shouldActivate journal turn
+                | _ -> false
+
+            // GLORY-041: a suicide was accepted — the Manager's completion is
+            // parked until the Finality workflow lands. Neither this turn's prose
+            // nor any later text may become the terminal: last_words is the only
+            // candidate (GLORY-061).
+            let finalityOutstanding =
+                match turn.Role with
+                | Some Role.Manager ->
+                    match journal with
+                    | Some durable ->
+                        AgentProjection.tryFind turn.SessionId (AgentJournal.snapshot durable).AgentProjections
+                        |> Option.bind (fun session -> session.ManagerLife)
+                        |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+                        |> Option.exists (fun life ->
+                            match life.ActiveFinality with
+                            | Some request -> not request.Rejected && not request.Confirmed
+                            | None -> false)
+                    | None -> false
+                | _ -> false
+
             let completionDeferred =
                 if joinOutstanding then
+                    true
+                elif finalityOutstanding then
+                    true
+                elif managerPlanning then
                     true
                 else
                     match managerGuard with
@@ -385,6 +417,10 @@ module TurnCompletionProgram =
                     | _ -> ()
                 }
                 :> Task
+            elif finalityOutstanding then
+                // GLORY-041: the Finality workflow owns the Manager's ending now;
+                // no nudge, no completion, no prose-as-terminal.
+                AsyncSupport.completedTask ()
             else
                 match turn.Role with
                 // REVIEW-003: a first PERFECT must enter its causal confirmation
@@ -421,6 +457,28 @@ module TurnCompletionProgram =
                             HostReviewGuard.nudgeReviewer sessionPort journal nudgeSent turn.SessionId turn.ProviderRun
 
                         ()
+                    }
+                    :> Task
+                | Some Role.Manager when managerPlanning ->
+                    // GLORY-018/020: send the Activation continuation exactly once
+                    // (deduped by the pending-claim gate inside shouldActivate).
+                    // The Manager stays unfinished; the next turns are Labor.
+                    task {
+                        let! outcome =
+                            HostSessionNudge.sendContinuationResult
+                                sessionPort
+                                turn.SessionId
+                                ManagerLifecyclePrompt.WorkActivation
+                                PromptAuthority.ContinuationKind.ManagerWorkActivation
+                                turn.Directory
+                                journal
+                                PromptDispatcher.AwaitMode.Detached
+                                None
+
+                        match outcome with
+                        | Error error ->
+                            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
+                        | Ok _ -> ()
                     }
                     :> Task
                 | Some Role.Manager when TerminalPolicy.isTopLevelManager sessionParents journal sessionKey ->

@@ -1,42 +1,31 @@
-# REVIEW-003/006/007: a tree is confirmed only by two PERFECT verdicts from two distinct
-# ProviderRunIdentity, the second proving from its input seal that it consumed the first's
-# challenge. Plus the two fail-closed guards that make the rule enforceable:
+# GLORY-003/058 + REVIEW-003/006: a tree is confirmed only by two PERFECT
+# verdicts from two distinct ProviderRunIdentity, the second proving from its
+# input seal that it consumed the first's challenge. The confirmation now lives
+# in the Host-owned Finality workflow (GLORY-040/058-061): the Manager calls
+# suicide, the hidden Reviewer confirms, last_words becomes the answer.
 #
-#   a Manager that tries to finish unreviewed gets nudged (REVIEW-007)
-#   a Reviewer that answers in prose without the verdict tool gets nudged (REVIEW-004)
-#
-# Three sessions, because each guard needs a session that has NOT already satisfied the
-# rule. `createSession` names them; every lane below is declared in this one file.
+# Two sessions: the Manager's ending (suicide → hidden Reviewer → confirmed),
+# and a prose-verdict Reviewer that gets nudged (REVIEW-004, unchanged).
 
 scenario = "reviewer-verdict"
-description = "REVIEW-003 two distinct PERFECT runs confirm a tree; REVIEW-004/007 guards nudge prose verdicts and unreviewed completion"
-pass = "Reviewer verdict canary passed: two distinct PERFECT runs confirmed the tree; both guards nudged."
+description = "GLORY-058/060 hidden Reviewer dual PERFECT confirms a suicide; REVIEW-004 nudges prose verdicts"
+pass = "Reviewer verdict canary passed: two distinct PERFECT runs confirmed the ending; the prose-verdict guard nudged."
 
 setup = { strict = true, project = { files = { "review_target.txt" = "review target\n" } } }
 session = { agent = "fast-manager", bind = ["manager-title", "fast-manager"] }
-prompt = { agent = "fast-manager", text = "Fork a Reviewer for review_target.txt, join it after two PERFECT verdicts, then report." }
+prompt = { agent = "fast-manager", text = "Plan and then finish review_target.txt work with suicide when nothing useful remains." }
 
-must = ["reviewer.2", "reviewer-nudged"]
+must = ["finality-reviewer.1", "reviewer-nudged"]
 
 flow = [
   { wait = "manager.0" },
-  { wait = "reviewer.0" },
-  { wait = "reviewer.1" },
-  { wait = "reviewer.2" },
-  { wait = "manager.1" },
-  { wait = "manager.2" },
+  { wait = "manager-activation" },
+  { wait = "finality-reviewer.0" },
+  { wait = "finality-reviewer.1" },
+  { waitFact = { name = "ReviewVerdictRecorded", eq = 2 } },
+  { wait = "finality-reviewer.2" },
   { awaitTerminal = true, requireAssistantTerminal = true },
-  { assertFacts = { name = "ReviewVerdictRecorded", eq = 2 } },
   { custom = "oracle" },
-
-  # REVIEW-007: a fresh Manager whose tree ALREADY has a confirmed dual-PERFECT
-  # (the reviewer above confirmed the same workspace tree) must NOT be nudged:
-  # the review guard only fires on trees without confirmation.
-  { createSession = { agent = "fast-manager", bind = ["guard-manager-title", "guard-manager"], as = "guard" } },
-  { prompt = { agent = "fast-manager", text = "Attempt completion without review." }, session = "guard" },
-  { wait = "guard-manager.0" },
-  { awaitTerminal = true, session = "guard", requireAssistantTerminal = true },
-  { assertFacts = { name = "GuardPromptAccepted", eq = 0 } },
 
   # REVIEW-004. A Reviewer that reviews in prose and never calls the tool.
   { createSession = { agent = "fast-reviewer", bind = ["reviewer-nudge-title", "reviewer-nudge"], as = "nudge" } },
@@ -47,37 +36,47 @@ flow = [
   { expectSatisfied = true },
 ]
 
-# Three provider steps, one user message. The JSON form wrote three edges at
-# `lane.turn = 1|2|3` whose only `match` was the same `requiredTools`/`forbiddenTools`
-# pair — so what distinguished them lived entirely in the hand-maintained ordinal.
+[[turn]]
+id = "manager-title"
+lane = "manager-title"
+kind = "title"
+user = "Plan and then finish review_target.txt work with suicide when nothing useful remains."
 
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }
+
+# Planning turn → exactly one Activation continuation (GLORY-018/020).
 [[turn]]
 id = "manager"
 lane = "fast-manager"
-user = "Fork a Reviewer for review_target.txt, join it after two PERFECT verdicts, then report."
-tools = ["fork", "join", "list"]
+user = "Plan and then finish review_target.txt work with suicide when nothing useful remains."
+tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-reviewer", prompt = "Review review_target.txt and submit two PERFECT verdicts." } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "join" }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Reviewer joined and confirmed." }
-
-# The two PERFECTs are two STEPS of one turn, not two turns: production returns
-# `ReviewChallenge.Text` as the verdict tool RESULT (`VerdictTool.fs:64`), which leaves the
-# last user message unchanged. The JSON form said the same thing with
-# `afterToolResult: true`, a predicate for a fact the step count already carries.
-#
-# They are nonetheless two distinct ProviderRunIdentity, which is what REVIEW-003 requires
-# — the identity comes from the Host's run, not from how the scenario groups the text.
+  respond = { type = "text", text = "Plan: verify review_target.txt, then seek my end when nothing useful remains." }
 
 [[turn]]
-id = "reviewer"
-lane = "fast-reviewer"
-user = "# Review review_target.txt and submit two PERFECT verdicts."
+id = "manager-activation"
+internal = true
+user = ["Now complete it yourself.", "Carry out the work you described until the final goal is fully achieved."]
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "review_target.txt verified and complete." } }
+
+  # GLORY-041: the accepted suicide's tool result is the last thing the
+  # Manager sees; the Host still runs one more provider step for the tool
+  # round, which must be declared (step cursor counts real assistant steps).
+  [[turn.step]]
+  respond = { type = "text", text = "Manager work concluded." }
+
+# GLORY-040: the accepted suicide starts the Host-owned Reviewer. Two PERFECT
+# verdicts in one turn: the first issues the REVIEW-003 challenge as its tool
+# result, the second confirms via its input seal (REVIEW-003).
+[[turn]]
+id = "finality-reviewer"
+internal = true
+user = "# Review the current worktree against all authoritative user requirements."
 tools = ["verdict"]
 
   [[turn.step]]
@@ -89,537 +88,41 @@ tools = ["verdict"]
   [[turn.step]]
   respond = { type = "text", text = "The second independent PERFECT was accepted for this tree." }
 
-# The first PERFECT issues the REVIEW-003 challenge as its tool result; the
-# second request (same envelope, tool result attached) submits the second
-# PERFECT and confirms via its seal (REVIEW-003). If that seal ever fails, the
-# guard nudges the challenge text as a NEW user message — `reviewer-challenge`
-# below covers that fallback (production-composed, internal).
-
+# REVIEW-004: a Reviewer that answers in prose without the verdict tool gets
+# nudged with the reviewerVerdictGuard text.
 [[turn]]
-id = "reviewer-challenge"
+id = "manager-join-guard"
 internal = true
-user = "# Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
-tools = ["verdict"]
+optional = true
+user = ["# Background work is still outstanding.", "# Call join to collect completed results before finishing."]
+tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+  respond = { type = "tool-call", tool = "join", args = {} }
 
   [[turn.step]]
-  respond = { type = "text", text = "The second independent PERFECT was accepted for this tree." }
-
-[[turn]]
-id = "guard-manager"
-lane = "guard-manager"
-user = "Attempt completion without review."
-tools = ["fork", "join", "list"]
-
-  [[turn.step]]
-  respond = { type = "text", text = "Manager attempted completion without review." }
-
-# The guard nudge is a new user message composed by production
-# (`HostReviewGuard.fs:147`), so it is its own turn and no scenario text reaches it.
-# The retired `neverEnd` flag was standing in for this: the nudge may arrive more than
-# once, and each arrival is step 0 of this turn because nothing follows it yet.
-
-[[turn]]
-id = "guard-manager-nudged"
-internal = true
-user = "# Review is required before completion."
-tools = ["fork", "join", "list"]
-
-  [[turn.step]]
-  respond = { type = "text", text = "Manager received the review guard." }
+  respond = { type = "text", text = "Manager joined." }
 
 [[turn]]
 id = "reviewer-nudge"
 lane = "reviewer-nudge"
 user = "Review the tree but do not submit a verdict."
-tools = ["verdict"]
+tools = ["read", "glob", "grep", "inspector", "verdict"]
 
   [[turn.step]]
-  respond = { type = "text", text = "I reviewed the tree but omitted the structured verdict." }
-
-# `HostReviewGuard.fs:164`.
+  respond = { type = "text", text = "I reviewed the tree and it is fine." }
 
 [[turn]]
 id = "reviewer-nudged"
 internal = true
-user = "# Submit a structured verdict with the verdict tool: PERFECT or REVISE."
+user = ["# Submit a structured verdict with the verdict tool: PERFECT or REVISE.", "# Do not put a verdict in prose."]
 tools = ["verdict"]
 
   [[turn.step]]
-  respond = { type = "text", text = "The structured verdict prompt was received." }
-
-[[turn]]
-id = "blogger"
-internal = true
-user = "# Write the dense work-log continuation now"
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Session background.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Session background continued.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 2.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 3.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 4.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 5.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 6.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 7.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 8.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 9.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 10.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 11.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 12.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 13.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 14.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 15.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 16.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 17.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 18.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 19.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 20.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 21.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 22.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 23.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 24.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 25.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 26.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 27.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 28.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 29.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 30.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 31.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 32.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 33.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 34.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 35.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 36.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 37.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 38.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 39.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 40.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 41.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 42.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 43.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 44.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 45.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 46.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 47.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 48.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 49.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 50.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 51.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 52.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 53.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 54.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 55.", tip = "primitive-obsession" } }
-
-[[epoch]]
-turn = "blogger"
-step = 0
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 1
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 2
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 3
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 4
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 5
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 6
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 7
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 8
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 9
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 10
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 11
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 12
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 13
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 14
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 15
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 16
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 17
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 18
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 19
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 20
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 21
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 22
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 23
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 24
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 25
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 26
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 27
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 28
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 29
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 30
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 31
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 32
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 33
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 34
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 35
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 36
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 37
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 38
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 39
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 40
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 41
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 42
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 43
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 44
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 45
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 46
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 47
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 48
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 49
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 50
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 51
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 52
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 53
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 54
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 55
-reason = "frame-commit"
-
-[[turn]]
-id = "manager-title"
-lane = "manager-title"
-kind = "title"
-user = "Fork a Reviewer for review_target.txt, join it after two PERFECT verdicts, then report."
-
-  [[turn.step]]
-  respond = { type = "title", text = "E2E Test Session" }
-
-[[turn]]
-id = "guard-manager-title"
-lane = "guard-manager-title"
-kind = "title"
-user = "Attempt completion without review."
-
-  [[turn.step]]
-  respond = { type = "title", text = "E2E Test Session" }
+  respond = { type = "text", text = "Nudged Reviewer submitted the tool verdict." }
 
 [[turn]]
 id = "reviewer-nudge-title"
@@ -629,3 +132,20 @@ user = "Review the tree but do not submit a verdict."
 
   [[turn.step]]
   respond = { type = "title", text = "E2E Test Session" }
+
+[[turn]]
+id = "blogger"
+internal = true
+user = "# Write the dense work-log continuation now"
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Session background.", tip = "primitive-obsession" } }
+
+# The Blogger transcript is append-only between deliveries (ARCH-004); a frame
+# commit after the Activation continuation legitimately inserts the Activation
+# assistant turn in front of the user delta, so the wire is not a pure append of
+# the previous one. Declared like manager-companion's frame-commit epochs.
+[[epoch]]
+turn = "blogger"
+step = 0
+reason = "frame-commit"

@@ -26,6 +26,15 @@ module PromptAuthority =
         | ReviewConfirmation
         | BusyAgentNudge
         | ProviderRetryAttempt
+        /// GLORY-020: the Host asks the Manager to carry out the plan it just
+        /// described. Sent exactly once after a legal planning terminal.
+        | ManagerWorkActivation
+        /// GLORY-029: pure encouragement for an idle Manager; carries no work
+        /// record and no specific issue.
+        | ManagerIdleEncouragement
+        /// GLORY-053: a suicide was rejected; the reviewer's canonical work
+        /// record is the feedback body.
+        | FinalityRejected
 
     type PromptOrigin =
         | AuthorityRoot of RootAuthorityKind
@@ -185,6 +194,9 @@ module PromptAuthority =
         | Continuation ReviewConfirmation -> "ReviewConfirmation"
         | Continuation BusyAgentNudge -> "BusyAgentNudge"
         | Continuation ProviderRetryAttempt -> "ProviderRetryAttempt"
+        | Continuation ManagerWorkActivation -> "ManagerWorkActivation"
+        | Continuation ManagerIdleEncouragement -> "ManagerIdleEncouragement"
+        | Continuation FinalityRejected -> "FinalityRejected"
         | HostInternal -> "HostInternal"
         | UnknownOrigin -> "UnknownOrigin"
 
@@ -197,6 +209,9 @@ module PromptAuthority =
         | "ReviewConfirmation" -> Some ReviewConfirmation
         | "BusyAgentNudge" -> Some BusyAgentNudge
         | "ProviderRetryAttempt" -> Some ProviderRetryAttempt
+        | "ManagerWorkActivation" -> Some ManagerWorkActivation
+        | "ManagerIdleEncouragement" -> Some ManagerIdleEncouragement
+        | "FinalityRejected" -> Some FinalityRejected
         | _ -> None
 
     /// Labels and tier/role tables live in `ManagedAgentCatalog` (AGENT-001…004).

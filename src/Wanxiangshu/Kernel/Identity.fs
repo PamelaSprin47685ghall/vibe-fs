@@ -349,7 +349,24 @@ module Identity =
         let create (value: string) = CommitHash value
         let value (CommitHash v) = v
 
+    // ── Manager lifecycle (docs/what/glory.md GLORY-010) ──────────────────────────────────
+
+    /// One Manager Life: Birth → Activation → Labor → Finality (GLORY-004.1).
+    /// A new Life id opens on every completed-Life HumanRoot (GLORY-065).
+    type ManagerLifeId = private ManagerLifeId of string
+
+    /// One suicide request: request, reviewer, barrier are all 1:1 (GLORY-045).
+    type FinalityRequestId = private FinalityRequestId of string
+
     // ── composite identities ────────────────────────────────────────────────
+
+    module ManagerLifeId =
+        let create (value: string) = ManagerLifeId value
+        let value (ManagerLifeId v) = v
+
+    module FinalityRequestId =
+        let create (value: string) = FinalityRequestId value
+        let value (FinalityRequestId v) = v
 
     /// Dedupe key for one failed provider attempt (FALLBACK-003). The same
     /// failure observed twice — a retry signal plus an idle reconcile — must

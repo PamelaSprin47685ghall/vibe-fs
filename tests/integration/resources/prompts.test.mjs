@@ -60,16 +60,12 @@ test('ENFORCER_resource_prompts_load_independent_of_process_cwd', () => {
 test('PROMPT_manager_sub_session_reuse_algorithm_is_executable', () => {
   const text = promptResources.load().ManagerSystemPrompt
   // Semantic fragments only — not whole-block brittle match.
-  assert.match(text, /sub-session 复用/)
   assert.match(text, /\blist\b/)
   assert.match(text, /agent_id/)
-  assert.match(text, /优先复用/)
-  assert.match(text, /不得再次传 managed agent 名称/)
-  assert.match(text, /向同一 handle 发送 nudge/)
-  assert.match(text, /prefix cache/)
-  // Wrong vs right call shape (managed name vs existing agent_id).
-  assert.match(text, /fork\("fast-coder"/)
-  assert.match(text, /fork\("[a-z0-9]{6}"/)
+  assert.match(text, /reuse/)
+  assert.match(text, /compatible context/)
+  assert.match(text, /Do not reuse an agent/)
+  assert.match(text, /ambiguous or misleading/)
 })
 
 test('PROMPT_orchestrator_continues_manager_job_without_invented_reuse_api', () => {
@@ -102,10 +98,9 @@ test('PROMPT_devops_coder_tdd_workflow_requires_observed_red', () => {
 test('PROMPT_manager_fork_coder_requires_tdd', () => {
   const text = promptResources.load().ManagerSystemPrompt
   assert.match(text, /tdd/)
-  assert.match(text, /Required when the target is a coder role|fork a coder role without `tdd`/)
-  assert.match(text, /fast-coder.*deep-coder|coder role/i)
   assert.match(text, /tdd="red"/)
   assert.match(text, /tdd="green"/)
-  // Reuse path also requires tdd for coder handles.
-  assert.match(text, /fork\("a1b2c3", tdd=/)
+  // GLORY-027: delegation discipline lives in the prompt; the tdd schema and
+  // the ForkTool error carry the hard gate (ForkTool childPrompt).
+  assert.match(text, /failing test|already-established failing test/)
 })

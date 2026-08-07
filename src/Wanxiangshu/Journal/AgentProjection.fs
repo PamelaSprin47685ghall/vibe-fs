@@ -37,6 +37,9 @@ type SessionAgentProjection =
         Enforcement: EnforcementProjectionState option
         /// C5: open materializations + unified Entry|Squash receipts.
         BloggerCycles: BloggerCycleProjectionState option
+        /// GLORY-011: the Manager lifecycle (open Life, completed Lives).
+        /// Manager-only; other roles never receive a lifecycle fact.
+        ManagerLife: ManagerLifeProjection option
     }
 
 type AgentProjectionSet =
@@ -74,7 +77,8 @@ module AgentProjection =
           Fallback = None
           PromptAuthority = None
           Enforcement = None
-          BloggerCycles = None }
+          BloggerCycles = None
+          ManagerLife = None }
 
     let empty =
         { Sessions = Map.empty

@@ -26,6 +26,7 @@ module ToolRegistry =
         | "join" -> fun r -> Roles.isAllowed r ToolPermission.Join
         | "list" -> fun r -> Roles.isAllowed r ToolPermission.List
         | "verdict" -> fun r -> Roles.isAllowed r ToolPermission.Verdict
+        | "suicide" -> fun r -> Roles.isAllowed r ToolPermission.Finality
         | "executor" -> fun r -> Roles.isAllowed r ToolPermission.Exec
         | "inspector" -> fun r -> Roles.isAllowed r ToolPermission.Inspector
         | "mv" -> fun r -> Roles.isAllowed r ToolPermission.Move
@@ -79,6 +80,8 @@ module ToolRegistry =
               JoinTool.spec runtime
               ListTool.spec runtime
               VerdictTool.spec factory runtime
+              // GLORY-034/036: the Manager's end-of-life tool.
+              FinalityTool.spec factory runtime
               ExecutorTool.spec factory runtime
               InspectorTool.spec factory runtime
               CoderTool.spec factory runtime

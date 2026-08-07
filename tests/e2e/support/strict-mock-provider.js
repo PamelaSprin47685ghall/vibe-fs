@@ -419,6 +419,11 @@ export class StrictMockProvider {
       candidates: candidateLabels,
     });
     console.error(`[MOCK-FATAL] first script mismatch: reason=${reason} session=${sessId} parent=${parentSessionId || '-'} model=${JSON.stringify(parsed.model)} tools=${JSON.stringify(extractToolNames(parsed))} msgs=${msgs.length} lastUser=${JSON.stringify(fatal.lastUser)} candidates=${JSON.stringify(candidateLabels)}`);
+    // TEMP DIAG: step cursor investigation (removed after investigation).
+    try {
+      const roles = msgs.map((m) => `${m.role}`).join(' ');
+      console.error(`[MSG-ROLES] ${roles}`);
+    } catch {}
     if (isFirst) {
       const err = new Error(
         `FIRST SCRIPT MISMATCH: ${reason} session=${sessId} lastUser=${JSON.stringify(fatal.lastUser)} candidates=${JSON.stringify(candidateLabels)}`,

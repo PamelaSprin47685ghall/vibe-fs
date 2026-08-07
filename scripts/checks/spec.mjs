@@ -52,6 +52,8 @@ const PREFIX_OWNER = {
   PROJ: 'what/projection.md',
   LOOP: 'what/loop.md',
   DSL: 'what/dsl-structured-program.md',
+  GLORY: 'what/glory.md',
+  SURFACE: 'what/glory.md',
 }
 
 /** Prefixes allowed to split definitions across listed files (still unique IDs). */
@@ -86,6 +88,8 @@ const PREFIX_SPLIT_OWNERS = {
   ],
   GOV: ['what/document-governance.md'],
   VERIFY: ['proof/verify.md'],
+  GLORY: ['what/glory.md', 'shape/glory.md', 'how/glory.md', 'proof/glory.md', 'why/glory.md'],
+  SURFACE: ['what/glory.md'],
 }
 
 const PREFIX_ALTERNATION = Object.keys(PREFIX_OWNER).join('|')

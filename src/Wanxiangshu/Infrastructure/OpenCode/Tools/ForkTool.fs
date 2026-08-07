@@ -58,6 +58,11 @@ module ForkTool =
         else
             ManagedAgent.tryParse record.Agent
 
+    /// GLORY-032: provider-facing denial for a Manager trying to reach a
+    /// Reviewer. Narrative, no mechanism leak.
+    let ReviewerForkDeniedText =
+        "That path is not yours to command. Continue your own work, or call suicide when nothing useful remains."
+
     let private forbiddenManagerRole (managed: ManagedAgent) =
         match managed.Role with
         | Role.Executor
@@ -65,6 +70,11 @@ module ForkTool =
         | Role.Orchestrator
         | Role.Manager -> true
         | _ -> false
+
+    /// GLORY-031/032: a Manager must never create, reuse or nudge a Reviewer —
+    /// the Reviewer is Host-owned (GLORY-002/003). The denial is role-based
+    /// (durable/canonical Role), never string-based.
+    let private reviewerForkDenied (managed: ManagedAgent) = managed.Role = Role.Reviewer
 
     let private TddSchemaDescription =
         "Optional TDD phase. Use red to establish a failing behavior test and green to implement the smallest production change that makes the established test pass. Required by prompt when forking a coder role; omit for other roles."
@@ -95,21 +105,27 @@ module ForkTool =
                         | _, None ->
                             match runtime.TryFindAgent request.Agent with
                             | Some record ->
-                                // Reuse / busy nudge: no first-prompt envelope — keep composed assignment text.
-                                match! runtime.Reuse(request.Agent, assignment) with
-                                | Error reuseError -> return error reuseError
-                                | Ok result ->
-                                    match managedForRecord record with
-                                    | Some managed -> return forkPayload result.AgentId managed []
-                                    | None ->
-                                        return
-                                            ToolHostCodec.tomlObject
-                                                [ "agent_id", ToolHostCodec.TString result.AgentId
-                                                  "agent", ToolHostCodec.TString record.Agent
-                                                  "role",
-                                                  ToolHostCodec.TString(record.Role.ToString().ToLowerInvariant()) ]
+                                // GLORY-031: reuse of a Reviewer agent id is denied by
+                                // its durable role, before any nudge is sent.
+                                match managedForRecord record with
+                                | Some managed when reviewerForkDenied managed -> return error ReviewerForkDeniedText
+                                | _ ->
+                                    // Reuse / busy nudge: no first-prompt envelope — keep composed assignment text.
+                                    match! runtime.Reuse(request.Agent, assignment) with
+                                    | Error reuseError -> return error reuseError
+                                    | Ok result ->
+                                        match managedForRecord record with
+                                        | Some managed -> return forkPayload result.AgentId managed []
+                                        | None ->
+                                            return
+                                                ToolHostCodec.tomlObject
+                                                    [ "agent_id", ToolHostCodec.TString result.AgentId
+                                                      "agent", ToolHostCodec.TString record.Agent
+                                                      "role",
+                                                      ToolHostCodec.TString(record.Role.ToString().ToLowerInvariant()) ]
                             | None ->
                                 match ManagedAgent.tryParse request.Agent with
+                                | Some managed when reviewerForkDenied managed -> return error ReviewerForkDeniedText
                                 | Some managed when forbiddenManagerRole managed ->
                                     return
                                         error (

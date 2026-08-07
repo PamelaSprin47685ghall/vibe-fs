@@ -227,68 +227,44 @@ module HostForkAgent =
                                 this.ChildCreated agentId role childId
                                 this.ChildCreatedDir agentId childId (this.DirectoryOf agentId)
 
-                                // REVIEW-007: a Manager's own review fork opens the
-                                // barrier for the Reviewer BEFORE its first prompt is
-                                // sent, so the first verdict can confirm. Orchestrator
-                                // runtimes keep this off — ORCH-006 opens their
-                                // barriers at the reverify site, and a second writer
-                                // would fight the first over `CurrentBarrierId`.
-                                let barrierOutcome =
-                                    if this.ManagerOpensReviewBarrier && role = Role.Reviewer then
-                                        match this.TreeHashFor agentId with
-                                        | None -> Ok()
-                                        | Some tree ->
-                                            let barrierId = ReviewBarrierId.create (System.Guid.NewGuid().ToString("N"))
+                                // GLORY-033: the fork surface no longer opens review
+                                // barriers. A Manager cannot fork a Reviewer at all
+                                // (GLORY-031), and every Host-owned barrier opens at
+                                // its reverify site (HostReviewProgram / ORCH-006).
+                                let result =
+                                    this.Runtime.Fork(agentId, role, agentName, runWork = (fun () -> run.Source.Task))
 
-                                            ReviewBarrier.openBarrier this.Journal this.ParentId childId barrierId tree
-                                    else
-                                        Ok()
+                                match result with
+                                | ForkResult.NotFound _ ->
+                                    this.FailRun(run, "Fork runtime is cancelled")
+                                    return Error "Fork runtime is cancelled"
+                                | _ ->
+                                    this.MarkReady(run)
 
-                                match barrierOutcome with
-                                | Error err ->
-                                    let! _ = this.Sessions.AbortSession childId
-                                    this.FailRun(run, err)
-                                    return Error err
-                                | Ok() ->
-                                    let result =
-                                        this.Runtime.Fork(
-                                            agentId,
-                                            role,
-                                            agentName,
-                                            runWork = (fun () -> run.Source.Task)
-                                        )
+                                    // COMPANION-003 / EXEC-006: the child's
+                                    // OpeningPromptRaw is the ORIGINAL fork
+                                    // assignment and authoritative requirements,
+                                    // NOT the rendered envelope (which carries
+                                    // parent_work_record and would nest the
+                                    // parent LWR recursively). Captured before
+                                    // the first prompt is sent; idempotent.
+                                    if isFirstPrompt then
+                                        XTraceCapture.captureOpening this.Journal childId prompt requirements
 
-                                    match result with
-                                    | ForkResult.NotFound _ ->
-                                        this.FailRun(run, "Fork runtime is cancelled")
-                                        return Error "Fork runtime is cancelled"
-                                    | _ ->
-                                        this.MarkReady(run)
+                                    let! sent =
+                                        HostForkAgentOwner.sendFirstPrompt
+                                            this.Sessions
+                                            this.Journal
+                                            childId
+                                            agentName
+                                            (this.DirectoryOf agentId)
+                                            enrichedPrompt
 
-                                        // COMPANION-003 / EXEC-006: the child's
-                                        // OpeningPromptRaw is the ORIGINAL fork
-                                        // assignment and authoritative requirements,
-                                        // NOT the rendered envelope (which carries
-                                        // parent_work_record and would nest the
-                                        // parent LWR recursively). Captured before
-                                        // the first prompt is sent; idempotent.
-                                        if isFirstPrompt then
-                                            XTraceCapture.captureOpening this.Journal childId prompt requirements
-
-                                        let! sent =
-                                            HostForkAgentOwner.sendFirstPrompt
-                                                this.Sessions
-                                                this.Journal
-                                                childId
-                                                agentName
-                                                (this.DirectoryOf agentId)
-                                                enrichedPrompt
-
-                                        match sent with
-                                        | Ok _ -> return Ok result
-                                        | Error err ->
-                                            this.FailRun(run, err)
-                                            return Error err
+                                    match sent with
+                                    | Ok _ -> return Ok result
+                                    | Error err ->
+                                        this.FailRun(run, err)
+                                        return Error err
             }
 
         member this.Reuse(agentId: string, prompt: string) : Task<Result<ForkResult, string>> =

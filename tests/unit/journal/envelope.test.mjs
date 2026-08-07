@@ -350,6 +350,7 @@ test('PERSIST_008_one_session_projection_is_reached_by_a_keyed_lookup', () => {
     'Enforcement',
     'Fallback',
     'Handles',
+    'ManagerLife',
     'PrefixEpoch',
     'PromptAuthority',
     'ReviewGuard',

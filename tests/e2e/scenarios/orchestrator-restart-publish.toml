@@ -39,7 +39,7 @@ setup = { strict = true, project = { files = { "AGENTS.md" = "- orchestrator res
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch." }
 
-must = ["orch-continue.1", "reviewer-confirm.0"]
+must = ["orch-continue.1"]
 
 flow = [
   # The second physical delivery is the post-rebase reviewer. CandidateReady is
@@ -53,15 +53,9 @@ flow = [
   { wait = "coder.1" },
   { wait = "manager.1" },
   { wait = "manager.2" },
-  { wait = "manager-guard.0" },
-  { wait = "reviewer.0" },
-  { wait = "reviewer.1" },
-  { wait = "manager-guard.1" },
-  { wait = "manager-guard.2" },
   { wait = "barrier-reviewer.0" },
   { wait = "barrier-reviewer.1" },
   { wait = "barrier-reviewer.2" },
-  { wait = "reviewer-confirm.0" },
   { waitFact = { name = "CandidateReady", eq = 1 } },
 
   { awaitRestart = true },
@@ -80,15 +74,9 @@ flow = [
   { wait = "coder.1" },
   { wait = "manager.1" },
   { wait = "manager.2" },
-  { wait = "manager-guard.0" },
-  { wait = "reviewer.0" },
-  { wait = "reviewer.1" },
-  { wait = "manager-guard.1" },
-  { wait = "manager-guard.2" },
   { wait = "barrier-reviewer.0" },
   { wait = "barrier-reviewer.1" },
   { wait = "barrier-reviewer.2" },
-  { wait = "reviewer-confirm.0" },
   { waitFact = { name = "Published", eq = 1 }, timeoutMs = 20000 },
   { wait = "orch-continue.1" },
 
@@ -159,15 +147,11 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "manager-guard"
 internal = true
-user = "# Review is required before completion."
+user = "# Your work is not yet complete."
 tools = ["fork", "join", "list"]
 
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-reviewer", prompt = "Review the current worktree for correctness" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "join" }
-
+  # GLORY-031/032: the Manager ends the guard by prose — a Reviewer cannot be
+  # created, reused or nudged by a Manager (the Reviewer is Host-owned).
   [[turn.step]]
   respond = { type = "text", text = "Manager finished." }
 
@@ -187,20 +171,8 @@ tools = ["write"]
   respond = { type = "text", text = "Coder finished." }
 
 [[turn]]
-id = "reviewer"
-lane = "fast-reviewer"
-user = "# Review the current worktree for correctness"
-tools = ["verdict"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Reviewer intermediate text after verdict tool." }
-
-[[turn]]
 id = "barrier-reviewer"
-lane = "deep-reviewer"
+internal = true
 user = "# Review the current worktree for correctness. Submit your verdict with the verdict tool."
 tools = ["glob", "grep", "inspector", "read", "verdict"]
 

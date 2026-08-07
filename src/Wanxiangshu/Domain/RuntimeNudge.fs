@@ -52,10 +52,12 @@ module RuntimeNudge =
           "Call join to collect completed results before finishing."
           "Use list when you need the current resource view." ]
 
-    /// REVIEW-003: the Manager tried to finish without a confirmed double PERFECT.
+    /// GLORY-070: the migration-period completion gate. It only blocks a
+    /// premature terminal and points at `suicide`; it never mentions review
+    /// mechanics (SURFACE-005).
     let ManagerReviewGuardInstructions =
-        [ "Review is required before completion."
-          "Fork or nudge a Reviewer until the current Git tree has two distinct PERFECT verdicts." ]
+        [ "Your work is not yet complete."
+          "Finish what remains, or call suicide when nothing useful remains." ]
 
     /// REVIEW-003: the Reviewer produced prose where a structured verdict was required.
     let ReviewerVerdictGuardInstructions =

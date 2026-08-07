@@ -82,6 +82,7 @@ const EXPECTED_ARGUMENTS = {
   list: {},
   mv: { source: 'required', destination: 'required' },
   rm: { path: 'required' },
+  suicide: { last_words: 'required' },
   verdict: { verdict: 'required' },
 }
 
@@ -163,12 +164,13 @@ const KNOWN_TOOL_KEYS = [
   'network',
   'verdict',
   'blog',
+  'suicide',
 ]
 
 /** AGENT-006/011/013/014/015: the allowed tools per role. Everything else denies. */
 const ALLOWED_TOOLS = {
   orchestrator: ['fork-manager', 'join'],
-  manager: ['fork', 'join', 'list'],
+  manager: ['fork', 'join', 'list', 'suicide'],
   coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspector', 'mv', 'rm'],
   inspector: ['read', 'glob', 'grep', 'executor'],
   devops: ['fork-pty', 'join', 'list', 'read', 'glob', 'grep', 'inspector', 'coder', 'executor'],
@@ -230,27 +232,25 @@ const FACADE_ROLE_CASES = {
 const PROMPT_CLAUSES = {
   'fast-manager': {
     required: [
-      /Manager thinks and delegates/,
-      /fork\(agent, prompt, tdd\?\)|fork\(agent, prompt\)/,
-      /Treat every `join\(\)` as a deliberate blocking point/,
-      /work already known and work newly exposed by the latest facts/,
-      /fast-coder/,
-      /Never assign verification to a Coder/,
-      /Do not ask a Coder to run, check, diagnose, or interpret compilation, builds, typechecks, linters, tests, or program execution/,
-      /Do not ask a Coder to obtain any of those results through Inspector/,
-      /Once its edits are complete, the Coder is done/,
-      /DO NOT delegate local workspace reading or search to [`']fast-browser[`'] \/ [`']deep-browser[`']/i,
-      // PR B: sub-session reuse algorithm (list → agent_id → fork), not slogan-only.
-      /sub-session 复用/,
+      /Manager thinks, delegates, and integrates/,
+      /Your tools are `fork`, `join`, `list`, and `suicide`/,
+      /Call `join` only when no useful unassigned work remains/,
+      /A returned child record is evidence, not automatic completion/,
+      /Coder edits\./,
+      /Do not ask an agent to act outside its role/,
+      /Do not ask Coder to run commands/,
+      /Do not ask DevOps to edit files/,
+      /Planning is not completion/,
+      /Delegation is not completion/,
+      /A child finishing is not completion/,
       /agent_id/,
       /\blist\b/,
-      /优先复用|Prefer reuse|prefer reuse/i,
-      /不得再次传 managed agent 名称|不得再次传 managed agent/,
-      /向同一 handle 发送 nudge|same handle.*nudge/i,
-      // PR E+: fork optional tdd; prompt-required for coder roles.
-      /tdd/,
-      /fast-coder.*deep-coder|coder role/i,
-      /Required when the target is a coder role|fork a coder role without `tdd`|must pass `tdd/i,
+      /compatible context/,
+      /Do not reuse an agent/,
+      /tdd="red"/,
+      /tdd="green"/,
+      /suicide\(last_words\)/,
+      /When no useful action remains, call/,
     ],
     forbidden: [],
   },
@@ -309,7 +309,7 @@ const PROMPT_CLAUSES = {
   'fast-reviewer': {
     required: [
       /Uncompromising Reviewer/,
-      /Render a Verdict Only After Rigorous Review/,
+      /Quality Gatekeeper/,
       /verdict\("PERFECT"\)/,
       /verdict\("REVISE"\)/,
     ],
@@ -813,10 +813,12 @@ test('EXEC_002_one_shot_tools_return_the_managed_agent_and_the_turn_formal_text'
   })
 })
 
-test('REVIEW_007_reverted_human_root_is_not_required_by_reviewer', async () => {
-  await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
+test('GLORY_031_manager_fork_of_a_reviewer_is_denied_role_based', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'manager-reverted-root', 'fast-manager')
 
+    // GLORY-002/031: a Manager must never create, reuse or nudge a Reviewer;
+    // the Reviewer is Host-owned. Denied by durable role, before any prompt.
     const result = parseToml(
       await hooks.tool.fork.execute(
         { agent: 'fast-reviewer', prompt: 'Review the current tree.' },
@@ -824,32 +826,17 @@ test('REVIEW_007_reverted_human_root_is_not_required_by_reviewer', async () => {
       ),
     )
 
-    assert.equal(result.error, undefined)
-    assert.equal(runtime.prompts.length, 1)
-    assert.doesNotMatch(runtime.prompts[0].body.parts[0].text, /\[\[original_user_requirement\]\]/)
+    assert.equal(result.error, 'That path is not yours to command. Continue your own work, or call suicide when nothing useful remains.')
+    assert.equal(runtime.prompts.length, 0)
 
-    runtime.messages.push({
-      info: { id: 'root-manager-reverted-root', role: 'user' },
-      parts: [{ type: 'text', text: 'Requirement that survived compaction.' }],
-    })
-    const liveResult = parseToml(
+    const deepResult = parseToml(
       await hooks.tool.fork.execute(
         { agent: 'deep-reviewer', prompt: 'Review the same current tree.' },
         { sessionID: 'manager-reverted-root', agent: 'fast-manager' },
       ),
     )
-    assert.equal(liveResult.error, undefined)
-    assert.match(runtime.prompts[1].body.parts[0].text, /Requirement that survived compaction\./)
-
-    for (const [resultToJoin, childSessionId] of [
-      [result, createdIds[0]],
-      [liveResult, createdIds[1]],
-    ]) {
-      runtime.recordFork('manager-reverted-root', resultToJoin.agent_id, childSessionId)
-      const joined = hooks.tool.join.execute({}, { sessionID: 'manager-reverted-root', agent: 'fast-manager' })
-      notifyCompleted(runtime, childSessionId, 'review completed', 'review completed', 5)
-      await joined
-    }
+    assert.equal(deepResult.error, 'That path is not yours to command. Continue your own work, or call suicide when nothing useful remains.')
+    assert.equal(runtime.prompts.length, 0)
   })
 })
 

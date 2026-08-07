@@ -36,8 +36,12 @@
     <Compile Include="Domain/HostCompactionPolicy.fs"/>
     <Compile Include="Domain/ProviderProjection.fs"/>
     <Compile Include="Domain/XTrace.fs"/>
+    <Compile Include="Domain/ManagerNarrative.fs"/>
     <Compile Include="Domain/LifecycleWorkRecord.fs"/>
     <Compile Include="Domain/SyntheticToml.fs"/>
+    <Compile Include="Domain/ManagerLifecyclePrompt.fs"/>
+    <Compile Include="Domain/FinalityPrompt.fs"/>
+    <Compile Include="Domain/HostReviewPrompt.fs"/>
     <Compile Include="Domain/ToolResultBound.fs"/>
     <Compile Include="Domain/RuntimeNudge.fs"/>
     <Compile Include="Domain/LoopDetector.fs"/>
@@ -62,6 +66,7 @@
     <Compile Include="Journal/Envelope.fs"/>
     <Compile Include="Journal/CompanionProjection.fs"/>
     <Compile Include="Journal/XTraceProjection.fs"/>
+    <Compile Include="Journal/ManagerLifecycleProjection.fs"/>
     <Compile Include="Journal/BlogProjection.fs"/>
     <Compile Include="Journal/PrefixEpochProjection.fs"/>
     <Compile Include="Journal/FallbackProjection.fs"/>
@@ -134,6 +139,8 @@
     <Compile Include="Infrastructure/OpenCode/Codec/CanonicalJson.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/Projection.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Codec/PromptMetadataCodec.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/ManagerNarrativeTransform.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Diagnostic.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Events.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SharedTerminalBus.fs"/>
@@ -144,7 +151,6 @@
     <Compile Include="Infrastructure/OpenCode/Signals/HostSignalAdapter.fs"/>
     <Compile Include="Infrastructure/OpenCode/Signals/HostSignalSubscribe.fs"/>
     <Compile Include="Application/Reconciliation/ReconciledTurn.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Codec/PromptMetadataCodec.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SessionSnapshotPort.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/OpenCodePort.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Sessions.fs"/>
@@ -189,6 +195,7 @@
     <Compile Include="Infrastructure/OpenCode/Host/HostSessionNudge.fs"/>
     <Compile Include="Application/Reconciliation/TurnBinding.fs"/>
     <Compile Include="Application/Reconciliation/CompanionTransform.fs"/>
+    <Compile Include="Application/Reconciliation/ManagerLifecycleGate.fs"/>
     <Compile Include="Application/Reconciliation/ReviewSeal.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostReviewGuard.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostJoinGuard.fs"/>
@@ -210,6 +217,7 @@
     <Compile Include="Infrastructure/OpenCode/Orchestration/SessionDirectories.fs"/>
     <Compile Include="Infrastructure/OpenCode/Orchestration/ReviewState.fs"/>
     <Compile Include="Infrastructure/OpenCode/Orchestration/JobRecovery.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Orchestration/HostReviewProgram.fs"/>
     <Compile Include="Infrastructure/OpenCode/Orchestration/ReviewRunner.fs"/>
     <Compile Include="Infrastructure/OpenCode/Orchestration/Host.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/ToolHostCodec.fs"/>
@@ -225,6 +233,8 @@
     <Compile Include="Infrastructure/OpenCode/Tools/CoderTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/BlogTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/VerdictTool.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Tools/FinalityController.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Tools/FinalityTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FileMutationTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ToolRegistry.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginHost.fs"/>

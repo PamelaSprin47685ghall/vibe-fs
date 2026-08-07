@@ -128,14 +128,37 @@ module SpikePlugin =
                             let semantic =
                                 Projection.decodeMessageView rawMessages |> ProviderProjection.toSemantic
 
-                            XTraceCapture.captureProjection journal (SessionId.create sessionId) semantic
+                            // COMPANION-003/007: keep the XTrace in step with the
+                            // provider-visible semantic projection BEFORE the
+                            // Companion rewrite and X-wire run (see below).
+                            let traceState =
+                                XTraceCapture.captureProjection journal (SessionId.create sessionId) semantic
+
+                            traceState
                             |> Option.iter (fun updated ->
-                                // COMPANION-007: refresh the in-memory mirror so the
-                                // chunker maps the ingest cursor against the trace
-                                // that now exists, not the empty one from bootstrap.
                                 match scope.Companions.TryGetValue sessionId with
                                 | true, host -> host.RefreshXTrace updated
                                 | false, _ -> ())
+
+                            // GLORY-013: after durable X capture, before any further
+                            // rewrite: open a Manager Life and rewrite the Birth /
+                            // Reawakening narrative on the provider-facing transcript.
+                            // Idempotent by (session, message, source) and by the Life
+                            // projection itself; durable Opening stays the raw text.
+                            match
+                                ManagerNarrativeTransform.tryTransform journal (Some sessionId) traceState rawMessages
+                            with
+                            | Some rewritten -> HostMessageProjection.replaceMessagesInPlace outObj rewritten
+                            | None -> ()
+
+                            // GLORY-021: once the Activation continuation has been
+                            // physically accepted, fix the compression floor at the
+                            // XTrace head (just after the Activation prompt).
+                            ManagerNarrativeTransform.applyAcceptedActivation
+                                journal
+                                (Some sessionId)
+                                traceState
+                                rawMessages
                         | None -> ()
 
                         do!

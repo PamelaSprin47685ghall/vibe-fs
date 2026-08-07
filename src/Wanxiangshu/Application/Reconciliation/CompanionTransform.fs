@@ -183,8 +183,26 @@ module CompanionTransform =
                              |> Option.defaultValue XTraceProjection.empty)
                         | None -> companion.Memory.Blog, companion.Memory.XTrace
 
-                    let ingestCursor =
-                        XTraceProjection.semanticCursorFor blog.Coverage.IngestedThroughSequence xTrace
+                    // GLORY-023: the Manager Life floor also gates the cheap
+                    // prefilter, so Birth material never even reaches EnsureBlogger.
+                    let floorSequence =
+                        match journal with
+                        | None -> None
+                        | Some durable ->
+                            AgentProjection.tryFind
+                                (SessionId.create sessionId)
+                                (AgentJournal.snapshot durable).AgentProjections
+                            |> Option.bind (fun s -> s.ManagerLife)
+                            |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+                            |> Option.bind (fun life -> life.ProtectedPrefixEnd)
+                            |> Option.map (fun cursor -> cursor.Sequence)
+
+                    let effectiveIngested =
+                        floorSequence
+                        |> Option.map (fun floor -> max blog.Coverage.IngestedThroughSequence floor)
+                        |> Option.defaultValue blog.Coverage.IngestedThroughSequence
+
+                    let ingestCursor = XTraceProjection.semanticCursorFor effectiveIngested xTrace
 
                     // Cheap prefilter only: skip EnsureBlogger when the Host view has
                     // nothing past the ingest cursor. Birth gate (Next>Prev) still

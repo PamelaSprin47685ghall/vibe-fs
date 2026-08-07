@@ -38,11 +38,19 @@
  */
 
 import { readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { availableParallelism } from 'node:os';
 import { basename, isAbsolute, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertEq, assertTrue, tmpScenarioDir } from './lib.mjs';
 import { walk } from '../../../scripts/lib/walk.mjs';
-import { CANARY_DIR, CANARY_SUFFIX, CANARY_TESTS, nonConformingCanaryNames, readCanaryTests } from '../../e2e/support/manifest.mjs';
+import {
+  CANARY_DIR,
+  CANARY_MAX_PARALLEL,
+  CANARY_SUFFIX,
+  CANARY_TESTS,
+  nonConformingCanaryNames,
+  readCanaryTests,
+} from '../../e2e/support/manifest.mjs';
 
 /** Resolution base, derived from this file rather than from `cwd`, so the gate is location-free. */
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -370,6 +378,17 @@ export const singleSourceCases = [
   },
 
   // ── the manifest: the derivation itself, and its two fail-closed refusals ──
+
+  {
+    name: 'VERIFY-004 canary parallelism follows available CPUs',
+    fn: () => {
+      assertEq(
+        CANARY_MAX_PARALLEL,
+        Math.min(Math.max(1, Math.floor(availableParallelism() / 2)), CANARY_TESTS.length),
+        'one canary slot must reserve one CPU each for its Host and scenario/provider process',
+      );
+    },
+  },
 
   {
     name: 'VERIFY-004 the canary suite is exactly the -canary.mjs files on disk',

@@ -536,6 +536,8 @@ const Ids = {
   blobRef: idModule('BlobRef'),
   blobDigest: idModule('BlobDigest'),
   bloggerRequest: idModule('BloggerRequestId'),
+  managerLife: idModule('ManagerLifeId'),
+  finalityRequest: idModule('FinalityRequestId'),
 }
 
 export const runtimeId = (v) => Ids.runtime.create(v)
@@ -564,6 +566,8 @@ export const commitHash = (v) => Ids.commit.create(v)
 export const blobRef = (v) => Ids.blobRef.create(v)
 export const blobDigest = (v) => Ids.blobDigest.create(v)
 export const bloggerRequestId = (v) => Ids.bloggerRequest.create(v)
+export const managerLifeId = (v) => Ids.managerLife.create(v)
+export const finalityRequestId = (v) => Ids.finalityRequest.create(v)
 
 // Epoch ids wrap int64, so Fable represents them as BigInt. Taking a JS number
 // here and converting once keeps `1` out of every call site — passing a plain
@@ -663,6 +667,12 @@ export const asFact = (inner) => buildFact('Agent', [inner])
 
 /** Convenience: build and wrap in one step. */
 export const fact = (caseName, payload) => asFact(agentFact(caseName, payload))
+
+const buildManagerLifecycleFact = unionCase(FactModule.ManagerLifecycleFact, 'ManagerLifecycleFact')
+
+/** Build a ManagerLifecycleFact by case name (GLORY-010). */
+export const managerLifecycleFact = (caseName, payload) =>
+  buildFact('ManagerLifecycle', [buildManagerLifecycleFact(caseName, [payload])])
 
 /**
  * `RuntimeStarted`, wrapped as a top-level Fact.

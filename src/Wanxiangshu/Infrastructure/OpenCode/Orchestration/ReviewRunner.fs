@@ -2,14 +2,16 @@ namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
 open Wanxiangshu.Domain
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Fact
+open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Journal
 
 /// One review barrier, driven by the Orchestrator (REVIEW-008, REVIEW-009).
+///
+/// GLORY-042/044: the algorithm now lives in the shared `HostReviewProgram`;
+/// this module only adapts its typed outcome to the Orchestrator's
+/// `Result<unit, string>` contract (REVISE maps to the existing
+/// "Reviewer requested revision" error, keeping ORCH-009 publication semantics).
 module OrchestratorHostReview =
 
     /// ORCH-009: post-rebase review is always deep-reviewer. Explicit tier, never
@@ -20,33 +22,11 @@ module OrchestratorHostReview =
     let private OpeningPrompt =
         "Review the current worktree for correctness. Submit your verdict with the verdict tool."
 
-    /// Emit `ReviewBarrierStarted` for a freshly forked reviewer.
-    ///
-    /// REVIEW-008 decision (package G): the barrier is emitted from the reviewer fork
-    /// path, once the child session exists. It cannot be emitted earlier — the fact
-    /// carries `ReviewerSessionId` and the fold keys `ReviewGuardProjection` by it, so
-    /// a barrier opened before the fork has nothing to key. One reviewer session per
-    /// barrier also makes REVIEW-008's "a fresh dual PERFECT" automatic: that session's
-    /// guard starts empty, so no earlier witness can satisfy it.
-    /// `HostReviewGuard.openBarrier` — REVIEW-003's shared barrier writer. Both the
-    /// Orchestrator's review barrier (ORCH-006, here) and a Manager's own guard-path
-    /// review fork (REVIEW-007) emit the same fact through the same function.
-    let private startBarrier = HostReviewGuard.openBarrier
-
     /// Fork a reviewer, open its barrier, and wait for a confirmed dual PERFECT.
     ///
     /// `forkReviewer` returns the reviewer's Host session id; `awaitReviewer` waits for
     /// that run to reach terminal. They are separate because the barrier fact must be
     /// written between them — after the session exists, before any verdict arrives.
-    ///
-    /// A first PERFECT is answered by nudging the SAME reviewer session with
-    /// `ReviewChallenge.Prompt`, whose digest REVIEW-003's seal is searched for. Re-forking
-    /// would open a new barrier and throw the first PERFECT away.
-    ///
-    /// Exactly one confirmation round. The previous version had two nearly identical
-    /// nudge-then-reread blocks — one for `PendingConfirmation`, one for `NeedsReview`
-    /// with a different prompt — so a reviewer that produced no verdict at all got a
-    /// second chance that REVIEW-003 does not grant.
     let reverify
         (journal: AgentJournal option)
         (forkReviewer: ManagerJobId -> WorktreePath -> string -> Task<Result<SessionId, string>>)
@@ -64,34 +44,36 @@ module OrchestratorHostReview =
             let tree =
                 GitTreeHash.create ((GitTree.create (WorktreePath.value worktree)).GetTreeHash())
 
-            match! forkReviewer jobId worktree OpeningPrompt with
-            | Error error -> return Error error
-            | Ok reviewerSessionId ->
-                match startBarrier journal managerSessionId reviewerSessionId barrierId tree with
-                | Error error -> return Error error
-                | Ok() ->
-                    match! awaitReviewer jobId with
-                    | Error error -> return Error error
-                    | Ok() ->
-                        match OrchestratorReviewRead.read journal reviewerSessionId tree with
-                        | OrchestratorReviewRead.Confirmed -> return Ok()
-                        | OrchestratorReviewRead.RevisionRequired -> return Error "Reviewer requested revision"
-                        | OrchestratorReviewRead.NeedsReview -> return Error "Reviewer produced no verdict"
-                        | OrchestratorReviewRead.PendingConfirmation ->
-                            match! nudgeReviewer jobId ReviewChallenge.Prompt with
-                            | Error error -> return Error error
-                            | Ok() ->
-                                match! awaitReviewer jobId with
-                                | Error error -> return Error error
-                                | Ok() ->
-                                    match OrchestratorReviewRead.read journal reviewerSessionId tree with
-                                    | OrchestratorReviewRead.Confirmed -> return Ok()
-                                    | OrchestratorReviewRead.RevisionRequired ->
-                                        return Error "Reviewer requested revision"
-                                    // REVIEW-003 fail closed: the second PERFECT could not
-                                    // be proven causal, so this barrier does not confirm.
-                                    // Never fall back to same-root matching.
-                                    | OrchestratorReviewRead.PendingConfirmation
-                                    | OrchestratorReviewRead.NeedsReview ->
-                                        return Error "Reviewer produced no confirmed verdict"
+            let! outcome =
+                HostReviewProgram.reverify
+                    journal
+                    (fun () -> forkReviewer jobId worktree OpeningPrompt)
+                    (fun () -> awaitReviewer jobId)
+                    (fun () -> nudgeReviewer jobId ReviewChallenge.Prompt)
+                    managerSessionId
+                    barrierId
+                    tree
+
+            match outcome with
+            | Ok(HostReviewProgram.HostReviewOutcome.Confirmed _) -> return Ok()
+            | Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired _) -> return Error "Reviewer requested revision"
+            | Error failure ->
+                let message =
+                    match failure with
+                    | HostReviewProgram.HostReviewFailure.CannotReadTree reason -> sprintf "Cannot read tree: %s" reason
+                    | HostReviewProgram.HostReviewFailure.CannotCreateReviewer reason ->
+                        sprintf "Cannot create reviewer: %s" reason
+                    | HostReviewProgram.HostReviewFailure.CannotOpenBarrier reason ->
+                        sprintf "Cannot open review barrier: %s" reason
+                    | HostReviewProgram.HostReviewFailure.CannotSendPrompt reason ->
+                        sprintf "Cannot nudge reviewer: %s" reason
+                    | HostReviewProgram.HostReviewFailure.CannotAwaitReviewer reason ->
+                        sprintf "Cannot await reviewer: %s" reason
+                    | HostReviewProgram.HostReviewFailure.ReviewerProducedNoVerdict -> "Reviewer produced no verdict"
+                    | HostReviewProgram.HostReviewFailure.ConfirmationUnproven ->
+                        "Reviewer produced no confirmed verdict"
+                    | HostReviewProgram.HostReviewFailure.WorkRecordUnavailable -> "Reviewer work record is unavailable"
+                    | HostReviewProgram.HostReviewFailure.JournalFailure reason -> sprintf "Journal failure: %s" reason
+
+                return Error message
         }
