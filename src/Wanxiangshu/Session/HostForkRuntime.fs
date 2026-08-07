@@ -237,7 +237,7 @@ type HostForkRuntime
                     | Some batch -> Some(Ok(ResultsAvailable batch))
                     | None -> None
 
-    /// Permit gate shared by JoinWithPermit / JoinAvailableWithPermit.
+    /// Permit gate shared by JoinWithPermit / JoinAvailableWithPermit / AwaitAgentWithPermit.
     member private this.validatePermit(permit: FamilyRecoveryPermit) : Result<unit, ForkError> =
         let root = FamilyRecoveryPermit.root permit
         let permitSeq = FamilyRecoveryPermit.journalSequence permit
@@ -454,6 +454,20 @@ type HostForkRuntime
 
     member this.AwaitAgent(agentId: string, ?timeoutMs: int) : Task<Result<RunCompletion, string>> =
         runtime.AwaitAgent(agentId, ?timeoutMs = timeoutMs)
+
+    /// Permit-gated targeted agent await. validatePermit then AwaitAgent;
+    /// string errors map to ForkError.NotFound. No second RunCompletion truth source.
+    member this.AwaitAgentWithPermit
+        (permit: FamilyRecoveryPermit, agentId: string, ?timeoutMs: int)
+        : Task<Result<RunCompletion, ForkError>> =
+        match this.validatePermit permit with
+        | Error e -> Task.FromResult(Error e)
+        | Ok() ->
+            task {
+                match! this.AwaitAgent(agentId, ?timeoutMs = timeoutMs) with
+                | Error msg -> return Error(ForkError.NotFound msg)
+                | Ok completion -> return Ok completion
+            }
 
     /// Targeted cancel for one forked agent (Executor map/reduce sibling abort).
     /// Completes the pending run cell and aborts the Host child so Join unblocks;

@@ -46,67 +46,25 @@ module ExecutorSummarize =
     [<Literal>]
     let AwaitAgentTimeoutMs = 600_000
 
-    let awaitAgent (runtime: IExecutorRuntime) (agentId: string) (stash: Dictionary<string, RunCompletion>) =
+    /// Permit-gated targeted await (Journal-authoritative via HostForkRuntime).
+    let awaitAgentWithPermit (runtime: IExecutorRuntime) (agentId: string) =
         task {
-            let fromStash =
-                lock stash (fun () ->
-                    match stash.TryGetValue agentId with
-                    | true, completion ->
-                        stash.Remove agentId |> ignore
-                        Some completion
-                    | false, _ -> None)
+            let! joined = runtime.AwaitAgentWithPermit(agentId, Some AwaitAgentTimeoutMs)
 
-            match fromStash with
-            | Some completion -> return completion
-            | None ->
-                let mutable result: RunCompletion = Unchecked.defaultof<_>
-                let mutable done' = false
-                let mutable remainingMs = AwaitAgentTimeoutMs
-
-                while not done' do
-                    if remainingMs <= 0 then
-                        result <-
-                            raise (
-                                InvalidOperationException(
-                                    sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
-                                )
-                            )
-
-                        done' <- true
-                    else
-                        let started = DateTimeOffset.UtcNow
-                        // Fresh permit per join inside IExecutorRuntime.JoinWithPermit.
-                        let! joined = runtime.JoinWithPermit(Some remainingMs)
-
-                        match joined with
-                        | Error ForkError.TimedOut ->
-                            result <-
-                                raise (
-                                    InvalidOperationException(
-                                        sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
-                                    )
-                                )
-
-                            done' <- true
-                        | Error error ->
-                            result <- raise (InvalidOperationException(error.ToString()))
-                            done' <- true
-                        | Ok completion when completion.AgentId = agentId ->
-                            result <- completion
-                            done' <- true
-                        | Ok completion ->
-                            lock stash (fun () -> stash.[completion.AgentId] <- completion)
-
-                            let elapsed = int (DateTimeOffset.UtcNow - started).TotalMilliseconds
-
-                            remainingMs <- max 0 (remainingMs - max 0 elapsed)
-
-                return result
+            match joined with
+            | Error ForkError.TimedOut ->
+                return
+                    raise (
+                        InvalidOperationException(
+                            sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
+                        )
+                    )
+            | Error error -> return raise (InvalidOperationException(error.ToString()))
+            | Ok completion -> return completion
         }
 
     let runExecutorPrompt
         (runtime: IExecutorRuntime)
-        (stash: Dictionary<string, RunCompletion>)
         (forkedIds: ResizeArray<string>)
         (processId: string)
         (level: int)
@@ -124,13 +82,12 @@ module ExecutorSummarize =
             match fork with
             | Error error -> return raise (InvalidOperationException error)
             | Ok result ->
-                let! completion = awaitAgent runtime result.AgentId stash
+                let! completion = awaitAgentWithPermit runtime result.AgentId
                 return completionText completion
         }
 
     let summarizeChunk
         (runtime: IExecutorRuntime)
-        (stash: Dictionary<string, RunCompletion>)
         (forkedIds: ResizeArray<string>)
         (spoolPath: string)
         (chunk: byte[])
@@ -142,11 +99,10 @@ module ExecutorSummarize =
 
         let rootDigest = HostDigest.sha256Hex (sprintf "%s|%d" spoolPath index)
 
-        runExecutorPrompt runtime stash forkedIds rootDigest 0 index index prompt (Some content)
+        runExecutorPrompt runtime forkedIds rootDigest 0 index index prompt (Some content)
 
     let reduceBatch
         (runtime: IExecutorRuntime)
-        (stash: Dictionary<string, RunCompletion>)
         (forkedIds: ResizeArray<string>)
         (level: int)
         (batch: string list)
@@ -157,7 +113,7 @@ module ExecutorSummarize =
 
         let batchDigest = HostDigest.sha256Hex (String.concat "\n" batch)
 
-        runExecutorPrompt runtime stash forkedIds batchDigest level 0 (List.length batch - 1) prompt (Some combined)
+        runExecutorPrompt runtime forkedIds batchDigest level 0 (List.length batch - 1) prompt (Some combined)
 
     let private rippleInsert
         (reduceBatch: int -> string list -> Task<string>)
@@ -221,10 +177,9 @@ module ExecutorSummarize =
     /// Maps bounded spool chunks concurrently (results sorted by chunk index),
     /// then reduces online. Map/reduce failures yield partial summary plus the
     /// last 200KB raw tail instead of dropping ProcessResult.
-    /// Agent joins go through IExecutorRuntime.JoinWithPermit (fresh permit each wait).
+    /// Agent waits go through IExecutorRuntime.AwaitAgentWithPermit (fresh permit each wait).
     let summarizeSpool (runtime: IExecutorRuntime) (spoolPath: string) =
         task {
-            let stash = Dictionary<string, RunCompletion>()
             let forkedIds = ResizeArray<string>()
 
             let cancelOwned () =
@@ -246,7 +201,7 @@ module ExecutorSummarize =
                 [| for (chunkIndex, chunk) in chunks do
                        task {
                            try
-                               let! summary = summarizeChunk runtime stash forkedIds spoolPath chunk chunkIndex
+                               let! summary = summarizeChunk runtime forkedIds spoolPath chunk chunkIndex
                                return Choice1Of2(chunkIndex, summary)
                            with ex ->
                                return Choice2Of2(chunkIndex, chunk, ex.Message)
@@ -276,7 +231,7 @@ module ExecutorSummarize =
                     | Choice1Of2 _ -> None)
 
             let levels = ResizeArray<ResizeArray<string>>()
-            let reduce = reduceBatch runtime stash forkedIds
+            let reduce = reduceBatch runtime forkedIds
 
             try
                 for _, summary in successes do

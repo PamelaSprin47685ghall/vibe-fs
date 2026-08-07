@@ -242,6 +242,8 @@ advance(blocking = false)  → 只记录，不重置
 
 计时器必须不持有事件循环：所有其它句柄关闭后进程自然退出，watchdog 只在仍有东西（挂死的 SSE 读者、泄漏的 server）维持事件循环时开火。这样它不会把干净结束的 scenario 拖到静默窗口结束。
 
+`ITimerPort`：delay/cancel/dispose + ref/unref policy；生产=Node timer，测试=虚拟时钟注入；watchdog/deadline 判定与真实 timer 等价，cancel 后零回调触发。
+
 ### 覆盖必须无缝
 
 watchdog 装好之前的窗口同样需要因果判据。启动阶段（进程拉起到就绪）必须有独立的就绪判据，不得只靠兜底 wall-clock 覆盖。

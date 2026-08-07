@@ -16,6 +16,23 @@
 
 分层、模块和测试边界见 `shape/dsl-structured-program.md`。
 
+## 等待语义分类
+
+等待不是同一件事。按控制流所阻塞的对象分类，不得用统一方案误伤：
+
+| 类别 | 定义 | 判定规则 |
+|------|------|----------|
+| A. 业务状态探测 | 控制流为获知业务事实而反复读取（snapshot / projection） | 必须有界（因果重读上限）；不得以墙钟退避推进 |
+| B. 事件等待 | 控制流阻塞于真实物理信号（TCS / journal waiter / process signal） | 事件驱动，零轮询；允许注入可取消 timer 做 deadline |
+| C. Deadline / watchdog | 距上次因果进展的静默时长判据（VERIFY-004） | 允许墙钟，但须集中、可取消、可注入测试 |
+| D. 跨进程互斥等待 | 多进程竞争单一物理资源（publish lock） | 保持 cross-process 合同；另行裁决 |
+
+落点：
+
+- Reconciler 因果重读属 A 类：有界，≤3 次（HOST-004）；不得以墙钟退避推进。
+- Executor 定向等待属 B 类：permit-gated、Journal-authoritative；TCS/Pulse 仅作唤醒。
+- SSE 心跳属 C 类：one-shot silence deadline，非周期扫描。
+
 ## Algorithm
 
 业务流程直接执行：

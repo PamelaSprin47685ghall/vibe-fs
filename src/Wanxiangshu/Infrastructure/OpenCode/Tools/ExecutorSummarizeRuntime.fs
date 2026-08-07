@@ -16,6 +16,9 @@ module ExecutorSummarizeRuntime =
         abstract Fork: string * Role * string * string option -> Task<Result<ForkResult, string>>
         /// Agent join: require fresh permit → HostForkRuntime.JoinWithPermit. No bare Join.
         abstract JoinWithPermit: timeoutMs: int option -> Task<Result<RunCompletion, ForkError>>
+        /// Targeted agent await: fresh permit → HostForkRuntime.AwaitAgentWithPermit.
+        abstract AwaitAgentWithPermit:
+            agentId: string * timeoutMs: int option -> Task<Result<RunCompletion, ForkError>>
         /// Cancel one owned map/reduce agent without tearing down the runtime.
         abstract CancelAgent: agentId: string -> unit
 
@@ -34,13 +37,27 @@ module ExecutorSummarizeRuntime =
                     match! requirePermit () with
                     | Error msg when msg.StartsWith("RECOVERY_WAITING:", System.StringComparison.Ordinal) ->
                         // Incomplete recovery: wait-not-hard-error. Surface TimedOut so
-                        // awaitAgent loop retries requirePermit until Ready or wall budget.
+                        // caller may retry requirePermit until Ready or wall budget.
                         return Error ForkError.TimedOut
                     | Error msg -> return Error(ForkError.NotFound msg)
                     | Ok permit ->
                         match timeoutMs with
                         | Some ms -> return! runtime.JoinWithPermit(permit, timeoutMs = ms)
                         | None -> return! runtime.JoinWithPermit(permit)
+                }
+
+            member _.AwaitAgentWithPermit(agentId, timeoutMs) =
+                task {
+                    match! requirePermit () with
+                    | Error msg when msg.StartsWith("RECOVERY_WAITING:", System.StringComparison.Ordinal) ->
+                        // Incomplete recovery: wait-not-hard-error. Surface TimedOut so
+                        // caller may retry requirePermit until Ready or wall budget.
+                        return Error ForkError.TimedOut
+                    | Error msg -> return Error(ForkError.NotFound msg)
+                    | Ok permit ->
+                        match timeoutMs with
+                        | Some ms -> return! runtime.AwaitAgentWithPermit(permit, agentId, timeoutMs = ms)
+                        | None -> return! runtime.AwaitAgentWithPermit(permit, agentId)
                 }
 
             member _.CancelAgent(agentId) = runtime.CancelAgent(agentId) }
@@ -61,6 +78,15 @@ module ExecutorSummarizeRuntime =
                         Error(
                             ForkError.NotFound
                                 "pure ForkRuntime has no journal; agent Join requires JoinWithPermit under FamilyRecoveryPermit"
+                        )
+                }
+
+            member _.AwaitAgentWithPermit(_agentId, _timeoutMs) =
+                task {
+                    return
+                        Error(
+                            ForkError.NotFound
+                                "pure ForkRuntime has no journal; agent AwaitAgentWithPermit requires FamilyRecoveryPermit"
                         )
                 }
 

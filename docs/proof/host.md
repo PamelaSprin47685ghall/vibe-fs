@@ -10,6 +10,7 @@
 | Domain 仅 typed HostSignal | HOST-003 |
 | chat.message 不进普通业务 | HOST-002 |
 | provider `TurnAborted` 保留到消费边界；无 Armed 不产生 Agent completion | HOST-004、LOOP-006、EXEC-020 |
+| Reconciler 无新信号时不产生 setTimeout/GetMessages（仅 ≤3 次因果重读） | HOST-004、A 类有界 |
 
 ## Compaction
 

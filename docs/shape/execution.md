@@ -13,7 +13,8 @@ Executor 映射子会话是私有 runtime，不暴露为公开 fork 目标（配
 ## EXEC-023：恢复所有权与线性序
 
 Session/Child 恢复：端口全强制；结果分支穷尽（RecoveredActive / Terminal / Abandoned / RecoveryIncomplete / RecoveryBlocked）。  
-线性序：permit → join；禁止跳步恢复。
+线性序：permit → join；禁止跳步恢复。  
+Executor 定向等待（AwaitAgentWithPermit）同样受 permit 门：每次定向 await 前重新 requirePermit，校验通过才可读目标 agent 的 Journal 权威 completion；TCS/Pulse 仅作唤醒，不构成第二份 RunCompletion 真理源。
 
 ## EXEC-024：Mailbox 双通道
 

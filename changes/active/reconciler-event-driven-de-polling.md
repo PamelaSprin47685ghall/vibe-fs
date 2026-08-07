@@ -167,3 +167,9 @@ Wanxiangshu 项目 Owner。
   `requirePermit`）与 map/reduce 并发扇出的成本权衡。
 - Owner 需确认 `ITimerPort` 的 ref/unref policy 边界（长预算不持住进程 vs 短预算
   保持事件循环，`PtyTiming` 现有阈值语义的迁移）。
+
+## Active work
+
+启动：Owner 已裁决实施。范围限定本提案（A/B/C 三类，D 移出）。
+Reconciler 语义迁移已完成：`RereadWithBackoff`/`pickDelay`/`nextBackoffIndex`/`delays`/`budget`/`delayMs` 已删除，改为 `maxCausalRereads` 有界因果重读；`decideStep (rereadsRemaining) (evidence)`。
+剩余：Executor targeted await（AwaitAgentWithPermit + 删 while/stash）、SSE one-shot deadline、ITimerPort、proof 闭环、归档。

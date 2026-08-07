@@ -4021,8 +4021,8 @@ export const forkRuntime = (() => {
 
 /**
  * ExecutorSummarize map/reduce: summarizeSpool cancels owned children on failure.
- * Fake IExecutorRuntime: Fork / JoinWithPermit(timeoutMs) / CancelAgent.
- * JoinWithPermit is permit-gated in production (requirePermit → HostForkRuntime).
+ * Fake IExecutorRuntime: Fork / JoinWithPermit / AwaitAgentWithPermit / CancelAgent.
+ * Permit-gated in production (requirePermit → HostForkRuntime).
  */
 export const executorSummarizeRuntime = (() => {
   const summarizeSpool = member(ExecutorSummarize, 'ExecutorSummarize', 'summarizeSpool')
@@ -4038,16 +4038,25 @@ export const executorSummarizeRuntime = (() => {
     forkOk: (agentId) => okResult(new ForkResult(0, [agentId])),
     timedOut: () => errorResult(ForkError.TimedOut),
     /**
-     * Fake IExecutorRuntime. JoinWithPermit returns a Promise of Result each call.
-     * Default → TimedOut so awaitAgent fails after fork.
+     * Fake IExecutorRuntime. JoinWithPermit / AwaitAgentWithPermit return Promise of Result.
+     * Default → TimedOut so await fails after fork.
      */
-    fake: ({ fork, join, cancel } = {}) => {
+    fake: ({ fork, join, awaitAgent, cancel } = {}) => {
       const cancelled = []
+      const joinOrAwait = (timeoutMs, agentId) => {
+        if (typeof awaitAgent === 'function' && agentId !== undefined) {
+          return awaitAgent(agentId, timeoutMs)
+        }
+        if (typeof join === 'function') {
+          return join(timeoutMs, agentId)
+        }
+        return errorResult(ForkError.TimedOut)
+      }
       const runtime = {
         Fork: (agentId, _role, _prompt, _payload) =>
           Promise.resolve(typeof fork === 'function' ? fork(agentId) : okResult(new ForkResult(0, [agentId]))),
-        JoinWithPermit: (timeoutMs) =>
-          Promise.resolve(typeof join === 'function' ? join(timeoutMs) : errorResult(ForkError.TimedOut)),
+        JoinWithPermit: (timeoutMs) => Promise.resolve(joinOrAwait(timeoutMs)),
+        AwaitAgentWithPermit: (agentId, timeoutMs) => Promise.resolve(joinOrAwait(timeoutMs, agentId)),
         CancelAgent: (agentId) => {
           cancelled.push(agentId)
           if (typeof cancel === 'function') cancel(agentId)

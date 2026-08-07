@@ -464,8 +464,8 @@ test('P0_RECOVERY_JOIN_GATE_executor_permit_path_stays_green', () => {
   ].join('\n')
   const summarize = [
     'module ExecutorSummarize',
-    'let awaitAgent runtime agentId stash =',
-    '    let! joined = runtime.JoinWithPermit(Some remainingMs)',
+    'let awaitAgentWithPermit runtime agentId =',
+    '    let! joined = runtime.AwaitAgentWithPermit(agentId, Some AwaitAgentTimeoutMs)',
   ].join('\n')
   const wrap = [
     'module ExecutorSummarizeRuntime',

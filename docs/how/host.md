@@ -15,6 +15,7 @@ Host 适配、信号和共享状态边界见 `shape/host.md`。
 - Single-flight：同一 session 同时最多一次 reconcile。  
 - Dirty：idle 到达设 dirty。  
 - Unknown：一次 idle 建 Dirty latch；最多 3 次因果重读；仍 Unknown 则保持 Dirty 等下一信号。
+- 因果重读用尽仍非终态：保持 Dirty，等 idle/retry/deleted 之外下一粗粒度信号重新入队；绝不立即重入 runnable queue（重读用尽不立即重跑，等下一信号）。
 
 ### 终态对齐（EXEC-020）
 

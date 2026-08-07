@@ -26,6 +26,7 @@
 |------|------|
 | agent Pulse vs PTY Publish 分通道 | EXEC-024 |
 | ChildRecovery 分支穷尽与线性序 | EXEC-023 |
+| AwaitAgentWithPermit 乱序完成只返回目标 agent；每 join 重新 requirePermit；completion 从 Journal 投影读 | EXEC-023/024 |
 
 代表：`tests/unit/execution/*`（join-v2-wire、handle、fork）。
 

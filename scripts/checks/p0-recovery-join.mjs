@@ -212,8 +212,8 @@ export const RULES = [
   {
     id: 'executor-summarize-join-with-permit',
     fileHint: 'ExecutorSummarize.fs',
-    pattern: /JoinWithPermit/,
-    label: 'ExecutorSummarize awaitAgent must call runtime.JoinWithPermit',
+    pattern: /JoinWithPermit|AwaitAgentWithPermit/,
+    label: 'ExecutorSummarize must call JoinWithPermit / AwaitAgentWithPermit',
     positive: true,
   },
   {
