@@ -235,12 +235,14 @@ const [
   prod('Infrastructure/OpenCode/Host/ManagedAgentConfig'),
 ])
 
-const [NodeProcessWaitModule, NodeProcessHostModule, FableTask, FableTypes] = await Promise.all([
-  prod('Process/NodeProcessWait'),
-  prod('Process/NodeProcessHost'),
-  lib('Task.js'),
-  lib('Types.js'),
-])
+const [NodeProcessWaitModule, NodeProcessHostModule, PtyTimingModule, FableTask, FableTypes] =
+  await Promise.all([
+    prod('Process/NodeProcessWait'),
+    prod('Process/NodeProcessHost'),
+    prod('Process/PtyTiming'),
+    lib('Task.js'),
+    lib('Types.js'),
+  ])
 
 // ── the one Fable naming convention ──────────────────────────────────────────
 //
@@ -3559,6 +3561,70 @@ export const deadline = (() => {
   }
 })()
 
+/**
+ * ITimerPort (VERIFY-004): virtual clock + node port surface via PtyTiming.
+ * Delay Task is thenable under Fable; cancel/dispose must leave callbacks unfired.
+ */
+export const timerPort = (() => {
+  const m = bind(PtyTimingModule, 'PtyTiming', [
+    'createVirtualTimerPort',
+    'nodeTimerPort',
+    'timerTask',
+  ])
+
+  const asThenable = (task) => {
+    if (task == null) return Promise.reject(new Error('timerPort: Delay task is null'))
+    if (typeof task.then === 'function') return task
+    if (typeof task.ContinueWith === 'function') {
+      return new Promise((resolve, reject) => {
+        task.ContinueWith((t) => {
+          if (t.IsFaulted) reject(t.Exception)
+          else resolve(t.Result)
+        })
+      })
+    }
+    return Promise.resolve(task)
+  }
+
+  const wrapHandle = (handle) => {
+    if (handle == null || typeof handle.Cancel !== 'function') {
+      throw new Error('timerPort: ITimerHandle missing Cancel')
+    }
+    const delayTask = handle.Delay ?? handle.delay
+    return {
+      delay: () => asThenable(delayTask),
+      cancel: () => handle.Cancel(),
+    }
+  }
+
+  const wrapPort = (port) => {
+    if (port == null || typeof port.Delay !== 'function' || typeof port.Dispose !== 'function') {
+      throw new Error('timerPort: ITimerPort missing Delay/Dispose')
+    }
+    return {
+      delay: (ms) => wrapHandle(port.Delay(ms | 0)),
+      dispose: () => port.Dispose(),
+    }
+  }
+
+  return {
+    createVirtual: () => {
+      const vt = m.createVirtualTimerPort()
+      if (vt == null || vt.Port == null || typeof vt.Advance !== 'function') {
+        throw new Error('timerPort: createVirtualTimerPort shape unexpected')
+      }
+      return {
+        port: wrapPort(vt.Port),
+        advance: (ms) => vt.Advance(ms | 0),
+        nowMs: () => (typeof vt.NowMs === 'function' ? vt.NowMs() : vt.NowMs),
+      }
+    },
+    createNode: () => wrapPort(m.nodeTimerPort()),
+    /** Fire-and-forget production timerTask (no cancel surface). */
+    timerTask: (ms) => asThenable(m.timerTask(ms | 0)),
+  }
+})()
+
 // ── join completion reliability (Part 1 hang fix) ────────────────────────────
 
 /**
@@ -4076,10 +4142,9 @@ export const hostSignalSubscribe = (() => {
     reconnectMarkers: ['2 **', '10000', 'stream ended normally'],
     heartbeatMarkers: [
       'onHeartbeatTimeout',
-      'hb.unref',
-      'setInterval',
-      'clearInterval',
-      'state.connAbort',
+      'setTimeout',
+      'clearTimeout',
+      'state.heartbeatTimer',
       'state.lastEventMs',
     ],
   }

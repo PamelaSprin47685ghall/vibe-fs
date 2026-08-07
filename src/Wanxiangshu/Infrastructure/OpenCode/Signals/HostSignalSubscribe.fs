@@ -25,10 +25,7 @@ module HostSignalSubscribe =
         { Health: unit -> SignalHealth
           Dispose: unit -> unit }
 
-    /// Heartbeat interval: check silence every 15s.
-    let private HeartbeatIntervalMs = 15_000
-
-    /// No event within 30s → connection treated as dead; force reconnect.
+    /// No event within 30s → connection treated as dead (one-shot silence deadline).
     let private HeartbeatTimeoutMs = 30_000
 
     [<Emit("$0()")>]
@@ -70,7 +67,7 @@ module HostSignalSubscribe =
             let timer = state?heartbeatTimer
 
             if not (isNull timer) then
-                emitJsExpr timer "clearInterval($0)"
+                emitJsExpr timer "clearTimeout($0)"
                 state?heartbeatTimer <- null
 
             let connAbort = state?connAbort
@@ -141,10 +138,40 @@ module HostSignalSubscribe =
                               "connAbort", box null
                               "heartbeatTimer", box null ]
 
+                    // One-shot silence deadline (VERIFY-004 / C class): each event
+                    // clears + re-arms a single setTimeout(timeoutMs). No period scan.
+                    // Reconnect delay keeps Node setTimeout with nodeTimerPort-equivalent
+                    // unref policy; F# ITimerPort is not reliably callable inside emitJsExpr.
                     emitJsExpr
-                        (globalApi, onEvent, state, HeartbeatIntervalMs, HeartbeatTimeoutMs, onHeartbeatTimeout)
+                        (globalApi, onEvent, state, HeartbeatTimeoutMs, onHeartbeatTimeout)
                         """
-                        ((globalApi, onEvent, state, heartbeatMs, timeoutMs, onHeartbeatTimeout) => {
+                        ((globalApi, onEvent, state, timeoutMs, onHeartbeatTimeout) => {
+                          const armHeartbeat = () => {
+                            if (state.disposed) return;
+                            if (state.heartbeatTimer != null) {
+                              clearTimeout(state.heartbeatTimer);
+                              state.heartbeatTimer = null;
+                            }
+                            const hb = setTimeout(() => {
+                              if (state.disposed) return;
+                              const silent = Date.now() - state.lastEventMs;
+                              // Heartbeat is the causal watchdog for this SSE link: a
+                              // half-open TCP connection emits neither close/error nor
+                              // bytes. Detection is not a retry signal — a dead link
+                              // cannot be reconnected into existence, and a reconnect
+                              // loop over a dead link only manufactures noise. One
+                              // timeout reports and kills the process (Diagnostic.fatal);
+                              // one-shot clearTimeout + nulling prevents re-fire.
+                              onHeartbeatTimeout(silent);
+                              state.heartbeatTimer = null;
+                            }, timeoutMs);
+                            if (typeof hb.unref === 'function') hb.unref();
+                            state.heartbeatTimer = hb;
+                          };
+
+                          // Initial seed: 30s grace after subscribe with no events.
+                          armHeartbeat();
+
                           (async () => {
                             let attempt = 0;
                             while (!state.disposed) {
@@ -153,6 +180,7 @@ module HostSignalSubscribe =
                               state.connected = true;
                               // Grace period for this connection: silence clock starts now.
                               state.lastEventMs = Date.now();
+                              armHeartbeat();
                               const options = { signal: connAbort.signal, onSseEvent: onEvent };
                               try {
                                 const result = await globalApi.event(options);
@@ -165,6 +193,7 @@ module HostSignalSubscribe =
                                     if (state.disposed || connAbort.signal.aborted) break;
                                     state.lastEventMs = Date.now();
                                     state.lastError = null;
+                                    armHeartbeat();
                                     onEvent(data);
                                   }
                                   if (!state.disposed && !connAbort.signal.aborted) {
@@ -183,33 +212,17 @@ module HostSignalSubscribe =
                               state.connAbort = null;
                               if (state.disposed) break;
                               const delay = Math.min(1000 * 2 ** attempt, 10000);
-                              await new Promise(r => setTimeout(r, delay));
+                              // Same Node timer + unref policy as PtyTiming.nodeTimerPort.
+                              await new Promise(r => {
+                                const t = setTimeout(r, delay);
+                                if (typeof t.unref === 'function') t.unref();
+                              });
                               if (state.disposed) break;
                               attempt++;
                               state.reconnectAttempts = attempt;
                             }
                           })();
-
-                          const hb = setInterval(() => {
-                            if (state.disposed) return;
-                            const silent = Date.now() - state.lastEventMs;
-                            if (silent > timeoutMs && state.connAbort && !state.connAbort.signal.aborted) {
-                              // Heartbeat is the causal watchdog for this SSE link: a
-                              // half-open TCP connection emits neither close/error nor
-                              // bytes. Detection is not a retry signal — a dead link
-                              // cannot be reconnected into existence, and a reconnect
-                              // loop over a dead link only manufactures noise. One
-                              // timeout reports and kills the process (Diagnostic.fatal);
-                              // the clearInterval guards the gated (test) fatal path
-                              // from re-firing every tick.
-                              onHeartbeatTimeout(silent);
-                              clearInterval(hb);
-                              return;
-                            }
-                          }, heartbeatMs);
-                          if (typeof hb.unref === 'function') hb.unref();
-                          state.heartbeatTimer = hb;
-                        })($0, $1, $2, $3, $4, $5)
+                        })($0, $1, $2, $3, $4)
                         """
 
                     Ok
