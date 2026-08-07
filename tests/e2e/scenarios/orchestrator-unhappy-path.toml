@@ -53,22 +53,25 @@ flow = [
   # Stroke 3/4: conflict durable, same Manager resumes, Coder resolves file
   { waitFact = { name = "ConflictDetected", gte = 1 }, timeoutMs = 60000 },
   { wait = "conflict-resume.0", timeoutMs = 60000 },
+  { custom = "afterConflictResume" },
   { wait = "coder-resolve.0", timeoutMs = 60000 },
   { wait = "coder-resolve.1", timeoutMs = 60000 },
   { wait = "conflict-resume.1", timeoutMs = 60000 },
   { wait = "conflict-resume.2", timeoutMs = 60000 },
-  { custom = "afterConflictResume" },
 
-  # Stroke 5: integration review + exactly-once publish
+  # Stroke 5: integration review + exactly-once publish.
+  # Journal wait uses substring match: bare "Published" false-matches the
+  # coder assignment text "Published by orchestrator canary" in
+  # OpeningPromptCaptured. Pin the Orchestrator case tag shape.
   { wait = "barrier-reviewer.0", timeoutMs = 60000 },
   { wait = "barrier-reviewer.1", timeoutMs = 60000 },
   { wait = "barrier-reviewer.2", timeoutMs = 60000 },
-  { waitFact = { name = "Published", eq = 1 }, timeoutMs = 90000 },
+  { waitFact = { name = "\"Orchestrator\",[\"Published\"", eq = 1 }, timeoutMs = 90000 },
 
   # Stroke 6: Orchestrator harvest
   { wait = "orch.2", timeoutMs = 60000 },
   { awaitTerminal = true, requireAssistantTerminal = false },
-  { assertFacts = { name = "Published", eq = 1 } },
+  { assertFacts = { name = "\"Orchestrator\",[\"Published\"", eq = 1 } },
   { assertFile = { path = "publish_proof.txt", equals = "Published by orchestrator canary\n" } },
   { assertWorktreeClean = true },
   { custom = "finalOracle" },
@@ -146,6 +149,19 @@ tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
   respond = { type = "text", text = "Conflict resolved; rebase can continue." }
+
+# HOST-004: bare MissingFinalReport poke after a tool-only manager step.
+# Must not share the internal "#" repair key with blogger-repair — only one
+# optional "#" repair may exist per scenario (compiler: same lane/turn/step).
+[[turn]]
+id = "manager-repair"
+internal = true
+optional = true
+user = "#"
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager continues after repair." }
 
 [[turn]]
 id = "coder-resolve"
@@ -392,22 +408,6 @@ user = "# Write the dense work-log continuation now"
   [[turn.step]]
   respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 55.", tip = "primitive-obsession" } }
 
-
-# Missing-final-report repair on a blogger child (HOST-004). Optional.
-[[turn]]
-id = "blogger-repair"
-internal = true
-optional = true
-user = "#"
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Session background after repair.", tip = "primitive-obsession" } }
-
-
-[[epoch]]
-turn = "blogger-repair"
-step = 0
-reason = "prefix-probe"
 
 [[epoch]]
 turn = "blogger"

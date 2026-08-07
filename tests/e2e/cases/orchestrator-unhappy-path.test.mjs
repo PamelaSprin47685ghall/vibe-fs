@@ -63,17 +63,17 @@ function lastUserText(request) {
   return Array.isArray(content) ? content.map((part) => part?.text ?? '').join('') : String(content ?? '');
 }
 
-/** Stroke 4 checkpoint: conflict resume landed; publish must not yet be claimed. */
+/**
+ * Stroke 4 checkpoint: conflict resume landed on the wire.
+ * Do not require Published=0 here — wait("conflict-resume.0") only proves the
+ * request matched; the engine may already have continued rebase/review/publish
+ * by the time the flow step returns (async Manager completion).
+ */
 async function afterConflictResume(scenario) {
   const workDir = scenario.host.workDir;
   assert.ok(
     readJournal(workDir, 'ConflictDetected').named >= 1,
-    'stroke 3/4: ConflictDetected must be durable before resume',
-  );
-  assert.equal(
-    readJournal(workDir, 'Published').named,
-    0,
-    'stroke 4: Published must not exist at conflict-resume',
+    'stroke 3/4: ConflictDetected must be durable at resume',
   );
 
   const resumeRequests = scenario.provider.requests.filter((request) =>
@@ -84,6 +84,10 @@ async function afterConflictResume(scenario) {
     resumeRequests.some((request) => lastUserText(request).includes('do NOT restart the original task')),
     'stroke 4: resume prompt must forbid restarting the original task',
   );
+  assert.ok(
+    scenario.provider.matchCount('conflict-resume.0') >= 1,
+    'stroke 4: conflict-resume.0 must be matched',
+  );
 }
 
 /** Full trajectory oracle after Published. */
@@ -93,17 +97,23 @@ async function finalOracle(scenario) {
 
   assert.equal(countCase(lines, 'ManagerJobCreated'), 1, 'stroke 1: exactly one ManagerJobCreated');
   assert.ok(countCase(lines, 'ConflictDetected') >= 1, 'stroke 3: ConflictDetected required');
-  assert.equal(countCase(lines, 'Published'), 1, 'stroke 5: exactly-once Published');
+  assert.equal(countCase(lines, 'Published'), 1, 'stroke 5: exactly-once Orchestrator Published case');
   assert.equal(countCase(lines, 'JobFailed'), 0, 'job must not fail after conflict resume');
   assert.equal(countCase(lines, 'JobAbandoned'), 0, 'job must not be abandoned after conflict resume');
 
+  // Master must actually receive the candidate (not a waitFact false-positive).
+  const masterBody = execFileSync('git', ['-C', workDir, 'show', 'master:publish_proof.txt'], {
+    encoding: 'utf8',
+  });
+  assert.equal(
+    masterBody,
+    'Published by orchestrator canary\n',
+    'ORCH-005: master publish_proof.txt after ff-only publish',
+  );
+
   const created = factPayloads(lines, 'ManagerJobCreated');
   assert.equal(created.length, 1, 'ManagerJobCreated payload present');
-  const managerAgent =
-    created[0].ManagerAgent
-    ?? created[0].managerAgent
-    ?? (Array.isArray(created[0].ManagerAgent) ? created[0].ManagerAgent[1] : null);
-  const agentText = typeof managerAgent === 'string' ? managerAgent : JSON.stringify(created[0]);
+  const agentText = JSON.stringify(created[0]);
   assert.ok(
     agentText.includes('fast-manager') || agentText.includes('deep-manager'),
     `ORCH-006: ManagerAgent must be durable manager agent (got ${agentText})`,
@@ -116,7 +126,6 @@ async function finalOracle(scenario) {
   );
   assert.equal(managerSessions.size, 1, 'ORCH-003: one Manager session for the job');
 
-  // Resume is same-session: no second ManagerJobCreated, no task restart prompt as a new job.
   assert.equal(
     scenario.provider.matchCount('manager.0'),
     1,
@@ -126,11 +135,9 @@ async function finalOracle(scenario) {
     scenario.provider.matchCount('conflict-resume.0') >= 1,
     'stroke 4: conflict-resume must be delivered',
   );
-
-  assert.equal(
-    fs.readFileSync(path.join(workDir, 'publish_proof.txt'), 'utf8'),
-    'Published by orchestrator canary\n',
-    'proof file content after publish',
+  assert.ok(
+    scenario.provider.matchCount('coder-resolve.0') >= 1,
+    'stroke 4: coder-resolve must rewrite the conflicted file',
   );
 }
 
