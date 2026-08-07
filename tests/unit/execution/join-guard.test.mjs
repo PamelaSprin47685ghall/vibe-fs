@@ -26,6 +26,24 @@ import {
 import * as TerminalPolicyModule from '../../../dist/Infrastructure/OpenCode/Host/TerminalPolicy.js'
 import * as ForkTypesModule from '../../../dist/Session/ForkTypes.js'
 import * as RolesModule from '../../../dist/Kernel/Roles.js'
+import * as LinkageProjectionModule from '../../../dist/Journal/LinkageProjection.js'
+import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
+
+/** Production HandleProjection.link takes Ownership (GREEN-7); the domain.mjs
+ *  facade bind is stale, so tests call the dist entry directly. */
+const link = (handle, child, targetAgent, role, current) => {
+  const result = LinkageProjectionModule.HandleProjection_link(
+    handle,
+    child,
+    targetAgent,
+    role,
+    HandleOwnership.DurableParentHandle,
+    current,
+  )
+  return result.tag === 0
+    ? { ok: true, value: result.fields[0] }
+    : { ok: false, error: result.fields[0].cases()[result.fields[0].tag] }
+}
 
 const outstandingBackground = (() => {
   const names = Object.keys(TerminalPolicyModule)
@@ -66,7 +84,7 @@ test('EXEC_016_listable_handles_are_outstanding_for_manager', () => {
   // Durable half of outstandingBackground for Manager/DevOps: listable = Active ∪ CompletedAwaitingJoin.
   let projection = handleProjection.empty
   const handle = handleId.agent('child-1')
-  const linked = handleProjection.link(handle, sessionId('ses_child'), 'fast-coder', roles.Coder, projection)
+  const linked = link(handle, sessionId('ses_child'), 'fast-coder', roles.of('Coder'), projection)
   assert.equal(linked.ok, true)
   projection = linked.value
 

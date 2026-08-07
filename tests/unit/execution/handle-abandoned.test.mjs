@@ -20,6 +20,7 @@ import {
   handleAbandonReason,
   handleController,
   handleId,
+  handleOwnership,
   handleProjection,
   journal,
   payloadOf,
@@ -179,6 +180,7 @@ test('EXEC_009_fold_replays_HandleAbandoned_idempotent', () => {
     Handle: HANDLE,
     TargetAgent: 'fast-coder',
     CanonicalRole: roles.of('Coder'),
+    Ownership: handleOwnership.durableParentHandle(),
   })
   const abandoned = fact('HandleAbandoned', {
     ParentSessionId: PARENT,

@@ -15,19 +15,31 @@ import {
   roles,
   sessionId,
 } from '../support/domain.mjs'
+import * as LinkageProjectionModule from '../../../dist/Journal/LinkageProjection.js'
+import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
 
 const CHILD = sessionId('ses_race_c')
 const HANDLE = handleId.agent('h-race')
 const AGENT = 'fast-coder'
 
-const linkActive = () => {
-  const applied = handleProjection.link(
-    HANDLE,
-    CHILD,
-    AGENT,
-    roles.of('Coder'),
-    handleProjection.empty,
+/** Production HandleProjection.link takes Ownership (GREEN-7); the domain.mjs
+ *  facade bind is stale, so tests call the dist entry directly. */
+const link = (handle, child, targetAgent, role, current) => {
+  const result = LinkageProjectionModule.HandleProjection_link(
+    handle,
+    child,
+    targetAgent,
+    role,
+    HandleOwnership.DurableParentHandle,
+    current,
   )
+  return result.tag === 0
+    ? { ok: true, value: result.fields[0] }
+    : { ok: false, error: result.fields[0].cases()[result.fields[0].tag] }
+}
+
+const linkActive = () => {
+  const applied = link(HANDLE, CHILD, AGENT, roles.of('Coder'), handleProjection.empty)
   assert.equal(applied.ok, true, applied.ok ? '' : `link refused: ${applied.error}`)
   return applied.value
 }

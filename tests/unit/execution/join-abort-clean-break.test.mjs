@@ -43,6 +43,8 @@ import {
   sessionId,
   stream,
 } from '../support/domain.mjs'
+import * as HandleControllerModule from '../../../dist/Session/HandleController.js'
+import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
 
 const PARENT = sessionId('ses_parent_clean_break')
 const CHILD = sessionId('ses_child_clean_break')
@@ -50,6 +52,21 @@ const AGENT_ID = 'h-false-abort'
 const HANDLE = handleId.agent(AGENT_ID)
 const TARGET = 'fast-coder'
 const RUN_ID = 'run-legacy-abort'
+
+/** Production HandleController.link takes Ownership (GREEN-7); the domain.mjs
+ *  facade bind is stale, so tests call the dist entry directly. */
+const durableLink = (j, parentId, agentId, child, targetAgent, role) => {
+  const result = HandleControllerModule.HandleController_link(
+    j,
+    parentId,
+    agentId,
+    child,
+    targetAgent,
+    role,
+    HandleOwnership.DurableParentHandle,
+  )
+  return result.tag === 0 ? { ok: true, value: result.fields[0] } : { ok: false, error: result.fields[0] }
+}
 
 /** Plant historical false terminal: blob status=aborted + HandleCompleted(SendFailure). */
 const plantLegacyFalseAbort = (journal, { agentId = AGENT_ID, child = CHILD } = {}) => {
@@ -65,7 +82,7 @@ const plantLegacyFalseAbort = (journal, { agentId = AGENT_ID, child = CHILD } = 
   assert.equal(written.ok, true, written.ok ? '' : written.error)
   const receipt = written.value
 
-  const linked = handleController.link(
+  const linked = durableLink(
     journal,
     PARENT,
     agentId,
@@ -327,7 +344,7 @@ test('P0_CLEAN_BREAK_delayed_recovery_before_ready_no_aborted_join_then_true_ter
 
   try {
     const j = created.journal
-    const linked = handleController.link(j, PARENT, AGENT_ID, CHILD, TARGET, forkRuntime.role('Coder'))
+    const linked = durableLink(j, PARENT, AGENT_ID, CHILD, TARGET, forkRuntime.role('Coder'))
     assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
 
     // Host Aborted observation while recovery still incomplete → never Joinable.

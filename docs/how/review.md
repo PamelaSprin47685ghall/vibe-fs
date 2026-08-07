@@ -79,5 +79,5 @@ PhysicalBound 未完成时禁止 same-root 猜测成功。
 → transform 生成 seal（含 challenge digest）
 → 第二次检查工作树并验证不变性
 → PERFECT2 查 seal → ConfirmedReviewWitness
-→ Manager Guard 只认有效 witness
+→ Finality cohort 消费：任一 REVISE → FinalityRejected；全员双 PERFECT → blessing（GLORY-044/060）
 ```

@@ -27,5 +27,6 @@
 
 ## Guard 顺序
 
-JoinGuard 优先于 Review Guard（EXEC-016、REVIEW-007）。  
+JoinGuard 优先于其它 Manager completion 分支（EXEC-016）；Manager completion 不检查 review
+witness，Manager 面无 Review Guard（REVIEW-007、GLORY-070）。  
 Post-rebase 必须新双 PERFECT（REVIEW-009、ORCH）。

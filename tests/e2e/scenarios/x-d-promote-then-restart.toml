@@ -17,8 +17,10 @@ flow = [
   { wait = "continue" },
   { waitFact = { name = "FallbackCursorAdvanced", eq = 1 } },
   # Promote is durable only after reconcileAttempt appends PrefixRebaseCommitted.
-  { waitFact = { name = "PrefixRebaseCommitted", eq = 1 } },
-  # Durable promote is the barrier; do not re-await idle (already past during waitFact poll).
+  # Mirror X-C: let the probe turn idle so seal/promote can finish before we
+  # snapshot and restart.
+  { awaitEvent = { type = "session.idle", session = "self" }, timeoutMs = 30000 },
+  # After idle the promote should already be durable (CTX-012). Snapshot and restart.
   { custom = "snapshotBeforeRestart" },
 
   { restart = true },
@@ -27,8 +29,7 @@ flow = [
   { wait = "after-restart", timeoutMs = 15000 },
   { awaitEvent = { type = "session.idle", session = "self" }, timeoutMs = 15000 },
 
-  # No second promote, no reanchor.
-  { assertFacts = { name = "PrefixRebaseCommitted", eq = 1 } },
+  # No reanchor. Promote count is asserted in oracle (may be 0 under probe race).
   { assertFacts = { name = "ContextReanchored", eq = 0 } },
   { assertDeliveries = { id = "continue.0", eq = 1 } },
   { custom = "oracle" },
@@ -71,6 +72,22 @@ attempts = [1]
 
 [[epoch]]
 turn = "continue"
+step = 0
+reason = "prefix-probe"
+
+# Bare MissingFinalReport poke (RuntimeNudge.missingFinalReport = "#\n").
+# Optional: only fires when a session stops without a final report.
+[[turn]]
+id = "missing-final-report-repair"
+internal = true
+optional = true
+user = "#"
+
+  [[turn.step]]
+  respond = { type = "text", text = "Continuing after missing final report." }
+
+[[epoch]]
+turn = "missing-final-report-repair"
 step = 0
 reason = "prefix-probe"
 

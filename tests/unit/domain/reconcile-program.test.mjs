@@ -38,11 +38,15 @@ test('RECONCILE_PROGRAM_003: decideStep bounds causal rereads and stops on exhau
   assert.equal(name(3, reconcileProgram.evidence.provisional('TurnNeedsContinuation')), 'Reread')
   assert.equal(name(3, reconcileProgram.evidence.unknown()), 'Reread')
 
-  // Non-terminal with budget exhausted → StopPass (keep Dirty, wait next signal).
+  // Non-terminal with budget exhausted → fail closed per evidence kind: nothing
+  // to act on (SnapshotError/NoTurn) keeps StopPass; Provisional publishes the
+  // stop text; Unknown repairs the missing final report (GLORY-070). A stable
+  // idle is never silently StopPassed.
   assert.equal(name(0, reconcileProgram.evidence.snapshotError('transient')), 'StopPass')
   assert.equal(name(0, reconcileProgram.evidence.noTurn()), 'StopPass')
-  assert.equal(name(0, reconcileProgram.evidence.provisional('TurnInProgress')), 'StopPass')
-  assert.equal(name(0, reconcileProgram.evidence.unknown()), 'StopPass')
+  assert.equal(name(0, reconcileProgram.evidence.provisional('TurnInProgress')), 'Publish')
+  assert.equal(name(0, reconcileProgram.evidence.provisional('TurnNeedsContinuation')), 'Publish')
+  assert.equal(name(0, reconcileProgram.evidence.unknown()), 'RepairMissingFinalReport')
 
   // Unknown clears continuation candidate; provisional keeps it.
   assert.equal(

@@ -85,6 +85,11 @@ module HostReviewProgram =
                 match HostReviewGuard.openBarrier journal managerSessionId reviewerSessionId barrierId tree with
                 | Error error -> return Error(HostReviewFailure.CannotOpenBarrier error)
                 | Ok() ->
+                    // One barrier = one CE:
+                    //   await terminal → read
+                    //   if nudge needed → continue (send + await its terminal) → re-read
+                    // Continue owns the post-nudge await so AG-LISTENER-BEFORE-SEND
+                    // holds and we never double-await the same terminal.
                     match! awaitReviewer () with
                     | Error error -> return Error(HostReviewFailure.CannotAwaitReviewer error)
                     | Ok() ->

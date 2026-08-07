@@ -159,6 +159,11 @@ export async function awaitFactBarrier(scenario, step) {
   const lane = step.lane || `fact:${name}`;
   const deadline = Date.now() + (step.timeoutMs || WAIT_FACT_WINDOW_MS);
 
+  // VERIFY-004: a waitFact with an explicit timeout is a bounded wait step —
+  // widen the silence window to that bound so a slow-but-progressing promote
+  // is not killed by the default 5s silence watchdog mid-poll.
+  scenario.watchdog?.setWindow(step.timeoutMs ?? null);
+  try {
   let observed = readJournal(scenario.host.workDir, name, renewOn);
   while (!cmp(observed.named) && Date.now() < deadline) {
     const remaining = Math.max(1, deadline - Date.now());
@@ -193,6 +198,9 @@ export async function awaitFactBarrier(scenario, step) {
     `waitFact ${name} not satisfied (need ${step.waitFact.eq !== undefined ? 'eq' : 'gte'} ${need}, got ${observed.named})`,
   );
   scenario.watchdog?.advance({ reason: `fact-ready:${name}`, lane });
+  } finally {
+    scenario.watchdog?.setWindow(null);
+  }
 }
 
 async function runFlow(scenario, doc, ctx) {

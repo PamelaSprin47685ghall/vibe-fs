@@ -14,8 +14,8 @@ Host 适配、信号和共享状态边界见 `shape/host.md`。
 
 - Single-flight：同一 session 同时最多一次 reconcile。  
 - Dirty：idle 到达设 dirty。  
-- Unknown：一次 idle 建 Dirty latch；最多 3 次因果重读；仍 Unknown 则保持 Dirty 等下一信号。
-- 因果重读用尽仍非终态：保持 Dirty，等下一粗粒度信号（idle / retry / deleted）重新入队；绝不立即重入 runnable queue。
+- 有界因果重读：每次 idle 至多 3 次因果重读（`rereadsRemaining = maxCausalRereads + 1`）。  
+- `decideStep`（GLORY-070 / HOST-004 rev.2）：因果重读耗尽后 `Unknown` → `RepairMissingFinalReport`（missing-final-report repair 发送，TurnCompletionProgram 消费），`Provisional` → `Publish`；只有 `SnapshotError` / `NoTurn` 保持 `StopPass`（无对象可作用，等下一粗粒度信号重新入队）。稳定 idle 绝不静默 StopPass。
 
 ### 终态对齐（EXEC-020）
 

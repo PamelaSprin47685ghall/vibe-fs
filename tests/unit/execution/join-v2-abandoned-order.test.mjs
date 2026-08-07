@@ -28,6 +28,9 @@ import {
   sessionId,
   utcOffset,
 } from '../support/domain.mjs'
+import * as LinkageProjectionModule from '../../../dist/Journal/LinkageProjection.js'
+import * as HandleControllerModule from '../../../dist/Session/HandleController.js'
+import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
 
 const runtime = joinResultRenderer.stubRuntime()
 const parseWire = (text) => parseToml(text)
@@ -44,8 +47,37 @@ const withJournal = (fn) => {
   }
 }
 
+/** Production link entries take Ownership (GREEN-7); the domain.mjs facade binds
+ *  are stale, so tests call the dist entries directly with DurableParentHandle. */
+const projectionLink = (handle, child, targetAgent, role, current) => {
+  const result = LinkageProjectionModule.HandleProjection_link(
+    handle,
+    child,
+    targetAgent,
+    role,
+    HandleOwnership.DurableParentHandle,
+    current,
+  )
+  return result.tag === 0
+    ? { ok: true, value: result.fields[0] }
+    : { ok: false, error: result.fields[0].cases()[result.fields[0].tag] }
+}
+
+const durableLink = (j, parentId, agentId, child, targetAgent, role) => {
+  const result = HandleControllerModule.HandleController_link(
+    j,
+    parentId,
+    agentId,
+    child,
+    targetAgent,
+    role,
+    HandleOwnership.DurableParentHandle,
+  )
+  return result.tag === 0 ? { ok: true, value: result.fields[0] } : { ok: false, error: result.fields[0] }
+}
+
 const link = (projection, agentId, child, targetAgent = 'fast-coder') => {
-  const applied = handleProjection.link(
+  const applied = projectionLink(
     handleId.agent(agentId),
     sessionId(child),
     targetAgent,
@@ -57,7 +89,7 @@ const link = (projection, agentId, child, targetAgent = 'fast-coder') => {
 }
 
 const linkDurable = (j, agentId, child, targetAgent = 'fast-coder') => {
-  const linked = handleController.link(
+  const linked = durableLink(
     j,
     PARENT,
     agentId,

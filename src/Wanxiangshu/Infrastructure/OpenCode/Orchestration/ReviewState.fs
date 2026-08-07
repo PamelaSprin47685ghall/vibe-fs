@@ -41,11 +41,21 @@ module OrchestratorReviewRead =
             // `satisfiesGuard` owns that question; the previous version compared
             // `LastGitTreeHash` inline in three branches, which is the same rule
             // spelled a fourth time.
+            //
+            // REVISE / pending-PERFECT are barrier-scoped: a historical Reviewer's
+            // previous request must not short-circuit a fresh barrier (GLORY-045).
             if ReviewProjection.satisfiesGuard tree value then
                 Confirmed
-            elif ReviewWitness.isRevision value.Witness then
+            elif
+                ReviewWitness.isRevision value.Witness
+                && value.LastGitTreeHash = Some tree
+                && value.CurrentBarrierId.IsSome
+            then
                 RevisionRequired
-            elif ReviewWitness.isPerfectPending value.Witness then
+            elif
+                ReviewWitness.isPerfectPending value.Witness
+                && value.LastGitTreeHash = Some tree
+            then
                 PendingConfirmation
             else
                 NeedsReview

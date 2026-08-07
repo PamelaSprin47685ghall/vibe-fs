@@ -97,7 +97,7 @@ tools = ["fork-manager", "join"]
 id = "manager"
 lane = "fast-manager"
 user = "# Ship publish_proof.txt to the target branch."
-tools = ["fork", "join", "list"]
+tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Write publish_proof.txt." } }
@@ -105,10 +105,16 @@ tools = ["fork", "join", "list"]
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
 
-  # REVIEW-007 fires here: a Manager reporting finished on an unreviewed tree is nudged
-  # rather than allowed to complete.
+  # GLORY-040/060/062: first suicide → Host-owned Finality cohort → Blessed;
+  # second suicide ends the Manager Life with last_words.
   [[turn.step]]
-  respond = { type = "text", text = "Manager finished." }
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager rest in peace." }
 
 # `HostReviewGuard.fs:202`. Production composes the full two-line message
 # (`RuntimeNudge.ManagerReviewGuardInstructions`); the ordered fragments declare
@@ -117,13 +123,13 @@ tools = ["fork", "join", "list"]
 [[turn]]
 id = "manager-guard"
 internal = true
-user = ["# Your work is not yet complete.", "# Finish what remains, or call suicide when nothing useful remains."]
-tools = ["fork", "join", "list"]
+optional = true
+user = ["You are doing well.", "You have plenty of time.", "You can continue.", "When nothing useful remains, call suicide."]
+tools = ["fork", "join", "list", "suicide"]
 
-  # GLORY-031/032: the Manager ends the guard by prose — a Reviewer cannot be
-  # created, reused or nudged by a Manager (the Reviewer is Host-owned).
+  # GLORY-029/070: ordinary activated idle — ManagerIdleEncouragement only.
   [[turn.step]]
-  respond = { type = "text", text = "Manager finished." }
+  respond = { type = "text", text = "Manager continues." }
 
 [[turn]]
 id = "coder"
@@ -151,6 +157,23 @@ tools = ["write"]
 # (`OrchestratorHostReview.DeepReviewerAgent`), independent of the Manager's guard
 # path. Its assignment is the barrier's review request, and its verdict tool call
 # is the barrier's first PERFECT; the second comes through `reviewer-confirm`.
+
+# Manager Finality cohort (Host-owned hidden Reviewer). Dual PERFECT → Blessed.
+[[turn]]
+id = "manager-finality-reviewer"
+internal = true
+user = "# Review the current worktree against all authoritative user requirements."
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager finality reviewer confirmed." }
+
 [[turn]]
 id = "barrier-reviewer"
 internal = true
@@ -165,6 +188,18 @@ tools = ["glob", "grep", "read", "verdict"]
 
   [[turn.step]]
   respond = { type = "text", text = "Barrier reviewer completed the double PERFECT." }
+
+
+# Bare MissingFinalReport poke (RuntimeNudge.missingFinalReport = "#\n").
+# Optional: only fires when a session stops without a final report.
+[[turn]]
+id = "missing-final-report-repair"
+internal = true
+optional = true
+user = "#"
+
+  [[turn.step]]
+  respond = { type = "text", text = "Continuing after missing final report." }
 
 [[turn]]
 id = "blogger"
@@ -627,3 +662,5 @@ user = "Ship publish_proof.txt to the target branch."
 
   [[turn.step]]
   respond = { type = "title", text = "E2E Test Session" }
+
+

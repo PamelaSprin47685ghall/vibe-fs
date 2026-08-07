@@ -88,7 +88,7 @@ Blogger、Executor、Teacher 不得出现在任何模型可见的 enum、schema 
 
 | 暴露面 | 可见 Agent |
 |--------|-----------|
-| Manager fork-agent | fast/deep coder, inspector, devops, browser, meditator, reviewer |
+| Manager fork-agent | fast/deep coder, inspector, devops, browser, meditator |
 | Orchestrator fork-manager | fast-manager, deep-manager |
 | Inspector tool | fast-inspector, deep-inspector |
 | Coder tool | fast-coder, deep-coder |
@@ -124,7 +124,7 @@ Reviewer = 只读工具 + `verdict`。不能写文件、不能跑命令。
 
 ## AGENT-015：Orchestrator 只 fork Manager
 
-`fork-manager` 只接受 `fast-manager` / `deep-manager`。
+`fork-manager` 接受 `fast-manager` / `deep-manager`（新 Job）或已有 Manager job id（同 job 续做，同 worktree/session，`reused=true`；GLORY-068）。
 
 ## AGENT-016：mv / rm 仅 Coder
 

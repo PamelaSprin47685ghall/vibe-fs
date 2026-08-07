@@ -21,10 +21,15 @@ flow = [
   { wait = "manager.0" },
   { wait = "manager-activation" },
   { wait = "finality-reviewer.0" },
-  { wait = "reviewer-nudged" },
   { wait = "finality-reviewer-challenge.0" },
   { waitFact = { name = "ReviewVerdictRecorded", eq = 2 } },
   { wait = "finality-reviewer-challenge.1" },
+  # Blessed is the first suicide's tool result; second suicide is the next
+  # provider step of the same activation turn.
+  { wait = "manager-activation.1" },
+  { wait = "manager-activation.2" },
+  { waitFact = { name = "FinalityBlessed", eq = 1 } },
+  { waitFact = { name = "LifeCompleted", eq = 1 } },
   { awaitTerminal = true, requireAssistantTerminal = true },
   { custom = "oracle" },
 
@@ -62,14 +67,17 @@ internal = true
 user = ["Now complete it yourself.", "Carry out the work you described until the final goal is fully achieved."]
 tools = ["fork", "join", "list", "suicide"]
 
+  # First suicide: Host-owned 2N review. Tool result is FinalityBlessed minor-work
+  # prompt (not a new user message).
   [[turn.step]]
   respond = { type = "tool-call", tool = "suicide", args = { last_words = "review_target.txt verified and complete." } }
 
-  # GLORY-041: the accepted suicide's tool result is the last thing the
-  # Manager sees; the Host still runs one more provider step for the tool
-  # round, which must be declared (step cursor counts real assistant steps).
+  # After Blessed tool result: second suicide is final (rest in peace).
   [[turn.step]]
-  respond = { type = "text", text = "Manager work concluded." }
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "review_target.txt verified and complete." } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager rest in peace." }
 
 # GLORY-040: the accepted suicide starts the Host-owned Reviewer. Two PERFECT
 # verdicts in one turn: the first issues the REVIEW-003 challenge as its tool
@@ -94,6 +102,17 @@ tools = ["verdict"]
 
   [[turn.step]]
   respond = { type = "text", text = "The second independent PERFECT was accepted for this tree." }
+
+# GLORY-029: ordinary idle encouragement may race with other continuations.
+[[turn]]
+id = "manager-idle"
+internal = true
+optional = true
+user = ["You are doing well.", "You have plenty of time.", "You can continue.", "When nothing useful remains, call suicide."]
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager continues." }
 
 # REVIEW-004: a Reviewer that answers in prose without the verdict tool gets
 # nudged with the reviewerVerdictGuard text.

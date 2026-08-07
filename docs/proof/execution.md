@@ -14,8 +14,8 @@
 
 | 证明 | 条款 |
 |------|------|
-| JoinGuard 优先 Review | EXEC-016 |
-| 中断 = interrupted 非 error | EXEC-017 |
+| JoinGuard 优先于其它 Manager completion 分支；Manager 面无 Review Guard | EXEC-016、GLORY-070 |
+| 中断 = interrupted（仅 operator abort）非 error；DevOps 超时 → TIMED_OUT；用户消息不中断 join | EXEC-017、EXEC-025 |
 | EXEC-018 的批次上限、稳定排序、CAS | EXEC-018 |
 | blob v2；LegacyFalseAbort 永不 completion | EXEC-021 |
 | 假 completion 补偿路径 | EXEC-022 |

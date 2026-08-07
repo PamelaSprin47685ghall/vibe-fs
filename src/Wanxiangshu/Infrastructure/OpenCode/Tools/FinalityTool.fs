@@ -276,8 +276,8 @@ module FinalityTool =
                                                   "message", tString "Your final words have already been received." ]
                                     | _ ->
                                         // Crash recovery (docs/how/glory.md matrix):
-                                        // a request with no `FinalityReviewStarted`
-                                        // died before the Reviewer fork. Restart the
+                                        // a request with no enlisted Reviewer member
+                                        // died before the first enlistment. Restart the
                                         // Finality workflow on the SAME request; the
                                         // fold keeps the request open until the
                                         // restart lands a terminal fact.

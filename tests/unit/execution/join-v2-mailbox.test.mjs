@@ -5,14 +5,17 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   agentCompletion,
+  caseOf,
   completionMailbox,
   joinInterrupt,
   joinWaitOutcome,
   mailboxWakeReason,
   maxJoinBatch,
   nonEmptyBatch,
+  payloadOf,
   verdictMailbox,
 } from '../support/domain.mjs'
+import { JoinInterruptReason } from '../../../dist/Session/CompletionMailbox.js'
 
 const run = (id) =>
   agentCompletion.completedRun({
@@ -97,9 +100,10 @@ test('EXEC_017_wait_for_signal_user_interrupt_returns_user_interrupted', async (
   const interrupt = joinInterrupt.create()
   const pending = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
   await new Promise((r) => setTimeout(r, 5))
-  joinInterrupt.signal(interrupt)
+  interrupt.Signal(JoinInterruptReason.OperatorAbort)
   const reason = await pending
-  assert.equal(mailboxWakeReason.nameOf(reason), 'UserInterrupted')
+  assert.equal(mailboxWakeReason.nameOf(reason), 'LocalInterrupt')
+  assert.equal(caseOf(payloadOf(reason)), 'OperatorAbort')
 })
 
 // ── 2: interrupt does not cancel mailbox / does not discard later publish ────
@@ -108,7 +112,7 @@ test('EXEC_017_interrupt_does_not_cancel_mailbox_child_still_publishable', async
   const box = completionMailbox.create(() => true)
   const interrupt = joinInterrupt.create()
   const pending = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
-  joinInterrupt.signal(interrupt)
+  interrupt.Signal(JoinInterruptReason.OperatorAbort)
   await pending
 
   assert.equal(completionMailbox.isCancelled(box), false, 'interrupt ≠ Cancel')
@@ -124,8 +128,10 @@ test('EXEC_017_completion_after_interrupt_is_available_to_next_drain', async () 
   const box = completionMailbox.create(() => true)
   const interrupt = joinInterrupt.create()
   const waitP = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
-  joinInterrupt.signal(interrupt)
-  assert.equal(mailboxWakeReason.nameOf(await waitP), 'UserInterrupted')
+  interrupt.Signal(JoinInterruptReason.OperatorAbort)
+  const reason = await waitP
+  assert.equal(mailboxWakeReason.nameOf(reason), 'LocalInterrupt')
+  assert.equal(caseOf(payloadOf(reason)), 'OperatorAbort')
 
   // Child finishes after the interrupted join returned.
   completionMailbox.publish(box, run('late-child'))
@@ -147,12 +153,12 @@ test('EXEC_018_drain_before_interrupt_prefers_existing_completion', async () => 
 
   // Even if interrupt is already signalled, re-drain would still see results first.
   const interrupt = joinInterrupt.create()
-  joinInterrupt.signal(interrupt)
+  interrupt.Signal(JoinInterruptReason.OperatorAbort)
   completionMailbox.publish(box, run('also-done'))
   const reason = await completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
-  // Wait may report UserInterrupted or CompletionMayBeAvailable; re-drain is authoritative.
+  // Wait may report LocalInterrupt or CompletionMayBeAvailable; re-drain is authoritative.
   assert.ok(
-    mailboxWakeReason.nameOf(reason) === 'UserInterrupted' ||
+    mailboxWakeReason.nameOf(reason) === 'LocalInterrupt' ||
       mailboxWakeReason.nameOf(reason) === 'CompletionMayBeAvailable',
   )
   const after = completionMailbox.drainAvailable(box, maxJoinBatch)
@@ -201,10 +207,10 @@ test('EXEC_019_verdict_mailbox_join_available_interrupt_without_verdict', async 
   const interrupt = joinInterrupt.create()
   const pending = verdictMailbox.joinAvailable(box, maxJoinBatch, joinInterrupt.wait(interrupt))
   await new Promise((r) => setTimeout(r, 5))
-  joinInterrupt.signal(interrupt)
+  interrupt.Signal(JoinInterruptReason.OperatorAbort)
   const outcome = await pending
-  assert.equal(joinWaitOutcome.nameOf(outcome), 'InterruptedByUserMessage')
-  assert.equal(joinWaitOutcome.isInterrupted(outcome), true)
+  assert.equal(joinWaitOutcome.nameOf(outcome), 'Interrupted')
+  assert.equal(caseOf(payloadOf(outcome)), 'OperatorAbort')
 })
 
 test('EXEC_019_verdict_mailbox_join_available_prefers_drained_results_over_interrupt', async () => {
@@ -213,7 +219,7 @@ test('EXEC_019_verdict_mailbox_join_available_prefers_drained_results_over_inter
   verdictMailbox.publish(box, verdictMailbox.rejectedDirty('preloaded'))
 
   const interrupt = joinInterrupt.create()
-  joinInterrupt.signal(interrupt)
+  interrupt.Signal(JoinInterruptReason.OperatorAbort)
   const outcome = await verdictMailbox.joinAvailable(box, maxJoinBatch, joinInterrupt.wait(interrupt))
   assert.equal(joinWaitOutcome.nameOf(outcome), 'ResultsAvailable')
   const batch = joinWaitOutcome.results(outcome)
@@ -227,7 +233,7 @@ test('EXEC_017_mailbox_cancel_is_separate_from_join_interrupt', async () => {
   const box = completionMailbox.create(() => true)
   const interrupt = joinInterrupt.create()
   const waitP = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
-  joinInterrupt.signal(interrupt)
+  interrupt.Signal(JoinInterruptReason.OperatorAbort)
   await waitP
   assert.equal(completionMailbox.isCancelled(box), false)
 

@@ -19,7 +19,13 @@ type ReviewMemberRef =
 /// barriers, never stored as a bool.
 type ReviewerStanding =
     { ReviewerOrdinal: int
-      Barriers: ReviewBarrierId list }
+      Barriers: ReviewBarrierId list
+      /// GLORY-045: the stable runtime agent id of this Reviewer session. Set
+      /// on the FIRST enlistment (`finality-new-<requestId>` of the request
+      /// that created it) and never overwritten, so every later request reuses
+      /// the same id and its HandleCompleted still matches the original
+      /// HandleLinked (handle id IS agent id, EXEC-009).
+      AgentId: string }
 
 /// GLORY-011: the rejecting member's evidence. Only durable facts — the
 /// canonical work record blob — never a decision.
@@ -205,8 +211,22 @@ module ManagerLifecycleProjection =
                                     { previous with
                                         Barriers = payload.BarrierId :: previous.Barriers }
                                 | None ->
+                                    // First enlistment of this session. A fresh
+                                    // Reviewer is forked under
+                                    // `finality-new-<requestId>` (GLORY-040); keep
+                                    // that id for every later request so the
+                                    // durable handle identity never drifts.
                                     { ReviewerOrdinal = payload.ReviewerOrdinal
-                                      Barriers = [ payload.BarrierId ] }
+                                      Barriers = [ payload.BarrierId ]
+                                      AgentId =
+                                        if payload.IsNewReviewer then
+                                            sprintf
+                                                "finality-new-%s"
+                                                (FinalityRequestId.value payload.RequestId)
+                                        else
+                                            sprintf
+                                                "finality-reviewer-%s"
+                                                (SessionId.value payload.ReviewerSessionId) }
 
                             Ok(
                                 withLife

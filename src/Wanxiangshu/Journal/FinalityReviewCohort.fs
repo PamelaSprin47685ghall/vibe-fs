@@ -26,12 +26,6 @@ module FinalityReviewCohort =
           ReviewerOrdinal: int
           IsNew: bool }
 
-    /// GLORY-045: the stable per-Life agent id of a Reviewer session. Same
-    /// session across requests ⇒ same agent id, so the Finality runtime can
-    /// re-adopt it on the next request.
-    let agentIdOfReviewer (reviewerSessionId: SessionId) =
-        sprintf "finality-reviewer-%s" (SessionId.value reviewerSessionId)
-
     /// GLORY-045: a Reviewer graduated iff it has a confirmed witness on one of
     /// the barriers this Life enlisted it on. Derived from durable facts only.
     let graduatedReviewer
@@ -67,7 +61,7 @@ module FinalityReviewCohort =
                 not (Map.containsKey reviewerSessionId request.Members)
                 && not (graduatedReviewer snapshot reviewerSessionId standing))
             |> List.map (fun (reviewerSessionId, standing) ->
-                { AgentId = agentIdOfReviewer reviewerSessionId
+                { AgentId = standing.AgentId
                   ReviewerSessionId = Some reviewerSessionId
                   ReviewerOrdinal = standing.ReviewerOrdinal
                   IsNew = false })
@@ -80,9 +74,11 @@ module FinalityReviewCohort =
         let newSlot =
             match alreadyCreatedNew with
             | Some m ->
-                // Crash re-entry: the request's new Reviewer already exists;
-                // reuse its durable session like any old reviewer.
-                { AgentId = agentIdOfReviewer m.ReviewerSessionId
+                // Crash re-entry: the request's new Reviewer already exists
+                // (fork done, enlist durable). Reuse its session under the SAME
+                // id it was forked with — never drift to a derived id, or the
+                // durable HandleLinked becomes unreachable.
+                { AgentId = sprintf "finality-new-%s" (FinalityRequestId.value request.RequestId)
                   ReviewerSessionId = Some m.ReviewerSessionId
                   ReviewerOrdinal = m.ReviewerOrdinal
                   IsNew = false }

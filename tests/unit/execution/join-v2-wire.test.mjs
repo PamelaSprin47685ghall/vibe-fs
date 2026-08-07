@@ -113,8 +113,8 @@ test('EXEC_017_interrupted_wire_is_not_error', () => {
   const parsed = parseWire(wire)
   assert.deepEqual(parsed, {
     status: 'interrupted',
-    reason: 'new_user_message',
-    action: 'handle_latest_user_message',
+    reason: 'operator_abort',
+    message: 'join interrupted',
   })
   assert.equal(parsed.error, undefined)
   assert.ok(!wire.includes('status = "failed"'))

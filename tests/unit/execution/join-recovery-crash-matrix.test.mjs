@@ -17,6 +17,7 @@ import {
   sessionId,
   stream,
 } from '../support/domain.mjs'
+import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
 
 const PARENT = sessionId('ses_crash_p')
 const CHILD = sessionId('ses_crash_c')
@@ -29,6 +30,7 @@ const handleFact = {
     Handle: HANDLE,
     TargetAgent: 'fast-coder',
     CanonicalRole: roles.of('Coder'),
+    Ownership: HandleOwnership.DurableParentHandle,
   }),
   completed: fact('HandleCompleted', {
     ParentSessionId: PARENT,

@@ -28,7 +28,7 @@ Join 批次、blob、进程预算见 `how/execution.md`。
 
 Join 消费当前 owner 可用 completion，有界批次 wire（status/count/`[[result]]`）；agent 完成项 entry-local LWR 注释（`includeOpening=false`），禁止字段式 `work_record`。  
 DevOps 角色的 `join` 在无完成项时包含 10s 超时预算（`DevOpsJoinTimeoutMs = 10_000`）；若 10s 内无 completion，返回超时错误 `ForkError.TimedOut`（`status="failed"`, `code="TIMED_OUT"`）。Orchestrator 与 Manager 角色的 `join` 维持无 10s 超时规则。  
-用户消息中断 → `status=interrupted`，不是 error（EXEC-017）。
+工具调用中止（operator abort）→ `status=interrupted, reason=operator_abort`，不是 error（EXEC-017）；排队中的用户消息不中断 join。
 
 ## EXEC-005：List 语义
 
@@ -52,11 +52,11 @@ PTY completion **只**由 backend `onExit` 触发。禁止 stdout 启发式「�
 
 ## EXEC-016：Background Join Guard
 
-有 join 义务且仍有 outstanding 后台时，JoinGuard Continuation 优先于 Manager Review Guard。本 turn 不做 review 检查。
+有 join 义务且仍有 outstanding 后台时，本 turn 只发 JoinGuard Continuation；finality 处理停放，Manager 不做 idle 鼓励（GLORY-029/070）。
 
 ## EXEC-017：Join 中断不是错误
 
-用户新消息打断 join 等待 → 特殊 interrupted 结果，优先处理用户消息。tool abort ≠ runtime.Cancel。
+join 等待只被 `OperatorAbort`（宿主中止当前工具调用）或 `DeadlineExpired`（DevOps 超时）中断；中断是 `JoinWaitOutcome.Interrupted of JoinInterruptReason`，不是 ForkError。wire：operator abort → `status=interrupted, reason=operator_abort`；DevOps 超时 → `ForkError.TimedOut`（`status="failed", code="TIMED_OUT"`，EXEC-004）。排队中的用户消息不进入 join race，不中断等待。tool abort ≠ runtime.Cancel。
 
 ## EXEC-020：Agent 终态代数（无 ABORTED）
 

@@ -124,6 +124,16 @@ module ManagerNarrativeTransform =
         if messageIndex >= List.length rawMessages - 1 then
             false
         else
+            // GLORY-062: rest-in-peace / blessing tool results also prove the
+            // ending already ran. Without them, the next provider step after
+            // LifeCompleted re-opens a Life on the same HumanRoot (measured:
+            // reawakening rewrite on the terminal text step).
+            let isEndingEvidence (text: string) =
+                text.Contains("Your final words have been received")
+                || text.Contains("Your ending has not accepted you")
+                || text.Contains("Your ending has accepted you")
+                || text.Contains("rest in peace")
+
             rawMessages
             |> List.skip (messageIndex + 1)
             |> List.exists (fun raw ->
@@ -132,12 +142,8 @@ module ManagerNarrativeTransform =
                     message.Parts
                     |> List.exists (function
                         | WireToolCall(_callId, name, _args) -> name = "suicide"
-                        | WireToolResult(_callId, result) ->
-                            result.Contains("Your final words have been received")
-                            || result.Contains("Your ending has not accepted you")
-                        | WireText text ->
-                            text.Contains("Your final words have been received")
-                            || text.Contains("Your ending has not accepted you")
+                        | WireToolResult(_callId, result) -> isEndingEvidence result
+                        | WireText text -> isEndingEvidence text
                         | _ -> false)
                 | None -> false)
 

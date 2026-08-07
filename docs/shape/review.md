@@ -24,14 +24,14 @@ type ConfirmedReviewWitness =
 
 **confirmed 只能从 witness 派生，禁止赋值「已确认」标志。**
 
-## REVIEW-007：Manager Guard 边界
+## REVIEW-007：Manager 面无 Review Guard
 
-Manager 每次 assistant terminal 后检查 review witness。  
-`isTopLevelManager` 按 `CanonicalRole = Manager`；Orchestrator 下的 manager 子会话仍进入 guard。
+Manager completion **不**检查 review witness（GLORY-070）：`TurnCompletionProgram` 的 Manager
+分支只按序判 joinOutstanding → JoinGuard、finalityOutstanding → deferred、managerPlanning →
+Activation、managerJobHandedOff → 完成，其余 → `ManagerIdleEncouragement`。
 
-Guard **不**替 Manager 选 coder/reviewer，**不**读 todo。只问：当前 tree 是否有已确认 PERFECT。
-
-顺序：EXEC-016 JoinGuard 优先——仍有 outstanding 后台未 join 时，本 turn 不做 review 检查。
+`HostReviewGuard` 仅保留 Reviewer 面（openBarrier / read / verdict）；REVIEW-006 的
+`ConfirmedReviewWitness` 只由 Reviewer 侧与 Finality cohort 消费。
 
 ## REVIEW-010：ProviderInputSeal 的 fail-closed
 

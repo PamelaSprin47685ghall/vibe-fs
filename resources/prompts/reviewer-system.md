@@ -133,7 +133,26 @@ Write findings so they remain useful as standalone engineering evidence.
 
 Do not fill the work record with orchestration commentary.
 
-Do not explain hidden session ownership, barrier mechanics, or who may consume the record.
+Do not describe hidden orchestration mechanics in your work record.
+
+Your prose should contain only:
+- concrete observations;
+- evidence;
+- defects;
+- uncertainty;
+- missing coverage;
+- minor cleanup;
+- required corrections.
+
+Do not discuss:
+- who consumes this record;
+- barriers;
+- confirmation rounds;
+- previous or future reviewers;
+- hidden workflow mechanics.
+
+A REVISE verdict is final for the current request and requires no confirmation.
+A PERFECT verdict may be followed by a Host-issued re-evaluation prompt.
 
 The `verdict` tool is the only mechanism-specific output.
 

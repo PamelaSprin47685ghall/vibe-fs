@@ -1,15 +1,17 @@
-// tests/unit/verify/orchestrator-reuse-contract.test.mjs — PENDING 2 (PR B): sub-session reuse prompts.
+// tests/unit/verify/orchestrator-reuse-contract.test.mjs — fork-manager reuse contract.
 //
 // Layer 0 static resource contract. No dist import, no build needed: the prompt resource and the
 // ForkTool source are the physical facts under test.
 //
-// RED by construction: the Orchestrator tool surface is exactly [fork-manager, join] (AGENT-006)
-// with no `list` / `fork(existing_id)` reuse API, so reuse guidance must be executable without
-// them. The first test requires the prompt to carry three executable rules: continue the same
-// Manager job for same-goal follow-ups; fork-manager only for a truly independent target
-// (different worktree / different lane); and an explicit denial of `list` / `fork-manager(existing_id)`
-// / `reuse` tools — no invented APIs. The second and third tests are regression protection: the
-// "continue the existing Manager job" clauses and ForkTool's manager description (reuse/nudge + tdd).
+// The Orchestrator tool surface is exactly [fork-manager, join] (AGENT-006). Reuse is a REAL API:
+// `fork-manager(existing_job_id, prompt)` continues the existing Manager job in its worktree
+// (GLORY-068, `reused=true` in the result), so the prompt must say so — an orchestrator that does
+// not know the reuse API would fork duplicate jobs on every follow-up. The first test requires the
+// prompt to carry the executable reuse rules: continue the same Manager job for same-goal
+// follow-ups; fork-manager with an existing job id as the continuation mechanism; a new job only
+// for a truly independent target (different worktree / different lane); and no invented APIs
+// beyond that surface. The second and third tests are regression protection: the "continue the
+// existing Manager job" clauses and ForkTool's manager description (reuse/nudge + tdd).
 
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -23,7 +25,7 @@ const FORK_TOOL_PATH = new URL(
 
 const promptText = () => readFileSync(PROMPT_PATH, 'utf8')
 
-// ── PENDING 2: executable reuse discipline (continue same job; no invented API) ──
+// ── executable reuse discipline (continue same job via fork-manager(existing_job_id)) ──
 
 test('ORCHESTRATOR_REUSE_001_prompt_carries_executable_same_job_continue_rules', () => {
   const prompt = promptText()
@@ -32,6 +34,10 @@ test('ORCHESTRATOR_REUSE_001_prompt_carries_executable_same_job_continue_rules',
     /continue the same Manager job|continuing the same Manager job/i,
     // the continuation target is the originating Manager session.
     /originating Manager session|originating Manager/i,
+    // reuse is a REAL fork-manager API: an existing manager job id may be passed.
+    /existing manager job id|existing_job_id/i,
+    // the fork-manager result marks a continuation (executable claim, ForkTool emits reused=true).
+    /reused=true/,
     // same-goal work stays in the same worktree.
     /same worktree/i,
     // new fork-manager is reserved for truly independent goals.
@@ -40,10 +46,6 @@ test('ORCHESTRATOR_REUSE_001_prompt_carries_executable_same_job_continue_rules',
     /different worktree|different lane/i,
     // the tool surface is exactly [fork-manager, join]: no list tool exists.
     /exactly two tools: `fork-manager` and `join`/,
-    // no fork-manager(existing_id) reuse API — the denial is explicit.
-    /fork-manager\(existing_id\)/,
-    // no reuse tool, and inventing tools is forbidden.
-    /`reuse` tool|no reuse API/i,
     // explicit prohibition of invented APIs.
     /do not invent tools|invent tools/i,
   ]
@@ -52,31 +54,33 @@ test('ORCHESTRATOR_REUSE_001_prompt_carries_executable_same_job_continue_rules',
     if (!pattern.test(prompt)) failures.push(`orchestrator prompt is missing ${pattern}`)
   }
 
-  // No list() / fork(existing_id) invocation may be prescribed: the surface is [fork-manager, join].
-  if (/list\(\)|fork\(existing_agent_id|fork\(agent_id\)/.test(prompt)) {
-    failures.push('orchestrator prompt must not prescribe list()/fork(existing_id) invocations')
+  // No list() / fork(existing_agent_id) invocation may be prescribed, and no separate
+  // `reuse` tool may be invented: the surface is [fork-manager, join], reuse goes through
+  // fork-manager(existing_job_id) only.
+  if (/list\(\)|fork\(existing_agent_id|fork\(agent_id\)|`reuse` tool/.test(prompt)) {
+    failures.push('orchestrator prompt must not prescribe list()/fork(existing_id)/a separate `reuse` tool')
   }
 
-  assert.deepEqual(failures, [], 'orchestrator reuse discipline must be executable without list/fork(existing_id)')
+  assert.deepEqual(failures, [], 'orchestrator reuse discipline must be executable through fork-manager(existing_job_id)')
 })
 
-// ── PENDING 2: same-goal follow-ups continue the existing Manager job ────────
+// ── same-goal follow-ups continue the existing Manager job ───────────────────
 
 test('ORCHESTRATOR_REUSE_002_prompt_continues_existing_manager_job_on_conflict_followup_recovery', () => {
   const prompt = promptText()
   const required = [
-    // PENDING 2: publish conflict → same Manager job, not a new one.
+    // publish conflict → same Manager job, not a new one.
     /Publish conflicts|发布冲突/,
-    // PENDING 2: supplemental edits → same Manager job.
+    // supplemental edits → same Manager job.
     /follow-up edits|补充修改/,
-    // PENDING 2: recovery / resume execution → same Manager job.
+    // recovery / resume execution → same Manager job.
     /recovery|恢复执行/,
     // the "prefer continuing" directive itself, bound to the delivery goal.
     /continuing the same Manager|existing Manager job|originating Manager|Prefer continuing/i,
     // new Manager is the exception: parallel independent goal only.
     /truly independent|真正并行|parallel independent/i,
-    // no invented reuse API: continuation is the mechanism, not a fork-manager(existing_id).
-    /no reuse API|not.*invent tools|不存在.*API/i,
+    // no invented API beyond fork-manager(existing_job_id): no `reuse`/`list` tools.
+    /do not invent tools/i,
   ]
   const failures = []
   for (const pattern of required) {

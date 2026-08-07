@@ -498,6 +498,7 @@ const buildVerdict = unionCase(FactModule.ReviewGuardVerdict, 'ReviewGuardVerdic
 const buildAbandonReason = unionCase(FactModule.PromptAbandonReason, 'PromptAbandonReason')
 const buildCompletionKind = unionCase(FactModule.HandleCompletionKind, 'HandleCompletionKind')
 const buildHandleAbandonReason = unionCase(FactModule.HandleAbandonReason, 'HandleAbandonReason')
+const buildHandleOwnership = unionCase(FactModule.HandleOwnership, 'HandleOwnership')
 
 /** Flat case-name catalogue across all AgentFact families (DSL-003). */
 export const agentFactCaseNames = () => AGENT_FACT_FAMILIES.flatMap(([, unionClass]) => caseNames(unionClass))
@@ -648,6 +649,13 @@ export const handleAbandonReason = {
   parentCancelled: () => buildHandleAbandonReason('ParentCancelled'),
   deadlineExceeded: () => buildHandleAbandonReason('DeadlineExceeded'),
   hostSessionGone: () => buildHandleAbandonReason('HostSessionGone'),
+}
+
+/** HandleOwnership: which side of the boundary owns the physical resource. */
+export const handleOwnership = {
+  of: (name) => buildHandleOwnership(name),
+  durableParentHandle: () => buildHandleOwnership('DurableParentHandle'),
+  hostOwnedHidden: () => buildHandleOwnership('HostOwnedHidden'),
 }
 
 /** Build an AgentFact by case name with an anonymous-record payload. */
@@ -1806,9 +1814,9 @@ export const managedAgentCatalog = (() => {
     'allPublicRoles',
     'allInternalRoles',
     'allRoles',
-    'publicForkableRoles',
+    'managerForkableRoles',
+    'managerForkableNames',
     'requiredNames',
-    'publicForkableNames',
     'orchestratorForkableNames',
     'inspectorToolNames',
     'coderToolNames',
@@ -1838,10 +1846,10 @@ export const managedAgentCatalog = (() => {
     allPublicRoles: () => listItems(m.allPublicRoles).map(caseOf),
     allInternalRoles: () => listItems(m.allInternalRoles).map(caseOf),
     allRoles: () => listItems(m.allRoles).map(caseOf),
-    publicForkableRoles: () => listItems(m.publicForkableRoles).map(caseOf),
+    managerForkableRoles: () => listItems(m.managerForkableRoles).map(caseOf),
+    managerForkableNames: () => listItems(m.managerForkableNames),
     /** AGENT-002: exactly 20 names. */
     requiredNames: () => listItems(m.requiredNames),
-    publicForkableNames: () => listItems(m.publicForkableNames),
     orchestratorForkableNames: () => listItems(m.orchestratorForkableNames),
     inspectorToolNames: () => listItems(m.inspectorToolNames),
     coderToolNames: () => listItems(m.coderToolNames),
@@ -2733,7 +2741,8 @@ export const handleProjection = (() => {
 
   return {
     empty: m.empty,
-    link: (handle, child, targetAgent, role, current) => decided(m.link(handle, child, targetAgent, role, current)),
+    link: (handle, child, targetAgent, role, current, ownership = handleOwnership.durableParentHandle()) =>
+      decided(m.link(handle, child, targetAgent, role, ownership, current)),
     complete: (handle, completion, current) =>
       decided(m.complete(handle, typeof completion === 'string' ? completionOf(completion) : completion, current)),
     completionOf,
@@ -2924,8 +2933,8 @@ export const handleController = (() => {
   // recordCompletion facade still accepts (agentId, kind, body) for tests; it
   // mints JoinableCompletion via Domain TerminalEvidence (no raw Aborted path).
   return {
-    link: (journal, parentId, agentId, childSessionId, targetAgent, role) =>
-      resultOf(m.link(journal, parentId, agentId, childSessionId, targetAgent, role)),
+    link: (journal, parentId, agentId, childSessionId, targetAgent, role, ownership = handleOwnership.durableParentHandle()) =>
+      resultOf(m.link(journal, parentId, agentId, childSessionId, targetAgent, role, ownership)),
     recordCompletion: (journal, parentId, agentId, kind, body, childSessionId) => {
       const kindName = typeof kind === 'string' ? kind : caseOf(kind)
       const content = body === undefined || body === null ? '' : String(body)

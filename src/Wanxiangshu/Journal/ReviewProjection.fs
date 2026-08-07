@@ -122,8 +122,10 @@ module ReviewProjection =
             dropped |> List.fold (fun acc run -> Map.remove run acc) next
 
     /// A new barrier discards the previous barrier's pending challenge and
-    /// attempt window. REVIEW-008: the confirmed witness is NOT discarded — it
-    /// stays auditable, and validity against the current tree is derived.
+    /// attempt window. REVIEW-008: a confirmed witness stays auditable (validity
+    /// is still asked against the current tree / barrier); unfinished revision
+    /// or pending-PERFECT state is barrier-scoped and must not leak into the
+    /// next request (GLORY-045 reuse of the same Reviewer session).
     let startBarrier (barrierId: ReviewBarrierId) (gitTreeHash: GitTreeHash) (current: ReviewGuardProjection) =
         if current.CurrentBarrierId = Some barrierId then
             current
@@ -132,7 +134,13 @@ module ReviewProjection =
                 CurrentBarrierId = Some barrierId
                 LastGitTreeHash = Some gitTreeHash
                 PendingChallenge = None
-                ObservedAttemptKeys = [] }
+                ObservedAttemptKeys = []
+                Witness =
+                    match current.Witness with
+                    | ReviewWitness.Confirmed _ -> current.Witness
+                    | ReviewWitness.NoReview
+                    | ReviewWitness.RevisionWitness _
+                    | ReviewWitness.PerfectPending _ -> ReviewWitness.NoReview }
 
     /// REVIEW-010: record a seal. Pure storage; the causal judgement happens at
     /// verdict time.

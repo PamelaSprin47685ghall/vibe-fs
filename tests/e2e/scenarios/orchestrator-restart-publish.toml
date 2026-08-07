@@ -134,7 +134,7 @@ tools = ["fork-manager", "join"]
 id = "manager"
 lane = "fast-manager"
 user = "# Ship publish_proof.txt to the target branch."
-tools = ["fork", "join", "list"]
+tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Write publish_proof.txt." } }
@@ -143,18 +143,24 @@ tools = ["fork", "join", "list"]
   respond = { type = "tool-call", tool = "join" }
 
   [[turn.step]]
-  respond = { type = "text", text = "Manager finished." }
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager rest in peace." }
 
 [[turn]]
 id = "manager-guard"
 internal = true
-user = "# Your work is not yet complete."
-tools = ["fork", "join", "list"]
+optional = true
+user = ["You are doing well.", "You have plenty of time.", "You can continue.", "When nothing useful remains, call suicide."]
+tools = ["fork", "join", "list", "suicide"]
 
-  # GLORY-031/032: the Manager ends the guard by prose — a Reviewer cannot be
-  # created, reused or nudged by a Manager (the Reviewer is Host-owned).
+  # GLORY-029/070: ordinary activated idle — ManagerIdleEncouragement only.
   [[turn.step]]
-  respond = { type = "text", text = "Manager finished." }
+  respond = { type = "text", text = "Manager continues." }
 
 [[turn]]
 id = "coder"
@@ -170,6 +176,22 @@ tools = ["write"]
 
   [[turn.step]]
   respond = { type = "text", text = "Coder finished." }
+
+
+[[turn]]
+id = "manager-finality-reviewer"
+internal = true
+user = "# Review the current worktree against all authoritative user requirements."
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager finality reviewer confirmed." }
 
 [[turn]]
 id = "barrier-reviewer"
@@ -199,6 +221,18 @@ tools = ["verdict"]
   respond = { type = "text", text = "Reviewer confirmed the tree." }
 
 # Both Blogger shapes. The re-anchor frame (`CompanionHostBlogger.fs:72`) is reachable here
+
+
+# Bare MissingFinalReport poke (RuntimeNudge.missingFinalReport = "#\n").
+# Optional: only fires when a session stops without a final report.
+[[turn]]
+id = "missing-final-report-repair"
+internal = true
+optional = true
+user = "#"
+
+  [[turn.step]]
+  respond = { type = "text", text = "Continuing after missing final report." }
 
 [[turn]]
 id = "blogger"
@@ -661,3 +695,5 @@ user = "Ship publish_proof.txt to the target branch."
 
   [[turn.step]]
   respond = { type = "title", text = "E2E Test Session" }
+
+

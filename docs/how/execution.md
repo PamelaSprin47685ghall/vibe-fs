@@ -54,8 +54,9 @@ FIFO 排空，上限 32，与 EXEC-018 同界。
 ## EXEC-025：DevOps Join 超时
 
 - `DevOpsJoinTimeoutMs = 10_000`
-- DevOps 角色的 `join` 工具在 10s 内无任何完成项且未受到用户新消息打断时，触发 timerTask 超时，返回 `ForkError.TimedOut`（wire 渲染为 `status="failed"`, `code="TIMED_OUT"`）。
+- DevOps 角色的 `join` 工具在 10s 内无任何完成项时触发 timerTask 超时，返回 `ForkError.TimedOut`（wire 渲染为 `status="failed"`, `code="TIMED_OUT"`）。
 - Orchestrator 与 Manager 角色的 `join` 不使用 10s timerTask，维持无限期等待。
+- 用户消息不进入 Join race（EXEC-017 rev.2）：join 等待只被 `Publish/Pulse/Cancel` 唤醒。
 
 ---
 
@@ -68,7 +69,8 @@ FIFO 排空，上限 32，与 EXEC-018 同界。
 
 ## Join wire（与 ARCH-010）
 
-LLM-visible join：顶层 status+count，再 `[[result]]` 表数组；agent 项前 entry-local LWR 注释。详见 synthetic-toml §9.6 与 EXEC-004。
+LLM-visible join：顶层 status+count，再 `[[result]]` 表数组；agent 项前 entry-local LWR 注释。详见 synthetic-toml §9.6 与 EXEC-004。  
+中断 wire（EXEC-017 rev.2）：仅本地 operator abort 触发 `status="interrupted", reason="operator_abort", message="join interrupted"`；`interrupted` 不是 `ForkError` / `failed` / `aborted`，排队用户消息永不中断 join。
 
 ---
 

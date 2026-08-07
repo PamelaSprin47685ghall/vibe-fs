@@ -83,6 +83,23 @@ attempts = [1]
 # ENFORCER-045: coverage advances only via BlogEntryCommitted from a completed
 # blog tool cycle. A plain text reply never commits a frame, so PrefixCoverage
 # stays at 0 and the continue turn's prefix-probe never materialises.
+
+# Bare MissingFinalReport poke (RuntimeNudge.missingFinalReport = "#\n").
+# Optional: only fires when a session stops without a final report.
+[[turn]]
+id = "missing-final-report-repair"
+internal = true
+optional = true
+user = "#"
+
+  [[turn.step]]
+  respond = { type = "text", text = "Continuing after missing final report." }
+
+[[epoch]]
+turn = "missing-final-report-repair"
+step = 0
+reason = "prefix-probe"
+
 [[turn]]
 id = "blogger"
 internal = true
@@ -552,3 +569,5 @@ user = "Round 1 fallback attempt."
 
   [[turn.step]]
   respond = { type = "title", text = "E2E Test Session" }
+
+

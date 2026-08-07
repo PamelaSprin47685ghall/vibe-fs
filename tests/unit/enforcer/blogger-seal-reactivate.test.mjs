@@ -32,7 +32,7 @@ test('HANDLE_lifecycle_CompletedAwaitingJoin_and_Retired_seal_blogger', () => {
   let proj = handleProjection.empty
   const h = handleId.agent('agent-1')
   const child = sessionId('ses-child')
-  const linked = handleProjection.link(h, child, 'fast-coder', roles.Coder, proj)
+  const linked = handleProjection.link(h, child, 'fast-coder', roles.of('Coder'), proj)
   assert.equal(linked.ok, true)
   proj = linked.value
   assert.equal(handleProjection.recordSealsBlogger(handleProjection.tryFind(h, proj)), false)
@@ -52,7 +52,7 @@ test('HANDLE_lifecycle_Abandoned_seals_blogger', () => {
   let proj = handleProjection.empty
   const h = handleId.agent('agent-ab')
   const child = sessionId('ses-child-ab')
-  const linked = handleProjection.link(h, child, 'fast-coder', roles.Coder, proj)
+  const linked = handleProjection.link(h, child, 'fast-coder', roles.of('Coder'), proj)
   assert.equal(linked.ok, true)
   proj = linked.value
   const abandoned = handleProjection.abandon(h, 'ParentCancelled', proj)

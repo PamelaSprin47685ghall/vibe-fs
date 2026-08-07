@@ -66,15 +66,16 @@ test('PROMPT_manager_sub_session_reuse_algorithm_is_executable', () => {
   assert.match(text, /agent_id/)
   assert.match(text, /reuse/)
   assert.match(text, /compatible context/)
-  assert.match(text, /Do not reuse an agent/)
-  assert.match(text, /ambiguous or misleading/)
+  assert.match(text, /Do not reuse when old context would make the new assignment ambiguous/)
+  assert.match(text, /Reuse must not reduce parallelism/)
 })
 
 test('PROMPT_orchestrator_continues_manager_job_without_invented_reuse_api', () => {
   const text = promptResources.load().OrchestratorSystemPrompt
   assert.match(text, /originating Manager|existing Manager job|Continue the existing Manager/i)
   assert.match(text, /truly independent|真正并行|parallel independent/i)
-  assert.match(text, /There is no `fork-manager\(existing_id\)`|no `fork-manager\(existing_id\)`/i)
+  assert.match(text, /fork-manager\(existing_job_id|existing manager job id|reused=true/i)
+  assert.doesNotMatch(text, /There is no `fork-manager\(existing_id\)`|no `fork-manager\(existing_id\)`/i)
 })
 
 test('PROMPT_coder_tdd_phase_discipline_and_scope', () => {

@@ -82,8 +82,8 @@
 | isValidTerminal | CTX-004：非空且非 XML-only，唯一内容级校验 |
 | JoinGuard | EXEC-016：outstanding 后台资源时 terminal 先 join |
 | JoinableCompletion | EXEC-021：fromDecoded / tryFromProvenTerminal 唯一构造；禁止 kind+body 弱证明 |
-| JoinWaitOutcome | EXEC-004 / EXEC-017：`ResultsAvailable` \| `InterruptedByUserMessage` |
-| InterruptedByUserMessage | EXEC-017：join 中断不是 ForkError；wire `status="interrupted"` |
+| JoinWaitOutcome | EXEC-017：`ResultsAvailable` \| `Interrupted of JoinInterruptReason`；用户消息不中断 join |
+| JoinInterruptReason | EXEC-017：`OperatorAbort` \| `DeadlineExpired`；wire `status=interrupted, reason=operator_abort`；用户消息不中断 join |
 
 ## L
 
@@ -106,7 +106,7 @@
 | 术语 | 指向 |
 |------|------|
 | ManagedSessionKind | HOST-008：WorkSession / CompanionSession |
-| Manager Guard | REVIEW-007：Manager terminal 时必须检查 witness |
+| Manager Guard | GLORY-070：已删除的旧 review 门禁；仅历史行解析保留（PROMPT-003） |
 | Managed Agent | AGENT-002 定义的受管 Agent 身份 |
 | manual compaction | HOST-006：官方支持的用户动作，效果 best effort |
 

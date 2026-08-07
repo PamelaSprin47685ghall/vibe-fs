@@ -20,8 +20,9 @@ HumanRoot [X] → XTrace durable capture → ManagerNarrativeTransform 改写
 → 规划回合 → TurnCompletionProgram 检测规划 terminal → ManagerWorkActivation continuation
 → WorkActivated（写 ProtectedPrefixEnd）→ Labor
 → suicide(last_words) → FinalityRequested → HostReviewProgram（隐藏 Reviewer + barrier）
-→ confirmed dual PERFECT → 重读 tree → FinalityConfirmed → LifeCompleted
-→ last_words 成为 terminal → 完成 handle → 新 HumanRoot → 下一 Life（Reawakening）
+→ 全员双 PERFECT → 重读 tree → FinalityBlessed → minor-work continuation
+→ 第二次 suicide → rest in peace → LifeCompleted → last_words 成为 terminal → 完成 handle
+→ 新 HumanRoot → 下一 Life（Reawakening）
 ```
 
 ## 数据流（失败路径）
@@ -35,10 +36,10 @@ suicide → FinalityRequested → HostReviewProgram → REVISE
 ## 硬性边界
 
 1. Manager 面（system prompt、continuation、工具 schema、固定 tool result）不得出现 SURFACE-005 禁止词；`REVIEWER_WORK_RECORD` 是唯一例外且不得清洗（GLORY-048）。
-2. 自动 Reviewer session 对 Manager 的 `list`/`join` 不可见（GLORY-002）。
+2. 自动 Reviewer session 产生 `HostOwnedHidden` 句柄（`HandleLinked` 事实与 HandleRecord 携带 `HandleOwnership = DurableParentHandle | HostOwnedHidden`），对 Manager 的 `list`/`join` 不可见（GLORY-002）。
 3. `ManagerOpensReviewBarrier` 从 Manager 普通 fork surface 删除（GLORY-033）；barrier 只由 Finality workflow 与 Orchestrator post-rebase review 拥有。
 4. Reviewer 工作记录只由 `XTraceCapture.lifecycleWorkRecord journal reviewerSessionId false` 产生（GLORY-004/049）。
-5. 成功输出逐字等于 `last_words`，Host 零附加文本（GLORY-061）。
+5. 成功输出逐字等于 `last_words`，Host 零附加文本（GLORY-062）。
 6. 状态身份只来自 typed facts + projection，禁止故事文本反向解析（GLORY-008/009）。
 
 ## 与既有系统的关系
@@ -46,5 +47,5 @@ suicide → FinalityRequested → HostReviewProgram → REVISE
 - **XTrace**：保持 append-only；ManagerLifecycle 按 cursor range 物化 Life（GLORY-066/067）；通用单 Opening/Terminal 字段保留为兼容层。
 - **PromptAuthority**：新增 `ManagerWorkActivation`、`FinalityRejected`、`ManagerIdleEncouragement` 三种 continuation kind，全部走 PROMPT-005 claim → submitted → accepted 协议（GLORY-020/029/053）。
 - **Blogger**：`effectiveStart = max IngestedThrough ProtectedPrefixEnd`（GLORY-023/024）。
-- **Orchestrator**：ManagerJob 不原地复活（GLORY-068）；HostReviewProgram 由 Orchestrator 与 Manager Finality 共用（GLORY-042/044）。
-- **ReviewGuard**：GLORY-070 迁移期保留 fail-closed 角色但改写文本；新 pipeline 覆盖后删除 manager-facing old guard。
+- **Orchestrator**：ManagerJob 已发布/释放不复活；active owned Job 可由 Orchestrator append requirement（GLORY-068）；HostReviewProgram 由 Orchestrator 与 Manager Finality 共用（GLORY-042/044）。
+- **ReviewGuard**：`HostReviewGuard` 仅保留 Reviewer 面（openBarrier/read/verdict）；Manager 面（missingTree/nudgeManager/ManagerGuard）已删除（GLORY-070）。

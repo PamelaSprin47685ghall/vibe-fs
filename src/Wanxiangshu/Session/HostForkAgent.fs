@@ -289,7 +289,15 @@ module HostForkAgent =
         member this.Reuse(agentId: string, prompt: string) : Task<Result<ForkResult, string>> =
             task {
                 // GREEN-4: recovery ownership is SessionRecoveryWorkflow only.
-                let retired = this.IsRetiredHandle agentId
+                // After join retires the prior work unit, reuse of the same
+                // agent id reopens Labor on the same child session (GLORY-068 /
+                // "十年修得同船渡"). Abandoned handles stay unusable.
+                let abandoned =
+                    this.Journal
+                    |> Option.map (fun durable ->
+                        let projection = AgentJournal.handleProjection durable this.ParentId
+                        let handle = HandleController.agentHandle agentId
+                        HandleProjection.isAbandoned handle projection)
 
                 let existing =
                     lock this.Gate (fun () ->
@@ -297,7 +305,7 @@ module HostForkAgent =
                         | true, childId -> Some childId
                         | false, _ -> None)
 
-                match retired, existing with
+                match abandoned, existing with
                 | Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
                 | _, None -> return Error(sprintf "Unknown agent id: %s" agentId)
                 | _, Some childId ->
@@ -320,22 +328,59 @@ module HostForkAgent =
                             let role = record.Role
                             let agentName = record.Agent
 
-                            return!
-                                HostForkChildDispatch.sendToExistingChild
-                                    this.Gate
-                                    this.PendingRuns
+                            // Re-open a joined (Retired) handle before the new send so
+                            // the next completion has an Active cell to claim.
+                            match
+                                HandleController.link
                                     this.Journal
                                     this.ParentId
-                                    this.Sessions
-                                    this.ChildWorkRecordOf
-                                    this.Runtime
-                                    this.SendChildPrompt
-                                    this.SendBusyNudge
-                                    (fun child role -> this.RunStarted child role (this.DirectoryOf agentId))
                                     agentId
                                     childId
-                                    role
-                                    prompt
                                     agentName
-                                    None
+                                    role
+                                    this.HandleOwnership
+                            with
+                            | Error linkError -> return Error linkError
+                            | Ok() ->
+                                // A reuse after join is a new work unit on the same
+                                // child session — same first-prompt envelope a brand-new
+                                // fork would receive (ARCH-010). Busy-nudge continues
+                                // still go through sendToExistingChild's active-run path
+                                // with the raw prompt when a run is already live.
+                                let activeRun =
+                                    lock this.Gate (fun () ->
+                                        match this.PendingRuns.TryGetValue agentId with
+                                        | true, _ -> true
+                                        | false, _ -> false)
+
+                                let enriched =
+                                    if activeRun then
+                                        None
+                                    else
+                                        Some(
+                                            ForkChildPayload.relay
+                                                prompt
+                                                (this.ParentWorkRecordOf this.ParentId)
+                                                []
+                                                None
+                                        )
+
+                                return!
+                                    HostForkChildDispatch.sendToExistingChild
+                                        this.Gate
+                                        this.PendingRuns
+                                        this.Journal
+                                        this.ParentId
+                                        this.Sessions
+                                        this.ChildWorkRecordOf
+                                        this.Runtime
+                                        this.SendChildPrompt
+                                        this.SendBusyNudge
+                                        (fun child role -> this.RunStarted child role (this.DirectoryOf agentId))
+                                        agentId
+                                        childId
+                                        role
+                                        prompt
+                                        agentName
+                                        enriched
             }

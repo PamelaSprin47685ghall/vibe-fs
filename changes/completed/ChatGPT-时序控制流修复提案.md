@@ -1,3 +1,6 @@
+> 本文件是历史变更记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
+
 # 时序控制流修复提案
 
 **User:** Anonymous  
@@ -4266,3 +4269,42 @@ Powered by [ChatGPT Exporter](https://www.chatgptexporter.com)
 - 验收条件按 proposal §43 第 1–33 条逐项成立（2N roster、REVISE 立即生效、Blessed 第二
   suicide rest in peace、隐藏 Reviewer 不进 list/join/guard、join 无 user-message 中断、
   稳定 idle 无静默 StopPass、Manager 面零 review 泄漏、fork-manager reuse 真实可执行）。
+
+
+## Final outcome
+
+> 本文件是历史变更记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
+
+### Outcome
+
+收敛语义（回复二 CE/递归，禁 Stage/Disposition PC）已落地：2N Finality cohort、REVISE 立即短路、Blessed 后第二次 suicide → rest in peace + LifeCompleted、Reviewer HostOwnedHidden、Join 中断仅 `OperatorAbort|DeadlineExpired`、ManagerIdleEncouragement 取代旧 Manager Review Guard、跨请求 Reviewer agent id 稳定、join 后同 session 可 reuse。
+
+### Final specification
+
+权威语义见 `docs/what|shape|how|proof` 中 glory / review / execution / host 相关 Clause（GLORY-002/029/031/037/040/045/062/068/070，EXEC-017 rev.2 等）。本文件不复述条款。
+
+### Implementation result
+
+- `FinalityController` / `FinalityTool` / `FinalityReviewCohort`：2N enlist、concurrent short-circuit、Blessed 终态。
+- `TurnCompletionProgram`：删除 Manager Review Guard；idle → ManagerIdleEncouragement。
+- `JoinInterruptReason` / `CompletionMailbox` / `JoinTool`：无 user-message 中断。
+- `HostForkAgent.Reuse` + `LinkageProjection.link` + `ForkTool`：join 退休后同 agent id 可 reopen，并重发 ARCH-010 首 prompt 信封。
+- `ManagerNarrativeTransform`：LifeCompleted 后同 turn 不再误开新 Life（识别 rest-in-peace / blessing 工具结果）。
+- e2e：`manager-unhappy-path` 一笔画可绿；orch restart（after-candidate）可绿。
+
+### Verification
+
+- `npm run build`：OK
+- `node tests/unit/run.mjs`：1095 passed
+- `node tests/integration/run.mjs`：all suites passed
+- `node tests/e2e/run.mjs`：all staggered parallel scenarios passed（含 manager-unhappy-path、orchestrator-restart-publish after-candidate、context-recovery、fallback）
+- `node scripts/check.mjs`：architecture/dsl/p0 OK；spec-check 仅因无关 `changes/proposed/strength.md` 历史文件含正式 Clause 标题失败（非本 Change）
+
+### References
+
+- `tests/e2e/scenarios/manager-unhappy-path.toml`
+- `tests/unit/execution/finality-cohort-law.test.mjs`
+- `src/Wanxiangshu/Infrastructure/OpenCode/Tools/FinalityController.fs`
+- `src/Wanxiangshu/Session/HostForkAgent.fs`
+- `src/Wanxiangshu/Journal/LinkageProjection.fs`

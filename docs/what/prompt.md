@@ -51,6 +51,8 @@ StudentCompile
 StudentCompileNudge
 ```
 
+`ManagerGuard` 仅保留用于历史 journal 行解析（PromptAuthority.fromString），生产不再发送该 continuation（GLORY-070）。
+
 Continuation 只延续已有 Logical Run：
 
 - 不新建 RunId / completion  

@@ -100,9 +100,18 @@ module HandleProjection =
         (current: AgentLinkageProjection)
         : Result<AgentLinkageProjection, HandleTransitionRejection> =
         match Map.tryFind handle current.Handles with
-        | Some { Lifecycle = Retired } -> Error HandleIsRetired
-        | Some { Lifecycle = Abandoned _ } -> Error AlreadyAbandoned
-        | Some existing ->
+        // EXEC-009: a handle id is the agent id. After join retires the prior
+        // work unit, reuse of the same agent id reopens that handle on the
+        // same (or a recovered) child session for a new work unit. The
+        // tombstone is the prior completion cell (LastCompletion), not a ban
+        // on further Labor.
+        | Some ({ Lifecycle = Retired } as existing)
+        | Some existing when
+            match existing.Lifecycle with
+            | Active
+            | CompletedAwaitingJoin _ -> true
+            | _ -> false
+            ->
             Ok
                 { Handles =
                     Map.add
@@ -115,6 +124,8 @@ module HandleProjection =
                             Lifecycle = Active }
                         current.Handles
                   NextCreationOrder = current.NextCreationOrder }
+        | Some { Lifecycle = Abandoned _ } -> Error AlreadyAbandoned
+        | Some _ -> Error HandleIsRetired
         | None ->
             let order = current.NextCreationOrder
 

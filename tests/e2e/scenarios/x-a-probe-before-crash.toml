@@ -81,6 +81,18 @@ attempts = [1]
 # No [[epoch]] reason=prefix-probe: probe must not fire. Declaring it would make
 # unfiredBoundaries fail closed at scenario end (ARCH-004 / CTX-010).
 
+
+# Bare MissingFinalReport poke (RuntimeNudge.missingFinalReport = "#\n").
+# Optional: only fires when a session stops without a final report.
+[[turn]]
+id = "missing-final-report-repair"
+internal = true
+optional = true
+user = "#"
+
+  [[turn.step]]
+  respond = { type = "text", text = "Continuing after missing final report." }
+
 [[turn]]
 id = "blogger"
 internal = true
@@ -542,3 +554,5 @@ user = "X-A round 1 before probe crash."
 
   [[turn.step]]
   respond = { type = "title", text = "X-A Probe Before Crash" }
+
+

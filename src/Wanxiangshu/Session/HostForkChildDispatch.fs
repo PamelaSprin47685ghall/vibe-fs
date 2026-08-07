@@ -101,7 +101,7 @@ module HostForkChildDispatch =
                     let! sent = sendChildPrompt agentId childId role agent payload
 
                     match sent, result with
-                    | Ok(), ForkResult.Nudged _ -> return Ok result
+                    | Ok(), (ForkResult.Nudged _ | ForkResult.Created _) -> return Ok result
                     | Ok(), _ ->
                         HostForkRunLifecycle.failRun
                             gate

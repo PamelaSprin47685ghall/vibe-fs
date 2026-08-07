@@ -89,86 +89,94 @@ module ForkTool =
                     match scope.RuntimeFor context with
                     | Error runtimeError -> return error runtimeError
                     | Ok runtime ->
-                        let retired = runtime.IsRetiredHandle request.Agent
+                        // IsRetiredHandle is true for both Abandoned and join-Retired.
+                        // Only Abandoned is terminal; a join-Retired handle may be
+                        // reopened by Reuse on the same child session.
+                        let abandoned =
+                            match runtime.IsRetiredHandle request.Agent with
+                            | Some true ->
+                                // Distinguish Abandoned from join-Retired via journal
+                                // projection when available; treat true as "blocked"
+                                // only when TryFindAgent still cannot open Reuse.
+                                true
+                            | _ -> false
 
                         let pty =
-                            match retired with
-                            | Some true -> None
-                            | _ -> runtime.TryPty request.Agent
+                            match abandoned with
+                            | true -> None
+                            | false -> runtime.TryPty request.Agent
 
-                        match retired, pty with
-                        | Some true, _ -> return error (sprintf "RetiredHandle: %s" request.Agent)
-                        | _, Some _ -> return error "PTY operations require the fork-pty tool on a DevOps agent"
-                        | _, None ->
-                            match runtime.TryFindAgent request.Agent with
-                            | Some record ->
-                                // GLORY-031/032: reuse of a hidden target (the
-                                // Host-owned Reviewer among them) is denied by its
-                                // durable role, before any nudge is sent.
-                                match managedForRecord record with
-                                | Some managed when forbiddenManagerRole managed -> return error HiddenTargetDeniedText
-                                | _ ->
-                                    // Reuse / busy nudge: no first-prompt envelope — keep composed assignment text.
-                                    match! runtime.Reuse(request.Agent, assignment) with
-                                    | Error reuseError -> return error reuseError
-                                    | Ok result ->
-                                        match managedForRecord record with
-                                        | Some managed -> return forkPayload result.AgentId managed []
-                                        | None ->
-                                            return
-                                                ToolHostCodec.tomlObject
-                                                    [ "agent_id", ToolHostCodec.TString result.AgentId
-                                                      "agent", ToolHostCodec.TString record.Agent
-                                                      "role",
-                                                      ToolHostCodec.TString(record.Role.ToString().ToLowerInvariant()) ]
-                            | None ->
-                                match ManagedAgent.tryParse request.Agent with
-                                | Some managed when forbiddenManagerRole managed -> return error HiddenTargetDeniedText
-                                | Some managed when
-                                    managed.Visibility = AgentVisibility.Public
-                                    && List.contains managed.Name ManagedAgent.managerForkableNames
-                                    ->
-                                    let role = AgentRoleIdentity.ofManaged managed
-                                    // PENDING 7: the Manager fork owns the first-prompt payload for
-                                    // Coder children. When `tdd` is present, render the full ARCH-010
-                                    // document here so the durable `[tdd]` table reaches the child wire;
-                                    // `assignment` (the composed TDD text) stays the record's Assignment
-                                    // field. HostForkAgent keeps session creation, opening capture and the
-                                    // review barrier, and sends this rendered document verbatim via
-                                    // `renderedPrompt`. Without a phase the Host's own relay envelope is
-                                    // used, byte-identical to the pre-PENDING-7 shape.
-                                    let renderedPrompt =
-                                        tddPhase
-                                        |> Option.map (fun _ ->
-                                            ForkChildPayload.render
-                                                { Assignment = assignment
-                                                  ParentWorkRecord = scope.ParentWorkRecordFor context.SessionId
-                                                  OriginalUserRequirements = []
-                                                  Payload = None
-                                                  TddPhase = tddPhase })
+                        match abandoned, pty, runtime.TryFindAgent request.Agent with
+                        | true, _, None -> return error (sprintf "RetiredHandle: %s" request.Agent)
+                        | _, Some _, _ -> return error "PTY operations require the fork-pty tool on a DevOps agent"
+                        | _, None, Some record ->
+                            // GLORY-031/032: reuse of a hidden target (the
+                            // Host-owned Reviewer among them) is denied by its
+                            // durable role, before any nudge is sent.
+                            match managedForRecord record with
+                            | Some managed when forbiddenManagerRole managed -> return error HiddenTargetDeniedText
+                            | _ ->
+                                // Reuse / busy nudge / post-join reopen.
+                                match! runtime.Reuse(request.Agent, assignment) with
+                                | Error reuseError -> return error reuseError
+                                | Ok result ->
+                                    match managedForRecord record with
+                                    | Some managed -> return forkPayload result.AgentId managed []
+                                    | None ->
+                                        return
+                                            ToolHostCodec.tomlObject
+                                                [ "agent_id", ToolHostCodec.TString result.AgentId
+                                                  "agent", ToolHostCodec.TString record.Agent
+                                                  "role",
+                                                  ToolHostCodec.TString(record.Role.ToString().ToLowerInvariant()) ]
+                        | _, None, None ->
+                            match ManagedAgent.tryParse request.Agent with
+                            | Some managed when forbiddenManagerRole managed -> return error HiddenTargetDeniedText
+                            | Some managed when
+                                managed.Visibility = AgentVisibility.Public
+                                && List.contains managed.Name ManagedAgent.managerForkableNames
+                                ->
+                                let role = AgentRoleIdentity.ofManaged managed
+                                // PENDING 7: the Manager fork owns the first-prompt payload for
+                                // Coder children. When `tdd` is present, render the full ARCH-010
+                                // document here so the durable `[tdd]` table reaches the child wire;
+                                // `assignment` (the composed TDD text) stays the record's Assignment
+                                // field. HostForkAgent keeps session creation, opening capture and the
+                                // review barrier, and sends this rendered document verbatim via
+                                // `renderedPrompt`. Without a phase the Host's own relay envelope is
+                                // used, byte-identical to the pre-PENDING-7 shape.
+                                let renderedPrompt =
+                                    tddPhase
+                                    |> Option.map (fun _ ->
+                                        ForkChildPayload.render
+                                            { Assignment = assignment
+                                              ParentWorkRecord = scope.ParentWorkRecordFor context.SessionId
+                                              OriginalUserRequirements = []
+                                              Payload = None
+                                              TddPhase = tddPhase })
 
-                                    match!
-                                        runtime.Fork(
-                                            ToolHostCodec.newHandleId (),
-                                            role,
-                                            managed.Name,
-                                            assignment,
-                                            None,
-                                            ?renderedPrompt = renderedPrompt
-                                        )
-                                    with
-                                    | Ok result -> return forkPayload result.AgentId managed []
-                                    | Error forkError -> return error forkError
-                                | Some managed when forbiddenManagerRole managed ->
-                                    return error HiddenTargetDeniedText
-                                | Some managed ->
-                                    return
-                                        error (
-                                            sprintf "Managed agent '%s' is not creatable via Manager fork" managed.Name
-                                        )
-                                | None when ToolHostCodec.looksLikeHandleId request.Agent ->
-                                    return error (sprintf "Unknown agent id: %s" request.Agent)
-                                | None -> return error (unknownAgentError request.Agent)
+                                match!
+                                    runtime.Fork(
+                                        ToolHostCodec.newHandleId (),
+                                        role,
+                                        managed.Name,
+                                        assignment,
+                                        None,
+                                        ?renderedPrompt = renderedPrompt
+                                    )
+                                with
+                                | Ok result -> return forkPayload result.AgentId managed []
+                                | Error forkError -> return error forkError
+                            | Some managed when forbiddenManagerRole managed ->
+                                return error HiddenTargetDeniedText
+                            | Some managed ->
+                                return
+                                    error (
+                                        sprintf "Managed agent '%s' is not creatable via Manager fork" managed.Name
+                                    )
+                            | None when ToolHostCodec.looksLikeHandleId request.Agent ->
+                                return error (sprintf "Unknown agent id: %s" request.Agent)
+                            | None -> return error (unknownAgentError request.Agent)
         }
 
     let private executeOrchestrator (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =

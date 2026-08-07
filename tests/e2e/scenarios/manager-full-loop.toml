@@ -24,9 +24,15 @@ flow = [
   { wait = "finality-reviewer.0" },
   { wait = "finality-reviewer.1" },
   { wait = "finality-reviewer.2" },
+  # First suicide's tool result is Blessed (minor-work). The activation turn
+  # continues with a second suicide on the next provider step (steps 0..5).
+  { wait = "manager-activation.4" },
+  { wait = "manager-activation.5" },
 
   { awaitTerminal = true, requireAssistantTerminal = true },
   { waitFact = { name = "ReviewVerdictRecorded", gte = 2 } },
+  { waitFact = { name = "FinalityBlessed", eq = 1 } },
+  { waitFact = { name = "LifeCompleted", eq = 1 } },
   { expectSatisfied = true },
 ]
 
@@ -97,10 +103,6 @@ user = "# TDD phase: GREEN. Implement the smallest production change"
   [[turn.step]]
   respond = { type = "text", text = "Coder: edit applied." }
 
-# GLORY-018/020: the planning terminal is answered by the Host with the
-# Activation continuation, whose text this turn matches (production-composed,
-# internal). The Manager then works and ends with suicide (GLORY-040).
-
 # EXEC-016: the Manager's ending is deferred while background work (the Blogger
 # run) is outstanding; the join guard arrives if the blogger is still pending.
 # Optional: a fast blogger finishes first.
@@ -117,16 +119,17 @@ tools = ["fork", "join", "list", "suicide"]
   [[turn.step]]
   respond = { type = "text", text = "Manager joined." }
 
-# The Host may inject a review-guard continuation after an unreviewed manager
-# turn settles (RuntimeNudge.managerReviewGuard, GLORY-070).
+# GLORY-029/070: ordinary activated idle receives ManagerIdleEncouragement only
+# (the old Manager Review Guard is gone). Optional: race with other continuations.
 [[turn]]
-id = "manager-guard"
+id = "manager-idle"
 internal = true
-user = ["# Your work is not yet complete.", "# Finish what remains, or call suicide when nothing useful remains."]
-tools = ["fork", "join", "list"]
+optional = true
+user = ["You are doing well.", "You have plenty of time.", "You can continue.", "When nothing useful remains, call suicide."]
+tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
-  respond = { type = "text", text = "Manager review guard acknowledged." }
+  respond = { type = "text", text = "Manager continues." }
 
 [[turn]]
 id = "manager-activation"
@@ -145,16 +148,20 @@ tools = ["fork", "join", "list", "suicide"]
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
 
+  # First suicide: Host-owned 2N review. Tool result is FinalityBlessed minor-work
+  # prompt (not a new user message).
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "src/main.txt now contains 'done'." } }
+
+  # After Blessed tool result: second suicide is final (rest in peace).
   [[turn.step]]
   respond = { type = "tool-call", tool = "suicide", args = { last_words = "src/main.txt now contains 'done'." } }
 
   [[turn.step]]
-  respond = { type = "text", text = "Manager ended with suicide." }
+  respond = { type = "text", text = "Manager rest in peace." }
 
 # GLORY-040: the accepted suicide starts the Host-owned Reviewer on the current
-# tree. First verdict REVISE is not exercised here; the confirmation path is.
-# Two PERFECT verdicts in one turn: the first issues the REVIEW-003 challenge as
-# its tool result, the second confirms via its input seal.
+# tree. Dual PERFECT confirms → FinalityBlessed (no LifeCompleted yet).
 [[turn]]
 id = "finality-reviewer"
 internal = true
@@ -170,8 +177,7 @@ tools = ["verdict"]
   [[turn.step]]
   respond = { type = "text", text = "The second independent PERFECT was accepted for this tree." }
 
-# GLORY-060: confirmed → the Manager's last_words becomes the user-visible
-# terminal; the Manager is not woken again (GLORY-062).
+# GLORY-062: second suicide → LifeCompleted + last_words terminal.
 
 [[turn]]
 id = "blogger"

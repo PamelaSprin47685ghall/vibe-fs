@@ -4,7 +4,7 @@
 
 ## 事实与投影
 
-`ManagerLifecycleFact` 作为 `Fact.ManagerLifecycle` case 进入 journal（GLORY-010）。`Fold.foldAgentFact` 为 `AgentFact` 穷尽 match，新增 case 由编译器强制注册；`SessionAgentProjection` 增加 `ManagerLife: ManagerLifeProjection option`，由 `Journal/ManagerLifecycleProjection.fs` 折叠（GLORY-011）。`Identity.fs` 新增 `ManagerLifeId`、`FinalityRequestId` 包装类型。
+`ManagerLifecycleFact` 作为 `Fact.ManagerLifecycle` case 进入 journal（GLORY-010）。`Fold.foldAgentFact` 为 `AgentFact` 穷尽 match，新增 case 由编译器强制注册；`SessionAgentProjection` 增加 `ManagerLife: ManagerLifeProjection option`，由 `Journal/ManagerLifecycleProjection.fs` 折叠（GLORY-011）；`LifeProjection` 携带 `ActiveFinality`、`EnlistedReviewers`（跨 request 累积 roster 源，`FinalityReviewCohort.rosterOf` 消费）与 `LastBlessing`。`Identity.fs` 新增 `ManagerLifeId`、`FinalityRequestId` 包装类型。
 
 ## Slice A：Lifecycle 与 Birth
 
@@ -30,14 +30,14 @@
 2. `ToolRegistry.rolePredicate` 加 `"suicide" -> fun r -> r = Role.Manager`；`baseSpecs` 加 `FinalityTool.spec factory runtime`。
 3. `FinalityTool.execute`（GLORY-034/035/037-041）：
    - 前置条件 1-16 按序检查，失败返回 GLORY-038/039 或对应拒绝文本（禁止泄漏内部细节）；
-   - 合法受理：`gitTreePort.GetTreeHash()` → journal `WriteBlob last_words` → append `FinalityRequested` → 启动 `HostReviewProgram` 流程（同步等待 Reviewer 返回）；
-   - tool result：被拒时直接返回 `FinalityPrompt.rejected` 格式的拒绝 prompt（全注释块，不含 TOML 数据块）；成功时返回 `# Your final words have been received.`（golden fixture 6）。
-4. `ForkTool.executeManager`：解析 `agent` 为 `Role.Reviewer` 时（读 durable/canonical role，GLORY-031）返回 `That path is not yours to command. Continue your own work, or call suicide when nothing useful remains.`；`ToolRuntimeScope.RuntimeFor` 创建 `HostForkRuntime` 时 `managerOpensReviewBarrier` 置 false（GLORY-033），`HostForkAgent.fork` 的 `ManagerOpensReviewBarrier && role = Role.Reviewer` 分支随之成为死代码，删除。
-5. 自动 Reviewer 隐藏：HostReviewProgram 使用独立 `HostForkRuntime`（同 OrchestratorHost 模式，不注册进 Manager 的 `Children`），其 completion 不进 Manager `join`/`list`（GLORY-002）。
+   - 合法受理（未 Blessed）：`gitTreePort.GetTreeHash()` → journal `WriteBlob last_words` → append `FinalityRequested` → 启动 `FinalityController` cohort CE（`rosterOf` 选员，GLORY-040）；
+   - tool result：`FinalityOutcome` 决定返回文本——`Rejected` → `FinalityPrompt.rejected` 拒绝 prompt（全注释块，不含 TOML 数据块）；`Blessed` → `FinalityPrompt.blessed` minor-work continuation；`Undecided` → `ManagerLifecyclePrompt.FinalityUndecidable`（GLORY-041/052/053/057）；request 已有成员在途 → `Your ending is already in motion.`；Blessed Life 再 suicide → `completeBlessedLife`（`rest in peace`，GLORY-062）。
+4. `ForkTool.executeManager`：解析 `agent` 为 `Role.Reviewer` 时（读 durable/canonical role，GLORY-031）返回统一隐藏文案 `Unknown or unavailable managed agent.`（`HiddenTargetDeniedText`，GLORY-032）；`ToolRuntimeScope.RuntimeFor` 创建 `HostForkRuntime` 时 `managerOpensReviewBarrier` 置 false（GLORY-033），`HostForkAgent.fork` 的 `ManagerOpensReviewBarrier && role = Role.Reviewer` 分支随之成为死代码，删除。
+5. 自动 Reviewer 隐藏：HostReviewProgram 使用独立 `HostForkRuntime`（同 OrchestratorHost 模式，不注册进 Manager 的 `Children`），runtime 以 `ownership=HostOwnedHidden` 创建（P0-A）：`HandleLinked` 事实与 HandleRecord 携带 `HandleOwnership = DurableParentHandle | HostOwnedHidden`，Reviewer 产生 `HostOwnedHidden` 句柄，其 completion 不进 Manager `join`/`list`（GLORY-002）；Fork/RecoveryClosure/JoinDrain 按 ownership 过滤。
 
 ## Slice D：HostReviewProgram
 
-从 `OrchestratorHostReview.reverify` 提炼 `module HostReviewProgram`（GLORY-042/043/044）：
+从 `OrchestratorHostReview.reverify` 提炼 `module HostReviewProgram`（GLORY-042/043）：
 
 ```fsharp
 let reverify
@@ -53,20 +53,27 @@ let reverify
 
 - 流程：fork → `HostReviewGuard.openBarrier` → await → `OrchestratorReviewRead.read` → Confirmed=Ok(Confirmed) / RevisionRequired=Ok(RevisionRequired workRecord) / PendingConfirmation → nudge → 再读 → 非 Confirmed fail closed（`ConfirmationUnproven`）。
 - `RevisionRequired` 的 workRecord 由 `XTraceCapture.lifecycleWorkRecord journal reviewerSessionId false |> Option.defaultValue ""` 填充；为空时 `WorkRecordUnavailable`（GLORY-051 的空记录不得伪装成 wounds）。
-- `OrchestratorHost` 与 `OrchestratorHostReview` 改为调用该通用程序；Orchestrator 的 Error 映射保持 `NeedsReview`（GLORY-044）。
+- `OrchestratorHost` 与 `OrchestratorHostReview` 改为调用该通用程序；Orchestrator 的 Error 映射保持 `NeedsReview`（REVIEW-009）。
 
 ## Slice E：失败反馈
 
-1. `FinalityRejected` 流程（受理后由 HostReviewProgram 驱动）：`RevisionRequired` → LWR 读取 → journal `WriteBlob` → append `FinalityRejected` → 直接将 `FinalityPrompt.rejected` 渲染的拒绝 prompt（纯注释块，不含 TOML 数据块）作为 `suicide` 工具的返回值（GLORY-052/053，无需额外发送 continuation 消息）→ 标记旧 request 关闭（投影从 `ActiveFinality` 移除）→ 清理 Reviewer session（`scope.DisposeSession`）。
+1. `FinalityRejected` 流程（受理后由 FinalityController 驱动）：任一 member `RevisionRequired` → LWR 读取 → journal `WriteBlob` → append `FinalityRejected`（`RejectingReviewerSessionId`）→ 直接将 `FinalityPrompt.rejected` 渲染的拒绝 prompt（纯注释块，不含 TOML 数据块）作为 `suicide` 工具的返回值（GLORY-052/053，无需额外发送 continuation 消息）→ 标记旧 request 关闭（投影从 `ActiveFinality` 移除）→ sibling current attempt 可 best-effort cancel，但不 Dispose 未 graduate session（GLORY-055）；下次 suicide 建新 request/new barriers。
 2. dedupe：continuation claim scope 由 `PromptAuthority.claimScopeDigest` 天然覆盖（GLORY-053）。
-3. 基础设施失败（GLORY-056/057）：按序尝试恢复；无法恢复时发送 `ManagerLifecyclePrompt.FinalityUndecidable` 并关闭 request，不伪造 work record。
+3. 基础设施失败（GLORY-056/057）：按序尝试恢复；无法证明时 `concludeUndecided` append `FinalityUndecided` 关闭 request，返回 `ManagerLifecyclePrompt.FinalityUndecidable`，不伪造 work record。
 
-## Slice F：Glory
+## Slice F：Finality 收束
 
-1. `Confirmed` 后（GLORY-059/060）：重读 tree → 与 `FinalityRequested.GitTreeHash` 比较；不等 → 本次成功失效（fail closed 路径）。
-2. 相等 → append `FinalityConfirmed` → append `LifeCompleted`（terminalRef/Digest = last_words blob）→ `XTraceCapture` 式注册 last_words 为 terminal（`TerminalOutputCaptured`）→ `eventPort.NotifyTerminal managerSessionId (Completed { TerminalText = last_words; Role = Manager; ... })` → 完成 handle（Manager handle/ManagerJob 的 join 正常返回）→ 清理 Reviewer。
-3. 幂等：`LifeCompleted` 已存在则不再重复（GLORY-062 之后不再唤醒 Manager）。
-4. Orchestrator 衔接：ManagerJob 的 Manager 完成由现有 `AwaitManager` 路径感知；GLORY-068 规定新任务创建新 job。
+`concurrentAllOrShortCircuit` 汇聚全部 member 的 `driveMember` outcome（GLORY-059/060）：
+
+1. 任一 REVISE → `concludeRejection`：REVISE 落盘后当前 request 立即 `FinalityRejected`，其余 driver 停止下一次效果，不 Dispose session（GLORY-044/055）。
+2. 全员双 PERFECT → 重读 tree → 与 `FinalityRequested.GitTreeHash` 比较；不等 → 本次成功失效（fail closed，GLORY-059）；相等 → `concludeBlessing`：按 stable ordinal 物化 canonical LWR bundle → append `FinalityBlessed`（bundleRef/Digest）→ 发 minor-work continuation。不得 `LifeCompleted`、NotifyTerminal 或清除 Manager（GLORY-060）。
+3. 无法证明（超时/基础设施失败）→ `concludeUndecided`，不伪造 work record（GLORY-057）。
+
+第二次 suicide（Life 已有 latest blessing，GLORY-062）：先做 GLORY-037 资源安全；随后不读 tree、不创建 Reviewer/barrier、不检查 witness。写本次 last_words → append `LifeCompleted`（terminalRef/Digest = last_words blob）→ 注册 last_words 为 terminal（`TerminalOutputCaptured`）→ `eventPort.NotifyTerminal managerSessionId (Completed { TerminalText = last_words; Role = Manager; ... })` → 完成 handle（Manager handle/ManagerJob 的 join 正常返回）；tool result 固定包含 `rest in peace` 与终止对话指令。
+
+幂等：`LifeCompleted` 已存在则不再重复（GLORY-062 之后不再唤醒 Manager）。
+
+Orchestrator 衔接：ManagerJob 的 Manager 完成由现有 `AwaitManager` 路径感知；GLORY-068 规定 active owned Job 可由 Orchestrator append requirement，已发布/释放 Job 不复活。
 
 ## Slice G：Reawakening
 
@@ -76,7 +83,7 @@ let reverify
 
 ## 迁移（GLORY-069/070/071）
 
-启动/transform 检测 Manager session 已有 Opening 但无 Life → 写 migration `LifeOpened`（用现有 Opening 数据）+ `WorkActivated`（ProtectedPrefixEnd = 当前安全 cursor = XTrace head+1），视为已 Activation；旧 Manager Review Guard 文本替换为 Finality requirement 提示；新 prompt 只对新 session/root/Life 生效。
+启动/transform 检测 Manager session 已有 XTrace Opening 但无 Life → `ensureMigrationLife` 写 migration `LifeOpened`（用现有 Opening 数据）+ `WorkActivated`（ProtectedPrefixEnd = 当前安全 cursor = XTrace head+1），视为已 Activation；新 prompt 只对新 session/root/Life 生效（GLORY-071）。
 
 ## Crash Recovery Matrix
 
@@ -86,8 +93,8 @@ let reverify
 |------|------|------|
 | LifeOpened 缺 → provider request 前 | 无害；下个 transform 重开 | ✅ transform 幂等 |
 | LifeOpened 有 → 无 WorkActivated | 幂等改写 + Activation 逻辑继续 | ✅ transform + TurnCompletionProgram |
-| FinalityRequested 无 FinalityReviewStarted | FinalityTool「in motion」分支重启同一 request 的 FinalityController | ✅ |
+| FinalityRequested 无 enlisted member | FinalityTool「in motion」分支重启同一 request 的 FinalityController；`rosterOf` 崩溃重入不重复造新 Reviewer | ✅ |
 | REVISE 已存在但无 FinalityRejected | 从 durable evidence 重建同一 Reviewer LWR；证据不足时 fail closed，不以当前快照改写目标算法 | 目标算法 |
-| confirmed witness 存在但无 FinalityConfirmed/LifeCompleted | concludeGlory 幂等（Life 已完成/terminal 已记录则跳过） | ✅ |
-| LifeCompleted 存在但 terminal 未发布 | concludeGlory 幂等重放 | ✅ |
+| confirmed witness 存在但无 FinalityBlessed | concludeBlessing 幂等（blessing 已存在/terminal 已记录则跳过） | ✅ |
+| LifeCompleted 存在但 terminal 未发布 | completeBlessedLife 幂等重放 | ✅ |
 | XTrace terminal 单槽冲突（第二 Life） | 首个 Life 后跳过 TerminalOutputCaptured（terminal 只记录于 LifeCompleted） | ✅ |

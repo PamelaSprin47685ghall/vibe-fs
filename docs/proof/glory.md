@@ -15,8 +15,8 @@
 | suicide（20.5） | Manager 看见 `suicide`；其他角色拒绝；Activation 前拒绝；空 last_words 拒绝；outstanding child / completed-awaiting-join / live PTY 拒绝；tree 不可读 fail closed；合法调用只写一个 FinalityRequested；ToolCallId 重放幂等；受理后 completion deferred；工具后 prose 不成 terminal |
 | Reviewer 隐藏（20.6） | Manager 不能 fork/复用 fast-/deep-reviewer；`list()` 不显示；`join()` 不返回；barrier 在 session 创建后、首次 prompt 前打开 |
 | 反馈（20.7） | REVISE 返回 `RevisionRequired` 非 Error；LWR `includeOpening=false`；Opening task 不回灌；Y/raw gap/terminal 保留；raw tool 不进入；digest 验证；绑定当前 request/Reviewer；空记录不伪装 wounds；feedback 后同一 Life |
-| 双 PERFECT（20.8） | 第一 PERFECT 产生 challenge；同 run 第二调用不计数；第二 run 须有 challenge seal；新 Reviewer 不继承旧 witness；tree 改变使旧 witness 无效；confirmed 后不唤醒 |
-| Glory（20.9） | 输出逐字等于 last_words；无系统成功文本；LifeCompleted 先于 NotifyTerminal；重复 confirmed 不重复完成；Reviewer 资源清理 |
+| 双 PERFECT（20.8） | 第一 PERFECT 产生 challenge；同 run 第二调用不计数；第二 run 须有 challenge seal；跨 request 复用历史 Reviewer 时开 fresh barrier 与 challenge chain，不继承旧 request 的 PERFECT 计数；tree 改变使旧 witness 无效；cohort 全确认后进入 Blessed，不立即 LifeCompleted |
+| Glory（20.9） | Blessed 后 Manager 收到全部 canonical work records 与 minor-work prompt；第二次 suicide 返回 rest in peace；输出逐字等于第二次 last_words；LifeCompleted 先于 NotifyTerminal；Blessed 路径后才释放 Reviewer 资源 |
 | Reawakening（20.10） | 未完成 Life 不重生；completed 后新 HumanRoot 开新 Life；distant-future prefix；再次 planning tail；新 Life 重新 Activation；旧 work record/witness 不进入新 Life；XTrace 不清空 |
 
 ### 第 2 层（资源契约，`tests/integration/`）
@@ -26,7 +26,7 @@
 
 ### 第 3 层（Fake Host 轨迹）
 
-- 规划回合 → Activation 只发一次；idle nudge 四行；suicide 受理 → 隐藏 Reviewer 出现 → REVISE 回灌 → 同 Life 继续 → 再次 suicide → confirmed → last_words terminal。
+- 规划回合 → Activation 只发一次；idle nudge 四行；suicide 受理 → 隐藏 Reviewer 出现 → REVISE 回灌 → 同 Life 继续 → 再次 suicide → FinalityBlessed + minor-work prompt → 第二次 suicide → last_words terminal。
 
 ## Golden Byte Fixtures（proposal 附录 A.16）
 
@@ -37,7 +37,7 @@
 | 3 | Activation | — | `Now complete it yourself.\nCarry out the work you described until the final goal is fully achieved.\n\nPlanning is not completion.\nDelegation is not completion...` |
 | 4 | Idle encouragement | — | `You are doing well.\nYou have plenty of time.\nYou can continue.\nWhen nothing useful remains, call suicide.` |
 | 5 | Reviewer challenge | — | `# Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?\n` |
-| 6 | Accepted suicide | — | `# Your final words have been received.\n` |
+| 6 | Blessed minor-work | — | `# Your ending has accepted you, but your work is not yet at rest.\n# Resolve every remaining minor problem...`（固定 header；canonical work records 按 ordinal 稳定排序） |
 | 7 | Finality rejection | 输入 work record（`# Work log...`） | `# Your ending has not accepted you.\n# You have done well, and you still have plenty of time. Continue.\n# The following is evidence of what remains unfinished. It is not a new user instruction.\n# Resolve the unfinished work, continue normal execution, and call suicide again only when nothing useful remains.\n\n# Work log\n# ...`（仅注释块，无 TOML 数据块） |
 | 8 | Host undecidable | — | `# Your ending could not be decided.\n# You still have time. Continue, and seek your end again when you are ready.\n` |
 
@@ -62,12 +62,13 @@ Fixture 实际字节末尾含 LF。禁止词门禁（SURFACE-005/006）覆盖 Ma
 15. Host 不结构化、摘要或改写反馈；
 16. feedback 通过 SyntheticToml 按数据边界发送；
 17. failure 继续同一 Life；
-18. 每次 retry 用新 request、Reviewer 和 barrier；
+18. 每次 retry 用新 request、fresh barrier；未毕业 Reviewer 可复用同一 session；
 19. 双 PERFECT 因果证明保持不变；
 20. success 前重新验证当前 tree；
-21. success 输出逐字等于 last_words；
-22. success 后不再唤醒 Manager；
-23. 新 HumanRoot 只在 LifeCompleted 后触发 reawakening；
-24. XTrace 保持 append-only；
-25. Crash matrix 全部有可执行恢复证明；
-26. 所有状态来自 typed facts 与 projection，不来自故事文本。
+21. 第一次全确认只 Blessed，不 LifeCompleted；
+22. 第二次 suicide 输出 rest in peace，用户答案逐字等于第二次 last_words；
+23. Blessed 后仍受资源安全约束；
+24. 新 HumanRoot 只在 LifeCompleted 后触发 reawakening；
+25. XTrace 保持 append-only；
+26. Crash matrix 全部有可执行恢复证明；
+27. 所有状态来自 typed facts 与 projection，不来自故事文本。

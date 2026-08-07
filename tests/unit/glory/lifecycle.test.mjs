@@ -18,6 +18,7 @@ import {
   listItems,
   managerLifecycleFact,
   managerLifeId,
+  mapEntries,
   payloadOf,
   physicalUser,
   promptKey,
@@ -73,14 +74,16 @@ const finalityRequested = () =>
     ToolCallId: CALL,
   })
 
-const finalityReviewStarted = () =>
-  managerLifecycleFact('FinalityReviewStarted', {
+const finalityReviewerEnlisted = () =>
+  managerLifecycleFact('FinalityReviewerEnlisted', {
     SessionId: SESSION,
     LifeId: LIFE,
     RequestId: REQ,
     ReviewerSessionId: REVIEWER,
+    ReviewerOrdinal: 1,
     BarrierId: BARRIER,
     GitTreeHash: TREE,
+    IsNewReviewer: true,
   })
 
 const finalityRejected = () =>
@@ -88,21 +91,21 @@ const finalityRejected = () =>
     SessionId: SESSION,
     LifeId: LIFE,
     RequestId: REQ,
-    ReviewerSessionId: REVIEWER,
+    RejectingReviewerSessionId: REVIEWER,
     BarrierId: BARRIER,
     GitTreeHash: TREE,
     WorkRecordRef: BLOB,
     WorkRecordDigest: DIGEST,
   })
 
-const finalityConfirmed = () =>
-  managerLifecycleFact('FinalityConfirmed', {
+const finalityBlessed = () =>
+  managerLifecycleFact('FinalityBlessed', {
     SessionId: SESSION,
     LifeId: LIFE,
     RequestId: REQ,
-    ReviewerSessionId: REVIEWER,
-    BarrierId: BARRIER,
     GitTreeHash: TREE,
+    WorkRecordBundleRef: BLOB,
+    WorkRecordBundleDigest: DIGEST,
   })
 
 const lifeCompleted = () =>
@@ -174,28 +177,37 @@ test('GLORY_055_a_rejected_request_closes_and_a_new_suicide_opens_a_new_one', ()
     lifecycleEnv(lifeOpened()),
     lifecycleEnv(workActivated()),
     lifecycleEnv(finalityRequested()),
-    lifecycleEnv(finalityReviewStarted()),
+    lifecycleEnv(finalityReviewerEnlisted()),
     lifecycleEnv(finalityRejected()),
   ])
   assert.equal(rejected.ok, true, JSON.stringify(rejected.error))
-  assert.equal(life(rejected.value).CurrentLife.ActiveFinality.Rejected, true)
+  assert.equal(caseOf(life(rejected.value).CurrentLife.ActiveFinality.Resolution), 'Rejected')
   assert.ok(life(rejected.value).CurrentLife.LastRejectedWorkRecord != null)
 
   const retry = finalityRequested()
   const out = fold.apply(rejected.value, [lifecycleEnv(retry)])
   assert.equal(out.ok, true, JSON.stringify(out.error))
-  assert.equal(life(out.value).CurrentLife.ActiveFinality.Rejected, false)
+  assert.equal(caseOf(life(out.value).CurrentLife.ActiveFinality.Resolution), 'Open')
 })
 
-test('GLORY_060_glory_lands_Confirmed_then_LifeCompleted_and_archives_the_life', () => {
-  const glory = fold.apply(fold.empty, [
+test('GLORY_060_a_blessing_leaves_the_life_open_until_the_second_suicide', () => {
+  const blessed = fold.apply(fold.empty, [
     lifecycleEnv(lifeOpened()),
     lifecycleEnv(workActivated()),
     lifecycleEnv(finalityRequested()),
-    lifecycleEnv(finalityReviewStarted()),
-    lifecycleEnv(finalityConfirmed()),
-    lifecycleEnv(lifeCompleted()),
+    lifecycleEnv(finalityReviewerEnlisted()),
+    lifecycleEnv(finalityBlessed()),
   ])
+  assert.equal(blessed.ok, true, JSON.stringify(blessed.error))
+  // GLORY-061/062: Blessed is not completion; the Manager keeps working.
+  const open = life(blessed.value)
+  assert.ok(open.CurrentLife != null)
+  assert.equal(open.CurrentLife.Completed, false)
+  assert.equal(caseOf(open.CurrentLife.ActiveFinality.Resolution), 'Blessed')
+  assert.ok(open.CurrentLife.LastBlessing != null)
+
+  // The second suicide is the rest in peace: LifeCompleted archives the Life.
+  const glory = fold.apply(blessed.value, [lifecycleEnv(lifeCompleted())])
   assert.equal(glory.ok, true, JSON.stringify(glory.error))
   const state = life(glory.value)
   assert.ok(state.CurrentLife == null)
@@ -204,7 +216,7 @@ test('GLORY_060_glory_lands_Confirmed_then_LifeCompleted_and_archives_the_life',
   const archived = completed[0]
   assert.equal(archived.Completed, true)
   assert.ok(archived.CompletedTerminal != null)
-  assert.equal(archived.ActiveFinality.Confirmed, true)
+  assert.equal(caseOf(archived.ActiveFinality.Resolution), 'Blessed')
 })
 
 test('GLORY_057_FinalityUndecided_closes_the_request_without_a_wound_record', () => {
@@ -225,46 +237,81 @@ test('GLORY_057_FinalityUndecided_closes_the_request_without_a_wound_record', ()
   ])
   assert.equal(undecided.ok, true, JSON.stringify(undecided.error))
   const request = life(undecided.value).CurrentLife.ActiveFinality
-  assert.equal(request.Rejected, true)
-  assert.equal(request.Confirmed, false)
+  assert.equal(caseOf(request.Resolution), 'Undecided')
   // No wound record is ever fabricated (GLORY-056).
   assert.ok(life(undecided.value).CurrentLife.LastRejectedWorkRecord == null)
 })
 
-test('GLORY_057_second_challenge_revise_closes_finality_without_confirming_the_life', () => {
-  const firstPerfect = managerLifecycleFact('FinalityUndecided', {
-    SessionId: SESSION,
-    LifeId: LIFE,
-    RequestId: REQ,
-    ReviewerSessionId: REVIEWER,
-    BarrierId: BARRIER,
-    GitTreeHash: TREE,
-  })
+test('GLORY_057_a_revise_closes_finality_without_confirming_the_life', () => {
   const out = fold.apply(fold.empty, [
     lifecycleEnv(lifeOpened()),
     lifecycleEnv(workActivated()),
     lifecycleEnv(finalityRequested()),
-    lifecycleEnv(finalityReviewStarted()),
-    lifecycleEnv(firstPerfect),
+    lifecycleEnv(finalityReviewerEnlisted()),
+    lifecycleEnv(finalityRejected()),
   ])
 
   assert.equal(out.ok, true, JSON.stringify(out.error))
   const request = life(out.value).CurrentLife.ActiveFinality
-  assert.equal(request.Rejected, true)
-  assert.equal(request.Confirmed, false)
-  assert.ok(request.ReviewerSessionId != null, 'second challenge failure must still identify the reviewer to clean up')
+  assert.equal(caseOf(request.Resolution), 'Rejected')
+  // The rejection evidence still identifies the rejecting reviewer for cleanup (GLORY-004).
+  const evidence = payloadOf(request.Resolution)
+  assert.equal(idValue.session(evidence.RejectingReviewer), 'ses-reviewer')
 })
+
+// Plain-data view of the lifecycle projection. Raw deepEqual of two folds of
+// the same facts fails on FSharpMap comparer closure identity, not on content;
+// this view compares the durable facts (members, standing, evidence) instead.
+const managerLifeView = (projection) => {
+  const lifeView = (life) => ({
+    LifeId: idValue.managerLife(life.LifeId),
+    Completed: life.Completed,
+    CompletedTerminal: life.CompletedTerminal == null ? null : idValue.blobRef(life.CompletedTerminal),
+    ActiveFinality:
+      life.ActiveFinality == null
+        ? null
+        : {
+            RequestId: idValue.finalityRequest(life.ActiveFinality.RequestId),
+            Resolution: caseOf(life.ActiveFinality.Resolution),
+            Members: mapEntries(life.ActiveFinality.Members).map(([session, member]) => [
+              idValue.session(session),
+              {
+                ordinal: member.ReviewerOrdinal,
+                barrier: idValue.reviewBarrier(member.BarrierId),
+                isNew: member.IsNewReviewer,
+              },
+            ]),
+          },
+    EnlistedReviewers: mapEntries(life.EnlistedReviewers).map(([session, standing]) => [
+      idValue.session(session),
+      { ordinal: standing.ReviewerOrdinal, barriers: listItems(standing.Barriers).map(idValue.reviewBarrier) },
+    ]),
+    LastRejectedWorkRecord: life.LastRejectedWorkRecord == null ? null : idValue.blobRef(life.LastRejectedWorkRecord),
+    LastBlessing: life.LastBlessing == null ? null : idValue.finalityRequest(life.LastBlessing.RequestId),
+  })
+  return {
+    current: projection.CurrentLife == null ? null : lifeView(projection.CurrentLife),
+    completed: listItems(projection.CompletedLives).map(lifeView),
+  }
+}
 
 test('GLORY_066_lifecycle_facts_round_trip_through_ndjson', () => {
   const envelopes = [
     lifecycleEnv(lifeOpened()),
     lifecycleEnv(workActivated()),
     lifecycleEnv(finalityRequested()),
-    lifecycleEnv(finalityReviewStarted()),
+    lifecycleEnv(finalityReviewerEnlisted()),
+    lifecycleEnv(finalityRejected()),
+    lifecycleEnv(finalityRequested()),
+    lifecycleEnv(finalityReviewerEnlisted()),
+    lifecycleEnv(finalityBlessed()),
+    lifecycleEnv(lifeCompleted()),
   ]
   const replayed = fold.replay(envelopes)
   assert.equal(replayed.ok, true, JSON.stringify(replayed.error))
-  assert.deepEqual(fold.sessions(replayed.value), fold.sessions(fold.apply(fold.empty, envelopes).value))
+  const replayedSessions = fold.sessions(replayed.value)
+  const directSessions = fold.sessions(fold.apply(fold.empty, envelopes).value)
+  assert.deepEqual(managerLifeView(replayedSessions.ses_a.ManagerLife), managerLifeView(directSessions.ses_a.ManagerLife))
 })
 
 // ── golden byte fixtures (proof/glory.md) ────────────────────────────────────

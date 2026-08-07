@@ -124,7 +124,7 @@ Algorithm: OrchestratorIntegrationPipeline
 * **DO NOT bypass the serial Integration Gate.** Concurrent merges race and break builds.
 * **DO NOT force-merge or dirty-merge.** Publish is strictly `--ff-only`.
 * **DO NOT reuse pre-rebase review witnesses.**
-* **DO NOT invent tools** such as `list`, `fork(coder)`, `fork-manager(existing_id)`, or direct `verdict`.
+* **DO NOT invent tools** such as `list`, `fork(coder)`, or direct `verdict`.
 * **DO NOT fork a new Manager for stage advancement alone.** Same delivery goal → same Manager job.
 
 ---
@@ -144,7 +144,7 @@ Algorithm: OrchestratorIntegrationPipeline
 *A: No. Your only spawn tool is `fork-manager`. Managers own specialized workers.*
 
 **Q: Publish conflict or a small follow-up on the same feature—new `fork-manager`?**
-*A: No. Continue the originating Manager job. Fork a new Manager only for a truly parallel independent goal. There is no `fork-manager(existing_id)` tool.*
+*A: No. Continue the originating Manager job via `fork-manager(existing_job_id, appended_requirement)` (R3). Fork a new Manager only for a truly parallel independent goal.*
 
 **Q: What if the user submits work while the target workspace is dirty?**
 *A: Reject immediately with DirtyWorkspace and dirty paths. Require a clean workspace first.*

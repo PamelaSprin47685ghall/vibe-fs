@@ -17,6 +17,24 @@ import {
   roles,
   sessionId,
 } from '../support/domain.mjs'
+import * as LinkageProjectionModule from '../../../dist/Journal/LinkageProjection.js'
+import { HandleOwnership } from '../../../dist/Kernel/Fact.js'
+
+/** Production HandleProjection.link takes Ownership (GREEN-7); the domain.mjs
+ *  facade bind is stale, so tests call the dist entry directly. */
+const link = (handle, child, targetAgent, role, current) => {
+  const result = LinkageProjectionModule.HandleProjection_link(
+    handle,
+    child,
+    targetAgent,
+    role,
+    HandleOwnership.DurableParentHandle,
+    current,
+  )
+  return result.tag === 0
+    ? { ok: true, value: result.fields[0] }
+    : { ok: false, error: result.fields[0].cases()[result.fields[0].tag] }
+}
 
 test('EXEC_021_duplicate_join_is_fail_closed_before_waiting', () => {
   const runtime = readFileSync(join(ROOT, 'src/Wanxiangshu/Session/HostForkRuntime.fs'), 'utf8')
@@ -54,7 +72,7 @@ test('EXEC_017_interrupted_join_does_not_abandon_active_child_handle', () => {
   const HANDLE = handleId.agent('child-still-running')
   const CHILD = sessionId('ses_child_running')
   let projection = handleProjection.empty
-  const linked = handleProjection.link(HANDLE, CHILD, 'fast-coder', roles.of('Coder'), projection)
+  const linked = link(HANDLE, CHILD, 'fast-coder', roles.of('Coder'), projection)
   assert.equal(linked.ok, true)
   projection = linked.value
 

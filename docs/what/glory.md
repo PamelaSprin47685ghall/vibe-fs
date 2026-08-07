@@ -40,7 +40,7 @@ Fact 与 Projection 只描述发生过的事实和已证明的证据。禁止 `S
 
 ## GLORY-010：生命周期事实
 
-`ManagerLifecycleFact` 至少记录 `LifeOpened`、`WorkActivated`、`FinalityRequested`、`FinalityReviewerEnlisted(lifeId,requestId,reviewerSessionId,reviewerOrdinal,barrierId,gitTreeHash,isNew)`、`FinalityRejected`、`FinalityBlessed(lifeId,requestId,gitTreeHash,workRecordBundleRef,workRecordBundleDigest)`、`LifeCompleted`。`FinalityReviewStarted` 与 `FinalityConfirmed` 不再存在。
+`ManagerLifecycleFact` 至少记录 `LifeOpened`、`WorkActivated`、`FinalityRequested`、`FinalityReviewerEnlisted(SessionId,LifeId,RequestId,ReviewerSessionId,ReviewerOrdinal,BarrierId,GitTreeHash,IsNewReviewer)`、`FinalityRejected(RejectingReviewerSessionId,…)`、`FinalityBlessed(SessionId,LifeId,RequestId,GitTreeHash,WorkRecordBundleRef,WorkRecordBundleDigest)`、`FinalityUndecided`、`LifeCompleted`。`FinalityReviewStarted` 与 `FinalityConfirmed` 不再存在。
 
 ## GLORY-011：Projection
 

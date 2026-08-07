@@ -51,13 +51,12 @@ flow = [
   { wait = "coder.1" },
   { wait = "manager.1" },
   { wait = "manager.2" },
+  # Manager finality may still be running; Host-owned reviewers answer independently.
+  { wait = "manager-finality-reviewer.0", timeoutMs = 20000 },
+  { wait = "manager-finality-reviewer.1", timeoutMs = 20000 },
+  { wait = "manager.3", timeoutMs = 20000 },
   { wait = "barrier-reviewer.0" },
   { wait = "barrier-reviewer.1" },
-  # The guard round's challenge answer (`reviewer-confirm.0`) is NOT awaited
-  # before the restart: the rebase conflict interrupts the manager's guard round
-  # (the conflict resume busy-nudges the manager mid-join), so the fast
-  # reviewer's answer races the restart and legitimately never lands
-  # pre-restart. The guard round resumes and confirms on the recovered run.
   { wait = "barrier-reviewer.2" },
   # Post-restart resume: restart + cold start + journal fold exceed the default
   # 5s silence window under forest pressure. The wait sits AFTER awaitRestart:
@@ -84,8 +83,17 @@ flow = [
   { wait = "barrier-reviewer.0", timeoutMs = 20000 },
   { wait = "barrier-reviewer.1", timeoutMs = 20000 },
   { wait = "barrier-reviewer.2", timeoutMs = 20000 },
+  # Publish may complete while the Manager finishes Host-owned finality; do not
+  # enter join until the fact is durable (join with nothing hangs the tool).
   { wait = "orch-continue.0", timeoutMs = 30000 },
-  { waitFact = { name = "Published", eq = 1 }, timeoutMs = 30000 },
+  { wait = "manager.0", timeoutMs = 30000 },
+  { wait = "coder.0", timeoutMs = 30000 },
+  { wait = "manager.1", timeoutMs = 30000 },
+  { wait = "manager.2", timeoutMs = 30000 },
+  { wait = "barrier-reviewer.0", timeoutMs = 20000 },
+  { wait = "barrier-reviewer.1", timeoutMs = 20000 },
+  { wait = "barrier-reviewer.2", timeoutMs = 20000 },
+  { waitFact = { name = "Published", eq = 1 }, timeoutMs = 60000 },
   { wait = "orch-continue.1", timeoutMs = 30000 },
 
   { awaitTerminal = true, requireAssistantTerminal = false },
@@ -139,7 +147,7 @@ tools = ["fork-manager", "join"]
 id = "manager"
 lane = "fast-manager"
 user = "# Ship publish_proof.txt to the target branch."
-tools = ["fork", "join", "list"]
+tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Write publish_proof.txt." } }
@@ -147,23 +155,26 @@ tools = ["fork", "join", "list"]
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
 
+  # Host-owned Finality for AgentOwnerRoot ManagerJob (GLORY-068/069).
   [[turn.step]]
-  respond = { type = "text", text = "Manager finished." }
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager rest in peace." }
 
 [[turn]]
 id = "manager-guard"
 internal = true
-user = "# Your work is not yet complete."
-tools = ["fork", "join", "list"]
+optional = true
+user = ["You are doing well.", "You have plenty of time.", "You can continue.", "When nothing useful remains, call suicide."]
+tools = ["fork", "join", "list", "suicide"]
 
+  # GLORY-029/070: ordinary activated idle — ManagerIdleEncouragement only.
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-reviewer", prompt = "Review the current worktree for correctness" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "join" }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Manager finished." }
+  respond = { type = "text", text = "Manager continues." }
 
 # `src/Wanxiangshu/Application/Orchestration/Orchestrator.Prompts.fs:23`. The prompt embeds the conflicted file list, so the
 # declaration is a prefix of it — and production composes the whole thing, hence `internal`.
@@ -175,7 +186,7 @@ tools = ["fork", "join", "list"]
 id = "conflict-resume"
 internal = true
 user = "[CONFLICT RESUMPTION] An in-progress rebase hit conflicts. Conflicted files:"
-tools = ["fork", "join", "list"]
+tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
   respond = { type = "text", text = "Resuming rebase resolution." }
@@ -194,6 +205,21 @@ tools = ["write"]
 
   [[turn.step]]
   respond = { type = "text", text = "Coder finished." }
+
+[[turn]]
+id = "manager-finality-reviewer"
+internal = true
+user = "# Review the current worktree against all authoritative user requirements."
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager finality reviewer confirmed." }
 
 [[turn]]
 id = "barrier-reviewer"
@@ -394,6 +420,23 @@ user = "# Write the dense work-log continuation now"
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 55.", tip = "primitive-obsession" } }
+
+
+# Missing-final-report repair on a blogger child (HOST-004). Optional.
+[[turn]]
+id = "blogger-repair"
+internal = true
+optional = true
+user = "#"
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Session background after repair.", tip = "primitive-obsession" } }
+
+
+[[epoch]]
+turn = "blogger-repair"
+step = 0
+reason = "prefix-probe"
 
 [[epoch]]
 turn = "blogger"

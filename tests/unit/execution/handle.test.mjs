@@ -27,6 +27,7 @@ import {
   fold,
   forkChildPayload,
   handleId,
+  handleOwnership,
   handleProjection,
   isSome,
   journal,
@@ -302,6 +303,7 @@ const handleFact = {
     Handle: HANDLE,
     TargetAgent: 'fast-coder',
     CanonicalRole: roles.of('Coder'),
+    Ownership: handleOwnership.durableParentHandle(),
   }),
   completed: fact('HandleCompleted', {
     ParentSessionId: PARENT,

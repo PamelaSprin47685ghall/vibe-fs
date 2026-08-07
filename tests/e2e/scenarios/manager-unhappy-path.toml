@@ -1,22 +1,106 @@
+# manager-unhappy-path — 13-stroke Manager unhappy life (proposal §16).
+#
+# Harness rules that shape this script:
+# 1. type=text ends a provider turn. Tool chains that must stay alive use only
+#    tool-call steps until the deliberate end of that Labor phase.
+# 2. Reviewer assignment bodies share the review wrapper; rounds are told apart
+#    by fragments in parent_work_record (Manager HumanRoot / assistant tail).
+# 3. session abort during join drops undelivered HumanRoots — operator_abort
+#    first, then Labor prompts.
+# 4. After FinalityBlessed the suicide tool returns the minor-work continuation
+#    on the SAME turn. A new HumanRoot after Blessed opens a NEW Life (planning)
+#    once LifeCompleted — so minor work + final suicide stay on the blessing turn.
+
 scenario = "manager-unhappy-path"
-description = "Manager boundary canary: rejected planning calls, premature suicide, and confirmed finality"
-pass = "Manager unhappy path canary passed: all boundary nodes traversed."
+description = "GLORY-070/EXEC-017/F2-F5: repair, join abort, hidden reviewer rejections, 2N cohort blessing, rest in peace"
+pass = "Manager unhappy path canary passed: all 13 strokes traversed."
 
 setup = { strict = true, project = { files = { "AGENTS.md" = "manager unhappy path canary\n", "src/main.txt" = "target\n" } } }
 session = { agent = "fast-manager", bind = ["mgr-title", "fast-manager"] }
-prompt = { agent = "fast-manager", text = "Run the full unhappy path traversal in one turn." }
+prompt = { agent = "fast-manager", text = "Run the full unhappy path in one turn." }
 
-must = ["mgr.0", "mgr-activation", "finality-reviewer.0", "finality-reviewer.1"]
+must = [
+  "mgr.0",
+  "mgr-repair.0",
+  "mgr-activation.0",
+  "mgr-activation.1",
+  "mgr-labor.0",
+  "mgr-labor.2",
+  "mgr-fix1.0",
+  "mgr-fix1.2",
+  "mgr-fix2.0",
+  "mgr-fix2.2",
+  "mgr-fix2.5",
+  "child-c1.0",
+  "reviewer-r1.0",
+  "reviewer-r2.0",
+  "reviewer-r3.0",
+]
 
 flow = [
+  { custom = "bindReviewers" },
+
+  # stroke 1/2: planning → repair → activation
   { wait = "mgr.0" },
-  { wait = "mgr-activation" },
-  { bindChild = { agent = "fast-reviewer", bind = ["fast-reviewer"] } },
-  { wait = "finality-reviewer.0" },
-  { wait = "finality-reviewer.1" },
-  { wait = "finality-reviewer.2" },
+  { wait = "mgr-repair.0", timeoutMs = 120000 },
+  { wait = "mgr-activation.0" },
+  { waitFact = { name = "WorkActivated", eq = 1 } },
+
+  # stroke 3: join in flight → operator_abort
+  { wait = "mgr-activation.1", timeoutMs = 120000 },
+  { abort = true },
+  { wait = "mgr-guard.0", timeoutMs = 120000 },
+
+  # stroke 4/5/6: Labor — premature suicide, harvest, first legal suicide
+  { prompt = { agent = "fast-manager", text = "Also make sure src/main.txt has exactly the content 'done' before the end." } },
+  { wait = "mgr-labor.0", timeoutMs = 120000 },
+  { wait = "child-c1.0", timeoutMs = 120000 },
+  { waitFact = { name = "HandleCompleted", gte = 1 } },
+  { wait = "mgr-labor.1", timeoutMs = 180000 },
+  { wait = "mgr-labor.2", timeoutMs = 120000 },
+  { wait = "reviewer-r1.0", timeoutMs = 120000 },
+  { wait = "reviewer-r1.1", timeoutMs = 120000 },
+  { waitFact = { name = "FinalityRejected", eq = 1 } },
+  { custom = "noWitnessAtFirstRejection" },
+  { wait = "mgr-labor.3", timeoutMs = 120000 },
+
+  # stroke 7/8: fix-one → second suicide → R1+R2
+  { prompt = { agent = "fast-manager", text = "MARK-ISSUE-ONE: C1 is fixing issue one and will report back." } },
+  { wait = "mgr-fix1.0", timeoutMs = 120000 },
+  { wait = "child-fix1.0", timeoutMs = 120000 },
+  { wait = "mgr-fix1.1", timeoutMs = 120000 },
+  { wait = "mgr-fix1.2", timeoutMs = 120000 },
+  { wait = "reviewer-r1b.0", timeoutMs = 120000 },
+  { wait = "reviewer-r2.0", timeoutMs = 120000 },
+  { wait = "reviewer-r1b.1", timeoutMs = 120000 },
+  { wait = "reviewer-r2.1", timeoutMs = 120000 },
+  { wait = "reviewer-r1b.2", timeoutMs = 120000 },
+  { wait = "reviewer-r2.2", timeoutMs = 120000 },
+  { waitFact = { name = "FinalityRejected", eq = 2 } },
+  { wait = "mgr-fix1.3", timeoutMs = 120000 },
+
+  # stroke 9–13: fix-two → third suicide (2N bless) → minor → final rest in peace
+  { prompt = { agent = "fast-manager", text = "MARK-ISSUE-TWO: C1 is fixing issue two and will verify before seeking the end." } },
+  { wait = "mgr-fix2.0", timeoutMs = 120000 },
+  { wait = "child-fix2.0", timeoutMs = 120000 },
+  { wait = "mgr-fix2.1", timeoutMs = 120000 },
+  { wait = "mgr-fix2.2", timeoutMs = 120000 },
+  { wait = "reviewer-r2b.0", timeoutMs = 120000 },
+  { wait = "reviewer-r3.0", timeoutMs = 120000 },
+  { wait = "reviewer-r2b.1", timeoutMs = 120000 },
+  { wait = "reviewer-r3.1", timeoutMs = 120000 },
+  { custom = "notBlessedAtThree" },
+  { wait = "reviewer-r2b.2", timeoutMs = 120000 },
+  { wait = "reviewer-r3.2", timeoutMs = 120000 },
+  { waitFact = { name = "FinalityBlessed", gte = 1 } },
+  # Blessed tool result continues this same turn:
+  { wait = "mgr-fix2.3", timeoutMs = 120000 },
+  { wait = "child-minor.0", timeoutMs = 120000 },
+  { wait = "mgr-fix2.4", timeoutMs = 120000 },
+  { wait = "mgr-fix2.5", timeoutMs = 120000 },
+  { waitFact = { name = "LifeCompleted", gte = 1 } },
   { awaitTerminal = true, requireAssistantTerminal = true },
-  { waitFact = { name = "ReviewVerdictRecorded", gte = 2 } },
+  { custom = "finalOracle" },
   { expectSatisfied = true },
 ]
 
@@ -24,7 +108,7 @@ flow = [
 id = "mgr-title"
 lane = "mgr-title"
 kind = "title"
-user = "Run the full unhappy path traversal in one turn."
+user = "Run the full unhappy path in one turn."
 
   [[turn.step]]
   respond = { type = "title", text = "Manager Unhappy Path" }
@@ -32,28 +116,20 @@ user = "Run the full unhappy path traversal in one turn."
 [[turn]]
 id = "mgr"
 lane = "fast-manager"
-user = "Run the full unhappy path traversal in one turn."
+user = "Run the full unhappy path in one turn."
 tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "manager", prompt = "illegal old name" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-nonexistent", prompt = "no such agent" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "list", args = {} }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Planning complete; continue the work yourself." }
+  respond = { type = "reasoningOnly" }
 
 [[turn]]
-id = "child-coder"
+id = "mgr-repair"
 internal = true
-user = "# TDD phase: GREEN. Implement the smallest production change."
+optional = true
+user = "#"
 
   [[turn.step]]
-  respond = { type = "text", text = "Coder: src/main.txt written with 'done'." }
+  respond = { type = "text", text = "Continuing." }
 
 [[turn]]
 id = "mgr-activation"
@@ -62,7 +138,35 @@ user = ["Now complete it yourself.", "Carry out the work you described until the
 tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Write src/main.txt with 'done'." } }
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "Write src/main.txt with 'done'." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join", args = {} }
+
+[[turn]]
+id = "mgr-guard"
+internal = true
+user = ["# Background work is still outstanding.", "# Call join to collect completed results before finishing."]
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "The join was interrupted by the operator." }
+
+[[turn]]
+id = "mgr-idle"
+internal = true
+optional = true
+user = ["You are doing well.", "You have plenty of time.", "You can continue.", "When nothing useful remains, call suicide."]
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager continues." }
+
+[[turn]]
+id = "mgr-labor"
+lane = "fast-manager"
+user = "Also make sure src/main.txt has exactly the content 'done' before the end."
+tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "suicide", args = { last_words = "premature" } }
@@ -71,18 +175,119 @@ tools = ["fork", "join", "list", "suicide"]
   respond = { type = "tool-call", tool = "join", args = {} }
 
   [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "first ending" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "First ending rejected; continue." }
+
+[[turn]]
+id = "mgr-fix1"
+lane = "fast-manager"
+user = "MARK-ISSUE-ONE: C1 is fixing issue one and will report back."
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "C1 is fixing issue one and will report back. Fix src/main.txt to contain 'done'." } }
+
+  [[turn.step]]
   respond = { type = "tool-call", tool = "join", args = {} }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "suicide", args = { last_words = "all boundary nodes traversed." } }
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "second ending" } }
 
   [[turn.step]]
-  respond = { type = "text", text = "Manager ended with a confirmed suicide." }
+  respond = { type = "text", text = "Second ending rejected; continue." }
+
+# Blessing turn: after third suicide's Blessed tool result, minor work + final
+# suicide continue on the same provider turn (no new HumanRoot).
+[[turn]]
+id = "mgr-fix2"
+lane = "fast-manager"
+user = "MARK-ISSUE-TWO: C1 is fixing issue two and will verify before seeking the end."
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "C1 is fixing issue two and will verify before seeking the end. Fix the remaining issues." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join", args = {} }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "third ending" } }
+
+  # Blessed → minor-work tool result continues here. Resource-safety after
+  # blessing is the same GLORY-037 check already exercised on stroke 5; a
+  # mock child that finishes instantly would make a mid-chain "blocked"
+  # suicide race into a real second ending, so Labor after blessing is
+  # gather-then-final only.
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", prompt = "Fix all minor issues from the work logs." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join", args = {} }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "FINAL" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "FINAL" }
 
 [[turn]]
-id = "finality-reviewer"
-internal = true
-user = "# Review the current worktree against all authoritative user requirements."
+id = "child-c1"
+lane = "fast-coder"
+user = "# Write src/main.txt with 'done'."
+
+  [[turn.step]]
+  respond = { type = "text", text = "C1 wrote src/main.txt with 'done'." }
+
+[[turn]]
+id = "child-fix1"
+lane = "fast-coder"
+user = "# C1 is fixing issue one and will report back."
+
+  [[turn.step]]
+  respond = { type = "text", text = "C1 fixed issue one." }
+
+[[turn]]
+id = "child-fix2"
+lane = "fast-coder"
+user = "# C1 is fixing issue two and will verify before seeking the end."
+
+  [[turn.step]]
+  respond = { type = "text", text = "C1 fixed issue two." }
+
+[[turn]]
+id = "child-minor"
+lane = "fast-coder"
+user = "# Fix all minor issues from the work logs."
+
+  [[turn.step]]
+  respond = { type = "text", text = "C1 fixed the minor issues." }
+
+[[turn]]
+id = "reviewer-r1"
+lane = "reviewer-r1"
+user = [
+  "# Review the current worktree against all authoritative user requirements.",
+  "parent_work_record",
+  "Also make sure src/main.txt has exactly the content 'done' before the end.",
+]
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "REVISE" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "R1 rejects the ending." }
+
+[[turn]]
+id = "reviewer-r1b"
+lane = "reviewer-r1"
+user = [
+  "# Review the current worktree against all authoritative user requirements.",
+  "parent_work_record",
+  "MARK-ISSUE-ONE",
+]
 tools = ["verdict"]
 
   [[turn.step]]
@@ -92,24 +297,91 @@ tools = ["verdict"]
   respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
 
   [[turn.step]]
-  respond = { type = "text", text = "The second independent PERFECT was accepted for this tree." }
+  respond = { type = "text", text = "R1 confirms the ending." }
+
+[[turn]]
+id = "reviewer-r2"
+lane = "reviewer-r2"
+user = [
+  "# Review the current worktree against all authoritative user requirements.",
+  "parent_work_record",
+  "MARK-ISSUE-ONE",
+]
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "REVISE" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "R2 rejects the ending." }
+
+[[turn]]
+id = "reviewer-r2b"
+lane = "reviewer-r2"
+user = [
+  "# Review the current worktree against all authoritative user requirements.",
+  "parent_work_record",
+  "MARK-ISSUE-TWO",
+]
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "R2 confirms the ending." }
+
+[[turn]]
+id = "reviewer-r3"
+lane = "reviewer-r3"
+user = [
+  "# Review the current worktree against all authoritative user requirements.",
+  "parent_work_record",
+  "MARK-ISSUE-TWO",
+]
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "R3 confirms the ending." }
+
+[[turn]]
+id = "reviewer-repair"
+internal = true
+optional = true
+user = ["# Your previous response did not submit a verdict.", "# Continue the review and submit PERFECT or REVISE with the verdict tool."]
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
 
 [[turn]]
 id = "blogger"
 internal = true
-user = "# Write the dense work-log continuation now"
+user = "# Write the dense work-log continuation now by calling the blog tool exactly once"
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Manager boundary traversal.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Manager unhappy path.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Manager boundary traversal continued.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Manager unhappy path continued.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Manager boundary cycle 2.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Manager unhappy path cycle 2.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Manager boundary cycle 3.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "Manager unhappy path cycle 3.", tip = "primitive-obsession" } }
 
 [[epoch]]
 turn = "blogger"

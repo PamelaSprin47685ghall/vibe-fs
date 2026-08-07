@@ -108,13 +108,11 @@ const EXPECTED_AGENT_ENUMS = {
     'deep-devops',
     'deep-inspector',
     'deep-meditator',
-    'deep-reviewer',
     'fast-browser',
     'fast-coder',
     'fast-devops',
     'fast-inspector',
     'fast-meditator',
-    'fast-reviewer',
   ],
   'fork-manager': ['deep-manager', 'fast-manager'],
   inspector: ['deep-inspector', 'fast-inspector'],
@@ -254,7 +252,8 @@ const PROMPT_CLAUSES = {
       /agent_id/,
       /\blist\b/,
       /compatible context/,
-      /Do not reuse an agent/,
+      /Do not reuse when old context would make the new assignment ambiguous/,
+      /Reuse must not reduce parallelism/,
       /tdd="red"/,
       /tdd="green"/,
       /suicide\(last_words\)/,
@@ -332,7 +331,7 @@ const PROMPT_CLAUSES = {
       /verdict\("PERFECT"\)/,
       /verdict\("REVISE"\)/,
     ],
-    forbidden: [/Double-PERFECT|two consecutive `PERFECT`|confirmation|Nope, let's re-evaluate/i],
+    forbidden: [/Double-PERFECT|two consecutive `PERFECT`|Nope, let's re-evaluate/i],
   },
 
   'fast-browser': {
@@ -866,7 +865,7 @@ test('GLORY_031_manager_fork_of_a_reviewer_is_denied_role_based', async () => {
       ),
     )
 
-    assert.equal(result.error, 'That path is not yours to command. Continue your own work, or call suicide when nothing useful remains.')
+    assert.equal(result.error, 'Unknown or unavailable managed agent.')
     assert.equal(runtime.prompts.length, 0)
 
     const deepResult = parseToml(
@@ -875,7 +874,7 @@ test('GLORY_031_manager_fork_of_a_reviewer_is_denied_role_based', async () => {
         { sessionID: 'manager-reverted-root', agent: 'fast-manager' },
       ),
     )
-    assert.equal(deepResult.error, 'That path is not yours to command. Continue your own work, or call suicide when nothing useful remains.')
+    assert.equal(deepResult.error, 'Unknown or unavailable managed agent.')
     assert.equal(runtime.prompts.length, 0)
   })
 })
@@ -1098,7 +1097,7 @@ test('EXEC_002_fork_tool_description_states_create_or_reuse_by_agent_id', async 
     const managerJob = hooks.tool['fork-manager']?.description
     assert.equal(typeof managerJob, 'string')
     assert.match(managerJob, /Fork a manager job/)
-    assert.doesNotMatch(managerJob, /reuse/i)
+    assert.match(managerJob, /reuse|existing manager job|job id/i)
   })
 })
 
@@ -1185,6 +1184,8 @@ test('GLORY_057_suicide_returns_undecided_when_hidden_reviewer_times_out', async
     const outcome = await hooks.tool.suicide.execute({ last_words: 'Finished.' }, context)
 
     assert.equal(outcome, '# Your ending could not be decided.\n# You still have time. Continue, and seek your end again when you are ready.\n')
-    assert.ok(runtime.abortedIds.includes('host-child-1'), 'undecided finality must abort and clean the hidden reviewer')
+    // GLORY-055/057: infrastructure Undecided does not dispose an ungraduated
+    // Reviewer session — the physical session stays available for the next request.
+    assert.equal(runtime.abortedIds.includes('host-child-1'), false, 'undecided finality must not dispose the ungraduated hidden reviewer')
   }, { finalityReviewerTimeoutMs: 1 })
 })
