@@ -441,6 +441,14 @@ module SpikePlugin =
                             Some(fun sessionId ->
                                 XTraceCapture.lifecycleWorkRecord journal (SessionId.create sessionId) false)
 
+                        let finalityReviewerTimeoutMs =
+                            let configured: obj = input?finalityReviewerTimeoutMs
+
+                            if isNull configured then
+                                None
+                            else
+                                Some(unbox<int> configured)
+
                         let toolRegistration =
                             toolHooks
                                 toolModule
@@ -453,9 +461,10 @@ module SpikePlugin =
                                 onRunStarted
                                 parentWorkRecordFor
                                 childWorkRecordFor
-                                snapshotOpt
-                                (Some wired.CancelSignals)
-                                (Some eventPort)
+                                 snapshotOpt
+                                 (Some wired.CancelSignals)
+                                 (Some eventPort)
+                                 finalityReviewerTimeoutMs
 
                         scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
                         hooks?tool <- toolRegistration.Tools

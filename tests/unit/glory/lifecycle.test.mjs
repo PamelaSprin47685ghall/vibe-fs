@@ -231,6 +231,30 @@ test('GLORY_057_FinalityUndecided_closes_the_request_without_a_wound_record', ()
   assert.ok(life(undecided.value).CurrentLife.LastRejectedWorkRecord == null)
 })
 
+test('GLORY_057_second_challenge_revise_closes_finality_without_confirming_the_life', () => {
+  const firstPerfect = managerLifecycleFact('FinalityUndecided', {
+    SessionId: SESSION,
+    LifeId: LIFE,
+    RequestId: REQ,
+    ReviewerSessionId: REVIEWER,
+    BarrierId: BARRIER,
+    GitTreeHash: TREE,
+  })
+  const out = fold.apply(fold.empty, [
+    lifecycleEnv(lifeOpened()),
+    lifecycleEnv(workActivated()),
+    lifecycleEnv(finalityRequested()),
+    lifecycleEnv(finalityReviewStarted()),
+    lifecycleEnv(firstPerfect),
+  ])
+
+  assert.equal(out.ok, true, JSON.stringify(out.error))
+  const request = life(out.value).CurrentLife.ActiveFinality
+  assert.equal(request.Rejected, true)
+  assert.equal(request.Confirmed, false)
+  assert.ok(request.ReviewerSessionId != null, 'second challenge failure must still identify the reviewer to clean up')
+})
+
 test('GLORY_066_lifecycle_facts_round_trip_through_ndjson', () => {
   const envelopes = [
     lifecycleEnv(lifeOpened()),

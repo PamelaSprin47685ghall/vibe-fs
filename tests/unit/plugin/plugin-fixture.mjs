@@ -172,7 +172,7 @@ export const awaitPrompted = (sessionId) => {
  * childSessionId)` registers a forked handle so its terminal completion also
  * claims the EXEC-004 durable cell (see below).
  */
-export const withExecutablePlugin = async (body) => {
+export const withExecutablePlugin = async (body, options = {}) => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-plugin-exec-'))
   try {
     execFileSync('git', ['init', '--quiet', directory])
@@ -182,6 +182,7 @@ export const withExecutablePlugin = async (body) => {
     const messages = []
     const client = stubClient(createdIds, prompts, messages, abortedIds)
     const hooks = await initSpikePlugin({
+      ...options,
       client,
       directory,
       events: { listen: () => () => {} },

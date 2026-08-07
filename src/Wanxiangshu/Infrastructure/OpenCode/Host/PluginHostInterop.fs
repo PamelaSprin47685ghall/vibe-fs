@@ -58,6 +58,7 @@ module PluginHostInterop =
         (snapshot: ISessionSnapshotPort option)
         (cancelSignals: (SessionId seq -> unit) option)
         (eventPort: IEventObservationPort option)
+        (finalityReviewerTimeoutMs: int option)
         : ToolRegistration =
         let registration =
             ToolRegistry.create
@@ -75,9 +76,10 @@ module PluginHostInterop =
                 childWorkRecordFor
                 snapshot
                 cancelSignals
-                eventPort
-                (Some(scope :> IParkedTransformHost))
-                scope.StudentTeacherRuntime
+                 eventPort
+                 (Some(scope :> IParkedTransformHost))
+                 scope.StudentTeacherRuntime
+                 finalityReviewerTimeoutMs
 
         // P0-RECOVERY-JOIN-001: JoinTool RequireFamilyRecovery → PluginRuntimeScope.
         registration.Runtime.AttachFamilyRecovery(fun root -> scope.RequireFamilyRecovery root)

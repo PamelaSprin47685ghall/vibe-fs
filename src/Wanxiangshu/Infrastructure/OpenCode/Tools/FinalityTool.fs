@@ -192,10 +192,13 @@ module FinalityTool =
                                                     sid
                                                     life.LifeId
                                                     request.RequestId
-                                                    request.GitTreeHash
-                                                    request.LastWordsRef
-                                                    request.LastWordsDigest
-                                                    request.ProviderRun
+                                                     request.GitTreeHash
+                                                     request.LastWordsRef
+                                                     request.LastWordsDigest
+                                                     request.ProviderRun
+                                                      (defaultArg
+                                                          scope.FinalityReviewerTimeoutMs
+                                                          ExecutorSummarize.AwaitAgentTimeoutMs)
 
                                             match outcome with
                                             | FinalityController.FinalityOutcome.Rejected prompt
@@ -273,10 +276,13 @@ module FinalityTool =
                                                         sid
                                                         life.LifeId
                                                         requestId
-                                                        tree
-                                                        blob.BlobRef
-                                                        blob.BlobDigest
-                                                        context.ProviderRunId.Value
+                                                         tree
+                                                         blob.BlobRef
+                                                         blob.BlobDigest
+                                                         context.ProviderRunId.Value
+                                                         (defaultArg
+                                                             scope.FinalityReviewerTimeoutMs
+                                                             ExecutorSummarize.AwaitAgentTimeoutMs)
 
                                                 match outcome with
                                                 | FinalityController.FinalityOutcome.Rejected prompt

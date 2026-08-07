@@ -33,7 +33,8 @@ type ToolRuntimeScope
         childWorkRecordFor: (string -> string option) option,
         snapshot: ISessionSnapshotPort option,
         cancelSignals: (SessionId seq -> unit) option,
-        ?eventPort: IEventObservationPort
+        ?eventPort: IEventObservationPort,
+        ?finalityReviewerTimeoutMs: int
     ) =
 
     let gate = obj ()
@@ -47,9 +48,12 @@ type ToolRuntimeScope
     let parentRecord = defaultArg parentWorkRecordFor (fun _ -> None)
     let childRecord = defaultArg childWorkRecordFor (fun _ -> None)
     let terminalPort = eventPort
+    let finalityTimeoutMs = finalityReviewerTimeoutMs
     let mutable disposed = false
     /// P0-RECOVERY-JOIN-001: family recovery before join / publish consume.
     let mutable familyRecovery: (SessionId -> Task<FamilyRecovery>) option = None
+
+    member _.FinalityReviewerTimeoutMs = finalityTimeoutMs
 
     let registerChild parentSid (_role: Role) childId =
         sessionParents.[SessionId.value childId] <- parentSid

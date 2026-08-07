@@ -47,9 +47,13 @@ module FinalityController =
         |> ignore
 
     /// The hidden Reviewer's completion as the HostReviewProgram await result.
-    let private awaitReviewer (runtime: HostForkRuntime) (agentId: string) =
+    let private awaitReviewer (timeoutMs: int) (runtime: HostForkRuntime) (agentId: string) =
         task {
-            match! runtime.AwaitAgent(agentId) with
+            match!
+                runtime.AwaitAgent(
+                    agentId,
+                    ?timeoutMs = Some timeoutMs
+                ) with
             | Error error -> return Error error
             | Ok run ->
                 match run.Outcome with
@@ -276,6 +280,7 @@ module FinalityController =
         (lastWordsRef: BlobRef)
         (lastWordsDigest: BlobDigest)
         (providerRun: ProviderRunIdentity)
+        (reviewerTimeoutMs: int)
         : Task<FinalityOutcome> =
         task {
             match scope.Journal with
@@ -365,7 +370,7 @@ module FinalityController =
                             HostReviewProgram.reverify
                                 (Some journal)
                                 (fun () -> Task.FromResult(Ok reviewerSessionId))
-                                (fun () -> awaitReviewer runtime reviewerAgentId)
+                                (fun () -> awaitReviewer reviewerTimeoutMs runtime reviewerAgentId)
                                 (fun () ->
                                     task {
                                         match!
@@ -395,10 +400,11 @@ module FinalityController =
                                     requestId
                                     reviewerId
                                     barrier
-                                    requestTree
-                                    lastWordsRef
-                                    lastWordsDigest
-                                    providerRun
+                                     requestTree
+                                     lastWordsRef
+                                     lastWordsDigest
+                                     providerRun
+                                     reviewerTimeoutMs
                         | Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired(reviewerId, barrier, _tree, record)) ->
                             return!
                                 concludeRejection

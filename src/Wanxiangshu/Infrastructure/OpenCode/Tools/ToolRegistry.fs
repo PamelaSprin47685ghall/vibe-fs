@@ -51,11 +51,12 @@ module ToolRegistry =
         (parentWorkRecordFor: (string -> string option) option)
         (childWorkRecordFor: (string -> string option) option)
         (snapshot: ISessionSnapshotPort option)
-        (cancelSignals: (SessionId seq -> unit) option)
-        (eventPort: IEventObservationPort option)
-        (parkedHost: IParkedTransformHost option)
-        (studentTeacherRuntime: StudentTeacherRuntime option)
-        =
+         (cancelSignals: (SessionId seq -> unit) option)
+         (eventPort: IEventObservationPort option)
+         (parkedHost: IParkedTransformHost option)
+         (studentTeacherRuntime: StudentTeacherRuntime option)
+         (finalityReviewerTimeoutMs: int option)
+         =
         let factory = ToolHostCodec.factory toolModule
 
         let runtime =
@@ -72,9 +73,10 @@ module ToolRegistry =
                 parentWorkRecordFor,
                 childWorkRecordFor,
                 snapshot,
-                cancelSignals,
-                ?eventPort = eventPort
-            )
+                 cancelSignals,
+                 ?eventPort = eventPort,
+                 ?finalityReviewerTimeoutMs = finalityReviewerTimeoutMs
+             )
 
         let baseSpecs =
             [ yield ForkTool.managerSpec factory runtime

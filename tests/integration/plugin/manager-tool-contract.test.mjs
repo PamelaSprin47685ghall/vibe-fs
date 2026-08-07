@@ -1147,3 +1147,21 @@ test('GLORY_038_suicide_with_outstanding_child_prompts_to_join', async () => {
     )
   })
 })
+
+test('GLORY_057_suicide_returns_undecided_when_hidden_reviewer_times_out', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    acceptAuthorityRoot(runtime, 'manager-finality-no-terminal', 'fast-manager')
+    activateLife(runtime, 'manager-finality-no-terminal')
+    const context = {
+      sessionID: 'manager-finality-no-terminal',
+      agent: 'fast-manager',
+      callID: 'call-finality-no-terminal',
+      messageID: 'msg-finality-no-terminal',
+    }
+
+    const outcome = await hooks.tool.suicide.execute({ last_words: 'Finished.' }, context)
+
+    assert.equal(parseToml(outcome).error, '# Your ending could not be decided.\n# You still have time. Continue, and seek your end again when you are ready.\n')
+    assert.ok(runtime.abortedIds.includes('host-child-1'), 'undecided finality must abort and clean the hidden reviewer')
+  }, { finalityReviewerTimeoutMs: 1 })
+})
