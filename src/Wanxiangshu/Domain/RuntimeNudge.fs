@@ -61,8 +61,8 @@ module RuntimeNudge =
 
     /// REVIEW-003: the Reviewer produced prose where a structured verdict was required.
     let ReviewerVerdictGuardInstructions =
-        [ "Submit a structured verdict with the verdict tool: PERFECT or REVISE."
-          "Do not put a verdict in prose." ]
+        [ "Your previous response did not submit a verdict."
+          "Continue the review and submit PERFECT or REVISE with the verdict tool." ]
 
     /// Interaction repair after tool work with no final report.
     ///

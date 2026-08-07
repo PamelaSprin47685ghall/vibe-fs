@@ -49,7 +49,12 @@ module OrchestratorHostReview =
                     journal
                     (fun () -> forkReviewer jobId worktree OpeningPrompt)
                     (fun () -> awaitReviewer jobId)
-                    (fun () -> nudgeReviewer jobId ReviewChallenge.Prompt)
+                    (fun prompt ->
+                        task {
+                            match! nudgeReviewer jobId prompt with
+                            | Error error -> return Error error
+                            | Ok() -> return! awaitReviewer jobId
+                        })
                     managerSessionId
                     barrierId
                     tree

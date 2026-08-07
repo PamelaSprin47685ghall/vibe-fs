@@ -113,13 +113,20 @@ async function oracleCheck(scenario, ctx, step) {
       `HOST-010: ProviderInputSealed.ProviderRun ${run} must equal a ReviewVerdictRecorded.ProviderRun (verdict=[${verdictRuns.join(', ')}])`,
     );
   }
-  // Both PERFECT verdicts are accepted inside the SAME physical user turn
-  // (the second request reuses the envelope's user message): the reviewer's
-  // verdict-bearing requests all carry the same last user text.
+  // A prose-only first terminal must continue the SAME reviewer session through
+  // the durable verdict guard before the skeptical challenge requests the second
+  // PERFECT. The two continuation turns intentionally have different user text.
   const verdictReqUsers = scenario.provider.requests
     .filter(r => toolNames(r).includes('verdict'))
-    .map(r => lastUserText(r).slice(0, 40));
-  assert.equal(new Set(verdictReqUsers.filter(t => !t.includes("Nope, let's re-evaluate"))).size, 1, 'second PERFECT must be accepted in the same physical user turn');
+    .map(lastUserText);
+  assert.ok(
+    verdictReqUsers.some(text => text.includes('Your previous response did not submit a verdict.')),
+    'missing verdict must receive the durable reviewer guard continuation',
+  );
+  assert.ok(
+    verdictReqUsers.some(text => text.includes("Nope, let's re-evaluate:")),
+    'first recovered PERFECT must receive the skeptical confirmation continuation',
+  );
   assert.equal(new Set(valuesOf(rvFacts, 'GitTreeHash')).size, 1, 'double PERFECT must bind one tree hash');
   assert.equal(factsIn(scenario.host.workDir, 'ConfirmedReviewWitness').length, 1, 'dual PERFECT must produce one durable confirmed witness');
 
