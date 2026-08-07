@@ -77,7 +77,7 @@ schemaVersion=2；finality 仅 `completed|failed`。
 `HandleFalseCompletionRejected` → 确定性 replacement → parent correction。  
 禁止把历史假 abort 洗成成功。
 
-## EXEC-025：Student 学习与编译程序
+## EXEC-027：Student 学习与编译程序
 
 只有显式 Student HumanRoot 启动本程序；其它 Agent 零副作用。
 

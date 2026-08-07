@@ -72,7 +72,7 @@ LLM-visible join：顶层 status+count，再 `[[result]]` 表数组；agent 项�
 
 ---
 
-## Student / Teacher（EXEC-025/026）
+## Student / Teacher（EXEC-027/026）
 
 `teacher` 工具程序：
 

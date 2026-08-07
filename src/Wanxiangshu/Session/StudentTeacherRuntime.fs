@@ -33,7 +33,7 @@ type private StudentRunCell =
       mutable Waiter: TaskCompletionSource<Result<string, string>> option
       mutable PendingFinal: (ProviderRunIdentity * string) option }
 
-/// EXEC-025/026: control-plane owner for Student learning. This type stores no
+/// EXEC-027/026: control-plane owner for Student learning. This type stores no
 /// question or answer text; QA.md is the sole knowledge state.
 type StudentTeacherRuntime
     (

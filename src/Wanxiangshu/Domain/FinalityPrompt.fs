@@ -24,7 +24,8 @@ module FinalityPrompt =
     ///
     /// Only comment blocks, no TOML data blocks.
     let rejected (reviewerWorkRecord: string) =
-        let header = SyntheticToml.document rejectionInstructions [] |> fun s -> s.TrimEnd('\n')
+        let header =
+            SyntheticToml.document rejectionInstructions [] |> fun s -> s.TrimEnd('\n')
 
         let normalizedRecord = SyntheticToml.normalizeNewlines reviewerWorkRecord
 
