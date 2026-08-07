@@ -798,7 +798,7 @@ resources/prompts/blogger-system.md
 **Validation**:
 - `npm run lint` — pass (exit 0)
 - `npm run build` — pass (exit 0; required for unit tests via dist)
-- `node --test tests/unit/enforcer/*.test.mjs` — 139/139 pass (exit 0), including PartOrdinal-first multi-call tip, RecentTips cap 8, physical HasFlight busy, throttle/nudge tombstones, catalog 120 rules.
+- `node --test tests/unit/enforcer/*.test.mjs` — 143/143 pass (exit 0), including PartOrdinal-first multi-call tip, RecentTips cap 8, physical HasFlight busy, throttle/nudge tombstones, catalog 120 rules, and `bounds.test.mjs` 4 pass locking the §13.2 size/count fail-closed bounds (`MaxMergedToolCalls=32` / text 512KiB / evidence 128KiB).
 
 **Limitations**:
 - Full monorepo integration/e2e suites were not re-run under this Change (out of scope for documentation rebase).

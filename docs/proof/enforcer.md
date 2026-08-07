@@ -40,6 +40,9 @@
 | multi-call 仍提交单 cycle 并标记 protocol violation（`MultiCall=true`） | `tests/unit/enforcer/cycle-nudge.test.mjs`（`ENFORCER_042_single_call_is_not_multi_call`）；`EnforcerCycle.fs` |
 | 有效 cycle 要求非空 text | `tests/unit/enforcer/cycle-nudge.test.mjs`（`ENFORCER_043_valid_cycle_requires_nonempty_text`）；`EnforcerCycle.fs` `isValidCycle` |
 | 空 text tool gate 拒绝 | `tests/unit/enforcer/enforcer-cycle-protocol.test.mjs`（`ENFORCER_061_blog_tool_rejects_empty_canonical_text`） |
+| 合并 tool call 数 >32 → fail closed（`MaxMergedToolCalls=32`） | `tests/unit/enforcer/bounds.test.mjs`（`ENFORCER_042_more_than_32_merged_tool_calls_fails_closed`）；`src/Wanxiangshu/Session/EnforcerHost.fs`（`validateCycle`，`MaxMergedToolCalls=32`，strict `>`）→ `Diagnostic.fatal "enforcer-cycle-failed"` |
+| 合并 text >512 KiB UTF-8 → fail closed（`MaxBlogTextBytes`） | `tests/unit/enforcer/bounds.test.mjs`（`ENFORCER_042_merged_text_over_512KiB_fails_closed`）；`src/Wanxiangshu/Session/EnforcerHost.fs`（`validateCycle`，`MaxBlogTextBytes=512*1024`，strict `>`，UTF-8 `SyntheticToml.byteCount`）→ `Diagnostic.fatal "enforcer-cycle-failed"` |
+| 合并 evidence >128 KiB UTF-8 → fail closed（`MaxEvidenceBytes`） | `tests/unit/enforcer/bounds.test.mjs`（`ENFORCER_042_merged_evidence_over_128KiB_fails_closed`）；`src/Wanxiangshu/Session/EnforcerHost.fs`（`validateCycle`，`MaxEvidenceBytes=128*1024`，strict `>`，UTF-8 `SyntheticToml.byteCount`）→ `Diagnostic.fatal "enforcer-cycle-failed"` |
 
 ## 原子提交 / 恢复（§13.3）
 
