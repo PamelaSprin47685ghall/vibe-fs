@@ -211,8 +211,6 @@ module ManagedAgentConfig =
                         experimental?chatMaxRetries <- n
                     | _ -> ()
 
-    let private loggedSource = ref false
-
     /// Best-effort bindings for the Error path: role knowledge only, no model
     /// validation (the model checks are what failed). Enough to write owned
     /// fields so AGENT-007's fail-closed first layer survives a gate error.
@@ -225,6 +223,8 @@ module ManagedAgentConfig =
             | _ -> ()
 
         bindings
+
+    let private loggedSource = ref false
 
     let configureFromHostConfig (config: obj) : Result<ManagedAgentInventory, string> =
         match validate config with

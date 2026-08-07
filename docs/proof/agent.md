@@ -21,6 +21,7 @@
 | 唯一写入点 | 仅 `StaticTools.permissionObj` / `applyOwnedFields` | AGENT-019 |
 | fast/deep 权限相等 | 权限对象结构比较 | AGENT-010 |
 | 内部 Agent 不可见 | enum/schema 不含 blogger/executor/teacher | AGENT-008、AGENT-020 |
+| 首页默认与可见集合 | integration config 断言 `default_agent`、24 个 `hidden` 值；fork enum 保持 AGENT-009 集合 | AGENT-023、AGENT-009 |
 
 ## Student / Teacher
 

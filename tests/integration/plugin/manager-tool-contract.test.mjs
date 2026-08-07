@@ -49,6 +49,9 @@ const ROLE_NAMES = [
   'executor',
 ]
 
+/** AGENT-023: the OpenCode home selector exposes only these managed roles. */
+const HOME_VISIBLE_ROLES = new Set(['orchestrator', 'manager', 'devops', 'student'])
+
 const hostFinalConfig = () => {
   const agent = {}
   for (const role of ROLE_NAMES) {
@@ -471,6 +474,28 @@ test('AGENT_004_006_010_config_gains_a_prompt_and_the_whole_permission_matrix', 
   await withPlugin(async (hooks) => {
     const config = hostFinalConfig()
     hooks.config(config)
+
+    assert.equal(config.default_agent, 'deep-manager')
+    const observedHomeVisibility = Object.fromEntries(
+      ROLE_NAMES.flatMap((role) =>
+        ['fast', 'deep'].map((tier) => [`${tier}-${role}`, config.agent[`${tier}-${role}`].hidden === true]),
+      ),
+    )
+    const expectedHomeVisibility = Object.fromEntries(
+      ROLE_NAMES.flatMap((role) =>
+        ['fast', 'deep'].map((tier) => [`${tier}-${role}`, !HOME_VISIBLE_ROLES.has(role)]),
+      ),
+    )
+    assert.deepEqual(observedHomeVisibility, expectedHomeVisibility)
+
+    // AGENT-009 remains independent: home visibility must not change Manager's fork-agent offer.
+    assert.deepEqual(agentEnumEntries(hooks.tool.fork.args.agent), EXPECTED_AGENT_ENUMS.fork)
+
+    for (const role of ROLE_NAMES) {
+      for (const tier of ['fast', 'deep']) {
+        assert.equal(config.agent[`${tier}-${role}`].hidden, !HOME_VISIBLE_ROLES.has(role))
+      }
+    }
 
     // AGENT-006: one whole-object comparison per agent. Twenty-four of them, because
     // AGENT-010 makes fast and deep hold the same tools and a per-tier divergence has
