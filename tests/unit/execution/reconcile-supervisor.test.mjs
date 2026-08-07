@@ -1,5 +1,5 @@
-// P1 unit surface: ReconcileSupervisor timer-backoff materialization + wall-clock
-// budget, ClearSession mid-backoff, HostSignalSubscribe reconnect markers,
+// P1 unit surface: ReconcileSupervisor causal reread materialization,
+// ClearSession mid-pass, HostSignalSubscribe reconnect markers,
 // ForkRuntime AwaitAgent deadline, ExecutorSummarize cancelOwned on map failure.
 
 import assert from 'node:assert/strict'
@@ -23,17 +23,7 @@ import {
 } from '../support/domain.mjs'
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-
-// Injected backoff keeps timer-driven tests under PER_TEST_TIMEOUT_MS (1000).
-// Production uses [|50;100;250;500;1000;2000;3000;5000|] + 30s budget.
-const TEST_BACKOFF_MS = [5, 5, 5, 5, 5]
-// ClearSession race: first backoff must outlast waitUntil's step so clear can
-// run while the pass is still in delayMs (not already finished).
-const CLEAR_BACKOFF_MS = [80]
-const CLEAR_BUDGET_MS = 250
-// Always-incomplete budget test: short wall clock, short steps.
-const BUDGET_BACKOFF_MS = [5, 5, 5, 5, 5]
-const BUDGET_MAX_MS = 40
+const settle = () => new Promise((r) => setTimeout(r, 10))
 
 async function waitUntil(predicate, timeoutMs, stepMs = 10) {
   const deadline = Date.now() + timeoutMs
@@ -65,8 +55,6 @@ test('EXEC_reconcile_error_does_not_consume_causal_budget', async () => {
     snapshot,
     binding,
     onTurn,
-    backoffDelaysMs: TEST_BACKOFF_MS,
-    maxBudgetMs: 400,
   })
   reconcileSupervisor.bindUserMessage(supervisor, sid, physical)
   reconcileSupervisor.kick(supervisor, sid)
@@ -77,7 +65,7 @@ test('EXEC_reconcile_error_does_not_consume_causal_budget', async () => {
   assert.equal(caseOf(turns[0].Outcome), 'TurnCompleted')
 })
 
-// ── 1b. idle-before-transcript: inline backoff finds late terminal ───────────
+// ── 1b. idle-before-transcript: causal rereads find late terminal ────────────
 
 test('EXEC_reconcile_incomplete_delayed_rekick_finds_terminal', async () => {
   const sid = sessionId('ses_reconcile_rekick')
@@ -85,7 +73,7 @@ test('EXEC_reconcile_incomplete_delayed_rekick_finds_terminal', async () => {
   const turns = []
   const inProgress = reconcileSupervisor.inProgressTranscript('user-1', 'asst-ip')
   const terminal = reconcileSupervisor.terminalTranscript('user-1', 'asst-terminal')
-  // Reads 1–3: InProgress; read 4: terminal — all inside one Kick's backoff loop.
+  // Reads 1–3: InProgress; read 4: terminal — all inside one Kick's causal rereads.
   const reads = [
     { ok: true, messages: inProgress },
     { ok: true, messages: inProgress },
@@ -102,8 +90,7 @@ test('EXEC_reconcile_incomplete_delayed_rekick_finds_terminal', async () => {
     snapshot,
     binding,
     onTurn,
-    backoffDelaysMs: TEST_BACKOFF_MS,
-    maxBudgetMs: 400,
+    maxCausalRereads: 3,
   })
   reconcileSupervisor.bindUserMessage(supervisor, sid, physical)
   reconcileSupervisor.kick(supervisor, sid)
@@ -112,16 +99,16 @@ test('EXEC_reconcile_incomplete_delayed_rekick_finds_terminal', async () => {
     () => turns.some((t) => caseOf(t.Outcome) === 'TurnCompleted'),
     400,
   )
-  assert.equal(ok, true, 'timer backoff must surface TurnCompleted without a second Host signal')
+  assert.equal(ok, true, 'causal rereads must surface TurnCompleted without a second Host signal')
   const completed = turns.filter((t) => caseOf(t.Outcome) === 'TurnCompleted')
   assert.equal(completed.length, 1, 'exactly one TurnCompleted')
   assert.ok(snapshot.readCount >= 4, `need ≥4 snapshot reads; got ${snapshot.readCount}`)
 })
 
-// ── 1c. wall-clock budget stops rereading always-incomplete transcripts ─────
+// ── 1c. causal rereads exhausted stops always-incomplete transcripts ─────────
 
-test('EXEC_reconcile_incomplete_rekick_budget_stops', async () => {
-  const sid = sessionId('ses_reconcile_budget')
+test('EXEC_reconcile_incomplete_rereads_exhausted_stops', async () => {
+  const sid = sessionId('ses_reconcile_rereads')
   const physical = physicalUser('user-1')
   const turns = []
   const inProgress = reconcileSupervisor.inProgressTranscript('user-1', 'asst-ip')
@@ -131,27 +118,30 @@ test('EXEC_reconcile_incomplete_rekick_budget_stops', async () => {
     turns.push(turn)
     return Promise.resolve()
   }
+  // maxCausalRereads=3 → initial remaining=4 → 4 reads then StopPass.
+  const maxCausalRereads = 3
   const supervisor = reconcileSupervisor.create({
     snapshot,
     binding,
     onTurn,
-    backoffDelaysMs: BUDGET_BACKOFF_MS,
-    maxBudgetMs: BUDGET_MAX_MS,
+    maxCausalRereads,
   })
   reconcileSupervisor.bindUserMessage(supervisor, sid, physical)
   reconcileSupervisor.kick(supervisor, sid)
 
-  // Budget 40ms of 5ms steps → several reads, then stop.
-  await sleep(80)
-  const readsAfterBudget = snapshot.readCount
-  await sleep(100)
+  await settle()
+  const readsAfterPass = snapshot.readCount
+  assert.equal(
+    readsAfterPass,
+    maxCausalRereads + 1,
+    `causal rereads exhausted at maxCausalRereads+1; got ${readsAfterPass}`,
+  )
+  await settle()
   assert.equal(
     snapshot.readCount,
-    readsAfterBudget,
-    `no further reads after budget; reads stayed ${readsAfterBudget} then grew to ${snapshot.readCount}`,
+    readsAfterPass,
+    'StopPass: no further reads without a new host signal',
   )
-  assert.ok(readsAfterBudget >= 2, `at least two reads under budget, got ${readsAfterBudget}`)
-  assert.ok(readsAfterBudget <= 40, `bounded reads expected, got ${readsAfterBudget}`)
   const completed = turns.filter((t) => caseOf(t.Outcome) === 'TurnCompleted')
   assert.equal(completed.length, 0, 'always-in-progress must never publish TurnCompleted')
 })
@@ -209,8 +199,6 @@ test('EXEC_reconcile_on_turn_failure_is_not_sealed_and_later_wake_retries_once',
     snapshot,
     binding,
     onTurn,
-    backoffDelaysMs: TEST_BACKOFF_MS,
-    maxBudgetMs: 400,
   })
   reconcileSupervisor.bindUserMessage(supervisor, sid, physical)
   reconcileSupervisor.kick(supervisor, sid)
@@ -240,12 +228,11 @@ test('EXEC_reconcile_clear_rebind_drops_old_delayed_turn_and_runs_new_binding', 
       turns.push(turn)
       return Promise.resolve()
     },
-    backoffDelaysMs: CLEAR_BACKOFF_MS,
-    maxBudgetMs: CLEAR_BUDGET_MS,
+    maxCausalRereads: 3,
   })
   reconcileSupervisor.bindUserMessage(supervisor, sid, oldPhysical)
   reconcileSupervisor.kick(supervisor, sid)
-  assert.equal(await waitUntil(() => snapshot.readCount >= 1, 400), true, 'old pass must enter delay')
+  assert.equal(await waitUntil(() => snapshot.readCount >= 1, 400), true, 'old pass must start materializing')
 
   reconcileSupervisor.clearSession(supervisor, sid)
   reconcileSupervisor.bindUserMessage(supervisor, sid, newPhysical)
@@ -284,8 +271,6 @@ test('EXEC_reconcile_clear_rebind_fences_post_on_turn_effects_from_old_binding',
       observed.push(messages)
       return Promise.resolve()
     },
-    backoffDelaysMs: TEST_BACKOFF_MS,
-    maxBudgetMs: 400,
   })
   reconcileSupervisor.bindUserMessage(supervisor, sid, oldPhysical)
   reconcileSupervisor.kick(supervisor, sid)

@@ -136,3 +136,45 @@ test('EXEC_reconcile_consecutive_errors_retry_until_ok_terminal', async () => {
   assert.equal(caseOf(turns[0].Outcome), 'TurnCompleted')
   assert.ok(snapshot.readCount >= 4, `need ≥4 reads (3 errors + terminal); got ${snapshot.readCount}`)
 })
+
+// ── 4. persistent SnapshotError: consecutive-error cap ends the pass ─────────
+// Guards materializeActive Error branch against unbounded async recursion when
+// snapshot stays ok:false (production path never builds SnapshotError evidence;
+// GetMessages Error recurses outside decideStep). Default maxConsecutiveErrors=5.
+
+test('EXEC_reconcile_persistent_errors_stop_pass_bounded', async () => {
+  const sid = sessionId('ses_err_bounded')
+  const physical = physicalUser('user-1')
+  const turns = []
+  // Single Error entry repeats forever → continuous SnapshotError path.
+  const snapshot = reconcileSupervisor.createSnapshot([{ ok: false, error: 'persistent' }])
+  const binding = reconcileSupervisor.createStore()
+  const onTurn = (turn) => {
+    turns.push(turn)
+    return Promise.resolve()
+  }
+  const supervisor = reconcileSupervisor.create({
+    snapshot,
+    binding,
+    onTurn,
+    maxCausalRereads: 3,
+  })
+  reconcileSupervisor.bindUserMessage(supervisor, sid, physical)
+  reconcileSupervisor.kick(supervisor, sid)
+
+  await settle()
+  const readsAfterPass = snapshot.readCount
+  assert.equal(
+    readsAfterPass,
+    5,
+    `persistent errors must stop after default maxConsecutiveErrors (5); got ${readsAfterPass}`,
+  )
+  await settle()
+  assert.equal(
+    snapshot.readCount,
+    readsAfterPass,
+    'StopPass: no further reads without a new host signal',
+  )
+  const completed = turns.filter((t) => caseOf(t.Outcome) === 'TurnCompleted')
+  assert.equal(completed.length, 0, 'persistent SnapshotError must not publish TurnCompleted')
+})

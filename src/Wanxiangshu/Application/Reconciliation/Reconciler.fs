@@ -64,7 +64,8 @@ module Reconciler =
             ?onDeleted: SessionId -> unit,
             ?projection: (SessionId -> AgentProjectionSet option),
             ?onSnapshot: SessionId -> SessionMessage list -> Task,
-            ?maxCausalRereads: int
+            ?maxCausalRereads: int,
+            ?maxConsecutiveErrors: int
         ) as this =
 
         let gate = obj ()
@@ -80,6 +81,7 @@ module Reconciler =
             defaultArg onSnapshot (fun _ _ -> AsyncSupport.completedTask ())
 
         let maxRereads = defaultArg maxCausalRereads 3
+        let maxErrors = defaultArg maxConsecutiveErrors 5
 
         let isCleared (sessionId: SessionId) =
             lock gate (fun () -> cleared.Contains(SessionId.value sessionId))
@@ -186,6 +188,7 @@ module Reconciler =
             (sessionId: SessionId)
             (generation: int)
             (rereadsRemaining: int)
+            (consecutiveErrors: int)
             (candidate: ReconcileProgram.PublishTurn option)
             (maps: ReconcileProgram.PublishMaps)
             (activeBinding: ActiveRunBinding)
@@ -206,13 +209,23 @@ module Reconciler =
                         match result with
                         | Error error ->
                             logError "RECONCILE-SNAPSHOT" (sprintf "snapshot failed: %s" (string error))
+                            let nextErrors = consecutiveErrors + 1
 
-                            if isCurrent sessionId generation then
+                            if nextErrors >= maxErrors then
+                                // StopPass: keep Dirty for next host signal; errors do not consume causal budget.
+                                if isCurrent sessionId generation then
+                                    match lastSnapshot with
+                                    | Some messages -> do! observeSnapshot sessionId messages
+                                    | None -> ()
+                                else
+                                    return ()
+                            elif isCurrent sessionId generation then
                                 return!
                                     materializeActive
                                         sessionId
                                         generation
                                         rereadsRemaining
+                                        nextErrors
                                         candidate
                                         maps
                                         activeBinding
@@ -258,6 +271,7 @@ module Reconciler =
                                             sessionId
                                             generation
                                             remaining
+                                            0
                                             candidate'
                                             maps
                                             activeBinding
@@ -291,6 +305,7 @@ module Reconciler =
                                 sessionId
                                 generation
                                 (maxRereads + 1)
+                                0
                                 None
                                 (mapsFor sessionId)
                                 bound

@@ -173,3 +173,16 @@ Wanxiangshu 项目 Owner。
 启动：Owner 已裁决实施。范围限定本提案（A/B/C 三类，D 移出）。
 Reconciler 语义迁移已完成：`RereadWithBackoff`/`pickDelay`/`nextBackoffIndex`/`delays`/`budget`/`delayMs` 已删除，改为 `maxCausalRereads` 有界因果重读；`decideStep (rereadsRemaining) (evidence)`。
 剩余：Executor targeted await（AwaitAgentWithPermit + 删 while/stash）、SSE one-shot deadline、ITimerPort、proof 闭环、归档。
+
+## Final outcome
+
+- **完成范围**：A/B/C 三类（Reconciler 有界因果重读、Executor targeted permit await、SSE one-shot deadline）；D 类（IntegrationGate）按 Non-Goal 未处理。
+- **Reconciler**：`RereadWithBackoff`/`pickDelay`/`nextBackoffIndex`/`delays`/`budget`/`delayMs` 已删除，改为 `maxCausalRereads` 有界因果重读（`decideStep (rereadsRemaining) (evidence)`）；`StopPass` 后保持 Dirty 等下一信号，不立即重入 runnable queue；另补 `maxConsecutiveErrors`（默认 5）连续 SnapshotError 上限，消除持续报错时的无限递归（改造删除时间预算后 Error 分支失去终止条件的回归修复）。
+- **Executor**：`IExecutorRuntime` 增 `AwaitAgentWithPermit(agentId, timeoutMs)`，`asExecutorRuntime` 经 `requirePermit` 门（RECOVERY_WAITING→TimedOut），`HostForkRuntime.AwaitAgentWithPermit` 先 `validatePermit` 再定向 await；`ExecutorSummarize.awaitAgent` 的 while 忙等待与 stash 字典删除，`summarizeSpool` 改每 chunk 定向 await；completion 权威仍在 Journal + validatePermit，无第二份 RunCompletion 真理源。门禁 `p0-recovery-join.mjs` 的 `executor-summarize-join-with-permit` 规则 pattern 扩展为 `JoinWithPermit|AwaitAgentWithPermit`。
+- **SSE**：`HostSignalSubscribe.fs` 删除 `setInterval` 周期扫描，改 one-shot silence deadline（每次 onEvent `clearTimeout` + 重置单次 `setTimeout`），`sse-heartbeat-timeout` 致命语义保留；reconnect 指数退避保留。
+- **ITimerPort**：`PtyTiming.fs` 定义 `ITimerHandle`/`ITimerPort` + 生产 `nodeTimerPort`（`ms>=1000` 时 `.unref()`）+ 虚拟时钟 `createVirtualTimerPort`；5 处 `let mutable` 补 `// DSL-MUTABLE:` 声明；`TrySetResult`→`AsyncSupport.trySetResult`（Fable 兼容）。SSE 心跳因 F# ITimerPort 无法在 emitJsExpr 内可靠调用，用裸 Node timer 实现（字面偏离，语义等价）。
+- **门禁修复**：`dsl-ownership-ratchet.mjs` 的 `scanRoot` 路径规范化 bug（`relative(root,file)` 丢失 `/Process/` 段致 DSL-MUTABLE 失效）已修复（双路径策略），未更新 baseline。
+- **文档**：`docs/how/dsl-structured-program.md` 等待语义分类（A/B/C/D）、`docs/how/host.md` HOST-004 明确用尽即保持 Dirty、`docs/shape/execution.md` EXEC-023/024 补 targeted await permit 门、`docs/proof/{host,execution,verify}.md` 增零无界轮询/targeted await 契约/ITimerPort 注入面条目。
+- **测试**：`reconcile-idle-early.test.mjs` 三回归改为因果重读次数；`reconcile-supervisor.test.mjs` 清理 `maxBudgetMs`/`backoffDelaysMs` 残留、1c 改因果重读语义；新增 `EXEC_reconcile_persistent_errors_stop_pass_bounded`（连续错误有界终止）、`timer-port.test.mjs`（ITimerPort 虚拟时钟契约）；`p0-recovery-join-gate.test.mjs` 绿路径 fixture 更新。
+- **验证**：`npm run check`（lint/build/test/integration）全绿；unit 1074/0；lint 含 spec-check/architecture/dsl-ownership/dsl-ownership-ratchet/p0-recovery-join 全绿。
+- **已知限制**：SSE 心跳用 Node timer 而非 ITimerPort 注入（字面偏离，结构断言守卫）；D 类 IntegrationGate 未处理；无更强 Host happens-after 顺序保证（HOST-004 上限与 early-idle 保护保留）。

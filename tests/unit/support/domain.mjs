@@ -4026,6 +4026,7 @@ export const reconcileSupervisor = (() => {
       projection,
       onSnapshot,
       maxCausalRereads,
+      maxConsecutiveErrors,
     } = {}) => {
       if (snapshot === undefined || binding === undefined || onTurn === undefined) {
         throw new Error('reconcileSupervisor.create requires snapshot, binding, onTurn')
@@ -4039,6 +4040,7 @@ export const reconcileSupervisor = (() => {
         projection,
         onSnapshot,
         maxCausalRereads,
+        maxConsecutiveErrors,
       )
     },
     bindUserMessage: (supervisor, session, physical, agentRole) =>

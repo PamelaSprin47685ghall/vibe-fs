@@ -18,7 +18,8 @@ module ReconcileSupervisor =
             ?onDeleted: SessionId -> unit,
             ?projection: (SessionId -> AgentProjectionSet option),
             ?onSnapshot: SessionId -> SessionMessage list -> Task,
-            ?maxCausalRereads: int
+            ?maxCausalRereads: int,
+            ?maxConsecutiveErrors: int
         ) =
 
         let scheduler =
@@ -29,7 +30,8 @@ module ReconcileSupervisor =
                 ?onDeleted = onDeleted,
                 ?projection = projection,
                 ?onSnapshot = onSnapshot,
-                ?maxCausalRereads = maxCausalRereads
+                ?maxCausalRereads = maxCausalRereads,
+                ?maxConsecutiveErrors = maxConsecutiveErrors
             )
 
         member _.Kick(sessionId: SessionId) = scheduler.Kick(sessionId)
