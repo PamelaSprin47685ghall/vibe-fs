@@ -81,9 +81,77 @@ test('GIT_is_dirty_true_only_on_nonempty_porcelain', async () => {
 // ── Rebase / ConflictedFiles / HasRebaseHead ─────────────────────────────────
 
 test('GIT_rebase_ok_on_zero_exit', async () => {
+  // No rebase-merge / rebase-apply directories → fresh rebase path.
   const { runner } = fakeRunner([['rebase main', [0, '', '']]])
   const result = resultOf(await createWithRepo(REPO, runner).Rebase(worktreePath(WORKTREE), targetRef('main')))
   assert.equal(result.ok, true)
+})
+
+test('GIT_rebase_stale_rebase_head_is_cleared_before_fresh_rebase', async () => {
+  const { runner, calls } = fakeRunner([])
+  await createWithRepo(REPO, runner).Rebase(worktreePath(WORKTREE), targetRef('main'))
+
+  const sequence = calls.map((call) => call.args.join(' '))
+  assert.deepEqual(sequence, [
+    'rev-parse --git-path rebase-merge',
+    'rev-parse --git-path rebase-apply',
+    'update-ref -d REBASE_HEAD',
+    'rebase main',
+  ])
+})
+
+test('GIT_rebase_in_progress_stages_and_continues', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-rebase-'))
+
+  const { runner, calls } = fakeRunner([['rev-parse --git-path rebase-merge', [0, `${dir}\n`, '']]])
+  const result = resultOf(await createWithRepo(REPO, runner).Rebase(worktreePath(WORKTREE), targetRef('main')))
+
+  assert.equal(result.ok, true)
+  const sequence = calls.map((call) => call.args.join(' '))
+  assert.deepEqual(sequence, [
+    'rev-parse --git-path rebase-merge',
+    'rev-parse --git-path rebase-apply',
+    'add -A',
+    '-c core.editor=true rebase --continue',
+  ])
+  rmSync(dir, { recursive: true, force: true })
+})
+
+test('GIT_rebase_continue_failure_surfaces_stderr', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-rebase-fail-'))
+
+  const { runner } = fakeRunner([
+    ['rev-parse --git-path rebase-apply', [0, `${dir}\n`, '']],
+    ['-c core.editor=true rebase --continue', [1, '', 'conflict remains']],
+  ])
+  const result = resultOf(await createWithRepo(REPO, runner).Rebase(worktreePath(WORKTREE), targetRef('main')))
+
+  assert.equal(result.ok, false)
+  assert.equal(result.error, 'conflict remains')
+  rmSync(dir, { recursive: true, force: true })
+})
+
+test('GIT_rebase_stage_failure_is_an_error', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-rebase-stage-'))
+
+  const { runner } = fakeRunner([
+    ['rev-parse --git-path rebase-merge', [0, `${dir}\n`, '']],
+    ['add -A', [1, '', 'index locked']],
+  ])
+  const result = resultOf(await createWithRepo(REPO, runner).Rebase(worktreePath(WORKTREE), targetRef('main')))
+
+  assert.equal(result.ok, false)
+  assert.equal(result.error, 'index locked')
+  rmSync(dir, { recursive: true, force: true })
 })
 
 test('GIT_rebase_surfaces_stderr_on_failure', async () => {
@@ -107,12 +175,27 @@ test('GIT_conflicted_files_error_propagates', async () => {
   assert.equal(result.error, 'not a repo')
 })
 
-test('GIT_has_rebase_head_reflects_exit_code', async () => {
-  const { runner: yes } = fakeRunner([['rev-parse --verify REBASE_HEAD', [0, 'abc', '']]])
-  assert.equal(await createWithRepo(REPO, yes).HasRebaseHead(worktreePath(WORKTREE)), true)
+test('GIT_has_rebase_head_true_only_when_git_path_dir_exists', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-rebase-head-'))
 
-  const { runner: no } = fakeRunner([['rev-parse --verify REBASE_HEAD', [1, '', '']]])
-  assert.equal(await createWithRepo(REPO, no).HasRebaseHead(worktreePath(WORKTREE)), false)
+  const port = createWithRepo(
+    REPO,
+    fakeRunner([['rev-parse --git-path rebase-merge', [0, `${dir}\n`, '']]]).runner,
+  )
+  assert.equal(await port.HasRebaseHead(worktreePath(WORKTREE)), true)
+
+  // A missing directory is NOT an in-progress rebase even when rev-parse answers.
+  const { runner: missing } = fakeRunner([['rev-parse --git-path rebase-merge', [0, `${dir}-gone\n`, '']]])
+  assert.equal(await createWithRepo(REPO, missing).HasRebaseHead(worktreePath(WORKTREE)), false)
+
+  // No rebase-merge / rebase-apply at all → false.
+  const { runner: none } = fakeRunner([])
+  assert.equal(await createWithRepo(REPO, none).HasRebaseHead(worktreePath(WORKTREE)), false)
+
+  rmSync(dir, { recursive: true, force: true })
 })
 
 // ── ReadHead / GetTargetHead ─────────────────────────────────────────────────
