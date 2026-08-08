@@ -27,6 +27,7 @@
 | journal 代理等式 canary | HOST-010 |
 | Tool 身份仅 ToolContext 双半边 | HOST-011 |
 | 跨实例共享表 vs 每实例 Journal；共享表操作不跨 await | HOST-012 |
+| 空 Content 预防 | assistant/user 消息空 content 兜底；reasoning 填充或非空 text | HOST-016 |
 
 ## Session 关联
 

@@ -87,3 +87,10 @@ metadata 用于重建，不得把自然语言问题、回答或 QA 正文放进�
 - 共享表的并发所有者是单一 Node.js event loop，不假定不存在的跨线程 CAS。
 - 单次查改与枚举必须同步完成，不跨 `await`；需要跨异步边界使用的数据先复制成不可变快照。
 - 禁止“读取 → await → 按旧值回写”的 read-modify-write；若引入 Worker/共享内存，须先新增明确的消息所有者或原子同步端口。
+
+### 空 Content 预防边界（HOST-016）
+
+| 角色 | 触发条件 | 补救动作 |
+|------|----------|----------|
+| `assistant` | 无 `tool_calls` / tool part，且 text part / content 为空 | 提取 reasoning/thinking 文本填充为 text part；无 reasoning 则填充 `"..."` |
+| `user` | text part / content 为空 | 填充 `"#"` text part |

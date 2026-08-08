@@ -316,6 +316,12 @@ module SpikePlugin =
                         | Some newMessages -> HostMessageProjection.replaceMessagesInPlace outObj newMessages
                         | None -> ()
 
+                        // HOST-016: 对 provider-facing 消息做非空 content 兜底保障，
+                        // 避免仅推理/空 content 导致上游 API 报 400 messages[i].content cannot be empty。
+                        let currentMessages = unbox<obj array> outObj?messages |> Array.toList
+                        let sanitized = HostMessageProjection.sanitizeMessages currentMessages
+                        HostMessageProjection.replaceMessagesInPlace outObj sanitized
+
                         // REVIEW-010: seal LAST, and only after the Companion rewrite has
                         // mutated `outObj`. The seal must digest the message view the
                         // provider actually receives; sealing before the rewrite would

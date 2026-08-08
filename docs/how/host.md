@@ -221,7 +221,7 @@ Review 只见 PendingIdentity/Rejected（REVIEW-010）。开裂侧安全：宁�
 
 ```text
 XTraceCapture → Companion → XWire → EnforcerHost
-→ PairProgrammingThoughtTransform → ReviewSeal
+→ PairProgrammingThoughtTransform → HostMessageProjection.sanitizeMessages (HOST-016) → ReviewSeal
 ```
 
 - 锚点：至少存在一个 user 或已完成 tool-result；满足门槛后在 provider-facing 历史全局末尾追加单条 marker。  
@@ -231,3 +231,12 @@ XTraceCapture → Companion → XWire → EnforcerHost
 - `id = digest(sessionId + source)`，禁止随机/时间，也不依赖 anchor 或 tip 文本。幂等键为 `sessionId + source`，全局只保留一条。  
 - 排除路径按 `source` 过滤，禁止只按正文过滤。  
 - 文本与 source 单点定义。
+
+## 空 Content 预防（归属 HOST-016）
+
+在 `PairProgrammingThoughtTransform` 之后、`ReviewSeal` 之前，遍历 `messages` 进行合法性保障：
+1. 任何 `assistant` 消息：若无 tool part（`type: tool / tool-call / tool_call / tool-result / tool_result` 或 top-level `tool_calls`），且无非空 text part / content：
+   - 若存在 reasoning / thinking part，提取其非空文本填充为 text part（`{ type: "text", text: r }`）；
+   - 若不存在 reasoning 文本，补充最小非空占位 text part（`{ type: "text", text: "..." }`）。
+2. 任何 `user` 消息：若无非空 text part / content，补充非空 text part（`{ type: "text", text: "#" }`）。
+3. 经 `HostMessageProjection.sanitizeMessages` 处理后的消息就地写回 `outObj.messages`，确保 ReviewSeal 与上游 Provider 获得相同且合法的数据。

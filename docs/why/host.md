@@ -39,3 +39,7 @@ Transform input 为空对象是 Host 能力现实；绑定必须用「已创建�
 ### 7. 跨实例：Journal 共享 writer vs 身份注册表共享
 - **被拒方案**：共享 writer。实测第二实例读不到主实例 verdict。
 - **选择方案**：只共享不可变身份注册表，避免折叠写盘。
+
+### 8. HOST-016 空 Content 预防：在 transform 阶段兜底 vs 依赖上游网关修补
+- **被拒方案**：依赖外部网关（如 OneAPI / NewAPI）或不同 Provider 自身的容错逻辑；各厂商实现不一，遇到严格校验的 OpenAI/DeepSeek 兼容端点必然导致 400 `messages[i].content cannot be empty`。
+- **选择方案**：在 `experimental.chat.messages.transform` 管道的末尾（seal 之前）由插件主动做非空 content 兜底，提取 reasoning 文本或注入安全占位符，从根本上杜绝非法空请求体。
