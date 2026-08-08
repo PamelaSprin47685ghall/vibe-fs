@@ -52,8 +52,10 @@ type ToolRuntimeScope
     let mutable disposed = false
     /// P0-RECOVERY-JOIN-001: family recovery before join / publish consume.
     let mutable familyRecovery: (SessionId -> Task<FamilyRecovery>) option = None
+
     /// Phase 4: join interrupt registry (wired from PluginRuntimeScope, or local default).
-    let mutable joinInterrupts: IJoinInterruptRegistry = JoinInterruptRegistry() :> IJoinInterruptRegistry
+    let mutable joinInterrupts: IJoinInterruptRegistry =
+        JoinInterruptRegistry() :> IJoinInterruptRegistry
 
     let registerChild parentSid (_role: Role) childId =
         sessionParents.[SessionId.value childId] <- parentSid

@@ -144,11 +144,7 @@ module FinalityTool =
         : Task<string> =
         task {
             match journal.WriteBlob lastWords with
-            | Error _ ->
-                return
-                    ToolHostCodec.tomlObjectWithInstructions
-                        [ "Continue working and try again later." ]
-                        []
+            | Error _ -> return ToolHostCodec.tomlObjectWithInstructions [ "Continue working and try again later." ] []
             | Ok blob ->
                 let providerRun = context.ProviderRunId.Value
 
@@ -227,20 +223,14 @@ module FinalityTool =
             match scope.RoleFor context with
             | Some Role.Manager ->
                 if String.IsNullOrWhiteSpace context.SessionId then
-                    return
-                        ToolHostCodec.tomlObjectWithInstructions
-                            [ "Continue working and try again later." ]
-                            []
+                    return ToolHostCodec.tomlObjectWithInstructions [ "Continue working and try again later." ] []
                 else
                     let sessionId = context.SessionId
                     let sid = SessionId.create sessionId
 
                     match scope.Journal with
                     | None ->
-                        return
-                            ToolHostCodec.tomlObjectWithInstructions
-                                [ "Continue working and try again later." ]
-                                []
+                        return ToolHostCodec.tomlObjectWithInstructions [ "Continue working and try again later." ] []
                     | Some journal ->
                         let snapshot = AgentJournal.snapshot journal
 
@@ -281,8 +271,7 @@ module FinalityTool =
 
                                     match context.ToolCallId with
                                     | Some callId when callId = request.ToolCallId ->
-                                        return
-                                            ToolHostCodec.tomlObject [ "status", tString "already_received" ]
+                                        return ToolHostCodec.tomlObject [ "status", tString "already_received" ]
                                     | _ ->
                                         // Crash recovery (docs/how/glory.md matrix):
                                         // a request with no enlisted Reviewer member
@@ -409,20 +398,14 @@ module FinalityTool =
 
                         match effectiveLife with
                         // GLORY-039: still no Life — the HumanRoot Manager is planning.
-                        | None ->
-                            return ToolHostCodec.tomlObjectWithInstructions [ "Continue working." ] []
+                        | None -> return ToolHostCodec.tomlObjectWithInstructions [ "Continue working." ] []
                         | Some life when life.ProtectedPrefixEnd.IsNone ->
                             return ToolHostCodec.tomlObjectWithInstructions [ "Continue working." ] []
                         | Some life when life.Completed ->
                             return ToolHostCodec.tomlObject [ "status", tString "already_completed" ]
                         | Some life -> return! acceptSuicide life
-            | Some _ ->
-                return ToolHostCodec.tomlObjectWithInstructions [ "Do not call suicide from this role." ] []
-            | None ->
-                return
-                    ToolHostCodec.tomlObjectWithInstructions
-                        [ "Continue working and try again later." ]
-                        []
+            | Some _ -> return ToolHostCodec.tomlObjectWithInstructions [ "Do not call suicide from this role." ] []
+            | None -> return ToolHostCodec.tomlObjectWithInstructions [ "Continue working and try again later." ] []
         }
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

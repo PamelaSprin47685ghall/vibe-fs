@@ -383,6 +383,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         this.LoopSensor.DropSession(SessionId.create sessionId)
         // HOST-004 Q-10: a deleted session's idle permits die forever.
         this.Quiescence.DropSession(SessionId.create sessionId)
+        // SessionDeleted: drop join-interrupt waiters + one-shot user-message latch.
+        this.JoinInterrupts.ClearSession(SessionId.create sessionId)
 
         // Always cancel the deleted id; also cancel linked Blogger keys.
         let cancelKeys = (sessionId :: linkedBloggerKeys) |> List.distinct

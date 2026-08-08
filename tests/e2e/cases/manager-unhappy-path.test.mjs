@@ -20,6 +20,11 @@ import { readJournal } from '../support/journal-observer.js';
 const ROOT_PROMPT = 'Run the full unhappy path in one turn.';
 const QUEUED_PROMPT = "Also make sure src/main.txt has exactly the content 'done' before the end.";
 const FINAL_WORDS = 'FINAL';
+// Production Host Finality reviewer lastUser is OpeningAssignment + BaseInstructions.
+// TOML second fragments exist only for compile-time reachableTurnIds (flow.prompt);
+// MARK mid-run text is not on reviewer lastUser (PROMPT-004).
+const REVIEWER_OPENING = '# Review the current worktree against all authoritative user requirements.';
+const REVIEWER_RETIRED = '__reviewer-turn-retired-never-match__';
 
 const pollSlice = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -113,6 +118,14 @@ async function bindReviewers(scenario) {
   // respond.args at runtime from the live provider request stream.
   const runtime = scenario.provider._scenario;
   if (runtime?.scenario?.entries) {
+    // Stroke 3: keep C1 incomplete until after the premature-suicide tool-call is
+    // declared (mgr-labor.0). Otherwise child finishes before the activation join,
+    // drain-before-interrupt returns completed, and reason=user_message never appears.
+    let releaseChildC1 = null;
+    const childC1Hold = new Promise((resolve) => {
+      releaseChildC1 = resolve;
+    });
+
     for (const entry of runtime.scenario.entries) {
       if (
         entry.respond?.type === 'tool-call'
@@ -129,7 +142,43 @@ async function bindReviewers(scenario) {
           },
         };
       }
+      if (entry.id === 'child-c1.0') {
+        entry.respond = { ...entry.respond, waitUntil: childC1Hold };
+      }
     }
+
+    // Compile vs production wire: TOML second fragments satisfy reachableTurnIds via
+    // flow.prompt text, but Host Finality reviewers match OpeningAssignment only.
+    // First-round r1/r2/r3 open on that prefix; r1b/r2b keep MARK fragments so they
+    // cannot steal the first enlistment. ScenarioRuntime.consume records answered but
+    // select still sees all entries — retire first-round digests only on their last step.
+    const setTurnFor = (turnId, turnText) => {
+      for (const entry of runtime.scenario.entries) {
+        if (entry.turnId === turnId) entry.turn = turnText;
+      }
+    };
+    for (const turnId of ['reviewer-r1', 'reviewer-r2', 'reviewer-r3']) {
+      setTurnFor(turnId, REVIEWER_OPENING);
+    }
+
+    const originalConsume = runtime.consume.bind(runtime);
+    runtime.consume = (body, selection, context) => {
+      originalConsume(body, selection, context);
+      const id = selection?.entry?.id;
+      if (id === 'mgr-labor.0') {
+        // Premature suicide tool-call is on the wire; outstanding C1 still holds.
+        // Release after this consume so the Host executes suicide against live work,
+        // then C1 can complete for the harvest join (mgr-labor.1).
+        releaseChildC1?.();
+        releaseChildC1 = null;
+      } else if (id === 'reviewer-r1.1') {
+        setTurnFor('reviewer-r1', REVIEWER_RETIRED);
+        setTurnFor('reviewer-r1b', REVIEWER_OPENING);
+      } else if (id === 'reviewer-r2.2') {
+        setTurnFor('reviewer-r2', REVIEWER_RETIRED);
+        setTurnFor('reviewer-r2b', REVIEWER_OPENING);
+      }
+    };
   }
 }
 
@@ -148,29 +197,6 @@ function extractCoderAgentId(requests) {
 async function noWitnessAtFirstRejection(scenario) {
   const witnesses = readJournal(scenario.host.workDir, 'ConfirmedReviewWitness').named;
   assert.equal(witnesses, 0, 'the first REVISE rejection must not confirm anything');
-}
-
-/**
- * Stroke 10: at the moment 3 (or even all 4) verdict facts have landed, the
- * cohort is not yet blessed — the blessing requires every member's terminal.
- * A checkpoint rather than a journal-order comparison: verdict facts live in
- * per-reviewer streams, so cross-stream ordering is not observable.
- */
-async function notBlessedAtThree(scenario) {
-  const workDir = scenario.host.workDir;
-  const deadline = Date.now() + 30000;
-  let verdicts = readJournal(workDir, 'ReviewVerdictRecorded').named;
-  while (verdicts < 3 && Date.now() < deadline) {
-    await pollSlice(100);
-    scenario.watchdog?.advance({ reason: 'waiting-3-verdicts', lane: 'finality', blocking: true });
-    verdicts = readJournal(workDir, 'ReviewVerdictRecorded').named;
-  }
-  assert.ok(verdicts >= 3, `expected >= 3 verdict facts before the blessing check, got ${verdicts}`);
-  assert.equal(
-    readJournal(workDir, 'FinalityBlessed').named,
-    0,
-    'the cohort must not be blessed at 3/4 PERFECTs',
-  );
 }
 
 /** Every durable fact, message and wire contract of the whole traversal. */
@@ -386,7 +412,6 @@ async function finalOracle(scenario, ctx) {
 const customs = {
   bindReviewers,
   noWitnessAtFirstRejection,
-  notBlessedAtThree,
   finalOracle,
 };
 

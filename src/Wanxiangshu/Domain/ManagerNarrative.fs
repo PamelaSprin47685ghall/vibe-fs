@@ -24,9 +24,7 @@ module ManagerNarrative =
 
     /// One provider-visible narrative part. Synthetic guidance is marked so
     /// OpeningPromptRaw capture can exclude it (COMPANION-003).
-    type NarrativePart =
-        { Text: string
-          Synthetic: bool }
+    type NarrativePart = { Text: string; Synthetic: bool }
 
     /// Structured Birth / Reawakening projection: human raw separate from
     /// synthetic instruction parts (SURFACE-004 packaging).
@@ -42,19 +40,15 @@ module ManagerNarrative =
     let private reawakeningPrefixDocument =
         SyntheticToml.document [ ReawakeningPrefix ] []
 
-    let private humanPart (text: string) : NarrativePart =
-        { Text = text; Synthetic = false }
+    let private humanPart (text: string) : NarrativePart = { Text = text; Synthetic = false }
 
-    let private syntheticPart (text: string) : NarrativePart =
-        { Text = text; Synthetic = true }
+    let private syntheticPart (text: string) : NarrativePart = { Text = text; Synthetic = true }
 
     /// GLORY-014: first-Life Birth rewrite as multi-part projection.
     /// Provider-visible: [human raw] then [synthetic PlanningTail document].
     /// Durable Opening remains raw HumanRoot (capture before rewrite).
     let firstBirth (userTextRaw: string) : NarrativeProjection =
-        { Parts =
-            [ humanPart userTextRaw
-              syntheticPart planningTailDocument ] }
+        { Parts = [ humanPart userTextRaw; syntheticPart planningTailDocument ] }
 
     /// GLORY-064: reawakening rewrite after a completed Life.
     /// Provider-visible: [synthetic ReawakeningPrefix] + [human raw] + [synthetic PlanningTail].

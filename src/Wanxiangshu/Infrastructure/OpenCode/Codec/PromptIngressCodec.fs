@@ -133,8 +133,7 @@ module PromptIngressCodec =
                 None
             else
                 match readString part "type" with
-                | Some kind when kind.Equals("text", StringComparison.OrdinalIgnoreCase) ->
-                    readString part "text"
+                | Some kind when kind.Equals("text", StringComparison.OrdinalIgnoreCase) -> readString part "text"
                 | _ -> None)
         |> Array.filter (String.IsNullOrWhiteSpace >> not)
         |> Array.toList

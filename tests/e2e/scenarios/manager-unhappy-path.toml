@@ -3,8 +3,14 @@
 # Harness rules that shape this script:
 # 1. type=text ends a provider turn. Tool chains that must stay alive use only
 #    tool-call steps until the deliberate end of that Labor phase.
-# 2. Reviewer assignment bodies share the review wrapper; rounds are told apart
-#    by fragments in parent_work_record (Manager HumanRoot / assistant tail).
+# 2. Reviewer assignment bodies share the OpeningAssignment + BaseInstructions
+#    wrapper (`# Review the current worktree against all authoritative user
+#    requirements.`). Compile-time reachableTurnIds only sees flow.prompt text,
+#    so second fragments are prefix-related to those prompts (labor / MARK-ISSUE-*
+#    HumanRoots). Runtime lastUser is OpeningAssignment only (PROMPT-004 omits
+#    MARK mid-run from reviewer original_user_requirement) — bindReviewers
+#    rewrites entry.turn digests and retires first-round turns so same-lane
+#    re-enlistments do not ambiguous-match.
 # 3. Stroke 3 wakes a blocked join with a real external user message
 #    (wire reason=user_message). Esc/operator_abort is unit-tested separately;
 #    session abort is no longer the stroke-3 mechanism. The wake prompt is also
@@ -52,7 +58,9 @@ flow = [
   { wait = "mgr-activation.0" },
   { waitFact = { name = "WorkActivated", eq = 1 } },
 
-  # stroke 3: join in flight → external user message wakes join (reason=user_message)
+  # stroke 3: join in flight → external user message wakes join (reason=user_message).
+  # bindReviewers holds child-c1 SSE open until mgr-labor.0 so drain-before-interrupt
+  # cannot harvest a completed child and skip interrupted/user_message.
   { wait = "mgr-activation.1", timeoutMs = 120000 },
   { prompt = { agent = "fast-manager", text = "Also make sure src/main.txt has exactly the content 'done' before the end." } },
   # stroke 4/5/6: Labor — premature suicide, harvest, first legal suicide
@@ -89,11 +97,13 @@ flow = [
   { wait = "child-fix2.0", timeoutMs = 120000 },
   { wait = "mgr-fix2.1", timeoutMs = 120000 },
   { wait = "mgr-fix2.2", timeoutMs = 120000 },
+  # Third suicide drives Host Finality to completion before the tool result returns,
+  # so a mid-cohort "not yet blessed" custom races dual-PERFECT and is not stable.
+  # finalOracle owns FinalityRejected>=2 + FinalityBlessed=1.
   { wait = "reviewer-r2b.0", timeoutMs = 120000 },
   { wait = "reviewer-r3.0", timeoutMs = 120000 },
   { wait = "reviewer-r2b.1", timeoutMs = 120000 },
   { wait = "reviewer-r3.1", timeoutMs = 120000 },
-  { custom = "notBlessedAtThree" },
   { wait = "reviewer-r2b.2", timeoutMs = 120000 },
   { wait = "reviewer-r3.2", timeoutMs = 120000 },
   # Blessing can lag while Companion/blogger still appends; bare waitFact keeps
@@ -281,12 +291,11 @@ user = "# Fix all minor issues from the work logs."
 [[turn]]
 id = "reviewer-r1"
 lane = "reviewer-r1"
-# First-assignment lastUser is ForkChildPayload from HostReviewPrompt.OpeningAssignment
-# + BaseInstructions. parent_work_record is optional (omitted when Manager LWR is None);
-# do not require that field name as a match fragment.
+# Compile: last fragment is prefix-related to the stroke-3 labor flow.prompt.
+# Runtime: bindReviewers rewrites turn to OpeningAssignment only (production wire).
 user = [
   "# Review the current worktree against all authoritative user requirements.",
-  "Also make sure src/main.txt has exactly the content 'done' before the end.",
+  "Also make sure src/main.txt",
 ]
 tools = ["verdict"]
 
@@ -299,6 +308,8 @@ tools = ["verdict"]
 [[turn]]
 id = "reviewer-r1b"
 lane = "reviewer-r1"
+# Compile: last fragment ties to MARK-ISSUE-ONE flow.prompt (reachableTurnIds).
+# Runtime starts non-matching until r1 is retired; then turn becomes OpeningAssignment.
 user = [
   "# Review the current worktree against all authoritative user requirements.",
   "MARK-ISSUE-ONE",
@@ -317,6 +328,7 @@ tools = ["verdict"]
 [[turn]]
 id = "reviewer-r2"
 lane = "reviewer-r2"
+# Lane reviewer-r2 (cohort with r1b). Compile fragment shared with r1b; lanes differ.
 user = [
   "# Review the current worktree against all authoritative user requirements.",
   "MARK-ISSUE-ONE",
@@ -335,6 +347,7 @@ tools = ["verdict"]
 [[turn]]
 id = "reviewer-r2b"
 lane = "reviewer-r2"
+# Compile: MARK-ISSUE-TWO flow.prompt. Runtime activates after r2.2 retire.
 user = [
   "# Review the current worktree against all authoritative user requirements.",
   "MARK-ISSUE-TWO",
@@ -353,6 +366,7 @@ tools = ["verdict"]
 [[turn]]
 id = "reviewer-r3"
 lane = "reviewer-r3"
+# Lane reviewer-r3 (cohort with r2b). Compile fragment shared with r2b; lanes differ.
 user = [
   "# Review the current worktree against all authoritative user requirements.",
   "MARK-ISSUE-TWO",
@@ -418,6 +432,8 @@ user = "# Write the dense work-log continuation now by calling the blog tool exa
 # Missing-final-report nudge is bare "#" (RuntimeNudge.MissingFinalReport).
 # After mgr-repair gained tools=[fork/join/list/suicide], blogger no longer
 # falls into that catch-all; declare a blog-scoped optional continue.
+# Measured: bare-hash can land at step=1 with only blogger.1 as candidate when
+# blogger-continue had only step 0 — expand multi-step optional tool chain.
 [[turn]]
 id = "blogger-continue"
 internal = true
@@ -427,6 +443,15 @@ tools = ["blog"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "blog", args = { text = "Blogger continue after bare-hash nudge.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger continue step 1 after bare-hash nudge.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger continue step 2 after bare-hash nudge.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger continue step 3 after bare-hash nudge.", tip = "primitive-obsession" } }
 
 # Protocol repair after undeclared blogger stop (tools=["blog"]). Optional recovery;
 # not in must. Production lastUser starts with "# Protocol repair".
@@ -450,6 +475,21 @@ reason = "frame-commit"
 [[epoch]]
 turn = "blogger-continue"
 step = 0
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger-continue"
+step = 1
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger-continue"
+step = 2
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger-continue"
+step = 3
 reason = "frame-commit"
 
 [[epoch]]

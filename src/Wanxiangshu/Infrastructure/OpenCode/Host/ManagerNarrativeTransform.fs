@@ -170,10 +170,7 @@ module ManagerNarrativeTransform =
                     projection.Parts
                     |> List.map (fun part ->
                         if part.Synthetic then
-                            createObj
-                                [ "type", box "text"
-                                  "text", box part.Text
-                                  "synthetic", box true ]
+                            createObj [ "type", box "text"; "text", box part.Text; "synthetic", box true ]
                         else
                             createObj [ "type", box "text"; "text", box part.Text ])
                     |> List.toArray

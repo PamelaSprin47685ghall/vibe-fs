@@ -35,8 +35,7 @@ module FinalityPrompt =
                 if String.IsNullOrWhiteSpace normalized then
                     None
                 else
-                    let block =
-                        sprintf "Work log %d\n%s" ordinal normalized
+                    let block = sprintf "Work log %d\n%s" ordinal normalized
 
                     Some(SyntheticToml.comment block))
 

@@ -450,8 +450,7 @@ module FinalityController =
                         orderedRecords
                         |> List.map (fun (ordinal, record) -> ordinal + 1, SyntheticToml.normalizeNewlines record)
 
-                    let material =
-                        logs |> List.map snd |> String.concat "\n\n"
+                    let material = logs |> List.map snd |> String.concat "\n\n"
 
                     match journal.WriteBlob material with
                     | Error _ -> return Undecided ManagerLifecyclePrompt.FinalityUndecidable

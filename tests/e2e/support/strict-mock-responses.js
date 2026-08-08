@@ -31,6 +31,11 @@ async function respondStream(res, chunks, exp) {
   }
 
   if (exp.respond.neverEnd) return;
+  // Optional causal hold: keep the SSE open until a Promise resolves (no fixed sleep).
+  // Used by manager-unhappy-path so C1 stays incomplete across join + user_message wake.
+  if (exp.respond.waitUntil != null) {
+    await exp.respond.waitUntil;
+  }
   if (exp.respond.delayDone > 0) {
     await new Promise((resolve) => setTimeout(resolve, exp.respond.delayDone));
   }

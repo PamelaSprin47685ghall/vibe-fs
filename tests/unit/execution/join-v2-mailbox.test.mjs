@@ -162,6 +162,45 @@ test('EXEC_017_join_interrupt_registry_signal_user_message_fans_out', async () =
   reg2.Dispose()
 })
 
+// Signal-before-Register race: pulse latched when zero waiters, consumed on Register.
+test('EXEC_017_join_interrupt_registry_signal_before_register_latches', async () => {
+  const registry = new JoinInterruptRegistry()
+  const session = SessionIdModule_create('ses-registry-latch')
+  const interrupt = joinInterrupt.create()
+
+  registry.SignalUserMessage(session) // before Register — must latch, not drop
+  const reg = registry.Register(session, interrupt)
+  const reason = await interrupt.Wait
+  assert.equal(caseOf(reason), 'UserMessageArrived')
+
+  reg.Dispose()
+})
+
+// SessionDeleted cleanup: ClearSession drops the latch so a later Register does not wake.
+test('EXEC_017_join_interrupt_registry_clear_session_drops_latch', async () => {
+  const registry = new JoinInterruptRegistry()
+  const session = SessionIdModule_create('ses-registry-clear')
+
+  registry.SignalUserMessage(session) // latches for zero waiters
+  registry.ClearSession(session)
+
+  const interrupt = joinInterrupt.create()
+  const reg = registry.Register(session, interrupt)
+
+  let woke = false
+  const race = Promise.race([
+    interrupt.Wait.then((reason) => {
+      woke = true
+      return reason
+    }),
+    new Promise((resolve) => setTimeout(resolve, 30)),
+  ])
+  await race
+  assert.equal(woke, false, 'ClearSession must drop latch; Register must not signal UserMessageArrived')
+
+  reg.Dispose()
+})
+
 // ── 2: interrupt does not cancel mailbox / does not discard later publish ────
 
 test('EXEC_017_interrupt_does_not_cancel_mailbox_child_still_publishable', async () => {

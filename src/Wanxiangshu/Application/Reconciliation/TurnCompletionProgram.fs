@@ -707,16 +707,12 @@ module TurnCompletionProgram =
                         // No open Life: fail closed / skip rather than claim an
                         // unscoped idle encouragement.
                         AsyncSupport.completedTask ()
-                    | Some _, Some _ when nudgeSent.Contains encouragementKey ->
-                        AsyncSupport.completedTask ()
+                    | Some _, Some _ when nudgeSent.Contains encouragementKey -> AsyncSupport.completedTask ()
                     | Some permit, Some lifeId ->
                         let idleAlreadyClaimed =
                             match journal, HostSessionNudge.tryActiveProfile journal turn.SessionId with
                             | Some durable, Some profile ->
-                                PromptDispatcher.forJournal(durable).IdleAlreadyClaimed
-                                    profile
-                                    lifeId
-                                    turn.ProviderRun
+                                PromptDispatcher.forJournal(durable).IdleAlreadyClaimed profile lifeId turn.ProviderRun
                             | _ -> false
 
                         if idleAlreadyClaimed then
@@ -741,8 +737,7 @@ module TurnCompletionProgram =
                                 | HostSessionNudge.IdleContinuationOutcome.Sent _ -> ()
                                 | HostSessionNudge.IdleContinuationOutcome.Superseded -> ()
                                 | HostSessionNudge.IdleContinuationOutcome.Failed error ->
-                                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error)
-                                    |> ignore
+                                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
                             }
                             :> Task
                 | _ -> AsyncSupport.completedTask ()

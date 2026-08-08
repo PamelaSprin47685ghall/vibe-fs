@@ -368,9 +368,10 @@ module HostSignalBootstrap =
                     // physical id + no PromptKey + not compaction → join wake.
                     let decoded = PromptIngressCodec.decode input output
 
-                    match decoded.SessionId, decoded.PhysicalUserMessageId, decoded.PromptKey, decoded.IsHostCompaction with
-                    | Some sessionId, Some _, None, false ->
-                        scope.JoinInterrupts.SignalUserMessage sessionId
+                    match
+                        decoded.SessionId, decoded.PhysicalUserMessageId, decoded.PromptKey, decoded.IsHostCompaction
+                    with
+                    | Some sessionId, Some _, None, false -> scope.JoinInterrupts.SignalUserMessage sessionId
                     | _ -> ()
 
                     promptIngressHook input output

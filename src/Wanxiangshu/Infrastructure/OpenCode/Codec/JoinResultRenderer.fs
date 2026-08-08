@@ -37,9 +37,7 @@ module JoinResultRenderer =
                   field "reason" (str "operator_abort")
                   field "message" (str "join interrupted") ]
         | JoinInterruptReason.UserMessageArrived ->
-            joinBlocks
-                [ field "status" (str "interrupted")
-                  field "reason" (str "user_message") ]
+            joinBlocks [ field "status" (str "interrupted"); field "reason" (str "user_message") ]
         | JoinInterruptReason.DeadlineExpired ->
             // Defensive: production JoinTool maps DeadlineExpired to TIMED_OUT.
             joinBlocks
