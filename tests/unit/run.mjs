@@ -19,7 +19,8 @@
 // the same verdict-silence criterion (VERIFY-004). UNIT_VERDICT_SILENCE_MS remains the unit budget.
 
 import { statSync } from 'node:fs'
-import { relative } from 'node:path'
+import { dirname, join, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { UNIT_VERDICT_SILENCE_MS } from '../e2e/support/time-budget.js'
 import { superviseNodeTest } from '../e2e/support/supervise-node-test.mjs'
@@ -28,8 +29,19 @@ import { walk } from '../../scripts/lib/walk.mjs'
 const TESTS_ROOT = 'tests/unit'
 const PRODUCTION_ROOT = 'src/Wanxiangshu'
 const BUILD_ROOT = 'dist'
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 const skipStaleness = process.argv.includes('--skip-staleness-check')
+const withCoverage = process.argv.includes('--coverage')
+
+// Coverage is measured in the inner runner (NODE_TEST_COVERAGE) so the V8 map lives in the same
+// process as the tests. The threshold is VERIFY-009's floor, and the summary lands in artifacts/.
+if (withCoverage) {
+  process.env.NODE_TEST_COVERAGE = '1'
+  process.env.COVERAGE_SUMMARY_PATH = join(ROOT, 'artifacts/coverage/coverage-summary.json')
+  process.env.COVERAGE_LINE_THRESHOLD = '60'
+  console.error('runner: coverage ON — summary → artifacts/coverage/coverage-summary.json, threshold 60% lines')
+}
 
 // ── staleness gate ──────────────────────────────────────────────────────────
 
