@@ -73,6 +73,23 @@ class Js extends JsProgram {
 > **If a method is present, the capability exists.
 > If a method is absent, it does not.**
 
+最强不变量（五层同构）：
+
+> 没有某能力 → 生成的基类里没有该方法 → 工具描述里不出现该方法 → canonical examples 里不出现该方法 → 对应 alias 不可见 → 即使伪造底层调用，runtime gate 仍 fail closed。
+
+本 Change 只有两个核心不变量：
+
+1. **LLM-visible SDK 与 executable authority 完全同构**；
+2. **一次 JS 工具调用 = 一个 all-or-nothing mutation transaction**（纯查询除外）。
+
+Compatibility：**Clean break**。五个 legacy 工具实现与其 schema 全部移除；`read/edit/write/glob/grep` 五个名字保留，但全部变成 generated aliases（见 # 71 / # 72）。不允许任何 legacy 兼容模式。
+
+### 模型侧使用合同（必须写进工具描述）
+
+1. **只要需要就并行调用多个工具**：并行读取、并行编辑、同文件、异文件全部绝对安全（Host 侧合同见 # 55.1）；
+2. **强烈鼓励对同文件与异文件提交大量并行编辑**，不要因为担心冲突而串行等待；
+3. **强烈鼓励模型写很复杂的 JavaScript 脚本**处理工作：一次 program 内批量读、批量变换、批量 rewrite/write，Host 保证整个 program 是单个事务。
+
 ---
 
 # 1. Motivation
@@ -134,6 +151,40 @@ glob
 
 JavaScript filesystem program 本身成为 primitive。
 
+### 1.1 为什么需要 anchors
+
+传统实现允许模型自己写：
+
+```js
+source.indexOf(...)
+source.slice(...)
+source.replace(...)
+```
+
+anchors 并没有增加 Node.js 的理论表达力。
+
+它增加的是可靠性：
+
+1. **Intent 可验证**：Host 可以在运行 JS 前确认所有定位依据确实存在；
+2. **定位与变换解耦**：模型不用一边处理 `indexOf` 的 corner case，一边构造输出；
+3. **Fail closed**：anchor 找不到 → 根本不运行程序，而不是 JS 算出一个奇怪位置继续写；
+4. **对重复内容天然友好**：ordered matching 是模型最便宜的 disambiguation mechanism；
+5. **描述容易教**：模型只需要学会一个惯用法：
+
+```js
+text("^", "a") + replacement + text("b", "$")
+```
+
+6. **未修改原文被精确复制**：`text(a,b)` 保留原始 bytes，而不是让模型重新打一遍未改动内容 → 减少意外格式变化。
+
+### 1.2 表达力界限
+
+不计 JS 本身的计算能力，anchor-and-splice 小语言已经能表示：
+
+> **任意有限个原文 substring 与任意新字符串的有限拼接。**
+
+绝大多数 source edit 本质上都属于这一类。
+
 ---
 
 # 2. Design Principle: Capability-Projected Tool Surface
@@ -178,6 +229,21 @@ alias 表再一份
 
 这种设计最终一定漂移。
 
+### 2.1 最强不变量：5 层投影
+
+对于当前 Attempt 的每一个 capability，以下五层必须完全同构：
+
+```text
+没有该 capability
+→ 1. 生成的基类中没有对应方法
+→ 2. 工具描述中不出现该方法
+→ 3. canonical examples 中不出现该方法
+→ 4. 对应 alias 不可见
+→ 5. 即使伪造底层调用，runtime gate 仍 fail closed
+```
+
+模型的认知负担因此为零：不需要记“文档里有但你不能用”。
+
 ---
 
 # 3. 不新增第二份 Authority
@@ -205,6 +271,18 @@ AttemptExecutionProfile.ToolCapabilitySet
 ```
 
 Role 和 RequestKind 已经在 profile 构造阶段完成解释。
+
+生成器必须保持纯函数姿态。它不能：
+
+```text
+读 Session mutable
+查当前注册了哪些工具
+猜 Agent name
+观察 provider schema 后反推权限
+根据 alias 再推权限
+```
+
+输入已经是 canonical profile，输出只是 projection。
 
 这对 Student 尤其重要：
 
@@ -588,6 +666,16 @@ see js-inspector
 
 但 provider 没有暴露 `js-inspector`。
 
+### 9.1 alias 集合 = capability advertisement
+
+模型看到的 alias 集合本身就是一张能力公告。
+
+`js-ROLE` description 应说明：
+
+> 当前可见的 aliases 表示本次 request 可用的 filesystem capabilities。
+
+模型看到没有 `edit` / `write` alias，自然知道这是只读 JS 环境；不需要再读权限表。
+
 ---
 
 # 10. Schema
@@ -649,6 +737,37 @@ JsProgram
 ```
 
 也不得自造 Host capability。
+
+### 11.1 并行调用绝对安全
+
+模型**只要需要就并行调用多个工具**：并行读取、并行编辑、同文件、异文件全部绝对安全（Host 侧合同见 # 55.1）。
+
+强烈鼓励对**同文件与异文件提交大量并行编辑**。
+
+绝对安全的合同基础：
+
+```text
+同一 assistant 消息中的工具调用由 Host 按确定性顺序逐个执行
+→ 每个调用是独立 transaction
+→ 后一个调用基于前一个调用提交后的 committed state 重新 snapshot
+→ 同文件多轮编辑 = 顺序叠加，无 lost update
+→ 异文件并行编辑 = 各自独立 all-or-nothing
+```
+
+### 11.2 强烈鼓励复杂 JavaScript 脚本
+
+模型应尽量写**很复杂的 JS 脚本**一次完成工作：
+
+```text
+一次 program
+→ glob 大量路径
+→ 循环批量读取
+→ 复杂字符串/正则/JSON 变换
+→ 批量 rewrite/write
+→ return 结构化摘要
+```
+
+Host 保证整个 program 属于**单个事务**：全部成功或全部不生效。不需要模型把大任务拆成多次简单调用，也不需要为规避文件冲突而串行化（见 # 55.1）。
 
 ---
 
@@ -906,6 +1025,18 @@ async file(path, matches = []) {
 实际 Host 实现不要求字节逐字等于这段 JavaScript。
 
 但可观察语义必须完全等价。
+
+### 16.1 Anchor 声明校验（5 类拒绝）
+
+在读取完原文件、但**运行任何模型 JS 之前**，必须完成全部 anchor 声明校验。至少拒绝：
+
+1. **空名字**：`begin` 或 `end` 为空字符串；
+2. **保留名字**：`begin` 或 `end` 为 `^` / `$`；
+3. **重复名字**：所有 begin/end 名称共享同一个 namespace，重复即拒绝；
+4. **begin == end**：同一声明中两个名字相同；
+5. **空字符串 pattern**：字符串 pattern 必须非空；空字符串没有稳定的 source-identification 含义。
+
+注意：正则 pattern 没有“空”概念，零宽正则 `/(?=...)/` 是合法匹配（见 # 19）。
 
 ---
 
@@ -1178,6 +1309,16 @@ StagedRewrite
 ```
 
 到当前 transaction WriteSet。
+
+模型**不要求**先 `file(path)` 再 `rewrite(path)`。
+
+Host 在首次 staging 时自动为该路径建立 preimage snapshot（见 # 57）。
+
+因此以下程序合法：
+
+```js
+this.rewrite("version.txt", "2\n");
+```
 
 ---
 
@@ -1956,6 +2097,23 @@ Anchors locate. JavaScript transforms. Mutations are staged and committed by
 the Host as one transaction.
 ```
 
+### 47.1 模型推荐 workflow
+
+工具描述应教授以下使用顺序：
+
+1. 声明定位所需的最小 anchor 集合；
+2. 让 Host 解析 begin/end 位置；
+3. 用 `text(...)` slices 与新内容构造**完整的新文件**；
+4. 只有 anchor-and-splice 形式真正不便时，才使用通用 JS 字符串处理（如 `indexOf` / `replaceAll`）。
+
+简单替换优先写：
+
+```js
+f.text("^", "begin") + "newString" + f.text("end", "$")
+```
+
+而不是手动计算 offset 或重新实现匹配逻辑。
+
 ---
 
 # 48. Generated Role Surfaces
@@ -2397,6 +2555,69 @@ JsProgram public members
 → Host capability RPC
 ```
 
+### 53.1 runner 只获得数据，不获得文件
+
+父进程负责：
+
+```text
+path → path gate → read file → strict UTF-8 decode → resolve anchors
+```
+
+runner 只收到已物化的数据：
+
+```fsharp
+type EditProgramRequest =
+    { Source: string
+      Anchors: Map<string, int>
+      Program: string }
+```
+
+其中 Anchors map 已包含 `^` / `$`。
+
+runner **不收到可用的 repository capability**：
+
+```text
+runner 不负责 read(path)
+runner 不负责 write(path)
+runner 不负责 resolve path
+```
+
+即使模型程序完全失控，它面对的也只是一个已物化的字符串快照。
+
+### 53.2 `new Function` 只是 invocation mechanism
+
+Host 内部可以这样调用 program：
+
+```js
+const run = new Function("text", "glob", "rewrite", "write", `"use strict";\n${program}`)
+```
+
+但：
+
+> **安全边界永远是外层隔离进程，不是 `new Function`。**
+
+`new Function` 只是 program invocation mechanism；同 `node:vm` 一样，不能单独充当安全证明（# 76）。
+
+### 53.3 stdout/stderr 不是编辑结果
+
+禁止：
+
+```text
+模型 console.log 什么 → Host 把 stdout 当成结果
+```
+
+编辑结果 / observation 只来自：
+
+```text
+run() 的 return value（经固定 bootstrap 的 result envelope）
+```
+
+stdout/stderr 只能作为 bounded diagnostics。
+
+不能从普通输出猜“最后一行可能是结果”，也不能因为程序打印了 JSON 就解析成结果。
+
+runner 必须有明确的 framed response protocol；模型程序产生的 console/stdout 内容不得被当成 protocol。
+
 ---
 
 # 54. Arbitrary JavaScript, Not Arbitrary Host Authority
@@ -2440,6 +2661,70 @@ language power
 
 不能把 in-process JavaScript context 本身当作 security proof。
 
+### 54.1 Deadline 与资源界
+
+模型程序：
+
+```js
+while (true) {}
+```
+
+不能挂死工具。
+
+要求：
+
+```text
+每个 edit program 一个明确 deadline
+deadline 到达 → kill runner
+kill 后等待 process reap
+返回 PROGRAM_TIMEOUT
+绝不继续写文件
+```
+
+第一版至少限制：
+
+```text
+最大 runner memory
+最大 program source bytes
+最大 input source bytes
+最大 returned file bytes
+最大 diagnostic bytes
+```
+
+这些常量必须有**单一 owner**：
+
+- 如果现有 write/edit 已有文件大小合同 → 复用该合同；
+- 如果当前没有 → 在正式 what/how 中新增一个明确常量 owner，再实现；
+- 禁止在三个模块各写一个 magic number。
+
+### 54.2 日志
+
+允许 diagnostics：
+
+```text
+operation = js-*
+tool name / alias
+path
+result
+failure_code
+anchor_count
+input_bytes
+output_bytes
+duration
+```
+
+不得记录：
+
+```text
+完整 source
+完整 program
+完整 replacement
+模型处理后的完整文件
+secrets
+```
+
+调试 program failure 时只记录 bounded sanitized diagnostic。
+
 ---
 
 # 55. Transaction Model
@@ -2480,6 +2765,56 @@ run()
 
 成功结束以前不得被修改。
 
+### 55.1 同一消息内的并行工具调用由 Host 串行化
+
+模型可以在一次 assistant 消息中并行发出任意多个 js-* / alias 调用（同文件、异文件均可）。
+
+Host 对同一消息内的工具调用按**确定性顺序逐个执行**：
+
+```text
+调用 1 执行 → 独立 transaction → commit
+调用 2 执行 → 独立 transaction → commit（基于调用 1 之后的 committed state）
+...
+```
+
+因此：
+
+```text
+同文件并行编辑 = 顺序叠加，后一个调用重新 snapshot 到最新 committed state → 绝对安全
+异文件并行编辑 = 各自独立 all-or-nothing → 绝对安全
+并行读取 = 各自独立只读 → 绝对安全
+```
+
+“并行”是模型侧的请求形态；执行侧是确定性的串行提交。
+
+不存在 lost update（# 58 / FILE_CHANGED），也不需要模型自己节流。
+
+### 55.2 模型不拥有事务控制权
+
+派生类**没有**：
+
+```js
+this.commit()
+this.rollback()
+this.transaction()
+this.snapshot()
+```
+
+以下 API 必须不存在于生成的基类：
+
+```text
+commit / rollback / snapshot / resolve / filesystem / transaction
+```
+
+事务生命周期完全由 Host 持有：
+
+```text
+run() 正常返回 → Host 统一 preflight → prepare → commit
+run() throw / 任意 file()/glob() 失败 → 所有 staged rewrites 丢弃 → 零提交
+```
+
+编辑意图只通过 `rewrite()` / `write()` 表达；`run()` 的 return value 只是 observation result（# 27），不是提交指令。
+
 ---
 
 # 56. Transaction Read Snapshot
@@ -2509,6 +2844,18 @@ INVALID_UTF8
 ```
 
 不得 replacement-character 修复。
+
+不得：
+
+```text
+replacement-character 修复
+跳过坏字节
+猜 encoding
+自动转 Latin-1
+以 binary Buffer 继续
+```
+
+Student 现有合同本身也要求目标 SKILL 为 UTF-8 并在不可解码时 fail closed；新工具必须保持相同姿态。
 
 ---
 
@@ -2573,6 +2920,20 @@ FILE_CHANGED
 第一版 `glob()` 结果视为一次路径观察。
 
 Host 不承诺针对外部进程提供完整数据库级 phantom serializability；但所有实际读取文件和 mutation preimages 必须在提交前重新验证。
+
+### 58.1 失败不隐式 retry
+
+检测到 FILE_CHANGED 后：
+
+```text
+不得自动重新读取
+不得自动重新 resolve anchors
+不得自动重新执行模型 program
+```
+
+那会把一次 tool call 变成隐式 retry，并可能改变模型原本定位的对象。
+
+失败就是失败（# 89 测试）。
 
 ---
 
@@ -2867,6 +3228,22 @@ WriteSet empty
 ```
 
 因此同一个 JS primitive 同时自然支持 query 和 mutation。
+
+### 67.1 No-op
+
+如果某个 staged replacement 与 preimage 字节相同：
+
+```text
+该文件不执行无意义 write/rename
+整体仍算成功
+```
+
+No-op 结果（见 # 78.1）：
+
+```text
+status = "ok"
+changed = false
+```
 
 ---
 
@@ -3215,7 +3592,39 @@ type AnchorFailure =
     | PatternNotFound of declarationIndex: int
 ```
 
-不要从 exception prose 反推领域 failure。
+### 77.1 稳定失败码
+
+Provider-visible renderer 把 typed failure 映射为稳定 code，第一版建议：
+
+```text
+INVALID_PROGRAM
+PROGRAM_FAILED
+PROGRAM_TIMEOUT
+PROGRAM_RESOURCE_LIMIT
+PERMISSION_DENIED
+PATH_DENIED
+FILE_NOT_FOUND
+FILE_ALREADY_EXISTS
+FILE_READ_FAILED
+INVALID_UTF8
+RESERVED_ANCHOR
+DUPLICATE_ANCHOR
+EMPTY_ANCHOR_NAME
+EMPTY_ANCHOR_CONTENT
+ANCHOR_NOT_FOUND
+UNKNOWN_ANCHOR
+INVALID_SLICE
+DUPLICATE_MUTATION_TARGET
+RESULT_TOO_LARGE
+INVALID_RETURN_VALUE
+FILE_CHANGED
+TRANSACTION_PREPARE_FAILED
+TRANSACTION_COMMIT_FAILED
+TRANSACTION_ROLLBACK_FAILED
+TRANSACTION_RECOVERY_REQUIRED
+```
+
+不要从 exception message 反推业务错误种类。
 
 ---
 
@@ -3247,6 +3656,50 @@ environment
 ```
 
 Program error stack 必须 sanitize + bound。
+
+### 78.1 成功结果形状
+
+成功结果保持小而确定：
+
+```toml
+status = "ok"
+changed = true
+files = 3
+```
+
+no-op：
+
+```toml
+status = "ok"
+changed = false
+files = 0
+```
+
+或调用了 `rewrite()` 但全部 replacement 与 originals 相同：
+
+```toml
+status = "ok"
+changed = false
+files = 3
+```
+
+其中：
+
+```text
+files = staged target 文件数（含 write 创建的文件）
+```
+
+Tool result 不返回：
+
+```text
+完整新文件
+完整旧文件
+program
+source
+巨大 diff
+```
+
+模型需要检查内容时自己调用 `read` / file()。
 
 ---
 
@@ -3594,6 +4047,33 @@ public member exists
 ⇔ executable runtime capability exists
 ```
 
+### 86.1 Tool Description Golden
+
+必须有 golden 测试固定 provider-visible schema 与核心说明。
+
+至少断言 `js-ROLE` description 中明确存在这些概念：
+
+```text
+ordered
+begin
+end
+content
+text(from, to)
+^
+$
+complete resulting file
+```
+
+以及标准 replace example。
+
+目的不是逐字冻结整篇 prose，而是防止未来“精简描述”时把推荐 idiom 删掉，只剩：
+
+```text
+Run JavaScript to edit a file.
+```
+
+那会把模型重新推回手写 `indexOf` 的不稳定路径。
+
 ---
 
 # 87. “Lying Generator” Permanent Counterexamples
@@ -3836,6 +4316,21 @@ do not overwrite
 → recovery required
 ```
 
+并行调用（# 55.1）：
+
+```text
+同消息两个调用编辑同一文件
+→ 按确定性顺序执行
+→ 第二个调用看到第一个的 committed state
+→ 两个都成功，无 lost update
+
+同消息两个调用编辑不同文件
+→ 各自独立 all-or-nothing
+
+同消息并行读取 + 编辑
+→ 读取调用不影响编辑调用
+```
+
 ---
 
 # 94. Crash Recovery Tests
@@ -4029,6 +4524,54 @@ glob
 
 只允许第二处改变。
 
+具体 fixture（真实 Coder canary）：
+
+原文件：
+
+```js
+function first() {
+  return "old";
+}
+
+function second() {
+  return "old";
+}
+```
+
+程序：
+
+```js
+class Js extends JsProgram {
+  async run() {
+    const f = await this.file("target.js", [
+      ["second", "secondBody", "function second() {"],
+      ["target", "afterTarget", 'return "old";'],
+    ]);
+
+    this.rewrite(
+      "target.js",
+      f.text("^", "target")
+        + 'return "new";'
+        + f.text("afterTarget", "$")
+    );
+
+    return { changed: ["target.js"] };
+  }
+}
+```
+
+最终必须只改第二个函数。
+
+这个 canary 同时证明：
+
+```text
+duplicate source fragment
+ordered disambiguation
+standard splice
+whole-file result
+真实 filesystem commit
+```
+
 ---
 
 # 101. E2E Canary — Multi-file Refactor
@@ -4053,6 +4596,50 @@ return changed list
 ```text
 全部不变
 ```
+
+补充：**多区域编辑** fixture——用两个 anchor declarations，一次 program 同时修改两处：
+
+原文件：
+
+```text
+HEADER
+
+A=old
+
+middle
+
+B=old
+
+FOOTER
+```
+
+程序用 `["a","b","A=old"]` 与 `["c","d","B=old"]` 两个 anchor，一次 `rewrite()` 同时替换 A、B。
+
+这证明该工具不是换皮 single replace。
+
+补充：**move/copy** canary——至少一个测试不属于 replace，例如把一个 block 移到另一个位置：
+
+```js
+class Js extends JsProgram {
+  async run() {
+    const f = await this.file("src/foo.js", [
+      ["a", "b", "first block"],
+      ["c", "d", "second block"],
+    ]);
+
+    this.rewrite(
+      "src/foo.js",
+      f.text("^", "a")
+        + f.text("c", "d")
+        + f.text("b", "c")
+        + f.text("a", "b")
+        + f.text("d", "$")
+    );
+  }
+}
+```
+
+否则实现虽然 schema 很强，实际 proof 仍只证明了 legacy replace。
 
 ---
 
@@ -4316,6 +4903,14 @@ mv
 * 五个 familiar names 保留为 aliases；
 * legacy schemas 移除；
 * provider 同名 spec 无重复。
+
+## Parallel
+
+* 同消息并行工具调用按确定性顺序串行执行；
+* 同文件并行编辑无 lost update；
+* 异文件并行编辑各自 all-or-nothing；
+* 并行读取不影响编辑；
+* 复杂 JS 脚本（批量 glob/read/rewrite）在单事务内成立。
 
 ## Proof
 
