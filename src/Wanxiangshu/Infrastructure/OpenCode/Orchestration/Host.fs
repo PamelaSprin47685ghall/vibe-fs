@@ -81,11 +81,82 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 | None -> return Error(sprintf "Fork of '%s' produced no child session" agentId)
         }
 
+    // Await one HostPendingRun.Source for this agent. Prefer Host pending over
+    // ForkRuntime.AwaitAgent: same agentId resume would otherwise re-observe the
+    // already-settled ChildRun.Completion and skip the new work unit.
+    let awaitPendingSource (agentId: string) (source: Task<AgentCompletionOutcome>) =
+        task {
+            let! completedFirst =
+                Wanxiangshu.Process.PtyTiming.raceExit (source :> Task) ExecutorSummarize.AwaitAgentTimeoutMs
+
+            if not completedFirst then
+                return Error(sprintf "await agent timed out: %s" agentId)
+            else
+                let! outcome = source
+
+                match outcome with
+                | AgentCompleted _ -> return Ok()
+                | AgentFailed payload -> return Error payload.Message
+                | AgentAbandoned(_, reason) -> return Error reason
+        }
+
+    // After Resume/Fork: wait for an unfinished Host pending Source, await it,
+    // then return. If the manager finishes before we observe pending (fast path),
+    // treat as done. Never finalize before this returns — early Ok on missing
+    // pending raced installRun and staged an unresolved conflict (ORCH-003).
+    let awaitCurrentPendingRun (agentId: string) =
+        task {
+            let deadline = DateTimeOffset.UtcNow.AddMilliseconds(float ExecutorSummarize.AwaitAgentTimeoutMs)
+            // Brief window for sendToExistingChild to installRun after Fork returns.
+            let appearDeadline = DateTimeOffset.UtcNow.AddMilliseconds(2000.0)
+
+            let trySource () =
+                lock runtime.Gate (fun () ->
+                    match runtime.PendingRuns.TryGetValue agentId with
+                    | true, run when not run.Finished -> Some run.Source.Task
+                    | _ -> None)
+
+            let rec waitAppear () =
+                task {
+                    match trySource () with
+                    | Some source -> return Some source
+                    | None when DateTimeOffset.UtcNow >= appearDeadline -> return None
+                    | None ->
+                        do! Wanxiangshu.Process.PtyTiming.timerTask 10
+                        return! waitAppear ()
+                }
+
+            match! waitAppear () with
+            | Some source -> return! awaitPendingSource agentId source
+            | None ->
+                // No pending within appear window: either still installing (spin)
+                // or already finished. Poll until deadline for a late pending.
+                let rec waitLate () =
+                    task {
+                        match trySource () with
+                        | Some source -> return! awaitPendingSource agentId source
+                        | None when DateTimeOffset.UtcNow >= deadline -> return Ok()
+                        | None ->
+                            do! Wanxiangshu.Process.PtyTiming.timerTask 25
+                            return! waitLate ()
+                    }
+
+                return! waitLate ()
+        }
+
     let awaitChild (agentId: string) =
         task {
-            match! runtime.AwaitAgent(agentId, ?timeoutMs = Some ExecutorSummarize.AwaitAgentTimeoutMs) with
-            | Error error -> return Error error
-            | Ok run -> return outcomeOf run
+            match
+                lock runtime.Gate (fun () ->
+                    match runtime.PendingRuns.TryGetValue agentId with
+                    | true, run when not run.Finished -> Some run.Source.Task
+                    | _ -> None)
+            with
+            | Some source -> return! awaitPendingSource agentId source
+            | None ->
+                match! runtime.AwaitAgent(agentId, ?timeoutMs = Some ExecutorSummarize.AwaitAgentTimeoutMs) with
+                | Error error -> return Error error
+                | Ok run -> return outcomeOf run
         }
 
     // ── ManagerPort ─────────────────────────────────────────────────────────
@@ -110,10 +181,29 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 | false, _ -> return Error(sprintf "No worktree registered for manager job '%s'" agentId)
         }
 
+    /// Drop a leftover Host pending for this agent so Resume can install a fresh
+    /// work unit. A stuck unfinished pending (e.g. dual-suicide race) would make
+    /// sendToExistingChild take the busy-nudge path and never re-installRun, leaving
+    /// awaitCurrentPendingRun waiting on a Source that will not observe conflict
+    /// resolution (ORCH-003 measured: conflict-resume on wire, REBASE_HEAD unmerged).
+    let clearStalePending (agentId: string) =
+        lock runtime.Gate (fun () ->
+            match runtime.PendingRuns.TryGetValue agentId with
+            | true, run when not run.Finished ->
+                run.Finished <- true
+                run.Subscription |> Option.iter (fun s -> s.Dispose())
+                run.Source.TrySetResult(
+                    AgentCompletion.failed agentId ("run-" + agentId) (Some Role.Manager) None "SUPERSEDED" "superseded by ResumeManager"
+                )
+                |> ignore
+                runtime.PendingRuns.Remove agentId |> ignore
+            | true, _ -> runtime.PendingRuns.Remove agentId |> ignore
+            | false, _ -> ())
+
     /// ORCH-003/ORCH-007: hand work back to the SAME Manager in the SAME worktree.
     ///
-    /// `Fork` on an existing agent nudges it (EXEC-002) rather than creating a second
-    /// child, so this is a continuation of that Manager's Logical Run.
+    /// Clear stale pending → Fork conflict-resume → await Host pending Source →
+    /// finalizeWorktree (stage + rebase --continue).
     let resumeManager (jobId: ManagerJobId) (worktree: WorktreePath) (prompt: string) =
         task {
             match jobRecord jobId with
@@ -121,10 +211,18 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             | Some record ->
                 let agentId = managerAgentId jobId
                 worktrees.[agentId] <- WorktreePath.value worktree
+                clearStalePending agentId
 
                 match! runtime.Fork(agentId, Role.Manager, record.ManagerAgent, prompt, None, firstPrompt = false) with
                 | Error error -> return Error error
-                | Ok _ -> return! awaitManager jobId
+                | Ok _ ->
+                    match! awaitCurrentPendingRun agentId with
+                    | Error error -> return Error error
+                    | Ok() ->
+                        match worktrees.TryGetValue agentId with
+                        | true, path -> return! OrchestratorGit.finalizeWorktree OrchestratorGit.run agentId path
+                        | false, _ ->
+                            return Error(sprintf "No worktree registered for manager job '%s'" agentId)
         }
 
     /// ORCH-006: abort the manager and every reviewer child session for a job

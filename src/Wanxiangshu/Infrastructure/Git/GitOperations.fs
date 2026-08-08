@@ -183,10 +183,41 @@ module GitOperations =
           Rebase =
             fun worktree target ->
                 task {
-                    let! code, stdout, stderr =
-                        runner (command (WorktreePath.value worktree) [ "rebase"; TargetRef.value target ])
+                    let dir = WorktreePath.value worktree
+                    // ORCH-003: continue only when rebase-merge/rebase-apply exists.
+                    // A bare REBASE_HEAD ref can be stale (no rebase in progress).
+                    let! mergeCode, mergePath, _ =
+                        runner (command dir [ "rev-parse"; "--git-path"; "rebase-merge" ])
 
-                    return if code = 0 then Ok() else Error(failure stdout stderr)
+                    let! applyCode, applyPath, _ =
+                        runner (command dir [ "rev-parse"; "--git-path"; "rebase-apply" ])
+
+                    let inProgress =
+                        let exists code path =
+                            code = 0
+                            && not (String.IsNullOrWhiteSpace path)
+                            && System.IO.Directory.Exists(path.Trim())
+
+                        exists mergeCode mergePath || exists applyCode applyPath
+
+                    if inProgress then
+                        // Stage any Manager/Coder resolution before continue (ORCH-003).
+                        // ResumeManager's finalizeWorktree should already have staged, but a
+                        // missed finalize leaves unmerged paths; add here is idempotent.
+                        let! addCode, _, addErr = runner (command dir [ "add"; "-A" ])
+
+                        if addCode <> 0 then
+                            return Error(failure "" addErr)
+                        else
+                            let! code, stdout, stderr =
+                                runner (command dir [ "-c"; "core.editor=true"; "rebase"; "--continue" ])
+
+                            return if code = 0 then Ok() else Error(failure stdout stderr)
+                    else
+                        // Clear stale REBASE_HEAD so the fresh rebase is not confused.
+                        let! _ = runner (command dir [ "update-ref"; "-d"; "REBASE_HEAD" ])
+                        let! code, stdout, stderr = runner (command dir [ "rebase"; TargetRef.value target ])
+                        return if code = 0 then Ok() else Error(failure stdout stderr)
                 }
 
           ConflictedFiles =
@@ -210,10 +241,20 @@ module GitOperations =
           HasRebaseHead =
             fun worktree ->
                 task {
-                    let! code, _, _ =
-                        runner (command (WorktreePath.value worktree) [ "rev-parse"; "--verify"; "REBASE_HEAD" ])
+                    let dir = WorktreePath.value worktree
 
-                    return code = 0
+                    let! mergeCode, mergePath, _ =
+                        runner (command dir [ "rev-parse"; "--git-path"; "rebase-merge" ])
+
+                    let! applyCode, applyPath, _ =
+                        runner (command dir [ "rev-parse"; "--git-path"; "rebase-apply" ])
+
+                    let exists code path =
+                        code = 0
+                        && not (String.IsNullOrWhiteSpace path)
+                        && System.IO.Directory.Exists(path.Trim())
+
+                    return exists mergeCode mergePath || exists applyCode applyPath
                 }
 
           ListWorktrees = WorktreeCommands.list runner repoPath

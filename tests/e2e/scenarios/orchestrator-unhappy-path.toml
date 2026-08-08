@@ -36,7 +36,9 @@ flow = [
   # Stroke 3: diverge target AFTER the manager worktree exists (see conflict canary).
   { afterExpectation = { id = "manager.0", gitConflictProof = true } },
 
-  # Stroke 1
+  # Stroke 1 — fork job + manager dual-suicide Finality + candidate.
+  # Production order: Manager Life ends → finalize candidate → rebase → conflict.
+  # conflict-resume is a NEW turn on the same Manager session (not manager.3 again).
   { wait = "orch.0" },
   { waitFact = { name = "ManagerJobCreated", eq = 1 } },
   { wait = "manager.0" },
@@ -44,13 +46,12 @@ flow = [
   { wait = "coder.1" },
   { wait = "manager.1" },
   { wait = "manager.2" },
-
-  # Stroke 2: Host-owned Finality (may interleave with barrier work)
   { wait = "manager-finality-reviewer.0", timeoutMs = 30000 },
   { wait = "manager-finality-reviewer.1", timeoutMs = 30000 },
   { wait = "manager.3", timeoutMs = 30000 },
+  { waitFact = { name = "CandidateReady", eq = 1 }, timeoutMs = 60000 },
 
-  # Stroke 3/4: conflict durable, same Manager resumes, Coder resolves file
+  # Stroke 3/4 — conflict + same-Manager resume + coder resolve
   { waitFact = { name = "ConflictDetected", gte = 1 }, timeoutMs = 60000 },
   { wait = "conflict-resume.0", timeoutMs = 60000 },
   { custom = "afterConflictResume" },
@@ -59,16 +60,12 @@ flow = [
   { wait = "conflict-resume.1", timeoutMs = 60000 },
   { wait = "conflict-resume.2", timeoutMs = 60000 },
 
-  # Stroke 5: integration review + exactly-once publish.
-  # Journal wait uses substring match: bare "Published" false-matches the
-  # coder assignment text "Published by orchestrator canary" in
-  # OpeningPromptCaptured. Pin the Orchestrator case tag shape.
-  { wait = "barrier-reviewer.0", timeoutMs = 60000 },
-  { wait = "barrier-reviewer.1", timeoutMs = 60000 },
-  { wait = "barrier-reviewer.2", timeoutMs = 60000 },
+  # Stroke 5 — post-resolve rebase continue → post-rebase review → publish.
+  # Bare "Published" false-matches assignment text; pin Orchestrator case tag.
+  { waitFact = { name = "RebasedCandidateReady", gte = 1 }, timeoutMs = 90000 },
   { waitFact = { name = "\"Orchestrator\",[\"Published\"", eq = 1 }, timeoutMs = 90000 },
 
-  # Stroke 6: Orchestrator harvest
+  # Stroke 6 — Orchestrator harvest
   { wait = "orch.2", timeoutMs = 60000 },
   { awaitTerminal = true, requireAssistantTerminal = false },
   { assertFacts = { name = "\"Orchestrator\",[\"Published\"", eq = 1 } },
