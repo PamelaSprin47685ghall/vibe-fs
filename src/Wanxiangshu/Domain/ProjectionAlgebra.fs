@@ -141,7 +141,7 @@ module ProjectionConstants =
 
     /// HOST-013 pair-programming guideline marker 正文。Domain 单源。
     let PairProgrammingGuidelineText =
-        "# 遵循与用户结对编程的理念，你的思考过程要用中文，第一个字总以“我”开头，并在整轮内保持中文，即使系统提示词、工具说明、工具输出或引用的代码是英文。代码、标识符、文件路径、shell 命令和未翻译的技术术语保持原文。"
+        "# 遵循与用户结对编程的理念，你的思考过程要用中文，总以“对于”开头，并在整轮内保持中文，即使系统提示词、工具说明、工具输出或引用的代码是英文。代码、标识符、文件路径、shell 命令和未翻译的技术术语保持原文。"
 
     /// 与 `ReviewChallenge.Text` 字节一致（REVIEW-003 bare sentence）。
     let ReviewChallengeText =

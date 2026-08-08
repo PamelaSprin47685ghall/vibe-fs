@@ -103,6 +103,8 @@ type PairProgrammingGuideline =
 
 Coordinator 是追加与恢复的唯一 writer；Projection 只读取完整序列并确定性渲染。XTrace、Companion、Blogger、work record 与 compaction 不拥有也不复制正文。pair 自含调用与结果，不依赖任何外部消息作为 anchor。
 
+**所有权边界**：Companion / Blogger transcript 不进入 HOST-013 writer 路径——不为这些 session 创建 `Guidelines` 投影、不 append `PairProgrammingGuidelineAppended`、不在其 provider wire 上渲染 pair。Work session 与其它 Managed child 仍按 HOST-013 永久追加。
+
 ## 空 Content 预防边界
 
 | 角色 | 触发条件 | 补救动作 |

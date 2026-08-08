@@ -47,3 +47,7 @@ Transform input 为空对象是 Host 能力现实；绑定必须用「已创建�
 ### 9. HOST-013 前缀稳定：移动单 marker vs 永久追加 pair
 - **被拒方案**：每次 transform 删除历史 marker，再把单条 completed tool-result 移到当前全局末尾。旧请求已发送的 marker 会在后续请求中消失或换位，provider-visible 历史不再以前次请求为字节前缀，Prefix Cache 因而失效；裸 tool-result 还依赖外部 anchor 才合法。
 - **选择方案**：每次 transform 在当前全局末尾追加一组自足的 synthetic tool-call + 对应 completed tool-result。pair 一经加入即成为不可变永久历史，后续每次 transform 都按原位置、原字节恢复全部既有 pair，再追加本次 pair。成对结构不依赖 user 或既有 tool-result，空历史同样有效；只追加、不删除、不换位，才能保持 Prefix Cache。
+
+### 10. HOST-013 范围：全 session 注入 vs 排除 Blogger
+- **被拒方案**：对全部 provider transcript（含 Companion Blogger）注入结对编程 guideline。Blogger 的唯一任务是把 TOML delta 压成 `blog` 工作日志；中文「以“我”开头」的思考约束与 tip nudge 会污染其 system/tool 合同，导致偏离 `blogger-system.md` 与 ENFORCER 工具纪律。
+- **选择方案**：HOST-013 仅作用于非 Companion session。Blogger 身份以 durable `SessionAssociationProjection.isCompanion` 判定，transform 短路跳过 pair 注入与 durable append。

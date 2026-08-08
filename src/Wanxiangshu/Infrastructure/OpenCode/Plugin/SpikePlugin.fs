@@ -300,21 +300,36 @@ module SpikePlugin =
                         // HOST-013：永久 pair-programming guideline。
                         // XTrace 之后、ReviewSeal 之前。恢复 durable 历史 pair，
                         // 再在全局末尾追加本次 tool-call + tool-result。
-                        let messages = unbox<obj array> outObj?messages |> Array.toList
-
-                        let markerText =
+                        // Companion / Blogger 整段跳过：结对编程约束干扰 blog 工具合同。
+                        let skipGuideline =
                             match journal, projectionSessionIdOpt with
-                            | Some durable, Some bloggerSessionId ->
-                                match EnforcerHost.latestTipNudge durable (SessionId.create bloggerSessionId) with
-                                | Some nudge -> nudge + "\n\n" + ProjectionConstants.PairProgrammingGuidelineText
-                                | None -> ProjectionConstants.PairProgrammingGuidelineText
-                            | _ -> ProjectionConstants.PairProgrammingGuidelineText
+                            | Some durable, Some sessionId ->
+                                SessionAssociationProjection.isCompanion
+                                    (SessionId.create sessionId)
+                                    (AgentJournal.snapshot durable).AgentProjections.Associations
+                            | _ -> false
 
-                        match
-                            PairProgrammingThoughtTransform.tryInject journal projectionSessionIdOpt markerText messages
-                        with
-                        | Some newMessages -> HostMessageProjection.replaceMessagesInPlace outObj newMessages
-                        | None -> ()
+                        if not skipGuideline then
+                            let messages = unbox<obj array> outObj?messages |> Array.toList
+
+                            let markerText =
+                                match journal, projectionSessionIdOpt with
+                                | Some durable, Some sessionId ->
+                                    match EnforcerHost.latestTipNudge durable (SessionId.create sessionId) with
+                                    | Some nudge ->
+                                        nudge + "\n\n" + ProjectionConstants.PairProgrammingGuidelineText
+                                    | None -> ProjectionConstants.PairProgrammingGuidelineText
+                                | _ -> ProjectionConstants.PairProgrammingGuidelineText
+
+                            match
+                                PairProgrammingThoughtTransform.tryInject
+                                    journal
+                                    projectionSessionIdOpt
+                                    markerText
+                                    messages
+                            with
+                            | Some newMessages -> HostMessageProjection.replaceMessagesInPlace outObj newMessages
+                            | None -> ()
 
                         // HOST-016: 对 provider-facing 消息做非空 content 兜底保障，
                         // 避免仅推理/空 content 导致上游 API 报 400 messages[i].content cannot be empty。

@@ -69,13 +69,15 @@ Host compaction **不得删除** XTrace：否则 Y 落后补缺口与 LWR 自包
 
 ## HOST-013：结对编程 marker（行为）
 
-每次 transform 必须在 provider-facing 历史全局末尾追加一组 synthetic `guideline` pair：assistant tool-call，随后是使用同一 `callID` 的 completed tool-result。tool-call 的输入为 `{}`；tool-result 正文有最近一个 prior tip 时为英文 Nudge、空行、`ProjectionConstants.PairProgrammingGuidelineText`，否则仅为该中文正文。
+对**非 Companion / 非 Blogger** 的 provider transcript，每次 transform 必须在 provider-facing 历史全局末尾追加一组 synthetic `guideline` pair：assistant tool-call，随后是使用同一 `callID` 的 completed tool-result。tool-call 的输入为 `{}`；tool-result 正文有最近一个 prior tip 时为英文 Nudge、空行、`ProjectionConstants.PairProgrammingGuidelineText`，否则仅为该中文正文。
 
 它**是**会影响 prompt bytes、Prefix Cache、ReviewSeal 的合成历史；**不是**私有思维、容量估算或通用恢复信号。
 
+**范围排除**：`ManagedSessionKind.SatelliteSession(_, Companion)`（Blogger）的 transform **禁止**注入、恢复或追加任何 guideline pair。Blogger 只消费 `blogger-system.md` + 工作日志 TOML；结对编程中文思考约束不得进入其 provider-facing 历史。判断依据是 durable SessionAssociation（`isCompanion`），禁止按 agent 名字猜测。
+
 行为约束：
 
-1. 每次 transform 无条件追加恰好一组完整 pair；无 user、无既有 tool-call/tool-result、空历史时同样追加。pair 自足合法，不存在 anchor 门槛。
+1. 对适用 session，每次 transform 无条件追加恰好一组完整 pair；无 user、无既有 tool-call/tool-result、空历史时同样追加。pair 自足合法，不存在 anchor 门槛。Companion / Blogger session 整段跳过，消息序列字节不变。
 2. pair 一经加入即永久有效。后续每次 transform 必须按原位置、原字节恢复全部既有 pair，再在当前全局末尾追加本次 pair；禁止删除、过滤、去重、改写、换位或复用既有 pair 的 `callID`。
 3. 同一 pair 的 tool-call 与 tool-result 必须相邻、共享 `callID`；不同 pair 的 `callID` 唯一且可稳定重建。恢复顺序与字节必须来自 durable append-only 事实，不得依赖文本识别。
 4. pair 正文不得进入 XTrace / Companion decode / Blogger delta / work record / compaction input；仅 pair 的 durable 投影事实参与 HOST-013 恢复。

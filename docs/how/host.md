@@ -224,13 +224,21 @@ XTraceCapture → Companion → XWire → EnforcerHost
 → PairProgrammingThoughtTransform → HostMessageProjection.sanitizeMessages (HOST-016) → ReviewSeal
 ```
 
+- 适用判定：仅非 Companion session 进入本程序。`journal` 存在时以 `SessionAssociationProjection.isCompanion sessionId` 为准；为 true（Blogger）则跳过 `PairProgrammingThoughtTransform`，不读 tip、不 append durable pair、不改 `messages`。无 journal / 无 association 时按非 Companion 处理（保持既有测试与未知 session 行为）。
 - transform 每次读取该 provider transcript 的完整 durable pair 序列，按 `Ordinal` 顺序恢复所有既有 pair；不得从正文猜测、跳过或折叠记录。
 - 本次 transform 分配新的 `Ordinal` 与唯一稳定 `CallId`，先追加 durable 事实，再在 provider-facing 历史全局末尾重新构造本次 pair。任何既有 pair 的字节、顺序与 `CallId` 永不改变；不清理、不去重、不复用。
 - 一个 pair 的 provider wire 形态必须是相邻的两步：assistant `tool-call`（工具名 `guideline`、输入 `{}`）→ 对应 `tool-result`（同一 `callID`、`status = completed`、输出 `markerText`）。它不依赖 user 或其它 tool-result anchor，空历史也必须有效。
-- `markerText` 只对本次新 pair 读取当时的 prior tip；历史 pair 保留其原始正文。有 prior tip 时为英文 Nudge、空行、中文正文；无 prior tip 时仅为中文正文。中文正文由 `ProjectionConstants.PairProgrammingGuidelineText` 定义。
+- `markerText` 只对本次新 pair 读取当时的 prior tip；历史 pair 保留其原始正文。有 prior tip 时为英文 Nudge、空行、中文正文；无 prior tip 时仅为中文正文。中文正文由 `ProjectionConstants.PairProgrammingGuidelineText` 定义。prior tip 由 owner 的 RecentTips 解析（主 session），不是 Blogger 自身 tip 注入。
 - pair 的 synthetic side-channel 标识为 `source = "pair-programming-guideline"`；两侧均按 source 排除于 XTrace 等非 provider 投影，禁止按正文识别或过滤。
 - `CallId = digest(transcript identity + source + Ordinal)`；禁止随机、时间、anchor 或 tip 文本参与身份。正文与 source 单点定义。
-- ReviewSeal 覆盖恢复后的全部历史 pair 与本次末尾 pair；只有该永久 append-only 字节序列可保持 Prefix Cache。
+- ReviewSeal 覆盖恢复后的全部历史 pair 与本次末尾 pair；只有该永久 append-only 字节序列可保持 Prefix Cache。Blogger 跳过注入时 ReviewSeal 只覆盖无 guideline 的消息视图。
+- tip nudge 查找：`latestTipNudge` 仅在非 Companion 路径调用；不得以当前 session 是 Blogger 为由把 tip 写进 Blogger transcript。
+
+---
+
+## Marker 程序（归属 HOST-013）——Blogger 排除
+
+Companion / Blogger 整段跳过 HOST-013。实现点：`SpikePlugin` transform 在 `PairProgrammingThoughtTransform.tryInject` 之前用 association 门禁短路。
 
 ## 空 Content 预防（归属 HOST-016）
 
