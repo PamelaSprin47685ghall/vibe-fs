@@ -11,6 +11,8 @@
 | chat.message 不进普通业务 | HOST-002 |
 | provider `TurnAborted` 保留到消费边界；无 Armed 不产生 Agent completion | HOST-004、LOOP-006、EXEC-020 |
 | Reconciler 无新信号时不产生 setTimeout/GetMessages（仅 ≤3 次因果重读） | HOST-004、A 类有界 |
+| 重复 snapshot 稳定只证明观测稳定；`Unknown` 无 `IdleWake` 不产生 idle-derived continuation | HOST-004 |
+| 发送瞬间 fresh permit：stale permit → zero physical prompt + zero `PluginPromptClaimed`；`TryConsume` 与 dispatcher send 间无 await | HOST-004 |
 
 ## Compaction
 
@@ -27,11 +29,11 @@
 | journal 代理等式 canary | HOST-010 |
 | Tool 身份仅 ToolContext 双半边 | HOST-011 |
 | 跨实例共享表 vs 每实例 Journal；共享表操作不跨 await | HOST-012 |
-| 永久 auto-injected pair | 空历史也插入完整 tool-call/tool-result；本次 pair 在 trailing user 之前（无 user 则末尾）；有同批 tool 时 call 批末 / result 批末顺序为 `tool1 tool2 auto-injected result1 result2 result-auto-injected[ user]`；第 $n+1$ 次 transform 原位恢复前 $n$ 组并只插入本次一组；同 pair `callID` 相同、跨 pair 唯一；重启恢复字节相等 | HOST-013 |
-| Companion / Blogger 不注入 auto-injected | durable `isCompanion=true` 的 session transform 后 `markerCount=0`、消息字节与注入前相等；不为该 session append `PairProgrammingGuidelineAppended` | HOST-013 |
+| 永久 auto-injected pair | 用户 canonical multi-tool 序列逐字成立（`Req1 Req2 FakeReq1 Resp1 Resp2 FakeResp1` → `… Req3 FakeReq2 Resp3 FakeResp2`）；历史 pair 不随 current placement 搬家；same placement 重入不新增 pair（journal append 数 = 1、wire bytes exactly equal）；restart replay byte-identical；anchor 缺失 fail closed；N 轮 property：同 epoch `isAppendOnlyPrefix(wire[n], wire[n+1])` 恒 true | HOST-013 |
+| Companion / Blogger 不注入 auto-injected | durable `isCompanion=true` 的 session transform 后 `markerCount=0`、消息字节与注入前相等；不为该 session append `PairProgrammingGuidelineAnchored` | HOST-013 |
 | 空 Content 预防 | assistant/user 消息空 content 兜底；reasoning 填充或非空 text | HOST-016 |
 
-代表：`tests/unit/host/pair-thought-transform.test.mjs`、`tests/integration/plugin/manager-tool-contract.test.mjs`（`HOST_013_*`）、`tests/unit/enforcer/latest-tip-nudge.test.mjs`。
+代表：`tests/unit/host/pair-thought-transform.test.mjs`、`tests/integration/plugin/manager-tool-contract.test.mjs`（`HOST_013_*`）、`tests/unit/enforcer/latest-tip-nudge.test.mjs`、HOST-013 replay property / restart / fail-closed 单测、Quiescence gate 单测（`tests/unit/host/`）。
 
 ## Session 关联
 

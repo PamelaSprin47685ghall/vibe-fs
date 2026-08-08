@@ -26,9 +26,12 @@ insertBlogFrames
 insertRepair
 suppressTransportOnly
 appendReviewChallenge
-insertPairProgrammingThought // HOST-013：恢复永久 pair 序列；本次 pair 插在 trailing user 前
 reanchorAfterCompaction
 ```
+
+HOST-013 pair-programming marker 不占 intent：wire 级 DSL 消息无 transcript 地址，无法做
+anchored 渲染；由 `PairProgrammingThoughtTransform` 在 raw 域按 durable gap anchor
+replay（见 `how/host.md` HOST-013）。
 
 禁止任何业务功能直接接收和修改 `Message list`。
 

@@ -475,6 +475,7 @@ const AGENT_FACT_FAMILIES = [
   ['Orchestrator', FactModule.OrchestratorFactCases],
   ['Companion', FactModule.CompanionFactCases],
   ['Context', FactModule.ContextFactCases],
+  ['Host', FactModule.HostFactCases],
 ]
 
 const buildAgentFact = (() => {
@@ -573,6 +574,21 @@ export const blobDigest = (v) => Ids.blobDigest.create(v)
 export const bloggerRequestId = (v) => Ids.bloggerRequest.create(v)
 export const managerLifeId = (v) => Ids.managerLife.create(v)
 export const finalityRequestId = (v) => Ids.finalityRequest.create(v)
+
+// HOST-013: Host transcript message address (raw `info.id` / `id`). A transcript
+// position, not a user-only / authority / run identity.
+export const transcriptAddress = {
+  create: (value) => Identity.TranscriptMessageAddressModule_create(value),
+  value: (id) => Identity.TranscriptMessageAddressModule_value(id),
+}
+
+/** HOST-013 TranscriptGap: Start | Before addr | After addr. */
+const buildTranscriptGap = unionCase(Identity.TranscriptGap, 'TranscriptGap')
+export const transcriptGap = {
+  start: () => buildTranscriptGap('Start', []),
+  before: (address) => buildTranscriptGap('Before', [address]),
+  after: (address) => buildTranscriptGap('After', [address]),
+}
 
 // Epoch ids wrap int64, so Fable represents them as BigInt. Taking a JS number
 // here and converting once keeps `1` out of every call site — passing a plain
@@ -1969,14 +1985,6 @@ export const projectionIntent = (() => {
     },
     /** PROJ-008 step 5: REVIEW-003 skeptical challenge. */
     appendReviewChallenge: (intent = { TextVersion: 1 }) => build('AppendReviewChallenge', [intent]),
-    /** PROJ-008 step 5 / HOST-013: permanent auto-injected pair history + next. */
-    insertPairProgrammingThought: (intent = { History: [], Next: undefined }) =>
-      build('InsertPairProgrammingThought', [
-        {
-          History: toList(intent.History ?? []),
-          Next: intent.Next ?? { CallId: 'pair-marker-1', MarkerText: '' },
-        },
-      ]),
     /** PROJ-008 step 6: Host compaction reanchor (renderer no-op on wire bytes). */
     get reanchorAfterCompaction() {
       return build('ReanchorAfterCompaction', [])

@@ -598,9 +598,13 @@ test('CTX_002_transform_appends_one_pair_programming_pair', async () => {
   })
 })
 
-test('HOST_013_pair_before_trailing_user_not_after_assistant_only_tail', async () => {
+test('HOST_013_pair_lands_at_end_when_transcript_ends_with_assistant_tail', async () => {
   await withPlugin(async (hooks) => {
-    // last user is first message → pair before it; assistant stays after user.
+    // Transcript ends with assistant text (no trailing user, no tool batch):
+    // the new pair must land at the transcript END. The old "before the last
+    // user anywhere" rule inserted the pair mid-transcript on continuation
+    // transcripts, rewriting already-sent bytes and breaking the append-only
+    // prefix (HOST-013 constraint 5).
     const transformed = {
       messages: withSession([
         { role: 'user', text: 'hello' },
@@ -611,10 +615,10 @@ test('HOST_013_pair_before_trailing_user_not_after_assistant_only_tail', async (
 
     assert.equal(transformed.messages.length, 4)
     assert.equal(markerCount(transformed.messages), 2)
-    assert.equal(transformed.messages[0].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-    assert.equal(transformed.messages[1].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-    assert.equal(transformed.messages[2].role ?? transformed.messages[2].info?.role, 'user')
-    assert.equal(transformed.messages[3].role ?? transformed.messages[3].info?.role, 'assistant')
+    assert.equal(transformed.messages[0].role ?? transformed.messages[0].info?.role, 'user')
+    assert.equal(transformed.messages[1].role ?? transformed.messages[1].info?.role, 'assistant')
+    assert.equal(transformed.messages[2].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
+    assert.equal(transformed.messages[3].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
   })
 })
 
@@ -679,9 +683,10 @@ test('HOST_013_pair_before_trailing_user_in_mixed_history', async () => {
   })
 })
 
-test('HOST_013_repeated_transform_appends_another_pair', async () => {
+test('HOST_013_repeated_transform_of_same_placement_replays_only', async () => {
   await withPlugin(async (hooks) => {
-    // HOST-013: each transform permanently inserts one new pair before trailing user.
+    // HOST-013: a placement occasion that already has a bracket only replays —
+    // repeated transform of the same real transcript must not append a pair.
     // Use non-synthetic base so history is re-hydrated from durable/memory ledger.
     const first = { messages: withSession([{ role: 'user', text: 'hello' }], 'ses-repeat') }
     await hooks['experimental.chat.messages.transform']({}, first)
@@ -690,7 +695,7 @@ test('HOST_013_repeated_transform_appends_another_pair', async () => {
 
     const second = { messages: withSession([{ role: 'user', text: 'hello' }], 'ses-repeat') }
     await hooks['experimental.chat.messages.transform']({}, second)
-    assert.equal(markerCount(second.messages), 4, 'history pair + new pair')
+    assert.equal(markerCount(second.messages), 2, 'same placement must replay, not append a second pair')
     assert.equal(second.messages.at(-1).role ?? second.messages.at(-1).info?.role, 'user')
   })
 })

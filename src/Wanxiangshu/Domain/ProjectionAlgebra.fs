@@ -57,17 +57,6 @@ type RepairIntent = { RequestKey: string }
 /// `AppendReviewChallenge` 载荷：REVIEW-003 TextVersion。
 type ChallengeIntent = { TextVersion: int }
 
-/// `InsertPairProgrammingThought` 载荷：完整永久 pair 序列 + 本次新增 pair。
-///
-/// `History` 按 Ordinal 升序；`Next` 是本次 transform 新追加的 pair。
-/// Renderer 恢复 history 原位语义后，把本次 pair 插在 trailing user 前
-/// （多 tool 时 call/result 批末；无 user 则全局末尾）。
-type PairProgrammingGuidelineWire = { CallId: string; MarkerText: string }
-
-type PairThoughtIntent =
-    { History: PairProgrammingGuidelineWire list
-      Next: PairProgrammingGuidelineWire }
-
 /// PROJ-002：一次 attempt 的只读投影快照——DSL 核心输入（PROJ-002）。
 ///
 /// attempt-local：字段覆盖一次 provider attempt 的投影输入。PROJ-008 step 3a 在
@@ -110,8 +99,6 @@ type ProjectionIntent =
     | SuppressTransportOnly
     /// REVIEW-003 skeptical challenge。
     | AppendReviewChallenge of ChallengeIntent
-    /// HOST-013 固定 pair-programming marker。
-    | InsertPairProgrammingThought of PairThoughtIntent
     /// ContextReanchored → Snapshot=None；wire 字节 no-op。
     | ReanchorAfterCompaction
 
@@ -156,7 +143,7 @@ module ProjectionConstants =
 [<RequireQualifiedAccess>]
 module ProjectionPlanner =
 
-    /// Canonical rank（how/projection.md）：Prefix0, Blog1, Repair2, Suppress3, Challenge4, Pair5, Reanchor6。
+    /// Canonical rank（how/projection.md）：Prefix0, Blog1, Repair2, Suppress3, Challenge4, Reanchor5。
     let private rank (intent: ProjectionIntent) : int =
         match intent with
         | ProjectionIntent.KeepPhysicalPrefix
@@ -165,8 +152,7 @@ module ProjectionPlanner =
         | ProjectionIntent.InsertRepair _ -> 2
         | ProjectionIntent.SuppressTransportOnly -> 3
         | ProjectionIntent.AppendReviewChallenge _ -> 4
-        | ProjectionIntent.InsertPairProgrammingThought _ -> 5
-        | ProjectionIntent.ReanchorAfterCompaction -> 6
+        | ProjectionIntent.ReanchorAfterCompaction -> 5
 
     let private kindKey (intent: ProjectionIntent) : int = rank intent
 
@@ -257,7 +243,7 @@ module ProjectionPlanner =
                 Error ProjectionConflict.ConflictingReviewChallenge
         | first :: _ -> Ok(Some first)
 
-    /// 幂等并 1：Suppress / Pair / Reanchor（以及任何单例重放型）。
+    /// 幂等并 1：Suppress / Reanchor（以及任何单例重放型）。
     let private reduceIdempotent (items: ProjectionIntent list) : Result<ProjectionIntent option, ProjectionConflict> =
         match items with
         | [] -> Ok None
@@ -274,7 +260,6 @@ module ProjectionPlanner =
             | ProjectionIntent.InsertRepair _ -> reduceRepair items
             | ProjectionIntent.AppendReviewChallenge _ -> reduceChallenge items
             | ProjectionIntent.SuppressTransportOnly
-            | ProjectionIntent.InsertPairProgrammingThought _
             | ProjectionIntent.ReanchorAfterCompaction -> reduceIdempotent items
 
     /// PROJ-006：汇总各功能意图 → groupBy kind → reduce → sortBy rank。
@@ -377,31 +362,6 @@ module ProjectionRenderer =
 
         message
 
-    let private guidelinePairMessages (pair: PairProgrammingGuidelineWire) : ProviderProjection.WireMessage list =
-        let callId = ToolCallId.create pair.CallId
-
-        [ { Role = "assistant"
-            Parts = [ ProviderProjection.WireToolCall(callId, "auto-injected", "{}") ] }
-          { Role = "assistant"
-            Parts = [ ProviderProjection.WireToolResult(callId, pair.MarkerText) ] } ]
-
-    /// Fable/JS 边界：Parts 可能为 null/undefined 或非 F# list。此时视为无 part，
-    /// 不当 tool-result anchor / pair marker，禁止对缺失 list 调 IsEmpty/tail。
-    let private safeParts (message: ProviderProjection.WireMessage) : ProviderProjection.WirePart list =
-        let parts = message.Parts
-
-        if isNull (box parts) then
-            []
-        else
-            // 非 F# list（例如 JS Array）在 Fable List 原语上会崩；仅接受有 tail 的 list 形状。
-            try
-                // 触达 head/tail 形状：空 list 与非空 list 均可；非法形状进 catch。
-                ignore (List.isEmpty parts)
-                parts
-            with _ ->
-                []
-
-
     /// COMPANION-005：`InsertBlogFrames` 的唯一形状源是 `CompanionProjectionBuilder`。
     /// Builder 只在此调用一次；真实 `sha256` 产出 MessageId，经 Host 侧信道写回（PROJ-004）。
     ///
@@ -471,139 +431,6 @@ module ProjectionRenderer =
                       HostMessageIds = List.head acc.HostMessageIds :: companionIds @ List.tail acc.HostMessageIds
                       HostIsPhysical = List.head acc.HostIsPhysical :: companionPhysical @ List.tail acc.HostIsPhysical }
 
-    /// HOST-013：恢复 history + 插入 next。
-    /// pair = tool-call + tool-result，永久 append-only。
-    /// base 中若残留同 CallId 的 auto-injected wire，剔除后按 durable 原字节重建。
-    /// 本次 pair：trailing user 前；多 tool 时 call/result 批末；无 user 则末尾。
-    let private applyPairThought (intent: PairThoughtIntent) (acc: RenderedMessages) : RenderedMessages =
-        let knownIds =
-            (intent.History @ [ intent.Next ])
-            |> List.map (fun pair -> pair.CallId)
-            |> Set.ofList
-
-        let isKnownGuideline (message: ProviderProjection.WireMessage) : bool =
-            message.Role = "assistant"
-            && safeParts message
-               |> List.exists (function
-                   | ProviderProjection.WireToolCall(callId, name, _) ->
-                       name = "auto-injected" && Set.contains (ToolCallId.value callId) knownIds
-                   | ProviderProjection.WireToolResult(callId, _) -> Set.contains (ToolCallId.value callId) knownIds
-                   | _ -> false)
-
-        let isWireToolCall (message: ProviderProjection.WireMessage) : bool =
-            match safeParts message with
-            | ProviderProjection.WireToolCall _ :: _ -> true
-            | _ -> false
-
-        let isWireToolResult (message: ProviderProjection.WireMessage) : bool =
-            match safeParts message with
-            | ProviderProjection.WireToolResult _ :: _ -> true
-            | _ -> false
-
-        let retained =
-            List.zip3 acc.Messages acc.HostMessageIds acc.HostIsPhysical
-            |> List.filter (fun (message, _, _) -> not (isKnownGuideline message))
-
-        let retainedArr = retained |> List.toArray
-
-        let trailingUserIdx =
-            // DSL-MUTABLE: algorithm-scratch
-            let mutable idx = retainedArr.Length - 1
-            let mutable found = -1
-
-            while idx >= 0 && found < 0 do
-                let message, _, _ = retainedArr.[idx]
-
-                if message.Role = "user" then
-                    found <- idx
-
-                idx <- idx - 1
-
-            found
-
-        let headLen =
-            if trailingUserIdx < 0 then
-                retainedArr.Length
-            else
-                trailingUserIdx
-
-        let head = if headLen = 0 then [||] else retainedArr.[0 .. headLen - 1]
-
-        let tail =
-            if trailingUserIdx < 0 then
-                [||]
-            else
-                retainedArr.[trailingUserIdx..]
-
-        // DSL-MUTABLE: algorithm-scratch
-        let mutable resultStart = head.Length
-        let mutable scanningResults = true
-
-        while scanningResults && resultStart > 0 do
-            let message, _, _ = head.[resultStart - 1]
-
-            if isWireToolResult message then
-                resultStart <- resultStart - 1
-            else
-                scanningResults <- false
-
-        // DSL-MUTABLE: algorithm-scratch
-        let mutable callStart = resultStart
-        let mutable scanningCalls = true
-
-        while scanningCalls && callStart > 0 do
-            let message, _, _ = head.[callStart - 1]
-
-            if isWireToolCall message then
-                callStart <- callStart - 1
-            else
-                scanningCalls <- false
-
-        let historyBlock =
-            intent.History
-            |> List.collect (fun pair ->
-                let msgs = guidelinePairMessages pair
-
-                [ (List.item 0 msgs, Some pair.CallId, false)
-                  (List.item 1 msgs, Some pair.CallId, false) ])
-
-        let nextMsgs = guidelinePairMessages intent.Next
-        let nextCall = List.item 0 nextMsgs, Some intent.Next.CallId, false
-        let nextResult = List.item 1 nextMsgs, Some intent.Next.CallId, false
-
-        let prefix = if callStart = 0 then [||] else head.[0 .. callStart - 1]
-
-        let calls =
-            if callStart >= resultStart then
-                [||]
-            else
-                head.[callStart .. resultStart - 1]
-
-        let results =
-            if resultStart >= head.Length then
-                [||]
-            else
-                head.[resultStart..]
-
-        let placed =
-            if callStart < head.Length then
-                (prefix |> Array.toList)
-                @ historyBlock
-                @ (calls |> Array.toList)
-                @ [ nextCall ]
-                @ (results |> Array.toList)
-                @ [ nextResult ]
-                @ (tail |> Array.toList)
-            else
-                (head |> Array.toList)
-                @ historyBlock
-                @ [ nextCall; nextResult ]
-                @ (tail |> Array.toList)
-
-        { Messages = placed |> List.map (fun (message, _, _) -> message)
-          HostMessageIds = placed |> List.map (fun (_, id, _) -> id)
-          HostIsPhysical = placed |> List.map (fun (_, _, physical) -> physical) }
-
     let private appendSynthetic (role: string) (text: string) (acc: RenderedMessages) : RenderedMessages =
         { Messages = acc.Messages @ [ textMessage role text ]
           HostMessageIds = acc.HostMessageIds @ [ None ]
@@ -671,7 +498,6 @@ module ProjectionRenderer =
         | ProjectionIntent.AppendReviewChallenge _ ->
             // REVIEW-003 生产可见字节 = Prompt（`# Text\n`），与 tool-result / nudge / seal 一致。
             appendSynthetic "user" ProjectionConstants.ReviewChallengePrompt acc
-        | ProjectionIntent.InsertPairProgrammingThought intent -> applyPairThought intent acc
         // wire no-op：CommittedPrefix=None 的语义由 Coordinator 填 Snapshot；此处不改字节。
         | ProjectionIntent.ReanchorAfterCompaction -> acc
 

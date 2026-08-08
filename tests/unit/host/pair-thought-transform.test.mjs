@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { toList, listItems } from '../support/domain.mjs'
+import { toList, listItems, resultOf } from '../support/domain.mjs'
 
 const {
   tryInject,
@@ -14,8 +14,9 @@ const {
 } = await import('../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js')
 
 const inject = (session, raw, markerText = text) => {
-  const out = tryInject(undefined, session, markerText, toList(raw))
-  return out === undefined ? undefined : listItems(out)
+  const result = resultOf(tryInject(undefined, session, markerText, toList(raw)))
+  assert.equal(result.ok, true, `HOST-013 transform must commit the pair: ${result.error ?? ''}`)
+  return listItems(result.value)
 }
 
 const userMsg = (id, body = 'hello') => ({
@@ -80,7 +81,7 @@ test('PPT_source_is_the_frozen_side_channel_identity', () => {
   assert.equal(isPairProgrammingThought({ parts: [] }), false, 'no info.source means not a marker')
 })
 
-test('PPT_tryInject_appends_pair_on_empty_history_without_anchor', () => {
+test('PPT_tryInject_appends_pair_on_empty_history_at_start_gap', () => {
   const out = inject('ses_empty', [])
   assert.ok(out, 'empty history must still append one pair')
   assert.equal(out.length, 2)
@@ -139,22 +140,22 @@ test('PPT_tryInject_merges_into_tool_batches_before_user', () => {
   assert.deepEqual(out[6], raw[4])
 })
 
-test('PPT_tryInject_second_pass_keeps_history_before_trailing_user', () => {
+test('PPT_tryInject_second_pass_of_same_placement_replays_existing_pair', () => {
   const once = inject('ses_append', [userMsg('msg_1')])
   assert.ok(once)
   assert.equal(once.length, 3)
 
-  const twice = inject('ses_append', [userMsg('msg_1')])
+  // Same real transcript again (production raw carries the previous wire's
+  // synthetic messages): same placement → replay only, no new pair.
+  const twice = inject('ses_append', once)
   assert.ok(twice)
-  assert.equal(twice.length, 5, 'history pair + new pair + user')
-  assert.equal(pairMessages(twice).length, 4)
+  assert.equal(twice.length, 3, 'same placement must not append a second pair')
+  assert.equal(pairMessages(twice).length, 2)
 
   const firstCall = stableCallId('ses_append', 1n)
-  const secondCall = stableCallId('ses_append', 2n)
-  assert.notEqual(firstCall, secondCall)
   assertPairShape(twice[0], twice[1], firstCall, text)
-  assertPairShape(twice[2], twice[3], secondCall, text)
-  assert.equal(twice[4].info.role, 'user')
+  assert.equal(twice[2].info.role, 'user')
+  assert.deepEqual(twice, once, 'replay must be byte-identical')
 })
 
 test('PPT_tryInject_call_id_is_stable_per_session_and_ordinal', () => {

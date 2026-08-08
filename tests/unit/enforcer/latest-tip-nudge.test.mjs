@@ -16,6 +16,7 @@ import {
   bloggerRequestId,
   prefixEpochId,
   providerRun,
+  resultOf,
   runtimeResources,
   sessionId,
   stream,
@@ -123,12 +124,14 @@ const markerOutput = (messages) => {
 }
 
 test('CTX_002_GUIDELINE_001_marker_without_nudge_is_guideline_text', () => {
-  const messages = tryInject(undefined, 'ses-auto-injected', guideline, anchor)
-  assert.equal(markerOutput(messages), guideline)
+  const result = resultOf(tryInject(undefined, 'ses-auto-injected', guideline, anchor))
+  assert.equal(result.ok, true, result.error ?? '')
+  assert.equal(markerOutput(result.value), guideline)
 })
 
 test('CTX_002_GUIDELINE_002_marker_with_nudge_uses_double_newline', () => {
   const nudge = 'A domain concept is crossing a boundary as a primitive. Introduce a distinct type so invalid substitutions become impossible.'
-  const messages = tryInject(undefined, 'ses-auto-injected-nudge', `${nudge}\n\n${guideline}`, anchor)
-  assert.equal(markerOutput(messages), `${nudge}\n\n${guideline}`)
+  const result = resultOf(tryInject(undefined, 'ses-auto-injected-nudge', `${nudge}\n\n${guideline}`, anchor))
+  assert.equal(result.ok, true, result.error ?? '')
+  assert.equal(markerOutput(result.value), `${nudge}\n\n${guideline}`)
 })

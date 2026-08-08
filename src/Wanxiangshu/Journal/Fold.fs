@@ -973,13 +973,18 @@ module Fold =
 
         | AgentFact.Host host ->
             match host with
-            | HostFactCases.PairProgrammingGuidelineAppended payload ->
+            | HostFactCases.PairProgrammingGuidelineAnchored payload ->
                 AgentProjection.tryUpdate
                     payload.SessionId
                     (fun session ->
                         session.Guidelines
                         |> Option.defaultValue GuidelineProjection.empty
-                        |> GuidelineProjection.apply payload.Ordinal payload.CallId payload.MarkerText
+                        |> GuidelineProjection.apply
+                            payload.Ordinal
+                            payload.CallId
+                            payload.MarkerText
+                            payload.CallGap
+                            payload.ResultGap
                         |> Result.map (fun updated ->
                             { session with
                                 Guidelines = Some updated }))
@@ -988,12 +993,19 @@ module Fold =
                     | Ok updated -> Ok updated
                     | Error(GuidelineFoldRejection.NonSequentialOrdinal(expected, actual)) ->
                         reject
-                            "PairProgrammingGuidelineAppended"
+                            "PairProgrammingGuidelineAnchored"
                             (sprintf "ordinal %d is not the successor of %d (HOST-013)" actual expected)
                     | Error(GuidelineFoldRejection.DuplicateCallId callId) ->
                         reject
-                            "PairProgrammingGuidelineAppended"
+                            "PairProgrammingGuidelineAnchored"
                             (sprintf "call id %s already exists in this transcript (HOST-013)" callId)
+                    | Error(GuidelineFoldRejection.DuplicatePlacement(callGap, resultGap)) ->
+                        reject
+                            "PairProgrammingGuidelineAnchored"
+                            (sprintf
+                                "placement (%A, %A) already exists in this transcript (HOST-013 §8)"
+                                callGap
+                                resultGap)
 
     let foldEnvelope (projection: ProjectionSet) (envelope: Envelope) : Result<ProjectionSet, FoldRejection> =
         match envelope.Fact with

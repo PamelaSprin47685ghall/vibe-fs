@@ -26,19 +26,19 @@
 
 代表测试：
 
-- `tests/unit/context/projection-algebra.test.mjs`（八 intent Domain 代数）
+- `tests/unit/context/projection-algebra.test.mjs`（七 intent Domain 代数）
 - `tests/unit/context/companion-projection.test.mjs`（Companion 高层契约）
 - `tests/unit/context/blog-projection.test.mjs`（blog 投影契约）
 - provider projection 相关 facade 测试
 
 | 证明项 | 状态 |
 |--------|------|
-| 八 intent 定义（KeepPhysicalPrefix / ActivatePrefixEpoch / InsertBlogFrames / InsertRepair / SuppressTransportOnly / AppendReviewChallenge / InsertPairProgrammingThought / ReanchorAfterCompaction） | Domain + unit |
-| Canonical Rank 0–6 | unit |
+| 七 intent 定义（KeepPhysicalPrefix / ActivatePrefixEpoch / InsertBlogFrames / InsertRepair / SuppressTransportOnly / AppendReviewChallenge / ReanchorAfterCompaction；HOST-013 pair 渲染归 `PairProgrammingThoughtTransform`，见 host proof） | Domain + unit |
+| Canonical Rank 0–5 | unit |
 | plan 幂等 / 冲突（含 ConflictingPrefixLifecycle 等） | unit |
 | `renderMessagesWithIntents` fold | unit |
 | `InsertBlogFrames` ↔ `CompanionProjectionBuilder` digest 等价 | unit + 生产 rebuild 接线 |
-| `InsertRepair` / `AppendReviewChallenge` / `InsertPairProgrammingThought` 生产字节合同（含空历史无门槛、永久 tool-call/tool-result pair 恢复、本次 pair 在 trailing user 前 / 多 tool 批末、重启字节等价） | 生产接线 + unit + restart |
+| `InsertRepair` / `AppendReviewChallenge` 生产字节合同 | 生产接线 + unit |
 | `ReanchorAfterCompaction` | 生产接线 + unit |
 | **`SuppressTransportOnly`** | **仅 Domain + unit 骨架**；生产 `TransportMessages` 恒空、未声明 intent。COMPANION-012 字段级过滤由模型边界 / `toSemantic` 承担；消息级 Suppress 待 host-id 侧信道后续变更 |
 

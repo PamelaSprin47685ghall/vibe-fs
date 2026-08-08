@@ -2526,3 +2526,53 @@ F# DSL 的价值不是把所有状态写成 DU。
 它的价值是让一个**缺少必要前提的副作用无法被构造或无法通过唯一执行入口**。
 
 本 Change 完成后，这两个 bug 都应该从“靠工程师小心”升级成“错误代码很难写出来”。
+
+---
+
+# Active work
+
+> 本文件是变更工作记录，不是当前产品规范。当前产品语义仅以 `docs/` 正式层为准。
+
+启动指令：用户要求按本 Proposal 一步一步实施（2026-08-08）。Original proposal 已冻结。
+
+## Specification impact
+
+- HOST-013：bracket 语义（synthetic pair = 跨越真实 response batch 的 temporal bracket）、
+  anchored durable fact（`PairProgrammingGuidelineAnchored` + `CallGap`/`ResultGap`）、
+  gap replay 算法、same-placement 幂等、anchor 缺失 fail closed、legacy unanchored fact fail closed。
+- HOST-004 / auto-continue：idle-derived continuation 必须同时满足业务决策 + fresh
+  `QuiescencePermit`（process-local `SessionQuiescenceGate`）；删除 `isRecoveryProbeRun` 特判。
+- 修改文档：`docs/{what,shape,how,proof,why}/host.md`（HOST-013 + HOST-004 章节）。
+- 新增/重建测试：H13-01..H13-08、Q-01..Q-10。
+
+## Remaining work
+
+按 Proposal §35 顺序执行：
+
+1. 更新正式语义文档（Phase 1）。
+2. HOST-013 RED：H13-01 canonical sequence、H13-02 no relocation、H13-03 idempotence、
+   H13-04 restart replay、H13-05 anchor missing fail closed、H13-08 N-round prefix property。
+3. HOST-013 GREEN：`TranscriptGap`/`TranscriptMessageAddress`、anchored fact + fold、
+   replay 算法、same-placement dedupe、删除 `historyBlock`/`placePairs`/`placeWirePairs`。
+4. Quiescence RED：Q-01..Q-10（至少 Q-01、Q-02、Q-05、Q-07、Q-08、Q-09）。
+5. Quiescence GREEN：`SessionQuiescenceGate` + PluginRuntimeScope/HostSignalBootstrap/
+   SpikePlugin 接线 + Reconciler permit 携带 + TurnCompletionProgram/HostSessionNudge
+   typed idle-send helper + StudentTeacher 走 gate。
+6. 删除 `isRecoveryProbeRun`（定义 + TurnUnknown/TurnNeedsContinuation 两处豁免）。
+7. 全量 gate：`npm run build`、lint、unit、integration、e2e、`scripts/check.mjs`、
+   `git diff --check`。
+
+## Completion criteria
+
+- `isAppendOnlyPrefix(wire[n], wire[n+1]) == true`（同 epoch，H13-01/08 断言）。
+- 任意历史 synthetic half 位置只由 durable gap anchor 决定（H13-02）。
+- 同一 placement 重入不新增 pair（H13-03）；restart replay byte-identical（H13-04）。
+- anchor 缺失 / legacy unanchored fact → fail closed（H13-05、§13）。
+- stale permit → zero physical prompt + zero PluginPromptClaimed（Q-02）。
+- fresh idle + stable incomplete → exactly one continuation（Q-01）。
+- `isRecoveryProbeRun` 已删除，Q-08 靠 permit 过期自然通过。
+- 全量 gate 绿。
+
+## Blockers
+
+无。

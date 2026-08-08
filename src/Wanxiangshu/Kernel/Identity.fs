@@ -97,6 +97,28 @@ module Identity =
     /// make that check expressible but meaningless.
     type ToolCallId = private ToolCallId of string
 
+    /// A Host transcript message address (HOST-013).
+    ///
+    /// The raw message's `info.id` / `id` — the same address Session snapshot
+    /// lookups use. Distinct from `PhysicalUserMessageId` (user-only PROMPT-001
+    /// identity), `AuthorityRootUserMessageId`, `ProviderRunIdentity` and
+    /// `ToolCallId`: those are semantic identities, this names a transcript
+    /// position any message (user, assistant, tool) can occupy.
+    type TranscriptMessageAddress = private TranscriptMessageAddress of string
+
+    /// A transcript gap where a synthetic half anchors (HOST-013).
+    ///
+    /// `Start` = before the first real message; `Before id` = between the
+    /// messages preceding and including `id`; `After id` = between the messages
+    /// including and following `id`. A pair's two halves carry independent gaps:
+    /// the bracket spans a real tool batch (`real calls → synthetic call →
+    /// real results → synthetic result`).
+    [<RequireQualifiedAccess>]
+    type TranscriptGap =
+        | Start
+        | Before of TranscriptMessageAddress
+        | After of TranscriptMessageAddress
+
     /// Which system prompt a provider request carried (PROMPT-008).
     ///
     /// An id, not the text. The prompt body lives in `prompts/*.md` and is
@@ -263,6 +285,10 @@ module Identity =
     module ToolCallId =
         let create (value: string) = ToolCallId value
         let value (ToolCallId v) = v
+
+    module TranscriptMessageAddress =
+        let create (value: string) = TranscriptMessageAddress value
+        let value (TranscriptMessageAddress v) = v
 
     module SystemPromptId =
         let create (value: string) = SystemPromptId value

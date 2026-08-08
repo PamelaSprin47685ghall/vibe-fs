@@ -90,22 +90,69 @@ metadata 用于重建，不得把自然语言问题、回答或 QA 正文放进�
 
 ## 永久 auto-injected pair 所有权
 
-HOST-013 的唯一持久状态是按 provider transcript 分区的 append-only pair 序列：
+HOST-013 的唯一持久状态是按 provider transcript 分区的 append-only anchored pair 序列：
 
 ```fsharp
+type TranscriptMessageAddress = private TranscriptMessageAddress of string
+
+type TranscriptGap =
+    | Start
+    | Before of TranscriptMessageAddress
+    | After of TranscriptMessageAddress
+
 type PairProgrammingGuideline =
     { Ordinal: int64
       CallId: ToolCallId
-      MarkerText: string }
+      MarkerText: string
+      CallGap: TranscriptGap
+      ResultGap: TranscriptGap }
 ```
 
-`Ordinal` 严格递增；`CallId` 在该 transcript 内唯一。记录一经追加不可修改、删除或换位。每条记录渲染为 assistant `auto-injected` tool-call 与对应 completed tool-result，两侧共享 `CallId`，均标记 `source = "pair-programming-auto-injected"` 与 `synthetic = true`。
+`Ordinal` 严格递增；`CallId` 在该 transcript 内唯一；`CallGap` / `ResultGap` 是 pair 两个 half 各自的 transcript gap anchor。记录一经追加不可修改、删除或换位。每条记录渲染为 assistant `auto-injected` tool-call 与对应 completed tool-result，两侧共享 `CallId`，均标记 `source = "pair-programming-auto-injected"` 与 `synthetic = true`。
 
-**放置边界**：本次 pair 的插入点由 trailing user 与其前同轮 tool 批决定——call 批末 / result 批末 / 无 tool 时 call+result 相邻且整体在 trailing user 前。历史 pair 恢复到原位，不整块挪到全局末尾。无 trailing user 时本次 pair 落全局末尾。
+`TranscriptMessageAddress` 是 Host transcript message address（raw message 的 `info.id` / `id`，与 Session snapshot 以 message `Id` 寻址一致）的窄类型 codec；禁止偷换成 `PhysicalUserMessageId`、`AuthorityRootUserMessageId`、`ProviderRunIdentity` 或 `ToolCallId`，除非该值在具体位置上确实就是 transcript message address。
 
-Coordinator 是追加与恢复的唯一 writer；Projection 只读取完整序列并按放置边界确定性渲染。XTrace、Companion、Blogger、work record 与 compaction 不拥有也不复制正文。pair 自含 call/result 身份，不依赖外部消息作为合法性 anchor。
+**放置边界**：历史 synthetic half 的位置只由它自己的 durable gap anchor 决定，replay 按 `Start → 逐条真实消息（Before 组 → 消息 → After 组）` 注入，组内 ordinal 升序、同 ordinal call 先于 result。当前 transcript 长什么样不得改变历史 pair 的位置。新 pair 的 gap 只由当前真实消息末端结构决定（tool batch 时 call 挂 call 批末、result 挂 result 批末；无 tool 时二者同 gap 相邻；空历史用 `Start`）。同一 placement identity（SessionId + CallGap + ResultGap）最多一个 pair；重复 transform 只 replay。
 
-**所有权边界**：Companion / Blogger transcript 不进入 HOST-013 writer 路径——不为这些 session 创建 `Guidelines` 投影、不 append `PairProgrammingGuidelineAppended`、不在其 provider wire 上渲染 pair。Work session 与其它 Managed child 仍按 HOST-013 永久追加。
+Coordinator 是追加与恢复的唯一 writer；Projection 只按 anchor 确定性渲染，不再决定历史位置。XTrace、Companion、Blogger、work record 与 compaction 不拥有也不复制正文。anchor 引用的真实消息在 transcript 中缺失时 fail closed（`HistoricalSyntheticAnchorMissing`），禁止“尽量放”或忽略；legacy 无 anchor fact 使该 session fail closed，不做启发式迁移。
+
+**所有权边界**：Companion / Blogger transcript 不进入 HOST-013 writer 路径——不为这些 session 创建 `Guidelines` 投影、不 append `PairProgrammingGuidelineAnchored`、不在其 provider wire 上渲染 pair。Work session 与其它 Managed child 仍按 HOST-013 永久追加。
+
+## Idle-derived continuation 发送资格（HOST-004）
+
+`SessionQuiescenceGate` 是每插件实例 process-local 的 side-effect admission capability，只回答一个问题：一个以 idle 为前提的副作用现在是否仍有资格发送。它不是领域状态机：不写 Journal、不参与 crash recovery、不表达业务 stage。重启后 gate 清空（没有 fresh idle → 没有 permit → 不自动发送 idle-derived continuation），安全侧失败。
+
+```fsharp
+type QuiescencePermit =
+    private { SessionId: SessionId; AttemptSerial: int64 }
+
+type private Activity =
+    | Unknown
+    | Running of attemptSerial: int64
+    | Idle of attemptSerial: int64
+    | IdleConsumed of attemptSerial: int64
+```
+
+唯一状态转换：
+
+```text
+BeginProviderAttempt(session)  serial+1 → Running(serial)；任何旧 permit 立即失效
+ObserveIdle(session)            Running(serial) → Idle(serial)，返回 Permit(session, serial)
+TryConsume(permit)              state == Idle(permit.AttemptSerial) → IdleConsumed(serial) → true；否则 false
+DropSession(session)            清空该 session 状态，旧 permit 永久失效
+```
+
+`AttemptSerial` 只是进程内同步 token，**禁止写入 Journal**（HOST-007）。
+
+接线边界：
+
+- `BeginProviderAttempt` 必须在每次 provider request 构建前的最早同步位置调用（`experimental.chat.messages.transform` 入口，任何 `let!` 之前），不得等 request 已运行。
+- `ObserveIdle` 在收到 `SessionIdle` 时调用；permit 从 idle 观察携带到 side-effect 边界（`ReconcileWake = IdleWake of QuiescencePermit`），禁止用 scheduler dispatch generation 冒充 provider attempt serial。
+- 最终物理发送前必须再次 `TryConsume`；`TryConsume` 与 dispatcher send 之间禁止 await（防 TOCTOU）。permit 失效 = `Superseded`，不是错误、不写 `PluginPromptClaimed`。
+
+idle-derived continuation（missing-final-report、interaction-repair、ManagerIdleEncouragement、TeacherIdleNudge、StudentCompileNudge）必须同时满足：业务决策认为值得继续 + fresh `QuiescencePermit`。`ProviderRetryAttempt`、`BusyAgentNudge`、显式用户 continuation、`FinalityRejected` 不由 idle 前提产生，不走 gate。
+
+**所有权**：gate 由 `PluginRuntimeScope` 持有（与 NudgeSent / AbortedSessions / LoopSensor 同层），不放 SharedState / Journal projection / PromptAuthority。若 session 因插件实例变化发生 owner 转移，新实例没有旧 permit，安全侧失败。
 
 ## 空 Content 预防边界
 

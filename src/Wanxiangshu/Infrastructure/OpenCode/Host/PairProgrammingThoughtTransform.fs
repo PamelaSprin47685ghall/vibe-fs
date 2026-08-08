@@ -1,10 +1,10 @@
 namespace Wanxiangshu.OpenCode
 
+open System
 open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
-open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Host
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
@@ -13,8 +13,11 @@ open Wanxiangshu.Kernel.Identity
 
 /// HOST-013：永久 pair-programming auto-injected pairs。
 ///
-/// 每次 transform 读取完整 durable pair 序列，按原字节恢复 history，
-/// 再把本次 pair 插在 trailing user 之前（多 tool 时 call/result 批末）。
+/// Synthetic pair 是跨越真实 tool batch 的 temporal bracket：
+/// `real calls → synthetic call → real results → synthetic result`。
+/// 每个 half 的 transcript 位置只由它自己 durable 的 gap anchor 决定；同一 placement
+/// occasion（SessionId + CallGap + ResultGap）最多一个 pair，重复 transform 只 replay、
+/// 不再新增。同 epoch 内前次 provider wire 必须是后次 wire 的字节前缀（ARCH-004）。
 module PairProgrammingThoughtTransform =
 
     /// HOST-013 auto-injected 正文。Domain 单源。
@@ -27,6 +30,14 @@ module PairProgrammingThoughtTransform =
     let private legacySource = "pair-programming-thought"
 
     let private idPrefix = "pair-programming-auto-injected-"
+
+    /// Durable/memory pair with both halves' transcript gap anchors.
+    type PairProgrammingGuidelineWire =
+        { Ordinal: int64
+          CallId: string
+          MarkerText: string
+          CallGap: TranscriptGap
+          ResultGap: TranscriptGap }
 
     /// Process-local fallback when journal is unavailable (tests / no workspace).
     /// Keyed by transcript identity; append-only within process.
@@ -91,10 +102,6 @@ module PairProgrammingThoughtTransform =
                         "synthetic", box true ]
               )
               "parts", box [| part |] ]
-
-    let private buildPair (callId: string) (markerText: string) : obj list =
-        [ buildPairMessage callId markerText true
-          buildPairMessage callId markerText false ]
 
     let private messageRole (rawMsg: obj) : string =
         if isNull rawMsg then
@@ -177,87 +184,198 @@ module PairProgrammingThoughtTransform =
                | Some "error" -> true
                | _ -> false)
 
-    /// 将 history + next 插入 retained：trailing user 前；多 tool 时 call/result 批末。
-    let private placePairs (retained: obj list) (pairs: PairProgrammingGuidelineWire list) : obj list =
-        match pairs with
-        | [] -> retained
-        | _ ->
-            let arr = retained |> List.toArray
+    // ── transcript addressing ────────────────────────────────────────────────
 
-            let trailingUserIdx =
-                let mutable idx = arr.Length - 1
-                let mutable found = -1
+    /// The callId a stripped synthetic message belongs to: the call half's id
+    /// is `callId + "-call"`, the result half's id is `callId`.
+    let private syntheticCallIdOf (rawMsg: obj) : string option =
+        if isNull rawMsg then
+            None
+        else
+            match rawMsg?info with
+            | null -> None
+            | info ->
+                match info?id with
+                | null -> None
+                | id ->
+                    let raw = unbox<string> id
 
-                while idx >= 0 && found < 0 do
-                    if messageRole arr.[idx] = "user" then
-                        found <- idx
+                    if raw.EndsWith("-call", StringComparison.Ordinal) then
+                        Some(raw.Substring(0, raw.Length - 5))
+                    else
+                        Some raw
 
-                    idx <- idx - 1
+    /// Real messages in transcript order, each carrying its Host message
+    /// address (`info.id` / `id`). Every real message must have one — a message
+    /// without an address could never anchor a synthetic half, and a duplicate
+    /// address would make anchors ambiguous.
+    let private addressedRealMessages (realMessages: obj list) : Result<(string * obj) list, string> =
+        let rec loop acc seen =
+            function
+            | [] -> Ok(List.rev acc)
+            | message :: rest ->
+                match Projection.hostMessageId message with
+                | None -> Error "transcript message without address (HOST-013)"
+                | Some id when Set.contains id seen -> Error(sprintf "duplicate transcript address %s (HOST-013)" id)
+                | Some id -> loop ((id, message) :: acc) (Set.add id seen) rest
 
-                found
+        loop [] Set.empty realMessages
 
-            let headLen = if trailingUserIdx < 0 then arr.Length else trailingUserIdx
-            let head = if headLen = 0 then [||] else arr.[0 .. headLen - 1]
+    // ── replay：唯一合法渲染路径 ─────────────────────────────────────────────
 
-            let tail =
-                if trailingUserIdx < 0 then
-                    [||]
-                else
-                    arr.[trailingUserIdx..]
+    /// The one and only HOST-013 renderer: real messages + durable anchored
+    /// pairs → the exact provider wire. Historical halves sit at their own
+    /// durable gaps; nothing re-decides their position (`historyBlock` 禁止).
+    ///
+    /// 组内排序唯一合法：`Ordinal` 升序，同 ordinal 时 call 先于 result。
+    let private replay (realMessages: obj list) (pairs: PairProgrammingGuidelineWire list) : Result<obj list, string> =
+        match addressedRealMessages realMessages with
+        | Error error -> Error error
+        | Ok addressed ->
+            let addressSet = addressed |> List.map fst |> Set.ofList
 
-            let mutable resultStart = head.Length
+            let validateAnchor (pair: PairProgrammingGuidelineWire) (gap: TranscriptGap) =
+                match gap with
+                | TranscriptGap.Start -> Ok()
+                | TranscriptGap.Before address
+                | TranscriptGap.After address ->
+                    let key = TranscriptMessageAddress.value address
 
-            while resultStart > 0 && isToolResultMessage head.[resultStart - 1] do
-                resultStart <- resultStart - 1
+                    if Set.contains key addressSet then
+                        Ok()
+                    else
+                        Error(
+                            sprintf
+                                "HistoricalSyntheticAnchorMissing: transcript has no message %s (pair %d, HOST-013)"
+                                key
+                                pair.Ordinal
+                        )
 
-            let mutable callStart = resultStart
+            let anchorsOk =
+                pairs
+                |> List.fold
+                    (fun acc pair ->
+                        match acc with
+                        | Error _ -> acc
+                        | Ok() ->
+                            match validateAnchor pair pair.CallGap with
+                            | Error error -> Error error
+                            | Ok() -> validateAnchor pair pair.ResultGap)
+                    (Ok())
 
-            while callStart > 0 && isToolCallMessage head.[callStart - 1] do
-                callStart <- callStart - 1
+            match anchorsOk with
+            | Error error -> Error error
+            | Ok() ->
+                let starts = ResizeArray<PairProgrammingGuidelineWire * bool>()
+                let before = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire * bool>>()
+                let after = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire * bool>>()
 
-            let historyPairs, nextPair =
-                match List.rev pairs with
-                | next :: rest -> List.rev rest, next
-                | [] -> [], Unchecked.defaultof<_>
+                for pair in pairs do
+                    for isCall in [ true; false ] do
+                        let gap = if isCall then pair.CallGap else pair.ResultGap
 
-            let historyBlock =
-                historyPairs |> List.collect (fun pair -> buildPair pair.CallId pair.MarkerText)
+                        let bucket
+                            (table: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire * bool>>)
+                            (address: TranscriptMessageAddress)
+                            =
+                            let key = TranscriptMessageAddress.value address
 
-            let nextCall = buildPairMessage nextPair.CallId nextPair.MarkerText true
-            let nextResult = buildPairMessage nextPair.CallId nextPair.MarkerText false
+                            match table.TryGetValue key with
+                            | true, entries -> entries.Add(pair, isCall)
+                            | false, _ ->
+                                let entries = ResizeArray<PairProgrammingGuidelineWire * bool>()
+                                entries.Add(pair, isCall)
+                                table.[key] <- entries
 
-            let prefix =
-                if callStart = 0 then
-                    []
-                else
-                    head.[0 .. callStart - 1] |> Array.toList
+                        match gap with
+                        | TranscriptGap.Start -> starts.Add(pair, isCall)
+                        | TranscriptGap.Before address -> bucket before address
+                        | TranscriptGap.After address -> bucket after address
 
-            let calls =
-                if callStart >= resultStart then
-                    []
-                else
-                    head.[callStart .. resultStart - 1] |> Array.toList
+                let ordered (entries: ResizeArray<PairProgrammingGuidelineWire * bool>) =
+                    entries
+                    |> Seq.sortBy (fun (pair, isCall) -> pair.Ordinal, (if isCall then 0L else 1L))
+                    |> Seq.toList
 
-            let results =
-                if resultStart >= head.Length then
-                    []
-                else
-                    head.[resultStart..] |> Array.toList
+                let output = ResizeArray<obj>()
 
-            let tailList = tail |> Array.toList
+                for pair, isCall in ordered starts do
+                    output.Add(buildPairMessage pair.CallId pair.MarkerText isCall)
 
-            if callStart < head.Length then
-                // 有同轮 tool 批（call 和/或 result）：history 在批前；next call/result 批末。
-                prefix
-                @ historyBlock
-                @ calls
-                @ [ nextCall ]
-                @ results
-                @ [ nextResult ]
-                @ tailList
-            else
-                // 无 tool 批：history + next 相邻，整体在 trailing user 前。
-                (head |> Array.toList) @ historyBlock @ [ nextCall; nextResult ] @ tailList
+                for address, message in addressed do
+                    match before.TryGetValue address with
+                    | true, entries ->
+                        for pair, isCall in ordered entries do
+                            output.Add(buildPairMessage pair.CallId pair.MarkerText isCall)
+                    | _ -> ()
+
+                    output.Add message
+
+                    match after.TryGetValue address with
+                    | true, entries ->
+                        for pair, isCall in ordered entries do
+                            output.Add(buildPairMessage pair.CallId pair.MarkerText isCall)
+                    | _ -> ()
+
+                Ok(Seq.toList output)
+
+    // ── 本轮新 pair 的 placement（只读当前真实消息）──────────────────────────
+
+    /// 末端结构 → gap：
+    ///
+    /// - 末端存在同轮 tool batch（`Req1 Req2 Resp1 Resp2 [User]`，或 batch 直接
+    ///   结尾）：`After(last call)` / `After(last result)` —— HOST-013 核心 bracket。
+    /// - 无 batch 且最后一条消息是 user（trailing user）：`Before(user)` / `Before(user)`。
+    /// - 无 batch、无 trailing user：`After(last real)` / `After(last real)`。
+    /// - 空 transcript：`Start` / `Start`。
+    ///
+    /// 新 pair 的 gap 必须落在本次追加区（末尾），否则会改写已发送 wire 的中间字节、
+    /// 破坏 append-only prefix。旧实现「pair 总在最后一条 user（任意位置）前」在
+    /// continuation transcript（末尾是 assistant 文本）上会在中途插入新 pair —— 正是
+    /// 本 Change 修复的 prefix 破坏。
+    let private decideCurrentPlacement (realMessages: obj list) : Result<TranscriptGap * TranscriptGap, string> =
+        match List.rev realMessages with
+        | [] -> Ok(TranscriptGap.Start, TranscriptGap.Start)
+        | last :: rest ->
+            let lastIsUser = messageRole last = "user"
+            let scanFrom = if lastIsUser then rest else (last :: rest)
+
+            let rec takeResults found xs =
+                match xs with
+                | message :: tail when isToolResultMessage message -> takeResults (message :: found) tail
+                | _ -> found, xs
+
+            let rec takeCalls found xs =
+                match xs with
+                | message :: tail when isToolCallMessage message -> takeCalls (message :: found) tail
+                | _ -> found, xs
+
+            let resultRun, afterResults = takeResults [] scanFrom
+            let callRun, _ = takeCalls [] afterResults
+
+            match List.rev resultRun, List.rev callRun with
+            | lastResult :: _, lastCall :: _ ->
+                match Projection.hostMessageId lastCall, Projection.hostMessageId lastResult with
+                | Some callId, Some resultId ->
+                    Ok(
+                        TranscriptGap.After(TranscriptMessageAddress.create callId),
+                        TranscriptGap.After(TranscriptMessageAddress.create resultId)
+                    )
+                | _ -> Error "tool batch message without transcript address (HOST-013)"
+            | _ when lastIsUser ->
+                match Projection.hostMessageId last with
+                | Some id ->
+                    let address = TranscriptMessageAddress.create id
+                    Ok(TranscriptGap.Before address, TranscriptGap.Before address)
+                | None -> Error "trailing user without transcript address (HOST-013)"
+            | _ ->
+                match Projection.hostMessageId last with
+                | Some id ->
+                    let address = TranscriptMessageAddress.create id
+                    Ok(TranscriptGap.After address, TranscriptGap.After address)
+                | None -> Error "last message without transcript address (HOST-013)"
+
+    // ── durable / memory history ─────────────────────────────────────────────
 
     let private readDurableHistory (journal: AgentJournal) (sessionId: SessionId) : PairProgrammingGuidelineWire list =
         match AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections with
@@ -267,15 +385,18 @@ module PairProgrammingThoughtTransform =
             |> Option.map GuidelineProjection.pairs
             |> Option.defaultValue []
             |> List.map (fun pair ->
-                { CallId = ToolCallId.value pair.CallId
-                  MarkerText = pair.MarkerText })
+                { Ordinal = pair.Ordinal
+                  CallId = ToolCallId.value pair.CallId
+                  MarkerText = pair.MarkerText
+                  CallGap = pair.CallGap
+                  ResultGap = pair.ResultGap })
 
     let private readMemoryHistory (key: string) : PairProgrammingGuidelineWire list =
         match memoryLedger.TryGetValue key with
         | true, pairs -> pairs |> Seq.toList
         | false, _ -> []
 
-    let private appendMemory (key: string) (pair: PairProgrammingGuidelineWire) : unit =
+    let private appendMemory (key: string) (pair: PairProgrammingGuidelineWire) : Result<unit, string> =
         match memoryLedger.TryGetValue key with
         | true, pairs -> pairs.Add pair
         | false, _ ->
@@ -283,202 +404,103 @@ module PairProgrammingThoughtTransform =
             pairs.Add pair
             memoryLedger.[key] <- pairs
 
+        Ok()
+
     let private appendDurable
         (journal: AgentJournal)
         (sessionId: SessionId)
-        (ordinal: int64)
-        (callId: string)
-        (markerText: string)
+        (pair: PairProgrammingGuidelineWire)
         : Result<unit, string> =
         let fact =
-            HostFact.PairProgrammingGuidelineAppended
+            HostFact.PairProgrammingGuidelineAnchored
                 {| SessionId = sessionId
-                   Ordinal = ordinal
-                   CallId = ToolCallId.create callId
-                   MarkerText = markerText |}
+                   Ordinal = pair.Ordinal
+                   CallId = ToolCallId.create pair.CallId
+                   MarkerText = pair.MarkerText
+                   CallGap = pair.CallGap
+                   ResultGap = pair.ResultGap |}
 
         match AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal with
         | Ok _ -> Ok()
         | Error failure -> Error(JournalAppendFailure.describe failure)
 
-    let private emptySnapshot: ProjectionSnapshot =
-        { CurrentProjection =
-            { ProviderId = None
-              ModelId = None
-              Variant = None
-              Tools = []
-              System = []
-              Messages = [] }
-          CommittedPrefix = None
-          BlogFrames = []
-          TransportMessages = Set.empty
-          HostReanchor = None }
+    // ── 入口 ─────────────────────────────────────────────────────────────────
 
-    let private wireIsToolCall (message: WireMessage) : bool =
-        match message.Parts with
-        | ProviderProjection.WireToolCall _ :: _ -> true
-        | _ -> false
-
-    let private wireIsToolResult (message: WireMessage) : bool =
-        match message.Parts with
-        | ProviderProjection.WireToolResult _ :: _ -> true
-        | _ -> false
-
-    let private wirePairMessages (pair: PairProgrammingGuidelineWire) : WireMessage list =
-        let callId = ToolCallId.create pair.CallId
-
-        [ { Role = "assistant"
-            Parts = [ WireToolCall(callId, "auto-injected", "{}") ] }
-          { Role = "assistant"
-            Parts = [ WireToolResult(callId, pair.MarkerText) ] } ]
-
-    /// Canonical wire 放置：与 raw placePairs 同构。
-    let private placeWirePairs
-        (retained: WireMessage list)
-        (pairs: PairProgrammingGuidelineWire list)
-        : WireMessage list =
-        match pairs with
-        | [] -> retained
-        | _ ->
-            let arr = retained |> List.toArray
-
-            let trailingUserIdx =
-                let mutable idx = arr.Length - 1
-                let mutable found = -1
-
-                while idx >= 0 && found < 0 do
-                    if arr.[idx].Role = "user" then
-                        found <- idx
-
-                    idx <- idx - 1
-
-                found
-
-            let headLen = if trailingUserIdx < 0 then arr.Length else trailingUserIdx
-            let head = if headLen = 0 then [||] else arr.[0 .. headLen - 1]
-
-            let tail =
-                if trailingUserIdx < 0 then
-                    [||]
-                else
-                    arr.[trailingUserIdx..]
-
-            let mutable resultStart = head.Length
-
-            while resultStart > 0 && wireIsToolResult head.[resultStart - 1] do
-                resultStart <- resultStart - 1
-
-            let mutable callStart = resultStart
-
-            while callStart > 0 && wireIsToolCall head.[callStart - 1] do
-                callStart <- callStart - 1
-
-            let historyPairs, nextPair =
-                match List.rev pairs with
-                | next :: rest -> List.rev rest, next
-                | [] -> [], Unchecked.defaultof<_>
-
-            let historyBlock = historyPairs |> List.collect wirePairMessages
-            let nextMsgs = wirePairMessages nextPair
-            let nextCall = List.head nextMsgs
-            let nextResult = List.item 1 nextMsgs
-
-            let prefix =
-                if callStart = 0 then
-                    []
-                else
-                    head.[0 .. callStart - 1] |> Array.toList
-
-            let calls =
-                if callStart >= resultStart then
-                    []
-                else
-                    head.[callStart .. resultStart - 1] |> Array.toList
-
-            let results =
-                if resultStart >= head.Length then
-                    []
-                else
-                    head.[resultStart..] |> Array.toList
-
-            let tailList = tail |> Array.toList
-
-            if callStart < head.Length then
-                prefix
-                @ historyBlock
-                @ calls
-                @ [ nextCall ]
-                @ results
-                @ [ nextResult ]
-                @ tailList
-            else
-                (head |> Array.toList) @ historyBlock @ nextMsgs @ tailList
-
-    /// HOST-013：恢复 history，本次 pair 插在 trailing user 前。
+    /// HOST-013 commit 顺序（fail closed）：
     ///
-    /// - journal + sessionId：durable append-only 事实
-    /// - 否则：process-local memory ledger（同键永久追加）
-    /// 始终返回 Some（空历史同样有效）。
+    /// 1. 读 durable history
+    /// 2. 内存 strip（只有 durable 记录能解释的 synthetic 才允许删除）
+    /// 3. 决定本轮候选 placement（仅当该 placement 尚不存在）
+    /// 4. 内存构造候选 fact
+    /// 5. 内存渲染完整 wire（replay，校验全部 anchor）
+    /// 6. append durable fact —— 失败 fail closed，禁止忽略后照发
+    /// 7. 返回已校验的渲染消息
+    ///
+    /// 同一 placement 重复进入只 replay，不 append 新 fact。
     let tryInject
         (journal: AgentJournal option)
         (sessionId: string option)
         (markerText: string)
         (rawMessages: obj list)
-        : obj list option =
+        : Result<obj list, string> =
         let key = transcriptKey sessionId
-        let retainedRaw = rawMessages |> List.filter (isPairProgrammingThought >> not)
 
-        let history, appendNext =
+        let strippedCallIds =
+            rawMessages
+            |> List.filter isPairProgrammingThought
+            |> List.choose syntheticCallIdOf
+
+        let realMessages = rawMessages |> List.filter (isPairProgrammingThought >> not)
+
+        let history, append =
             match journal, sessionId with
-            | Some durable, Some sid when not (System.String.IsNullOrWhiteSpace sid) ->
+            | Some durable, Some sid when not (String.IsNullOrWhiteSpace sid) ->
                 let session = SessionId.create sid
-                let history = readDurableHistory durable session
-                let ordinal = int64 history.Length + 1L
-                let callId = stableCallId sessionId ordinal
+                readDurableHistory durable session, appendDurable durable session
+            | _ -> readMemoryHistory key, appendMemory key
 
-                let append () =
-                    match appendDurable durable session ordinal callId markerText with
-                    | Ok() ->
-                        Some
-                            { CallId = callId
-                              MarkerText = markerText }
-                    | Error _ -> None
+        // 删掉 raw 中的 synthetic 只有在 durable anchor 能完整解释它们时合法：
+        // 否则 replay 会静默丢弃这些字节，破坏前次 wire 的 prefix。
+        let knownCallIds = history |> List.map (fun pair -> pair.CallId) |> Set.ofList
 
-                history, append
-            | _ ->
-                let history = readMemoryHistory key
-                let ordinal = int64 history.Length + 1L
-                let callId = stableCallId sessionId ordinal
+        let orphaned =
+            strippedCallIds
+            |> List.filter (fun callId -> not (Set.contains callId knownCallIds))
 
-                let append () =
-                    let next =
-                        { CallId = callId
-                          MarkerText = markerText }
+        if not (List.isEmpty orphaned) then
+            Error(
+                sprintf
+                    "synthetic messages without durable record (callId %s, HOST-013)"
+                    (String.Join(", ", orphaned |> List.truncate 3))
+            )
+        else
+            match decideCurrentPlacement realMessages with
+            | Error error -> Error error
+            | Ok(callGap, resultGap) ->
+                let existing =
+                    history
+                    |> List.tryFind (fun pair -> pair.CallGap = callGap && pair.ResultGap = resultGap)
 
-                    appendMemory key next
-                    Some next
+                match existing with
+                | Some _ ->
+                    // 同一 placement occasion 重入：只 replay，不新增。
+                    replay realMessages history
+                | None ->
+                    let ordinal =
+                        match history with
+                        | [] -> 1L
+                        | pairs -> (List.last pairs).Ordinal + 1L
 
-                history, append
+                    let candidate =
+                        { Ordinal = ordinal
+                          CallId = stableCallId sessionId ordinal
+                          MarkerText = markerText
+                          CallGap = callGap
+                          ResultGap = resultGap }
 
-        match appendNext () with
-        | None -> None
-        | Some next ->
-            let allPairs = history @ [ next ]
-
-            let intent =
-                ProjectionIntent.InsertPairProgrammingThought { History = history; Next = next }
-
-            match ProjectionPlanner.plan [ intent ] with
-            | Error _ -> None
-            | Ok ordered ->
-                let baseWire = retainedRaw |> List.choose Projection.decodeMessage
-
-                let wire =
-                    ProjectionRenderer.renderMessagesWithIntents emptySnapshot baseWire ordered
-
-                let expected = placeWirePairs baseWire allPairs
-
-                if wire <> expected then
-                    None
-                else
-                    Some(placePairs retainedRaw allPairs)
+                    match replay realMessages (history @ [ candidate ]) with
+                    | Error error -> Error error
+                    | Ok rendered ->
+                        match append candidate with
+                        | Ok() -> Ok rendered
+                        | Error error -> Error error

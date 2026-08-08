@@ -40,9 +40,11 @@ insertBlogFrames          // Y 有效帧（Entry/Squash）插入历史槽
 insertRepair              // Interaction Repair 回合
 suppressTransportOnly     // transport-only 消息剔除（COMPANION-012）
 appendReviewChallenge     // skeptical challenge
-    insertPairProgrammingThought // HOST-013 恢复永久 pair 序列；本次 pair 插在 trailing user 前
 reanchorAfterCompaction   // ContextReanchored → Snapshot=None
 ```
+
+HOST-013 pair-programming marker 不占 intent（wire 无消息地址，anchored replay 在
+`PairProgrammingThoughtTransform` raw 域执行，见 HOST-013 程序）。
 
 消息级 `suppressTransportOnly` intent 路径以 proof/实现为准；当前生产未声明该 intent（`TransportMessages` 恒空）。COMPANION-012 字段级过滤由模型边界 / `toSemantic` 承担。
 
@@ -102,7 +104,7 @@ seal 一经发出不可变（COMPANION-009 字节级 sealed 屏障）。
 | LWR / delta | Semantic 源同 XTrace、不同投影（COMPANION-007；delta 见 how/context.md CTX-013） |
 | reanchor | transform 观察到 compaction → `reanchorAfterCompaction`（how/host.md HOST-006） |
 | challenge / seal | how/review.md REVIEW-003/004/006 |
-| pair-programming marker | how/host.md HOST-013 → `insertPairProgrammingThought`；按原字节恢复永久 tool-call/tool-result pair 序列，再把本次 pair 插在 trailing user 前（多 tool 时 call/result 批末；无 user 则末尾），参与 Wire/seal，不进 XTrace |
+| pair-programming marker | how/host.md HOST-013 — 由 `PairProgrammingThoughtTransform` 直接按 durable gap anchor replay（wire 级 DSL 无消息地址，无法做 anchored 渲染，故不占用 intent）；参与 Wire/seal，不进 XTrace |
 
 ---
 

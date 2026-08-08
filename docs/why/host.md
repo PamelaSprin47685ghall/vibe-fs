@@ -44,14 +44,27 @@ Transform input 为空对象是 Host 能力现实；绑定必须用「已创建�
 - **被拒方案**：依赖外部网关（如 OneAPI / NewAPI）或不同 Provider 自身的容错逻辑；各厂商实现不一，遇到严格校验的 OpenAI/DeepSeek 兼容端点必然导致 400 `messages[i].content cannot be empty`。
 - **选择方案**：在 `experimental.chat.messages.transform` 管道的末尾（seal 之前）由插件主动做非空 content 兜底，提取 reasoning 文本或注入安全占位符，从根本上杜绝非法空请求体。
 
-### 9. HOST-013 前缀稳定：移动单 marker vs 永久追加 pair
+### 9. HOST-013 前缀稳定：durable gap anchor 原位 replay vs 移动 / 重定位 marker
 - **被拒方案**：每次 transform 删除历史 marker，再把单条 completed tool-result 挪到新位置。旧请求已发送的 marker 会在后续请求中消失或换位，provider-visible 历史不再以前次请求为字节前缀，Prefix Cache 因而失效；裸 tool-result 还依赖外部 anchor 才合法。
-- **选择方案**：每次 transform 插入一组自足的 synthetic tool-call + 对应 completed tool-result。pair 一经加入即成为不可变永久历史；后续 transform 按原位置、原字节恢复全部既有 pair，再只插入本次 pair。空历史同样有效；不删除、不换位历史 pair，才能保持 Prefix Cache。
+- **被拒方案**：删除历史 synthetic 后把全部历史 pair 压缩成 `historyBlock` 放到当前 call/result 批前，或按当前 trailing user / 当前 tool batch 给历史 pair 重新定位。当前 transcript 的形态随时间变化，历史字节随之搬家，前次 wire 不再是后次 wire 的字节前缀；且 renderer 与同构 oracle 可以一起错而测试仍然通过。
+- **选择方案**：每次 transform 插入一组自足的 synthetic tool-call + 对应 completed tool-result。pair 一经加入即成为不可变永久历史；每个 synthetic half 的 transcript 位置由它自己 durable 的 gap anchor（`Start` / `Before id` / `After id`）唯一决定，replay 是纯函数逐条注入。anchor 缺失 fail closed，不做启发式近似；旧无 anchor journal fail closed，不猜 ordinal ≈ 第 N 个 tool batch。
 
 ### 10. HOST-013 位置：trailing user 之后 vs 之前
 - **被拒方案**：把本次 pair 挂在全局末尾（trailing user 之后）。模型看到的顺序变成「先读 user，再出现 tool-call/result」，不像真实 tool 轮次；有多 tool 时更不像 `tool1 tool2 … result1 result2` 批。
-- **选择方案**：本次 pair **总在 trailing user 之前**。无同批 tool 时 call+result 相邻并紧挨 user 前；有同批 tool 时 `auto-injected` call 进 call 批末、result 进 result 批末，user（含 steer）仍在整批之后。无 trailing user 时才落全局末尾。
+- **选择方案**：本次 pair 的 gap 由当前真实消息末端结构决定：有同轮 tool batch 时 `call` 挂 call 批末、`result` 挂 result 批末（bracket 语义：`real calls → synthetic call → real results → synthetic result`）；无 tool 时二者同 gap 相邻并紧挨 user 前；空历史用 `Start`；无 trailing user 时挂末尾。
 
 ### 11. HOST-013 范围：全 session 注入 vs 排除 Blogger
 - **被拒方案**：对全部 provider transcript（含 Companion Blogger）注入结对编程 auto-injected。Blogger 的唯一任务是把 TOML delta 压成 `blog` 工作日志；中文「以“我”开头」的思考约束与 tip nudge 会污染其 system/tool 合同，导致偏离 `blogger-system.md` 与 ENFORCER 工具纪律。
 - **选择方案**：HOST-013 仅作用于非 Companion session。Blogger 身份以 durable `SessionAssociationProjection.isCompanion` 判定，transform 短路跳过 pair 注入与 durable append。
+
+### 12. HOST-013 幂等：placement identity vs 每次 transform 无条件新增
+- **被拒方案**：每次 transform 无条件 `ordinal+1` 并 append 一组新 pair，以 `history.Length + 1` 判断“这一定是新 round”。Hook invocation 被错误提升为业务 round identity；Host retry、测试重放、同一 request 重入会凭空多出 pair，前缀性质在无新增真实内容时即被破坏。
+- **选择方案**：每个尚未存在 HOST-013 synthetic bracket 的真实 placement occasion 恰好一组 pair；同一 occasion 的重复 transform 只 replay。placement identity = SessionId + CallGap + ResultGap；durable fact 原子携带两个 gap，不拆成两个事实（否则 crash 留下 FakeReq durable、FakeResp 不 durable 的半状态）。
+
+### 13. HOST-013 判定：`isAppendOnlyPrefix` vs 近似断言
+- **被拒方案**：只检查 pair 数量、callID 相同、markerText 正确、FakeReq 在 Req 后、FakeResp 在 Resp 后——这些在 Prefix Cache 已坏（历史被搬家）的实现上全部通过；或自己写 `JSON.stringify(next).startsWith(...)` 第二套“差不多是前缀”的 helper。
+- **选择方案**：以 `ProviderProjection.isAppendOnlyPrefix` 为 PREFIX LAW 唯一权威判定（比较 provider/model/variant/tools/system 及完整 message prefix），生产前置 proof 与回归测试共用同一函数。
+
+### 14. idle-derived continuation：QuiescenceGate vs 重复读 snapshot / busy 状态
+- **被拒方案**：把 busy/running 加进业务 HostSignal 并在几十处维护 if/else——transport 状态机不得搬进 Domain（HOST-002 只允许 coarse wake 进入业务）；连续多读几次 snapshot 称为“仍 idle”——snapshot 只证明观测稳定，不证明发送瞬间仍 idle；给 `TurnUnknown` 加 `Task.Delay`；每发现新 race 加 `isXxxRun` 特判——把 symptom 类别清单当正确性证明，永远补不完。
+- **选择方案**：process-local `SessionQuiescenceGate`，唯一状态转换 `BeginProviderAttempt / ObserveIdle / TryConsume / DropSession`。permit 从 idle 观察随 reconcile 携带到发送边界，物理发送前再次 `TryConsume`（与 dispatcher send 之间零 await）。业务决策 × 物理发送资格 = 允许的副作用；stale permit → `Superseded`（不写 claim、不发消息）。不写 Journal、不参与 crash recovery、重启清空（安全侧失败）。

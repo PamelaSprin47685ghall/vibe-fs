@@ -327,8 +327,20 @@ module SpikePlugin =
                                     markerText
                                     messages
                             with
-                            | Some newMessages -> HostMessageProjection.replaceMessagesInPlace outObj newMessages
-                            | None -> ()
+                            | Ok newMessages -> HostMessageProjection.replaceMessagesInPlace outObj newMessages
+                            | Error reason ->
+                                // HOST-013 fail closed：synthetic 历史无法按 durable anchor
+                                // 字节级重建时，禁止把 raw transcript 原样发给 provider
+                                // （那会静默破坏 append-only prefix）。中止本次物理 run。
+                                Diagnostic.emit
+                                    "host-013-fail-closed"
+                                    [ "session_id", (defaultArg projectionSessionIdOpt ""); "result", reason ]
+
+                                match projectionSessionIdOpt with
+                                | Some sessionId ->
+                                    let! _ = sessionPort.AbortSession(SessionId.create sessionId)
+                                    ()
+                                | None -> ()
 
                         // HOST-016: 对 provider-facing 消息做非空 content 兜底保障，
                         // 避免仅推理/空 content 导致上游 API 报 400 messages[i].content cannot be empty。

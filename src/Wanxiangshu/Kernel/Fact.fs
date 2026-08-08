@@ -611,16 +611,23 @@ module Fact =
 
     /// HOST-013: permanent auto-injected pairs for one provider transcript.
     type HostFactCases =
-        /// One permanent auto-injected pair was appended.
+        /// One permanent auto-injected pair was anchored.
         ///
         /// `Ordinal` is the transcript-local append counter (1-based). `CallId` is
         /// stable across restarts. `MarkerText` is the exact tool-result body the
         /// provider saw for this pair — history restores these bytes verbatim.
-        | PairProgrammingGuidelineAppended of
+        /// `CallGap` / `ResultGap` anchor the two halves to transcript positions:
+        /// the bracket spans one real tool batch (`real calls → synthetic call →
+        /// real results → synthetic result`). A pair's identity, bytes and both
+        /// placements must commit atomically — two split facts would leave a
+        /// crash-time half-pair.
+        | PairProgrammingGuidelineAnchored of
             {| SessionId: SessionId
                Ordinal: int64
                CallId: ToolCallId
-               MarkerText: string |}
+               MarkerText: string
+               CallGap: TranscriptGap
+               ResultGap: TranscriptGap |}
 
     // There is deliberately no `CompanionEpochSwitched`. COMPANION-009's epoch has
     // exactly two movers now — `PrefixRebaseCommitted` (CTX-012) and
@@ -644,8 +651,8 @@ module Fact =
 
     /// HOST-013 constructor surface.
     module HostFact =
-        let inline PairProgrammingGuidelineAppended payload =
-            AgentFact.Host(HostFactCases.PairProgrammingGuidelineAppended payload)
+        let inline PairProgrammingGuidelineAnchored payload =
+            AgentFact.Host(HostFactCases.PairProgrammingGuidelineAnchored payload)
 
     /// Constructor surface for the PromptFact family: each function wraps its
     /// family case in the single-case Prompt dispatch.

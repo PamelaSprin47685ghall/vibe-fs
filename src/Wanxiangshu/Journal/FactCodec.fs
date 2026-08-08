@@ -79,6 +79,18 @@ module FactCodec =
             let hasTipRuleId = json.IndexOf("\"TipRuleId\"", StringComparison.Ordinal) >= 0
             hasScoreVector || not hasTipRuleId
 
+    /// HOST-013 anchored replay clean break: the legacy unanchored
+    /// `PairProgrammingGuidelineAppended` carried only Ordinal / CallId /
+    /// MarkerText. Its transcript position cannot be recovered without a
+    /// heuristic ordinal≈batch guess, which would re-create the exact prefix
+    /// bug this change fixes. Refuse — never migrate by guessing (cache §13).
+    let containsLegacyUnanchoredGuideline (json: string) =
+        json.IndexOf("\"PairProgrammingGuidelineAppended\"", StringComparison.Ordinal)
+        >= 0
+
+    let legacyGuidelineCleanBreakMessage =
+        "Wanxiangshu HOST-013 requires anchored PairProgrammingGuidelineAnchored facts; legacy unanchored PairProgrammingGuidelineAppended journals are not supported (anchored replay clean break).\nArchive or remove the old Wanxiangshu runtime journal before starting."
+
     /// PERSIST-001: the fact's own bytes must not depend on the machine that
     /// reads them. Embedded DateTimeOffset fields (RuntimeStarted.StartedAt,
     /// HandleAbandoned.AbandonedAt, HostTurnObserved.ObservedAt) share the
@@ -234,6 +246,8 @@ module FactCodec =
             Error pre050MigrationMessage
         elif containsLegacyScoreVectorEntry json then
             Error tipV2CleanBreakMessage
+        elif containsLegacyUnanchoredGuideline json then
+            Error legacyGuidelineCleanBreakMessage
         else
             Decode.Auto.fromString<Fact> (json |> migrateHandleCompleted |> migrateHandleOwnership, extra = extra)
             |> Result.map pinToUtc

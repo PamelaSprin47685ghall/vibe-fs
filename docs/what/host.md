@@ -69,15 +69,50 @@ Host compaction **不得删除** XTrace：否则 Y 落后补缺口与 LWR 自包
 
 ## HOST-013：结对编程 marker（行为）
 
-对**非 Companion / 非 Blogger** 的 provider transcript，每次 transform 必须插入一组 synthetic `auto-injected` pair：assistant tool-call + 使用同一 `callID` 的 completed tool-result。tool-call 输入为 `{}`；tool-result 正文有最近 prior tip 时为英文 Nudge、空行、`ProjectionConstants.PairProgrammingGuidelineText`，否则仅为该中文正文。
+对**非 Companion / 非 Blogger** 的 provider transcript，每个尚未存在 HOST-013 synthetic bracket 的真实 provider/tool exchange（placement occasion）恰好产生一组 synthetic `auto-injected` pair：assistant tool-call + 使用同一 `callID` 的 completed tool-result。tool-call 输入为 `{}`；tool-result 正文有最近 prior tip 时为英文 Nudge、空行、`ProjectionConstants.PairProgrammingGuidelineText`，否则仅为该中文正文。
 
-**位置**：本次 pair **总在 trailing user message 之前**，禁止落在 trailing user 之后或全局末尾。无 trailing user 时 pair 落在全局末尾（空历史同样有效）。
+**Bracket 结构**（规范，不是示意图）。synthetic pair 不是相邻的两条消息，而是跨越真实 response batch 的 temporal bracket。规范序列：
 
-**多 tool 批**：若 trailing user 前存在同轮 tool-call / tool-result 批，则：
-- `auto-injected` tool-call 排在该批 **tool-call 末尾**（`tool1, tool2, auto-injected`）；
-- `auto-injected` tool-result 排在该批 **tool-result 末尾**（`result1, result2, result-auto-injected`）；
-- 其后才是 trailing user（若有 steer：`… result-auto-injected, user`）。
-无同批 tool 时，pair 的 call 与 result 相邻，整体仍在 trailing user 前。
+```text
+LLM -> Local:
+Req1 Req2
+
+Local -> LLM:
+Req1 Req2 FakeReq1 Resp1 Resp2 FakeResp1
+
+LLM -> Local:
+Req1 Req2 FakeReq1 Resp1 Resp2 FakeResp1 Req3
+
+Local -> LLM:
+Req1 Req2 FakeReq1 Resp1 Resp2 FakeResp1 Req3 FakeReq2 Resp3 FakeResp2
+```
+
+其中 `ReqN` / `RespN` 为真实 tool-call / tool-result，`FakeReqN` / `FakeRespN` 为同一 `callID` 的 synthetic call / result。局部结构恒为：
+
+```text
+real calls → synthetic call → real results → synthetic result
+```
+
+禁止：
+
+```text
+real history → synthetic call → synthetic result
+```
+
+更禁止每次 transform 删除全部历史 synthetic 后把历史 pair 整块重建到当前 insertion point。
+
+**位置**：新 pair 的 `CallGap` / `ResultGap` 只由当前**真实**消息末端结构决定（synthetic 消息不参与判断）。trailing user = 最后一条消息是 user message：
+
+- 末端存在同轮 tool batch（`Req1 Req2 Resp1 Resp2` 或 `Req1 Req2 Resp1 Resp2 [User]`）：`CallGap = After(Req2)`、`ResultGap = After(Resp2)`，渲染 `Req1 Req2 FakeReq Resp1 Resp2 FakeResp [User]`；
+- 无 tool batch 且有 trailing user：`CallGap = Before(U1)`、`ResultGap = Before(U1)`；
+- 空 transcript：`Start` / `Start`；
+- 无 trailing user（含末尾为 assistant 文本的 continuation transcript）：`After(lastReal)` / `After(lastReal)`。
+
+新 pair 的 gap 必须落在本次追加区（末尾）。旧「pair 总在最后一条 user 任意位置之前」规则在 continuation transcript 上会把新 pair 插进已发送 wire 的中间，破坏 append-only prefix——已废弃。
+
+同一 gap 内排序固定：pair ordinal 升序，同 ordinal 时 call 先于 result。禁止依赖 Map 枚举顺序。
+
+**幂等**：同一 placement occasion 的重复 transform 只 replay 既有 bracket，不 append 新事实、不新增 pair。同一 placement identity（SessionId + CallGap + ResultGap）最多一个 `PairProgrammingGuideline`。
 
 它**是**会影响 prompt bytes、Prefix Cache、ReviewSeal 的合成历史；**不是**私有思维、容量估算或通用恢复信号。
 
@@ -85,11 +120,13 @@ Host compaction **不得删除** XTrace：否则 Y 落后补缺口与 LWR 自包
 
 行为约束：
 
-1. 对适用 session，每次 transform 无条件插入恰好一组完整 pair；无 user、无既有 tool-call/tool-result、空历史时同样插入。Companion / Blogger session 整段跳过，消息序列字节不变。
-2. pair 一经加入即永久有效。后续每次 transform 必须按原位置、原字节恢复全部既有 pair，再把**本次** pair 插在当前 trailing user 之前（无 trailing user 则全局末尾）；禁止删除、过滤、去重、改写历史 pair，禁止复用既有 `callID`。
-3. 同一 pair 共享 `callID`。无同批 tool 时 call 与 result 相邻；有同批 tool 时 call 并入 call 批末、result 并入 result 批末（此时 call/result 不必相邻）。不同 pair 的 `callID` 唯一且可稳定重建。恢复顺序与字节必须来自 durable append-only 事实，不得依赖文本识别。
+1. 每个尚未存在 HOST-013 synthetic bracket 的真实 placement occasion 恰好产生一组 pair；同一 occasion 的重复 transform 只 replay，不再新增。Companion / Blogger session 整段跳过，消息序列字节不变。
+2. pair 一经加入即永久有效。后续每次 transform 必须按 durable gap anchor 原位置、原字节恢复全部既有 synthetic half，再把本次 pair 按其 gap anchor 渲染；禁止删除、过滤、去重、改写历史 pair，禁止复用既有 `callID`。历史 synthetic half 的位置只由它自己 durable 的 gap anchor 决定，不得由当前 trailing user 或当前 tool batch 重新决定。
+3. 同一 pair 共享 `callID`，但两个 half 各自拥有独立 transcript placement（共同 identity ≠ 相邻存储）。不同 pair 的 `callID` 唯一且可稳定重建。恢复顺序与字节必须来自 durable append-only 事实，不得依赖文本识别。
 4. pair 正文不得进入 XTrace / Companion decode / Blogger delta / work record / compaction input；仅 pair 的 durable 投影事实参与 HOST-013 恢复。
-5. 同一 epoch 内，前次 provider-visible wire 必须是后次 wire 的稳定字节前缀；历史 pair 保留原位，本次 pair 只插入 trailing user 前，不读 limit、不做 token 估算（CTX-002）。
+5. 同一 epoch 内，前次 provider-visible wire 必须是后次 wire 的稳定字节前缀，权威判定为 `ProviderProjection.isAppendOnlyPrefix`；历史 pair 保留原位，不读 limit、不做 token 估算（CTX-002）。禁止用 PrefixEpoch 切换掩盖 HOST-013 自己造成的前缀漂移。
+6. durable anchor 引用的真实消息在当前 transcript 中缺失时 fail closed（`HistoricalSyntheticAnchorMissing`）；禁止“放到当前最接近的位置”、放 trailing user 前、放末尾或忽略该 pair。
+7. legacy 无 anchor 的 `PairProgrammingGuidelineAppended` 存在时该 session 不允许继续 HOST-013 replay，fail closed（incompatible journal）；禁止把旧 ordinal 近似为第 N 个 tool batch 的启发式迁移。
 
 构造与链序见 `how/host.md`。
 

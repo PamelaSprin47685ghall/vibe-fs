@@ -15,7 +15,18 @@ Host 适配、信号和共享状态边界见 `shape/host.md`。
 - Single-flight：同一 session 同时最多一次 reconcile。  
 - Dirty：idle 到达设 dirty。  
 - 有界因果重读：每次 idle 至多 3 次因果重读（`rereadsRemaining = maxCausalRereads + 1`）。  
-- `decideStep`（GLORY-070 / HOST-004 rev.2）：因果重读耗尽后 `Unknown` → `RepairMissingFinalReport`（missing-final-report repair 发送，TurnCompletionProgram 消费），`Provisional` → `Publish`；只有 `SnapshotError` / `NoTurn` 保持 `StopPass`（无对象可作用，等下一粗粒度信号重新入队）。稳定 idle 绝不静默 StopPass。
+- `decideStep`（GLORY-070 / HOST-004 rev.3）：因果重读耗尽后 `Provisional` → `Publish`；只有 `SnapshotError` / `NoTurn` 保持 `StopPass`（无对象可作用，等下一粗粒度信号重新入队）。`Unknown` 不再由重读耗尽直接推导 continuation：`RepairMissingFinalReport` 只在带 `IdleWake`（fresh `QuiescencePermit`）evidence 时可构造；`Retry` / `Failure` wake 下的 `Unknown` 不产生 idle-derived continuation。
+- 观测稳定性 ≠ 静止资格：重复 snapshot 相同只证明观测稳定，不证明发送瞬间仍 idle。idle-derived continuation 必须同时满足：
+  1. snapshot / 业务决策认为 continuation 有用；
+  2. 起源的 `QuiescencePermit` 在 side-effect 时刻仍 fresh（发送边界再次 `TryConsume`）。
+- 三层分离：snapshot 观测（ObservedTurn + StableObservation）→ idle wake evidence（`ReconcileWake = IdleWake of QuiescencePermit | RetryWake | FailureWake`）→ physical continuation admission（`ContinuationAdmission = Ordinary | RequiresQuiescence of QuiescencePermit`）。`materializeActive` 全程携带 wake 直到 publish；`onTurn` 收 `ReconciledTurnContext { Turn; Quiescence: QuiescencePermit option }`，仅 `IdleWake` 有 `Some permit`。
+
+### 接线
+
+- `BeginProviderAttempt(sessionId)`：在 `experimental.chat.messages.transform` 最早同步位置（sessionId 解析后、任何 `let!` 之前）调用，使旧 idle permit 在新 provider request 开始构建时立即失效。
+- `SessionIdle`：`LoopSensor.ResetDetector` 后 `ObserveIdle` 得 permit，随 `SignalIdle(sessionId, permit)` 进入 Reconciler。
+- `SessionDeleted`：`DropSession`，旧 permit 永久失效。
+- 发送边界：`trySendIdleContinuation` / `trySendIdleInteractionRepair` 唯一封装——`TryConsume` 失败 → `Superseded`（不写 claim、不发消息）；成功 → 同一同步调用链直接进入 dispatcher，中间禁止 await。`TryConsume` 不得复制到多个 caller。
 
 ### 终态对齐（EXEC-020）
 
@@ -225,21 +236,30 @@ XTraceCapture → Companion → XWire → EnforcerHost
 ```
 
 - 适用判定：仅非 Companion session 进入本程序。`journal` 存在时以 `SessionAssociationProjection.isCompanion sessionId` 为准；为 true（Blogger）则跳过 `PairProgrammingThoughtTransform`，不读 tip、不 append durable pair、不改 `messages`。无 journal / 无 association 时按非 Companion 处理（保持既有测试与未知 session 行为）。
-- transform 每次读取该 provider transcript 的完整 durable pair 序列，按 `Ordinal` 顺序、原位置、原字节恢复所有既有 pair；不得从正文猜测、跳过、折叠或把历史 pair 整块挪到新位置。
-- 本次 transform 分配新的 `Ordinal` 与唯一稳定 `CallId`，先追加 durable 事实，再把本次 pair 插入 **trailing user message 之前**。无 trailing user 时落在全局末尾。禁止插在 trailing user 之后。
-- 放置算法（对 retained 非 marker 消息）：
-  1. 找最后一条 user（trailing user）；无则 insertion window = 全序列末尾。
-  2. 在 trailing user 之前的后缀中识别同轮 tool 批：连续的 tool-call 消息 / part，随后连续的 tool-result 消息 / part（host raw 中 `type=tool` + `state.status=pending|completed` 均计入）。
-  3. 有 tool 批：`auto-injected` call 插入 call 批末尾；`auto-injected` result 插入 result 批末尾；其后才是 trailing user。  
-     例：`tool1, tool2, auto-injected, result1, result2, result-auto-injected[, user]`。
-  4. 无 tool 批：`auto-injected` call + result 相邻，整体紧挨 trailing user 之前。  
-     例：`…, auto-injected-call, auto-injected-result, user`。
-  5. 空历史：仅本次 pair（call + result）。
-- 一个 pair 的 wire：assistant `tool-call`（工具名 `auto-injected`、输入 `{}`）与对应 `tool-result`（同一 `callID`、`status = completed`、输出 `markerText`）。无同批 tool 时二者相邻；有同批 tool 时分别挂在 call 批 / result 批末尾。
+- 每次 transform 的 commit 顺序：读 durable anchored pair 序列 → strip raw 中已有 HOST-013 synthetic 消息（仅在 durable anchor 足够完整时）→ 校验（真实消息地址唯一；每个 synthetic anchor 在真实消息中可解析，否则 `HistoricalSyntheticAnchorMissing` fail closed）→ 内存中 replay 历史 → 决定本轮新 pair 的 placement（仅当该 placement 尚不存在）→ 内存构造候选 fact → 内存渲染完整 wire → 校验全部不变量 → append durable fact（失败 fail closed，禁止忽略后照发或降级为不注入）→ 返回已校验消息。
+- gap replay（禁止再出现 `historyBlock`）：输入真实消息 + durable synthetic entries，输出：
+
+```text
+Start 组（ordinal 升序）
+逐条真实消息：
+    Before(id) 组（ordinal 升序）→ 消息 → After(id) 组（ordinal 升序）
+```
+
+组内排序唯一合法：`Ordinal` 升序，同 ordinal 时 call 先于 result。历史 synthetic 位置只由它自己 durable 的 gap anchor 决定；当前 transcript 长什么样不得改变历史 pair 的位置。
+
+- 本轮新 pair 的 placement 决策（只读当前**真实**消息，不含 synthetic；trailing user = 最后一条消息是 user）：
+  - 末端存在同轮 tool batch（`Req1 Req2 Resp1 Resp2`，或紧跟 trailing user 之前）：`CallGap = After(Req2)`、`ResultGap = After(Resp2)`；
+  - 无 tool batch 且最后一条是 user：`CallGap = Before(trailingUser)`、`ResultGap = Before(trailingUser)`；
+  - 空 transcript：`Start` / `Start`；
+  - 无 trailing user（含末尾为 assistant 文本的 continuation transcript）：`After(lastReal)` / `After(lastReal)`。
+  新 pair 的 gap 必须落在本次追加区；旧「pair 总在最后一条 user 任意位置之前」在 continuation transcript 上会中途插入新 pair 破坏 prefix，已废弃。
+  查同一 placement identity（SessionId + CallGap + ResultGap）是否已存在：存在 → 只 replay 既有 pair，不 append 新 fact；不存在 → 走上述 commit 顺序。
+- 一个 pair 的 wire：assistant `tool-call`（工具名 `auto-injected`、输入 `{}`）与对应 `tool-result`（同一 `callID`、`status = completed`、输出 `markerText`）。有同批 tool 时 call / result 分别挂 call 批末 / result 批末；无同批 tool 时二者同 gap 相邻。
 - `markerText` 只对本次新 pair 读取当时的 prior tip；历史 pair 保留其原始正文。有 prior tip 时为英文 Nudge、空行、中文正文；无 prior tip 时仅为中文正文。中文正文由 `ProjectionConstants.PairProgrammingGuidelineText` 定义。prior tip 由 owner 的 RecentTips 解析（主 session），不是 Blogger 自身 tip 注入。
 - pair 的 synthetic side-channel 标识为 `source = "pair-programming-auto-injected"`；两侧均按 source 排除于 XTrace 等非 provider 投影，禁止按正文识别或过滤。
 - `CallId = digest(transcript identity + source + Ordinal)`；禁止随机、时间、anchor 或 tip 文本参与身份。正文与 source 单点定义。
-- ReviewSeal 覆盖恢复后的全部历史 pair 与本次新 pair；历史 pair 原位不变，本次 pair 在 trailing user 前，以保持 Prefix Cache。Blogger 跳过注入时 ReviewSeal 只覆盖无 auto-injected 的消息视图。
+- 不变量校验至少：全部历史 anchor 已解析、无重复 placement、call/result 同 callID、synthetic 字节确定（同输入同输出）、当前 placement 与决策算法一致。
+- ReviewSeal 覆盖恢复后的全部历史 pair 与本次新 pair；历史 pair 原位不变，以保持 Prefix Cache。Blogger 跳过注入时 ReviewSeal 只覆盖无 auto-injected 的消息视图。
 - tip nudge 查找：`latestTipNudge` 仅在非 Companion 路径调用；不得以当前 session 是 Blogger 为由把 tip 写进 Blogger transcript。
 - 实现点：`SpikePlugin` transform 在 `PairProgrammingThoughtTransform.tryInject` 之前用 association 门禁短路。
 
