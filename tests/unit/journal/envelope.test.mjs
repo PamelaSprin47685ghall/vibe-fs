@@ -342,13 +342,16 @@ test('PERSIST_008_one_session_projection_is_reached_by_a_keyed_lookup', () => {
   assert.equal(projection.ok, true, projection.ok ? '' : JSON.stringify(projection.error))
 
   // Every bounded projection hangs off the session key. A missing one would force
-  // a caller to scan, which is the shape the clause forbids.
+  // a caller to scan, which is the shape the clause forbids. ses_a is a Work
+  // session (not Companion/Blogger), so HOST-013 adds the `Guidelines` projection
+  // to the full `SessionAgentProjection` field set (shape/host.md:108).
   assert.deepEqual(Object.keys(fold.session(projection.value, 'ses_a')).sort(), [
     'Blog',
     'BloggerCycles',
     'Companion',
     'Enforcement',
     'Fallback',
+    'Guidelines',
     'Handles',
     'ManagerLife',
     'PrefixEpoch',

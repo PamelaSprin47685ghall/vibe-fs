@@ -87,12 +87,23 @@ const HOOK_FIXTURES = {
     output: {},
   },
 
-  // COMPANION-005 / CTX-002: with no committed prefix snapshot, X sees raw history,
-  // so an empty view stays empty rather than gaining a synthetic memory head.
+  // HOST-013: every non-Companion session gets one unconditional synthetic pair
+  // injected at transform time, empty history included. A tool-call and a
+  // tool-result share one callID and carry source = "pair-programming-auto-injected";
+  // with no user message the pair lands at the global end.
   'experimental.chat.messages.transform': {
     input: { sessionID: SESSION },
     output: { messages: [] },
-    assert: (output) => assert.deepEqual(output.messages, [], 'no snapshot means raw history'),
+    assert: (output) => {
+      const messages = output.messages
+      assert.equal(messages.length, 2, 'HOST-013 injects one pair into an empty non-Companion history')
+      const [call, result] = messages
+      assert.equal(call.info.source, 'pair-programming-auto-injected', 'HOST-013 pair source')
+      assert.equal(result.info.source, 'pair-programming-auto-injected', 'HOST-013 pair source')
+      assert.equal(call.parts[0].type, 'tool', 'HOST-013 pair opens with a tool-call')
+      assert.equal(result.parts[0].state.status, 'completed', 'HOST-013 pair closes with a tool-result')
+      assert.equal(result.parts[0].callID, call.parts[0].callID, 'HOST-013 call and result share one callID')
+    },
   },
 
   // HOST-006 containment: this hook has no cancel field, so the plugin can only

@@ -507,6 +507,7 @@ module ProjectionRenderer =
         let retainedArr = retained |> List.toArray
 
         let trailingUserIdx =
+            // DSL-MUTABLE: algorithm-scratch
             let mutable idx = retainedArr.Length - 1
             let mutable found = -1
 
@@ -534,6 +535,7 @@ module ProjectionRenderer =
             else
                 retainedArr.[trailingUserIdx..]
 
+        // DSL-MUTABLE: algorithm-scratch
         let mutable resultStart = head.Length
         let mutable scanningResults = true
 
@@ -545,6 +547,7 @@ module ProjectionRenderer =
             else
                 scanningResults <- false
 
+        // DSL-MUTABLE: algorithm-scratch
         let mutable callStart = resultStart
         let mutable scanningCalls = true
 
