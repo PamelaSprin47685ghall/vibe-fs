@@ -224,13 +224,13 @@ XTraceCapture → Companion → XWire → EnforcerHost
 → PairProgrammingThoughtTransform → HostMessageProjection.sanitizeMessages (HOST-016) → ReviewSeal
 ```
 
-- 锚点：至少存在一个 user 或已完成 tool-result；满足门槛后在 provider-facing 历史全局末尾追加单条 marker。  
-- marker wire 形态是伪装成 `tool: "guideline"` 的 completed tool result：`{type: "tool", tool: "guideline", callID, state: {status: "completed", input: {}, output: markerText}}`。  
-- `markerText` 有最近一个 prior tip 时为英文 Nudge、空行、中文正文；无 prior tip 时仅为中文正文。中文正文由 `ProjectionConstants.PairProgrammingGuidelineText` 定义。  
-- `source = "pair-programming-guideline"`；兼容清理旧 `"pair-programming-thought"` marker。  
-- `id = digest(sessionId + source)`，禁止随机/时间，也不依赖 anchor 或 tip 文本。幂等键为 `sessionId + source`，全局只保留一条。  
-- 排除路径按 `source` 过滤，禁止只按正文过滤。  
-- 文本与 source 单点定义。
+- transform 每次读取该 provider transcript 的完整 durable pair 序列，按 `Ordinal` 顺序恢复所有既有 pair；不得从正文猜测、跳过或折叠记录。
+- 本次 transform 分配新的 `Ordinal` 与唯一稳定 `CallId`，先追加 durable 事实，再在 provider-facing 历史全局末尾重新构造本次 pair。任何既有 pair 的字节、顺序与 `CallId` 永不改变；不清理、不去重、不复用。
+- 一个 pair 的 provider wire 形态必须是相邻的两步：assistant `tool-call`（工具名 `guideline`、输入 `{}`）→ 对应 `tool-result`（同一 `callID`、`status = completed`、输出 `markerText`）。它不依赖 user 或其它 tool-result anchor，空历史也必须有效。
+- `markerText` 只对本次新 pair 读取当时的 prior tip；历史 pair 保留其原始正文。有 prior tip 时为英文 Nudge、空行、中文正文；无 prior tip 时仅为中文正文。中文正文由 `ProjectionConstants.PairProgrammingGuidelineText` 定义。
+- pair 的 synthetic side-channel 标识为 `source = "pair-programming-guideline"`；两侧均按 source 排除于 XTrace 等非 provider 投影，禁止按正文识别或过滤。
+- `CallId = digest(transcript identity + source + Ordinal)`；禁止随机、时间、anchor 或 tip 文本参与身份。正文与 source 单点定义。
+- ReviewSeal 覆盖恢复后的全部历史 pair 与本次末尾 pair；只有该永久 append-only 字节序列可保持 Prefix Cache。
 
 ## 空 Content 预防（归属 HOST-016）
 

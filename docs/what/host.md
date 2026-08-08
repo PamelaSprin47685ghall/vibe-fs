@@ -69,15 +69,17 @@ Host compaction **不得删除** XTrace：否则 Y 落后补缺口与 LWR 自包
 
 ## HOST-013：结对编程 marker（行为）
 
-Transform 可在 provider-facing 历史末尾注入唯一的 synthetic `tool: "guideline"` completed tool-result marker（source = `pair-programming-guideline`）。其正文位于 `state.output`：有最近一个 prior tip 时，先放英文 Nudge，再放 `ProjectionConstants.PairProgrammingGuidelineText` 的中文正文；无 prior tip 时仅放中文正文。
+每次 transform 必须在 provider-facing 历史全局末尾追加一组 synthetic `guideline` pair：assistant tool-call，随后是使用同一 `callID` 的 completed tool-result。tool-call 的输入为 `{}`；tool-result 正文有最近一个 prior tip 时为英文 Nudge、空行、`ProjectionConstants.PairProgrammingGuidelineText`，否则仅为该中文正文。
 
-它**是**会影响 prompt bytes、prefix cache、ReviewSeal 的合成消息；**不是**私有思维、不是容量估算、不是恢复信号。
+它**是**会影响 prompt bytes、Prefix Cache、ReviewSeal 的合成历史；**不是**私有思维、容量估算或通用恢复信号。
 
 行为约束：
 
-1. 仅在存在 user 或 completed tool-result anchor 时注入；marker 全局末尾单条追加，且幂等，不读 limit、不做 token 估算（CTX-002）。  
-2. 不得进入 XTrace / Companion decode / Blogger delta / work record / recovery / compaction input。  
-3. 同一 epoch 内 provider-visible wire 必须保持 append-only 稳定（全锚点重放 + 稳定 id）。  
+1. 每次 transform 无条件追加恰好一组完整 pair；无 user、无既有 tool-call/tool-result、空历史时同样追加。pair 自足合法，不存在 anchor 门槛。
+2. pair 一经加入即永久有效。后续每次 transform 必须按原位置、原字节恢复全部既有 pair，再在当前全局末尾追加本次 pair；禁止删除、过滤、去重、改写、换位或复用既有 pair 的 `callID`。
+3. 同一 pair 的 tool-call 与 tool-result 必须相邻、共享 `callID`；不同 pair 的 `callID` 唯一且可稳定重建。恢复顺序与字节必须来自 durable append-only 事实，不得依赖文本识别。
+4. pair 正文不得进入 XTrace / Companion decode / Blogger delta / work record / compaction input；仅 pair 的 durable 投影事实参与 HOST-013 恢复。
+5. 同一 epoch 内，前次 provider-visible wire 必须是后次 wire 的稳定字节前缀；历史 pair 永久保留，本次 pair 只追加在末尾，不读 limit、不做 token 估算（CTX-002）。
 
 构造与链序见 `how/host.md`。
 

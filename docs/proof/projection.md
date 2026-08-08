@@ -38,7 +38,7 @@
 | plan 幂等 / 冲突（含 ConflictingPrefixLifecycle 等） | unit |
 | `renderMessagesWithIntents` fold | unit |
 | `InsertBlogFrames` ↔ `CompanionProjectionBuilder` digest 等价 | unit + 生产 rebuild 接线 |
-| `InsertRepair` / `AppendReviewChallenge` / `InsertPairProgrammingThought` 生产字节合同（含末尾唯一 `guideline` tool-result marker） | 生产接线 + unit |
+| `InsertRepair` / `AppendReviewChallenge` / `InsertPairProgrammingThought` 生产字节合同（含空历史无门槛、永久 tool-call/tool-result pair 恢复、每次 transform 仅末尾新增一组、重启字节等价） | 生产接线 + unit + restart |
 | `ReanchorAfterCompaction` | 生产接线 + unit |
 | **`SuppressTransportOnly`** | **仅 Domain + unit 骨架**；生产 `TransportMessages` 恒空、未声明 intent。COMPANION-012 字段级过滤由模型边界 / `toSemantic` 承担；消息级 Suppress 待 host-id 侧信道后续变更 |
 

@@ -88,7 +88,22 @@ metadata 用于重建，不得把自然语言问题、回答或 QA 正文放进�
 - 单次查改与枚举必须同步完成，不跨 `await`；需要跨异步边界使用的数据先复制成不可变快照。
 - 禁止“读取 → await → 按旧值回写”的 read-modify-write；若引入 Worker/共享内存，须先新增明确的消息所有者或原子同步端口。
 
-### 空 Content 预防边界（HOST-016）
+## 永久 guideline pair 所有权
+
+HOST-013 的唯一持久状态是按 provider transcript 分区的 append-only pair 序列：
+
+```fsharp
+type PairProgrammingGuideline =
+    { Ordinal: int64
+      CallId: ToolCallId
+      MarkerText: string }
+```
+
+`Ordinal` 严格递增；`CallId` 在该 transcript 内唯一。记录一经追加不可修改、删除或换位。每条记录只渲染为相邻的 assistant `guideline` tool-call 与对应 completed tool-result，两侧共享 `CallId`，均标记 `source = "pair-programming-guideline"` 与 `synthetic = true`。
+
+Coordinator 是追加与恢复的唯一 writer；Projection 只读取完整序列并确定性渲染。XTrace、Companion、Blogger、work record 与 compaction 不拥有也不复制正文。pair 自含调用与结果，不依赖任何外部消息作为 anchor。
+
+## 空 Content 预防边界
 
 | 角色 | 触发条件 | 补救动作 |
 |------|----------|----------|

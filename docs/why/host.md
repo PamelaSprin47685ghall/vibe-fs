@@ -43,3 +43,7 @@ Transform input 为空对象是 Host 能力现实；绑定必须用「已创建�
 ### 8. HOST-016 空 Content 预防：在 transform 阶段兜底 vs 依赖上游网关修补
 - **被拒方案**：依赖外部网关（如 OneAPI / NewAPI）或不同 Provider 自身的容错逻辑；各厂商实现不一，遇到严格校验的 OpenAI/DeepSeek 兼容端点必然导致 400 `messages[i].content cannot be empty`。
 - **选择方案**：在 `experimental.chat.messages.transform` 管道的末尾（seal 之前）由插件主动做非空 content 兜底，提取 reasoning 文本或注入安全占位符，从根本上杜绝非法空请求体。
+
+### 9. HOST-013 前缀稳定：移动单 marker vs 永久追加 pair
+- **被拒方案**：每次 transform 删除历史 marker，再把单条 completed tool-result 移到当前全局末尾。旧请求已发送的 marker 会在后续请求中消失或换位，provider-visible 历史不再以前次请求为字节前缀，Prefix Cache 因而失效；裸 tool-result 还依赖外部 anchor 才合法。
+- **选择方案**：每次 transform 在当前全局末尾追加一组自足的 synthetic tool-call + 对应 completed tool-result。pair 一经加入即成为不可变永久历史，后续每次 transform 都按原位置、原字节恢复全部既有 pair，再追加本次 pair。成对结构不依赖 user 或既有 tool-result，空历史同样有效；只追加、不删除、不换位，才能保持 Prefix Cache。
