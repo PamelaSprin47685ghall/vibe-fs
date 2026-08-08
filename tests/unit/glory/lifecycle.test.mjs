@@ -5,6 +5,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { ManagerLifecycleProjection_isLifeArchived as isLifeArchived } from '../../../dist/Journal/ManagerLifecycleProjection.js'
 import {
   blobDigest,
   blobRef,
@@ -217,6 +218,52 @@ test('GLORY_060_a_blessing_leaves_the_life_open_until_the_second_suicide', () =>
   assert.equal(archived.Completed, true)
   assert.ok(archived.CompletedTerminal != null)
   assert.equal(caseOf(archived.ActiveFinality.Resolution), 'Blessed')
+})
+
+const ManagerLifecycleProjectionLike = {
+  empty: () => ({ CurrentLife: undefined, CompletedLives: [] }),
+}
+
+test('GLORY_062_isLifeArchived_true_only_after_life_completed', () => {
+  // GLORY-070: an idle earns encouragement for any Life state EXCEPT a completed
+  // one. The production bug re-sent `IdleEncouragement` after the final
+  // rest-in-peace suicide, because the leftover turn saw `CurrentLife = None`
+  // (archived) and took the generic Manager idle branch. This is the pure
+  // decision primitive: a Life is "done" only when it was archived by
+  // LifeCompleted (CurrentLife cleared AND CompletedLives non-empty).
+  const archived = fold.apply(fold.empty, [
+    lifecycleEnv(lifeOpened()),
+    lifecycleEnv(workActivated()),
+    lifecycleEnv(finalityRequested()),
+    lifecycleEnv(finalityReviewerEnlisted()),
+    lifecycleEnv(finalityBlessed()),
+    lifecycleEnv(lifeCompleted()),
+  ])
+  assert.equal(archived.ok, true, JSON.stringify(archived.error))
+  assert.equal(isLifeArchived(life(archived.value)), true)
+
+  // A fresh session that never opened a Life is NOT done (CurrentLife None but
+  // CompletedLives empty) — it must keep working.
+  assert.equal(isLifeArchived(ManagerLifecycleProjectionLike.empty()), false)
+
+  // An open / activated-but-unfinished Life is NOT done.
+  const open = fold.apply(fold.empty, [
+    lifecycleEnv(lifeOpened()),
+    lifecycleEnv(workActivated()),
+  ])
+  assert.equal(open.ok, true, JSON.stringify(open.error))
+  assert.equal(isLifeArchived(life(open.value)), false)
+
+  // A blessed Life is still open until the second suicide (GLORY-061/062).
+  const blessed = fold.apply(fold.empty, [
+    lifecycleEnv(lifeOpened()),
+    lifecycleEnv(workActivated()),
+    lifecycleEnv(finalityRequested()),
+    lifecycleEnv(finalityReviewerEnlisted()),
+    lifecycleEnv(finalityBlessed()),
+  ])
+  assert.equal(blessed.ok, true, JSON.stringify(blessed.error))
+  assert.equal(isLifeArchived(life(blessed.value)), false)
 })
 
 test('GLORY_057_FinalityUndecided_closes_the_request_without_a_wound_record', () => {

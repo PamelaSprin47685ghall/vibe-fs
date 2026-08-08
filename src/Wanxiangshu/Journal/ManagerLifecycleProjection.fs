@@ -339,3 +339,14 @@ module ManagerLifecycleProjection =
         | FinalityResolution.Rejected _
         | FinalityResolution.Blessed _
         | FinalityResolution.Undecided -> false
+
+    /// GLORY-070/062: the session's Life is archived by the final rest-in-peace
+    /// suicide (LifeCompleted clears `CurrentLife` and pushes into
+    /// `CompletedLives`). The Manager's terminal was already `last_words`; a
+    /// leftover turn must not be re-awakened with an idle encouragement.
+    /// Distinct from a fresh session (CurrentLife None, CompletedLives empty),
+    /// which is still planning and must keep working.
+    let isLifeArchived (projection: ManagerLifeProjection) : bool =
+        match projection.CurrentLife with
+        | None -> not (List.isEmpty projection.CompletedLives)
+        | Some _ -> false

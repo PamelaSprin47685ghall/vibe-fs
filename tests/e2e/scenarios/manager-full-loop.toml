@@ -119,18 +119,10 @@ tools = ["fork", "join", "list", "suicide"]
   [[turn.step]]
   respond = { type = "text", text = "Manager joined." }
 
-# GLORY-029/070: ordinary activated idle receives ManagerIdleEncouragement only
-# (the old Manager Review Guard is gone). Optional: race with other continuations.
-[[turn]]
-id = "manager-idle"
-internal = true
-optional = true
-user = ["You are doing well.", "You have plenty of time.", "You can continue.", "When nothing useful remains, call suicide."]
-tools = ["fork", "join", "list", "suicide"]
-
-  [[turn.step]]
-  respond = { type = "text", text = "Manager continues." }
-
+# A post-rest-in-peace IdleEncouragement is NOT declared here on purpose: the
+# final rest-in-peace suicide appended LifeCompleted, so the Manager must receive
+# NO further continuation. A spurious "You are doing well." after rest in peace
+# would be an unmatched StrictMock request and fail this canary (GLORY-062/070).
 [[turn]]
 id = "manager-activation"
 internal = true
