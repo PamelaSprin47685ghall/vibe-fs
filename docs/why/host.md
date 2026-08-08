@@ -45,9 +45,13 @@ Transform input 为空对象是 Host 能力现实；绑定必须用「已创建�
 - **选择方案**：在 `experimental.chat.messages.transform` 管道的末尾（seal 之前）由插件主动做非空 content 兜底，提取 reasoning 文本或注入安全占位符，从根本上杜绝非法空请求体。
 
 ### 9. HOST-013 前缀稳定：移动单 marker vs 永久追加 pair
-- **被拒方案**：每次 transform 删除历史 marker，再把单条 completed tool-result 移到当前全局末尾。旧请求已发送的 marker 会在后续请求中消失或换位，provider-visible 历史不再以前次请求为字节前缀，Prefix Cache 因而失效；裸 tool-result 还依赖外部 anchor 才合法。
-- **选择方案**：每次 transform 在当前全局末尾追加一组自足的 synthetic tool-call + 对应 completed tool-result。pair 一经加入即成为不可变永久历史，后续每次 transform 都按原位置、原字节恢复全部既有 pair，再追加本次 pair。成对结构不依赖 user 或既有 tool-result，空历史同样有效；只追加、不删除、不换位，才能保持 Prefix Cache。
+- **被拒方案**：每次 transform 删除历史 marker，再把单条 completed tool-result 挪到新位置。旧请求已发送的 marker 会在后续请求中消失或换位，provider-visible 历史不再以前次请求为字节前缀，Prefix Cache 因而失效；裸 tool-result 还依赖外部 anchor 才合法。
+- **选择方案**：每次 transform 插入一组自足的 synthetic tool-call + 对应 completed tool-result。pair 一经加入即成为不可变永久历史；后续 transform 按原位置、原字节恢复全部既有 pair，再只插入本次 pair。空历史同样有效；不删除、不换位历史 pair，才能保持 Prefix Cache。
 
-### 10. HOST-013 范围：全 session 注入 vs 排除 Blogger
-- **被拒方案**：对全部 provider transcript（含 Companion Blogger）注入结对编程 guideline。Blogger 的唯一任务是把 TOML delta 压成 `blog` 工作日志；中文「以“我”开头」的思考约束与 tip nudge 会污染其 system/tool 合同，导致偏离 `blogger-system.md` 与 ENFORCER 工具纪律。
+### 10. HOST-013 位置：trailing user 之后 vs 之前
+- **被拒方案**：把本次 pair 挂在全局末尾（trailing user 之后）。模型看到的顺序变成「先读 user，再出现 tool-call/result」，不像真实 tool 轮次；有多 tool 时更不像 `tool1 tool2 … result1 result2` 批。
+- **选择方案**：本次 pair **总在 trailing user 之前**。无同批 tool 时 call+result 相邻并紧挨 user 前；有同批 tool 时 `auto-injected` call 进 call 批末、result 进 result 批末，user（含 steer）仍在整批之后。无 trailing user 时才落全局末尾。
+
+### 11. HOST-013 范围：全 session 注入 vs 排除 Blogger
+- **被拒方案**：对全部 provider transcript（含 Companion Blogger）注入结对编程 auto-injected。Blogger 的唯一任务是把 TOML delta 压成 `blog` 工作日志；中文「以“我”开头」的思考约束与 tip nudge 会污染其 system/tool 合同，导致偏离 `blogger-system.md` 与 ENFORCER 工具纪律。
 - **选择方案**：HOST-013 仅作用于非 Companion session。Blogger 身份以 durable `SessionAssociationProjection.isCompanion` 判定，transform 短路跳过 pair 注入与 durable append。

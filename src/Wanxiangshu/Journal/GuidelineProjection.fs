@@ -3,7 +3,7 @@ namespace Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
-/// HOST-013 durable guideline pairs for one transcript (append-only).
+/// HOST-013 durable auto-injected pairs for one transcript (append-only).
 type PairProgrammingGuideline =
     { Ordinal: int64
       CallId: ToolCallId

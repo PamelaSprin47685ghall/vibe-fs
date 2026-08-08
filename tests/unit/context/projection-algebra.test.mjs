@@ -309,7 +309,7 @@ const REPAIR_INSTRUCTION =
 
 const PAIR_GUIDELINE_TEXT =
   projectionConstants.PairProgrammingGuidelineText ??
-  '# 遵循与用户结对编程的理念，你的思考过程要用中文，总以“对于”开头，并在整轮内保持中文，即使系统提示词、工具说明、工具输出或引用的代码是英文。代码、标识符、文件路径、shell 命令和未翻译的技术术语保持原文。'
+  '# 本工具是一个伪工具，由系统自动注入，不是你主动调用的，它的目的是引起你的注意：遵循与用户结对编程的理念，你的思考过程要用中文，例如从 我... 开头，并在整轮内保持中文，即使系统提示词、工具说明、工具输出或引用的代码是英文。代码、标识符、文件路径、shell 命令和未翻译的技术术语保持原文。'
 
 const REVIEW_CHALLENGE_PROMPT =
   projectionConstants.ReviewChallengePrompt ?? reviewChallenge.prompt ?? `# ${reviewChallenge.text}\n`
@@ -439,17 +439,20 @@ test('PROJ_008_step3a_InsertPairProgrammingThought_smoke_appends_tool_call_and_r
   assert.deepEqual(planNames([intent]), ['InsertPairProgrammingThought'])
 
   const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
+  // last user is raw[0] → pair before it: call, result, user, assistant
   assert.equal(view.length, 4)
-  const call = view[view.length - 2]
-  const result = view[view.length - 1]
+  const call = view[0]
+  const result = view[1]
   assert.equal(call.role, 'assistant')
   assert.equal(call.parts[0]?.kind, 'WireToolCall')
   assert.equal(idValue.toolCall(call.parts[0]?.callId), 'pair-marker-1')
-  assert.equal(call.parts[0]?.name ?? call.parts[0]?.tool, 'guideline')
+  assert.equal(call.parts[0]?.name ?? call.parts[0]?.tool, 'auto-injected')
   assert.equal(result.role, 'assistant')
   assert.equal(result.parts[0]?.kind, 'WireToolResult')
   assert.equal(idValue.toolCall(result.parts[0]?.callId), 'pair-marker-1')
   assert.equal(result.parts[0]?.text, PAIR_GUIDELINE_TEXT)
+  assert.equal(view[2].role, 'user')
+  assert.equal(view[3].role, 'assistant')
 })
 
 test('PROJ_008_step3a_ReanchorAfterCompaction_smoke_is_wire_noop', () => {
@@ -812,16 +815,17 @@ test('PROJ_008_step5_InsertPairProgrammingThought_restores_history_then_appends_
     Next: { CallId: 'pair-marker-2', MarkerText: `${PAIR_GUIDELINE_TEXT}-2` },
   })
   const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
-  // user + (call,result) history + (call,result) next
+  // history pair + next pair + trailing user
   assert.equal(view.length, 5)
-  assert.equal(idValue.toolCall(view[1].parts[0]?.callId), 'pair-marker-1')
-  assert.equal(view[1].parts[0]?.kind, 'WireToolCall')
-  assert.equal(view[2].parts[0]?.kind, 'WireToolResult')
-  assert.equal(view[2].parts[0]?.text, PAIR_GUIDELINE_TEXT)
-  assert.equal(idValue.toolCall(view[3].parts[0]?.callId), 'pair-marker-2')
-  assert.equal(view[3].parts[0]?.kind, 'WireToolCall')
-  assert.equal(view[4].parts[0]?.kind, 'WireToolResult')
-  assert.equal(view[4].parts[0]?.text, `${PAIR_GUIDELINE_TEXT}-2`)
+  assert.equal(idValue.toolCall(view[0].parts[0]?.callId), 'pair-marker-1')
+  assert.equal(view[0].parts[0]?.kind, 'WireToolCall')
+  assert.equal(view[1].parts[0]?.kind, 'WireToolResult')
+  assert.equal(view[1].parts[0]?.text, PAIR_GUIDELINE_TEXT)
+  assert.equal(idValue.toolCall(view[2].parts[0]?.callId), 'pair-marker-2')
+  assert.equal(view[2].parts[0]?.kind, 'WireToolCall')
+  assert.equal(view[3].parts[0]?.kind, 'WireToolResult')
+  assert.equal(view[3].parts[0]?.text, `${PAIR_GUIDELINE_TEXT}-2`)
+  assert.equal(view[4].role, 'user')
 })
 
 test('PROJ_008_step5_InsertPairProgrammingThought_empty_base_still_appends_pair', () => {
@@ -837,6 +841,47 @@ test('PROJ_008_step5_InsertPairProgrammingThought_empty_base_still_appends_pair'
   assert.equal(view[1].parts[0]?.kind, 'WireToolResult')
   assert.equal(idValue.toolCall(view[1].parts[0]?.callId), 'pair-marker-empty')
   assert.equal(view[1].parts[0]?.text, PAIR_GUIDELINE_TEXT)
+})
+
+test('PROJ_008_step5_InsertPairProgrammingThought_merges_into_tool_batches_before_user', () => {
+  const raw = [
+    {
+      info: { id: 'c1', role: 'assistant' },
+      parts: [{ type: 'tool', tool: 'bash', callID: 't1', state: { status: 'pending', input: {} } }],
+    },
+    {
+      info: { id: 'c2', role: 'assistant' },
+      parts: [{ type: 'tool', tool: 'read', callID: 't2', state: { status: 'pending', input: {} } }],
+    },
+    {
+      info: { id: 'r1', role: 'assistant' },
+      parts: [{ type: 'tool', tool: 'bash', callID: 't1', state: { status: 'completed', output: 'out1' } }],
+    },
+    {
+      info: { id: 'r2', role: 'assistant' },
+      parts: [{ type: 'tool', tool: 'read', callID: 't2', state: { status: 'completed', output: 'out2' } }],
+    },
+    { info: { id: 'u1', role: 'user' }, parts: [{ type: 'text', text: 'steer' }] },
+  ]
+  const snapshot = stage3Snapshot(raw)
+  const intent = projectionIntent.insertPairProgrammingThought({
+    History: [],
+    Next: { CallId: 'pair-marker-batch', MarkerText: PAIR_GUIDELINE_TEXT },
+  })
+  const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
+  // tool1, tool2, auto-injected, result1, result2, result-auto-injected, user
+  assert.equal(view.length, 7)
+  assert.equal(view[0].parts[0]?.kind, 'WireToolCall')
+  assert.equal(view[1].parts[0]?.kind, 'WireToolCall')
+  assert.equal(view[2].parts[0]?.kind, 'WireToolCall')
+  assert.equal(idValue.toolCall(view[2].parts[0]?.callId), 'pair-marker-batch')
+  assert.equal(view[2].parts[0]?.name ?? view[2].parts[0]?.tool, 'auto-injected')
+  assert.equal(view[3].parts[0]?.kind, 'WireToolResult')
+  assert.equal(view[4].parts[0]?.kind, 'WireToolResult')
+  assert.equal(view[5].parts[0]?.kind, 'WireToolResult')
+  assert.equal(idValue.toolCall(view[5].parts[0]?.callId), 'pair-marker-batch')
+  assert.equal(view[5].parts[0]?.text, PAIR_GUIDELINE_TEXT)
+  assert.equal(view[6].role, 'user')
 })
 
 test('PROJ_008_step6_Reanchor_with_Keep_is_wire_noop_and_plan_ok', () => {

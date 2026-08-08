@@ -569,22 +569,23 @@ const withSession = (messages, sessionID = 'ses-host-013') =>
 
 test('CTX_002_transform_appends_one_pair_programming_pair', async () => {
   await withPlugin(async (hooks) => {
-    // HOST-013: every transform appends one tool-call + tool-result pair.
+    // HOST-013: every transform inserts one tool-call + tool-result pair before trailing user.
     const transformed = { messages: withSession([{ role: 'user', text: 'hello' }]) }
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
     assert.equal(transformed.messages.length, 3)
-    assert.equal(transformed.messages[0].role ?? transformed.messages[0].info?.role, 'user')
     assert.equal(markerCount(transformed.messages), 2)
 
-    const call = transformed.messages[1]
-    const result = transformed.messages[2]
+    const call = transformed.messages[0]
+    const result = transformed.messages[1]
+    const user = transformed.messages[2]
     assert.equal(call.info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-    assert.equal(call.parts[0].tool, 'guideline')
+    assert.equal(call.parts[0].tool, 'auto-injected')
     assert.equal(call.parts[0].state.status, 'pending')
     assert.equal(result.parts[0].state.status, 'completed')
     assert.equal(result.parts[0].state.output, PAIR_PROGRAMMING_THOUGHT_TEXT)
     assert.equal(call.parts[0].callID, result.parts[0].callID)
+    assert.equal(user.role ?? user.info?.role, 'user')
 
     const markerRe = /\[(CAPS|REVIEW|HINT):/
     const marked = transformed.messages
@@ -597,8 +598,9 @@ test('CTX_002_transform_appends_one_pair_programming_pair', async () => {
   })
 })
 
-test('HOST_013_pair_appends_after_later_assistant', async () => {
+test('HOST_013_pair_before_trailing_user_not_after_assistant_only_tail', async () => {
   await withPlugin(async (hooks) => {
+    // last user is first message → pair before it; assistant stays after user.
     const transformed = {
       messages: withSession([
         { role: 'user', text: 'hello' },
@@ -609,7 +611,10 @@ test('HOST_013_pair_appends_after_later_assistant', async () => {
 
     assert.equal(transformed.messages.length, 4)
     assert.equal(markerCount(transformed.messages), 2)
-    assert.equal(transformed.messages.at(-1).info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
+    assert.equal(transformed.messages[0].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
+    assert.equal(transformed.messages[1].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
+    assert.equal(transformed.messages[2].role ?? transformed.messages[2].info?.role, 'user')
+    assert.equal(transformed.messages[3].role ?? transformed.messages[3].info?.role, 'assistant')
   })
 })
 
@@ -630,7 +635,8 @@ test('HOST_013_empty_messages_still_append_pair', async () => {
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
     assert.equal(markerCount(transformed.messages) >= 2, true)
-    assert.equal(transformed.messages.at(-1).parts[0].tool, 'guideline')
+    // no trailing user → pair at end
+    assert.equal(transformed.messages.at(-1).parts[0].tool, 'auto-injected')
   })
 })
 
@@ -645,11 +651,12 @@ test('HOST_013_system_and_assistant_history_still_appends_pair', async () => {
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
     assert.equal(markerCount(transformed.messages), 2)
+    // no user → pair at end
     assert.equal(transformed.messages.at(-1).info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
   })
 })
 
-test('HOST_013_pair_appends_after_mixed_history', async () => {
+test('HOST_013_pair_before_trailing_user_in_mixed_history', async () => {
   await withPlugin(async (hooks) => {
     // Keep messages in the bare shape used by other HOST-013 cases so Companion
     // recovery is not armed; only the permanent pair contract is under test.
@@ -666,21 +673,25 @@ test('HOST_013_pair_appends_after_mixed_history', async () => {
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
     assert.equal(markerCount(transformed.messages), 2)
-    assert.equal(transformed.messages.at(-1).info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
+    assert.equal(transformed.messages.at(-1).role ?? transformed.messages.at(-1).info?.role, 'user')
+    assert.equal(transformed.messages.at(-2).info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
+    assert.equal(transformed.messages.at(-3).info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
   })
 })
 
 test('HOST_013_repeated_transform_appends_another_pair', async () => {
   await withPlugin(async (hooks) => {
-    // HOST-013: each transform permanently appends one new pair.
+    // HOST-013: each transform permanently inserts one new pair before trailing user.
     // Use non-synthetic base so history is re-hydrated from durable/memory ledger.
     const first = { messages: withSession([{ role: 'user', text: 'hello' }], 'ses-repeat') }
     await hooks['experimental.chat.messages.transform']({}, first)
     assert.equal(markerCount(first.messages), 2)
+    assert.equal(first.messages.at(-1).role ?? first.messages.at(-1).info?.role, 'user')
 
     const second = { messages: withSession([{ role: 'user', text: 'hello' }], 'ses-repeat') }
     await hooks['experimental.chat.messages.transform']({}, second)
     assert.equal(markerCount(second.messages), 4, 'history pair + new pair')
+    assert.equal(second.messages.at(-1).role ?? second.messages.at(-1).info?.role, 'user')
   })
 })
 
@@ -690,7 +701,8 @@ test('HOST_013_new_user_turn_keeps_history_and_appends_new_pair', async () => {
       messages: withSession([{ role: 'user', text: 'hello' }], 'ses-turn'),
     }
     await hooks['experimental.chat.messages.transform']({}, first)
-    const firstCallId = first.messages.at(-1).parts[0].callID
+    // first: [call, result, user]
+    const firstCallId = first.messages[0].parts[0].callID
 
     const second = {
       messages: withSession(
@@ -703,22 +715,24 @@ test('HOST_013_new_user_turn_keeps_history_and_appends_new_pair', async () => {
     }
     await hooks['experimental.chat.messages.transform']({}, second)
 
+    // second: [user hello, hist-call, hist-result, next-call, next-result, user second]
     assert.equal(markerCount(second.messages), 4)
-    assert.equal(second.messages.at(-3).parts[0].callID, firstCallId)
-    assert.notEqual(second.messages.at(-1).parts[0].callID, firstCallId)
+    assert.equal(second.messages[1].parts[0].callID, firstCallId)
+    assert.notEqual(second.messages[3].parts[0].callID, firstCallId)
+    assert.equal(second.messages.at(-1).role ?? second.messages.at(-1).info?.role, 'user')
   })
 })
 
 test('HOST_013_companion_blogger_skips_guideline_injection', async () => {
   // HOST-013 scope: durable Companion (Blogger) transcripts must not receive
-  // pair-programming guideline pairs — they pollute the blog tool contract.
+  // pair-programming auto-injected pairs — they pollute the blog tool contract.
   const { agentFact, sessionId, caseOf } = await import('../../unit/support/domain.mjs')
   const { AgentJournalModule_appendAgent } = await import('../../../dist/Journal/AgentJournal.js')
   const { StreamId } = await import('../../../dist/Journal/Envelope.js')
 
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    const main = sessionId('ses-main-no-guideline')
-    const blogger = sessionId('ses-blogger-no-guideline')
+    const main = sessionId('ses-main-no-auto-injected')
+    const blogger = sessionId('ses-blogger-no-auto-injected')
     const linked = AgentJournalModule_appendAgent(
       new StreamId(1, main),
       undefined,
@@ -734,14 +748,14 @@ test('HOST_013_companion_blogger_skips_guideline_injection', async () => {
     const transformed = {
       messages: withSession(
         [{ role: 'user', text: 'record this delta', parts: [{ type: 'text', text: 'record this delta' }] }],
-        'ses-blogger-no-guideline',
+        'ses-blogger-no-auto-injected',
       ),
     }
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
-    assert.equal(markerCount(transformed.messages), 0, 'blogger must not receive guideline pairs')
+    assert.equal(markerCount(transformed.messages), 0, 'blogger must not receive auto-injected pairs')
     assert.equal(
-      transformed.messages.some((m) => m?.parts?.some((p) => p?.tool === 'guideline')),
+      transformed.messages.some((m) => m?.parts?.some((p) => p?.tool === 'auto-injected')),
       false,
     )
     assert.equal(

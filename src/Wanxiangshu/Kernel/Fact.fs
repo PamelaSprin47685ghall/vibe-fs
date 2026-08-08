@@ -609,9 +609,9 @@ module Fact =
                NextEpochId: PrefixEpochId
                ObservedCompactionRun: ProviderRunIdentity |}
 
-    /// HOST-013: permanent guideline pairs for one provider transcript.
+    /// HOST-013: permanent auto-injected pairs for one provider transcript.
     type HostFactCases =
-        /// One permanent guideline pair was appended.
+        /// One permanent auto-injected pair was appended.
         ///
         /// `Ordinal` is the transcript-local append counter (1-based). `CallId` is
         /// stable across restarts. `MarkerText` is the exact tool-result body the

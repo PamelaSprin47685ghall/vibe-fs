@@ -88,7 +88,7 @@ metadata 用于重建，不得把自然语言问题、回答或 QA 正文放进�
 - 单次查改与枚举必须同步完成，不跨 `await`；需要跨异步边界使用的数据先复制成不可变快照。
 - 禁止“读取 → await → 按旧值回写”的 read-modify-write；若引入 Worker/共享内存，须先新增明确的消息所有者或原子同步端口。
 
-## 永久 guideline pair 所有权
+## 永久 auto-injected pair 所有权
 
 HOST-013 的唯一持久状态是按 provider transcript 分区的 append-only pair 序列：
 
@@ -99,9 +99,11 @@ type PairProgrammingGuideline =
       MarkerText: string }
 ```
 
-`Ordinal` 严格递增；`CallId` 在该 transcript 内唯一。记录一经追加不可修改、删除或换位。每条记录只渲染为相邻的 assistant `guideline` tool-call 与对应 completed tool-result，两侧共享 `CallId`，均标记 `source = "pair-programming-guideline"` 与 `synthetic = true`。
+`Ordinal` 严格递增；`CallId` 在该 transcript 内唯一。记录一经追加不可修改、删除或换位。每条记录渲染为 assistant `auto-injected` tool-call 与对应 completed tool-result，两侧共享 `CallId`，均标记 `source = "pair-programming-auto-injected"` 与 `synthetic = true`。
 
-Coordinator 是追加与恢复的唯一 writer；Projection 只读取完整序列并确定性渲染。XTrace、Companion、Blogger、work record 与 compaction 不拥有也不复制正文。pair 自含调用与结果，不依赖任何外部消息作为 anchor。
+**放置边界**：本次 pair 的插入点由 trailing user 与其前同轮 tool 批决定——call 批末 / result 批末 / 无 tool 时 call+result 相邻且整体在 trailing user 前。历史 pair 恢复到原位，不整块挪到全局末尾。无 trailing user 时本次 pair 落全局末尾。
+
+Coordinator 是追加与恢复的唯一 writer；Projection 只读取完整序列并按放置边界确定性渲染。XTrace、Companion、Blogger、work record 与 compaction 不拥有也不复制正文。pair 自含 call/result 身份，不依赖外部消息作为合法性 anchor。
 
 **所有权边界**：Companion / Blogger transcript 不进入 HOST-013 writer 路径——不为这些 session 创建 `Guidelines` 投影、不 append `PairProgrammingGuidelineAppended`、不在其 provider wire 上渲染 pair。Work session 与其它 Managed child 仍按 HOST-013 永久追加。
 

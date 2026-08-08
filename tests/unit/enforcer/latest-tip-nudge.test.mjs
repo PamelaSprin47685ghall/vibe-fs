@@ -113,17 +113,22 @@ test('ENFORCER_TIP_NUDGE_003_missing_owner_returns_none', () => {
   }
 })
 
-const guideline = '# Pair programming guideline'
+const guideline = '# Pair programming auto-injected'
 const anchor = toList([{ info: { id: 'user-1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] }])
-const markerOutput = (messages) => listItems(messages).at(-1).parts[0].state.output
+const markerOutput = (messages) => {
+  const items = listItems(messages)
+  // pair sits before trailing user: call, result, user
+  const result = items.find((m) => m?.parts?.[0]?.tool === 'auto-injected' && m?.parts?.[0]?.state?.status === 'completed')
+  return result?.parts?.[0]?.state?.output
+}
 
 test('CTX_002_GUIDELINE_001_marker_without_nudge_is_guideline_text', () => {
-  const messages = tryInject(undefined, 'ses-guideline', guideline, anchor)
+  const messages = tryInject(undefined, 'ses-auto-injected', guideline, anchor)
   assert.equal(markerOutput(messages), guideline)
 })
 
 test('CTX_002_GUIDELINE_002_marker_with_nudge_uses_double_newline', () => {
   const nudge = 'A domain concept is crossing a boundary as a primitive. Introduce a distinct type so invalid substitutions become impossible.'
-  const messages = tryInject(undefined, 'ses-guideline-nudge', `${nudge}\n\n${guideline}`, anchor)
+  const messages = tryInject(undefined, 'ses-auto-injected-nudge', `${nudge}\n\n${guideline}`, anchor)
   assert.equal(markerOutput(messages), `${nudge}\n\n${guideline}`)
 })

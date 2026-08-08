@@ -225,13 +225,21 @@ XTraceCapture → Companion → XWire → EnforcerHost
 ```
 
 - 适用判定：仅非 Companion session 进入本程序。`journal` 存在时以 `SessionAssociationProjection.isCompanion sessionId` 为准；为 true（Blogger）则跳过 `PairProgrammingThoughtTransform`，不读 tip、不 append durable pair、不改 `messages`。无 journal / 无 association 时按非 Companion 处理（保持既有测试与未知 session 行为）。
-- transform 每次读取该 provider transcript 的完整 durable pair 序列，按 `Ordinal` 顺序恢复所有既有 pair；不得从正文猜测、跳过或折叠记录。
-- 本次 transform 分配新的 `Ordinal` 与唯一稳定 `CallId`，先追加 durable 事实，再在 provider-facing 历史全局末尾重新构造本次 pair。任何既有 pair 的字节、顺序与 `CallId` 永不改变；不清理、不去重、不复用。
-- 一个 pair 的 provider wire 形态必须是相邻的两步：assistant `tool-call`（工具名 `guideline`、输入 `{}`）→ 对应 `tool-result`（同一 `callID`、`status = completed`、输出 `markerText`）。它不依赖 user 或其它 tool-result anchor，空历史也必须有效。
+- transform 每次读取该 provider transcript 的完整 durable pair 序列，按 `Ordinal` 顺序、原位置、原字节恢复所有既有 pair；不得从正文猜测、跳过、折叠或把历史 pair 整块挪到新位置。
+- 本次 transform 分配新的 `Ordinal` 与唯一稳定 `CallId`，先追加 durable 事实，再把本次 pair 插入 **trailing user message 之前**。无 trailing user 时落在全局末尾。禁止插在 trailing user 之后。
+- 放置算法（对 retained 非 marker 消息）：
+  1. 找最后一条 user（trailing user）；无则 insertion window = 全序列末尾。
+  2. 在 trailing user 之前的后缀中识别同轮 tool 批：连续的 tool-call 消息 / part，随后连续的 tool-result 消息 / part（host raw 中 `type=tool` + `state.status=pending|completed` 均计入）。
+  3. 有 tool 批：`auto-injected` call 插入 call 批末尾；`auto-injected` result 插入 result 批末尾；其后才是 trailing user。  
+     例：`tool1, tool2, auto-injected, result1, result2, result-auto-injected[, user]`。
+  4. 无 tool 批：`auto-injected` call + result 相邻，整体紧挨 trailing user 之前。  
+     例：`…, auto-injected-call, auto-injected-result, user`。
+  5. 空历史：仅本次 pair（call + result）。
+- 一个 pair 的 wire：assistant `tool-call`（工具名 `auto-injected`、输入 `{}`）与对应 `tool-result`（同一 `callID`、`status = completed`、输出 `markerText`）。无同批 tool 时二者相邻；有同批 tool 时分别挂在 call 批 / result 批末尾。
 - `markerText` 只对本次新 pair 读取当时的 prior tip；历史 pair 保留其原始正文。有 prior tip 时为英文 Nudge、空行、中文正文；无 prior tip 时仅为中文正文。中文正文由 `ProjectionConstants.PairProgrammingGuidelineText` 定义。prior tip 由 owner 的 RecentTips 解析（主 session），不是 Blogger 自身 tip 注入。
-- pair 的 synthetic side-channel 标识为 `source = "pair-programming-guideline"`；两侧均按 source 排除于 XTrace 等非 provider 投影，禁止按正文识别或过滤。
+- pair 的 synthetic side-channel 标识为 `source = "pair-programming-auto-injected"`；两侧均按 source 排除于 XTrace 等非 provider 投影，禁止按正文识别或过滤。
 - `CallId = digest(transcript identity + source + Ordinal)`；禁止随机、时间、anchor 或 tip 文本参与身份。正文与 source 单点定义。
-- ReviewSeal 覆盖恢复后的全部历史 pair 与本次末尾 pair；只有该永久 append-only 字节序列可保持 Prefix Cache。Blogger 跳过注入时 ReviewSeal 只覆盖无 guideline 的消息视图。
+- ReviewSeal 覆盖恢复后的全部历史 pair 与本次新 pair；历史 pair 原位不变，本次 pair 在 trailing user 前，以保持 Prefix Cache。Blogger 跳过注入时 ReviewSeal 只覆盖无 auto-injected 的消息视图。
 - tip nudge 查找：`latestTipNudge` 仅在非 Companion 路径调用；不得以当前 session 是 Blogger 为由把 tip 写进 Blogger transcript。
 - 实现点：`SpikePlugin` transform 在 `PairProgrammingThoughtTransform.tryInject` 之前用 association 门禁短路。
 

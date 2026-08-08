@@ -1,4 +1,4 @@
-// HOST-013: durable guideline pair ordinal succession.
+// HOST-013: durable auto-injected pair ordinal succession.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'

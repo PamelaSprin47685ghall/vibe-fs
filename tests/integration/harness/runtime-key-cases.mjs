@@ -207,15 +207,15 @@ export const runtimeKeyCases = [
     name: 'HOST-013 the pair-programming thought marker never counts as a step',
     fn: () => {
       // The marker is a synthetic assistant message, not a provider step. Its
-      // Host identity and completed guideline tool part must both be skipped.
+      // Host identity and completed auto-injected tool part must both be skipped.
       const rawShape = {
         role: 'assistant',
         info: { source: pairProgrammingThoughtSource },
-        parts: [{ type: 'tool', tool: 'guideline', state: { status: 'completed', output: pairProgrammingThoughtText } }],
+        parts: [{ type: 'tool', tool: 'auto-injected', state: { status: 'completed', output: pairProgrammingThoughtText } }],
       };
       const contentShape = {
         role: 'assistant',
-        content: [{ type: 'tool', tool: 'guideline', state: { status: 'completed', output: pairProgrammingThoughtText } }],
+        content: [{ type: 'tool', tool: 'auto-injected', state: { status: 'completed', output: pairProgrammingThoughtText } }],
       };
 
       for (const marker of [rawShape, contentShape]) {

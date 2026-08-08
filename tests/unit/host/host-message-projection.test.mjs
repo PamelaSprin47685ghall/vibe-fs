@@ -67,7 +67,7 @@ test('HOST_016_message_with_existing_text_is_untouched', () => {
 test('HOST_016_assistant_message_with_tool_call_is_untouched', () => {
   const raw = {
     info: { id: 'asst_5', role: 'assistant' },
-    parts: [{ type: 'tool', tool: 'guideline', callID: 'g1' }],
+    parts: [{ type: 'tool', tool: 'auto-injected', callID: 'g1' }],
   }
   const sanitized = sanitizeMessage(raw)
   assert.equal(sanitized.parts.length, 1)

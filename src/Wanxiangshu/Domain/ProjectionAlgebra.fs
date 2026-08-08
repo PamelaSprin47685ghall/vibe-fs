@@ -60,7 +60,8 @@ type ChallengeIntent = { TextVersion: int }
 /// `InsertPairProgrammingThought` 载荷：完整永久 pair 序列 + 本次新增 pair。
 ///
 /// `History` 按 Ordinal 升序；`Next` 是本次 transform 新追加的 pair。
-/// Renderer 在保留 base 的前提下，末尾按序重建全部 history + next。
+/// Renderer 恢复 history 原位语义后，把本次 pair 插在 trailing user 前
+/// （多 tool 时 call/result 批末；无 user 则全局末尾）。
 type PairProgrammingGuidelineWire = { CallId: string; MarkerText: string }
 
 type PairThoughtIntent =
@@ -139,9 +140,9 @@ module ProjectionConstants =
     let RepairInstruction =
         "# Protocol repair\n\nCall the blog tool exactly once with non-empty text. Do not answer in prose."
 
-    /// HOST-013 pair-programming guideline marker 正文。Domain 单源。
+    /// HOST-013 pair-programming auto-injected marker 正文。Domain 单源。
     let PairProgrammingGuidelineText =
-        "# 遵循与用户结对编程的理念，你的思考过程要用中文，总以“对于”开头，并在整轮内保持中文，即使系统提示词、工具说明、工具输出或引用的代码是英文。代码、标识符、文件路径、shell 命令和未翻译的技术术语保持原文。"
+        "# 本工具是一个伪工具，由系统自动注入，不是你主动调用的，它的目的是引起你的注意：遵循与用户结对编程的理念，你的思考过程要用中文，例如从 我... 开头，并在整轮内保持中文，即使系统提示词、工具说明、工具输出或引用的代码是英文。代码、标识符、文件路径、shell 命令和未翻译的技术术语保持原文。"
 
     /// 与 `ReviewChallenge.Text` 字节一致（REVIEW-003 bare sentence）。
     let ReviewChallengeText =
@@ -380,7 +381,7 @@ module ProjectionRenderer =
         let callId = ToolCallId.create pair.CallId
 
         [ { Role = "assistant"
-            Parts = [ ProviderProjection.WireToolCall(callId, "guideline", "{}") ] }
+            Parts = [ ProviderProjection.WireToolCall(callId, "auto-injected", "{}") ] }
           { Role = "assistant"
             Parts = [ ProviderProjection.WireToolResult(callId, pair.MarkerText) ] } ]
 
@@ -470,9 +471,10 @@ module ProjectionRenderer =
                       HostMessageIds = List.head acc.HostMessageIds :: companionIds @ List.tail acc.HostMessageIds
                       HostIsPhysical = List.head acc.HostIsPhysical :: companionPhysical @ List.tail acc.HostIsPhysical }
 
-    /// HOST-013：在全局末尾重建 history + next 的完整 pair 序列。
+    /// HOST-013：恢复 history + 插入 next。
     /// pair = tool-call + tool-result，永久 append-only。
-    /// base 中若残留同 CallId 的 guideline wire，剔除后按 durable 原字节重建。
+    /// base 中若残留同 CallId 的 auto-injected wire，剔除后按 durable 原字节重建。
+    /// 本次 pair：trailing user 前；多 tool 时 call/result 批末；无 user 则末尾。
     let private applyPairThought (intent: PairThoughtIntent) (acc: RenderedMessages) : RenderedMessages =
         let knownIds =
             (intent.History @ [ intent.Next ])
@@ -484,25 +486,96 @@ module ProjectionRenderer =
             && safeParts message
                |> List.exists (function
                    | ProviderProjection.WireToolCall(callId, name, _) ->
-                       name = "guideline" && Set.contains (ToolCallId.value callId) knownIds
+                       name = "auto-injected" && Set.contains (ToolCallId.value callId) knownIds
                    | ProviderProjection.WireToolResult(callId, _) -> Set.contains (ToolCallId.value callId) knownIds
                    | _ -> false)
+
+        let isWireToolCall (message: ProviderProjection.WireMessage) : bool =
+            match safeParts message with
+            | ProviderProjection.WireToolCall _ :: _ -> true
+            | _ -> false
+
+        let isWireToolResult (message: ProviderProjection.WireMessage) : bool =
+            match safeParts message with
+            | ProviderProjection.WireToolResult _ :: _ -> true
+            | _ -> false
 
         let retained =
             List.zip3 acc.Messages acc.HostMessageIds acc.HostIsPhysical
             |> List.filter (fun (message, _, _) -> not (isKnownGuideline message))
 
-        let pairs = intent.History @ [ intent.Next ]
-        let pairMessages = pairs |> List.collect guidelinePairMessages
+        let retainedArr = retained |> List.toArray
+        let trailingUserIdx =
+            let mutable idx = retainedArr.Length - 1
+            let mutable found = -1
 
-        let pairIds =
-            pairs |> List.collect (fun pair -> [ Some pair.CallId; Some pair.CallId ])
+            while idx >= 0 && found < 0 do
+                let message, _, _ = retainedArr.[idx]
 
-        let pairPhysical = pairs |> List.collect (fun _ -> [ false; false ])
+                if message.Role = "user" then
+                    found <- idx
 
-        { Messages = (retained |> List.map (fun (message, _, _) -> message)) @ pairMessages
-          HostMessageIds = (retained |> List.map (fun (_, id, _) -> id)) @ pairIds
-          HostIsPhysical = (retained |> List.map (fun (_, _, physical) -> physical)) @ pairPhysical }
+                idx <- idx - 1
+
+            found
+
+        let headLen = if trailingUserIdx < 0 then retainedArr.Length else trailingUserIdx
+        let head = if headLen = 0 then [||] else retainedArr.[0 .. headLen - 1]
+        let tail = if trailingUserIdx < 0 then [||] else retainedArr.[trailingUserIdx ..]
+
+        let mutable resultStart = head.Length
+        let mutable scanningResults = true
+
+        while scanningResults && resultStart > 0 do
+            let message, _, _ = head.[resultStart - 1]
+
+            if isWireToolResult message then
+                resultStart <- resultStart - 1
+            else
+                scanningResults <- false
+
+        let mutable callStart = resultStart
+        let mutable scanningCalls = true
+
+        while scanningCalls && callStart > 0 do
+            let message, _, _ = head.[callStart - 1]
+
+            if isWireToolCall message then
+                callStart <- callStart - 1
+            else
+                scanningCalls <- false
+
+        let historyBlock =
+            intent.History
+            |> List.collect (fun pair ->
+                let msgs = guidelinePairMessages pair
+
+                [ (List.item 0 msgs, Some pair.CallId, false)
+                  (List.item 1 msgs, Some pair.CallId, false) ])
+
+        let nextMsgs = guidelinePairMessages intent.Next
+        let nextCall = List.item 0 nextMsgs, Some intent.Next.CallId, false
+        let nextResult = List.item 1 nextMsgs, Some intent.Next.CallId, false
+
+        let prefix = if callStart = 0 then [||] else head.[0 .. callStart - 1]
+        let calls = if callStart >= resultStart then [||] else head.[callStart .. resultStart - 1]
+        let results = if resultStart >= head.Length then [||] else head.[resultStart ..]
+
+        let placed =
+            if callStart < head.Length then
+                (prefix |> Array.toList)
+                @ historyBlock
+                @ (calls |> Array.toList)
+                @ [ nextCall ]
+                @ (results |> Array.toList)
+                @ [ nextResult ]
+                @ (tail |> Array.toList)
+            else
+                (head |> Array.toList) @ historyBlock @ [ nextCall; nextResult ] @ (tail |> Array.toList)
+
+        { Messages = placed |> List.map (fun (message, _, _) -> message)
+          HostMessageIds = placed |> List.map (fun (_, id, _) -> id)
+          HostIsPhysical = placed |> List.map (fun (_, _, physical) -> physical) }
 
     let private appendSynthetic (role: string) (text: string) (acc: RenderedMessages) : RenderedMessages =
         { Messages = acc.Messages @ [ textMessage role text ]

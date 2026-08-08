@@ -27,8 +27,8 @@
 | journal 代理等式 canary | HOST-010 |
 | Tool 身份仅 ToolContext 双半边 | HOST-011 |
 | 跨实例共享表 vs 每实例 Journal；共享表操作不跨 await | HOST-012 |
-| 永久 guideline pair | 空历史也追加完整 tool-call/tool-result；第 $n+1$ 次 transform 按原位置、原字节恢复前 $n$ 组并只在末尾追加一组；同 pair `callID` 相同、跨 pair 唯一；重启恢复结果字节相等 | HOST-013 |
-| Companion / Blogger 不注入 guideline | durable `isCompanion=true` 的 session transform 后 `markerCount=0`、消息字节与注入前相等；不为该 session append `PairProgrammingGuidelineAppended` | HOST-013 |
+| 永久 auto-injected pair | 空历史也插入完整 tool-call/tool-result；本次 pair 在 trailing user 之前（无 user 则末尾）；有同批 tool 时 call 批末 / result 批末顺序为 `tool1 tool2 auto-injected result1 result2 result-auto-injected[ user]`；第 $n+1$ 次 transform 原位恢复前 $n$ 组并只插入本次一组；同 pair `callID` 相同、跨 pair 唯一；重启恢复字节相等 | HOST-013 |
+| Companion / Blogger 不注入 auto-injected | durable `isCompanion=true` 的 session transform 后 `markerCount=0`、消息字节与注入前相等；不为该 session append `PairProgrammingGuidelineAppended` | HOST-013 |
 | 空 Content 预防 | assistant/user 消息空 content 兜底；reasoning 填充或非空 text | HOST-016 |
 
 代表：`tests/unit/host/pair-thought-transform.test.mjs`、`tests/integration/plugin/manager-tool-contract.test.mjs`（`HOST_013_*`）、`tests/unit/enforcer/latest-tip-nudge.test.mjs`。

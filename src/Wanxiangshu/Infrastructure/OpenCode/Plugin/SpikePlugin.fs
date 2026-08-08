@@ -297,7 +297,7 @@ module SpikePlugin =
                             | None -> ()
                         | None -> ()
 
-                        // HOST-013：永久 pair-programming guideline。
+                        // HOST-013：永久 pair-programming auto-injected。
                         // XTrace 之后、ReviewSeal 之前。恢复 durable 历史 pair，
                         // 再在全局末尾追加本次 tool-call + tool-result。
                         // Companion / Blogger 整段跳过：结对编程约束干扰 blog 工具合同。

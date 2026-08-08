@@ -11,22 +11,22 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 
-/// HOST-013：永久 pair-programming guideline pairs。
+/// HOST-013：永久 pair-programming auto-injected pairs。
 ///
-/// 每次 transform 读取完整 durable pair 序列，按原字节恢复，再在全局末尾追加
-/// 本次 tool-call + tool-result。无 anchor 门槛；不删除历史 pair。
+/// 每次 transform 读取完整 durable pair 序列，按原字节恢复 history，
+/// 再把本次 pair 插在 trailing user 之前（多 tool 时 call/result 批末）。
 module PairProgrammingThoughtTransform =
 
-    /// HOST-013 guideline 正文。Domain 单源。
+    /// HOST-013 auto-injected 正文。Domain 单源。
     let text = ProjectionConstants.PairProgrammingGuidelineText
 
     /// The marker's source identity (HOST-013). Filtering must use this, never
     /// the text: a real user may quote the sentence.
-    let source = "pair-programming-guideline"
+    let source = "pair-programming-auto-injected"
 
     let private legacySource = "pair-programming-thought"
 
-    let private idPrefix = "pair-programming-guideline-"
+    let private idPrefix = "pair-programming-auto-injected-"
 
     /// Process-local fallback when journal is unavailable (tests / no workspace).
     /// Keyed by transcript identity; append-only within process.
@@ -53,12 +53,12 @@ module PairProgrammingThoughtTransform =
 
         idPrefix + digest.Substring(0, 24)
 
-    let private buildPairMessage (rolePart: string) (callId: string) (markerText: string) (isCall: bool) : obj =
+    let private buildPairMessage (callId: string) (markerText: string) (isCall: bool) : obj =
         let part =
             if isCall then
                 createObj
                     [ "type", box "tool"
-                      "tool", box "guideline"
+                      "tool", box "auto-injected"
                       "callID", box callId
                       "state",
                       box (
@@ -70,7 +70,7 @@ module PairProgrammingThoughtTransform =
             else
                 createObj
                     [ "type", box "tool"
-                      "tool", box "guideline"
+                      "tool", box "auto-injected"
                       "callID", box callId
                       "state",
                       box (
@@ -93,8 +93,140 @@ module PairProgrammingThoughtTransform =
               "parts", box [| part |] ]
 
     let private buildPair (callId: string) (markerText: string) : obj list =
-        [ buildPairMessage "assistant" callId markerText true
-          buildPairMessage "assistant" callId markerText false ]
+        [ buildPairMessage callId markerText true
+          buildPairMessage callId markerText false ]
+
+    let private messageRole (rawMsg: obj) : string =
+        if isNull rawMsg then
+            ""
+        else
+            let fromInfo =
+                match rawMsg?info with
+                | null -> None
+                | info ->
+                    match info?role with
+                    | null -> None
+                    | role -> Some(unbox<string> role)
+
+            let fromTop =
+                match rawMsg?role with
+                | null -> None
+                | role -> Some(unbox<string> role)
+
+            defaultArg fromInfo (defaultArg fromTop "")
+            |> fun value -> value.ToLowerInvariant()
+
+    let private isJsArray (value: obj) : bool =
+        not (isNull value) && emitJsExpr value "Array.isArray($0)"
+
+    let private rawParts (rawMsg: obj) : obj array =
+        if isNull rawMsg then
+            [||]
+        else
+            match rawMsg?parts with
+            | null ->
+                match rawMsg?content with
+                | null -> [||]
+                | content when isJsArray content -> unbox<obj array> content
+                | _ -> [||]
+            | parts when isJsArray parts -> unbox<obj array> parts
+            | _ -> [||]
+
+    let private isToolPart (part: obj) : bool =
+        if isNull part then
+            false
+        else
+            match part?``type`` with
+            | null -> false
+            | t ->
+                let kind = (unbox<string> t).ToLowerInvariant()
+                kind = "tool" || kind = "tool-call" || kind = "tool_call" || kind = "tool-result" || kind = "tool_result"
+
+    let private partStatus (part: obj) : string option =
+        if isNull part then
+            None
+        else
+            match part?state with
+            | null -> None
+            | state ->
+                match state?status with
+                | null -> None
+                | status -> Some((unbox<string> status).ToLowerInvariant())
+
+    /// Host raw：pending/running tool part = call；completed/error = result。
+    let private isToolCallMessage (rawMsg: obj) : bool =
+        rawParts rawMsg
+        |> Array.exists (fun part ->
+            isToolPart part
+            && match partStatus part with
+               | Some "completed"
+               | Some "error" -> false
+               | _ -> true)
+
+    let private isToolResultMessage (rawMsg: obj) : bool =
+        rawParts rawMsg
+        |> Array.exists (fun part ->
+            isToolPart part
+            && match partStatus part with
+               | Some "completed"
+               | Some "error" -> true
+               | _ -> false)
+
+    /// 将 history + next 插入 retained：trailing user 前；多 tool 时 call/result 批末。
+    let private placePairs (retained: obj list) (pairs: PairProgrammingGuidelineWire list) : obj list =
+        match pairs with
+        | [] -> retained
+        | _ ->
+            let arr = retained |> List.toArray
+            let trailingUserIdx =
+                let mutable idx = arr.Length - 1
+                let mutable found = -1
+
+                while idx >= 0 && found < 0 do
+                    if messageRole arr.[idx] = "user" then
+                        found <- idx
+
+                    idx <- idx - 1
+
+                found
+
+            let headLen = if trailingUserIdx < 0 then arr.Length else trailingUserIdx
+            let head = if headLen = 0 then [||] else arr.[0 .. headLen - 1]
+            let tail = if trailingUserIdx < 0 then [||] else arr.[trailingUserIdx ..]
+
+            let mutable resultStart = head.Length
+
+            while resultStart > 0 && isToolResultMessage head.[resultStart - 1] do
+                resultStart <- resultStart - 1
+
+            let mutable callStart = resultStart
+
+            while callStart > 0 && isToolCallMessage head.[callStart - 1] do
+                callStart <- callStart - 1
+
+            let historyPairs, nextPair =
+                match List.rev pairs with
+                | next :: rest -> List.rev rest, next
+                | [] -> [], Unchecked.defaultof<_>
+
+            let historyBlock =
+                historyPairs
+                |> List.collect (fun pair -> buildPair pair.CallId pair.MarkerText)
+
+            let nextCall = buildPairMessage nextPair.CallId nextPair.MarkerText true
+            let nextResult = buildPairMessage nextPair.CallId nextPair.MarkerText false
+
+            let prefix = if callStart = 0 then [] else head.[0 .. callStart - 1] |> Array.toList
+            let calls = if callStart >= resultStart then [] else head.[callStart .. resultStart - 1] |> Array.toList
+            let results = if resultStart >= head.Length then [] else head.[resultStart ..] |> Array.toList
+            let tailList = tail |> Array.toList
+
+            if callStart < head.Length then
+                // 有同轮 tool 批（call 和/或 result）：history 在批前；next call/result 批末。
+                prefix @ historyBlock @ calls @ [ nextCall ] @ results @ [ nextResult ] @ tailList
+            else
+                // 无 tool 批：history + next 相邻，整体在 trailing user 前。
+                (head |> Array.toList) @ historyBlock @ [ nextCall; nextResult ] @ tailList
 
     let private readDurableHistory (journal: AgentJournal) (sessionId: SessionId) : PairProgrammingGuidelineWire list =
         match AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections with
@@ -151,7 +283,77 @@ module PairProgrammingThoughtTransform =
           TransportMessages = Set.empty
           HostReanchor = None }
 
-    /// HOST-013：无门槛恢复历史 pair，并在末尾追加本次 pair。
+    let private wireIsToolCall (message: WireMessage) : bool =
+        match message.Parts with
+        | ProviderProjection.WireToolCall _ :: _ -> true
+        | _ -> false
+
+    let private wireIsToolResult (message: WireMessage) : bool =
+        match message.Parts with
+        | ProviderProjection.WireToolResult _ :: _ -> true
+        | _ -> false
+
+    let private wirePairMessages (pair: PairProgrammingGuidelineWire) : WireMessage list =
+        let callId = ToolCallId.create pair.CallId
+
+        [ { Role = "assistant"
+            Parts = [ WireToolCall(callId, "auto-injected", "{}") ] }
+          { Role = "assistant"
+            Parts = [ WireToolResult(callId, pair.MarkerText) ] } ]
+
+    /// Canonical wire 放置：与 raw placePairs 同构。
+    let private placeWirePairs (retained: WireMessage list) (pairs: PairProgrammingGuidelineWire list) : WireMessage list =
+        match pairs with
+        | [] -> retained
+        | _ ->
+            let arr = retained |> List.toArray
+            let trailingUserIdx =
+                let mutable idx = arr.Length - 1
+                let mutable found = -1
+
+                while idx >= 0 && found < 0 do
+                    if arr.[idx].Role = "user" then
+                        found <- idx
+
+                    idx <- idx - 1
+
+                found
+
+            let headLen = if trailingUserIdx < 0 then arr.Length else trailingUserIdx
+            let head = if headLen = 0 then [||] else arr.[0 .. headLen - 1]
+            let tail = if trailingUserIdx < 0 then [||] else arr.[trailingUserIdx ..]
+
+            let mutable resultStart = head.Length
+
+            while resultStart > 0 && wireIsToolResult head.[resultStart - 1] do
+                resultStart <- resultStart - 1
+
+            let mutable callStart = resultStart
+
+            while callStart > 0 && wireIsToolCall head.[callStart - 1] do
+                callStart <- callStart - 1
+
+            let historyPairs, nextPair =
+                match List.rev pairs with
+                | next :: rest -> List.rev rest, next
+                | [] -> [], Unchecked.defaultof<_>
+
+            let historyBlock = historyPairs |> List.collect wirePairMessages
+            let nextMsgs = wirePairMessages nextPair
+            let nextCall = List.head nextMsgs
+            let nextResult = List.item 1 nextMsgs
+
+            let prefix = if callStart = 0 then [] else head.[0 .. callStart - 1] |> Array.toList
+            let calls = if callStart >= resultStart then [] else head.[callStart .. resultStart - 1] |> Array.toList
+            let results = if resultStart >= head.Length then [] else head.[resultStart ..] |> Array.toList
+            let tailList = tail |> Array.toList
+
+            if callStart < head.Length then
+                prefix @ historyBlock @ calls @ [ nextCall ] @ results @ [ nextResult ] @ tailList
+            else
+                (head |> Array.toList) @ historyBlock @ nextMsgs @ tailList
+
+    /// HOST-013：恢复 history，本次 pair 插在 trailing user 前。
     ///
     /// - journal + sessionId：durable append-only 事实
     /// - 否则：process-local memory ledger（同键永久追加）
@@ -200,6 +402,8 @@ module PairProgrammingThoughtTransform =
         match appendNext () with
         | None -> None
         | Some next ->
+            let allPairs = history @ [ next ]
+
             let intent =
                 ProjectionIntent.InsertPairProgrammingThought { History = history; Next = next }
 
@@ -211,28 +415,9 @@ module PairProgrammingThoughtTransform =
                 let wire =
                     ProjectionRenderer.renderMessagesWithIntents emptySnapshot baseWire ordered
 
-                let expectedPairs =
-                    (history @ [ next ])
-                    |> List.collect (fun pair ->
-                        let callId = ToolCallId.create pair.CallId
-
-                        let callMsg: WireMessage =
-                            { Role = "assistant"
-                              Parts = [ WireToolCall(callId, "guideline", "{}") ] }
-
-                        let resultMsg: WireMessage =
-                            { Role = "assistant"
-                              Parts = [ WireToolResult(callId, pair.MarkerText) ] }
-
-                        [ callMsg; resultMsg ])
-
-                let expected = baseWire @ expectedPairs
+                let expected = placeWirePairs baseWire allPairs
 
                 if wire <> expected then
                     None
                 else
-                    let pairObjs =
-                        (history @ [ next ])
-                        |> List.collect (fun pair -> buildPair pair.CallId pair.MarkerText)
-
-                    Some(retainedRaw @ pairObjs)
+                    Some(placePairs retainedRaw allPairs)

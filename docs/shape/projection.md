@@ -26,7 +26,7 @@ insertBlogFrames
 insertRepair
 suppressTransportOnly
 appendReviewChallenge
-insertPairProgrammingThought // HOST-013：恢复永久 pair 序列并在全局末尾追加本次 pair
+insertPairProgrammingThought // HOST-013：恢复永久 pair 序列；本次 pair 插在 trailing user 前
 reanchorAfterCompaction
 ```
 

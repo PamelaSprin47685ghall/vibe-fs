@@ -158,12 +158,12 @@ const isAssistant = (message) => {
   // assistant step; it never enters the scenario step cursor.
   //
   // Measured shapes: Host raw message keeps `info.source` and a completed
-  // guideline tool part. Provider-compatible bodies may carry the same tool
+  // auto-injected tool part. Provider-compatible bodies may carry the same tool
   // part in `parts` or as a typed content chunk with `state.output`.
   if (message?.info?.source === pairProgrammingThoughtSource) return false;
   const isGuidelineToolPart = (part) =>
     part?.type === 'tool'
-    && part?.tool === 'guideline'
+    && part?.tool === 'auto-injected'
     && part?.state?.status === 'completed'
     && part?.state?.output === pairProgrammingThoughtText;
   if (Array.isArray(message?.parts) && message.parts.some(isGuidelineToolPart)) return false;

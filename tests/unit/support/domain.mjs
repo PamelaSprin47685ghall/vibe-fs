@@ -1969,7 +1969,7 @@ export const projectionIntent = (() => {
     },
     /** PROJ-008 step 5: REVIEW-003 skeptical challenge. */
     appendReviewChallenge: (intent = { TextVersion: 1 }) => build('AppendReviewChallenge', [intent]),
-    /** PROJ-008 step 5 / HOST-013: permanent guideline pair history + next. */
+    /** PROJ-008 step 5 / HOST-013: permanent auto-injected pair history + next. */
     insertPairProgrammingThought: (intent = { History: [], Next: undefined }) =>
       build('InsertPairProgrammingThought', [
         {
