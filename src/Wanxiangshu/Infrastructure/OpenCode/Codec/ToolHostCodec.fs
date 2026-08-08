@@ -28,14 +28,22 @@ type HostToolArguments internal (raw: obj) =
             None
         else
             try
-                unbox<obj array> raw?(name)
-                |> Array.choose (fun item ->
-                    if isNull item then
-                        None
-                    else
-                        string item |> Option.ofObj |> Option.filter (String.IsNullOrWhiteSpace >> not))
-                |> Array.toList
-                |> Some
+                // Fable erases unbox<obj array> to identity: a plain string would
+                // iterate its CHARACTERS as items. Array-test first — a non-array
+                // is absent, never a char sequence.
+                let value = raw?(name)
+
+                if emitJsExpr value "Array.isArray($0)" then
+                    unbox<obj array> value
+                    |> Array.choose (fun item ->
+                        if isNull item then
+                            None
+                        else
+                            string item |> Option.ofObj |> Option.filter (String.IsNullOrWhiteSpace >> not))
+                    |> Array.toList
+                    |> Some
+                else
+                    None
             with _ ->
                 None
 
@@ -44,7 +52,15 @@ type HostToolArguments internal (raw: obj) =
             None
         else
             try
-                Some(unbox<float> raw?(name))
+                // Fable erases unbox<float> to identity, so a string would pass
+                // through where .NET would throw. Type-test instead: a non-number
+                // is absent, never a wrong-typed Some.
+                let value = raw?(name)
+
+                if emitJsExpr value "typeof $0 === 'number'" then
+                    Some(unbox<float> value)
+                else
+                    None
             with _ ->
                 None
 
@@ -293,6 +309,9 @@ module ToolHostCodec =
         let mutable hash = 2166136261u
 
         for c in Text.Encoding.UTF8.GetBytes text do
-            hash <- (hash ^^^ uint32 c) * 16777619u
+            // Fable lowers uint32 multiplication to a float64 multiply, which
+            // drops the low bits once the product exceeds 2^53 — every step of
+            // this loop. FNV-1a needs the 32-bit wrapping multiply .NET performs.
+            hash <- emitJsExpr (hash ^^^ uint32 c) "(Math.imul($0, 16777619) >>> 0)"
 
         sprintf "fnv1a:%08x" hash
