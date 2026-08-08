@@ -86,10 +86,10 @@ export const sourceCases = [
   },
 
   {
-    name: 'VERIFY-003 tool-set predicates are retired but declared tools are not',
+    name: 'VERIFY-003 tool-set predicates are retired but declared tools are live assertions',
     fn: () => {
-      rejectsField('requiredTools = ["fork"]', 'not a filter');
-      rejectsField('forbiddenTools = ["executor"]', 'a different turn');
+      rejectsField('requiredTools = ["fork"]', 'the runtime asserts every declared tool is present on the wire request');
+      assertTrue(compile(withField('forbiddenTools = ["executor"]')).ok, 'forbiddenTools is a live wire assertion and must load');
       assertTrue(compile(withField('tools = ["fork", "join"]')).ok, 'declared tools must still load');
     },
   },

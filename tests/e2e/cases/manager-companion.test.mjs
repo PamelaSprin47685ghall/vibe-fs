@@ -51,10 +51,10 @@ try {
   assert.ok(prompt.ok, `prompt failed: ${JSON.stringify(prompt.data)}`);
   await turn.awaitTerminal({ requireActivity: true, requireAssistantTerminal: false, requireIdleAfterActivity: true });
 
-  // Scope the search to the MANAGER session: the companion Blogger request and
-  // any review-guard continuation also carry tools, and whichever request was
-  // recorded first used to win — a race that flaked the schema assertion in
-  // 3-round continuous runs when the blogger request landed first.
+  // Scope the search to the MANAGER session: the companion Blogger request
+  // also carries tools, and whichever request was recorded first used to win
+  // — a race that flaked the schema assertion in 3-round continuous runs when
+  // the blogger request landed first.
   const managerRequest = scenario.provider.requests.find(
     (request) =>
       Array.isArray(request.tools) && request.tools.length > 0 && request.sessionID === managerId,

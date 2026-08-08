@@ -47,6 +47,28 @@ module TurnCompletionProgram =
         }
         :> Task
 
+    /// CTX-012: is this run the recovery probe — a physical message accepted as
+    /// a ProviderRetryAttempt continuation?
+    ///
+    /// The probe's terminal is often still on the wire when an interleaved
+    /// reconcile pass reads the run as Unknown (finish=None), and the bounded
+    /// rereads are synchronous, so RepairMissingFinalReport fires before the
+    /// response lands. Repairing hijacks the probe run and the TurnCompleted
+    /// promote never fires (measured: FallbackCursorAdvanced + ProviderRetryAttempt
+    /// with PrefixRebaseCommitted=0 in x-c/x-d). The probe turn's own idle
+    /// re-reconciles it as TurnCompleted.
+    let private isRecoveryProbeRun (journal: AgentJournal option) (turn: ReconciledTurn) : bool =
+        match journal with
+        | None -> false
+        | Some durable ->
+            AgentProjection.tryFind turn.SessionId (AgentJournal.snapshot durable).AgentProjections
+            |> Option.bind (fun session -> session.PromptAuthority)
+            |> Option.exists (fun authority ->
+                authority.AcceptedContinuationIds
+                |> Map.tryFind turn.PhysicalUserMessageId
+                |> Option.exists (fun kind ->
+                    kind = PromptAuthority.ContinuationKind.ProviderRetryAttempt))
+
     /// CTX-006 hasMaterial for X: BlogEntryCommitted coverage on the main session.
     let private sessionHasCoverage (durable: AgentJournal) (sessionId: SessionId) =
         AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections
@@ -309,7 +331,15 @@ module TurnCompletionProgram =
             // GLORY-070: a stable idle that never produced a final report is
             // repaired exactly once (the reconcile maps dedupe the turn token);
             // it must never silently stop.
-            sendRepair sessionPort eventPort journal turn RuntimeNudge.missingFinalReport "missing-final-report"
+            //
+            // Exception: the recovery probe run. Its terminal is still on the
+            // wire when an interleaved pass reads it as Unknown; repairing it
+            // hijacks the probe and the TurnCompleted promote never fires. The
+            // probe turn's own idle re-reconciles it as TurnCompleted.
+            if isRecoveryProbeRun journal turn then
+                AsyncSupport.completedTask ()
+            else
+                sendRepair sessionPort eventPort journal turn RuntimeNudge.missingFinalReport "missing-final-report"
         | ReconcileProgram.TurnInProgress when reviewerAlreadyConfirmed ->
             // A second PERFECT is frequently a tool-only provider step. Once the
             // witness is Confirmed, finish the physical reviewer run so
@@ -371,7 +401,13 @@ module TurnCompletionProgram =
             // Absorb text and reasoning into the XTrace even though this turn is
             // not completable, then ask for the missing report. Still not fallback.
             // (The XTrace parts are captured at the transform boundary.)
-            sendRepair sessionPort eventPort journal turn RuntimeNudge.missingFinalReport "missing-final-report"
+            //
+            // Same recovery-probe exception as TurnUnknown: the probe's terminal
+            // may still be on the wire; repairing would hijack the promote.
+            if isRecoveryProbeRun journal turn then
+                AsyncSupport.completedTask ()
+            else
+                sendRepair sessionPort eventPort journal turn RuntimeNudge.missingFinalReport "missing-final-report"
         | ReconcileProgram.TurnAborted reason ->
             // LOOP-006: our own kill is bridged into the provider-failure AABB path.
             // User / cleanup aborts still report Aborted and do not advance the cursor.

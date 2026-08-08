@@ -55,16 +55,33 @@ function lastUserText(request) {
 }
 
 function uniqueVerdictToolResults(requests) {
+  // A tool result counts only when its tool_call id belongs to a verdict
+  // assistant call. Other tools' results may embed the challenge sentence or the
+  // confirmation text in their transcript tail — the join LWR uncompressed tail
+  // (EXEC-004/COMPANION-003) and the suicide FinalityBlessed work-log prompt both
+  // carry the reviewer session's own wire — and those are not verdict results.
+  const verdictCallIds = new Set();
+  for (const request of requests) {
+    for (const message of request.messages || []) {
+      if (message.role !== 'assistant' || !Array.isArray(message.tool_calls)) continue;
+      for (const call of message.tool_calls) {
+        if ((call?.function?.name ?? call?.name) === 'verdict' && typeof call?.id === 'string') {
+          verdictCallIds.add(call.id);
+        }
+      }
+    }
+  }
   const results = new Map();
   for (const request of requests) {
     for (const message of request.messages || []) {
       if (message.role !== 'tool' && message.role !== 'toolResult') continue;
+      const id = message.tool_call_id || message.toolCallId;
+      if (typeof id === 'string' && !verdictCallIds.has(id)) continue;
       const content = typeof message.content === 'string'
         ? message.content
         : JSON.stringify(message.content || '');
-      // EXEC-004/COMPANION-003: join returns an opaque LWR that may embed the
-      // challenge sentence in its uncompressed tail. That is not a verdict tool
-      // result — only count actual verdict wire shapes.
+      // Belt for a result whose tool_call id is absent from the wire: never count
+      // an opaque LWR (EXEC-004/COMPANION-003) as a verdict shape.
       if (content.includes('work_record')) continue;
       if (!content.includes('Nope, let\'s re-evaluate:') && !content.includes('verdict = "PERFECT"')) continue;
       const key = message.tool_call_id || message.toolCallId || content;
@@ -78,14 +95,15 @@ async function oracleCheck(scenario, ctx, step) {
   // Oracle: the real regression is two provider runs under one physical user
   // root. The old canary ended the first turn, so it never exercised the loop
   // that made every subsequent PERFECT return the skeptical sentence.
-  // A REVIEW-003 challenge nudge (production-composed "Nope, let's re-evaluate"
-  // user message) may arrive as a redundant follow-up after the confirmation
-  // sealed; the three REQUIRED requests are envelope-1, envelope-2 (second
-  // PERFECT) and the terminal prose.
+  // The three REQUIRED verdict-tool requests are the opening prose envelope
+  // (finality-reviewer.0), the durable guard continuation that receives the
+  // first PERFECT (reviewer-nudged.0), and its prose follow-up
+  // (reviewer-nudged.1). The challenge continuation ("Nope, let's re-evaluate")
+  // is excluded by the filter and asserted separately below.
   const reviewerReqs = scenario.provider.requests.filter(
     r => toolNames(r).includes('verdict') && !lastUserText(r).includes("Nope, let's re-evaluate"),
   );
-  assert.equal(reviewerReqs.length, 3, 'reviewer must make exactly two verdict calls and one terminal follow-up');
+  assert.equal(reviewerReqs.length, 3, 'reviewer must make exactly three verdict-tool requests before REVIEW-004: opening prose, guard PERFECT, guard follow-up');
   const rvFacts = factsIn(scenario.host.workDir, 'ReviewVerdictRecorded');
   assert.ok(!fs.existsSync(path.join(scenario.host.workDir, '.wanxiangshu-next')), 'Journal must not dirty workspace');
   assert.equal(rvFacts.length, 2, 'two distinct PERFECT verdict facts required');
@@ -116,29 +134,55 @@ async function oracleCheck(scenario, ctx, step) {
   // A prose-only first terminal must continue the SAME reviewer session through
   // the durable verdict guard before the skeptical challenge requests the second
   // PERFECT. The two continuation turns intentionally have different user text.
-  const verdictReqUsers = scenario.provider.requests
-    .filter(r => toolNames(r).includes('verdict'))
-    .map(lastUserText);
+  // A tool-call message stays in every later request's history, so each verdict
+  // call is located by the FIRST request carrying its tool_call id.
+  const verdictCallSeen = new Set();
+  const firstVerdictCallIdx = [];
+  scenario.provider.requests.forEach((request, index) => {
+    for (const message of request.messages ?? []) {
+      if (message.role !== 'assistant' || !Array.isArray(message.tool_calls)) continue;
+      for (const call of message.tool_calls) {
+        const name = call?.function?.name ?? call?.name;
+        const id = call?.id;
+        if (name !== 'verdict' || typeof id !== 'string' || verdictCallSeen.has(id)) continue;
+        verdictCallSeen.add(id);
+        firstVerdictCallIdx.push(index);
+      }
+    }
+  });
+  assert.equal(firstVerdictCallIdx.length, 2, 'dual PERFECT requires exactly two verdict tool calls');
   assert.ok(
-    verdictReqUsers.some(text => text.includes('Your previous response did not submit a verdict.')),
-    'missing verdict must receive the durable reviewer guard continuation',
+    lastUserText(scenario.provider.requests[firstVerdictCallIdx[0]]).startsWith('# Your previous response did not submit a verdict.'),
+    'first PERFECT must be submitted inside the durable reviewer guard request',
   );
   assert.ok(
-    verdictReqUsers.some(text => text.includes("Nope, let's re-evaluate:")),
-    'first recovered PERFECT must receive the skeptical confirmation continuation',
+    lastUserText(scenario.provider.requests[firstVerdictCallIdx[1]]).startsWith("# Nope, let's re-evaluate:"),
+    'second PERFECT must be submitted inside the skeptical challenge request',
   );
+  // Turn attribution by PREFIX, not substring: a work-log blog request embeds
+  // the reviewer wire (guard and challenge sentences included) in its data body
+  // after the instruction header, so a substring test would mistake that
+  // request for a guard continuation.
+  const guardUserIdxs = scenario.provider.requests
+    .map((request, index) => (lastUserText(request).startsWith('# Your previous response did not submit a verdict.') ? index : -1))
+    .filter((index) => index >= 0);
+  const firstChallengeUserIdx = scenario.provider.requests.findIndex((request) =>
+    lastUserText(request).startsWith("# Nope, let's re-evaluate:"));
+  assert.ok(guardUserIdxs.length >= 1 && firstChallengeUserIdx >= 0, 'guard and challenge continuations must both appear on the wire');
+  assert.equal(firstChallengeUserIdx, guardUserIdxs.at(-1) + 1, 'skeptical challenge must immediately follow the guard request as adjacent steps');
   assert.equal(new Set(valuesOf(rvFacts, 'GitTreeHash')).size, 1, 'double PERFECT must bind one tree hash');
   assert.equal(factsIn(scenario.host.workDir, 'ConfirmedReviewWitness').length, 1, 'dual PERFECT must produce one durable confirmed witness');
 
   const verdictResults = uniqueVerdictToolResults(scenario.provider.requests);
-  assert.ok(
-    verdictResults.filter(x => x.includes('# Nope, let\'s re-evaluate:')).length >= 1,
-    'first recovered PERFECT must request re-evaluation at least once',
-  );
-  // The confirmation's report (`verdict = "PERFECT"`) may
-  // land on a later request when the REVIEW-010 seal fallback re-submits; the
-  // durable proof is the ConfirmedReviewWitness asserted above.
-  assert.ok(verdictResults.filter(x => x.includes('verdict = "PERFECT"')).length <= 1, 'second PERFECT must be accepted at most once');
+  const challengeResults = verdictResults.filter(x => x.includes('# Nope, let\'s re-evaluate:'));
+  assert.equal(challengeResults.length, 1, `first recovered PERFECT must request re-evaluation exactly once (got ${JSON.stringify(challengeResults)})`);
+  // REVIEW-003: only the FIRST PERFECT receives the skeptical challenge; the
+  // second PERFECT is confirmed and reports `verdict = "PERFECT"` (VerdictTool.fs
+  // Confirmed branch). The REVIEW-010 seal fallback still reports its final
+  // decision once — a repeated confirmation report would mean the same verdict
+  // was accepted twice.
+  const acceptedResults = verdictResults.filter(x => x.includes('verdict = "PERFECT"'));
+  assert.equal(acceptedResults.length, 1, `second PERFECT must be accepted exactly once (got ${JSON.stringify(acceptedResults)})`);
 }
 
 if (!runStaticGate([__filename]).passed) process.exit(1);

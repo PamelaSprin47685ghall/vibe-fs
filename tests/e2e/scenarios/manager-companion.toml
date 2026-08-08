@@ -41,17 +41,6 @@ tools = ["fork", "join", "list", "suicide"]
   [[turn.step]]
   respond = { type = "text", text = "Manager working turn." }
 
-# Host may inject a review-guard continuation after an unreviewed manager turn
-# settles (RuntimeNudge.managerReviewGuard, GLORY-070). Production-composed → internal.
-[[turn]]
-id = "manager-guard"
-internal = true
-user = ["# Your work is not yet complete.", "# Finish what remains, or call suicide when nothing useful remains."]
-tools = ["fork", "join", "list"]
-
-  [[turn.step]]
-  respond = { type = "text", text = "Manager review guard acknowledged." }
-
 [[turn]]
 id = "manager-blogger-1"
 internal = true

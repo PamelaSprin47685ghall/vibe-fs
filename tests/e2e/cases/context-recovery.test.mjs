@@ -213,9 +213,11 @@ async function oracleXa(scenario, _ctx) {
   assertNoReanchor(workDir, 'X-A');
   assert.equal(countNamed(workDir, 'PrefixRebaseCommitted'), 0, 'X-A: no promote without probe');
   assert.equal(scenario.provider.matchCount('continue.0'), 0, 'X-A: no physical continue/probe delivery');
-  // Cursor fact may race SIGTERM inside the arm window; either side is legal.
-  // Post-restart main is ordinary (NotArmed) — proven by zero continue deliveries.
-  assert.ok(xTraceCount(workDir) >= 0, 'X-A: journal readable after restart');
+  // OpeningPromptCaptured is appended at HumanRoot prompt ingress (PromptIngress →
+  // XTraceCapture.captureOpening) before any provider delivery, so the round-1
+  // prompt is durable pre-SIGTERM and must replay after restart. Post-restart main
+  // is ordinary (NotArmed) — proven by zero continue deliveries.
+  assert.ok(xTraceCount(workDir) >= 1, 'X-A: OpeningPromptCaptured durable at prompt ingress (journal readable after restart)');
 }
 
 async function oracleXb(scenario, ctx) {
@@ -227,19 +229,18 @@ async function oracleXb(scenario, ctx) {
     1,
     'X-B: exactly one physical probe delivery; lost AttemptPlan must not re-send',
   );
+  assert.ok(ctx.preRestart, 'X-B requires snapshotBeforeRestart');
 
   const after = snapshotCoverage(workDir);
-  if (ctx.preRestart) {
-    assertXTraceSurvives(ctx.preRestart, after, 'X-B');
-    assertRecordCoverageHolds(ctx.preRestart, after, 'X-B');
-  } else {
-    assert.ok(xTraceCount(workDir) >= 1, 'X-B: XTrace durable facts present');
-  }
+  assertXTraceSurvives(ctx.preRestart, after, 'X-B');
+  assertRecordCoverageHolds(ctx.preRestart, after, 'X-B');
 
   // No promote expected — blog path independent of the single continue.0 probe.
+  // The blogger turn is declared (56 frame-commit steps) and listed in must; the
+  // flow barriers on the first BlogEntryCommitted before this oracle runs.
   assert.ok(
-    after.blogEntry >= 0,
-    `X-B: frame/probe BlogEntryCommitted path independent of probe (count=${after.blogEntry})`,
+    after.blogEntry >= 1,
+    `X-B: frame/probe BlogEntryCommitted present after blogger cycle (count=${after.blogEntry})`,
   );
   assert.equal(
     scenario.provider.matchCount('continue.0'),
@@ -256,16 +257,20 @@ async function oracleXc(scenario, ctx) {
   assertNoReanchor(workDir, 'X-C');
   assertXTraceSurvives(ctx.preRestart, after, 'X-C');
   assertRecordCoverageHolds(ctx.preRestart, after, 'X-C');
-  // Promote may land on either side of the crash window (TOML header): the
-  // snapshot step and the restart signal race, so 0→1 between them is the
-  // X-C window itself. Retreat or a second promote is the defect.
-  assert.ok(
-    after.prefixRebase >= ctx.preRestart.prefixRebase,
-    `X-C: promote count must not retreat across restart (before=${ctx.preRestart.prefixRebase}, after=${after.prefixRebase})`,
+  // X-C's contract: promote is durable once the probe turn reaches terminal idle
+  // (c431ae33 keeps the AttemptPlan across provisional states so the TurnCompleted
+  // promote fires). The host broadcasts idle before reconcileAttempt appends
+  // PrefixRebaseCommitted, so the flow barriers on the fact before snapshot and
+  // restart — the restart cannot lose the promote. Exactly one promote must then
+  // survive; a second one without a new probe is silent re-promote.
+  assert.equal(
+    after.prefixRebase,
+    1,
+    `X-C: PrefixRebaseCommitted must be exactly 1 after promote+restart (got ${after.prefixRebase}; preRestart=${ctx.preRestart.prefixRebase})`,
   );
   assert.ok(
     ctx.preRestart.prefixRebase <= 1,
-    `X-C: at most one promote before restart; preRestart=${ctx.preRestart.prefixRebase} implies re-promote`,
+    `X-C: pre-restart promote count must be 0 or 1 (got ${ctx.preRestart.prefixRebase})`,
   );
   assert.ok(
     after.prefixRebase <= 1,
@@ -332,6 +337,7 @@ const CUSTOMS = {
     oracle: oracleXa,
   },
   'x-b-probe-sent-unaccepted': {
+    snapshotBeforeRestart,
     oracle: oracleXb,
   },
   'x-c-accepted-before-promote': {

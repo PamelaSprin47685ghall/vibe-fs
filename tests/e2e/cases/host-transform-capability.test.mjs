@@ -8,7 +8,7 @@
  *  - `blog` returns "OK" immediately (step 0.1) — the tool result travels into
  *    the NEXT Blogger request, proving execute resolved;
  *  - the Host's tool-loop continuation re-enters the transform (step 0.2) and
- *    the continuation commits exactly one EnforcementCycleCommitted with the
+ *    the continuation commits exactly one BlogEntryCommitted with the
  *    misspelled rule field mapped (step 0.7, ENFORCER-024) and identity
  *    present (step 0.6 HOST-011: BlogEntryCommitted.ProviderRun = tool
  *    ToolContext.messageID half via lastAssistantStep; ToolCallIds = callID
@@ -417,19 +417,15 @@ try {
   // main turn's synchronous window (skip while InFlight). After the parked
   // cycle commits, at most one additional request may start for the batched
   // third material (offer/start from Parked), never two for the same material.
-  await waitForCount(
-    scenario,
-    () => blogRequests().length >= blogCountBeforeThird,
-    blogCountBeforeThird,
-    'blogger-stable-after-third',
-  );
-  // Allow one more request for the third material offer, but not unbounded fan-out.
+  // Wait for that one request, then hold a stability window — no fourth request
+  // for 2×ENFORCER_POLL_SLICE_MS — before accepting the single-flight bound.
   await waitForCount(
     scenario,
     () => blogRequests().length >= blogCountBeforeThird + 1,
     blogCountBeforeThird + 1,
     'blogger-request-for-third-material',
   );
+  await new Promise((resolve) => setTimeout(resolve, 2 * ENFORCER_POLL_SLICE_MS));
   assert.ok(
     blogRequests().length <= blogCountBeforeThird + 1,
     `single-flight: at most one blogger request for third material (got ${blogRequests().length}, before=${blogCountBeforeThird})`,
@@ -438,7 +434,7 @@ try {
   if (thirdBlogRequest && thirdBlogRequest !== secondBlogRequest) {
     const thirdTexts = requestTexts(thirdBlogRequest);
     assert.ok(
-      thirdTexts.includes('Third coder turn.') || thirdTexts.includes('[[new_work_to_record]]'),
+      thirdTexts.includes('Third coder turn.') && thirdTexts.includes('[[new_work_to_record]]'),
       'third blogger request must carry batched third material in new_work_to_record, not a concurrent InFlight override',
     );
     assert.ok(
@@ -450,15 +446,20 @@ try {
   // ── 4. journal: committed cycles with identity and per-run uniqueness ─────
   // The main Blogger commits one cycle per provider step (request 1 + the
   // resumed request); the parallel session's own Blogger commits its first
-  // cycle as well. The second main cycle lands asynchronously after the main
-  // turn settles, so poll the journal.
+  // cycle on its own session as well. BlogEntryCommitted carries SessionId, so
+  // count only the main session's facts — the second main cycle lands
+  // asynchronously after the main turn settles, so poll the journal.
+  const mainBlogFacts = () =>
+    runtimeFacts(scenario.host.workDir, 'BlogEntryCommitted').filter((fact) =>
+      fieldValues(fact, 'SessionId').includes(primaryId),
+    );
   await waitForCount(
     scenario,
-    () => runtimeFacts(scenario.host.workDir, 'BlogEntryCommitted').length >= 2,
+    () => mainBlogFacts().length >= 2,
     2,
     'blog-entries-committed',
   );
-  const facts = runtimeFacts(scenario.host.workDir, 'BlogEntryCommitted');
+  const facts = mainBlogFacts();
 
   // C5: each physical send materializes a durable request context first.
   const materialized = runtimeFacts(scenario.host.workDir, 'BloggerRequestMaterialized');
@@ -525,17 +526,20 @@ try {
   assert.equal(cycleFacts.length, 0, 'no independent EnforcementCycleCommitted (ENFORCER-045)');
 
   // ENFORCER-020/025 tip v2: blog args carry required tip (catalog field exact).
-  // Scenario uses tip = "primitive-obsession"; journal must record TipRuleId / field.
+  // Scenario uses tip = "primitive-obsession"; the journal must record the
+  // catalog mapping by VALUE — TipRuleId = enforcement-a01 and
+  // FieldNameAtCommit = primitive-obsession (catalog.json; EnforcerHost.fs:424-425).
   const tipFacts = runtimeFacts(scenario.host.workDir, 'BlogEntryCommitted');
-  const hasTip = tipFacts.some((fact) => {
-    const text = JSON.stringify(fact);
-    return (
-      text.includes('primitive-obsession') ||
-      text.includes('TipRuleId') ||
-      text.includes('enforcement-a01')
-    );
-  });
-  assert.ok(hasTip, 'tip field reaches the journal as TipRuleId (ENFORCER-020/025)');
+  const tipRuleIds = fieldValues(tipFacts, 'TipRuleId');
+  assert.ok(
+    tipRuleIds.includes('enforcement-a01'),
+    `tip must reach the journal as catalog RuleId enforcement-a01 (got ${JSON.stringify(tipRuleIds)})`,
+  );
+  const fieldNamesAtCommit = fieldValues(tipFacts, 'FieldNameAtCommit');
+  assert.ok(
+    fieldNamesAtCommit.includes('primitive-obsession'),
+    `FieldNameAtCommit must snapshot the catalog field (got ${JSON.stringify(fieldNamesAtCommit)})`,
+  );
 
   assert.deepEqual(runtime.unanswered(), [], 'all declared steps must be consumed');
   assert.deepEqual(runtime.unmetMust(), [], 'all required scenario steps must complete');

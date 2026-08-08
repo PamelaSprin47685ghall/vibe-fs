@@ -17,10 +17,12 @@ flow = [
   { wait = "continue" },
   { waitFact = { name = "FallbackCursorAdvanced", eq = 1 } },
   # Promote is durable only after reconcileAttempt appends PrefixRebaseCommitted.
-  # Mirror X-C: let the probe turn idle so seal/promote can finish before we
-  # snapshot and restart.
+  # The host broadcasts idle before that append (promote runs downstream of the
+  # idle-driven reconcile), so barrier on the fact — snapshot/restart must not
+  # race the promote.
   { awaitEvent = { type = "session.idle", session = "self" }, timeoutMs = 30000 },
-  # After idle the promote should already be durable (CTX-012). Snapshot and restart.
+  { waitFact = { name = "PrefixRebaseCommitted", eq = 1 } },
+  # After the promote is durable (CTX-012). Snapshot and restart.
   { custom = "snapshotBeforeRestart" },
 
   { restart = true },
@@ -86,11 +88,6 @@ user = "#"
 
   [[turn.step]]
   respond = { type = "text", text = "Continuing after missing final report." }
-
-[[epoch]]
-turn = "missing-final-report-repair"
-step = 0
-reason = "prefix-probe"
 
 [[turn]]
 id = "blogger"

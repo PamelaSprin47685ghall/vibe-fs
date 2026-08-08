@@ -18,6 +18,9 @@ flow = [
   { wait = "title" },
   { wait = "inspector.0" },
   { wait = "inspector.1" },
+  # EXEC-011 evidence: the executor tool result the model sees must report the
+  # timeout — the case-file oracle scans the wire tool results for it.
+  { custom = "assertTimeoutReported" },
   { awaitTerminal = true, requireAssistantTerminal = true },
   { expectSatisfied = true },
 ]

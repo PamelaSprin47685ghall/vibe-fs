@@ -32,7 +32,7 @@ setup = { strict = true, project = { files = { "AGENTS.md" = "- orchestrator res
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch." }
 
-must = ["conflict-resume.0", "orch-continue.1"]
+must = ["conflict-resume.0", "coder-resolve.0", "orch-continue.1"]
 
 flow = [
   # gitConflictProof must land AFTER the manager worktree exists.
@@ -71,12 +71,12 @@ flow = [
   # Continue → (2nd conflict-resume, only when the rebase still conflicts) →
   # review/confirm → Published → orch-continue join/text.
   # `orch.2` covers the restart race path (the recovered run answering the old turn again).
-  # The SAME conflict-resume key may be delivered a second time when the recovered
-  # rebase still conflicts (the manager had not resolved before the crash); when the
-  # crash happened after resolution, the recovered rebase succeeds directly and no
-  # second conflict-resume arrives. Both timelines converge on `Published`, which is
-  # the restart-phase criterion — the conflict-resume wait below is deliberately
-  # absent so a resolved-before-crash run is not held to a resume that never fires.
+  # The restart fires at the FIRST conflict-resume delivery (afterExpectation
+  # above), so the crash is by construction before resolution: the recovered
+  # rebase still conflicts, and ResumeConflictResolution re-sends the prompt. The
+  # wait below is therefore a real barrier on the recovery — guaranteed to fire,
+  # not a "may or may not" branch — and the 2nd delivery is the same key (same
+  # session, same turn; content is a pure function of the request).
   { wait = "conflict-resume.0", timeoutMs = 30000 },
   { prompt = { agent = "fast-orchestrator", text = "Continue the publish job and join its result." } },
   { prompt = { agent = "fast-orchestrator", text = "Continue the publish job and join its result." } },
@@ -97,7 +97,22 @@ flow = [
   { wait = "orch-continue.1", timeoutMs = 30000 },
 
   { awaitTerminal = true, requireAssistantTerminal = false },
+  { assertFile = { path = "publish_proof.txt", equals = "Published by orchestrator canary\n" } },
   { assertFacts = { name = "Published", eq = 1 } },
+  # One job, one worktree, one Manager (ORCH-003): a re-fork of the original
+  # task would write a second ManagerJobCreated and go red here.
+  { assertFacts = { name = "ManagerJobCreated", eq = 1 } },
+  # manager.0 (the Manager's fork) is delivered exactly once: recovery resumes the
+  # SAME session, so its already-answered steps are never re-delivered. A production
+  # that re-ran the original task — even into the same session — would deliver
+  # manager.0 a second time and go red. Placed here, not right after awaitRestart,
+  # because the recovery is driven by the first post-restart join (lazy engine
+  # init) and the count is only final once the recovery phase has completed.
+  { assertDeliveries = { id = "manager.0", eq = 1 } },
+  # barrier-reviewer.0 is delivered once by the pre-rebase review (pre-restart) and
+  # once by the post-rebase review (post-restart): a production that skipped the
+  # post-rebase review would deliver it only once and go red.
+  { assertDeliveries = { id = "barrier-reviewer.0", gte = 2 } },
   { assertWorktreeClean = true },
   { expectSatisfied = true },
 ]
@@ -118,12 +133,17 @@ tools = ["fork-manager", "join"]
 # old turn again — either the pre-crash join (step-1) was answered and the
 # model's next request is this step, or the interrupted join is re-delivered
 # at step 1 and this step follows it. The text reply terminates the recovered
-# turn deterministically; job recovery is engine-driven (RecoverManagerJob
-# starts at engine boot, independent of this session's replies), so the
-# manager's rebase-conflict resume is NOT coupled to this step. The Continue
-# prompt then anchors `orch-continue` as the declared recovery path.
-# `optional = true` because the Continue prompt's new user message may win the
-# race and anchor `orch-continue` directly, leaving this step unreached.
+# turn deterministically. Recovery is NOT a boot-time sweep: the engine
+# initializes lazily on the first engine tool call, and initializeEngine →
+# recoverJobs → RecoverManagerJob then resumes the job from its last durable
+# fact — here ConflictPending → ResumeConflictResolution, which sends the
+# conflict-resume prompt to the SAME manager session. So the manager's
+# rebase-conflict resume IS coupled to this session's replies: whichever join
+# fires first (this re-delivered step or the Continue prompt's) drives it.
+# The Continue prompt then anchors `orch-continue` as the declared recovery
+# path. `optional = true` because the Continue prompt's new user message may
+# win the race and anchor `orch-continue` directly, leaving this step
+# unreached.
 
   [[turn.step]]
   optional = true
@@ -176,20 +196,46 @@ tools = ["fork", "join", "list", "suicide"]
   [[turn.step]]
   respond = { type = "text", text = "Manager continues." }
 
-# `src/Wanxiangshu/Application/Orchestration/Orchestrator.Prompts.fs:23`. The prompt embeds the conflicted file list, so the
-# declaration is a prefix of it — and production composes the whole thing, hence `internal`.
+# `src/Wanxiangshu/Application/Orchestration/Prompts.fs:23` (`buildConflictResumePrompt`).
+# Production embeds the conflicted-file list between the two fragments, so the
+# declaration is ordered fragments around it — and production composes the whole
+# thing, hence `internal`.
 #
-# The clause it carries is the load-bearing part: "You are RESUMING an in-progress rebase in
-# this same session — do NOT restart the original task."
+# The second fragment is the load-bearing clause: "You are RESUMING an in-progress
+# rebase in this same session — do NOT restart the original task." Matching it pins
+# ORCH-007's same-session continuation on the wire — a re-forked task (fresh prompt)
+# would not carry it and would fail closed instead of passing.
 
 [[turn]]
 id = "conflict-resume"
 internal = true
-user = "[CONFLICT RESUMPTION] An in-progress rebase hit conflicts. Conflicted files:"
+user = [
+  "[CONFLICT RESUMPTION] An in-progress rebase hit conflicts. Conflicted files:",
+  "You are RESUMING an in-progress rebase in this same session — do NOT restart the original task.",
+]
 tools = ["fork", "join", "list", "suicide"]
 
+  # The Manager has no editor (AGENT tools: fork/join/list/suicide); it resolves
+  # the conflicted file through the Coder, joins, then ends its Life with suicide.
+  # GLORY-029/070: a Manager's run completes only at suicide — a plain text reply
+  # under ConflictPending is deferred forever (IdleEncouragement loop) and the
+  # recovery never returns. The Life was blessed pre-restart, so GLORY-062 ends
+  # it with ONE suicide; only then does AwaitManager return and finalizeWorktree
+  # stage the resolution and `rebase --continue` (GitAdapter.finalizeWorktree).
+  # The fork prompt avoids the literal word "Published": the journal observer
+  # counts waitFact facts by substring, and the assignment text lands in the
+  # journal — the word would fake a `Published` fact.
   [[turn.step]]
-  respond = { type = "text", text = "Resuming rebase resolution." }
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Resolve the conflicted publish_proof.txt so it contains exactly the orchestrator canary marker" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager rest in peace." }
 
 [[turn]]
 id = "coder"
@@ -205,6 +251,25 @@ tools = ["write"]
 
   [[turn.step]]
   respond = { type = "text", text = "Coder finished." }
+
+[[turn]]
+id = "coder-resolve"
+lane = "fast-coder"
+user = [
+  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
+  "# Resolve the conflicted publish_proof.txt so it contains exactly the orchestrator canary marker",
+]
+tools = ["write"]
+
+  # Post-restart conflict resolution: the Manager forks the Coder into the same
+  # worktree; the write overwrites the conflicted file with the canonical content
+  # so finalizeWorktree's `git add -A` + `rebase --continue` resolve the conflict
+  # and the published file passes assertFile.
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "write", args = { filePath = "publish_proof.txt", content = "Published by orchestrator canary\n" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Conflict file resolved." }
 
 [[turn]]
 id = "manager-finality-reviewer"

@@ -62,48 +62,30 @@ test('EXEC_025_three_teacher_calls_reuse_one_private_session_and_QA_records_raw_
         toolContext(student, `asst_student_${index}`, `call_teacher_${index}`),
       )
 
-      if (index === 0) {
-        while (runtime.prompts.length <= index) await new Promise((resolve) => setImmediate(resolve))
-        const teacher = createdIds[0]
-        assert.ok(teacher, 'first call must create the private Teacher')
-        await awaitPrompted(teacher)
+      while (runtime.prompts.length <= index) await new Promise((resolve) => setImmediate(resolve))
+      const teacher = createdIds[0]
+      assert.ok(teacher, 'first call must create the private Teacher')
+      await awaitPrompted(teacher)
 
-        const prompt = runtime.prompts[index]
-        const promptKey = promptKeyOf(prompt)
-        assert.ok(promptKey, 'Teacher prompt must carry PromptDispatcher identity')
-        assert.equal(prompt.body.agent, 'fast-teacher')
-        assert.equal(prompt.body.model, undefined, 'Teacher model must come from its Host agent config')
-        assert.equal(prompt.body.tools.return, true)
-        assert.equal(prompt.body.tools.read, true)
-        assert.equal(prompt.body.tools.fork, false)
-        assert.equal(prompt.body.tools.join, false)
-        assert.equal(prompt.body.tools['fork-pty'], false)
+      const prompt = runtime.prompts[index]
+      const promptKey = promptKeyOf(prompt)
+      assert.ok(promptKey, 'Teacher prompt must carry PromptDispatcher identity')
+      assert.equal(prompt.body.agent, 'fast-teacher')
+      assert.equal(prompt.body.model, undefined, 'Teacher model must come from its Host agent config')
+      assert.equal(prompt.body.tools.return, true)
+      assert.equal(prompt.body.tools.read, true)
+      assert.equal(prompt.body.tools.fork, false)
+      assert.equal(prompt.body.tools.join, false)
+      assert.equal(prompt.body.tools['fork-pty'], false)
 
-        await hooks['chat.message'](
-          { sessionID: teacher, agent: 'fast-teacher', messageID: `msg_teacher_${index}` },
-          {
-            message: {
-              id: `msg_teacher_${index}`,
-              role: 'user',
-              sessionID: teacher,
-              agent: 'fast-teacher',
-            },
-            parts: [
-              {
-                type: 'text',
-                text: prompt.body.parts[0].text,
-                metadata: { wanxiangshu_prompt_key: promptKey },
-              },
-            ],
-          },
-        )
-        runtime.pushHostMessage(teacher, {
-          info: {
+      await hooks['chat.message'](
+        { sessionID: teacher, agent: 'fast-teacher', messageID: `msg_teacher_${index}` },
+        {
+          message: {
             id: `msg_teacher_${index}`,
             role: 'user',
             sessionID: teacher,
             agent: 'fast-teacher',
-            metadata: { wanxiangshu_prompt_key: promptKey },
           },
           parts: [
             {
@@ -112,14 +94,43 @@ test('EXEC_025_three_teacher_calls_reuse_one_private_session_and_QA_records_raw_
               metadata: { wanxiangshu_prompt_key: promptKey },
             },
           ],
-        })
-      }
+        },
+      )
+      runtime.pushHostMessage(teacher, {
+        info: {
+          id: `msg_teacher_${index}`,
+          role: 'user',
+          sessionID: teacher,
+          agent: 'fast-teacher',
+          metadata: { wanxiangshu_prompt_key: promptKey },
+        },
+        parts: [
+          {
+            type: 'text',
+            text: prompt.body.parts[0].text,
+            metadata: { wanxiangshu_prompt_key: promptKey },
+          },
+        ],
+      })
 
-      const teacher = createdIds[0]
-      const teacherReturnPromise = hooks.tool.return.execute(
+      const teacherReturn = await hooks.tool.return.execute(
         { message: answer },
         toolContext(teacher, `asst_teacher_${index}`, `call_return_${index}`),
-      ).catch(() => {})
+      )
+      assert.equal(parseToml(teacherReturn).completion_text, 'Teacher answer returned to Student.')
+
+      const completionID = `asst_teacher_completion_${index}`
+      const completion = { text: 'provider trailing prose' }
+      await hooks['experimental.text.complete'](
+        { sessionID: teacher, messageID: completionID, partID: `part_teacher_completion_${index}` },
+        completion,
+      )
+      assert.equal(completion.text, 'Teacher answer returned to Student.')
+      runtime.pushHostMessage(
+        teacher,
+        assistantMessage(teacher, completionID, `msg_teacher_${index}`, 'fast-teacher', completion.text),
+      )
+      hooks.event(idle(teacher))
 
       const delivered = parseToml(await studentRun)
       assert.equal(delivered.answer, answer)

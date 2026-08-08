@@ -22,14 +22,21 @@
 # differed differed only in text — `"Manager recovered."` against `"Manager finished."` —
 # and that difference existed solely so the old flow could `wait` on a distinct id.
 #
-# Under (lane, turn, step) they ARE one key: after the restart the recovered job may open a
-# fresh Manager child with the same prompt, so it is a fresh conversation whose step counter
-# starts at 0 again. Content is a pure function of the request, so one declaration answers
-# both deliveries and the flow simply waits on the same id twice.
+# Under (lane, turn, step) the two deliveries ARE one key, but not because a fresh
+# child restarts the counter: ORCH-003 keeps ONE Manager for the job's whole life,
+# and recovery re-hydrates the SAME session — journal transcript, step counter
+# continues, and steps already answered before the crash are not re-delivered.
+# Content is a pure function of the request, so one declaration answers any
+# delivery of that turn. A `wait` on an already-consumed id returns immediately
+# (one-shot expectations are permanent-after-first-consume), so re-waiting the
+# same id is NOT evidence that it was delivered again — the post-restart
+# `wait = "manager.0"` / `"coder.0"` below resolve on the pre-restart deliveries.
 #
-# What actually proves the recovery is therefore not a differently-worded reply — it is the
-# fact assertions and the file assertion at the end of the flow. The old text pair looked
-# like evidence and was decoration.
+# What actually proves the recovery is therefore not a differently-worded reply —
+# it is the fact assertions, the file assertion, and the delivery-count assertions
+# at the end of the flow (`manager.0 eq 1`: the Manager is never re-forked;
+# `barrier-reviewer.0 gte 3`: the post-rebase review really re-fires after
+# restart). The old text pair looked like evidence and was decoration.
 
 scenario = "orchestrator-restart-publish"
 description = "ORCH-005 crash after the publish candidate exists recovers to an exactly-once publish"
@@ -84,6 +91,19 @@ flow = [
   { awaitTerminal = true, requireAssistantTerminal = false },
   { assertFile = { path = "publish_proof.txt", equals = "Published by orchestrator canary\n" } },
   { assertFacts = { name = "Published", eq = 1 } },
+  # One job, one worktree, one Manager (ORCH-003): a re-fork of the original
+  # task would write a second ManagerJobCreated and go red here.
+  { assertFacts = { name = "ManagerJobCreated", eq = 1 } },
+  # Recovery from CandidateReady never touches the Manager again, so manager.0
+  # (the Manager's fork) is delivered exactly once — re-running the original
+  # task would deliver it a second time and go red.
+  { assertDeliveries = { id = "manager.0", eq = 1 } },
+  # barrier-reviewer.0 deliveries: (1) the pre-rebase review, (2) the post-rebase
+  # review round whose first request triggers the restart (afterExpectation
+  # attempts = 2), (3) the post-restart re-review (round restarts at 0). A
+  # production that skipped the post-restart re-review would deliver it only
+  # twice and go red.
+  { assertDeliveries = { id = "barrier-reviewer.0", gte = 3 } },
   { assertWorktreeClean = true },
   { expectSatisfied = true },
 ]
