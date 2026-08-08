@@ -32,7 +32,7 @@
 
 | # | 名称 | 输入 | 输出 |
 |---|------|------|------|
-| 1 | First Birth | `Fix the retry race.` | `[X]\n\nIf I want to complete the request above, how should I work?\nHow should I define the final goal?\nYou may call several rounds of tools to investigate and research, but in the end simply output your answer in text. Do not perform any actual work.` |
+| 1 | First Birth | `Fix the retry race.` | `[X]\n\nIf I want to complete the request above, how should I work?\nHow should I define the final goal?\nYou may call several rounds of tools to investigate and research, but in the end simply output your answer as direct text. Do not perform any actual work. Do not call suicide.` |
 | 2 | Reawakening | `Add Windows support.` | `You awaken once more in the distant future.\n\n[X]\n\nIf I want to...` |
 | 3 | Activation | — | `Now complete it yourself.\nCarry out the work you described until the final goal is fully achieved.\n\nPlanning is not completion.\nDelegation is not completion...` |
 | 4 | Idle encouragement | — | `You are doing well.\nYou have plenty of time.\nYou can continue.\nWhen nothing useful remains, call suicide.` |
