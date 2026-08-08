@@ -1969,8 +1969,8 @@ export const projectionIntent = (() => {
     },
     /** PROJ-008 step 5: REVIEW-003 skeptical challenge. */
     appendReviewChallenge: (intent = { TextVersion: 1 }) => build('AppendReviewChallenge', [intent]),
-    /** PROJ-008 step 5 / HOST-013: pair-programming thought markers. */
-    insertPairProgrammingThought: (intent = { SessionId: undefined }) =>
+    /** PROJ-008 step 5 / HOST-013: pair-programming guideline marker. */
+    insertPairProgrammingThought: (intent = { MarkerId: undefined, MarkerText: undefined }) =>
       build('InsertPairProgrammingThought', [intent]),
     /** PROJ-008 step 6: Host compaction reanchor (renderer no-op on wire bytes). */
     get reanchorAfterCompaction() {
@@ -2002,7 +2002,7 @@ export const projectionAlgebra = (() => {
           return { kind, text: payload }
         }
         if (kind === 'WireToolResult') {
-          const [callId, result] = Array.isArray(payload) ? payload : [undefined, payload]
+          const [callId, result] = part.fields ?? (Array.isArray(payload) ? payload : [undefined, payload])
           return { kind, callId, text: result }
         }
         if (kind === 'WireToolCall') {
@@ -2146,7 +2146,7 @@ export const projectionAlgebra = (() => {
  * pair / challenge text; Host modules must reference these rather than literals.
  */
 export const projectionConstants = (() => {
-  const names = ['RepairInstruction', 'PairProgrammingThoughtText', 'ReviewChallengeText', 'ReviewChallengePrompt']
+  const names = ['RepairInstruction', 'PairProgrammingGuidelineText', 'ReviewChallengeText', 'ReviewChallengePrompt']
   const out = {}
   for (const name of names) {
     try {

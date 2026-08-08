@@ -297,14 +297,27 @@ module SpikePlugin =
                             | None -> ()
                         | None -> ()
 
-                        // HOST-013: the pair-programming thought marker. Runs
+                        // HOST-013：结对编程 guideline marker。Runs
                         // after XTrace capture (the marker never enters the
                         // trace) and before ReviewSeal (the seal covers the
                         // final bytes the provider receives). Idempotent per
-                        // anchor; no anchor → untouched.
+                        // transcript 末尾；幂等。
                         let messages = unbox<obj array> outObj?messages |> Array.toList
 
-                        match PairProgrammingThoughtTransform.tryInject projectionSessionIdOpt messages with
+                        let markerText =
+                            match journal, projectionSessionIdOpt with
+                            | Some durable, Some bloggerSessionId ->
+                                match EnforcerHost.latestTipNudge durable (SessionId.create bloggerSessionId) with
+                                | Some nudge -> nudge + "\n\n" + ProjectionConstants.PairProgrammingGuidelineText
+                                | None -> ProjectionConstants.PairProgrammingGuidelineText
+                            | _ -> ProjectionConstants.PairProgrammingGuidelineText
+
+                        match
+                            PairProgrammingThoughtTransform.tryInject
+                                projectionSessionIdOpt
+                                markerText
+                                messages
+                        with
                         | Some newMessages -> HostMessageProjection.replaceMessagesInPlace outObj newMessages
                         | None -> ()
 
