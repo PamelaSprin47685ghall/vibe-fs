@@ -321,6 +321,9 @@ tools = ["blog"]
   [[turn.step]]
   respond = { type = "tool-call", tool = "blog", args = { text = "Session background after repair.", tip = "primitive-obsession" } }
 
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Session background after repair continued.", tip = "primitive-obsession" } }
+
 # Attempt 1 of `continue` is a recovery-slot request and carries an attempt-local
 # prefix probe: the failed `prove` attempt armed the slot, and the provider-visible
 # side can advance to B here. The probe rebases the message prefix while the system
@@ -335,6 +338,18 @@ reason = "prefix-probe"
 [[epoch]]
 turn = "repair"
 step = 0
+reason = "frame-commit"
+
+# HOST-004 bare "#\n" blogger-repair may rewrite message prefix while tools stay
+# blog-only (measured seal-undeclared after blogger-repair.0 redeliveries).
+[[epoch]]
+turn = "blogger-repair"
+step = 0
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger-repair"
+step = 1
 reason = "frame-commit"
 
 [[epoch]]

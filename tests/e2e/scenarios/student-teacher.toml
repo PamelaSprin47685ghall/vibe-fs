@@ -30,8 +30,9 @@ tools = ["teacher"]
   [[turn.step]]
   respond = { type = "tool-call", tool = "teacher", args = { message = "What is the smallest sufficient principle for this canary topic?" } }
 
+  # HOST-013 FakeReq no longer inflates stepOf: after teacher tool-call the next
+  # provider request is step=1 (measured no-declared-turn on fast-student).
   [[turn.step]]
-  runtimeStep = 3
   respond = { type = "text", text = "The learning phase has converged." }
 
 [[turn]]
@@ -42,8 +43,9 @@ user = "# Answer the Student's current question"
   [[turn.step]]
   respond = { type = "tool-call", tool = "return", args = { message = "The smallest sufficient principle is to preserve one proven causal chain." } }
 
+  # HOST-013 FakeReq no longer inflates stepOf: after return tool-call the next
+  # provider request is step=1 (measured no-declared-turn on fast-teacher).
   [[turn.step]]
-  runtimeStep = 3
   respond = { type = "text", text = "Teacher answer returned to Student." }
 
 [[turn]]
@@ -55,12 +57,12 @@ tools = ["read", "glob", "grep", "write", "edit", "return"]
   [[turn.step]]
   respond = { type = "tool-call", tool = "write", args = { filePath = ".agent/skills/student-canary/SKILL.md", content = "---\nname: student-canary\ndescription: Preserve one proven causal chain for the Student canary.\n---\n\n# Student canary\n\nPreserve one proven causal chain.\n" } }
 
+  # HOST-013 FakeReq no longer inflates stepOf: after write tool-call the next
+  # provider request is step=1 (measured no-declared-turn on student-compile).
   [[turn.step]]
-  runtimeStep = 3
   respond = { type = "tool-call", tool = "return", args = { message = "Created .agent/skills/student-canary/SKILL.md; restart OpenCode to load it." } }
 
   [[turn.step]]
-  runtimeStep = 6
   respond = { type = "text", text = "provider paraphrase that must be replaced" }
 
 [[epoch]]

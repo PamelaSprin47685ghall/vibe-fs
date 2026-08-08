@@ -16,7 +16,9 @@
 
 import { assertEq, assertTrue } from './lib.mjs';
 import { kindOf, lanesOf, resolveEntry, runtimeKeyOf, sessionIdOf, stepOf, turnOf } from '../../e2e/support/runtime-key.js';
+import { messageText, semanticOf } from '../../e2e/support/provider-wire.js';
 import { forkAnchor, forkRelay } from '../../e2e/support/production.js';
+import { toArray as listToArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js';
 // HOST-013: production constants read from the build artifact, so the step
 // cases exercise the real marker text and source, not a copy.
 import {
@@ -65,7 +67,11 @@ const forkPrompt = (assignment, requirements = []) => forkRelay(assignment, unde
 const titleRequest = (text) =>
   request([{ role: 'user', content: 'Generate a title for this conversation:\n' }, user(text)]);
 
-const titleRequestOn = (text) => titleRequest(text);
+/** Wire tools list in the shape `extractToolNames` reads from the provider body. */
+const withTools = (body, names) => ({
+  ...body,
+  tools: names.map((name) => ({ name })),
+});
 
 export const runtimeKeyCases = [
   // ── kind: the fourth component, and why turn alone cannot carry it ────────
@@ -206,19 +212,37 @@ export const runtimeKeyCases = [
   {
     name: 'HOST-013 the pair-programming thought marker never counts as a step',
     fn: () => {
-      // The marker is a synthetic assistant message, not a provider step. Its
-      // Host identity and completed auto-injected tool part must both be skipped.
+      // The marker is a synthetic assistant message, not a provider step. Host
+      // identity (current or legacy source) and auto-injected tool parts — both
+      // pending FakeReq and completed FakeResp — must all be skipped.
       const rawShape = {
         role: 'assistant',
         info: { source: pairProgrammingThoughtSource },
         parts: [{ type: 'tool', tool: 'auto-injected', state: { status: 'completed', output: pairProgrammingThoughtText } }],
       };
+      const legacySourceShape = {
+        role: 'assistant',
+        info: { source: 'pair-programming-thought' },
+      };
       const contentShape = {
         role: 'assistant',
         content: [{ type: 'tool', tool: 'auto-injected', state: { status: 'completed', output: pairProgrammingThoughtText } }],
       };
+      // Provider wire often strips `info.source`; FakeReq half is status pending
+      // with no output and must not count as a real step either.
+      const pendingFakeReq = {
+        role: 'assistant',
+        parts: [{ type: 'tool', tool: 'auto-injected', state: { status: 'pending' } }],
+      };
+      const completedFakeResp = {
+        role: 'assistant',
+        parts: [{ type: 'tool', tool: 'auto-injected', state: { status: 'completed', output: pairProgrammingThoughtText } }],
+      };
+      // OpenAI HTTP wire FakeReq: assistant with tool_calls named auto-injected
+      // (no completed status/output required). FakeResp is often role tool.
+      const openAiFakeReq = toolCall('auto-injected');
 
-      for (const marker of [rawShape, contentShape]) {
+      for (const marker of [rawShape, legacySourceShape, contentShape, pendingFakeReq, completedFakeResp, openAiFakeReq]) {
         assertEq(stepOf(request([user('go'), marker])), 0, 'marker alone is not a step');
         assertEq(
           stepOf(request([user('go'), marker, assistant('r1')])),
@@ -226,6 +250,57 @@ export const runtimeKeyCases = [
           'marker before a real reply does not shift the count',
         );
       }
+
+      // Probe: user + OpenAI FakeReq must not count as a step.
+      assertEq(stepOf(request([user('go'), openAiFakeReq])), 0, 'OpenAI FakeReq tool_calls alone is step 0');
+
+      // Measured failure: FakeReq+FakeResp both assistant halves around a real
+      // tool batch must not shift stepOf — only the real assistant counts.
+      assertEq(
+        stepOf(request([
+          user('go'),
+          pendingFakeReq,
+          completedFakeResp,
+          toolCall('fork'),
+          toolResult('ok'),
+          assistant('r2'),
+        ])),
+        2,
+        'FakeReq+FakeResp around a real assistant still yield the real step count',
+      );
+
+      // Measured OpenAI sequence: user + real toolCall + fakeReq tool_calls + tool
+      // + real toolCall + fakeReq + tool counts only the real assistants.
+      assertEq(
+        stepOf(request([
+          user('go'),
+          toolCall('fork'),
+          openAiFakeReq,
+          toolResult('ok'),
+          toolCall('fork-manager'),
+          openAiFakeReq,
+          toolResult('ok'),
+        ])),
+        2,
+        'OpenAI FakeReq halves must not inflate step around real tool_calls',
+      );
+
+      // Mixed real + auto-injected tool_calls still counts as a real step.
+      assertEq(
+        stepOf(request([
+          user('go'),
+          {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              { id: 'c1', type: 'function', function: { name: 'fork', arguments: '{}' } },
+              { id: 'c2', type: 'function', function: { name: 'auto-injected', arguments: '{}' } },
+            ],
+          },
+        ])),
+        1,
+        'mixed real+synthetic tool_calls still counts',
+      );
 
       // A real assistant message quoting the same sentence is NOT a marker.
       assertEq(
@@ -305,11 +380,17 @@ export const runtimeKeyCases = [
       // Non-prose parts are tagged with `\u001f`, which prose cannot contain. Without
       // the tag, a scenario declaring the text `fork` would match a tool call to
       // `fork` — content and structure would share one namespace.
+      //
+      // `turnOf` only projects the last user message, so the tool-call half must be
+      // taken from the same `messageText` path applied to the tool-call message
+      // itself — not from a later user utterance that never contains the call.
       const prose = turnOf(request([user('fork')]));
-      const call = turnOf(request([user('u'), toolCall('fork'), user('u2')]));
+      const projected = listToArray(semanticOf(request([toolCall('fork')])).Messages);
+      const call = projected.length === 0 ? null : messageText(projected[0]);
 
       assertEq(prose, 'fork');
-      assertTrue(!call.includes('\u001f') || call !== prose, 'tool call text must be distinguishable');
+      assertTrue(typeof call === 'string' && call.includes('\u001f'), 'tool call must be tagged out of the prose namespace');
+      assertTrue(call !== prose, 'tool call text must be distinguishable from prose');
     },
   },
 
@@ -451,6 +532,48 @@ export const runtimeKeyCases = [
   },
 
   {
+    name: 'HOST-008 production bindings shape is alias to a set of session ids',
+    fn: () => {
+      // Production binds alias → Set of session ids: one lane can own several concurrent
+      // threads (e.g. a Reviewer forked before and after a rebase). Unit fixtures use a
+      // plain string, so the Set form must be exercised here or `lanesOf`/`resolveEntry`
+      // only ever see the fixture shape.
+      const reviewerSessions = new Set(['ses_rev_1', 'ses_rev_2']);
+      const bindings = new Map([
+        ['fast-reviewer', reviewerSessions],
+        ['fast-manager', new Set([SESSION])],
+      ]);
+
+      assertEq([...lanesOf(request([user('go')]), bindings, { sessionId: 'ses_rev_1' })].join(), 'fast-reviewer');
+      assertEq([...lanesOf(request([user('go')]), bindings, { sessionId: 'ses_rev_2' })].join(), 'fast-reviewer');
+      assertEq(lanesOf(request([user('go')]), bindings, { sessionId: 'ses_other' }).size, 0);
+      assertEq([...lanesOf(request([user('go')]), bindings, { sessionId: SESSION })].join(), 'fast-manager');
+
+      const entries = [
+        entry({ id: 'rev-a', lane: 'fast-reviewer', turn: 'Review A' }),
+        entry({ id: 'rev-b', lane: 'fast-reviewer', turn: 'Review B' }),
+        entry({ id: 'mgr', lane: 'fast-manager', turn: 'Review A' }),
+      ];
+      assertEq(
+        resolveEntry(request([user('Review A')]), entries, bindings, { sessionId: 'ses_rev_2' }).matched?.id,
+        'rev-a',
+      );
+      assertEq(
+        resolveEntry(request([user('Review B')]), entries, bindings, { sessionId: 'ses_rev_1' }).matched?.id,
+        'rev-b',
+      );
+      assertEq(
+        resolveEntry(request([user('Review A')]), entries, bindings, { sessionId: SESSION }).matched?.id,
+        'mgr',
+      );
+      assertTrue(
+        resolveEntry(request([user('Review A')]), entries, bindings, { sessionId: 'ses_other' }).matched === undefined,
+        'a session outside the set must not resolve the lane',
+      );
+    },
+  },
+
+  {
     name: 'HOST-008 an unbound session yields no lane, not a guess',
     fn: () => {
       // The mock cannot know which alias an unbound session belongs to. Inventing
@@ -501,7 +624,7 @@ export const runtimeKeyCases = [
 
       assertEq(resolveEntry(request([user('Ship it.')]), entries, bindings, { sessionId: shared }).matched.id, 'chat.0');
       assertEq(
-        resolveEntry(titleRequestOn('Ship it.'), entries, bindings, { sessionId: shared }).matched.id,
+        resolveEntry(titleRequest('Ship it.'), entries, bindings, { sessionId: shared }).matched.id,
         'title.0',
       );
     },
@@ -602,6 +725,70 @@ export const runtimeKeyCases = [
       assertEq(resolved.unmatched?.key.turn, 'Something else');
       assertEq(resolved.unmatched?.key.step, 0);
       assertEq(resolved.unmatched?.key.lane, 'fast-manager');
+    },
+  },
+
+  {
+    name: 'AGENT-006 missing required tool yields unmatched',
+    fn: () => {
+      // toolsGate: declared `tools` are required on the wire. A request that lacks one
+      // is not a match for that entry — it fails closed like an undeclared turn.
+      const entries = [{
+        id: 'needs-fork',
+        lane: 'fast-manager',
+        turn: 'Do it',
+        step: 0,
+        tools: ['fork'],
+      }];
+
+      const missing = resolveEntry(
+        withTools(request([user('Do it')]), ['join']),
+        entries,
+        BINDINGS,
+        { sessionId: SESSION },
+      );
+      assertTrue(missing.matched === undefined, 'missing required tool must not match');
+      assertTrue(missing.unmatched !== undefined, 'missing required tool must yield unmatched');
+
+      const present = resolveEntry(
+        withTools(request([user('Do it')]), ['fork', 'join']),
+        entries,
+        BINDINGS,
+        { sessionId: SESSION },
+      );
+      assertEq(present.matched?.id, 'needs-fork', 'required tool present must still match');
+    },
+  },
+
+  {
+    name: 'AGENT-006 present forbiddenTools yields unmatched',
+    fn: () => {
+      // toolsGate: `forbiddenTools` asserts absence. A request carrying a forbidden
+      // name is filtered out of candidates and fails closed.
+      const entries = [{
+        id: 'no-fork',
+        lane: 'fast-manager',
+        turn: 'Do it',
+        step: 0,
+        forbiddenTools: ['fork'],
+      }];
+
+      const forbidden = resolveEntry(
+        withTools(request([user('Do it')]), ['fork', 'join']),
+        entries,
+        BINDINGS,
+        { sessionId: SESSION },
+      );
+      assertTrue(forbidden.matched === undefined, 'forbidden tool must not match');
+      assertTrue(forbidden.unmatched !== undefined, 'forbidden tool must yield unmatched');
+
+      const allowed = resolveEntry(
+        withTools(request([user('Do it')]), ['join']),
+        entries,
+        BINDINGS,
+        { sessionId: SESSION },
+      );
+      assertEq(allowed.matched?.id, 'no-fork', 'request without forbidden tools must match');
     },
   },
 

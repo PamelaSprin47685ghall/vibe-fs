@@ -1,3 +1,6 @@
+> 本文件是历史变更记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
+
 # Proposal：修复 HOST-013 Auto-Injected Prefix Cache 与 Idle-Only Auto-Continue 资格
 
 **Status:** Proposed
@@ -2574,58 +2577,73 @@ F# DSL 的价值不是把所有状态写成 DU。
    修：durable `ProviderRetryAttempt` 身份抑制（不是 isRecoveryProbeRun 白名单复活；
    不是 runtime AttemptPlan 字典）。stale permit 仍是独立 HOST-004 门。
 
-### 已验证（本机，未提交修复之上）
+### 已验证（收尾）
 
 | 门禁 | 结果 |
 |------|------|
 | `npm run build` | OK |
-| unit `1783` | 全绿 |
-| integration `275` | 全绿 |
+| unit / integration | 全绿（Phase 7 提交基线） |
 | `node scripts/check.mjs` | OK（spec 347 / arch / dsl / p0-recovery-join） |
-| e2e `context-recovery` x-a..x-d | 全绿 |
-| e2e `fallback` | 全绿 |
-| e2e `student-teacher` | 全绿；场景 runtime cursor 已按实测补齐 |
-| 全量 `node tests/e2e/run.mjs` | 25 scenarios 中至少 8 项已过；当前 EXIT=1 |
+| `git diff --check` | OK |
+| 全量 `node tests/e2e/run.mjs` | 25 scenarios 全绿，无 `MOCK-FATAL` |
 
-### 未完成 / 阻塞
+### Phase 7 未提交 harness 修复（与 `6de29d4b` 配套）
 
-1. **全量 e2e 仍红**：
-   - `orchestrator-restart-publish.test.mjs`：`no-declared-turn`，Orchestrator 原始 prompt 的
-     `step=3` 未声明；候选为 `blogger.3`。
-   - `manager-unhappy-path.test.mjs`：strict mock mismatch；完整首错与 cursor 尚未记录。
-   - 两个独立 debugger 在诊断启动后被用户中断；恢复时先分别运行：
-     `MOCK_TRACE=1 node tests/e2e/cases/orchestrator-restart-publish.test.mjs` 与
-     `MOCK_TRACE=1 node tests/e2e/cases/manager-unhappy-path.test.mjs`，读取全部 trace，
-     只对实测 runtimeStep 作最小场景声明修复。
-2. 全量 e2e 绿后仍需：`git diff --check`、如有 F# 再 `npm run format`。
-3. 未写 `Final outcome`，未移动至 `changes/completed/`，未提交。
+根因：HOST-013 FakeReq 在 OpenAI wire 上是 `tool_calls[].function.name=auto-injected`，
+e2e `stepOf` 未排除 → chat step cursor 整体偏移；repair/`#` 路径还缺 cold-boundary 声明。
 
-### 注意
+修复：
 
-- `global.json` 曾在 stash 误删；已 `git restore`。勿提交 `openbuff.json` 或 `.omx/`。
-- 分支相对 origin **ahead 2**（`633af829` + `d9e6ef9e`）；保留当前未提交工作区。
-- 勿再引入 `isRecoveryProbeRun` 函数名；当前抑制谓词是 `isRecoveryContinue`（ledger）。
-- `tests/e2e/scenarios/student-teacher.toml` 已由自动门禁 `LOOKS_GOOD`；定向 canary 通过。
+- `tests/e2e/support/runtime-key.js`：`isAssistant` 排除 OpenAI FakeReq + pending/completed
+  auto-injected parts（兼容 legacy source）
+- `tests/integration/harness/runtime-key-cases.mjs`：对应 HOST-013 harness 合同
+- scenario 最小声明：`student-teacher` 实测 step；`orchestrator-restart-publish-conflict` /
+  `orchestrator-unhappy-path` / `fallback-aabb-trace` 的 blogger-repair / manager-repair /
+  reviewer `frame-commit` epoch
 
-## Remaining work（收尾序列）
+---
 
-1. 分别诊断并最小修复 `orchestrator-restart-publish` 与 `manager-unhappy-path` 的 scenario cursor / 声明。
-2. 重跑全量 `node tests/e2e/run.mjs`，要求 25 scenarios 全绿且无 `MOCK-FATAL`。
-3. `git diff --check` + 如有 F# 再 `npm run format`。
-4. 核对全部未提交修复；提交 Phase 7 修复（不 push）。
-5. 在本文件追加 `Final outcome`（Outcome / Final specification / Implementation result /
-   Verification / References）→ 移动至 `changes/completed/` → commit（不 push）。
+# Final outcome
 
-## Completion criteria
+### Outcome
 
-- PREFIX LAW + 历史 pair 不搬家 + same-placement 幂等 + restart byte-identical。
-- unplaceable historical pair omit（非 Abort）；legacy unanchored journal 仍 fail closed。
-- QUIESCENCE LAW：stale/no permit → zero send；fresh idle 普通主路径仍可 repair。
-- ProviderRetryAttempt 不被 missing-final-report / interaction-repair 劫持；x-c/x-d 有
-  PrefixRebaseCommitted。
-- 全量 e2e 25 scenarios 绿，无 `MOCK-FATAL`。
-- Final outcome 落盘并 completed。
+HOST-013 Prefix Cache 与 HOST-004 Idle-Only Auto-Continue 资格均闭环。
+生产语义：anchored gap replay（unplaceable historical pair omit，不 Abort）；
+SessionQuiescenceGate + durable `ProviderRetryAttempt` 身份抑制（非 `isRecoveryProbeRun`）。
+e2e harness 与 strict scenario 对齐 OpenAI wire 与实测 step/epoch；全量 25 canary 绿。
 
-## Blockers
+### Final specification
 
-- `orchestrator-restart-publish` 与 `manager-unhappy-path` 的 strict scenario 声明仍未闭环。
+- HOST-013：synthetic pair = 跨真实 tool batch 的 temporal bracket；位置仅由 durable
+  CallGap/ResultGap 决定；same-placement 幂等；legacy unanchored journal fail closed；
+  unplaceable historical pair omit（XWire DropLeading 合法）。
+- HOST-004：idle-derived continuation 必须 fresh `QuiescencePermit` 且 side-effect 前
+  `TryConsume`；BeginProviderAttempt 在 transform 最早同步点；Restart 无 synthetic idle。
+- 删除 `isRecoveryProbeRun`；保留 ledger `isRecoveryContinue`（ProviderRetryAttempt）防
+  probe 同 attempt fresh Idle 劫持。
+- 正式 docs：`docs/{why,what,shape,how,proof}/host.md` 已对齐。
+
+### Implementation result
+
+- `633af829` HOST-013 anchored gap replay
+- `d9e6ef9e` HOST-004 SessionQuiescenceGate
+- `6de29d4b` unplaceable omit + isRecoveryContinue + docs/tests
+- harness/e2e（本工作区）：`runtime-key.js`、`runtime-key-cases.mjs`、
+  `orchestrator-restart-publish-conflict.toml`、`orchestrator-unhappy-path.toml`、
+  `fallback-aabb-trace.toml`、`student-teacher.toml`
+
+### Verification
+
+- `npm run build` OK
+- `node scripts/check.mjs` OK
+- `git diff --check` OK
+- `node tests/e2e/run.mjs`：25 scenarios 全绿（含 orchestrator-restart-publish 双场景、
+  manager-unhappy-path、student-teacher、orchestrator-unhappy-path、fallback-aabb-trace）
+
+### References
+
+- `src/Wanxiangshu/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.fs`
+- `src/Wanxiangshu/Infrastructure/OpenCode/Host/SessionQuiescenceGate.fs`
+- `src/Wanxiangshu/Session/TurnCompletionProgram.fs`（路径以仓库为准）
+- `tests/e2e/support/runtime-key.js`
+- `docs/{why,what,shape,how,proof}/host.md`

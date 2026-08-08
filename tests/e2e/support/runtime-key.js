@@ -40,7 +40,6 @@ import { toArray as listToArray } from '../../../dist/fable_modules/fable-librar
 // making every marker-shaped assistant count as a real step.
 import {
   source as pairProgrammingThoughtSource,
-  text as pairProgrammingThoughtText,
 } from '../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js';
 
 // ── lane ────────────────────────────────────────────────────────────────────
@@ -157,19 +156,28 @@ const isAssistant = (message) => {
   // HOST-013: the synthetic pair-programming thought marker is not a real
   // assistant step; it never enters the scenario step cursor.
   //
-  // Measured shapes: Host raw message keeps `info.source` and a completed
-  // auto-injected tool part. Provider-compatible bodies may carry the same tool
-  // part in `parts` or as a typed content chunk with `state.output`.
-  if (message?.info?.source === pairProgrammingThoughtSource) return false;
+  // Measured shapes: Host raw message may keep `info.source`. Provider wire often
+  // strips it and instead carries auto-injected tool parts — FakeReq half is
+  // `status: pending` (no output), FakeResp half is completed with the guideline
+  // text. Both halves must be skipped or they shift `stepOf` after real tool batches.
+  const source = message?.info?.source;
+  if (source === pairProgrammingThoughtSource || source === 'pair-programming-thought') return false;
+  // Any auto-injected tool part is synthetic regardless of status/output: production
+  // uses that tool name only for HOST-013, and requiring completed+output would miss
+  // the pending FakeReq half.
   const isGuidelineToolPart = (part) =>
     part?.type === 'tool'
-    && part?.tool === 'auto-injected'
-    && part?.state?.status === 'completed'
-    && part?.state?.output === pairProgrammingThoughtText;
+    && part?.tool === 'auto-injected';
   if (Array.isArray(message?.parts) && message.parts.some(isGuidelineToolPart)) return false;
   const content = message?.content;
-  if (Array.isArray(content) && content.some(isGuidelineToolPart)) {
-    return false;
+  if (Array.isArray(content) && content.some(isGuidelineToolPart)) return false;
+  // OpenAI HTTP wire: FakeReq is an assistant with tool_calls named auto-injected
+  // (FakeResp is often role tool and already non-assistant). Skip only when every
+  // named call is synthetic so a mixed real+auto-injected message still counts.
+  const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
+  if (toolCalls.length > 0) {
+    const names = toolCalls.map((call) => call?.function?.name ?? call?.name);
+    if (names.every((name) => name === 'auto-injected')) return false;
   }
   return true;
 };
@@ -241,13 +249,6 @@ export function runtimeKeyOf(body, bindings, context) {
 
 // ── longest-prefix lookup ───────────────────────────────────────────────────
 
-/**
- * Which declared turns this request's turn begins with, longest first.
- *
- * A declaration is a semantic-text prefix. `null` turn (no user message at all)
- * matches nothing — a request with no user message cannot begin with any declared
- * user text, and admitting it would make every scenario match a bare continuation.
- */
 /**
  * A declaration's fragments, in order. A plain string is a one-fragment declaration.
  *
