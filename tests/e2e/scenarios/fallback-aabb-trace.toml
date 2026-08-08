@@ -333,11 +333,6 @@ step = 0
 reason = "prefix-probe"
 
 [[epoch]]
-turn = "squash"
-step = 0
-reason = "frame-commit"
-
-[[epoch]]
 turn = "repair"
 step = 0
 reason = "frame-commit"
