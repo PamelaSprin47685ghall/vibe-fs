@@ -320,7 +320,7 @@ test('GLORY_014_first_birth_golden_bytes', async () => {
   const { managerNarrative } = await import('../support/glory.mjs')
   assert.equal(
     managerNarrative.firstBirth('Fix the retry race.'),
-    'Fix the retry race.\n\nIf I want to complete the request above, how should I work?\nHow should I define the final goal?\nOnly answer the questions. Do not perform any actual work.',
+    'Fix the retry race.\n\nIf I want to complete the request above, how should I work?\nHow should I define the final goal?\nYou may call several rounds of tools to investigate and research, but in the end simply output your answer in text. Do not perform any actual work.',
   )
 })
 
@@ -328,7 +328,7 @@ test('GLORY_064_reawakening_golden_bytes', async () => {
   const { managerNarrative } = await import('../support/glory.mjs')
   assert.equal(
     managerNarrative.reawakening('Add Windows support.'),
-    'You awaken once more in the distant future.\n\nAdd Windows support.\n\nIf I want to complete the request above, how should I work?\nHow should I define the final goal?\nOnly answer the questions. Do not perform any actual work.',
+    'You awaken once more in the distant future.\n\nAdd Windows support.\n\nIf I want to complete the request above, how should I work?\nHow should I define the final goal?\nYou may call several rounds of tools to investigate and research, but in the end simply output your answer in text. Do not perform any actual work.',
   )
 })
 

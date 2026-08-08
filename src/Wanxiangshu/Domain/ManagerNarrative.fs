@@ -10,7 +10,7 @@ module ManagerNarrative =
     /// GLORY-014: frozen planning tail.
     [<Literal>]
     let PlanningTail =
-        "If I want to complete the request above, how should I work?\nHow should I define the final goal?\nOnly answer the questions. Do not perform any actual work."
+        "If I want to complete the request above, how should I work?\nHow should I define the final goal?\nYou may call several rounds of tools to investigate and research, but in the end simply output your answer in text. Do not perform any actual work."
 
     /// GLORY-064: frozen reawakening prefix.
     [<Literal>]
