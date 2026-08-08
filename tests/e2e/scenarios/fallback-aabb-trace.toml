@@ -101,13 +101,6 @@ status = 400
 retryable = false
 attempts = [1, 2, 3]
 
-# CTX-010: attempt 1 of `continue` is a recovery-slot request and therefore carries
-# an attempt-local X prefix probe (the failed `prove` attempt armed the slot, and the
-# Companion has coverage). The probe rebases the message prefix while the system
-# prompt and tool set stay byte-identical, which ARCH-004 admits as an explicit cold
-# boundary. Later deliveries of the same entry are append-only and need no second
-# declaration — the boundary is consumed by the request whose break it admitted.
-
 [[turn]]
 id = "title"
 lane = "title"
@@ -303,6 +296,15 @@ user = "# Write the dense work-log continuation now"
   respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 55.", tip = "primitive-obsession" } }
 
 [[turn]]
+id = "squash"
+internal = true
+user = "# Rewrite the preceding assistant work-log frames now by calling the blog tool\n# exactly once. Put the rewritten frame in `text`, set required tip to one catalog\n# field, and do not output ordinary assistant prose."
+tools = ["blog"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Rewritten work-log frame.", tip = "primitive-obsession" } }
+
+[[turn]]
 id = "repair"
 internal = true
 user = "# Protocol repair\n\nCall the blog tool exactly once with non-empty text. Do not answer in prose."
@@ -310,10 +312,30 @@ user = "# Protocol repair\n\nCall the blog tool exactly once with non-empty text
   [[turn.step]]
   respond = { type = "text", text = "repair unreachable: consumed by recovery" }
 
+[[turn]]
+id = "blogger-repair"
+internal = true
+user = "#\n"
+tools = ["blog"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Session background after repair.", tip = "primitive-obsession" } }
+
+# Attempt 1 of `continue` is a recovery-slot request and carries an attempt-local
+# prefix probe: the failed `prove` attempt armed the slot, and the provider-visible
+# side can advance to B here. The probe rebases the message prefix while the system
+# prompt and tool set stay byte-identical, which ARCH-004 admits as an explicit cold
+# boundary. Later deliveries of the same entry are append-only and need no second
+# declaration — the boundary is consumed by the request whose break it admitted.
 [[epoch]]
 turn = "continue"
 step = 0
 reason = "prefix-probe"
+
+[[epoch]]
+turn = "squash"
+step = 0
+reason = "frame-commit"
 
 [[epoch]]
 turn = "repair"

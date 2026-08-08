@@ -227,6 +227,12 @@ module OrchestratorProgram =
             return outcome
         }
 
+    let private releaseTerminalWorktree (deps: OrchestratorProgramDeps) (job: ManagerJob) =
+        task {
+            do! deps.Manager.TerminateChildren job.JobId
+            return! job.Worktree.Release()
+        }
+
     /// ORCH-005: rebase → fresh dual PERFECT → short-gate ff. On a moved target the
     /// whole round repeats, and the previous post-rebase witness is abandoned
     /// (REVIEW-008) rather than reused.
@@ -248,7 +254,7 @@ module OrchestratorProgram =
                             | Error verdict -> return verdict
                             | Ok TargetMoved -> return! rebaseReviewPublish deps job (round + 1)
                             | Ok(Landed commit) ->
-                                match! job.Worktree.Release() with
+                                match! releaseTerminalWorktree deps job with
                                 | Ok() -> return OrchestratorVerdict.Published(job.JobId, commit)
                                 | Error error ->
                                     return
@@ -286,7 +292,7 @@ module OrchestratorProgram =
                 | Error verdict -> return verdict
                 | Ok TargetMoved -> return! rebaseReviewPublish deps job 0
                 | Ok(Landed commit) ->
-                    match! job.Worktree.Release() with
+                    match! releaseTerminalWorktree deps job with
                     | Ok() -> return OrchestratorVerdict.Published(job.JobId, commit)
                     | Error error ->
                         return
@@ -307,14 +313,12 @@ module OrchestratorProgram =
                 with
                 | Error verdict -> return verdict
                 | Ok() ->
-                    do! deps.Manager.TerminateChildren job.JobId
-
-                    match! job.Worktree.Release() with
+                    match! releaseTerminalWorktree deps job with
                     | Ok() -> return OrchestratorVerdict.Published(job.JobId, landed.ResultingTargetHead)
                     | Error error -> return failed job (sprintf "Backfilled Published but cleanup failed: %s" error)
             | RebaseAndReviewAgain -> return! rebaseReviewPublish deps job 0
             | CleanUp ->
-                match! job.Worktree.Release() with
+                match! releaseTerminalWorktree deps job with
                 | Ok() -> return OrchestratorVerdict.Empty
                 | Error error -> return failed job (sprintf "Terminal job cleanup failed: %s" error)
             | FailClosed reason -> return failed job reason

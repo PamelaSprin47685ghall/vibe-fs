@@ -559,9 +559,9 @@ const markerCount = (messages) =>
 test('CTX_002_transform_injects_exactly_one_pair_programming_thought', async () => {
   await withPlugin(async (hooks) => {
     // HOST-013: after the latest user message the transform must insert exactly
-    // one provider-visible synthetic assistant thought. The first user message
+    // one provider-visible synthetic assistant marker. The first user message
     // survives byte-identical; the marker carries the frozen source/synthetic
-    // identity and the exact reasoning part.
+    // identity and the completed guideline tool result.
     const transformed = { messages: [{ role: 'user', text: 'hello' }] }
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
@@ -573,23 +573,27 @@ test('CTX_002_transform_injects_exactly_one_pair_programming_thought', async () 
     assert.equal(marker.info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
     assert.equal(marker.info.synthetic, true)
     assert.equal(marker.parts.length, 1)
-    assert.equal(marker.parts[0].type, 'reasoning')
-    assert.equal(marker.parts[0].text, PAIR_PROGRAMMING_THOUGHT_TEXT)
+    assert.equal(marker.parts[0].type, 'tool')
+    assert.equal(marker.parts[0].tool, 'guideline')
+    assert.equal(marker.parts[0].state.status, 'completed')
+    assert.equal(marker.parts[0].state.output, PAIR_PROGRAMMING_THOUGHT_TEXT)
 
     // VERIFY-003: the injected message must not smuggle any test-only
     // `[CAPS]`/`[REVIEW]`/`[HINT]:` marker into the production prompt.
     const markerRe = /\[(CAPS|REVIEW|HINT):/
     const marked = transformed.messages
-      .flatMap((message) => [message.text ?? '', ...(message.parts ?? []).map((part) => part.text ?? '')])
+      .flatMap((message) => [
+        message.text ?? '',
+        ...(message.parts ?? []).flatMap((part) => [part.text ?? '', part.state?.output ?? '']),
+      ])
       .filter((text) => markerRe.test(text))
     assert.deepEqual(marked, [])
   })
 })
 
-test('HOST_013_marker_inserts_after_anchor_not_after_later_assistant', async () => {
+test('HOST_013_marker_appends_after_later_assistant', async () => {
   await withPlugin(async (hooks) => {
-    // HOST-013: the anchor is the latest user message. An assistant shell that
-    // already follows it must be displaced — never blindly appended at the end.
+    // HOST-013: the marker is always rebuilt at the transcript end.
     const transformed = {
       messages: [
         { role: 'user', text: 'hello' },
@@ -600,8 +604,8 @@ test('HOST_013_marker_inserts_after_anchor_not_after_later_assistant', async () 
 
     assert.equal(transformed.messages.length, 3)
     assert.deepEqual(transformed.messages[0], { role: 'user', text: 'hello' })
-    assert.equal(transformed.messages[1].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-    assert.deepEqual(transformed.messages[2], { role: 'assistant', text: 'ok' })
+    assert.deepEqual(transformed.messages[1], { role: 'assistant', text: 'ok' })
+    assert.equal(transformed.messages[2].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
   })
 })
 
@@ -634,12 +638,9 @@ test('HOST_013_system_and_assistant_history_only_inserts_nothing', async () => {
   })
 })
 
-test('HOST_013_marker_appends_after_every_anchor', async () => {
+test('HOST_013_marker_appends_once_after_all_anchors', async () => {
   await withPlugin(async (hooks) => {
-    // HOST-013: every anchor — the user message AND the completed tool-result
-    // message — gets its own marker, in order. The tool shapes follow the
-    // decode path's accepted forms (Projection.decodePart `tool_result` /
-    // `tool-call`, HOST-012).
+    // HOST-013: all anchors produce one marker, rebuilt at the transcript end.
     const toolResultMessage = {
       info: { role: 'tool' },
       parts: [{ type: 'tool_result', callID: 'call_1', result: 'ok' }],
@@ -656,12 +657,12 @@ test('HOST_013_marker_appends_after_every_anchor', async () => {
     }
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
-    assert.equal(transformed.messages.length, 5)
+    assert.equal(transformed.messages.length, 4)
     assert.deepEqual(transformed.messages[0], { role: 'user', text: 'hello' })
-    assert.equal(transformed.messages[1].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-    assert.deepEqual(transformed.messages[3], toolResultMessage)
-    assert.equal(transformed.messages[4].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-    assert.equal(markerCount(transformed.messages), 2)
+    assert.deepEqual(transformed.messages[1].info, { role: 'assistant' })
+    assert.deepEqual(transformed.messages[2], toolResultMessage)
+    assert.equal(transformed.messages[3].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
+    assert.equal(markerCount(transformed.messages), 1)
   })
 })
 
@@ -678,18 +679,17 @@ test('HOST_013_repeated_transform_injects_no_duplicate_marker', async () => {
   })
 })
 
-test('HOST_013_new_user_turn_adds_marker_and_keeps_previous', async () => {
+test('HOST_013_new_user_turn_cleans_and_rebuilds_one_marker', async () => {
   await withPlugin(async (hooks) => {
-    // HOST-013: a previous turn's marker is not an anchor. The new user message
-    // is; this round's marker lands after it while the earlier marker survives.
+    // HOST-013: old markers are removed and one marker is rebuilt at the end.
     const previousMarker = {
       info: {
         id: 'marker-prev',
         role: 'assistant',
-        source: PAIR_PROGRAMMING_THOUGHT_SOURCE,
+        source: 'pair-programming-thought',
         synthetic: true,
       },
-      parts: [{ type: 'reasoning', text: PAIR_PROGRAMMING_THOUGHT_TEXT }],
+      parts: [{ type: 'reasoning', text: 'legacy marker' }],
     }
     const transformed = {
       messages: [
@@ -700,10 +700,12 @@ test('HOST_013_new_user_turn_adds_marker_and_keeps_previous', async () => {
     }
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
-    assert.equal(transformed.messages.length, 4)
-    assert.deepEqual(transformed.messages[1], previousMarker)
-    assert.equal(transformed.messages[3].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-    assert.equal(markerCount(transformed.messages), 2)
+    assert.equal(transformed.messages.length, 3)
+    assert.deepEqual(transformed.messages[0], { role: 'user', text: 'hello' })
+    assert.deepEqual(transformed.messages[1], { role: 'user', text: 'second turn' })
+    assert.equal(transformed.messages[2].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
+    assert.equal(markerCount(transformed.messages), 1)
+    assert.equal(transformed.messages.includes(previousMarker), false)
   })
 })
 

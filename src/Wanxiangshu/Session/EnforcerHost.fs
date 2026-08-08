@@ -86,6 +86,28 @@ module EnforcerHost =
     let private projectMessages (messages: obj list) (fallback: obj list) : ContinuationOutcome =
         ContinuationOutcome.ProjectMessages(ensureNonEmpty messages fallback)
 
+    /// Latest committed tip for the blogger's owner, resolved through the runtime catalog.
+    let latestTipNudge (journal: AgentJournal) (bloggerSessionId: SessionId) : string option =
+        let projections = AgentJournal.snapshot journal
+
+        match
+            SessionAssociationProjection.tryMainSessionOf
+                bloggerSessionId
+                projections.AgentProjections.Associations
+        with
+        | None -> None
+        | Some owner ->
+            match projections.AgentProjections.Sessions |> Map.tryFind owner with
+            | None -> None
+            | Some session ->
+                match session.Enforcement |> Option.map EnforcementProjection.recentTips |> Option.defaultValue [] |> List.tryLast with
+                | None -> None
+                | Some tip ->
+                    EnforcerCatalog.tryFindByField
+                        tip.FieldName
+                        (Wanxiangshu.Infrastructure.Resources.RuntimeResources.current().EnforcerRules)
+                    |> Option.map (fun rule -> rule.Nudge)
+
     let private stopPhysicalRun (messages: obj list) (fallback: obj list) (reason: string) : ContinuationOutcome =
         ContinuationOutcome.StopPhysicalRun(ensureNonEmpty messages fallback, reason)
 
