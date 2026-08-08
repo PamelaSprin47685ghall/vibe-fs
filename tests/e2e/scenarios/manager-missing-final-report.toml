@@ -1,0 +1,119 @@
+# MISSING_FINAL_REPORT regression: a manager's fork subagent that stops with an
+# empty terminal is NOT concluded as failed. Per FALLBACK-008 an empty/XML-only
+# terminal earns an interaction repair (RepairOnce / AbandonRoundProduct, never
+# FailSlot); the subagent auto-retries and continues, and only a later proven
+# terminal may claim the run (P0-RECOVERY-JOIN-001). Before the fix,
+# HostForkRunLifecycle.complete delivered a proven MISSING_FINAL_REPORT failure
+# for the empty `<finish=stop/>` and the manager saw its subagent fail instead of
+# completing.
+
+scenario = "manager-missing-final-report"
+description = "Manager subagent with empty terminal continues and completes (not MISSING_FINAL_REPORT)"
+pass = "Manager missing-final-report canary passed: subagent repaired and completed, never failed as MISSING_FINAL_REPORT."
+
+setup = { strict = true, project = { files = { "AGENTS.md" = "manager missing-final-report canary\n" } } }
+session = { agent = "fast-manager", bind = ["manager-title", "fast-manager"] }
+prompt = { agent = "fast-manager", text = "fork a coder and wait for its report" }
+
+must = ["manager.2", "coder-repaired.0"]
+
+flow = [
+  { wait = "blogger" },
+  { wait = "manager.0" },
+  { bindChild = { agent = "fast-coder", bind = ["fast-coder"] } },
+  # The coder's first reply is EMPTY (finish=stop, no formal text). This is a
+  # missing final report, not a failure: the subagent must be repaired and keep
+  # running, and the manager's join must see it complete — never a
+  # MISSING_FINAL_REPORT failure.
+  { wait = "coder-empty.0" },
+  { wait = "coder-repaired.0" },
+  { wait = "manager.1" },
+  { wait = "manager.2" },
+  { custom = "oracle" },
+  { expectSatisfied = true },
+]
+
+[[turn]]
+id = "blogger"
+internal = true
+user = "# Write the dense work-log continuation now"
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Session background.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Session background continued.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 2.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 3.", tip = "primitive-obsession" } }
+
+[[epoch]]
+turn = "blogger"
+step = 0
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 1
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 2
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 3
+reason = "frame-commit"
+
+[[turn]]
+id = "manager"
+lane = "fast-manager"
+user = "fork a coder and wait for its report"
+tools = ["fork", "join", "list"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Report the missing-final-report canary is reachable." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager missing-final-report canary finished." }
+
+# The coder's FIRST reply is empty (no formal text, finish=stop). This simulates
+# a subagent turn that stops without a final report. It must not conclude the run
+# as failed; the empty terminal is repaired and the subagent continues.
+[[turn]]
+id = "coder-empty"
+lane = "fast-coder"
+user = [
+  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
+  "# Report the missing-final-report canary is reachable.",
+]
+
+  [[turn.step]]
+  respond = { type = "text", text = "", emptyAssistant = true }
+
+# The missing-final-report repair (bare "#" poke) continues the planned TDD work;
+# the subagent now produces a valid terminal report.
+[[turn]]
+id = "coder-repaired"
+internal = true
+user = "#"
+
+  [[turn.step]]
+  respond = { type = "text", text = "Coder report: missing-final-report canary is reachable." }
+
+[[turn]]
+id = "title"
+lane = "manager-title"
+kind = "title"
+user = "fork a coder and wait for its report"
+
+  [[turn.step]]
+  respond = { type = "title", text = "Manager Missing Final Report" }
