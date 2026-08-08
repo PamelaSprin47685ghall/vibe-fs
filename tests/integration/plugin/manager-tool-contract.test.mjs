@@ -709,6 +709,50 @@ test('HOST_013_new_user_turn_keeps_history_and_appends_new_pair', async () => {
   })
 })
 
+test('HOST_013_companion_blogger_skips_guideline_injection', async () => {
+  // HOST-013 scope: durable Companion (Blogger) transcripts must not receive
+  // pair-programming guideline pairs — they pollute the blog tool contract.
+  const { agentFact, sessionId, caseOf } = await import('../../unit/support/domain.mjs')
+  const { AgentJournalModule_appendAgent } = await import('../../../dist/Journal/AgentJournal.js')
+  const { StreamId } = await import('../../../dist/Journal/Envelope.js')
+
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const main = sessionId('ses-main-no-guideline')
+    const blogger = sessionId('ses-blogger-no-guideline')
+    const linked = AgentJournalModule_appendAgent(
+      new StreamId(1, main),
+      undefined,
+      agentFact('CompanionBloggerLinked', {
+        SessionId: main,
+        BloggerSessionId: blogger,
+        BloggerAgent: 'fast-blogger',
+      }),
+      runtime.journal,
+    )
+    assert.equal(caseOf(linked), 'Ok')
+
+    const transformed = {
+      messages: withSession(
+        [{ role: 'user', text: 'record this delta', parts: [{ type: 'text', text: 'record this delta' }] }],
+        'ses-blogger-no-guideline',
+      ),
+    }
+    await hooks['experimental.chat.messages.transform']({}, transformed)
+
+    assert.equal(markerCount(transformed.messages), 0, 'blogger must not receive guideline pairs')
+    assert.equal(
+      transformed.messages.some((m) => m?.parts?.some((p) => p?.tool === 'guideline')),
+      false,
+    )
+    assert.equal(
+      transformed.messages.every((m) => m?.info?.source !== PAIR_PROGRAMMING_THOUGHT_SOURCE),
+      true,
+    )
+  })
+})
+
+
+
 // ── the execute path (EXEC-002, EXEC-004, AGENT-007 layer two) ───────────────
 //
 // Everything above is layer 2: what the Host is OFFERED. The three tests below

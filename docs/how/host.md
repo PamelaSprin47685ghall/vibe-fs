@@ -233,12 +233,7 @@ XTraceCapture → Companion → XWire → EnforcerHost
 - `CallId = digest(transcript identity + source + Ordinal)`；禁止随机、时间、anchor 或 tip 文本参与身份。正文与 source 单点定义。
 - ReviewSeal 覆盖恢复后的全部历史 pair 与本次末尾 pair；只有该永久 append-only 字节序列可保持 Prefix Cache。Blogger 跳过注入时 ReviewSeal 只覆盖无 guideline 的消息视图。
 - tip nudge 查找：`latestTipNudge` 仅在非 Companion 路径调用；不得以当前 session 是 Blogger 为由把 tip 写进 Blogger transcript。
-
----
-
-## Marker 程序（归属 HOST-013）——Blogger 排除
-
-Companion / Blogger 整段跳过 HOST-013。实现点：`SpikePlugin` transform 在 `PairProgrammingThoughtTransform.tryInject` 之前用 association 门禁短路。
+- 实现点：`SpikePlugin` transform 在 `PairProgrammingThoughtTransform.tryInject` 之前用 association 门禁短路。
 
 ## 空 Content 预防（归属 HOST-016）
 
