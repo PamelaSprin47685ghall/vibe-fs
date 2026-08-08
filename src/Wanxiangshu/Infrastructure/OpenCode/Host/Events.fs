@@ -27,8 +27,16 @@ module Events =
     /// that computed the same answer by a different spelling. It had no production
     /// consumer at all; only tests constructed it, so it was a second definition of
     /// this class kept alive by its test callers.
+    /// One registration slot. A bare function element would be curry-wrapped by
+    /// Fable at every call site (the wrapper identity is re-created per call),
+    /// so a reference-based Remove could never match and disposal leaked the
+    /// listener. A record keeps one stable identity; disposal is a flag flip.
+    type ListenerRegistration =
+        { Listener: TerminalCompletionListener
+          mutable Live: bool }
+
     type HostEventPort() as this =
-        let listeners = ResizeArray<TerminalCompletionListener>()
+        let listeners = ResizeArray<ListenerRegistration>()
         let lockObj = obj ()
         let lastCompletedRun = System.Collections.Generic.Dictionary<string, string>()
 
@@ -46,8 +54,9 @@ module Events =
         let notify sessionId outcome =
             let handlers = lock lockObj (fun () -> listeners |> Seq.toList)
 
-            for handler in handlers do
-                handler sessionId outcome
+            for registration in handlers do
+                if registration.Live then
+                    registration.Listener sessionId outcome
 
         /// One Completed terminal per (session, provider run), across every plugin
         /// instance sharing this port.
@@ -79,24 +88,27 @@ module Events =
 
         /// Terminal completions arrive through NotifyTerminal from the reconcile
         /// path. Raw host event observation is handled upstream by the signal stack
-        /// (HostSignalAdapter / HostSignalSubscribe), so Observe is a no-op.
-        member _.Observe(_rawEvent: obj) = ()
-
+        /// (HostSignalAdapter / HostSignalSubscribe).
         interface IEventObservationPort with
             member _.SubscribeTerminalListener(listener) =
-                let stickyReplay =
+                let registration: ListenerRegistration =
                     lock lockObj (fun () ->
-                        listeners.Add(listener)
-                        stickyTerminal |> Seq.map (fun kv -> kv.Key, kv.Value) |> Seq.toList)
+                        let registration: ListenerRegistration = { Listener = listener; Live = true }
+
+                        listeners.Add registration
+                        registration)
 
                 // Sessions.SubscribeTerminal filters by sessionId; replaying every
                 // sticky entry is correct — non-matching session ids are ignored.
+                let stickyReplay =
+                    lock lockObj (fun () -> stickyTerminal |> Seq.map (fun kv -> kv.Key, kv.Value) |> Seq.toList)
+
                 for sessionKey, outcome in stickyReplay do
                     listener (SessionId.create sessionKey) outcome
 
                 { new IDisposable with
                     member _.Dispose() =
-                        lock lockObj (fun () -> listeners.Remove(listener) |> ignore) }
+                        lock lockObj (fun () -> registration.Live <- false) }
 
             member _.NotifyTerminal sessionId outcome =
                 if not (this.IsCompletedDuplicate(sessionId, outcome)) then
@@ -113,7 +125,8 @@ module Events =
                                     let evicted = stickyOrder.Dequeue()
                                     stickyTerminal.Remove(evicted) |> ignore
 
-                            listeners.Count > 0)
+                            listeners.Count > 0
+                            && listeners |> Seq.exists (fun registration -> registration.Live))
 
                     notify sessionId outcome
                     hasListeners

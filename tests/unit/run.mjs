@@ -39,8 +39,8 @@ const withCoverage = process.argv.includes('--coverage')
 if (withCoverage) {
   process.env.NODE_TEST_COVERAGE = '1'
   process.env.COVERAGE_SUMMARY_PATH = join(ROOT, 'artifacts/coverage/coverage-summary.json')
-  process.env.COVERAGE_LINE_THRESHOLD = '60'
-  console.error('runner: coverage ON — summary → artifacts/coverage/coverage-summary.json, threshold 60% lines')
+  process.env.COVERAGE_LINE_THRESHOLD = '80'
+  console.error('runner: coverage ON — summary → artifacts/coverage/coverage-summary.json, threshold 80% lines')
 }
 
 // ── staleness gate ──────────────────────────────────────────────────────────

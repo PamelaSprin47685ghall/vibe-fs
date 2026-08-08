@@ -48,7 +48,7 @@ if (files.length === 0) {
 
 const withCoverage = process.env.NODE_TEST_COVERAGE === '1'
 const coverageSummaryPath = process.env.COVERAGE_SUMMARY_PATH
-const coverageLineThreshold = withCoverage ? Number(process.env.COVERAGE_LINE_THRESHOLD ?? 60) : null
+const coverageLineThreshold = withCoverage ? Number(process.env.COVERAGE_LINE_THRESHOLD ?? 80) : null
 
 if (withCoverage) {
   if (!Number.isFinite(coverageLineThreshold) || coverageLineThreshold <= 0) {

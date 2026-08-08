@@ -587,7 +587,7 @@ ORCH_007_changed_target_requires_rereview
 `tests/unit` 的节点:test 运行必须同时产出整体行覆盖率并接受阈值门禁。
 
 ```text
-门槛：整体行覆盖率 ≥ 60%（dist 全部生产模块，排除 fable_modules）
+门槛：整体行覆盖率 ≥ 80%（dist 全部生产模块，排除 fable_modules）
 入口：npm run test:coverage（= node tests/unit/run.mjs --coverage）
 产物：artifacts/coverage/coverage-summary.json
 ```
@@ -602,7 +602,7 @@ node:test 的 V8 覆盖率只统计被加载的文件；未加载模块在报告
 
 ### 低于门槛即红
 
-阈值由 `COVERAGE_LINE_THRESHOLD` 持有（默认 60），在 inner runner 内判罚：低于门槛 exit 1，监督器继承退出码，套件整体失败。不允许豁免通道——任何豁免都会成为伪门（VERIFY-004 同款逻辑：没锁的门不是门）。
+阈值由 `COVERAGE_LINE_THRESHOLD` 持有（默认 80），在 inner runner 内判罚：低于门槛 exit 1，监督器继承退出码，套件整体失败。不允许豁免通道——任何豁免都会成为伪门（VERIFY-004 同款逻辑：没锁的门不是门）。
 
 ### 提升手段约束
 
