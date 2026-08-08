@@ -581,3 +581,29 @@ ORCH_007_changed_target_requires_rereview
 需要 F# 计算表达式语义保真的资源契约测试（`Flow` 的 `use!` 异常保留顺序等），仍从 `.mjs` 通过已有公开入口调用。这不构成为测试污染生产：`Flow.run` 本身就是公开消费入口。
 
 不得为了测试新增生产 export 或放宽可见性。若某语义只能通过新增 export 验证，说明它缺少契约面——先补契约，不补 export。
+
+## VERIFY-009：单元测试覆盖率门禁
+
+`tests/unit` 的节点:test 运行必须同时产出整体行覆盖率并接受阈值门禁。
+
+```text
+门槛：整体行覆盖率 ≥ 60%（dist 全部生产模块，排除 fable_modules）
+入口：npm run test:coverage（= node tests/unit/run.mjs --coverage）
+产物：artifacts/coverage/coverage-summary.json
+```
+
+### 分母必须是整体
+
+node:test 的 V8 覆盖率只统计被加载的文件；未加载模块在报告里凭空消失，分母缩水会让百分比虚高。覆盖率运行先预导入 `dist` 全部生产模块（`fable_modules` 除外），一个没被任何测试触碰的模块以 0% 计入分母，而不是从账本上消失。预导入失败即 fail closed——部分世界算出的百分比不是覆盖率。
+
+### 只统计生产字节
+
+排除项固定为 `**/node_modules/**`、`**/fable_modules/**`、`**/tests/**`：测试自身、support facade、Fable 运行时与第三方包都不是被测对象。
+
+### 低于门槛即红
+
+阈值由 `COVERAGE_LINE_THRESHOLD` 持有（默认 60），在 inner runner 内判罚：低于门槛 exit 1，监督器继承退出码，套件整体失败。不允许豁免通道——任何豁免都会成为伪门（VERIFY-004 同款逻辑：没锁的门不是门）。
+
+### 提升手段约束
+
+覆盖率只许通过增加测试达成。禁止：为测试新增生产 export、放宽可见性、改写生产代码结构以压缩行数（VERIFY-008 例外条款同样适用）。
