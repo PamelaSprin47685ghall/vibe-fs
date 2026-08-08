@@ -230,18 +230,6 @@ tools = ["verdict"]
 
   [[turn.step]]
   respond = { type = "text", text = "Reviewer confirmed the tree." }
-lane = "fast-coder"
-user = [
-  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
-  "# Resolve the conflicted publish_proof.txt so it contains exactly: Published by orchestrator canary",
-]
-tools = ["write"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "write", args = { filePath = "publish_proof.txt", content = "Published by orchestrator canary\n" } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Conflict file resolved." }
 
 [[turn]]
 id = "blogger"
@@ -428,11 +416,6 @@ tools = ["blog"]
   [[turn.step]]
   respond = { type = "tool-call", tool = "blog", args = { text = "Session background after repair.", tip = "primitive-obsession" } }
 
-
-[[epoch]]
-turn = "blogger-repair"
-step = 0
-reason = "prefix-probe"
 
 [[epoch]]
 turn = "blogger"

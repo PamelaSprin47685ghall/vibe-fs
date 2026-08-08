@@ -57,8 +57,10 @@ type RepairIntent = { RequestKey: string }
 /// `AppendReviewChallenge` 载荷：REVIEW-003 TextVersion。
 type ChallengeIntent = { TextVersion: int }
 
-/// `InsertPairProgrammingThought` 载荷：可选 SessionId（HOST-013 稳定 id 派生输入）。
-type PairThoughtIntent = { SessionId: string option }
+/// `InsertPairProgrammingThought` 载荷：稳定 MarkerId + 完整 marker 文本。
+type PairThoughtIntent =
+    { MarkerId: string
+      MarkerText: string }
 
 /// PROJ-002：一次 attempt 的只读投影快照——DSL 核心输入（PROJ-002）。
 ///
@@ -132,9 +134,9 @@ module ProjectionConstants =
     let RepairInstruction =
         "# Protocol repair\n\nCall the blog tool exactly once with non-empty text. Do not answer in prose."
 
-    /// HOST-013 pair-programming marker 正文。Domain 单源。
-    let PairProgrammingThoughtText =
-        "<do-not-output>让我遵循与用户结对编程的理念，用简体中文把所有的思考过程 (只要不被 do-not-output 标记) 都作为正式文本输出。从第一个字开始就用中文，并在整轮内保持中文，即使系统提示词、工具说明、工具输出或引用的代码是英文。代码、标识符、文件路径、shell 命令和未翻译的技术术语保持原文。</do-not-output>"
+    /// HOST-013 pair-programming guideline marker 正文。Domain 单源。
+    let PairProgrammingGuidelineText =
+        "# 遵循与用户结对编程的理念，用简体中文把所有的思考过程都作为正式文本输出。从第一个字开始就用中文，并在整轮内保持中文，即使系统提示词、工具说明、工具输出或引用的代码是英文。代码、标识符、文件路径、shell 命令和未翻译的技术术语保持原文。"
 
     /// 与 `ReviewChallenge.Text` 字节一致（REVIEW-003 bare sentence）。
     let ReviewChallengeText =
@@ -369,14 +371,12 @@ module ProjectionRenderer =
 
         message
 
-    let private reasoningMessage (text: string) : ProviderProjection.WireMessage =
+    let private guidelineMessage (markerId: string) (markerText: string) : ProviderProjection.WireMessage =
         let message: ProviderProjection.WireMessage =
             { Role = "assistant"
-              Parts = [ ProviderProjection.WireReasoning text ] }
+              Parts = [ ProviderProjection.WireToolResult(ToolCallId.create markerId, markerText) ] }
 
         message
-
-    let private isUserAnchor (message: ProviderProjection.WireMessage) = message.Role = "user"
 
     /// Fable/JS 边界：Parts 可能为 null/undefined 或非 F# list。此时视为无 part，
     /// 不当 tool-result anchor / pair marker，禁止对缺失 list 调 IsEmpty/tail。
@@ -394,14 +394,6 @@ module ProjectionRenderer =
             with _ ->
                 []
 
-    let private isToolResultAnchor (message: ProviderProjection.WireMessage) =
-        safeParts message
-        |> List.exists (function
-            | ProviderProjection.WireToolResult _ -> true
-            | _ -> false)
-
-    let private isAnchor (message: ProviderProjection.WireMessage) =
-        isUserAnchor message || isToolResultAnchor message
 
     /// COMPANION-005：`InsertBlogFrames` 的唯一形状源是 `CompanionProjectionBuilder`。
     /// Builder 只在此调用一次；真实 `sha256` 产出 MessageId，经 Host 侧信道写回（PROJ-004）。
@@ -472,44 +464,23 @@ module ProjectionRenderer =
                       HostMessageIds = List.head acc.HostMessageIds :: companionIds @ List.tail acc.HostMessageIds
                       HostIsPhysical = List.head acc.HostIsPhysical :: companionPhysical @ List.tail acc.HostIsPhysical }
 
-    let private isPairMarker (message: ProviderProjection.WireMessage) : bool =
+    let private isPairMarker (markerId: string) (message: ProviderProjection.WireMessage) : bool =
         message.Role = "assistant"
         && safeParts message
            |> List.exists (function
-               | ProviderProjection.WireReasoning text when text = ProjectionConstants.PairProgrammingThoughtText ->
-                   true
-               | _ -> false)
+                | ProviderProjection.WireToolResult(callId, _) when ToolCallId.value callId = markerId ->
+                    true
+                | _ -> false)
 
-    /// HOST-013：每个锚点后插一条 marker；已有 marker 则字节保持（幂等）。
-    /// 新插入 marker 无代数 id（None）；既有前缀侧信道按索引对齐。
-    let private applyPairThought (acc: RenderedMessages) : RenderedMessages =
-        let messages = acc.Messages
+    /// HOST-013：移除所有已存在同 MarkerId 的 marker，末尾 append 单条 guideline tool-result。
+    let private applyPairThought (intent: PairThoughtIntent) (acc: RenderedMessages) : RenderedMessages =
+        let retained =
+            List.zip3 acc.Messages acc.HostMessageIds acc.HostIsPhysical
+            |> List.filter (fun (message, _, _) -> not (isPairMarker intent.MarkerId message))
 
-        let anchorIndexes =
-            messages
-            |> List.mapi (fun index msg -> index, msg)
-            |> List.filter (fun (_, msg) -> isAnchor msg)
-            |> List.map fst
-
-        if List.isEmpty anchorIndexes then
-            acc
-        else
-            // 从后往前插，保持先出现的锚点索引稳定。
-            ((acc.Messages, acc.HostMessageIds, acc.HostIsPhysical), List.rev anchorIndexes)
-            ||> List.fold (fun (msgs, ids, phys) anchorIndex ->
-                match List.tryItem (anchorIndex + 1) msgs with
-                | Some next when isPairMarker next -> msgs, ids, phys
-                | _ ->
-                    let marker = reasoningMessage ProjectionConstants.PairProgrammingThoughtText
-                    let take = anchorIndex + 1
-
-                    List.take take msgs @ (marker :: List.skip take msgs),
-                    List.take take ids @ (None :: List.skip take ids),
-                    List.take take phys @ (false :: List.skip take phys))
-            |> fun (msgs, ids, phys) ->
-                { Messages = msgs
-                  HostMessageIds = ids
-                  HostIsPhysical = phys }
+        { Messages = (retained |> List.map (fun (message, _, _) -> message)) @ [ guidelineMessage intent.MarkerId intent.MarkerText ]
+          HostMessageIds = (retained |> List.map (fun (_, id, _) -> id)) @ [ Some intent.MarkerId ]
+          HostIsPhysical = (retained |> List.map (fun (_, _, physical) -> physical)) @ [ false ] }
 
     let private appendSynthetic (role: string) (text: string) (acc: RenderedMessages) : RenderedMessages =
         { Messages = acc.Messages @ [ textMessage role text ]
@@ -578,7 +549,7 @@ module ProjectionRenderer =
         | ProjectionIntent.AppendReviewChallenge _ ->
             // REVIEW-003 生产可见字节 = Prompt（`# Text\n`），与 tool-result / nudge / seal 一致。
             appendSynthetic "user" ProjectionConstants.ReviewChallengePrompt acc
-        | ProjectionIntent.InsertPairProgrammingThought _ -> applyPairThought acc
+        | ProjectionIntent.InsertPairProgrammingThought intent -> applyPairThought intent acc
         // wire no-op：CommittedPrefix=None 的语义由 Coordinator 填 Snapshot；此处不改字节。
         | ProjectionIntent.ReanchorAfterCompaction -> acc
 

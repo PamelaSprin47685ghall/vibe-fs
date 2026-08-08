@@ -206,21 +206,19 @@ export const runtimeKeyCases = [
   {
     name: 'HOST-013 the pair-programming thought marker never counts as a step',
     fn: () => {
-      // The marker is a synthetic assistant message, not a provider step. Every
-      // shape it has been measured in on the wire must be skipped, or the whole
-      // scenario step cursor shifts by one per marker.
-      // Host raw message shape: `info.source` identity.
-      const rawShape = { role: 'assistant', info: { source: pairProgrammingThoughtSource }, content: '' };
-      // OpenAI-compatible wire: reasoning text carried directly as content
-      // (measured: the `reasoning_content` folding transform does not run for
-      // the test model).
-      const contentShape = { role: 'assistant', content: pairProgrammingThoughtText };
-      // OpenAI wire variant: message-level reasoning_content.
-      const reasoningContentShape = { role: 'assistant', content: '', reasoning_content: pairProgrammingThoughtText };
-      // Lone reasoning chunk.
-      const chunkShape = { role: 'assistant', content: [{ type: 'reasoning', text: pairProgrammingThoughtText }] };
+      // The marker is a synthetic assistant message, not a provider step. Its
+      // Host identity and completed guideline tool part must both be skipped.
+      const rawShape = {
+        role: 'assistant',
+        info: { source: pairProgrammingThoughtSource },
+        parts: [{ type: 'tool', tool: 'guideline', state: { status: 'completed', output: pairProgrammingThoughtText } }],
+      };
+      const contentShape = {
+        role: 'assistant',
+        content: [{ type: 'tool', tool: 'guideline', state: { status: 'completed', output: pairProgrammingThoughtText } }],
+      };
 
-      for (const marker of [rawShape, contentShape, reasoningContentShape, chunkShape]) {
+      for (const marker of [rawShape, contentShape]) {
         assertEq(stepOf(request([user('go'), marker])), 0, 'marker alone is not a step');
         assertEq(
           stepOf(request([user('go'), marker, assistant('r1')])),
@@ -229,9 +227,7 @@ export const runtimeKeyCases = [
         );
       }
 
-      // A real assistant message quoting the same sentence is NOT a marker: the
-      // text is filtered only when it IS the whole content (or a lone reasoning
-      // chunk with that exact text). A user may legitimately quote it.
+      // A real assistant message quoting the same sentence is NOT a marker.
       assertEq(
         stepOf(request([user('go'), assistant(`prefix ${pairProgrammingThoughtText} suffix`)])),
         1,

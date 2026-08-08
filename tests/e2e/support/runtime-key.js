@@ -157,16 +157,18 @@ const isAssistant = (message) => {
   // HOST-013: the synthetic pair-programming thought marker is not a real
   // assistant step; it never enters the scenario step cursor.
   //
-  // Measured shapes: Host raw message keeps `info.source`; the OpenAI wire
-  // carries the reasoning text directly as `content` (the transform folding
-  // to `reasoning_content` does not run for test-model), or as a lone
-  // reasoning chunk / message-level `reasoning_content`.
+  // Measured shapes: Host raw message keeps `info.source` and a completed
+  // guideline tool part. Provider-compatible bodies may carry the same tool
+  // part in `parts` or as a typed content chunk with `state.output`.
   if (message?.info?.source === pairProgrammingThoughtSource) return false;
-  if (message?.content === pairProgrammingThoughtText) return false;
-  if (message?.reasoning_content === pairProgrammingThoughtText) return false;
+  const isGuidelineToolPart = (part) =>
+    part?.type === 'tool'
+    && part?.tool === 'guideline'
+    && part?.state?.status === 'completed'
+    && part?.state?.output === pairProgrammingThoughtText;
+  if (Array.isArray(message?.parts) && message.parts.some(isGuidelineToolPart)) return false;
   const content = message?.content;
-  if (Array.isArray(content) && content.length === 1 && content[0]?.type === 'reasoning'
-      && content[0]?.text === pairProgrammingThoughtText) {
+  if (Array.isArray(content) && content.some(isGuidelineToolPart)) {
     return false;
   }
   return true;
