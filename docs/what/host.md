@@ -69,13 +69,13 @@ Host compaction **不得删除** XTrace：否则 Y 落后补缺口与 LWR 自包
 
 ## HOST-013：结对编程 marker（行为）
 
-Transform 可在 provider-facing 历史上注入固定中文 synthetic assistant marker（source = `pair-programming-thought`）。
+Transform 可在 provider-facing 历史末尾注入唯一的 synthetic `tool: "guideline"` completed tool-result marker（source = `pair-programming-guideline`）。其正文位于 `state.output`：有最近一个 prior tip 时，先放英文 Nudge，再放 `ProjectionConstants.PairProgrammingGuidelineText` 的中文正文；无 prior tip 时仅放中文正文。
 
 它**是**会影响 prompt bytes、prefix cache、ReviewSeal 的合成消息；**不是**私有思维、不是容量估算、不是恢复信号。
 
 行为约束：
 
-1. 插入与否只取决于锚点存在与幂等，不读 limit、不做 token 估算（CTX-002）。  
+1. 仅在存在 user 或 completed tool-result anchor 时注入；marker 全局末尾单条追加，且幂等，不读 limit、不做 token 估算（CTX-002）。  
 2. 不得进入 XTrace / Companion decode / Blogger delta / work record / recovery / compaction input。  
 3. 同一 epoch 内 provider-visible wire 必须保持 append-only 稳定（全锚点重放 + 稳定 id）。  
 

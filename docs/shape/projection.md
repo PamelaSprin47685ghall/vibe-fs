@@ -26,7 +26,7 @@ insertBlogFrames
 insertRepair
 suppressTransportOnly
 appendReviewChallenge
-insertPairProgrammingThought
+insertPairProgrammingThought // HOST-013：全局末尾唯一 guideline marker
 reanchorAfterCompaction
 ```
 

@@ -224,9 +224,10 @@ XTraceCapture → Companion → XWire → EnforcerHost
 → PairProgrammingThoughtTransform → ReviewSeal
 ```
 
-- 锚点：每个 user 或已完成 tool-result；`anchorIndex+1` 插入；从后向前处理。  
-- 全锚点重放（Host 不持久化 synthetic）。  
-- `id = digest(sessionId + anchorMessageId + source)`，禁止随机/时间。  
-- 幂等键 = 锚点 identity + source；同锚点只插一次。  
-- 排除路径按 `source` 过滤，禁止只按中文正文过滤。  
+- 锚点：至少存在一个 user 或已完成 tool-result；满足门槛后在 provider-facing 历史全局末尾追加单条 marker。  
+- marker wire 形态是伪装成 `tool: "guideline"` 的 completed tool result：`{type: "tool", tool: "guideline", callID, state: {status: "completed", input: {}, output: markerText}}`。  
+- `markerText` 有最近一个 prior tip 时为英文 Nudge、空行、中文正文；无 prior tip 时仅为中文正文。中文正文由 `ProjectionConstants.PairProgrammingGuidelineText` 定义。  
+- `source = "pair-programming-guideline"`；兼容清理旧 `"pair-programming-thought"` marker。  
+- `id = digest(sessionId + source)`，禁止随机/时间，也不依赖 anchor 或 tip 文本。幂等键为 `sessionId + source`，全局只保留一条。  
+- 排除路径按 `source` 过滤，禁止只按正文过滤。  
 - 文本与 source 单点定义。
