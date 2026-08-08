@@ -8,15 +8,28 @@ import { resolvePluginPath } from './scenario-paths.js';
 import { StrictMockProvider } from './strict-mock-provider.js';
 import { createScenarioTurn } from './scenario-turn.js';
 import { Watchdog } from './watchdog.js';
-import { journalFactTail, readJournal } from './journal-observer.js';
+import { journalFactTail, readJournal, watchJournal } from './journal-observer.js';
+import { createNodeDelayPort } from './delay-port.mjs';
 import { WATCHDOG_TIMEOUT_MS, DIAGNOSTIC_RACE_MS } from './time-budget.js';
 
-const JOURNAL_OBSERVE_SLICE_MS = 500;
+const JOURNAL_WAKE_GUARD_MS = 50;
+const delayPort = createNodeDelayPort();
 
 async function observeRestartJournal(workDir, watchdog, state) {
   let observed = readJournal(workDir).total;
   while (!state.done) {
-    await new Promise((resolve) => setTimeout(resolve, JOURNAL_OBSERVE_SLICE_MS));
+    await new Promise((resolve) => {
+      let settled = false;
+      const done = () => {
+        if (settled) return;
+        settled = true;
+        stop();
+        resolve();
+      };
+      const stop = watchJournal(workDir, done);
+      delayPort.delay(JOURNAL_WAKE_GUARD_MS).then(done);
+    });
+    if (state.done) break;
     const next = readJournal(workDir).total;
     if (next > observed) {
       watchdog?.advance({

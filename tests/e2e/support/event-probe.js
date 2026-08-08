@@ -13,13 +13,16 @@ import {
 } from './event-shape.js';
 import { attachEventProbeQueries } from './event-probe-queries.js';
 import { attachEventProbeAwaits } from './event-probe-awaits.js';
+import { createNodeDelayPort } from './delay-port.mjs';
 
 const READ_ERROR_FALLBACK = 'unknown read error';
+const RETRY_SLICE_MS = 200;
 
 export class EventProbe {
-  constructor(baseUrl, workDir) {
+  constructor(baseUrl, workDir, delayPort = createNodeDelayPort()) {
     this._baseUrl = baseUrl;
     this._workDir = workDir;
+    this._delayPort = delayPort;
     this._events = [];
     this._seq = 0;
     this._reader = null;
@@ -72,7 +75,7 @@ export class EventProbe {
         lastErr = err;
         if (err.name === 'AbortError') return;
         if (attempt < 3) {
-          await new Promise((r) => setTimeout(r, 200));
+          await this._delayPort.delay(RETRY_SLICE_MS);
         }
       }
     }

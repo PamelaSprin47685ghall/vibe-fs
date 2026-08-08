@@ -31,41 +31,78 @@ import {
   teardownScenario,
   getSessionId,
 } from './index.js';
-import { WAIT_FACT_WINDOW_MS, ENFORCER_POLL_SLICE_MS } from './time-budget.js';
+import { WAIT_FACT_WINDOW_MS } from './time-budget.js';
 import { bindLaneSession } from './lane.mjs';
 import { compileScenario } from './scenario-schema.js';
 import { ScenarioRuntime } from './scenario-runtime.js';
-import { readJournal } from './journal-observer.js';
+import { readJournal, watchJournal } from './journal-observer.js';
+import { createNodeDelayPort } from './delay-port.mjs';
 import { kindOf } from './runtime-key.js';
 import { parse as parseToml } from 'smol-toml';
 
 const SCENARIO_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scenarios');
 
-/**
- * Poll slice of the `waitFact` barrier. Below LITERAL_BUDGET_THRESHOLD_MS by construction and
- * therefore a slice rather than a budget: it must re-read the journal several times inside one
- * silence window, or a stalled chain and a coarse poll become indistinguishable.
- */
-const FACT_POLL_SLICE_MS = 500;
+/** Short wall-clock guard when journal/SSE wake is unavailable; not a success-path sleep. */
+const FACT_WAKE_GUARD_MS = 50;
 
-const pollSlice = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const delayPort = createNodeDelayPort();
+
+function wakeOnJournal(workDir, ms) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      stop();
+      resolve();
+    };
+    const stop = watchJournal(workDir, done);
+    delayPort.delay(ms).then(done);
+  });
+}
+
+function wakeOnSignal(ms, subscribe) {
+  return new Promise((resolve) => {
+    let settled = false;
+    let unsubscribe = () => {};
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      try { unsubscribe(); } catch {}
+      resolve();
+    };
+    try {
+      unsubscribe = subscribe(done) || (() => {});
+    } catch {
+      unsubscribe = () => {};
+    }
+    delayPort.delay(ms).then(done);
+  });
+}
+
+async function fetchSessionsByAgent(scenario, agent) {
+  const response = await scenario.client.request('GET', '/session', { query: { scope: 'project' } });
+  if (!response.ok) {
+    throw new Error(`bindChild session snapshot failed: ${JSON.stringify(response.data)}`);
+  }
+  const payload = response.data?.data?.data ?? response.data?.data ?? response.data;
+  const sessions = Array.isArray(payload) ? payload : [];
+  return sessions.filter((session) => session?.agent === agent && typeof session?.id === 'string');
+}
 
 async function awaitSessionsByAgent(scenario, agent, timeoutMs) {
   const deadline = timeoutMs === undefined ? Number.POSITIVE_INFINITY : Date.now() + timeoutMs;
-  let observed = [];
+  let observed = await fetchSessionsByAgent(scenario, agent);
+  if (observed.length > 0) return observed;
 
   while (Date.now() < deadline) {
-    const response = await scenario.client.request('GET', '/session', { query: { scope: 'project' } });
-    if (!response.ok) {
-      throw new Error(`bindChild session snapshot failed: ${JSON.stringify(response.data)}`);
-    }
-
-    const payload = response.data?.data?.data ?? response.data?.data ?? response.data;
-    const sessions = Array.isArray(payload) ? payload : [];
-    observed = sessions.filter((session) => session?.agent === agent && typeof session?.id === 'string');
+    const remaining = Math.max(1, deadline - Date.now());
+    // Identity comes only from the Host snapshot (GET /session); a session.created
+    // event is diagnostic transport noise, never a session fact. Wake is the short
+    // wall guard only, time-independent on the success path.
+    await delayPort.delay(Math.min(remaining, FACT_WAKE_GUARD_MS));
+    observed = await fetchSessionsByAgent(scenario, agent);
     if (observed.length > 0) return observed;
-
-    await pollSlice(Math.min(FACT_POLL_SLICE_MS, deadline - Date.now()));
   }
 
   throw new Error(`bindChild timed out waiting for Host agent ${agent}; observed=${JSON.stringify(observed)}`);
@@ -167,10 +204,8 @@ export async function awaitFactBarrier(scenario, step) {
   let observed = readJournal(scenario.host.workDir, name, renewOn);
   while (!cmp(observed.named) && Date.now() < deadline) {
     const remaining = Math.max(1, deadline - Date.now());
-    // The observable is a file on disk, so the wait is a poll rather than an event await. Kept
-    // well under the silence budget for one reason only: a slice longer than the budget could
-    // not tell a stalled chain from a coarse poll, since the watchdog would fire mid-slice.
-    await pollSlice(Math.min(remaining, FACT_POLL_SLICE_MS));
+    // Journal watch wakes on *.ndjson change; ≤FACT_WAKE_GUARD_MS wall guard is fallback only.
+    await wakeOnJournal(scenario.host.workDir, Math.min(remaining, FACT_WAKE_GUARD_MS));
 
     const next = readJournal(scenario.host.workDir, name, renewOn);
     // VERIFY-004 / waitFact causal renewal: only the awaited count OR an explicitly
@@ -531,7 +566,28 @@ async function runFlow(scenario, doc, ctx) {
           });
         }
 
-        await pollSlice(ENFORCER_POLL_SLICE_MS);
+        await wakeOnSignal(FACT_WAKE_GUARD_MS, (done) => {
+          const unsubs = [];
+          if (scenario.provider && 'onExpectationConsumed' in scenario.provider) {
+            const prev = scenario.provider.onExpectationConsumed;
+            scenario.provider.onExpectationConsumed = (arg) => {
+              try { prev?.(arg); } finally { done(); }
+            };
+            unsubs.push(() => {
+              scenario.provider.onExpectationConsumed = prev;
+            });
+          }
+          if (typeof scenario.events?.onEvent === 'function') {
+            unsubs.push(scenario.events.onEvent((e) => {
+              if (e.type === 'message.updated') done();
+            }));
+          }
+          return () => {
+            for (const unsub of unsubs) {
+              try { unsub(); } catch {}
+            }
+          };
+        });
       }
       continue;
     }

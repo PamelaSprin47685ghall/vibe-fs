@@ -64,3 +64,70 @@ export function journalFactTail(workDir, limit) {
     }
   });
 }
+
+/** Watch runtime *.ndjson; onChange debounced to one call per tick. Returns stop(). */
+export function watchJournal(workDir, onChange) {
+  let closed = false;
+  let dirWatcher = null;
+  let parentWatcher = null;
+  let debounce = null;
+
+  const notify = () => {
+    if (closed) return;
+    if (debounce !== null) return;
+    debounce = setImmediate(() => {
+      debounce = null;
+      if (!closed) onChange();
+    });
+  };
+
+  const stopDir = () => {
+    try { dirWatcher?.close(); } catch {}
+    dirWatcher = null;
+  };
+
+  const startDir = (directory) => {
+    stopDir();
+    try {
+      dirWatcher = fs.watch(directory, (_event, file) => {
+        if (file == null || file.endsWith('.ndjson')) notify();
+      });
+      dirWatcher.on('error', () => {});
+    } catch {
+      // caller falls back to short guard slice
+    }
+  };
+
+  const directory = runtimeDirectory(workDir);
+  if (fs.existsSync(directory)) {
+    startDir(directory);
+  } else {
+    const parent = path.dirname(directory);
+    const tryAttach = () => {
+      if (closed) return;
+      if (!fs.existsSync(directory)) return;
+      try { parentWatcher?.close(); } catch {}
+      parentWatcher = null;
+      startDir(directory);
+      notify();
+    };
+    try {
+      if (fs.existsSync(parent)) {
+        parentWatcher = fs.watch(parent, tryAttach);
+        parentWatcher.on('error', () => {});
+      }
+    } catch {}
+    tryAttach();
+  }
+
+  return () => {
+    closed = true;
+    if (debounce !== null) {
+      clearImmediate(debounce);
+      debounce = null;
+    }
+    stopDir();
+    try { parentWatcher?.close(); } catch {}
+    parentWatcher = null;
+  };
+}
