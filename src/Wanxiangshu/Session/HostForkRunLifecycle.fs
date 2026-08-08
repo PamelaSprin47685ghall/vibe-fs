@@ -146,25 +146,12 @@ module HostForkRunLifecycle =
             // Observation only. Keep pending run Active for a later proven terminal.
             ()
         | Completed result when not result.IsValid ->
-            let agentOutcome =
-                AgentCompletion.failed
-                    run.AgentId
-                    runId
-                    (Some run.Role)
-                    (Some childId)
-                    "MISSING_FINAL_REPORT"
-                    "completed with empty terminal output"
-
-            let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
-
-            deliverProvenCompletion
-                gate
-                pendingRuns
-                journal
-                parentId
-                run
-                (TerminalEvidence.failed run.AgentId handle childId body)
-                agentOutcome
+            // FALLBACK-008 / P0-RECOVERY-JOIN-001: an empty / XML-only terminal is
+            // not a proven failure. The subagent auto-retries and continues — its
+            // reconcile loop repairs the missing final report (RepairOnce /
+            // AbandonRoundProduct, never FailSlot). Concluding MISSING_FINAL_REPORT
+            // here would fail the run before the last effort. Observation only.
+            ()
         | Completed result ->
             let agentOutcome =
                 AgentCompletion.completed
@@ -188,14 +175,16 @@ module HostForkRunLifecycle =
                 run
                 (TerminalEvidence.completed run.AgentId handle childId body)
                 agentOutcome
+        | Failed error when error = "MISSING_FINAL_REPORT" || error.Contains("MISSING_FINAL_REPORT") ->
+            // FALLBACK-008 / P0-RECOVERY-JOIN-001: a missing final report is not a
+            // proven terminal failure. The subagent auto-retries and continues (its
+            // reconcile loop keeps repairing the empty terminal); delivering a
+            // proven MISSING_FINAL_REPORT failure here concludes the run before the
+            // last effort (the same reason the `Aborted` branch observes only).
+            // Observation only — keep pending run Active for a later proven terminal.
+            ()
         | Failed error ->
-            let code =
-                if error = "MISSING_FINAL_REPORT" || error.Contains("MISSING_FINAL_REPORT") then
-                    "MISSING_FINAL_REPORT"
-                elif error = "cancelled" then
-                    "CANCELLED"
-                else
-                    "ERROR"
+            let code = if error = "cancelled" then "CANCELLED" else "ERROR"
 
             let agentOutcome =
                 AgentCompletion.failed run.AgentId runId (Some run.Role) (Some childId) code error
