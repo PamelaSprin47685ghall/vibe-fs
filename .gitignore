@@ -41,10 +41,4 @@ Thumbs.db
 /repomix-output*.md
 
 # Runtime state
-/.wanxiangshu.ndjson
-/.wanxiangshu.ndjson.lock
-/.wanxiangshu-recovery/
-/.wanxiangzhen.ndjson
-/.wanxiangzhen.ndjson.lock
-/.wanxiangzhen-e2e-meta.json
-/.sdd/
+/.codebuff-index
