@@ -10,6 +10,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
+open Wanxiangshu.Host
 
 /// Session-scoped resource owner implemented by the tool runtime without
 /// exposing its concrete dictionaries to the plugin composition root.
@@ -119,6 +120,10 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member val AbortedSessions = HashSet<string>()
     member val RecoveryArming = Dictionary<string, SlotArming>()
     member val AttemptPlans = Dictionary<string, AttemptPlan>()
+    // HOST-004: process-local idle-derived continuation admission. Per plugin
+    // instance like NudgeSent / LoopSensor; never journalled (HOST-007). A
+    // worktree owner transfer starts a fresh gate — no old permit survives.
+    member val Quiescence = SessionQuiescenceGate()
 
     member _.AttachLoopSensor(sensor: LoopSensor) = loopSensor <- Some sensor
 
@@ -373,6 +378,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         this.AbortedSessions.Remove sessionId |> ignore
         this.RecoveryArming.Remove sessionId |> ignore
         this.LoopSensor.DropSession(SessionId.create sessionId)
+        // HOST-004 Q-10: a deleted session's idle permits die forever.
+        this.Quiescence.DropSession(SessionId.create sessionId)
 
         // Always cancel the deleted id; also cancel linked Blogger keys.
         let cancelKeys = (sessionId :: linkedBloggerKeys) |> List.distinct

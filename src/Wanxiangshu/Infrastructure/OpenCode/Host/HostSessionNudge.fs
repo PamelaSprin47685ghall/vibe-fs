@@ -179,3 +179,80 @@ module HostSessionNudge =
                             PromptDispatcher.AwaitMode.Detached
                             None
         }
+
+    // ── idle-derived continuation admission（HOST-004）────────────────────────
+
+    /// What an idle-derived send attempt came to.
+    [<RequireQualifiedAccess>]
+    type IdleContinuationOutcome =
+        | Sent of PromptKey
+        /// The idle occasion expired before the physical send (a newer provider
+        /// attempt began, or the session was dropped). Not an error, not a
+        /// terminal failure: nothing was claimed and nothing was sent — the
+        /// system is doing something fresher.
+        | Superseded
+        | Failed of string
+
+    /// The single idle-derived continuation helper: `TryConsume` first, then the
+    /// dispatcher chain immediately (no await in between), so the send boundary
+    /// is as tight as the claim/persist/send path allows. `Superseded` never
+    /// writes `PluginPromptClaimed` and never sends.
+    let trySendIdleContinuation
+        (quiescence: SessionQuiescenceGate)
+        (permit: QuiescencePermit)
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (kind: PromptAuthority.ContinuationKind)
+        (directory: string option)
+        (journal: AgentJournal option)
+        : Task<IdleContinuationOutcome> =
+        task {
+            if not (quiescence.TryConsume permit) then
+                return IdleContinuationOutcome.Superseded
+            else
+                match!
+                    sendContinuationResult
+                        sessionPort
+                        sessionId
+                        prompt
+                        kind
+                        directory
+                        journal
+                        PromptDispatcher.AwaitMode.Detached
+                        None
+                with
+                | Ok key -> return IdleContinuationOutcome.Sent key
+                | Error error -> return IdleContinuationOutcome.Failed error
+        }
+
+    /// The single idle-derived interaction repair helper (missing-final-report /
+    /// interaction-repair). Same admission contract as `trySendIdleContinuation`.
+    let trySendIdleInteractionRepair
+        (quiescence: SessionQuiescenceGate)
+        (permit: QuiescencePermit)
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (terminalProviderRun: ProviderRunIdentity)
+        (repairKind: string)
+        : Task<IdleContinuationOutcome> =
+        task {
+            if not (quiescence.TryConsume permit) then
+                return IdleContinuationOutcome.Superseded
+            else
+                match!
+                    trySendInteractionRepair
+                        sessionPort
+                        sessionId
+                        prompt
+                        directory
+                        journal
+                        terminalProviderRun
+                        repairKind
+                with
+                | Ok key -> return IdleContinuationOutcome.Sent key
+                | Error error -> return IdleContinuationOutcome.Failed error
+        }

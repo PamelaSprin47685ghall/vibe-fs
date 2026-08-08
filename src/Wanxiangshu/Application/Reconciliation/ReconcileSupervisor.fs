@@ -1,10 +1,12 @@
 namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
+open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 open Wanxiangshu.Journal
+open Wanxiangshu.Host
 
 /// Compatibility surface for existing Host and focused tests.
 /// Reconciler.Scheduler owns queueing and direct-CE pass execution.
@@ -19,14 +21,17 @@ module ReconcileSupervisor =
             ?projection: (SessionId -> AgentProjectionSet option),
             ?onSnapshot: SessionId -> SessionMessage list -> Task,
             ?maxCausalRereads: int,
-            ?maxConsecutiveErrors: int
+            ?maxConsecutiveErrors: int,
+            ?quiescence: SessionQuiescenceGate
         ) =
+
+        let quiescenceGate = defaultArg quiescence (SessionQuiescenceGate())
 
         let scheduler =
             Reconciler.Scheduler(
                 snapshot,
                 binding,
-                onTurn,
+                (fun (context: ReconciledTurnContext) -> onTurn context.Turn),
                 ?onDeleted = onDeleted,
                 ?projection = projection,
                 ?onSnapshot = onSnapshot,
@@ -34,8 +39,15 @@ module ReconcileSupervisor =
                 ?maxConsecutiveErrors = maxConsecutiveErrors
             )
 
-        member _.Kick(sessionId: SessionId) = scheduler.Kick(sessionId)
-        member _.Signal(signal: HostSignal) = scheduler.Signal(signal)
+        member _.Kick(sessionId: SessionId) =
+            scheduler.Kick(sessionId, ReconcileProgram.ReconcileWake.RetryWake)
+
+        member _.Signal(signal: HostSignal) =
+            match signal with
+            | SessionIdle sessionId -> scheduler.SignalIdle(sessionId, quiescenceGate.ObserveIdle sessionId)
+            | ProviderRetry _
+            | ProviderFailure _
+            | SessionDeleted _ -> scheduler.Signal signal
 
         member _.BindUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId, ?agentRole: Role) =
             scheduler.BindUserMessage(sessionId, physical, ?agentRole = agentRole)

@@ -60,7 +60,7 @@ module Reconciler =
         (
             snapshot: ISessionSnapshotPort,
             binding: TurnBinding.Store,
-            onTurn: ReconciledTurn -> Task,
+            onTurn: ReconciledTurnContext -> Task,
             ?onDeleted: SessionId -> unit,
             ?projection: (SessionId -> AgentProjectionSet option),
             ?onSnapshot: SessionId -> SessionMessage list -> Task,
@@ -74,6 +74,11 @@ module Reconciler =
         let cleared = HashSet<string>()
         let generations = Dictionary<string, int>()
         let published = Dictionary<string, ReconcileProgram.PublishMaps>()
+        // The wake of the most recent dispatch for a session. Never consumed:
+        // a ResumeDrain re-run needs the same wake, and a newer signal simply
+        // overwrites it. A session with no recorded wake defaults to RetryWake
+        // (no idle rights — the safe side).
+        let wakes = Dictionary<string, ReconcileProgram.ReconcileWake>()
         let resolveProjection = defaultArg projection (fun _ -> None)
         let onDeleted = defaultArg onDeleted ignore
 
@@ -95,10 +100,11 @@ module Reconciler =
         let isCurrent (sessionId: SessionId) (generation: int) =
             currentGeneration sessionId = generation
 
-        let dispatch (sessionId: SessionId) =
+        let dispatch (sessionId: SessionId) (wake: ReconcileProgram.ReconcileWake) =
             lock gate (fun () ->
                 let key = SessionId.value sessionId
                 let generation = currentGeneration sessionId
+                wakes.[key] <- wake
                 queued.[key] <- generation
 
                 if active.ContainsKey key then
@@ -106,6 +112,14 @@ module Reconciler =
                 else
                     active.[key] <- generation
                     Dispatch.Start generation)
+
+        let currentWake (sessionId: SessionId) =
+            lock gate (fun () ->
+                let key = SessionId.value sessionId
+
+                match wakes.TryGetValue key with
+                | true, wake -> wake
+                | false, _ -> ReconcileProgram.ReconcileWake.RetryWake)
 
         let takeWork (sessionId: SessionId) (generation: int) =
             lock gate (fun () ->
@@ -155,6 +169,7 @@ module Reconciler =
         let publishIfAllowed
             (sessionId: SessionId)
             (generation: int)
+            (wake: ReconcileProgram.ReconcileWake)
             (maps: ReconcileProgram.PublishMaps)
             (turn: ReconcileProgram.PublishTurn option)
             (turns: Map<string, ReconciledTurn>)
@@ -172,7 +187,17 @@ module Reconciler =
                     if decision.shouldPublish && isCurrent sessionId generation then
                         match Map.tryFind (ReconcileProgram.consumeKey value) turns with
                         | Some reconciled ->
-                            do! onTurn reconciled
+                            let quiescence =
+                                match wake with
+                                | ReconcileProgram.ReconcileWake.IdleWake permit -> Some permit
+                                | ReconcileProgram.ReconcileWake.RetryWake
+                                | ReconcileProgram.ReconcileWake.FailureWake -> None
+
+                            let context: ReconciledTurnContext =
+                                { Turn = reconciled
+                                  Quiescence = quiescence }
+
+                            do! onTurn context
 
                             if isCurrent sessionId generation then
                                 recordMaps sessionId decision.maps
@@ -187,6 +212,7 @@ module Reconciler =
         let rec materializeActive
             (sessionId: SessionId)
             (generation: int)
+            (wake: ReconcileProgram.ReconcileWake)
             (rereadsRemaining: int)
             (consecutiveErrors: int)
             (candidate: ReconcileProgram.PublishTurn option)
@@ -224,6 +250,7 @@ module Reconciler =
                                     materializeActive
                                         sessionId
                                         generation
+                                        wake
                                         rereadsRemaining
                                         nextErrors
                                         candidate
@@ -242,14 +269,15 @@ module Reconciler =
                                 | Some value -> Map.add (ReconcileProgram.consumeKey (publishTurnOf value)) value turns
                                 | None -> turns
 
-                            let decision = ReconcileProgram.decideStep rereadsRemaining evidence
+                            let decision = ReconcileProgram.decideStep wake rereadsRemaining evidence
 
                             match decision with
                             | ReconcileProgram.ReconcileDecision.Publish
                             | ReconcileProgram.ReconcileDecision.RepairMissingFinalReport ->
                                 // RepairMissingFinalReport publishes the observed
                                 // Unknown turn as-is; TurnCompletionProgram turns it
-                                // into the missing-final-report repair (GLORY-070).
+                                // into the missing-final-report repair (GLORY-070),
+                                // gated on the pass's quiescence evidence.
                                 let publishable =
                                     match evidence with
                                     | ReconcileProgram.ReconcileEvidence.Terminal observed -> observed.PublishTurn
@@ -257,7 +285,15 @@ module Reconciler =
                                     | ReconcileProgram.ReconcileEvidence.Provisional observed -> observed.PublishTurn
                                     | _ -> candidate
 
-                                do! publishIfAllowed sessionId generation maps publishable observedTurns (Some messages)
+                                do!
+                                    publishIfAllowed
+                                        sessionId
+                                        generation
+                                        wake
+                                        maps
+                                        publishable
+                                        observedTurns
+                                        (Some messages)
                             | ReconcileProgram.ReconcileDecision.StopPass ->
                                 if isCurrent sessionId generation then
                                     do! observeSnapshot sessionId messages
@@ -276,6 +312,7 @@ module Reconciler =
                                         materializeActive
                                             sessionId
                                             generation
+                                            wake
                                             remaining
                                             0
                                             candidate'
@@ -292,6 +329,8 @@ module Reconciler =
                 if not (isCurrent sessionId generation) || isCleared sessionId then
                     return ()
                 else
+                    let wake = currentWake sessionId
+
                     let activeBinding =
                         binding.ActiveRunBinding(sessionId, ?projection = resolveProjection sessionId)
 
@@ -310,6 +349,7 @@ module Reconciler =
                             materializeActive
                                 sessionId
                                 generation
+                                wake
                                 (maxRereads + 1)
                                 0
                                 None
@@ -344,16 +384,19 @@ module Reconciler =
                 | Release.Released -> return ()
             }
 
-        member _.Kick(sessionId: SessionId) : unit =
-            match dispatch sessionId with
+        member _.Kick(sessionId: SessionId, wake: ReconcileProgram.ReconcileWake) : unit =
+            match dispatch sessionId wake with
             | Dispatch.Start generation -> this.Run(sessionId, generation) |> ignore
             | Dispatch.Enqueued -> ()
 
+        member _.SignalIdle(sessionId: SessionId, permit: QuiescencePermit) : unit =
+            this.Kick(sessionId, ReconcileProgram.ReconcileWake.IdleWake permit)
+
         member this.Signal(signal: HostSignal) : unit =
             match signal with
-            | SessionIdle sessionId
-            | ProviderFailure(sessionId, _) -> this.Kick(sessionId)
-            | ProviderRetry retry -> this.Kick(retry.SessionId)
+            | SessionIdle sessionId -> this.Kick(sessionId, ReconcileProgram.ReconcileWake.RetryWake)
+            | ProviderFailure(sessionId, _) -> this.Kick(sessionId, ReconcileProgram.ReconcileWake.FailureWake)
+            | ProviderRetry retry -> this.Kick(retry.SessionId, ReconcileProgram.ReconcileWake.RetryWake)
             | SessionDeleted sessionId -> this.ClearSession(sessionId)
 
         member _.BindUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId, ?agentRole: Role) =
@@ -385,7 +428,8 @@ module Reconciler =
                 cleared.Add(key) |> ignore
                 queued.Remove(key) |> ignore
                 active.Remove(key) |> ignore
-                published.Remove(key) |> ignore)
+                published.Remove(key) |> ignore
+                wakes.Remove(key) |> ignore)
 
             binding.ClearSession(sessionId)
             onDeleted sessionId

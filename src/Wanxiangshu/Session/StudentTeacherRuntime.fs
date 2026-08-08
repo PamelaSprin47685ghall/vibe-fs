@@ -11,6 +11,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Host
 open Wanxiangshu.Tools
 
 module private StudentTeacherPath =
@@ -50,7 +51,8 @@ type StudentTeacherRuntime
         journal: AgentJournal,
         qa: StudentQaStore,
         workspaceDirectory: string,
-        onTeacherReady: SessionId -> string -> unit
+        onTeacherReady: SessionId -> string -> unit,
+        quiescence: SessionQuiescenceGate
     ) =
     let gate = obj ()
     let runs = Dictionary<string, StudentRunCell>()
@@ -165,49 +167,63 @@ type StudentTeacherRuntime
                         tools
         }
 
-    let sendTeacherNudge (cell: StudentRunCell) teacher =
+    let sendTeacherNudge (cell: StudentRunCell) (permit: QuiescencePermit option) teacher =
         task {
-            match activeProfile teacher with
-            | None -> return Error "Teacher nudge rejected: no active Teacher Authority Root"
-            | Some profile ->
-                return!
-                    dispatcher.SendContinuationWithTools
-                        sessions
-                        teacher
-                        StudentTeacherPrompt.teacherIdleNudge
-                        PromptAuthority.ContinuationKind.TeacherIdleNudge
-                        profile
-                        (teacherAgent cell)
-                        (Some workspaceDirectory)
-                        PromptDispatcher.AwaitMode.Detached
-                        None
-                        (toolMap Role.Teacher ProviderRequestKind.WorkMain)
+            // HOST-004: TeacherIdleNudge is idle-derived — a fresh permit must
+            // still hold at send time.
+            match permit with
+            | None -> return Error "Superseded: no idle permit for TeacherIdleNudge"
+            | Some p when not (quiescence.TryConsume p) ->
+                return Error "Superseded: idle permit stale for TeacherIdleNudge"
+            | Some _ ->
+                match activeProfile teacher with
+                | None -> return Error "Teacher nudge rejected: no active Teacher Authority Root"
+                | Some profile ->
+                    return!
+                        dispatcher.SendContinuationWithTools
+                            sessions
+                            teacher
+                            StudentTeacherPrompt.teacherIdleNudge
+                            PromptAuthority.ContinuationKind.TeacherIdleNudge
+                            profile
+                            (teacherAgent cell)
+                            (Some workspaceDirectory)
+                            PromptDispatcher.AwaitMode.Detached
+                            None
+                            (toolMap Role.Teacher ProviderRequestKind.WorkMain)
         }
 
-    let sendCompile (cell: StudentRunCell) isNudge =
+    let sendCompile (cell: StudentRunCell) isNudge (permit: QuiescencePermit option) =
         task {
-            match qa.Path(cell.SessionId, cell.LogicalRunId), activeProfile cell.SessionId with
-            | Error error, _ -> return Error error
-            | _, None -> return Error "Student compile rejected: no active Student Authority Root"
-            | Ok path, Some profile ->
-                let continuation, text =
-                    if isNudge then
-                        PromptAuthority.ContinuationKind.StudentCompileNudge, StudentTeacherPrompt.compileNudge
-                    else
-                        PromptAuthority.ContinuationKind.StudentCompile, StudentTeacherPrompt.compile path
+            // HOST-004: StudentCompileNudge is idle-derived; the initial
+            // StudentCompile is not (it is the run's own hand-off).
+            match isNudge, permit with
+            | true, None -> return Error "Superseded: no idle permit for StudentCompileNudge"
+            | true, Some p when not (quiescence.TryConsume p) ->
+                return Error "Superseded: idle permit stale for StudentCompileNudge"
+            | _ ->
+                match qa.Path(cell.SessionId, cell.LogicalRunId), activeProfile cell.SessionId with
+                | Error error, _ -> return Error error
+                | _, None -> return Error "Student compile rejected: no active Student Authority Root"
+                | Ok path, Some profile ->
+                    let continuation, text =
+                        if isNudge then
+                            PromptAuthority.ContinuationKind.StudentCompileNudge, StudentTeacherPrompt.compileNudge
+                        else
+                            PromptAuthority.ContinuationKind.StudentCompile, StudentTeacherPrompt.compile path
 
-                return!
-                    dispatcher.SendContinuationWithTools
-                        sessions
-                        cell.SessionId
-                        text
-                        continuation
-                        profile
-                        cell.Agent
-                        (Some workspaceDirectory)
-                        PromptDispatcher.AwaitMode.Detached
-                        None
-                        (toolMap Role.Student ProviderRequestKind.StudentCompile)
+                    return!
+                        dispatcher.SendContinuationWithTools
+                            sessions
+                            cell.SessionId
+                            text
+                            continuation
+                            profile
+                            cell.Agent
+                            (Some workspaceDirectory)
+                            PromptDispatcher.AwaitMode.Detached
+                            None
+                            (toolMap Role.Student ProviderRequestKind.StudentCompile)
         }
 
     let tryCell sessionId =
@@ -482,7 +498,7 @@ type StudentTeacherRuntime
                         Error(sprintf "Tool '%s' is outside the Teacher execution profile" tool)
             | _ -> Ok()
 
-    member _.HandleTurn(turn: ReconciledTurn) : Task<bool> =
+    member _.HandleTurn(turn: ReconciledTurn, quiescence: QuiescencePermit option) : Task<bool> =
         task {
             match turn.Role with
             | Some Role.Student ->
@@ -504,13 +520,13 @@ type StudentTeacherRuntime
 
                         let! _ = satellites.Retire(cell.SessionId, teacherSpec cell)
 
-                        match! sendCompile cell false with
+                        match! sendCompile cell false None with
                         | Ok _ -> cell.State <- StudentTeacher.RunState.CompileReady
                         | Error _ -> cell.State <- StudentTeacher.RunState.LearnReady
 
                         return true
                     | ReconcileProgram.TurnCompleted, None, StudentTeacher.RunState.CompileReady ->
-                        let! _ = sendCompile cell true
+                        let! _ = sendCompile cell true quiescence
                         return true
                     | ReconcileProgram.TurnAborted _, _, _ ->
                         let! _ = satellites.Retire(cell.SessionId, teacherSpec cell)
@@ -549,7 +565,7 @@ type StudentTeacherRuntime
 
                         return true
                     | ReconcileProgram.TurnCompleted, None, Some _ ->
-                        let! _ = sendTeacherNudge cell turn.SessionId
+                        let! _ = sendTeacherNudge cell quiescence turn.SessionId
                         return true
                     | ReconcileProgram.TurnFailed error, _, Some parentWaiter
                     | ReconcileProgram.TurnAborted error, _, Some parentWaiter ->

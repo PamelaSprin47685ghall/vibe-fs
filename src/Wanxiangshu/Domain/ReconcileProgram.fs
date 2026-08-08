@@ -34,6 +34,19 @@ module ReconcileProgram =
 
     // ── evidence / decision ──────────────────────────────────────────────────
 
+    /// What started this reconcile pass (HOST-004 rev.3).
+    ///
+    /// Only an `IdleWake` carries quiescence evidence — a fresh `SessionIdle`
+    /// observation. Retry / failure wakes never grant idle-derived continuation
+    /// rights, and the scheduler generation (single-flight fencing) is a
+    /// different physical concept and must never be reused as the attempt
+    /// serial.
+    [<RequireQualifiedAccess>]
+    type ReconcileWake =
+        | IdleWake of QuiescencePermit
+        | RetryWake
+        | FailureWake
+
     [<RequireQualifiedAccess>]
     type ReconcileEvidence =
         | SnapshotError of reason: string
@@ -47,9 +60,12 @@ module ReconcileProgram =
     type ReconcileDecision =
         | Reread of clearContinuationCandidate: bool * rereadsRemaining: int
         | Publish
-        /// GLORY-070 / HOST-004 rev.2: a stable idle that never settled into a
+        /// GLORY-070 / HOST-004 rev.3: a stable idle that never settled into a
         /// terminal (finish=None) must produce the missing-final-report repair
-        /// instead of a silent StopPass black hole.
+        /// instead of a silent StopPass black hole — but only when the pass
+        /// actually carries idle evidence. Without an `IdleWake`, `Unknown` is
+        /// observation stability only, not quiescence: no idle-derived
+        /// continuation may be constructed.
         | RepairMissingFinalReport
         | StopPass
 
@@ -76,12 +92,15 @@ module ReconcileProgram =
 
     /// 有界因果重读：rereadsRemaining = 还能进行多少次读取判定（初始 = maxCausalRereads + 1）。
     ///
-    /// 不变量（GLORY-070 / HOST-004 rev.2）：SessionIdle 被消费后只允许产生一个
-    /// 稳定业务决定或明确 fail closed；因果重读耗尽绝不静默 StopPass 一个 stable
-    /// idle。`Unknown`（finish=None）与 `Provisional`（finish=stop 无合法正文 /
-    /// tool-calls 停滞）耗尽后分别进入修复与发布；只有 `SnapshotError` / `NoTurn`
-    /// 保持 StopPass（没有任何可作用的对象，等待下一个 Host signal 重踢）。
-    let decideStep (rereadsRemaining: int) (evidence: ReconcileEvidence) : ReconcileDecision =
+    /// 不变量（GLORY-070 / HOST-004 rev.3）：SessionIdle 被消费后只允许产生一个
+    /// 稳定业务决定或明确 fail closed；因果重读耗尽绝不静默 StopPass 一个带 idle
+    /// evidence 的稳定 `Unknown`。`Unknown`（finish=None）耗尽后只有在 `IdleWake`
+    /// 下进入 `RepairMissingFinalReport`；`Retry` / `Failure` wake 只证明观测稳定、
+    /// 不证明静止——不产生 idle-derived continuation（StopPass，等下一个 signal）。
+    /// `Provisional`（finish=stop 无合法正文 / tool-calls 停滞）耗尽后发布；只有
+    /// `SnapshotError` / `NoTurn` 保持 StopPass（没有任何可作用的对象，等待下一个
+    /// Host signal 重踢）。
+    let decideStep (wake: ReconcileWake) (rereadsRemaining: int) (evidence: ReconcileEvidence) : ReconcileDecision =
         match evidence with
         | ReconcileEvidence.Terminal _ -> ReconcileDecision.Publish
         | ReconcileEvidence.SnapshotError _
@@ -101,10 +120,17 @@ module ReconcileProgram =
             if rereadsRemaining > 1 then
                 ReconcileDecision.Reread(true, rereadsRemaining - 1)
             else
-                // The classic black hole: SessionIdle + assistant reasoning +
-                // finish=None + rereads exhausted. Must auto-continue (missing
-                // final report) or fail closed — never StopPass silently.
-                ReconcileDecision.RepairMissingFinalReport
+                match wake with
+                | ReconcileWake.IdleWake _ ->
+                    // The classic black hole: SessionIdle + assistant reasoning +
+                    // finish=None + rereads exhausted. Must auto-continue (missing
+                    // final report) or fail closed — never StopPass silently.
+                    ReconcileDecision.RepairMissingFinalReport
+                | ReconcileWake.RetryWake
+                | ReconcileWake.FailureWake ->
+                    // Observation stability only. No idle evidence → no
+                    // idle-derived continuation; the next SessionIdle re-kicks.
+                    ReconcileDecision.StopPass
         | ReconcileEvidence.SessionCleared -> ReconcileDecision.StopPass
 
     let decisionName (decision: ReconcileDecision) : string =

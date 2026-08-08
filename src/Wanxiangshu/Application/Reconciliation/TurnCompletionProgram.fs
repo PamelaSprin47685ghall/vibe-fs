@@ -10,17 +10,24 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
 open Wanxiangshu.Session
+open Wanxiangshu.Host
 
 /// The one production path that turns a reconciled turn into side effects
 /// (NotifyTerminal, dispose runtime, nudges, fallback advance).
 module TurnCompletionProgram =
 
-    /// FALLBACK-008: one repair per unusable terminal.
+    /// FALLBACK-008: one repair per unusable terminal, gated on a fresh idle
+    /// permit (HOST-004).
     ///
     /// The task is awaited rather than discarded. `|> ignore` on the task also
     /// discarded the claim/abandon bookkeeping inside it, so a failed repair left
     /// a Claimed fact with nothing after it and no terminal for the caller.
+    ///
+    /// `Superseded` (stale permit) is not a failure: nothing was claimed, nothing
+    /// was sent — the system is doing something fresher.
     let private sendRepair
+        (quiescence: SessionQuiescenceGate)
+        (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -29,8 +36,10 @@ module TurnCompletionProgram =
         (repairKind: string)
         : Task =
         task {
-            let! sent =
-                HostSessionNudge.trySendInteractionRepair
+            let! outcome =
+                HostSessionNudge.trySendIdleInteractionRepair
+                    quiescence
+                    permit
                     sessionPort
                     turn.SessionId
                     prompt
@@ -39,34 +48,31 @@ module TurnCompletionProgram =
                     turn.ProviderRun
                     repairKind
 
-            match sent with
-            | Ok _ -> ()
-            | Error _ ->
+            match outcome with
+            | HostSessionNudge.IdleContinuationOutcome.Sent _ -> ()
+            | HostSessionNudge.IdleContinuationOutcome.Superseded -> ()
+            | HostSessionNudge.IdleContinuationOutcome.Failed _ ->
                 eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "MISSING_FINAL_REPORT")
                 |> ignore
         }
         :> Task
 
-    /// CTX-012: is this run the recovery probe — a physical message accepted as
-    /// a ProviderRetryAttempt continuation?
-    ///
-    /// The probe's terminal is often still on the wire when an interleaved
-    /// reconcile pass reads the run as Unknown (finish=None), and the bounded
-    /// rereads are synchronous, so RepairMissingFinalReport fires before the
-    /// response lands. Repairing hijacks the probe run and the TurnCompleted
-    /// promote never fires (measured: FallbackCursorAdvanced + ProviderRetryAttempt
-    /// with PrefixRebaseCommitted=0 in x-c/x-d). The probe turn's own idle
-    /// re-reconciles it as TurnCompleted.
-    let private isRecoveryProbeRun (journal: AgentJournal option) (turn: ReconciledTurn) : bool =
-        match journal with
-        | None -> false
-        | Some durable ->
-            AgentProjection.tryFind turn.SessionId (AgentJournal.snapshot durable).AgentProjections
-            |> Option.bind (fun session -> session.PromptAuthority)
-            |> Option.exists (fun authority ->
-                authority.AcceptedContinuationIds
-                |> Map.tryFind turn.PhysicalUserMessageId
-                |> Option.exists (fun kind -> kind = PromptAuthority.ContinuationKind.ProviderRetryAttempt))
+    /// HOST-004: the three idle-derived repair sends (missing-final-report ×2,
+    /// interaction-repair) all funnel through one admission point. No idle
+    /// permit in the context, or a permit that no longer holds at send time →
+    /// zero physical prompt, zero claim, zero terminal.
+    let private trySendIdleRepair
+        (quiescence: SessionQuiescenceGate)
+        (context: ReconciledTurnContext)
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (prompt: string)
+        (repairKind: string)
+        : Task =
+        match context.Quiescence with
+        | None -> AsyncSupport.completedTask ()
+        | Some permit -> sendRepair quiescence permit sessionPort eventPort journal context.Turn prompt repairKind
 
     /// CTX-006 hasMaterial for X: BlogEntryCommitted coverage on the main session.
     let private sessionHasCoverage (durable: AgentJournal) (sessionId: SessionId) =
@@ -222,8 +228,10 @@ module TurnCompletionProgram =
         (hasLivePty: string -> bool)
         (abortedSessions: HashSet<string>)
         (loopSensor: LoopSensor option)
-        (turn: ReconciledTurn)
+        (quiescence: SessionQuiescenceGate)
+        (context: ReconciledTurnContext)
         : Task =
+        let turn = context.Turn
         let sessionKey = SessionId.value turn.SessionId
         disposeExecutorRuntime sessionKey
 
@@ -328,18 +336,20 @@ module TurnCompletionProgram =
 
         match turn.Outcome with
         | ReconcileProgram.TurnUnknown ->
-            // GLORY-070: a stable idle that never produced a final report is
-            // repaired exactly once (the reconcile maps dedupe the turn token);
-            // it must never silently stop.
-            //
-            // Exception: the recovery probe run. Its terminal is still on the
-            // wire when an interleaved pass reads it as Unknown; repairing it
-            // hijacks the probe and the TurnCompleted promote never fires. The
-            // probe turn's own idle re-reconciles it as TurnCompleted.
-            if isRecoveryProbeRun journal turn then
-                AsyncSupport.completedTask ()
-            else
-                sendRepair sessionPort eventPort journal turn RuntimeNudge.missingFinalReport "missing-final-report"
+            // GLORY-070 / HOST-004 rev.3: a stable idle that never produced a
+            // final report is repaired exactly once (the reconcile maps dedupe
+            // the turn token), and only when the pass carried idle evidence.
+            // A retry/failure wake or a permit stale at send time sends nothing
+            // (the recovery-probe race is suppressed by the stale permit, not
+            // by a run-category exemption).
+            trySendIdleRepair
+                quiescence
+                context
+                sessionPort
+                eventPort
+                journal
+                RuntimeNudge.missingFinalReport
+                "missing-final-report"
         | ReconcileProgram.TurnInProgress when reviewerAlreadyConfirmed ->
             // A second PERFECT is frequently a tool-only provider step. Once the
             // witness is Confirmed, finish the physical reviewer run so
@@ -385,11 +395,12 @@ module TurnCompletionProgram =
                 completeReviewerOrAssistant false |> ignore
                 AsyncSupport.completedTask ()
             elif CompletedTurnClassifier.needsInteractionRepair turn.Role turn.Outcome turn.Parts then
-                sendRepair
+                trySendIdleRepair
+                    quiescence
+                    context
                     sessionPort
                     eventPort
                     journal
-                    turn
                     RuntimeNudge.interactionRepairContinue
                     "interaction-repair"
             else
@@ -402,12 +413,16 @@ module TurnCompletionProgram =
             // not completable, then ask for the missing report. Still not fallback.
             // (The XTrace parts are captured at the transform boundary.)
             //
-            // Same recovery-probe exception as TurnUnknown: the probe's terminal
-            // may still be on the wire; repairing would hijack the promote.
-            if isRecoveryProbeRun journal turn then
-                AsyncSupport.completedTask ()
-            else
-                sendRepair sessionPort eventPort journal turn RuntimeNudge.missingFinalReport "missing-final-report"
+            // Same admission contract as TurnUnknown: idle evidence required,
+            // stale permit sends nothing.
+            trySendIdleRepair
+                quiescence
+                context
+                sessionPort
+                eventPort
+                journal
+                RuntimeNudge.missingFinalReport
+                "missing-final-report"
         | ReconcileProgram.TurnAborted reason ->
             // LOOP-006: our own kill is bridged into the provider-failure AABB path.
             // User / cleanup aborts still report Aborted and do not advance the cursor.
@@ -636,7 +651,9 @@ module TurnCompletionProgram =
                 | Some Role.Manager ->
                     // GLORY-029/070: ordinary Labor idle. The Manager is never
                     // reviewed by a guard; it continues until suicide. Exactly one
-                    // encouragement per idle terminal (dedupe: pending claim + run).
+                    // encouragement per idle terminal (dedupe: pending claim + run),
+                    // and only with a fresh idle permit (HOST-004): an idle-derived
+                    // continuation must not fire when a newer attempt began.
                     let encouragementKey =
                         sprintf "manager-idle:%s:%s" sessionKey (ProviderRunIdentity.value turn.ProviderRun)
 
@@ -654,27 +671,30 @@ module TurnCompletionProgram =
                                     | _ -> false))
                         | None -> false
 
-                    if nudgeSent.Contains encouragementKey || idleAlreadyClaimed then
+                    match context.Quiescence with
+                    | None -> AsyncSupport.completedTask ()
+                    | Some _ when nudgeSent.Contains encouragementKey || idleAlreadyClaimed ->
                         AsyncSupport.completedTask ()
-                    else
+                    | Some permit ->
                         nudgeSent.Add encouragementKey |> ignore
 
                         task {
                             let! outcome =
-                                HostSessionNudge.sendContinuationResult
+                                HostSessionNudge.trySendIdleContinuation
+                                    quiescence
+                                    permit
                                     sessionPort
                                     turn.SessionId
                                     ManagerLifecyclePrompt.IdleEncouragement
                                     PromptAuthority.ContinuationKind.ManagerIdleEncouragement
                                     turn.Directory
                                     journal
-                                    PromptDispatcher.AwaitMode.Detached
-                                    None
 
                             match outcome with
-                            | Error error ->
+                            | HostSessionNudge.IdleContinuationOutcome.Sent _ -> ()
+                            | HostSessionNudge.IdleContinuationOutcome.Superseded -> ()
+                            | HostSessionNudge.IdleContinuationOutcome.Failed error ->
                                 eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
-                            | Ok _ -> ()
                         }
                         :> Task
                 | _ -> AsyncSupport.completedTask ()

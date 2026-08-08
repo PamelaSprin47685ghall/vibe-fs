@@ -590,6 +590,14 @@ export const transcriptGap = {
   after: (address) => buildTranscriptGap('After', [address]),
 }
 
+// HOST-004: process-local idle admission token. Constructed only by the gate in
+// production; tests construct one for decision-layer calls that take a wake.
+export const quiescencePermit = {
+  create: (session, serial) => Identity.QuiescencePermitModule_create(sessionId(session), BigInt(serial)),
+  sessionId: (permit) => idValue.session(Identity.QuiescencePermitModule_sessionId(permit)),
+  attemptSerial: (permit) => Number(Identity.QuiescencePermitModule_attemptSerial(permit)),
+}
+
 // Epoch ids wrap int64, so Fable represents them as BigInt. Taking a JS number
 // here and converting once keeps `1` out of every call site — passing a plain
 // number where F# expects int64 does not throw, it silently compares unequal.
@@ -5386,7 +5394,7 @@ export const reconcileProgram = (() => {
         [mod?.decideStep, mod?.ReconcileProgram_decideStep, mod?.Reconcile_decideStep],
         'decideStep',
       )
-      return (rereadsRemaining, evidence) => applyArgs(fn, [rereadsRemaining, evidence])
+      return (wake, rereadsRemaining, evidence) => applyArgs(fn, [wake, rereadsRemaining, evidence])
     },
 
     get decisionName() {
@@ -5540,3 +5548,11 @@ export const reconcileProgram = (() => {
       ),
   }
 })()
+
+/** HOST-004 ReconcileWake: IdleWake of QuiescencePermit | RetryWake | FailureWake. */
+const buildReconcileWake = unionCase(ReconcileProgramModule.ReconcileWake, 'ReconcileWake')
+export const reconcileWake = {
+  idleWake: (permit) => buildReconcileWake('IdleWake', [permit]),
+  retryWake: () => buildReconcileWake('RetryWake', []),
+  failureWake: () => buildReconcileWake('FailureWake', []),
+}

@@ -64,8 +64,10 @@ module HostSignalBootstrap =
 
             let binding = TurnBinding.Store()
 
-            let onTurn (turn: ReconciledTurn) : Task =
+            let onTurn (context: ReconciledTurnContext) : Task =
                 task {
+                    let turn = context.Turn
+
                     // RECOVERY-FAMILY: family recovery before business effects of a turn.
                     let! recovery = scope.EnsureRecoveryDone turn.SessionId
 
@@ -112,7 +114,7 @@ module HostSignalBootstrap =
 
                         let! studentTeacherHandled =
                             match scope.StudentTeacherRuntime with
-                            | Some runtime -> runtime.HandleTurn turn
+                            | Some runtime -> runtime.HandleTurn(turn, context.Quiescence)
                             | None -> Task.FromResult false
 
                         if not studentTeacherHandled then
@@ -130,7 +132,8 @@ module HostSignalBootstrap =
                                     scope.HasLivePty
                                     scope.AbortedSessions
                                     (Some scope.LoopSensor)
-                                    turn
+                                    scope.Quiescence
+                                    context
                 }
 
             /// HOST-006 containment: observe every reconciled snapshot for compaction
@@ -216,7 +219,12 @@ module HostSignalBootstrap =
                     // LoopKillArmed must stay until TurnCompletionProgram bridges TurnAborted
                     // (ResetDetector deliberately does not clear it; LOOP-006).
                     scope.LoopSensor.ResetDetector sessionId
-                    reconciler.Signal signal
+
+                    // HOST-004: the idle observation mints the quiescence permit that
+                    // idle-derived continuations must hold at send time. The permit is
+                    // process-local — never journalled.
+                    let permit = scope.Quiescence.ObserveIdle sessionId
+                    reconciler.SignalIdle(sessionId, permit)
                 | ProviderRetry _
                 | ProviderFailure _ -> reconciler.Signal signal
                 | SessionDeleted sessionId ->
@@ -225,6 +233,7 @@ module HostSignalBootstrap =
                     scope.StudentTeacherRuntime
                     |> Option.iter (fun runtime -> runtime.CancelSession sessionId |> ignore)
 
+                    scope.Quiescence.DropSession sessionId
                     scope.DisposeSession(SessionId.value sessionId)
                     reconciler.Signal signal
 

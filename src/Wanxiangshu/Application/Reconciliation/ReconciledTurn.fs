@@ -28,6 +28,14 @@ type ReconciledTurn =
         Outcome: ReconcileProgram.TurnOutcome
     }
 
+/// The reconciled turn plus the quiescence evidence of the pass that published
+/// it (HOST-004). Only an IdleWake carries `Some permit`; retry / failure
+/// wakes carry None. The side-effect boundary re-checks the permit with the
+/// gate immediately before any physical idle-derived send.
+type ReconciledTurnContext =
+    { Turn: ReconciledTurn
+      Quiescence: QuiescencePermit option }
+
 type ActiveRunBinding =
     {
         SessionId: SessionId

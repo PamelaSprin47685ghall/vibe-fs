@@ -6,7 +6,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { reconcileProgram } from '../support/domain.mjs'
+import { quiescencePermit, reconcileProgram, reconcileWake } from '../support/domain.mjs'
 
 // ── pure classifiers ─────────────────────────────────────────────────────────
 
@@ -28,8 +28,8 @@ test('RECONCILE_PROGRAM_003: decideStep bounds causal rereads and stops on exhau
   assert.equal(typeof reconcileProgram.decideStep, 'function')
   assert.equal(typeof reconcileProgram.decisionName, 'function')
 
-  const name = (remaining, evidence) =>
-    reconcileProgram.decisionName(reconcileProgram.decideStep(remaining, evidence))
+  const name = (remaining, evidence, wake = reconcileWake.retryWake()) =>
+    reconcileProgram.decisionName(reconcileProgram.decideStep(wake, remaining, evidence))
 
   // Non-terminal evidence with budget remaining → Reread.
   assert.equal(name(3, reconcileProgram.evidence.snapshotError('transient')), 'Reread')
@@ -40,27 +40,39 @@ test('RECONCILE_PROGRAM_003: decideStep bounds causal rereads and stops on exhau
 
   // Non-terminal with budget exhausted → fail closed per evidence kind: nothing
   // to act on (SnapshotError/NoTurn) keeps StopPass; Provisional publishes the
-  // stop text; Unknown repairs the missing final report (GLORY-070). A stable
-  // idle is never silently StopPassed.
+  // stop text; Unknown repairs the missing final report only when the pass
+  // carries idle evidence (HOST-004 rev.3) — retry/failure wakes prove
+  // observation stability, not quiescence, and never repair.
   assert.equal(name(0, reconcileProgram.evidence.snapshotError('transient')), 'StopPass')
   assert.equal(name(0, reconcileProgram.evidence.noTurn()), 'StopPass')
   assert.equal(name(0, reconcileProgram.evidence.provisional('TurnInProgress')), 'Publish')
   assert.equal(name(0, reconcileProgram.evidence.provisional('TurnNeedsContinuation')), 'Publish')
-  assert.equal(name(0, reconcileProgram.evidence.unknown()), 'RepairMissingFinalReport')
+  assert.equal(name(0, reconcileProgram.evidence.unknown(), reconcileWake.retryWake()), 'StopPass')
+  assert.equal(name(0, reconcileProgram.evidence.unknown(), reconcileWake.failureWake()), 'StopPass')
+  assert.equal(
+    name(0, reconcileProgram.evidence.unknown(), reconcileWake.idleWake(quiescencePermit.create('ses-a', 1))),
+    'RepairMissingFinalReport',
+  )
 
   // Unknown clears continuation candidate; provisional keeps it.
   assert.equal(
-    reconcileProgram.clearsContinuationCandidate(reconcileProgram.decideStep(3, reconcileProgram.evidence.unknown())),
+    reconcileProgram.clearsContinuationCandidate(
+      reconcileProgram.decideStep(reconcileWake.retryWake(), 3, reconcileProgram.evidence.unknown()),
+    ),
     true,
   )
   assert.equal(
     reconcileProgram.clearsContinuationCandidate(
-      reconcileProgram.decideStep(3, reconcileProgram.evidence.provisional('TurnInProgress')),
+      reconcileProgram.decideStep(
+        reconcileWake.retryWake(),
+        3,
+        reconcileProgram.evidence.provisional('TurnInProgress'),
+      ),
     ),
     false,
   )
 
-  // Terminal → Publish regardless of remaining.
+  // Terminal → Publish regardless of remaining and wake.
   assert.equal(name(0, reconcileProgram.evidence.terminal('TurnCompleted')), 'Publish')
   assert.equal(name(3, reconcileProgram.evidence.terminal('TurnAborted')), 'Publish')
   assert.equal(name(3, reconcileProgram.evidence.terminal('TurnFailed')), 'Publish')
@@ -69,7 +81,11 @@ test('RECONCILE_PROGRAM_003: decideStep bounds causal rereads and stops on exhau
   assert.equal(name(3, reconcileProgram.evidence.sessionCleared()), 'StopPass')
 
   // Reread decrements remaining (no time/backoff information carried).
-  const rereadDecision = reconcileProgram.decideStep(3, reconcileProgram.evidence.provisional('TurnInProgress'))
+  const rereadDecision = reconcileProgram.decideStep(
+    reconcileWake.retryWake(),
+    3,
+    reconcileProgram.evidence.provisional('TurnInProgress'),
+  )
   // decisionName is 'Reread'; verify clearsContinuationCandidate is false.
   assert.equal(reconcileProgram.clearsContinuationCandidate(rereadDecision), false)
 })

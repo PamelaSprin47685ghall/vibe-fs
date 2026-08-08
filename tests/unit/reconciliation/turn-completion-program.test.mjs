@@ -42,6 +42,11 @@ import { buildTurn } from '../../../dist/Application/Reconciliation/CompletedTur
 import { SessionMessage } from '../../../dist/Infrastructure/OpenCode/Host/SessionSnapshotPort.js'
 import { applyWithContinuation } from '../../../dist/Application/Reconciliation/TurnCompletionProgram.js'
 import { LoopSensor, LoopSensor__IsArmed_Z31B28506, LoopSensor__TryArm_Z31B28506 } from '../../../dist/Infrastructure/OpenCode/Host/LoopSensor.js'
+import {
+  SessionQuiescenceGate,
+  SessionQuiescenceGate__BeginProviderAttempt_Z31B28506 as beginProviderAttempt,
+  SessionQuiescenceGate__ObserveIdle_Z31B28506 as observeIdle,
+} from '../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js'
 import { AgentJournalModule_appendManagerLifecycle } from '../../../dist/Journal/AgentJournal.js'
 
 const text = (value) => xTraceCapture.text(value)
@@ -207,7 +212,7 @@ const seedManagerJob = (append, { progress = 'CandidateReady' } = {}) => {
   }
 }
 
-const harness = ({ journal, loopSensor = undefined, hasLivePty = () => false } = {}) => {
+const harness = ({ journal, loopSensor = undefined, hasLivePty = () => false, gate = new SessionQuiescenceGate() } = {}) => {
   const events = []
   const portCalls = []
   const sessionPort = {
@@ -239,7 +244,13 @@ const harness = ({ journal, loopSensor = undefined, hasLivePty = () => false } =
   const sessionParents = new Map()
   const abortedSessions = new Set()
 
-  const run = (turnValue) =>
+  /** A fresh idle permit minted by THIS harness's gate. */
+  const freshPermit = () => {
+    beginProviderAttempt(gate, sessionId(SESSION))
+    return observeIdle(gate, sessionId(SESSION))
+  }
+
+  const run = (turnValue, quiescence = undefined) =>
     applyWithContinuation(
       sessionPort,
       eventPort,
@@ -253,7 +264,8 @@ const harness = ({ journal, loopSensor = undefined, hasLivePty = () => false } =
       hasLivePty,
       abortedSessions,
       loopSensor,
-      turnValue,
+      gate,
+      { Turn: turnValue, Quiescence: quiescence },
     )
 
   return {
@@ -263,6 +275,8 @@ const harness = ({ journal, loopSensor = undefined, hasLivePty = () => false } =
     verdictSessions,
     nudgeSent,
     abortedSessions,
+    gate,
+    freshPermit,
     run,
   }
 }
@@ -271,11 +285,11 @@ const terminalEvent = (events) => events[0]?.[1]
 const eventCase = (events, index = 0) => terminalEvent(events)?.tag
 const eventPayload = (events) => payloadOf(terminalEvent(events))
 
-// ── TurnUnknown: repair exactly once, probe runs never repaired ─────────────
+// ── TurnUnknown: repair only with a fresh idle permit ───────────────────────
 
 test('TCP_unknown_no_journal_repairs_and_fails_closed', async () => {
   const h = harness({})
-  await h.run(turn({ finish: undefined, completed: false, parts: [text('streaming')] }))
+  await h.run(turn({ finish: undefined, completed: false, parts: [text('streaming')] }), h.freshPermit())
 
   assert.deepEqual(h.disposed, ['ses_tcp'], 'disposeExecutorRuntime always runs first')
   assert.equal(h.events.length, 1)
@@ -283,15 +297,67 @@ test('TCP_unknown_no_journal_repairs_and_fails_closed', async () => {
   assert.equal(eventPayload(h.events), 'MISSING_FINAL_REPORT')
 })
 
-test('TCP_unknown_probe_run_is_not_repaired', async () => {
+test('Q01_unknown_with_fresh_idle_permit_sends_exactly_one_repair', async () => {
+  const live = liveJournal()
+  seedAuthority(live.append)
+  const h = harness({ journal: live.journal })
+
+  await h.run(turn({ finish: undefined, completed: false, parts: [text('streaming')] }), h.freshPermit())
+
+  assert.deepEqual(h.events, [], 'repair send succeeds: no terminal')
+  const sends = h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync')
+  assert.equal(sends.length, 1, 'exactly one missing-final-report poke')
+  live.cleanup()
+})
+
+test('Q02_unknown_with_stale_permit_sends_nothing', async () => {
+  const live = liveJournal()
+  seedAuthority(live.append)
+  const h = harness({ journal: live.journal })
+
+  // The core race: the idle permit was minted, then attempt B's transform
+  // began (BeginProviderAttempt) before the old reconcile's side effect ran.
+  const permit = h.freshPermit()
+  beginProviderAttempt(h.gate, sessionId(SESSION))
+
+  await h.run(turn({ finish: undefined, completed: false, parts: [text('streaming')] }), permit)
+
+  assert.deepEqual(h.events, [], 'stale permit: zero PromptClaimed, zero terminal')
+  assert.deepEqual(h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync'), [])
+  live.cleanup()
+})
+
+test('Q08_probe_run_with_stale_permit_is_not_repaired', async () => {
   const live = liveJournal()
   seedAuthority(live.append)
   seedAcceptedContinuation(live.append, { physical: 'user-1' })
   const h = harness({ journal: live.journal })
 
-  await h.run(turn({ finish: undefined, completed: false, parts: [text('streaming')] }))
+  // CTX-012 race, without isRecoveryProbeRun: the probe continuation's
+  // transform began after the old idle was observed, so the old repair
+  // permit is stale and the repair is suppressed; the probe completes
+  // normally and its own reconcile promotes it.
+  const permit = h.freshPermit()
+  beginProviderAttempt(h.gate, sessionId(SESSION))
+
+  await h.run(turn({ finish: undefined, completed: false, parts: [text('streaming')] }), permit)
 
   assert.deepEqual(h.events, [], 'the probe turn must not be hijacked by a repair (CTX-012)')
+  assert.deepEqual(h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync'), [])
+  live.cleanup()
+})
+
+test('Q08_probe_run_with_no_idle_wake_is_not_repaired', async () => {
+  const live = liveJournal()
+  seedAuthority(live.append)
+  seedAcceptedContinuation(live.append, { physical: 'user-1' })
+  const h = harness({ journal: live.journal })
+
+  // A pass without idle evidence (retry/failure wake) carries no permit:
+  // no idle-derived continuation, regardless of the run's category.
+  await h.run(turn({ finish: undefined, completed: false, parts: [text('streaming')] }))
+
+  assert.deepEqual(h.events, [])
   assert.deepEqual(h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync'), [])
   live.cleanup()
 })
@@ -302,7 +368,7 @@ test('TCP_unknown_accepted_continuation_of_other_kind_still_repairs', async () =
   seedAcceptedContinuation(live.append, { physical: 'user-1', kind: 'InteractionRepair' })
   const h = harness({ journal: live.journal })
 
-  await h.run(turn({ finish: undefined, completed: false }))
+  await h.run(turn({ finish: undefined, completed: false }), h.freshPermit())
 
   assert.deepEqual(h.events, [], 'repair send succeeds: no terminal')
   assert.equal(h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync').length, 1)
@@ -311,21 +377,36 @@ test('TCP_unknown_accepted_continuation_of_other_kind_still_repairs', async () =
 
 test('TCP_needs_continuation_repairs_missing_report', async () => {
   const h = harness({})
-  await h.run(turn({ finish: 'length', completed: false, parts: [text('truncated')] }))
+  await h.run(turn({ finish: 'length', completed: false, parts: [text('truncated')] }), h.freshPermit())
 
   assert.equal(eventCase(h.events), 2)
   assert.equal(eventPayload(h.events), 'MISSING_FINAL_REPORT')
 })
 
-test('TCP_needs_continuation_probe_run_skips_repair', async () => {
+test('TCP_needs_continuation_probe_run_with_stale_permit_skips_repair', async () => {
   const live = liveJournal()
   seedAuthority(live.append)
   seedAcceptedContinuation(live.append, { physical: 'user-1' })
   const h = harness({ journal: live.journal })
 
-  await h.run(turn({ finish: 'length', completed: false, parts: [text('truncated')] }))
+  const permit = h.freshPermit()
+  beginProviderAttempt(h.gate, sessionId(SESSION))
+
+  await h.run(turn({ finish: 'length', completed: false, parts: [text('truncated')] }), permit)
 
   assert.deepEqual(h.events, [])
+  live.cleanup()
+})
+
+test('TCP_needs_continuation_without_permit_sends_nothing', async () => {
+  const live = liveJournal()
+  seedAuthority(live.append)
+  const h = harness({ journal: live.journal })
+
+  await h.run(turn({ finish: 'length', completed: false, parts: [text('truncated')] }))
+
+  assert.deepEqual(h.events, [], 'no idle evidence: no idle-derived continuation')
+  assert.deepEqual(h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync'), [])
   live.cleanup()
 })
 
@@ -335,10 +416,19 @@ test('TCP_in_progress_coder_repairs_interaction', async () => {
   const h = harness({})
   await h.run(
     turn({ roleAgent: 'fast-coder', finish: 'tool-calls', completed: false, parts: [text('working')] }),
+    h.freshPermit(),
   )
 
   assert.equal(eventCase(h.events), 2)
   assert.equal(eventPayload(h.events), 'MISSING_FINAL_REPORT')
+})
+
+test('TCP_in_progress_without_permit_sends_no_interaction_repair', async () => {
+  const h = harness({})
+  await h.run(turn({ roleAgent: 'fast-coder', finish: 'tool-calls', completed: false, parts: [text('working')] }))
+
+  assert.deepEqual(h.events, [], 'interaction repair is idle-derived: no permit, no send')
+  assert.deepEqual(h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync'), [])
 })
 
 test('TCP_in_progress_confirmed_reviewer_completes_with_fallback_text', async () => {
@@ -437,12 +527,31 @@ test('TCP_completed_manager_idle_encouragement_deduped', async () => {
   const h = harness({})
   const managerTurn = turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('progress')] })
 
-  await h.run(managerTurn)
-  await h.run(managerTurn)
+  await h.run(managerTurn, h.freshPermit())
+  await h.run(managerTurn, h.freshPermit())
 
   const fails = h.events.filter(([, outcome]) => outcome.tag === 2)
   assert.equal(fails.length, 1, 'encouragement claimed once; the replay is deduped by nudgeSent')
   assert.equal(payloadOf(fails[0][1]), 'No journal: a continuation cannot be claimed')
+})
+
+test('Q09_manager_idle_encouragement_without_permit_sends_nothing', async () => {
+  const h = harness({})
+  await h.run(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('progress')] }))
+
+  assert.deepEqual(h.events, [], 'no idle evidence: ManagerIdleEncouragement must not fire')
+  assert.deepEqual(h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync'), [])
+})
+
+test('Q09_manager_idle_encouragement_with_stale_permit_sends_nothing', async () => {
+  const h = harness({})
+  const permit = h.freshPermit()
+  beginProviderAttempt(h.gate, sessionId(SESSION))
+
+  await h.run(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('progress')] }), permit)
+
+  assert.deepEqual(h.events, [], 'stale permit: no stale IdleEncouragement')
+  assert.deepEqual(h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync'), [])
 })
 
 test('TCP_completed_manager_job_handed_off_completes_run', async () => {
@@ -476,7 +585,7 @@ test('TCP_in_progress_manager_conflict_pending_repairs_interaction', async () =>
   seedManagerJob(live.append, { progress: 'ConflictPending' })
   const h = harness({ journal: live.journal })
 
-  await h.run(turn({ roleAgent: 'fast-manager', finish: 'tool-calls', completed: false, parts: [text('guard round')] }))
+  await h.run(turn({ roleAgent: 'fast-manager', finish: 'tool-calls', completed: false, parts: [text('guard round')] }), h.freshPermit())
 
   assert.deepEqual(h.events, [], 'ConflictPending is not handed off for an in-progress manager: repair, not completion')
   assert.equal(h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync').length, 1)
@@ -514,18 +623,18 @@ test('TCP_completed_manager_planning_sends_work_activation', async () => {
   live.cleanup()
 })
 
-test('TCP_completed_join_outstanding_defers_then_nudges', async () => {
+test('TCP_completed_manager_deferred_encouragement_fails_closed_without_profile', async () => {
   const live = liveJournal()
   const h = harness({ journal: live.journal, hasLivePty: () => true })
-  await h.run(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('done')] }))
+  await h.run(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('done')] }), h.freshPermit())
 
-  assert.equal(h.events.length, 1, 'completion deferred, then the join nudge fails closed with a terminal')
+  assert.equal(h.events.length, 1, 'completion deferred (GLORY-070), encouragement attempt fails closed with a terminal')
   assert.equal(eventCase(h.events), 2)
   assert.equal(eventPayload(h.events), 'No active authority profile')
   assert.equal(
     h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync').length,
     0,
-    'join nudge fails closed without an authority profile (no physical send)',
+    'encouragement fails closed without an authority profile (no physical send)',
   )
   live.cleanup()
 })

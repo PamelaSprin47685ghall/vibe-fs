@@ -72,6 +72,10 @@ module SpikePlugin =
                     match StudentQaStore.Create directory with
                     | Error error -> scope.MarkStudentTeacherUnavailable error
                     | Ok qaStore ->
+                        let registerTeacher teacherId _agent =
+                            wired.RegisterOwned(SessionId.value teacherId)
+                            wired.BindActiveRun teacherId Role.Teacher (Some directory)
+
                         let studentTeacher =
                             new StudentTeacherRuntime(
                                 sessionPort,
@@ -80,9 +84,8 @@ module SpikePlugin =
                                 durable,
                                 qaStore,
                                 directory,
-                                fun teacherId _agent ->
-                                    wired.RegisterOwned(SessionId.value teacherId)
-                                    wired.BindActiveRun teacherId Role.Teacher (Some directory)
+                                registerTeacher,
+                                scope.Quiescence
                             )
 
                         scope.AttachStudentTeacherRuntime studentTeacher
@@ -134,6 +137,13 @@ module SpikePlugin =
                         let projectionSessionIdOpt = projectionSessionIdFromMessages outObj
 
                         projectionSessionIdOpt |> Option.iter wired.RegisterOwned
+
+                        // HOST-004：新 provider request 开始构建 → 旧 idle permit
+                        // 立即失效。必须在该 transform 的最早同步位置（任何 let!
+                        // 之前）调用，不得等 request 已运行才标 Running。
+                        projectionSessionIdOpt
+                        |> Option.iter (fun sessionId ->
+                            scope.Quiescence.BeginProviderAttempt(SessionId.create sessionId))
 
                         // COMPANION-003/007: keep the XTrace in step with the
                         // provider-visible semantic projection at the transform

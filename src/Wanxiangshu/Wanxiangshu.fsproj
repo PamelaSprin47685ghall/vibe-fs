@@ -169,6 +169,7 @@
     <Compile Include="Application/Reconciliation/CompletedTurnClassifier.fs"/>
     <Compile Include="Application/Reconciliation/XTraceCapture.fs"/>
     <Compile Include="Application/Prompting/PromptIngress.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/SessionQuiescenceGate.fs"/>
     <Compile Include="Session/StudentTeacherRuntime.fs"/>
     <Compile Include="Application/Reconciliation/PromptRecovery.fs"/>
     <Compile Include="Session/HostPendingRun.fs"/>
