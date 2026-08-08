@@ -38,14 +38,13 @@ must = []
 flow = [
   # A non-retryable provider error does not emit a scenario response signal. The
   # settled assistant snapshot is the only legal wake-up for FALLBACK-003.
-  { awaitTerminal = { requireAssistantTerminal = true, requireIdleAfterActivity = true } },
+  { awaitTerminal = true, requireAssistantTerminal = true, requireIdleAfterActivity = true },
   { waitFact = { name = "FallbackCursorAdvanced", eq = 4 } },
 
   # First continue match only. StrictMockSignals permanent-consume makes wait="continue"
   # return immediately after the first continue delivery — it cannot barrier multi-delivery
   # continues. assertModelTrajectory polls for the fifth (success) chat request.
-  # Reconciler snapshot backoff can legitimately cross the default 5s silence window.
-  { wait = "continue", timeoutMs = 15000 },
+  { wait = "continue" },
 
   # Exact list: four settled failures cycle A→A→B→B, then the fifth delivery
   # (Offset 3→0, still inside FALLBACK-005's budget of 12) succeeds and the run completes.

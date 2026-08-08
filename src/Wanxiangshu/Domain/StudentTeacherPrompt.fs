@@ -5,6 +5,9 @@ namespace Wanxiangshu.Domain
 [<RequireQualifiedAccess>]
 module StudentTeacherPrompt =
 
+    [<Literal>]
+    let TeacherReturnCompletion = "Teacher answer returned to Student."
+
     let teacherQuestion (question: string) (replacement: bool) =
         let instructions =
             [ "Answer the Student's current question using Socratic, first-principles reasoning."
@@ -25,6 +28,12 @@ module StudentTeacherPrompt =
         SyntheticToml.document
             [ "This is the Teacher's returned answer. Continue learning from it." ]
             [ SyntheticToml.field "answer" (SyntheticToml.renderString answer) ]
+
+    let teacherReturnResult =
+        SyntheticToml.document
+            [ "The answer is durably recorded and will be delivered to the Student after this turn completes."
+              "Do not call another tool. Finish this turn now by outputting completion_text exactly." ]
+            [ SyntheticToml.field "completion_text" (SyntheticToml.renderString TeacherReturnCompletion) ]
 
     let compile (qaPath: string) =
         SyntheticToml.document

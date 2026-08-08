@@ -23,16 +23,12 @@ must = ["continue"]
 flow = [
   # The fault does not wake the strict provider expectation queue. Await the real Host
   # terminal/idle transition, then the durable fact written by FallbackController.
-  # Host 1.18.9 writes `finish = null` on a 400 provider-error message (no finishReason),
-  # so a top-level `requireAssistantTerminal = true` can never be satisfied here — the
-  # settled snapshot is the legal wake-up (same nested form as fallback-aabb-trace).
-  { awaitTerminal = { requireIdleAfterActivity = true } },
+  { awaitTerminal = true, requireAssistantTerminal = true, requireIdleAfterActivity = true },
   # The continuation response is the causal wake for the rest of the flow. It is waited
   # on BEFORE the journal fact: `waitFact` polls on 500ms slices, and by the time the
   # fact is observed the continuation's SSE (and its session.idle) may already be over —
   # an `awaitEvent` after it would wait for an idle that never comes again.
-  # Reconciler snapshot backoff can legitimately cross the default 5s silence window.
-  { wait = "continue", timeoutMs = 15000 },
+  { wait = "continue" },
   # The durable cursor fact is written before the continuation is sent, so it is
   # guaranteed to exist by the time the continuation response has been consumed.
   { waitFact = { name = "FallbackCursorAdvanced", eq = 1 } },
@@ -94,11 +90,6 @@ user = "#"
 
   [[turn.step]]
   respond = { type = "text", text = "Continuing after missing final report." }
-
-[[epoch]]
-turn = "missing-final-report-repair"
-step = 0
-reason = "prefix-probe"
 
 [[turn]]
 id = "blogger"

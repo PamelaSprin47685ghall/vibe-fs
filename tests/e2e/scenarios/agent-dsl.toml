@@ -27,7 +27,10 @@ flow = [
 id = "manager"
 lane = "fast-manager"
 user = "Delegate this canary to a Coder with fork, join the Coder, and report the result."
+# AGENT-006/AGENT-011: Manager owns only fork/join/list. The tools gate fails
+# closed if any of these leaks onto the wire.
 tools = ["fork", "join", "list"]
+forbiddenTools = ["read", "write", "edit", "bash", "glob", "grep", "verdict"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Write canary_output.txt with exactly Coder canary slice OK\n, then report completion." } }

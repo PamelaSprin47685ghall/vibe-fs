@@ -484,11 +484,11 @@ user = "# Review is required before completion."
       runtime.bind('inspector-title', SESSION);
       const prompt = 'Run the command and report if it timed out.';
 
-      const step0 = deliver(runtime, request([user(prompt)]));
+      const step0 = deliver(runtime, request([user(prompt)], { tools: [{ name: 'executor' }] }));
       assertEq(step0.entry.id, 'inspector.0');
       assertEq(step0.entry.respond.tool, 'executor');
 
-      const step1 = deliver(runtime, request([user(prompt), assistant('executor called')]));
+      const step1 = deliver(runtime, request([user(prompt), assistant('executor called')], { tools: [{ name: 'executor' }] }));
       assertEq(step1.entry.id, 'inspector.1');
 
       const title = deliver(runtime, request([user('Generate a title for this conversation:\n'), user(prompt)]));

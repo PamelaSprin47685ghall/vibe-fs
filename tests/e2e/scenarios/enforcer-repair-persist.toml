@@ -27,6 +27,8 @@ flow = [
   { wait = "blogger-repair.0" },
   { custom = "assertRepairPersisted" },
   { abort = true },
+  # `must` only takes effect through a flow step; abort alone never asserts.
+  { expectSatisfied = true },
 ]
 
 [[turn]]

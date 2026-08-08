@@ -35,25 +35,49 @@ function isRepairMessage(message) {
   return false
 }
 
+/** The last user message's text on the wire, or null. */
+function lastUserText(request) {
+  const messages = request?.messages ?? [];
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.role !== 'user') continue;
+    const content = message?.content;
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) {
+      const text = content
+        .filter((chunk) => chunk?.type === 'text' && typeof chunk?.text === 'string')
+        .map((chunk) => chunk.text)
+        .join('');
+      if (text !== '') return text;
+    }
+    for (const part of message?.parts ?? []) {
+      if (part?.type === 'text' && typeof part?.text === 'string') return part.text;
+    }
+  }
+  return null;
+}
+
 async function assertRepairPersisted(scenario) {
   const requests = scenario.provider?.requests ?? [];
   assert.ok(requests.length >= 2, `expected at least two blogger requests, got ${requests.length}`);
 
-  // The injected message must appear in a request OTHER than the one whose
-  // empty reply triggered the injection: Host persistence is the property
-  // under test, not the transform output of the triggering request itself.
-  const carries = [];
-  for (let i = 1; i < requests.length; i++) {
-    const messages = requests[i]?.messages ?? [];
-    const hit = messages.find(isRepairMessage);
-    if (hit) {
-      carries.push({ request: i });
-    }
-  }
+  // The SECOND blogger request is the automatic continuation after the AABB
+  // repair: the injected RepairInstruction is its last user turn (scenario
+  // turn `blogger-repair`). The marker must ride in THAT request's history —
+  // Host persistence is the property under test, not the transform output of
+  // the triggering request itself. A marker in any later request is not
+  // evidence of persistence.
+  const second = requests.find((request) => (lastUserText(request) ?? '').includes(REPAIR_MARKER));
   assert.ok(
-    carries.length >= 1,
-    `no later provider request carries the injected repair message; requests=${requests.length}` +
-      `\n${requests.map((r, i) => `${i}: ${(r.messages ?? []).length} messages, roles=${(r.messages ?? []).map((m) => m.role).join(',')}`).join('\n')}`,
+    second,
+    `no second blogger request carries the injected prompt; requests=${requests.length}\n` +
+      requests.map((r, i) => `${i}: lastUser=${JSON.stringify(lastUserText(r))}, roles=${(r.messages ?? []).map((m) => m.role).join(',')}`).join('\n'),
+  );
+  assert.ok(
+    (second.messages ?? []).some(isRepairMessage),
+    `the SECOND blogger request must carry the injected repair message in its history; ` +
+      `lastUser=${JSON.stringify(lastUserText(second))}\n` +
+      JSON.stringify(second.messages, null, 1),
   );
 }
 

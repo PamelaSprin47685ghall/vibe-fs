@@ -11,7 +11,7 @@ setup = { strict = true }
 session = { agent = "fast-coder", bind = ["coder-title", "fast-coder"] }
 prompt = { agent = "fast-coder", text = "X-B round 1 probe sent unaccepted." }
 
-must = ["continue", "after-restart"]
+must = ["continue", "after-restart", "blogger"]
 
 flow = [
   # Restart as soon as continue.0 is matched at the mock (probe already on the wire
@@ -21,6 +21,11 @@ flow = [
 
   { wait = "continue" },
   { awaitRestart = true },
+
+  # Journal is cumulative across the restart: snapshotting right after boot reads
+  # the replayed pre-restart facts (OpeningPromptCaptured, FallbackCursorAdvanced),
+  # proving they survived; the oracle then checks nothing retreats post-restart.
+  { custom = "snapshotBeforeRestart" },
 
   { assertDeliveries = { id = "continue.0", eq = 1 } },
   { assertFacts = { name = "PrefixRebaseCommitted", eq = 0 } },
@@ -33,6 +38,11 @@ flow = [
   # Lost AttemptPlan must not cause a second physical continue for the same plan.
   { assertDeliveries = { id = "continue.0", eq = 1 } },
   { assertFacts = { name = "PrefixRebaseCommitted", eq = 0 } },
+
+  # Blogger cycle runs in the background after the post-restart main turn; barrier
+  # on its first durable frame so the oracle's blogEntry >= 1 is deterministic.
+  { waitFact = { name = "BlogEntryCommitted", gte = 1 } },
+
   { custom = "oracle" },
   { expectSatisfied = true },
 ]

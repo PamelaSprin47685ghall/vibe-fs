@@ -1,13 +1,14 @@
 # HOST-004/EXEC-009 + GLORY: a Host restart mid-run must reconcile from the
-# journal, and a restored child must still carry the tools its agent declares.
+# journal, and the restored Manager Life continues with a working tool surface.
 # The Manager Life is born (GLORY-014), planned, activated (GLORY-018/020), and
 # finished via suicide → Host-owned Reviewer → confirmed (GLORY-060). The
-# restart fires after the Activation continuation lands; the restored Manager
-# nudges the SAME coder child (child-a1) and gets a reply (child-a2).
+# restart fires after the Activation continuation lands; the restored Manager's
+# post-restart fork does not match the pre-restart child handle and creates a
+# FRESH coder child (child-a2), which carries the coder tools its agent declares.
 
 scenario = "host-restart"
-description = "HOST-004 restart reconcile; restored Manager Life continues; restored child retains coder tools"
-pass = "Host restart reconcile canary passed: restored child retained coder tools across restart."
+description = "HOST-004 restart reconcile; restored Manager Life continues; post-restart fork creates a fresh coder child"
+pass = "Host restart reconcile canary passed: restored Manager Life continues and its post-restart fork creates a fresh coder child with coder tools."
 
 setup = { strict = true, project = { files = { "AGENTS.md" = "host restart canary\n" } } }
 session = { agent = "fast-manager", bind = ["parent-title", "fast-manager"] }
@@ -94,8 +95,9 @@ tools = ["fork", "join", "list", "suicide"]
   [[turn.step]]
   respond = { type = "text", text = "Activation acknowledged; working." }
 
-# After the restart: the restored Manager nudges the restored coder child
-# (child-a1's session) for a second write, then finishes via suicide.
+# After the restart: the restored Manager's fork creates a fresh coder child
+# (child-a2) — the pre-restart child-a1 session is not re-adopted — then the
+# Manager joins twice and finishes via suicide.
 [[turn]]
 id = "manager-after-restart"
 lane = "fast-manager"

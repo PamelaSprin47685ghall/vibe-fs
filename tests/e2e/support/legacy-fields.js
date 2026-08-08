@@ -18,8 +18,7 @@ export const RETIRED_FIELDS = {
   match: 'declare the turn text; a step is keyed by (lane, turn, step), not by a predicate bag',
   userRegex: 'declare a distinctive literal prefix of the user text; regexes cannot be prefix-ordered',
   containsText: 'declare the turn text as a prefix',
-  requiredTools: 'declare tools on the turn; they are part of the request identity, not a filter',
-  forbiddenTools: 'a tool set that must be absent is a different turn, so declare that turn',
+  requiredTools: 'declare tools on the turn; the runtime asserts every declared tool is present on the wire request',
   messageCount: 'use step; it counts assistant messages after the last user message',
   afterToolResult: 'a tool result is already in the semantic prefix, so the prefix shape says this',
 

@@ -122,6 +122,18 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 let agentId = managerAgentId jobId
                 worktrees.[agentId] <- WorktreePath.value worktree
 
+                // ORCH-003 restart: family recovery is journal-only for this
+                // Host (SpikePlugin.restoreHandles → restoreLinkedChildrenWithoutRuntime),
+                // so the runtime's children map is empty after a crash and Fork
+                // would mint a NEW Manager session. The durable record names the
+                // original session; re-enlisting it (GLORY-045 AdoptChild) makes
+                // Fork take its existing-child nudge path — the SAME session with
+                // its ManagerLife — so the resumed conflict-resolution run can
+                // still end with suicide instead of looping on IdleEncouragement.
+                match runtime.Children.TryGetValue agentId with
+                | true, _ -> ()
+                | false, _ -> runtime.AdoptChild(agentId, record.ManagerSessionId)
+
                 match! runtime.Fork(agentId, Role.Manager, record.ManagerAgent, prompt, None, firstPrompt = false) with
                 | Error error -> return Error error
                 | Ok _ -> return! awaitManager jobId

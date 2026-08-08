@@ -33,6 +33,7 @@
  */
 
 import { messageText, semanticOf } from './provider-wire.js';
+import { extractToolNames } from './strict-mock-matches.js';
 import { toArray as listToArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js';
 // HOST-013: the production constants, read from the build artifact rather than
 // copied, so a rewording of the marker text fails here instead of silently
@@ -328,14 +329,31 @@ const prefixMatches = (turn, declarations) =>
  * same point in the conversation with two different responses, so the scenario does
  * not say what the model does next.
  */
+/**
+ * The tools gate: a declared `tools` list is an assertion that the wire request
+ * carries every named tool (the old `requiredTools` semantics), and
+ * `forbiddenTools` asserts absence. A request failing the gate is not a match
+ * for that entry — it falls through to `unmatched` and the strict mock fails
+ * closed, exactly like an undeclared turn. Without the gate the fields were
+ * dead data: compiled into entries, read by no one, while authors believed the
+ * AGENT-006 tool matrix was under test.
+ */
+const toolsGate = (entry, requestTools) => {
+  if ((entry.tools ?? []).some((name) => !requestTools.includes(name))) return false;
+  if ((entry.forbiddenTools ?? []).some((name) => requestTools.includes(name))) return false;
+  return true;
+};
+
 export function resolveEntry(body, entries, bindings, context) {
   const key = runtimeKeyOf(body, bindings, context);
+  const requestTools = extractToolNames(body);
 
   const atKey = entries.filter(
     (entry) =>
       (entry.lane === undefined || key.lanes.has(entry.lane)) &&
       (entry.kind ?? 'chat') === key.kind &&
-      entry.step === key.step,
+      entry.step === key.step &&
+      toolsGate(entry, requestTools),
   );
 
   const matches = prefixMatches(key.turn, atKey);

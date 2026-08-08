@@ -1,9 +1,10 @@
 # X-C (CTX-012 / PERSIST-010): probe attempt reaches Completed at Host; promote
-# either lands or is the crash window. Clean restart after continue completes.
-# Durable facts that must survive: XTrace*, BlogEntryCommitted (RecordCoverage).
-# PrefixCoverage only zeroes on ContextReanchored (reanchor), not on failed promote.
-# If PrefixRebaseCommitted already committed before kill, X-C still proves XTrace
-# and coverage do not retreat; X-D covers promote-then-restart identity.
+# lands at terminal idle (c431ae33) and must survive the clean restart after the
+# continue completes. Durable facts that must survive: PrefixRebaseCommitted,
+# XTrace*, BlogEntryCommitted (RecordCoverage). PrefixCoverage only zeroes on
+# ContextReanchored (reanchor), never on promote. The host broadcasts idle before
+# the promote append, so the flow barriers on PrefixRebaseCommitted before the
+# snapshot/restart; the oracle then requires exactly one promote after restart.
 
 scenario = "x-c-accepted-before-promote"
 description = "X-C: probe completed then restart; XTrace/RecordCoverage survive; PrefixCoverage not zeroed without reanchor"
@@ -20,6 +21,11 @@ flow = [
   { wait = "continue" },
   { waitFact = { name = "FallbackCursorAdvanced", eq = 1 } },
   { awaitEvent = { type = "session.idle", session = "self" }, timeoutMs = 15000 },
+
+  # The host broadcasts idle before reconcileAttempt appends PrefixRebaseCommitted
+  # (the promote runs downstream of the idle-driven reconcile). Barrier on the
+  # durable fact so snapshot/restart cannot lose the promote to that window.
+  { waitFact = { name = "PrefixRebaseCommitted", eq = 1 } },
 
   # Snapshot durable counters before restart (oracle reads journal again after).
   { custom = "snapshotBeforeRestart" },
@@ -86,11 +92,6 @@ user = "#"
 
   [[turn.step]]
   respond = { type = "text", text = "Continuing after missing final report." }
-
-[[epoch]]
-turn = "missing-final-report-repair"
-step = 0
-reason = "prefix-probe"
 
 [[turn]]
 id = "blogger"

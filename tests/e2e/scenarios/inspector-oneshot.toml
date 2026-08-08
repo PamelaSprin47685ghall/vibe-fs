@@ -1,7 +1,8 @@
 # AGENT-007: Coder may reach a fact through the opaque `inspector` tool, and its
-# schema contains no `executor`. The forbidden half used to be a `forbiddenTools`
-# predicate here; it is now a production gate assertion, because a mock cannot prove
-# a tool is absent from a schema it never sees.
+# schema contains no `executor`. The coder turn below declares
+# `forbiddenTools = ["executor"]`, and the harness tools gate (runtime-key.js)
+# fails the turn closed if `executor` appears on the wire — the mock sees the
+# request's tool list, so the absence is asserted, not assumed.
 
 scenario = "inspector-oneshot"
 description = "AGENT-007 Coder investigates through inspector and stops"
@@ -30,7 +31,9 @@ flow = [
 id = "coder"
 lane = "fast-coder"
 user = "Use inspector once to investigate a precise workspace fact needed for the edit. Then stop with a short summary."
+# AGENT-006: Coder matrix has inspector but no executor.
 tools = ["inspector"]
+forbiddenTools = ["executor"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "inspector", args = { prompt = "Inspect the workspace and return factual findings relevant to the requested edit." } }

@@ -328,7 +328,7 @@ async function finalOracle(scenario, ctx) {
   );
   assert.equal(fs.readFileSync(blobPath, 'utf8'), FINAL_WORDS, 'terminal last_words must be verbatim FINAL');
 
-  assert.equal(readJournal(workDir, 'LifeCompleted').named, 1, 'LifeCompleted must precede the terminal');
+  assert.equal(readJournal(workDir, 'LifeCompleted').named, 1, 'journal must record exactly one LifeCompleted');
 }
 
 const customs = {

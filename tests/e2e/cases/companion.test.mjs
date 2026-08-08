@@ -31,11 +31,22 @@ function sessionCreatedIds(scenario) {
 async function assertBloggerTranscript(scenario, bloggerId) {
   const res = await scenario.client.messages(bloggerId);
   assert.ok(res.ok, `failed to fetch Blogger messages: ${JSON.stringify(res.data)}`);
-  const transcript = JSON.stringify(res.data);
-  // Cycle text lands via blog tool args (not bare assistant prose).
+  const messages = res?.data?.messages ?? res?.data?.data ?? res?.data;
+  const list = Array.isArray(messages) ? messages : [];
+  // Cycle text lands via blog tool args (not bare assistant prose), so the
+  // assertion is the exact args text, never a substring of the whole transcript.
+  const blogTexts = [];
+  for (const message of list) {
+    const parts = message?.parts ?? (Array.isArray(message?.content) ? message.content : []);
+    for (const part of parts) {
+      if (part?.type !== 'tool' || (part.tool !== 'blog' && part.name !== 'blog')) continue;
+      const args = part?.state?.input ?? part?.input ?? part?.args ?? {};
+      if (typeof args?.text === 'string') blogTexts.push(args.text);
+    }
+  }
   assert.ok(
-    transcript.includes('Blogger paragraph.') || transcript.includes('blog'),
-    `Blogger transcript missing cycle/blog content: ${transcript.slice(0, 500)}`,
+    blogTexts.includes('Blogger paragraph.'),
+    `Blogger transcript missing blog tool-call with args.text exactly 'Blogger paragraph.': ${JSON.stringify(res.data).slice(0, 500)}`,
   );
 }
 
@@ -62,9 +73,10 @@ async function runProjectionScenario(scenario) {
   const childIdsAfterFirstProjection = [...new Set(sessionCreatedIds(scenario))].filter((id) => id !== primaryId);
   assert.equal(childIdsAfterFirstProjection.length, 1, 'first primary projection must create exactly one Blogger child session');
   const bloggerId = childIdsAfterFirstProjection[0];
-  // Blogger parks after the blog tool cycle (ENFORCER-050). Do not wait for
-  // session.idle on the Blogger — parked waiters keep the child non-idle until
-  // the next main offer. Provider request count is the observable.
+  // The Blogger parks after the blog tool-call instead of going idle (a
+  // production behaviour; no clause names the park). Do not wait for
+  // session.idle on the Blogger — a parked waiter keeps the child non-idle
+  // until the next main offer. Provider request count is the observable.
   const deadline1 = Date.now() + WATCHDOG_TIMEOUT_MS;
   while (Date.now() < deadline1 && bloggerRequests(scenario.provider, bloggerId).length < 1) {
     await new Promise((r) => setTimeout(r, 50));

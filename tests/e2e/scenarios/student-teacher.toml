@@ -41,6 +41,9 @@ user = "# Answer the Student's current question"
   [[turn.step]]
   respond = { type = "tool-call", tool = "return", args = { message = "The smallest sufficient principle is to preserve one proven causal chain." } }
 
+  [[turn.step]]
+  respond = { type = "text", text = "provider trailing Teacher prose that must be replaced" }
+
 [[turn]]
 id = "student-compile"
 internal = true

@@ -268,6 +268,7 @@ const compileTurns = (turns) =>
       turn: turn.user,
       step: stepIndex,
       tools: turn.tools ?? [],
+      forbiddenTools: turn.forbiddenTools ?? [],
       respond: step.respond,
     })),
   );
@@ -620,6 +621,23 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
     }
     if (turn.internal !== undefined && turn.internal !== true) {
       problems.push(`turn[${index}] internal must be true when present; omit it otherwise`);
+    }
+    // `tools` and `forbiddenTools` are live wire assertions (runtime-key.js toolsGate):
+    // every declared tool must be present on the request, every forbidden one absent.
+    for (const field of ['tools', 'forbiddenTools']) {
+      const declared = turn[field];
+      if (declared === undefined) continue;
+      if (!Array.isArray(declared) || declared.some((name) => typeof name !== 'string' || name === '')) {
+        problems.push(`turn[${index}] ${field} must be an array of non-empty tool names`);
+      } else if (new Set(declared).size !== declared.length) {
+        problems.push(`turn[${index}] ${field} entries must be unique`);
+      }
+    }
+    if (Array.isArray(turn.tools) && Array.isArray(turn.forbiddenTools)) {
+      const overlap = turn.tools.filter((name) => turn.forbiddenTools.includes(name));
+      if (overlap.length > 0) {
+        problems.push(`turn[${index}] tool '${overlap[0]}' is both required and forbidden`);
+      }
     }
     (turn.step ?? []).forEach((step, stepIndex) => {
       if (step.optional !== undefined && step.optional !== true) {
