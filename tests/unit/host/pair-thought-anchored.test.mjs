@@ -239,18 +239,20 @@ test('H13_04_restart_replay_is_byte_identical', () => {
   rmSync(dir, { recursive: true, force: true })
 })
 
-// ── H13-05: a lost anchor fails closed ──────────────────────────────────────
+// ── H13-05: missing-anchor pairs are omitted (XWire DropLeading) ────────────
+//
+// CTX-010 prefix probe rewrites the covered head to FrozenRecordPrefix and
+// drops those messages. Anchors that lived in the dropped region are absent
+// from the rewritten real view. Relocating the pair would break PREFIX LAW;
+// AbortSession would kill the recovery slot. The durable fact stays; only
+// placeable pairs render. When the full transcript returns, anchors reappear.
 
-test('H13_05_missing_anchor_fails_closed', () => {
+test('H13_05_missing_anchor_pair_is_omitted_not_relocated', () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-h1305-'))
   const opened = openJournal(dir)
   try {
     const session = 'h13-05'
 
-    // A durable fact claims FakeReq1 sits after message M7, but the current
-    // raw transcript has no M7. Replay must fail closed — "place it near the
-    // current batch / before the trailing user / at the end / drop the pair"
-    // would all silently break the prefix cache.
     const anchored = agentFact('PairProgrammingGuidelineAnchored', {
       SessionId: sessionId(session),
       Ordinal: 1n,
@@ -267,9 +269,75 @@ test('H13_05_missing_anchor_fails_closed', () => {
     )
     assert.equal(appended.ok, true, JSON.stringify(appended))
 
-    const result = resultOf(tryInject(opened.journal, session, text, toList([userMsg('u1')])))
-    assert.equal(result.ok, false, 'missing anchor must fail closed')
-    assert.match(result.error, /HistoricalSyntheticAnchorMissing/)
+    // Rewritten view: covered u1/msg_7 gone; only a synthetic prefix + continue.
+    const synthPrefix = {
+      info: { id: 'synth-prefix-frozen', role: 'user' },
+      parts: [{ type: 'text', text: '# Opening task\ncovered work' }],
+    }
+    const cont = userMsg('u-continue', '# Continue after provider failure.')
+    const result = resultOf(tryInject(opened.journal, session, text, toList([synthPrefix, cont])))
+    assert.equal(result.ok, true, `missing-anchor pair must omit, not fail: ${result.error ?? ''}`)
+    const wire = listItems(result.value)
+    // Pair1 (after msg_7) must not reappear anywhere — no relocate.
+    const call1 = stableCallId(session, 1n)
+    assert.equal(
+      wire.some((m) => m.parts?.[0]?.callID === call1),
+      false,
+      'unplaceable historical pair must not be relocated onto the rewritten view',
+    )
+    // Historical fact remains; a new pair may land on the rewritten trailing placement.
+    const durable = durablePairCount(opened.journal, session)
+    assert.ok(durable === 1 || durable === 2, `durable pairs 1..2, got ${durable}`)
+    const pairs = pairMessages(wire)
+    assert.ok(pairs.length === 0 || pairs.length === 2, 'at most one new pair on the rewritten view')
+    assert.equal(
+      pairs.some((m) => m.parts?.[0]?.callID === call1),
+      false,
+      'new wire pairs must not reuse the unplaceable historical callId',
+    )
+  } finally {
+    opened.dispose()
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+// X-B regression: after a durable pair on the opening user, XWire drops that
+// user for the recovery continue. tryInject must still commit (not Abort).
+test('H13_05b_xwire_drop_leading_continue_still_commits', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-h1305b-'))
+  const opened = openJournal(dir)
+  try {
+    const session = 'h13-05b'
+    const user1 = userMsg('u1', 'X-B round 1')
+    const failAsst = { info: { id: 'a1', role: 'assistant' }, parts: [] }
+    const cont = userMsg('u2', '# Continue after provider failure.')
+    const synthPrefix = {
+      info: { id: 'synth-prefix-frozen', role: 'user' },
+      parts: [{ type: 'text', text: '# Opening task\nX-B round 1\n\n# Work log\nframe' }],
+    }
+
+    const wire1 = inject(opened.journal, session, [user1])
+    assert.equal(durablePairCount(opened.journal, session), 1)
+
+    // DropLeading removes u1 (pair1's Before(u1) anchors).
+    const result = resultOf(
+      tryInject(opened.journal, session, text, toList([synthPrefix, failAsst, cont])),
+    )
+    assert.equal(result.ok, true, `XWire continue must not fail closed: ${result.error ?? ''}`)
+    const wire2 = listItems(result.value)
+    const call1 = stableCallId(session, 1n)
+    assert.equal(
+      wire2.some((m) => m.parts?.[0]?.callID === call1),
+      false,
+      'pair1 anchors dropped with covered prefix — must not reappear',
+    )
+    // Full transcript (no drop) still replays pair1; pure u1 re-entry is byte-identical.
+    const restored = inject(opened.journal, session, [user1, failAsst, cont])
+    assert.ok(
+      restored.some((m) => m.parts?.[0]?.callID === call1),
+      'full transcript must re-place pair1 at its durable anchor',
+    )
+    assertWireEqual(wire1, inject(opened.journal, session, [user1]), 'H13-05b same placement on u1 is pure replay')
   } finally {
     opened.dispose()
     rmSync(dir, { recursive: true, force: true })

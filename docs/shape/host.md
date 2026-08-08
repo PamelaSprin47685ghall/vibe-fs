@@ -114,7 +114,7 @@ type PairProgrammingGuideline =
 
 **放置边界**：历史 synthetic half 的位置只由它自己的 durable gap anchor 决定，replay 按 `Start → 逐条真实消息（Before 组 → 消息 → After 组）` 注入，组内 ordinal 升序、同 ordinal call 先于 result。当前 transcript 长什么样不得改变历史 pair 的位置。新 pair 的 gap 只由当前真实消息末端结构决定（tool batch 时 call 挂 call 批末、result 挂 result 批末；无 tool 时二者同 gap 相邻；空历史用 `Start`）。同一 placement identity（SessionId + CallGap + ResultGap）最多一个 pair；重复 transform 只 replay。
 
-Coordinator 是追加与恢复的唯一 writer；Projection 只按 anchor 确定性渲染，不再决定历史位置。XTrace、Companion、Blogger、work record 与 compaction 不拥有也不复制正文。anchor 引用的真实消息在 transcript 中缺失时 fail closed（`HistoricalSyntheticAnchorMissing`），禁止“尽量放”或忽略；legacy 无 anchor fact 使该 session fail closed，不做启发式迁移。
+Coordinator 是追加与恢复的唯一 writer；Projection 只按 anchor 确定性渲染，不再决定历史位置。XTrace、Companion、Blogger、work record 与 compaction 不拥有也不复制正文。anchor 引用的真实消息在当前真实 view 中缺失时，该 pair 不参与本次 wire 渲染（禁止重定位；禁止因此 AbortSession）；durable fact 保留，完整 transcript 回来后再 replay。legacy 无 anchor fact 使该 session fail closed，不做启发式迁移。
 
 **所有权边界**：Companion / Blogger transcript 不进入 HOST-013 writer 路径——不为这些 session 创建 `Guidelines` 投影、不 append `PairProgrammingGuidelineAnchored`、不在其 provider wire 上渲染 pair。Work session 与其它 Managed child 仍按 HOST-013 永久追加。
 

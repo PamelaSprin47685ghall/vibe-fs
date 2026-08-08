@@ -18,6 +18,7 @@ const compile = (source) => compileScenario(source, { name: 'p.toml' });
 const rejects = (source, fragment) => {
   const result = compile(source);
   assertTrue(!result.ok, 'expected rejection');
+  assertTrue(result.scenario === undefined, 'a rejection must not carry a usable scenario');
   assertTrue(
     result.problems.some((problem) => problem.includes(fragment)),
     `expected a problem mentioning '${fragment}', got: ${result.problems.join(' | ')}`,
@@ -100,6 +101,39 @@ export const schemaCases = [
         scenario.entries.map((entry) => `${entry.id}@${entry.step}`).join(' '),
         'mgr.0@0 mgr.1@1 coder.0@0',
       );
+    },
+  },
+
+  {
+    name: 'VERIFY-003 an explicit runtimeStep compiles a sparse measured cursor',
+    fn: () => {
+      const scenario = accepts(`scenario = "p"
+flow = [ { prompt = { text = "go" } } ]
+
+[[turn]]
+id = "a"
+user = "go"
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "return", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 3
+  respond = { type = "text", text = "done" }
+`);
+
+      assertEq(
+        scenario.entries.map((entry) => `${entry.id}@${entry.step}`).join(' '),
+        'a.0@0 a.1@3',
+      );
+    },
+  },
+
+  {
+    name: 'VERIFY-003 runtimeStep rejects malformed and duplicate cursors',
+    fn: () => {
+      rejects(minimal('\n  [[turn.step]]\n  runtimeStep = -1\n  respond = { type = "text", text = "bad" }\n'), 'runtimeStep must be a non-negative integer');
+      rejects(minimal('\n  [[turn.step]]\n  runtimeStep = 0\n  respond = { type = "text", text = "duplicate" }\n'), 'runtimeStep 0 duplicates');
     },
   },
 
@@ -795,6 +829,7 @@ user = "Ship the parser fix."
   respond = { type = "text", text = "Done." }
 `;
 
+      rejects(claiming('false'), 'assertModelTrajectory must be a table');
       rejects(claiming('{ lane = "nonexistent", models = ["test-model"] }'), "references lane 'nonexistent'");
       rejects(claiming('{ lane = "fast-manager", models = [] }'), 'needs the exact expected model sequence');
       accepts(claiming('{ lane = "fast-manager", models = ["test-model", "test-model-b"] }'));
@@ -875,6 +910,7 @@ user = "go"
 ]`,
       );
 
+      rejects(withWaitFact('false'), 'waitFact must be a table');
       rejects(withWaitFact('{ name = "Published", renewOn = ["", "CandidateReady"] }'), 'renewOn entries must be non-empty strings');
       rejects(withWaitFact('{ name = "Published", renewOn = ["CandidateReady", "CandidateReady"] }'), 'renewOn entries must be unique');
       rejects(withWaitFact('{ name = "Published", renewOn = ["Published"] }'), 'renewOn must not contain the target fact');
@@ -910,6 +946,27 @@ user = "go"
     fn: () => {
       // The two are different author actions: fix the syntax, versus fix the meaning.
       rejects('scenario = "p"\n[[turn\nid = "a"\n', 'TOML parse failed');
+    },
+  },
+
+  {
+    name: 'VERIFY-003 malformed top-level collections fail closed with prefixed schema diagnostics',
+    fn: () => {
+      // TOML accepts a root table or scalar where the scenario grammar requires an
+      // array. Reject before the compiler reaches flatMap, forEach, or map so every
+      // invalid source has one fail-closed result rather than a thrown TypeError.
+      for (const [source, fragment] of [
+        ['scenario = "p"\nflow = "x"\n', 'flow must be an array of tables'],
+        ['scenario = "p"\nturn = {}\n', 'turn must be an array of tables'],
+        ['scenario = "p"\nfault = {}\n', 'fault must be an array of tables'],
+        ['scenario = "p"\nepoch = {}\n', 'epoch must be an array of tables'],
+      ]) {
+        const result = compile(source);
+        assertTrue(!result.ok, `${fragment} must reject`);
+        assertTrue(result.scenario === undefined, `${fragment} must not yield a usable scenario`);
+        assertTrue(result.problems.every((problem) => problem.startsWith('p.toml: ')), result.problems.join(' | '));
+        assertTrue(result.problems.some((problem) => problem.includes(fragment)), result.problems.join(' | '));
+      }
     },
   },
 

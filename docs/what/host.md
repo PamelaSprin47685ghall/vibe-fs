@@ -125,7 +125,7 @@ real history → synthetic call → synthetic result
 3. 同一 pair 共享 `callID`，但两个 half 各自拥有独立 transcript placement（共同 identity ≠ 相邻存储）。不同 pair 的 `callID` 唯一且可稳定重建。恢复顺序与字节必须来自 durable append-only 事实，不得依赖文本识别。
 4. pair 正文不得进入 XTrace / Companion decode / Blogger delta / work record / compaction input；仅 pair 的 durable 投影事实参与 HOST-013 恢复。
 5. 同一 epoch 内，前次 provider-visible wire 必须是后次 wire 的稳定字节前缀，权威判定为 `ProviderProjection.isAppendOnlyPrefix`；历史 pair 保留原位，不读 limit、不做 token 估算（CTX-002）。禁止用 PrefixEpoch 切换掩盖 HOST-013 自己造成的前缀漂移。
-6. durable anchor 引用的真实消息在当前 transcript 中缺失时 fail closed（`HistoricalSyntheticAnchorMissing`）；禁止“放到当前最接近的位置”、放 trailing user 前、放末尾或忽略该 pair。
+6. durable anchor 引用的真实消息在当前真实 view 中缺失时，该 historical pair 不参与本次渲染（禁止重定位到“最接近位置 / trailing user 前 / 末尾”）。XWire prefix probe 的 DropLeading 会合法移除已覆盖前缀上的 anchor；不得因此 AbortSession 或破坏 recovery slot。durable fact 保留；完整 transcript 回来后按 anchor 再 replay。
 7. legacy 无 anchor 的 `PairProgrammingGuidelineAppended` 存在时该 session 不允许继续 HOST-013 replay，fail closed（incompatible journal）；禁止把旧 ordinal 近似为第 N 个 tool batch 的启发式迁移。
 
 构造与链序见 `how/host.md`。

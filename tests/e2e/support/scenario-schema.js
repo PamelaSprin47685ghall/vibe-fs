@@ -35,6 +35,47 @@ import { validateFault } from './delivery-plan.js';
 const ROOT_KEYS = ['scenario', 'description', 'must', 'flow', 'setup', 'session', 'pass', 'prompt'];
 
 /**
+ * Collections consumed by the compiler must retain their TOML array shape.
+ *
+ * TOML permits a root table (`turn = {}`) where the scenario grammar expects an
+ * array of tables (`[[turn]]`). Validate that distinction before downstream
+ * validators iterate the collection, so invalid source fails closed rather than
+ * escaping as a JavaScript array-method error.
+ */
+const collectionShapeProblems = (raw) => {
+  const problems = [];
+  const tableCollections = ['flow', 'turn', 'fault', 'epoch'];
+
+  for (const field of tableCollections) {
+    const value = raw[field];
+    if (value === undefined) continue;
+    if (!Array.isArray(value)) {
+      problems.push(`${field} must be an array of tables`);
+      continue;
+    }
+    value.forEach((entry, index) => {
+      if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
+        problems.push(`${field}[${index}] must be a table`);
+      }
+    });
+  }
+
+  if (raw.must !== undefined) {
+    if (!Array.isArray(raw.must)) {
+      problems.push('must must be an array of signal identifiers');
+    } else {
+      raw.must.forEach((id, index) => {
+        if (typeof id !== 'string' || id === '') {
+          problems.push(`must[${index}] must be a non-empty signal identifier`);
+        }
+      });
+    }
+  }
+
+  return problems;
+};
+
+/**
  * Flow verbs, measured from the 19 JSON scenarios rather than invented.
  *
  * A whitelist because `wait`'s dangling reference is checked but its NAME was not: a
@@ -136,7 +177,12 @@ const afterExpectationProblems = (flow) =>
 const waitFactRenewOnProblems = (flow) =>
   (flow ?? []).flatMap((flowStep, index) => {
     const wf = flowStep?.waitFact;
-    if (wf === undefined || wf.renewOn === undefined) return [];
+    if (wf === undefined) return [];
+    if (wf === null || typeof wf !== 'object' || Array.isArray(wf)) {
+      return [`flow[${index}] waitFact must be a table`];
+    }
+    if (wf.renewOn === undefined) return [];
+
     const problems = [];
     if (!Array.isArray(wf.renewOn) || wf.renewOn.some((entry) => typeof entry !== 'string')) {
       problems.push(`flow[${index}] renewOn must be an array of fact names`);
@@ -251,7 +297,7 @@ const userTextProblems = (turn, index) => {
   return [];
 };
 
-/** A step's position within its turn IS its runtime `step` (K2). */
+/** A step's position within its turn is its runtime `step`, unless `runtimeStep` declares the measured cursor explicitly. */
 const compileTurns = (turns) =>
   turns.flatMap((turn, turnIndex) =>
     (turn.step ?? []).map((step, stepIndex) => ({
@@ -266,7 +312,7 @@ const compileTurns = (turns) =>
       optional: step.optional === true,
       kind: turn.kind ?? 'chat',
       turn: turn.user,
-      step: stepIndex,
+      step: step.runtimeStep ?? stepIndex,
       tools: turn.tools ?? [],
       forbiddenTools: turn.forbiddenTools ?? [],
       respond: step.respond,
@@ -376,10 +422,6 @@ const responseDigest = (respond) => JSON.stringify(respond ?? null);
  * naturally. Under this keying a recurring nudge has several steps, so a true
  * duplicate is debris — both cases reject, and the message says which fix applies.
  *
- * DEVIATION: the design document collapses identical templates. That was a mitigation
- * for predicate-conjunction matching, where template reuse produced duplicates
- * naturally. Under (lane, turn, step) keying a recurring nudge has several steps, so a
- * true duplicate is debris — both cases reject, and the message says which fix applies.
  */
 const signalIdentifierCollisions = (turns, entries) => {
   const owners = new Map();
@@ -512,6 +554,9 @@ const trajectoryProblems = (entries, scenario) =>
   (scenario.flow ?? []).flatMap((flowStep, index) => {
     const claim = flowStep.assertModelTrajectory;
     if (claim === undefined) return [];
+    if (claim === null || typeof claim !== 'object' || Array.isArray(claim)) {
+      return [`flow[${index}] assertModelTrajectory must be a table`];
+    }
 
     const problems = [];
     if (!entries.some((entry) => entry.lane === claim.lane)) {
@@ -599,6 +644,11 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
     return { ok: false, problems: [`${name}: TOML parse failed: ${error.message}`] };
   }
 
+  const shapeProblems = collectionShapeProblems(raw);
+  if (shapeProblems.length > 0) {
+    return { ok: false, problems: shapeProblems.map((problem) => `${name}: ${problem}`) };
+  }
+
   const retired = retiredFieldProblems(raw);
   if (retired.length > 0) {
     return { ok: false, problems: retired.map((problem) => `${name}: ${problem}`) };
@@ -621,7 +671,8 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
   turns.forEach((turn, index) => {
     if (typeof turn.id !== 'string' || turn.id === '') problems.push(`turn[${index}] needs an id`);
     problems.push(...userTextProblems(turn, index));
-    if (!Array.isArray(turn.step) || turn.step.length === 0) problems.push(`turn[${index}] needs at least one step`);
+    const steps = Array.isArray(turn.step) ? turn.step : [];
+    if (steps.length === 0) problems.push(`turn[${index}] needs at least one step`);
     if (turn.kind !== undefined && turn.kind !== 'chat' && turn.kind !== 'title') {
       problems.push(`turn[${index}] kind '${turn.kind}' is not chat or title`);
     }
@@ -645,7 +696,26 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
         problems.push(`turn[${index}] tool '${overlap[0]}' is both required and forbidden`);
       }
     }
-    (turn.step ?? []).forEach((step, stepIndex) => {
+    const runtimeSteps = new Map();
+    steps.forEach((step, stepIndex) => {
+      if (step === null || typeof step !== 'object' || Array.isArray(step)) {
+        problems.push(`turn[${index}].step[${stepIndex}] must be a table`);
+        return;
+      }
+      const runtimeStep = step.runtimeStep ?? stepIndex;
+      if (!Number.isInteger(runtimeStep) || runtimeStep < 0) {
+        problems.push(`turn[${index}].step[${stepIndex}] runtimeStep must be a non-negative integer`);
+      } else {
+        const earlier = runtimeSteps.get(runtimeStep);
+        if (earlier !== undefined) {
+          problems.push(
+            `turn[${index}].step[${stepIndex}] runtimeStep ${runtimeStep} duplicates ` +
+              `turn[${index}].step[${earlier}] within the same turn`,
+          );
+        } else {
+          runtimeSteps.set(runtimeStep, stepIndex);
+        }
+      }
       if (step.optional !== undefined && step.optional !== true) {
         problems.push(`turn[${index}].step[${stepIndex}] optional must be true when present; omit it otherwise`);
       }
@@ -653,7 +723,7 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
       // AFTER an optional one is only reachable when the race fired, so a
       // required step there would silently depend on the race. Declare the
       // tail as optional too, or move the required step before the race.
-      const previous = (turn.step ?? [])[stepIndex - 1];
+      const previous = steps[stepIndex - 1];
       if (previous?.optional === true && step.optional !== true) {
         problems.push(
           `turn[${index}].step[${stepIndex}] follows an optional step but is not optional; ` +

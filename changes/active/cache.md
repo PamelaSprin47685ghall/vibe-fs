@@ -2537,42 +2537,95 @@ F# DSL 的价值不是把所有状态写成 DU。
 
 ## Specification impact
 
-- HOST-013：bracket 语义（synthetic pair = 跨越真实 response batch 的 temporal bracket）、
-  anchored durable fact（`PairProgrammingGuidelineAnchored` + `CallGap`/`ResultGap`）、
-  gap replay 算法、same-placement 幂等、anchor 缺失 fail closed、legacy unanchored fact fail closed。
-- HOST-004 / auto-continue：idle-derived continuation 必须同时满足业务决策 + fresh
-  `QuiescencePermit`（process-local `SessionQuiescenceGate`）；删除 `isRecoveryProbeRun` 特判。
-- 修改文档：`docs/{what,shape,how,proof,why}/host.md`（HOST-013 + HOST-004 章节）。
-- 新增/重建测试：H13-01..H13-08、Q-01..Q-10。
+- HOST-013：bracket 语义、anchored durable fact、gap replay、same-placement 幂等、
+  legacy unanchored fact fail closed。
+- HOST-013 / XWire：当前真实 view 中找不到 gap anchor 的 historical pair **不重放、不重定位、
+  不 AbortSession**（XWire DropLeading 合法 drop 已覆盖前缀）；durable fact 保留。
+- HOST-004：idle-derived continuation 必须 `QuiescencePermit`；删除 `isRecoveryProbeRun` 后，
+  **仍保留 durable `ProviderRetryAttempt` 身份抑制**——stale permit 挡不住 probe 同 attempt 的
+  新 Idle（实测 x-c/x-d）。
+- 文档：`docs/{what,shape,how,proof,why}/host.md` 已同步 anchor-omit 语义。
 
-## Remaining work
+## Progress log（2026-08-08 下班交接）
 
-按 Proposal §35 顺序执行：
+### 已提交（勿重做）
 
-1. 更新正式语义文档（Phase 1）。
-2. HOST-013 RED：H13-01 canonical sequence、H13-02 no relocation、H13-03 idempotence、
-   H13-04 restart replay、H13-05 anchor missing fail closed、H13-08 N-round prefix property。
-3. HOST-013 GREEN：`TranscriptGap`/`TranscriptMessageAddress`、anchored fact + fold、
-   replay 算法、same-placement dedupe、删除 `historyBlock`/`placePairs`/`placeWirePairs`。
-4. Quiescence RED：Q-01..Q-10（至少 Q-01、Q-02、Q-05、Q-07、Q-08、Q-09）。
-5. Quiescence GREEN：`SessionQuiescenceGate` + PluginRuntimeScope/HostSignalBootstrap/
-   SpikePlugin 接线 + Reconciler permit 携带 + TurnCompletionProgram/HostSessionNudge
-   typed idle-send helper + StudentTeacher 走 gate。
-6. 删除 `isRecoveryProbeRun`（定义 + TurnUnknown/TurnNeedsContinuation 两处豁免）。
-7. 全量 gate：`npm run build`、lint、unit、integration、e2e、`scripts/check.mjs`、
-   `git diff --check`。
+- `633af829` HOST-013 anchored gap replay
+- `d9e6ef9e` HOST-004 SessionQuiescenceGate + 删除 isRecoveryProbeRun
+
+### 工作区未提交（Phase 7 修复）
+
+文件：
+
+- `PairProgrammingThoughtTransform.fs`：replay 时 unplaceable pair 跳过（不 `HistoricalSyntheticAnchorMissing` Abort）
+- `TurnCompletionProgram.fs`：`isRecoveryContinue` = durable `ProviderRetryAttempt`；
+  TurnUnknown / TurnNeedsContinuation / TurnInProgress interaction-repair 均抑制
+- `pair-thought-anchored.test.mjs`：H13-05 omit + H13-05b XWire DropLeading
+- `turn-completion-program.test.mjs`：Q08b/Q08c fresh permit 仍不 hijack probe
+- `docs/{why,what,how,shape,proof}/host.md`：anchor 语义从 fail-closed-abort → omit
+
+根因与决策：
+
+1. **x-b 超时**：XWire prefix probe DropLeading 去掉 opening user → pair1 anchor 缺失 →
+   tryInject Error → SpikePlugin AbortSession → continue 从未打到 mock。
+   修：unplaceable pair omit，不 Abort。
+2. **x-c seal-undeclared / PrefixRebase=0**：删除 isRecoveryProbeRun 后，probe 同 attempt
+   的 SessionIdle 铸出 **fresh** permit → missing-final-report / interaction-repair 劫持 probe。
+   修：durable `ProviderRetryAttempt` 身份抑制（不是 isRecoveryProbeRun 白名单复活；
+   不是 runtime AttemptPlan 字典）。stale permit 仍是独立 HOST-004 门。
+
+### 已验证（本机，未提交修复之上）
+
+| 门禁 | 结果 |
+|------|------|
+| `npm run build` | OK |
+| unit `1783` | 全绿 |
+| integration `275` | 全绿 |
+| `node scripts/check.mjs` | OK（spec 347 / arch / dsl / p0-recovery-join） |
+| e2e `context-recovery` x-a..x-d | 全绿 |
+| e2e `fallback` | 全绿 |
+| e2e `student-teacher` | 全绿；场景 runtime cursor 已按实测补齐 |
+| 全量 `node tests/e2e/run.mjs` | 25 scenarios 中至少 8 项已过；当前 EXIT=1 |
+
+### 未完成 / 阻塞
+
+1. **全量 e2e 仍红**：
+   - `orchestrator-restart-publish.test.mjs`：`no-declared-turn`，Orchestrator 原始 prompt 的
+     `step=3` 未声明；候选为 `blogger.3`。
+   - `manager-unhappy-path.test.mjs`：strict mock mismatch；完整首错与 cursor 尚未记录。
+   - 两个独立 debugger 在诊断启动后被用户中断；恢复时先分别运行：
+     `MOCK_TRACE=1 node tests/e2e/cases/orchestrator-restart-publish.test.mjs` 与
+     `MOCK_TRACE=1 node tests/e2e/cases/manager-unhappy-path.test.mjs`，读取全部 trace，
+     只对实测 runtimeStep 作最小场景声明修复。
+2. 全量 e2e 绿后仍需：`git diff --check`、如有 F# 再 `npm run format`。
+3. 未写 `Final outcome`，未移动至 `changes/completed/`，未提交。
+
+### 注意
+
+- `global.json` 曾在 stash 误删；已 `git restore`。勿提交 `openbuff.json` 或 `.omx/`。
+- 分支相对 origin **ahead 2**（`633af829` + `d9e6ef9e`）；保留当前未提交工作区。
+- 勿再引入 `isRecoveryProbeRun` 函数名；当前抑制谓词是 `isRecoveryContinue`（ledger）。
+- `tests/e2e/scenarios/student-teacher.toml` 已由自动门禁 `LOOKS_GOOD`；定向 canary 通过。
+
+## Remaining work（收尾序列）
+
+1. 分别诊断并最小修复 `orchestrator-restart-publish` 与 `manager-unhappy-path` 的 scenario cursor / 声明。
+2. 重跑全量 `node tests/e2e/run.mjs`，要求 25 scenarios 全绿且无 `MOCK-FATAL`。
+3. `git diff --check` + 如有 F# 再 `npm run format`。
+4. 核对全部未提交修复；提交 Phase 7 修复（不 push）。
+5. 在本文件追加 `Final outcome`（Outcome / Final specification / Implementation result /
+   Verification / References）→ 移动至 `changes/completed/` → commit（不 push）。
 
 ## Completion criteria
 
-- `isAppendOnlyPrefix(wire[n], wire[n+1]) == true`（同 epoch，H13-01/08 断言）。
-- 任意历史 synthetic half 位置只由 durable gap anchor 决定（H13-02）。
-- 同一 placement 重入不新增 pair（H13-03）；restart replay byte-identical（H13-04）。
-- anchor 缺失 / legacy unanchored fact → fail closed（H13-05、§13）。
-- stale permit → zero physical prompt + zero PluginPromptClaimed（Q-02）。
-- fresh idle + stable incomplete → exactly one continuation（Q-01）。
-- `isRecoveryProbeRun` 已删除，Q-08 靠 permit 过期自然通过。
-- 全量 gate 绿。
+- PREFIX LAW + 历史 pair 不搬家 + same-placement 幂等 + restart byte-identical。
+- unplaceable historical pair omit（非 Abort）；legacy unanchored journal 仍 fail closed。
+- QUIESCENCE LAW：stale/no permit → zero send；fresh idle 普通主路径仍可 repair。
+- ProviderRetryAttempt 不被 missing-final-report / interaction-repair 劫持；x-c/x-d 有
+  PrefixRebaseCommitted。
+- 全量 e2e 25 scenarios 绿，无 `MOCK-FATAL`。
+- Final outcome 落盘并 completed。
 
 ## Blockers
 
-无。
+- `orchestrator-restart-publish` 与 `manager-unhappy-path` 的 strict scenario 声明仍未闭环。

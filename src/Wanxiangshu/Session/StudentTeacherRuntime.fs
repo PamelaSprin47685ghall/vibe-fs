@@ -38,6 +38,7 @@ type private StudentRunCell =
       mutable TeacherSessionId: SessionId option
       mutable Waiter: TaskCompletionSource<Result<string, string>> option
       mutable PendingTeacherReturn: PendingTeacherReturn option
+      mutable TeacherReturnHandoff: bool
       mutable TouchedSkillDocuments: Map<string, string>
       mutable PendingFinal: (ProviderRunIdentity * string) option }
 
@@ -262,6 +263,7 @@ type StudentTeacherRuntime
                                   TeacherSessionId = restoredTeacher sessionId
                                   Waiter = None
                                   PendingTeacherReturn = None
+                                  TeacherReturnHandoff = false
                                   TouchedSkillDocuments = Map.empty
                                   PendingFinal = None }
 
@@ -287,7 +289,8 @@ type StudentTeacherRuntime
                 let claimed =
                     lock gate (fun () ->
                         if
-                            cell.State = StudentTeacher.RunState.LearnReady
+                            StudentTeacher.mayInvokeTeacher cell.State
+                            && not cell.TeacherReturnHandoff
                             && cell.Waiter.IsNone
                             && cell.PendingTeacherReturn.IsNone
                         then
@@ -521,7 +524,29 @@ type StudentTeacherRuntime
                         let! _ = satellites.Retire(cell.SessionId, teacherSpec cell)
 
                         match! sendCompile cell false None with
-                        | Ok _ -> cell.State <- StudentTeacher.RunState.CompileReady
+                        | Ok _ ->
+                            cell.TeacherReturnHandoff <- false
+                            cell.State <- StudentTeacher.RunState.CompileReady
+                        | Error _ when cell.TeacherReturnHandoff ->
+                            // A completed Teacher return must not reopen the
+                            // learning window while its compile handoff is
+                            // still outstanding.
+                            cell.State <- StudentTeacher.RunState.CompileDispatching
+                        | Error _ -> cell.State <- StudentTeacher.RunState.LearnReady
+
+                        return true
+                    | ReconcileProgram.TurnCompleted, None, StudentTeacher.RunState.CompileDispatching ->
+                        // A completed deferred Teacher return closes the
+                        // learning window. Do not turn a raced terminal into
+                        // another ordinary TeacherQuestion opportunity.
+                        match! sendCompile cell false None with
+                        | Ok _ ->
+                            cell.TeacherReturnHandoff <- false
+                            cell.State <- StudentTeacher.RunState.CompileReady
+                        | Error _ when cell.TeacherReturnHandoff ->
+                            // Keep the completed-return handoff ineligible for
+                            // another ordinary TeacherQuestion.
+                            cell.State <- StudentTeacher.RunState.CompileDispatching
                         | Error _ -> cell.State <- StudentTeacher.RunState.LearnReady
 
                         return true
@@ -546,14 +571,20 @@ type StudentTeacherRuntime
                     | ReconcileProgram.TurnCompleted, Some pending, Some parentWaiter ->
                         let finalText = CompletedTurnClassifier.partsText turn.Parts
 
+                        // The Host text-complete message and reconciled terminal
+                        // may carry different ProviderRun identities across the
+                        // hook boundary. TextComplete has already armed this
+                        // pending return; the exact deferred terminal text is
+                        // the stable completion proof.
                         let completedExpectedRun =
-                            pending.CompletionRun = Some turn.ProviderRun
+                            pending.CompletionRun.IsSome
                             && finalText = StudentTeacherPrompt.TeacherReturnCompletion
 
                         lock gate (fun () ->
                             cell.PendingTeacherReturn <- None
                             cell.Waiter <- None
-                            cell.State <- StudentTeacher.RunState.LearnReady)
+                            cell.TeacherReturnHandoff <- true
+                            cell.State <- StudentTeacher.RunState.CompileDispatching)
 
                         if completedExpectedRun then
                             AsyncSupport.trySetResult parentWaiter (Ok pending.Answer) |> ignore
@@ -564,7 +595,9 @@ type StudentTeacherRuntime
                             |> ignore
 
                         return true
-                    | ReconcileProgram.TurnCompleted, None, Some _ ->
+                    | ReconcileProgram.TurnCompleted, None, Some _ when
+                        cell.State = StudentTeacher.RunState.TeacherWaiting
+                        ->
                         let! _ = sendTeacherNudge cell quiescence turn.SessionId
                         return true
                     | ReconcileProgram.TurnFailed error, _, Some parentWaiter
@@ -572,16 +605,21 @@ type StudentTeacherRuntime
                         lock gate (fun () ->
                             cell.PendingTeacherReturn <- None
                             cell.Waiter <- None
-                            cell.State <- StudentTeacher.RunState.LearnReady)
+
+                            if cell.TeacherReturnHandoff then
+                                cell.State <- StudentTeacher.RunState.CompileDispatching
+                            else
+                                cell.State <- StudentTeacher.RunState.LearnReady)
 
                         AsyncSupport.trySetResult parentWaiter (Error(sprintf "Teacher run failed: %s" error))
                         |> ignore
 
                         return true
                     | ReconcileProgram.TurnCompleted, Some _, None ->
-                        lock gate (fun () ->
-                            cell.PendingTeacherReturn <- None
-                            cell.State <- StudentTeacher.RunState.LearnReady)
+                        // The Teacher terminal may race the parent waiter. The
+                        // durable return has already been recorded, so this
+                        // branch must not reopen LearnReady or clear it.
+                        lock gate (fun () -> cell.State <- StudentTeacher.RunState.CompileDispatching)
 
                         return true
                     | _ -> return true

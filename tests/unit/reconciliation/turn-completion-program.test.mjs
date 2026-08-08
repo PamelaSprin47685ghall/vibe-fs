@@ -333,16 +333,44 @@ test('Q08_probe_run_with_stale_permit_is_not_repaired', async () => {
   seedAcceptedContinuation(live.append, { physical: 'user-1' })
   const h = harness({ journal: live.journal })
 
-  // CTX-012 race, without isRecoveryProbeRun: the probe continuation's
-  // transform began after the old idle was observed, so the old repair
-  // permit is stale and the repair is suppressed; the probe completes
-  // normally and its own reconcile promotes it.
+  // CTX-012: ProviderRetryAttempt owns the recovery slot. Even without the
+  // stale-permit path, the durable continuation kind alone suppresses repair.
+  // Stale permit is an independent HOST-004 gate; both must hold.
   const permit = h.freshPermit()
   beginProviderAttempt(h.gate, sessionId(SESSION))
 
   await h.run(turn({ finish: undefined, completed: false, parts: [text('streaming')] }), permit)
 
   assert.deepEqual(h.events, [], 'the probe turn must not be hijacked by a repair (CTX-012)')
+  assert.deepEqual(h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync'), [])
+  live.cleanup()
+})
+
+// Measured: probe transform BeginProviderAttempt + SessionIdle of the *same*
+// attempt mints a valid permit. Stale-permit gating alone cannot suppress the
+// race — the durable ProviderRetryAttempt identity must.
+test('Q08b_probe_run_with_fresh_idle_permit_is_not_repaired', async () => {
+  const live = liveJournal()
+  seedAuthority(live.append)
+  seedAcceptedContinuation(live.append, { physical: 'user-1' })
+  const h = harness({ journal: live.journal })
+
+  await h.run(turn({ finish: undefined, completed: false, parts: [text('streaming')] }), h.freshPermit())
+
+  assert.deepEqual(h.events, [], 'fresh idle on ProviderRetryAttempt must not hijack the probe')
+  assert.deepEqual(h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync'), [])
+  live.cleanup()
+})
+
+test('Q08c_probe_needs_continuation_with_fresh_permit_is_not_repaired', async () => {
+  const live = liveJournal()
+  seedAuthority(live.append)
+  seedAcceptedContinuation(live.append, { physical: 'user-1' })
+  const h = harness({ journal: live.journal })
+
+  await h.run(turn({ finish: 'length', completed: false, parts: [text('truncated')] }), h.freshPermit())
+
+  assert.deepEqual(h.events, [])
   assert.deepEqual(h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync'), [])
   live.cleanup()
 })

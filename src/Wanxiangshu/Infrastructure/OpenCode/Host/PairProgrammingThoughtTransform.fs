@@ -228,96 +228,81 @@ module PairProgrammingThoughtTransform =
     /// durable gaps; nothing re-decides their position (`historyBlock` 禁止).
     ///
     /// 组内排序唯一合法：`Ordinal` 升序，同 ordinal 时 call 先于 result。
+    ///
+    /// Anchor 不在当前真实消息里的 historical pair **不重放、不报错**。
+    /// XWire prefix probe 用 FrozenRecordPrefix 替换已覆盖前缀时会 drop 那些
+    /// 消息（CTX-010 `DropLeading`）；被覆盖区里的 pair 属于被替换的前缀，
+    /// 不应再注入 rewritten view，更不能因此 AbortSession 杀死 recovery slot。
+    /// Durable fact 仍保留；完整 transcript 回来时 anchor 在场即可再 replay。
     let private replay (realMessages: obj list) (pairs: PairProgrammingGuidelineWire list) : Result<obj list, string> =
         match addressedRealMessages realMessages with
         | Error error -> Error error
         | Ok addressed ->
             let addressSet = addressed |> List.map fst |> Set.ofList
 
-            let validateAnchor (pair: PairProgrammingGuidelineWire) (gap: TranscriptGap) =
+            let gapPresent (gap: TranscriptGap) =
                 match gap with
-                | TranscriptGap.Start -> Ok()
+                | TranscriptGap.Start -> true
                 | TranscriptGap.Before address
-                | TranscriptGap.After address ->
-                    let key = TranscriptMessageAddress.value address
+                | TranscriptGap.After address -> Set.contains (TranscriptMessageAddress.value address) addressSet
 
-                    if Set.contains key addressSet then
-                        Ok()
-                    else
-                        Error(
-                            sprintf
-                                "HistoricalSyntheticAnchorMissing: transcript has no message %s (pair %d, HOST-013)"
-                                key
-                                pair.Ordinal
-                        )
-
-            let anchorsOk =
+            // Only pairs whose anchors still exist in this real view are placeable.
+            let placeable =
                 pairs
-                |> List.fold
-                    (fun acc pair ->
-                        match acc with
-                        | Error _ -> acc
-                        | Ok() ->
-                            match validateAnchor pair pair.CallGap with
-                            | Error error -> Error error
-                            | Ok() -> validateAnchor pair pair.ResultGap)
-                    (Ok())
+                |> List.filter (fun pair -> gapPresent pair.CallGap && gapPresent pair.ResultGap)
 
-            match anchorsOk with
-            | Error error -> Error error
-            | Ok() ->
-                let starts = ResizeArray<PairProgrammingGuidelineWire * bool>()
-                let before = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire * bool>>()
-                let after = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire * bool>>()
+            let starts = ResizeArray<PairProgrammingGuidelineWire * bool>()
+            let before = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire * bool>>()
+            let after = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire * bool>>()
 
-                for pair in pairs do
-                    for isCall in [ true; false ] do
-                        let gap = if isCall then pair.CallGap else pair.ResultGap
+            for pair in placeable do
+                for isCall in [ true; false ] do
+                    let gap = if isCall then pair.CallGap else pair.ResultGap
 
-                        let bucket
-                            (table: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire * bool>>)
-                            (address: TranscriptMessageAddress)
-                            =
-                            let key = TranscriptMessageAddress.value address
+                    let bucket
+                        (table: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire * bool>>)
+                        (address: TranscriptMessageAddress)
+                        =
+                        let key = TranscriptMessageAddress.value address
 
-                            match table.TryGetValue key with
-                            | true, entries -> entries.Add(pair, isCall)
-                            | false, _ ->
-                                let entries = ResizeArray<PairProgrammingGuidelineWire * bool>()
-                                entries.Add(pair, isCall)
-                                table.[key] <- entries
+                        match table.TryGetValue key with
+                        | true, entries -> entries.Add(pair, isCall)
+                        | false, _ ->
+                            let entries = ResizeArray<PairProgrammingGuidelineWire * bool>()
+                            entries.Add(pair, isCall)
+                            table.[key] <- entries
 
-                        match gap with
-                        | TranscriptGap.Start -> starts.Add(pair, isCall)
-                        | TranscriptGap.Before address -> bucket before address
-                        | TranscriptGap.After address -> bucket after address
+                    match gap with
+                    | TranscriptGap.Start -> starts.Add(pair, isCall)
+                    | TranscriptGap.Before address -> bucket before address
+                    | TranscriptGap.After address -> bucket after address
 
-                let ordered (entries: ResizeArray<PairProgrammingGuidelineWire * bool>) =
-                    entries
-                    |> Seq.sortBy (fun (pair, isCall) -> pair.Ordinal, (if isCall then 0L else 1L))
-                    |> Seq.toList
+            let ordered (entries: ResizeArray<PairProgrammingGuidelineWire * bool>) =
+                entries
+                |> Seq.sortBy (fun (pair, isCall) -> pair.Ordinal, (if isCall then 0L else 1L))
+                |> Seq.toList
 
-                let output = ResizeArray<obj>()
+            let output = ResizeArray<obj>()
 
-                for pair, isCall in ordered starts do
-                    output.Add(buildPairMessage pair.CallId pair.MarkerText isCall)
+            for pair, isCall in ordered starts do
+                output.Add(buildPairMessage pair.CallId pair.MarkerText isCall)
 
-                for address, message in addressed do
-                    match before.TryGetValue address with
-                    | true, entries ->
-                        for pair, isCall in ordered entries do
-                            output.Add(buildPairMessage pair.CallId pair.MarkerText isCall)
-                    | _ -> ()
+            for address, message in addressed do
+                match before.TryGetValue address with
+                | true, entries ->
+                    for pair, isCall in ordered entries do
+                        output.Add(buildPairMessage pair.CallId pair.MarkerText isCall)
+                | _ -> ()
 
-                    output.Add message
+                output.Add message
 
-                    match after.TryGetValue address with
-                    | true, entries ->
-                        for pair, isCall in ordered entries do
-                            output.Add(buildPairMessage pair.CallId pair.MarkerText isCall)
-                    | _ -> ()
+                match after.TryGetValue address with
+                | true, entries ->
+                    for pair, isCall in ordered entries do
+                        output.Add(buildPairMessage pair.CallId pair.MarkerText isCall)
+                | _ -> ()
 
-                Ok(Seq.toList output)
+            Ok(Seq.toList output)
 
     // ── 本轮新 pair 的 placement（只读当前真实消息）──────────────────────────
 

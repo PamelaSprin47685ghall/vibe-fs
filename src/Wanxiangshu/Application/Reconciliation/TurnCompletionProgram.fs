@@ -74,6 +74,28 @@ module TurnCompletionProgram =
         | None -> AsyncSupport.completedTask ()
         | Some permit -> sendRepair quiescence permit sessionPort eventPort journal context.Turn prompt repairKind
 
+    /// CTX-010 recovery continue owns the physical run until its own terminal is
+    /// published. Missing-final-report / interaction-repair on that run hijacks the
+    /// recovery slot: the interleaved idle reads finish=None (Unknown) or a
+    /// provisional NeedsContinuation while the probe response is still on the wire,
+    /// and a fresh SessionIdle of the *same* provider attempt mints a valid
+    /// quiescence permit (BeginProviderAttempt already ran for the probe itself).
+    /// Stale-permit gating cannot suppress that race — the permit is not stale.
+    ///
+    /// The durable fact is the authority ledger: this PhysicalUserMessageId was
+    /// accepted as `ProviderRetryAttempt`. That is the recovery continue's identity,
+    /// not a runtime whitelist and not a substitute for HOST-004 on ordinary mains.
+    let private isRecoveryContinue (journal: AgentJournal option) (turn: ReconciledTurn) : bool =
+        match journal with
+        | None -> false
+        | Some durable ->
+            AgentProjection.tryFind turn.SessionId (AgentJournal.snapshot durable).AgentProjections
+            |> Option.bind (fun session -> session.PromptAuthority)
+            |> Option.exists (fun authority ->
+                authority.AcceptedContinuationIds
+                |> Map.tryFind turn.PhysicalUserMessageId
+                |> Option.exists (fun kind -> kind = PromptAuthority.ContinuationKind.ProviderRetryAttempt))
+
     /// CTX-006 hasMaterial for X: BlogEntryCommitted coverage on the main session.
     let private sessionHasCoverage (durable: AgentJournal) (sessionId: SessionId) =
         AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections
@@ -339,17 +361,19 @@ module TurnCompletionProgram =
             // GLORY-070 / HOST-004 rev.3: a stable idle that never produced a
             // final report is repaired exactly once (the reconcile maps dedupe
             // the turn token), and only when the pass carried idle evidence.
-            // A retry/failure wake or a permit stale at send time sends nothing
-            // (the recovery-probe race is suppressed by the stale permit, not
-            // by a run-category exemption).
-            trySendIdleRepair
-                quiescence
-                context
-                sessionPort
-                eventPort
-                journal
-                RuntimeNudge.missingFinalReport
-                "missing-final-report"
+            // ProviderRetryAttempt continues own the recovery slot — suppress
+            // missing-final-report so the probe's own terminal can promote.
+            if isRecoveryContinue journal turn then
+                AsyncSupport.completedTask ()
+            else
+                trySendIdleRepair
+                    quiescence
+                    context
+                    sessionPort
+                    eventPort
+                    journal
+                    RuntimeNudge.missingFinalReport
+                    "missing-final-report"
         | ReconcileProgram.TurnInProgress when reviewerAlreadyConfirmed ->
             // A second PERFECT is frequently a tool-only provider step. Once the
             // witness is Confirmed, finish the physical reviewer run so
@@ -394,6 +418,9 @@ module TurnCompletionProgram =
             if managerJobHandedOff then
                 completeReviewerOrAssistant false |> ignore
                 AsyncSupport.completedTask ()
+            elif isRecoveryContinue journal turn then
+                // Recovery continue owns the slot until its terminal publishes.
+                AsyncSupport.completedTask ()
             elif CompletedTurnClassifier.needsInteractionRepair turn.Role turn.Outcome turn.Parts then
                 trySendIdleRepair
                     quiescence
@@ -413,16 +440,19 @@ module TurnCompletionProgram =
             // not completable, then ask for the missing report. Still not fallback.
             // (The XTrace parts are captured at the transform boundary.)
             //
-            // Same admission contract as TurnUnknown: idle evidence required,
-            // stale permit sends nothing.
-            trySendIdleRepair
-                quiescence
-                context
-                sessionPort
-                eventPort
-                journal
-                RuntimeNudge.missingFinalReport
-                "missing-final-report"
+            // Same admission contract as TurnUnknown, plus recovery-continue
+            // ownership: do not hijack a ProviderRetryAttempt with repair.
+            if isRecoveryContinue journal turn then
+                AsyncSupport.completedTask ()
+            else
+                trySendIdleRepair
+                    quiescence
+                    context
+                    sessionPort
+                    eventPort
+                    journal
+                    RuntimeNudge.missingFinalReport
+                    "missing-final-report"
         | ReconcileProgram.TurnAborted reason ->
             // LOOP-006: our own kill is bridged into the provider-failure AABB path.
             // User / cleanup aborts still report Aborted and do not advance the cursor.

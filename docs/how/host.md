@@ -236,7 +236,7 @@ XTraceCapture → Companion → XWire → EnforcerHost
 ```
 
 - 适用判定：仅非 Companion session 进入本程序。`journal` 存在时以 `SessionAssociationProjection.isCompanion sessionId` 为准；为 true（Blogger）则跳过 `PairProgrammingThoughtTransform`，不读 tip、不 append durable pair、不改 `messages`。无 journal / 无 association 时按非 Companion 处理（保持既有测试与未知 session 行为）。
-- 每次 transform 的 commit 顺序：读 durable anchored pair 序列 → strip raw 中已有 HOST-013 synthetic 消息（仅在 durable anchor 足够完整时）→ 校验（真实消息地址唯一；每个 synthetic anchor 在真实消息中可解析，否则 `HistoricalSyntheticAnchorMissing` fail closed）→ 内存中 replay 历史 → 决定本轮新 pair 的 placement（仅当该 placement 尚不存在）→ 内存构造候选 fact → 内存渲染完整 wire → 校验全部不变量 → append durable fact（失败 fail closed，禁止忽略后照发或降级为不注入）→ 返回已校验消息。
+- 每次 transform 的 commit 顺序：读 durable anchored pair 序列 → strip raw 中已有 HOST-013 synthetic 消息（仅在 durable anchor 足够完整时）→ 校验（真实消息地址唯一）→ 过滤 placeable pairs（CallGap 与 ResultGap 的 anchor 均在当前真实消息中）→ 内存中 replay 可放置历史 → 决定本轮新 pair 的 placement（仅当该 placement 尚不存在）→ 内存构造候选 fact → 内存渲染完整 wire → 校验全部不变量 → append durable fact（失败 fail closed，禁止忽略后照发或降级为不注入）→ 返回已校验消息。
 - gap replay（禁止再出现 `historyBlock`）：输入真实消息 + durable synthetic entries，输出：
 
 ```text
