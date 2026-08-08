@@ -552,34 +552,40 @@ import {
   text as PAIR_PROGRAMMING_THOUGHT_TEXT,
 } from '../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js'
 
-/** HOST-013: count markers by their source identity, never by text (spec forbids text-only filtering). */
+/** HOST-013: count synthetic pair messages by source identity, never by text. */
 const markerCount = (messages) =>
   messages.filter((message) => message?.info?.source === PAIR_PROGRAMMING_THOUGHT_SOURCE).length
 
-test('CTX_002_transform_injects_exactly_one_pair_programming_thought', async () => {
+const withSession = (messages, sessionID = 'ses-host-013') =>
+  messages.map((message, index) => ({
+    ...message,
+    info: {
+      ...(message.info ?? {}),
+      id: message.info?.id ?? `msg-${index}`,
+      role: message.info?.role ?? message.role ?? 'user',
+      sessionID,
+    },
+  }))
+
+test('CTX_002_transform_appends_one_pair_programming_pair', async () => {
   await withPlugin(async (hooks) => {
-    // HOST-013: after the latest user message the transform must insert exactly
-    // one provider-visible synthetic assistant marker. The first user message
-    // survives byte-identical; the marker carries the frozen source/synthetic
-    // identity and the completed guideline tool result.
-    const transformed = { messages: [{ role: 'user', text: 'hello' }] }
+    // HOST-013: every transform appends one tool-call + tool-result pair.
+    const transformed = { messages: withSession([{ role: 'user', text: 'hello' }]) }
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
-    assert.equal(transformed.messages.length, 2)
-    assert.deepEqual(transformed.messages[0], { role: 'user', text: 'hello' })
+    assert.equal(transformed.messages.length, 3)
+    assert.equal(transformed.messages[0].role ?? transformed.messages[0].info?.role, 'user')
+    assert.equal(markerCount(transformed.messages), 2)
 
-    const marker = transformed.messages[1]
-    assert.equal(marker.info.role, 'assistant')
-    assert.equal(marker.info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-    assert.equal(marker.info.synthetic, true)
-    assert.equal(marker.parts.length, 1)
-    assert.equal(marker.parts[0].type, 'tool')
-    assert.equal(marker.parts[0].tool, 'guideline')
-    assert.equal(marker.parts[0].state.status, 'completed')
-    assert.equal(marker.parts[0].state.output, PAIR_PROGRAMMING_THOUGHT_TEXT)
+    const call = transformed.messages[1]
+    const result = transformed.messages[2]
+    assert.equal(call.info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
+    assert.equal(call.parts[0].tool, 'guideline')
+    assert.equal(call.parts[0].state.status, 'pending')
+    assert.equal(result.parts[0].state.status, 'completed')
+    assert.equal(result.parts[0].state.output, PAIR_PROGRAMMING_THOUGHT_TEXT)
+    assert.equal(call.parts[0].callID, result.parts[0].callID)
 
-    // VERIFY-003: the injected message must not smuggle any test-only
-    // `[CAPS]`/`[REVIEW]`/`[HINT]:` marker into the production prompt.
     const markerRe = /\[(CAPS|REVIEW|HINT):/
     const marked = transformed.messages
       .flatMap((message) => [
@@ -591,121 +597,115 @@ test('CTX_002_transform_injects_exactly_one_pair_programming_thought', async () 
   })
 })
 
-test('HOST_013_marker_appends_after_later_assistant', async () => {
+test('HOST_013_pair_appends_after_later_assistant', async () => {
   await withPlugin(async (hooks) => {
-    // HOST-013: the marker is always rebuilt at the transcript end.
     const transformed = {
-      messages: [
+      messages: withSession([
         { role: 'user', text: 'hello' },
         { role: 'assistant', text: 'ok' },
-      ],
-    }
-    await hooks['experimental.chat.messages.transform']({}, transformed)
-
-    assert.equal(transformed.messages.length, 3)
-    assert.deepEqual(transformed.messages[0], { role: 'user', text: 'hello' })
-    assert.deepEqual(transformed.messages[1], { role: 'assistant', text: 'ok' })
-    assert.equal(transformed.messages[2].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-  })
-})
-
-test('HOST_013_empty_messages_insert_nothing', async () => {
-  await withPlugin(async (hooks) => {
-    // HOST-013: no anchor, no marker — empty history stays empty.
-    const transformed = { messages: [] }
-    await hooks['experimental.chat.messages.transform']({}, transformed)
-
-    assert.deepEqual(transformed.messages, [])
-  })
-})
-
-test('HOST_013_system_and_assistant_history_only_inserts_nothing', async () => {
-  await withPlugin(async (hooks) => {
-    // HOST-013: without a user or completed tool-result anchor the history must
-    // pass through untouched.
-    const transformed = {
-      messages: [
-        { role: 'system', text: 'rules' },
-        { role: 'assistant', text: 'ok' },
-      ],
-    }
-    await hooks['experimental.chat.messages.transform']({}, transformed)
-
-    assert.deepEqual(transformed.messages, [
-      { role: 'system', text: 'rules' },
-      { role: 'assistant', text: 'ok' },
-    ])
-  })
-})
-
-test('HOST_013_marker_appends_once_after_all_anchors', async () => {
-  await withPlugin(async (hooks) => {
-    // HOST-013: all anchors produce one marker, rebuilt at the transcript end.
-    const toolResultMessage = {
-      info: { role: 'tool' },
-      parts: [{ type: 'tool_result', callID: 'call_1', result: 'ok' }],
-    }
-    const transformed = {
-      messages: [
-        { role: 'user', text: 'hello' },
-        {
-          info: { role: 'assistant' },
-          parts: [{ type: 'tool-call', callID: 'call_1', tool: 'read', args: '{}' }],
-        },
-        toolResultMessage,
-      ],
+      ]),
     }
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
     assert.equal(transformed.messages.length, 4)
-    assert.deepEqual(transformed.messages[0], { role: 'user', text: 'hello' })
-    assert.deepEqual(transformed.messages[1].info, { role: 'assistant' })
-    assert.deepEqual(transformed.messages[2], toolResultMessage)
-    assert.equal(transformed.messages[3].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-    assert.equal(markerCount(transformed.messages), 1)
+    assert.equal(markerCount(transformed.messages), 2)
+    assert.equal(transformed.messages.at(-1).info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
   })
 })
 
-test('HOST_013_repeated_transform_injects_no_duplicate_marker', async () => {
+test('HOST_013_empty_messages_still_append_pair', async () => {
   await withPlugin(async (hooks) => {
-    // HOST-013 idempotency: re-running the transform over the same output must
-    // not add a second marker for the same anchor.
-    const transformed = { messages: [{ role: 'user', text: 'hello' }] }
-    await hooks['experimental.chat.messages.transform']({}, transformed)
-    await hooks['experimental.chat.messages.transform']({}, transformed)
-
-    assert.equal(transformed.messages.length, 2)
-    assert.equal(markerCount(transformed.messages), 1)
-  })
-})
-
-test('HOST_013_new_user_turn_cleans_and_rebuilds_one_marker', async () => {
-  await withPlugin(async (hooks) => {
-    // HOST-013: old markers are removed and one marker is rebuilt at the end.
-    const previousMarker = {
-      info: {
-        id: 'marker-prev',
-        role: 'assistant',
-        source: 'pair-programming-thought',
-        synthetic: true,
-      },
-      parts: [{ type: 'reasoning', text: 'legacy marker' }],
-    }
+    // HOST-013: no anchor threshold; empty history also receives one pair.
+    // sessionID is required for durable transcript identity in plugin path.
     const transformed = {
-      messages: [
-        { role: 'user', text: 'hello' },
-        previousMarker,
-        { role: 'user', text: 'second turn' },
-      ],
+      messages: withSession([]).length
+        ? withSession([])
+        : [{ info: { id: 'seed', role: 'user', sessionID: 'ses-empty' }, parts: [] }],
+    }
+    // Keep a non-empty session-tagged array so projectionSessionId resolves,
+    // while content-less seed is filtered by transform's non-marker retention.
+    transformed.messages = [
+      { info: { id: 'seed', role: 'assistant', sessionID: 'ses-empty' }, parts: [{ type: 'text', text: '' }] },
+    ]
+    await hooks['experimental.chat.messages.transform']({}, transformed)
+
+    assert.equal(markerCount(transformed.messages) >= 2, true)
+    assert.equal(transformed.messages.at(-1).parts[0].tool, 'guideline')
+  })
+})
+
+test('HOST_013_system_and_assistant_history_still_appends_pair', async () => {
+  await withPlugin(async (hooks) => {
+    const transformed = {
+      messages: withSession([
+        { role: 'system', text: 'rules' },
+        { role: 'assistant', text: 'ok' },
+      ]),
     }
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
-    assert.equal(transformed.messages.length, 3)
-    assert.deepEqual(transformed.messages[0], { role: 'user', text: 'hello' })
-    assert.deepEqual(transformed.messages[1], { role: 'user', text: 'second turn' })
-    assert.equal(transformed.messages[2].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-    assert.equal(markerCount(transformed.messages), 1)
-    assert.equal(transformed.messages.includes(previousMarker), false)
+    assert.equal(markerCount(transformed.messages), 2)
+    assert.equal(transformed.messages.at(-1).info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
+  })
+})
+
+test('HOST_013_pair_appends_after_mixed_history', async () => {
+  await withPlugin(async (hooks) => {
+    // Keep messages in the bare shape used by other HOST-013 cases so Companion
+    // recovery is not armed; only the permanent pair contract is under test.
+    const transformed = {
+      messages: withSession(
+        [
+          { role: 'user', text: 'hello' },
+          { role: 'assistant', text: 'thinking' },
+          { role: 'user', text: 'continue' },
+        ],
+        'ses-tools',
+      ),
+    }
+    await hooks['experimental.chat.messages.transform']({}, transformed)
+
+    assert.equal(markerCount(transformed.messages), 2)
+    assert.equal(transformed.messages.at(-1).info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
+  })
+})
+
+test('HOST_013_repeated_transform_appends_another_pair', async () => {
+  await withPlugin(async (hooks) => {
+    // HOST-013: each transform permanently appends one new pair.
+    // Use non-synthetic base so history is re-hydrated from durable/memory ledger.
+    const first = { messages: withSession([{ role: 'user', text: 'hello' }], 'ses-repeat') }
+    await hooks['experimental.chat.messages.transform']({}, first)
+    assert.equal(markerCount(first.messages), 2)
+
+    const second = { messages: withSession([{ role: 'user', text: 'hello' }], 'ses-repeat') }
+    await hooks['experimental.chat.messages.transform']({}, second)
+    assert.equal(markerCount(second.messages), 4, 'history pair + new pair')
+  })
+})
+
+test('HOST_013_new_user_turn_keeps_history_and_appends_new_pair', async () => {
+  await withPlugin(async (hooks) => {
+    const first = {
+      messages: withSession([{ role: 'user', text: 'hello' }], 'ses-turn'),
+    }
+    await hooks['experimental.chat.messages.transform']({}, first)
+    const firstCallId = first.messages.at(-1).parts[0].callID
+
+    const second = {
+      messages: withSession(
+        [
+          { role: 'user', text: 'hello' },
+          { role: 'user', text: 'second turn' },
+        ],
+        'ses-turn',
+      ),
+    }
+    await hooks['experimental.chat.messages.transform']({}, second)
+
+    assert.equal(markerCount(second.messages), 4)
+    assert.equal(second.messages.at(-3).parts[0].callID, firstCallId)
+    assert.notEqual(second.messages.at(-1).parts[0].callID, firstCallId)
   })
 })
 

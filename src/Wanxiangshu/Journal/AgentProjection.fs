@@ -40,6 +40,8 @@ type SessionAgentProjection =
         /// GLORY-011: the Manager lifecycle (open Life, completed Lives).
         /// Manager-only; other roles never receive a lifecycle fact.
         ManagerLife: ManagerLifeProjection option
+        /// HOST-013: permanent guideline pairs for this transcript.
+        Guidelines: GuidelineProjectionState option
     }
 
 type AgentProjectionSet =
@@ -78,7 +80,8 @@ module AgentProjection =
           PromptAuthority = None
           Enforcement = None
           BloggerCycles = None
-          ManagerLife = None }
+          ManagerLife = None
+          Guidelines = None }
 
     let empty =
         { Sessions = Map.empty

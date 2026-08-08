@@ -1969,9 +1969,14 @@ export const projectionIntent = (() => {
     },
     /** PROJ-008 step 5: REVIEW-003 skeptical challenge. */
     appendReviewChallenge: (intent = { TextVersion: 1 }) => build('AppendReviewChallenge', [intent]),
-    /** PROJ-008 step 5 / HOST-013: pair-programming guideline marker. */
-    insertPairProgrammingThought: (intent = { MarkerId: undefined, MarkerText: undefined }) =>
-      build('InsertPairProgrammingThought', [intent]),
+    /** PROJ-008 step 5 / HOST-013: permanent guideline pair history + next. */
+    insertPairProgrammingThought: (intent = { History: [], Next: undefined }) =>
+      build('InsertPairProgrammingThought', [
+        {
+          History: toList(intent.History ?? []),
+          Next: intent.Next ?? { CallId: 'pair-marker-1', MarkerText: '' },
+        },
+      ]),
     /** PROJ-008 step 6: Host compaction reanchor (renderer no-op on wire bytes). */
     get reanchorAfterCompaction() {
       return build('ReanchorAfterCompaction', [])

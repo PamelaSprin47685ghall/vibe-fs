@@ -57,9 +57,15 @@ type RepairIntent = { RequestKey: string }
 /// `AppendReviewChallenge` 载荷：REVIEW-003 TextVersion。
 type ChallengeIntent = { TextVersion: int }
 
-/// `InsertPairProgrammingThought` 载荷：稳定 MarkerId + 完整 marker 文本。
+/// `InsertPairProgrammingThought` 载荷：完整永久 pair 序列 + 本次新增 pair。
+///
+/// `History` 按 Ordinal 升序；`Next` 是本次 transform 新追加的 pair。
+/// Renderer 在保留 base 的前提下，末尾按序重建全部 history + next。
+type PairProgrammingGuidelineWire = { CallId: string; MarkerText: string }
+
 type PairThoughtIntent =
-    { MarkerId: string; MarkerText: string }
+    { History: PairProgrammingGuidelineWire list
+      Next: PairProgrammingGuidelineWire }
 
 /// PROJ-002：一次 attempt 的只读投影快照——DSL 核心输入（PROJ-002）。
 ///
@@ -370,12 +376,13 @@ module ProjectionRenderer =
 
         message
 
-    let private guidelineMessage (markerId: string) (markerText: string) : ProviderProjection.WireMessage =
-        let message: ProviderProjection.WireMessage =
-            { Role = "assistant"
-              Parts = [ ProviderProjection.WireToolResult(ToolCallId.create markerId, markerText) ] }
+    let private guidelinePairMessages (pair: PairProgrammingGuidelineWire) : ProviderProjection.WireMessage list =
+        let callId = ToolCallId.create pair.CallId
 
-        message
+        [ { Role = "assistant"
+            Parts = [ ProviderProjection.WireToolCall(callId, "guideline", "{}") ] }
+          { Role = "assistant"
+            Parts = [ ProviderProjection.WireToolResult(callId, pair.MarkerText) ] } ]
 
     /// Fable/JS 边界：Parts 可能为 null/undefined 或非 F# list。此时视为无 part，
     /// 不当 tool-result anchor / pair marker，禁止对缺失 list 调 IsEmpty/tail。
@@ -463,24 +470,39 @@ module ProjectionRenderer =
                       HostMessageIds = List.head acc.HostMessageIds :: companionIds @ List.tail acc.HostMessageIds
                       HostIsPhysical = List.head acc.HostIsPhysical :: companionPhysical @ List.tail acc.HostIsPhysical }
 
-    let private isPairMarker (markerId: string) (message: ProviderProjection.WireMessage) : bool =
-        message.Role = "assistant"
-        && safeParts message
-           |> List.exists (function
-               | ProviderProjection.WireToolResult(callId, _) when ToolCallId.value callId = markerId -> true
-               | _ -> false)
-
-    /// HOST-013：移除所有已存在同 MarkerId 的 marker，末尾 append 单条 guideline tool-result。
+    /// HOST-013：在全局末尾重建 history + next 的完整 pair 序列。
+    /// pair = tool-call + tool-result，永久 append-only。
+    /// base 中若残留同 CallId 的 guideline wire，剔除后按 durable 原字节重建。
     let private applyPairThought (intent: PairThoughtIntent) (acc: RenderedMessages) : RenderedMessages =
+        let knownIds =
+            (intent.History @ [ intent.Next ])
+            |> List.map (fun pair -> pair.CallId)
+            |> Set.ofList
+
+        let isKnownGuideline (message: ProviderProjection.WireMessage) : bool =
+            message.Role = "assistant"
+            && safeParts message
+               |> List.exists (function
+                   | ProviderProjection.WireToolCall(callId, name, _) ->
+                       name = "guideline" && Set.contains (ToolCallId.value callId) knownIds
+                   | ProviderProjection.WireToolResult(callId, _) -> Set.contains (ToolCallId.value callId) knownIds
+                   | _ -> false)
+
         let retained =
             List.zip3 acc.Messages acc.HostMessageIds acc.HostIsPhysical
-            |> List.filter (fun (message, _, _) -> not (isPairMarker intent.MarkerId message))
+            |> List.filter (fun (message, _, _) -> not (isKnownGuideline message))
 
-        { Messages =
-            (retained |> List.map (fun (message, _, _) -> message))
-            @ [ guidelineMessage intent.MarkerId intent.MarkerText ]
-          HostMessageIds = (retained |> List.map (fun (_, id, _) -> id)) @ [ Some intent.MarkerId ]
-          HostIsPhysical = (retained |> List.map (fun (_, _, physical) -> physical)) @ [ false ] }
+        let pairs = intent.History @ [ intent.Next ]
+        let pairMessages = pairs |> List.collect guidelinePairMessages
+
+        let pairIds =
+            pairs |> List.collect (fun pair -> [ Some pair.CallId; Some pair.CallId ])
+
+        let pairPhysical = pairs |> List.collect (fun _ -> [ false; false ])
+
+        { Messages = (retained |> List.map (fun (message, _, _) -> message)) @ pairMessages
+          HostMessageIds = (retained |> List.map (fun (_, id, _) -> id)) @ pairIds
+          HostIsPhysical = (retained |> List.map (fun (_, _, physical) -> physical)) @ pairPhysical }
 
     let private appendSynthetic (role: string) (text: string) (acc: RenderedMessages) : RenderedMessages =
         { Messages = acc.Messages @ [ textMessage role text ]

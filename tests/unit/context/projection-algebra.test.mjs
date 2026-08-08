@@ -425,37 +425,31 @@ test('PROJ_008_step3a_AppendReviewChallenge_smoke_appends_challenge_text', () =>
   )
 })
 
-test('PROJ_008_step3a_InsertPairProgrammingThought_smoke_appends_one_guideline_tool_result', () => {
+test('PROJ_008_step3a_InsertPairProgrammingThought_smoke_appends_tool_call_and_result_pair', () => {
   const raw = [
     { info: { id: 'u1', role: 'user' }, parts: [{ type: 'text', text: 'ask' }] },
     { info: { id: 'a1', role: 'assistant' }, parts: [{ type: 'text', text: 'answer' }] },
   ]
   const snapshot = stage3Snapshot(raw)
   const intent = projectionIntent.insertPairProgrammingThought({
-    MarkerId: 'pair-marker-1',
-    MarkerText: PAIR_GUIDELINE_TEXT,
+    History: [],
+    Next: { CallId: 'pair-marker-1', MarkerText: PAIR_GUIDELINE_TEXT },
   })
 
   assert.deepEqual(planNames([intent]), ['InsertPairProgrammingThought'])
 
   const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
-  const last = view[view.length - 1]
-  assert.equal(last.role, 'assistant')
-  assert.equal(last.parts[0]?.kind, 'WireToolResult')
-  assert.equal(idValue.toolCall(last.parts[0]?.callId), 'pair-marker-1')
-  assert.equal(last.parts[0]?.text, PAIR_GUIDELINE_TEXT)
-
-  const markers = view.filter(
-    (m) =>
-      m.role === 'assistant' && m.parts.some((p) => p.kind === 'WireToolResult' && idValue.toolCall(p.callId) === 'pair-marker-1'),
-  )
-  assert.equal(markers.length, 1, 'exactly one marker has the requested MarkerId')
-  assert.equal(markers[0], last, 'the marker is the final transcript message')
-  assert.equal(
-    view.flatMap((m) => m.parts.map((p) => p.text)).some((text) => text?.includes('<do-not-output>')),
-    false,
-    'the rendered transcript contains no legacy pseudo-thinking marker',
-  )
+  assert.equal(view.length, 4)
+  const call = view[view.length - 2]
+  const result = view[view.length - 1]
+  assert.equal(call.role, 'assistant')
+  assert.equal(call.parts[0]?.kind, 'WireToolCall')
+  assert.equal(idValue.toolCall(call.parts[0]?.callId), 'pair-marker-1')
+  assert.equal(call.parts[0]?.name ?? call.parts[0]?.tool, 'guideline')
+  assert.equal(result.role, 'assistant')
+  assert.equal(result.parts[0]?.kind, 'WireToolResult')
+  assert.equal(idValue.toolCall(result.parts[0]?.callId), 'pair-marker-1')
+  assert.equal(result.parts[0]?.text, PAIR_GUIDELINE_TEXT)
 })
 
 test('PROJ_008_step3a_ReanchorAfterCompaction_smoke_is_wire_noop', () => {
@@ -497,7 +491,10 @@ test('PROJ_008_step3a_canonical_order_is_rank_sorted_regardless_of_input_order',
   // | 5 PairThought | 6 Reanchor
   const shuffled = [
     projectionIntent.reanchorAfterCompaction,
-    projectionIntent.insertPairProgrammingThought({ MarkerId: 'pair-marker-order', MarkerText: PAIR_GUIDELINE_TEXT }),
+    projectionIntent.insertPairProgrammingThought({
+      History: [],
+      Next: { CallId: 'pair-marker-order', MarkerText: PAIR_GUIDELINE_TEXT },
+    }),
     projectionIntent.appendReviewChallenge({ TextVersion: 1 }),
     projectionIntent.suppressTransportOnly,
     projectionIntent.insertRepair({ RequestKey: 'k' }),
@@ -528,8 +525,14 @@ test('PROJ_008_step3a_duplicate_Suppress_Pair_Reanchor_merge_to_one', () => {
   )
   assert.deepEqual(
     planNames([
-      projectionIntent.insertPairProgrammingThought({ MarkerId: 'pair-marker-duplicate', MarkerText: PAIR_GUIDELINE_TEXT }),
-      projectionIntent.insertPairProgrammingThought({ MarkerId: 'pair-marker-duplicate', MarkerText: PAIR_GUIDELINE_TEXT }),
+      projectionIntent.insertPairProgrammingThought({
+        History: [],
+        Next: { CallId: 'pair-marker-duplicate', MarkerText: PAIR_GUIDELINE_TEXT },
+      }),
+      projectionIntent.insertPairProgrammingThought({
+        History: [],
+        Next: { CallId: 'pair-marker-duplicate', MarkerText: PAIR_GUIDELINE_TEXT },
+      }),
     ]),
     ['InsertPairProgrammingThought'],
   )
@@ -801,61 +804,39 @@ test('PROJ_008_step5_AppendReviewChallenge_production_bytes_are_Prompt', () => {
   )
 })
 
-test('PROJ_008_step5_InsertPairProgrammingThought_idempotent_when_marker_already_present', () => {
-  const raw = [
-    { info: { id: 'u1', role: 'user' }, parts: [{ type: 'text', text: 'ask' }] },
-    {
-      info: { id: 'pair-1', role: 'assistant', source: 'pair-programming-thought', synthetic: true },
-      parts: [{ type: 'tool_result', callID: 'pair-marker-1', result: PAIR_GUIDELINE_TEXT }],
-    },
-  ]
+test('PROJ_008_step5_InsertPairProgrammingThought_restores_history_then_appends_next_pair', () => {
+  const raw = [{ info: { id: 'u1', role: 'user' }, parts: [{ type: 'text', text: 'ask' }] }]
   const snapshot = stage3Snapshot(raw)
   const intent = projectionIntent.insertPairProgrammingThought({
-    MarkerId: 'pair-marker-1',
-    MarkerText: PAIR_GUIDELINE_TEXT,
+    History: [{ CallId: 'pair-marker-1', MarkerText: PAIR_GUIDELINE_TEXT }],
+    Next: { CallId: 'pair-marker-2', MarkerText: `${PAIR_GUIDELINE_TEXT}-2` },
   })
-  const once = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
-  const twice = projectionAlgebra.renderMessagesWithIntents(snapshot, once, [intent])
-
-  const markers = (view) =>
-    view.filter(
-      (m) =>
-        m.role === 'assistant' &&
-        m.parts.some((p) => p.kind === 'WireToolResult' && idValue.toolCall(p.callId) === 'pair-marker-1'),
-    )
-  assert.equal(markers(once).length, 1, 'one marker remains after replacement')
-  assert.equal(markers(twice).length, 1, 'second apply stays idempotent (no double marker)')
-  assert.equal(markers(once)[0], once[once.length - 1], 'once appends marker at the transcript end')
-  assert.equal(markers(twice)[0], twice[twice.length - 1], 'twice keeps marker at the transcript end')
-  assert.deepEqual(twice, once)
+  const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
+  // user + (call,result) history + (call,result) next
+  assert.equal(view.length, 5)
+  assert.equal(idValue.toolCall(view[1].parts[0]?.callId), 'pair-marker-1')
+  assert.equal(view[1].parts[0]?.kind, 'WireToolCall')
+  assert.equal(view[2].parts[0]?.kind, 'WireToolResult')
+  assert.equal(view[2].parts[0]?.text, PAIR_GUIDELINE_TEXT)
+  assert.equal(idValue.toolCall(view[3].parts[0]?.callId), 'pair-marker-2')
+  assert.equal(view[3].parts[0]?.kind, 'WireToolCall')
+  assert.equal(view[4].parts[0]?.kind, 'WireToolResult')
+  assert.equal(view[4].parts[0]?.text, `${PAIR_GUIDELINE_TEXT}-2`)
 })
 
-test('PROJ_008_step5_InsertPairProgrammingThought_multiple_anchors_append_one_final_marker', () => {
-  const raw = [
-    { info: { id: 'u1', role: 'user' }, parts: [{ type: 'text', text: 'ask' }] },
-    {
-      info: { id: 'tool-1', role: 'tool' },
-      parts: [{ type: 'tool_result', callID: 'read-1', result: 'tool output' }],
-    },
-  ]
+test('PROJ_008_step5_InsertPairProgrammingThought_empty_base_still_appends_pair', () => {
+  const raw = []
   const snapshot = stage3Snapshot(raw)
   const intent = projectionIntent.insertPairProgrammingThought({
-    MarkerId: 'pair-marker-multiple-anchors',
-    MarkerText: PAIR_GUIDELINE_TEXT,
+    History: [],
+    Next: { CallId: 'pair-marker-empty', MarkerText: PAIR_GUIDELINE_TEXT },
   })
-
   const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
-  const markers = view.filter(
-    (m) =>
-      m.role === 'assistant' &&
-      m.parts.some(
-        (p) => p.kind === 'WireToolResult' && idValue.toolCall(p.callId) === 'pair-marker-multiple-anchors',
-      ),
-  )
-
-  assert.equal(markers.length, 1, 'multiple anchors yield one pair-programming marker')
-  assert.equal(markers[0], view[view.length - 1], 'the only marker is appended after every anchor')
-  assert.equal(markers[0].parts[0]?.text, PAIR_GUIDELINE_TEXT)
+  assert.equal(view.length, 2)
+  assert.equal(view[0].parts[0]?.kind, 'WireToolCall')
+  assert.equal(view[1].parts[0]?.kind, 'WireToolResult')
+  assert.equal(idValue.toolCall(view[1].parts[0]?.callId), 'pair-marker-empty')
+  assert.equal(view[1].parts[0]?.text, PAIR_GUIDELINE_TEXT)
 })
 
 test('PROJ_008_step6_Reanchor_with_Keep_is_wire_noop_and_plan_ok', () => {

@@ -80,6 +80,7 @@
     <Compile Include="Journal/ReviewProjection.fs"/>
     <Compile Include="Journal/EnforcementProjection.fs"/>
     <Compile Include="Journal/BloggerCycleProjection.fs"/>
+    <Compile Include="Journal/GuidelineProjection.fs"/>
     <Compile Include="Journal/AgentProjection.fs"/>
     <Compile Include="Journal/FinalityReviewCohort.fs"/>
     <Compile Include="Journal/RecoveryClosureProjection.fs"/>

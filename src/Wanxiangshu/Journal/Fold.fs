@@ -971,6 +971,30 @@ module Fold =
                     projection
                 |> prefixOutcome "ContextReanchored" projection
 
+        | AgentFact.Host host ->
+            match host with
+            | HostFactCases.PairProgrammingGuidelineAppended payload ->
+                AgentProjection.tryUpdate
+                    payload.SessionId
+                    (fun session ->
+                        session.Guidelines
+                        |> Option.defaultValue GuidelineProjection.empty
+                        |> GuidelineProjection.apply payload.Ordinal payload.CallId payload.MarkerText
+                        |> Result.map (fun updated ->
+                            { session with
+                                Guidelines = Some updated }))
+                    projection
+                |> function
+                    | Ok updated -> Ok updated
+                    | Error(GuidelineFoldRejection.NonSequentialOrdinal(expected, actual)) ->
+                        reject
+                            "PairProgrammingGuidelineAppended"
+                            (sprintf "ordinal %d is not the successor of %d (HOST-013)" actual expected)
+                    | Error(GuidelineFoldRejection.DuplicateCallId callId) ->
+                        reject
+                            "PairProgrammingGuidelineAppended"
+                            (sprintf "call id %s already exists in this transcript (HOST-013)" callId)
+
     let foldEnvelope (projection: ProjectionSet) (envelope: Envelope) : Result<ProjectionSet, FoldRejection> =
         match envelope.Fact with
         | Runtime(RuntimeStarted runtime) ->

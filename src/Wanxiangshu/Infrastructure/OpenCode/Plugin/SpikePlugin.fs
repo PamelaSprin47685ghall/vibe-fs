@@ -297,11 +297,9 @@ module SpikePlugin =
                             | None -> ()
                         | None -> ()
 
-                        // HOST-013：结对编程 guideline marker。Runs
-                        // after XTrace capture (the marker never enters the
-                        // trace) and before ReviewSeal (the seal covers the
-                        // final bytes the provider receives). Idempotent per
-                        // transcript 末尾；幂等。
+                        // HOST-013：永久 pair-programming guideline。
+                        // XTrace 之后、ReviewSeal 之前。恢复 durable 历史 pair，
+                        // 再在全局末尾追加本次 tool-call + tool-result。
                         let messages = unbox<obj array> outObj?messages |> Array.toList
 
                         let markerText =
@@ -312,7 +310,9 @@ module SpikePlugin =
                                 | None -> ProjectionConstants.PairProgrammingGuidelineText
                             | _ -> ProjectionConstants.PairProgrammingGuidelineText
 
-                        match PairProgrammingThoughtTransform.tryInject projectionSessionIdOpt markerText messages with
+                        match
+                            PairProgrammingThoughtTransform.tryInject journal projectionSessionIdOpt markerText messages
+                        with
                         | Some newMessages -> HostMessageProjection.replaceMessagesInPlace outObj newMessages
                         | None -> ()
 

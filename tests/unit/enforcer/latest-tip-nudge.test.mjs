@@ -118,12 +118,12 @@ const anchor = toList([{ info: { id: 'user-1', role: 'user' }, parts: [{ type: '
 const markerOutput = (messages) => listItems(messages).at(-1).parts[0].state.output
 
 test('CTX_002_GUIDELINE_001_marker_without_nudge_is_guideline_text', () => {
-  const messages = tryInject('ses-guideline', guideline, anchor)
+  const messages = tryInject(undefined, 'ses-guideline', guideline, anchor)
   assert.equal(markerOutput(messages), guideline)
 })
 
 test('CTX_002_GUIDELINE_002_marker_with_nudge_uses_double_newline', () => {
   const nudge = 'A domain concept is crossing a boundary as a primitive. Introduce a distinct type so invalid substitutions become impossible.'
-  const messages = tryInject('ses-guideline', `${nudge}\n\n${guideline}`, anchor)
+  const messages = tryInject(undefined, 'ses-guideline-nudge', `${nudge}\n\n${guideline}`, anchor)
   assert.equal(markerOutput(messages), `${nudge}\n\n${guideline}`)
 })

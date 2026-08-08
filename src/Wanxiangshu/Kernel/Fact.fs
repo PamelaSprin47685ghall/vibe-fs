@@ -609,6 +609,19 @@ module Fact =
                NextEpochId: PrefixEpochId
                ObservedCompactionRun: ProviderRunIdentity |}
 
+    /// HOST-013: permanent guideline pairs for one provider transcript.
+    type HostFactCases =
+        /// One permanent guideline pair was appended.
+        ///
+        /// `Ordinal` is the transcript-local append counter (1-based). `CallId` is
+        /// stable across restarts. `MarkerText` is the exact tool-result body the
+        /// provider saw for this pair — history restores these bytes verbatim.
+        | PairProgrammingGuidelineAppended of
+            {| SessionId: SessionId
+               Ordinal: int64
+               CallId: ToolCallId
+               MarkerText: string |}
+
     // There is deliberately no `CompanionEpochSwitched`. COMPANION-009's epoch has
     // exactly two movers now — `PrefixRebaseCommitted` (CTX-012) and
     // `ContextReanchored` (HOST-006) — and the old fact was a third: it carried the
@@ -627,6 +640,12 @@ module Fact =
         | Orchestrator of OrchestratorFactCases
         | Companion of CompanionFactCases
         | Context of ContextFactCases
+        | Host of HostFactCases
+
+    /// HOST-013 constructor surface.
+    module HostFact =
+        let inline PairProgrammingGuidelineAppended payload =
+            AgentFact.Host(HostFactCases.PairProgrammingGuidelineAppended payload)
 
     /// Constructor surface for the PromptFact family: each function wraps its
     /// family case in the single-case Prompt dispatch.
