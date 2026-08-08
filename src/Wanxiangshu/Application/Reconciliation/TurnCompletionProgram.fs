@@ -465,7 +465,10 @@ module TurnCompletionProgram =
 
             // ORCH-006: once the Orchestrator has taken the job over, the Manager
             // has no work left and its run may complete (the Orchestrator's
-            // barrier owns the review).
+            // barrier owns the review). ConflictPending is still Orchestrator-
+            // owned work: ResumeManager is driving a conflict-resolution turn
+            // that MUST NotifyTerminal so finalizeWorktree can stage+continue
+            // (measured: ConflictPending → idle-only → REBASE_HEAD stuck).
             let managerJobHandedOff =
                 match turn.Role with
                 | Some Role.Manager ->
@@ -478,8 +481,8 @@ module TurnCompletionProgram =
                             snapshot.AgentProjections.Orchestrator
                         |> Option.exists (fun job ->
                             match job.Progress with
-                            | JobProgress.ManagerStarted
-                            | JobProgress.ConflictPending _ -> false
+                            | JobProgress.ManagerStarted -> false
+                            | JobProgress.ConflictPending _
                             | JobProgress.CandidateReady _
                             | JobProgress.RebasedCandidateReady _
                             | JobProgress.PublishClaimed _
@@ -498,7 +501,14 @@ module TurnCompletionProgram =
                 | _ -> false
 
             let completionDeferred =
-                if joinOutstanding then
+                // Orchestrator-owned job states must NotifyTerminal so ResumeManager
+                // can finalizeWorktree (ConflictPending rebase continue). Do not defer
+                // on joinOutstanding here — a race where join is still retiring would
+                // leave Host pending open forever (measured: conflict-resume.2 on wire,
+                // coder resolved, REBASE_HEAD unmerged, no manager HandleCompleted).
+                if managerJobHandedOff then
+                    false
+                elif joinOutstanding then
                     true
                 elif finalityOutstanding then
                     true

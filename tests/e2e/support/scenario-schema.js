@@ -410,11 +410,17 @@ const duplicateDeclarations = (entries) => {
   // `turn` may be an array, so compare a digest: two distinct arrays with the same contents
   // are the same declaration and `!==` would not say so.
   const turnDigest = (entry) => JSON.stringify(turnFragments(entry.turn));
+  // toolsGate (runtime-key) distinguishes declarations by required/forbidden tools;
+  // compile-time must use the same identity or optional "#" repairs for manager vs
+  // blogger (different tool surfaces, same bare user text) falsely collide.
+  const toolsDigest = (entry) =>
+    JSON.stringify({ tools: entry.tools ?? [], forbiddenTools: entry.forbiddenTools ?? [] });
 
   for (const left of entries) {
     for (const right of entries) {
       if (left.lane !== right.lane || left.step !== right.step) continue;
       if (turnDigest(left) !== turnDigest(right)) continue;
+      if (toolsDigest(left) !== toolsDigest(right)) continue;
       if (left.kind !== right.kind) continue;
       if (left.id >= right.id) continue;
 

@@ -202,25 +202,22 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     /// ORCH-003/ORCH-007: hand work back to the SAME Manager in the SAME worktree.
     ///
-    /// Clear stale pending → Fork conflict-resume → await Host pending Source →
-    /// finalizeWorktree (stage + rebase --continue).
+    /// Fork the conflict-resume prompt, then wait until the worktree has no
+    /// unmerged paths / conflict markers (Coder resolution on disk), then
+    /// finalizeWorktree. Do not await Host pending terminal alone: after
+    /// LifeCompleted the Manager turn often stays on IdleEncouragement and never
+    /// NotifyTerminal (measured: conflict-resume.2 + coder resolved, REBASE_HEAD
+    /// stuck, no manager HandleCompleted for the resume unit).
     let resumeManager (jobId: ManagerJobId) (worktree: WorktreePath) (prompt: string) =
         task {
             match jobRecord jobId with
             | None -> return Error(sprintf "No durable job record for '%s'" (ManagerJobId.value jobId))
             | Some record ->
                 let agentId = managerAgentId jobId
-                worktrees.[agentId] <- WorktreePath.value worktree
+                let path = WorktreePath.value worktree
+                worktrees.[agentId] <- path
                 clearStalePending agentId
 
-                // ORCH-003 restart: family recovery is journal-only for this
-                // Host (SpikePlugin.restoreHandles → restoreLinkedChildrenWithoutRuntime),
-                // so the runtime's children map is empty after a crash and Fork
-                // would mint a NEW Manager session. The durable record names the
-                // original session; re-enlisting it (GLORY-045 AdoptChild) makes
-                // Fork take its existing-child nudge path — the SAME session with
-                // its ManagerLife — so the resumed conflict-resolution run can
-                // still end with suicide instead of looping on IdleEncouragement.
                 match runtime.Children.TryGetValue agentId with
                 | true, _ -> ()
                 | false, _ -> runtime.AdoptChild(agentId, record.ManagerSessionId)
@@ -228,13 +225,48 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 match! runtime.Fork(agentId, Role.Manager, record.ManagerAgent, prompt, None, firstPrompt = false) with
                 | Error error -> return Error error
                 | Ok _ ->
-                    match! awaitCurrentPendingRun agentId with
+                    // Keep Host pending progressing in the background.
+                    awaitCurrentPendingRun agentId |> ignore
+
+                    let resolutionDeadline =
+                        DateTimeOffset.UtcNow.AddMilliseconds(float ExecutorSummarize.AwaitAgentTimeoutMs)
+
+                    // Gate on disk content only. Unmerged index entries clear only
+                    // after `git add`; that belongs to finalizeWorktree. Waiting for
+                    // empty `--diff-filter=U` before add is a deadlock (Coder can
+                    // rewrite the file while paths stay AA until staged).
+                    let rec waitResolved () =
+                        task {
+                            let! grepCode, grepOut, _ =
+                                OrchestratorGit.run (
+                                    OrchestratorGit.command
+                                        path
+                                        [ "grep"; "-I"; "-n"; "-E"; "^<<<<<<< |^>>>>>>> "; "--"; "." ]
+                                )
+
+                            // git grep: 0 = markers present, 1 = clean, >1 = error
+                            if grepCode = 1 then
+                                return Ok()
+                            elif grepCode > 1 then
+                                return Error "conflict-marker scan failed"
+                            elif DateTimeOffset.UtcNow >= resolutionDeadline then
+                                return
+                                    Error(
+                                        sprintf
+                                            "conflict resolution timed out (markers still present):\n%s"
+                                            (if String.IsNullOrWhiteSpace grepOut then
+                                                 "(no grep body)"
+                                             else
+                                                 grepOut.Trim())
+                                    )
+                            else
+                                do! Wanxiangshu.Process.PtyTiming.timerTask 50
+                                return! waitResolved ()
+                        }
+
+                    match! waitResolved () with
                     | Error error -> return Error error
-                    | Ok() ->
-                        match worktrees.TryGetValue agentId with
-                        | true, path -> return! OrchestratorGit.finalizeWorktree OrchestratorGit.run agentId path
-                        | false, _ ->
-                            return Error(sprintf "No worktree registered for manager job '%s'" agentId)
+                    | Ok() -> return! OrchestratorGit.finalizeWorktree OrchestratorGit.run agentId path
         }
 
     /// ORCH-006: abort the manager and every reviewer child session for a job
