@@ -505,6 +505,7 @@ module ProjectionRenderer =
             |> List.filter (fun (message, _, _) -> not (isKnownGuideline message))
 
         let retainedArr = retained |> List.toArray
+
         let trailingUserIdx =
             let mutable idx = retainedArr.Length - 1
             let mutable found = -1
@@ -519,9 +520,19 @@ module ProjectionRenderer =
 
             found
 
-        let headLen = if trailingUserIdx < 0 then retainedArr.Length else trailingUserIdx
+        let headLen =
+            if trailingUserIdx < 0 then
+                retainedArr.Length
+            else
+                trailingUserIdx
+
         let head = if headLen = 0 then [||] else retainedArr.[0 .. headLen - 1]
-        let tail = if trailingUserIdx < 0 then [||] else retainedArr.[trailingUserIdx ..]
+
+        let tail =
+            if trailingUserIdx < 0 then
+                [||]
+            else
+                retainedArr.[trailingUserIdx..]
 
         let mutable resultStart = head.Length
         let mutable scanningResults = true
@@ -558,8 +569,18 @@ module ProjectionRenderer =
         let nextResult = List.item 1 nextMsgs, Some intent.Next.CallId, false
 
         let prefix = if callStart = 0 then [||] else head.[0 .. callStart - 1]
-        let calls = if callStart >= resultStart then [||] else head.[callStart .. resultStart - 1]
-        let results = if resultStart >= head.Length then [||] else head.[resultStart ..]
+
+        let calls =
+            if callStart >= resultStart then
+                [||]
+            else
+                head.[callStart .. resultStart - 1]
+
+        let results =
+            if resultStart >= head.Length then
+                [||]
+            else
+                head.[resultStart..]
 
         let placed =
             if callStart < head.Length then
@@ -571,7 +592,10 @@ module ProjectionRenderer =
                 @ [ nextResult ]
                 @ (tail |> Array.toList)
             else
-                (head |> Array.toList) @ historyBlock @ [ nextCall; nextResult ] @ (tail |> Array.toList)
+                (head |> Array.toList)
+                @ historyBlock
+                @ [ nextCall; nextResult ]
+                @ (tail |> Array.toList)
 
         { Messages = placed |> List.map (fun (message, _, _) -> message)
           HostMessageIds = placed |> List.map (fun (_, id, _) -> id)

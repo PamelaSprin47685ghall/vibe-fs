@@ -140,7 +140,12 @@ module PairProgrammingThoughtTransform =
             | null -> false
             | t ->
                 let kind = (unbox<string> t).ToLowerInvariant()
-                kind = "tool" || kind = "tool-call" || kind = "tool_call" || kind = "tool-result" || kind = "tool_result"
+
+                kind = "tool"
+                || kind = "tool-call"
+                || kind = "tool_call"
+                || kind = "tool-result"
+                || kind = "tool_result"
 
     let private partStatus (part: obj) : string option =
         if isNull part then
@@ -178,6 +183,7 @@ module PairProgrammingThoughtTransform =
         | [] -> retained
         | _ ->
             let arr = retained |> List.toArray
+
             let trailingUserIdx =
                 let mutable idx = arr.Length - 1
                 let mutable found = -1
@@ -192,7 +198,12 @@ module PairProgrammingThoughtTransform =
 
             let headLen = if trailingUserIdx < 0 then arr.Length else trailingUserIdx
             let head = if headLen = 0 then [||] else arr.[0 .. headLen - 1]
-            let tail = if trailingUserIdx < 0 then [||] else arr.[trailingUserIdx ..]
+
+            let tail =
+                if trailingUserIdx < 0 then
+                    [||]
+                else
+                    arr.[trailingUserIdx..]
 
             let mutable resultStart = head.Length
 
@@ -210,20 +221,40 @@ module PairProgrammingThoughtTransform =
                 | [] -> [], Unchecked.defaultof<_>
 
             let historyBlock =
-                historyPairs
-                |> List.collect (fun pair -> buildPair pair.CallId pair.MarkerText)
+                historyPairs |> List.collect (fun pair -> buildPair pair.CallId pair.MarkerText)
 
             let nextCall = buildPairMessage nextPair.CallId nextPair.MarkerText true
             let nextResult = buildPairMessage nextPair.CallId nextPair.MarkerText false
 
-            let prefix = if callStart = 0 then [] else head.[0 .. callStart - 1] |> Array.toList
-            let calls = if callStart >= resultStart then [] else head.[callStart .. resultStart - 1] |> Array.toList
-            let results = if resultStart >= head.Length then [] else head.[resultStart ..] |> Array.toList
+            let prefix =
+                if callStart = 0 then
+                    []
+                else
+                    head.[0 .. callStart - 1] |> Array.toList
+
+            let calls =
+                if callStart >= resultStart then
+                    []
+                else
+                    head.[callStart .. resultStart - 1] |> Array.toList
+
+            let results =
+                if resultStart >= head.Length then
+                    []
+                else
+                    head.[resultStart..] |> Array.toList
+
             let tailList = tail |> Array.toList
 
             if callStart < head.Length then
                 // 有同轮 tool 批（call 和/或 result）：history 在批前；next call/result 批末。
-                prefix @ historyBlock @ calls @ [ nextCall ] @ results @ [ nextResult ] @ tailList
+                prefix
+                @ historyBlock
+                @ calls
+                @ [ nextCall ]
+                @ results
+                @ [ nextResult ]
+                @ tailList
             else
                 // 无 tool 批：history + next 相邻，整体在 trailing user 前。
                 (head |> Array.toList) @ historyBlock @ [ nextCall; nextResult ] @ tailList
@@ -302,11 +333,15 @@ module PairProgrammingThoughtTransform =
             Parts = [ WireToolResult(callId, pair.MarkerText) ] } ]
 
     /// Canonical wire 放置：与 raw placePairs 同构。
-    let private placeWirePairs (retained: WireMessage list) (pairs: PairProgrammingGuidelineWire list) : WireMessage list =
+    let private placeWirePairs
+        (retained: WireMessage list)
+        (pairs: PairProgrammingGuidelineWire list)
+        : WireMessage list =
         match pairs with
         | [] -> retained
         | _ ->
             let arr = retained |> List.toArray
+
             let trailingUserIdx =
                 let mutable idx = arr.Length - 1
                 let mutable found = -1
@@ -321,7 +356,12 @@ module PairProgrammingThoughtTransform =
 
             let headLen = if trailingUserIdx < 0 then arr.Length else trailingUserIdx
             let head = if headLen = 0 then [||] else arr.[0 .. headLen - 1]
-            let tail = if trailingUserIdx < 0 then [||] else arr.[trailingUserIdx ..]
+
+            let tail =
+                if trailingUserIdx < 0 then
+                    [||]
+                else
+                    arr.[trailingUserIdx..]
 
             let mutable resultStart = head.Length
 
@@ -343,13 +383,34 @@ module PairProgrammingThoughtTransform =
             let nextCall = List.head nextMsgs
             let nextResult = List.item 1 nextMsgs
 
-            let prefix = if callStart = 0 then [] else head.[0 .. callStart - 1] |> Array.toList
-            let calls = if callStart >= resultStart then [] else head.[callStart .. resultStart - 1] |> Array.toList
-            let results = if resultStart >= head.Length then [] else head.[resultStart ..] |> Array.toList
+            let prefix =
+                if callStart = 0 then
+                    []
+                else
+                    head.[0 .. callStart - 1] |> Array.toList
+
+            let calls =
+                if callStart >= resultStart then
+                    []
+                else
+                    head.[callStart .. resultStart - 1] |> Array.toList
+
+            let results =
+                if resultStart >= head.Length then
+                    []
+                else
+                    head.[resultStart..] |> Array.toList
+
             let tailList = tail |> Array.toList
 
             if callStart < head.Length then
-                prefix @ historyBlock @ calls @ [ nextCall ] @ results @ [ nextResult ] @ tailList
+                prefix
+                @ historyBlock
+                @ calls
+                @ [ nextCall ]
+                @ results
+                @ [ nextResult ]
+                @ tailList
             else
                 (head |> Array.toList) @ historyBlock @ nextMsgs @ tailList
 

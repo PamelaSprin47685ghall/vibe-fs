@@ -316,8 +316,7 @@ module SpikePlugin =
                                 match journal, projectionSessionIdOpt with
                                 | Some durable, Some sessionId ->
                                     match EnforcerHost.latestTipNudge durable (SessionId.create sessionId) with
-                                    | Some nudge ->
-                                        nudge + "\n\n" + ProjectionConstants.PairProgrammingGuidelineText
+                                    | Some nudge -> nudge + "\n\n" + ProjectionConstants.PairProgrammingGuidelineText
                                     | None -> ProjectionConstants.PairProgrammingGuidelineText
                                 | _ -> ProjectionConstants.PairProgrammingGuidelineText
 
