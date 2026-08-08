@@ -91,16 +91,19 @@ module EnforcerHost =
         let projections = AgentJournal.snapshot journal
 
         match
-            SessionAssociationProjection.tryMainSessionOf
-                bloggerSessionId
-                projections.AgentProjections.Associations
+            SessionAssociationProjection.tryMainSessionOf bloggerSessionId projections.AgentProjections.Associations
         with
         | None -> None
         | Some owner ->
             match projections.AgentProjections.Sessions |> Map.tryFind owner with
             | None -> None
             | Some session ->
-                match session.Enforcement |> Option.map EnforcementProjection.recentTips |> Option.defaultValue [] |> List.tryLast with
+                match
+                    session.Enforcement
+                    |> Option.map EnforcementProjection.recentTips
+                    |> Option.defaultValue []
+                    |> List.tryLast
+                with
                 | None -> None
                 | Some tip ->
                     EnforcerCatalog.tryFindByField

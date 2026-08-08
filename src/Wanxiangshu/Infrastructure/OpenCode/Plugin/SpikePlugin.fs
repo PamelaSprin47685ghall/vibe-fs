@@ -312,12 +312,7 @@ module SpikePlugin =
                                 | None -> ProjectionConstants.PairProgrammingGuidelineText
                             | _ -> ProjectionConstants.PairProgrammingGuidelineText
 
-                        match
-                            PairProgrammingThoughtTransform.tryInject
-                                projectionSessionIdOpt
-                                markerText
-                                messages
-                        with
+                        match PairProgrammingThoughtTransform.tryInject projectionSessionIdOpt markerText messages with
                         | Some newMessages -> HostMessageProjection.replaceMessagesInPlace outObj newMessages
                         | None -> ()
 
@@ -474,10 +469,10 @@ module SpikePlugin =
                                 onRunStarted
                                 parentWorkRecordFor
                                 childWorkRecordFor
-                                 snapshotOpt
-                                 (Some wired.CancelSignals)
-                                 (Some eventPort)
-                                 finalityReviewerTimeoutMs
+                                snapshotOpt
+                                (Some wired.CancelSignals)
+                                (Some eventPort)
+                                finalityReviewerTimeoutMs
 
                         scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
                         hooks?tool <- toolRegistration.Tools

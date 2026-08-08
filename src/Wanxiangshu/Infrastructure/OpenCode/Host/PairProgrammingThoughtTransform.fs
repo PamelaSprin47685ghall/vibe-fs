@@ -61,13 +61,14 @@ module PairProgrammingThoughtTransform =
             [ "info",
               box (
                   createObj
-                       [ "id", box markerId
-                         "role", box "assistant"
-                         "source", box source
-                         "synthetic", box true ]
+                      [ "id", box markerId
+                        "role", box "assistant"
+                        "source", box source
+                        "synthetic", box true ]
               )
               "parts",
-              box [| createObj
+              box
+                  [| createObj
                          [ "type", box "tool"
                            "tool", box "guideline"
                            "callID", box markerId
@@ -77,7 +78,7 @@ module PairProgrammingThoughtTransform =
                                    [ "status", box "completed"
                                      "input", box (createObj [])
                                      "output", box markerText ]
-                            ) ] |] ]
+                           ) ] |] ]
 
     let private isWireAnchor (message: WireMessage) : bool =
         message.Role = "user"
@@ -117,6 +118,7 @@ module PairProgrammingThoughtTransform =
         | Ok _ when baseWire |> List.exists isWireAnchor |> not -> None
         | Ok ordered ->
             let wire = ProjectionRenderer.renderMessagesWithIntents snapshot baseWire ordered
+
             let expected =
                 baseWire
                 @ [ { Role = "assistant"

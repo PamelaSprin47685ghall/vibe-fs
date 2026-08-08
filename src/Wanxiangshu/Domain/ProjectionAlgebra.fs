@@ -59,8 +59,7 @@ type ChallengeIntent = { TextVersion: int }
 
 /// `InsertPairProgrammingThought` 载荷：稳定 MarkerId + 完整 marker 文本。
 type PairThoughtIntent =
-    { MarkerId: string
-      MarkerText: string }
+    { MarkerId: string; MarkerText: string }
 
 /// PROJ-002：一次 attempt 的只读投影快照——DSL 核心输入（PROJ-002）。
 ///
@@ -468,9 +467,8 @@ module ProjectionRenderer =
         message.Role = "assistant"
         && safeParts message
            |> List.exists (function
-                | ProviderProjection.WireToolResult(callId, _) when ToolCallId.value callId = markerId ->
-                    true
-                | _ -> false)
+               | ProviderProjection.WireToolResult(callId, _) when ToolCallId.value callId = markerId -> true
+               | _ -> false)
 
     /// HOST-013：移除所有已存在同 MarkerId 的 marker，末尾 append 单条 guideline tool-result。
     let private applyPairThought (intent: PairThoughtIntent) (acc: RenderedMessages) : RenderedMessages =
@@ -478,7 +476,9 @@ module ProjectionRenderer =
             List.zip3 acc.Messages acc.HostMessageIds acc.HostIsPhysical
             |> List.filter (fun (message, _, _) -> not (isPairMarker intent.MarkerId message))
 
-        { Messages = (retained |> List.map (fun (message, _, _) -> message)) @ [ guidelineMessage intent.MarkerId intent.MarkerText ]
+        { Messages =
+            (retained |> List.map (fun (message, _, _) -> message))
+            @ [ guidelineMessage intent.MarkerId intent.MarkerText ]
           HostMessageIds = (retained |> List.map (fun (_, id, _) -> id)) @ [ Some intent.MarkerId ]
           HostIsPhysical = (retained |> List.map (fun (_, _, physical) -> physical)) @ [ false ] }
 
