@@ -20,6 +20,10 @@ const {
 const { managerSpec, orchestratorSpec } = await import('../../../dist/Infrastructure/OpenCode/Tools/ForkTool.js')
 const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
 const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
+const { Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_Fork_Z7B3EB305: forkRuntime } = await import(
+  '../../../dist/Session/HostForkAgent.js'
+)
+const { Role } = await import('../../../dist/Kernel/Roles.js')
 const { OrchestratorHost } = await import('../../../dist/Infrastructure/OpenCode/Orchestration/Host.js')
 const { OrchestratorHostDeps } = await import('../../../dist/Infrastructure/OpenCode/Orchestration/Types.js')
 const { Orchestrator_$ctor_2E3EDB2: createOrchestrator } = await import(
@@ -79,7 +83,7 @@ const fakeSessions = (behaviour = {}) => {
       calls.push(['SendPromptAsync', ...args])
       return { tag: 0, fields: [] }
     },
-    SubscribeTerminal: async (childId, callback) => {
+    SubscribeTerminal: (childId, callback) => {
       calls.push(['SubscribeTerminal', childId])
       return { Dispose: () => {} }
     },
@@ -292,10 +296,10 @@ test('FORK_reuse_of_hidden_role_is_denied_generically', async () => {
 
   // Plant a reviewer child directly through the runtime (bypassing the tool's
   // own creation gate), then try to nudge it by agent id.
-  const reviewerRuntime = live.runtime
-  const forked = await reviewerRuntime.Fork(
+  const forked = await forkRuntime(
+    live.runtime,
     'rw0001',
-    undefined,
+    Role.Reviewer,
     'fast-reviewer',
     'review the diff',
     undefined,
