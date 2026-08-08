@@ -500,6 +500,21 @@ module TurnCompletionProgram =
                 | Some Role.Manager -> not managerJobHandedOff
                 | _ -> false
 
+            // GLORY-062/070: the final rest-in-peace suicide appended LifeCompleted,
+            // archiving the Life (CurrentLife None, CompletedLives non-empty). The
+            // Manager's terminal was already last_words; a leftover turn must not be
+            // re-awakened with IdleEncouragement.
+            let lifeArchived =
+                match turn.Role with
+                | Some Role.Manager ->
+                    match journal with
+                    | Some durable ->
+                        AgentProjection.tryFind turn.SessionId (AgentJournal.snapshot durable).AgentProjections
+                        |> Option.bind (fun session -> session.ManagerLife)
+                        |> Option.exists ManagerLifecycleProjection.isLifeArchived
+                    | None -> false
+                | _ -> false
+
             let completionDeferred =
                 // Orchestrator-owned job states must NotifyTerminal so ResumeManager
                 // can finalizeWorktree (ConflictPending rebase continue). Do not defer
@@ -612,6 +627,11 @@ module TurnCompletionProgram =
                     // ORCH-006: the job is out of the Manager's hands; this run
                     // may complete so the Orchestrator's AwaitManager returns.
                     completeReviewerOrAssistant false |> ignore
+                    AsyncSupport.completedTask ()
+                | Some Role.Manager when lifeArchived ->
+                    // GLORY-062/070: rest in peace already terminated this Life;
+                    // the terminal was last_words. Absorb the leftover turn
+                    // silently — no nudge, no re-completion.
                     AsyncSupport.completedTask ()
                 | Some Role.Manager ->
                     // GLORY-029/070: ordinary Labor idle. The Manager is never
