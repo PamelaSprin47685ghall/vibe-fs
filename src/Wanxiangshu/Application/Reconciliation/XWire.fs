@@ -317,8 +317,7 @@ module XWire =
 
                 scope.ClearAttemptPlan turn.SessionId turn.ProviderRun
             | ReconcileProgram.TurnFailed _
-            | ReconcileProgram.TurnAborted _ ->
-                scope.ClearAttemptPlan turn.SessionId turn.ProviderRun
+            | ReconcileProgram.TurnAborted _ -> scope.ClearAttemptPlan turn.SessionId turn.ProviderRun
             | ReconcileProgram.TurnNeedsContinuation _
             | ReconcileProgram.TurnInProgress
             | ReconcileProgram.TurnUnknown -> ()

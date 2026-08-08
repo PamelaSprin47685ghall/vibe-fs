@@ -41,11 +41,13 @@ module FinalityController =
     /// Fable's Task does not expose `IsCompleted`; keep a local flag.
     type CancelToken() =
         let mutable cancelled = false
+
         let tcs =
             TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
 
         member _.Task = tcs.Task
         member _.IsCancelled = cancelled
+
         member _.Cancel() =
             cancelled <- true
             AsyncSupport.trySetResult tcs () |> ignore
@@ -58,8 +60,7 @@ module FinalityController =
             let taggedCancel: Task<obj> =
                 emitJsExpr cancel.Task "$0.then(function () { return { kind: 1 }; })"
 
-            let! winner =
-                emitJsExpr (taggedWork, taggedCancel) "Promise.race([$0, $1])": Task<obj>
+            let! winner = emitJsExpr (taggedWork, taggedCancel) "Promise.race([$0, $1])": Task<obj>
 
             let kind: int = emitJsExpr winner "$0.kind"
 
@@ -170,7 +171,8 @@ module FinalityController =
                         return Error "review attempt cancelled"
                     }
 
-                return! emitJsExpr (finished, timedOut, cancelled) "Promise.race([$0, $1, $2])": Task<Result<unit, string>>
+                return!
+                    (emitJsExpr (finished, timedOut, cancelled) "Promise.race([$0, $1, $2])": Task<Result<unit, string>>)
         }
 
     /// Send a reviewer continuation and wait for the NEXT terminal it produces.
@@ -419,16 +421,7 @@ module FinalityController =
                     | first :: _ -> first.ReviewerSessionId, first.BarrierId
                     | [] -> managerSessionId, ReviewBarrierId.create (Guid.NewGuid().ToString("N"))
 
-                return!
-                    concludeUndecided
-                        scope
-                        journal
-                        managerSessionId
-                        lifeId
-                        requestId
-                        requestTree
-                        reviewer
-                        barrier
+                return! concludeUndecided scope journal managerSessionId lifeId requestId requestTree reviewer barrier
             else
                 // GLORY-050/060: one canonical LWR per member, ordered by the
                 // stable ReviewerOrdinal, concatenated into one bundle blob.
@@ -449,21 +442,14 @@ module FinalityController =
                         | [] -> managerSessionId, ReviewBarrierId.create (Guid.NewGuid().ToString("N"))
 
                     return!
-                        concludeUndecided
-                            scope
-                            journal
-                            managerSessionId
-                            lifeId
-                            requestId
-                            requestTree
-                            reviewer
-                            barrier
+                        concludeUndecided scope journal managerSessionId lifeId requestId requestTree reviewer barrier
                 else
                     let bundle =
                         orderedRecords
                         |> List.map (fun (ordinal, record) ->
                             sprintf "# Work log %d\n%s" (ordinal + 1) (SyntheticToml.normalizeNewlines record))
                         |> String.concat "\n\n"
+
                     match journal.WriteBlob bundle with
                     | Error _ -> return Undecided ManagerLifecyclePrompt.FinalityUndecidable
                     | Ok blob ->
@@ -517,9 +503,7 @@ module FinalityController =
             // (crash re-entry), else a fresh one.
             let existingMember =
                 request
-                |> Option.bind (fun r ->
-                    slot.ReviewerSessionId
-                    |> Option.bind (fun sid -> Map.tryFind sid r.Members))
+                |> Option.bind (fun r -> slot.ReviewerSessionId |> Option.bind (fun sid -> Map.tryFind sid r.Members))
 
             let barrierId =
                 match existingMember with
@@ -572,7 +556,9 @@ module FinalityController =
                                IsNewReviewer = isNew |})
 
                 // Step 3: barrier — durable, before any assignment byte.
-                match ReviewBarrier.openBarrier (Some journal) managerSessionId reviewerSessionId barrierId requestTree with
+                match
+                    ReviewBarrier.openBarrier (Some journal) managerSessionId reviewerSessionId barrierId requestTree
+                with
                 | Error error -> return Error error
                 | Ok() ->
                     // Step 4: first assignment (GLORY-040: never before the barrier).
@@ -641,16 +627,13 @@ module FinalityController =
                         |> Option.bind (fun session -> session.ManagerLife)
                         |> Option.defaultValue ManagerLifecycleProjection.empty
 
-                    let life =
-                        lifecycle.CurrentLife
-                        |> Option.filter (fun life -> life.LifeId = lifeId)
+                    let life = lifecycle.CurrentLife |> Option.filter (fun life -> life.LifeId = lifeId)
 
                     match life with
                     | None -> return Undecided ManagerLifecyclePrompt.FinalityUndecidable
                     | Some life ->
                         let request =
-                            life.ActiveFinality
-                            |> Option.filter (fun r -> r.RequestId = requestId)
+                            life.ActiveFinality |> Option.filter (fun r -> r.RequestId = requestId)
 
                         match request with
                         | None -> return Undecided ManagerLifecyclePrompt.FinalityUndecidable
@@ -677,7 +660,8 @@ module FinalityController =
                                     directoryFor = (fun _ -> scope.DirectoryFor(SessionId.value managerSessionId)),
                                     onRunStarted = scope.RunStarted,
                                     parentWorkRecordFor =
-                                        (fun _ -> XTraceCapture.lifecycleWorkRecord (Some journal) managerSessionId true),
+                                        (fun _ ->
+                                            XTraceCapture.lifecycleWorkRecord (Some journal) managerSessionId true),
                                     childWorkRecordFor = (fun _ -> None),
                                     ?sessionSnapshot = scope.Snapshot,
                                     managerOpensReviewBarrier = false,
@@ -728,9 +712,7 @@ module FinalityController =
                                     | first :: _ when first.ReviewerSessionId.IsSome ->
                                         first.ReviewerSessionId.Value,
                                         ReviewBarrierId.create (Guid.NewGuid().ToString("N"))
-                                    | _ ->
-                                        managerSessionId,
-                                        ReviewBarrierId.create (Guid.NewGuid().ToString("N"))
+                                    | _ -> managerSessionId, ReviewBarrierId.create (Guid.NewGuid().ToString("N"))
 
                                 return!
                                     concludeUndecided
@@ -762,9 +744,9 @@ module FinalityController =
                                     concurrentAllOrShortCircuit
                                         cancel
                                         (function
-                                            | Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired _) -> true
-                                            | Ok(HostReviewProgram.HostReviewOutcome.Confirmed _) -> false
-                                            | Error _ -> false)
+                                        | Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired _) -> true
+                                        | Ok(HostReviewProgram.HostReviewOutcome.Confirmed _) -> false
+                                        | Error _ -> false)
                                         memberTasks
 
                                 // Defensive: ensure cancel is set even if the
@@ -772,8 +754,10 @@ module FinalityController =
                                 cancel.Cancel()
 
                                 match outcome with
-                                | Choice1Of2(Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired
-                                    (reviewerId, barrier, _tree, record))) ->
+                                | Choice1Of2(Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired(reviewerId,
+                                                                                                     barrier,
+                                                                                                     _tree,
+                                                                                                     record))) ->
                                     return!
                                         concludeRejection
                                             scope
@@ -785,12 +769,13 @@ module FinalityController =
                                             barrier
                                             requestTree
                                             record
-                                | Choice2Of2 results
-                                    when List.forall
+                                | Choice2Of2 results when
+                                    List.forall
                                         (function
-                                            | Ok(HostReviewProgram.HostReviewOutcome.Confirmed _) -> true
-                                            | _ -> false)
-                                        results ->
+                                        | Ok(HostReviewProgram.HostReviewOutcome.Confirmed _) -> true
+                                        | _ -> false)
+                                        results
+                                    ->
                                     return!
                                         concludeBlessing
                                             scope
@@ -819,6 +804,9 @@ module FinalityController =
                 with ex ->
                     // Exception boundary: never leak an exception out of the
                     // tool call that accepted the suicide.
-                    Diagnostic.emit "finality" [ "session_id", SessionId.value managerSessionId; "provider_error", ex.Message ]
+                    Diagnostic.emit
+                        "finality"
+                        [ "session_id", SessionId.value managerSessionId; "provider_error", ex.Message ]
+
                     return Undecided ManagerLifecyclePrompt.FinalityUndecidable
         }

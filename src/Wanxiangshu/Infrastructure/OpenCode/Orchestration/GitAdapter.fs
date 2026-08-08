@@ -46,7 +46,9 @@ module OrchestratorGit =
             let! applyCode, applyPath, _ = runner (command worktree [ "rev-parse"; "--git-path"; "rebase-apply" ])
 
             let exists (code: int) (path: string) =
-                code = 0 && not (String.IsNullOrWhiteSpace path) && System.IO.Directory.Exists(path.Trim())
+                code = 0
+                && not (String.IsNullOrWhiteSpace path)
+                && System.IO.Directory.Exists(path.Trim())
 
             return exists mergeCode mergePath || exists applyCode applyPath
         }
@@ -78,11 +80,7 @@ module OrchestratorGit =
                     return Error(sprintf "unmerged paths remain after stage: %s" (unmergedOut.Trim()))
                 else
                     let! grepCode, grepOut, _ =
-                        runner (
-                            command
-                                worktree
-                                [ "grep"; "-I"; "-n"; "-E"; "^<<<<<<< |^>>>>>>> "; "--"; "." ]
-                        )
+                        runner (command worktree [ "grep"; "-I"; "-n"; "-E"; "^<<<<<<< |^>>>>>>> "; "--"; "." ])
 
                     // git grep exit 0 = matches, 1 = no match, >1 = error
                     if grepCode = 0 && not (String.IsNullOrWhiteSpace grepOut) then

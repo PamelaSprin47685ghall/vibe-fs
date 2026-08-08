@@ -74,7 +74,9 @@ module JoinTool =
                                     tString "family recovery incomplete: wait for FamilyReady before join drain" ] ]
                 | FamilyRecovery.FamilyReady permit ->
                     let interrupt = JoinInterrupt.create ()
-                    let detachAbort = context.AttachAbort (fun () -> interrupt.Signal JoinInterruptReason.OperatorAbort)
+
+                    let detachAbort =
+                        context.AttachAbort(fun () -> interrupt.Signal JoinInterruptReason.OperatorAbort)
 
                     use _cleanup =
                         { new IDisposable with

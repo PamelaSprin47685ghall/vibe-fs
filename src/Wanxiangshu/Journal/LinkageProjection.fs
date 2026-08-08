@@ -105,7 +105,7 @@ module HandleProjection =
         // same (or a recovered) child session for a new work unit. The
         // tombstone is the prior completion cell (LastCompletion), not a ban
         // on further Labor.
-        | Some ({ Lifecycle = Retired } as existing)
+        | Some({ Lifecycle = Retired } as existing)
         | Some existing when
             match existing.Lifecycle with
             | Active

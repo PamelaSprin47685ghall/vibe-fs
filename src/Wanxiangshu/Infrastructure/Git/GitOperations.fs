@@ -186,11 +186,9 @@ module GitOperations =
                     let dir = WorktreePath.value worktree
                     // ORCH-003: continue only when rebase-merge/rebase-apply exists.
                     // A bare REBASE_HEAD ref can be stale (no rebase in progress).
-                    let! mergeCode, mergePath, _ =
-                        runner (command dir [ "rev-parse"; "--git-path"; "rebase-merge" ])
+                    let! mergeCode, mergePath, _ = runner (command dir [ "rev-parse"; "--git-path"; "rebase-merge" ])
 
-                    let! applyCode, applyPath, _ =
-                        runner (command dir [ "rev-parse"; "--git-path"; "rebase-apply" ])
+                    let! applyCode, applyPath, _ = runner (command dir [ "rev-parse"; "--git-path"; "rebase-apply" ])
 
                     let inProgress =
                         let exists code path =
@@ -243,11 +241,9 @@ module GitOperations =
                 task {
                     let dir = WorktreePath.value worktree
 
-                    let! mergeCode, mergePath, _ =
-                        runner (command dir [ "rev-parse"; "--git-path"; "rebase-merge" ])
+                    let! mergeCode, mergePath, _ = runner (command dir [ "rev-parse"; "--git-path"; "rebase-merge" ])
 
-                    let! applyCode, applyPath, _ =
-                        runner (command dir [ "rev-parse"; "--git-path"; "rebase-apply" ])
+                    let! applyCode, applyPath, _ = runner (command dir [ "rev-parse"; "--git-path"; "rebase-apply" ])
 
                     let exists code path =
                         code = 0

@@ -61,8 +61,7 @@ module ForkTool =
     /// GLORY-032: provider-facing denial for any target the Manager cannot
     /// reach (the Host-owned Reviewer among them). Generic — it must not prove
     /// the hidden target exists.
-    let HiddenTargetDeniedText =
-        "Unknown or unavailable managed agent."
+    let HiddenTargetDeniedText = "Unknown or unavailable managed agent."
 
     let private forbiddenManagerRole (managed: ManagedAgent) =
         match managed.Role with
@@ -167,13 +166,10 @@ module ForkTool =
                                 with
                                 | Ok result -> return forkPayload result.AgentId managed []
                                 | Error forkError -> return error forkError
-                            | Some managed when forbiddenManagerRole managed ->
-                                return error HiddenTargetDeniedText
+                            | Some managed when forbiddenManagerRole managed -> return error HiddenTargetDeniedText
                             | Some managed ->
                                 return
-                                    error (
-                                        sprintf "Managed agent '%s' is not creatable via Manager fork" managed.Name
-                                    )
+                                    error (sprintf "Managed agent '%s' is not creatable via Manager fork" managed.Name)
                             | None when ToolHostCodec.looksLikeHandleId request.Agent ->
                                 return error (sprintf "Unknown agent id: %s" request.Agent)
                             | None -> return error (unknownAgentError request.Agent)

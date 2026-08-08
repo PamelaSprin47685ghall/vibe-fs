@@ -76,10 +76,10 @@ module PluginHostInterop =
                 childWorkRecordFor
                 snapshot
                 cancelSignals
-                 eventPort
-                 (Some(scope :> IParkedTransformHost))
-                 scope.StudentTeacherRuntime
-                 finalityReviewerTimeoutMs
+                eventPort
+                (Some(scope :> IParkedTransformHost))
+                scope.StudentTeacherRuntime
+                finalityReviewerTimeoutMs
 
         // P0-RECOVERY-JOIN-001: JoinTool RequireFamilyRecovery → PluginRuntimeScope.
         registration.Runtime.AttachFamilyRecovery(fun root -> scope.RequireFamilyRecovery root)

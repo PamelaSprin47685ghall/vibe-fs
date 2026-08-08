@@ -60,7 +60,12 @@ type HostForkRuntime
     // DSL-MUTABLE: resource — first prompts deferred until the review barrier
     // has durably opened (GLORY-040: barrier before assignment).
     let deferredFirstPrompts =
-        Dictionary<string, {| ChildId: SessionId; AgentName: string; Prompt: string |}>()
+        Dictionary<
+            string,
+            {| ChildId: SessionId
+               AgentName: string
+               Prompt: string |}
+         >()
 
     let directoryOf = defaultArg directoryFor (fun _ -> None)
     let childCreated = defaultArg onChildCreated (fun _ _ _ -> ())
@@ -411,14 +416,11 @@ type HostForkRuntime
                                         "$0.then(function () { return { kind: 1 }; })"
 
                                 let interruptTask: Task<obj> =
-                                    emitJsExpr
-                                        interrupt
-                                        "$0.then(function (r) { return { kind: 2, reason: r }; })"
+                                    emitJsExpr interrupt "$0.then(function (r) { return { kind: 2, reason: r }; })"
 
                                 let! winner =
-                                    emitJsExpr
-                                        (wakeTask, changeTask, interruptTask)
-                                        "Promise.race([$0, $1, $2])": Task<obj>
+                                    emitJsExpr (wakeTask, changeTask, interruptTask) "Promise.race([$0, $1, $2])"
+                                    : Task<obj>
 
                                 runtime.PulseWake()
 

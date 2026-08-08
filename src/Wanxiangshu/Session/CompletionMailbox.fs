@@ -205,9 +205,7 @@ type CompletionMailbox(gate: obj, hasActive: unit -> bool) =
                         let timerTask = Wanxiangshu.Process.PtyTiming.timerTask remainingMs
 
                         let interrupt: Task<JoinInterruptReason> =
-                            emitJsExpr
-                                timerTask
-                                "$0.then(function () { return 'DeadlineExpired'; })"
+                            emitJsExpr timerTask "$0.then(function () { return 'DeadlineExpired'; })"
 
                         let started = System.DateTimeOffset.UtcNow
                         let! reason = this.WaitForSignal interrupt

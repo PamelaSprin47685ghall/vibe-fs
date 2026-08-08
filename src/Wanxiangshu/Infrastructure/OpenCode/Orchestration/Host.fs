@@ -106,7 +106,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     // pending raced installRun and staged an unresolved conflict (ORCH-003).
     let awaitCurrentPendingRun (agentId: string) =
         task {
-            let deadline = DateTimeOffset.UtcNow.AddMilliseconds(float ExecutorSummarize.AwaitAgentTimeoutMs)
+            let deadline =
+                DateTimeOffset.UtcNow.AddMilliseconds(float ExecutorSummarize.AwaitAgentTimeoutMs)
             // Brief window for sendToExistingChild to installRun after Fork returns.
             let appearDeadline = DateTimeOffset.UtcNow.AddMilliseconds(2000.0)
 
@@ -192,10 +193,18 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             | true, run when not run.Finished ->
                 run.Finished <- true
                 run.Subscription |> Option.iter (fun s -> s.Dispose())
+
                 run.Source.TrySetResult(
-                    AgentCompletion.failed agentId ("run-" + agentId) (Some Role.Manager) None "SUPERSEDED" "superseded by ResumeManager"
+                    AgentCompletion.failed
+                        agentId
+                        ("run-" + agentId)
+                        (Some Role.Manager)
+                        None
+                        "SUPERSEDED"
+                        "superseded by ResumeManager"
                 )
                 |> ignore
+
                 runtime.PendingRuns.Remove agentId |> ignore
             | true, _ -> runtime.PendingRuns.Remove agentId |> ignore
             | false, _ -> ())

@@ -86,11 +86,7 @@ module ManagedAgentCatalog =
     /// Host-owned and does not exist on the Manager's surface. No
     /// orchestrator/manager/blogger/executor either.
     let managerForkableRoles: Role list =
-        [ Role.Coder
-          Role.Inspector
-          Role.DevOps
-          Role.Browser
-          Role.Meditator ]
+        [ Role.Coder; Role.Inspector; Role.DevOps; Role.Browser; Role.Meditator ]
 
     let private namesFor (roles: Role list) : string list =
         roles

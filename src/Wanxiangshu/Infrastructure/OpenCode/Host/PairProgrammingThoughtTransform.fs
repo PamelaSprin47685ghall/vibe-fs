@@ -77,7 +77,8 @@ module PairProgrammingThoughtTransform =
                                createObj
                                    [ "status", box "completed"
                                      "input", box (createObj [])
-                                     "output", box markerText ]
+                                     "output", box markerText
+                                     "time", box (createObj [ "start", box 0; "end", box 0 ]) ]
                            ) ] |] ]
 
     let private isWireAnchor (message: WireMessage) : bool =

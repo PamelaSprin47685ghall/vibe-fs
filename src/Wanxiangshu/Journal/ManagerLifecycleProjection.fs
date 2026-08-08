@@ -18,14 +18,16 @@ type ReviewMemberRef =
 /// graduation is DERIVED from the reviewer's confirmed witness on one of these
 /// barriers, never stored as a bool.
 type ReviewerStanding =
-    { ReviewerOrdinal: int
-      Barriers: ReviewBarrierId list
-      /// GLORY-045: the stable runtime agent id of this Reviewer session. Set
-      /// on the FIRST enlistment (`finality-new-<requestId>` of the request
-      /// that created it) and never overwritten, so every later request reuses
-      /// the same id and its HandleCompleted still matches the original
-      /// HandleLinked (handle id IS agent id, EXEC-009).
-      AgentId: string }
+    {
+        ReviewerOrdinal: int
+        Barriers: ReviewBarrierId list
+        /// GLORY-045: the stable runtime agent id of this Reviewer session. Set
+        /// on the FIRST enlistment (`finality-new-<requestId>` of the request
+        /// that created it) and never overwritten, so every later request reuses
+        /// the same id and its HandleCompleted still matches the original
+        /// HandleLinked (handle id IS agent id, EXEC-009).
+        AgentId: string
+    }
 
 /// GLORY-011: the rejecting member's evidence. Only durable facts — the
 /// canonical work record blob — never a decision.
@@ -68,20 +70,22 @@ type FinalityRequestProjection =
 /// what was the last rejection, is there a blessing, is the Life complete". It
 /// never answers "what runs next" (ARCH-001).
 type LifeProjection =
-    { LifeId: ManagerLifeId
-      OpeningUserMessageId: PhysicalUserMessageId
-      OpeningTextRef: BlobRef
-      OpeningTextDigest: BlobDigest
-      OpeningCursor: XTraceCursor
-      ProtectedPrefixEnd: XTraceCursor option
-      ActiveFinality: FinalityRequestProjection option
-      /// Every Reviewer this Life ever enlisted, across all requests
-      /// (GLORY-045 roster source). Never pruned.
-      EnlistedReviewers: Map<SessionId, ReviewerStanding>
-      LastRejectedWorkRecord: BlobRef option
-      LastBlessing: BlessingEvidence option
-      CompletedTerminal: BlobRef option
-      Completed: bool }
+    {
+        LifeId: ManagerLifeId
+        OpeningUserMessageId: PhysicalUserMessageId
+        OpeningTextRef: BlobRef
+        OpeningTextDigest: BlobDigest
+        OpeningCursor: XTraceCursor
+        ProtectedPrefixEnd: XTraceCursor option
+        ActiveFinality: FinalityRequestProjection option
+        /// Every Reviewer this Life ever enlisted, across all requests
+        /// (GLORY-045 roster source). Never pruned.
+        EnlistedReviewers: Map<SessionId, ReviewerStanding>
+        LastRejectedWorkRecord: BlobRef option
+        LastBlessing: BlessingEvidence option
+        CompletedTerminal: BlobRef option
+        Completed: bool
+    }
 
 /// GLORY-066: per-session lifecycle state. `CurrentLife` is the open Life
 /// (None after LifeCompleted until the next HumanRoot); `CompletedLives`
@@ -168,8 +172,7 @@ module ManagerLifecycleProjection =
                 match life.ActiveFinality with
                 // GLORY-055: a closed request (rejected/blessed/undecided) may
                 // be replaced; an open one may not.
-                | Some { Resolution = FinalityResolution.Open } ->
-                    Error ManagerLifeFoldRejection.FinalityAlreadyActive
+                | Some { Resolution = FinalityResolution.Open } -> Error ManagerLifeFoldRejection.FinalityAlreadyActive
                 | _ ->
                     Ok(
                         withLife
@@ -220,13 +223,9 @@ module ManagerLifecycleProjection =
                                       Barriers = [ payload.BarrierId ]
                                       AgentId =
                                         if payload.IsNewReviewer then
-                                            sprintf
-                                                "finality-new-%s"
-                                                (FinalityRequestId.value payload.RequestId)
+                                            sprintf "finality-new-%s" (FinalityRequestId.value payload.RequestId)
                                         else
-                                            sprintf
-                                                "finality-reviewer-%s"
-                                                (SessionId.value payload.ReviewerSessionId) }
+                                            sprintf "finality-reviewer-%s" (SessionId.value payload.ReviewerSessionId) }
 
                             Ok(
                                 withLife
@@ -236,7 +235,8 @@ module ManagerLifecycleProjection =
                                         ActiveFinality =
                                             Some
                                                 { request with
-                                                    Members = Map.add payload.ReviewerSessionId memberRef request.Members } }
+                                                    Members =
+                                                        Map.add payload.ReviewerSessionId memberRef request.Members } }
                                     state
                             )
                     | _ -> Error ManagerLifeFoldRejection.UnknownRequest

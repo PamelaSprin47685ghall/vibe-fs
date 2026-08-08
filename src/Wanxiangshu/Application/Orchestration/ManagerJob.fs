@@ -132,7 +132,9 @@ type VerdictMailbox() =
 
     /// EXEC-017 / EXEC-019: drain-first → race wait/interrupt → re-drain.
     /// A local operator abort is not a publish failure.
-    member this.JoinAvailable(maxCount: int, interrupt: Task<JoinInterruptReason>) : Task<JoinWaitOutcome<OrchestratorVerdict>> =
+    member this.JoinAvailable
+        (maxCount: int, interrupt: Task<JoinInterruptReason>)
+        : Task<JoinWaitOutcome<OrchestratorVerdict>> =
         let cap = min (max 0 maxCount) JoinBatch.Max
         let ready = this.DrainAvailable cap
 

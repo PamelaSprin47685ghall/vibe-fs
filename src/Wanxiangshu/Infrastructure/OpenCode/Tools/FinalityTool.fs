@@ -94,9 +94,7 @@ module FinalityTool =
                         |> Result.mapError (fun failure ->
                             raise (
                                 InvalidOperationException(
-                                    sprintf
-                                        "Life migration append failed: %s"
-                                        (JournalAppendFailure.describe failure)
+                                    sprintf "Life migration append failed: %s" (JournalAppendFailure.describe failure)
                                 )
                             ))
                         |> ignore
@@ -146,7 +144,8 @@ module FinalityTool =
         : Task<string> =
         task {
             match journal.WriteBlob lastWords with
-            | Error _ -> return ToolHostCodec.tomlObject [ "error", tString "Your ending could not be entered.\nContinue." ]
+            | Error _ ->
+                return ToolHostCodec.tomlObject [ "error", tString "Your ending could not be entered.\nContinue." ]
             | Ok blob ->
                 let providerRun = context.ProviderRunId.Value
 
@@ -156,7 +155,8 @@ module FinalityTool =
                     |> Option.exists (fun lifecycle ->
                         (lifecycle.CurrentLife
                          |> Option.exists (fun current -> current.LifeId = life.LifeId && current.Completed))
-                        || lifecycle.CompletedLives |> List.exists (fun completed -> completed.LifeId = life.LifeId))
+                        || lifecycle.CompletedLives
+                           |> List.exists (fun completed -> completed.LifeId = life.LifeId))
 
                 let terminalRecorded =
                     AgentProjection.tryFind sid (AgentJournal.snapshot journal).AgentProjections
@@ -201,9 +201,7 @@ module FinalityTool =
                         let runResult: AgentRunResult =
                             { SessionId = sid
                               AuthorityRootUserMessageId =
-                                PromptAuthorityLedger.activeProfile
-                                    sid
-                                    (AgentJournal.snapshot journal).AgentProjections
+                                PromptAuthorityLedger.activeProfile sid (AgentJournal.snapshot journal).AgentProjections
                                 |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
                                 |> Option.defaultValue (AuthorityRootUserMessageId.create "")
                               ProviderRun = providerRun
@@ -295,13 +293,13 @@ module FinalityTool =
                                                     sid
                                                     life.LifeId
                                                     request.RequestId
-                                                     request.GitTreeHash
-                                                     request.LastWordsRef
-                                                     request.LastWordsDigest
-                                                     request.ProviderRun
-                                                      (defaultArg
-                                                          scope.FinalityReviewerTimeoutMs
-                                                          ExecutorSummarize.AwaitAgentTimeoutMs)
+                                                    request.GitTreeHash
+                                                    request.LastWordsRef
+                                                    request.LastWordsDigest
+                                                    request.ProviderRun
+                                                    (defaultArg
+                                                        scope.FinalityReviewerTimeoutMs
+                                                        ExecutorSummarize.AwaitAgentTimeoutMs)
 
                                             match outcome with
                                             | FinalityController.FinalityOutcome.Rejected prompt
@@ -337,21 +335,15 @@ module FinalityTool =
                                         match life.LastBlessing with
                                         | Some blessing ->
                                             return!
-                                                completeBlessedLife
-                                                    scope
-                                                    journal
-                                                    context
-                                                    sid
-                                                    life
-                                                    blessing
-                                                    lastWords
+                                                completeBlessedLife scope journal context sid life blessing lastWords
                                         | None ->
                                             // GLORY-037.14/15: the tree must be readable.
                                             match treeOf scope sessionId with
                                             | None ->
                                                 return
                                                     ToolHostCodec.tomlObject
-                                                        [ "error", tString "Your ending could not be entered.\nContinue." ]
+                                                        [ "error",
+                                                          tString "Your ending could not be entered.\nContinue." ]
                                             | Some tree ->
                                                 match journal.WriteBlob lastWords with
                                                 | Error err ->
@@ -362,7 +354,8 @@ module FinalityTool =
                                                 | Ok blob ->
                                                     // GLORY-040: accept in order. Synchronously wait for the Finality
                                                     // workflow to complete; every outcome lands on the journal before any side effect.
-                                                    let requestId = FinalityRequestId.create (Guid.NewGuid().ToString("N"))
+                                                    let requestId =
+                                                        FinalityRequestId.create (Guid.NewGuid().ToString("N"))
 
                                                     AgentJournal.appendManagerLifecycle
                                                         (StreamId.Session sid)
@@ -392,18 +385,19 @@ module FinalityTool =
                                                             sid
                                                             life.LifeId
                                                             requestId
-                                                             tree
-                                                             blob.BlobRef
-                                                             blob.BlobDigest
-                                                             context.ProviderRunId.Value
-                                                             (defaultArg
-                                                                 scope.FinalityReviewerTimeoutMs
-                                                                 ExecutorSummarize.AwaitAgentTimeoutMs)
+                                                            tree
+                                                            blob.BlobRef
+                                                            blob.BlobDigest
+                                                            context.ProviderRunId.Value
+                                                            (defaultArg
+                                                                scope.FinalityReviewerTimeoutMs
+                                                                ExecutorSummarize.AwaitAgentTimeoutMs)
 
                                                     match outcome with
                                                     | FinalityController.FinalityOutcome.Rejected prompt
                                                     | FinalityController.FinalityOutcome.Blessed prompt
-                                                    | FinalityController.FinalityOutcome.Undecided prompt -> return prompt
+                                                    | FinalityController.FinalityOutcome.Undecided prompt ->
+                                                        return prompt
                             }
 
                         match effectiveLife with

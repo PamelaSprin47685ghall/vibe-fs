@@ -67,6 +67,7 @@ test('PPT_tryInject_injects_one_marker_after_user_anchor', () => {
   assert.equal(marker.parts[0].callID, marker.info.id)
   assert.equal(marker.parts[0].state.status, 'completed')
   assert.equal(marker.parts[0].state.output, text, 'the marker carries the frozen guideline text')
+  assert.deepEqual(marker.parts[0].state.time, { start: 0, end: 0 }, 'the marker carries a completed tool state time object')
 })
 
 test('PPT_tryInject_appends_one_final_marker_after_every_anchor', () => {

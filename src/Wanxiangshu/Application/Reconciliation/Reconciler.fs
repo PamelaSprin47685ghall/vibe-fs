@@ -253,8 +253,7 @@ module Reconciler =
                                 let publishable =
                                     match evidence with
                                     | ReconcileProgram.ReconcileEvidence.Terminal observed -> observed.PublishTurn
-                                    | ReconcileProgram.ReconcileEvidence.Unknown(Some observed) ->
-                                        observed.PublishTurn
+                                    | ReconcileProgram.ReconcileEvidence.Unknown(Some observed) -> observed.PublishTurn
                                     | ReconcileProgram.ReconcileEvidence.Provisional observed -> observed.PublishTurn
                                     | _ -> candidate
 

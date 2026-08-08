@@ -38,9 +38,11 @@ module ManagerLifecycleGate =
 
             match lifecycle.CurrentLife with
             // Life opened, not yet activated, not completed.
-            | Some life when life.ProtectedPrefixEnd.IsNone
-                           && not life.Completed
-                           && turn.Outcome = ReconcileProgram.TurnCompleted ->
+            | Some life when
+                life.ProtectedPrefixEnd.IsNone
+                && not life.Completed
+                && turn.Outcome = ReconcileProgram.TurnCompleted
+                ->
                 // A legal planning terminal carries formal text; an empty or
                 // XML-only terminal does not trigger Activation (GLORY-018).
                 not (System.String.IsNullOrWhiteSpace(CompletedTurnClassifier.partsText turn.Parts))

@@ -66,8 +66,7 @@ module TurnCompletionProgram =
             |> Option.exists (fun authority ->
                 authority.AcceptedContinuationIds
                 |> Map.tryFind turn.PhysicalUserMessageId
-                |> Option.exists (fun kind ->
-                    kind = PromptAuthority.ContinuationKind.ProviderRetryAttempt))
+                |> Option.exists (fun kind -> kind = PromptAuthority.ContinuationKind.ProviderRetryAttempt))
 
     /// CTX-006 hasMaterial for X: BlogEntryCommitted coverage on the main session.
     let private sessionHasCoverage (durable: AgentJournal) (sessionId: SessionId) =
@@ -116,7 +115,8 @@ module TurnCompletionProgram =
                                 emitJsExpr
                                     (AgentJournal.awaitChangeFrom fromRev durable,
                                      Wanxiangshu.Process.PtyTiming.timerTask sliceMs)
-                                    "Promise.race([$0, $1]).then(function () { return undefined; })": Task
+                                    "Promise.race([$0, $1]).then(function () { return undefined; })"
+                                : Task
 
                             return! loop ()
                     }
@@ -618,10 +618,7 @@ module TurnCompletionProgram =
                     // reviewed by a guard; it continues until suicide. Exactly one
                     // encouragement per idle terminal (dedupe: pending claim + run).
                     let encouragementKey =
-                        sprintf
-                            "manager-idle:%s:%s"
-                            sessionKey
-                            (ProviderRunIdentity.value turn.ProviderRun)
+                        sprintf "manager-idle:%s:%s" sessionKey (ProviderRunIdentity.value turn.ProviderRun)
 
                     let idleAlreadyClaimed =
                         match journal with
@@ -632,8 +629,8 @@ module TurnCompletionProgram =
                                 authority.PendingClaims
                                 |> Map.exists (fun _ claim ->
                                     match claim.Origin with
-                                    | PromptAuthority.PromptOrigin.Continuation
-                                        PromptAuthority.ContinuationKind.ManagerIdleEncouragement -> true
+                                    | PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ManagerIdleEncouragement ->
+                                        true
                                     | _ -> false))
                         | None -> false
 
