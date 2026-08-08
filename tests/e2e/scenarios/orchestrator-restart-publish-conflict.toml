@@ -219,9 +219,12 @@ tools = ["fork", "join", "list", "suicide"]
   # the conflicted file through the Coder, joins, then ends its Life with suicide.
   # GLORY-029/070: a Manager's run completes only at suicide — a plain text reply
   # under ConflictPending is deferred forever (IdleEncouragement loop) and the
-  # recovery never returns. The Life was blessed pre-restart, so GLORY-062 ends
-  # it with ONE suicide; only then does AwaitManager return and finalizeWorktree
-  # stage the resolution and `rebase --continue` (GitAdapter.finalizeWorktree).
+  # recovery never returns. The pre-restart Life was completed (archived), so the
+  # ending opens a NEW migration Life (FinalityTool.ensureMigrationLife) and runs
+  # the full Finality cycle: first suicide → Host-owned cohort
+  # (manager-finality-reviewer) → second suicide ends the Life. Only then does
+  # AwaitManager return and finalizeWorktree stage the resolution and
+  # `rebase --continue` (GitAdapter.finalizeWorktree).
   # The fork prompt avoids the literal word "Published": the journal observer
   # counts waitFact facts by substring, and the assignment text lands in the
   # journal — the word would fake a `Published` fact.
@@ -230,6 +233,9 @@ tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
@@ -270,6 +276,27 @@ tools = ["write"]
 
   [[turn.step]]
   respond = { type = "text", text = "Conflict file resolved." }
+
+# The recovered run's join may return interrupted/empty (the publish has not
+# landed yet), and the Host then repairs the completed turn: the missing-final-
+# report poke (`RuntimeNudge.missingFinalReport = "#\n"`) is sent to the
+# ORCHESTRATOR session, not the blogger — the "#" blogger-repair declaration
+# cannot answer step 1 of that turn. Declared as "#\n" (weight 2 beats the "#"
+# blogger turn for the same wire) with two steps: the Host keeps poking until a
+# report lands. Optional: on the green path the turn may complete before the
+# poke fires.
+[[turn]]
+id = "orch-repair"
+internal = true
+optional = true
+user = "#\n"
+tools = ["fork-manager", "join"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Orchestrator continues." }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Orchestrator continues." }
 
 [[turn]]
 id = "manager-finality-reviewer"

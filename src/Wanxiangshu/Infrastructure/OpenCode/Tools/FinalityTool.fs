@@ -62,67 +62,74 @@ module FinalityTool =
     /// GLORY-068/069: an AgentOwnerRoot Manager (an Orchestrator's ManagerJob)
     /// has no HumanRoot and therefore no Life. Its ending still goes through
     /// suicide; build the migration Life on acceptance so the Finality workflow
-    /// has an identity. Idempotent: an existing Life is returned as-is.
+    /// has an identity. Idempotent: a current Life is returned as-is; a
+    /// completed (archived) Life is a closed chapter, and ORCH-007 recovery may
+    /// resume the Manager — a new migration Life is opened for the new ending.
     let private ensureMigrationLife (journal: AgentJournal) (sessionId: string) : ManagerLifeId option =
         let sid = SessionId.create sessionId
         let snapshot = AgentJournal.snapshot journal
+
+        let openLife (xTrace: XTraceProjectionState option) : ManagerLifeId option =
+            match xTrace with
+            | None -> None
+            | Some xTrace ->
+                match xTrace.Opening with
+                | None -> None
+                | Some opening ->
+                    match journal.WriteBlob opening.AssignmentText with
+                    | Error _ -> None
+                    | Ok blob ->
+                        let lifeId = ManagerLifeId.create (Guid.NewGuid().ToString("N"))
+
+                        AgentJournal.appendManagerLifecycle
+                            (StreamId.Session sid)
+                            (ManagerLifecycleFact.LifeOpened
+                                {| SessionId = sid
+                                   LifeId = lifeId
+                                   OpeningUserMessageId = PhysicalUserMessageId.create sessionId
+                                   OpeningTextRef = blob.BlobRef
+                                   OpeningTextDigest = blob.BlobDigest
+                                   OpeningCursorSequence = 0L |})
+                            journal
+                        |> Result.mapError (fun failure ->
+                            raise (
+                                InvalidOperationException(
+                                    sprintf
+                                        "Life migration append failed: %s"
+                                        (JournalAppendFailure.describe failure)
+                                )
+                            ))
+                        |> ignore
+
+                        AgentJournal.appendManagerLifecycle
+                            (StreamId.Session sid)
+                            (ManagerLifecycleFact.WorkActivated
+                                {| SessionId = sid
+                                   LifeId = lifeId
+                                   ActivationPromptKey = PromptKey.create ""
+                                   ProtectedPrefixEndSequence = XTraceProjection.headSequence xTrace + 1L |})
+                            journal
+                        |> Result.mapError (fun failure ->
+                            raise (
+                                InvalidOperationException(
+                                    sprintf
+                                        "Life migration activation failed: %s"
+                                        (JournalAppendFailure.describe failure)
+                                )
+                            ))
+                        |> ignore
+
+                        Some lifeId
 
         match AgentProjection.tryFind sid snapshot.AgentProjections with
         | None -> None
         | Some session ->
             match session.ManagerLife with
-            | Some existing -> existing.CurrentLife |> Option.map (fun life -> life.LifeId)
-            | None ->
-                match session.XTrace with
-                | None -> None
-                | Some xTrace ->
-                    match xTrace.Opening with
-                    | None -> None
-                    | Some opening ->
-                        match journal.WriteBlob opening.AssignmentText with
-                        | Error _ -> None
-                        | Ok blob ->
-                            let lifeId = ManagerLifeId.create (Guid.NewGuid().ToString("N"))
-
-                            AgentJournal.appendManagerLifecycle
-                                (StreamId.Session sid)
-                                (ManagerLifecycleFact.LifeOpened
-                                    {| SessionId = sid
-                                       LifeId = lifeId
-                                       OpeningUserMessageId = PhysicalUserMessageId.create sessionId
-                                       OpeningTextRef = blob.BlobRef
-                                       OpeningTextDigest = blob.BlobDigest
-                                       OpeningCursorSequence = 0L |})
-                                journal
-                            |> Result.mapError (fun failure ->
-                                raise (
-                                    InvalidOperationException(
-                                        sprintf
-                                            "Life migration append failed: %s"
-                                            (JournalAppendFailure.describe failure)
-                                    )
-                                ))
-                            |> ignore
-
-                            AgentJournal.appendManagerLifecycle
-                                (StreamId.Session sid)
-                                (ManagerLifecycleFact.WorkActivated
-                                    {| SessionId = sid
-                                       LifeId = lifeId
-                                       ActivationPromptKey = PromptKey.create ""
-                                       ProtectedPrefixEndSequence = XTraceProjection.headSequence xTrace + 1L |})
-                                journal
-                            |> Result.mapError (fun failure ->
-                                raise (
-                                    InvalidOperationException(
-                                        sprintf
-                                            "Life migration activation failed: %s"
-                                            (JournalAppendFailure.describe failure)
-                                    )
-                                ))
-                            |> ignore
-
-                            Some lifeId
+            | Some existing ->
+                match existing.CurrentLife with
+                | Some life -> Some life.LifeId
+                | None -> openLife session.XTrace
+            | None -> openLife session.XTrace
 
     /// GLORY-062: the second suicide of a blessed Life. Resource safety first
     /// (GLORY-037); then NO tree read, NO Reviewer/barrier/witness. The NEW
