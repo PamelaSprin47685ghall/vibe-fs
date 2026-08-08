@@ -299,6 +299,19 @@ tools = ["fork-manager", "join"]
   respond = { type = "text", text = "Orchestrator continues." }
 
 [[turn]]
+id = "manager-repair"
+internal = true
+optional = true
+user = "#\n"
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager continues." }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager continues." }
+
+[[turn]]
 id = "manager-finality-reviewer"
 internal = true
 user = "# Review the current worktree against all authoritative user requirements."

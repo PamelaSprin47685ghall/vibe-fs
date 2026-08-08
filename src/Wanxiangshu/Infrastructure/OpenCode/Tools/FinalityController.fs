@@ -531,6 +531,8 @@ module FinalityController =
                 match slot.ReviewerSessionId with
                 | Some existing ->
                     runtime.AdoptChild(slot.AgentId, existing)
+                    scope.DirectoryFor(SessionId.value managerSessionId)
+                    |> Option.iter (fun directory -> scope.RegisterDirectory(SessionId.value existing, directory))
                     Task.FromResult(Ok(existing, false))
                 | None ->
                     // New reviewer: fork with deferred send — the session is
