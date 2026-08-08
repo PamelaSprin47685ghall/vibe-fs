@@ -6,9 +6,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Process
 
-/// Subscribes coarse host signals from exactly one source per plugin instance:
-/// global SSE preferred; local events.listen as fallback for older hosts.
-/// Both unavailable is a hard failure — no dual delivery, no silent degradation.
+    /// Subscribes coarse host signals from exactly one source per plugin instance:
+    /// local events.listen preferred; global SSE only when the local listener is
+    /// unavailable. Both unavailable is a hard failure — no dual delivery, no
+    /// silent degradation, and never a cross-instance connection.
 ///
 /// Global SSE: supervised reconnect + heartbeat. Half-open TCP (no error, no end)
 /// is detected by silence timeout; errors surface via console.warn and Health.
@@ -342,25 +343,30 @@ module HostSignalSubscribe =
 
             let client = if isNull input then null else input?client
 
-            // Global SSE carries sessions from manager worktrees whose
-            // directory differs from this plugin instance. Prefer it whenever a
-            // real listener answers; fall back to the directory-scoped listener
-            // for older hosts without /global/event, and hard-fail only when no
-            // transport remains at all.
+            // Directory-scoped listener is authoritative for this plugin
+            // instance; the global SSE transport is only a fallback when the
+            // local listener is unavailable. This ordering prevents subscribing
+            // to a foreign instance's sessions. Hard-fail only when no transport
+            // remains at all.
             let subscribeGlobalOrLocal () =
-                match subscribeGlobalEvent client onSignalEvent timerPort with
-                | Ok sub ->
-                    logInfo "OPENCODE-SIGNAL-SOURCE" "global.event"
-                    Ok(Some sub, "global.event")
-                | Error globalError ->
-                    match listenTarget with
-                    | Some events ->
-                        match subscribeListen events onSignalEvent with
-                        | Error err -> Error err
-                        | Ok localSub ->
-                            logInfo "OPENCODE-SIGNAL-SOURCE" "events.listen"
-                            Ok(Some localSub, "events.listen")
-                    | None -> Error globalError
+                match listenTarget with
+                | Some events ->
+                    match subscribeListen events onSignalEvent with
+                    | Ok localSub ->
+                        logInfo "OPENCODE-SIGNAL-SOURCE" "events.listen"
+                        Ok(Some localSub, "events.listen")
+                    | Error localError ->
+                        match subscribeGlobalEvent client onSignalEvent timerPort with
+                        | Ok sub ->
+                            logInfo "OPENCODE-SIGNAL-SOURCE" "global.event"
+                            Ok(Some sub, "global.event")
+                        | Error _ -> Error localError
+                | None ->
+                    match subscribeGlobalEvent client onSignalEvent timerPort with
+                    | Ok sub ->
+                        logInfo "OPENCODE-SIGNAL-SOURCE" "global.event"
+                        Ok(Some sub, "global.event")
+                    | Error globalError -> Error globalError
 
             // Embedded (TUI) mode: no listener answers the server URL, so the
             // SDK SSE path cannot deliver. Local signals already arrive through

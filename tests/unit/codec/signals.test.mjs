@@ -236,6 +236,22 @@ test('MISC_signals_client_events_listen_fallback', async () => {
   assert.equal(called, true)
 })
 
+test('MISC_signals_local_subscription_precedes_global_when_both_available', async () => {
+  let globalCalls = 0
+  let unsubscribed = false
+  const stream = (async function* () { yield idleRaw('local-first') })()
+  const result = await trySubscribe({
+    events: { listen: () => () => { unsubscribed = true } },
+    client: { global: { event: async () => { globalCalls += 1; return { stream } } } },
+  }, () => {}, undefined)
+
+  assert.equal(result.tag, 0)
+  assert.equal(result.fields[0][1], 'events.listen')
+  assert.equal(globalCalls, 0, 'local subscription prevents cross-instance global connection')
+  result.fields[0][0].Dispose()
+  assert.equal(unsubscribed, true)
+})
+
 test('MISC_signals_server_url_probe_healthy_then_global', async () => {
   const originalFetch = globalThis.fetch
   globalThis.fetch = async (target) => ({
