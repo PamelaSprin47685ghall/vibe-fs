@@ -8,7 +8,22 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+import { readdirSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { listItems, toList } from '../support/domain.mjs'
+
+const fableLibraryDir = join(
+  process.cwd(),
+  'dist',
+  'fable_modules',
+  readdirSync('dist/fable_modules').find((entry) => entry.startsWith('fable-library-js.')),
+)
+const { curry2 } = await import(join(fableLibraryDir, 'Util.js'))
+
+// Record function fields are emitted uncurried by Fable; curry2 recovers the
+// original curried function from the `curried` WeakMap.
+const attachAbort = (ctx, callback) => curry2(ctx.AttachAbort)(callback)
 
 const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,
@@ -82,32 +97,7 @@ test('CODEC_arguments_null_raw_is_all_absent', () => {
 
 // ── schema DSL over a fake factory ───────────────────────────────────────────
 
-const fakeSchemaDsl = () => {
-  const calls = []
-  const api = {
-    string: () => ({ schema: 'string' }),
-    number: () => ({ schema: 'number' }),
-    enum: (values) => {
-      calls.push(['enum', values])
-      return {
-        describe: (description) => {
-          calls.push(['describe', description])
-          return { optional: () => ({ schema: 'enum-described-optional', values, description }) }
-        },
-        optional: () => ({ schema: 'enum-optional', values }),
-      }
-    },
-    array: (inner) => ({ schema: 'array', inner }),
-    union: (parts) => ({ schema: 'union', parts }),
-  }
-  api.string.optional = undefined
-  return { calls, api }
-}
-
 test('CODEC_schema_dsl_builds_each_shape', () => {
-  const { api } = fakeSchemaDsl()
-  // The raw emits call $0.schema.X() — the fake exposes schema as an object, so
-  // the callable form needs schema methods as functions on the tool object.
   const toolModule = {
     tool: {
       schema: {
@@ -121,39 +111,41 @@ test('CODEC_schema_dsl_builds_each_shape', () => {
           optional: () => ({ schema: 'enum-optional', values }),
           value: { schema: 'enum', values },
         }),
-        array: (inner) => ({ schema: 'array', inner }),
+        array: (inner) => ({ schema: 'array', inner, optional: () => ({ schema: 'array-optional', inner }) }),
         union: (parts) => ({ schema: 'union', parts }),
       },
     },
   }
   const factory = makeFactory(toolModule)
 
-  assert.deepEqual(stringSchema(factory), { schema: 'string', optional: expect.anything() })
-  assert.deepEqual(numberSchema(factory).schema, 'number')
+  const unwrap = (hostSchema) => hostSchema.fields[0]
 
-  const described = enumSchemaDescribed(['a', 'b'], 'pick one', factory)
+  assert.equal(unwrap(stringSchema(factory)).schema, 'string')
+  assert.equal(unwrap(numberSchema(factory)).schema, 'number')
+
+  const described = unwrap(enumSchemaDescribed(toList(['a', 'b']), 'pick one', factory))
   assert.equal(described.value.schema, 'enum-described')
 
-  const plain = enumSchema(['x'], factory)
+  const plain = unwrap(enumSchema(toList(['x']), factory))
   assert.equal(plain.value.schema, 'enum')
 
-  const optional = optionalEnumSchema(['y'], factory)
+  const optional = unwrap(optionalEnumSchema(toList(['y']), factory))
   assert.deepEqual(optional, { schema: 'enum-optional', values: ['y'] })
 
-  const optionalDescribed = optionalEnumSchemaDescribed(['z'], 'maybe', factory)
+  const optionalDescribed = unwrap(optionalEnumSchemaDescribed(toList(['z']), 'maybe', factory))
   assert.deepEqual(optionalDescribed, { schema: 'enum-described-optional', values: ['z'], description: 'maybe' })
 
-  const managed = managedOrHandleSchema(['fast-coder'], factory)
+  const managed = unwrap(managedOrHandleSchema(toList(['fast-coder']), factory))
   assert.equal(managed.schema, 'union')
 
-  const optString = optionalStringSchema(factory)
+  const optString = unwrap(optionalStringSchema(factory))
   assert.deepEqual(optString, { schema: 'string-optional' })
 
-  const optNumber = optionalNumberSchema(factory)
+  const optNumber = unwrap(optionalNumberSchema(factory))
   assert.deepEqual(optNumber, { schema: 'number-optional' })
 
-  const optArray = optionalStringArraySchema(factory)
-  assert.equal(optArray.schema, 'array')
+  const optArray = unwrap(optionalStringArraySchema(factory))
+  assert.equal(optArray.schema, 'array-optional')
 })
 
 // ── register / registry / hide ───────────────────────────────────────────────
@@ -182,7 +174,7 @@ test('CODEC_registry_maps_specs_by_name', () => {
   const first = new ToolSpec('one', 'first', [], async () => '1')
   const second = new ToolSpec('two', 'second', [], async () => '2')
 
-  const built = registry(factory, [first, second])
+  const built = registry(factory, toList([first, second]))
   assert.ok(built.one, 'registry must key by spec name')
   assert.ok(built.two)
 })
@@ -228,7 +220,7 @@ test('CODEC_prompt_text_blank_parts_fall_through', () => {
 test('CODEC_attach_abort_without_signal_is_noop_unsubscribe', () => {
   const ctx = decodeContext({ sessionID: 's' })
   let fired = false
-  const unsubscribe = ctx.AttachAbort(() => {
+  const unsubscribe = attachAbort(ctx, () => {
     fired = true
   })
   unsubscribe()
@@ -243,7 +235,7 @@ test('CODEC_attach_abort_fires_immediately_on_aborted_signal', () => {
   }
   const ctx = decodeContext({ sessionID: 's', abort: signal })
   let fired = false
-  ctx.AttachAbort(() => {
+  attachAbort(ctx, () => {
     fired = true
   })
   assert.equal(fired, true, 'an already-aborted signal must fire the callback immediately')
@@ -261,7 +253,7 @@ test('CODEC_attach_abort_subscribes_and_unsubscribes', () => {
   }
   const ctx = decodeContext({ sessionID: 's', abortSignal: signal })
   let fired = false
-  const unsubscribe = ctx.AttachAbort(() => {
+  const unsubscribe = attachAbort(ctx, () => {
     fired = true
   })
   assert.equal(listeners.length, 1)
@@ -328,10 +320,19 @@ test('CODEC_looks_like_handle_id_shape', () => {
   assert.equal(looksLikeHandleId('      '), false)
 })
 
-test('CODEC_digest_is_fnv1a_hex', () => {
-  assert.equal(digest(''), 'fnv1a:811c9dc5')
-  assert.equal(digest('a'), 'fnv1a:050c5d7e')
-  assert.equal(digest('wanxiangshu'), digest('wanxiangshu'))
+test('CODEC_digest_is_true_fnv1a_32bit', () => {
+  // Independent reference implementation: 32-bit wrapping multiply (BigInt).
+  const reference = (text) => {
+    let hash = 2166136261n
+    for (const byte of new TextEncoder().encode(text)) {
+      hash = ((hash ^ BigInt(byte)) * 16777619n) & 0xffffffffn
+    }
+    return 'fnv1a:' + hash.toString(16).padStart(8, '0')
+  }
+
+  for (const text of ['', 'a', 'wanxiangshu', 'the quick brown fox jumps over the lazy dog', 'fnv1a must wrap at 32 bits']) {
+    assert.equal(digest(text), reference(text), `digest('${text}') must be true FNV-1a 32-bit`)
+  }
   assert.notEqual(digest('a'), digest('b'))
   assert.match(digest('anything'), /^fnv1a:[0-9a-f]{8}$/)
 })
