@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { acceptAuthorityRoot, withExecutablePlugin } from '../plugin/plugin-fixture.mjs'
+import { listItems, payloadOf } from '../support/domain.mjs'
 
 const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,
@@ -61,8 +62,9 @@ test('VERDICT_spec_exposes_the_verdict_input_and_public_tool_identity', () => {
 
   assert.equal(tool.Name, 'verdict')
   assert.equal(tool.Description, 'Submit the review verdict')
-  assert.deepEqual(tool.Arguments[0][0], 'verdict')
-  assert.deepEqual(tool.Arguments[0][1].values, ['PERFECT', 'REVISE'])
+  const args = listItems(tool.Arguments)
+  assert.deepEqual(args[0][0], 'verdict')
+  assert.deepEqual(payloadOf(args[0][1]).values, ['PERFECT', 'REVISE'])
 })
 
 test('VERDICT_invalid_input_is_rejected_as_a_public_error_result', async () => {
@@ -71,7 +73,7 @@ test('VERDICT_invalid_input_is_rejected_as_a_public_error_result', async () => {
 
     const result = parseToml(await hooks.tool.verdict.execute({ verdict: 'APPROVE' }, hostContext()))
 
-    assert.equal(result.error, 'Verdict rejected: unknown verdict. Expected PERFECT or REVISE.')
+    assert.equal(result.error, 'Verdict rejected: verdict must be exactly PERFECT or REVISE.')
   })
 })
 
@@ -81,7 +83,7 @@ test('VERDICT_missing_input_is_rejected_as_a_public_error_result', async () => {
 
     const result = parseToml(await hooks.tool.verdict.execute({}, hostContext()))
 
-    assert.equal(result.error, 'Verdict rejected: unknown verdict. Expected PERFECT or REVISE.')
+    assert.equal(result.error, 'Verdict rejected: verdict must be exactly PERFECT or REVISE.')
   })
 })
 
@@ -104,7 +106,9 @@ test('VERDICT_empty_session_is_rejected_before_role_resolution', async () => {
       await hooks.tool.verdict.execute({ verdict: 'REVISE' }, hostContext({ sessionId: '' })),
     )
 
-    assert.equal(result.error, 'Verdict rejected: the verdict tool is available only to reviewer sessions.')
+    // The registry's role gate fires before the tool runs: an empty session has no
+    // role, so the denial is the fail-closed registry message, not the tool's own.
+    assert.equal(result.error, "Tool 'verdict' rejected: no Authority Root fixes this session's role")
   })
 })
 

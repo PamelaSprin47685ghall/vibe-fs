@@ -210,7 +210,9 @@ test('FORK_hidden_role_by_name_is_denied_generically', async () => {
 test('FORK_known_but_not_forkable_role_is_explained', async () => {
   const live = liveScope()
   const spec = managerSpec(factory, live.scope)
-  const result = parseToml(await runManager(spec, 'fast-inspector', 'inspect'))
+  // fast-student is public but not on the Manager fork surface (only coder,
+  // inspector, devops, browser, meditator are); the denial must explain that.
+  const result = parseToml(await runManager(spec, 'fast-student', 'learn something'))
   assert.match(result.error, /not creatable via Manager fork/)
   live.cleanup()
 })
@@ -271,7 +273,7 @@ test('FORK_handle_shaped_unknown_agent_reports_id', async () => {
 
 // ── reuse path: fork once, then nudge by agent_id ────────────────────────────
 
-test('FORK_existing_agent_reuses_with_composed_assignment', async () => {
+test('FORK_existing_agent_busy_reuse_without_active_run_fails_closed', async () => {
   const live = liveScope()
   const spec = managerSpec(factory, live.scope)
 
@@ -279,12 +281,16 @@ test('FORK_existing_agent_reuses_with_composed_assignment', async () => {
   assert.equal(first.agent, 'fast-coder')
   const agentId = first.agent_id
 
+  // The child is still running (no terminal) but no Authority Root has been
+  // accepted on it, so the busy nudge has no ActiveLogicalRun to attach to
+  // (PROMPT-005, HostForkBusyNudge). Reuse must fail closed, not invent a run.
+  // The successful busy-nudge path is exercised end-to-end in
+  // tests/integration/plugin/manager-tool-contract.test.mjs via the real
+  // PromptDispatcher (acceptChildAgentOwnerRoot).
   const reused = parseToml(await runManager(spec, agentId, 'continue the work'))
-  assert.equal(reused.agent_id, agentId)
-  assert.equal(reused.agent, 'fast-coder')
-  assert.equal(reused.role, 'coder')
+  assert.match(reused.error, /Busy nudge requires ActiveLogicalRun on child session/)
 
-  // Exactly one spawn: the reuse nudged the existing child.
+  // Exactly one spawn: the failed nudge must not create a second session.
   const created = live.sessions.calls.filter(([name]) => name === 'CreateChildSession')
   assert.equal(created.length, 1, 'reuse must not spawn a second session')
   live.cleanup()
