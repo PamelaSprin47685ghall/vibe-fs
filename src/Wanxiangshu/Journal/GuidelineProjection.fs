@@ -24,9 +24,10 @@ module GuidelineProjection =
     let pairs (state: GuidelineProjectionState) : PairProgrammingGuideline list = state.Pairs
 
     let nextOrdinal (state: GuidelineProjectionState) : int64 =
+        // Pairs append at the end (oldest → newest). Successor is last.Ordinal + 1.
         match state.Pairs with
         | [] -> 1L
-        | last :: _ -> last.Ordinal + 1L
+        | pairs -> (List.last pairs).Ordinal + 1L
 
     let apply
         (ordinal: int64)
