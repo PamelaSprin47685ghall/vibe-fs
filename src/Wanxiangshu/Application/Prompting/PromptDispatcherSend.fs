@@ -338,3 +338,34 @@ module PromptDispatcherSend =
                 awaitMode
                 onAccepted
                 None
+
+        /// GLORY-029: one Manager idle encouragement per occasion.
+        ///
+        /// Its payload digest names the occasion (Life + trigger ProviderRun), not
+        /// the constant IdleEncouragement text. Digesting the text would collapse
+        /// every idle into one claim scope and make a pending Detached send for A
+        /// suppress B's encouragement.
+        member this.SendManagerIdleEncouragement
+            (port: ISessionHostPort)
+            (sessionId: SessionId)
+            (text: string)
+            (lifeId: ManagerLifeId)
+            (triggerProviderRun: ProviderRunIdentity)
+            (profile: PromptAuthority.AuthorityExecutionProfile)
+            (effectiveAgent: string)
+            (directory: string option)
+            (awaitMode: PromptDispatcher.AwaitMode)
+            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            : Task<Result<PromptKey, string>> =
+            this.SendContinuationWithDigest
+                port
+                sessionId
+                text
+                (PromptAuthority.idlePayloadDigest lifeId triggerProviderRun)
+                PromptAuthority.ContinuationKind.ManagerIdleEncouragement
+                profile
+                effectiveAgent
+                directory
+                awaitMode
+                onAccepted
+                None

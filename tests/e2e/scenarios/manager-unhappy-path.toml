@@ -5,14 +5,20 @@
 #    tool-call steps until the deliberate end of that Labor phase.
 # 2. Reviewer assignment bodies share the review wrapper; rounds are told apart
 #    by fragments in parent_work_record (Manager HumanRoot / assistant tail).
-# 3. session abort during join drops undelivered HumanRoots — operator_abort
-#    first, then Labor prompts.
+# 3. Stroke 3 wakes a blocked join with a real external user message
+#    (wire reason=user_message). Esc/operator_abort is unit-tested separately;
+#    session abort is no longer the stroke-3 mechanism. The wake prompt is also
+#    the Labor user text consumed on the next Manager turn (PROMPT-004: same Life).
 # 4. After FinalityBlessed the suicide tool returns the minor-work continuation
 #    on the SAME turn. A new HumanRoot after Blessed opens a NEW Life (planning)
 #    once LifeCompleted — so minor work + final suicide stay on the blessing turn.
+# 5. mgr-guard remains defined for the operator-abort join-guard path but is
+#    unused in this flow. Optional IdleEncouragement (mgr-idle) may appear;
+#    a second independent idle occasion is unit-proven via
+#    TCP_completed_manager_idle_encouragement_occasion_dedupe.
 
 scenario = "manager-unhappy-path"
-description = "GLORY-070/EXEC-017/F2-F5: repair, join abort, hidden reviewer rejections, 2N cohort blessing, rest in peace"
+description = "GLORY-070/EXEC-017/F2-F5: repair, join user_message wake, hidden reviewer rejections, 2N cohort blessing, rest in peace"
 pass = "Manager unhappy path canary passed: all 13 strokes traversed."
 
 setup = { strict = true, project = { files = { "AGENTS.md" = "manager unhappy path canary\n", "src/main.txt" = "target\n" } } }
@@ -46,13 +52,11 @@ flow = [
   { wait = "mgr-activation.0" },
   { waitFact = { name = "WorkActivated", eq = 1 } },
 
-  # stroke 3: join in flight → operator_abort
+  # stroke 3: join in flight → external user message wakes join (reason=user_message)
   { wait = "mgr-activation.1", timeoutMs = 120000 },
-  { abort = true },
-  { wait = "mgr-guard.0", timeoutMs = 120000 },
-
-  # stroke 4/5/6: Labor — premature suicide, harvest, first legal suicide
   { prompt = { agent = "fast-manager", text = "Also make sure src/main.txt has exactly the content 'done' before the end." } },
+  # stroke 4/5/6: Labor — premature suicide, harvest, first legal suicide
+  # (the prompt above is the wake; labor waits follow immediately)
   { wait = "mgr-labor.0", timeoutMs = 120000 },
   { wait = "child-c1.0", timeoutMs = 120000 },
   { waitFact = { name = "HandleCompleted", gte = 1 } },
@@ -92,7 +96,10 @@ flow = [
   { custom = "notBlessedAtThree" },
   { wait = "reviewer-r2b.2", timeoutMs = 120000 },
   { wait = "reviewer-r3.2", timeoutMs = 120000 },
-  { waitFact = { name = "FinalityBlessed", gte = 1 } },
+  # Blessing can lag while Companion/blogger still appends; bare waitFact keeps
+  # the 5s silence window and dies on non-renewing journal noise. Widen window
+  # and renew on intermediate finality/review facts (VERIFY-004 renewOn).
+  { waitFact = { name = "FinalityBlessed", gte = 1, renewOn = ["ReviewVerdictRecorded", "ConfirmedReviewWitness", "FinalityReviewerEnlisted"] }, timeoutMs = 180000 },
   # Blessed tool result continues this same turn:
   { wait = "mgr-fix2.3", timeoutMs = 120000 },
   { wait = "child-minor.0", timeoutMs = 120000 },
@@ -126,7 +133,12 @@ tools = ["fork", "join", "list", "suicide"]
 id = "mgr-repair"
 internal = true
 optional = true
+# Prefix "#" alone is too weak: dual-PERFECT challenge lastUser also starts with
+# "#" and tools=verdict. Without a manager tool gate this entry steals the
+# challenge forever (measured: mgr-repair.0 ×200+ on "# Nope, let's re-evaluate",
+# FinalityBlessed never lands).
 user = "#"
+tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
   respond = { type = "text", text = "Continuing." }
@@ -134,7 +146,7 @@ user = "#"
 [[turn]]
 id = "mgr-activation"
 internal = true
-user = ["Now complete it yourself.", "Carry out the work you described until the final goal is fully achieved."]
+user = ["# Now complete it yourself.", "# Carry out the work you described until the final goal is fully achieved."]
 tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
@@ -143,9 +155,11 @@ tools = ["fork", "join", "list", "suicide"]
   [[turn.step]]
   respond = { type = "tool-call", tool = "join", args = {} }
 
+# Optional/unused in this flow: operator-abort join guard (Esc path unit-tested).
 [[turn]]
 id = "mgr-guard"
 internal = true
+optional = true
 user = ["# Background work is still outstanding.", "# Call join to collect completed results before finishing."]
 tools = ["fork", "join", "list", "suicide"]
 
@@ -156,7 +170,7 @@ tools = ["fork", "join", "list", "suicide"]
 id = "mgr-idle"
 internal = true
 optional = true
-user = ["You are doing well.", "You have plenty of time.", "You can continue.", "When nothing useful remains, call suicide."]
+user = ["# You are doing well.", "# You have plenty of time.", "# You can continue.", "# When nothing useful remains, call suicide."]
 tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
@@ -267,9 +281,11 @@ user = "# Fix all minor issues from the work logs."
 [[turn]]
 id = "reviewer-r1"
 lane = "reviewer-r1"
+# First-assignment lastUser is ForkChildPayload from HostReviewPrompt.OpeningAssignment
+# + BaseInstructions. parent_work_record is optional (omitted when Manager LWR is None);
+# do not require that field name as a match fragment.
 user = [
   "# Review the current worktree against all authoritative user requirements.",
-  "parent_work_record",
   "Also make sure src/main.txt has exactly the content 'done' before the end.",
 ]
 tools = ["verdict"]
@@ -285,7 +301,6 @@ id = "reviewer-r1b"
 lane = "reviewer-r1"
 user = [
   "# Review the current worktree against all authoritative user requirements.",
-  "parent_work_record",
   "MARK-ISSUE-ONE",
 ]
 tools = ["verdict"]
@@ -304,7 +319,6 @@ id = "reviewer-r2"
 lane = "reviewer-r2"
 user = [
   "# Review the current worktree against all authoritative user requirements.",
-  "parent_work_record",
   "MARK-ISSUE-ONE",
 ]
 tools = ["verdict"]
@@ -323,7 +337,6 @@ id = "reviewer-r2b"
 lane = "reviewer-r2"
 user = [
   "# Review the current worktree against all authoritative user requirements.",
-  "parent_work_record",
   "MARK-ISSUE-TWO",
 ]
 tools = ["verdict"]
@@ -342,7 +355,6 @@ id = "reviewer-r3"
 lane = "reviewer-r3"
 user = [
   "# Review the current worktree against all authoritative user requirements.",
-  "parent_work_record",
   "MARK-ISSUE-TWO",
 ]
 tools = ["verdict"]
@@ -366,6 +378,26 @@ tools = ["verdict"]
   [[turn.step]]
   respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
 
+  # Same lastUser can continue as step 1 after the tool result (measured:
+  # no-declared-turn at reviewer-r2 step=1 with this repair as lastUser).
+  [[turn.step]]
+  respond = { type = "text", text = "Repaired Reviewer submitted the tool verdict." }
+
+# REVIEW-003 dual-PERFECT challenge: first PERFECT returns this as the next
+# lastUser. Heavier than bare "#" and tools=verdict (mgr-repair is manager-only).
+[[turn]]
+id = "reviewer-confirm"
+internal = true
+optional = true
+user = "# Nope, let's re-evaluate:"
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Reviewer confirmed the tree after re-evaluation." }
+
 [[turn]]
 id = "blogger"
 internal = true
@@ -382,6 +414,43 @@ user = "# Write the dense work-log continuation now by calling the blog tool exa
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "blog", args = { text = "Manager unhappy path cycle 3.", tip = "primitive-obsession" } }
+
+# Missing-final-report nudge is bare "#" (RuntimeNudge.MissingFinalReport).
+# After mgr-repair gained tools=[fork/join/list/suicide], blogger no longer
+# falls into that catch-all; declare a blog-scoped optional continue.
+[[turn]]
+id = "blogger-continue"
+internal = true
+optional = true
+user = "#"
+tools = ["blog"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger continue after bare-hash nudge.", tip = "primitive-obsession" } }
+
+# Protocol repair after undeclared blogger stop (tools=["blog"]). Optional recovery;
+# not in must. Production lastUser starts with "# Protocol repair".
+[[turn]]
+id = "blogger-repair"
+internal = true
+optional = true
+user = "# Protocol repair"
+tools = ["blog"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Repair acknowledged.", tip = "primitive-obsession" } }
+
+[[epoch]]
+turn = "blogger-repair"
+step = 0
+reason = "frame-commit"
+
+# Bare "#" MissingFinalReport on blogger may rewrite message prefix while tools
+# stay blog-only (measured seal-undeclared without this boundary).
+[[epoch]]
+turn = "blogger-continue"
+step = 0
+reason = "frame-commit"
 
 [[epoch]]
 turn = "blogger"

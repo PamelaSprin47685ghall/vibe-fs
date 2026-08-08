@@ -22,13 +22,21 @@ const assistantMessage = (id, text) => ({
   parts: [{ type: 'text', text }],
 })
 
+// Birth/Reawakening is multi-part: human raw + synthetic guidance (synthetic=true).
+// Join all text parts so planning tail is visible across the message view.
 const textOf = (messages, id) => {
   const message = messages.find((m) => m?.info?.id === id || m?.id === id)
-  const part = message?.parts?.find((p) => p?.type === 'text')
-  return part?.text
+  const texts = (message?.parts ?? [])
+    .filter((p) => p?.type === 'text')
+    .map((p) => p?.text ?? '')
+  if (texts.length === 0) return undefined
+  return texts.join('\n')
 }
 
-const ACTIVATION = 'Now complete it yourself.\nCarry out the work you described until the final goal is fully achieved.\n\nPlanning is not completion.\nDelegation is not completion.\nA child finishing is not completion.\nA successful command is not completion while meaningful uncertainty remains.\nAn explanation of the work is not the work itself.\nA partial implementation is not completion merely because the remaining work is difficult.\nAs long as any useful action remains, continue.'
+// Host-sent activation is comment-only SyntheticToml; this fixture injects the
+// same imperative body the production surface still contains (match substring).
+const ACTIVATION =
+  '# Now complete it yourself.\n# Carry out the work you described until the final goal is fully achieved.\n#\n# Planning is not completion.\n# Delegation is not completion.\n# A child finishing is not completion.\n# A successful command is not completion while meaningful uncertainty remains.\n# An explanation of the work is not the work itself.\n# A partial implementation is not completion merely because the remaining work is difficult.\n# As long as any useful action remains, continue.\n'
 
 test('GLORY_015_opening_rewrite_is_byte_identical_across_requests', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {

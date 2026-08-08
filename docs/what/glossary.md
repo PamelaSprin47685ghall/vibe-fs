@@ -82,8 +82,8 @@
 | isValidTerminal | CTX-004：非空且非 XML-only，唯一内容级校验 |
 | JoinGuard | EXEC-016：outstanding 后台资源时 terminal 先 join |
 | JoinableCompletion | EXEC-021：fromDecoded / tryFromProvenTerminal 唯一构造；禁止 kind+body 弱证明 |
-| JoinWaitOutcome | EXEC-017：`ResultsAvailable` \| `Interrupted of JoinInterruptReason`；用户消息不中断 join |
-| JoinInterruptReason | EXEC-017：`OperatorAbort` \| `DeadlineExpired`；wire `status=interrupted, reason=operator_abort`；用户消息不中断 join |
+| JoinWaitOutcome | EXEC-017：`ResultsAvailable` \| `Interrupted of JoinInterruptReason`；user wake 只打断 wait，不授予 authority |
+| JoinInterruptReason | EXEC-017：`OperatorAbort` \| `UserMessageArrived` \| `DeadlineExpired`；wire `operator_abort` / `user_message`；wake ≠ Prompt authority |
 
 ## L
 

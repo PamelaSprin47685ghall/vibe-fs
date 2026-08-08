@@ -457,6 +457,39 @@ module PromptAuthority =
 
         nextClaimSequence scope projection > 1
 
+    /// GLORY-029: the payload digest of a Manager idle encouragement.
+    ///
+    /// IdleEncouragement text is constant, so digesting the prompt would collapse
+    /// every idle into one session-wide act. The occasion is Session + Life +
+    /// trigger ProviderRun — one terminal earns one encouragement — so the digest
+    /// names that pair. ClaimSequences then makes the budget durable across
+    /// restarts without a new fact kind.
+    let idlePayloadDigest (lifeId: ManagerLifeId) (triggerProviderRun: ProviderRunIdentity) =
+        String.Join("\u001f", [| ManagerLifeId.value lifeId; ProviderRunIdentity.value triggerProviderRun |])
+
+    /// GLORY-029: has this idle occasion already spent its one encouragement.
+    ///
+    /// Derived from ClaimSequences, not PendingClaims. A Detached send keeps its
+    /// claim pending until PhysicalAccepted; scanning pending ManagerIdle claims
+    /// session-wide would suppress ProviderRun B while A's claim is still open.
+    /// `nextClaimSequence > 1` means this exact (session, run, life, trigger)
+    /// occasion already claimed once — whether or not acceptance completed.
+    let idleAlreadyClaimed
+        (sessionId: SessionId)
+        (logicalRunId: LogicalRunId)
+        (lifeId: ManagerLifeId)
+        (triggerProviderRun: ProviderRunIdentity)
+        (projection: PromptAuthorityProjection)
+        =
+        let scope =
+            claimScopeDigest
+                sessionId
+                (Some logicalRunId)
+                (PromptOrigin.Continuation ContinuationKind.ManagerIdleEncouragement)
+                (idlePayloadDigest lifeId triggerProviderRun)
+
+        nextClaimSequence scope projection > 1
+
     /// AGENT-001: fast-ROLE and deep-ROLE share one system prompt, so the prompt
     /// identity is a function of CanonicalRole alone. Tier deliberately does not
     /// participate — if it did, `permissions(fast-coder) = permissions(deep-coder)`

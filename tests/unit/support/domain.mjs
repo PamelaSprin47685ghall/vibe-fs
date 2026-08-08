@@ -5074,6 +5074,8 @@ const JoinModule = await prod('Application/Reconciliation/Join')
 const AgentCompletionModule = AgentCompletionModuleEarly
 const JoinResultRendererModule = await prod('Infrastructure/OpenCode/Codec/JoinResultRenderer')
 const ManagerJobModule = await prod('Application/Orchestration/ManagerJob')
+// Phase 4: cases on CompletionMailboxModule (already loaded above).
+const JoinInterruptReason = CompletionMailboxModule.JoinInterruptReason
 
 export const joinProgram = (() => {
   const joinAnyFn = JoinModule.joinAny ?? JoinModule.Join_joinAny
@@ -5217,7 +5219,8 @@ export const joinResultRenderer = (() => {
   }
 
   return {
-    renderInterrupted: () => renderInterruptedFn(),
+    /** @param reason JoinInterruptReason (default OperatorAbort for legacy callers). */
+    renderInterrupted: (reason = JoinInterruptReason.OperatorAbort) => renderInterruptedFn(reason),
     renderCompletedBatch: (runtime, batch) => {
       const isPty = (runId) =>
         typeof runtime?.IsPtyCompletion === 'function' ? !!runtime.IsPtyCompletion(runId) : false

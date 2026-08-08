@@ -20,10 +20,32 @@ module FinalityPrompt =
           "When all of them have been handled, call suicide again."
           "Your next accepted ending will be final." ]
 
-    /// GLORY-060/061: the minor-work continuation after the whole cohort
-    /// confirmed. The bundle is the stable-ordinal concatenation of every
-    /// member's canonical work record. Only comment blocks, no TOML data
-    /// blocks (SURFACE-004).
+    /// GLORY-060/061: render the minor-work continuation from typed work logs.
+    /// Controller passes semantic (ordinal, content) only; all `# Work log N`
+    /// comment layout lives here (SURFACE-004).
+    let blessedFromLogs (logs: (int * string) list) =
+        let header =
+            SyntheticToml.document blessingInstructions [] |> fun s -> s.TrimEnd('\n')
+
+        let recordBlocks =
+            logs
+            |> List.choose (fun (ordinal, content) ->
+                let normalized = SyntheticToml.normalizeNewlines content
+
+                if String.IsNullOrWhiteSpace normalized then
+                    None
+                else
+                    let block =
+                        sprintf "Work log %d\n%s" ordinal normalized
+
+                    Some(SyntheticToml.comment block))
+
+        match recordBlocks with
+        | [] -> header + "\n"
+        | blocks -> header + "\n\n" + String.concat "\n\n" blocks + "\n"
+
+    /// GLORY-060/061: minor-work continuation from a pre-joined record bundle.
+    /// Prefer `blessedFromLogs` when ordinals are available.
     let blessed (workRecordBundle: string) =
         let header =
             SyntheticToml.document blessingInstructions [] |> fun s -> s.TrimEnd('\n')

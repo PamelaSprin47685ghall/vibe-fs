@@ -116,6 +116,29 @@ test('PROMPT_manager_forbids_full_text_and_query_dumps_from_inspector', () => {
   assert.match(text, /only locatable summaries|locatable summaries|locatable pointers/i)
 })
 
+test('PROMPT_manager_devops_operational_closure_delegation', () => {
+  const text = promptResources.load().ManagerSystemPrompt
+  assert.match(text, /Do not ask DevOps to edit files directly/)
+  assert.match(
+    text,
+    /execution\/repair objective|bounded mechanical repair|autonomous mechanical repair|operational closure/i,
+  )
+  assert.match(text, /observed operational result|coordinate bounded Coder repairs/i)
+})
+
+test('PROMPT_devops_mechanical_repair_autonomy', () => {
+  const text = promptResources.load().DevopsSystemPrompt
+  assert.match(text, /Mechanical Repair Autonomy/)
+  assert.match(text, /Do not ask Manager for permission to make an obvious mechanical repair/)
+  assert.match(text, /operational closure/)
+  assert.match(text, /coder-driven mechanical repair|Coder-driven mechanical repair/i)
+  assert.match(
+    text,
+    /No Direct File Modification|cannot edit files directly|do not possess direct `write` or `edit`/i,
+  )
+  assert.match(text, /architecture|product/i)
+})
+
 test('PROMPT_inspector_resists_parent_full_text_and_returns_summary_only', () => {
   const text = promptResources.load().InspectorSystemPrompt
   // PROMPT-INSP-002: even a Parent demand for full text must be refused, the

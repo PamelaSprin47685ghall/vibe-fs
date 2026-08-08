@@ -180,6 +180,47 @@ module HostSessionNudge =
                             None
         }
 
+    /// GLORY-029: one Manager idle encouragement per (Life, trigger ProviderRun).
+    ///
+    /// Budget is durable ClaimSequences, not a session-wide PendingClaims scan:
+    /// Detached keeps A's claim pending until PhysicalAccepted, and that must not
+    /// suppress B's independent occasion.
+    let trySendManagerIdleEncouragement
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (lifeId: ManagerLifeId)
+        (triggerProviderRun: ProviderRunIdentity)
+        : Task<Result<PromptKey, string>> =
+        task {
+            match journal, tryActiveProfile journal sessionId with
+            | None, _ -> return Error "No journal: a manager idle encouragement cannot be claimed"
+            | Some _, None -> return Error "No active authority profile"
+            | Some durable, Some profile ->
+                let rt = PromptDispatcher.forJournal durable
+
+                if rt.IdleAlreadyClaimed profile lifeId triggerProviderRun then
+                    return Error "Manager idle encouragement already claimed for this occasion"
+                else
+                    let agent = agentForActiveCursor journal sessionId profile
+
+                    // PROMPT-007 Detached: idle encouragement does not wait for PhysicalAccepted.
+                    return!
+                        rt.SendManagerIdleEncouragement
+                            sessionPort
+                            sessionId
+                            prompt
+                            lifeId
+                            triggerProviderRun
+                            profile
+                            agent
+                            (liveDirectory directory)
+                            PromptDispatcher.AwaitMode.Detached
+                            None
+        }
+
     // ── idle-derived continuation admission（HOST-004）────────────────────────
 
     /// What an idle-derived send attempt came to.
@@ -221,6 +262,37 @@ module HostSessionNudge =
                         journal
                         PromptDispatcher.AwaitMode.Detached
                         None
+                with
+                | Ok key -> return IdleContinuationOutcome.Sent key
+                | Error error -> return IdleContinuationOutcome.Failed error
+        }
+
+    /// HOST-004 + GLORY-029: idle-derived Manager encouragement with occasion digest.
+    /// Same admission contract as `trySendIdleContinuation` / interaction repair.
+    let trySendIdleManagerEncouragement
+        (quiescence: SessionQuiescenceGate)
+        (permit: QuiescencePermit)
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (lifeId: ManagerLifeId)
+        (triggerProviderRun: ProviderRunIdentity)
+        : Task<IdleContinuationOutcome> =
+        task {
+            if not (quiescence.TryConsume permit) then
+                return IdleContinuationOutcome.Superseded
+            else
+                match!
+                    trySendManagerIdleEncouragement
+                        sessionPort
+                        sessionId
+                        prompt
+                        directory
+                        journal
+                        lifeId
+                        triggerProviderRun
                 with
                 | Ok key -> return IdleContinuationOutcome.Sent key
                 | Error error -> return IdleContinuationOutcome.Failed error

@@ -33,12 +33,15 @@ module NonEmptyBatch =
     let map (f: 'a -> 'b) (NonEmptyBatch(head, tail)) = NonEmptyBatch(f head, List.map f tail)
 
 /// EXEC-017 / EXEC-018: why a join wait ended without results. Typed local
-/// interruption only — a queued user message is NOT an interrupt (GLORY-007 /
-/// EXEC-017 rev.2): the Host queues it and join keeps waiting.
+/// interruption only. A queued external user message CAN interrupt wait via
+/// UserMessageArrived (Phase 4); it does not cancel mailbox/runtime/child.
+/// Drain-before-interrupt remains: completions already available still win.
 [<RequireQualifiedAccess>]
 type JoinInterruptReason =
     /// The current tool call was aborted locally (Esc / tool-call abort).
     | OperatorAbort
+    /// An external user message arrived for this session while join waited.
+    | UserMessageArrived
     /// The DevOps join budget elapsed without a completion.
     | DeadlineExpired
 

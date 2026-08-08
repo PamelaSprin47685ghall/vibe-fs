@@ -29,11 +29,17 @@ render leading instruction comments
 每条可信 instruction 由 renderer 生成顶层 `# ` comment。换行 instruction 被拆成连续
 comment 行；一旦开始 data，renderer 不再发出顶层 comment。
 
-### Data values
+### Data values 与 instruction 分类（producer adoption）
 
-所有不可信或历史内容只作为 TOML value：用户/assistant/reasoning 副本、tool arguments、
-stdout/stderr、文件、diff、日志、网络响应与外部文档。业务模块只提供字段名和 typed value，
-不得拼接裸表头、comment 或 delimiter。
+Instruction/data 分类由**当前** synthetic projection 的 owner 指派，不由 provenance、
+trust 或 historicity 自动决定。原料从不自我提升；采用是显式 producer 决策：
+
+- 该 owner **明确采用**为接收 agent 当前指引的材料 → instruction comment plane；
+- 作为引用证据、背景、状态、payload 或 machine-readable context **保留**的材料 → TOML data。
+
+业务模块只提供字段名和 typed value，不得拼接裸表头、comment 或 delimiter。未采用的
+用户/assistant/reasoning 副本、tool arguments、stdout/stderr、文件、diff、日志、网络响应
+与外部文档仍作为 data value 编码。
 
 ### String encoding
 
@@ -54,13 +60,23 @@ envelope，也不得从渲染文本反向恢复这些类型。
 ### Blogger delta
 
 Blogger data body 与可选 instruction header 分开构造，再由同一 renderer 合并。
-CTX-013 的大小计量发生在完整渲染后的 UTF-8 字节上。historic frame 和 join LWR 中的
-历史祈使句仍作为 data value，不提升为 comment。
+CTX-013 的大小计量发生在完整渲染后的 UTF-8 字节上。该 surface 的 owner 决策下，
+historic frame 中的历史祈使句仍作为 data value，不提升为 comment；此为局部 surface
+合同，不是全局「凡历史一律 data」。
 
 ### Join / fork
 
-assignment 属可信 instruction；继承 work record、child result、failure/interrupt detail 属 data。
-具体 wire 字段由 EXEC-004 唯一定义，本文件只规定它们使用统一 codec。
+本地语义分类（owner 采用，非 trust 自动提升）：
+
+| 材料 | plane |
+|------|-------|
+| Fork assignment | instruction |
+| Fork parent_work_record | background data |
+| Fork original_user_requirement | data（由 instruction header 说明） |
+| Join 已完成 child work_record | entry-local guidance comments |
+| Join status / ordinal / kind / agent / failure / interrupt 元数据 | data |
+
+具体 wire 字段由 EXEC-004 唯一定义，本文件只规定它们使用统一 codec 与上述 plane 指派。
 
 ### Tool results
 

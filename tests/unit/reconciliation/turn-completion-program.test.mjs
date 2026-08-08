@@ -212,6 +212,48 @@ const seedManagerJob = (append, { progress = 'CandidateReady' } = {}) => {
   }
 }
 
+/** GLORY-029 Labor Life: opened + activated so idle encouragement is in scope. */
+const seedActivatedManagerLife = (journal, { life = 'life-1' } = {}) => {
+  const opened = AgentJournalModule_appendManagerLifecycle(
+    stream.session(sessionId(SESSION)),
+    {
+      tag: 0, // LifeOpened
+      fields: [
+        {
+          SessionId: sessionId(SESSION),
+          LifeId: { tag: 0, fields: [life] },
+          OpeningUserMessageId: physicalUser('user-1'),
+          OpeningTextRef: { tag: 0, fields: ['blob-open'] },
+          OpeningTextDigest: { tag: 0, fields: ['sha-open'] },
+          OpeningCursorSequence: 1,
+        },
+      ],
+    },
+    journal,
+  )
+  assert.equal(opened.tag, 0, opened.tag === 0 ? '' : JSON.stringify(opened.fields))
+
+  const activated = AgentJournalModule_appendManagerLifecycle(
+    stream.session(sessionId(SESSION)),
+    {
+      tag: 1, // WorkActivated
+      fields: [
+        {
+          SessionId: sessionId(SESSION),
+          LifeId: { tag: 0, fields: [life] },
+          ActivationPromptKey: promptKey('key-activate'),
+          ProtectedPrefixEndSequence: 2,
+        },
+      ],
+    },
+    journal,
+  )
+  assert.equal(activated.tag, 0, activated.tag === 0 ? '' : JSON.stringify(activated.fields))
+}
+
+const sendCount = (portCalls) =>
+  portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync').length
+
 const harness = ({ journal, loopSensor = undefined, hasLivePty = () => false, gate = new SessionQuiescenceGate() } = {}) => {
   const events = []
   const portCalls = []
@@ -552,34 +594,128 @@ test('TCP_completed_coder_notifies_terminal', async () => {
 })
 
 test('TCP_completed_manager_idle_encouragement_deduped', async () => {
-  const h = harness({})
-  const managerTurn = turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('progress')] })
+  // Process-local HashSet: same ProviderRun re-reconcile does not resend even
+  // before durable ClaimSequences is consulted again.
+  const live = liveJournal()
+  seedAuthority(live.append, { agent: 'fast-manager', role: 'manager' })
+  seedActivatedManagerLife(live.journal)
+  const h = harness({ journal: live.journal })
+  const managerTurn = turn({
+    roleAgent: 'fast-manager',
+    finish: 'stop',
+    completed: true,
+    parts: [text('progress')],
+    id: 'asst-a',
+  })
 
   await h.run(managerTurn, h.freshPermit())
   await h.run(managerTurn, h.freshPermit())
 
-  const fails = h.events.filter(([, outcome]) => outcome.tag === 2)
-  assert.equal(fails.length, 1, 'encouragement claimed once; the replay is deduped by nudgeSent')
-  assert.equal(payloadOf(fails[0][1]), 'No journal: a continuation cannot be claimed')
+  assert.deepEqual(h.events, [], 'successful idle sends do not NotifyTerminal')
+  assert.equal(sendCount(h.portCalls), 1, 'encouragement claimed once; replay is deduped by encouragementKey')
+  live.cleanup()
+})
+
+// Four-step causal: occasion = Session + Life + TriggerProviderRun.
+// Pending Detached claim for A must not suppress independent occasion B.
+test('TCP_completed_manager_idle_encouragement_occasion_dedupe', async () => {
+  const live = liveJournal()
+  seedAuthority(live.append, { agent: 'fast-manager', role: 'manager' })
+  seedActivatedManagerLife(live.journal)
+  const h = harness({ journal: live.journal })
+
+  const turnA = turn({
+    roleAgent: 'fast-manager',
+    finish: 'stop',
+    completed: true,
+    parts: [text('progress-a')],
+    id: 'asst-a',
+  })
+  const turnB = turn({
+    roleAgent: 'fast-manager',
+    finish: 'stop',
+    completed: true,
+    parts: [text('progress-b')],
+    id: 'asst-b',
+  })
+
+  // A. ProviderRun A idle → exactly one encouragement A
+  await h.run(turnA, h.freshPermit())
+  assert.equal(sendCount(h.portCalls), 1, 'A: exactly one encouragement')
+  assert.deepEqual(h.events, [])
+
+  // Detached leave claim A pending (no PhysicalAccepted) — the bug was a
+  // session-wide PendingClaims scan that blocked B while A stayed open.
+  const pendingAfterA =
+    agentJournal.snapshot(live.journal).AgentProjections.Sessions.get(sessionId(SESSION))?.PromptAuthority
+      ?.PendingClaims
+  assert.ok(pendingAfterA && pendingAfterA.size >= 1, 'A claim stays pending under Detached')
+
+  // B. re-reconcile A → no duplicate (process-local + durable)
+  await h.run(turnA, h.freshPermit())
+  assert.equal(sendCount(h.portCalls), 1, 'B: re-reconcile A sends nothing')
+
+  // C. keep A claim pending + new ProviderRun B idle → exactly one B
+  await h.run(turnB, h.freshPermit())
+  assert.equal(sendCount(h.portCalls), 2, 'C: pending A must not suppress B')
+
+  // D. re-reconcile B → no duplicate
+  await h.run(turnB, h.freshPermit())
+  assert.equal(sendCount(h.portCalls), 2, 'D: re-reconcile B sends nothing')
+  assert.deepEqual(h.events, [])
+  live.cleanup()
+})
+
+// Durable: ClaimSequences alone still at-most-once after clearing process-local HashSet.
+test('TCP_completed_manager_idle_encouragement_durable_claim_sequences', async () => {
+  const live = liveJournal()
+  seedAuthority(live.append, { agent: 'fast-manager', role: 'manager' })
+  seedActivatedManagerLife(live.journal)
+  const h = harness({ journal: live.journal })
+  const managerTurn = turn({
+    roleAgent: 'fast-manager',
+    finish: 'stop',
+    completed: true,
+    parts: [text('progress')],
+    id: 'asst-a',
+  })
+
+  await h.run(managerTurn, h.freshPermit())
+  assert.equal(sendCount(h.portCalls), 1)
+
+  // Simulate process restart: process-local nudgeSent is empty, ClaimSequences remains.
+  h.nudgeSent.clear()
+  await h.run(managerTurn, h.freshPermit())
+  assert.equal(sendCount(h.portCalls), 1, 'ClaimSequences keeps occasion at-most-once after restart')
+  assert.deepEqual(h.events, [])
+  live.cleanup()
 })
 
 test('Q09_manager_idle_encouragement_without_permit_sends_nothing', async () => {
-  const h = harness({})
+  const live = liveJournal()
+  seedAuthority(live.append, { agent: 'fast-manager', role: 'manager' })
+  seedActivatedManagerLife(live.journal)
+  const h = harness({ journal: live.journal })
   await h.run(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('progress')] }))
 
   assert.deepEqual(h.events, [], 'no idle evidence: ManagerIdleEncouragement must not fire')
-  assert.deepEqual(h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync'), [])
+  assert.equal(sendCount(h.portCalls), 0)
+  live.cleanup()
 })
 
 test('Q09_manager_idle_encouragement_with_stale_permit_sends_nothing', async () => {
-  const h = harness({})
+  const live = liveJournal()
+  seedAuthority(live.append, { agent: 'fast-manager', role: 'manager' })
+  seedActivatedManagerLife(live.journal)
+  const h = harness({ journal: live.journal })
   const permit = h.freshPermit()
   beginProviderAttempt(h.gate, sessionId(SESSION))
 
   await h.run(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('progress')] }), permit)
 
   assert.deepEqual(h.events, [], 'stale permit: no stale IdleEncouragement')
-  assert.deepEqual(h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync'), [])
+  assert.equal(sendCount(h.portCalls), 0)
+  live.cleanup()
 })
 
 test('TCP_completed_manager_job_handed_off_completes_run', async () => {
@@ -652,7 +788,9 @@ test('TCP_completed_manager_planning_sends_work_activation', async () => {
 })
 
 test('TCP_completed_manager_deferred_encouragement_fails_closed_without_profile', async () => {
+  // Life is present so idle is in scope; missing authority profile fails closed on send.
   const live = liveJournal()
+  seedActivatedManagerLife(live.journal)
   const h = harness({ journal: live.journal, hasLivePty: () => true })
   await h.run(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('done')] }), h.freshPermit())
 
@@ -660,10 +798,22 @@ test('TCP_completed_manager_deferred_encouragement_fails_closed_without_profile'
   assert.equal(eventCase(h.events), 2)
   assert.equal(eventPayload(h.events), 'No active authority profile')
   assert.equal(
-    h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync').length,
+    sendCount(h.portCalls),
     0,
     'encouragement fails closed without an authority profile (no physical send)',
   )
+  live.cleanup()
+})
+
+test('TCP_completed_manager_idle_without_life_skips', async () => {
+  // No CurrentLife: skip rather than claim an unscoped idle encouragement.
+  const live = liveJournal()
+  seedAuthority(live.append, { agent: 'fast-manager', role: 'manager' })
+  const h = harness({ journal: live.journal })
+  await h.run(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('done')] }), h.freshPermit())
+
+  assert.deepEqual(h.events, [], 'no open Life: idle encouragement is skipped closed')
+  assert.equal(sendCount(h.portCalls), 0)
   live.cleanup()
 })
 // ── linked child: EXEC-009 / PROMPT-008 authority registration ─────────────

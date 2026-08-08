@@ -36,9 +36,9 @@
     <Compile Include="Domain/HostCompactionPolicy.fs"/>
     <Compile Include="Domain/ProviderProjection.fs"/>
     <Compile Include="Domain/XTrace.fs"/>
-    <Compile Include="Domain/ManagerNarrative.fs"/>
     <Compile Include="Domain/LifecycleWorkRecord.fs"/>
     <Compile Include="Domain/SyntheticToml.fs"/>
+    <Compile Include="Domain/ManagerNarrative.fs"/>
     <Compile Include="Domain/ManagerLifecyclePrompt.fs"/>
     <Compile Include="Domain/FinalityPrompt.fs"/>
     <Compile Include="Domain/HostReviewPrompt.fs"/>
@@ -102,6 +102,7 @@
     <Compile Include="Session/ChildRunProjection.fs"/>
     <Compile Include="Process/PtyTiming.fs"/>
     <Compile Include="Session/CompletionMailbox.fs"/>
+    <Compile Include="Session/JoinInterruptRegistry.fs"/>
     <Compile Include="Session/ForkRecovery.fs"/>
     <Compile Include="Session/ForkRuntime.fs"/>
     <Compile Include="Session/DurableFallback.fs"/>

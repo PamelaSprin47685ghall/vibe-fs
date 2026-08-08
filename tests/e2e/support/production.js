@@ -50,10 +50,11 @@ const fableLibraryDir = (() => {
 
 const { ofArray } = await import(join(fableLibraryDir, 'List.js'));
 
-const [ForkModule, BloggerModule, SyntheticModule] = await Promise.all([
+const [ForkModule, BloggerModule, SyntheticModule, LifecycleModule] = await Promise.all([
   import(join(BUILD_ROOT, 'Domain/ForkChildPayload.js')),
   import(join(BUILD_ROOT, 'Domain/BloggerToml.js')),
   import(join(BUILD_ROOT, 'Domain/SyntheticToml.js')),
+  import(join(BUILD_ROOT, 'Domain/ManagerLifecyclePrompt.js')),
 ]);
 
 /** An F# list from an array, or an already-converted list left alone. */
@@ -118,3 +119,10 @@ export const bloggerDocument = (items) => BloggerModule.BloggerToml_render(toLis
 
 export const bloggerDocumentWith = (instructions, items) =>
   BloggerModule.BloggerToml_renderWith(toList(instructions), toList(items));
+
+// ── ManagerLifecyclePrompt: GLORY activation / idle / undecidable ─────────────
+// Instruction-only SyntheticToml documents (already comment-prefixed).
+
+export const workActivation = () => LifecycleModule.WorkActivation;
+export const idleEncouragement = () => LifecycleModule.IdleEncouragement;
+export const finalityUndecidable = () => LifecycleModule.FinalityUndecidable;

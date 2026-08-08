@@ -124,7 +124,7 @@ tools = ["fork", "join", "list", "suicide"]
 id = "manager-guard"
 internal = true
 optional = true
-user = ["You are doing well.", "You have plenty of time.", "You can continue.", "When nothing useful remains, call suicide."]
+user = ["# You are doing well.", "# You have plenty of time.", "# You can continue.", "# When nothing useful remains, call suicide."]
 tools = ["fork", "join", "list", "suicide"]
 
   # GLORY-029/070: ordinary activated idle — ManagerIdleEncouragement only.

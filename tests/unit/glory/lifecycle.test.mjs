@@ -365,25 +365,35 @@ test('GLORY_066_lifecycle_facts_round_trip_through_ndjson', () => {
 
 test('GLORY_014_first_birth_golden_bytes', async () => {
   const { managerNarrative } = await import('../support/glory.mjs')
+  const birth = managerNarrative.firstBirth('Fix the retry race.')
+  assert.equal(birth.parts.length, 2)
+  assert.equal(birth.parts[0].text, 'Fix the retry race.')
+  assert.equal(birth.parts[0].synthetic, false)
+  assert.equal(birth.parts[1].synthetic, true)
   assert.equal(
-    managerNarrative.firstBirth('Fix the retry race.'),
-    'Fix the retry race.\n\nIf I want to complete the request above, how should I work?\nHow should I define the final goal?\nYou may call several rounds of tools to investigate and research, but in the end simply output your answer as direct text. Do not perform any actual work. Do not call suicide.',
+    birth.parts[1].text,
+    '# If I want to complete the request above, how should I work?\n# How should I define the final goal?\n# You may call several rounds of tools to investigate and research, but in the end simply output your answer as direct text. Do not perform any actual work. Do not call suicide.\n',
   )
+  assert.equal(managerNarrative.planningTail().includes('Do not perform any actual work'), true)
 })
 
 test('GLORY_064_reawakening_golden_bytes', async () => {
   const { managerNarrative } = await import('../support/glory.mjs')
-  assert.equal(
-    managerNarrative.reawakening('Add Windows support.'),
-    'You awaken once more in the distant future.\n\nAdd Windows support.\n\nIf I want to complete the request above, how should I work?\nHow should I define the final goal?\nYou may call several rounds of tools to investigate and research, but in the end simply output your answer as direct text. Do not perform any actual work. Do not call suicide.',
-  )
+  const reawakening = managerNarrative.reawakening('Add Windows support.')
+  assert.equal(reawakening.parts.length, 3)
+  assert.equal(reawakening.parts[0].synthetic, true)
+  assert.equal(reawakening.parts[0].text, '# You awaken once more in the distant future.\n')
+  assert.equal(reawakening.parts[1].text, 'Add Windows support.')
+  assert.equal(reawakening.parts[1].synthetic, false)
+  assert.equal(reawakening.parts[2].synthetic, true)
+  assert.ok(reawakening.parts[2].text.startsWith('# If I want to complete the request above'))
 })
 
 test('GLORY_019_activation_golden_bytes', async () => {
   const { managerLifecyclePrompt } = await import('../support/glory.mjs')
   assert.equal(
     managerLifecyclePrompt.workActivation(),
-    'Now complete it yourself.\nCarry out the work you described until the final goal is fully achieved.\n\nPlanning is not completion.\nDelegation is not completion.\nA child finishing is not completion.\nA successful command is not completion while meaningful uncertainty remains.\nAn explanation of the work is not the work itself.\nA partial implementation is not completion merely because the remaining work is difficult.\nAs long as any useful action remains, continue.',
+    '# Now complete it yourself.\n# Carry out the work you described until the final goal is fully achieved.\n#\n# Planning is not completion.\n# Delegation is not completion.\n# A child finishing is not completion.\n# A successful command is not completion while meaningful uncertainty remains.\n# An explanation of the work is not the work itself.\n# A partial implementation is not completion merely because the remaining work is difficult.\n# As long as any useful action remains, continue.\n',
   )
 })
 
@@ -391,7 +401,7 @@ test('GLORY_029_idle_encouragement_golden_bytes', async () => {
   const { managerLifecyclePrompt } = await import('../support/glory.mjs')
   assert.equal(
     managerLifecyclePrompt.idleEncouragement(),
-    'You are doing well.\nYou have plenty of time.\nYou can continue.\nWhen nothing useful remains, call suicide.',
+    '# You are doing well.\n# You have plenty of time.\n# You can continue.\n# When nothing useful remains, call suicide.\n',
   )
 })
 
@@ -403,7 +413,7 @@ test('GLORY_057_host_undecidable_golden_bytes', async () => {
   )
 })
 
-test('GLORY_052_finality_rejection_renders_the_record_as_data', async () => {
+test('GLORY_052_finality_rejection_renders_work_record_as_guidance_comments', async () => {
   const { finalityPrompt } = await import('../support/glory.mjs')
   const record = '# Work log\n- defect A at src/a.ts\n- missing test for B'
   const rendered = finalityPrompt.rejected(record)
@@ -437,8 +447,8 @@ test('SURFACE_006_manager_prompt_lists_exactly_four_tools', async () => {
 test('SURFACE_002_frozen_texts_use_lf_only', async () => {
   const { managerNarrative, managerLifecyclePrompt, finalityPrompt } = await import('../support/glory.mjs')
   for (const text of [
-    managerNarrative.firstBirth('X'),
-    managerNarrative.reawakening('X'),
+    managerNarrative.firstBirthText('X'),
+    managerNarrative.reawakeningText('X'),
     managerLifecyclePrompt.workActivation(),
     managerLifecyclePrompt.idleEncouragement(),
     managerLifecyclePrompt.finalityUndecidable(),

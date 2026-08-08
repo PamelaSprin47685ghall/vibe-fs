@@ -180,14 +180,24 @@ async function finalOracle(scenario, ctx) {
   assert.ok(managerId, 'manager session id required');
   const lines = journalLines(workDir);
 
-  // ── Manager lifecycle facts ────────────────────────────────────────────────
+  // ── Manager lifecycle facts (corrective invariants + path-tolerant counts) ─
+  // Measured under user_message stroke 3 + optional reviewer-repair: request/enlist/
+  // reject may exceed the original 3/5/2 path (rest-in-peace or extra REVISE rounds).
+  // Keep hard: one activation, one blessing, one life complete, no undecided.
   assert.equal(countCase(lines, 'WorkActivated'), 1, 'exactly one WorkActivated (stroke 2)');
-  assert.equal(countCase(lines, 'FinalityRequested'), 3, 'three legal suicides request finality');
-  assert.equal(countCase(lines, 'FinalityReviewerEnlisted'), 5, 'R1, R1-adopt, R2, R2-adopt, R3');
-  assert.equal(countCase(lines, 'FinalityRejected'), 2, 'rounds 1 and 2 rejected');
-  assert.equal(countCase(lines, 'FinalityBlessed'), 1, 'round 3 blessed');
+  assert.ok(
+    countCase(lines, 'FinalityRequested') >= 3,
+    'at least three FinalityRequested (legal endings; rest-in-peace may add more)',
+  );
+  assert.ok(
+    countCase(lines, 'FinalityReviewerEnlisted') >= 5,
+    'at least the R1/R1-adopt/R2/R2-adopt/R3 enlistments',
+  );
+  assert.ok(countCase(lines, 'FinalityRejected') >= 2, 'at least two rejected finality rounds');
+  assert.equal(countCase(lines, 'FinalityBlessed'), 1, 'exactly one FinalityBlessed');
   assert.equal(countCase(lines, 'FinalityUndecided'), 0, 'no undecided finality');
   assert.equal(countCase(lines, 'LifeCompleted'), 1, 'the final suicide completes the life');
+  // Dual-PERFECT challenge must not be stolen by mgr-repair (tools gate + confirm turn).
 
   // ── Review subsystem facts ─────────────────────────────────────────────────
   // BarrierStarted may append more than once per barrier id (restart/reopen);
@@ -195,9 +205,12 @@ async function finalOracle(scenario, ctx) {
   const barrierIds = new Set(
     factPayloads(lines, 'ReviewBarrierStarted').map((b) => JSON.stringify(b.BarrierId ?? b)),
   );
-  assert.equal(barrierIds.size, 5, 'one distinct barrier per enlistment');
+  assert.ok(barrierIds.size >= 5, `at least five distinct barriers, got ${barrierIds.size}`);
   assert.ok(countCase(lines, 'ReviewBarrierStarted') >= 5, 'barrier facts land for every enlistment');
-  assert.equal(countCase(lines, 'ReviewVerdictRecorded'), 9, '1 REVISE + 2+2 + 2+2 PERFECT path');
+  assert.ok(
+    countCase(lines, 'ReviewVerdictRecorded') >= 9,
+    'at least the dual-PERFECT path verdicts (extra REVISE/repair may add more)',
+  );
   assert.equal(countCase(lines, 'ConfirmedReviewWitness'), 3, 'R1, R2, R3 each graduate once');
 
   // ── Handle ownership (stroke 6: hidden reviewers; strokes 7/9/12: C1 reuse) ─
@@ -213,8 +226,9 @@ async function finalOracle(scenario, ctx) {
   assert.equal(coderSessions.size, 1, 'C1 is one durable child session across reuses');
   assert.ok(coderHandles.length >= 1, 'C1 is linked at least once');
 
-  // ── Verdict distribution per reviewer (stroke 8: no third confirmation) ────
-  // R1: REVISE + 2 PERFECT = 3; R2: PERFECT+REVISE + 2 PERFECT = 4; R3: 2 PERFECT = 2.
+  // ── Verdict distribution per reviewer ───────────────────────────────────────
+  // Extra REVISE/repair can grow per-reviewer counts beyond the classic 2,3,4.
+  // Keep: exactly three reviewers; each revises at most once.
   const verdicts = factPayloads(lines, 'ReviewVerdictRecorded');
   const byReviewer = new Map();
   for (const verdict of verdicts) {
@@ -223,11 +237,11 @@ async function finalOracle(scenario, ctx) {
     list.push(verdict.Verdict?.[0] ?? JSON.stringify(verdict.Verdict));
     byReviewer.set(reviewer, list);
   }
-  const counts = [...byReviewer.values()].map((list) => list.length).sort().join(',');
-  assert.equal(counts, '2,3,4', 'R3:2 PERFECT, R1:REVISE+2 PERFECT, R2:PERFECT+REVISE+2 PERFECT');
+  assert.equal(byReviewer.size, 3, 'exactly three reviewers record verdicts');
   for (const [reviewer, list] of byReviewer) {
     const revises = list.filter((v) => v === 'Revise').length;
     assert.ok(revises <= 1, `reviewer ${reviewer} must REVISE at most once: ${list.join(',')}`);
+    assert.ok(list.length >= 2, `reviewer ${reviewer} must record at least two verdicts`);
   }
 
   // ── Sessions (strokes 7/9/12: C1 reused; 6: hidden reviewers) ───────────────
@@ -250,25 +264,63 @@ async function finalOracle(scenario, ctx) {
     ),
   ];
 
-  // ── The operator abort wire (stroke 3: never user_message) ─────────────────
-  const abortTexts = managerToolResults.filter((text) => text.includes('operator_abort'));
-  assert.ok(abortTexts.length >= 1, 'the interrupted join must reach the Manager conversation');
+  // ── The user_message wake wire (stroke 3: external user message, not Esc) ──
+  // Esc/operator_abort remains unit-tested separately; this e2e path must use
+  // user_message (proposal §7.1/§21).
+  const interruptTexts = managerToolResults.filter(
+    (text) => text.includes('status = "interrupted"'),
+  );
+  assert.ok(interruptTexts.length >= 1, 'the interrupted join must reach the Manager conversation');
   assert.ok(
-    abortTexts.some((text) => text.includes('status = "interrupted"') && text.includes('reason = "operator_abort"')),
-    'the join tool result must be status=interrupted, reason=operator_abort',
+    interruptTexts.some((text) => text.includes('reason = "user_message"')),
+    'the join tool result must be status=interrupted, reason=user_message',
   );
   assert.equal(
-    abortTexts.some((text) => text.includes('user_message')),
-    false,
-    'a queued user message must never interrupt the join',
+    interruptTexts.filter((text) => text.includes('reason = "operator_abort"')).length,
+    0,
+    'stroke 3 must not use operator_abort as the wake mechanism',
   );
 
+  // Queued labor prompt is the same message that woke join — next Manager turn
+  // consumes it (still one WorkActivated; no new Life / PROMPT-004).
+  const managerRequests = scenario.provider.requests.filter((request) => request.sessionID === managerId);
+  assert.ok(
+    managerRequests.some(
+      (request) =>
+        lastUserText(request).includes(QUEUED_PROMPT) || requestText(request).includes(QUEUED_PROMPT),
+    ),
+    'next Manager turn must consume the queued user message that woke join',
+  );
+
+  // Optional IdleEncouragement may appear (mgr-idle is optional). A second
+  // independent idle occasion is unit-proven via
+  // TCP_completed_manager_idle_encouragement_occasion_dedupe — do not force two
+  // idles here without redesigning the 13-stroke path.
+  // Soft check: if any idle fires, golden comment-prefixed text still matches.
+  const idleFragments = managerRequests.filter((request) =>
+    requestText(request).includes('You are doing well'),
+  );
+  if (idleFragments.length > 0) {
+    assert.ok(
+      idleFragments.some((request) => requestText(request).includes('You have plenty of time')),
+      'IdleEncouragement, when present, carries the full encouragement body',
+    );
+  }
+
   // ── The premature suicides (stroke 5) ───────────────────────────────────────
-  // Resource safety refuses suicide while C1 is outstanding. The post-blessing
-  // path is gather-then-final (a mock child finishes too fast for a second
-  // blocked attempt without racing into LifeCompleted with the wrong last_words).
-  const blockedResults = managerToolResults.filter((text) => text.includes('Your work still walks the world'));
+  // Resource safety refuses suicide while C1 is outstanding. Instruction-only
+  // refusal (corrective §8.3): no top-level error= field; # Call join ...
+  // The post-blessing path is gather-then-final (a mock child finishes too fast
+  // for a second blocked attempt without racing into LifeCompleted with the
+  // wrong last_words).
+  const blockedResults = managerToolResults.filter(
+    (text) => text.includes('Call join before seeking your end'),
+  );
   assert.ok(blockedResults.length >= 1, 'resource safety refuses suicide while background work walks');
+  assert.ok(
+    blockedResults.every((text) => !/^error\s*=/m.test(text)),
+    'ordinary suicide refusal must not use top-level error= data field',
+  );
 
   // ── The canonical work record on rejection (stroke 6) ──────────────────────
   const rejectionResults = managerToolResults.filter((text) => text.includes('Your ending has not accepted you.'));

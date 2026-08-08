@@ -121,6 +121,20 @@ test('EXEC_017_interrupted_wire_is_not_error', () => {
   assert.ok(!wire.includes('status = "aborted"'))
 })
 
+test('EXEC_017_user_message_interrupt_wire', async () => {
+  const { JoinInterruptReason } = await import('../../../dist/Session/CompletionMailbox.js')
+  const wire = joinResultRenderer.renderInterrupted(JoinInterruptReason.UserMessageArrived)
+  const parsed = parseWire(wire)
+  assert.deepEqual(parsed, {
+    status: 'interrupted',
+    reason: 'user_message',
+  })
+  assert.equal(parsed.message, undefined)
+  assert.equal(parsed.error, undefined)
+  assert.ok(!wire.includes('operator_abort'))
+  assert.ok(!wire.includes('status = "failed"'))
+})
+
 // ── failed / aborted agent: flat code/message, not nested [error] ────────────
 
 test('EXEC_004_rev2_agent_failed_is_flat_code_message_in_result', () => {

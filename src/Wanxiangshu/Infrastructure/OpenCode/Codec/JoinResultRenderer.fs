@@ -25,14 +25,27 @@ module JoinResultRenderer =
     let private completedDocument (headerFields: string list) (entries: string list) : string =
         String.concat "\n" headerFields + "\n\n" + String.concat "\n" entries + "\n"
 
-    /// EXEC-017 rev.2: a local operator abort (Esc) interrupts the join wait.
-    /// A queued user message never interrupts join. `interrupted` is not
-    /// ForkError / failed / aborted.
-    let renderInterrupted () : string =
-        joinBlocks
-            [ field "status" (str "interrupted")
-              field "reason" (str "operator_abort")
-              field "message" (str "join interrupted") ]
+    /// EXEC-017: local join interrupt wire. `interrupted` is not
+    /// ForkError / failed / aborted. OperatorAbort keeps the existing message;
+    /// UserMessageArrived omits user text copy. DeadlineExpired is TIMED_OUT
+    /// (renderForkError), not this path.
+    let renderInterrupted (reason: JoinInterruptReason) : string =
+        match reason with
+        | JoinInterruptReason.OperatorAbort ->
+            joinBlocks
+                [ field "status" (str "interrupted")
+                  field "reason" (str "operator_abort")
+                  field "message" (str "join interrupted") ]
+        | JoinInterruptReason.UserMessageArrived ->
+            joinBlocks
+                [ field "status" (str "interrupted")
+                  field "reason" (str "user_message") ]
+        | JoinInterruptReason.DeadlineExpired ->
+            // Defensive: production JoinTool maps DeadlineExpired to TIMED_OUT.
+            joinBlocks
+                [ field "status" (str "interrupted")
+                  field "reason" (str "operator_abort")
+                  field "message" (str "join interrupted") ]
 
     /// One [[result]] block; optional leading LWR comment lines (agent completed only).
     let private resultEntry

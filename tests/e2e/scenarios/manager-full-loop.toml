@@ -126,7 +126,7 @@ tools = ["fork", "join", "list", "suicide"]
 [[turn]]
 id = "manager-activation"
 internal = true
-user = ["Now complete it yourself.", "Carry out the work you described until the final goal is fully achieved."]
+user = ["# Now complete it yourself.", "# Carry out the work you described until the final goal is fully achieved."]
 tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]

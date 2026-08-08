@@ -444,13 +444,16 @@ module FinalityController =
                     return!
                         concludeUndecided scope journal managerSessionId lifeId requestId requestTree reviewer barrier
                 else
-                    let bundle =
+                    // Semantic material only — no TOML / comment syntax here.
+                    // Display ordinal is 1-based stable ReviewerOrdinal + 1.
+                    let logs =
                         orderedRecords
-                        |> List.map (fun (ordinal, record) ->
-                            sprintf "# Work log %d\n%s" (ordinal + 1) (SyntheticToml.normalizeNewlines record))
-                        |> String.concat "\n\n"
+                        |> List.map (fun (ordinal, record) -> ordinal + 1, SyntheticToml.normalizeNewlines record)
 
-                    match journal.WriteBlob bundle with
+                    let material =
+                        logs |> List.map snd |> String.concat "\n\n"
+
+                    match journal.WriteBlob material with
                     | Error _ -> return Undecided ManagerLifecyclePrompt.FinalityUndecidable
                     | Ok blob ->
                         appendLifecycle
@@ -468,7 +471,7 @@ module FinalityController =
                         for m in members do
                             scope.Sessions.AbortSession m.ReviewerSessionId |> ignore
 
-                        return Blessed(FinalityPrompt.blessed bundle)
+                        return Blessed(FinalityPrompt.blessedFromLogs logs)
         }
 
     /// GLORY-040: enlist one cohort member in the forced causal order —

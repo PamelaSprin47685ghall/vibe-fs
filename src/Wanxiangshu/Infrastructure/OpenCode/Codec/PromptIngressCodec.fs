@@ -125,13 +125,17 @@ module PromptIngressCodec =
 
     /// COMPANION-003: the user message's text, for the opening capture. Only the
     /// physical user message's own text parts count — the opening is the first
-    /// task prompt, and a synthetic part (tool result, metadata) is not it.
+    /// task prompt, and a synthetic part (tool result, metadata, guidance) is not it.
     let private textOf (output: obj) : string option =
         parts output
         |> Array.choose (fun part ->
-            match readString part "type" with
-            | Some kind when kind.Equals("text", StringComparison.OrdinalIgnoreCase) -> readString part "text"
-            | _ -> None)
+            if isTrue (if isNull part then null else part?synthetic) then
+                None
+            else
+                match readString part "type" with
+                | Some kind when kind.Equals("text", StringComparison.OrdinalIgnoreCase) ->
+                    readString part "text"
+                | _ -> None)
         |> Array.filter (String.IsNullOrWhiteSpace >> not)
         |> Array.toList
         |> function

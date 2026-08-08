@@ -42,10 +42,13 @@ import {
   bloggerText,
   bloggerToolResult,
   field,
+  finalityUndecidable,
   forkBaseInstructions,
   forkPayload,
+  idleEncouragement,
   renderString,
   syntheticDocument,
+  workActivation,
 } from '../../e2e/support/production.js';
 
 /** The nastiest body available: every structural token the notation uses, inside one value. */
@@ -114,6 +117,10 @@ const productionPayloads = () => ({
   'writer: instruction only': syntheticDocument(['Continue the current logical run.'], []),
   'writer: data only': syntheticDocument([], [field('status', renderString('ok'))]),
   'writer: empty': syntheticDocument([], []),
+  // GLORY lifecycle prompts — instruction-only SyntheticToml (all # comments).
+  'glory: work activation': workActivation(),
+  'glory: idle encouragement': idleEncouragement(),
+  'glory: finality undecidable': finalityUndecidable(),
 });
 
 /** Assert a fixture is refused, and that the refusal names the rule rather than something adjacent. */
@@ -178,6 +185,18 @@ export const arch010Cases = [
       assertTrue(
         !payloads['blogger: data only'].includes('#'),
         'the data-only fixture must actually carry no comment',
+      );
+      assertTrue(
+        payloads['glory: work activation'].startsWith('# Now complete it yourself'),
+        'work activation must start with the activation imperative as a comment',
+      );
+      assertTrue(
+        payloads['glory: idle encouragement'].startsWith('# You are doing well'),
+        'idle encouragement must start with the idle golden as a comment',
+      );
+      assertTrue(
+        payloads['glory: finality undecidable'].startsWith('#'),
+        'finality undecidable must be instruction-only comments',
       );
 
       // And the four fork shapes must be four distinct documents. Identical output would mean the

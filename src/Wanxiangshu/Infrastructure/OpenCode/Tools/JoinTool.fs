@@ -78,6 +78,12 @@ module JoinTool =
                     let detachAbort =
                         context.AttachAbort(fun () -> interrupt.Signal JoinInterruptReason.OperatorAbort)
 
+                    // Phase 4: register for external user-message wake before wait.
+                    // Dispose unregisters; never Cancel mailbox/runtime on user wake.
+                    let sessionId = SessionId.create context.SessionId
+
+                    use _registration = scope.JoinInterrupts.Register(sessionId, interrupt)
+
                     use _cleanup =
                         { new IDisposable with
                             member _.Dispose() = detachAbort () }
@@ -93,7 +99,7 @@ module JoinTool =
                             return
                                 ToolHostCodec.tomlObject
                                     [ "error", ToolHostCodec.TString(sprintf "Orchestrator init failed: %s" reason) ]
-                        | Ok(Interrupted _) -> return JoinResultRenderer.renderInterrupted ()
+                        | Ok(Interrupted reason) -> return JoinResultRenderer.renderInterrupted reason
                         | Ok(ResultsAvailable batch) -> return JoinResultRenderer.renderOrchestratorBatch batch
                     else
                         match scope.RuntimeFor context with
@@ -118,7 +124,9 @@ module JoinTool =
                             match joined with
                             | Ok(Interrupted reason) ->
                                 match reason with
-                                | JoinInterruptReason.OperatorAbort -> return JoinResultRenderer.renderInterrupted ()
+                                | JoinInterruptReason.OperatorAbort
+                                | JoinInterruptReason.UserMessageArrived ->
+                                    return JoinResultRenderer.renderInterrupted reason
                                 | JoinInterruptReason.DeadlineExpired ->
                                     return JoinResultRenderer.renderForkError ForkError.TimedOut
                             | Ok(ResultsAvailable batch) ->

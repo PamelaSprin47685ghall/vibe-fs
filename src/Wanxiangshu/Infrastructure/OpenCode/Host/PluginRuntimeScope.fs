@@ -124,6 +124,9 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     // instance like NudgeSent / LoopSensor; never journalled (HOST-007). A
     // worktree owner transfer starts a fresh gate — no old permit survives.
     member val Quiescence = SessionQuiescenceGate()
+    /// Phase 4: process-local join wait registry. External user messages signal
+    /// UserMessageArrived without cancelling mailbox/runtime (not journaled).
+    member val JoinInterrupts: IJoinInterruptRegistry = JoinInterruptRegistry() :> IJoinInterruptRegistry
 
     member _.AttachLoopSensor(sensor: LoopSensor) = loopSensor <- Some sensor
 

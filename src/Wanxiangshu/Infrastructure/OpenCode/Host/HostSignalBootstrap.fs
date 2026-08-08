@@ -362,9 +362,20 @@ module HostSignalBootstrap =
 
             let chatMessageHook =
                 fun (input: obj) (output: obj) ->
+                    // Decode once for wake + student; authority path re-decodes inside
+                    // createHook (PROMPT-004 fail-closed unchanged). Signal even when
+                    // mid-run UnknownOrigin — not only after AcceptHumanRoot.
+                    // physical id + no PromptKey + not compaction → join wake.
+                    let decoded = PromptIngressCodec.decode input output
+
+                    match decoded.SessionId, decoded.PhysicalUserMessageId, decoded.PromptKey, decoded.IsHostCompaction with
+                    | Some sessionId, Some _, None, false ->
+                        scope.JoinInterrupts.SignalUserMessage sessionId
+                    | _ -> ()
+
                     promptIngressHook input output
 
-                    match PromptIngressCodec.decode input output |> scope.ObserveStudentMessage with
+                    match scope.ObserveStudentMessage decoded with
                     | Ok() -> ()
                     | Error error -> raise (InvalidOperationException error)
 

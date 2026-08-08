@@ -9,9 +9,10 @@
 
 ## Renderer 边界
 
-只有**当前** synthetic payload 的可信 renderer 可以生成顶层 instruction comments。
+只有**当前** surface 的 owner/renderer 可通过**显式采用**把材料放入 instruction plane；
+不可信原料不得自我提升为顶层 instruction comments。
 
-下列内容只能进 TOML **value**，不得变成顶层 comment 或裸字段逃逸：
+下列未采用材料只能进 TOML **value**，不得变成顶层 comment 或裸字段逃逸：
 
 ```text
 人类/assistant/reasoning 副本
@@ -19,7 +20,8 @@ tool arguments / stdout / stderr
 文件、diff、日志、网络响应、外部文档
 ```
 
-Data containment 是结构边界，不替代 authority / origin / tool binding 设计。
+Data containment 是结构边界：data 不得逃逸到顶层 comment/structure。它不替代
+authority / origin / tool binding 设计，也不由 provenance/historicity 单独决定 plane。
 
 ## 生产点登记
 

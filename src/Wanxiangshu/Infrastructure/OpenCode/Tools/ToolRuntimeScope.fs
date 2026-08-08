@@ -52,6 +52,8 @@ type ToolRuntimeScope
     let mutable disposed = false
     /// P0-RECOVERY-JOIN-001: family recovery before join / publish consume.
     let mutable familyRecovery: (SessionId -> Task<FamilyRecovery>) option = None
+    /// Phase 4: join interrupt registry (wired from PluginRuntimeScope, or local default).
+    let mutable joinInterrupts: IJoinInterruptRegistry = JoinInterruptRegistry() :> IJoinInterruptRegistry
 
     let registerChild parentSid (_role: Role) childId =
         sessionParents.[SessionId.value childId] <- parentSid
@@ -229,6 +231,11 @@ type ToolRuntimeScope
 
     /// Wire PluginRuntimeScope.RequireFamilyRecovery (or test double).
     member _.AttachFamilyRecovery(fn: SessionId -> Task<FamilyRecovery>) = familyRecovery <- Some fn
+
+    /// Phase 4: share PluginRuntimeScope.JoinInterrupts with JoinTool.
+    member _.AttachJoinInterrupts(registry: IJoinInterruptRegistry) = joinInterrupts <- registry
+
+    member _.JoinInterrupts = joinInterrupts
 
     /// P0-RECOVERY-JOIN-001: join / JoinPublished require FamilyReady. Missing attach → FamilyBlocked.
     member _.RequireFamilyRecovery(root: SessionId) : Task<FamilyRecovery> =

@@ -229,6 +229,20 @@ module PromptDispatcher =
                 repairKind
                 (this.ProjectionFor profile.SessionId)
 
+        /// GLORY-029: has this Manager idle occasion already spent its one
+        /// encouragement. Durable via ClaimSequences (see PromptAuthority.idleAlreadyClaimed).
+        member this.IdleAlreadyClaimed
+            (profile: PromptAuthority.AuthorityExecutionProfile)
+            (lifeId: ManagerLifeId)
+            (triggerProviderRun: ProviderRunIdentity)
+            : bool =
+            PromptAuthority.idleAlreadyClaimed
+                profile.SessionId
+                profile.LogicalRunId
+                lifeId
+                triggerProviderRun
+                (this.ProjectionFor profile.SessionId)
+
         member internal _.Metadata (key: PromptKey) (origin: string) (logicalRunId: LogicalRunId option) =
             PromptMetadataCodec.create key origin logicalRunId
 

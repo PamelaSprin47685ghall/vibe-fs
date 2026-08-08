@@ -2,7 +2,9 @@
 // CompletionMailbox + VerdictMailbox only — no HostForkRuntime (journal/durable).
 
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 import {
   agentCompletion,
   caseOf,
@@ -16,6 +18,8 @@ import {
   verdictMailbox,
 } from '../support/domain.mjs'
 import { JoinInterruptReason } from '../../../dist/Session/CompletionMailbox.js'
+import { JoinInterruptRegistry } from '../../../dist/Session/JoinInterruptRegistry.js'
+import { SessionIdModule_create } from '../../../dist/Kernel/Identity.js'
 
 const run = (id) =>
   agentCompletion.completedRun({
@@ -93,9 +97,9 @@ test('EXEC_018_second_drain_does_not_re_consume_same_completion', () => {
   assert.equal(completionMailbox.pendingCount(box), 0)
 })
 
-// ── 1: WaitForSignal + user interrupt → UserInterrupted ──────────────────────
+// ── 1: WaitForSignal + operator abort → LocalInterrupt OperatorAbort ─────────
 
-test('EXEC_017_wait_for_signal_user_interrupt_returns_user_interrupted', async () => {
+test('EXEC_017_wait_for_signal_operator_abort_returns_local_interrupt', async () => {
   const box = completionMailbox.create(() => true)
   const interrupt = joinInterrupt.create()
   const pending = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
@@ -104,6 +108,58 @@ test('EXEC_017_wait_for_signal_user_interrupt_returns_user_interrupted', async (
   const reason = await pending
   assert.equal(mailboxWakeReason.nameOf(reason), 'LocalInterrupt')
   assert.equal(caseOf(payloadOf(reason)), 'OperatorAbort')
+})
+
+// ── 1b: WaitForSignal + UserMessageArrived (registry signal, not OperatorAbort)
+
+test('EXEC_017_wait_for_signal_user_message_returns_user_message_arrived', async () => {
+  const box = completionMailbox.create(() => true)
+  const interrupt = joinInterrupt.create()
+  const pending = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
+  await new Promise((r) => setTimeout(r, 5))
+  interrupt.Signal(JoinInterruptReason.UserMessageArrived)
+  const reason = await pending
+  assert.equal(mailboxWakeReason.nameOf(reason), 'LocalInterrupt')
+  assert.equal(caseOf(payloadOf(reason)), 'UserMessageArrived')
+  assert.notEqual(caseOf(payloadOf(reason)), 'OperatorAbort')
+})
+
+test('EXEC_017_user_message_interrupt_does_not_cancel_mailbox', async () => {
+  const box = completionMailbox.create(() => true)
+  const interrupt = joinInterrupt.create()
+  const pending = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
+  interrupt.Signal(JoinInterruptReason.UserMessageArrived)
+  await pending
+
+  assert.equal(completionMailbox.isCancelled(box), false, 'user message ≠ Cancel')
+  completionMailbox.publish(box, run('after-user-message'))
+  assert.equal(completionMailbox.pendingCount(box), 1)
+  const drained = completionMailbox.drainAvailable(box, 1)
+  assert.equal(drained[0].AgentId, 'after-user-message')
+})
+
+// Registry fan-out: Register + SignalUserMessage fans UserMessageArrived to all
+// waiters for that session (HostSignalBootstrap → JoinInterruptRegistry path).
+test('EXEC_017_join_interrupt_registry_signal_user_message_fans_out', async () => {
+  const registry = new JoinInterruptRegistry()
+  const session = SessionIdModule_create('ses-registry-fanout')
+  const first = joinInterrupt.create()
+  const second = joinInterrupt.create()
+  const reg1 = registry.Register(session, first)
+  const reg2 = registry.Register(session, second)
+
+  const wait1 = first.Wait
+  const wait2 = second.Wait
+  registry.SignalUserMessage(session)
+
+  const reason1 = await wait1
+  const reason2 = await wait2
+  assert.equal(caseOf(reason1), 'UserMessageArrived')
+  assert.equal(caseOf(reason2), 'UserMessageArrived')
+  assert.notEqual(caseOf(reason1), 'OperatorAbort')
+
+  reg1.Dispose()
+  reg2.Dispose()
 })
 
 // ── 2: interrupt does not cancel mailbox / does not discard later publish ────
@@ -241,4 +297,51 @@ test('EXEC_017_mailbox_cancel_is_separate_from_join_interrupt', async () => {
   assert.equal(completionMailbox.isCancelled(box), true)
   const reason = await completionMailbox.waitForWake(box)
   assert.equal(mailboxWakeReason.nameOf(reason), 'MailboxCancelled')
+})
+
+// ── Anti-cheat: user_message tests must not use OperatorAbort as stimulus ────
+// Proposal §7.2: names containing user_message / UserMessageArrived /
+// human_root_interrupt must not call JoinInterruptReason.OperatorAbort as the
+// primary stimulus. Comments that forbid OperatorAbort are allowed.
+
+test('EXEC_017_anti_cheat_user_message_tests_must_not_use_operator_abort_stimulus', () => {
+  const source = fs.readFileSync(fileURLToPath(import.meta.url), 'utf8')
+  const titleNeedle = /user_message|UserMessageArrived|human_root_interrupt/i
+  const testOpenRe =
+    /test\(\s*(['"`])((?:\\.|(?!\1).)*)\1\s*,\s*(?:async\s*)?\([^)]*\)\s*=>\s*\{/g
+
+  let match
+  let scanned = 0
+  while ((match = testOpenRe.exec(source)) !== null) {
+    const title = match[2]
+    if (!titleNeedle.test(title)) continue
+    // This meta-test's own title matches the needle; skip self.
+    if (title.includes('anti_cheat')) continue
+
+    let depth = 1
+    let i = match.index + match[0].length
+    while (i < source.length && depth > 0) {
+      const ch = source[i]
+      if (ch === '{') depth += 1
+      else if (ch === '}') depth -= 1
+      i += 1
+    }
+    const body = source.slice(match.index + match[0].length, i - 1)
+    const codeOnly = body
+      .split('\n')
+      .filter((line) => {
+        const trimmed = line.trim()
+        return !(trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*'))
+      })
+      .join('\n')
+
+    scanned += 1
+    assert.equal(
+      codeOnly.includes('JoinInterruptReason.OperatorAbort'),
+      false,
+      `test '${title}' must not use JoinInterruptReason.OperatorAbort as the primary stimulus`,
+    )
+  }
+
+  assert.ok(scanned >= 1, 'expected at least one user_message-named test body to scan')
 })

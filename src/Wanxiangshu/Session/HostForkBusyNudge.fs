@@ -42,12 +42,16 @@ module HostForkBusyNudge =
 
                     let rt = PromptDispatcher.forJournal j
 
+                    // Busy-nudge requirement only: commentize multi-line guidance.
+                    // Do not wrap an already-rendered ForkChildPayload on this path.
+                    let syntheticPrompt = SyntheticToml.document [ prompt ] []
+
                     // PROMPT-007 Detached: busy nudge does not wait for PhysicalAccepted.
                     let! sent =
                         rt.SendContinuation
                             sessions
                             childId
-                            prompt
+                            syntheticPrompt
                             PromptAuthority.ContinuationKind.BusyAgentNudge
                             profile
                             busyAgent

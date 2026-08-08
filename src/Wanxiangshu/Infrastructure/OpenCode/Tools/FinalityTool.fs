@@ -145,7 +145,10 @@ module FinalityTool =
         task {
             match journal.WriteBlob lastWords with
             | Error _ ->
-                return ToolHostCodec.tomlObject [ "error", tString "Your ending could not be entered.\nContinue." ]
+                return
+                    ToolHostCodec.tomlObjectWithInstructions
+                        [ "Continue working and try again later." ]
+                        []
             | Ok blob ->
                 let providerRun = context.ProviderRunId.Value
 
@@ -225,7 +228,9 @@ module FinalityTool =
             | Some Role.Manager ->
                 if String.IsNullOrWhiteSpace context.SessionId then
                     return
-                        ToolHostCodec.tomlObject [ "error", tString "The ending cannot be entered without a session." ]
+                        ToolHostCodec.tomlObjectWithInstructions
+                            [ "Continue working and try again later." ]
+                            []
                 else
                     let sessionId = context.SessionId
                     let sid = SessionId.create sessionId
@@ -233,8 +238,9 @@ module FinalityTool =
                     match scope.Journal with
                     | None ->
                         return
-                            ToolHostCodec.tomlObject
-                                [ "error", tString "The ending cannot be entered because the journal is unavailable." ]
+                            ToolHostCodec.tomlObjectWithInstructions
+                                [ "Continue working and try again later." ]
+                                []
                     | Some journal ->
                         let snapshot = AgentJournal.snapshot journal
 
@@ -276,9 +282,7 @@ module FinalityTool =
                                     match context.ToolCallId with
                                     | Some callId when callId = request.ToolCallId ->
                                         return
-                                            ToolHostCodec.tomlObject
-                                                [ "status", tString "already_received"
-                                                  "message", tString "Your final words have already been received." ]
+                                            ToolHostCodec.tomlObject [ "status", tString "already_received" ]
                                     | _ ->
                                         // Crash recovery (docs/how/glory.md matrix):
                                         // a request with no enlisted Reviewer member
@@ -307,28 +311,31 @@ module FinalityTool =
                                             | FinalityController.FinalityOutcome.Undecided prompt -> return prompt
                                         else
                                             return
-                                                ToolHostCodec.tomlObject
-                                                    [ "error", tString "Your ending is already in motion." ]
+                                                ToolHostCodec.tomlObjectWithInstructions
+                                                    [ "Wait for the current ending to resolve." ]
+                                                    []
                                 | _ ->
                                     if String.IsNullOrWhiteSpace lastWords then
-                                        return ToolHostCodec.tomlObject [ "error", tString "Final words are required." ]
+                                        return
+                                            ToolHostCodec.tomlObjectWithInstructions
+                                                [ "Call suicide again with non-empty last_words." ]
+                                                []
                                     elif context.ToolCallId.IsNone then
                                         return
-                                            ToolHostCodec.tomlObject
-                                                [ "error",
-                                                  tString "The ending cannot be entered without a tool call identity." ]
+                                            ToolHostCodec.tomlObjectWithInstructions
+                                                [ "Continue working and try again later." ]
+                                                []
                                     elif context.ProviderRunId.IsNone then
                                         return
-                                            ToolHostCodec.tomlObject
-                                                [ "error",
-                                                  tString "The ending cannot be entered without a run identity." ]
+                                            ToolHostCodec.tomlObjectWithInstructions
+                                                [ "Continue working and try again later." ]
+                                                []
                                     elif outstandingWork scope context then
                                         // GLORY-038: background work still walks the world.
                                         return
-                                            ToolHostCodec.tomlObject
-                                                [ "error",
-                                                  tString
-                                                      "Your work still walks the world.\nCall join to gather what remains before seeking your end." ]
+                                            ToolHostCodec.tomlObjectWithInstructions
+                                                [ "Call join before seeking your end." ]
+                                                []
                                     else
                                         // GLORY-062: a blessed Life ends without a
                                         // second review — resource safety only.
@@ -341,16 +348,16 @@ module FinalityTool =
                                             match treeOf scope sessionId with
                                             | None ->
                                                 return
-                                                    ToolHostCodec.tomlObject
-                                                        [ "error",
-                                                          tString "Your ending could not be entered.\nContinue." ]
+                                                    ToolHostCodec.tomlObjectWithInstructions
+                                                        [ "Continue working and seek your end again when you are ready." ]
+                                                        []
                                             | Some tree ->
                                                 match journal.WriteBlob lastWords with
-                                                | Error err ->
+                                                | Error _ ->
                                                     return
-                                                        ToolHostCodec.tomlObject
-                                                            [ "error",
-                                                              tString "Your ending could not be entered.\nContinue." ]
+                                                        ToolHostCodec.tomlObjectWithInstructions
+                                                            [ "Continue working and seek your end again when you are ready." ]
+                                                            []
                                                 | Ok blob ->
                                                     // GLORY-040: accept in order. Synchronously wait for the Finality
                                                     // workflow to complete; every outcome lands on the journal before any side effect.
@@ -403,19 +410,19 @@ module FinalityTool =
                         match effectiveLife with
                         // GLORY-039: still no Life — the HumanRoot Manager is planning.
                         | None ->
-                            return
-                                ToolHostCodec.tomlObject [ "error", tString "Your work has not yet begun.\nContinue." ]
+                            return ToolHostCodec.tomlObjectWithInstructions [ "Continue working." ] []
                         | Some life when life.ProtectedPrefixEnd.IsNone ->
-                            return
-                                ToolHostCodec.tomlObject [ "error", tString "Your work has not yet begun.\nContinue." ]
+                            return ToolHostCodec.tomlObjectWithInstructions [ "Continue working." ] []
                         | Some life when life.Completed ->
                             return ToolHostCodec.tomlObject [ "status", tString "already_completed" ]
                         | Some life -> return! acceptSuicide life
-            | Some _ -> return ToolHostCodec.tomlObject [ "error", tString "The ending is not yours to call." ]
+            | Some _ ->
+                return ToolHostCodec.tomlObjectWithInstructions [ "Do not call suicide from this role." ] []
             | None ->
                 return
-                    ToolHostCodec.tomlObject
-                        [ "error", tString "The ending cannot be entered without an accepted role." ]
+                    ToolHostCodec.tomlObjectWithInstructions
+                        [ "Continue working and try again later." ]
+                        []
         }
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

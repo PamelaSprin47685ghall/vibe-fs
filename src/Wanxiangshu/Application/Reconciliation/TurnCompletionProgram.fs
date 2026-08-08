@@ -681,50 +681,68 @@ module TurnCompletionProgram =
                 | Some Role.Manager ->
                     // GLORY-029/070: ordinary Labor idle. The Manager is never
                     // reviewed by a guard; it continues until suicide. Exactly one
-                    // encouragement per idle terminal (dedupe: pending claim + run),
-                    // and only with a fresh idle permit (HOST-004): an idle-derived
-                    // continuation must not fire when a newer attempt began.
+                    // encouragement per idle occasion (Session + Life + trigger
+                    // ProviderRun), durable via ClaimSequences, plus process-local
+                    // encouragementKey for same-process reentry. HOST-004 still
+                    // requires a fresh idle permit.
+                    //
+                    // Do not scan PendingClaims by ContinuationKind alone: Detached
+                    // keeps claim A pending until PhysicalAccepted and must not
+                    // suppress independent occasion B.
                     let encouragementKey =
                         sprintf "manager-idle:%s:%s" sessionKey (ProviderRunIdentity.value turn.ProviderRun)
 
-                    let idleAlreadyClaimed =
+                    let currentLifeId =
                         match journal with
                         | Some durable ->
                             AgentProjection.tryFind turn.SessionId (AgentJournal.snapshot durable).AgentProjections
-                            |> Option.bind (fun session -> session.PromptAuthority)
-                            |> Option.exists (fun authority ->
-                                authority.PendingClaims
-                                |> Map.exists (fun _ claim ->
-                                    match claim.Origin with
-                                    | PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ManagerIdleEncouragement ->
-                                        true
-                                    | _ -> false))
-                        | None -> false
+                            |> Option.bind (fun session -> session.ManagerLife)
+                            |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+                            |> Option.map (fun life -> life.LifeId)
+                        | None -> None
 
-                    match context.Quiescence with
-                    | None -> AsyncSupport.completedTask ()
-                    | Some _ when nudgeSent.Contains encouragementKey || idleAlreadyClaimed ->
+                    match context.Quiescence, currentLifeId with
+                    | None, _ -> AsyncSupport.completedTask ()
+                    | _, None ->
+                        // No open Life: fail closed / skip rather than claim an
+                        // unscoped idle encouragement.
                         AsyncSupport.completedTask ()
-                    | Some permit ->
-                        nudgeSent.Add encouragementKey |> ignore
+                    | Some _, Some _ when nudgeSent.Contains encouragementKey ->
+                        AsyncSupport.completedTask ()
+                    | Some permit, Some lifeId ->
+                        let idleAlreadyClaimed =
+                            match journal, HostSessionNudge.tryActiveProfile journal turn.SessionId with
+                            | Some durable, Some profile ->
+                                PromptDispatcher.forJournal(durable).IdleAlreadyClaimed
+                                    profile
+                                    lifeId
+                                    turn.ProviderRun
+                            | _ -> false
 
-                        task {
-                            let! outcome =
-                                HostSessionNudge.trySendIdleContinuation
-                                    quiescence
-                                    permit
-                                    sessionPort
-                                    turn.SessionId
-                                    ManagerLifecyclePrompt.IdleEncouragement
-                                    PromptAuthority.ContinuationKind.ManagerIdleEncouragement
-                                    turn.Directory
-                                    journal
+                        if idleAlreadyClaimed then
+                            AsyncSupport.completedTask ()
+                        else
+                            nudgeSent.Add encouragementKey |> ignore
 
-                            match outcome with
-                            | HostSessionNudge.IdleContinuationOutcome.Sent _ -> ()
-                            | HostSessionNudge.IdleContinuationOutcome.Superseded -> ()
-                            | HostSessionNudge.IdleContinuationOutcome.Failed error ->
-                                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
-                        }
-                        :> Task
+                            task {
+                                let! outcome =
+                                    HostSessionNudge.trySendIdleManagerEncouragement
+                                        quiescence
+                                        permit
+                                        sessionPort
+                                        turn.SessionId
+                                        ManagerLifecyclePrompt.IdleEncouragement
+                                        turn.Directory
+                                        journal
+                                        lifeId
+                                        turn.ProviderRun
+
+                                match outcome with
+                                | HostSessionNudge.IdleContinuationOutcome.Sent _ -> ()
+                                | HostSessionNudge.IdleContinuationOutcome.Superseded -> ()
+                                | HostSessionNudge.IdleContinuationOutcome.Failed error ->
+                                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error)
+                                    |> ignore
+                            }
+                            :> Task
                 | _ -> AsyncSupport.completedTask ()

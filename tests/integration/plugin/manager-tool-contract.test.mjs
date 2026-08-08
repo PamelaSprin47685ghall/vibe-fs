@@ -248,7 +248,8 @@ const PROMPT_CLAUSES = {
       /Coder edits\./,
       /Do not ask an agent to act outside its role/,
       /Do not ask Coder to run commands/,
-      /Do not ask DevOps to edit files/,
+      /Do not ask DevOps to edit files directly/,
+      /bounded mechanical repair|autonomous mechanical repair|operational closure|execution\/repair objective/i,
       /agent_id/,
       /\blist\b/,
       /compatible context/,
@@ -293,6 +294,9 @@ const PROMPT_CLAUSES = {
       /DevOps executes/,
       /fork-pty/,
       /No Direct File Modification/,
+      /Mechanical Repair Autonomy/,
+      /Do not ask Manager for permission to make an obvious mechanical repair/,
+      /operational closure/,
       /tdd="red"/,
       /tdd="green"/,
       /Confirm true red\/green|confirm.*red.*green|true red\/green/i,
@@ -1006,6 +1010,86 @@ test('EXEC_002_EXEC_004_fork_join_and_list_carry_the_same_mailbox_identity', asy
   })
 })
 
+// Phase 4 / corrective §7.1: real chat.message (keyless external human) wakes a
+// blocked JoinTool via JoinInterruptRegistry → reason=user_message. Must not use
+// OperatorAbort or tool abort controller as the primary stimulus.
+test('EXEC_017_blocked_join_wakes_on_user_message_from_chat_message', async () => {
+  await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
+    acceptAuthorityRoot(runtime, 'manager-user-wake', 'fast-manager')
+    const context = { sessionID: 'manager-user-wake', agent: 'fast-manager' }
+
+    const fork = parseToml(await hooks.tool.fork.execute({ agent: 'fast-coder', prompt: 'work' }, context))
+    assert.equal(fork.error, undefined, `fork failed: ${fork.error}`)
+    // Join blocks waiting only when an active handle is recorded.
+    runtime.recordFork('manager-user-wake', fork.agent_id, createdIds[0])
+
+    // No AttachAbort / abort controller — join waits on child + registry wake.
+    const joinP = hooks.tool.join.execute({}, context)
+    // Allow JoinTool to Register on the session interrupt registry before pulse.
+    await new Promise((r) => setTimeout(r, 20))
+
+    // Keyless external human: PhysicalUserMessageId present, no PromptKey metadata,
+    // not host compaction. HostSignalBootstrap signals JoinInterrupts first.
+    await hooks['chat.message'](
+      { sessionID: 'manager-user-wake' },
+      {
+        message: { id: 'msg-user-wake-1', role: 'user', sessionID: 'manager-user-wake' },
+        parts: [{ type: 'text', text: 'new instruction from user' }],
+      },
+    )
+
+    const raceTimeoutMs = 2000
+    const text = await Promise.race([
+      joinP,
+      new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`join did not wake from chat.message within ${raceTimeoutMs}ms`)),
+          raceTimeoutMs,
+        ),
+      ),
+    ])
+    const wire = parseToml(text)
+    assert.equal(wire.status, 'interrupted')
+    assert.equal(wire.reason, 'user_message')
+    assert.notEqual(wire.reason, 'operator_abort')
+    assert.ok(!text.includes('operator_abort'), 'user_message path must not emit operator_abort')
+    assert.equal(wire.message, undefined, 'user_message wire omits operator join-interrupted message')
+
+    // Negative shape: PromptKey continuation is not the external-human signal path
+    // (HostSignalBootstrap only SignalUserMessage when PromptKey is absent). Do not
+    // hang proving non-wake; just show a PromptKey ingress does not force OperatorAbort.
+    await hooks['chat.message'](
+      { sessionID: 'manager-user-wake' },
+      {
+        message: {
+          id: 'msg-prompt-key-cont',
+          role: 'user',
+          sessionID: 'manager-user-wake',
+          metadata: { wanxiangshu_prompt_key: 'pk-continuation-not-user-wake' },
+        },
+        parts: [
+          {
+            type: 'text',
+            text: 'continuation with prompt key',
+            metadata: { wanxiangshu_prompt_key: 'pk-continuation-not-user-wake' },
+          },
+        ],
+      },
+    )
+
+    // Resource safety: child was not cancelled by user_message interrupt.
+    // Late terminal still claims the completion cell for a subsequent join.
+    notifyCompleted(runtime, createdIds[0], 'late session-wide A', 'late turn formal report')
+    const join2Text = await hooks.tool.join.execute({}, context)
+    const join2 = parseToml(join2Text)
+    assert.equal(join2.status, 'completed', `late join after user_message must harvest child: ${join2Text}`)
+    assert.equal(join2.count, 1)
+    assert.equal(join2.result?.[0]?.status, 'completed')
+    assert.equal(join2.result?.[0]?.agent, 'fast-coder')
+    assert.equal(runtime.abortedIds.includes(createdIds[0]), false, 'user_message must not abort the child session')
+  })
+})
+
 test('EXEC_002_fork_existing_agent_id_reuses_child_without_new_session', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'manager-reuse', 'fast-manager')
@@ -1193,11 +1277,11 @@ test('GLORY_034_suicide_tool_executes_synchronously', async () => {
     acceptAuthorityRoot(runtime, 'manager-suicide-sync', 'fast-manager')
     const context = { sessionID: 'manager-suicide-sync', agent: 'fast-manager' }
 
-    // Calling suicide before activation returns precondition error synchronously:
-    const preActivation = parseToml(
-      await hooks.tool.suicide.execute({ last_words: 'Task completed.' }, context),
-    )
-    assert.equal(preActivation.error, 'Your work has not yet begun.\nContinue.\n')
+    // Pre-activation refusal is instruction-only (comment wire); parseToml strips comments.
+    const preText = await hooks.tool.suicide.execute({ last_words: 'Task completed.' }, context)
+    assert.match(preText, /# Continue working\./)
+    assert.doesNotMatch(preText, /^error\s*=/m)
+    assert.equal(parseToml(preText).error, undefined)
   })
 })
 
@@ -1213,13 +1297,11 @@ test('GLORY_038_suicide_with_outstanding_child_prompts_to_join', async () => {
       context,
     )
 
-    const result = parseToml(
-      await hooks.tool.suicide.execute({ last_words: 'Finished.' }, context),
-    )
-    assert.equal(
-      result.error,
-      'Your work still walks the world.\nCall join to gather what remains before seeking your end.\n',
-    )
+    // Outstanding-child refusal is instruction-only (comment wire); parseToml strips comments.
+    const resultText = await hooks.tool.suicide.execute({ last_words: 'Finished.' }, context)
+    assert.match(resultText, /# Call join before seeking your end\./)
+    assert.doesNotMatch(resultText, /^error\s*=/m)
+    assert.equal(parseToml(resultText).error, undefined)
   })
 })
 

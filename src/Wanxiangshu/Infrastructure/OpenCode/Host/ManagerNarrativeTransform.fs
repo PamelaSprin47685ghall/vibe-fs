@@ -147,10 +147,14 @@ module ManagerNarrativeTransform =
                         | _ -> false)
                 | None -> false)
 
-    /// Replace the text of the user message at `messageIndex` with the narrative
-    /// text. Only text parts are touched; reasoning/tool/activity parts pass
-    /// through unchanged.
-    let private rewriteMessage (rawMessages: obj list) (messageIndex: int) (narrative: string) : obj list =
+    /// Replace the user message at `messageIndex` with multi-part narrative
+    /// projection: human text part(s) + synthetic guidance parts (synthetic=true).
+    /// Non-text parts (reasoning/tool/activity) pass through unchanged.
+    let private rewriteMessage
+        (rawMessages: obj list)
+        (messageIndex: int)
+        (projection: ManagerNarrative.NarrativeProjection)
+        : obj list =
         rawMessages
         |> List.mapi (fun index raw ->
             if index <> messageIndex then
@@ -162,9 +166,21 @@ module ManagerNarrativeTransform =
                     else
                         unbox<obj array> raw?parts
 
-                let rewritten =
+                let narrativeParts =
+                    projection.Parts
+                    |> List.map (fun part ->
+                        if part.Synthetic then
+                            createObj
+                                [ "type", box "text"
+                                  "text", box part.Text
+                                  "synthetic", box true ]
+                        else
+                            createObj [ "type", box "text"; "text", box part.Text ])
+                    |> List.toArray
+
+                let nonText =
                     parts
-                    |> Array.map (fun part ->
+                    |> Array.filter (fun part ->
                         let kind =
                             if isNull part then
                                 ""
@@ -172,10 +188,9 @@ module ManagerNarrativeTransform =
                                 let value = readField part "type"
                                 if isNull value then "" else unbox<string> value
 
-                        if kind = "text" then
-                            createObj [ "type", box "text"; "text", box narrative ]
-                        else
-                            part)
+                        kind <> "text")
+
+                let rewritten = Array.append narrativeParts nonText
 
                 // Clone the message and replace only its parts: every other field
                 // (info id/role/sessionID, metadata, timing) must survive verbatim,
@@ -548,7 +563,8 @@ module ManagerNarrativeTransform =
                             message.Parts
                             |> List.exists (function
                                 | WireText text ->
-                                    text.StartsWith("Now complete it yourself.", StringComparison.Ordinal)
+                                    // Comment-only activation starts with `# Now complete...`.
+                                    text.Contains("Now complete it yourself.", StringComparison.Ordinal)
                                 | _ -> false)
                         | _ -> false)
 

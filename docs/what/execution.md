@@ -28,7 +28,7 @@ Join 批次、blob、进程预算见 `how/execution.md`。
 
 Join 消费当前 owner 可用 completion，有界批次 wire（status/count/`[[result]]`）；agent 完成项 entry-local LWR 注释（`includeOpening=false`），禁止字段式 `work_record`。  
 DevOps 角色的 `join` 在无完成项时包含 10s 超时预算（`DevOpsJoinTimeoutMs = 10_000`）；若 10s 内无 completion，返回超时错误 `ForkError.TimedOut`（`status="failed"`, `code="TIMED_OUT"`）。Orchestrator 与 Manager 角色的 `join` 维持无 10s 超时规则。  
-工具调用中止（operator abort）→ `status=interrupted, reason=operator_abort`，不是 error（EXEC-017）；排队中的用户消息不中断 join。
+工具调用中止（operator abort）→ `status=interrupted, reason=operator_abort`；外部用户入站 → `status=interrupted, reason=user_message`；均非 error（EXEC-017）。
 
 ## EXEC-005：List 语义
 
@@ -56,7 +56,11 @@ PTY completion **只**由 backend `onExit` 触发。禁止 stdout 启发式「�
 
 ## EXEC-017：Join 中断不是错误
 
-join 等待只被 `OperatorAbort`（宿主中止当前工具调用）或 `DeadlineExpired`（DevOps 超时）中断；中断是 `JoinWaitOutcome.Interrupted of JoinInterruptReason`，不是 ForkError。wire：operator abort → `status=interrupted, reason=operator_abort`；DevOps 超时 → `ForkError.TimedOut`（`status="failed", code="TIMED_OUT"`，EXEC-004）。排队中的用户消息不进入 join race，不中断等待。tool abort ≠ runtime.Cancel。
+join 等待直至：completion 可用 / 本地 operator abort / external-user ingress 唤醒 / 适用的 DevOps deadline。中断是 `JoinWaitOutcome.Interrupted of JoinInterruptReason`，不是 ForkError。`JoinInterruptReason` = `OperatorAbort` \| `UserMessageArrived` \| `DeadlineExpired`。
+
+External-user ingress 只打断**当前** wait：不 cancel mailbox/runtime/session/child，也不本身授予 Prompt authority。任意 race 唤醒后，已可用的 completion 先 drain，再才发出 interrupt 结果。
+
+wire：operator abort → `status=interrupted, reason=operator_abort`；user message → `status=interrupted, reason=user_message`；DevOps 超时 → `ForkError.TimedOut`（`status="failed", code="TIMED_OUT"`，EXEC-004）。tool abort ≠ runtime.Cancel。中途用户消息可唤醒 join，不经 AcceptHumanRoot、不重置 LogicalRun、不新建 Manager Life（PROMPT-004 不变，fail-closed）。
 
 ## EXEC-020：Agent 终态代数（无 ABORTED）
 

@@ -148,7 +148,7 @@ module RoleDefinitions =
     let managerPrompt =
         "Manager system prompt SSOT: prompts/manager-system.md\n"
         + "Tools: fork / join / list / suicide.\n"
-        + "Manager owns verification. Coder edits then stops. DevOps executes."
+        + "Manager owns verification. Coder edits then stops. DevOps executes and owns operational closure for mechanical repair objectives."
 
     /// Full Coder system prompt lives in prompts/coder-system.md and is loaded
     /// into OpenCode AgentConfig.prompt (host system prompt).
@@ -169,7 +169,7 @@ module RoleDefinitions =
     let devopsPrompt =
         "DevOps system prompt SSOT: prompts/devops-system.md\n"
         + "Tools: fork-pty / executor / read / glob / grep / inspector / coder / join / list.\n"
-        + "Only DevOps operates PTY. Never write/edit; delegate file changes via coder."
+        + "DevOps executes and autonomously closes mechanical operational failures through Coder; it does not make product/architecture decisions. Never write/edit directly."
 
 
     /// Full Browser system prompt lives in prompts/browser-system.md and is

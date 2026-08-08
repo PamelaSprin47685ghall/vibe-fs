@@ -25,14 +25,47 @@ const load = async (rel, names) => {
   return out
 }
 
-const narrative = await load('Domain/ManagerNarrative.js', ['firstBirth', 'reawakening'])
+const narrative = await load('Domain/ManagerNarrative.js', [
+  'PlanningTail',
+  'ReawakeningPrefix',
+  'firstBirth',
+  'reawakening',
+  'renderText',
+])
 const lifecycle = await load('Domain/ManagerLifecyclePrompt.js', ['WorkActivation', 'IdleEncouragement', 'FinalityUndecidable'])
 const finality = await load('Domain/FinalityPrompt.js', ['rejected'])
 const hostReview = await load('Domain/HostReviewPrompt.js', ['OpeningAssignment'])
 
+/** F# list → array (Fable list has head/tail). */
+const listToArray = (list) => {
+  const out = []
+  let cur = list
+  while (cur && cur.tail !== undefined) {
+    if (cur.head !== undefined) out.push(cur.head)
+    cur = cur.tail
+  }
+  return out
+}
+
+const projectionView = (projection) => {
+  const parts = listToArray(projection.Parts).map((part) => ({
+    text: part.Text,
+    synthetic: Boolean(part.Synthetic),
+  }))
+  return {
+    parts,
+    text: narrative.renderText(projection),
+  }
+}
+
 export const managerNarrative = {
-  firstBirth: (text) => narrative.firstBirth(text),
-  reawakening: (text) => narrative.reawakening(text),
+  planningTail: () => narrative.PlanningTail,
+  reawakeningPrefix: () => narrative.ReawakeningPrefix,
+  firstBirth: (text) => projectionView(narrative.firstBirth(text)),
+  reawakening: (text) => projectionView(narrative.reawakening(text)),
+  /** Joined text view for LF / golden compatibility. */
+  firstBirthText: (text) => narrative.renderText(narrative.firstBirth(text)),
+  reawakeningText: (text) => narrative.renderText(narrative.reawakening(text)),
 }
 
 export const managerLifecyclePrompt = {

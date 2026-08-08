@@ -76,7 +76,7 @@ Birth 与 Labor 的 Manager 工具表面一致；Activation 前 `suicide` 由前
 
 ## GLORY-019：Activation 文本
 
-`ManagerLifecyclePrompt.WorkActivation` 是唯一冻结 owner。
+`ManagerLifecyclePrompt.WorkActivation` 是唯一冻结 owner：comment-only SyntheticToml instruction surface。
 
 ## GLORY-020：Activation continuation
 
@@ -116,7 +116,7 @@ Manager 拆分、委派、收割并填满安全独立 lane；不能因减少 age
 
 ## GLORY-029：idle nudge
 
-`ManagerIdleEncouragement` 只发送冻结四行鼓励；open finality 或 completed Life 不发送。
+`ManagerIdleEncouragement` 为 comment-only；只发送冻结四行鼓励。occasion identity = Session + Life + TriggerProviderRun；同一 occasion 至多一次。旧 occasion 的 pending claim 不得压制新 occasion。durable 为 ClaimSequences digest，而非 session-wide ContinuationKind 锁。open finality 或 completed Life 不发送。
 
 ## GLORY-030：Manager 固定 surface
 
@@ -208,7 +208,7 @@ Y 是主体，raw gap 与 terminal 是不丢失最后发现的必要尾部。
 
 ## GLORY-052：REVISE prompt
 
-`FinalityPrompt.rejected` 以数据边界渲染 canonical LWR，提示 Manager 继续工作；它不解释隐藏机制。
+`FinalityPrompt.rejected` 将 canonical LWR 作为 guidance comments 渲染（Host 显式采用为当前 Manager 指引，非「trusted source」），提示 Manager 继续工作；它不解释隐藏机制。
 
 ## GLORY-053：失败 identity
 
@@ -302,9 +302,9 @@ XTrace append-only；每 Life 以 cursor range 物化。
 
 用户文本、LWR、requirements、child assignment 与工具错误都是 typed data，不得由字符串反向解析状态。
 
-## SURFACE-004：固定文本 owner
+## SURFACE-004：surface 分类合同与唯一 owner
 
-Manager/Orchestrator/Reviewer system prompt、Lifecycle prompt、Finality prompt、review assignment/challenge 与 tool schema 均各有唯一 owner；测试只读取 owner。
+每个 surface 有唯一 owner，并固定分类合同：哪些句子是 Host-owned instruction（comment plane）、哪些动态材料是 data（value plane）、本地 TOML schema、以及哪些字段/顺序 byte-stable。Manager/Orchestrator/Reviewer system prompt、Lifecycle prompt、Finality prompt、review assignment/challenge 与 tool schema 均各有唯一 owner；测试只读取 owner。
 
 ## SURFACE-005：Manager 禁止泄漏
 

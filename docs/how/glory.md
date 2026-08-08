@@ -12,9 +12,9 @@
    - 若该消息是合法 HumanRoot（无 PromptKey、非 compaction、非 retry，GLORY-012）且 session 是 Manager（从 journal Authority Root 的 CanonicalRole 判定）；
    - 且当前无未完成 Life（`ManagerLife` 投影为 None）或上一 Life 已 `LifeCompleted` → 打开新 Life：
      - 写 Opening blob（用户原始文本）→ append `LifeOpened`（openingCursor = 该消息在 XTrace 中的首个 part cursor）；
-     - 改写 provider-facing 消息：无前 Life 用 `FirstBirth`（`[X]\n\n` + PlanningTail），有已完成的 Life 用 `Reawakening`（ReawakeningPrefix + `\n\n` + `[X]\n\n` + PlanningTail）；
+     - 改写 provider-facing 消息：无前 Life 用 `FirstBirth`（`[X]\n\n` + PlanningTail），有已完成的 Life 用 `Reawakening`（ReawakeningPrefix + `\n\n` + `[X]\n\n` + PlanningTail）；provider-visible 将 human raw parts 与 synthetic guidance parts 分开承载，不得把 synthetic 散文并入 human 文本字节；
      - 幂等：改写 identity 记录在内存 `Dictionary<(sessionId, lifeId, messageId), source>`，重复 transform 不重复注入（GLORY-015）。
-2. durable Opening 永远是原始 `[X]`：captureProjection 先于改写运行，XTrace 不含 synthetic tail（GLORY-013/014）。
+2. durable Opening 永远是原始 HumanRoot/`[X]`：captureProjection 先于改写运行，XTrace 在 rewrite 之前落盘，不含 synthetic tail（GLORY-013/014）。
 
 ## Slice B：Activation 与 X floor
 
@@ -31,7 +31,7 @@
 3. `FinalityTool.execute`（GLORY-034/035/037-041）：
    - 前置条件 1-16 按序检查，失败返回 GLORY-038/039 或对应拒绝文本（禁止泄漏内部细节）；
    - 合法受理（未 Blessed）：`gitTreePort.GetTreeHash()` → journal `WriteBlob last_words` → append `FinalityRequested` → 启动 `FinalityController` cohort CE（`rosterOf` 选员，GLORY-040）；
-   - tool result：`FinalityOutcome` 决定返回文本——`Rejected` → `FinalityPrompt.rejected` 拒绝 prompt（全注释块，不含 TOML 数据块）；`Blessed` → `FinalityPrompt.blessed` minor-work continuation；`Undecided` → `ManagerLifecyclePrompt.FinalityUndecidable`（GLORY-041/052/053/057）；request 已有成员在途 → `Your ending is already in motion.`；Blessed Life 再 suicide → `completeBlessedLife`（`rest in peace`，GLORY-062）。
+   - tool result：`FinalityOutcome` 决定返回文本——`Rejected` → `FinalityPrompt.rejected` 拒绝 prompt（全注释块，不含 TOML 数据块；Host 显式采用 record 为当前 Manager guidance，属 producer adoption，非 source trust）；`Blessed` → `FinalityPrompt.blessed` minor-work continuation；`Undecided` → `ManagerLifecyclePrompt.FinalityUndecidable`（GLORY-041/052/053/057）；request 已有成员在途 → `Your ending is already in motion.`；Blessed Life 再 suicide → `completeBlessedLife`（`rest in peace`，GLORY-062）。
 4. `ForkTool.executeManager`：解析 `agent` 为 `Role.Reviewer` 时（读 durable/canonical role，GLORY-031）返回统一隐藏文案 `Unknown or unavailable managed agent.`（`HiddenTargetDeniedText`，GLORY-032）；`ToolRuntimeScope.RuntimeFor` 创建 `HostForkRuntime` 时 `managerOpensReviewBarrier` 置 false（GLORY-033），`HostForkAgent.fork` 的 `ManagerOpensReviewBarrier && role = Role.Reviewer` 分支随之成为死代码，删除。
 5. 自动 Reviewer 隐藏：HostReviewProgram 使用独立 `HostForkRuntime`（同 OrchestratorHost 模式，不注册进 Manager 的 `Children`），runtime 以 `ownership=HostOwnedHidden` 创建（P0-A）：`HandleLinked` 事实与 HandleRecord 携带 `HandleOwnership = DurableParentHandle | HostOwnedHidden`，Reviewer 产生 `HostOwnedHidden` 句柄，其 completion 不进 Manager `join`/`list`（GLORY-002）；Fork/RecoveryClosure/JoinDrain 按 ownership 过滤。
 
@@ -57,7 +57,7 @@ let reverify
 
 ## Slice E：失败反馈
 
-1. `FinalityRejected` 流程（受理后由 FinalityController 驱动）：任一 member `RevisionRequired` → LWR 读取 → journal `WriteBlob` → append `FinalityRejected`（`RejectingReviewerSessionId`）→ 直接将 `FinalityPrompt.rejected` 渲染的拒绝 prompt（纯注释块，不含 TOML 数据块）作为 `suicide` 工具的返回值（GLORY-052/053，无需额外发送 continuation 消息）→ 标记旧 request 关闭（投影从 `ActiveFinality` 移除）→ sibling current attempt 可 best-effort cancel，但不 Dispose 未 graduate session（GLORY-055）；下次 suicide 建新 request/new barriers。
+1. `FinalityRejected` 流程（受理后由 FinalityController 驱动）：任一 member `RevisionRequired` → LWR 读取 → journal `WriteBlob` → append `FinalityRejected`（`RejectingReviewerSessionId`）→ 直接将 `FinalityPrompt.rejected` 渲染的拒绝 prompt（纯注释块，不含 TOML 数据块；Host 显式采用为当前 Manager guidance，producer adoption 而非 source trust）作为 `suicide` 工具的返回值（GLORY-052/053，无需额外发送 continuation 消息）→ 标记旧 request 关闭（投影从 `ActiveFinality` 移除）→ sibling current attempt 可 best-effort cancel，但不 Dispose 未 graduate session（GLORY-055）；下次 suicide 建新 request/new barriers。
 2. dedupe：continuation claim scope 由 `PromptAuthority.claimScopeDigest` 天然覆盖（GLORY-053）。
 3. 基础设施失败（GLORY-056/057）：按序尝试恢复；无法证明时 `concludeUndecided` append `FinalityUndecided` 关闭 request，返回 `ManagerLifecyclePrompt.FinalityUndecidable`，不伪造 work record。
 
