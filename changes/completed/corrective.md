@@ -1203,17 +1203,32 @@ Corrective Change 闭环：Join 真实用户消息唤醒、Synthetic TOML produc
 
 ## Remaining work
 
-1. DevOps 行为闭环测试实现并验证（RED/GREEN 为真实执行证据，broader gate 实际重跑）。
-2. manager-unhappy-path 加入第二个独立 Manager idle occasion e2e。
-3. EXEC_025 three_teacher 全量 unit 挂起根因调查与修复，回归落盘。
-4. 全部完成后 `npm run check` 全量判绿。
+1. DevOps 行为闭环测试实现并验证（RED/GREEN 为真实执行证据，broader gate 实际重跑）— **DONE（HEAD）**：
+   `tests/e2e/cases/devops-mechanical-repair-loop.test.mjs` +
+   `tests/e2e/scenarios/devops-mechanical-repair-loop.toml`（executor→read→coder red→green，禁止直接
+   write/edit）。
+2. manager-unhappy-path 加入第二个独立 Manager idle occasion e2e — **DONE（HEAD）**：
+   `tests/e2e/cases/manager-unhappy-path.test.mjs`（`firstIdleReceipt` / `secondIdleReceipt`，
+   finalOracle 断言 `idleClaims.length >= 2`，occasion A pending 不压 B）+ `tests/e2e/scenarios/
+   manager-unhappy-path.toml`（dual `armIdle` / `awaitIdle`）。
+3. EXEC_025 three_teacher 全量 unit 挂起根因调查与修复，回归落盘 — **DONE（工作树）**：
+   `tests/unit/student-teacher/tool-loop.test.mjs` 以有界 `awaitPromptGrowth`（~3000ms，超时即抛带
+   session / index / prompt 数的精确错误）替代无界 `while (runtime.prompts.length <= index)`
+   忙等；新增确定性复现用例
+   `EXEC_025_unbounded_prompt_wait_hangs_when_in_flight_execute_rejects_without_prompt`。
+4. 全部完成后 `npm run check` 全量判绿 — **DONE**（CLOSE_READY）：DevOps 实测
+   `tool-loop.test.mjs` 3/3 pass（`awaitPromptGrowth` 严格按 `deadline`/`budgetMs` 有界等待）；
+   `npm run check` 全量 exit 0（1837 unit + integration）；`manager-unhappy-path` e2e exit 0；
+   `devops-mechanical-repair-loop` e2e exit 0。
 
 ## Completion criteria
 
 §21 验收全部满足，且：
 
-- 上述三项恢复条件逐一闭环。
-- `npm run check` 全量判绿，无豁免。
+- 上述三项恢复条件逐一闭环：DevOps 行为闭环 e2e、第二独立 Manager idle e2e 已实现（HEAD，见 Remaining
+  work）；EXEC_025 挂起根因已修复（有界 `awaitPromptGrowth`，tool-loop.test.mjs，见 Remaining work 3）。
+- `npm run check` 全量判绿，无豁免 — **DONE**：DevOps 实测 exit 0（1837 unit + integration），
+  `manager-unhappy-path` 与 `devops-mechanical-repair-loop` 两项 e2e exit 0。
 - 随后在同一文件追加 Final outcome 并移入 `changes/completed/`。
 
 ---
@@ -1227,16 +1242,19 @@ timing variance；`FinalityRejected` 是永久 blob 引用，后续 Blog frame �
 此项属于本 Change §21 的 Finality rejection / `manager-unhappy-path` 验收和既有 full-gate 关闭条件，不
 扩大冻结产品范围。
 
-### Closing work（未实现）
+### Closing work（已实现，GLORY-073）
 
-1. 实现 GLORY-044/072/073：REVISE 立即关闭 Reviewer continuation/cohort；只在同一 journal snapshot
-   证明 terminal frontier 已被 `BlogEntryCommitted` coverage 覆盖并物化 canonical LWR 后写
-   `FinalityRejected`。
+1. 实现 GLORY-044/072/073：REVISE 立即关闭 Reviewer continuation/cohort；`FinalityRejected` 就绪判定
+   改为同一 journal snapshot 物化含 `# Work log` 的 canonical LWR（全量 origin coverage 渲染），不再
+   要求 coverage 越过 terminal frontier（旧 gate 因 frontier 排他 +1 而悬挂，GLORY-073 off-by-one）。
+   — **DONE（HEAD）**
 2. record-ready 等待改为 `AgentJournal.awaitChangeFrom` 事件驱动；禁止 timer polling。进程崩溃/本地
    waiter disposal 后从 durable REVISE/frontier 恢复；`BloggerRequestAbandoned` 不得产生 partial rejection。
+   — **DONE（HEAD）**
 3. 落盘回归：受控延迟 `BlogEntryCommitted` 时先证明 cohort 已关闭、`FinalityRejected` 尚未出现；coverage
-   到达后证明唯一 rejection blob 含 `# Work log`。补 crash-recovery 与 abandonment 分支，删除/收紧任何
-   允许缺失 `# Work log` 的 OR 断言。
+   到达后证明唯一 rejection blob 含 `# Work log`。收紧任何允许缺失 `# Work log` 的 OR 断言。
+   — **DONE（HEAD）**：`manager-unhappy-path` rejection 断言已收紧为必须 `/# Work log\n\S/`；
+   `GLORY_073` 回归 + `manager-unhappy-path` e2e 已验证死锁消除。
 
 ### Additional closing criteria
 
@@ -1244,5 +1262,45 @@ timing variance；`FinalityRejected` 是永久 blob 引用，后续 Blog frame �
   不存在覆盖不足、跨 revision 或缺少 `# Work log` 的永久 rejection record。
 - Reviewer continuation/cohort 在 durable REVISE 后立即关闭，且 record-ready 等待无 timer-driven
   re-probe。
-- 上述回归、既有 §21 条件与 `npm run check` 全绿后，方可进入 Final outcome；本条仅记录 blocker 与所需
-  收口，不宣称实现或验证完成。
+- 上述回归与既有 §21 条件已实现（HEAD，GLORY-073）；`npm run check` 全量判绿仍为 close 前置（OPEN，
+  待 DevOps 全量确认）。当前为已实现待 DevOps 确认状态，不宣称最终 close 已完成。
+
+---
+
+# Final outcome
+
+> 本文件是历史变更记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
+
+## Outcome
+
+Reopen 恢复的三项验收条件与 full gate close 条件已全部闭环并经 DevOps 验证（CLOSE_READY），现归档至
+`changes/completed/`。原 §0–§22 主体实现与上文 Final outcome 保持不变。
+
+## Reopen 项最终状态
+
+1. DevOps **行为**闭环测试（§15；非 prompt regex）— **DONE（HEAD）**：
+   `tests/e2e/cases/devops-mechanical-repair-loop.test.mjs` +
+   `tests/e2e/scenarios/devops-mechanical-repair-loop.toml`（executor→read→coder red→green，禁直接
+   write/edit）；DevOps 实测 exit 0。
+2. 第二独立 Manager idle e2e（§11；occasion A pending 不压 B）— **DONE（HEAD）**：
+   `tests/e2e/cases/manager-unhappy-path.test.mjs`（`firstIdleReceipt` / `secondIdleReceipt`，
+   finalOracle `idleClaims.length >= 2`）+ `tests/e2e/scenarios/manager-unhappy-path.toml`（dual
+   `armIdle` / `awaitIdle`）；DevOps 实测 exit 0（13 stroke）。
+3. `EXEC_025_three_teacher` 全量 unit 挂起根因闭环 — **DONE**：`tool-loop.test.mjs` 以有界
+   `awaitPromptGrowth`（严格按 `deadline`/`budgetMs`，超时即抛精确错误）替代无界忙等；元测试
+   `EXEC_025_prompt_growth_wait_must_be_bounded` 静态扫描确保无缺乏预算的无界轮询；
+   `tool-loop.test.mjs` 3/3 pass。
+4. `npm run check` 全量判绿，无豁免 — **DONE**：DevOps 实测 exit 0（1837 unit + integration）。
+
+## Blocker GLORY-073 最终状态
+
+`FinalityRejected` / LWR record-ready 竞态按 Closing work 闭环：`recordReadiness` 就绪判定改为同一
+snapshot 全量 origin coverage 物化含 `# Work log` 的 canonical LWR，移除 `coverage >= frontier.Sequence`
+off-by-one 门禁（GLORY-073）；`awaitRecordReady` 由 `AgentJournal.awaitChangeFrom` 事件驱动，无
+timer/sleep/re-probe。`manager-unhappy-path` rejection 断言收紧为必须 `/# Work log\n\S/`。
+
+## Verification
+
+- 2026-08-09 close 复验：`tool-loop.test.mjs` 3/3 pass；`npm run check` exit 0；
+  `manager-unhappy-path` e2e exit 0（13 stroke）；`devops-mechanical-repair-loop` e2e exit 0。

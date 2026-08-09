@@ -36,6 +36,95 @@ const idle = (sessionID) => ({
   properties: { sessionID, status: { type: 'idle' } },
 })
 
+// EXEC_025 hang root cause (harness): waiting on prompts.length without a budget.
+// When a Teacher execute does not grow `runtime.prompts` (e.g. in-flight reject),
+// an unbounded loop spins until the runner ~30s timeout. Bounded helper fails fast.
+const awaitPromptGrowth = async (prompts, index, session, budgetMs = 3000) => {
+  const timeoutMs =
+    budgetMs != null && typeof budgetMs === 'object'
+      ? (budgetMs.timeoutMs ?? budgetMs.budgetMs ?? 3000)
+      : budgetMs
+  const deadline = Date.now() + timeoutMs
+  while (prompts.length <= index) {
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `prompt[${index}] for session ${session} did not arrive within ${timeoutMs}ms (prompts.length=${prompts.length})`,
+      )
+    }
+    await new Promise((resolve) => setImmediate(resolve))
+  }
+}
+
+test('EXEC_025_awaitPromptGrowth_fails_fast_when_prompts_never_grow', async () => {
+  const BOUND_MS = 100
+  let helperError
+  const outcome = await Promise.race([
+    awaitPromptGrowth([], 0, 'ses_red', BOUND_MS).then(
+      () => 'grew',
+      (err) => {
+        helperError = err
+        return 'rejected'
+      },
+    ),
+    new Promise((resolve) => setTimeout(() => resolve('hung'), BOUND_MS + 150)),
+  ])
+  assert.equal(
+    outcome,
+    'rejected',
+    `awaitPromptGrowth must honor timeoutMs and fail fast when prompts never grow; got ${outcome}`,
+  )
+  assert.match(
+    String(helperError?.message ?? helperError),
+    /did not arrive within/,
+    'fail-fast error must name the missing prompt growth',
+  )
+})
+
+test('EXEC_025_prompt_growth_wait_must_be_bounded', () => {
+  const source = readFileSync(new URL(import.meta.url), 'utf8')
+  assert.match(source, /const awaitPromptGrowth\s*=/, 'awaitPromptGrowth helper must exist')
+  assert.match(
+    source,
+    /EXEC_025_three_teacher_calls_reuse_one_private_session_and_QA_records_raw_order[\s\S]*?await awaitPromptGrowth\(/,
+    'three_teacher must wait via awaitPromptGrowth',
+  )
+
+  const helperMatch = source.match(
+    /const awaitPromptGrowth\s*=\s*async\s*\([^)]*\)\s*=>\s*\{([\s\S]*?)\n\}/,
+  )
+  assert.ok(helperMatch, 'awaitPromptGrowth body must be parseable')
+  const helperBody = helperMatch[1]
+  assert.match(
+    helperBody,
+    /timeoutMs|budgetMs|deadline/,
+    'awaitPromptGrowth must enforce a timeout budget/deadline',
+  )
+  assert.doesNotMatch(
+    helperBody,
+    /\bvoid\s+(budgetMs|timeoutMs)\b/,
+    'budget must not be discarded',
+  )
+
+  // Detect truly unbounded busy-waits outside the helper: while + setImmediate/setTimeout
+  // without a nearby timeoutMs/budgetMs/deadline. Helper internals are excluded so a
+  // bounded poll does not false-positive.
+  const outsideHelper = source.replace(helperMatch[0], '')
+  const busyWaitBlocks = [
+    ...outsideHelper.matchAll(/while\s*\([^)]*\)\s*\{[\s\S]*?\}/g),
+  ].map((m) => m[0])
+  const unbounded = busyWaitBlocks.some(
+    (block) =>
+      /prompts\.length/.test(block) &&
+      /await\s+new\s+Promise[\s\S]*(?:setImmediate|setTimeout)/.test(block) &&
+      !/(timeoutMs|budgetMs|deadline)/.test(block),
+  )
+  assert.equal(
+    unbounded,
+    false,
+    'EXEC_025 must not unbounded-wait on runtime.prompts.length; use awaitPromptGrowth(..., { timeoutMs }) that fails fast when prompts do not grow',
+  )
+})
+
 test('EXEC_025_three_teacher_calls_reuse_one_private_session_and_QA_records_raw_order', async () => {
   await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
     const student = 'ses_student_tool_loop'
@@ -62,7 +151,7 @@ test('EXEC_025_three_teacher_calls_reuse_one_private_session_and_QA_records_raw_
         toolContext(student, `asst_student_${index}`, `call_teacher_${index}`),
       )
 
-      while (runtime.prompts.length <= index) await new Promise((resolve) => setImmediate(resolve))
+      await awaitPromptGrowth(runtime.prompts, index, student)
       const teacher = createdIds[0]
       assert.ok(teacher, 'first call must create the private Teacher')
       await awaitPrompted(teacher)

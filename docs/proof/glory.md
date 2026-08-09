@@ -32,7 +32,7 @@
 ### REVISE record-ready race（GLORY-044/072/073）
 
 1. durable REVISE 先于 reviewer `BlogEntryCommitted`：Reviewer continuation/cohort 立即关闭，且尚无 `FinalityRejected` 或 `WorkRecordRef`。
-2. 仅在 `BlogEntryCommitted` 将 `RecordCoverage` 推过该 REVISE terminal frontier 后，以同一 snapshot 物化 LWR；随后恰好一次 `FinalityRejected`，其 blob 含对应 `# Work log`。
+2. record-ready 由物化成功判定，而非 coverage 越过 frontier（GLORY-073 off-by-one 死锁）：在 snapshot 上以全量 origin coverage 物化含 `# Work log` 的 canonical LWR → `RecordReady`；物化失败且 `coverageCanAdvance` → `AwaitJournal`；否则 `RecordUnavailable` → undecided。随后恰好一次 `FinalityRejected`，其 blob 含对应 `# Work log`。
 3. 记录等待只由 `AgentJournal.awaitChangeFrom` 唤醒；结构与行为 proof 均拒绝 timer/sleep/re-probe 轮询。
 4. REVISE 后、coverage 前崩溃并恢复：不重开 cohort、不补发 challenge；后续 coverage 仍只落同一 rejection。`BloggerRequestAbandoned` 不得产出 partial rejection；无法重建证据时只能 undecided。
 
@@ -81,4 +81,4 @@ Fixture 实际字节末尾含 LF。禁止词门禁（SURFACE-005/006）覆盖 Ma
 26. Crash matrix 全部有可执行恢复证明；
 27. 所有状态来自 typed facts 与 projection，不来自故事文本。
 28. REVISE 的 cohort 关闭与 `FinalityRejected` durable 落盘分离；前者不等待 sibling，后者必经 record-ready。
-29. `FinalityRejected` 的 WorkRecordRef 来自同一 snapshot 的 covered LWR；延迟 `BlogEntryCommitted`、waiter 崩溃与 Blogger abandonment 都不得留下缺少 `# Work log` 的永久 record。
+29. `FinalityRejected` 的 WorkRecordRef 来自同一 snapshot 的 canonical LWR（全量 origin coverage 渲染）；延迟 `BlogEntryCommitted`、waiter 崩溃与 Blogger abandonment 都不得留下缺少 `# Work log` 的永久 record。

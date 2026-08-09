@@ -58,7 +58,7 @@ let reverify
 ## Slice E：失败反馈
 
 1. REVISE 首先关闭 cohort：撤销对应 Reviewer continuation capability、cancel sibling 的下一次 effect；不发 confirmation/challenge，不 Dispose 未 graduate session（GLORY-044/055）。该步骤不写 `FinalityRejected`。
-2. record-ready 等待：从 durable REVISE 重建 terminal frontier；原子取得 `(snapshot, revision)`，在该 snapshot 上同时检查 `RecordCoverage.IngestedThrough >= frontier` 与物化 canonical LWR。未同时成立则 `AgentJournal.awaitChangeFrom revision`，收到 journal change 后重读；不得以 timer、sleep、timeout 或 re-probe 推进。成立后才 `WriteBlob`，再 append `FinalityRejected`（`RejectingReviewerSessionId`），并将 `FinalityPrompt.rejected` 的拒绝 prompt 作为 `suicide` 工具结果返回（GLORY-052/053/072/073）。
+2. record-ready 等待：从 durable REVISE 重建 terminal frontier；原子取得 `(snapshot, revision)`，在该 snapshot 上以全量 origin coverage 物化 canonical LWR，并确认含 `# Work log`（`materializeRecord`）。就绪判定是「能否物化有效工作日志」，不是 `coverage >= frontier.Sequence`——frontier 为排他（lastPart+1），真实 Blogger coverage 上限只达 lastPart，旧 coverage 门禁会在 `coverageCanAdvance` 恒真时永远悬挂（GLORY-073 off-by-one 死锁）。物化成功 → `RecordReady`；物化失败但 `coverageCanAdvance`（Blogger 未 Abandoned/Retired）→ `AwaitJournal`，经 `AgentJournal.awaitChangeFrom revision` 事件驱动唤醒后重读，不得以 timer、sleep、timeout 或 re-probe 推进；否则 `RecordUnavailable` → `concludeUndecided`。就绪后才 `WriteBlob`，再 append `FinalityRejected`（`RejectingReviewerSessionId`），并将 `FinalityPrompt.rejected` 的拒绝 prompt 作为 `suicide` 工具结果返回（GLORY-052/053/072/073）。
 3. `BloggerRequestAbandoned` 只令本次记录尝试失效；reconcile 以同一 durable frontier 重新建立机会。frontier 或同 snapshot LWR 无法证明时走 `concludeUndecided`，不得用当前 head 或局部 record 代替（GLORY-056/057/073）。
 4. dedupe：continuation claim scope 由 `PromptAuthority.claimScopeDigest` 天然覆盖（GLORY-053）。
 
@@ -95,7 +95,7 @@ Orchestrator 衔接：ManagerJob 的 Manager 完成由现有 `AwaitManager` 路�
 | LifeOpened 缺 → provider request 前 | 无害；下个 transform 重开 | ✅ transform 幂等 |
 | LifeOpened 有 → 无 WorkActivated | 幂等改写 + Activation 逻辑继续 | ✅ transform + ManagerWorkflow |
 | FinalityRequested 无 enlisted member | FinalityTool「in motion」分支重启同一 request 的 FinalityController；`rosterOf` 崩溃重入不重复造新 Reviewer | ✅ |
-| REVISE 已存在但无 FinalityRejected | 从 durable evidence 重建同一 terminal frontier；cohort 继续关闭，等待 `BlogEntryCommitted` 覆盖后以同一 snapshot 物化 LWR；`BloggerRequestAbandoned` 重建记录机会，证据不足则 undecided | 目标算法 |
+| REVISE 已存在但无 FinalityRejected | 从 durable evidence 重建同一 terminal frontier；cohort 继续关闭，以全量 origin coverage 物化含 `# Work log` 的 canonical LWR；物化失败且 `coverageCanAdvance` 则等待 journal change；`BloggerRequestAbandoned` 重建记录机会，证据不足则 undecided | ✅ |
 | record-ready waiter 崩溃/Dispose | 不写 abandonment 或 lifecycle 终态；replay 后从 durable REVISE/frontier 重新订阅 journal change | 目标算法 |
 | confirmed witness 存在但无 FinalityBlessed | concludeBlessing 幂等（blessing 已存在/terminal 已记录则跳过） | ✅ |
 | LifeCompleted 存在但 terminal 未发布 | completeBlessedLife 幂等重放 | ✅ |

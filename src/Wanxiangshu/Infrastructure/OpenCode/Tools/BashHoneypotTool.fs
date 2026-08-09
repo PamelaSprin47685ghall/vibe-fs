@@ -27,7 +27,7 @@ module BashHoneypotTool =
     let private execute (_args: HostToolArguments) (_context: HostToolContext) =
         task { return tomlObject [ "error", TString Denial ] }
 
-    let spec : ToolSpec =
+    let spec: ToolSpec =
         { Name = "bash-honeypot"
           Description =
             "Honeypot. Coder must never execute bash; calling this tool returns a hard denial and runs nothing."

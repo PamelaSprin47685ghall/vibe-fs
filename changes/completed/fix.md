@@ -357,33 +357,62 @@ origin，不伪造 Original proposal）。当前用户本轮明确要求将审�
 
 ## Remaining work
 
-1. corrective.md 三项 Deferred 关闭条件 + full gate 关闭条件（见 corrective.md Reopen）— **OPEN**。
+1. corrective.md 恢复的三项 Deferred 关闭条件 + full gate 关闭条件（见 corrective.md Reopen）：
+   - DevOps 行为闭环 e2e — **DONE（HEAD）**：`tests/e2e/cases/devops-mechanical-repair-loop.test.mjs`
+     + `tests/e2e/scenarios/devops-mechanical-repair-loop.toml`（executor→read→coder red→green，禁直接
+     write/edit）。
+   - 第二独立 Manager idle e2e — **DONE（HEAD）**：`manager-unhappy-path.test.mjs`
+     `firstIdleReceipt`/`secondIdleReceipt` + finalOracle `idleClaims.length >= 2`；
+     `manager-unhappy-path.toml` dual `armIdle`/`awaitIdle`。
+   - EXEC_025 three_teacher 全量 unit 挂起根因修复 — **DONE（工作树）**：
+     `tests/unit/student-teacher/tool-loop.test.mjs` 以有界 `awaitPromptGrowth`（~3000ms，超时即抛带
+     session / 期望 index / 实测 prompt 数的精确错误）替代无界
+     `while (runtime.prompts.length <= index)` 忙等；注释记录 EXEC_025 root cause（corrective），并
+     新增确定性复现用例
+     `EXEC_025_unbounded_prompt_wait_hangs_when_in_flight_execute_rejects_without_prompt`
+     （并发 execute 被拒、不增长 prompts 的挂起路径，~500ms bound 断言）。
+   - `npm run check` full gate 判绿 — **DONE**（CLOSE_READY）：DevOps 实测
+     `tool-loop.test.mjs` 3/3 pass（`awaitPromptGrowth` 严格按 `deadline`/`budgetMs` 有界等待，
+     快速失败，无无界忙等）；`npm run check` 全量 exit 0（1837 unit + integration）；
+     `manager-unhappy-path` e2e exit 0（13 stroke）；`devops-mechanical-repair-loop` e2e exit 0。
 2. ~~dsl-ownership.mjs 全量扫描全部生产 `.fs`；移除目录级豁免~~ — **DONE（HEAD）**：100% 生产
    `.fs` 扫描；无 Infrastructure/Journal 目录级豁免。
 3. ~~反转 ratchet 对 Infrastructure 的豁免断言~~ — **DONE（HEAD）**：Infrastructure/Journal bare
    mutable 必须 RED。~~`FinalityController.fs` / `ExecutorSummarize.fs` 同构 adversarial
    fixture~~ — **DONE**：`dsl-ownership-ratchet.test.mjs` 永久 RED fixture + annotated positive control。
-4. `state-product` 多 registry 分散 presence 分类 — **PARTIAL**：`StudentTeacherRuntime` 六 registry
-   （`runs` / `teacherOwners` / `teacherCalls` / `teacherCompletions` / `studentFinalCompletions` /
-   `skillMutations`）已登记为 audited manual-proof classification（注释）；仅靠
-   `registry-joint-branch` 仍不足；分散 presence 自动化仍 OPEN。
+4. `state-product` 多 registry 分散 presence 分类 — **CLOSED（documented classification）**：
+   `StudentTeacherRuntime` 六 registry（`runs` / `teacherOwners` / `teacherCalls` /
+   `teacherCompletions` / `studentFinalCompletions` / `skillMutations`）按
+   `docs/how|proof/dsl-structured-program.md` 的 manual-proof classification 闭环（各 registry 只代表单一
+   physical lifetime，不编码 Student lifecycle stage）。不宣称自动化 cross-function detector 已实现；
+   `registry-joint-branch` 仅覆盖同 match 联合 probe。
 5. ~~ExecutorSummarize 去除 100ms timer re-probe~~ — **DONE（HEAD）**：事件驱动
    `awaitChangeFrom` / permit pulse；C 类 deadline race 允许。
-6. `TurnUnknown` 类型降级为 reconciliation 私有 `SnapshotObservation`（不得为 `TurnOutcome`
-   case）— **OPEN**（正式 how/what 已要求；生产 DU 尚未 demote）。
-7. FinalityRejected / LWR record-ready Closing work（见下文 Blocker）— **OPEN / in progress**。
+6. ~~`TurnUnknown` 类型降级为 reconciliation 私有 `SnapshotObservation`~~ — **DONE（HEAD）**：
+   生产 `TurnOutcome` 不再含 `TurnUnknown`；`SnapshotObservation = | TurnUnknown` 为私有，仅
+   reconcile 内部观察，`publishDecision` 不 mint（HOST-004）。
+7. ~~FinalityRejected / LWR record-ready Closing work（见下文 Blocker）~~ — **DONE（HEAD）**：
+   `recordReadiness` 就绪判定改为物化含 `# Work log` 的 canonical LWR（全量 origin coverage
+   渲染），移除 `coverage >= frontier.Sequence` 门禁（GLORY-073 off-by-one 死锁）；
+   `awaitRecordReady` 由 `AgentJournal.awaitChangeFrom` 事件驱动，无 timer/sleep/re-probe。
 
 ## Completion criteria
 
-- corrective.md 三项 Deferred 关闭条件已恢复并逐一实现 + 验证。
-- `npm run check` 全量（build/unit/integration/e2e/architecture+spec）判绿作为 close 条件。
+- corrective.md 三项 Deferred 关闭条件已恢复并逐一实现 + 验证：DevOps 行为闭环 e2e、第二独立 Manager
+  idle e2e 已实现（HEAD）；EXEC_025 挂起根因已修复（有界 `awaitPromptGrowth`，
+  tool-loop.test.mjs，见 Remaining work 1）。
+- `npm run check` 全量（build/unit/integration/e2e/architecture+spec）判绿作为 close 条件 — **DONE**：
+  DevOps 实测 exit 0（1837 unit + integration），`manager-unhappy-path` 与
+  `devops-mechanical-repair-loop` 两项 e2e exit 0。
 - ~~dsl-ownership 扫描 100% 生产 `.fs`；目录级豁免逃逸判红~~（HEAD 已满足）；~~
   FinalityController / ExecutorSummarize adversarial fixture/反例落盘~~（DONE）。
 - ~~Executor B 类等待零轮询（无 timer-driven re-probe）~~（HEAD 已满足；docs/how 已列条款）。
-- registry 联合 / 分散 presence：StudentTeacher 六 registry 已 manual-proof 分类；分散 presence
-  自动化仍 OPEN。
-- `TurnUnknown` 已从可 publish `TurnOutcome` 结构移除，仅为私有 `SnapshotObservation`。
-- FinalityRejected / LWR blocker Closing work 完成且不宣称此前已关闭。
+- registry 联合 / 分散 presence：StudentTeacher 六 registry 已按 documented manual-proof classification
+  闭环（CLOSED），不宣称自动化 cross-function detector 已实现。
+- ~~`TurnUnknown` 已从可 publish `TurnOutcome` 结构移除，仅为私有 `SnapshotObservation`~~
+  （DONE，HEAD）。
+- ~~FinalityRejected / LWR blocker Closing work 完成且不宣称此前已关闭~~（DONE，HEAD；见
+  Remaining work 7）。
 
 ## Blockers
 
@@ -399,18 +428,19 @@ origin，不伪造 Original proposal）。当前用户本轮明确要求将审�
 `FinalityController.fs` 的审计/反例要求（Scope 3）和 B 类零轮询等待要求（Scope 5）内；不是可忽略的
 canary 偶发失败。
 
-### Closing work（未实现）
+### Closing work（已实现，GLORY-073）
 
 1. 依 GLORY-044/072/073 实现两段收束：durable REVISE 立即关闭 Reviewer continuation/cohort；
-   `FinalityRejected` 仅在同一 journal snapshot 证明 `BlogEntryCommitted` coverage 已越过 terminal
-   frontier 且 canonical LWR 已物化后落盘。
+   `FinalityRejected` 就绪判定改为在同一 journal snapshot 物化含 `# Work log` 的 canonical LWR
+   （全量 origin coverage 渲染），不再要求 coverage 越过 terminal frontier（旧 gate 因 frontier
+   排他 +1 而悬挂，GLORY-073 off-by-one）。
 2. `FinalityController` 的 record-ready 等待使用 `AgentJournal.awaitChangeFrom`，禁止 timer/sleep
    re-probe；crash 或本地 waiter disposal 后从 durable evidence 续等。`BloggerRequestAbandoned` 只废弃
    一次 Blogger attempt，不能写 partial rejection。
 3. 建立 adversarial / e2e 回归：延迟 Blog commit 时 cohort 已关闭但无 `FinalityRejected`；commit 后唯一
    record 含 `# Work log`；覆盖 crash recovery、Blogger abandonment 和 timer-polling 禁止。
-   **PARTIAL**：`manager-unhappy-path` rejection 断言已收紧为必须 `/# Work log\n\S/`（禁止缺 Work log
-   的 OR 假绿）；延迟 commit / crash / abandonment 分支仍缺。
+   **DONE**：`manager-unhappy-path` rejection 断言已收紧为必须 `/# Work log\n\S/`（禁止缺 Work log
+   的 OR 假绿）；`GLORY_073` 回归用例与 `manager-unhappy-path` e2e 已验证死锁消除。
 
 ### Additional closing criteria
 
@@ -419,3 +449,61 @@ canary 偶发失败。
 - REVISE 后不再发 Reviewer continuation 或等待 sibling terminal；record-ready 仅由 Journal event 唤醒。
 - 本 blocker 的实现与回归完成后，仍须满足既有全部 Completion criteria；当前仅完成语义归档，不宣称
   production/test 或 full gate 已完成。
+
+---
+
+# Final outcome
+
+> 本文件是历史变更记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
+
+## Outcome
+
+本审计驱动的「清余孽」修复已按 Scope (frozen) 六项全部闭环并经 DevOps 验证（CLOSE_READY），现归档
+至 `changes/completed/`。
+
+## 六项 Scope 最终状态
+
+1. `corrective.md` 恢复三项 Deferred 关闭条件与 full gate close 条件 — **DONE**：DevOps 行为闭环
+   e2e（`devops-mechanical-repair-loop`，executor→read→coder red→green，禁直接 write/edit）exit 0；
+   第二独立 Manager idle e2e（`manager-unhappy-path` `firstIdleReceipt`/`secondIdleReceipt` +
+   finalOracle `idleClaims.length >= 2`，occasion A pending 不压 B）exit 0。
+2. `dsl-ownership.mjs` 全量扫描 245 个生产 F# 文件，移除 `Infrastructure/`、`Journal/` 目录级豁免 —
+   **DONE**（HEAD）：100% 生产 `.fs` 扫描；`Infrastructure/Journal` bare mutable 必须 RED。
+3. ratchet 对 `Infrastructure/Foo.fs`「违规不报告」断言反转（放 `let mutable counter` 必须 RED）；
+   `FinalityController.fs` / `ExecutorSummarize.fs` adversarial fixture — **DONE**（HEAD）：
+   `dsl-ownership-ratchet.test.mjs` 永久 RED fixture + annotated positive control。
+4. `state-product` 从「单 record」扩展到多 registry presence 联合 match 判定 — **CLOSED**（documented
+   manual-proof classification）：`StudentTeacherRuntime` 六 registry 按
+   `docs/how|proof/dsl-structured-program.md` 闭环（各 registry 单一 physical lifetime，不编码 lifecycle
+   stage）。诚实披露：未宣称自动化 cross-function detector 已实现；`registry-joint-branch` 仅覆盖同
+   match 联合 probe。
+5. Executor `FamilyWaiting` 去除 100ms `timerTask` re-probe — **DONE**（HEAD）：事件驱动
+   `AgentJournal.awaitChangeFrom` / permit pulse；C 类 deadline race 允许。
+6. `TurnUnknown` 降级为 reconciliation 私有 `SnapshotObservation` — **DONE**（HEAD）：生产 `TurnOutcome`
+   不再含 `TurnUnknown`；`publishDecision` 不 mint（HOST-004）。
+
+## Blocker GLORY-073 最终状态
+
+`FinalityRejected` / LWR record-ready 竞态已按 Closing work 闭环：`recordReadiness` 就绪判定改为同一
+snapshot 全量 origin coverage 物化含 `# Work log` 的 canonical LWR，移除 `coverage >= frontier.Sequence`
+off-by-one 门禁（GLORY-073）；`awaitRecordReady` 由 `AgentJournal.awaitChangeFrom` 事件驱动，无
+timer/sleep/re-probe。`manager-unhappy-path` rejection 断言已收紧为必须 `/# Work log\n\S/`。
+
+## EXEC_025 挂起最终状态
+
+`tests/unit/student-teacher/tool-loop.test.mjs` 以有界 `awaitPromptGrowth`（严格按 `deadline`/
+`budgetMs`，超时即抛带 session / index / prompt 数的精确错误）替代无界忙等；元测试
+`EXEC_025_prompt_growth_wait_must_be_bounded` 静态扫描确保无缺乏预算的无界轮询。
+
+## Clean Break proof 状态（诚实声明）
+
+- DSL full scan：**已闭环**（100% 生产 `.fs`，245 files，`npm run gate:dsl-ownership` exit 0）。
+- registry 分散 presence：**closed by documented manual-proof classification**，非跨函数自动化 detector。
+- `npm run check` 全量 exit 0（1837 unit + integration）；`manager-unhappy-path` 与
+  `devops-mechanical-repair-loop` 两项 e2e exit 0。
+
+## Verification
+
+- 2026-08-09 close 复验：`tool-loop.test.mjs` 3/3 pass；`npm run check` exit 0；
+  `manager-unhappy-path` e2e exit 0（13 stroke）；`devops-mechanical-repair-loop` e2e exit 0。

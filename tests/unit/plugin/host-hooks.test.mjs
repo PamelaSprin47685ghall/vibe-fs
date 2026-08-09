@@ -243,6 +243,7 @@ test('HOST_009_the_tool_registry_is_a_registry_not_a_triggered_hook', async () =
 
     const toolNames = Object.keys(hooks.tool).sort()
     assert.deepEqual(toolNames, [
+      'bash-honeypot',
       'blog',
       'coder',
       'executor',
