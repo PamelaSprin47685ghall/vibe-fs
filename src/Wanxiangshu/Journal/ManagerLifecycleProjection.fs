@@ -63,16 +63,18 @@ type SiblingSteerEvidence =
 
 /// GLORY-011: one FinalityRequest's derived view inside a Life.
 type FinalityRequestProjection =
-    { RequestId: FinalityRequestId
-      GitTreeHash: GitTreeHash
-      LastWordsRef: BlobRef
-      LastWordsDigest: BlobDigest
-      ProviderRun: ProviderRunIdentity
-      ToolCallId: ToolCallId
-      Members: Map<SessionId, ReviewMemberRef>
-      /// GLORY-044: sibling steers recorded for this request; does not affect Resolution.
-      SiblingSteers: Map<SessionId, SiblingSteerEvidence>
-      Resolution: FinalityResolution }
+    {
+        RequestId: FinalityRequestId
+        GitTreeHash: GitTreeHash
+        LastWordsRef: BlobRef
+        LastWordsDigest: BlobDigest
+        ProviderRun: ProviderRunIdentity
+        ToolCallId: ToolCallId
+        Members: Map<SessionId, ReviewMemberRef>
+        /// GLORY-044: sibling steers recorded for this request; does not affect Resolution.
+        SiblingSteers: Map<SessionId, SiblingSteerEvidence>
+        Resolution: FinalityResolution
+    }
 
 /// GLORY-011: one Manager Life's derived view. Answers "who is the current
 /// Life, is it activated, where is the compression floor, is a suicide active,

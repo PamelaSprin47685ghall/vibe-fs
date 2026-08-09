@@ -354,12 +354,7 @@ module FinalityController =
                 // Cancel after a durable REVISE must still return Ok so reverify
                 // can readOutcome → RevisionRequired (not CannotAwaitReviewer).
                 let promoteCancelled error =
-                    if
-                        hasDurableRevisionRequired
-                            journal
-                            memberInfo.ReviewerSessionId
-                            memberInfo.BarrierId
-                    then
+                    if hasDurableRevisionRequired journal memberInfo.ReviewerSessionId memberInfo.BarrierId then
                         Ok()
                     else
                         Error error
@@ -584,6 +579,7 @@ module FinalityController =
         (records: (SessionId * ReviewBarrierId * string) list)
         : Result<(SessionId * string) list, string> =
         let snapshot = AgentJournal.snapshot journal
+
         let existingSteers =
             tryActiveFinality snapshot managerSessionId requestId
             |> Option.map (fun active -> active.SiblingSteers)
@@ -600,20 +596,12 @@ module FinalityController =
                         match Map.tryFind reviewerSessionId existingSteers with
                         | Some evidence ->
                             match journal.Writer.BlobWriter.Read evidence.WorkRecordRef with
-                            | Ok text ->
-                                Ok(
-                                    prepared
-                                    @ [ reviewerSessionId, barrierId, text, None ]
-                                )
+                            | Ok text -> Ok(prepared @ [ reviewerSessionId, barrierId, text, None ])
                             | Error reason -> Error reason
                         | None ->
                             match journal.WriteBlob workRecord with
                             | Error reason -> Error reason
-                            | Ok blob ->
-                                Ok(
-                                    prepared
-                                    @ [ reviewerSessionId, barrierId, workRecord, Some blob ]
-                                ))
+                            | Ok blob -> Ok(prepared @ [ reviewerSessionId, barrierId, workRecord, Some blob ]))
                 (Ok [])
 
         match preparedResult with
@@ -695,8 +683,7 @@ module FinalityController =
                         rejectingReviewer
                         barrierId
             | Ok records ->
-                let! primaryStaged =
-                    stagePrimaryRejectionRecord journal rejectingReviewer barrierId
+                let! primaryStaged = stagePrimaryRejectionRecord journal rejectingReviewer barrierId
 
                 match primaryStaged with
                 | Error _ ->
@@ -712,15 +699,7 @@ module FinalityController =
                             rejectingReviewer
                             barrierId
                 | Ok(workRecord, primaryBlob) ->
-                    match
-                        commitSiblingSteerFacts
-                            journal
-                            managerSessionId
-                            lifeId
-                            requestId
-                            requestTree
-                            records
-                    with
+                    match commitSiblingSteerFacts journal managerSessionId lifeId requestId requestTree records with
                     | Error _ ->
                         return!
                             concludeUndecided
@@ -777,26 +756,14 @@ module FinalityController =
                     | Error _ ->
                         // Blob gone: one-shot rematerialize from durable journal
                         // evidence (no await loop — request is already sealed).
-                        match
-                            recordReadiness
-                                journal
-                                snapshot
-                                reviewerSessionId
-                                evidence.BarrierId
-                                true
-                        with
+                        match recordReadiness journal snapshot reviewerSessionId evidence.BarrierId true with
                         | RecordReady record -> Some record
                         | AwaitJournal
                         | RecordUnavailable _ -> None
 
                 match workRecordOpt with
                 | Some workRecord ->
-                    do!
-                        sendSiblingSteerContinuations
-                            scope
-                            journal
-                            managerSessionId
-                            [ reviewerSessionId, workRecord ]
+                    do! sendSiblingSteerContinuations scope journal managerSessionId [ reviewerSessionId, workRecord ]
                 | None ->
                     // Accounted sibling still undeliverable: Manager-visible
                     // comment-only failure — do not pretend the evidence arrived.
@@ -989,13 +956,7 @@ module FinalityController =
                             |> List.map (fun (sid, evidence) -> sid, evidence.BarrierId)
 
                         if not (List.isEmpty siblings) then
-                            do!
-                                steerSiblingRevisions
-                                    scope
-                                    journal
-                                    managerSessionId
-                                    requestId
-                                    siblings
+                            do! steerSiblingRevisions scope journal managerSessionId requestId siblings
 
                         return None
                 with _ ->

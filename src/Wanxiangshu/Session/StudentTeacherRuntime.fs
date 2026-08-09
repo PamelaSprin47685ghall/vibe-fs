@@ -28,30 +28,35 @@ type private StudentRun =
     { SessionId: SessionId
       LogicalRunId: LogicalRunId
       Agent: string
-      Tier: AgentTier }
+      Tier: AgentTier
+      CompileNudges: int }
 
-type private TeacherCallScope =
+type private TeacherAnswer =
+    { Answer: string
+      ToolRun: ProviderRunIdentity }
+
+/// In-flight teacher call: delivery address + CE await points (Returned, Completion).
+/// Nudges is a physical auto-recovery budget counter (EXEC-027), not a lifecycle stage.
+type private TeacherCall =
     { Student: StudentRun
       Teacher: SessionId
-      Waiter: TaskCompletionSource<Result<string, string>> }
+      Returned: TaskCompletionSource<Result<TeacherAnswer, string>>
+      Completion: TaskCompletionSource<Result<unit, string>>
+      Nudges: int }
 
-type private TeacherCompletionScope =
-    { Call: TeacherCallScope
-      ToolRun: ProviderRunIdentity
-      Answer: string
-      CompletionRun: ProviderRunIdentity option }
+/// TextComplete rewrite arm only — presence must not select HandleTurn branches.
+type private PendingCompletionText =
+    { Text: string
+      ToolRun: ProviderRunIdentity }
 
-type private StudentFinalCompletionScope =
-    { ProviderRun: ProviderRunIdentity
-      Message: string }
-
-/// Audited manual-proof classification (physical lifetimes, not stage encoding):
-/// the six registries below — `runs`, `teacherOwners`, `teacherCalls`,
-/// `teacherCompletions`, `studentFinalCompletions`, `skillMutations` — each own
-/// one physical lifetime only (a teacher call, teacher completion, final
-/// completion, or observed skill mutation). HandleTurn / observe paths MUST NOT
-/// jointly match presence across these registries as an implicit program counter.
-/// Student facts remain durable; no registry encodes a Student lifecycle stage.
+/// Registries after CE collapse / durable-evidence revise:
+/// - `runs` — physical Student lifetime + delivery address
+/// - `teacherCalls` — in-flight teacher call delivery + EXEC-027 single-flight latch
+/// - `pendingCompletionTexts` — TextComplete rewrite arm (not a HandleTurn PC)
+/// - `skillMutations` — observed skill write/edit evidence
+/// Deleted: `teacherOwners` (durable association is sole truth), `teacherCompletions`
+/// (answer+confirm live on TeacherCall CE stack). No function may jointly probe two
+/// registry presences to choose an effect branch.
 type StudentTeacherRuntime
     (
         sessions: ISessionHostPort,
@@ -65,13 +70,14 @@ type StudentTeacherRuntime
     ) =
     let gate = obj ()
     let runs = Dictionary<string, StudentRun>()
-    let teacherOwners = Dictionary<string, string>()
-    let teacherCalls = Dictionary<string, TeacherCallScope>()
-    let teacherCompletions = Dictionary<string, TeacherCompletionScope>()
-    let studentFinalCompletions = Dictionary<string, StudentFinalCompletionScope>()
+    let teacherCalls = Dictionary<string, TeacherCall>()
+    let pendingCompletionTexts = Dictionary<string, PendingCompletionText>()
     let skillMutations = Dictionary<string, Map<string, string>>()
+    let recoveryBudget = AgentPairCursor.DefaultAutoRecoveryBudget
 
     let sessionKey (sessionId: SessionId) = SessionId.value sessionId
+
+    let normalizePayload (text: string) = if isNull text then "" else text.Trim()
 
     let appendFact owner fact =
         AgentJournal.appendAgent (StreamId.Session owner) None fact journal
@@ -91,13 +97,9 @@ type StudentTeacherRuntime
                 {| SessionId = owner
                    TeacherSessionId = teacher
                    TeacherAgent = agent |})
-        |> Result.map (fun () -> lock gate (fun () -> teacherOwners.[sessionKey teacher] <- sessionKey owner))
 
     let closeTeacher owner =
         appendFact owner (CompanionFact.StudentTeacherClosed {| SessionId = owner |})
-        |> Result.map (fun () ->
-            restoredTeacher owner
-            |> Option.iter (fun teacher -> lock gate (fun () -> teacherOwners.Remove(sessionKey teacher) |> ignore)))
 
     let teacherSpec run =
         let agent = teacherAgent run
@@ -120,14 +122,34 @@ type StudentTeacherRuntime
         AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
         |> Option.bind (fun session -> session.PromptAuthority)
         |> Option.map (fun authority ->
-            authority.AcceptedContinuationIds
-            |> Map.toSeq
-            |> Seq.map snd
-            |> Seq.tryPick (function
-                | PromptAuthority.ContinuationKind.StudentCompile
-                | PromptAuthority.ContinuationKind.StudentCompileNudge -> Some ProviderRequestKind.StudentCompile
-                | _ -> None)
-            |> Option.defaultValue ProviderRequestKind.StudentLearn)
+            let fromAccepted =
+                authority.AcceptedContinuationIds
+                |> Map.toSeq
+                |> Seq.map snd
+                |> Seq.tryPick (function
+                    | PromptAuthority.ContinuationKind.StudentCompile
+                    | PromptAuthority.ContinuationKind.StudentCompileNudge -> Some ProviderRequestKind.StudentCompile
+                    | _ -> None)
+
+            match fromAccepted with
+            | Some kind -> kind
+            | None ->
+                // Claimed-but-not-Accepted must not fall through to Learn (ce.md).
+                let claimedCompile =
+                    authority.PendingClaims
+                    |> Map.toSeq
+                    |> Seq.map snd
+                    |> Seq.exists (fun claim ->
+                        match claim.Origin with
+                        | PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.StudentCompile
+                        | PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.StudentCompileNudge ->
+                            true
+                        | _ -> false)
+
+                if claimedCompile then
+                    ProviderRequestKind.StudentCompile
+                else
+                    ProviderRequestKind.StudentLearn)
 
     let tryRun sessionId =
         lock gate (fun () ->
@@ -136,29 +158,50 @@ type StudentTeacherRuntime
             | false, _ -> None)
 
     let tryOwner teacher =
-        lock gate (fun () ->
-            match teacherOwners.TryGetValue(sessionKey teacher) with
-            | true, owner -> Some(SessionId.create owner)
-            | false, _ ->
-                (AgentJournal.snapshot journal).AgentProjections.Associations
-                |> SessionAssociationProjection.tryOwnerOf teacher)
+        (AgentJournal.snapshot journal).AgentProjections.Associations
+        |> SessionAssociationProjection.tryOwnerOf teacher
 
     let tryTeacherCall student =
         lock gate (fun () ->
             match teacherCalls.TryGetValue(sessionKey student) with
-            | true, scope -> Some scope
+            | true, call -> Some call
             | false, _ -> None)
 
-    let tryTeacherCompletion teacher =
+    let tryTeacherCallByTeacher teacher =
+        lock gate (fun () -> teacherCalls.Values |> Seq.tryFind (fun call -> call.Teacher = teacher))
+
+    let tryPendingText sessionId =
         lock gate (fun () ->
-            match teacherCompletions.TryGetValue(sessionKey teacher) with
-            | true, scope -> Some scope
+            match pendingCompletionTexts.TryGetValue(sessionKey sessionId) with
+            | true, pending -> Some pending
             | false, _ -> None)
 
-    let tryFinalCompletion student =
+    let armPendingText sessionId pending =
+        lock gate (fun () -> pendingCompletionTexts.[sessionKey sessionId] <- pending)
+
+    let clearPendingText sessionId =
+        lock gate (fun () -> pendingCompletionTexts.Remove(sessionKey sessionId) |> ignore)
+
+    let updateTeacherCall student (update: TeacherCall -> TeacherCall) =
         lock gate (fun () ->
-            match studentFinalCompletions.TryGetValue(sessionKey student) with
-            | true, scope -> Some scope
+            let key = sessionKey student
+
+            match teacherCalls.TryGetValue key with
+            | true, current ->
+                let next = update current
+                teacherCalls.[key] <- next
+                Some next
+            | false, _ -> None)
+
+    let updateStudentRun student (update: StudentRun -> StudentRun) =
+        lock gate (fun () ->
+            let key = sessionKey student
+
+            match runs.TryGetValue key with
+            | true, current ->
+                let next = update current
+                runs.[key] <- next
+                Some next
             | false, _ -> None)
 
     let skillDocuments student =
@@ -188,6 +231,13 @@ type StudentTeacherRuntime
                         with ex ->
                             Error(sprintf "%s: SKILL.md UTF-8 read failed: %s" path ex.Message)))
                 (Ok())
+
+    let failTeacherCall (call: TeacherCall) (error: string) =
+        AsyncSupport.trySetResult call.Returned (Error error) |> ignore
+        AsyncSupport.trySetResult call.Completion (Error error) |> ignore
+
+    let removeTeacherCall student =
+        lock gate (fun () -> teacherCalls.Remove(sessionKey student) |> ignore)
 
     let sendTeacherPrompt run (lease: SatelliteLease) question =
         task {
@@ -283,8 +333,43 @@ type StudentTeacherRuntime
         lock gate (fun () ->
             runs.Remove(sessionKey student) |> ignore
             teacherCalls.Remove(sessionKey student) |> ignore
-            studentFinalCompletions.Remove(sessionKey student) |> ignore
+            pendingCompletionTexts.Remove(sessionKey student) |> ignore
             skillMutations.Remove(sessionKey student) |> ignore)
+
+    /// Registers the call under `teacherCalls` and fails unsettled waiters on dispose
+    /// if the entry is still owned by this registration (send-fail / abandon paths).
+    let beginTeacherCall (run: StudentRun) (teacher: SessionId) : TeacherCall * IDisposable =
+        let returned =
+            TaskCompletionSource<Result<TeacherAnswer, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+        let completion =
+            TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+        let call =
+            { Student = run
+              Teacher = teacher
+              Returned = returned
+              Completion = completion
+              Nudges = 0 }
+
+        let key = sessionKey run.SessionId
+        lock gate (fun () -> teacherCalls.[key] <- call)
+
+        let registration =
+            { new IDisposable with
+                member _.Dispose() =
+                    let stillOwned =
+                        lock gate (fun () ->
+                            match teacherCalls.TryGetValue key with
+                            | true, current when Object.ReferenceEquals(current.Returned, call.Returned) ->
+                                teacherCalls.Remove key |> ignore
+                                true
+                            | _ -> false)
+
+                    if stillOwned then
+                        failTeacherCall call "Teacher call scope disposed" }
+
+        call, registration
 
     member _.ObserveChatMessage(message: PromptIngressCodec.DecodedMessage) : Result<unit, string> =
         match message.SessionId, message.PhysicalUserMessageId, message.PromptKey, message.Text with
@@ -303,7 +388,8 @@ type StudentTeacherRuntime
                                 { SessionId = sessionId
                                   LogicalRunId = profile.LogicalRunId
                                   Agent = profile.SelectedAgent
-                                  Tier = profile.SelectedTier }
+                                  Tier = profile.SelectedTier
+                                  CompileNudges = 0 }
 
                             runs.[sessionKey sessionId] <- created
                             created)
@@ -326,9 +412,6 @@ type StudentTeacherRuntime
             | Some run when currentStudentRequestKind student <> Some ProviderRequestKind.StudentLearn ->
                 return Error "teacher rejected: Student is not in StudentLearn"
             | Some run ->
-                let waiter =
-                    TaskCompletionSource<Result<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
-
                 let claimed =
                     lock gate (fun () -> not (teacherCalls.ContainsKey(sessionKey student)))
 
@@ -343,24 +426,29 @@ type StudentTeacherRuntime
                             satellites.Invalidate(run.SessionId, SatelliteKind.Teacher)
                             return Error error
                         | Ok lease ->
-                            let scope =
-                                { Student = run
-                                  Teacher = lease.SessionId
-                                  Waiter = waiter }
+                            let call, registration = beginTeacherCall run lease.SessionId
 
-                            lock gate (fun () ->
-                                teacherCalls.[sessionKey student] <- scope
-                                teacherOwners.[sessionKey lease.SessionId] <- sessionKey student)
+                            use _registration = registration
 
                             onTeacherReady lease.SessionId (teacherAgent run)
 
                             match! sendTeacherPrompt run lease question with
                             | Error error ->
-                                lock gate (fun () -> teacherCalls.Remove(sessionKey student) |> ignore)
+                                failTeacherCall call error
+                                removeTeacherCall student
                                 return Error error
                             | Ok _ ->
-                                let! answer = waiter.Task
-                                return answer |> Result.map StudentTeacherPrompt.teacherAnswerResult
+                                // CE stack owns the handshake: return payload then fixed completion.
+                                let! returned = call.Returned.Task
+
+                                match returned with
+                                | Error error -> return Error error
+                                | Ok answer ->
+                                    let! confirmed = call.Completion.Task
+
+                                    return
+                                        confirmed
+                                        |> Result.map (fun () -> StudentTeacherPrompt.teacherAnswerResult answer.Answer)
         }
 
     member _.Return
@@ -371,25 +459,32 @@ type StudentTeacherRuntime
 
             match activeProfile sessionId with
             | Some profile when profile.CanonicalRole = Role.Teacher ->
-                match tryOwner sessionId |> Option.bind tryTeacherCall, providerRunId with
+                match
+                    (tryOwner sessionId
+                     |> Option.bind tryTeacherCall
+                     |> Option.orElseWith (fun () -> tryTeacherCallByTeacher sessionId)),
+                    providerRunId
+                with
                 | None, _ -> return Error "return rejected: Teacher has no active Student owner"
                 | Some _, None -> return Error "return rejected: Host provided no Teacher provider-run identity"
                 | Some call, Some toolRun when call.Teacher <> sessionId ->
                     return Error "return rejected: Teacher does not own the active Student call"
                 | Some call, Some toolRun ->
-                    match tryTeacherCompletion sessionId with
-                    | Some _ -> return Error "return rejected: Teacher return completion is already pending"
-                    | None ->
+                    // Fable Task has no IsCompleted — pending rewrite arm is the duplicate latch.
+                    if tryPendingText sessionId |> Option.isSome then
+                        return Error "return rejected: Teacher return completion is already pending"
+                    else
                         match qa.Append(call.Student.SessionId, call.Student.LogicalRunId, message) with
                         | Error error -> return Error error
                         | Ok _ ->
-                            let completion =
-                                { Call = call
-                                  ToolRun = toolRun
-                                  Answer = message
-                                  CompletionRun = None }
+                            armPendingText
+                                sessionId
+                                { Text = StudentTeacherPrompt.TeacherReturnCompletion
+                                  ToolRun = toolRun }
 
-                            lock gate (fun () -> teacherCompletions.[sessionKey sessionId] <- completion)
+                            AsyncSupport.trySetResult call.Returned (Ok { Answer = message; ToolRun = toolRun })
+                            |> ignore
+
                             return Ok StudentTeacherPrompt.teacherReturnResult
 
             | Some profile when profile.CanonicalRole = Role.Student ->
@@ -398,7 +493,7 @@ type StudentTeacherRuntime
                 | Some _, None, _ -> return Error "return rejected: Host provided no provider-run identity"
                 | Some _, Some _, Some kind when kind <> ProviderRequestKind.StudentCompile ->
                     return Error "return rejected: Student is not in StudentCompile"
-                | Some run, Some providerRun, _ when tryFinalCompletion sessionId |> Option.isSome ->
+                | Some run, Some providerRun, _ when tryPendingText sessionId |> Option.isSome ->
                     return Error "return rejected: final completion is already pending"
                 | Some run, Some providerRun, _ ->
                     match validateTouchedSkills run with
@@ -407,10 +502,10 @@ type StudentTeacherRuntime
                         match qa.Delete(run.SessionId, run.LogicalRunId) with
                         | Error error -> return Error error
                         | Ok() ->
-                            lock gate (fun () ->
-                                studentFinalCompletions.[sessionKey sessionId] <-
-                                    { ProviderRun = providerRun
-                                      Message = message })
+                            armPendingText
+                                sessionId
+                                { Text = message
+                                  ToolRun = providerRun }
 
                             return Ok(StudentTeacherPrompt.finalReturnResult message)
             | _ -> return Error "return rejected: role is neither active Student nor Teacher"
@@ -423,22 +518,11 @@ type StudentTeacherRuntime
             && not (isNull input?messageID)
         then
             let sessionId = SessionId.create (unbox<string> input?sessionID)
+            let completionRun = ProviderRunIdentity.create (unbox<string> input?messageID)
 
-            match tryFinalCompletion sessionId with
-            | Some completion -> output?text <- completion.Message
-            | None ->
-                match tryTeacherCompletion sessionId with
-                | None -> ()
-                | Some completion ->
-                    let completionRun = ProviderRunIdentity.create (unbox<string> input?messageID)
-
-                    if completionRun <> completion.ToolRun then
-                        lock gate (fun () ->
-                            teacherCompletions.[sessionKey sessionId] <-
-                                { completion with
-                                    CompletionRun = Some completionRun })
-
-                        output?text <- StudentTeacherPrompt.TeacherReturnCompletion
+            match tryPendingText sessionId with
+            | Some pending when completionRun <> pending.ToolRun -> output?text <- pending.Text
+            | _ -> ()
 
     member _.ValidateTool(input: obj, output: obj) : Result<unit, string> =
         if isNull input || isNull input?sessionID || isNull input?tool then
@@ -451,7 +535,7 @@ type StudentTeacherRuntime
             | Some profile when profile.CanonicalRole = Role.Student ->
                 match tryRun sessionId with
                 | None -> Error "Student tool rejected: no active QA-backed run"
-                | Some _ when tryFinalCompletion sessionId |> Option.isSome ->
+                | Some _ when tryPendingText sessionId |> Option.isSome ->
                     Error "Student tool rejected: final text completion is already expected"
                 | Some run ->
                     let requestKind =
@@ -493,7 +577,7 @@ type StudentTeacherRuntime
             | Some profile when profile.CanonicalRole = Role.Teacher ->
                 let allowed = Roles.permissions Role.Teacher |> Set.map StaticTools.toolName
 
-                if tryTeacherCompletion sessionId |> Option.isSome then
+                if tryPendingText sessionId |> Option.isSome then
                     Error "Teacher tool rejected: return completion is already expected"
                 elif Set.contains tool allowed then
                     Ok()
@@ -508,64 +592,101 @@ type StudentTeacherRuntime
                 match tryRun turn.SessionId with
                 | None -> return false
                 | Some run ->
-                    match turn.Outcome, tryFinalCompletion turn.SessionId with
-                    | ReconcileProgram.TurnCompleted, Some completion ->
-                        if CompletedTurnClassifier.partsText turn.Parts = completion.Message then
-                            let! _ = satellites.Retire(run.SessionId, teacherSpec run)
-                            releaseStudent run.SessionId
-
-                        return true
-                    | ReconcileProgram.TurnCompleted, None ->
+                    match turn.Outcome with
+                    | ReconcileProgram.TurnCompleted ->
                         match currentStudentRequestKind run.SessionId with
                         | Some ProviderRequestKind.StudentLearn ->
                             let! _ = satellites.Retire(run.SessionId, teacherSpec run)
                             let! _ = sendCompile run false None
+
+                            updateStudentRun run.SessionId (fun current -> { current with CompileNudges = 0 })
+                            |> ignore
+
                             return true
                         | Some ProviderRequestKind.StudentCompile ->
-                            let! _ = sendCompile run true permit
-                            return true
+                            // Durable evidence: QA absence means final return already deleted it.
+                            match qa.Exists(run.SessionId, run.LogicalRunId) with
+                            | Error _ ->
+                                // Fail closed: do not throw across reconcile Running latch.
+                                return true
+                            | Ok false ->
+                                let pending = tryPendingText turn.SessionId
+                                let payload = normalizePayload (CompletedTurnClassifier.partsText turn.Parts)
+
+                                let matched =
+                                    match pending with
+                                    | Some arm -> payload = normalizePayload arm.Text
+                                    | None -> false
+
+                                if matched then
+                                    let! _ = satellites.Retire(run.SessionId, teacherSpec run)
+                                    releaseStudent run.SessionId
+
+                                return true
+                            | Ok true ->
+                                match run.CompileNudges >= recoveryBudget with
+                                | true -> return true
+                                | false ->
+                                    match! sendCompile run true permit with
+                                    | Ok _ ->
+                                        updateStudentRun run.SessionId (fun current ->
+                                            { current with
+                                                CompileNudges = current.CompileNudges + 1 })
+                                        |> ignore
+                                    | Error _ -> ()
+
+                                    return true
                         | _ -> return true
-                    | ReconcileProgram.TurnAborted _, _ ->
+                    | ReconcileProgram.TurnAborted _ ->
                         let! _ = satellites.Retire(run.SessionId, teacherSpec run)
                         qa.Delete(run.SessionId, run.LogicalRunId) |> ignore
                         releaseStudent run.SessionId
                         return true
                     | _ -> return true
             | Some Role.Teacher ->
-                match tryTeacherCall (tryOwner turn.SessionId |> Option.defaultValue turn.SessionId) with
+                match
+                    tryOwner turn.SessionId
+                    |> Option.bind tryTeacherCall
+                    |> Option.orElseWith (fun () -> tryTeacherCallByTeacher turn.SessionId)
+                with
                 | None -> return true
                 | Some call ->
-                    match turn.Outcome, tryTeacherCompletion turn.SessionId with
-                    | ReconcileProgram.TurnCompleted, Some completion ->
-                        let valid =
-                            completion.CompletionRun.IsSome
-                            && CompletedTurnClassifier.partsText turn.Parts = StudentTeacherPrompt.TeacherReturnCompletion
+                    match turn.Outcome with
+                    | ReconcileProgram.TurnCompleted ->
+                        let payload = normalizePayload (CompletedTurnClassifier.partsText turn.Parts)
 
-                        lock gate (fun () ->
-                            teacherCompletions.Remove(sessionKey turn.SessionId) |> ignore
-                            teacherCalls.Remove(sessionKey call.Student.SessionId) |> ignore)
-
-                        if valid then
-                            AsyncSupport.trySetResult call.Waiter (Ok completion.Answer) |> ignore
+                        if payload = normalizePayload StudentTeacherPrompt.TeacherReturnCompletion then
+                            clearPendingText turn.SessionId
+                            removeTeacherCall call.Student.SessionId
+                            AsyncSupport.trySetResult call.Completion (Ok()) |> ignore
+                            return true
                         else
-                            AsyncSupport.trySetResult
-                                call.Waiter
-                                (Error "Teacher return completion did not match the pending provider run")
-                            |> ignore
+                            // Payload is turn-carried physical evidence — not registry presence.
+                            match call.Nudges >= recoveryBudget with
+                            | true ->
+                                clearPendingText turn.SessionId
+                                removeTeacherCall call.Student.SessionId
 
-                        return true
-                    | ReconcileProgram.TurnCompleted, None ->
-                        let! _ = sendTeacherNudge call.Student permit turn.SessionId
-                        return true
-                    | ReconcileProgram.TurnFailed error, _
-                    | ReconcileProgram.TurnAborted error, _ ->
-                        lock gate (fun () ->
-                            teacherCompletions.Remove(sessionKey turn.SessionId) |> ignore
-                            teacherCalls.Remove(sessionKey call.Student.SessionId) |> ignore)
+                                failTeacherCall
+                                    call
+                                    (sprintf "Teacher idle recovery budget exhausted after %i nudges" recoveryBudget)
 
-                        AsyncSupport.trySetResult call.Waiter (Error(sprintf "Teacher run failed: %s" error))
-                        |> ignore
+                                return true
+                            | false ->
+                                match! sendTeacherNudge call.Student permit turn.SessionId with
+                                | Ok _ ->
+                                    updateTeacherCall call.Student.SessionId (fun current ->
+                                        { current with
+                                            Nudges = current.Nudges + 1 })
+                                    |> ignore
+                                | Error _ -> ()
 
+                                return true
+                    | ReconcileProgram.TurnFailed error
+                    | ReconcileProgram.TurnAborted error ->
+                        clearPendingText turn.SessionId
+                        removeTeacherCall call.Student.SessionId
+                        failTeacherCall call (sprintf "Teacher run failed: %s" error)
                         return true
                     | _ -> return true
             | _ -> return false
@@ -578,17 +699,13 @@ type StudentTeacherRuntime
             | Some run ->
                 let call = tryTeacherCall sessionId
 
-                lock gate (fun () ->
-                    teacherCompletions
-                    |> Seq.filter (fun pair -> pair.Value.Call.Student.SessionId = sessionId)
-                    |> Seq.map (fun pair -> pair.Key)
-                    |> Seq.toList
-                    |> List.iter (fun key -> teacherCompletions.Remove key |> ignore))
-
                 call
                 |> Option.iter (fun scope ->
-                    AsyncSupport.trySetResult scope.Waiter (Error "Student run was cancelled")
-                    |> ignore)
+                    clearPendingText scope.Teacher
+                    removeTeacherCall sessionId
+                    failTeacherCall scope "Student run was cancelled")
+
+                clearPendingText sessionId
 
                 let deleteResult = qa.Delete(run.SessionId, run.LogicalRunId)
                 let! retireResult = satellites.Retire(run.SessionId, teacherSpec run)
@@ -604,14 +721,11 @@ type StudentTeacherRuntime
     member _.Dispose() =
         lock gate (fun () ->
             for call in teacherCalls.Values do
-                AsyncSupport.trySetResult call.Waiter (Error "Student–Teacher runtime disposed")
-                |> ignore
+                failTeacherCall call "Student–Teacher runtime disposed"
 
             runs.Clear()
-            teacherOwners.Clear()
             teacherCalls.Clear()
-            teacherCompletions.Clear()
-            studentFinalCompletions.Clear()
+            pendingCompletionTexts.Clear()
             skillMutations.Clear())
 
     interface IDisposable with

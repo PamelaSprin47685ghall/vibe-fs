@@ -15,12 +15,14 @@ module OneShotAgentTool =
     type Request = { Agent: string; Prompt: string }
 
     type Outcome =
-        { ChildId: string
-          Managed: ManagedAgent
-          ParentBackgroundDigest: string option
-          Output: string
-          /// EXEC-028: child LWR (includeOpening=false) on Completed; None otherwise.
-          WorkRecord: string option }
+        {
+            ChildId: string
+            Managed: ManagedAgent
+            ParentBackgroundDigest: string option
+            Output: string
+            /// EXEC-028: child LWR (includeOpening=false) on Completed; None otherwise.
+            WorkRecord: string option
+        }
 
     /// Same management bound as ExecutorSummarize / HostForkRuntime join budget.
     /// Unbounded `completion.Task` hung callers when the child never went terminal.
@@ -113,8 +115,7 @@ module OneShotAgentTool =
 
                         // Ok carries (formal text, optional WorkRecord); Error is the
                         // Result.Error channel (timeout sibling) — not SetException.
-                        let completion =
-                            TaskCompletionSource<Result<string * string option, string>>()
+                        let completion = TaskCompletionSource<Result<string * string option, string>>()
                         // DSL-MUTABLE: subscription — one-shot terminal subscription
                         let mutable subscription: IDisposable option = None
                         // DSL-MUTABLE: resource — one-shot completion latch

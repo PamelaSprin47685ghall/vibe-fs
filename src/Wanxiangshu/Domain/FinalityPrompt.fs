@@ -92,12 +92,10 @@ module FinalityPrompt =
         [ "Accounted unfinished work evidence that should have followed your refused ending could not be recovered."
           "You still have time. Continue, and seek your end again when you are ready." ]
 
-    let steerUnavailable =
-        SyntheticToml.document steerUnavailableInstructions []
+    let steerUnavailable = SyntheticToml.document steerUnavailableInstructions []
 
     let steer (siblingWorkRecord: string) =
-        let header =
-            SyntheticToml.document steerInstructions [] |> fun s -> s.TrimEnd('\n')
+        let header = SyntheticToml.document steerInstructions [] |> fun s -> s.TrimEnd('\n')
 
         let normalizedRecord = SyntheticToml.normalizeNewlines siblingWorkRecord
 

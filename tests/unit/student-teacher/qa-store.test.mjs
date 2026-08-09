@@ -9,6 +9,7 @@ import {
   StudentQaStore_Create_Z721C83C5 as createStore,
   StudentQaStore__Append_Z126B0D71 as append,
   StudentQaStore__Delete_Z145977CC as remove,
+  StudentQaStore__Exists_Z145977CC as exists,
   StudentQaStore__Path_Z145977CC as pathFor,
   StudentQaStore__Read_Z145977CC as read,
 } from '../../../dist/Infrastructure/OpenCode/Host/StudentQaStore.js'
@@ -72,6 +73,29 @@ test('PERSIST_011_invalid_UTF8_fails_closed_and_preserves_the_bad_file', () => {
     assert.equal(append(store, sid, run, 'must-not-append').tag, 1)
     assert.deepEqual(readFileSync(path), before)
     assert.equal(ok(pathFor(store, sid, run)), path)
+  } finally {
+    rmSync(repo, { recursive: true, force: true })
+  }
+})
+
+test('EXEC_026_Exists_reports_durable_QA_presence_and_rejects_unsafe_ids', () => {
+  const repo = mkdtempSync(join(tmpdir(), 'wxs-qa-exists-'))
+  try {
+    execFileSync('git', ['init', '--quiet', repo])
+    const store = ok(createStore(repo))
+    const sid = session('ses_student_exists')
+    const run = logicalRun('run_exists')
+
+    assert.equal(ok(exists(store, sid, run)), false)
+    const path = ok(append(store, sid, run, 'opening'))
+    assert.equal(ok(exists(store, sid, run)), true)
+    assert.equal(existsSync(path), true)
+    ok(remove(store, sid, run))
+    assert.equal(ok(exists(store, sid, run)), false)
+
+    const bad = exists(store, session('../evil'), run)
+    assert.equal(bad.tag, 1)
+    assert.match(String(bad.fields?.[0] ?? ''), /Unsafe/)
   } finally {
     rmSync(repo, { recursive: true, force: true })
   }

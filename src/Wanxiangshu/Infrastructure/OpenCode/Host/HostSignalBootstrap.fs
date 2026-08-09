@@ -34,8 +34,8 @@ module HostSignalBootstrap =
             ChatMessageHook: obj
             ObserveEvent: obj -> unit
             /// REVIEW-010 deferred-binding park: challenge requests have no
-            /// assistant to bind at transform time; the reconcile `onTurn` binds
-            /// the parked candidate to the turn's run.
+            /// assistant to bind at transform time; VerdictTool bindToRun resolves
+            /// the parked seal evidence against the tool ProviderRunId (fail-closed).
             PendingReviewSeals: Dictionary<string, SharedState.PendingSeal>
         }
 

@@ -63,31 +63,39 @@
 declared registry 的 direct/try probe 联合选择 effect branch 这一语法反例；其它多 registry
 联合 presence 的分散探测不在该自动门禁范围内，须由人工 proof 判断是否驱动阶段推进。
 
-### StudentTeacher 六 registry — 已人工分类证明
+### StudentTeacher registries — CE collapse + durable evidence
 
 参照上表 Blogger 正交物理槽位风格：`src/Wanxiangshu/Session/StudentTeacherRuntime.fs`
-（类型头注释 L48–54；字段 L67–72）声明的六 registry **各拥有单一物理 lifetime / resource
-mailbox**，不把跨 registry 的 presence 乘积编码为 Student lifecycle stage PC：
+声明的 registries **各拥有单一物理 lifetime / 投递地址**，且重构后**不存在**任何函数同时 probe
+两个 registry 的 presence 来选择 effect branch：
 
-| registry | 物理归属 | HandleTurn / Return 消费方式 |
+| registry | 物理归属 | 消费方式 |
 |---|---|---|
-| `runs` | 活跃 Student run mailbox | `tryRun`；Student 分支先确认 run 存在再处理 turn |
-| `teacherOwners` | Teacher↔Student 关联 mailbox | `tryOwner`；Teacher 路径定位 owner，亦可回落 durable association |
-| `teacherCalls` | 在途 Teacher 调用 / waiter mailbox | `tryTeacherCall`；消费 `TeacherCallScope`（含 `Waiter` TCS） |
-| `teacherCompletions` | 待返回的 Teacher completion mailbox | `tryTeacherCompletion`；消费 `TeacherCompletionScope` 的 Answer / ToolRun 载荷 |
-| `studentFinalCompletions` | Student 终稿 completion mailbox | `tryFinalCompletion`；消费 `StudentFinalCompletionScope.Message` 与 provider-run |
-| `skillMutations` | 观测到的 skill 文档改动 mailbox | `skillDocuments`；校验 touched skills，非阶段推进 |
+| `runs` | 活跃 Student run mailbox | `tryRun`；Student `HandleTurn` 只确认 run 存在 |
+| `teacherCalls` | 在途 Teacher 调用 / CE await 点 | `tryTeacherCall`；Teacher 路径只做投递（resolve / fail-closed），分支看 turn payload |
+| `pendingCompletionTexts` | TextComplete 改写武装 | 仅 `TextComplete` / `ValidateTool` / `Return` 重复拒绝；**不得**驱动 `HandleTurn` 阶段选择 |
+| `skillMutations` | skill 文档改动观测 | `validateTouchedSkills`；非阶段推进 |
 
-`HandleTurn`（同文件 L504–572）分支消费的是上述 **物理返回载荷**（completion message /
-`CompletedTurnClassifier.partsText` 比对）以及 durable projection 上的
-`PromptAuthority` continuation kind（`currentStudentRequestKind`，L119–130，读
-`AgentJournal` snapshot），**不是**「哪些 registry 同时非空」所编码的阶段程序计数。
-`Return`（L366–417）按 role 装入对应 mailbox 的物理 payload，亦不把六槽位联合 presence
-当作 stage PC。
+已删除：`teacherOwners`（durable `SessionAssociationProjection` 为唯一真理源）、
+`teacherCompletions`（含 `CompletionRun option` stage bit）。Student Compile 完成 vs idle 改读
+`StudentQaStore.Exists`（durable QA 存在性）+ `currentStudentRequestKind`（durable
+`AcceptedContinuationIds`），不再读 final-completion registry presence。
 
-诚实边界：`registry-joint-branch` 自动门禁仅拦截同 match 内的 direct/try 联合 probe；
-分散时序 presence（跨辅助函数的 `try*`）仍在 auto 范围之外，本小节 manual-proof 闭合该分类，
-不得仅凭 joint-branch 自动绿宣称已分类。未新增跨函数静态 detector。
+Teacher `InvokeTeacher` 为单一 CE 栈（`Returned` 然后 `Completion`）；固定 completion 判据是
+normalize 后的 turn payload 是否等于 `TeacherReturnCompletion`，不是 registry presence。
+自动恢复 nudge 受 `AgentPairCursor.DefaultAutoRecoveryBudget` 有界。
+
+结构性证明目标：`HandleTurn` 对 Student 只 probe `runs`，对 Teacher 只 probe `teacherCalls`；
+`TextComplete` 只 probe `pendingCompletionTexts`。joint-branch 判据在结构上不可能成立，不再依赖
+人工「mailbox 因此无罪」兜底。诚实边界：`registry-joint-branch` 自动门禁仍只拦截同 match 内
+direct/try 联合；本小节以结构消除替代跨 helper detector。
+
+举一反三（同仓联合 presence / park→bind 对照，2026-08 复审）：
+`BloggerRuntime.decideMaterial`、`PluginRuntimeScope` parked∩pendingOffer、`Reconciler` active∩queued、
+`BloggerCrashRecovery` 多 presence、`ReviewSeal` PendingReviewSeals park→bind 均属**物理资源路由 /
+投递握手 / 调度 latch**，不是 Student–Teacher 那种用 mailbox presence 推导 lifecycle stage 的 PC；
+保持 ACCEPT-as-physical，不套用 CE collapse。ReviewSeal 消费面是 VerdictTool fail-closed resolve，
+不是 HandleTurn 上的 nudge-vs-complete 分支。
 
 永久 adversarial fixture 必须覆盖与 `FinalityController.fs`、`ExecutorSummarize.fs` 同构的
 反例形状（未分类 mutable / 程序计数 scratch），并在 dsl-ownership 与 state-product 规则下判红；

@@ -211,9 +211,10 @@ module ReviewSeal =
                 // `bindableRun` binds THAT run, and the next PERFECT queries a
                 // different run, so it always fails `ChallengeUnproven`
                 // (measured: every dual-PERFECT flow on Host 1.18.10). Parking
-                // unconditionally and binding the turn's run at `onTurn` is the
-                // exact REVIEW-010 contract: transform → candidate → bind when
-                // the assistant appears. First-PERFECT submissions never query a
+                // unconditionally and binding at VerdictTool via bindToRun with
+                // the tool's ProviderRunId is the REVIEW-010 contract: transform
+                // parks seal evidence → tool resolves/fail-closed (not an onTurn
+                // stage bit). First-PERFECT submissions never query a
                 // seal (there is no pending challenge yet), so the deferred
                 // binding is safe for them too.
                 parkSeal pendingSeals sessionId physicalUserAddress transformed

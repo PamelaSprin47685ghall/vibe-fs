@@ -324,20 +324,16 @@ module FinalityTool =
                                 | Some request when
                                     (match context.ToolCallId with
                                      | Some callId -> callId = request.ToolCallId
-                                     | None -> false) ->
+                                     | None -> false)
+                                    ->
                                     let! resumed =
-                                        FinalityController.resumeDurableRevise
-                                            scope
-                                            sid
-                                            life.LifeId
-                                            request.RequestId
+                                        FinalityController.resumeDurableRevise scope sid life.LifeId request.RequestId
 
                                     match resumed with
                                     | Some(FinalityController.FinalityOutcome.Rejected prompt)
                                     | Some(FinalityController.FinalityOutcome.Blessed prompt)
                                     | Some(FinalityController.FinalityOutcome.Undecided prompt) -> return prompt
-                                    | None ->
-                                        return ToolHostCodec.tomlObject [ "status", tString "already_received" ]
+                                    | None -> return ToolHostCodec.tomlObject [ "status", tString "already_received" ]
                                 | _ ->
                                     if String.IsNullOrWhiteSpace lastWords then
                                         return

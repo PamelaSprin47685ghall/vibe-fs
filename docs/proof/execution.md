@@ -49,7 +49,8 @@
 | return completion scope | 无 call/重复/错 Session fail closed；匹配正常 terminal 后只完成一个父调用 | EXEC-026 |
 | 静态所有权 | 无 mutable lifecycle record；scope fixture 的状态轴与业务字段均被 DSL gate 拒绝 | EXEC-026、FLOW-006 |
 | Teacher 正常结束 | return 后固定 completion 为 `TurnCompleted`；成功路径无 abort/interrupted | EXEC-026、EXEC-027、HOST-014 |
-| Teacher idle | 同 Session nudge；预算耗尽失败；普通正文不作答案 | EXEC-027 |
-| Student idle | Learn→Compile 一次；Compile idle nudge；不回 Learn | EXEC-027、PROMPT-012 |
-| final return | AGENT-022 全量校验后才 delete/pending terminal；失败可重试且无最终回复 | EXEC-027、AGENT-022 |
-| cancel/delete | abort 两端、retire Teacher、删除 QA；清理失败不伪装成功 | EXEC-027、HOST-008 |
+| Teacher idle | 同 Session nudge；预算耗尽失败；普通正文不作答案；payload normalize 后比对固定 completion | EXEC-027 |
+| Student idle | Learn→Compile 一次；Compile idle nudge（有界）；不回 Learn；Claimed-not-Accepted 不误判 Learn | EXEC-027、PROMPT-012 |
+| final return | AGENT-022 全量校验后才 delete/pending terminal；完成判据读 QA 存在性；失败可重试且无最终回复 | EXEC-027、AGENT-022、EXEC-026 |
+| cancel/delete | abort 两端、retire Teacher、删除 QA；两个 CE await 点均可取消；清理失败不伪装成功 | EXEC-027、HOST-008 |
+| CE collapse | InvokeTeacher 为 Returned→Completion 单栈；无 teacherCompletions/CompletionRun；无 teacherOwners cache | EXEC-026、FLOW-006 |

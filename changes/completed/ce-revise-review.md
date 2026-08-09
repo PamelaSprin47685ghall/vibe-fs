@@ -1,3 +1,7 @@
+**Status:** Completed (archived review that drove ce-student-teacher-collapse)
+
+---
+
 我按新快照重新审了一遍。**这次比上一版扎实很多，我会撤销上次大约一半的判红；但还不能给"状态机余孽清零 / completed 全部可信"盖章。**
 
 这份新文件确实是整个仓库的 Repomix 合并快照，可用于直接做代码级复审。

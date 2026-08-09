@@ -12,11 +12,7 @@ module InspectorTool =
         let managed = outcome.Managed
         let report = outcome.Output
 
-        let instructions =
-            if String.IsNullOrWhiteSpace report then
-                []
-            else
-                [ report ]
+        let instructions = if String.IsNullOrWhiteSpace report then [] else [ report ]
 
         // EXEC-028: entry-local LWR comment prefix (mirror JoinResultRenderer).
         let body =

@@ -161,6 +161,18 @@ type StudentQaStore private (gitDirectory: string) =
 
     member _.Path(sessionId: SessionId, logicalRunId: LogicalRunId) = pathFor sessionId logicalRunId
 
+    /// Durable completion evidence for StudentCompile (EXEC-026): QA gone means
+    /// final return already committed delete. Path validation failures and FS
+    /// exceptions stay typed — callers must not let existsSync throw across Host.
+    member _.Exists(sessionId: SessionId, logicalRunId: LogicalRunId) : Result<bool, string> =
+        match pathFor sessionId logicalRunId with
+        | Error error -> Error error
+        | Ok path ->
+            try
+                Ok(StudentQaNode.existsSync path)
+            with ex ->
+                Error(sprintf "Student QA exists check failed: %s" ex.Message)
+
     member _.Read(sessionId: SessionId, logicalRunId: LogicalRunId) =
         pathFor sessionId logicalRunId |> Result.bind readFatal
 
