@@ -104,7 +104,9 @@ module OneShotAgentTool =
                         |> Option.iter (fun path -> scope.RegisterDirectory(SessionId.value childId, path))
 
                         let completion = TaskCompletionSource<string>()
+                        // DSL-MUTABLE: subscription — one-shot terminal subscription
                         let mutable subscription: IDisposable option = None
+                        // DSL-MUTABLE: resource — one-shot completion latch
                         let mutable completed = false
 
                         let finish setResult =
@@ -144,6 +146,7 @@ module OneShotAgentTool =
                         | Error sendError -> succeed (sprintf "send failed: %s" sendError)
                         | Ok _ -> ()
 
+                        // DSL-MUTABLE: cancellation — parent-abort child session task slot
                         let mutable abortTask: Task<Microsoft.FSharp.Core.Result<unit, string>> option =
                             None
 

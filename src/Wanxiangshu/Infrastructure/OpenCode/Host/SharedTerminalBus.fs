@@ -15,6 +15,7 @@ open Wanxiangshu.Journal
 /// OrchestratorHost.reverify never observes the reviewer completion.
 module SharedTerminalBus =
 
+    /// DSL-state-combination: physical — shared terminal port refcount resource
     type private SharedPort =
         { Port: Events.HostEventPort
           mutable RefCount: int }

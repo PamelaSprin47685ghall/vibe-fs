@@ -6,14 +6,12 @@ open System.Threading.Tasks
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Process
 
 
 type ToolContext =
     { SessionId: SessionId
       Workspace: string
-      Cancellation: CancellationToken
-      Deadline: Deadline }
+      Cancellation: CancellationToken }
 
 type ToolInput = { Payload: string }
 type ToolOutput = { Result: string; Truncated: bool }

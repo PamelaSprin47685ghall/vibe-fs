@@ -8,6 +8,7 @@ open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Process
+open Wanxiangshu.Session
 
 /// Non-interactive command execution with the request's sole 3x deadline and
 /// private Executor-agent summary mailbox.
@@ -145,34 +146,39 @@ module ExecutorTool =
 
                             // Hard-fail only on definitive FamilyBlocked. Waiting/incomplete
                             // must not abort map/reduce; JoinWithPermit retries requirePermit.
-                            match scope.Journal with
-                            | None -> return error "Executor map/reduce requires AgentJournal"
-                            | Some journal ->
-                                match! requirePermit () with
-                                | Error msg when msg.StartsWith("RECOVERY_BLOCKED:", System.StringComparison.Ordinal) ->
-                                    return error msg
-                                | Error _
-                                | Ok _ ->
-                                    let runtime = scope.ExecutorRuntimeFor context
+                            match! requirePermit () with
+                            | Error msg when msg.StartsWith("RECOVERY_BLOCKED:", System.StringComparison.Ordinal) ->
+                                return error msg
+                            | Error _
+                            | Ok _ ->
+                                // Journal present → event-driven targeted await. Missing
+                                // journal → the pure fork runtime fails every chunk fork
+                                // fast, so a spooled summary still degrades to a partial
+                                // report instead of being dropped.
+                                let runtime =
+                                    match scope.Journal with
+                                    | Some journal ->
+                                        ExecutorSummarize.asExecutorRuntime
+                                            (scope.ExecutorRuntimeFor context)
+                                            journal
+                                            requirePermit
+                                    | None -> ExecutorSummarize.ofForkRuntime (ForkRuntime())
 
-                                    let! summary =
-                                        ExecutorSummarize.summarizeSpool
-                                            (ExecutorSummarize.asExecutorRuntime runtime journal requirePermit)
-                                            spoolPath
+                                let! summary = ExecutorSummarize.summarizeSpool runtime spoolPath
 
-                                    let instructions =
-                                        if System.String.IsNullOrWhiteSpace summary then
-                                            []
-                                        else
-                                            [ summary ]
+                                let instructions =
+                                    if System.String.IsNullOrWhiteSpace summary then
+                                        []
+                                    else
+                                        [ summary ]
 
-                                    return
-                                        tomlObjectWithInstructions
-                                            instructions
-                                            [ "exit_code", TInt exitCode
-                                              "spool_path", TString spoolPath
-                                              "total_bytes", TInt64 totalBytes
-                                              "chunk_count", TInt chunkCount ]
+                                return
+                                    tomlObjectWithInstructions
+                                        instructions
+                                        [ "exit_code", TInt exitCode
+                                          "spool_path", TString spoolPath
+                                          "total_bytes", TInt64 totalBytes
+                                          "chunk_count", TInt chunkCount ]
                     finally
                         Spool.delete spoolPath
         }

@@ -66,7 +66,7 @@ module NodeProcessWait =
             let settled = TaskCompletionSource<WaitSignal>()
             // DSL-MUTABLE: resource — JS timer handle
             let mutable timerId = None
-            // DSL-MUTABLE: resource — clearTimeout idempotency
+            // DSL-MUTABLE: resource — clearTimeout idempotency latch
             let mutable timerCleared = false
 
             let clearTimer () =

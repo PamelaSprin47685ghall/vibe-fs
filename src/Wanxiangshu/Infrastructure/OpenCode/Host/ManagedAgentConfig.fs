@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Tools
 
@@ -97,7 +98,9 @@ module ManagedAgentConfig =
                 match legacyHit with
                 | Some legacy -> Error(formatError (LegacyAgentPresent legacy))
                 | None ->
+                    // DSL-MUTABLE: algorithm-scratch — config binding fold accumulator
                     let mutable bindings = Map.empty
+                    // DSL-MUTABLE: algorithm-scratch — first validation error latch for fold
                     let mutable firstError: ConfigGateError option = None
 
                     for name in ManagedAgent.requiredNames do
@@ -123,6 +126,7 @@ module ManagedAgentConfig =
                     match firstError with
                     | Some err -> Error(formatError err)
                     | None ->
+                        // DSL-MUTABLE: algorithm-scratch — pair-model validation error latch
                         let mutable pairError: ConfigGateError option = None
 
                         for role in ManagedAgent.allRoles do
@@ -166,21 +170,30 @@ module ManagedAgentConfig =
                             | None -> ()
                             | Some entry ->
                                 let role = binding.Agent.Role
+                                let prompts = RuntimeResources.current().Prompts
 
                                 let owned =
                                     match role with
-                                    | Role.Manager -> StaticTools.managerAgentConfig ()
-                                    | Role.Orchestrator -> StaticTools.orchestratorAgentConfig ()
-                                    | Role.Coder -> StaticTools.coderAgentConfig ()
-                                    | Role.Inspector -> StaticTools.inspectorAgentConfig ()
-                                    | Role.DevOps -> StaticTools.devopsAgentConfig ()
-                                    | Role.Browser -> StaticTools.browserAgentConfig ()
-                                    | Role.Meditator -> StaticTools.meditatorAgentConfig ()
-                                    | Role.Reviewer -> StaticTools.reviewerAgentConfig ()
-                                    | Role.Student -> StaticTools.studentAgentConfig ()
-                                    | Role.Teacher -> StaticTools.teacherAgentConfig ()
-                                    | Role.Blogger -> StaticTools.bloggerAgentConfig ()
-                                    | Role.Executor -> StaticTools.executorAgentConfig ()
+                                    | Role.Manager ->
+                                        StaticTools.managerAgentConfig (Some prompts.ManagerSystemPrompt)
+                                    | Role.Orchestrator ->
+                                        StaticTools.orchestratorAgentConfig (Some prompts.OrchestratorSystemPrompt)
+                                    | Role.Coder -> StaticTools.coderAgentConfig (Some prompts.CoderSystemPrompt)
+                                    | Role.Inspector ->
+                                        StaticTools.inspectorAgentConfig (Some prompts.InspectorSystemPrompt)
+                                    | Role.DevOps ->
+                                        StaticTools.devopsAgentConfig (Some prompts.DevopsSystemPrompt)
+                                    | Role.Browser ->
+                                        StaticTools.browserAgentConfig (Some prompts.BrowserSystemPrompt)
+                                    | Role.Meditator ->
+                                        StaticTools.meditatorAgentConfig (Some prompts.MeditatorSystemPrompt)
+                                    | Role.Reviewer ->
+                                        StaticTools.reviewerAgentConfig (Some prompts.ReviewerSystemPrompt)
+                                    | Role.Student ->
+                                        StaticTools.studentAgentConfig (Some prompts.StudentSystemPrompt)
+                                    | Role.Teacher -> StaticTools.teacherAgentConfig prompts.TeacherSystemPrompt
+                                    | Role.Blogger -> StaticTools.bloggerAgentConfig prompts.BloggerSystemPrompt
+                                    | Role.Executor -> StaticTools.executorAgentConfig prompts.ExecutorSystemPrompt
 
                                 // Copy Wanxiangshu-owned keys without touching model.
                                 entry?mode <- owned?mode
@@ -217,6 +230,7 @@ module ManagedAgentConfig =
     /// validation (the model checks are what failed). Enough to write owned
     /// fields so AGENT-007's fail-closed first layer survives a gate error.
     let private roleBindings (agents: obj) : Map<string, ManagedAgentBinding> =
+        // DSL-MUTABLE: algorithm-scratch — best-effort role binding fold
         let mutable bindings = Map.empty
 
         for name in ManagedAgent.requiredNames do

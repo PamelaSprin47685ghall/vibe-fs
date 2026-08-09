@@ -1,17 +1,13 @@
 namespace Wanxiangshu.Tools
 
 open System
-open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open Thoth.Json
-open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Process
 
 module NodeFs =
     [<Import("readFileSync", "fs")>]
@@ -34,10 +30,6 @@ module NodeFs =
 
     [<Import("rmSync", "fs")>]
     let rmSync (path: string, options: obj) : unit = jsNative
-
-module NodeProcess =
-    [<Import("platform", "process")>]
-    let platform: string = jsNative
 
 module StaticTools =
 
@@ -153,105 +145,42 @@ module StaticTools =
     let reviewerVerdictSchemaJson =
         """{"type":"object","properties":{"verdict":{"type":"string","enum":["PERFECT","REVISE"]}},"required":["verdict"],"additionalProperties":false}"""
 
-    let private prompts () = RuntimeResources.current().Prompts
+    let managerAgentConfig (prompt: string option) : obj =
+        primaryAgent Role.Manager prompt
 
-    let managerAgentConfig () : obj =
-        primaryAgent Role.Manager (Some (prompts ()).ManagerSystemPrompt)
+    let orchestratorAgentConfig (prompt: string option) : obj =
+        primaryAgent Role.Orchestrator prompt
 
-    let orchestratorAgentConfig () : obj =
-        primaryAgent Role.Orchestrator (Some (prompts ()).OrchestratorSystemPrompt)
+    let coderAgentConfig (prompt: string option) : obj =
+        primaryAgent Role.Coder prompt
 
-    let coderAgentConfig () : obj =
-        primaryAgent Role.Coder (Some (prompts ()).CoderSystemPrompt)
-
-    let reviewerAgentConfig () : obj =
-        primaryAgent Role.Reviewer (Some (prompts ()).ReviewerSystemPrompt)
+    let reviewerAgentConfig (prompt: string option) : obj =
+        primaryAgent Role.Reviewer prompt
 
     /// Companion Session Y: tool set is exactly { blog } (ENFORCER-010).
     /// System prompt for B-record distillation with blog tool protocol.
-    let bloggerAgentConfig () : obj =
-        hiddenAgent Role.Blogger (prompts ()).BloggerSystemPrompt
+    let bloggerAgentConfig (prompt: string) : obj =
+        hiddenAgent Role.Blogger prompt
 
     /// Role.Executor: no tools; system prompt for map/reduce output summarization.
     /// Distinct from Tool.executor (OS command tool used by Inspector/DevOps).
-    let executorAgentConfig () : obj =
-        hiddenAgent Role.Executor (prompts ()).ExecutorSystemPrompt
+    let executorAgentConfig (prompt: string) : obj =
+        hiddenAgent Role.Executor prompt
 
-    let studentAgentConfig () : obj =
-        primaryAgent Role.Student (Some (prompts ()).StudentSystemPrompt)
+    let studentAgentConfig (prompt: string option) : obj =
+        primaryAgent Role.Student prompt
 
-    let teacherAgentConfig () : obj =
-        hiddenAgent Role.Teacher (prompts ()).TeacherSystemPrompt
+    let teacherAgentConfig (prompt: string) : obj =
+        hiddenAgent Role.Teacher prompt
 
-    let meditatorAgentConfig () : obj =
-        primaryAgent Role.Meditator (Some (prompts ()).MeditatorSystemPrompt)
+    let meditatorAgentConfig (prompt: string option) : obj =
+        primaryAgent Role.Meditator prompt
 
-    let browserAgentConfig () : obj =
-        primaryAgent Role.Browser (Some (prompts ()).BrowserSystemPrompt)
+    let browserAgentConfig (prompt: string option) : obj =
+        primaryAgent Role.Browser prompt
 
-    let inspectorAgentConfig () : obj =
-        primaryAgent Role.Inspector (Some (prompts ()).InspectorSystemPrompt)
+    let inspectorAgentConfig (prompt: string option) : obj =
+        primaryAgent Role.Inspector prompt
 
-    let devopsAgentConfig () : obj =
-        primaryAgent Role.DevOps (Some (prompts ()).DevopsSystemPrompt)
-
-    let executorTool () : Tool =
-        { Name = "executor"
-          Description = "Execute shell command within timeout budget."
-          SchemaJson = """{"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}"""
-          Execute =
-            fun ctx input ->
-                task {
-                    ctx.Cancellation.ThrowIfCancellationRequested()
-
-                    let cmdText =
-                        try
-                            let decoder = Decode.field "command" Decode.string
-
-                            match Decode.fromString decoder input.Payload with
-                            | Ok s -> s
-                            | Error _ ->
-                                match Decode.Auto.fromString<string> input.Payload with
-                                | Ok s -> s
-                                | Error _ -> input.Payload
-                        with _ ->
-                            input.Payload
-
-                    let isWindows = NodeProcess.platform = "win32"
-                    let fileName = if isWindows then "cmd.exe" else "sh"
-                    let argFlag = if isWindows then "/c" else "-c"
-
-                    let cmd: Command =
-                        { FileName = fileName
-                          Arguments = [ argFlag; cmdText ]
-                          WorkingDirectory = None
-                          Environment = None
-                          Stdin = None
-                          Deadline = None
-                          PtyOptions = None }
-
-                    let procCtx: ProcessContext =
-                        { WorkingDirectory = None
-                          HardLimit = ProcessEstimate.DefaultHardLimit }
-
-                    let estimate: ProcessEstimate =
-                        { EstimatedRuntime = RuntimeSeconds 30.0
-                          EstimatedOutput = OutputBytes 200000L
-                          EstimatedMemory = EstimatedMemory.Medium }
-
-                    let! res = ProcessRunner.run cmd estimate procCtx ctx.Cancellation
-
-                    match res with
-                    | Ok(ProcessOutcome.Completed(code, stdout, stderr, _)) ->
-                        return
-                            { Result = sprintf "Exit: %d\nStdout: %s\nStderr: %s" code stdout stderr
-                              Truncated = false }
-                    | Ok(ProcessOutcome.Spooled(code, path, totalBytes, chunks)) ->
-                        return
-                            { Result = sprintf "Exit: %d\nSpool: %s\nBytes: %d\nChunks: %d" code path totalBytes chunks
-                              Truncated = false }
-                    | Error err ->
-                        return
-                            { Result = sprintf "Error: %A" err
-                              Truncated = false }
-                } }
+    let devopsAgentConfig (prompt: string option) : obj =
+        primaryAgent Role.DevOps prompt

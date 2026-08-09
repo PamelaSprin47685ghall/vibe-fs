@@ -36,6 +36,12 @@ export async function teardownScenario(scenario, { keepOnFailure = false } = {})
   scenario.watchdog?.stop();
   const errors = [];
 
+  try {
+    await scenario.acceptanceGate?.cleanup(TEARDOWN_IDLE_MS);
+  } catch (e) {
+    errors.push(`ReceiptAcceptanceGate: ${e.message}`);
+  }
+
   // 1. 停止继续发送 mock 响应
   try {
     if (scenario.provider) {

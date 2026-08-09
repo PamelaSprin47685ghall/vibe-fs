@@ -123,8 +123,11 @@ type BlobWriter private (directory: string) =
 
 type JournalWriter private (runtimeId: RuntimeId, blobWriter: IBlobWriter, filePath: string, fd: int) =
     let gate = obj ()
+    // DSL-MUTABLE: resource — next local sequence number under writer gate
     let mutable currentSeq = 2L
+    // DSL-MUTABLE: resource — writer poison latch after write failure
     let mutable poisoned = false
+    // DSL-MUTABLE: resource — writer dispose latch
     let mutable disposed = false
 
     member _.RuntimeId = runtimeId

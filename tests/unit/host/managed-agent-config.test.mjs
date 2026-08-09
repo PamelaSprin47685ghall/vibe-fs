@@ -11,8 +11,8 @@ const { resultOf, runtimeResources, mapEntries, caseOf } = await import('../supp
 
 const bindingsOf = (inventory) => Object.fromEntries(mapEntries(inventory.Bindings))
 
-// configureFromHostConfig calls StaticTools.managerAgentConfig() which needs
-// RuntimeResources installed (production does this at plugin init).
+// configureFromHostConfig injects RuntimeResources prompts into StaticTools.*AgentConfig.
+// Production installs resources at plugin init.
 runtimeResources.installFromPackage()
 
 const { validate, applyOwnedFields, configureFromHostConfig } = await import(

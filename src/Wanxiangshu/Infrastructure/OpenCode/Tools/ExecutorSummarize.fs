@@ -165,6 +165,7 @@ module ExecutorSummarize =
                 levels.Add(ResizeArray())
 
             levels.[0].Add summary
+            // DSL-MUTABLE: algorithm-scratch — online reduce level index
             let mutable lvl = 0
 
             while levels.[lvl].Count >= ReduceFanIn do
@@ -187,6 +188,7 @@ module ExecutorSummarize =
             if levels.Count = 0 then
                 return ""
             else
+                // DSL-MUTABLE: algorithm-scratch — online reduce carry list
                 let mutable carry: string list = []
 
                 for i in 0 .. levels.Count - 1 do
@@ -227,6 +229,7 @@ module ExecutorSummarize =
                     runtime.CancelAgent id
 
             let chunks = ResizeArray<int * byte[]>()
+            // DSL-MUTABLE: algorithm-scratch — spool chunk index counter
             let mutable index = 0
 
             do!

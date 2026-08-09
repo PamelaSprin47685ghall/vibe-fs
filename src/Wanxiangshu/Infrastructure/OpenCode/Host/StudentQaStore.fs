@@ -123,6 +123,7 @@ type StudentQaStore private (gitDirectory: string) =
             StudentQaNode.join2 (directory, ".QA." + Guid.NewGuid().ToString("N") + ".tmp")
 
         let bytes = System.Text.Encoding.UTF8.GetBytes expected
+        // DSL-MUTABLE: resource — atomic rename success latch for QA write
         let mutable renamed = false
 
         try

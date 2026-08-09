@@ -238,6 +238,64 @@ export async function awaitFactBarrier(scenario, step) {
   }
 }
 
+function isIdleEvent(event) {
+  if (event.type === 'session.idle') return true;
+  const status = event.status ?? event.properties?.status;
+  return status === 'idle' || status?.type === 'idle' || status?.status === 'idle';
+}
+
+const idleBarrierKey = (target, attempts) => `${target}@${attempts}`;
+
+function armIdleBarrier(scenario, ctx, target, attempts = 1) {
+  ctx.idleBarriers ??= new Map();
+  const key = idleBarrierKey(target, attempts);
+  const existing = ctx.idleBarriers.get(key);
+  if (existing) return existing;
+
+  let capture;
+  const baseline = new Promise((resolve) => {
+    capture = resolve;
+  });
+  const barrier = { key, baseline };
+  scenario.provider.afterExpectation(target, () => capture(scenario.events.lastSeq), attempts);
+  ctx.idleBarriers.set(key, barrier);
+  return barrier;
+}
+
+async function awaitIdleBarrier(scenario, ctx, step) {
+  const target = step.awaitIdle.after;
+  const attempts = step.awaitIdle.attempts ?? 1;
+  const anchor = step.awaitIdle.arm ?? target;
+  const anchorAttempts = step.awaitIdle.armAttempts ?? attempts;
+  const sessionId = step.awaitIdle.session === 'child' ? ctx.childId
+    : step.awaitIdle.session === 'guard' ? (ctx.guardId || ctx.sessions?.guard)
+    : step.awaitIdle.session === 'nudge' ? (ctx.nudgeId || ctx.sessions?.nudge)
+    : (step.awaitIdle.session && ctx.sessions?.[step.awaitIdle.session]) || ctx.sessionId;
+  assert.ok(sessionId, 'awaitIdle requires session');
+
+  const barrier = armIdleBarrier(scenario, ctx, anchor, anchorAttempts);
+  scenario.watchdog?.setWindow(step.timeoutMs ?? null);
+  try {
+    await scenario.provider.waitForExpectationAttempt(target, attempts, step.timeoutMs);
+    if (anchor !== target || anchorAttempts !== attempts) {
+      await scenario.provider.waitForExpectationAttempt(anchor, anchorAttempts, step.timeoutMs);
+    }
+    const after = await barrier.baseline;
+    await scenario.events.awaitEvent((event) => {
+      const eventSession = event.sessionID ?? event.properties?.sessionID;
+      return event.seq > after && eventSession === sessionId && isIdleEvent(event);
+    }, step.timeoutMs ?? null);
+    ctx.idleBarriers?.delete(barrier.key);
+    scenario.watchdog?.advance({
+      reason: `provider-terminal-idle:${target}`,
+      lane: `session:${sessionId}`,
+      blocking: true,
+    });
+  } finally {
+    scenario.watchdog?.setWindow(null);
+  }
+}
+
 async function runFlow(scenario, doc, ctx) {
   const flow = doc.flow || [];
   for (const step of flow) {
@@ -263,6 +321,14 @@ async function runFlow(scenario, doc, ctx) {
     }
     if (step.waitFact) {
       await awaitFactBarrier(scenario, step);
+      continue;
+    }
+    if (step.armIdle) {
+      armIdleBarrier(scenario, ctx, step.armIdle.id, step.armIdle.attempts ?? 1);
+      continue;
+    }
+    if (step.awaitIdle) {
+      await awaitIdleBarrier(scenario, ctx, step);
       continue;
     }
     if (step.prompt) {
@@ -632,6 +698,7 @@ export async function runCanary(scriptName, { customs } = {}) {
       project: doc.setup?.project || { files: {} },
       strict: doc.setup?.strict !== false,
       extraEnv: doc.setup?.env || {},
+      acceptanceGate: doc.setup?.acceptanceGate,
       watchdogLabel: doc.setup?.watchdogLabel || doc.name,
     });
 

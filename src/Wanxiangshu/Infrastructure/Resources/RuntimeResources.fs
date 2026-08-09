@@ -10,6 +10,7 @@ type RuntimeResources =
 
 module RuntimeResources =
 
+    // DSL-MUTABLE: resource — process-local installed runtime resources singleton
     let mutable private installed: RuntimeResources option = None
 
     let load () : RuntimeResources =

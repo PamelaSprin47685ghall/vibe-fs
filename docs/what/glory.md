@@ -174,9 +174,11 @@ Reviewer turn reconcile/ReviewController 独占 missing-verdict、first PERFECT 
 
 `ReviewerOutcome = Revision of WorkRecord | Confirmed of ConfirmedWitness` 与 typed infrastructure failure 是合法领域结果；它们不是全局 dispatcher 或 durable stage。
 
-## GLORY-044：REVISE
+## GLORY-044：REVISE 的立即 cohort 关闭
 
-REVISE 是合法业务结果。其 fact 落盘后当前 request 立刻 `FinalityRejected`；不等待 reviewer terminal、不等待 sibling、不发送 confirmation。
+REVISE 是合法业务结果。其 verdict fact durable 后，当前 request 的 Reviewer continuation capability 与 cohort 立即关闭：不发送 confirmation/challenge、不等待 sibling terminal；sibling 必须在下一次 effect 前停下，未 graduate session 不 Dispose（GLORY-055）。此关闭由 durable REVISE 派生，不以 `FinalityRejected` 为前提。
+
+立即关闭不等同于立即写 `FinalityRejected`。该 durable lifecycle fact 只能在 rejecting Reviewer 满足 GLORY-072 的 `record-ready` 后落盘。
 
 ## GLORY-045：Roster 与 graduate
 
@@ -285,6 +287,25 @@ XTrace append-only；每 Life 以 cursor range 物化。
 ## GLORY-071：cold prompt boundary
 
 新 system prompt 只用于新 Manager session、Authority Root 或明确新 Life。
+
+## GLORY-072：拒绝记录就绪
+
+拒绝 Reviewer 的 terminal frontier 是产生 durable REVISE 的 terminal evidence 所界定的 XTrace 边界；该边界必须能从 durable journal evidence 在恢复时重建，禁止以后来的 XTrace head 替换。
+
+`record-ready` 当且仅当**同一 journal snapshot**同时证明：
+
+1. 该 Reviewer 的 `RecordCoverage.IngestedThrough` 已由 `BlogEntryCommitted` 覆盖 terminal frontier；
+2. `XTraceCapture.lifecycleWorkRecord journal reviewerSessionId false` 从该 snapshot 物化 canonical LWR。
+
+coverage 与 materialization 不同 revision 即不成立。只有 `record-ready` 的 LWR 可写 blob 并形成 `FinalityRejected.WorkRecordRef/Digest`；不得用缓存、较早/较晚 snapshot、raw tail 或摘要替代。已覆盖的 frame 未渲染为 `# Work log` 时是物化不一致，fail closed，不得写 rejection。
+
+## GLORY-073：record-ready 等待、恢复与 abandonment
+
+record-ready 是 Journal B 类事件等待：读取 snapshot 与 revision；未就绪则 `AgentJournal.awaitChangeFrom revision`；仅在 journal change 后重判。禁止 timer、sleep、timeout-driven re-probe 或轮询。
+
+本地 waiter 的取消、dispose 或进程崩溃不是 durable abandonment，且不得写 lifecycle 终态。恢复从 durable REVISE 与同一 terminal frontier 重建等待，Reviewer continuation/cohort 保持关闭，不重发 challenge、不建新 cohort。
+
+`BloggerRequestAbandoned` 只废弃该次 Blogger request，不证明 record-ready，也不得触发 `FinalityRejected`。恢复须为同一 frontier 重新建立可证明的记录机会；无法从 durable evidence 证明 frontier 或 canonical LWR 时，按 GLORY-056/057 `FinalityUndecided` fail closed，绝不写部分或替代 record。
 
 ---
 

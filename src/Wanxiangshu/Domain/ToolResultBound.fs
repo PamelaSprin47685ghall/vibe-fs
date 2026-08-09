@@ -75,8 +75,9 @@ module ToolResultBound =
         elif SyntheticToml.byteCount text <= maxBytes then
             text
         else
-            // DSL-MUTABLE: algorithm-scratch — backward scalar walk state
+            // DSL-MUTABLE: algorithm-scratch — backward scalar walk end exclusive
             let mutable endExclusive = text.Length
+            // DSL-MUTABLE: algorithm-scratch — backward scalar walk start
             let mutable start = text.Length
             // DSL-MUTABLE: algorithm-scratch — accumulated bytes so far
             let mutable acc = 0

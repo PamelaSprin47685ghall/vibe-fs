@@ -121,7 +121,11 @@ module TurnCompletionProgram =
     ///
     /// Wait on journal folds until coverage exists or the budget expires. Fail
     /// open: timeout still sends the ordinary main (CTX-011 no-candidate path).
-    let private awaitCoverageBeforeRetry (durable: AgentJournal) (sessionId: SessionId) : Task =
+    let private awaitCoverageBeforeRetry
+        (sliceTimer: int -> Task<unit>)
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        : Task =
         task {
             if not (expectsCoverage durable sessionId) || sessionHasCoverage durable sessionId then
                 return ()
@@ -141,8 +145,7 @@ module TurnCompletionProgram =
                             // Fable Task has no WhenAny export; race journal wake vs slice.
                             do!
                                 emitJsExpr
-                                    (AgentJournal.awaitChangeFrom fromRev durable,
-                                     Wanxiangshu.Process.PtyTiming.timerTask sliceMs)
+                                    (AgentJournal.awaitChangeFrom fromRev durable, sliceTimer sliceMs)
                                     "Promise.race([$0, $1]).then(function () { return undefined; })"
                                 : Task
 
@@ -162,6 +165,7 @@ module TurnCompletionProgram =
     /// budget still permits one. The continuation itself produces no second
     /// advance, which is why nothing here writes again.
     let private continueAfterProviderFailure
+        (sliceTimer: int -> Task<unit>)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -193,7 +197,7 @@ module TurnCompletionProgram =
                 | Ok _ ->
                     // CTX-006: give the linked Blogger a chance to commit coverage
                     // before the armed A′/B′ continue is planned (XWire.applyTransform).
-                    do! awaitCoverageBeforeRetry durable turn.SessionId
+                    do! awaitCoverageBeforeRetry sliceTimer durable turn.SessionId
 
                     let! continuation =
                         HostSessionNudge.sendContinuationResult
@@ -219,21 +223,37 @@ module TurnCompletionProgram =
 
     /// LOOP-006: an abort we armed is provider failure for AABB purposes.
     let private continueAfterLoopKill
+        (sliceTimer: int -> Task<unit>)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
         : Task =
-        continueAfterProviderFailure sessionPort eventPort journal turn "loop-kill" RuntimeNudge.loopContinue
+        continueAfterProviderFailure
+            sliceTimer
+            sessionPort
+            eventPort
+            journal
+            turn
+            "loop-kill"
+            RuntimeNudge.loopContinue
 
     let private continueAfterOrdinaryFailure
+        (sliceTimer: int -> Task<unit>)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
         (error: string)
         : Task =
-        continueAfterProviderFailure sessionPort eventPort journal turn error RuntimeNudge.providerRetry
+        continueAfterProviderFailure
+            sliceTimer
+            sessionPort
+            eventPort
+            journal
+            turn
+            error
+            RuntimeNudge.providerRetry
 
 
     /// Physical cleanup and durable child-authority registration before routing.
@@ -297,7 +317,10 @@ module TurnCompletionProgram =
         wasAborted, terminalValid
 
     /// Generic terminal plumbing for ordinary turns.
+    /// `sliceTimer` and `abortParent` are injected by Host composition (Process is not Application).
     let applyWithContinuation
+        (sliceTimer: int -> Task<unit>)
+        (abortParent: string -> unit)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -375,17 +398,18 @@ module TurnCompletionProgram =
                 | _ -> false
 
             if loopKill then
-                continueAfterLoopKill sessionPort eventPort journal turn
+                continueAfterLoopKill sliceTimer sessionPort eventPort journal turn
             else
                 abortedSessions.Add sessionKey |> ignore
-                Wanxiangshu.Process.Pty.abortParent sessionKey
+                abortParent sessionKey
                 sessionPort.AbortChildren turn.SessionId |> ignore
 
                 eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
                 |> ignore
 
                 AsyncSupport.completedTask ()
-        | ReconcileProgram.TurnFailed error -> continueAfterOrdinaryFailure sessionPort eventPort journal turn error
+        | ReconcileProgram.TurnFailed error ->
+            continueAfterOrdinaryFailure sliceTimer sessionPort eventPort journal turn error
         | ReconcileProgram.TurnCompleted ->
             let joinOutstanding =
                 TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId

@@ -10,7 +10,7 @@ open Wanxiangshu.Kernel.Identity
 [<RequireQualifiedAccess>]
 type private Activity =
     | Unknown
-    | Running of attemptSerial: int64
+    | ProviderAttempt of attemptSerial: int64
     | Idle of attemptSerial: int64
     | IdleConsumed of attemptSerial: int64
     /// HOST-004: operator abort permanently revokes the current attempt's
@@ -28,14 +28,16 @@ type private Activity =
 /// 唯一状态转换：
 ///
 /// ```text
-/// BeginProviderAttempt(session)  serial+1 → Running(serial)；任何旧 permit 立即失效
-/// ObserveIdle(session)            Running(serial) → Idle(serial)，返回 Permit(session, serial)
+/// BeginProviderAttempt(session)  serial+1 → ProviderAttempt(serial)；任何旧 permit 立即失效
+/// ObserveIdle(session)            ProviderAttempt(serial) → Idle(serial)，返回 Permit(session, serial)
 /// TryConsume(permit)              state == Idle(permit.AttemptSerial) → IdleConsumed → true；否则 false
 /// DropSession(session)            清空该 session 状态，旧 permit 永久失效
 /// ```
 type SessionQuiescenceGate() =
     let gate = obj ()
+    // DSL-MUTABLE: resource — per-session attempt serial map under gate
     let mutable serials = Map.empty<string, int64>
+    // DSL-MUTABLE: resource — per-session activity admission map under gate
     let mutable activities = Map.empty<string, Activity>
 
     /// 每次 provider request 开始构建（`experimental.chat.messages.transform`
@@ -51,9 +53,9 @@ type SessionQuiescenceGate() =
                 | None -> 1L
 
             serials <- Map.add key serial serials
-            activities <- Map.add key (Activity.Running serial) activities)
+            activities <- Map.add key (Activity.ProviderAttempt serial) activities)
 
-    /// 收到 `SessionIdle` 时调用。Running(serial) → Idle(serial) 并返回该 serial
+    /// 收到 `SessionIdle` 时调用。ProviderAttempt(serial) → Idle(serial) 并返回该 serial
     /// 的 permit；状态 Unknown（还没有任何 attempt）时同样建立当前 serial 的
     /// idle（规则单点定义）；已 Idle / IdleConsumed 时不回退状态——同一 idle
     /// occasion 最多一次发送（Q-03）。
@@ -69,7 +71,7 @@ type SessionQuiescenceGate() =
                     1L
 
             match Map.tryFind key activities with
-            | Some(Activity.Running current) when current = serial ->
+            | Some(Activity.ProviderAttempt current) when current = serial ->
                 activities <- Map.add key (Activity.Idle serial) activities
             | Some(Activity.Unknown)
             | None -> activities <- Map.add key (Activity.Idle serial) activities

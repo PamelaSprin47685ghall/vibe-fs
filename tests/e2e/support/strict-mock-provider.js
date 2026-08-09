@@ -154,6 +154,9 @@ export class StrictMockProvider {
   waitForExpectation(id, timeoutMs = WATCHDOG_TIMEOUT_MS) {
     return this._signals.waitForExpectation(id, timeoutMs);
   }
+  waitForExpectationAttempt(id, attempts, timeoutMs = WATCHDOG_TIMEOUT_MS) {
+    return this._signals.waitForExpectationAttempt(id, attempts, timeoutMs);
+  }
   waitForIdle(timeoutMs = WATCHDOG_TIMEOUT_MS) { return this._signals.waitForIdle(timeoutMs); }
   matchCount(id) { return this._signals.matchCount(id); }
   afterExpectation(id, callback, attempts = 1) {

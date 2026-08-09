@@ -25,10 +25,15 @@ type ISessionRuntimeOwner =
 /// physical resources, display caches, or bounded per-call deduplication.
 type PluginRuntimeScope(journal: AgentJournal option) =
     let toolRuntimeGate = obj ()
+    // DSL-MUTABLE: resource — session tool runtime owner handle
     let mutable toolRuntime: ISessionRuntimeOwner option = None
+    // DSL-MUTABLE: subscription — plugin host event subscription
     let mutable subscription: IDisposable option = None
+    // DSL-MUTABLE: resource — shared terminal bus key
     let mutable sharedTerminalKey: string option = None
+    // DSL-MUTABLE: resource — shared terminal bus port handle
     let mutable sharedTerminalPort: Events.HostEventPort option = None
+    // DSL-MUTABLE: resource — scope dispose latch
     let mutable disposed = false
 
     /// ENFORCER-160/162: parked continuation transforms, keyed by session id.
@@ -52,6 +57,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     /// Recorded rather than thrown, because HOST-006's verdict needs both halves — the
     /// settings and the first turn's observation. Throwing at config time would report
     /// the symptom before the probe could say whether anything actually compacted.
+    // DSL-MUTABLE: resource — HOST-006 compaction setting gap observation
     let mutable compactionSettingGap: Wanxiangshu.Domain.CompactionSetting option = None
 
     /// HOST-006 startup probe latch, with its own gate.
@@ -60,20 +66,26 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     /// if they were related, and the next person to touch either has to prove they are
     /// not.
     let startupProbeGate = obj ()
+    // DSL-MUTABLE: single-flight — HOST-006 startup probe one-shot latch
     let mutable startupProbeDone = false
 
     /// Family recovery coordinator ports (PROMPT-011 + C5 + RECOVERY-FAMILY).
     ///
     /// Attached after `createHost`. First business entry point runs
     /// SessionRecoveryWorkflow; later callers await the same single-flight task.
+    // DSL-MUTABLE: resource — family recovery ports attachment slot
     let mutable familyRecoveryPorts: SessionRecoveryWorkflow.Ports option = None
     let recoveryGateLock = obj ()
 
     /// LOOP-006: process-local LoopKillArmed lives inside the sensor.
     /// Optional until HostSignalBootstrap wires abort + ownership.
+    // DSL-MUTABLE: resource — loop sensor attachment slot
     let mutable loopSensor: LoopSensor option = None
+    // DSL-MUTABLE: resource — satellite runtime attachment slot
     let mutable satelliteRuntime: SatelliteRuntime option = None
+    // DSL-MUTABLE: resource — student-teacher runtime attachment slot
     let mutable studentTeacherRuntime: StudentTeacherRuntime option = None
+    // DSL-MUTABLE: resource — student-teacher unavailable reason latch
     let mutable studentTeacherUnavailable: string option = None
 
     member _.Journal = journal
@@ -330,7 +342,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     /// Cheap read for the common case: after the probe has run, every later reconcile
     /// pass skips the judgement entirely rather than building a verdict and discarding
     /// it.
-    member _.CompactionProbePending =
+    member _.IsStartupProbeOpen =
         lock startupProbeGate (fun () -> not startupProbeDone)
 
     member _.AttachToolRuntime(owner: ISessionRuntimeOwner) =

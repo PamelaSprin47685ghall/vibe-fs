@@ -306,6 +306,7 @@ module ToolHostCodec =
                |> Seq.forall (fun c -> (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))
 
     let digest (text: string) =
+        // DSL-MUTABLE: algorithm-scratch — FNV-1a rolling hash accumulator
         let mutable hash = 2166136261u
 
         for c in Text.Encoding.UTF8.GetBytes text do

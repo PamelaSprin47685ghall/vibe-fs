@@ -84,7 +84,7 @@ module ForkTool =
             else
                 match childPrompt request with
                 | Error tddError -> return error tddError
-                | Ok(assignment, tddPhase) ->
+                | Ok(assignment, tdd) ->
                     match scope.RuntimeFor context with
                     | Error runtimeError -> return error runtimeError
                     | Ok runtime ->
@@ -135,7 +135,7 @@ module ForkTool =
                                 managed.Visibility = AgentVisibility.Public
                                 && List.contains managed.Name ManagedAgent.managerForkableNames
                                 ->
-                                let role = AgentRoleIdentity.ofManaged managed
+                                let role = AgentRoleIdentity.ofManaged managed.Role
                                 // PENDING 7: the Manager fork owns the first-prompt payload for
                                 // Coder children. When `tdd` is present, render the full ARCH-010
                                 // document here so the durable `[tdd]` table reaches the child wire;
@@ -145,14 +145,14 @@ module ForkTool =
                                 // `renderedPrompt`. Without a phase the Host's own relay envelope is
                                 // used, byte-identical to the pre-PENDING-7 shape.
                                 let renderedPrompt =
-                                    tddPhase
+                                    tdd
                                     |> Option.map (fun _ ->
                                         ForkChildPayload.render
                                             { Assignment = assignment
                                               ParentWorkRecord = scope.ParentWorkRecordFor context.SessionId
                                               OriginalUserRequirements = []
                                               Payload = None
-                                              TddPhase = tddPhase })
+                                              TddPhase = tdd })
 
                                 match!
                                     runtime.Fork(

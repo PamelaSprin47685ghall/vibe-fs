@@ -21,15 +21,11 @@ const fableLibraryDir = join(
 )
 const { createCancellationToken } = await import(join(fableLibraryDir, 'Async.js'))
 
-const { DeadlineModule_ofBudget } = await import('../../../dist/Process/Deadline.js')
-const { fromDate: offsetFromDate } = await import(join(fableLibraryDir, 'DateOffset.js'))
-
 const context = (workspace) =>
   new ToolContext(
     { fields: ['ses_file_tools'], cases: () => ['SessionId'], tag: 0 },
     workspace,
     createCancellationToken(false),
-    DeadlineModule_ofBudget(offsetFromDate(new Date('2026-01-01T00:00:00Z'), 0), 60_000),
   )
 
 const input = (payload) => ({ Payload: payload })

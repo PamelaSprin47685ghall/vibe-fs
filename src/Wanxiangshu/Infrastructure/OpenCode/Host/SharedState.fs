@@ -43,4 +43,5 @@ module SharedState =
     /// pin their blogger companions here so the blogger's system prompt
     /// (Host instruction loading from the session directory) survives the
     /// manager worktree release at publish.
+    // DSL-MUTABLE: resource — process-local root workspace pin for worktree plugin instances
     let mutable RootWorkspace: string option = None

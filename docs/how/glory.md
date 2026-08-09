@@ -57,15 +57,16 @@ let reverify
 
 ## Slice E：失败反馈
 
-1. `FinalityRejected` 流程（受理后由 FinalityController 驱动）：任一 member `RevisionRequired` → LWR 读取 → journal `WriteBlob` → append `FinalityRejected`（`RejectingReviewerSessionId`）→ 直接将 `FinalityPrompt.rejected` 渲染的拒绝 prompt（纯注释块，不含 TOML 数据块；Host 显式采用为当前 Manager guidance，producer adoption 而非 source trust）作为 `suicide` 工具的返回值（GLORY-052/053，无需额外发送 continuation 消息）→ 标记旧 request 关闭（投影从 `ActiveFinality` 移除）→ sibling current attempt 可 best-effort cancel，但不 Dispose 未 graduate session（GLORY-055）；下次 suicide 建新 request/new barriers。
-2. dedupe：continuation claim scope 由 `PromptAuthority.claimScopeDigest` 天然覆盖（GLORY-053）。
-3. 基础设施失败（GLORY-056/057）：按序尝试恢复；无法证明时 `concludeUndecided` append `FinalityUndecided` 关闭 request，返回 `ManagerLifecyclePrompt.FinalityUndecidable`，不伪造 work record。
+1. REVISE 首先关闭 cohort：撤销对应 Reviewer continuation capability、cancel sibling 的下一次 effect；不发 confirmation/challenge，不 Dispose 未 graduate session（GLORY-044/055）。该步骤不写 `FinalityRejected`。
+2. record-ready 等待：从 durable REVISE 重建 terminal frontier；原子取得 `(snapshot, revision)`，在该 snapshot 上同时检查 `RecordCoverage.IngestedThrough >= frontier` 与物化 canonical LWR。未同时成立则 `AgentJournal.awaitChangeFrom revision`，收到 journal change 后重读；不得以 timer、sleep、timeout 或 re-probe 推进。成立后才 `WriteBlob`，再 append `FinalityRejected`（`RejectingReviewerSessionId`），并将 `FinalityPrompt.rejected` 的拒绝 prompt 作为 `suicide` 工具结果返回（GLORY-052/053/072/073）。
+3. `BloggerRequestAbandoned` 只令本次记录尝试失效；reconcile 以同一 durable frontier 重新建立机会。frontier 或同 snapshot LWR 无法证明时走 `concludeUndecided`，不得用当前 head 或局部 record 代替（GLORY-056/057/073）。
+4. dedupe：continuation claim scope 由 `PromptAuthority.claimScopeDigest` 天然覆盖（GLORY-053）。
 
 ## Slice F：Finality 收束
 
 `concurrentAllOrShortCircuit` 汇聚全部 member 的 `driveMember` outcome（GLORY-059/060）：
 
-1. 任一 REVISE → `concludeRejection`：REVISE 落盘后当前 request 立即 `FinalityRejected`，其余 driver 停止下一次效果，不 Dispose session（GLORY-044/055）。
+1. 任一 REVISE → 立即关闭 cohort：其余 driver 停止下一次效果，不 Dispose session；随后按 Slice E 的 event-driven record-ready 过程落 `FinalityRejected`，不等待 sibling terminal（GLORY-044/055/072/073）。
 2. 全员双 PERFECT → 重读 tree → 与 `FinalityRequested.GitTreeHash` 比较；不等 → 本次成功失效（fail closed，GLORY-059）；相等 → `concludeBlessing`：按 stable ordinal 物化 canonical LWR bundle → append `FinalityBlessed`（bundleRef/Digest）→ 发 minor-work continuation。不得 `LifeCompleted`、NotifyTerminal 或清除 Manager（GLORY-060）。
 3. 无法证明（超时/基础设施失败）→ `concludeUndecided`，不伪造 work record（GLORY-057）。
 
@@ -94,7 +95,8 @@ Orchestrator 衔接：ManagerJob 的 Manager 完成由现有 `AwaitManager` 路�
 | LifeOpened 缺 → provider request 前 | 无害；下个 transform 重开 | ✅ transform 幂等 |
 | LifeOpened 有 → 无 WorkActivated | 幂等改写 + Activation 逻辑继续 | ✅ transform + ManagerWorkflow |
 | FinalityRequested 无 enlisted member | FinalityTool「in motion」分支重启同一 request 的 FinalityController；`rosterOf` 崩溃重入不重复造新 Reviewer | ✅ |
-| REVISE 已存在但无 FinalityRejected | 从 durable evidence 重建同一 Reviewer LWR；证据不足时 fail closed，不以当前快照改写目标算法 | 目标算法 |
+| REVISE 已存在但无 FinalityRejected | 从 durable evidence 重建同一 terminal frontier；cohort 继续关闭，等待 `BlogEntryCommitted` 覆盖后以同一 snapshot 物化 LWR；`BloggerRequestAbandoned` 重建记录机会，证据不足则 undecided | 目标算法 |
+| record-ready waiter 崩溃/Dispose | 不写 abandonment 或 lifecycle 终态；replay 后从 durable REVISE/frontier 重新订阅 journal change | 目标算法 |
 | confirmed witness 存在但无 FinalityBlessed | concludeBlessing 幂等（blessing 已存在/terminal 已记录则跳过） | ✅ |
 | LifeCompleted 存在但 terminal 未发布 | completeBlessedLife 幂等重放 | ✅ |
 | XTrace terminal 单槽冲突（第二 Life） | 首个 Life 后跳过 TerminalOutputCaptured（terminal 只记录于 LifeCompleted） | ✅ |

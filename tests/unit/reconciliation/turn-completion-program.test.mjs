@@ -294,9 +294,14 @@ const harness = ({ journal, loopSensor = undefined, hasLivePty = () => false, ga
     return observeIdle(gate, sessionId(SESSION))
   }
 
+  const sliceTimer = (ms) => new Promise((resolve) => setTimeout(resolve, ms | 0))
+  const abortParent = () => {}
+
   const run = (turnValue, quiescence = undefined) => {
     prepareTurn(journal, (key) => disposed.push(key), turnValue)
     return applyWithContinuation(
+      sliceTimer,
+      abortParent,
       sessionPort,
       eventPort,
       journal,
@@ -328,6 +333,8 @@ const harness = ({ journal, loopSensor = undefined, hasLivePty = () => false, ga
     )
     if (!handled) {
       await applyWithContinuation(
+        sliceTimer,
+        abortParent,
         sessionPort,
         eventPort,
         journal,

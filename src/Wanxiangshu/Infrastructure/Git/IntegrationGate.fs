@@ -17,6 +17,7 @@ module private IntegrationGateDisposal =
 
 /// Cross-process publish serialization represented as one disposable resource.
 type IntegrationGate(releaseFn: obj) =
+    // DSL-MUTABLE: resource — one-shot release latch for cross-process publish gate
     let mutable released = false
 
     member _.Release() =

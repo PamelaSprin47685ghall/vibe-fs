@@ -49,11 +49,14 @@ type ToolRuntimeScope
     let childRecord = defaultArg childWorkRecordFor (fun _ -> None)
     let terminalPort = eventPort
     let finalityTimeoutMs = finalityReviewerTimeoutMs
+    // DSL-MUTABLE: resource — tool runtime dispose latch
     let mutable disposed = false
     /// P0-RECOVERY-JOIN-001: family recovery before join / publish consume.
+    // DSL-MUTABLE: resource — family recovery callback attachment
     let mutable familyRecovery: (SessionId -> Task<FamilyRecovery>) option = None
 
     /// EXEC-017 attempt-scoped join interrupt registry (PluginRuntimeScope or local default).
+    // DSL-MUTABLE: resource — join attempt registry attachment
     let mutable joinAttempts: IJoinAttemptRegistry =
         JoinAttemptRegistry() :> IJoinAttemptRegistry
 

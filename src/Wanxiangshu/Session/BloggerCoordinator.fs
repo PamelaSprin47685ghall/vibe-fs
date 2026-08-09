@@ -11,6 +11,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.OpenCode
 
 /// ENFORCER-047/050: the ONE main-session decision entry for Blogger material.
 module BloggerCoordinator =
@@ -84,7 +85,7 @@ module BloggerCoordinator =
         | Some chunk ->
             // Birth gate: mapping failure / Next≤Prev → None (no Start, no fatal).
             // Commit-path fatal remains only for contexts that somehow escaped this gate.
-            Wanxiangshu.OpenCode.EnforcerHost.mainContextFromChunk
+            EnforcerHost.mainContextFromChunk
                 mainSessionId
                 bloggerSessionId
                 observedEpoch
@@ -175,7 +176,7 @@ module BloggerCoordinator =
                         Ok(openReq.ContextRef, openReq.ContextDigest)
                     | Some openReq when openReq.PromptKey = promptKey -> Ok(openReq.ContextRef, openReq.ContextDigest)
                     | _ ->
-                        match journal.WriteBlob(Wanxiangshu.OpenCode.CanonicalJson.canonicalJson contextPayload) with
+                        match journal.WriteBlob(CanonicalJson.canonicalJson contextPayload) with
                         | Error error -> Error error
                         | Ok blob -> Ok(blob.BlobRef, blob.BlobDigest)
 

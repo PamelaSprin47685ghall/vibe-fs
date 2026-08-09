@@ -243,6 +243,7 @@ module FinalityTool =
                         // ManagerJob, GLORY-068) has no Life; migrate on its first
                         // ending. A HumanRoot Manager without a Life is still
                         // planning and must keep working.
+                        // DSL-MUTABLE: algorithm-scratch — effective life after optional migration ensure
                         let mutable effectiveLife: LifeProjection option = lifecycle.CurrentLife
 
                         if effectiveLife.IsNone then

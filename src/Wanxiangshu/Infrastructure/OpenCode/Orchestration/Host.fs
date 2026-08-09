@@ -14,6 +14,7 @@ open Wanxiangshu.Orchestrator
 type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let worktrees = Dictionary<string, string>()
     let joinGate = obj ()
+    // DSL-MUTABLE: single-flight — join-in-flight latch under joinGate
     let mutable joinInFlight = false
 
     let gitPort = GitOperations.createWithRepo deps.RepoPath OrchestratorGit.run
@@ -187,7 +188,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     /// sendToExistingChild take the busy-nudge path and never re-installRun, leaving
     /// awaitCurrentPendingRun waiting on a Source that will not observe conflict
     /// resolution (ORCH-003 measured: conflict-resume on wire, REBASE_HEAD unmerged).
-    let clearStalePending (agentId: string) =
+    let clearStaleHostRun (agentId: string) =
         lock runtime.Gate (fun () ->
             match runtime.PendingRuns.TryGetValue agentId with
             | true, run when not run.Finished ->
@@ -225,7 +226,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 let agentId = managerAgentId jobId
                 let path = WorktreePath.value worktree
                 worktrees.[agentId] <- path
-                clearStalePending agentId
+                clearStaleHostRun agentId
 
                 match runtime.Children.TryGetValue agentId with
                 | true, _ -> ()
@@ -335,8 +336,10 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     // ── engine ──────────────────────────────────────────────────────────────
 
+    // DSL-MUTABLE: resource — memoized orchestrator engine instance
     let mutable engineInstance: Orchestrator option = None
     let engineGate = obj ()
+    // DSL-MUTABLE: single-flight — engine create task under engineGate
     let mutable engineTask: Task<Result<Orchestrator, string>> option = None
 
     /// ORCH-008: freeze the publish target by `symbolic-ref` once, at engine start.

@@ -240,8 +240,9 @@ module NodeProcessHost =
     let readFileSyncChunks (path: string) (chunkSize: int) (consume: byte[] -> unit) : unit =
         let fd = openSync path "r"
         let buffer = Array.zeroCreate<byte> chunkSize
-        // DSL-MUTABLE: buffer — read loop file offset and done flag
+        // DSL-MUTABLE: buffer — read loop file offset
         let mutable position = 0
+        // DSL-MUTABLE: buffer — read loop done flag
         let mutable done' = false
 
         try

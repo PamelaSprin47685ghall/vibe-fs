@@ -83,5 +83,5 @@ PhysicalBound 未完成时禁止 same-root 猜测成功。
 → transform 生成 seal（含 challenge digest）
 → 第二次检查工作树并验证不变性
 → PERFECT2 查 seal → ConfirmedReviewWitness
-→ Finality cohort 消费：任一 REVISE → FinalityRejected；全员双 PERFECT → blessing（GLORY-044/060）
+→ Finality cohort 消费：任一 REVISE → 立即关闭 cohort → event-driven record-ready → FinalityRejected；全员双 PERFECT → blessing（GLORY-044/060/072/073）
 ```

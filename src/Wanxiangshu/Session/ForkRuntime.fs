@@ -7,6 +7,7 @@ open Wanxiangshu.Agent
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Process
 
 /// Runtime for managing child agent runs and PTY sessions.
 ///
@@ -29,8 +30,9 @@ type ForkRuntime
     let terminalListener = defaultArg listener ignore
     let cleanupPort = defaultArg cleanup ignore
 
-    // DSL-MUTABLE: resource — live child/pty registries under lockObj
+    // DSL-MUTABLE: resource — live child agent registry under lockObj
     let mutable agents: Map<string, ChildRun> = Map.empty
+    // DSL-MUTABLE: resource — live pty registry under lockObj
     let mutable ptys: Map<string, PtyRecord> = Map.empty
     let lockObj = obj ()
 
@@ -201,7 +203,7 @@ type ForkRuntime
         lock lockObj (fun () -> agents <- ForkRecovery.bindChildSession agentId childSessionId agents)
 
     /// Internal targeted completion handle. Model-visible join remains join-any.
-    /// Optional timeoutMs races the completion cell via Wanxiangshu.Process.PtyTiming.raceExit.
+    /// Optional timeoutMs races the completion cell via PtyTiming.raceExit.
     member _.AwaitAgent(agentId: string, ?timeoutMs: int) : Task<Result<RunCompletion, string>> =
         let completion =
             lock lockObj (fun () -> agents |> Map.tryFind agentId |> Option.map (fun run -> run.Completion.Await))
@@ -218,7 +220,7 @@ type ForkRuntime
             | Some ms when ms <= 0 -> Task.FromResult(Error(sprintf "await agent timed out: %s" agentId))
             | Some ms ->
                 task {
-                    let! completedFirst = Wanxiangshu.Process.PtyTiming.raceExit (pending :> Task) ms
+                    let! completedFirst = PtyTiming.raceExit (pending :> Task) ms
 
                     if completedFirst then
                         let! value = pending

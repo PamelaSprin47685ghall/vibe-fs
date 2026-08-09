@@ -6,6 +6,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
@@ -108,7 +109,7 @@ module EnforcerHost =
                 | Some tip ->
                     EnforcerCatalog.tryFindByField
                         tip.FieldName
-                        (Wanxiangshu.Infrastructure.Resources.RuntimeResources.current().EnforcerRules)
+                        (RuntimeResources.current().EnforcerRules)
                     |> Option.map (fun rule -> rule.Nudge)
 
     let private stopPhysicalRun (messages: obj list) (fallback: obj list) (reason: string) : ContinuationOutcome =
@@ -255,8 +256,7 @@ module EnforcerHost =
         match lastAssistantStep rawMessages with
         | None -> None
         | Some(messageId, parts, completed) ->
-            let rules =
-                Wanxiangshu.Infrastructure.Resources.RuntimeResources.current().EnforcerRules
+            let rules = RuntimeResources.current().EnforcerRules
 
             let calls =
                 parts

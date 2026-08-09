@@ -24,7 +24,9 @@ module private WorktreeDisposal =
 /// orphan its job.
 type WorktreeResource
     private (path: WorktreePath, identity: WorktreeIdentity, git: GitPort, releaseOnDisposeInitially: bool) =
+    // DSL-MUTABLE: resource — one-shot worktree release latch
     let mutable released = false
+    // DSL-MUTABLE: resource — durable-mark flag for worktree dispose policy
     let mutable releaseOnDispose = releaseOnDisposeInitially
 
     member _.Path = path

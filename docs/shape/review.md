@@ -32,8 +32,9 @@ managerJobHandedOff → 完成，其余 → `ManagerIdleEncouragement`。`TurnCo
 Manager / Reviewer / Student–Teacher 业务。
 
 `ReviewerWorkflow` 是 Reviewer terminal 后 `ReviewerGuard` / `ReviewConfirmation` continuation 的
-唯一业务 writer；`HostReviewGuard` 只是 transport primitive。Finality cohort 只等待 durable verdict /
-witness，并在 request 关闭时撤销对应 Reviewer continuation capability，不发送 challenge 或 guard。
+唯一业务 writer；`HostReviewGuard` 只是 transport primitive。durable REVISE 立即令 Finality cohort 撤销对应
+Reviewer continuation capability 并关闭 cohort，不发送 challenge 或 guard；`FinalityRejected` 留待 GLORY-072
+record-ready，二者不得倒置。
 REVIEW-006 的 `ConfirmedReviewWitness` 只由 Reviewer 侧与 Finality cohort 消费。
 
 ## REVIEW-010：ProviderInputSeal 的 fail-closed
@@ -48,4 +49,3 @@ Seal 类型与绑定流程见 `how/review.md`。
 Reviewer 角色的系统提示词由 `resources/prompts/reviewer-system.md` 静态资源权威承载，在 Session 加载时作为 Reviewer 系统的 System Prompt，负责向模型灌输 REVIEW-011 的 8 大代码质量支柱与工具规范。
 
 双 PERFECT 流程不得写入 Reviewer 提示词（REVIEW-003）：屏障由 Host 侧执行，Reviewer 只需针对当前 tree 给出独立 verdict；提前告知流程会诱导模型自行扮演确认方。
-

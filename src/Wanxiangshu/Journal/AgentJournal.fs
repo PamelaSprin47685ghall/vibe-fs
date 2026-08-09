@@ -66,9 +66,13 @@ module JournalAppendFailure =
 /// check → subscribe → recheck → await (see `AwaitChangeFrom`).
 type AgentJournal internal (writer: JournalWriter, initialProjection: ProjectionSet) =
     let gate = obj ()
+    // DSL-MUTABLE: resource — in-memory projection after last committed fold
     let mutable projection = initialProjection
+    // DSL-MUTABLE: resource — fold rejection poison latch
     let mutable rejected: (EventId * FoldRejection) option = None
+    // DSL-MUTABLE: resource — journal revision cursor
     let mutable revision = JournalRevision.create writer.LastCommittedLocalSeq
+    // DSL-MUTABLE: resource — last journal change notification payload
     let mutable lastChange: JournalChange option = None
     let waiters = ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>()
 
@@ -162,6 +166,7 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
         (providerRun: ProviderRunIdentity option)
         (fact: Fact)
         : Result<ProjectionSet, JournalAppendFailure> =
+        // DSL-MUTABLE: buffer — waiters to notify after lock release
         let mutable notify: (TaskCompletionSource<JournalChange> * JournalChange) list = []
 
         let result =

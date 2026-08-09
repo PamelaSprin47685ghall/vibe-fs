@@ -378,3 +378,31 @@ origin，不伪造 Original proposal）。当前用户本轮明确要求将审�
 
 - 全量扫描可能暴露既有 Infrastructure/Journal pattern（leak/mutable/while），须逐项分类
   physical 或 remediation，不得批量豁免冲绿（见 `docs/how/dsl-structured-program.md`）。
+
+---
+
+## Blocker update 2026-08-09：FinalityRejected / LWR 因果竞态
+
+已实证 `manager-unhappy-path` e2e 5 次中 1 次：`FinalityRejected` 先于 rejecting Reviewer 的
+`BlogEntryCommitted` durable，永久 `WorkRecordRef` 因而缺 `# Work log`。这直接落在本 Change 对
+`FinalityController.fs` 的审计/反例要求（Scope 3）和 B 类零轮询等待要求（Scope 5）内；不是可忽略的
+canary 偶发失败。
+
+### Closing work（未实现）
+
+1. 依 GLORY-044/072/073 实现两段收束：durable REVISE 立即关闭 Reviewer continuation/cohort；
+   `FinalityRejected` 仅在同一 journal snapshot 证明 `BlogEntryCommitted` coverage 已越过 terminal
+   frontier 且 canonical LWR 已物化后落盘。
+2. `FinalityController` 的 record-ready 等待使用 `AgentJournal.awaitChangeFrom`，禁止 timer/sleep
+   re-probe；crash 或本地 waiter disposal 后从 durable evidence 续等。`BloggerRequestAbandoned` 只废弃
+   一次 Blogger attempt，不能写 partial rejection。
+3. 建立 adversarial / e2e 回归：延迟 Blog commit 时 cohort 已关闭但无 `FinalityRejected`；commit 后唯一
+   record 含 `# Work log`；覆盖 crash recovery、Blogger abandonment 和 timer-polling 禁止。
+
+### Additional closing criteria
+
+- 任何 rejection blob 都绑定 record-ready 的同 snapshot coverage/materialization；不得留下缺少
+  `# Work log` 的 WorkRecordRef。
+- REVISE 后不再发 Reviewer continuation 或等待 sibling terminal；record-ready 仅由 Journal event 唤醒。
+- 本 blocker 的实现与回归完成后，仍须满足既有全部 Completion criteria；当前仅完成语义归档，不宣称
+  production/test 或 full gate 已完成。

@@ -10,7 +10,7 @@ setup = { strict = true, project = { files = { "mechanical-target.txt" = "BROKEN
 session = { agent = "fast-devops", bind = ["devops-title", "fast-devops"] }
 prompt = { agent = "fast-devops", text = "Run the deterministic mechanical repair fixture. Diagnose its failing gate, use Coder RED then GREEN for the one-file value correction, rerun the broader gate, and report the observed closure." }
 
-must = ["devops.0", "devops.1", "devops.2", "coder-red.0", "devops.3", "coder-green.0", "devops.5", "devops.6"]
+must = ["devops.0", "devops.1", "devops.2", "coder-red.0", "devops.3", "devops.4", "coder-green.0", "devops.5", "devops.6"]
 
 flow = [
   { custom = "bindCoderChildren" },
@@ -94,46 +94,24 @@ user = "Run the deterministic mechanical repair fixture. Diagnose its failing ga
   [[turn.step]]
   respond = { type = "title", text = "E2E Test Session" }
 
+# COMPANION: Host always opens a fast-blogger sidecar. Prompt is production-composed
+# (`CompanionHostBlogger.fs`); omit from must/flow — absence is fine, presence must match.
 [[turn]]
 id = "blogger"
 internal = true
 user = "# Write the dense work-log continuation now"
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair background.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "DevOps mechanical repair background.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair background continued.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "DevOps mechanical repair background continued.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 2.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "DevOps repair cycle 2.", tip = "primitive-obsession" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 3.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 4.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 5.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 6.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 7.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 8.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 9.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 10.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 11.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "blog", args = { text = "DevOps repair cycle 3.", tip = "primitive-obsession" } }
 
 [[epoch]]
 turn = "blogger"
@@ -153,44 +131,4 @@ reason = "frame-commit"
 [[epoch]]
 turn = "blogger"
 step = 3
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 4
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 5
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 6
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 7
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 8
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 9
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 10
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 11
 reason = "frame-commit"

@@ -15,7 +15,8 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate } from '../support/index.js';
 import { runCanary } from '../support/scenario-driver.mjs';
-import { readJournal } from '../support/journal-observer.js';
+import { readJournal, watchJournal } from '../support/journal-observer.js';
+import { WAIT_FACT_WINDOW_MS } from '../support/time-budget.js';
 
 const ROOT_PROMPT = 'Run the full unhappy path in one turn.';
 const QUEUED_PROMPT = "Also make sure src/main.txt has exactly the content 'done' before the end.";
@@ -61,6 +62,117 @@ function factPayloads(lines, caseName) {
 }
 
 const countCase = (lines, caseName) => factPayloads(lines, caseName).length;
+
+const promptKeyOf = (payload) => {
+  const key = payload?.PromptKey;
+  if (typeof key === 'string') return key;
+  if (Array.isArray(key) && typeof key.at(-1) === 'string') return key.at(-1);
+  return JSON.stringify(key);
+};
+
+function managerIdlePromptState(lines) {
+  const claims = factPayloads(lines, 'PluginPromptClaimed').filter(
+    (claim) => claim?.ContinuationKind === 'ManagerIdleEncouragement',
+  );
+  return {
+    claims,
+    submitted: new Set(factPayloads(lines, 'PluginPromptSubmitted').map(promptKeyOf)),
+    accepted: new Set(factPayloads(lines, 'PluginPromptPhysicalAccepted').map(promptKeyOf)),
+  };
+}
+
+function awaitJournalState(scenario, label, select) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let timer;
+    let stop = () => {};
+    const finish = (error, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      stop();
+      if (error) reject(error);
+      else resolve(value);
+    };
+    const observe = () => {
+      try {
+        const value = select(journalLines(scenario.host.workDir));
+        if (value !== undefined) finish(null, value);
+      } catch (error) {
+        finish(error);
+      }
+    };
+    stop = watchJournal(scenario.host.workDir, observe);
+    timer = setTimeout(
+      () => finish(new Error(`timed out awaiting durable manager idle ${label}`)),
+      WAIT_FACT_WINDOW_MS,
+    );
+    observe();
+  });
+}
+
+async function awaitIdleReceipt(scenario, ctx, phase) {
+  const seen = ctx.managerIdlePromptKeys ?? new Set();
+  const held = await scenario.acceptanceGate?.awaitHold(phase, WAIT_FACT_WINDOW_MS);
+  assert.ok(held, `manager idle receipt gate ${phase} required`);
+  const observation = await awaitJournalState(scenario, `claim-${phase}`, (lines) => {
+    const state = managerIdlePromptState(lines);
+    const claim = state.claims.find((candidate) => {
+      const key = promptKeyOf(candidate);
+      return key === held.promptKey && !seen.has(key) && state.submitted.has(key);
+    });
+    if (!claim) return undefined;
+    return { key: promptKeyOf(claim), state };
+  });
+
+  assert.equal(held.origin, 'ManagerIdleEncouragement');
+  assert.equal(held.sessionID, ctx.sessionId);
+  assert.equal(held.promptKey, observation.key, `gate ${phase} must hold the claimed prompt`);
+  assert.equal(observation.state.accepted.has(observation.key), false, `idle ${phase} must remain pending`);
+
+  seen.add(observation.key);
+  ctx.managerIdlePromptKeys = seen;
+  return observation;
+}
+
+async function firstIdleReceipt(scenario, ctx) {
+  const observation = await awaitIdleReceipt(scenario, ctx, 1);
+  assert.equal(scenario.acceptanceGate.hold(1)?.mode, 'defer');
+  ctx.firstIdlePrompt = observation;
+}
+
+async function secondIdleReceipt(scenario, ctx) {
+  const observation = await awaitIdleReceipt(scenario, ctx, 2);
+  assert.equal(scenario.acceptanceGate.hold(2)?.mode, 'defer');
+  assert.ok(ctx.firstIdlePrompt, 'first idle receipt required before second idle receipt');
+  assert.equal(
+    observation.state.accepted.has(ctx.firstIdlePrompt.key),
+    false,
+    'B ManagerIdleEncouragement must claim while A remains physically unaccepted',
+  );
+  assert.notEqual(observation.key, ctx.firstIdlePrompt.key, 'A and B idle claims need distinct prompt keys');
+
+  const firstClaim = observation.state.claims.find(
+    (claim) => promptKeyOf(claim) === ctx.firstIdlePrompt.key,
+  );
+  const secondClaim = observation.state.claims.find((claim) => promptKeyOf(claim) === observation.key);
+  assert.ok(firstClaim?.PayloadDigest, 'A ManagerIdleEncouragement must carry PayloadDigest');
+  assert.ok(secondClaim?.PayloadDigest, 'B ManagerIdleEncouragement must carry PayloadDigest');
+  assert.notEqual(
+    firstClaim.PayloadDigest,
+    secondClaim.PayloadDigest,
+    'A and B idle claims need distinct PayloadDigest values',
+  );
+
+  scenario.acceptanceGate.release(1);
+  scenario.acceptanceGate.release(2);
+  const releases = await Promise.all([
+    scenario.acceptanceGate.awaitRelease(1, WAIT_FACT_WINDOW_MS),
+    scenario.acceptanceGate.awaitRelease(2, WAIT_FACT_WINDOW_MS),
+  ]);
+  for (const release of releases) assert.equal(release.status, 'released');
+  scenario.acceptanceGate.assertHealthy();
+}
 
 function toolNames(request) {
   return (request?.tools ?? []).map((tool) => tool?.function?.name ?? tool?.name);
@@ -171,12 +283,6 @@ async function bindReviewers(scenario) {
         // then C1 can complete for the harvest join (mgr-labor.1).
         releaseChildC1?.();
         releaseChildC1 = null;
-      } else if (id === 'mgr-idle-a.0') {
-        // The same constant prompt represents a different occasion only after
-        // the first ProviderRun completes. Retire A before admitting B so the
-        // mock proves order without a matcher cursor.
-        setTurnFor('mgr-idle-a', '__manager-idle-a-retired__');
-        setTurnFor('mgr-idle-b', '# You are doing well.');
       } else if (id === 'reviewer-r1.1') {
         setTurnFor('reviewer-r1', REVIEWER_RETIRED);
         setTurnFor('reviewer-r1b', REVIEWER_OPENING);
@@ -324,20 +430,30 @@ async function finalOracle(scenario, ctx) {
     'next Manager turn must consume the queued user message that woke join',
   );
 
-  // Optional IdleEncouragement may appear (mgr-idle is optional). A second
-  // independent idle occasion is unit-proven via
-  // TCP_completed_manager_idle_encouragement_occasion_dedupe — do not force two
-  // idles here without redesigning the 13-stroke path.
-  // Soft check: if any idle fires, golden comment-prefixed text still matches.
+  // GLORY-029: each Manager idle encouragement claims its own occasion digest
+  // (Session + Life + trigger ProviderRun), so a pending Detached claim for
+  // occasion A must NOT suppress independent occasion B. Hard assertion on the
+  // durable journal: two distinct ManagerIdleEncouragement claims must land.
+  const idleClaims = factPayloads(lines, 'PluginPromptClaimed').filter(
+    (claim) => claim?.ContinuationKind === 'ManagerIdleEncouragement',
+  );
+  assert.ok(
+    idleClaims.length >= 2,
+    `A pending idle occasion must not suppress independent occasion B: expected >=2 ManagerIdleEncouragement claims, got ${idleClaims.length}`,
+  );
+  const idleDigests = new Set(idleClaims.map((claim) => claim?.PayloadDigest));
+  assert.equal(
+    idleDigests.size,
+    idleClaims.length,
+    'each Manager idle occasion must claim its own payload digest (occasion-scoped, not session-scoped)',
+  );
   const idleFragments = managerRequests.filter((request) =>
     requestText(request).includes('You are doing well'),
   );
-  if (idleFragments.length > 0) {
-    assert.ok(
-      idleFragments.some((request) => requestText(request).includes('You have plenty of time')),
-      'IdleEncouragement, when present, carries the full encouragement body',
-    );
-  }
+  assert.ok(
+    idleFragments.some((request) => requestText(request).includes('You have plenty of time')),
+    'IdleEncouragement carries the full encouragement body',
+  );
 
   // ── The premature suicides (stroke 5) ───────────────────────────────────────
   // Resource safety refuses suicide while C1 is outstanding. Instruction-only
@@ -418,6 +534,8 @@ async function finalOracle(scenario, ctx) {
 const customs = {
   bindReviewers,
   noWitnessAtFirstRejection,
+  firstIdleReceipt,
+  secondIdleReceipt,
   finalOracle,
 };
 

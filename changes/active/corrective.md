@@ -1216,3 +1216,33 @@ Corrective Change 闭环：Join 真实用户消息唤醒、Synthetic TOML produc
 - `npm run check` 全量判绿，无豁免。
 - 随后在同一文件追加 Final outcome 并移入 `changes/completed/`。
 
+---
+
+## Blocker 2026-08-09：FinalityRejected / LWR 因果竞态
+
+已实证 `manager-unhappy-path` e2e 5 次中 1 次：`FinalityRejected` 在 rejecting Reviewer 的
+`BlogEntryCommitted` 前 durable，导致其 `WorkRecordRef` 永久缺少 `# Work log`。这不是可接受的
+timing variance；`FinalityRejected` 是永久 blob 引用，后续 Blog frame 不能修正既有 record。
+
+此项属于本 Change §21 的 Finality rejection / `manager-unhappy-path` 验收和既有 full-gate 关闭条件，不
+扩大冻结产品范围。
+
+### Closing work（未实现）
+
+1. 实现 GLORY-044/072/073：REVISE 立即关闭 Reviewer continuation/cohort；只在同一 journal snapshot
+   证明 terminal frontier 已被 `BlogEntryCommitted` coverage 覆盖并物化 canonical LWR 后写
+   `FinalityRejected`。
+2. record-ready 等待改为 `AgentJournal.awaitChangeFrom` 事件驱动；禁止 timer polling。进程崩溃/本地
+   waiter disposal 后从 durable REVISE/frontier 恢复；`BloggerRequestAbandoned` 不得产生 partial rejection。
+3. 落盘回归：受控延迟 `BlogEntryCommitted` 时先证明 cohort 已关闭、`FinalityRejected` 尚未出现；coverage
+   到达后证明唯一 rejection blob 含 `# Work log`。补 crash-recovery 与 abandonment 分支，删除/收紧任何
+   允许缺失 `# Work log` 的 OR 断言。
+
+### Additional closing criteria
+
+- 每个 REVISE 的 `FinalityRejected.WorkRecordRef` 都来自同一 snapshot 的 record-ready canonical LWR；
+  不存在覆盖不足、跨 revision 或缺少 `# Work log` 的永久 rejection record。
+- Reviewer continuation/cohort 在 durable REVISE 后立即关闭，且 record-ready 等待无 timer-driven
+  re-probe。
+- 上述回归、既有 §21 条件与 `npm run check` 全绿后，方可进入 Final outcome；本条仅记录 blocker 与所需
+  收口，不宣称实现或验证完成。

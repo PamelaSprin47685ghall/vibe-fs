@@ -259,6 +259,125 @@ test('DSL_OWNERSHIP_domain_pending_evidence_is_not_behaviour_bool', () => {
   assert.deepEqual(hits, [])
 })
 
+test('DSL_OWNERSHIP_verb_named_function_ending_Pending_is_not_behaviour_bool', () => {
+  // A verb-named function that ends in a nominal suffix is a pure operation,
+  // not a stored stage latch. `clearStalePending` / `tryClaimStartupProbe` are
+  // names of work being performed, not fields recording "which step we are at".
+  const source = [
+    'module Sample',
+    'let clearStalePending agentId = ()',
+    'let tryClaimStartupProbe () = true',
+    'let failPending entries reason = ()',
+    'let takePending supervisor id = []',
+    'let hasPendingActivation journal sessionId = false',
+  ].join('\n')
+  const hits = scanText(source, 'src/Wanxiangshu/Infrastructure/OpenCode/Orchestration/Host.fs')
+  assert.ok(
+    !hits.some((h) => h.gate === 'behaviour-bool'),
+    'verb-named functions ending in Pending/Probe are pure operations, not stage latch names',
+  )
+})
+
+test('DSL_OWNERSHIP_physical_pending_latch_and_estimate_fields_are_not_behaviour_bool', () => {
+  // Cat-C false positives: physical abort set, runtime estimate field, recovery
+  // probe type alias, and fold-rejection tokens that merely end in Already/Pending.
+  const source = [
+    'module Sample',
+    'let abortPending = HashSet<PtyId>()',
+    'type Request = { EstimatedRunningSeconds: float }',
+    'type RecoveryStageProbe = unit -> unit',
+    'type GuardNudgeOutcome = | AlreadyOutstanding | Sent',
+    'type PendingSeal = { ReviewerId: string }',
+  ].join('\n')
+  const hits = scanText(source, 'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ExecutorTool.fs')
+  assert.ok(
+    !hits.some((h) => h.gate === 'behaviour-bool'),
+    'physical Pending/Already/Running names must not fire behaviour-bool',
+  )
+})
+
+test('DSL_OWNERSHIP_field_named_HasPendingCompletion_still_fires_behaviour_bool', () => {
+  // The residual exact-name block is the authority for stage latches: a
+  // stored boolean completion slot must keep firing.
+  const source = ['module Sample', 'type State = { HasPendingCompletion: bool }'].join('\n')
+  const hits = scanText(source, 'src/Wanxiangshu/Session/Sample.fs')
+  assert.ok(
+    hits.some((h) => h.gate === 'behaviour-bool'),
+    'a stored HasPendingCompletion slot must still fire behaviour-bool',
+  )
+})
+
+test('DSL_OWNERSHIP_pascal_member_Pending_still_fires_behaviour_bool', () => {
+  // A PascalCase property named as a stage latch (CompactionProbePending) is a
+  // stored control slot and must fire even though verb-named functions are now
+  // allowed.
+  const source = ['module Sample', 'type S() =', '    member _.CompactionProbePending = true'].join('\n')
+  const hits = scanText(source, 'src/Wanxiangshu/Session/Sample.fs')
+  assert.ok(
+    hits.some((h) => h.gate === 'behaviour-bool'),
+    'a PascalCase stage-latch property must still fire behaviour-bool',
+  )
+})
+
+test('DSL_OWNERSHIP_business_stage_bool_suffix_still_fires_behaviour_bool', () => {
+  // Residual suffix must still catch true business stage bools that are not
+  // domain evidence / physical allowlist entries.
+  const source = ['module Sample', 'type Flags = { isRunning: bool; repairSpent: bool }'].join('\n')
+  const hits = scanText(source, 'src/Wanxiangshu/Session/Sample.fs')
+  assert.ok(
+    hits.some((h) => h.gate === 'behaviour-bool'),
+    'business *Running/*Spent stage bools must still fire behaviour-bool',
+  )
+})
+
+test('DSL_OWNERSHIP_qualified_infrastructure_reference_is_leak_outside_infra', () => {
+  const source = [
+    'module Sample',
+    'let prompts () = Wanxiangshu.Infrastructure.Resources.RuntimeResources.current().Prompts',
+  ].join('\n')
+  const hits = scanText(source, 'src/Wanxiangshu/Tools/StaticTools.fs')
+  assert.ok(
+    hits.some((h) => h.gate === 'infrastructure-leak'),
+    'FQN Infrastructure reference outside Infrastructure/Process/Host-boundary must fire',
+  )
+})
+
+test('DSL_OWNERSHIP_qualified_process_reference_is_leak_outside_infra', () => {
+  const source = [
+    'module Sample',
+    'let run () = Wanxiangshu.Process.ProcessRunner.run cmd est ctx ct',
+  ].join('\n')
+  const hits = scanText(source, 'src/Wanxiangshu/Tools/StaticTools.fs')
+  assert.ok(
+    hits.some((h) => h.gate === 'infrastructure-leak'),
+    'FQN Process reference outside Infrastructure/Process/Host-boundary must fire',
+  )
+})
+
+test('DSL_OWNERSHIP_namespace_OpenCode_declaration_is_not_infrastructure_leak', () => {
+  // A `namespace Wanxiangshu.OpenCode` line declares the module's own home, not
+  // a dependency on the infrastructure layer — it must not fire
+  // infrastructure-leak (C-class false positive).
+  const source = 'namespace Wanxiangshu.OpenCode\nmodule Sample =\n    let x = 1'
+  const hits = scanText(source, 'src/Wanxiangshu/Application/Reconciliation/Sample.fs')
+  assert.ok(!hits.some((h) => h.gate === 'infrastructure-leak'))
+})
+
+test('DSL_OWNERSHIP_namespace_Process_declaration_is_not_infrastructure_leak', () => {
+  const source = 'namespace Wanxiangshu.Process\nmodule Sample =\n    let x = 1'
+  const hits = scanText(source, 'src/Wanxiangshu/Application/Reconciliation/Sample.fs')
+  assert.ok(!hits.some((h) => h.gate === 'infrastructure-leak'))
+})
+
+test('DSL_OWNERSHIP_qualified_process_reference_is_clean_inside_infra', () => {
+  // Infrastructure may use Process FQN without leaking across the boundary.
+  const hits = scanText(
+    'module Sample\nlet x = Wanxiangshu.Process.ProcessRunner.run',
+    'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ExecutorTool.fs',
+  ).filter((h) => h.gate === 'infrastructure-leak')
+  assert.deepEqual(hits, [], 'Infrastructure path must stay clean for Process FQN')
+})
+
 
 test('DSL_OWNERSHIP_scanFiles_aggregates_entries', () => {
   const hits = scanFiles([
@@ -308,10 +427,22 @@ test('DSL_OWNERSHIP_mutable_requires_dsl_mutable_declaration', () => {
     assert.deepEqual(scanText(declared, path), [], `declared mutable must stay green in ${path}`)
   }
 
-  // Agent and non-Parallel Kernel stay fully fail-closed: even a declaration
-  // cannot legalize a mutable there.
-  assert.ok(scanText(declared, 'src/Wanxiangshu/Agent/Sample.fs').some((h) => h.gate === 'mutable'))
-  assert.ok(scanText(declared, 'src/Wanxiangshu/Kernel/Outcome.fs').some((h) => h.gate === 'mutable'))
+  // Mutable policy is now declaration-gated for ALL production paths
+  // (isMutableDeclarationAllowed = true): Agent and non-Parallel Kernel are
+  // no longer categorically fail-closed. A bare mutable still fires there;
+  // a precise declaration legalizes it.
+  assert.ok(scanText(bare, 'src/Wanxiangshu/Agent/Sample.fs').some((h) => h.gate === 'mutable'))
+  assert.ok(scanText(bare, 'src/Wanxiangshu/Kernel/Outcome.fs').some((h) => h.gate === 'mutable'))
+  assert.deepEqual(
+    scanText(declared, 'src/Wanxiangshu/Agent/Sample.fs'),
+    [],
+    'a declared mutable must stay green in Agent',
+  )
+  assert.deepEqual(
+    scanText(declared, 'src/Wanxiangshu/Kernel/Outcome.fs'),
+    [],
+    'a declared mutable must stay green in Kernel',
+  )
 })
 
 test('DSL_OWNERSHIP_unknown_mutable_category_is_rejected', () => {
@@ -459,13 +590,17 @@ test('DSL_OWNERSHIP_host_boundary_open_is_not_gate_red', () => {
   assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('HostForkRuntime.fs'))
   assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('SatelliteRuntime.fs'))
   assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('StudentTeacherRuntime.fs'))
+  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('CompletionMailbox.fs'))
+  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('ForkRuntime.fs'))
+  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('EnforcerHost.fs'))
+  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('HandleCompletionCodec.fs'))
+  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('BloggerCoordinator.fs'))
   assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Session/HostForkRuntime.fs'), true)
   assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Session/SatelliteRuntime.fs'), true)
   assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Session/StudentTeacherRuntime.fs'), true)
+  assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Session/BloggerCoordinator.fs'), true)
   assert.deepEqual(scanText(source, 'src/Wanxiangshu/Session/HostForkRuntime.fs'), [])
-  assert.ok(
-    scanText(source, 'src/Wanxiangshu/Session/BloggerCoordinator.fs').some((h) => h.gate === 'infrastructure-leak'),
-  )
+  assert.deepEqual(scanText(source, 'src/Wanxiangshu/Session/BloggerCoordinator.fs'), [])
   assert.ok(scanText(source, 'src/Wanxiangshu/Agent/Sample.fs').some((h) => h.gate === 'infrastructure-leak'))
 })
 

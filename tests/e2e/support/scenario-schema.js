@@ -87,6 +87,8 @@ const collectionShapeProblems = (raw) => {
 const FLOW_VERBS = new Set([
   'wait',
   'waitFact',
+  'armIdle',
+  'awaitIdle',
   'prompt',
   'session',
   'lane',
@@ -137,6 +139,65 @@ const bindChildProblems = (flow) =>
     for (const field of Object.keys(binding)) {
       if (!BIND_CHILD_KEYS.has(field)) {
         problems.push(`flow[${index}] bindChild field '${field}' is unsupported`);
+      }
+    }
+    return problems;
+  });
+
+const AWAIT_IDLE_KEYS = new Set(['after', 'arm', 'attempts', 'armAttempts', 'session']);
+
+const awaitIdleProblems = (flow) =>
+  (flow ?? []).flatMap((flowStep, index) => {
+    const idle = flowStep?.awaitIdle;
+    if (idle === undefined) return [];
+    if (idle === null || typeof idle !== 'object' || Array.isArray(idle)) {
+      return [`flow[${index}] awaitIdle must be a table`];
+    }
+
+    const problems = [];
+    if (typeof idle.after !== 'string' || idle.after.trim() === '') {
+      problems.push(`flow[${index}] awaitIdle requires an exact provider expectation id`);
+    }
+    if (idle.arm !== undefined && (typeof idle.arm !== 'string' || idle.arm.trim() === '')) {
+      problems.push(`flow[${index}] awaitIdle arm must be an exact provider expectation id`);
+    }
+    if (idle.attempts !== undefined && (!Number.isInteger(idle.attempts) || idle.attempts < 1)) {
+      problems.push(`flow[${index}] awaitIdle attempts must be a positive integer`);
+    }
+    if (idle.armAttempts !== undefined && (!Number.isInteger(idle.armAttempts) || idle.armAttempts < 1)) {
+      problems.push(`flow[${index}] awaitIdle armAttempts must be a positive integer`);
+    }
+    if (idle.session !== undefined && (typeof idle.session !== 'string' || idle.session.trim() === '')) {
+      problems.push(`flow[${index}] awaitIdle session must be a non-empty session selector`);
+    }
+    for (const field of Object.keys(idle)) {
+      if (!AWAIT_IDLE_KEYS.has(field)) {
+        problems.push(`flow[${index}] awaitIdle field '${field}' is unsupported`);
+      }
+    }
+    return problems;
+  });
+
+const ARM_IDLE_KEYS = new Set(['id', 'attempts']);
+
+const armIdleProblems = (flow) =>
+  (flow ?? []).flatMap((flowStep, index) => {
+    const arm = flowStep?.armIdle;
+    if (arm === undefined) return [];
+    if (arm === null || typeof arm !== 'object' || Array.isArray(arm)) {
+      return [`flow[${index}] armIdle must be a table`];
+    }
+
+    const problems = [];
+    if (typeof arm.id !== 'string' || arm.id.trim() === '') {
+      problems.push(`flow[${index}] armIdle requires an exact provider expectation id`);
+    }
+    if (arm.attempts !== undefined && (!Number.isInteger(arm.attempts) || arm.attempts < 1)) {
+      problems.push(`flow[${index}] armIdle attempts must be a positive integer`);
+    }
+    for (const field of Object.keys(arm)) {
+      if (!ARM_IDLE_KEYS.has(field)) {
+        problems.push(`flow[${index}] armIdle field '${field}' is unsupported`);
       }
     }
     return problems;
@@ -604,6 +665,21 @@ const danglingReferences = (entries, scenario) => {
       problems.push(`flow wait references '${waited}', which is not a declared step or turn`);
     }
 
+    const idleAfter = flowStep.awaitIdle?.after;
+    if (typeof idleAfter === 'string' && !entries.some((entry) => entry.id === idleAfter || entry.turnId === idleAfter)) {
+      problems.push(`flow awaitIdle references '${idleAfter}', which is not a declared step or turn`);
+    }
+
+    const idleArm = flowStep.awaitIdle?.arm;
+    if (typeof idleArm === 'string' && !entries.some((entry) => entry.id === idleArm || entry.turnId === idleArm)) {
+      problems.push(`flow awaitIdle arm references '${idleArm}', which is not a declared step or turn`);
+    }
+
+    const armedIdle = flowStep.armIdle?.id;
+    if (typeof armedIdle === 'string' && !entries.some((entry) => entry.id === armedIdle || entry.turnId === armedIdle)) {
+      problems.push(`flow armIdle references '${armedIdle}', which is not a declared step or turn`);
+    }
+
     const asserted = flowStep.assertDeliveries?.id;
     if (typeof asserted === 'string' && !entries.some((entry) => entry.id === asserted)) {
       problems.push(`assertDeliveries references '${asserted}', which is not a declared step`);
@@ -763,6 +839,8 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
   const validationProblems = [
     ...unknownFlowVerbs(raw.flow),
     ...bindChildProblems(raw.flow),
+    ...awaitIdleProblems(raw.flow),
+    ...armIdleProblems(raw.flow),
     ...afterExpectationProblems(raw.flow),
     ...waitFactRenewOnProblems(raw.flow),
     ...assertDeliveriesProblems(raw.flow),

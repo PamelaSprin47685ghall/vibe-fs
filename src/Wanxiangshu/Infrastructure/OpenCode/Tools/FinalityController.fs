@@ -40,6 +40,7 @@ module FinalityController =
     /// stops their NEXT effect, never touches their durable sessions.
     /// Fable's Task does not expose `IsCompleted`; keep a local flag.
     type CancelToken() =
+        // DSL-MUTABLE: cancellation — cooperative cancel latch for sibling drivers
         let mutable cancelled = false
 
         let tcs =

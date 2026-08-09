@@ -91,6 +91,7 @@ module FileMutationTools =
                     NodeFs.renameSync (source, destination)
                     return ToolHostCodec.tomlObject [ "moved", tString source; "destination", tString destination ]
                 with ex ->
+                    // DSL-MUTABLE: algorithm-scratch — node error code extract buffer
                     let mutable code = ""
 
                     try
@@ -110,6 +111,7 @@ module FileMutationTools =
                             return
                                 ToolHostCodec.tomlObject [ "moved", tString source; "destination", tString destination ]
                         with copyEx ->
+                            // DSL-MUTABLE: algorithm-scratch — copy exception message buffer
                             let mutable copyMessage = "copy failed"
 
                             try
@@ -122,6 +124,7 @@ module FileMutationTools =
 
                             return error (sprintf "mv: %s -> %s: %s" source destination copyMessage)
                     else
+                        // DSL-MUTABLE: algorithm-scratch — rename exception message buffer
                         let mutable message = "rename failed"
 
                         try

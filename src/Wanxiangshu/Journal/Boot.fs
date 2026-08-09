@@ -74,6 +74,7 @@ module Boot =
                 [], []
             else
                 let fd = NodeFsBoot.openSync (filePath, "r")
+                // DSL-MUTABLE: algorithm-scratch — readPrefixEnvelopes result holder across finally
                 let mutable res = [], []
 
                 try
@@ -84,7 +85,9 @@ module Boot =
                         if bytesRead <= 0 then
                             [||]
                         else
+                            // DSL-MUTABLE: algorithm-scratch — last newline index for prefix truncate
                             let mutable lastNewline = -1
+                            // DSL-MUTABLE: algorithm-scratch — backward scan index for newline
                             let mutable i = bytesRead - 1
 
                             while i >= 0 && lastNewline = -1 do
@@ -166,6 +169,7 @@ module Boot =
                 NodeFsBoot.readdirSync directory
                 |> Array.filter (fun f -> f.EndsWith(".ndjson"))
 
+            // DSL-MUTABLE: algorithm-scratch — accumulated boot diagnostics across streams
             let mutable allDiags = []
 
             let streamEnvelopes =

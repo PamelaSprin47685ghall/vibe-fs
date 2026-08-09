@@ -14,6 +14,7 @@ import {
   teardownScenario,
 } from '../support/index.js';
 import { bindLaneSession } from '../support/lane.mjs';
+import { stepOf } from '../support/runtime-key.js';
 import { WATCHDOG_TIMEOUT_MS } from '../support/time-budget.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -128,7 +129,10 @@ try {
     (request) => requestText(request).includes(rootText) && toolNames(request).includes('teacher'),
   );
   const compileRequests = studentRequests.filter(
-    (request) => requestText(request).includes('你已经结束向 Teacher 提问') && toolNames(request).includes('write'),
+    (request) =>
+      stepOf(request) === 0 &&
+      requestText(request).includes('你已经结束向 Teacher 提问') &&
+      toolNames(request).includes('write'),
   );
   assert.equal(
     compileRequests.length,

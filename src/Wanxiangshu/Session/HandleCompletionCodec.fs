@@ -5,10 +5,11 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain.ChildRecovery
 open Wanxiangshu.Host
+open Wanxiangshu.Journal
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Kernel
-open Wanxiangshu.Journal
+open Wanxiangshu.OpenCode
 
 /// EXEC-009 durable join payload. Written before `HandleCompleted`; join reads
 /// it after a controlled consume. Identity fields that already live on the
@@ -64,7 +65,7 @@ module HandleCompletionCodec =
                   "child_session_id", str ""
                   "agent_id", str agentId ]
 
-        Wanxiangshu.OpenCode.CanonicalJson.canonicalJson (createObj fields)
+        CanonicalJson.canonicalJson (createObj fields)
 
     let private field (raw: obj) (key: string) : string =
         let hasKey: bool =

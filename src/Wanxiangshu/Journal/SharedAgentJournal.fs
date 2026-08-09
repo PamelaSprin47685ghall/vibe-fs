@@ -14,6 +14,7 @@ open Wanxiangshu.Kernel.Identity
 /// happening.
 module SharedAgentJournal =
 
+    /// DSL-state-combination: physical — shared journal owner refcount resource
     type private SharedJournal =
         { Journal: AgentJournal
           mutable RefCount: int }

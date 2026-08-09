@@ -140,6 +140,8 @@ module HostSignalBootstrap =
                         if not studentTeacherHandled && not reviewerHandled && not managerHandled then
                             do!
                                 TurnCompletionProgram.applyWithContinuation
+                                    PtyTiming.timerTask
+                                    Pty.abortParent
                                     sessionPort
                                     eventPort
                                     journal
@@ -177,7 +179,7 @@ module HostSignalBootstrap =
                     // compacts outside the configuration the plugin can reach, the correct
                     // response is to refuse to run — not to reanchor and carry on, which would
                     // hide the condition behind behaviour that looks correct.
-                    if scope.CompactionProbePending then
+                    if scope.IsStartupProbeOpen then
                         match HostCompactionGate.judgeStartup scope.CompactionSettingGap sessionId messages with
                         | None -> () // Not a completed first turn yet; the probe stays armed.
                         | Some verdict ->

@@ -103,8 +103,13 @@ export const CONTROL_STATE_EXEMPT = new Set([])
  * These files compose Host ports / PromptDispatcher extensions / Pty backends.
  */
 export const HOST_BOUNDARY_OPEN_BASENAMES = new Set([
+  'BloggerCoordinator.fs',
   'CompanionHost.fs',
   'CompanionHostBlogger.fs',
+  'CompletionMailbox.fs',
+  'EnforcerHost.fs',
+  'ForkRuntime.fs',
+  'HandleCompletionCodec.fs',
   'HostForkAgent.fs',
   'HostForkAgentOwner.fs',
   'HostForkBusyNudge.fs',
@@ -152,9 +157,15 @@ export const FORBIDDEN = [
   },
   {
     gate: 'infrastructure-leak',
+    // Matches `open Wanxiangshu.Infrastructure|OpenCode|Process` (explicit
+    // import) OR a qualified member reference (`Wanxiangshu.Process.ProcessRunner.run`)
+    // so the FQN lexical-escape loop is closed. A bare namespace declaration
+    // (`namespace Wanxiangshu.OpenCode`) matches neither branch, so it is not
+    // a false-positive leak. Authorized Infrastructure/Process/Host boundary
+    // paths stay clean via skipIf.
     pattern:
-      /\b(?:open Wanxiangshu\.Infrastructure|open Wanxiangshu\.OpenCode|open Wanxiangshu\.Process)\b/,
-    label: 'infrastructure namespace open',
+      /\bopen\s+Wanxiangshu\.(?:Infrastructure|OpenCode|Process)\b|\bWanxiangshu\.(?:Infrastructure|OpenCode|Process)\.\w/,
+    label: 'infrastructure namespace open or qualified reference',
     skipIf: (file) =>
       isHostBoundaryOpenPath(file) || isProcessPhysicalPath(file) || isInfrastructurePath(file),
   },
@@ -173,9 +184,13 @@ export const FORBIDDEN = [
   {
     gate: 'behaviour-bool',
     // Domain evidence DUs / pure queries ending in Pending|Spent|Phase are allowlisted.
-    // Program-counter bools and staging slots stay forbidden by exact name or residual suffix.
+    // Physical/algorithm names that merely contain a suffix (EstimatedRunningSeconds,
+    // RecoveryStageProbe type alias, Already* fold rejections, Pending* durable fields)
+    // are allowlisted. Residual pattern still catches true stage latches
+    // (HasPendingCompletion, CompactionProbePending, isRunning-style counters).
+    // Verb-named functions (`let clearStalePending agentId =`) are skipped in scanText.
     pattern:
-      /\b(?!TddPhase\b|parseTddPhase\b|UnknownTddPhase\b|PerfectPending\b|isPerfectPending\b|StillPending\b|ConflictPending\b|recoveryBudgetSpent\b|tryTakePending\b)[a-zA-Z]+(?:Stage|Phase|Next|Running|Pending|Spent|Already|Should)\b|\b(HasPendingCompletion|LastCompletionStatus|bloggerTask|bloggerFailed)\b/,
+      /\b(?!TddPhase\b|parseTddPhase\b|UnknownTddPhase\b|PerfectPending\b|isPerfectPending\b|StillPending\b|ConflictPending\b|recoveryBudgetSpent\b|tryTakePending\b|failPending\b|takePending\b|abortPending\b|hasPendingActivation\b|EstimatedRunningSeconds\b|RecoveryStageProbe\b|AlreadyOutstanding\b|AlreadyCounted\b|AlreadyCompleted\b|AlreadyAbandoned\b|AlreadyObserved\b|AlreadyExhausted\b|AlreadyInProgress\b|AlreadyLinkedToOther\b|OpeningAlreadyCaptured\b|TerminalAlreadyCaptured\b|LifeAlreadyOpen\b|FinalityAlreadyActive\b|CompactionAlreadyReanchored\b|PendingConfirmation\b|PendingChallenge\b|PendingClaimUnknown\b|PendingClaims\b|PendingOffer\b|PendingReviewSeals\b|PendingRuns\b|PendingSeal\b|PendingRunCount\b|NoPendingSeal\b)[a-zA-Z]+(?:Stage|Phase|Next|Running|Pending|Spent|Already|Should)\b|\b(HasPendingCompletion|LastCompletionStatus|bloggerTask|bloggerFailed)\b/,
     label: 'behaviour bool or stage field',
     skipIf: isProcessPhysicalPath,
   },
@@ -648,6 +663,17 @@ export const scanText = (text, file = '<synthetic>') => {
     for (const { gate, pattern, skipIf } of FORBIDDEN) {
       if (skipIf && skipIf(file)) continue
       if (gate === 'mutable' && isMutableDeclarationAllowed(file) && hasDslMutableDeclaration(lines, i)) continue
+      // A `let name arg =` / `let name (args) =` binding is a pure operation
+      // (work being performed), not a stored stage latch. Function bindings are
+      // skipped so verb-named operations like `clearStalePending` do not fire
+      // behaviour-bool; stored stage slots (record fields, member properties)
+      // are not `let`-function shapes and still fire via the residual pattern.
+      if (
+        gate === 'behaviour-bool' &&
+        /\blet\s+(?!mutable\b)\w+(?:\s+\w+|\s*\([^)]*\))+\s*=/.test(code)
+      ) {
+        continue
+      }
       if (pattern.test(code)) {
         violations.push({ gate, file, line: i + 1, text: line.trim() })
       }

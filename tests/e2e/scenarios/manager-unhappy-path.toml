@@ -19,14 +19,14 @@
 #    on the SAME turn. A new HumanRoot after Blessed opens a NEW Life (planning)
 #    once LifeCompleted — so minor work + final suicide stay on the blessing turn.
 # 5. mgr-guard remains defined for the operator-abort join-guard path but is
-#    unused in this flow. mgr-idle-a and mgr-idle-b prove two independent
-#    Manager idle occasions under one Life.
+#    unused in this flow. The controlled idle phase ties each Manager idle
+#    claim to a real provider terminal and keeps A physically pending through B.
 
 scenario = "manager-unhappy-path"
 description = "GLORY-070/EXEC-017/F2-F5: repair, join user_message wake, hidden reviewer rejections, 2N cohort blessing, rest in peace"
 pass = "Manager unhappy path canary passed: all 13 strokes traversed."
 
-setup = { strict = true, project = { files = { "AGENTS.md" = "manager unhappy path canary\n", "src/main.txt" = "target\n" } } }
+setup = { strict = true, acceptanceGate = { origin = "ManagerIdleEncouragement", plan = ["defer", "defer"] }, project = { files = { "AGENTS.md" = "manager unhappy path canary\n", "src/main.txt" = "target\n" } } }
 session = { agent = "fast-manager", bind = ["mgr-title", "fast-manager"] }
 prompt = { agent = "fast-manager", text = "Run the full unhappy path in one turn." }
 
@@ -47,7 +47,6 @@ must = [
   "reviewer-r2.0",
   "reviewer-r3.0",
   "mgr-idle-a.0",
-  "mgr-idle-b.0",
 ]
 
 flow = [
@@ -75,7 +74,15 @@ flow = [
   { wait = "reviewer-r1.1", timeoutMs = 120000 },
   { waitFact = { name = "FinalityRejected", eq = 1 } },
   { custom = "noWitnessAtFirstRejection" },
-  { wait = "mgr-labor.3", timeoutMs = 120000 },
+  # Controlled GLORY-029 phase: labor terminal → A receipt/provider terminal →
+  # B receipt/provider terminal. Arm delivery two before A can become idle, so
+  # the second barrier binds B's real provider lifecycle rather than reusing an
+  # already-consumed delivery signal.
+  { armIdle = { id = "mgr-idle-a.0", attempts = 2 } },
+  { awaitIdle = { after = "mgr-labor.3", arm = "mgr-idle-a.0", session = "self" }, timeoutMs = 120000 },
+  { custom = "firstIdleReceipt" },
+  { awaitIdle = { after = "mgr-idle-a.0", attempts = 2, session = "self" }, timeoutMs = 120000 },
+  { custom = "secondIdleReceipt" },
 
   # stroke 7/8: fix-one → second suicide → R1+R2
   { prompt = { agent = "fast-manager", text = "MARK-ISSUE-ONE: C1 is fixing issue one and will report back." } },
@@ -185,17 +192,6 @@ tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
   respond = { type = "text", text = "Manager continues." }
-
-[[turn]]
-id = "mgr-idle-b"
-internal = true
-# bindReviewers admits this full prompt only after mgr-idle-a.0. Keeping the
-# compiled declaration retired prevents same-prefix ambiguity before A.
-user = "__manager-idle-b-retired__"
-tools = ["fork", "join", "list", "suicide"]
-
-  [[turn.step]]
-  respond = { type = "text", text = "Manager continues after independent idle B." }
 
 [[turn]]
 id = "mgr-labor"

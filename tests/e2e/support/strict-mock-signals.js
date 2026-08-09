@@ -14,6 +14,7 @@ export class StrictMockSignals {
      */
     this._claimCount = new Map();
     this._expectationWaiters = new Map();
+    this._expectationAttemptWaiters = new Map();
     this._idleWaiters = new Set();
     this._fatalError = null;
   }
@@ -39,6 +40,7 @@ export class StrictMockSignals {
     this._resolveWaiters(this._expectationWaiters.get(id));
     // Do not delete the waiter set before resolve — _resolveWaiters iterates a copy.
     this._expectationWaiters.delete(id);
+    this._resolveAttemptWaiters(id);
   }
 
   hasConsumed(id) {
@@ -75,6 +77,44 @@ export class StrictMockSignals {
     });
   }
 
+  waitForExpectationAttempt(id, attempts, timeoutMs) {
+    if (!Number.isInteger(attempts) || attempts < 1) {
+      return Promise.reject(new Error(`expectation attempts must be a positive integer: ${attempts}`));
+    }
+    if (this._fatalError) return Promise.reject(this._fatalError);
+    if (this.matchCount(id) >= attempts) return Promise.resolve();
+
+    return new Promise((resolve, reject) => {
+      const waiters = this._expectationAttemptWaiters.get(id) || new Set();
+      let timeout;
+      const remove = () => {
+        waiters.delete(entry);
+        if (waiters.size === 0) this._expectationAttemptWaiters.delete(id);
+      };
+      const entry = {
+        attempts,
+        resolve: () => {
+          clearTimeout(timeout);
+          remove();
+          resolve();
+        },
+        reject: (error) => {
+          clearTimeout(timeout);
+          remove();
+          reject(error);
+        },
+      };
+      if (timeoutMs !== undefined) {
+        timeout = setTimeout(() => {
+          remove();
+          reject(new Error(`Timed out waiting for expectation ${id} attempt ${attempts}`));
+        }, timeoutMs);
+      }
+      waiters.add(entry);
+      this._expectationAttemptWaiters.set(id, waiters);
+    });
+  }
+
   waitForIdle(timeoutMs) {
     if (this._fatalError) return Promise.reject(this._fatalError);
     if (this._activeResponses.size === 0) return Promise.resolve();
@@ -91,6 +131,10 @@ export class StrictMockSignals {
       this._rejectWaiters(waiters, this._fatalError);
     }
     this._expectationWaiters.clear();
+    for (const waiters of this._expectationAttemptWaiters.values()) {
+      this._rejectWaiters(waiters, this._fatalError);
+    }
+    this._expectationAttemptWaiters.clear();
     this._rejectWaiters(this._idleWaiters, this._fatalError);
     this._idleWaiters.clear();
   }
@@ -159,6 +203,14 @@ export class StrictMockSignals {
   _resolveWaiters(waiters) {
     if (!waiters) return;
     for (const entry of [...waiters]) entry.resolve();
+  }
+
+  _resolveAttemptWaiters(id) {
+    const waiters = this._expectationAttemptWaiters.get(id);
+    if (!waiters) return;
+    for (const entry of [...waiters]) {
+      if (this.matchCount(id) >= entry.attempts) entry.resolve();
+    }
   }
 
   _rejectWaiters(waiters, err) {

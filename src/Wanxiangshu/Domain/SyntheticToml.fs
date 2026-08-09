@@ -198,8 +198,9 @@ module SyntheticToml =
         if isNull text then
             0
         else
-            // DSL-MUTABLE: algorithm-scratch — byte-count loop accumulators
+            // DSL-MUTABLE: algorithm-scratch — byte-count total accumulator
             let mutable total = 0
+            // DSL-MUTABLE: algorithm-scratch — byte-count index cursor
             let mutable index = 0
 
             while index < text.Length do

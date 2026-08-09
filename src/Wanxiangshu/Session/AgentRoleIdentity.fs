@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Session
 
 open System
+open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 
 /// SSOT: `Role` lives in `Kernel/Roles.fs`. This module only provides
@@ -9,15 +10,19 @@ module AgentRoleIdentity =
 
     let ofRole (role: Role) : Role = role
 
-    let ofManaged (agent: Wanxiangshu.OpenCode.ManagedAgent) : Role = agent.Role
+    /// Host composition passes `managed.Role`; Session never depends on OpenCode types.
+    let ofManaged (role: Role) : Role = role
 
     let toRole (role: Role) : Role = role
 
-    let roleOfString (value: string) =
+    /// Host wire names (`fast-manager`) parse via Domain SSOT; bare role labels fall back to catalog.
+    let roleOfString (value: string) : Role option =
         if String.IsNullOrWhiteSpace value then
             None
         else
-            Wanxiangshu.OpenCode.ManagedAgent.tryParse value |> Option.map ofManaged
+            match PromptAuthority.parseAgentNameTyped value with
+            | Ok parsed -> Some parsed.Role
+            | Error _ -> ManagedAgentCatalog.tryParseRole (value.Trim().ToLowerInvariant())
 
     /// The canonical role label persisted in durable facts.
     ///
@@ -26,4 +31,4 @@ module AgentRoleIdentity =
     /// would silently change the durable string, and every `roleOfString` read of
     /// an older journal would then answer `None`.
     let roleName (role: Role) : string =
-        Wanxiangshu.Domain.ManagedAgentCatalog.roleLabel role
+        ManagedAgentCatalog.roleLabel role

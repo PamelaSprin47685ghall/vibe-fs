@@ -1,6 +1,6 @@
 # Glory：所有权与边界（shape 层）
 
-本文件定义 GLORY 机制的模块所有权、数据流边界与禁止的泄漏路径。条款正文见 `docs/what/glory.md`（GLORY-001..071、SURFACE-001..006）。
+本文件定义 GLORY 机制的模块所有权、数据流边界与禁止的泄漏路径。条款正文见 `docs/what/glory.md`（GLORY-001..073、SURFACE-001..006）。
 
 ## 模块所有权
 
@@ -11,6 +11,7 @@
 | 终结工具 | `Infrastructure/OpenCode/Tools/FinalityTool.fs` | `suicide` 唯一写入口：受理顺序见 GLORY-040 |
 | Manager terminal sequencing | `Application/Manager/ManagerWorkflow.fs` | 唯一判定 Activation、JoinGuard、Finality defer、Orchestrator handoff 与 idle encouragement；`TurnCompletionProgram` 只做普通 terminal plumbing（GLORY-018/029/070） |
 | 自动评审 | `Infrastructure/OpenCode/Orchestration/HostReviewProgram.fs` | 从 `OrchestratorHostReview` 提炼的通用 reverify（GLORY-042） |
+| 拒绝记录就绪 | `Infrastructure/OpenCode/Tools/FinalityController.fs` | 关闭 Reviewer cohort 后只等待 durable journal evidence；不写 `BlogEntryCommitted`，只在 GLORY-072 成立时写 `FinalityRejected` |
 | 反馈渲染 | `Domain/FinalityPrompt.fs` | `SyntheticToml` 唯一渲染路径（GLORY-052，SURFACE-004） |
 | 冻结文本 | 各 Domain owner + `resources/prompts/*.md` | 每个固定文本恰好一个 owner（SURFACE-004） |
 
@@ -30,7 +31,9 @@ HumanRoot [X] → XTrace durable capture → ManagerNarrativeTransform 改写
 
 ```text
 suicide → FinalityRequested → HostReviewProgram → REVISE
-→ Reviewer LWR（includeOpening=false）→ FinalityRejected → FinalityPrompt.rejected 拒绝 prompt（作为 suicide 工具返回值直接返回）
+→ 立即关闭 Reviewer continuation/cohort
+→ `BlogEntryCommitted` 覆盖 reviewer terminal frontier → 同一 snapshot 的 Reviewer LWR（includeOpening=false）
+→ FinalityRejected → FinalityPrompt.rejected 拒绝 prompt（作为 suicide 工具返回值直接返回）
 → Manager 同一 Life 继续工作 → 再次 suicide → 新 request/Reviewer/barrier
 ```
 
@@ -42,6 +45,7 @@ suicide → FinalityRequested → HostReviewProgram → REVISE
 4. Reviewer 工作记录只由 `XTraceCapture.lifecycleWorkRecord journal reviewerSessionId false` 产生（GLORY-004/049）。
 5. 成功输出逐字等于 `last_words`，Host 零附加文本（GLORY-062）。
 6. 状态身份只来自 typed facts + projection，禁止故事文本反向解析（GLORY-008/009）。
+7. `FinalityController` 可等待 `AgentJournal` change，却不得伪造 Blogger frame、推进 RecordCoverage 或把 coverage snapshot 与 LWR materialization 分两次读取；process-local waiter 不构成 durable request abandonment（GLORY-072/073）。
 
 ## 与既有系统的关系
 

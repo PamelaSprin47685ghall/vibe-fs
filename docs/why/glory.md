@@ -26,6 +26,12 @@
 
 `RevisionRequired` 从「执行错误」提升为正常业务结果；只有 Reviewer 启动失败、Journal 失败、tree 不可读等才是基础设施错误（GLORY-044/056）。区分二者的意义：wounds 是 Manager 该修复的证据；基础设施失败是系统缺陷，不得伪装成「工作不完整」。
 
+## 为什么 REVISE 立即关闭 Reviewer、却不立即写拒绝事实
+
+REVISE 已是对本 request 的终局审查判断，继续发 challenge、等待 sibling 或让 cohort 产生下一次效果只会制造与该判断竞争的事实，故必须立即关闭。`FinalityRejected` 则不是 verdict 的别名：它永久引用 canonical LWR；若 Blogger 尚未以 `BlogEntryCommitted` 覆盖 reviewer terminal frontier，立即物化会把临时空 frame 误写成永久证据，之后任何补写都无法修复 blob（GLORY-044/072）。
+
+被拒方向：以 sleep、timer 或当前 XTrace head 等待/重试。否决：前者把 Journal 因果等待退化为轮询；后者会在崩溃或后续活动后改变原 REVISE 的记录目标。只接受 durable frontier、同一 snapshot 的 coverage 与 materialization；本地 waiter 丢失后由 durable evidence 重建（GLORY-073）。
+
 ## 为什么复用现有 Reviewer session 与 ReviewRunner
 
 被拒方案：私有 `FinalityReviewHandleId`。否决：复用现有 Reviewer session 与 ReviewRunner，只改变所有权与可见性（GLORY-042/045）。自动 Reviewer 是隐藏的 Host-owned session，不进入 Manager 的 handle 面；每次 suicide 用全新 session/barrier，保证工作记录只描述当前 tree 和当前请求。

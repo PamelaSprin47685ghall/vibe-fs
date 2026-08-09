@@ -5,6 +5,7 @@ import { EventProbe } from './event-probe.js';
 import { FsOracle, HttpClient } from './scenario-http.js';
 import { initGitWorkspace } from './process-host-utils.js';
 import { resolvePluginPath } from './scenario-paths.js';
+import { ReceiptAcceptanceGate, receiptAcceptanceGatePluginPath } from './receipt-acceptance-gate.mjs';
 import { StrictMockProvider } from './strict-mock-provider.js';
 import { createScenarioTurn } from './scenario-turn.js';
 import { Watchdog } from './watchdog.js';
@@ -50,6 +51,7 @@ export class Scenario {
     this.client = ctx.client;
     this.fs = ctx.fs;
     this.scenarioDir = ctx.scenarioDir;
+    this.acceptanceGate = ctx.acceptanceGate ?? null;
     this.sessionIds = [];
     this.sessionCreatedDiagnostics = [];
     this.turn = createScenarioTurn(this);
@@ -117,7 +119,13 @@ export async function setupScenarioParallel(opts, tmpDir) {
 
   const provider = configureProvider(new StrictMockProvider(), opts);
   const host = new ProcessHost();
-  const pluginPaths = opts.plugin !== false ? [resolvePluginPath(opts.variant || 'opencode')] : [];
+  const productionPluginPath = opts.plugin !== false ? resolvePluginPath(opts.variant || 'opencode') : null;
+  const acceptanceGateDirectory = opts.acceptanceGate ? path.join(scenarioDir, 'receipt-acceptance-gate') : null;
+  if (acceptanceGateDirectory) fs.mkdirSync(acceptanceGateDirectory, { recursive: true });
+  const acceptanceGate = acceptanceGateDirectory ? new ReceiptAcceptanceGate(acceptanceGateDirectory) : null;
+  const pluginPaths = productionPluginPath === null
+    ? []
+    : [acceptanceGateDirectory ? receiptAcceptanceGatePluginPath : productionPluginPath];
 
   try {
     const t0 = Date.now();
@@ -146,6 +154,11 @@ export async function setupScenarioParallel(opts, tmpDir) {
           opts.contextLimit != null
             ? String(opts.contextLimit)
             : (process.env.WANXIANGSHU_BLOGGER_CONTEXT_LIMIT || '32000'),
+        ...(acceptanceGateDirectory ? {
+          WANXIANGSHU_E2E_ACCEPTANCE_GATE_DIR: acceptanceGateDirectory,
+          WANXIANGSHU_E2E_ACCEPTANCE_GATE_PLUGIN: productionPluginPath,
+          WANXIANGSHU_E2E_ACCEPTANCE_GATE_CONFIG: JSON.stringify(opts.acceptanceGate),
+        } : {}),
         ...(opts.extraEnv || {}),
       },
     });
@@ -170,6 +183,7 @@ export async function setupScenarioParallel(opts, tmpDir) {
       client,
       fs: new FsOracle(host.workDir),
       scenarioDir,
+      acceptanceGate,
     });
     events.onEvent((e) => {
       if (e.type === 'session.created' && e.sessionAgent && e.sessionID) {

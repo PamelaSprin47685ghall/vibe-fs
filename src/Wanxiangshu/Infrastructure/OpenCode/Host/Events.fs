@@ -31,6 +31,7 @@ module Events =
     /// Fable at every call site (the wrapper identity is re-created per call),
     /// so a reference-based Remove could never match and disposal leaked the
     /// listener. A record keeps one stable identity; disposal is a flag flip.
+    /// DSL-state-combination: physical — listener identity + live flag for disposal without identity leak
     type ListenerRegistration =
         { Listener: TerminalCompletionListener
           mutable Live: bool }
