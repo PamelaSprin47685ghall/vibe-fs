@@ -18,6 +18,9 @@
 //     - durable sibling REVISE + materialization RecordUnavailable (GLORY-074
 //       abandon): must not soft-fail vanish — steer, fail-closed Undecided, or
 //       refuse Rejected while siblings remain unaccounted (GLORY-044 / REVIEW-002)
+//     - inverse: sibling durable+ready, primary abandoned/RecordUnavailable →
+//       Undecided with zero FinalitySiblingSteered and no sibling tool evidence
+//       (primary preflight before SiblingSteered; no orphan steered facts)
 //     - crash after FinalitySiblingSteered / missing Manager FinalitySteer:
 //       resumeDurableRevise best-effort re-delivers steers; no new cohort
 //   ensureX (enlistMember)
@@ -894,6 +897,126 @@ test('GLORY_044_074_durable_sibling_REVISE_materialization_failure_must_not_sile
     assert.ok(result.startsWith('# Your ending could not be decided.'), result)
 
     assert.deepEqual(runtime.abortedIds, [], 'materialization failure must not dispose durable sessions')
+  }, FINALITY_PLUGIN_OPTS)
+})
+
+// ── GLORY-044/074 inverse: primary RecordUnavailable must not orphan SiblingSteered ─
+//
+// Sibling is durable+ready (would steer on happy path). Primary rejecting winner
+// is abandoned → RecordUnavailable. Resolution must be Undecided with zero
+// FinalitySiblingSteered (primary staged before any SiblingSteered append).
+
+test('GLORY_044_074_primary_fail_must_not_orphan_FinalitySiblingSteered_without_steers', async () => {
+  await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
+    commitWorkspace(directory)
+    acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
+    activateLife(runtime, 'mgr')
+
+    const primaryEvidence = 'primary-fail primary unfinished work alpha'
+    const siblingEvidence = 'primary-fail sibling unfinished work beta'
+
+    const roundOne = hooks.tool.suicide.execute(
+      { last_words: 'primary-fail first ending' },
+      suicideContext('call-pri-fail-1', 'run-mgr-pri-fail-1'),
+    )
+    const historical = await waitForSession(createdIds, 0)
+    await waitForPromptCount(runtime, historical, 1)
+    acceptLatestPrompt(runtime, historical)
+    captureWorkRecord(runtime.journal, historical, primaryEvidence)
+    makeRecordReady(runtime.journal, historical, 'run-pri-fail-a-1', 'pri-fail-round-one')
+    submitVerdict(
+      runtime.journal,
+      currentRequest(runtime.journal),
+      historical,
+      'run-pri-fail-a-1',
+      'call-pri-fail-a-1',
+      ReviewGuardVerdict.Revise,
+    )
+    notifyCompleted(runtime, historical, 'wide pri-fail a', 'formal pri-fail a', ROLE_REVIEWER)
+    await roundOne
+
+    const roundTwo = hooks.tool.suicide.execute(
+      { last_words: 'primary-fail second ending' },
+      suicideContext('call-pri-fail-2', 'run-mgr-pri-fail-2'),
+    )
+    const newcomer = await waitForSession(createdIds, 1)
+    await waitForPromptCount(runtime, historical, 2)
+    acceptLatestPrompt(runtime, historical)
+    await waitForPromptCount(runtime, newcomer, 1)
+    acceptLatestPrompt(runtime, newcomer)
+
+    // Sibling: fully materializable. Primary winner: durable REVISE frontier +
+    // abandoned companion ⇒ RecordUnavailable on primary preflight (before any
+    // FinalitySiblingSteered).
+    captureWorkRecord(runtime.journal, newcomer, siblingEvidence)
+    makeRecordReady(runtime.journal, newcomer, 'run-pri-fail-n-2', 'pri-fail-sibling-ready')
+    appendTerminalEvidence(runtime.journal, historical, 'run-pri-fail-h-2', 'pri-fail-primary terminal evidence')
+    const { bloggerAgentId } = linkActiveCompanionBlogger(runtime.journal, historical)
+    abandonCompanionBlogger(runtime.journal, historical, bloggerAgentId)
+
+    const request = currentRequest(runtime.journal)
+    assert.equal(mapEntries(request.Members).length, 2)
+    const requestIdValue = idValue.finalityRequest(request.RequestId)
+
+    submitVerdict(runtime.journal, request, historical, 'run-pri-fail-h-2', 'call-pri-fail-h-2', ReviewGuardVerdict.Revise)
+    submitVerdict(runtime.journal, request, newcomer, 'run-pri-fail-n-2', 'call-pri-fail-n-2', ReviewGuardVerdict.Revise)
+    notifyCompleted(runtime, historical, 'wide pri-fail h2', 'formal pri-fail h2', ROLE_REVIEWER)
+    notifyCompleted(runtime, newcomer, 'wide pri-fail n2', 'formal pri-fail n2', ROLE_REVIEWER)
+
+    const primaryGuard = mapTryFind(sessionId(historical), sessionsOf(runtime.journal))?.ReviewGuard
+    assert.ok(primaryGuard, 'primary must keep a ReviewGuard after durable REVISE')
+    assert.equal(
+      caseOf(primaryGuard.Witness),
+      'RevisionWitness',
+      'precondition: primary REVISE must be durable before materialization failure',
+    )
+
+    const outcome = await raceOrTimeout(roundTwo.then((result) => ({ kind: 'settled', result })))
+    assert.notEqual(
+      outcome.kind,
+      'timeout',
+      `primary materialization failure must settle within ${PER_TEST_TIMEOUT_MS}ms; must not hang on AwaitJournal`,
+    )
+    const result = outcome.result
+    const resolution = caseOf(currentRequest(runtime.journal).Resolution)
+
+    const undecidedFacts = agentJournal
+      .persistedEnvelopes(runtime.journal)
+      .filter((envelope) => caseOf(envelope.Fact) === 'ManagerLifecycle')
+      .map((envelope) => payloadOf(envelope.Fact))
+      .filter((fact) => caseOf(fact) === 'FinalityUndecided')
+      .map(payloadOf)
+      .filter((payload) => idValue.finalityRequest(payload.RequestId) === requestIdValue)
+
+    const siblingSteered = agentJournal
+      .persistedEnvelopes(runtime.journal)
+      .filter((envelope) => caseOf(envelope.Fact) === 'ManagerLifecycle')
+      .map((envelope) => payloadOf(envelope.Fact))
+      .filter((fact) => caseOf(fact) === 'FinalitySiblingSteered')
+      .map(payloadOf)
+      .filter((payload) => idValue.finalityRequest(payload.RequestId) === requestIdValue)
+
+    assert.equal(
+      resolution,
+      'Undecided',
+      'GLORY-044: primary RecordUnavailable must fail-closed to Undecided before SiblingSteered',
+    )
+    assert.ok(
+      undecidedFacts.length >= 1,
+      'GLORY-044: primary materialization failure must append FinalityUndecided',
+    )
+    assert.equal(
+      siblingSteered.length,
+      0,
+      'primary hard-fail must leave zero FinalitySiblingSteered (no orphan steered facts)',
+    )
+    assert.ok(result.startsWith('# Your ending could not be decided.'), result)
+    assert.equal(
+      result.includes(siblingEvidence),
+      false,
+      'sibling LWR must not appear in the Undecided tool result',
+    )
+    assert.deepEqual(runtime.abortedIds, [], 'primary materialization failure must not dispose durable sessions')
   }, FINALITY_PLUGIN_OPTS)
 })
 

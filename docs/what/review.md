@@ -16,7 +16,7 @@ Seal 绑定与因果链算法见 `how/review.md`。
 
 任一 durable REVISE 立即关闭当前 request 的 Reviewer continuation capability 与 cohort：无 confirmation、不等待尚未 durable 的 sibling 新 terminal / 新 effect；未完成的 PERFECT 确认链同时作废，关闭后不得补发 challenge。`FinalityRejected` 必须另行满足 GLORY-072 的 record-ready，不能在 verdict 时抢先落盘（GLORY-044/055/072）。
 
-已 durable 的 sibling REVISE 不参与「等待新 terminal」：成功路径下其 LWR 在首个拒绝工具结果之外，物化为 Manager 的 steer continuation（instruction-only `# ` Synthetic TOML，GLORY-044 双轨交付），不得丢弃、不得并入 `FinalityRejected` 工具结果。任一 durable sibling 的 LWR 无法物化 → fail-closed `FinalityUndecided`，同样不得静默丢弃。
+已 durable 的 sibling REVISE 不参与「等待新 terminal」：成功路径下先预置 rejecting primary 的 record-ready/`WriteBlob`，再入账 sibling 并物化为 Manager 的 steer continuation（instruction-only `# ` Synthetic TOML，GLORY-044 双轨交付），不得丢弃、不得并入 `FinalityRejected` 工具结果。Primary 硬物化失败 → `FinalityUndecided` 且零 `FinalitySiblingSteered`。任一 durable sibling 的 LWR 无法物化 → fail-closed `FinalityUndecided`，同样不得静默丢弃。
 
 ## REVIEW-003：PERFECT 需要因果证明
 
