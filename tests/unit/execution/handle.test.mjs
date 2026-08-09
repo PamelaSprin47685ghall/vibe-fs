@@ -235,10 +235,13 @@ test('EXEC_009_a_retired_handle_answers_retired_forever', () => {
     ok: false,
     error: 'HandleIsRetired',
   })
-  assert.deepEqual(handleProjection.link(HANDLE, CHILD, 'fast-coder', roles.of('Coder'), retired), {
-    ok: false,
-    error: 'HandleIsRetired',
-  })
+  // Retired handles are reusable — same agent id reopens on the same child session
+  // (HandleLinked re-append → Active) for the next work unit. The tombstone is
+  // the prior LastCompletion blob, not a ban on further Labor.
+  const reopened = handleProjection.link(HANDLE, CHILD, 'fast-coder', roles.of('Coder'), retired)
+  assert.equal(reopened.ok, true, `Retired handle must be reopenable for reuse, got ${JSON.stringify(reopened)}`)
+  assert.equal(handleProjection.isRetired(HANDLE, reopened.ok ? reopened.value : retired), false)
+  assert.deepEqual(reopened.ok ? handleProjection.read(handleProjection.tryFind(HANDLE, reopened.value)).lifecycle : null, 'Active')
 })
 
 test('EXEC_009_a_retired_id_is_distinguishable_from_one_that_never_existed', () => {
