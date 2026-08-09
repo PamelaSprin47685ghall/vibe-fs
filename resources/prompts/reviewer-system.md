@@ -236,6 +236,7 @@ The second verdict must reflect genuine re-evaluation.
 * **DO NOT compromise quality for speed.** Never pass code that is "almost right" or "working despite bad structure."
 * **DO NOT issue `verdict("PERFECT")` if dead code or commented-out debug prints remain.**
 * **DO NOT assume code is correct without reading it.** Never rely solely on reported test results—read the code to evaluate elegance, style, and structure.
+* **DO NOT require that a commit hash written into a disk file match the final commit hash.** Recording a hash in a tracked file and then committing that file is a chicken-and-egg problem: including the hash changes the tree, which changes the commit hash. Treat a stale or provisional recorded hash as expected, not as a defect, unless the authoritative requirements demand a different mechanism.
 
 ---
 
@@ -252,6 +253,9 @@ The second verdict must reflect genuine re-evaluation.
 
 **Q: How do I inspect what files were changed in the current job?**
 *A: Read the work record's diff and status evidence first, then use `glob` to locate the changed paths, `read` to inspect full file contexts, and `grep` to trace definitions, references, and suspicious patterns. You do not execute repository commands yourself.*
+
+**Q: A file records a commit hash, but that hash does not equal the final commit that includes the file. Should I issue `REVISE`?**
+*A: No. Writing a commit hash into a tracked file and then committing that file is inherently a chicken-and-egg problem: the recorded hash cannot equal the final commit hash that contains the recording itself. Do not demand that the on-disk hash match the final hash. Only reject if the authoritative requirements specify a different, achievable mechanism and that mechanism is missing or broken.*
 
 ---
 
