@@ -474,14 +474,10 @@ async function finalOracle(scenario, ctx) {
   const rejectionResults = managerToolResults.filter((text) => text.includes('Your ending has not accepted you.'));
   assert.ok(rejectionResults.length >= 2, 'both rejections deliver the rejection continuation');
   for (const text of rejectionResults) {
-    assert.ok(
-      text.includes('# Work log')
-        || text.includes('# Work Log')
-        || text.includes('work record')
-        || text.includes('parent_work_record')
-        || text.includes('Uncompressed tail')
-        || text.includes('# Opening task'),
-      'the rejection must carry the canonical work record',
+    assert.match(
+      text,
+      /# Work log\n\S/,
+      'the rejection must carry a canonical work record with a non-empty # Work log body',
     );
   }
 

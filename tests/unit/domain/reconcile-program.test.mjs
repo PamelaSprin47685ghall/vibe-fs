@@ -10,7 +10,7 @@ import { quiescencePermit, reconcileProgram, reconcileWake } from '../support/do
 
 // ── pure classifiers ─────────────────────────────────────────────────────────
 
-test('RECONCILE_PROGRAM_001: isTerminalOutcome classifies terminal vs provisional', () => {
+test('RECONCILE_PROGRAM_001: isTerminalOutcome classifies terminal vs provisional', async () => {
   assert.equal(typeof reconcileProgram.isTerminalOutcome, 'function')
 
   assert.equal(reconcileProgram.isTerminalOutcome('TurnCompleted'), true)
@@ -19,7 +19,17 @@ test('RECONCILE_PROGRAM_001: isTerminalOutcome classifies terminal vs provisiona
 
   assert.equal(reconcileProgram.isTerminalOutcome('TurnInProgress'), false)
   assert.equal(reconcileProgram.isTerminalOutcome('TurnNeedsContinuation'), false)
-  assert.equal(reconcileProgram.isTerminalOutcome('TurnUnknown'), false)
+
+  // HOST-004 Clean Break: TurnUnknown is not a TurnOutcome member, so it cannot
+  // be classified as a non-terminal TurnOutcome. Structural demotion is the gate;
+  // isTerminalOutcome('TurnUnknown') is type-unreachable after the cut.
+  const mod = await import(new URL('../../../dist/Domain/ReconcileProgram.js', import.meta.url).pathname)
+  const turnOutcomeCases = Object.create(mod.TurnOutcome.prototype).cases()
+  assert.equal(
+    turnOutcomeCases.includes('TurnUnknown'),
+    false,
+    `TurnUnknown must not be a TurnOutcome case; have: ${turnOutcomeCases.join(', ')}`,
+  )
 })
 
 // ── decideStep: bounded causal reread → next pure decision ───────────────────
@@ -155,7 +165,7 @@ test('RECONCILE_PROGRAM_004: publishDecision gates already-published terminal an
   assert.equal(cleared.provisionalHas(provisional), false)
 })
 
-test('RECONCILE_PROGRAM_005: TurnUnknown never crosses the stable business-turn boundary', () => {
+test('RECONCILE_PROGRAM_005: TurnUnknown never crosses the stable business-turn boundary', async () => {
   const unknown = reconcileProgram.turnFixture({
     session: 'ses-a',
     physical: 'user-1',
@@ -178,6 +188,28 @@ test('RECONCILE_PROGRAM_005: TurnUnknown never crosses the stable business-turn 
     reconcileProgram.evidence.unknown(),
   )
   assert.equal(reconcileProgram.decisionName(repair), 'RepairMissingFinalReport')
+
+  // HOST-004 Clean Break: TurnUnknown must leave TurnOutcome entirely and live
+  // only as reconciliation-private SnapshotObservation (type-unreachable for
+  // publishDecision). Behavior above stays; this locks the structural demotion.
+  const mod = await import(new URL('../../../dist/Domain/ReconcileProgram.js', import.meta.url).pathname)
+  const turnOutcomeCases = Object.create(mod.TurnOutcome.prototype).cases()
+  assert.equal(
+    turnOutcomeCases.includes('TurnUnknown'),
+    false,
+    `TurnUnknown must not be a TurnOutcome case; have: ${turnOutcomeCases.join(', ')}`,
+  )
+  assert.equal(
+    typeof mod.SnapshotObservation,
+    'function',
+    'SnapshotObservation must exist as the private observation carrier for TurnUnknown',
+  )
+  const observationCases = Object.create(mod.SnapshotObservation.prototype).cases()
+  assert.deepEqual(
+    observationCases,
+    ['TurnUnknown'],
+    `SnapshotObservation must carry TurnUnknown only; have: ${observationCases.join(', ')}`,
+  )
 })
 
 test('RECONCILE_PROGRAM_006: Domain surface has no Command/Reply/Trace AST exports', async () => {
@@ -190,4 +222,39 @@ test('RECONCILE_PROGRAM_006: Domain surface has no Command/Reply/Trace AST expor
   )
   assert.ok(names.some((n) => n.includes('decideStep')), `decideStep missing; ${names.join(', ')}`)
   assert.ok(names.some((n) => n.includes('publishDecision')), `publishDecision missing; ${names.join(', ')}`)
+})
+
+test('RECONCILE_PROGRAM_007: TurnUnknown is SnapshotObservation, not TurnOutcome', async () => {
+  const mod = await import(new URL('../../../dist/Domain/ReconcileProgram.js', import.meta.url).pathname)
+  const turnOutcomeCases = Object.create(mod.TurnOutcome.prototype).cases()
+
+  assert.deepEqual(
+    turnOutcomeCases,
+    ['TurnInProgress', 'TurnNeedsContinuation', 'TurnCompleted', 'TurnAborted', 'TurnFailed'],
+    `publishable TurnOutcome must exclude TurnUnknown; have: ${turnOutcomeCases.join(', ')}`,
+  )
+  assert.equal(typeof mod.SnapshotObservation, 'function')
+  assert.deepEqual(Object.create(mod.SnapshotObservation.prototype).cases(), ['TurnUnknown'])
+
+  // outcomeOf must refuse TurnUnknown as a TurnOutcome. Throwing is fine;
+  // silently minting TurnUnknown or collapsing into TurnFailed is not.
+  let minted
+  let refused = false
+  try {
+    minted = mod.outcomeOf('TurnUnknown')
+  } catch {
+    refused = true
+  }
+  if (!refused) {
+    assert.notEqual(
+      minted.cases()[minted.tag],
+      'TurnUnknown',
+      'outcomeOf("TurnUnknown") must not return a TurnOutcome.TurnUnknown case',
+    )
+    assert.notEqual(
+      minted.cases()[minted.tag],
+      'TurnFailed',
+      'outcomeOf("TurnUnknown") must not collapse Unknown into a false TurnFailed terminal',
+    )
+  }
 })

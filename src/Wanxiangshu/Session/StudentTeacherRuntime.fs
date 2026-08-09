@@ -45,9 +45,13 @@ type private StudentFinalCompletionScope =
     { ProviderRun: ProviderRunIdentity
       Message: string }
 
-/// Student facts are durable; each mutable registry below owns one physical
-/// lifetime only: a teacher call, teacher completion, final completion, or
-/// observed skill mutation. No registry encodes a Student lifecycle stage.
+/// Audited manual-proof classification (physical lifetimes, not stage encoding):
+/// the six registries below — `runs`, `teacherOwners`, `teacherCalls`,
+/// `teacherCompletions`, `studentFinalCompletions`, `skillMutations` — each own
+/// one physical lifetime only (a teacher call, teacher completion, final
+/// completion, or observed skill mutation). HandleTurn / observe paths MUST NOT
+/// jointly match presence across these registries as an implicit program counter.
+/// Student facts remain durable; no registry encodes a Student lifecycle stage.
 type StudentTeacherRuntime
     (
         sessions: ISessionHostPort,

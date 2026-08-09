@@ -157,9 +157,29 @@ test('RECON_classify_unknown_finish_is_failed_with_finish_name', () => {
   assert.equal(payloadOf(outcome), 'assistant finish=content_filter')
 })
 
-test('RECON_classify_no_finish_is_unknown_even_with_parts', () => {
-  const outcome = classifyOutcome(false, undefined, undefined, [text('streaming')])
-  assert.equal(caseOf(outcome), 'TurnUnknown')
+test('RECON_classify_no_finish_is_unknown_even_with_parts', async () => {
+  const observation = classifyOutcome(false, undefined, undefined, [text('streaming')])
+  assert.equal(caseOf(observation), 'TurnUnknown')
+
+  // HOST-004 Clean Break: finish=None is a private SnapshotObservation, not a
+  // publishable TurnOutcome case. SnapshotObservation is a single-case DU.
+  assert.deepEqual(
+    observation.cases(),
+    ['TurnUnknown'],
+    'finish=None must classify as SnapshotObservation.TurnUnknown, not TurnOutcome',
+  )
+
+  const mod = await import(new URL('../../../dist/Domain/ReconcileProgram.js', import.meta.url).pathname)
+  assert.equal(typeof mod.SnapshotObservation, 'function')
+  assert.ok(
+    observation instanceof mod.SnapshotObservation,
+    'finish=None classification must be SnapshotObservation, not TurnOutcome',
+  )
+  assert.equal(
+    observation instanceof mod.TurnOutcome,
+    false,
+    'finish=None must not produce TurnOutcome.TurnUnknown',
+  )
 })
 
 // ── needsInteractionRepair ─────────────────────────────────────────────────

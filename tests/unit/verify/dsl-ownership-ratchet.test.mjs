@@ -149,6 +149,77 @@ test('DSL_OWNERSHIP_RATCHET_rejects_unannotated_mutable_in_infrastructure_and_jo
   }
 })
 
+test('DSL_OWNERSHIP_RATCHET_rejects_finality_controller_shaped_bare_mutable', async (t) => {
+  const fx = makeFixture()
+  t.after(fx.dispose)
+
+  const file = 'Infrastructure/OpenCode/Tools/FinalityController.fs'
+  const source = [
+    'module FinalityController',
+    'let mutable cancelled = false',
+  ].join('\n')
+  fx.write(file, source)
+
+  const hits = scanText(source, file).filter((v) => v.gate === 'mutable')
+  assert.equal(hits.length, 1)
+
+  const baseline = fx.baseline({})
+  const result = await runRatchet(baseline, fx.dir, fx.dir)
+  const out = output(result)
+  assert.notEqual(result.code, 0, `expected non-zero exit, got ${result.code}: ${out}`)
+  assert.ok(out.includes(`${file} mutable 0 -> 1`), `expected FinalityController hint in output, got: ${out}`)
+})
+
+test('DSL_OWNERSHIP_RATCHET_rejects_executor_summarize_shaped_bare_mutable', async (t) => {
+  const fx = makeFixture()
+  t.after(fx.dispose)
+
+  const file = 'Infrastructure/OpenCode/Tools/ExecutorSummarize.fs'
+  // Adversarial shape: bare program-counter mutable co-located with the
+  // historical timerTask → FamilyWaiting re-probe loop (ownership catches the
+  // unannotated mutable; Infrastructure path must not hide it).
+  const source = [
+    'module ExecutorSummarize',
+    'let mutable probing = true',
+    'let rec loop () =',
+    '    task {',
+    '        do! PtyTiming.timerTask 100',
+    '        return! loop ()',
+    '    }',
+  ].join('\n')
+  fx.write(file, source)
+
+  const hits = scanText(source, file).filter((v) => v.gate === 'mutable')
+  assert.equal(hits.length, 1)
+
+  const baseline = fx.baseline({})
+  const result = await runRatchet(baseline, fx.dir, fx.dir)
+  const out = output(result)
+  assert.notEqual(result.code, 0, `expected non-zero exit, got ${result.code}: ${out}`)
+  assert.ok(out.includes(`${file} mutable 0 -> 1`), `expected ExecutorSummarize hint in output, got: ${out}`)
+})
+
+test('DSL_OWNERSHIP_RATCHET_allows_annotated_dsl_mutable_in_tools', async (t) => {
+  const fx = makeFixture()
+  t.after(fx.dispose)
+
+  const file = 'Infrastructure/OpenCode/Tools/AnnotatedPhysical.fs'
+  const source = [
+    'module AnnotatedPhysical',
+    'let scratch () =',
+    '    // DSL-MUTABLE: cancellation — request abort latch',
+    '    let mutable cancelled = false',
+    '    cancelled',
+  ].join('\n')
+  fx.write(file, source)
+
+  assert.deepEqual(scanText(source, file), [])
+
+  const baseline = fx.baseline({})
+  const result = await runRatchet(baseline, fx.dir, fx.dir)
+  assert.equal(result.code, 0, `expected exit 0, got ${result.code}: ${output(result)}`)
+})
+
 test('DSL_OWNERSHIP_RATCHET_direct_task_workflow_is_allowed', async (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
