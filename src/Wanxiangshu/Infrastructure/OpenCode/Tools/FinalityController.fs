@@ -96,7 +96,8 @@ module FinalityController =
         | RecordUnavailable of string
 
     let private hasRenderedWorkLog (record: string) =
-        let marker = "# Work log\n"
+        // Raw LWR titles are plain; `# ` is injected only by SyntheticToml.comment on wire.
+        let marker = "Work log\n"
         let start = record.IndexOf(marker, StringComparison.Ordinal)
 
         start >= 0

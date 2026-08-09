@@ -1,4 +1,4 @@
-// Join v2 wire contract (EXEC-004 rev.2 / EXEC-017 / docs/how/synthetic-toml.md §9.6).
+// Join v2 wire contract (EXEC-004 rev.2 / EXEC-017 / docs/how/synthetic-toml.md ### Join / fork).
 // Renderer-only: JoinResultRenderer + SyntheticToml.comment containment.
 
 import assert from 'node:assert/strict'

@@ -479,6 +479,7 @@ async function finalOracle(scenario, ctx) {
       /# Work log\n\S/,
       'the rejection must carry a canonical work record with a non-empty # Work log body',
     );
+    assert.doesNotMatch(text, /# # /, 'wire LWR must not double-hash after SyntheticToml.comment');
   }
 
   // ── The minor-work continuation with both work records (stroke 11) ─────────

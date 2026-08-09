@@ -721,7 +721,7 @@ test('GLORY_044_072_073_REVISE_closes_the_cohort_but_waits_for_the_matching_cove
       assert.equal(rejections.length, 1, 'lastPart coverage lands exactly one FinalityRejected')
       const record = agentJournal.readBlob(runtime.journal, rejections[0].WorkRecordRef)
       assert.equal(record.ok, true, record.ok ? '' : record.error)
-      assert.match(record.value, /# Work log\n\S/, 'FinalityRejected must reference a non-empty covered work log')
+      assert.match(record.value, /Work log\n\S/, 'FinalityRejected must reference a non-empty covered work log')
       assert.match(record.value, /older-target-frontier durable work log/)
     } finally {
       recordReadyWait.restore()
@@ -854,14 +854,14 @@ test('GLORY_073_real_reachable_lastPart_coverage_unlocks_FinalityRejected_with_w
     assert.equal(rejections.length, 1, 'exactly one FinalityRejected')
     const record = agentJournal.readBlob(runtime.journal, rejections[0].WorkRecordRef)
     assert.equal(record.ok, true, record.ok ? '' : record.error)
-    assert.match(record.value, /# Work log\n\S/, 'FinalityRejected must reference a non-empty work log')
+    assert.match(record.value, /Work log\n\S/, 'FinalityRejected must reference a non-empty work log')
   })
 })
 
 // ── GLORY-074: Abandoned Blogger during record-ready → Undecided, no partial rejection ─
 //
 // coverageCanAdvance becomes false when the companion Blogger handle is Abandoned.
-// Without a materializable `# Work log`, recordReadiness is RecordUnavailable and
+// Without a materializable `Work log`, recordReadiness is RecordUnavailable and
 // concludeRejection fail-closes to FinalityUndecided — never a WorkRecordRef-less
 // FinalityRejected.
 
@@ -942,7 +942,7 @@ test('GLORY_074_blogger_abandonment_during_record_ready_concludes_undecided_no_p
         .filter((envelope) => caseOf(envelope.Fact) === 'ManagerLifecycle')
         .map((envelope) => payloadOf(envelope.Fact))
         .filter((fact) => caseOf(fact) === 'FinalityRejected')
-      assert.equal(rejectionLike.length, 0, 'no partial rejection blob without # Work log')
+      assert.equal(rejectionLike.length, 0, 'no partial rejection blob without Work log')
     } finally {
       recordReadyWait.restore()
     }
@@ -1059,7 +1059,7 @@ test('GLORY_075_waiter_crash_resumes_from_durable_evidence_no_timer_poll', async
       assert.equal(rejections.length, 1, 'exactly one FinalityRejected after durable resume + coverage')
       const record = agentJournal.readBlob(runtime.journal, rejections[0].WorkRecordRef)
       assert.equal(record.ok, true, record.ok ? '' : record.error)
-      assert.match(record.value, /# Work log\n\S/, 'FinalityRejected must reference a non-empty work log')
+      assert.match(record.value, /Work log\n\S/, 'FinalityRejected must reference a non-empty work log')
     } finally {
       resumeWait.restore()
     }

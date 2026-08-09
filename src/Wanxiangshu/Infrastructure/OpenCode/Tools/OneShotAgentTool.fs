@@ -18,7 +18,9 @@ module OneShotAgentTool =
         { ChildId: string
           Managed: ManagedAgent
           ParentBackgroundDigest: string option
-          Output: string }
+          Output: string
+          /// EXEC-028: child LWR (includeOpening=false) on Completed; None otherwise.
+          WorkRecord: string option }
 
     /// Same management bound as ExecutorSummarize / HostForkRuntime join budget.
     /// Unbounded `completion.Task` hung callers when the child never went terminal.
@@ -103,7 +105,16 @@ module OneShotAgentTool =
                         directory
                         |> Option.iter (fun path -> scope.RegisterDirectory(SessionId.value childId, path))
 
-                        let completion = TaskCompletionSource<string>()
+                        // COMPANION-003 / EXEC-006: child's OpeningPromptRaw is the
+                        // ORIGINAL oneshot assignment (not the rendered relay
+                        // envelope), matching HostForkAgent. PromptIngress skips
+                        // Opening for AgentOwnerRoot; capture before send.
+                        XTraceCapture.captureOpening scope.Journal childId request.Prompt []
+
+                        // Ok carries (formal text, optional WorkRecord); Error is the
+                        // Result.Error channel (timeout sibling) — not SetException.
+                        let completion =
+                            TaskCompletionSource<Result<string * string option, string>>()
                         // DSL-MUTABLE: subscription — one-shot terminal subscription
                         let mutable subscription: IDisposable option = None
                         // DSL-MUTABLE: resource — one-shot completion latch
@@ -116,11 +127,16 @@ module OneShotAgentTool =
                                 subscription <- None
                                 setResult ()
 
-                        let succeed text =
-                            finish (fun () -> completion.SetResult text)
+                        let succeed text workRecord =
+                            finish (fun () -> completion.SetResult(Ok(text, workRecord)))
 
                         let fail (error: exn) =
                             finish (fun () -> completion.SetException error)
+
+                        let childWorkRecord () =
+                            match scope.ChildWorkRecordFor(SessionId.value childId) with
+                            | Some wr when not (String.IsNullOrWhiteSpace wr) -> Some wr
+                            | _ -> None
 
                         subscription <-
                             Some(
@@ -134,7 +150,37 @@ module OneShotAgentTool =
                                         // text including host-visible reasoning, so
                                         // the calling model received the child's
                                         // reasoning stream as if it were the answer.
-                                        | TerminalOutcome.Completed terminal -> succeed terminal.TurnFormalText
+                                        // EXEC-028: Completed requires child LWR
+                                        // (includeOpening=false); missing → Error.
+                                        | TerminalOutcome.Completed terminal ->
+                                            match childWorkRecord () with
+                                            | Some wr -> succeed terminal.TurnFormalText (Some wr)
+                                            | None ->
+                                                // notifyCompleted / some hosts may fire
+                                                // TerminalOutcome without writing XTrace
+                                                // terminal first; includeOpening=false then
+                                                // yields empty LWR. Capture TerminalText
+                                                // then re-query ChildWorkRecordFor.
+                                                let providerRun =
+                                                    if isNull (box terminal.ProviderRun) then
+                                                        ProviderRunIdentity.create ""
+                                                    else
+                                                        terminal.ProviderRun
+
+                                                XTraceCapture.captureTerminalText
+                                                    scope.Journal
+                                                    childId
+                                                    terminal.TerminalText
+                                                    providerRun
+
+                                                match childWorkRecord () with
+                                                | Some wr -> succeed terminal.TurnFormalText (Some wr)
+                                                | None ->
+                                                    finish (fun () ->
+                                                        completion.SetResult(
+                                                            Error
+                                                                "EXEC-028: Completed without LifecycleWorkRecord (WorkRecord missing or empty)"
+                                                        ))
                                         | TerminalOutcome.Aborted reason ->
                                             fail (InvalidOperationException(sprintf "%s aborted: %s" roleLabel reason))
                                         | TerminalOutcome.Failed error ->
@@ -143,7 +189,7 @@ module OneShotAgentTool =
                             )
 
                         match! send scope childId fullPrompt managed.Name directory with
-                        | Error sendError -> succeed (sprintf "send failed: %s" sendError)
+                        | Error sendError -> succeed (sprintf "send failed: %s" sendError) None
                         | Ok _ -> ()
 
                         // DSL-MUTABLE: cancellation — parent-abort child session task slot
@@ -155,7 +201,7 @@ module OneShotAgentTool =
                                 if abortTask.IsNone then
                                     abortTask <- Some(scope.Sessions.AbortSession childId)
 
-                                succeed "aborted: parent cancelled")
+                                succeed "aborted: parent cancelled" None)
 
                         try
                             // Bound the wait: race completion against a management timer.
@@ -172,14 +218,19 @@ module OneShotAgentTool =
 
                                 return Error(sprintf "%s timed out after %d ms" roleLabel CompletionTimeoutMs)
                             else
-                                let! output = outputTask
+                                let! settled = outputTask
 
-                                return
-                                    Ok
-                                        { ChildId = SessionId.value childId
-                                          Managed = managed
-                                          ParentBackgroundDigest = parentWorkRecord |> Option.map ToolHostCodec.digest
-                                          Output = output }
+                                match settled with
+                                | Error err -> return Error err
+                                | Ok(output, workRecord) ->
+                                    return
+                                        Ok
+                                            { ChildId = SessionId.value childId
+                                              Managed = managed
+                                              ParentBackgroundDigest =
+                                                parentWorkRecord |> Option.map ToolHostCodec.digest
+                                              Output = output
+                                              WorkRecord = workRecord }
                         finally
                             detachAbort ()
 

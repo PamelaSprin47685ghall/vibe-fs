@@ -22,6 +22,6 @@ PROMPT-001 与 ARCH-011。
 ## 领域交叉入口
 
 - Blogger delta 的字节合同：CTX-013
-- Join/LWR wire：EXEC-004
+- Join/LWR wire：EXEC-004、EXEC-028
 - tool 文本结果上限：ARCH-012
 - 所有权与可信 renderer：`shape/synthetic-toml.md`

@@ -48,7 +48,7 @@ PrefixCoverage   // 完整 Host turn 边界；prefix replacement 证明
 
 X prefix probe 只能用 CoverableRecordPrefix（Opening + 可证明完整 turn 的 Y prefix），不能用 RawGap。
 
-`includeOpening`：父→子 true；子→父 join false；同 Session frozen prefix true。
+`includeOpening`：父→子 true；子→父 false；同 Session frozen prefix true。
 
 ## COMPANION-004：Y 的 system
 

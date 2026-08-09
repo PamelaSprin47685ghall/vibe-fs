@@ -5258,7 +5258,7 @@ export const agentCompletion = (() => {
 })()
 
 /**
- * EXEC-004 rev.2 / docs/how/synthetic-toml.md §9.6 JoinResultRenderer — LLM-facing join wire only.
+ * EXEC-004 rev.2 / docs/how/synthetic-toml.md ### Join / fork JoinResultRenderer — LLM-facing join wire only.
  * `runtime` for agent/pty batch is a minimal { IsPtyCompletion, TryFindAgent } surface.
  */
 export const joinResultRenderer = (() => {

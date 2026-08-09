@@ -415,7 +415,7 @@ test('GLORY_057_host_undecidable_golden_bytes', async () => {
 
 test('GLORY_052_finality_rejection_renders_work_record_as_guidance_comments', async () => {
   const { finalityPrompt } = await import('../support/glory.mjs')
-  const record = '# Work log\n- defect A at src/a.ts\n- missing test for B'
+  const record = 'Work log\n- defect A at src/a.ts\n- missing test for B'
   const rendered = finalityPrompt.rejected(record)
   assert.ok(rendered.startsWith('# Your ending has not accepted you.'), rendered)
   assert.ok(!rendered.includes('unfinished_work_record'), rendered)

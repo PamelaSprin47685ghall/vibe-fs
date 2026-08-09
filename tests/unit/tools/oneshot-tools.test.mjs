@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { agentJournal, listItems, sessionId } from '../support/domain.mjs'
+import { agentJournal, listItems, sessionId, xTraceCapture } from '../support/domain.mjs'
 import { uncurry2 } from '../../../dist/fable_modules/fable-library-js.5.13.0/Util.js'
 
 const {
@@ -105,8 +105,9 @@ const completedTerminal = (formalText) =>
     ),
   ])
 
-/** { scope, sessions, cleanup } — real journal + fake host. */
-const liveScope = ({ sessions = fakeSessions(), parentWorkRecord, directories } = {}) => {
+/** { scope, sessions, journal, cleanup } — real journal + fake host.
+ *  `childWorkRecord` / `parentWorkRecord` may be a string or `(sessionId) => string|undefined`. */
+const liveScope = ({ sessions = fakeSessions(), parentWorkRecord, childWorkRecord, directories } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-oneshot-'))
   const opened = agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true, 'journal must open')
@@ -121,14 +122,23 @@ const liveScope = ({ sessions = fakeSessions(), parentWorkRecord, directories } 
     new Set(),
     directories ?? new Map(),
     undefined,
-    parentWorkRecord ? () => parentWorkRecord : undefined,
-    undefined,
+    parentWorkRecord
+      ? typeof parentWorkRecord === 'function'
+        ? parentWorkRecord
+        : () => parentWorkRecord
+      : undefined,
+    childWorkRecord
+      ? typeof childWorkRecord === 'function'
+        ? childWorkRecord
+        : () => childWorkRecord
+      : undefined,
     undefined,
     undefined,
   )
   return {
     scope,
     sessions,
+    journal: opened.journal,
     cleanup: () => {
       try {
         opened.dispose()
@@ -282,7 +292,15 @@ test('COD_create_session_failure_surfaces_host_error', async () => {
 
 test('COD_success_reports_outcome_and_disposes_the_child', async () => {
   const sessions = fakeSessions()
-  const live = liveScope({ sessions })
+  const childWorkRecord = [
+    'Work log',
+    'historic frame content',
+    'Uncompressed tail',
+    'gap content',
+    'Final output',
+    'terminal body',
+  ].join('\n')
+  const live = liveScope({ sessions, childWorkRecord })
   const tool = coderSpec(factory, live.scope)
 
   const pending = tool.Execute(makeArgs({ agent: 'fast-coder', tdd: 'red', prompt: 'implement it' }), context())
@@ -301,8 +319,18 @@ test('COD_success_reports_outcome_and_disposes_the_child', async () => {
   assert.equal(result.fallback_peer, 'deep-coder')
   assert.equal(result.tdd, 'red')
   assert.equal(result.parent_b_digest, '')
+  // EXEC-028: entry-local LWR comment (includeOpening=false) + TurnFormalText.
+  assert.match(text, /# Work log/)
+  assert.match(text, /historic frame content/)
+  assert.match(text, /# Uncompressed tail/)
+  assert.match(text, /gap content/)
+  assert.match(text, /# Final output/)
+  assert.match(text, /terminal body/)
+  assert.doesNotMatch(text, /# Opening task/)
+  assert.doesNotMatch(text, /# # /)
   // COMPANION-005: the report is the turn-formal text, not the session-wide text.
   assert.match(text, /the formal report/)
+  assert.doesNotMatch(text, /^work_record\s*=/m)
   assert.equal(sessions.calls.abort, 1, 'the child is physically aborted after the terminal')
   // The PromptDispatcher installs and disposes its own NoOp terminal listener per
   // send, so the count covers both the tool's subscription and the dispatcher's.
@@ -310,9 +338,62 @@ test('COD_success_reports_outcome_and_disposes_the_child', async () => {
   live.cleanup()
 })
 
-test('COD_green_phase_and_prompts_array_compose_the_assignment', async () => {
+test('COD_completed_without_lifecycle_work_record_fails_closed', async () => {
+  // EXEC-028: Completed with formal text but missing LWR must not soft-omit to
+  // formal-only Ok — surface as tool error= (Result.Error), same shape as validation.
   const sessions = fakeSessions()
   const live = liveScope({ sessions })
+  const tool = coderSpec(factory, live.scope)
+
+  const pending = tool.Execute(makeArgs({ agent: 'fast-coder', tdd: 'red', prompt: 'work' }), context())
+  for (let attempt = 0; attempt < 100 && sessions.calls.prompt.length === 0; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+  assert.equal(sessions.calls.prompt.length, 1, 'the child prompt must be sent')
+  sessions.fireTerminal(completedTerminal('formal only without LWR'))
+
+  const text = await pending
+  const result = parseToml(text)
+  assert.match(result.error ?? '', /EXEC-028|LifecycleWorkRecord|WorkRecord/i)
+  // Must not silently look like happy-path encode (LWR comment or formal-only success).
+  assert.doesNotMatch(text, /# Work log/)
+  assert.equal(result.coder_id, undefined)
+  live.cleanup()
+})
+
+test('COD_completed_materializes_lifecycle_work_record_from_real_journal', async () => {
+  // EXEC-028: prove Opening→LWR via real journal (fails if captureOpening is removed).
+  // Stubbed childWorkRecord strings cannot catch that production break.
+  const sessions = fakeSessions()
+  let journal
+  const live = liveScope({
+    sessions,
+    childWorkRecord: (sid) => xTraceCapture.lifecycleWorkRecord(journal, sessionId(sid), false),
+  })
+  journal = live.journal
+  const tool = coderSpec(factory, live.scope)
+
+  const pending = tool.Execute(makeArgs({ agent: 'fast-coder', tdd: 'red', prompt: 'implement it' }), context())
+  for (let attempt = 0; attempt < 100 && sessions.calls.prompt.length === 0; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+  assert.equal(sessions.calls.prompt.length, 1, 'the child prompt must be sent')
+  sessions.fireTerminal(completedTerminal('the formal report'))
+
+  const text = await pending
+  const result = parseToml(text)
+  assert.equal(result.error, undefined)
+  assert.match(text, /# Final output|# Work log/)
+  assert.doesNotMatch(text, /# # /)
+  assert.doesNotMatch(text, /# Opening task/)
+  assert.match(text, /the formal report/)
+  assert.doesNotMatch(text, /^work_record\s*=/m)
+  live.cleanup()
+})
+
+test('COD_green_phase_and_prompts_array_compose_the_assignment', async () => {
+  const sessions = fakeSessions()
+  const live = liveScope({ sessions, childWorkRecord: 'child LWR body' })
   const tool = coderSpec(factory, live.scope)
 
   const pending = tool.Execute(
@@ -334,7 +415,7 @@ test('COD_green_phase_and_prompts_array_compose_the_assignment', async () => {
 
 test('COD_parent_work_record_lands_in_the_digest_field', async () => {
   const sessions = fakeSessions()
-  const live = liveScope({ sessions, parentWorkRecord: 'the parent background record' })
+  const live = liveScope({ sessions, parentWorkRecord: 'the parent background record', childWorkRecord: 'child LWR body' })
   const tool = coderSpec(factory, live.scope)
 
   const pending = tool.Execute(makeArgs({ agent: 'fast-coder', tdd: 'red', prompt: 'work' }), context())
@@ -350,7 +431,14 @@ test('COD_parent_work_record_lands_in_the_digest_field', async () => {
 
 test('COD_child_inherits_the_parent_directory', async () => {
   const sessions = fakeSessions()
-  const live = liveScope({ sessions, directories: new Map([['ses-call', '/tmp']]) })
+  const childWorkRecord = [
+    'Work log',
+    'historic frame content',
+    'Uncompressed tail',
+    'Final output',
+    'terminal body',
+  ].join('\n')
+  const live = liveScope({ sessions, childWorkRecord, directories: new Map([['ses-call', '/tmp']]) })
   const tool = coderSpec(factory, live.scope)
 
   const pending = tool.Execute(makeArgs({ agent: 'fast-coder', tdd: 'red', prompt: 'work' }), context())
@@ -358,8 +446,11 @@ test('COD_child_inherits_the_parent_directory', async () => {
     await new Promise((resolve) => setTimeout(resolve, 5))
   }
   sessions.fireTerminal(completedTerminal('report'))
-  await pending
 
+  const text = await pending
+  const result = parseToml(text)
+  assert.equal(result.error, undefined, 'a completed child with an LWR must not fail closed')
+  assert.ok(result.coder_id.length > 0, 'completed child yields an id')
   assert.equal(directoryFor(live.scope, 'child-1'), '/tmp', 'the child directory is registered')
   live.cleanup()
 })
@@ -439,7 +530,15 @@ test('COD_parent_abort_completes_as_cancelled_and_aborts_the_child', async () =>
 
 test('INSPECTOR_success_reports_outcome_without_a_tdd_field', async () => {
   const sessions = fakeSessions()
-  const live = liveScope({ sessions })
+  const childWorkRecord = [
+    'Work log',
+    'historic frame content',
+    'Uncompressed tail',
+    'gap content',
+    'Final output',
+    'terminal body',
+  ].join('\n')
+  const live = liveScope({ sessions, childWorkRecord })
   const tool = inspectorSpec(factory, live.scope)
 
   const pending = tool.Execute(makeArgs({ agent: 'fast-inspector', prompt: 'read the code' }), context())
@@ -454,6 +553,39 @@ test('INSPECTOR_success_reports_outcome_without_a_tdd_field', async () => {
   assert.equal(result.agent, 'fast-inspector')
   assert.equal(result.fallback_peer, 'deep-inspector')
   assert.equal(result.tdd, undefined, 'inspector reports no tdd field')
+  // EXEC-028: entry-local LWR comment (includeOpening=false) + TurnFormalText.
+  assert.match(text, /# Work log/)
+  assert.match(text, /historic frame content/)
+  assert.match(text, /# Uncompressed tail/)
+  assert.match(text, /gap content/)
+  assert.match(text, /# Final output/)
+  assert.match(text, /terminal body/)
+  assert.doesNotMatch(text, /# Opening task/)
+  assert.doesNotMatch(text, /# # /)
   assert.match(text, /inspector findings/)
+  assert.doesNotMatch(text, /^work_record\s*=/m)
+  live.cleanup()
+})
+
+test('INSPECTOR_completed_without_lifecycle_work_record_fails_closed', async () => {
+  // EXEC-028: Completed with formal text but missing LWR must not soft-omit to
+  // formal-only Ok — surface as tool error= (Result.Error), same shape as validation.
+  const sessions = fakeSessions()
+  const live = liveScope({ sessions })
+  const tool = inspectorSpec(factory, live.scope)
+
+  const pending = tool.Execute(makeArgs({ agent: 'fast-inspector', prompt: 'read the code' }), context())
+  for (let attempt = 0; attempt < 100 && sessions.calls.prompt.length === 0; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+  assert.equal(sessions.calls.prompt.length, 1, 'the child prompt must be sent')
+  sessions.fireTerminal(completedTerminal('formal only without LWR'))
+
+  const text = await pending
+  const result = parseToml(text)
+  assert.match(result.error ?? '', /EXEC-028|LifecycleWorkRecord|WorkRecord/i)
+  // Must not silently look like happy-path encode (LWR comment or formal-only success).
+  assert.doesNotMatch(text, /# Work log/)
+  assert.equal(result.inspector_id, undefined)
   live.cleanup()
 })

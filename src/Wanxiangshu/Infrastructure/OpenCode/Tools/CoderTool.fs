@@ -21,17 +21,26 @@ module CoderTool =
 
         let instructions = if String.IsNullOrWhiteSpace report then [] else [ report ]
 
-        tomlObjectWithInstructions
-            instructions
-            [ "coder_id", TString outcome.ChildId
-              "agent", TString managed.Name
-              "tier", TString(ManagedAgent.tierName managed.Tier)
-              "fallback_peer", TString (ManagedAgent.peer managed).Name
-              "tdd", TString(TddPhase.wireName phase)
-              "parent_b_digest",
-              outcome.ParentBackgroundDigest
-              |> Option.map TString
-              |> Option.defaultValue (TString "") ]
+        // EXEC-028: entry-local LWR comment prefix (mirror JoinResultRenderer).
+        let body =
+            tomlObjectWithInstructions
+                instructions
+                [ "coder_id", TString outcome.ChildId
+                  "agent", TString managed.Name
+                  "tier", TString(ManagedAgent.tierName managed.Tier)
+                  "fallback_peer", TString (ManagedAgent.peer managed).Name
+                  "tdd", TString(TddPhase.wireName phase)
+                  "parent_b_digest",
+                  outcome.ParentBackgroundDigest
+                  |> Option.map TString
+                  |> Option.defaultValue (TString "") ]
+
+        // EXEC-028: Completed never reaches encode with empty WorkRecord (fail-closed in run);
+        // soft-omit arms remain for non-Completed soft Ok paths only
+        // (send-failed and parent-abort/cancel: succeed ... None).
+        match outcome.WorkRecord with
+        | Some wr when not (String.IsNullOrEmpty wr) -> SyntheticToml.comment wr + "\n" + body
+        | _ -> body
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {

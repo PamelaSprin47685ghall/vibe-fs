@@ -848,8 +848,14 @@ test('EXEC_002_one_shot_tools_return_the_managed_agent_and_the_turn_formal_text'
       fallback_peer: 'deep-inspector',
       parent_b_digest: '',
     })
+    // EXEC-028: entry-local LWR (includeOpening=false) + TurnFormalText; no work_record field.
+    assert.match(inspectorText, /# (Work log|Final output|Uncompressed tail)/)
+    assert.ok(!inspectorText.includes('# Opening task'))
+    assert.doesNotMatch(inspectorText, /# # /)
+    assert.equal(inspectorResult.work_record, undefined)
+    assert.ok(!/(^|\n)\s*work_record\s*=/.test(inspectorText))
     assert.ok(inspectorText.includes('inspector turn formal report'))
-    assert.ok(!inspectorText.includes('inspector session-wide A'))
+    assert.equal(inspectorResult.error, undefined)
 
     const coderResultP = hooks.tool.coder.execute(
       { agent: 'fast-coder', tdd: 'green', prompts: ['apply the requested edit'] },
@@ -870,8 +876,13 @@ test('EXEC_002_one_shot_tools_return_the_managed_agent_and_the_turn_formal_text'
       tdd: 'green',
       parent_b_digest: '',
     })
+    assert.match(coderText, /# (Work log|Final output|Uncompressed tail)/)
+    assert.ok(!coderText.includes('# Opening task'))
+    assert.doesNotMatch(coderText, /# # /)
+    assert.equal(coderResult.work_record, undefined)
+    assert.ok(!/(^|\n)\s*work_record\s*=/.test(coderText))
     assert.ok(coderText.includes('coder turn formal report'))
-    assert.ok(!coderText.includes('coder session-wide A'))
+    assert.equal(coderResult.error, undefined)
 
     // Child assignment must carry the GREEN phase constraint (not metadata-only).
     // OpenCodePort promptAsync shape: { path: { id }, body: { parts, … } }.
@@ -896,6 +907,12 @@ test('EXEC_002_one_shot_tools_return_the_managed_agent_and_the_turn_formal_text'
     const redResult = parseToml(redText)
     assert.equal(redResult.tdd, 'red')
     assert.equal(redResult.error, undefined)
+    assert.match(redText, /# (Work log|Final output|Uncompressed tail)/)
+    assert.ok(!redText.includes('# Opening task'))
+    assert.doesNotMatch(redText, /# # /)
+    assert.equal(redResult.work_record, undefined)
+    assert.ok(!/(^|\n)\s*work_record\s*=/.test(redText))
+    assert.ok(redText.includes('red turn formal report'))
     const redBody = promptTextFor(createdIds[2])
     assert.match(redBody, /TDD phase: RED/)
     assert.match(redBody, /Do not implement the production fix/)
@@ -982,7 +999,7 @@ test('EXEC_002_EXEC_004_fork_join_and_list_carry_the_same_mailbox_identity', asy
     const joinText = await joinResultP
     const join = parseToml(joinText)
 
-    // EXEC-004 rev.2 / docs/how/synthetic-toml.md §9.6: batch wire — status + count + [[result]].
+    // EXEC-004 rev.2 / docs/how/synthetic-toml.md ### Join / fork: batch wire — status + count + [[result]].
     // Single completion still uses [[result]] (count=1, ordinal=1, kind=agent).
     // work_record is entry-local comment, never a TOML field.
     // Fixture has no Opening capture → LWR empty → no # comment block before [[result]].

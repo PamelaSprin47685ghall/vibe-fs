@@ -9,6 +9,8 @@
 - `AGENTS.md`：修正 `architecture` 文件数 226、`gate:dsl-ownership` 契约为 `--threshold=0`（删除陈旧 322）。
 - Enforcer / Blogger-as-Enforcer rebase 文档收口：`how`/`shape`/`proof` 对齐 tip-v2 基线（PartOrdinal-first 多调用 tip、物理所有权轴取代 Runtime cell 的 DU 叙事、`§13` 证明清单）。变更生命周期见 `changes/completed/enforcer.md`；未恢复 wire/runtime score 路径，生产本就 tip-v2。新增 `bounds.test.mjs` 永久回归锁定归并 size/count 越界 fail-closed（>32 calls / text >512 KiB / evidence >128 KiB）。
 - 新增 `tests/unit/enforcer/bounds.test.mjs` 永久回归，锁定 EnforcerHost 归并 size/count fail-closed 边界：合并 tool call >32（`MaxMergedToolCalls=32`）、合并 text >512 KiB（`MaxBlogTextBytes=512KiB`）、合并 evidence >128 KiB（`MaxEvidenceBytes=128KiB`）均触发 `enforcer-cycle-failed` fatal；无生产逻辑变更。
+- EXEC-028：同步 one-shot `inspector`/`coder` 返回统一为 entry-local LWR 注释（`includeOpening=false`）+ 末条 TurnFormalText，禁字段式 `work_record`；与 Join 共用 COMPANION-003 物化器。Opening 在 send 前从原始 assignment 捕获以便物化；`Completed` 无法物化非空 LWR 时 fail-closed 返回工具级 `error=`，不 soft-omit。
+- LWR 段标题在 materialize 中为纯文本（`Opening task` / `Work log` / …）；`# ` 仅由 `SyntheticToml.comment` 在 wire 注入，消除 join/oneshot/finality 上的 `# # Work log`。
 
 ## 0.5.4
 

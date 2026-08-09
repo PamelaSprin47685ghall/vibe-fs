@@ -132,7 +132,7 @@ test('PERSIST_010_a_second_different_terminal_overwrites_for_reuse', () => {
   const result = fold.apply(fold.empty, [terminalFact(), terminalFact({ ref: 'blob-term-2', digest: 'sha-term-2' })])
   assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
   const s = fold.session(result.value, SESSION)
-  // EXEC-009: reuse overwrites the terminal so the LWR's # Final output
+  // EXEC-009: reuse overwrites the terminal so the LWR's Final output
   // reflects the latest work unit, not the first.
   assert.deepEqual(s.XTrace.Terminal[0].fields[0], 'blob-term-2')
 })

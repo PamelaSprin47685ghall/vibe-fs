@@ -30,6 +30,10 @@ Join 消费当前 owner 可用 completion，有界批次 wire（status/count/`[[
 DevOps 角色的 `join` 在无完成项时包含 10s 超时预算（`DevOpsJoinTimeoutMs = 10_000`）；若 10s 内无 completion，返回超时错误 `ForkError.TimedOut`（`status="failed"`, `code="TIMED_OUT"`）。Orchestrator 与 Manager 角色的 `join` 维持无 10s 超时规则。  
 工具调用中止（operator abort）→ `status=interrupted, reason=operator_abort`；外部用户入站 → `status=interrupted, reason=user_message`；均非 error（EXEC-017）。
 
+## EXEC-028：同步 one-shot 返回语义
+
+同步 one-shot agent 工具（如 `inspector`/`coder`）成功完成时：entry-local LWR 注释（`includeOpening=false`）+ 末条 TurnFormalText 报告；禁止字段式 `work_record`。LWR 物化与子→父方向同 COMPANION-003（与 EXEC-004 共用物化器，非 Join 批次 wire）。Opening 从原始 assignment 捕获（对齐 fork），以便 COMPANION-003 物化可运行；返回的 LWR 仍为 `includeOpening=false`。若 Completed 无法物化出非空 child LWR，则 fail-closed：返回工具级 `error=`（显式失败），绝不静默退回仅 formal report 的 soft success。
+
 ## EXEC-005：List 语义
 
 List 列当前 running handle，不是可创建 Agent 菜单。
