@@ -100,32 +100,6 @@ module HandleProjection =
         (current: AgentLinkageProjection)
         : Result<AgentLinkageProjection, HandleTransitionRejection> =
         match Map.tryFind handle current.Handles with
-        // EXEC-009: a handle id is the agent id. After join retires the prior
-        // work unit, reuse of the same agent id reopens that handle on the
-        // same (or a recovered) child session for a new work unit. The
-        // tombstone is the prior completion cell (LastCompletion), not a ban
-        // on further Labor.
-        | Some({ Lifecycle = Retired } as existing)
-        | Some existing when
-            match existing.Lifecycle with
-            | Active
-            | CompletedAwaitingJoin _ -> true
-            | _ -> false
-            ->
-            Ok
-                { Handles =
-                    Map.add
-                        handle
-                        { existing with
-                            ChildSessionId = childSessionId
-                            TargetAgent = targetAgent
-                            CanonicalRole = role
-                            Ownership = ownership
-                            Lifecycle = Active }
-                        current.Handles
-                  NextCreationOrder = current.NextCreationOrder }
-        | Some { Lifecycle = Abandoned _ } -> Error AlreadyAbandoned
-        | Some _ -> Error HandleIsRetired
         | None ->
             let order = current.NextCreationOrder
 
@@ -143,6 +117,24 @@ module HandleProjection =
                           LastCompletion = None }
                         current.Handles
                   NextCreationOrder = order + 1 }
+        | Some existing ->
+            match existing.Lifecycle with
+            | Retired
+            | Active
+            | CompletedAwaitingJoin _ ->
+                Ok
+                    { Handles =
+                        Map.add
+                            handle
+                            { existing with
+                                ChildSessionId = childSessionId
+                                TargetAgent = targetAgent
+                                CanonicalRole = role
+                                Ownership = ownership
+                                Lifecycle = Active }
+                            current.Handles
+                      NextCreationOrder = current.NextCreationOrder }
+            | Abandoned _ -> Error AlreadyAbandoned
 
     /// EXEC-004: terminal, send-failure and cancel race for one cell. Whoever
     /// arrives first wins; later arrivals are refused, not overwritten.

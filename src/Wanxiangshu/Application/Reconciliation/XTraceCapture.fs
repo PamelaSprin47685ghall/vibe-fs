@@ -84,22 +84,29 @@ module XTraceCapture =
                        ProviderRun = None |}
                 |> appendFact durable sessionId None
 
-    /// COMPANION-003: capture the terminal output verbatim as the XTrace's last
-    /// segment. Idempotent — the first capture wins (PERSIST-010).
+    /// COMPANION-003 / EXEC-009: capture the terminal output verbatim as the
+    /// XTrace's last segment. Idempotent replay (same text) is a no-op;
+    /// a different text overwrites — subagent reuse produces a new terminal
+    /// per work unit on the same child session.
     let captureTerminal (journal: AgentJournal option) (turn: ReconciledTurn) =
         match journal with
         | None -> ()
         | Some durable ->
-            let existing = xTraceOf durable turn.SessionId
+            // COMPANION-003: TerminalOutputRaw = formal text + host-visible
+            // reasoning only. partsSessionText drops tool call/result so
+            // LWR Final output stays free of raw tools and matches
+            // AgentRunResult.TerminalText.
+            let text = CompletedTurnClassifier.partsSessionText turn.Parts
 
-            if existing.Terminal.IsNone then
-                // COMPANION-003: TerminalOutputRaw = formal text + host-visible
-                // reasoning only. partsSessionText drops tool call/result so
-                // LWR Final output stays free of raw tools and matches
-                // AgentRunResult.TerminalText.
-                let text = CompletedTurnClassifier.partsSessionText turn.Parts
+            if not (String.IsNullOrWhiteSpace text) then
+                let existing = xTraceOf durable turn.SessionId
 
-                if not (String.IsNullOrWhiteSpace text) then
+                let isReplay =
+                    existing.Terminal
+                    |> Option.exists (fun (_, digest) ->
+                        HostDigest.sha256Hex text = BlobDigest.value digest)
+
+                if not isReplay then
                     match durable.WriteBlob text with
                     | Error error ->
                         // PERSIST-003: the terminal segment is non-retryable (the

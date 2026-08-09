@@ -136,10 +136,11 @@ test('EXEC_009_Abandoned_is_not_joinable_and_cannot_complete', () => {
     handleProjection.link(HANDLE, CHILD, 'fast-coder', roles.of('Coder'), abandoned),
     { ok: false, error: 'AlreadyAbandoned' },
   )
-  assert.deepEqual(
-    handleProjection.link(HANDLE, CHILD, 'fast-coder', roles.of('Coder'), retired.value),
-    { ok: false, error: 'HandleIsRetired' },
-  )
+  // EXEC-009: Retired handles reopen on link for agent reuse. The tombstone is
+  // the prior LastCompletion, not a permanent ban on further Labor.
+  const reopened = handleProjection.link(HANDLE, CHILD, 'fast-coder', roles.of('Coder'), retired.value)
+  assert.equal(reopened.ok, true, `Retired handle must be reopenable, got ${JSON.stringify(reopened)}`)
+  assert.equal(handleProjection.lifecycleOf(handleProjection.tryFind(HANDLE, reopened.value)), 'Active')
 })
 
 test('EXEC_009_recordAbandon_CAS_first_wins', () => {
