@@ -1,6 +1,10 @@
+> **状态**：Active — 本文件为变更工作记录，不是当前产品规范。当前产品语义仅以 `docs/` 正式层为准。
+> 原始 Proposal 已冻结于下方；后续事实仅追加于 Active work / Blockers / Final outcome。
+
 # 万象术统一持久化底座 — 正式版方案与保姆级开发指南
 
 > **文件定位**：`changes/proposed/unified-git-raw-event-store.md`
+> **Active 路径**：`changes/active/storage.md`
 > **优先级**：P0 / 横切型架构
 > **兼容性策略**：ExplicitMigration + Clean Cutover
 > **原则**：领域拥有事实，Persist 拥有持久化，Git 拥有字节；任何 feature 都不再拥有自己的 storage。
@@ -1807,3 +1811,27 @@ npm run check
 ```
 
 **一句话**：万象术只有一个持久化系统；Git Raw 只是这个系统唯一的物理介质。
+
+---
+
+## Active work
+
+**Original proposal**：冻结于上方（`changes/proposed/storage.md` 原文，1813 行，已移入本文件）。
+
+**范围**：按 §0–§48 执行 ExplicitMigration + Clean Cutover，完成 §43 Completion Criteria 与 §47/§48 永久证明。
+
+**Remaining work**：
+- [ ] Phase 0 Inventory（独立文档或本节清单）
+- [ ] Phase 1 RED Architecture Gates（`unified-store-gate.mjs` + fixtures 先红后绿）
+- [ ] Phase 2 Git Raw EventStore 核心（Domain/Persist/GitRawStore/EventStore/Fold/Merge + unit）
+- [ ] Phase 3 GitGateway + HookDispatcher + Dumb Server proof
+- [ ] Phase 4 Legacy Migration（freeze/enumerate/import/parents重建/bytes确定性）
+- [ ] Phase 5 Cutover（删除正常 runtime 旧 Journal/Blob/StudentQa file backend）
+- [ ] Phase 6 现有 Domain 改用统一 Store
+- [ ] Phase 7 重写 Proposed Storage Sections（perm-inspector/rulebook/strength）
+- [ ] Phase 8 Full Proof（`spec`/`architecture`/`dsl-ownership`/`unified-store-gate` + build + unit/integration/e2e + migration + dumb-server + `npm run check`）
+- [ ] Formal docs 重写（`docs/{why,what,shape,how,proof}/persist.md`）
+
+**Blockers**：无（待实施中发现则追加）。
+
+**Completion criteria**：见 §43 + §48；另以 `npm run check` 全绿为准。
