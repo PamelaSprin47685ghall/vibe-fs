@@ -91,7 +91,16 @@ module HostForkRuntimePty =
                                       Closed = closed }
                         | Error err -> return Error err
                     | None ->
-                        let! writeResult = this.PtyPort.Send(id, PtyCommand.Write(Pty.bytes prompt))
+                        // Agents often omit the trailing Enter; shells then hang waiting
+                        // for it. Ensure write ends with LF unless CR/LF is already present.
+                        let payload =
+                            if prompt.EndsWith("\n", StringComparison.Ordinal)
+                               || prompt.EndsWith("\r", StringComparison.Ordinal) then
+                                prompt
+                            else
+                                prompt + "\n"
+
+                        let! writeResult = this.PtyPort.Send(id, PtyCommand.Write(Pty.bytes payload))
 
                         match writeResult with
                         | Ok() -> return Ok { Id = id; Output = ""; Closed = false }

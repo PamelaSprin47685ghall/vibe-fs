@@ -69,7 +69,8 @@ module PtyTool =
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "fork-pty"
-          Description = "Create, write, read, or signal a PTY"
+          Description =
+            "Create, write, read, or signal a PTY. When writing a prompt to an existing PTY, a trailing newline is appended automatically if missing."
           Arguments =
             [ "agent", ToolHostCodec.stringSchema factory
               "prompt", ToolHostCodec.optionalStringSchema factory
