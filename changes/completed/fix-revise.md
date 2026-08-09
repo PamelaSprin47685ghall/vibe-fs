@@ -99,4 +99,4 @@ CLOSE_READY + Final outcome（归档提交 `2a67f451`）已取代 fix.md 与 cor
   两项 e2e exit 0。
 - 2026-08-09（docs 同步）：`docs/how/glory.md` Crash Recovery Matrix 的
   record-ready waiter 崩溃/Dispose 行由「目标算法」标记为 `✅`（`resumeDurableRevise`，
-  `GLORY_075`），与 GLORY-075 落盘及 Gap A 闭环一致。
+  `GLORY_075`），与 GLORY_075 落盘及 Gap A 闭环一致。
