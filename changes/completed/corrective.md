@@ -1304,3 +1304,16 @@ timer/sleep/re-probe。`manager-unhappy-path` rejection 断言收紧为必须 `/
 
 - 2026-08-09 close 复验：`tool-loop.test.mjs` 3/3 pass；`npm run check` exit 0；
   `manager-unhappy-path` e2e exit 0（13 stroke）；`devops-mechanical-repair-loop` e2e exit 0。
+
+---
+
+# Reconciliation note
+
+本记录仅做语义归档同步，不重写上文中间快照历史。本文件在第二个 Final outcome 之前，其
+Additional closing criteria 仍记录「`npm run check` 全量判绿仍为 close 前置（OPEN，待 DevOps 全量
+确认）。当前为已实现待 DevOps 确认状态，不宣称最终 close 已完成」。该中间 OPEN 快照之后，后续
+DevOps 已实测 CLOSE_READY：`npm run check` 全量 exit 0、`tool-loop.test.mjs` 3/3、
+`manager-unhappy-path` e2e exit 0（13 stroke）、`devops-mechanical-repair-loop` e2e exit 0。据此追加
+的第二个 Final outcome 取代该中间 OPEN 状态；归档提交 `2a67f451` 已落盘。该项语义闭合，不再视为
+OPEN。本文件审查后的剩余技术缺口统一登记于 `changes/completed/fix.md` 的 REVISE follow-up，并经
+`changes/active/fix-revise.md` 追踪，不在本文件重复登记。

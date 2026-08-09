@@ -9,7 +9,7 @@
 |---|---|
 | `scripts/checks/dsl-ownership.mjs --threshold=0` | 业务 Interpreter/Command-Reply 第二运行时、程序计数字段、未声明 mutable、record `ref` 可变存储、跨文件同构 DU、未分类的大 DU、未登记 Infrastructure leak、record 中≥2 个独立状态轴且无 `DSL-state-combination` 分类、无结构化理由的 `ControlState`、目录级整体豁免（Infrastructure/Journal/Process 以「不在扫描范围」不报告）、两个 declared registry 的 direct/try probe 联合选择 effect branch |
 | adversarial fixture（`FinalityController` 形） | 裸/未分类 `mutable`、程序计数 scratch（含并发 `ref`/`ResizeArray` 若未 structured-physical 分类）在 dsl-ownership / state-product 下必须 RED；目录级 Infrastructure 豁免不得掩盖 |
-| adversarial fixture（`ExecutorSummarize` 形） | `timerTask`→re-probe / FamilyWaiting 墙钟轮询形状在 B 类零轮询规则下必须 RED；不得因文件落在 Infrastructure/ 而逃逸 |
+| adversarial fixture（`ExecutorSummarize` 形） | 裸/未分类 `mutable` 在 dsl-ownership 下必须 RED；fixture 可含 `timerTask`→re-probe 文本作形状上下文，但静态判红触发是未分类 mutable（B 类零轮询由行为证明闭合，非此静态门禁，见下）；不得因文件落在 Infrastructure/ 而逃逸 |
 | `StudentTeacherRuntime.fs` 六 registry | `runs` / `teacherOwners` / `teacherCalls` / `teacherCompletions` / `studentFinalCompletions` / `skillMutations` 登记为 audited manual-proof / classification 候选；`registry-joint-branch` 只抓同 match 联合 probe，分散时序 presence 须人工分类证明 |
 | `scripts/checks/architecture.mjs` | Domain 向上层依赖、源码根/fsproj 不一致、资源越界读取 |
 | `scripts/checks/spec.mjs` | DSL Clause 重复、悬空或 Change 影子定义 |
@@ -65,8 +65,13 @@ declared registry 的 direct/try probe 联合选择 effect branch 这一语法�
 六 registry 的分散时序 presence 即属此类：不得仅凭 joint-branch 自动绿宣称已分类。
 
 永久 adversarial fixture 必须覆盖与 `FinalityController.fs`、`ExecutorSummarize.fs` 同构的
-反例形状（未分类 mutable / 程序计数 scratch；`timerTask`→FamilyWaiting re-probe），并在
-dsl-ownership、state-product 与 B 类零轮询规则下判红；Infrastructure 目录级豁免不得隐藏它们。
+反例形状（未分类 mutable / 程序计数 scratch），并在 dsl-ownership 与 state-product 规则下判红；
+`ExecutorSummarize` 形的 fixture 可含 `timerTask`→re-probe 文本作为形状上下文，但静态判红触发是
+未分类 mutable（dsl-ownership 不静态判定 B 类零轮询形状本身）。B 类零轮询闭合不依赖静态
+`timerTask` 门禁，而由三部分共同证明：(a) 生产 `AwaitJournalChangeFrom` / `AgentJournal.awaitChangeFrom`
+事件驱动等待；(b) 行为证明 `tests/unit/execution/executor-summarize.test.mjs` 的 callOrder 无
+timer 驱动 re-probe；(c) 上述 `ExecutorSummarize` 形裸 `mutable` 对抗 fixture 的 mutable gate RED。
+Infrastructure 目录级豁免不得隐藏它们。
 
 ## 动态义务
 

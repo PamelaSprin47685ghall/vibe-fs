@@ -1,4 +1,4 @@
-// tests/unit/execution/finality-cohort-law.test.mjs — GLORY-040/042/044/045/055/060/072/073.
+// tests/unit/execution/finality-cohort-law.test.mjs — GLORY-040/042/044/045/055/060/072/073/074/075.
 //
 // The combinator law tests of the timing-control-flow proposal §18, asserted on
 // the observable behaviour of the Finality cohort through the real Host surface
@@ -42,6 +42,7 @@ import {
   bloggerRequestId,
   caseOf,
   frameEpochId,
+  handleController,
   idValue,
   listItems,
   mapEntries,
@@ -50,8 +51,10 @@ import {
   prefixEpochId,
   promptDispatcher,
   reviewChallenge,
+  roles,
   sessionId,
   transportReceipt,
+  utcOffset,
   xTraceCapture,
 } from '../support/domain.mjs'
 
@@ -288,6 +291,54 @@ const rejectionsFor = (journal, requestId) =>
     .filter((fact) => caseOf(fact) === 'FinalityRejected')
     .map(payloadOf)
     .filter((payload) => idValue.finalityRequest(payload.RequestId) === idValue.finalityRequest(requestId))
+
+/** Active Companion Blogger + Handle so coverageCanAdvance can flip to false on abandon. */
+const linkActiveCompanionBlogger = (journal, reviewerValue) => {
+  const bloggerValue = `blogger-${reviewerValue}`
+  const bloggerAgentId = `blogger-agent-${reviewerValue}`
+  const association = AgentJournalModule_appendAgent(
+    new StreamId(1, [sessionId(reviewerValue)]),
+    undefined,
+    agentFact('CompanionBloggerLinked', {
+      SessionId: sessionId(reviewerValue),
+      BloggerSessionId: sessionId(bloggerValue),
+      BloggerAgent: 'fast-blogger',
+    }),
+    journal,
+  )
+  assert.equal(association.tag, 0, `CompanionBloggerLinked rejected: ${association.fields?.[0]}`)
+  const linked = handleController.link(
+    journal,
+    sessionId(reviewerValue),
+    bloggerAgentId,
+    sessionId(bloggerValue),
+    'fast-blogger',
+    roles.of('Blogger'),
+  )
+  assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
+  return { bloggerValue, bloggerAgentId }
+}
+
+const abandonCompanionBlogger = (journal, reviewerValue, bloggerAgentId) => {
+  const abandoned = handleController.recordAbandon(
+    journal,
+    sessionId(reviewerValue),
+    bloggerAgentId,
+    'DeadlineExceeded',
+    utcOffset('2026-03-01T12:00:00Z'),
+  )
+  assert.equal(abandoned.ok, true, abandoned.ok ? '' : abandoned.error)
+}
+
+/** Drop process-local journal waiters (crash); durable REVISE evidence stays. */
+const crashLocalJournalWaiters = (journal) => {
+  assert.ok(Array.isArray(journal.waiters), 'AgentJournal waiter collection is unavailable')
+  const orphaned = journal.waiters.splice(0, journal.waiters.length)
+  for (const entry of orphaned) {
+    const tcs = entry?.[1]
+    if (tcs && typeof tcs.SetCancelled === 'function') tcs.SetCancelled()
+  }
+}
 
 const awaitSubscriptions = async (subscriptions, count) => {
   for (let index = 0; index < count; index += 1) await subscriptions.next()
@@ -804,5 +855,213 @@ test('GLORY_073_real_reachable_lastPart_coverage_unlocks_FinalityRejected_with_w
     const record = agentJournal.readBlob(runtime.journal, rejections[0].WorkRecordRef)
     assert.equal(record.ok, true, record.ok ? '' : record.error)
     assert.match(record.value, /# Work log\n\S/, 'FinalityRejected must reference a non-empty work log')
+  })
+})
+
+// ── GLORY-074: Abandoned Blogger during record-ready → Undecided, no partial rejection ─
+//
+// coverageCanAdvance becomes false when the companion Blogger handle is Abandoned.
+// Without a materializable `# Work log`, recordReadiness is RecordUnavailable and
+// concludeRejection fail-closes to FinalityUndecided — never a WorkRecordRef-less
+// FinalityRejected.
+
+test('GLORY_074_blogger_abandonment_during_record_ready_concludes_undecided_no_partial_rejection', async () => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    commitWorkspace(directory)
+    acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
+    activateLife(runtime, 'mgr')
+
+    const subscriptions = observeTerminalSubscriptions(runtime)
+    const ending = hooks.tool.suicide.execute(
+      { last_words: 'abandonment during record-ready' },
+      suicideContext('call-abandon-1', 'run-abandon-mgr'),
+    )
+    const request = await awaitOpenCohort(runtime.journal, 1)
+    const [reviewer] = reviewerIds(request)
+    assert.ok(reviewer, 'cohort must enlist one reviewer')
+    await awaitPrompted(reviewer)
+    acceptLatestPrompt(runtime, reviewer)
+    await awaitSubscriptions(subscriptions, 3)
+    subscriptions.restore()
+
+    captureWorkRecord(runtime.journal, reviewer, 'abandonment deliberation')
+    const frontier = terminalFrontier(runtime.journal, reviewer)
+    assert.ok(frontier > 1, 'reviewer must have a two-part frontier')
+    appendTerminalEvidence(runtime.journal, reviewer, 'run-abandon-revise', 'abandonment terminal evidence')
+    const { bloggerAgentId } = linkActiveCompanionBlogger(runtime.journal, reviewer)
+
+    const recordReadyWait = agentJournal.observeWaiters(runtime.journal)
+    try {
+      submitVerdict(
+        runtime.journal,
+        request,
+        reviewer,
+        'run-abandon-revise',
+        'call-abandon-revise',
+        ReviewGuardVerdict.Revise,
+      )
+      notifyCompleted(runtime, reviewer, 'abandonment wide', 'abandonment formal', ROLE_REVIEWER)
+
+      const BOUND_MS = 2500
+      const initialProgress = await Promise.race([
+        ending.then((result) => ({ kind: 'settled', result })),
+        recordReadyWait.next().then(() => ({ kind: 'waiting' })),
+        new Promise((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), BOUND_MS)),
+      ])
+      assert.equal(
+        initialProgress.kind,
+        'waiting',
+        `REVISE must await record-ready before abandonment; got ${initialProgress.kind}`,
+      )
+      assert.equal(caseOf(currentRequest(runtime.journal).Resolution), 'Open')
+      assert.equal(rejectionsFor(runtime.journal, request.RequestId).length, 0, 'no FinalityRejected before abandonment')
+
+      abandonCompanionBlogger(runtime.journal, reviewer, bloggerAgentId)
+
+      const outcome = await Promise.race([
+        ending.then((result) => ({ kind: 'settled', result })),
+        new Promise((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), BOUND_MS)),
+      ])
+      assert.notEqual(
+        outcome.kind,
+        'timeout',
+        `Abandoned Blogger must conclude Undecided within ${BOUND_MS}ms; must not hang on AwaitJournal`,
+      )
+      assert.ok(
+        outcome.result.startsWith('# Your ending could not be decided.'),
+        outcome.result,
+      )
+      assert.equal(caseOf(currentRequest(runtime.journal).Resolution), 'Undecided')
+      assert.equal(
+        rejectionsFor(runtime.journal, request.RequestId).length,
+        0,
+        'Abandoned Blogger must not emit FinalityRejected / WorkRecordRef',
+      )
+      const rejectionLike = agentJournal
+        .persistedEnvelopes(runtime.journal)
+        .filter((envelope) => caseOf(envelope.Fact) === 'ManagerLifecycle')
+        .map((envelope) => payloadOf(envelope.Fact))
+        .filter((fact) => caseOf(fact) === 'FinalityRejected')
+      assert.equal(rejectionLike.length, 0, 'no partial rejection blob without # Work log')
+    } finally {
+      recordReadyWait.restore()
+    }
+  })
+})
+
+// ── GLORY-075: waiter crash → resumeDurableRevise from durable evidence, no timer poll ─
+//
+// Local waiter disposal is not durable abandonment. Re-entry with the same ToolCallId
+// resumes concludeRejection / awaitRecordReady via awaitChangeFrom only.
+
+test('GLORY_075_waiter_crash_resumes_from_durable_evidence_no_timer_poll', async () => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    commitWorkspace(directory)
+    acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
+    activateLife(runtime, 'mgr')
+
+    const subscriptions = observeTerminalSubscriptions(runtime)
+    const firstEnding = hooks.tool.suicide
+      .execute(
+        { last_words: 'waiter crash before coverage' },
+        suicideContext('call-075', 'run-075-mgr'),
+      )
+      .catch(() => ({ crashed: true }))
+    const request = await awaitOpenCohort(runtime.journal, 1)
+    const [reviewer] = reviewerIds(request)
+    assert.ok(reviewer, 'cohort must enlist one reviewer')
+    await awaitPrompted(reviewer)
+    acceptLatestPrompt(runtime, reviewer)
+    await awaitSubscriptions(subscriptions, 3)
+    subscriptions.restore()
+
+    captureWorkRecord(runtime.journal, reviewer, 'crash-resume deliberation')
+    const frontier = terminalFrontier(runtime.journal, reviewer)
+    assert.ok(frontier > 1, 'reviewer must have a two-part frontier')
+    const lastPart = frontier - 1
+    appendTerminalEvidence(runtime.journal, reviewer, 'run-075-revise', 'crash-resume terminal evidence')
+
+    const firstWait = agentJournal.observeWaiters(runtime.journal)
+    try {
+      submitVerdict(
+        runtime.journal,
+        request,
+        reviewer,
+        'run-075-revise',
+        'call-075-revise',
+        ReviewGuardVerdict.Revise,
+      )
+      notifyCompleted(runtime, reviewer, 'crash-resume wide', 'crash-resume formal', ROLE_REVIEWER)
+
+      const BOUND_MS = 2500
+      const initialProgress = await Promise.race([
+        firstEnding.then((result) => ({ kind: 'settled', result })),
+        firstWait.next().then(() => ({ kind: 'waiting' })),
+        new Promise((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), BOUND_MS)),
+      ])
+      assert.equal(
+        initialProgress.kind,
+        'waiting',
+        `REVISE must register awaitChangeFrom before coverage; got ${initialProgress.kind}`,
+      )
+      assert.equal(caseOf(currentRequest(runtime.journal).Resolution), 'Open')
+      assert.equal(rejectionsFor(runtime.journal, request.RequestId).length, 0)
+    } finally {
+      firstWait.restore()
+    }
+
+    // Process-local waiter death: durable REVISE + frontier remain; no lifecycle terminal.
+    crashLocalJournalWaiters(runtime.journal)
+    await firstEnding
+    assert.equal(caseOf(currentRequest(runtime.journal).Resolution), 'Open', 'waiter crash must not close the request')
+    assert.equal(rejectionsFor(runtime.journal, request.RequestId).length, 0)
+
+    const resumeWait = agentJournal.observeWaiters(runtime.journal)
+    try {
+      const resumed = hooks.tool.suicide.execute(
+        { last_words: 'waiter crash before coverage' },
+        suicideContext('call-075', 'run-075-resume'),
+      )
+
+      const BOUND_MS = 2500
+      const afterResume = await Promise.race([
+        resumed.then((result) => ({ kind: 'settled', result })),
+        resumeWait.next().then(() => ({ kind: 'waiting' })),
+        new Promise((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), BOUND_MS)),
+      ])
+      assert.equal(
+        afterResume.kind,
+        'waiting',
+        'resumeDurableRevise must re-register awaitChangeFrom (no timerTask/sleep re-probe)',
+      )
+      assert.equal(caseOf(currentRequest(runtime.journal).Resolution), 'Open')
+      assert.equal(rejectionsFor(runtime.journal, request.RequestId).length, 0, 'resume must not reject before coverage')
+      assert.equal(
+        mapEntries(currentRequest(runtime.journal).Members).length,
+        1,
+        'resume must not reopen / re-enlist the cohort',
+      )
+
+      appendBlogCoverage(runtime.journal, reviewer, {
+        previous: 0,
+        next: lastPart,
+        label: 'crash-resume-lastPart',
+      })
+
+      const outcome = await Promise.race([
+        resumed.then((result) => ({ kind: 'settled', result })),
+        new Promise((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), BOUND_MS)),
+      ])
+      assert.notEqual(outcome.kind, 'timeout', `resumed record-ready must settle within ${BOUND_MS}ms`)
+      assert.ok(outcome.result.startsWith('# Your ending has not accepted you.'), outcome.result)
+      assert.equal(caseOf(currentRequest(runtime.journal).Resolution), 'Rejected')
+      const rejections = rejectionsFor(runtime.journal, request.RequestId)
+      assert.equal(rejections.length, 1, 'exactly one FinalityRejected after durable resume + coverage')
+      const record = agentJournal.readBlob(runtime.journal, rejections[0].WorkRecordRef)
+      assert.equal(record.ok, true, record.ok ? '' : record.error)
+      assert.match(record.value, /# Work log\n\S/, 'FinalityRejected must reference a non-empty work log')
+    } finally {
+      resumeWait.restore()
+    }
   })
 })

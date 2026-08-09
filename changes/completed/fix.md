@@ -507,3 +507,55 @@ timer/sleep/re-probe。`manager-unhappy-path` rejection 断言已收紧为必须
 
 - 2026-08-09 close 复验：`tool-loop.test.mjs` 3/3 pass；`npm run check` exit 0；
   `manager-unhappy-path` e2e exit 0（13 stroke）；`devops-mechanical-repair-loop` e2e exit 0。
+
+---
+
+# Reconciliation note
+
+本记录仅做语义归档同步，不重写上文中间快照历史。本文件自上文的 Additional closing criteria（
+「当前仅完成语义归档，不宣称 production/test 或 full gate 已完成」）与中间 OPEN 状态之后，后续
+DevOps 已实测 CLOSE_READY：`npm run check` 全量 exit 0、`tool-loop.test.mjs` 3/3、
+`manager-unhappy-path` e2e exit 0（13 stroke）、`devops-mechanical-repair-loop` e2e exit 0。据此
+追加的 Final outcome 取代中间 OPEN 快照所描述的状态；归档提交 `2a67f451` 已落盘。该项语义闭合，
+不再视为 OPEN。
+
+---
+
+# REVISE follow-up（审查后仅剩技术缺口，未声称完成）
+
+本 REVISE 仅登记审查后仍存的技术缺口，供后续 `changes/active/fix-revise.md` 追踪。以下各项
+**均未声称 DONE**，仅为待完成工作。
+
+1. **Finality record-ready 拒绝/崩溃恢复回归仍未闭环**：`docs/proof/glory.md` §29 仍要求
+   Blogger abandonment 与 waiter-crash 恢复场景的专项回归（Closing work 3 覆盖不全）。当前
+   `manager-unhappy-path` 只验证正常 rejection 死锁消除，未覆盖 Blogger 放弃 / waiter 崩溃后
+   `awaitRecordReady` 从 durable evidence 续等的专项测试。
+2. **B 类零轮询静态证明 vs proof 措辞仍存对齐缺口**：`dsl-ownership` 门禁缺少对
+   `timerTask → re-probe` 递归轮询形状的静态 RED 判定。`ExecutorSummarize` 已改为事件驱动
+   `awaitChangeFrom`，但静态门禁尚未能把「禁止 B 类 timer re-probe」作为可判 RED 的对抗式规则，
+   与 `docs/how|proof/dsl-structured-program.md` 的 B 类零轮询措辞未完全对齐。
+
+上述两项在未实现且未验证前不得标 DONE。
+
+---
+
+# REVISE follow-up（完成记录）
+
+上文两项缺口已由 `changes/active/fix-revise.md` 闭环并经 DevOps 验证，现均标 **DONE**：
+
+1. **Finality record-ready 拒绝/崩溃恢复回归 — DONE**：
+   `tests/unit/execution/finality-cohort-law.test.mjs` 补并验证（8/8 pass）：
+   - `GLORY_074`（Blogger abandonment 期间 record-ready，AbandonedAt 触发 coverageCanAdvance
+     变 false）→ `concludeRejection` fail-close 至 `Undecided`，绝不产生缺 `# Work log` 的
+     `FinalityRejected`/`WorkRecordRef`（无 partial rejection）。
+   - `GLORY_075`（waiter crash → `resumeDurableRevise` 从 durable evidence 续等，经
+     `awaitChangeFrom` 唤醒，无 timer/sleep re-probe）→ appendBlogCoverage 后唯一
+     `FinalityRejected` 引用非空 `# Work log`，不重开/re-enlist cohort。
+   证据：`finality-cohort-law.test.mjs` 8/8 通过（含 GLORY_074/075）。
+2. **B 类零轮询静态证明 vs proof 措辞对齐 — DONE**：`docs/proof/dsl-structured-program.md`
+   措辞收窄，撤销「timerTask→re-probe 在 dsl-ownership 静态判 RED」overclaim；B 类零轮询改以
+   三合一证明（生产 `AgentJournal.awaitChangeFrom` + `executor-summarize.test.mjs` 行为 callOrder
+   + `ExecutorSummarize` 形裸 `mutable` 对抗 fixture）闭环，未新增 dsl-ownership timer gate。
+
+全量门禁 — **DONE**：`npm run check` 全量 exit 0（Lint / Build / 1837 unit / integration）；
+`manager-unhappy-path` 与 `devops-mechanical-repair-loop` e2e exit 0。本 REVISE 正式关闭。
