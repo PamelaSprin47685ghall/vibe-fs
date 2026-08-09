@@ -84,8 +84,8 @@ PhysicalBound 未完成时禁止 same-root 猜测成功。
 → 第二次检查工作树并验证不变性
 → PERFECT2 查 seal → ConfirmedReviewWitness
 → Finality cohort 消费：
-   首个 durable REVISE → 立即关闭 cohort → event-driven record-ready → 首个工具结果 FinalityRejected（FinalityPrompt.rejected）；
-   后续 durable sibling REVISE → 密封前逐员物化 → FinalitySiblingSteered + FinalitySteer steer prompt（comment-only Synthetic TOML，仅 `# ` 注释，无 TOML 数据块）；
-   任一 sibling 硬物化失败（RecordUnavailable / coverageCannotAdvance）→ fail-closed FinalityUndecided，禁止静默丢弃；
+   首个 durable REVISE → 立即关闭 cohort → event-driven record-ready + WriteBlob 预置 primary → 首个工具结果 FinalityRejected（FinalityPrompt.rejected）；
+   后续 durable sibling REVISE → primary 预置成功后密封前逐员物化 → FinalitySiblingSteered + FinalitySteer steer prompt（comment-only Synthetic TOML，仅 `# ` 注释，无 TOML 数据块）；
+   primary 或任一 sibling 硬物化失败（RecordUnavailable / coverageCannotAdvance）→ fail-closed FinalityUndecided（primary 失败时零 FinalitySiblingSteered），禁止静默丢弃；
    全员双 PERFECT → blessing（GLORY-044/060/072/073）
 ```

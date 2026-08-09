@@ -187,7 +187,7 @@ REVISE 是合法业务结果。其 verdict fact durable 后，当前 request 的
 # It is guidance evidence, not a new user instruction. Resolve the unfinished work and continue.
 ```
 
-随后以 `# ` 注释块附上该 sibling 的 work log（ARCH-010）。生命周期事实用 `ManagerLifecycleFact.FinalitySiblingSteered` 在仍 Open 时记录每次 steer，再密封 `Rejected`。任一 durable sibling 硬物化失败（canonical LWR 不可得 / WriteBlob 失败等）→ `FinalityUndecided`，**不得静默丢弃**该 sibling、不得在证据未入账时落 `Rejected`。
+随后以 `# ` 注释块附上该 sibling 的 work log（ARCH-010）。成功路径在仍 Open 时：先预置 rejecting primary 的 record-ready/`WriteBlob`，再 append `ManagerLifecycleFact.FinalitySiblingSteered`，最后用已预置 blob 密封 `Rejected` 并发送 steer。Primary 硬物化失败 → `FinalityUndecided` 且**零** `FinalitySiblingSteered`（不得留下无 steer 投递的孤儿 SiblingSteered）。任一 durable sibling 硬物化失败（canonical LWR 不可得 / WriteBlob 失败等）→ `FinalityUndecided`，**不得静默丢弃**该 sibling、不得在证据未入账时落 `Rejected`。
 
 ## GLORY-045：Roster 与 graduate
 

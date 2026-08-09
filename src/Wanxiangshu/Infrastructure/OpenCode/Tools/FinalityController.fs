@@ -458,11 +458,28 @@ module FinalityController =
             return Undecided ManagerLifecyclePrompt.FinalityUndecidable
         }
 
-    /// The wound path (GLORY-051/052/053): the rejecting reviewer's canonical
-    /// LWR becomes the FinalityRejected suicide tool result; the same Life
-    /// continues. The reviewer stays ungraduated and its session is preserved.
-    let private concludeRejection
-        (scope: ToolRuntimeScope)
+    /// GLORY-044: rejecting-reviewer record-ready + WriteBlob must complete
+    /// before any FinalitySiblingSteered. Hard failure → caller Undecided with
+    /// zero sibling steered facts (不得 orphan SiblingSteered without steers).
+    let private stagePrimaryRejectionRecord
+        (journal: AgentJournal)
+        (rejectingReviewer: SessionId)
+        (barrierId: ReviewBarrierId)
+        : Task<Result<string * BlobWriteReceipt, string>> =
+        task {
+            let! record = awaitRecordReady journal rejectingReviewer barrierId
+
+            match record with
+            | Error reason -> return Error reason
+            | Ok workRecord ->
+                match journal.WriteBlob workRecord with
+                | Error reason -> return Error reason
+                | Ok blob -> return Ok(workRecord, blob)
+        }
+
+    /// The wound path (GLORY-051/052/053): seal FinalityRejected from an already
+    /// staged primary blob. The reviewer stays ungraduated; session preserved.
+    let private sealFinalityRejected
         (journal: AgentJournal)
         (managerSessionId: SessionId)
         (lifeId: ManagerLifeId)
@@ -470,40 +487,22 @@ module FinalityController =
         (rejectingReviewer: SessionId)
         (barrierId: ReviewBarrierId)
         (requestTree: GitTreeHash)
-        : Task<FinalityOutcome> =
-        task {
-            let! record = awaitRecordReady journal rejectingReviewer barrierId
+        (workRecord: string)
+        (blob: BlobWriteReceipt)
+        : FinalityOutcome =
+        appendLifecycle
+            journal
+            (ManagerLifecycleFact.FinalityRejected
+                {| SessionId = managerSessionId
+                   LifeId = lifeId
+                   RequestId = requestId
+                   RejectingReviewerSessionId = rejectingReviewer
+                   BarrierId = barrierId
+                   GitTreeHash = requestTree
+                   WorkRecordRef = blob.BlobRef
+                   WorkRecordDigest = blob.BlobDigest |})
 
-            match record with
-            | Error _ ->
-                return!
-                    concludeUndecided
-                        scope
-                        journal
-                        managerSessionId
-                        lifeId
-                        requestId
-                        requestTree
-                        rejectingReviewer
-                        barrierId
-            | Ok workRecord ->
-                match journal.WriteBlob workRecord with
-                | Error _ -> return Undecided ManagerLifecyclePrompt.FinalityUndecidable
-                | Ok blob ->
-                    appendLifecycle
-                        journal
-                        (ManagerLifecycleFact.FinalityRejected
-                            {| SessionId = managerSessionId
-                               LifeId = lifeId
-                               RequestId = requestId
-                               RejectingReviewerSessionId = rejectingReviewer
-                               BarrierId = barrierId
-                               GitTreeHash = requestTree
-                               WorkRecordRef = blob.BlobRef
-                               WorkRecordDigest = blob.BlobDigest |})
-
-                    return Rejected(FinalityPrompt.rejected workRecord)
-        }
+        Rejected(FinalityPrompt.rejected workRecord)
 
     /// GLORY-044/REVIEW-002: wait until every durable sibling is RecordReady, or
     /// fail closed on hard RecordUnavailable (no silent drop; no AwaitJournal hang
@@ -662,10 +661,12 @@ module FinalityController =
                 ()
         }
 
-    /// GLORY-044: seal FinalityRejected only after every durable sibling is
-    /// record-ready and atomically blob-committed (all WriteBlob, then all
-    /// FinalitySiblingSteered — or none). Hard RecordUnavailable / WriteBlob
-    /// failure → concludeUndecided (Open-only; no partial SiblingSteered).
+    /// GLORY-044: seal FinalityRejected only after (1) every durable sibling is
+    /// record-ready, (2) primary rejecting LWR is staged (record-ready+WriteBlob),
+    /// then (3) atomic sibling WriteBlob + all FinalitySiblingSteered, (4) seal
+    /// Rejected from the staged primary blob, (5) sendSiblingSteerContinuations.
+    /// Primary hard-fail before sibling facts → Undecided with zero SiblingSteered
+    /// (avoids orphaning steered facts when Manager suicides under a new ToolCallId).
     let private concludeRejectionAccountingSiblings
         (scope: ToolRuntimeScope)
         (journal: AgentJournal)
@@ -693,16 +694,12 @@ module FinalityController =
                         rejectingReviewer
                         barrierId
             | Ok records ->
-                match
-                    commitSiblingSteerFacts
-                        journal
-                        managerSessionId
-                        lifeId
-                        requestId
-                        requestTree
-                        records
-                with
+                let! primaryStaged =
+                    stagePrimaryRejectionRecord journal rejectingReviewer barrierId
+
+                match primaryStaged with
                 | Error _ ->
+                    // Primary hard-fail: no FinalitySiblingSteered yet.
                     return!
                         concludeUndecided
                             scope
@@ -713,24 +710,44 @@ module FinalityController =
                             requestTree
                             rejectingReviewer
                             barrierId
-                | Ok prepared ->
-                    let! outcome =
-                        concludeRejection
-                            scope
+                | Ok(workRecord, primaryBlob) ->
+                    match
+                        commitSiblingSteerFacts
                             journal
                             managerSessionId
                             lifeId
                             requestId
-                            rejectingReviewer
-                            barrierId
                             requestTree
+                            records
+                    with
+                    | Error _ ->
+                        return!
+                            concludeUndecided
+                                scope
+                                journal
+                                managerSessionId
+                                lifeId
+                                requestId
+                                requestTree
+                                rejectingReviewer
+                                barrierId
+                    | Ok prepared ->
+                        let outcome =
+                            sealFinalityRejected
+                                journal
+                                managerSessionId
+                                lifeId
+                                requestId
+                                rejectingReviewer
+                                barrierId
+                                requestTree
+                                workRecord
+                                primaryBlob
 
-                    match outcome with
-                    | Rejected _ ->
+                        // SiblingSteered already committed: always deliver steers
+                        // (Rejected is the only seal path after primary preflight).
                         do! sendSiblingSteerContinuations scope journal managerSessionId prepared
                         return outcome
-                    | Blessed _
-                    | Undecided _ -> return outcome
         }
 
     /// GLORY-073 resume: replay already-committed sibling steers. Blob first;
@@ -905,8 +922,9 @@ module FinalityController =
 
     /// GLORY-073: a replay resumes a durable REVISE at its frozen frontier. It
     /// never re-enlists the cohort or replays a Reviewer continuation.
-    /// GLORY-044: after/with concludeRejection, also steer durable sibling REVISE
-    /// and best-effort replay FinalitySiblingSteered continuations.
+    /// GLORY-044: Open path uses concludeRejectionAccountingSiblings (primary
+    /// preflight → SiblingSteered → seal Rejected → send steers); resolved path
+    /// best-effort replays already-committed FinalitySiblingSteered continuations.
     let resumeDurableRevise
         (scope: ToolRuntimeScope)
         (managerSessionId: SessionId)
