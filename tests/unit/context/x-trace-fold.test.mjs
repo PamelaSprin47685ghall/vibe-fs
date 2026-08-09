@@ -128,11 +128,13 @@ test('PERSIST_010_terminal_is_captured_once_and_idempotent', () => {
   assert.deepEqual(s.XTrace.Terminal[0].fields[0], 'blob-term')
 })
 
-test('PERSIST_010_a_second_different_terminal_is_refused', () => {
+test('PERSIST_010_a_second_different_terminal_overwrites_for_reuse', () => {
   const result = fold.apply(fold.empty, [terminalFact(), terminalFact({ ref: 'blob-term-2', digest: 'sha-term-2' })])
-  assert.equal(result.ok, false)
-  assert.equal(result.error.Fact, 'TerminalOutputCaptured')
-  assert.match(result.error.Reason, /already captured with a different blob/)
+  assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
+  const s = fold.session(result.value, SESSION)
+  // EXEC-009: reuse overwrites the terminal so the LWR's # Final output
+  // reflects the latest work unit, not the first.
+  assert.deepEqual(s.XTrace.Terminal[0].fields[0], 'blob-term-2')
 })
 
 test('PERSIST_010_xtrace_facts_survive_NDJSON_and_still_fold', () => {

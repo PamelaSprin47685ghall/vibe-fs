@@ -126,8 +126,11 @@ module XTraceProjection =
                               TextRef = textRef
                               TextDigest = textDigest } ] }
 
-    /// COMPANION-003: capture the terminal output reference. Idempotent: replaying
-    /// the same ref changes nothing; a different one is refused.
+    /// COMPANION-003 / EXEC-009: capture the terminal output reference.
+    /// Idempotent replay (same ref+digest) is a no-op; a different ref
+    /// overwrites — subagent reuse produces a new terminal per work unit
+    /// on the same child session, and the LWR's `# Final output` must
+    /// reflect the latest terminal, not the first.
     let applyTerminal
         (textRef: BlobRef)
         (textDigest: BlobDigest)
@@ -135,11 +138,7 @@ module XTraceProjection =
         : Result<XTraceProjectionState, XTraceFoldRejection> =
         match state.Terminal with
         | Some(existingRef, existingDigest) when existingRef = textRef && existingDigest = textDigest -> Ok state
-        | Some _ -> Error XTraceFoldRejection.TerminalAlreadyCaptured
-        | None ->
-            Ok
-                { state with
-                    Terminal = Some(textRef, textDigest) }
+        | _ -> Ok { state with Terminal = Some(textRef, textDigest) }
 
     /// Provenance generation: `g:N/...` after HOST-006 reanchor; legacy `turn:N/part:M` → 0.
     let provenanceGeneration (provenance: string) : int =
