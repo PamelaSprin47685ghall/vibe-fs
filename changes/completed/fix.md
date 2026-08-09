@@ -571,3 +571,26 @@ DevOps 已实测 CLOSE_READY：`npm run check` 全量 exit 0、`tool-loop.test.m
 tool-loop.test.mjs` 的有界 `awaitPromptGrowth`）已随 CE 迁移归档提交 `2a67f451`（fix/corrective
 close）及后续 `1b6d6986` / `df0e5e8b` 进入 HEAD，不再处于工作树，也不构成未提交债务。仅做语义
 归档同步，不重写上文历史。
+
+---
+
+# Reconciliation note（EXEC_025 测试名校正）
+
+上文 Remaining work 1 中出现的 `EXEC_025_unbounded_prompt_wait_hangs_when_in_flight_execute_rejects_without_prompt`
+是工作树草稿标签（worktree draft label），不是 `tests/unit/student-teacher/tool-loop.test.mjs`
+中实际落盘的测试名。实际落盘（HEAD）的 EXEC_025 测试为：
+
+- `EXEC_025_awaitPromptGrowth_fails_fast_when_prompts_never_grow`
+- `EXEC_025_prompt_growth_wait_must_be_bounded`
+- `EXEC_025_three_teacher_calls_reuse_one_private_session_and_QA_records_raw_order`
+
+三者均位于 `tests/unit/student-teacher/tool-loop.test.mjs`，随 CE 迁移归档提交 `2a67f451` 及
+`1b6d6986` 进入 HEAD。上文 ghost name 仅作占位，不代表任何物理测试。
+
+## npm run check 范围澄清
+
+`npm run check`（见 `package.json`）= lint / build / unit / integration；它不包含完整
+`test:e2e` / `check:release`。本 Change 的 e2e close 证据仅为两条定向 canary：
+`manager-unhappy-path` 与 `devops-mechanical-repair-loop`（直接以 `node` 运行对应
+`tests/e2e/cases/` 用例），并非完整 `test:e2e` suite 运行。不得将本 Change 的 e2e 证据解读为
+完整 e2e 套件已跑。仅做语义归档同步，不重写上文历史。
