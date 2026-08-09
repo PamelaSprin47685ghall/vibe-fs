@@ -478,6 +478,8 @@ canary 偶发失败。
    `docs/how|proof/dsl-structured-program.md` 闭环（各 registry 单一 physical lifetime，不编码 lifecycle
    stage）。诚实披露：未宣称自动化 cross-function detector 已实现；`registry-joint-branch` 仅覆盖同
    match 联合 probe。
+   Proof layer 现已将 StudentTeacher 六 registry 标为 **已人工分类证明**（见
+   `docs/proof/dsl-structured-program.md` 静态义务表行 +「StudentTeacher 六 registry — 已人工分类证明」节）。
 5. Executor `FamilyWaiting` 去除 100ms `timerTask` re-probe — **DONE**（HEAD）：事件驱动
    `AgentJournal.awaitChangeFrom` / permit pulse；C 类 deadline race 允许。
 6. `TurnUnknown` 降级为 reconciliation 私有 `SnapshotObservation` — **DONE**（HEAD）：生产 `TurnOutcome`

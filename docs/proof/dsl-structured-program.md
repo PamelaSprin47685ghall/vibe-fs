@@ -10,7 +10,7 @@
 | `scripts/checks/dsl-ownership.mjs --threshold=0` | 业务 Interpreter/Command-Reply 第二运行时、程序计数字段、未声明 mutable、record `ref` 可变存储、跨文件同构 DU、未分类的大 DU、未登记 Infrastructure leak、record 中≥2 个独立状态轴且无 `DSL-state-combination` 分类、无结构化理由的 `ControlState`、目录级整体豁免（Infrastructure/Journal/Process 以「不在扫描范围」不报告）、两个 declared registry 的 direct/try probe 联合选择 effect branch |
 | adversarial fixture（`FinalityController` 形） | 裸/未分类 `mutable`、程序计数 scratch（含并发 `ref`/`ResizeArray` 若未 structured-physical 分类）在 dsl-ownership / state-product 下必须 RED；目录级 Infrastructure 豁免不得掩盖 |
 | adversarial fixture（`ExecutorSummarize` 形） | 裸/未分类 `mutable` 在 dsl-ownership 下必须 RED；fixture 可含 `timerTask`→re-probe 文本作形状上下文，但静态判红触发是未分类 mutable（B 类零轮询由行为证明闭合，非此静态门禁，见下）；不得因文件落在 Infrastructure/ 而逃逸 |
-| `StudentTeacherRuntime.fs` 六 registry | `runs` / `teacherOwners` / `teacherCalls` / `teacherCompletions` / `studentFinalCompletions` / `skillMutations` 登记为 audited manual-proof / classification 候选；`registry-joint-branch` 只抓同 match 联合 probe，分散时序 presence 须人工分类证明 |
+| `StudentTeacherRuntime.fs` 六 registry | **已人工分类证明（classified）**：`runs` / `teacherOwners` / `teacherCalls` / `teacherCompletions` / `studentFinalCompletions` / `skillMutations` 各为一物理 lifetime/resource mailbox（见下节 manual-proof）；`registry-joint-branch` 只抓同 match 联合 probe，分散 presence 不在 auto 范围、由本 proof 闭合 |
 | `scripts/checks/architecture.mjs` | Domain 向上层依赖、源码根/fsproj 不一致、资源越界读取 |
 | `scripts/checks/spec.mjs` | DSL Clause 重复、悬空或 Change 影子定义 |
 
@@ -61,8 +61,33 @@
 `state-product` 门禁在字段名无关的结构层面识别 record 状态轴乘积；它不替代上表人工枚举
 的架构级语义，只把「未分类组合」变成构建期失败。`registry-joint-branch` 只拒绝两个
 declared registry 的 direct/try probe 联合选择 effect branch 这一语法反例；其它多 registry
-联合 presence 仅是候选审计，必须由人工 proof 判断是否驱动阶段推进。`StudentTeacherRuntime`
-六 registry 的分散时序 presence 即属此类：不得仅凭 joint-branch 自动绿宣称已分类。
+联合 presence 的分散探测不在该自动门禁范围内，须由人工 proof 判断是否驱动阶段推进。
+
+### StudentTeacher 六 registry — 已人工分类证明
+
+参照上表 Blogger 正交物理槽位风格：`src/Wanxiangshu/Session/StudentTeacherRuntime.fs`
+（类型头注释 L48–54；字段 L67–72）声明的六 registry **各拥有单一物理 lifetime / resource
+mailbox**，不把跨 registry 的 presence 乘积编码为 Student lifecycle stage PC：
+
+| registry | 物理归属 | HandleTurn / Return 消费方式 |
+|---|---|---|
+| `runs` | 活跃 Student run mailbox | `tryRun`；Student 分支先确认 run 存在再处理 turn |
+| `teacherOwners` | Teacher↔Student 关联 mailbox | `tryOwner`；Teacher 路径定位 owner，亦可回落 durable association |
+| `teacherCalls` | 在途 Teacher 调用 / waiter mailbox | `tryTeacherCall`；消费 `TeacherCallScope`（含 `Waiter` TCS） |
+| `teacherCompletions` | 待返回的 Teacher completion mailbox | `tryTeacherCompletion`；消费 `TeacherCompletionScope` 的 Answer / ToolRun 载荷 |
+| `studentFinalCompletions` | Student 终稿 completion mailbox | `tryFinalCompletion`；消费 `StudentFinalCompletionScope.Message` 与 provider-run |
+| `skillMutations` | 观测到的 skill 文档改动 mailbox | `skillDocuments`；校验 touched skills，非阶段推进 |
+
+`HandleTurn`（同文件 L504–572）分支消费的是上述 **物理返回载荷**（completion message /
+`CompletedTurnClassifier.partsText` 比对）以及 durable projection 上的
+`PromptAuthority` continuation kind（`currentStudentRequestKind`，L119–130，读
+`AgentJournal` snapshot），**不是**「哪些 registry 同时非空」所编码的阶段程序计数。
+`Return`（L366–417）按 role 装入对应 mailbox 的物理 payload，亦不把六槽位联合 presence
+当作 stage PC。
+
+诚实边界：`registry-joint-branch` 自动门禁仅拦截同 match 内的 direct/try 联合 probe；
+分散时序 presence（跨辅助函数的 `try*`）仍在 auto 范围之外，本小节 manual-proof 闭合该分类，
+不得仅凭 joint-branch 自动绿宣称已分类。未新增跨函数静态 detector。
 
 永久 adversarial fixture 必须覆盖与 `FinalityController.fs`、`ExecutorSummarize.fs` 同构的
 反例形状（未分类 mutable / 程序计数 scratch），并在 dsl-ownership 与 state-product 规则下判红；
