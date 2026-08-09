@@ -25,7 +25,11 @@ type ReconciledTurn =
         Finish: string option
         ErrorName: string option
         Model: OpencodeModel option
+        /// Publishable provider-turn classification (HOST-004). Never TurnUnknown.
         Outcome: ReconcileProgram.TurnOutcome
+        /// Reconciliation-private finish=None observation. When Some, evidence and
+        /// missing-final-report repair consult this — not Outcome.
+        Observation: ReconcileProgram.SnapshotObservation option
     }
 
 /// The reconciled turn plus the quiescence evidence of the pass that published

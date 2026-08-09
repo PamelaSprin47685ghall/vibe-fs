@@ -319,6 +319,5 @@ module XWire =
             | ReconcileProgram.TurnFailed _
             | ReconcileProgram.TurnAborted _ -> scope.ClearAttemptPlan turn.SessionId turn.ProviderRun
             | ReconcileProgram.TurnNeedsContinuation _
-            | ReconcileProgram.TurnInProgress
-            | ReconcileProgram.TurnUnknown -> ()
+            | ReconcileProgram.TurnInProgress -> ()
         | _ -> ()

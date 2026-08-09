@@ -71,28 +71,31 @@ module CompletedTurnClassifier =
             lower.Contains("abort")
         | None -> false
 
+    /// Returns either a publishable `TurnOutcome` or a private `SnapshotObservation`.
+    /// Heterogeneous `obj` so finish=None stays instanceof SnapshotObservation in JS
+    /// (HOST-004 Clean Break — must not mint TurnOutcome.TurnUnknown).
     let classifyOutcome
         (completed: bool)
         (finish: string option)
         (errorName: string option)
         (parts: MessagePart array)
-        : ReconcileProgram.TurnOutcome =
+        : obj =
         if isAbortErrorName errorName then
-            ReconcileProgram.TurnAborted(defaultArg errorName "aborted")
+            box (ReconcileProgram.TurnAborted(defaultArg errorName "aborted"))
         elif completed && Option.isSome errorName then
-            ReconcileProgram.TurnFailed(defaultArg errorName "assistant completed with error")
+            box (ReconcileProgram.TurnFailed(defaultArg errorName "assistant completed with error"))
         elif
             finish
             |> Option.exists (fun value -> value.Equals("aborted", StringComparison.OrdinalIgnoreCase))
         then
-            ReconcileProgram.TurnAborted("finish=aborted")
+            box (ReconcileProgram.TurnAborted("finish=aborted"))
         else
             match finish with
             | Some value when value.Equals("error", StringComparison.OrdinalIgnoreCase) ->
                 if isAbortErrorName errorName then
-                    ReconcileProgram.TurnAborted(defaultArg errorName "aborted")
+                    box (ReconcileProgram.TurnAborted(defaultArg errorName "aborted"))
                 else
-                    ReconcileProgram.TurnFailed(defaultArg errorName "assistant finish=error")
+                    box (ReconcileProgram.TurnFailed(defaultArg errorName "assistant finish=error"))
             | Some value when value.Equals("stop", StringComparison.OrdinalIgnoreCase) ->
                 // CTX-004: a terminal provider step is not a final answer unless
                 // it carries usable formal text. `TerminalValidity` is the single
@@ -101,32 +104,37 @@ module CompletedTurnClassifier =
                 // tool-call markup, and both cases earn interaction repair rather
                 // than durable provider fallback.
                 match TerminalValidity.check (partsText parts) with
-                | Ok() -> ReconcileProgram.TurnCompleted
+                | Ok() -> box ReconcileProgram.TurnCompleted
                 | Error rejection ->
-                    ReconcileProgram.TurnNeedsContinuation(
-                        sprintf "assistant stop with %s" (TerminalValidity.describe rejection)
+                    box (
+                        ReconcileProgram.TurnNeedsContinuation(
+                            sprintf "assistant stop with %s" (TerminalValidity.describe rejection)
+                        )
                     )
             | Some value when value.Equals("tool-calls", StringComparison.OrdinalIgnoreCase) ->
-                ReconcileProgram.TurnInProgress
+                box ReconcileProgram.TurnInProgress
             | Some value when value.Equals("length", StringComparison.OrdinalIgnoreCase) ->
-                ReconcileProgram.TurnNeedsContinuation "assistant finish=length"
-            | Some value -> ReconcileProgram.TurnFailed(sprintf "assistant finish=%s" value)
-            // No finish yet: Unknown. Never invent Completed from parts alone —
-            // abort/error may still be racing the idle wake-up.
-            | None -> ReconcileProgram.TurnUnknown
+                box (ReconcileProgram.TurnNeedsContinuation "assistant finish=length")
+            | Some value -> box (ReconcileProgram.TurnFailed(sprintf "assistant finish=%s" value))
+            // No finish yet: private SnapshotObservation. Never invent Completed
+            // from parts alone — abort/error may still be racing the idle wake-up.
+            | None -> box ReconcileProgram.TurnUnknown
 
     /// ARCH-011: named for the typed occasion (unfinished interaction), not for any
     /// character feature of the repair payload. `_parts` is deliberately ignored: a
     /// `TurnInProgress`/`TurnNeedsContinuation` outcome already carries the decision.
-    let needsInteractionRepair (role: Role option) (outcome: ReconcileProgram.TurnOutcome) (_parts: MessagePart array) =
+    /// Accepts `obj` because classifyOutcome may return SnapshotObservation.
+    let needsInteractionRepair (role: Role option) (classified: obj) (_parts: MessagePart array) =
         supportsInteractionRepair role
-        && (match outcome with
-            | ReconcileProgram.TurnInProgress
-            | ReconcileProgram.TurnNeedsContinuation _ -> true
-            | ReconcileProgram.TurnCompleted
-            | ReconcileProgram.TurnAborted _
-            | ReconcileProgram.TurnFailed _
-            | ReconcileProgram.TurnUnknown -> false)
+        && (match classified with
+            | :? ReconcileProgram.TurnOutcome as outcome ->
+                match outcome with
+                | ReconcileProgram.TurnInProgress
+                | ReconcileProgram.TurnNeedsContinuation _ -> true
+                | ReconcileProgram.TurnCompleted
+                | ReconcileProgram.TurnAborted _
+                | ReconcileProgram.TurnFailed _ -> false
+            | _ -> false)
 
     let roleOfAgent (agent: string option) (fallback: Role option) =
         match agent with
@@ -143,8 +151,19 @@ module CompletedTurnClassifier =
         : ReconciledTurn =
         let role = roleOfAgent assistant.Agent roleFallback
 
-        let outcome =
+        let classified =
             classifyOutcome assistant.Completed assistant.Finish assistant.ErrorName assistant.Parts
+
+        // When Observation is Some, Outcome is an unreachable placeholder for
+        // callers that only match publishable TurnOutcome cases (evidence and
+        // missing-final-report consult Observation first).
+        let outcome, observation =
+            match classified with
+            | :? ReconcileProgram.SnapshotObservation as obs ->
+                ReconcileProgram.TurnNeedsContinuation "private-snapshot-observation", Some obs
+            | :? ReconcileProgram.TurnOutcome as o -> o, None
+            | _ ->
+                failwith "classifyOutcome returned neither TurnOutcome nor SnapshotObservation"
 
         { SessionId = sessionId
           PhysicalUserMessageId = physicalUserMessageId
@@ -157,4 +176,5 @@ module CompletedTurnClassifier =
           Finish = assistant.Finish
           ErrorName = assistant.ErrorName
           Model = assistant.Model
-          Outcome = outcome }
+          Outcome = outcome
+          Observation = observation }

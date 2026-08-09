@@ -166,22 +166,9 @@ test('RECONCILE_PROGRAM_004: publishDecision gates already-published terminal an
 })
 
 test('RECONCILE_PROGRAM_005: TurnUnknown never crosses the stable business-turn boundary', async () => {
-  const unknown = reconcileProgram.turnFixture({
-    session: 'ses-a',
-    physical: 'user-1',
-    providerRun: 'asst-unknown',
-    outcome: 'TurnUnknown',
-  })
-  const empty = reconcileProgram.publishMaps.empty()
-
-  // Unknown is only a reconciliation observation. It must not acquire either
-  // a terminal (stable) or incomplete (provisional) business-turn seal.
-  const publication = reconcileProgram.publishDecision(empty, unknown)
-  assert.equal(publication.shouldPublish, false)
-  assert.equal(publication.maps.consumedHas(unknown), false)
-  assert.equal(publication.maps.provisionalHas(unknown), false)
-
-  // IdleWake retains the distinct missing-final-report repair path.
+  // HOST-004 Clean Break: TurnUnknown is type-unreachable for publishDecision
+  // (not a TurnOutcome). Publish silence is structural; IdleWake retains the
+  // distinct missing-final-report repair path via ReconcileEvidence.Unknown.
   const repair = reconcileProgram.decideStep(
     reconcileWake.idleWake(quiescencePermit.create('ses-a', 1)),
     0,
@@ -211,6 +198,7 @@ test('RECONCILE_PROGRAM_005: TurnUnknown never crosses the stable business-turn 
     `SnapshotObservation must carry TurnUnknown only; have: ${observationCases.join(', ')}`,
   )
 })
+
 
 test('RECONCILE_PROGRAM_006: Domain surface has no Command/Reply/Trace AST exports', async () => {
   const mod = await import(new URL('../../../dist/Domain/ReconcileProgram.js', import.meta.url).pathname)

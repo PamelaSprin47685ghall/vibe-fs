@@ -46,15 +46,20 @@ module Reconciler =
         match turn with
         | None -> ReconcileProgram.ReconcileEvidence.NoTurn
         | Some value ->
-            let observed = ReconcileProgram.observedTurn (publishTurnOf value)
+            match value.Observation with
+            | Some ReconcileProgram.TurnUnknown ->
+                // HOST-004: finish=None is SnapshotObservation — evidence Unknown,
+                // no PublishTurn (publishDecision must not see TurnUnknown).
+                ReconcileProgram.ReconcileEvidence.Unknown None
+            | None ->
+                let observed = ReconcileProgram.observedTurn (publishTurnOf value)
 
-            match value.Outcome with
-            | ReconcileProgram.TurnCompleted
-            | ReconcileProgram.TurnAborted _
-            | ReconcileProgram.TurnFailed _ -> ReconcileProgram.ReconcileEvidence.Terminal observed
-            | ReconcileProgram.TurnInProgress
-            | ReconcileProgram.TurnNeedsContinuation _ -> ReconcileProgram.ReconcileEvidence.Provisional observed
-            | ReconcileProgram.TurnUnknown -> ReconcileProgram.ReconcileEvidence.Unknown(Some observed)
+                match value.Outcome with
+                | ReconcileProgram.TurnCompleted
+                | ReconcileProgram.TurnAborted _
+                | ReconcileProgram.TurnFailed _ -> ReconcileProgram.ReconcileEvidence.Terminal observed
+                | ReconcileProgram.TurnInProgress
+                | ReconcileProgram.TurnNeedsContinuation _ -> ReconcileProgram.ReconcileEvidence.Provisional observed
 
     type Scheduler
         (

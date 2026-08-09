@@ -17,6 +17,10 @@ module ReconcileProgram =
         | TurnCompleted
         | TurnAborted of reason: string
         | TurnFailed of error: string
+
+    /// Reconciliation-private. Not a publishable TurnOutcome case (HOST-004).
+    /// finish=None stable snapshot observation; must not cross the publish boundary.
+    type SnapshotObservation =
         | TurnUnknown
 
     /// Stable production identity carried from snapshot classification to publish.
@@ -82,7 +86,8 @@ module ReconcileProgram =
         | "TurnFailed" -> TurnFailed "failed"
         | "TurnInProgress" -> TurnInProgress
         | "TurnNeedsContinuation" -> TurnNeedsContinuation "needs-continuation"
-        | "TurnUnknown" -> TurnUnknown
+        | "TurnUnknown" ->
+            invalidArg "name" "TurnUnknown is SnapshotObservation, not a TurnOutcome"
         | other -> TurnFailed(sprintf "unknown-outcome:%s" other)
 
     let isTerminalOutcome (outcome: TurnOutcome) : bool =
@@ -91,8 +96,7 @@ module ReconcileProgram =
         | TurnAborted _
         | TurnFailed _ -> true
         | TurnInProgress
-        | TurnNeedsContinuation _
-        | TurnUnknown -> false
+        | TurnNeedsContinuation _ -> false
 
     /// 有界因果重读：rereadsRemaining = 还能进行多少次读取判定（初始 = maxCausalRereads + 1）。
     ///
@@ -204,27 +208,20 @@ module ReconcileProgram =
         let key = SessionId.value turn.SessionId
         let token = consumeKey turn
 
-        match turn.Outcome with
-        | TurnUnknown ->
-            // HOST-004: TurnUnknown is a reconciliation observation only. It must
-            // never cross the stable business-turn boundary — no terminal (stable)
-            // and no incomplete (provisional) business-turn seal may be written.
-            // The distinct IdleWake → RepairMissingFinalReport path lives in
-            // decideStep and is untouched here.
-            {| shouldPublish = false; maps = maps |}
-        | _ ->
-            if isTerminalOutcome turn.Outcome then
-                match Map.tryFind key maps.Consumed with
-                | Some previous when previous = token -> {| shouldPublish = false; maps = maps |}
-                | _ ->
-                    {| shouldPublish = true
-                       maps = PublishMaps(Map.add key token maps.Consumed, Map.remove key maps.Provisional) |}
-            else
-                match Map.tryFind key maps.Provisional with
-                | Some previous when previous = token -> {| shouldPublish = false; maps = maps |}
-                | _ ->
-                    {| shouldPublish = true
-                       maps = PublishMaps(maps.Consumed, Map.add key token maps.Provisional) |}
+        // HOST-004: TurnUnknown is SnapshotObservation — type-unreachable here.
+        // IdleWake → RepairMissingFinalReport lives in decideStep (evidence layer).
+        if isTerminalOutcome turn.Outcome then
+            match Map.tryFind key maps.Consumed with
+            | Some previous when previous = token -> {| shouldPublish = false; maps = maps |}
+            | _ ->
+                {| shouldPublish = true
+                   maps = PublishMaps(Map.add key token maps.Consumed, Map.remove key maps.Provisional) |}
+        else
+            match Map.tryFind key maps.Provisional with
+            | Some previous when previous = token -> {| shouldPublish = false; maps = maps |}
+            | _ ->
+                {| shouldPublish = true
+                   maps = PublishMaps(maps.Consumed, Map.add key token maps.Provisional) |}
 
     let clearProvisional (maps: PublishMaps) (sessionKey: string) : PublishMaps =
         PublishMaps(maps.Consumed, Map.remove sessionKey maps.Provisional)

@@ -94,8 +94,8 @@ module HostSignalBootstrap =
                                 | _ -> ()
                         | ReconcileProgram.TurnCompleted
                         | ReconcileProgram.TurnNeedsContinuation _
-                        | ReconcileProgram.TurnInProgress
-                        | ReconcileProgram.TurnUnknown -> ()
+                        | ReconcileProgram.TurnInProgress -> ()
+
 
                         XWire.reconcileAttempt journal scope turn
                         TurnCompletionProgram.prepareTurn journal scope.DisposeExecutorRuntime turn

@@ -130,12 +130,18 @@ module XTraceCapture =
     ///
     /// Opening 必须仍已 captured（否则 LWR 未定义 → None）；标志只控制渲染。
     /// Same materialiser for frames/gap/terminal; no B-else-A branch.
+    ///
+    /// `coverageOverride`:
+    /// - None → use blog.Coverage (incremental / compressed-frames gap).
+    /// - Some → force that coverage for gapStart (blessing wants full canonical:
+    ///   IngestedThrough = origin so gap starts at openingEnd).
     let lifecycleWorkRecordFromSnapshotWithTerminal
         (durable: AgentJournal)
         (snapshot: ProjectionSet)
         (sessionId: SessionId)
         (includeOpening: bool)
         (terminalOverride: (BlobRef * BlobDigest) option)
+        (coverageOverride: RecordCoverage option)
         : string option =
         match AgentProjection.tryFind sessionId snapshot.AgentProjections with
         | None -> None
@@ -198,7 +204,10 @@ module XTraceCapture =
             | None -> None
             | Some opening ->
                 let coverage =
-                    { IngestedThrough = { Sequence = blog.Coverage.IngestedThroughSequence } }
+                    match coverageOverride with
+                    | Some forced -> forced
+                    | None ->
+                        { IngestedThrough = { Sequence = blog.Coverage.IngestedThroughSequence } }
 
                 // The opening is the first XTrace part (turn:0/part:0, captured
                 // at the first transform), so the gap must start AFTER it —
@@ -239,7 +248,7 @@ module XTraceCapture =
         (sessionId: SessionId)
         (includeOpening: bool)
         : string option =
-        lifecycleWorkRecordFromSnapshotWithTerminal durable snapshot sessionId includeOpening None
+        lifecycleWorkRecordFromSnapshotWithTerminal durable snapshot sessionId includeOpening None None
 
     let lifecycleWorkRecord
         (journal: AgentJournal option)

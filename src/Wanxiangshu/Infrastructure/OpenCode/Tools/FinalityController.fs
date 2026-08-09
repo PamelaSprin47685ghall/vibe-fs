@@ -112,6 +112,14 @@ module FinalityController =
         let terminalOverride =
             terminalFrontier |> Option.map (fun frontier -> frontier.TerminalRef, frontier.TerminalDigest)
 
+        // Finality cohort LWR (blessing bundle / rejection wound) must be the
+        // full canonical record from openingEnd — not the coverage-trimmed
+        // incremental gap. Historical reviewers reused after REVISE already
+        // have blog.Coverage at a prior frontier; trimming would drop their
+        // deliberation from the blessing bundle (GLORY-044/060).
+        let fullCanonicalCoverage =
+            Some { IngestedThrough = XTrace.originCursor }
+
         match
             XTraceCapture.lifecycleWorkRecordFromSnapshotWithTerminal
                 journal
@@ -119,6 +127,7 @@ module FinalityController =
                 reviewerSessionId
                 false
                 terminalOverride
+                fullCanonicalCoverage
         with
         | Some record when
             not (String.IsNullOrWhiteSpace record)

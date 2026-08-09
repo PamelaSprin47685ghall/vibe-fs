@@ -337,8 +337,8 @@ module TurnCompletionProgram =
         let completeAgent () =
             completeAgent eventPort journal abortedSessions turn
 
-        match turn.Outcome with
-        | ReconcileProgram.TurnUnknown ->
+        match turn.Observation with
+        | Some ReconcileProgram.TurnUnknown ->
             // GLORY-070 / HOST-004 rev.3: a stable idle that never produced a
             // final report is repaired exactly once (the reconcile maps dedupe
             // the turn token), and only when the pass carried idle evidence.
@@ -355,86 +355,90 @@ module TurnCompletionProgram =
                     journal
                     RuntimeNudge.missingFinalReport
                     "missing-final-report"
-        | ReconcileProgram.TurnInProgress ->
-            if isRecoveryContinue journal turn then
-                AsyncSupport.completedTask ()
-            elif CompletedTurnClassifier.needsInteractionRepair turn.Role turn.Outcome turn.Parts then
-                trySendIdleRepair
-                    quiescence
-                    context
-                    sessionPort
-                    eventPort
-                    journal
-                    RuntimeNudge.interactionRepairContinue
-                    "interaction-repair"
-            else
-                AsyncSupport.completedTask ()
-        | ReconcileProgram.TurnNeedsContinuation _ ->
-            // Absorb text and reasoning into the XTrace even though this turn is
-            // not completable, then ask for the missing report. Still not fallback.
-            // (The XTrace parts are captured at the transform boundary.)
-            //
-            // Same admission contract as TurnUnknown, plus recovery-continue
-            // ownership: do not hijack a ProviderRetryAttempt with repair.
-            if isRecoveryContinue journal turn then
-                AsyncSupport.completedTask ()
-            else
-                trySendIdleRepair
-                    quiescence
-                    context
-                    sessionPort
-                    eventPort
-                    journal
-                    RuntimeNudge.missingFinalReport
-                    "missing-final-report"
-        | ReconcileProgram.TurnAborted reason ->
-            // LOOP-006: our own kill is bridged into the provider-failure AABB path.
-            // User / cleanup aborts still report Aborted and do not advance the cursor.
-            let loopKill =
-                match loopSensor with
-                | Some sensor when sensor.IsArmed turn.SessionId ->
-                    sensor.ClearArmed turn.SessionId
-                    true
-                | _ -> false
-
-            if loopKill then
-                continueAfterLoopKill sliceTimer sessionPort eventPort journal turn
-            else
-                abortedSessions.Add sessionKey |> ignore
-                abortParent sessionKey
-                sessionPort.AbortChildren turn.SessionId |> ignore
-
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
-                |> ignore
-
-                AsyncSupport.completedTask ()
-        | ReconcileProgram.TurnFailed error ->
-            continueAfterOrdinaryFailure sliceTimer sessionPort eventPort journal turn error
-        | ReconcileProgram.TurnCompleted ->
-            let joinOutstanding =
-                TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId
-
-            let wasAborted, terminalValid =
-                if joinOutstanding then
-                    let aborted = abortedSessions.Contains sessionKey
-                    abortedSessions.Remove sessionKey |> ignore
-                    aborted, false
+        | None ->
+            match turn.Outcome with
+            | ReconcileProgram.TurnInProgress ->
+                if isRecoveryContinue journal turn then
+                    AsyncSupport.completedTask ()
+                elif CompletedTurnClassifier.needsInteractionRepair turn.Role (box turn.Outcome) turn.Parts then
+                    trySendIdleRepair
+                        quiescence
+                        context
+                        sessionPort
+                        eventPort
+                        journal
+                        RuntimeNudge.interactionRepairContinue
+                        "interaction-repair"
                 else
-                    completeAgent ()
+                    AsyncSupport.completedTask ()
+            | ReconcileProgram.TurnNeedsContinuation _ ->
+                // Absorb text and reasoning into the XTrace even though this turn is
+                // not completable, then ask for the missing report. Still not fallback.
+                // (The XTrace parts are captured at the transform boundary.)
+                //
+                // Same admission contract as SnapshotObservation.TurnUnknown, plus
+                // recovery-continue ownership: do not hijack a ProviderRetryAttempt
+                // with repair.
+                if isRecoveryContinue journal turn then
+                    AsyncSupport.completedTask ()
+                else
+                    trySendIdleRepair
+                        quiescence
+                        context
+                        sessionPort
+                        eventPort
+                        journal
+                        RuntimeNudge.missingFinalReport
+                        "missing-final-report"
+            | ReconcileProgram.TurnAborted reason ->
+                // LOOP-006: our own kill is bridged into the provider-failure AABB path.
+                // User / cleanup aborts still report Aborted and do not advance the cursor.
+                let loopKill =
+                    match loopSensor with
+                    | Some sensor when sensor.IsArmed turn.SessionId ->
+                        sensor.ClearArmed turn.SessionId
+                        true
+                    | _ -> false
 
-            if terminalValid then
-                AgentJournal.recordDerivedFallbackSuccess journal turn.SessionId
+                if loopKill then
+                    continueAfterLoopKill sliceTimer sessionPort eventPort journal turn
+                else
+                    abortedSessions.Add sessionKey |> ignore
+                    abortParent sessionKey
+                    sessionPort.AbortChildren turn.SessionId |> ignore
 
-            if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
-                AsyncSupport.completedTask ()
-            elif joinOutstanding then
-                task {
-                    match! HostJoinGuard.nudge sessionPort journal joinGuardNudges turn.SessionId turn.Directory with
-                    | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
-                        eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
-                        |> ignore
-                    | _ -> ()
-                }
-                :> Task
-            else
-                AsyncSupport.completedTask ()
+                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
+                    |> ignore
+
+                    AsyncSupport.completedTask ()
+            | ReconcileProgram.TurnFailed error ->
+                continueAfterOrdinaryFailure sliceTimer sessionPort eventPort journal turn error
+            | ReconcileProgram.TurnCompleted ->
+                let joinOutstanding =
+                    TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId
+
+                let wasAborted, terminalValid =
+                    if joinOutstanding then
+                        let aborted = abortedSessions.Contains sessionKey
+
+                        abortedSessions.Remove sessionKey |> ignore
+                        aborted, false
+                    else
+                        completeAgent ()
+
+                if terminalValid then
+                    AgentJournal.recordDerivedFallbackSuccess journal turn.SessionId
+
+                if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
+                    AsyncSupport.completedTask ()
+                elif joinOutstanding then
+                    task {
+                        match! HostJoinGuard.nudge sessionPort journal joinGuardNudges turn.SessionId turn.Directory with
+                        | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
+                            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
+                            |> ignore
+                        | _ -> ()
+                    }
+                    :> Task
+                else
+                    AsyncSupport.completedTask ()
