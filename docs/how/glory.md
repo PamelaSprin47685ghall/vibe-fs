@@ -96,7 +96,7 @@ Orchestrator 衔接：ManagerJob 的 Manager 完成由现有 `AwaitManager` 路�
 | LifeOpened 有 → 无 WorkActivated | 幂等改写 + Activation 逻辑继续 | ✅ transform + ManagerWorkflow |
 | FinalityRequested 无 enlisted member | FinalityTool「in motion」分支重启同一 request 的 FinalityController；`rosterOf` 崩溃重入不重复造新 Reviewer | ✅ |
 | REVISE 已存在但无 FinalityRejected | 从 durable evidence 重建同一 terminal frontier；cohort 继续关闭，以全量 origin coverage 物化含 `# Work log` 的 canonical LWR；物化失败且 `coverageCanAdvance` 则等待 journal change；`BloggerRequestAbandoned` 重建记录机会，证据不足则 undecided | ✅ |
-| record-ready waiter 崩溃/Dispose | 不写 abandonment 或 lifecycle 终态；replay 后从 durable REVISE/frontier 重新订阅 journal change | 目标算法 |
+| record-ready waiter 崩溃/Dispose | 不写 abandonment 或 lifecycle 终态；replay 后从 durable REVISE/frontier 重新订阅 journal change | ✅ resumeDurableRevise（GLORY_075） |
 | confirmed witness 存在但无 FinalityBlessed | concludeBlessing 幂等（blessing 已存在/terminal 已记录则跳过） | ✅ |
 | LifeCompleted 存在但 terminal 未发布 | completeBlessedLife 幂等重放 | ✅ |
 | XTrace terminal 单槽冲突（第二 Life） | 首个 Life 后跳过 TerminalOutputCaptured（terminal 只记录于 LifeCompleted） | ✅ |
