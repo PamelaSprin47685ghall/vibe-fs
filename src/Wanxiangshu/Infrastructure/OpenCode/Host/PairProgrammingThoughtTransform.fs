@@ -23,6 +23,41 @@ module PairProgrammingThoughtTransform =
     /// HOST-013 auto-injected 正文。Domain 单源。
     let text = ProjectionConstants.PairProgrammingGuidelineText
 
+    /// Provider id on a Host message (`info.providerID` or `info.model.providerID`).
+    let providerIdOfMessage (rawMsg: obj) : string option =
+        if isNull rawMsg then
+            None
+        else
+            match rawMsg?info with
+            | null -> None
+            | info ->
+                if not (isNull info?providerID) then
+                    Some(unbox<string> info?providerID)
+                elif not (isNull info?model) && not (isNull info?model?providerID) then
+                    Some(unbox<string> info?model?providerID)
+                else
+                    None
+
+    /// Most recent provider id on the transcript (assistant `providerID` or user `model.providerID`).
+    let providerIdFromMessages (rawMessages: obj list) : string option =
+        rawMessages |> List.rev |> List.tryPick providerIdOfMessage
+
+    /// Escape hatch: `WANXIANGSHU_SKIP_AUTO_INJECTED=1`, or provider `cursor`,
+    /// stops appending new auto-injected pairs. Historical durable pairs still
+    /// replay so an already-injected session keeps its append-only provider prefix.
+    let skipAutoInjectedRequested (providerId: string option) : bool =
+        let envSkip =
+            match Environment.GetEnvironmentVariable "WANXIANGSHU_SKIP_AUTO_INJECTED" with
+            | "1" -> true
+            | _ -> false
+
+        let cursorProvider =
+            match providerId with
+            | Some "cursor" -> true
+            | _ -> false
+
+        envSkip || cursorProvider
+
     /// The marker's source identity (HOST-013). Filtering must use this, never
     /// the text: a real user may quote the sentence.
     let source = "pair-programming-auto-injected"
@@ -469,6 +504,9 @@ module PairProgrammingThoughtTransform =
                 match existing with
                 | Some _ ->
                     // 同一 placement occasion 重入：只 replay，不新增。
+                    replay realMessages history
+                | None when skipAutoInjectedRequested (providerIdFromMessages realMessages) ->
+                    // Env / cursor-provider escape hatch: keep historical pairs, do not append.
                     replay realMessages history
                 | None ->
                     let ordinal =

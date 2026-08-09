@@ -26,6 +26,8 @@ session.deleted
 
 abort error 必须解码为 typed `AttemptAborted`，撤销当前 attempt 的全部 idle-derived continuation capability；它不是 `ProviderFailure`，不得推进 fallback。
 
+`finish=None` 的稳定 snapshot 分类为 reconciliation 私有观测 `TurnUnknown`（`SnapshotObservation`），**不是**可 publish 的 `TurnOutcome` case（HOST-004）。
+
 `chat.message` 通常只走 Prompt acknowledgement，不得拼装 terminal turn。两个额外用途都只认结构身份：PROMPT-012 的 Student HumanRoot bootstrap 在 Host 保存消息、调用 provider 前同步创建 QA 并写入原文；无 PromptKey 的真实外部用户消息 signal 当前 active `JoinAttempt`，零 active attempt 时不留下 future join wake（EXEC-017）。两者都不从正文判断意图。
 
 ## HOST-005：XTrace 是唯一原始语义轨迹
@@ -118,6 +120,11 @@ real history → synthetic call → synthetic result
 它**是**会影响 prompt bytes、Prefix Cache、ReviewSeal 的合成历史；**不是**私有思维、容量估算或通用恢复信号。
 
 **范围排除**：`ManagedSessionKind.SatelliteSession(_, Companion)`（Blogger）的 transform **禁止**注入、恢复或追加任何 auto-injected pair。Blogger 只消费 `blogger-system.md` + 工作日志 TOML；结对编程中文思考约束不得进入其 provider-facing 历史。判断依据是 durable SessionAssociation（`isCompanion`），禁止按 agent 名字猜测。
+
+**注入旁路**：下列任一成立时，非 Companion session 也不再追加新的 auto-injected pair；已落盘的历史 pair 仍按 durable gap anchor replay，以保持 append-only prefix：
+- 进程环境 `WANXIANGSHU_SKIP_AUTO_INJECTED=1`；
+- 当前 transcript 的 provider 为 `cursor`（取自消息 `info.providerID` 或 `info.model.providerID` 的最近一条）。
+未命中旁路时行为不变。
 
 行为约束：
 

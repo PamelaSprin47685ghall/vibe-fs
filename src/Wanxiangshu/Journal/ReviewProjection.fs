@@ -20,6 +20,14 @@ type PerfectChallenge =
       ChallengeTextVersion: int
       ChallengeContentDigest: SealDigest }
 
+/// The XTrace boundary captured by a terminal while this review barrier is active.
+/// It is projection-only: replay reconstructs it from the barrier and terminal facts.
+type ReviewTerminalFrontier =
+    { BarrierId: ReviewBarrierId
+      TerminalRef: BlobRef
+      TerminalDigest: BlobDigest
+      Sequence: int64 }
+
 /// REVIEW-010: the canonical provider input for one run, sealed at
 /// `messages.transform` time and bound to that run per HOST-010.
 type ProviderInputSeal =
@@ -44,6 +52,9 @@ type ReviewGuardProjection =
         CurrentManagerSessionId: SessionId option
         LastGitTreeHash: GitTreeHash option
         Witness: ReviewWitness
+        /// Frozen once the barrier reaches REVISE or Confirmed. Before that, a
+        /// later terminal replaces an earlier provisional one from this barrier.
+        TerminalFrontier: ReviewTerminalFrontier option
         /// Set once the first PERFECT issued its challenge; cleared by REVISE or a
         /// tree change.
         PendingChallenge: PerfectChallenge option
@@ -98,6 +109,7 @@ module ReviewProjection =
           CurrentManagerSessionId = None
           LastGitTreeHash = None
           Witness = ReviewWitness.NoReview
+          TerminalFrontier = None
           PendingChallenge = None
           Seals = Map.empty
           ObservedAttemptKeys = [] }
@@ -141,6 +153,7 @@ module ReviewProjection =
                 CurrentBarrierId = Some barrierId
                 CurrentManagerSessionId = Some managerSessionId
                 LastGitTreeHash = Some gitTreeHash
+                TerminalFrontier = None
                 PendingChallenge = None
                 ObservedAttemptKeys = []
                 Witness =
@@ -155,6 +168,36 @@ module ReviewProjection =
     let applySeal (seal: ProviderInputSeal) (current: ReviewGuardProjection) =
         { current with
             Seals = rememberSeal seal current.Seals }
+
+    /// GLORY-072/073: bind a terminal's exclusive XTrace frontier to the barrier
+    /// that was active when the terminal fact folded. ProviderRun is deliberately
+    /// not used: XTrace parts do not carry a comparable run identity.
+    let recordTerminalFrontier
+        (terminalRef: BlobRef)
+        (terminalDigest: BlobDigest)
+        (sequence: int64)
+        (current: ReviewGuardProjection)
+        =
+        match current.CurrentBarrierId with
+        | None -> current
+        | Some barrierId ->
+            let frozen =
+                match current.Witness with
+                | ReviewWitness.RevisionWitness _
+                | ReviewWitness.Confirmed _ -> current.TerminalFrontier.IsSome
+                | ReviewWitness.NoReview
+                | ReviewWitness.PerfectPending _ -> false
+
+            if frozen then
+                current
+            else
+                { current with
+                    TerminalFrontier =
+                        Some
+                            { BarrierId = barrierId
+                              TerminalRef = terminalRef
+                              TerminalDigest = terminalDigest
+                              Sequence = sequence } }
 
     /// REVIEW-003: the first PERFECT issued its challenge.
     ///

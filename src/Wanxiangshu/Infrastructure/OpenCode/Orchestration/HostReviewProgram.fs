@@ -21,8 +21,7 @@ module HostReviewProgram =
         | RevisionRequired of
             reviewerSessionId: SessionId *
             barrierId: ReviewBarrierId *
-            gitTreeHash: GitTreeHash *
-            workRecord: string
+            gitTreeHash: GitTreeHash
 
     type HostReviewFailure =
         | CannotReadTree of string
@@ -35,14 +34,6 @@ module HostReviewProgram =
         | WorkRecordUnavailable
         | JournalFailure of string
 
-    /// GLORY-049: the work record is the reviewer's canonical LWR
-    /// (includeOpening=false). `None` means the LWR is unavailable — that is an
-    /// infrastructure failure, never a wound record (GLORY-051/056).
-    let private workRecordOf (journal: AgentJournal option) (reviewerSessionId: SessionId) =
-        match XTraceCapture.lifecycleWorkRecord journal reviewerSessionId false with
-        | Some record when not (System.String.IsNullOrWhiteSpace record) -> Some record
-        | _ -> None
-
     let private readOutcome
         (journal: AgentJournal option)
         (managerSessionId: SessionId)
@@ -52,10 +43,7 @@ module HostReviewProgram =
         : Result<HostReviewOutcome, HostReviewFailure> =
         match OrchestratorReviewRead.read journal reviewerSessionId tree with
         | OrchestratorReviewRead.Confirmed -> Ok(HostReviewOutcome.Confirmed(reviewerSessionId, barrierId, tree))
-        | OrchestratorReviewRead.RevisionRequired ->
-            match workRecordOf journal reviewerSessionId with
-            | Some record -> Ok(HostReviewOutcome.RevisionRequired(reviewerSessionId, barrierId, tree, record))
-            | None -> Error HostReviewFailure.WorkRecordUnavailable
+        | OrchestratorReviewRead.RevisionRequired -> Ok(HostReviewOutcome.RevisionRequired(reviewerSessionId, barrierId, tree))
         | OrchestratorReviewRead.PendingConfirmation -> Error HostReviewFailure.ConfirmationUnproven
         | OrchestratorReviewRead.NeedsReview -> Error HostReviewFailure.ReviewerProducedNoVerdict
 

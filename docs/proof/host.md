@@ -12,7 +12,7 @@
 | `MessageAbortedError` / `AbortError` → typed `AttemptAborted` → revoke → `AbortWake`；零 ProviderFailure、零 repair/裸 `#` | `tests/unit/codec/signals.test.mjs`、`tests/unit/domain/reconcile-program.test.mjs`、`tests/unit/host/session-quiescence-gate.test.mjs`、`tests/e2e/cases/temporal-ownership-unhappy-path.test.mjs`（HOST-002、HOST-004） |
 | provider `TurnAborted` 保留到消费边界；无 Armed 不产生 Agent completion | HOST-004、LOOP-006、EXEC-020 |
 | Reconciler 无新信号时不产生 setTimeout/GetMessages（仅 ≤3 次因果重读） | HOST-004、A 类有界 |
-| 重复 snapshot 稳定只证明观测稳定；`Unknown` 无 `IdleWake` 不产生 idle-derived continuation | HOST-004 |
+| 重复 snapshot 稳定只证明观测稳定；`TurnUnknown` 为私有 `SnapshotObservation`（非 `TurnOutcome`）；无 `IdleWake` 不产生 idle-derived continuation | HOST-004 |
 | 发送瞬间 fresh permit：stale permit → zero physical prompt + zero `PluginPromptClaimed`；`TryConsume` 与 dispatcher send 间无 await | HOST-004 |
 
 ## Compaction
@@ -32,6 +32,7 @@
 | 跨实例共享表 vs 每实例 Journal；共享表操作不跨 await | HOST-012 |
 | 永久 auto-injected pair | 用户 canonical multi-tool 序列逐字成立（`Req1 Req2 FakeReq1 Resp1 Resp2 FakeResp1` → `… Req3 FakeReq2 Resp3 FakeResp2`）；历史 pair 不随 current placement 搬家；same placement 重入不新增 pair（journal append 数 = 1、wire bytes exactly equal）；restart replay byte-identical；anchor 不在当前真实 view 时 pair 不重放（不重定位）；XWire DropLeading continue 不 AbortSession；N 轮 property：同 epoch `isAppendOnlyPrefix(wire[n], wire[n+1])` 恒 true | HOST-013 |
 | Companion / Blogger 不注入 auto-injected | durable `isCompanion=true` 的 session transform 后 `markerCount=0`、消息字节与注入前相等；不为该 session append `PairProgrammingGuidelineAnchored` | HOST-013 |
+| `WANXIANGSHU_SKIP_AUTO_INJECTED=1` 或 provider=`cursor` | 空 transcript / cursor transcript 不追加 pair；已有 durable history 仍 replay、新 placement 不 append | HOST-013 |
 | 空 Content 预防 | assistant/user 消息空 content 兜底；reasoning 填充或非空 text | HOST-016 |
 
 代表：`tests/unit/host/pair-thought-transform.test.mjs`、`tests/integration/plugin/manager-tool-contract.test.mjs`（`HOST_013_*`）、`tests/unit/enforcer/latest-tip-nudge.test.mjs`、HOST-013 replay property / restart / fail-closed 单测、Quiescence gate 单测（`tests/unit/host/`）。

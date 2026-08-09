@@ -357,22 +357,31 @@ origin，不伪造 Original proposal）。当前用户本轮明确要求将审�
 
 ## Remaining work
 
-1. corrective.md 恢复三项 Deferred 关闭条件 + full gate 关闭条件（见 corrective.md Reopen）。
-2. dsl-ownership.mjs 全量扫描全部生产 `.fs`；移除目录级豁免；结构化物理豁免登记。
-3. 反转 ratchet 对 Infrastructure 的豁免断言；FinalityController / ExecutorSummarize adversarial
-   fixture 判红。
-4. `state-product` 多 registry presence 联合判定 + 回归。
-5. ExecutorSummarize 去除 100ms timer re-probe，改事件驱动 waiter（journal `awaitChangeFrom` /
-   permit pulse）。
-6. `TurnUnknown` 收口到 reconciliation 私有观察。
+1. corrective.md 三项 Deferred 关闭条件 + full gate 关闭条件（见 corrective.md Reopen）— **OPEN**。
+2. ~~dsl-ownership.mjs 全量扫描全部生产 `.fs`；移除目录级豁免~~ — **DONE（HEAD）**：100% 生产
+   `.fs` 扫描；无 Infrastructure/Journal 目录级豁免。
+3. ~~反转 ratchet 对 Infrastructure 的豁免断言~~ — **DONE（HEAD）**：Infrastructure/Journal bare
+   mutable 必须 RED。**OPEN**：`FinalityController.fs` / `ExecutorSummarize.fs` 同构 adversarial
+   fixture 仍缺。
+4. `state-product` 多 registry 分散 presence 分类 — **OPEN**：`StudentTeacherRuntime` 六 registry
+   （`runs` / `teacherOwners` / `teacherCalls` / `teacherCompletions` / `studentFinalCompletions` /
+   `skillMutations`）登记为 audited manual-proof 候选；仅靠 `registry-joint-branch` 不足。
+5. ~~ExecutorSummarize 去除 100ms timer re-probe~~ — **DONE（HEAD）**：事件驱动
+   `awaitChangeFrom` / permit pulse；C 类 deadline race 允许。
+6. `TurnUnknown` 类型降级为 reconciliation 私有 `SnapshotObservation`（不得为 `TurnOutcome`
+   case）— **OPEN**（正式 how/what 已要求；生产 DU 尚未 demote）。
+7. FinalityRejected / LWR record-ready Closing work（见下文 Blocker）— **OPEN / in progress**。
 
 ## Completion criteria
 
 - corrective.md 三项 Deferred 关闭条件已恢复并逐一实现 + 验证。
 - `npm run check` 全量（build/unit/integration/e2e/architecture+spec）判绿作为 close 条件。
-- dsl-ownership 扫描 100% 生产 `.fs`；目录级豁免逃逸判红；相关 fixture/反例落盘。
-- Executor B 类等待零轮询（无 timer-driven re-probe），行为测试禁止（docs/how 已列条款）。
-- registry 联合 presence 隐式程序计数已消除或分类。
+- ~~dsl-ownership 扫描 100% 生产 `.fs`；目录级豁免逃逸判红~~（HEAD 已满足）；相关
+  FinalityController / ExecutorSummarize adversarial fixture/反例落盘（仍 OPEN）。
+- ~~Executor B 类等待零轮询（无 timer-driven re-probe）~~（HEAD 已满足；docs/how 已列条款）。
+- registry 联合 / 分散 presence 隐式程序计数已消除或分类（含 StudentTeacher 六 registry）。
+- `TurnUnknown` 已从可 publish `TurnOutcome` 结构移除，仅为私有 `SnapshotObservation`。
+- FinalityRejected / LWR blocker Closing work 完成且不宣称此前已关闭。
 
 ## Blockers
 

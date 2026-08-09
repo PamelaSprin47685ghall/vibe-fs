@@ -192,6 +192,23 @@ module Fold =
                     ReviewGuard = Some(apply (Option.defaultValue ReviewProjection.empty session.ReviewGuard)) })
             projection
 
+    let private bindTerminalFrontier
+        (sessionId: SessionId)
+        (terminalRef: BlobRef)
+        (terminalDigest: BlobDigest)
+        (projection: AgentProjectionSet)
+        =
+        match AgentProjection.tryFind sessionId projection with
+        | Some { ReviewGuard = Some _; XTrace = Some xTrace } ->
+            updateReviewGuard
+                sessionId
+                (ReviewProjection.recordTerminalFrontier
+                    terminalRef
+                    terminalDigest
+                    (XTraceProjection.headSequence xTrace + 1L))
+                projection
+        | _ -> projection
+
     let private updateRequirements sessionId apply projection =
         updateSession
             sessionId
@@ -800,7 +817,7 @@ module Fold =
                         |> Result.map (fun updated -> { session with XTrace = Some updated }))
                     projection
                 |> function
-                    | Ok updated -> Ok updated
+                    | Ok updated -> Ok(bindTerminalFrontier payload.SessionId payload.TextRef payload.TextDigest updated)
                     | Error XTraceFoldRejection.TerminalAlreadyCaptured ->
                         reject
                             "TerminalOutputCaptured"

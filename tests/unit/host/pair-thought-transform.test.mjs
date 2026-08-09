@@ -8,6 +8,7 @@ import { toList, listItems, resultOf } from '../support/domain.mjs'
 const {
   tryInject,
   isPairProgrammingThought,
+  skipAutoInjectedRequested,
   source,
   text,
   stableCallId,
@@ -178,4 +179,102 @@ test('PPT_tryInject_user_quoting_the_thought_text_is_not_a_marker', () => {
   assert.equal(isPairProgrammingThought(out[2]), false, 'matching text alone must not classify as marker')
   assert.equal(out.length, 3)
   assert.equal(out[2].info.role, 'user')
+})
+
+test('PPT_skip_auto_injected_env_blocks_new_pair_but_replays_history', () => {
+  const previous = process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
+  try {
+    delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
+    assert.equal(skipAutoInjectedRequested(undefined), false)
+
+    const session = 'ses_skip_env'
+    const seeded = inject(session, [userMsg('msg_u1')])
+    assert.equal(pairMessages(seeded).length, 2)
+
+    process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = '1'
+    assert.equal(skipAutoInjectedRequested(undefined), true)
+
+    const raw = [
+      userMsg('msg_u1'),
+      toolCall('msg_c1', 'bash', 'call_1'),
+      toolResult('msg_r1', 'bash', 'call_1'),
+      userMsg('msg_u2'),
+    ]
+    const out = inject(session, raw)
+    // Historical pair for placement Before(msg_u1) still replays; no new pair for Before(msg_u2).
+    assert.equal(pairMessages(out).length, 2)
+    assert.equal(out.length, 6)
+    assert.equal(isPairProgrammingThought(out[0]), true)
+    assert.equal(isPairProgrammingThought(out[1]), true)
+    assert.equal(out[2].info.id, 'msg_u1')
+    assert.equal(out[5].info.id, 'msg_u2')
+  } finally {
+    if (previous === undefined) delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
+    else process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = previous
+  }
+})
+
+test('PPT_skip_auto_injected_env_keeps_empty_transcript_without_pair', () => {
+  const previous = process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
+  try {
+    process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = '1'
+    const out = inject('ses_skip_empty', [])
+    assert.equal(out.length, 0)
+    assert.equal(pairMessages(out).length, 0)
+  } finally {
+    if (previous === undefined) delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
+    else process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = previous
+  }
+})
+
+test('PPT_skip_auto_injected_cursor_provider_blocks_new_pair_but_replays_history', () => {
+  const previous = process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
+  try {
+    delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
+    assert.equal(skipAutoInjectedRequested(undefined), false)
+    assert.equal(skipAutoInjectedRequested('cursor'), true)
+    assert.equal(skipAutoInjectedRequested('anthropic'), false)
+
+    const session = 'ses_skip_cursor'
+    const seeded = inject(session, [userMsg('msg_u1')])
+    assert.equal(pairMessages(seeded).length, 2)
+
+    const raw = [
+      userMsg('msg_u1'),
+      toolCall('msg_c1', 'bash', 'call_1'),
+      toolResult('msg_r1', 'bash', 'call_1'),
+      {
+        info: { id: 'msg_u2', role: 'user', model: { providerID: 'cursor', modelID: 'composer' } },
+        parts: [{ type: 'text', text: 'steer' }],
+      },
+    ]
+    const out = inject(session, raw)
+    assert.equal(pairMessages(out).length, 2)
+    assert.equal(out.length, 6)
+    assert.equal(isPairProgrammingThought(out[0]), true)
+    assert.equal(isPairProgrammingThought(out[1]), true)
+    assert.equal(out[2].info.id, 'msg_u1')
+    assert.equal(out[5].info.id, 'msg_u2')
+  } finally {
+    if (previous === undefined) delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
+    else process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = previous
+  }
+})
+
+test('PPT_skip_auto_injected_cursor_provider_keeps_empty_of_cursor_assistant_without_new_pair', () => {
+  const previous = process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
+  try {
+    delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
+    const raw = [{
+      info: { id: 'a1', role: 'assistant', providerID: 'cursor', modelID: 'composer' },
+      parts: [{ type: 'text', text: 'ok' }],
+    }]
+    const out = inject('ses_skip_cursor_assistant', raw)
+    assert.equal(pairMessages(out).length, 0)
+    assert.equal(out.length, 1)
+    assert.deepEqual(out[0], raw[0])
+  } finally {
+    if (previous === undefined) delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
+    else process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = previous
+  }
 })

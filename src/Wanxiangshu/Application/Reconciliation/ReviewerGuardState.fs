@@ -22,6 +22,15 @@ module ReviewerGuardState =
             AgentProjection.tryFind (SessionId.create reviewerKey) (AgentJournal.snapshot durable).AgentProjections
             |> Option.bind (fun session -> session.ReviewGuard)
 
+    let private cohortHasRevision (projections: AgentProjectionSet) (request: FinalityRequestProjection) =
+        request.Members
+        |> Map.exists (fun reviewerSessionId memberRef ->
+            AgentProjection.tryFind reviewerSessionId projections
+            |> Option.bind (fun session -> session.ReviewGuard)
+            |> Option.exists (fun reviewGuard ->
+                reviewGuard.CurrentBarrierId = Some memberRef.BarrierId
+                && ReviewWitness.isRevision reviewGuard.Witness))
+
     /// Whether the barrier still authorizes reviewer continuation. Finality may
     /// stop waiting after a sibling REVISE; that closed request must also revoke
     /// the reviewer's challenge capability. Non-Finality review owners have no
@@ -31,8 +40,10 @@ module ReviewerGuardState =
         | Some durable, Some reviewGuard ->
             match reviewGuard.CurrentManagerSessionId, reviewGuard.CurrentBarrierId with
             | Some managerSessionId, Some barrierId ->
+                let snapshot = AgentJournal.snapshot durable
+
                 let managerLife =
-                    AgentProjection.tryFind managerSessionId (AgentJournal.snapshot durable).AgentProjections
+                    AgentProjection.tryFind managerSessionId snapshot.AgentProjections
                     |> Option.bind (fun session -> session.ManagerLife)
 
                 match managerLife with
@@ -41,6 +52,7 @@ module ReviewerGuardState =
                     lifecycle.CurrentLife
                     |> Option.bind (fun life -> life.ActiveFinality)
                     |> Option.filter ManagerLifecycleProjection.isOpen
+                    |> Option.filter (fun request -> not (cohortHasRevision snapshot.AgentProjections request))
                     |> Option.bind (fun request -> Map.tryFind (SessionId.create reviewerKey) request.Members)
                     |> Option.exists (fun enlisted -> enlisted.BarrierId = barrierId)
             | _ -> true

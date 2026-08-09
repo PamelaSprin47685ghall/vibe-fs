@@ -19,7 +19,7 @@ Host 适配、信号和共享状态边界见 `shape/host.md`。
 - 观测稳定性 ≠ 静止资格：重复 snapshot 相同只证明观测稳定，不证明发送瞬间仍 idle。idle-derived continuation 必须同时满足：
   1. snapshot / 业务决策认为 continuation 有用；
   2. 起源的 `QuiescencePermit` 在 side-effect 时刻仍 fresh（发送边界再次 `TryConsume`）。
-- 三层分离：snapshot 观测（ObservedTurn + StableObservation）→ wake evidence（`ReconcileWake = IdleWake of QuiescencePermit | RetryWake | FailureWake | AbortWake`）→ physical continuation admission（`ContinuationAdmission = Ordinary | RequiresQuiescence of QuiescencePermit`）。`materializeActive` 全程携带 wake 直到 publish；`onTurn` 收 `ReconciledTurnContext { Turn; Quiescence: QuiescencePermit option }`，仅 `IdleWake` 有 `Some permit`。`AbortWake` 下 `Unknown` / `Provisional` 只能 StopPass，禁止构造 missing-final-report、interaction-repair 或裸 `#`。
+- 三层分离：snapshot 观测（`ObservedTurn` + reconciliation 私有 `SnapshotObservation`）→ wake evidence（`ReconcileWake = IdleWake of QuiescencePermit | RetryWake | FailureWake | AbortWake`）→ physical continuation admission（`ContinuationAdmission = Ordinary | RequiresQuiescence of QuiescencePermit`）。`materializeActive` 全程携带 wake 直到 publish；`onTurn` 收 `ReconciledTurnContext { Turn; Quiescence: QuiescencePermit option }`，仅 `IdleWake` 有 `Some permit`。`AbortWake` 下 `TurnUnknown` / `Provisional` 只能 StopPass，禁止构造 missing-final-report、interaction-repair 或裸 `#`。
 
 ### 接线
 
@@ -31,16 +31,19 @@ Host 适配、信号和共享状态边界见 `shape/host.md`。
 
 ### 终态对齐（EXEC-020）
 
-这里的 `TurnOutcome` 是 provider turn 的 snapshot 分类，不是 EXEC-020 的 `AgentCompletionOutcome`：
+这里的 `TurnOutcome` 是可 publish / 稳定边界上的 provider-turn 分类，不是 EXEC-020 的 `AgentCompletionOutcome`。Clean Break：`TurnUnknown` 不得作为 `TurnOutcome` 成员；它是 reconciliation 私有的 `SnapshotObservation`（finish=None 的稳定 snapshot），不得穿过稳定业务 turn 边界。
 
 ```fsharp
+/// Reconciliation-private. Not a publishable TurnOutcome case.
+type SnapshotObservation =
+    | TurnUnknown
+
 type TurnOutcome =
     | TurnInProgress
     | TurnNeedsContinuation of reason: string
     | TurnCompleted
     | TurnAborted of reason: string
     | TurnFailed of error: string
-    | TurnUnknown
 
 type ReconciledTurn =
     { SessionId: SessionId
@@ -56,7 +59,7 @@ type ReconciledTurn =
       Outcome: TurnOutcome }
 ```
 
-`TurnUnknown` 只是 reconciliation 观测（finish=None 的稳定 snapshot），不是业务结局。它禁止跨过稳定业务 turn 边界：`publishDecision` 对 `TurnUnknown` 恒返回 `shouldPublish = false`，既不写 stable（consumed）也不写 provisional seal。它唯一的业务作用是经 `decideStep` 在 `IdleWake` 下进入 `RepairMissingFinalReport`；`Retry` / `Failure` / `Abort` wake 只 StopPass。
+行为不变：`IdleWake` 下因果重读耗尽仍为 `TurnUnknown` → `RepairMissingFinalReport`（禁止静默 StopPass）；无 idle 权限的 `Retry` / `Failure` / `Abort` wake 只 StopPass，等待下一真实信号。`publishDecision` 不得接收 `TurnUnknown`（类型上已不可达）；既不写 stable（consumed）也不写 provisional seal。
 
 Host 的 `MessageAbortedError` / `finish=aborted` 先被 Reconciler 分类为 `TurnAborted`。`TurnCompletionProgram` 再消费这个控制面结局：
 
@@ -265,6 +268,7 @@ Start 组（ordinal 升序）
 - ReviewSeal 覆盖恢复后的全部历史 pair 与本次新 pair；历史 pair 原位不变，以保持 Prefix Cache。Blogger 跳过注入时 ReviewSeal 只覆盖无 auto-injected 的消息视图。
 - tip nudge 查找：`latestTipNudge` 仅在非 Companion 路径调用；不得以当前 session 是 Blogger 为由把 tip 写进 Blogger transcript。
 - 实现点：`SpikePlugin` transform 在 `PairProgrammingThoughtTransform.tryInject` 之前用 association 门禁短路。
+- 注入旁路：`WANXIANGSHU_SKIP_AUTO_INJECTED=1` 或 transcript provider 为 `cursor` 时，`tryInject` 仍 strip + replay 历史 pair，但跳过「本轮 placement 尚不存在 → append 新 fact」分支（`PairProgrammingThoughtTransform.skipAutoInjectedRequested`；provider 由 `providerIdFromMessages` 读取）。
 
 ## 空 Content 预防（归属 HOST-016）
 

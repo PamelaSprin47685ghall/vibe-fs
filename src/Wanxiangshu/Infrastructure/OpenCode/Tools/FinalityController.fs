@@ -90,31 +90,160 @@ module FinalityController =
             ))
         |> ignore
 
-    /// GLORY-049: the member's canonical LWR (includeOpening=false). `None`
-    /// means the LWR is unavailable — an infrastructure failure, never a wound
-    /// record (GLORY-051/056).
-    let private workRecordOf (journal: AgentJournal) (reviewerSessionId: SessionId) =
-        match XTraceCapture.lifecycleWorkRecord (Some journal) reviewerSessionId false with
-        | Some record when not (System.String.IsNullOrWhiteSpace record) -> Some record
-        | _ -> None
+    type private RecordReadiness =
+        | RecordReady of string
+        | AwaitJournal
+        | RecordUnavailable of string
 
-    let private readOutcome
+    let private hasRenderedWorkLog (record: string) =
+        let marker = "# Work log\n"
+        let start = record.IndexOf(marker, StringComparison.Ordinal)
+
+        start >= 0
+        && not (String.IsNullOrWhiteSpace(record.Substring(start + marker.Length)))
+
+    let private materializeRecord
         (journal: AgentJournal)
-        (managerSessionId: SessionId)
-        (barrierId: ReviewBarrierId)
+        (snapshot: ProjectionSet)
         (reviewerSessionId: SessionId)
-        (tree: GitTreeHash)
-        : Result<HostReviewProgram.HostReviewOutcome, HostReviewProgram.HostReviewFailure> =
-        match OrchestratorReviewRead.read (Some journal) reviewerSessionId tree with
-        | OrchestratorReviewRead.Confirmed ->
-            Ok(HostReviewProgram.HostReviewOutcome.Confirmed(reviewerSessionId, barrierId, tree))
-        | OrchestratorReviewRead.RevisionRequired ->
-            match workRecordOf journal reviewerSessionId with
-            | Some record ->
-                Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired(reviewerSessionId, barrierId, tree, record))
-            | None -> Error HostReviewProgram.HostReviewFailure.WorkRecordUnavailable
-        | OrchestratorReviewRead.PendingConfirmation -> Error HostReviewProgram.HostReviewFailure.ConfirmationUnproven
-        | OrchestratorReviewRead.NeedsReview -> Error HostReviewProgram.HostReviewFailure.ReviewerProducedNoVerdict
+        (terminalFrontier: ReviewTerminalFrontier option)
+        (requiresWorkLog: bool)
+        =
+        let terminalOverride =
+            terminalFrontier |> Option.map (fun frontier -> frontier.TerminalRef, frontier.TerminalDigest)
+
+        match
+            XTraceCapture.lifecycleWorkRecordFromSnapshotWithTerminal
+                journal
+                snapshot
+                reviewerSessionId
+                false
+                terminalOverride
+        with
+        | Some record when
+            not (String.IsNullOrWhiteSpace record)
+            && (not requiresWorkLog || hasRenderedWorkLog record)
+            -> RecordReady record
+        | Some _ -> RecordUnavailable "canonical LWR has no rendered work log"
+        | None -> RecordUnavailable "canonical LWR is unavailable"
+
+    let private coverageCanAdvance (snapshot: ProjectionSet) (reviewerSessionId: SessionId) =
+        match
+            SessionAssociationProjection.tryBloggerOf reviewerSessionId snapshot.AgentProjections.Associations
+        with
+        | None -> true
+        | Some bloggerSessionId ->
+            match Map.tryFind bloggerSessionId snapshot.AgentProjections.HandleByChildSession with
+            | Some { Lifecycle = HandleLifecycle.Abandoned _ }
+            | Some { Lifecycle = HandleLifecycle.Retired } -> false
+            | _ -> true
+
+    let private recordReadiness
+        (journal: AgentJournal)
+        (snapshot: ProjectionSet)
+        (reviewerSessionId: SessionId)
+        (barrierId: ReviewBarrierId)
+        (requiresTerminalFrontier: bool)
+        =
+        match AgentProjection.tryFind reviewerSessionId snapshot.AgentProjections with
+        | None -> RecordUnavailable "reviewer projection is unavailable"
+        | Some session ->
+            match session.ReviewGuard with
+            | None -> RecordUnavailable "review barrier is unavailable"
+            | Some guard when guard.CurrentBarrierId <> Some barrierId ->
+                RecordUnavailable "review barrier no longer matches the finality member"
+            | Some guard ->
+                match guard.TerminalFrontier with
+                | Some frontier when frontier.BarrierId <> barrierId ->
+                    RecordUnavailable "terminal frontier no longer matches the finality barrier"
+                | Some frontier ->
+                    let coverage =
+                        session.Blog
+                        |> Option.map (fun blog -> blog.Coverage.IngestedThroughSequence)
+                        |> Option.defaultValue 0L
+
+                    if coverage >= frontier.Sequence then
+                        materializeRecord journal snapshot reviewerSessionId (Some frontier) true
+                    elif coverageCanAdvance snapshot reviewerSessionId then
+                        AwaitJournal
+                    else
+                        RecordUnavailable "the associated blogger can no longer cover the terminal frontier"
+                | None when requiresTerminalFrontier -> AwaitJournal
+                | None -> materializeRecord journal snapshot reviewerSessionId None false
+
+    let private awaitRecordReady
+        (journal: AgentJournal)
+        (reviewerSessionId: SessionId)
+        (barrierId: ReviewBarrierId)
+        : Task<Result<string, string>> =
+        let rec loop () =
+            task {
+                let snapshot, revision = AgentJournal.snapshotWithRevision journal
+
+                match recordReadiness journal snapshot reviewerSessionId barrierId true with
+                | RecordReady record -> return Ok record
+                | RecordUnavailable reason -> return Error reason
+                | AwaitJournal ->
+                    let! _ = AgentJournal.awaitChangeFrom revision journal
+                    return! loop ()
+            }
+
+        loop ()
+
+    let private awaitBlessingRecords
+        (journal: AgentJournal)
+        (members: EnlistedMember list)
+        : Task<Result<(int * string) list, string>> =
+        let ordered = members |> List.sortBy (fun memberInfo -> memberInfo.ReviewerOrdinal)
+
+        let rec loop () =
+            task {
+                let snapshot, revision = AgentJournal.snapshotWithRevision journal
+
+                let readiness =
+                    ordered
+                    |> List.map (fun memberInfo ->
+                        memberInfo,
+                        recordReadiness
+                            journal
+                            snapshot
+                            memberInfo.ReviewerSessionId
+                            memberInfo.BarrierId
+                            false)
+
+                let unavailable =
+                    readiness
+                    |> List.tryPick (fun (_, state) ->
+                        match state with
+                        | RecordUnavailable reason -> Some reason
+                        | _ -> None)
+
+                match unavailable with
+                | Some reason -> return Error reason
+                | None ->
+                    let pending =
+                        readiness
+                        |> List.exists (fun (_, state) ->
+                            match state with
+                            | AwaitJournal -> true
+                            | _ -> false)
+
+                    if pending then
+                        let! _ = AgentJournal.awaitChangeFrom revision journal
+                        return! loop ()
+                    else
+                        let records =
+                            readiness
+                            |> List.choose (fun (memberInfo, state) ->
+                                match state with
+                                | RecordReady record -> Some(memberInfo.ReviewerOrdinal, record)
+                                | AwaitJournal
+                                | RecordUnavailable _ -> None)
+
+                        return Ok records
+            }
+
+        loop ()
 
     /// The hidden Reviewer's next terminal as the driver's await result.
     /// Must not use `AwaitAgent`: that cell is single-assignment and a second
@@ -294,25 +423,39 @@ module FinalityController =
         (rejectingReviewer: SessionId)
         (barrierId: ReviewBarrierId)
         (requestTree: GitTreeHash)
-        (workRecord: string)
         : Task<FinalityOutcome> =
         task {
-            match journal.WriteBlob workRecord with
-            | Error _ -> return Undecided ManagerLifecyclePrompt.FinalityUndecidable
-            | Ok blob ->
-                appendLifecycle
-                    journal
-                    (ManagerLifecycleFact.FinalityRejected
-                        {| SessionId = managerSessionId
-                           LifeId = lifeId
-                           RequestId = requestId
-                           RejectingReviewerSessionId = rejectingReviewer
-                           BarrierId = barrierId
-                           GitTreeHash = requestTree
-                           WorkRecordRef = blob.BlobRef
-                           WorkRecordDigest = blob.BlobDigest |})
+            let! record = awaitRecordReady journal rejectingReviewer barrierId
 
-                return Rejected(FinalityPrompt.rejected workRecord)
+            match record with
+            | Error _ ->
+                return!
+                    concludeUndecided
+                        scope
+                        journal
+                        managerSessionId
+                        lifeId
+                        requestId
+                        requestTree
+                        rejectingReviewer
+                        barrierId
+            | Ok workRecord ->
+                match journal.WriteBlob workRecord with
+                | Error _ -> return Undecided ManagerLifecyclePrompt.FinalityUndecidable
+                | Ok blob ->
+                    appendLifecycle
+                        journal
+                        (ManagerLifecycleFact.FinalityRejected
+                            {| SessionId = managerSessionId
+                               LifeId = lifeId
+                               RequestId = requestId
+                               RejectingReviewerSessionId = rejectingReviewer
+                               BarrierId = barrierId
+                               GitTreeHash = requestTree
+                               WorkRecordRef = blob.BlobRef
+                               WorkRecordDigest = blob.BlobDigest |})
+
+                    return Rejected(FinalityPrompt.rejected workRecord)
         }
 
     /// GLORY-060/061: every member confirmed. Re-validate the tree, materialize
@@ -329,37 +472,26 @@ module FinalityController =
         (requestTree: GitTreeHash)
         : Task<FinalityOutcome> =
         task {
-            if not (treeUnchanged scope managerSessionId requestTree) then
-                // GLORY-059: the tree moved under the confirmed witnesses; this
-                // success is void. Close the request fail-closed.
+            let undecided () =
                 let reviewer, barrier =
                     match members with
                     | first :: _ -> first.ReviewerSessionId, first.BarrierId
                     | [] -> managerSessionId, ReviewBarrierId.create (Guid.NewGuid().ToString("N"))
 
-                return! concludeUndecided scope journal managerSessionId lifeId requestId requestTree reviewer barrier
+                concludeUndecided scope journal managerSessionId lifeId requestId requestTree reviewer barrier
+
+            if not (treeUnchanged scope managerSessionId requestTree) then
+                // GLORY-059: the tree moved under the confirmed witnesses; this
+                // success is void. Close the request fail-closed.
+                return! undecided ()
             else
-                // GLORY-050/060: one canonical LWR per member, ordered by the
-                // stable ReviewerOrdinal, concatenated into one bundle blob.
-                let orderedRecords =
-                    members
-                    |> List.sortBy (fun m -> m.ReviewerOrdinal)
-                    |> List.map (fun m ->
-                        match workRecordOf journal m.ReviewerSessionId with
-                        | Some record -> Some(m.ReviewerOrdinal, record)
-                        | None -> None)
-                    |> List.filter Option.isSome
-                    |> List.map Option.get
+                let! records = awaitBlessingRecords journal members
 
-                if List.length orderedRecords <> List.length members then
-                    let reviewer, barrier =
-                        match members with
-                        | first :: _ -> first.ReviewerSessionId, first.BarrierId
-                        | [] -> managerSessionId, ReviewBarrierId.create (Guid.NewGuid().ToString("N"))
-
-                    return!
-                        concludeUndecided scope journal managerSessionId lifeId requestId requestTree reviewer barrier
-                else
+                match records with
+                | Error _ -> return! undecided ()
+                | Ok orderedRecords when List.length orderedRecords <> List.length members -> return! undecided ()
+                | Ok orderedRecords when not (treeUnchanged scope managerSessionId requestTree) -> return! undecided ()
+                | Ok orderedRecords ->
                     // Semantic material only — no TOML / comment syntax here.
                     // Display ordinal is 1-based stable ReviewerOrdinal + 1.
                     let logs =
@@ -387,6 +519,67 @@ module FinalityController =
                             scope.Sessions.AbortSession m.ReviewerSessionId |> ignore
 
                         return Blessed(FinalityPrompt.blessedFromLogs logs)
+        }
+
+    let private pendingRevision
+        (snapshot: ProjectionSet)
+        (request: FinalityRequestProjection)
+        =
+        request.Members
+        |> Map.toList
+        |> List.tryPick (fun (reviewerSessionId, memberRef) ->
+            AgentProjection.tryFind reviewerSessionId snapshot.AgentProjections
+            |> Option.bind (fun session -> session.ReviewGuard)
+            |> Option.bind (fun guard ->
+                match guard.CurrentBarrierId, guard.Witness with
+                | Some barrierId, ReviewWitness.RevisionWitness _ when barrierId = memberRef.BarrierId ->
+                    Some(reviewerSessionId, barrierId)
+                | _ -> None))
+
+    /// GLORY-073: a replay resumes a durable REVISE at its frozen frontier. It
+    /// never re-enlists the cohort or replays a Reviewer continuation.
+    let resumePending
+        (scope: ToolRuntimeScope)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        : Task<FinalityOutcome option> =
+        task {
+            match scope.Journal with
+            | None -> return None
+            | Some journal ->
+                try
+                    let snapshot = AgentJournal.snapshot journal
+
+                    let request =
+                        AgentProjection.tryFind managerSessionId snapshot.AgentProjections
+                        |> Option.bind (fun session -> session.ManagerLife)
+                        |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+                        |> Option.filter (fun life -> life.LifeId = lifeId)
+                        |> Option.bind (fun life -> life.ActiveFinality)
+                        |> Option.filter (fun active -> active.RequestId = requestId)
+                        |> Option.filter ManagerLifecycleProjection.isOpen
+
+                    match request with
+                    | None -> return None
+                    | Some activeRequest ->
+                        match pendingRevision snapshot activeRequest with
+                        | None -> return None
+                        | Some(reviewerSessionId, barrierId) ->
+                            let! outcome =
+                                concludeRejection
+                                    scope
+                                    journal
+                                    managerSessionId
+                                    lifeId
+                                    requestId
+                                    reviewerSessionId
+                                    barrierId
+                                    activeRequest.GitTreeHash
+
+                            return Some outcome
+                with _ ->
+                    return Some(Undecided ManagerLifecyclePrompt.FinalityUndecidable)
         }
 
     /// GLORY-040: enlist one cohort member in the forced causal order —
@@ -673,9 +866,8 @@ module FinalityController =
 
                                 match outcome with
                                 | Choice1Of2(Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired(reviewerId,
-                                                                                                     barrier,
-                                                                                                     _tree,
-                                                                                                     record))) ->
+                                                                                                      barrier,
+                                                                                                      _tree))) ->
                                     return!
                                         concludeRejection
                                             scope
@@ -686,7 +878,6 @@ module FinalityController =
                                             reviewerId
                                             barrier
                                             requestTree
-                                            record
                                 | Choice2Of2 results when
                                     List.forall
                                         (function

@@ -46,6 +46,15 @@ npm install wanxiangshu --registry <your-private-registry>
 
 配置以 Host 文档与 `peerDependencies` 为准。角色与 Prompt 语义以 [docs/README.md](docs/README.md) 为高级参考；安装与挂载不依赖阅读条款正文。
 
+可选环境变量：
+
+| 变量 | 作用 |
+|------|------|
+| `WANXIANGSHU_SKIP_AUTO_INJECTED=1` | 跳过 HOST-013 新的 `auto-injected` 伪工具注入；已落盘历史 pair 仍会 replay（`provider=cursor` 时同样跳过新注入） |
+| `WANXIANGSHU_CHAT_MAX_RETRIES` | 覆盖 Host `experimental.chatMaxRetries`（非负整数） |
+| `WANXIANGSHU_PROCESS_HARD_LIMIT_SECS` | executor 单进程硬超时上限（秒） |
+| `WANXIANGSHU_NO_FATAL_EXIT=1` | 诊断路径禁止 `process.exit`（测试用） |
+
 ### 快速开始
 
 ```bash

@@ -130,6 +130,117 @@ module XTraceCapture =
     ///
     /// Opening 必须仍已 captured（否则 LWR 未定义 → None）；标志只控制渲染。
     /// Same materialiser for frames/gap/terminal; no B-else-A branch.
+    let lifecycleWorkRecordFromSnapshotWithTerminal
+        (durable: AgentJournal)
+        (snapshot: ProjectionSet)
+        (sessionId: SessionId)
+        (includeOpening: bool)
+        (terminalOverride: (BlobRef * BlobDigest) option)
+        : string option =
+        match AgentProjection.tryFind sessionId snapshot.AgentProjections with
+        | None -> None
+        | Some session ->
+            let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
+            let blog = session.Blog |> Option.defaultValue BlogProjection.empty
+
+            // Resolve frame bodies from blobs, oldest first.
+            let frames =
+                blog.Frames
+                |> List.choose (fun frame ->
+                    match durable.Writer.BlobWriter.Read frame.TextRef with
+                    | Ok text when HostDigest.sha256Hex text = BlobDigest.value frame.Digest -> Some text
+                    | _ -> None)
+
+            // Resolve XTrace part bodies into semantic items.
+            let trace =
+                xTrace.Parts
+                |> List.choose (fun part ->
+                    durable.Writer.BlobWriter.Read part.TextRef
+                    |> Result.toOption
+                    |> Option.bind (fun body ->
+                        let semantic =
+                            match part.Kind with
+                            | "text" -> Some(SemanticText body)
+                            | "reasoning" -> Some(SemanticReasoning body)
+                            | "tool_call" ->
+                                part.ToolName |> Option.map (fun name -> SemanticToolCall(name, body))
+                            | "tool_result" -> Some(SemanticToolResult body)
+                            // COMPANION-003: omission markers are semantic parts of
+                            // the XTrace; dropping them would make LWR gap/parent
+                            // background lose media presence the model already saw.
+                            | "media_omitted" ->
+                                let mediaType = if String.IsNullOrWhiteSpace body then None else Some body
+
+                                Some(SemanticMedia(mediaType, ""))
+                            | _ -> None
+
+                        semantic
+                        |> Option.map (fun partValue ->
+                            { Cursor = part.Cursor
+                              Provenance = part.Provenance
+                              Role = part.Role
+                              Part = partValue })))
+
+            let terminalRef =
+                match terminalOverride with
+                | Some specifiedTerminal -> Some specifiedTerminal
+                | None -> xTrace.Terminal
+
+            let terminal =
+                match terminalRef with
+                | Some(textRef, textDigest) ->
+                    match durable.Writer.BlobWriter.Read textRef with
+                    | Ok text when HostDigest.sha256Hex text = BlobDigest.value textDigest -> Some text
+                    | _ -> None
+                | None -> None
+
+            match xTrace.Opening with
+            | None -> None
+            | Some opening ->
+                let coverage =
+                    { IngestedThrough = { Sequence = blog.Coverage.IngestedThroughSequence } }
+
+                // The opening is the first XTrace part (turn:0/part:0, captured
+                // at the first transform), so the gap must start AFTER it —
+                // otherwise the opening renders twice: once in the Opening
+                // section and again as the gap's first item (COMPANION-003).
+                let openingEnd =
+                    match trace with
+                    | first :: _ -> { Sequence = first.Cursor.Sequence + 1L }
+                    | [] -> XTrace.originCursor
+
+                // Terminal lives outside the trace parts; a head cursor keeps
+                // materialize's terminal-exclusion filter from touching any gap
+                // item while still carrying the text into the Final output
+                // section.
+                let terminalItems =
+                    terminal
+                    |> Option.map (fun text ->
+                        [ { Cursor = XTrace.head trace
+                            Provenance = "terminal"
+                            Role = "assistant"
+                            Part = SemanticText text } ])
+                    |> Option.defaultValue []
+
+                Some(
+                    LifecycleWorkRecord.materialize
+                        opening
+                        frames
+                        trace
+                        coverage
+                        openingEnd
+                        terminalItems
+                        includeOpening
+                )
+
+    let lifecycleWorkRecordFromSnapshot
+        (durable: AgentJournal)
+        (snapshot: ProjectionSet)
+        (sessionId: SessionId)
+        (includeOpening: bool)
+        : string option =
+        lifecycleWorkRecordFromSnapshotWithTerminal durable snapshot sessionId includeOpening None
+
     let lifecycleWorkRecord
         (journal: AgentJournal option)
         (sessionId: SessionId)
@@ -137,99 +248,7 @@ module XTraceCapture =
         : string option =
         match journal with
         | None -> None
-        | Some durable ->
-            let snapshot = AgentJournal.snapshot durable
-
-            match AgentProjection.tryFind sessionId snapshot.AgentProjections with
-            | None -> None
-            | Some session ->
-                let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
-                let blog = session.Blog |> Option.defaultValue BlogProjection.empty
-
-                // Resolve frame bodies from blobs, oldest first.
-                let frames =
-                    blog.Frames
-                    |> List.choose (fun frame ->
-                        match durable.Writer.BlobWriter.Read frame.TextRef with
-                        | Ok text when HostDigest.sha256Hex text = BlobDigest.value frame.Digest -> Some text
-                        | _ -> None)
-
-                // Resolve XTrace part bodies into semantic items.
-                let trace =
-                    xTrace.Parts
-                    |> List.choose (fun part ->
-                        durable.Writer.BlobWriter.Read part.TextRef
-                        |> Result.toOption
-                        |> Option.bind (fun body ->
-                            let semantic =
-                                match part.Kind with
-                                | "text" -> Some(SemanticText body)
-                                | "reasoning" -> Some(SemanticReasoning body)
-                                | "tool_call" ->
-                                    part.ToolName |> Option.map (fun name -> SemanticToolCall(name, body))
-                                | "tool_result" -> Some(SemanticToolResult body)
-                                // COMPANION-003: omission markers are semantic parts of
-                                // the XTrace; dropping them would make LWR gap/parent
-                                // background lose media presence the model already saw.
-                                | "media_omitted" ->
-                                    let mediaType = if String.IsNullOrWhiteSpace body then None else Some body
-
-                                    Some(SemanticMedia(mediaType, ""))
-                                | _ -> None
-
-                            semantic
-                            |> Option.map (fun partValue ->
-                                { Cursor = part.Cursor
-                                  Provenance = part.Provenance
-                                  Role = part.Role
-                                  Part = partValue })))
-
-                let terminal =
-                    match xTrace.Terminal with
-                    | Some(textRef, textDigest) ->
-                        match durable.Writer.BlobWriter.Read textRef with
-                        | Ok text when HostDigest.sha256Hex text = BlobDigest.value textDigest -> Some text
-                        | _ -> None
-                    | None -> None
-
-                match xTrace.Opening with
-                | None -> None
-                | Some opening ->
-                    let coverage =
-                        { IngestedThrough = { Sequence = blog.Coverage.IngestedThroughSequence } }
-
-                    // The opening is the first XTrace part (turn:0/part:0, captured
-                    // at the first transform), so the gap must start AFTER it —
-                    // otherwise the opening renders twice: once in the Opening
-                    // section and again as the gap's first item (COMPANION-003).
-                    let openingEnd =
-                        match trace with
-                        | first :: _ -> { Sequence = first.Cursor.Sequence + 1L }
-                        | [] -> XTrace.originCursor
-
-                    // Terminal lives outside the trace parts; a head cursor keeps
-                    // materialize's terminal-exclusion filter from touching any gap
-                    // item while still carrying the text into the Final output
-                    // section.
-                    let terminalItems =
-                        terminal
-                        |> Option.map (fun text ->
-                            [ { Cursor = XTrace.head trace
-                                Provenance = "terminal"
-                                Role = "assistant"
-                                Part = SemanticText text } ])
-                        |> Option.defaultValue []
-
-                    Some(
-                        LifecycleWorkRecord.materialize
-                            opening
-                            frames
-                            trace
-                            coverage
-                            openingEnd
-                            terminalItems
-                            includeOpening
-                    )
+        | Some durable -> lifecycleWorkRecordFromSnapshot durable (AgentJournal.snapshot durable) sessionId includeOpening
 
     /// HOST-006: Host turn indices restart after reanchor; XTrace does not.
     /// Provenance must carry the reanchor generation or post-compaction turns

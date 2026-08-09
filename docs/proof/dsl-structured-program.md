@@ -8,6 +8,9 @@
 | 门 | 必须判红的反例 |
 |---|---|
 | `scripts/checks/dsl-ownership.mjs --threshold=0` | 业务 Interpreter/Command-Reply 第二运行时、程序计数字段、未声明 mutable、record `ref` 可变存储、跨文件同构 DU、未分类的大 DU、未登记 Infrastructure leak、record 中≥2 个独立状态轴且无 `DSL-state-combination` 分类、无结构化理由的 `ControlState`、目录级整体豁免（Infrastructure/Journal/Process 以「不在扫描范围」不报告）、两个 declared registry 的 direct/try probe 联合选择 effect branch |
+| adversarial fixture（`FinalityController` 形） | 裸/未分类 `mutable`、程序计数 scratch（含并发 `ref`/`ResizeArray` 若未 structured-physical 分类）在 dsl-ownership / state-product 下必须 RED；目录级 Infrastructure 豁免不得掩盖 |
+| adversarial fixture（`ExecutorSummarize` 形） | `timerTask`→re-probe / FamilyWaiting 墙钟轮询形状在 B 类零轮询规则下必须 RED；不得因文件落在 Infrastructure/ 而逃逸 |
+| `StudentTeacherRuntime.fs` 六 registry | `runs` / `teacherOwners` / `teacherCalls` / `teacherCompletions` / `studentFinalCompletions` / `skillMutations` 登记为 audited manual-proof / classification 候选；`registry-joint-branch` 只抓同 match 联合 probe，分散时序 presence 须人工分类证明 |
 | `scripts/checks/architecture.mjs` | Domain 向上层依赖、源码根/fsproj 不一致、资源越界读取 |
 | `scripts/checks/spec.mjs` | DSL Clause 重复、悬空或 Change 影子定义 |
 
@@ -58,7 +61,12 @@
 `state-product` 门禁在字段名无关的结构层面识别 record 状态轴乘积；它不替代上表人工枚举
 的架构级语义，只把「未分类组合」变成构建期失败。`registry-joint-branch` 只拒绝两个
 declared registry 的 direct/try probe 联合选择 effect branch 这一语法反例；其它多 registry
-联合 presence 仅是候选审计，必须由人工 proof 判断是否驱动阶段推进。
+联合 presence 仅是候选审计，必须由人工 proof 判断是否驱动阶段推进。`StudentTeacherRuntime`
+六 registry 的分散时序 presence 即属此类：不得仅凭 joint-branch 自动绿宣称已分类。
+
+永久 adversarial fixture 必须覆盖与 `FinalityController.fs`、`ExecutorSummarize.fs` 同构的
+反例形状（未分类 mutable / 程序计数 scratch；`timerTask`→FamilyWaiting re-probe），并在
+dsl-ownership、state-product 与 B 类零轮询规则下判红；Infrastructure 目录级豁免不得隐藏它们。
 
 ## 动态义务
 

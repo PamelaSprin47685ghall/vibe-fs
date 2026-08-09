@@ -12,6 +12,7 @@
 | Activation（20.2） | 合法规划 terminal 不完成 Manager；恰好一次 Activation；带 PromptKey；claim 后 crash 无第二逻辑发送；accepted 后写 WorkActivated；provider failure/empty terminal/用户中断不触发；ProtectedPrefixEnd 在 Activation 之后 |
 | 工作输入（20.3） | Activation 后用户消息不改写、不附加 tail/prefix、不创建新 Life、可进入正常 Y |
 | idle（20.4） | nudge 只有鼓励四行；不含 work record/issue；pending Finality 不发送；completed Life 不发送 |
+| 第二独立 Manager idle occasion（GLORY-029 / corrective reopen） | occasion A 保持 pending 时触发 occasion B；证明旧 pending 不压新 occasion；e2e 义务仍 OPEN |
 | suicide（20.5） | Manager 看见 `suicide`；其他角色拒绝；Activation 前拒绝；空 last_words 拒绝；outstanding child / completed-awaiting-join / live PTY 拒绝；tree 不可读 fail closed；合法调用只写一个 FinalityRequested；ToolCallId 重放幂等；受理后 completion deferred；工具后 prose 不成 terminal |
 | Reviewer 隐藏（20.6） | Manager 不能 fork/复用 fast-/deep-reviewer；`list()` 不显示；`join()` 不返回；barrier 在 session 创建后、首次 prompt 前打开 |
 | 反馈（20.7） | REVISE 返回 `RevisionRequired` 非 Error；LWR `includeOpening=false`；Opening task 不回灌；Y/raw gap/terminal 保留；raw tool 不进入；digest 验证；绑定当前 request/Reviewer；空记录不伪装 wounds；feedback 后同一 Life |

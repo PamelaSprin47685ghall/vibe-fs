@@ -1,4 +1,4 @@
-// tests/unit/execution/finality-cohort-law.test.mjs — GLORY-040/042/044/045/055/060.
+// tests/unit/execution/finality-cohort-law.test.mjs — GLORY-040/042/044/045/055/060/072/073.
 //
 // The combinator law tests of the timing-control-flow proposal §18, asserted on
 // the observable behaviour of the Finality cohort through the real Host surface
@@ -7,7 +7,8 @@
 // module-private in production (no visibility was widened for tests):
 //
 //   concurrentAllOrShortCircuit
-//     - the first Revision short-circuits to `FinalityRejected`
+//     - the first Revision short-circuits the cohort; `FinalityRejected` waits
+//       for its covered canonical work record
 //     - all Confirmed gathers all into one `FinalityBlessed` bundle
 //     - the short-circuit cancels the sibling driver before its next effect
 //       and never disposes a durable session
@@ -30,14 +31,23 @@ import {
   acceptAuthorityRoot,
   acceptChildAgentOwnerRoot,
   activateLife,
+  awaitPrompted,
   notifyCompleted,
+  observeTerminalSubscriptions,
   withExecutablePlugin,
 } from '../plugin/plugin-fixture.mjs'
 import {
+  agentFact,
+  agentJournal,
+  bloggerRequestId,
   caseOf,
+  frameEpochId,
   idValue,
+  listItems,
   mapEntries,
   mapTryFind,
+  payloadOf,
+  prefixEpochId,
   promptDispatcher,
   reviewChallenge,
   sessionId,
@@ -50,6 +60,8 @@ import { AgentFact, ManagerLifecycleFact, ReviewFactCases, ReviewGuardVerdict } 
 import {
   AgentJournalModule_appendAgent,
   AgentJournalModule_appendManagerLifecycle,
+  AgentJournalModule_awaitChangeFrom,
+  AgentJournalModule_revision,
   AgentJournalModule_snapshot,
   AgentJournal__WriteBlob_Z721C83C5,
 } from '../../../dist/Journal/AgentJournal.js'
@@ -168,6 +180,116 @@ const captureWorkRecord = (journal, reviewerValue, deliberation) => {
   )
   const record = xTraceCapture.lifecycleWorkRecord(journal, sessionId(reviewerValue), false)
   assert.ok(record && record.trim() !== '', `reviewer ${reviewerValue} must have a canonical work record`)
+  return record
+}
+
+/** Await a specific cohort shape through journal changes, never wall-clock time. */
+const awaitOpenCohort = async (journal, memberCount) => {
+  for (;;) {
+    const request = currentRequest(journal)
+    if (request && caseOf(request.Resolution) === 'Open' && mapEntries(request.Members).length === memberCount) {
+      return request
+    }
+    const revision = AgentJournalModule_revision(journal)
+    await AgentJournalModule_awaitChangeFrom(revision, journal)
+  }
+}
+
+const awaitResolution = async (journal, requestId, resolution) => {
+  for (;;) {
+    const request = currentRequest(journal)
+    if (
+      request
+      && idValue.finalityRequest(request.RequestId) === idValue.finalityRequest(requestId)
+      && caseOf(request.Resolution) === resolution
+    ) {
+      return request
+    }
+    const revision = AgentJournalModule_revision(journal)
+    await AgentJournalModule_awaitChangeFrom(revision, journal)
+  }
+}
+
+const reviewerIds = (request) => mapEntries(request.Members).map(([reviewer]) => idValue.session(reviewer))
+
+/** XTrace.head is exclusive: coverage must reach one past the final part cursor. */
+const terminalFrontier = (journal, reviewerValue) => {
+  const session = mapTryFind(sessionId(reviewerValue), sessionsOf(journal))
+  const parts = listItems(session?.XTrace?.Parts ?? [])
+  assert.ok(parts.length >= 2, `${reviewerValue} must have the two-part review trace`)
+  return Math.max(...parts.map((part) => Number(part.Cursor.Sequence))) + 1
+}
+
+/** Durable terminal evidence fixes the frontier before the REVISE fact arrives. */
+const appendTerminalEvidence = (journal, reviewerValue, run, text) => {
+  const written = AgentJournal__WriteBlob_Z721C83C5(journal, text)
+  assert.equal(written.tag, 0, `terminal evidence blob write rejected: ${written.fields?.[0]}`)
+  const receipt = written.fields[0]
+  const appended = AgentJournalModule_appendAgent(
+    new StreamId(1, [sessionId(reviewerValue)]),
+    ProviderRunIdentityModule_create(run),
+    agentFact('TerminalOutputCaptured', {
+      SessionId: sessionId(reviewerValue),
+      TextRef: receipt.BlobRef,
+      TextDigest: receipt.BlobDigest,
+      ProviderRun: ProviderRunIdentityModule_create(run),
+    }),
+    journal,
+  )
+  assert.equal(appended.tag, 0, `TerminalOutputCaptured append rejected: ${appended.fields?.[0]}`)
+}
+
+/** Controlled durable Blogger receipt; no transform, timer, or polling participates. */
+const appendBlogCoverage = (journal, reviewerValue, { previous, next, label }) => {
+  const written = AgentJournal__WriteBlob_Z721C83C5(journal, `${label} durable work log`)
+  assert.equal(written.tag, 0, `BlogEntryCommitted blob write rejected: ${written.fields?.[0]}`)
+  const receipt = written.fields[0]
+  const run = ProviderRunIdentityModule_create(`blog-run-${label}`)
+  const appended = AgentJournalModule_appendAgent(
+    new StreamId(1, [sessionId(reviewerValue)]),
+    run,
+    agentFact('BlogEntryCommitted', {
+      SessionId: sessionId(reviewerValue),
+      BloggerSessionId: sessionId(`blogger-${reviewerValue}`),
+      RequestId: bloggerRequestId(`blog-request-${label}`),
+      FrameEpochId: frameEpochId(0),
+      PreviousIngestedThroughSequence: BigInt(previous),
+      NextIngestedThroughSequence: BigInt(next),
+      PreviousCoverableTurnCutoffExclusive: 0,
+      NextCoverableTurnCutoffExclusive: 0,
+      NextCoveredPrefixDigest: `covered-${label}`,
+      TextRef: receipt.BlobRef,
+      TextDigest: receipt.BlobDigest,
+      ProviderRun: run,
+      ToolCallIds: ofArray([]),
+      TipRuleId: `tip-${label}`,
+      FieldNameAtCommit: `field-${label}`,
+      EvidenceRef: undefined,
+      ObservedPrefixEpochId: prefixEpochId(0),
+    }),
+    journal,
+  )
+  assert.equal(appended.tag, 0, `BlogEntryCommitted append rejected: ${appended.fields?.[0]}`)
+}
+
+const makeRecordReady = (journal, reviewerValue, run, label) => {
+  const frontier = terminalFrontier(journal, reviewerValue)
+  appendTerminalEvidence(journal, reviewerValue, run, `${label} terminal evidence`)
+  appendBlogCoverage(journal, reviewerValue, { previous: 0, next: frontier, label })
+  return frontier
+}
+
+const rejectionsFor = (journal, requestId) =>
+  agentJournal
+    .persistedEnvelopes(journal)
+    .filter((envelope) => caseOf(envelope.Fact) === 'ManagerLifecycle')
+    .map((envelope) => payloadOf(envelope.Fact))
+    .filter((fact) => caseOf(fact) === 'FinalityRejected')
+    .map(payloadOf)
+    .filter((payload) => idValue.finalityRequest(payload.RequestId) === idValue.finalityRequest(requestId))
+
+const awaitSubscriptions = async (subscriptions, count) => {
+  for (let index = 0; index < count; index += 1) await subscriptions.next()
 }
 
 /** One verdict through the real single writer (ReviewController.submit). */
@@ -275,6 +397,7 @@ test('GLORY_044_the_first_Revision_short_circuits_to_rejection_and_never_dispose
     await waitForPromptCount(runtime, reviewer, 1)
     acceptLatestPrompt(runtime, reviewer)
     captureWorkRecord(runtime.journal, reviewer, 'deliberation one')
+    makeRecordReady(runtime.journal, reviewer, 'run-r-1', 'first-revision')
 
     const request = currentRequest(runtime.journal)
     submitVerdict(runtime.journal, request, reviewer, 'run-r-1', 'call-r-1', ReviewGuardVerdict.Revise)
@@ -309,6 +432,7 @@ test('GLORY_044_all_Confirmed_gathers_all_into_one_blessing_bundle', async () =>
     await waitForPromptCount(runtime, historical, 1)
     acceptLatestPrompt(runtime, historical)
     captureWorkRecord(runtime.journal, historical, 'deliberation alpha')
+    makeRecordReady(runtime.journal, historical, 'run-a-1', 'round-one-revision')
     submitVerdict(runtime.journal, currentRequest(runtime.journal), historical, 'run-a-1', 'call-a-1', ReviewGuardVerdict.Revise)
     notifyCompleted(runtime, historical, 'wide a', 'formal a', ROLE_REVIEWER)
     await roundOne
@@ -369,6 +493,7 @@ test('GLORY_044_a_Revision_short_circuit_cancels_the_sibling_before_its_next_eff
     await waitForPromptCount(runtime, historical, 1)
     acceptLatestPrompt(runtime, historical)
     captureWorkRecord(runtime.journal, historical, 'deliberation alpha')
+    makeRecordReady(runtime.journal, historical, 'run-a-1', 'sibling-round-one-revision')
     submitVerdict(runtime.journal, currentRequest(runtime.journal), historical, 'run-a-1', 'call-a-1', ReviewGuardVerdict.Revise)
     notifyCompleted(runtime, historical, 'wide a', 'formal a', ROLE_REVIEWER)
     await roundOne
@@ -386,6 +511,7 @@ test('GLORY_044_a_Revision_short_circuit_cancels_the_sibling_before_its_next_eff
     await waitForPromptCount(runtime, newcomer, 1)
     acceptLatestPrompt(runtime, newcomer)
     captureWorkRecord(runtime.journal, newcomer, 'deliberation beta')
+    makeRecordReady(runtime.journal, newcomer, 'run-c-2', 'sibling-round-two-revision')
 
     const request = currentRequest(runtime.journal)
     // Land both verdicts first so the journal already knows the REVISE winner.
@@ -394,9 +520,7 @@ test('GLORY_044_a_Revision_short_circuit_cancels_the_sibling_before_its_next_eff
     submitVerdict(runtime.journal, request, historical, 'run-c-1', 'call-c-1', ReviewGuardVerdict.Perfect)
     submitVerdict(runtime.journal, request, newcomer, 'run-c-2', 'call-c-2', ReviewGuardVerdict.Revise)
     notifyCompleted(runtime, newcomer, 'wide c2', 'formal c2', ROLE_REVIEWER)
-    // Give the short-circuit a turn to cancel siblings before the Perfect
-    // member's terminal is delivered.
-    await new Promise((resolve) => setTimeout(resolve, 10))
+    await awaitResolution(runtime.journal, request.RequestId, 'Rejected')
     notifyCompleted(runtime, historical, 'wide c1', 'formal c1', ROLE_REVIEWER)
     await driveReviewerContinuation(runtime.journal, runtime, historical, 'run-c-1')
 
@@ -408,6 +532,150 @@ test('GLORY_044_a_Revision_short_circuit_cancels_the_sibling_before_its_next_eff
     assert.equal(promptTexts.includes(reviewChallenge.text), false, 'the cancelled sibling must not receive the challenge continuation')
     // Cancellation never disposes a durable session.
     assert.deepEqual(runtime.abortedIds, [], 'the short-circuit must not dispose either durable session')
+  })
+})
+
+test('GLORY_044_072_073_REVISE_closes_the_cohort_but_waits_for_the_matching_covered_work_record', async () => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    commitWorkspace(directory)
+    acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
+    activateLife(runtime, 'mgr')
+
+    // Establish one durable, ungraduated historical reviewer. Its complete first
+    // rejection keeps the second request focused on the delayed-record race.
+    const firstSubscriptions = observeTerminalSubscriptions(runtime)
+    const firstRound = hooks.tool.suicide.execute(
+      { last_words: 'first ending' },
+      suicideContext('call-race-1', 'run-race-manager-1'),
+    )
+    const firstRequest = await awaitOpenCohort(runtime.journal, 1)
+    const [historical] = reviewerIds(firstRequest)
+    assert.ok(historical, 'the first cohort must enlist one historical reviewer')
+    await awaitPrompted(historical)
+    acceptLatestPrompt(runtime, historical)
+    captureWorkRecord(runtime.journal, historical, 'historical deliberation')
+    makeRecordReady(runtime.journal, historical, 'run-race-historical-revise', 'historical-ready')
+    await awaitSubscriptions(firstSubscriptions, 3)
+    firstSubscriptions.restore()
+    submitVerdict(
+      runtime.journal,
+      firstRequest,
+      historical,
+      'run-race-historical-revise',
+      'call-race-historical-revise',
+      ReviewGuardVerdict.Revise,
+    )
+    notifyCompleted(runtime, historical, 'historical wide', 'historical formal', ROLE_REVIEWER)
+    await firstRound
+
+    // The next roster contains that pending-PERFECT sibling plus one fresh
+    // rejecting reviewer. Listener observations are event-driven readiness
+    // barriers: two runs each install Host, dispatch, and Finality subscriptions.
+    const secondSubscriptions = observeTerminalSubscriptions(runtime)
+    const secondRound = hooks.tool.suicide.execute(
+      { last_words: 'second ending' },
+      suicideContext('call-race-2', 'run-race-manager-2'),
+    )
+    const request = await awaitOpenCohort(runtime.journal, 2)
+    const newcomer = reviewerIds(request).find((value) => value !== historical)
+    assert.ok(newcomer, 'the second cohort must add exactly one new reviewer')
+    await Promise.all([awaitPrompted(historical), awaitPrompted(newcomer)])
+    acceptLatestPrompt(runtime, historical)
+    acceptLatestPrompt(runtime, newcomer)
+    await awaitSubscriptions(secondSubscriptions, 6)
+    secondSubscriptions.restore()
+
+    captureWorkRecord(runtime.journal, newcomer, 'delayed reviewer deliberation')
+    const frontier = terminalFrontier(runtime.journal, newcomer)
+    assert.ok(frontier > 1, 'the delayed record must have an older frontier to reject')
+    appendTerminalEvidence(runtime.journal, newcomer, 'run-race-revise', 'durable rejecting terminal evidence')
+    submitVerdict(
+      runtime.journal,
+      request,
+      historical,
+      'run-race-sibling-perfect',
+      'call-race-sibling-perfect',
+      ReviewGuardVerdict.Perfect,
+    )
+
+    // This observes the actual AgentJournal B-class subscription. It races only
+    // the Finality result: old production resolves via FinalityRejected; the
+    // required implementation registers AwaitChangeFrom before any durable wound.
+    const recordReadyWait = agentJournal.observeWaiters(runtime.journal)
+    try {
+      submitVerdict(
+        runtime.journal,
+        request,
+        newcomer,
+        'run-race-revise',
+        'call-race-revise',
+        ReviewGuardVerdict.Revise,
+      )
+      notifyCompleted(runtime, newcomer, 'rejecting wide', 'rejecting formal', ROLE_REVIEWER)
+
+      const initialProgress = await Promise.race([
+        secondRound.then((outcome) => ({ kind: 'settled', outcome })),
+        recordReadyWait.next().then(() => ({ kind: 'waiting' })),
+      ])
+      assert.equal(
+        initialProgress.kind,
+        'waiting',
+        `REVISE must await record-ready instead of resolving ${initialProgress.outcome ?? 'FinalityRejected'}`,
+      )
+      assert.equal(caseOf(currentRequest(runtime.journal).Resolution), 'Open')
+      assert.equal(rejectionsFor(runtime.journal, request.RequestId).length, 0, 'no WorkRecordRef before matching coverage')
+
+      const siblingPromptCount = promptsFor(runtime, historical).length
+      await driveReviewerContinuation(runtime.journal, runtime, historical, 'run-race-sibling-perfect')
+      assert.equal(
+        promptsFor(runtime, historical).length,
+        siblingPromptCount,
+        'a REVISE closes the sibling continuation before record-ready',
+      )
+
+      // A fully covered different reviewer must not release this reviewer.
+      appendBlogCoverage(runtime.journal, 'unrelated-reviewer', {
+        previous: 0,
+        next: frontier,
+        label: 'mismatched-reviewer',
+      })
+      const afterMismatch = await Promise.race([
+        secondRound.then((outcome) => ({ kind: 'settled', outcome })),
+        recordReadyWait.next().then(() => ({ kind: 'waiting' })),
+      ])
+      assert.equal(afterMismatch.kind, 'waiting', 'mismatched Blogger coverage must not unlock rejection')
+      assert.equal(rejectionsFor(runtime.journal, request.RequestId).length, 0)
+
+      // An older target frontier wakes the waiter but remains insufficient.
+      appendBlogCoverage(runtime.journal, newcomer, {
+        previous: 0,
+        next: frontier - 1,
+        label: 'older-target-frontier',
+      })
+      const afterOlderCoverage = await Promise.race([
+        secondRound.then((outcome) => ({ kind: 'settled', outcome })),
+        recordReadyWait.next().then(() => ({ kind: 'waiting' })),
+      ])
+      assert.equal(afterOlderCoverage.kind, 'waiting', 'older Blogger coverage must not unlock rejection')
+      assert.equal(rejectionsFor(runtime.journal, request.RequestId).length, 0)
+
+      appendBlogCoverage(runtime.journal, newcomer, {
+        previous: frontier - 1,
+        next: frontier,
+        label: 'matching-terminal-frontier',
+      })
+      const result = await secondRound
+      assert.ok(result.startsWith('# Your ending has not accepted you.'), result)
+
+      const rejections = rejectionsFor(runtime.journal, request.RequestId)
+      assert.equal(rejections.length, 1, 'matching coverage lands exactly one FinalityRejected')
+      const record = agentJournal.readBlob(runtime.journal, rejections[0].WorkRecordRef)
+      assert.equal(record.ok, true, record.ok ? '' : record.error)
+      assert.match(record.value, /# Work log\n\S/, 'FinalityRejected must reference a non-empty covered work log')
+      assert.match(record.value, /matching-terminal-frontier durable work log/)
+    } finally {
+      recordReadyWait.restore()
+    }
   })
 })
 
@@ -453,6 +721,7 @@ test('GLORY_040_crash_between_request_and_enlistment_replays_the_ensure_idempote
     await waitForPromptCount(runtime, reviewer, 1)
     acceptLatestPrompt(runtime, reviewer)
     captureWorkRecord(runtime.journal, reviewer, 'deliberation crash')
+    makeRecordReady(runtime.journal, reviewer, 'run-crash-r', 'crash-revision')
 
     const request = currentRequest(runtime.journal)
     assert.equal(idValue.finalityRequest(request.RequestId), 'req-crash-1', 'the replay continues the SAME request')

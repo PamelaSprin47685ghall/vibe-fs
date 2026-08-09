@@ -3500,6 +3500,19 @@ const AgentJournalCreate = bind(AgentJournalModule, 'AgentJournal', [
   'writeBlob',
 ])
 
+const durableJournal = (() => {
+  const writerOf = AgentJournalModule.AgentJournal__get_Writer
+  const blobWriterOf = writerMember('get_BlobWriter')
+  const pathOf = writerMember('get_FilePath')
+  if (typeof writerOf !== 'function' || typeof blobWriterOf !== 'function' || typeof pathOf !== 'function') {
+    throw new Error('AgentJournal durable read surface missing from dist')
+  }
+  return {
+    blobWriter: (value) => blobWriterOf(writerOf(value)),
+    path: (value) => pathOf(writerOf(value)),
+  }
+})()
+
 export const agentJournal = {
   create: ({ directory, runtime = 'rt_1', pid = 4242, startedAt = '2026-01-01T00:00:00Z' } = {}) => {
     const result = resultOf(AgentJournalCreate.create(directory, runtimeId(runtime), pid, utcOffset(startedAt)))
@@ -3543,6 +3556,58 @@ export const agentJournal = {
   handleProjection: (journal, parentId) => AgentJournalCreate.handleProjection(journal, parentId),
   /** Blob write receipt: { BlobRef, BlobDigest } after Ok. */
   writeBlob: (content, journal) => resultOf(AgentJournalCreate.writeBlob(content, journal)),
+  readBlob: (journal, ref) => resultOf(durableJournal.blobWriter(journal).Read(ref)),
+  persistedEnvelopes: (durable) =>
+    readFileSync(durableJournal.path(durable), 'utf8')
+      .split('\n')
+      .filter((line) => line !== '')
+      .map((line) => {
+        const decoded = journal.deserialize(line)
+        if (!decoded.ok) throw new Error(`persisted envelope did not decode: ${decoded.error}`)
+        return decoded.value
+      }),
+  observeWaiters: (journal) => {
+    const waiters = journal.waiters
+    if (!Array.isArray(waiters)) throw new Error('AgentJournal waiter collection is unavailable')
+
+    const observed = []
+    let resolveNext
+    const notify = (entry) => {
+      if (resolveNext !== undefined) {
+        const resolve = resolveNext
+        resolveNext = undefined
+        resolve(entry)
+      } else {
+        observed.push(entry)
+      }
+    }
+    const proxy = new Proxy(waiters, {
+      get(target, property, receiver) {
+        if (property === 'push') {
+          return (...entries) => {
+            const length = Array.prototype.push.apply(target, entries)
+            entries.forEach(notify)
+            return length
+          }
+        }
+        return Reflect.get(target, property, receiver)
+      },
+    })
+    journal.waiters = proxy
+
+    return {
+      next: () => {
+        if (observed.length > 0) return Promise.resolve(observed.shift())
+        if (resolveNext !== undefined) throw new Error('only one waiter observation may be pending')
+        return new Promise((resolve) => {
+          resolveNext = resolve
+        })
+      },
+      restore: () => {
+        if (journal.waiters === proxy) journal.waiters = waiters
+      },
+    }
+  },
 }
 
 /** F# Boot.boot(directory) — raw BootSnapshot for createFromBoot (not plain-JS projection). */

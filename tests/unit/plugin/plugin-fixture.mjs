@@ -162,6 +162,50 @@ export const awaitPrompted = (sessionId) => {
   return new Promise((resolve) => promptedWaiters.set(sessionId, resolve))
 }
 
+/** Observe real HostEventPort terminal subscriptions without a timer. */
+export const observeTerminalSubscriptions = (runtime) => {
+  const listeners = runtime?.terminalPort?.listeners
+  if (!Array.isArray(listeners)) throw new Error('HostEventPort listener collection is unavailable')
+
+  const observed = []
+  let resolveNext
+  const notify = (entry) => {
+    if (resolveNext !== undefined) {
+      const resolve = resolveNext
+      resolveNext = undefined
+      resolve(entry)
+    } else {
+      observed.push(entry)
+    }
+  }
+  const proxy = new Proxy(listeners, {
+    get(target, property, receiver) {
+      if (property === 'push') {
+        return (...entries) => {
+          const length = Array.prototype.push.apply(target, entries)
+          entries.forEach(notify)
+          return length
+        }
+      }
+      return Reflect.get(target, property, receiver)
+    },
+  })
+  runtime.terminalPort.listeners = proxy
+
+  return {
+    next: () => {
+      if (observed.length > 0) return Promise.resolve(observed.shift())
+      if (resolveNext !== undefined) throw new Error('only one terminal subscription observation may be pending')
+      return new Promise((resolve) => {
+        resolveNext = resolve
+      })
+    },
+    restore: () => {
+      if (runtime.terminalPort.listeners === proxy) runtime.terminalPort.listeners = listeners
+    },
+  }
+}
+
 /**
  * A plugin instance whose tools can actually execute (EXEC-002, layer 3).
  *

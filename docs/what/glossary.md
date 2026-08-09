@@ -142,7 +142,7 @@
 |------|------|
 | RawGap | COMPANION-003：Y 尚未覆盖的 X suffix，经 LWR 投影补洞；剔除 raw tool |
 | RecordCoverage | COMPANION-003：IngestedThrough，决定 LWR gap 起点 |
-| ReconciledTurn | HOST-004：SDK API 读取的完整 typed turn |
+| ReconciledTurn | HOST-004：SDK API 读取的完整 typed turn；其 `Outcome` 仅为可 publish 的 `TurnOutcome`，不含 `TurnUnknown` |
 | Review Attempt Identity | REVIEW-004：Barrier + Tree + Session + Run + ToolCall |
 | Review Witness | REVIEW-006：自包含证据 |
 | Reviewer Guard | REVIEW-003：terminal 无 verdict 时自动 nudge |
@@ -162,6 +162,7 @@
 |------|------|
 | TerminalOutputRaw | COMPANION-003：Session 末次 formal text + host-visible reasoning，LWR 末段；不含 raw tool |
 | ToolResultBound | ARCH-012：自定义 tool result 抢先留尾截断；≤2000 行 / ≤51200 字节 |
+| TurnUnknown | HOST-004：reconciliation 私有 `SnapshotObservation`（finish=None），不是 `TurnOutcome` case |
 
 ## W
 
