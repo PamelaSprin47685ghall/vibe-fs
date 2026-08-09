@@ -873,6 +873,19 @@ module Fact =
                WorkRecordRef: BlobRef
                WorkRecordDigest: BlobDigest |}
 
+        /// GLORY-044: a later durable sibling REVISE was steered to the Manager
+        /// as continuation (not merged into FinalityRejected). Does not change
+        /// Resolution. Blob-addressed; digest verified at write.
+        | FinalitySiblingSteered of
+            {| SessionId: SessionId
+               LifeId: ManagerLifeId
+               RequestId: FinalityRequestId
+               ReviewerSessionId: SessionId
+               BarrierId: ReviewBarrierId
+               GitTreeHash: GitTreeHash
+               WorkRecordRef: BlobRef
+               WorkRecordDigest: BlobDigest |}
+
         /// Every current member confirmed with fresh dual-PERFECT evidence; the
         /// stable-ordinal canonical work-record bundle is the minor-work
         /// evidence (GLORY-059/060). The Life is NOT completed here — the

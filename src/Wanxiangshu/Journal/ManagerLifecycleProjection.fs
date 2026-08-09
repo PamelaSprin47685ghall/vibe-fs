@@ -54,6 +54,13 @@ type FinalityResolution =
     | Blessed of BlessingEvidence
     | Undecided
 
+/// GLORY-044: one sibling REVISE that was steered (not the rejecting wound).
+type SiblingSteerEvidence =
+    { ReviewerSessionId: SessionId
+      BarrierId: ReviewBarrierId
+      WorkRecordRef: BlobRef
+      WorkRecordDigest: BlobDigest }
+
 /// GLORY-011: one FinalityRequest's derived view inside a Life.
 type FinalityRequestProjection =
     { RequestId: FinalityRequestId
@@ -63,6 +70,8 @@ type FinalityRequestProjection =
       ProviderRun: ProviderRunIdentity
       ToolCallId: ToolCallId
       Members: Map<SessionId, ReviewMemberRef>
+      /// GLORY-044: sibling steers recorded for this request; does not affect Resolution.
+      SiblingSteers: Map<SessionId, SiblingSteerEvidence>
       Resolution: FinalityResolution }
 
 /// GLORY-011: one Manager Life's derived view. Answers "who is the current
@@ -186,6 +195,7 @@ module ManagerLifecycleProjection =
                                           ProviderRun = payload.ProviderRun
                                           ToolCallId = payload.ToolCallId
                                           Members = Map.empty
+                                          SiblingSteers = Map.empty
                                           Resolution = FinalityResolution.Open } }
                             state
                     )
@@ -265,6 +275,38 @@ module ManagerLifecycleProjection =
                                 state
                         )
                     | _ -> Error ManagerLifeFoldRejection.UnknownRequest
+                | _ -> Error ManagerLifeFoldRejection.UnknownRequest
+            | _ -> Error ManagerLifeFoldRejection.LifeUnknown
+
+        | ManagerLifecycleFact.FinalitySiblingSteered payload ->
+            // GLORY-044: record a sibling steer; never rewrite Rejected/Blessed/Undecided.
+            match state.CurrentLife with
+            | Some life when life.LifeId = payload.LifeId ->
+                match life.ActiveFinality with
+                | Some request when request.RequestId = payload.RequestId ->
+                    match Map.tryFind payload.ReviewerSessionId request.SiblingSteers with
+                    | Some existing when
+                        existing.BarrierId = payload.BarrierId
+                        && existing.WorkRecordRef = payload.WorkRecordRef
+                        ->
+                        Ok state
+                    | _ ->
+                        let evidence =
+                            { ReviewerSessionId = payload.ReviewerSessionId
+                              BarrierId = payload.BarrierId
+                              WorkRecordRef = payload.WorkRecordRef
+                              WorkRecordDigest = payload.WorkRecordDigest }
+
+                        Ok(
+                            withLife
+                                { life with
+                                    ActiveFinality =
+                                        Some
+                                            { request with
+                                                SiblingSteers =
+                                                    Map.add payload.ReviewerSessionId evidence request.SiblingSteers } }
+                                state
+                        )
                 | _ -> Error ManagerLifeFoldRejection.UnknownRequest
             | _ -> Error ManagerLifeFoldRejection.LifeUnknown
 

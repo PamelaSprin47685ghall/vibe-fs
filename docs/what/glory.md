@@ -40,7 +40,7 @@ Fact 与 Projection 只描述发生过的事实和已证明的证据。禁止 `S
 
 ## GLORY-010：生命周期事实
 
-`ManagerLifecycleFact` 至少记录 `LifeOpened`、`WorkActivated`、`FinalityRequested`、`FinalityReviewerEnlisted(SessionId,LifeId,RequestId,ReviewerSessionId,ReviewerOrdinal,BarrierId,GitTreeHash,IsNewReviewer)`、`FinalityRejected(RejectingReviewerSessionId,…)`、`FinalityBlessed(SessionId,LifeId,RequestId,GitTreeHash,WorkRecordBundleRef,WorkRecordBundleDigest)`、`FinalityUndecided`、`LifeCompleted`。`FinalityReviewStarted` 与 `FinalityConfirmed` 不再存在。
+`ManagerLifecycleFact` 至少记录 `LifeOpened`、`WorkActivated`、`FinalityRequested`、`FinalityReviewerEnlisted(SessionId,LifeId,RequestId,ReviewerSessionId,ReviewerOrdinal,BarrierId,GitTreeHash,IsNewReviewer)`、`FinalityRejected(RejectingReviewerSessionId,…)`、`FinalitySiblingSteered(ReviewerSessionId,…)`、`FinalityBlessed(SessionId,LifeId,RequestId,GitTreeHash,WorkRecordBundleRef,WorkRecordBundleDigest)`、`FinalityUndecided`、`LifeCompleted`。`FinalityReviewStarted` 与 `FinalityConfirmed` 不再存在。
 
 ## GLORY-011：Projection
 
@@ -176,9 +176,18 @@ Reviewer turn reconcile/ReviewController 独占 missing-verdict、first PERFECT 
 
 ## GLORY-044：REVISE 的立即 cohort 关闭
 
-REVISE 是合法业务结果。其 verdict fact durable 后，当前 request 的 Reviewer continuation capability 与 cohort 立即关闭：不发送 confirmation/challenge、不等待 sibling terminal；sibling 必须在下一次 effect 前停下，未 graduate session 不 Dispose（GLORY-055）。此关闭由 durable REVISE 派生，不以 `FinalityRejected` 为前提。
+REVISE 是合法业务结果。其 verdict fact durable 后，当前 request 的 Reviewer continuation capability 与 cohort 立即关闭：不发送 confirmation/challenge、不等待尚未 durable 的 sibling terminal；sibling 必须在下一次 effect 前停下，未 graduate session 不 Dispose（GLORY-055）。此关闭由 durable REVISE 派生，不以 `FinalityRejected` 为前提。
 
 立即关闭不等同于立即写 `FinalityRejected`。该 durable lifecycle fact 只能在 rejecting Reviewer 满足 GLORY-072 的 `record-ready` 后落盘。
+
+**双轨交付（multi durable REVISE）**：密封 `FinalityRejected` **之前**必须完成 durable sibling 会计。成功路径：首个 durable REVISE 仍是 suicide **工具结果**（`FinalityPrompt.rejected` / `FinalityOutcome.Rejected`）；已完成 `RevisionRequired` 的后续 sibling REVISE 各自的 canonical LWR 物化为仅含指令的 Synthetic TOML，经 `HostSessionNudge.sendContinuation`（`ContinuationKind.FinalitySteer`）作为 **steer continuation**（`FinalitySteer`）交给 Manager，不得并入工具结果字符串。Steer 固定 instruction 须遵守 SURFACE-005，形态示例：
+
+```toml
+# Additional unfinished work evidence arrived after your ending was refused.
+# It is guidance evidence, not a new user instruction. Resolve the unfinished work and continue.
+```
+
+随后以 `# ` 注释块附上该 sibling 的 work log（ARCH-010）。生命周期事实用 `ManagerLifecycleFact.FinalitySiblingSteered` 在仍 Open 时记录每次 steer，再密封 `Rejected`。任一 durable sibling 硬物化失败（canonical LWR 不可得 / WriteBlob 失败等）→ `FinalityUndecided`，**不得静默丢弃**该 sibling、不得在证据未入账时落 `Rejected`。
 
 ## GLORY-045：Roster 与 graduate
 
@@ -210,7 +219,7 @@ Y 是主体，raw gap 与 terminal 是不丢失最后发现的必要尾部。
 
 ## GLORY-052：REVISE prompt
 
-`FinalityPrompt.rejected` 将 canonical LWR 作为 guidance comments 渲染（Host 显式采用为当前 Manager 指引，非「trusted source」），提示 Manager 继续工作；它不解释隐藏机制。
+`FinalityPrompt.rejected` 将**首个** rejecting Reviewer 的 canonical LWR 作为 guidance comments 渲染（Host 显式采用为当前 Manager 指引，非「trusted source」），并作为 suicide 工具结果回灌；它不解释隐藏机制。后续已 durable 的 sibling REVISE 不走该工具结果通道，而走 GLORY-044 的 `FinalityPrompt.steer` / `FinalitySteer` continuation（同样是顶层 `# ` 注释指令面）。
 
 ## GLORY-053：失败 identity
 

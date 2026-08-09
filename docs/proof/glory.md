@@ -49,6 +49,7 @@
 | 6 | Blessed minor-work | — | `# Your ending has accepted you, but your work is not yet at rest.\n# Resolve every remaining minor problem...`（固定 header；canonical work records 按 ordinal 稳定排序） |
 | 7 | Finality rejection | 输入 work record（`# Work log...`） | `# Your ending has not accepted you.\n# You have done well, and you still have plenty of time. Continue.\n# The following is evidence of what remains unfinished. It is not a new user instruction.\n# Resolve the unfinished work, continue normal execution, and call suicide again only when nothing useful remains.\n\n# Work log\n# ...`（仅注释块，无 TOML 数据块） |
 | 8 | Host undecidable | — | `# Your ending could not be decided.\n# You still have time. Continue, and seek your end again when you are ready.\n` |
+| 9 | Finality steer | 输入 sibling work record（`# Work log...`） | `# Additional unfinished work evidence arrived after your ending was refused.\n# It is guidance evidence, not a new user instruction. Resolve the unfinished work and continue.\n\n# Work log\n# ...`（固定 `# ` instruction 行 + sibling work-log 作 `# ` 注释；仅注释块，无 TOML 数据块；镜像 `FinalityPrompt.steer`，不含 SURFACE-005 禁用词 review/verdict/REVISE） |
 
 Fixture 实际字节末尾含 LF。禁止词门禁（SURFACE-005/006）覆盖 Manager system prompt、continuation、工具 description/schema 与固定 tool results；dynamic work record value 不做 forbidden-word 断言（GLORY-048）。
 

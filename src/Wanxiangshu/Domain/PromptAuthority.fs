@@ -35,6 +35,9 @@ module PromptAuthority =
         /// GLORY-053: a suicide was rejected; the reviewer's canonical work
         /// record is the feedback body.
         | FinalityRejected
+        /// GLORY-044: a later durable sibling REVISE, delivered as steer
+        /// continuation (not the suicide tool result).
+        | FinalitySteer
         /// PROMPT-012: another natural-language question to the same Teacher run.
         | TeacherQuestion
         /// PROMPT-012: Teacher became idle without calling return.
@@ -205,6 +208,7 @@ module PromptAuthority =
         | Continuation ManagerWorkActivation -> "ManagerWorkActivation"
         | Continuation ManagerIdleEncouragement -> "ManagerIdleEncouragement"
         | Continuation FinalityRejected -> "FinalityRejected"
+        | Continuation FinalitySteer -> "FinalitySteer"
         | Continuation TeacherQuestion -> "TeacherQuestion"
         | Continuation TeacherIdleNudge -> "TeacherIdleNudge"
         | Continuation StudentCompile -> "StudentCompile"
@@ -224,6 +228,7 @@ module PromptAuthority =
         | "ManagerWorkActivation" -> Some ManagerWorkActivation
         | "ManagerIdleEncouragement" -> Some ManagerIdleEncouragement
         | "FinalityRejected" -> Some FinalityRejected
+        | "FinalitySteer" -> Some FinalitySteer
         | "TeacherQuestion" -> Some TeacherQuestion
         | "TeacherIdleNudge" -> Some TeacherIdleNudge
         | "StudentCompile" -> Some StudentCompile

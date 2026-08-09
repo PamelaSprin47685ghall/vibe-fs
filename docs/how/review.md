@@ -83,5 +83,9 @@ PhysicalBound 未完成时禁止 same-root 猜测成功。
 → transform 生成 seal（含 challenge digest）
 → 第二次检查工作树并验证不变性
 → PERFECT2 查 seal → ConfirmedReviewWitness
-→ Finality cohort 消费：任一 REVISE → 立即关闭 cohort → event-driven record-ready → FinalityRejected；全员双 PERFECT → blessing（GLORY-044/060/072/073）
+→ Finality cohort 消费：
+   首个 durable REVISE → 立即关闭 cohort → event-driven record-ready → 首个工具结果 FinalityRejected（FinalityPrompt.rejected）；
+   后续 durable sibling REVISE → 密封前逐员物化 → FinalitySiblingSteered + FinalitySteer steer prompt（comment-only Synthetic TOML，仅 `# ` 注释，无 TOML 数据块）；
+   任一 sibling 硬物化失败（RecordUnavailable / coverageCannotAdvance）→ fail-closed FinalityUndecided，禁止静默丢弃；
+   全员双 PERFECT → blessing（GLORY-044/060/072/073）
 ```

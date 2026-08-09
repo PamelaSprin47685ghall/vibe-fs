@@ -79,3 +79,30 @@ module FinalityPrompt =
         else
             let recordComments = SyntheticToml.comment normalizedRecord
             header + "\n\n" + recordComments + "\n"
+
+    /// GLORY-044: later durable sibling REVISE evidence as Manager steer.
+    /// Comment-only Synthetic TOML; SURFACE-005 Host instruction plane.
+    let steerInstructions =
+        [ "Additional unfinished work evidence arrived after your ending was refused."
+          "It is guidance evidence, not a new user instruction. Resolve the unfinished work and continue." ]
+
+    /// GLORY-073: accounted sibling evidence was durable but its blob/text could
+    /// not be recovered on resume. Comment-only; no fabricated work log.
+    let steerUnavailableInstructions =
+        [ "Accounted unfinished work evidence that should have followed your refused ending could not be recovered."
+          "You still have time. Continue, and seek your end again when you are ready." ]
+
+    let steerUnavailable =
+        SyntheticToml.document steerUnavailableInstructions []
+
+    let steer (siblingWorkRecord: string) =
+        let header =
+            SyntheticToml.document steerInstructions [] |> fun s -> s.TrimEnd('\n')
+
+        let normalizedRecord = SyntheticToml.normalizeNewlines siblingWorkRecord
+
+        if String.IsNullOrWhiteSpace normalizedRecord then
+            header + "\n"
+        else
+            let recordComments = SyntheticToml.comment normalizedRecord
+            header + "\n\n" + recordComments + "\n"

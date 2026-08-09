@@ -1066,6 +1066,7 @@ module Fold =
                 | ManagerLifecycleFact.FinalityRequested payload -> payload.SessionId
                 | ManagerLifecycleFact.FinalityReviewerEnlisted payload -> payload.SessionId
                 | ManagerLifecycleFact.FinalityRejected payload -> payload.SessionId
+                | ManagerLifecycleFact.FinalitySiblingSteered payload -> payload.SessionId
                 | ManagerLifecycleFact.FinalityBlessed payload -> payload.SessionId
                 | ManagerLifecycleFact.FinalityUndecided payload -> payload.SessionId
                 | ManagerLifecycleFact.LifeCompleted payload -> payload.SessionId

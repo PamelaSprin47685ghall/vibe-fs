@@ -266,7 +266,12 @@ module FinalityTool =
                         let acceptSuicide (life: LifeProjection) =
                             task {
                                 // GLORY-037.7: an open request. The same ToolCallId is a
-                                // replay (idempotent); a different one is still in motion.
+                                // replay (idempotent); a different one waits (or restarts
+                                // empty-members). GLORY-073: resolved + same ToolCallId
+                                // resumes durable revise (sibling-steer replay /
+                                // already_received). GLORY-055: resolved + different
+                                // ToolCallId replaces the closed request — same path as
+                                // ActiveFinality = None.
                                 match life.ActiveFinality with
                                 | Some request when ManagerLifecycleProjection.isOpen request ->
 
@@ -316,6 +321,23 @@ module FinalityTool =
                                                 ToolHostCodec.tomlObjectWithInstructions
                                                     [ "Wait for the current ending to resolve." ]
                                                     []
+                                | Some request when
+                                    (match context.ToolCallId with
+                                     | Some callId -> callId = request.ToolCallId
+                                     | None -> false) ->
+                                    let! resumed =
+                                        FinalityController.resumeDurableRevise
+                                            scope
+                                            sid
+                                            life.LifeId
+                                            request.RequestId
+
+                                    match resumed with
+                                    | Some(FinalityController.FinalityOutcome.Rejected prompt)
+                                    | Some(FinalityController.FinalityOutcome.Blessed prompt)
+                                    | Some(FinalityController.FinalityOutcome.Undecided prompt) -> return prompt
+                                    | None ->
+                                        return ToolHostCodec.tomlObject [ "status", tString "already_received" ]
                                 | _ ->
                                     if String.IsNullOrWhiteSpace lastWords then
                                         return

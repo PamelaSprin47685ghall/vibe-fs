@@ -79,6 +79,7 @@ module FinalityController =
             | ManagerLifecycleFact.FinalityRequested payload -> payload.SessionId
             | ManagerLifecycleFact.FinalityReviewerEnlisted payload -> payload.SessionId
             | ManagerLifecycleFact.FinalityRejected payload -> payload.SessionId
+            | ManagerLifecycleFact.FinalitySiblingSteered payload -> payload.SessionId
             | ManagerLifecycleFact.FinalityBlessed payload -> payload.SessionId
             | ManagerLifecycleFact.FinalityUndecided payload -> payload.SessionId
             | ManagerLifecycleFact.LifeCompleted payload -> payload.SessionId
@@ -319,6 +320,22 @@ module FinalityController =
         with _ ->
             false
 
+    /// True when this member already has a durable RevisionWitness for its
+    /// barrier (GLORY-044): cancel must not erase an already-landed REVISE.
+    let private hasDurableRevisionRequired
+        (journal: AgentJournal)
+        (reviewerSessionId: SessionId)
+        (barrierId: ReviewBarrierId)
+        =
+        let snapshot = AgentJournal.snapshot journal
+
+        AgentProjection.tryFind reviewerSessionId snapshot.AgentProjections
+        |> Option.bind (fun session -> session.ReviewGuard)
+        |> Option.exists (fun guard ->
+            match guard.CurrentBarrierId, guard.Witness with
+            | Some current, ReviewWitness.RevisionWitness _ when current = barrierId -> true
+            | _ -> false)
+
     /// One member's protocol: Finality enlists and waits; ReviewerWorkflow owns
     /// every post-terminal continuation.
     let private driveMember
@@ -333,9 +350,23 @@ module FinalityController =
         : Task<Result<HostReviewProgram.HostReviewOutcome, HostReviewProgram.HostReviewFailure>> =
         let awaitOrCancel () =
             task {
+                // Cancel after a durable REVISE must still return Ok so reverify
+                // can readOutcome → RevisionRequired (not CannotAwaitReviewer).
+                let promoteCancelled error =
+                    if
+                        hasDurableRevisionRequired
+                            journal
+                            memberInfo.ReviewerSessionId
+                            memberInfo.BarrierId
+                    then
+                        Ok()
+                    else
+                        Error error
+
                 match! awaitReviewer scope timeoutMs cancel memberInfo.ReviewerSessionId with
+                | Error error when cancel.IsCancelled -> return promoteCancelled error
                 | Error error -> return Error error
-                | Ok() when cancel.IsCancelled -> return Error "review attempt cancelled"
+                | Ok() when cancel.IsCancelled -> return promoteCancelled "review attempt cancelled"
                 | Ok() -> return Ok()
             }
 
@@ -350,40 +381,54 @@ module FinalityController =
     /// GLORY-044: concurrent fan-out with immediate REVISE short-circuit. All
     /// drivers start together; the first Revision result wins the race, cancels
     /// siblings immediately, and remaining drivers stop before their next effect.
+    /// Short-circuit results are still accumulated; the Choice resolves only after
+    /// every started driver finishes so later durable REVISE can be steered.
     /// Durable Reviewer sessions are never disposed here (GLORY-055).
     let private concurrentAllOrShortCircuit
         (cancel: CancelToken)
         (isShortCircuit: 'a -> bool)
         (tasks: Task<'a> list)
-        : Task<Choice<'a, 'a list>> =
+        : Task<Choice<'a * 'a list, 'a list>> =
         task {
             let tcs =
-                TaskCompletionSource<Choice<'a, 'a list>>(TaskCreationOptions.RunContinuationsAsynchronously)
+                TaskCompletionSource<Choice<'a * 'a list, 'a list>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
             let remaining = ref (List.length tasks)
             let results = ResizeArray<'a>()
+            let shortCircuitWinner = ref None
 
             let decide (result: 'a) =
+                results.Add result
+
                 if isShortCircuit result then
                     // Cancel siblings before the outer CE resumes — otherwise a
                     // Perfect-pending sibling can still send its challenge after
                     // REVISE has already won the race.
-                    cancel.Cancel()
-                    AsyncSupport.trySetResult tcs (Choice1Of2 result) |> ignore
-                else
-                    results.Add result
-                    remaining.Value <- remaining.Value - 1
+                    match shortCircuitWinner.Value with
+                    | None ->
+                        shortCircuitWinner.Value <- Some result
+                        cancel.Cancel()
+                    | Some _ -> ()
 
-                    if remaining.Value = 0 then
-                        AsyncSupport.trySetResult tcs (Choice2Of2(List.ofSeq results)) |> ignore
+                remaining.Value <- remaining.Value - 1
 
-            tasks
-            |> List.iter (fun work ->
-                async {
-                    let! result = Async.AwaitTask work
-                    decide result
-                }
-                |> Async.StartImmediate)
+                if remaining.Value = 0 then
+                    let all = List.ofSeq results
+
+                    match shortCircuitWinner.Value with
+                    | Some winner -> AsyncSupport.trySetResult tcs (Choice1Of2(winner, all)) |> ignore
+                    | None -> AsyncSupport.trySetResult tcs (Choice2Of2 all) |> ignore
+
+            if List.isEmpty tasks then
+                AsyncSupport.trySetResult tcs (Choice2Of2 []) |> ignore
+            else
+                tasks
+                |> List.iter (fun work ->
+                    async {
+                        let! result = Async.AwaitTask work
+                        decide result
+                    }
+                    |> Async.StartImmediate)
 
             return! tcs.Task
         }
@@ -458,6 +503,309 @@ module FinalityController =
                                WorkRecordDigest = blob.BlobDigest |})
 
                     return Rejected(FinalityPrompt.rejected workRecord)
+        }
+
+    /// GLORY-044/REVIEW-002: wait until every durable sibling is RecordReady, or
+    /// fail closed on hard RecordUnavailable (no silent drop; no AwaitJournal hang
+    /// when coverageCannotAdvance — abandoned companion / retired blogger).
+    let private awaitDurableSiblingRecords
+        (journal: AgentJournal)
+        (siblings: (SessionId * ReviewBarrierId) list)
+        : Task<Result<(SessionId * ReviewBarrierId * string) list, string>> =
+        let rec loop () =
+            task {
+                if List.isEmpty siblings then
+                    return Ok []
+                else
+                    let snapshot, revision = AgentJournal.snapshotWithRevision journal
+
+                    let readiness =
+                        siblings
+                        |> List.map (fun (sid, barrierId) ->
+                            sid, barrierId, recordReadiness journal snapshot sid barrierId true)
+
+                    let unavailable =
+                        readiness
+                        |> List.tryPick (fun (_, _, state) ->
+                            match state with
+                            | RecordUnavailable reason -> Some reason
+                            | _ -> None)
+
+                    match unavailable with
+                    | Some reason -> return Error reason
+                    | None ->
+                        let pending =
+                            readiness
+                            |> List.exists (fun (_, _, state) ->
+                                match state with
+                                | AwaitJournal -> true
+                                | _ -> false)
+
+                        if pending then
+                            let! _ = AgentJournal.awaitChangeFrom revision journal
+                            return! loop ()
+                        else
+                            let records =
+                                readiness
+                                |> List.choose (fun (sid, barrierId, state) ->
+                                    match state with
+                                    | RecordReady record -> Some(sid, barrierId, record)
+                                    | AwaitJournal
+                                    | RecordUnavailable _ -> None)
+
+                            if List.length records <> List.length siblings then
+                                return Error "durable sibling record readiness is incomplete"
+                            else
+                                return Ok records
+            }
+
+        loop ()
+
+    let private tryActiveFinality
+        (snapshot: ProjectionSet)
+        (managerSessionId: SessionId)
+        (requestId: FinalityRequestId)
+        =
+        AgentProjection.tryFind managerSessionId snapshot.AgentProjections
+        |> Option.bind (fun session -> session.ManagerLife)
+        |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+        |> Option.bind (fun life -> life.ActiveFinality)
+        |> Option.filter (fun active -> active.RequestId = requestId)
+
+    /// WriteBlob+prepare ALL durable siblings first; only then append ALL
+    /// FinalitySiblingSteered (or none). Mid-list WriteBlob failure must not leave
+    /// partial FinalitySiblingSteered before concludeUndecided (still Open).
+    let private commitSiblingSteerFacts
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        (requestTree: GitTreeHash)
+        (records: (SessionId * ReviewBarrierId * string) list)
+        : Result<(SessionId * string) list, string> =
+        let snapshot = AgentJournal.snapshot journal
+        let existingSteers =
+            tryActiveFinality snapshot managerSessionId requestId
+            |> Option.map (fun active -> active.SiblingSteers)
+            |> Option.defaultValue Map.empty
+
+        // Phase 1: materialize every blob (or reuse existing steer text). No facts yet.
+        let preparedResult =
+            records
+            |> List.fold
+                (fun acc (reviewerSessionId, barrierId, workRecord) ->
+                    match acc with
+                    | Error reason -> Error reason
+                    | Ok prepared ->
+                        match Map.tryFind reviewerSessionId existingSteers with
+                        | Some evidence ->
+                            match journal.Writer.BlobWriter.Read evidence.WorkRecordRef with
+                            | Ok text ->
+                                Ok(
+                                    prepared
+                                    @ [ reviewerSessionId, barrierId, text, None ]
+                                )
+                            | Error reason -> Error reason
+                        | None ->
+                            match journal.WriteBlob workRecord with
+                            | Error reason -> Error reason
+                            | Ok blob ->
+                                Ok(
+                                    prepared
+                                    @ [ reviewerSessionId, barrierId, workRecord, Some blob ]
+                                ))
+                (Ok [])
+
+        match preparedResult with
+        | Error reason -> Error reason
+        | Ok prepared ->
+            // Phase 2: append every new FinalitySiblingSteered, or none if phase 1 failed.
+            for reviewerSessionId, barrierId, _, blobOpt in prepared do
+                match blobOpt with
+                | None -> ()
+                | Some blob ->
+                    appendLifecycle
+                        journal
+                        (ManagerLifecycleFact.FinalitySiblingSteered
+                            {| SessionId = managerSessionId
+                               LifeId = lifeId
+                               RequestId = requestId
+                               ReviewerSessionId = reviewerSessionId
+                               BarrierId = barrierId
+                               GitTreeHash = requestTree
+                               WorkRecordRef = blob.BlobRef
+                               WorkRecordDigest = blob.BlobDigest |})
+
+            Ok(prepared |> List.map (fun (sid, _, text, _) -> sid, text))
+
+    let private sendSiblingSteerContinuations
+        (scope: ToolRuntimeScope)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (prepared: (SessionId * string) list)
+        : Task<unit> =
+        task {
+            let directory = scope.DirectoryFor(SessionId.value managerSessionId)
+
+            for _, workRecord in prepared do
+                let prompt = FinalityPrompt.steer workRecord
+
+                let! _ =
+                    HostSessionNudge.sendContinuation
+                        scope.Sessions
+                        managerSessionId
+                        prompt
+                        PromptAuthority.ContinuationKind.FinalitySteer
+                        directory
+                        (Some journal)
+
+                ()
+        }
+
+    /// GLORY-044: seal FinalityRejected only after every durable sibling is
+    /// record-ready and atomically blob-committed (all WriteBlob, then all
+    /// FinalitySiblingSteered — or none). Hard RecordUnavailable / WriteBlob
+    /// failure → concludeUndecided (Open-only; no partial SiblingSteered).
+    let private concludeRejectionAccountingSiblings
+        (scope: ToolRuntimeScope)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        (rejectingReviewer: SessionId)
+        (barrierId: ReviewBarrierId)
+        (requestTree: GitTreeHash)
+        (siblings: (SessionId * ReviewBarrierId) list)
+        : Task<FinalityOutcome> =
+        task {
+            let! siblingRecords = awaitDurableSiblingRecords journal siblings
+
+            match siblingRecords with
+            | Error _ ->
+                return!
+                    concludeUndecided
+                        scope
+                        journal
+                        managerSessionId
+                        lifeId
+                        requestId
+                        requestTree
+                        rejectingReviewer
+                        barrierId
+            | Ok records ->
+                match
+                    commitSiblingSteerFacts
+                        journal
+                        managerSessionId
+                        lifeId
+                        requestId
+                        requestTree
+                        records
+                with
+                | Error _ ->
+                    return!
+                        concludeUndecided
+                            scope
+                            journal
+                            managerSessionId
+                            lifeId
+                            requestId
+                            requestTree
+                            rejectingReviewer
+                            barrierId
+                | Ok prepared ->
+                    let! outcome =
+                        concludeRejection
+                            scope
+                            journal
+                            managerSessionId
+                            lifeId
+                            requestId
+                            rejectingReviewer
+                            barrierId
+                            requestTree
+
+                    match outcome with
+                    | Rejected _ ->
+                        do! sendSiblingSteerContinuations scope journal managerSessionId prepared
+                        return outcome
+                    | Blessed _
+                    | Undecided _ -> return outcome
+        }
+
+    /// GLORY-073 resume: replay already-committed sibling steers. Blob first;
+    /// on miss, rematerialize from journal. No silent drop of accounted siblings;
+    /// unaccounted members are not invented here. Detached send is best-effort
+    /// only once content is deliverable.
+    let private replaySiblingSteer
+        (scope: ToolRuntimeScope)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (requestId: FinalityRequestId)
+        (reviewerSessionId: SessionId)
+        : Task<unit> =
+        task {
+            let snapshot = AgentJournal.snapshot journal
+
+            match
+                tryActiveFinality snapshot managerSessionId requestId
+                |> Option.bind (fun active -> Map.tryFind reviewerSessionId active.SiblingSteers)
+            with
+            | None -> ()
+            | Some evidence ->
+                let workRecordOpt =
+                    match journal.Writer.BlobWriter.Read evidence.WorkRecordRef with
+                    | Ok workRecord -> Some workRecord
+                    | Error _ ->
+                        // Blob gone: one-shot rematerialize from durable journal
+                        // evidence (no await loop — request is already sealed).
+                        match
+                            recordReadiness
+                                journal
+                                snapshot
+                                reviewerSessionId
+                                evidence.BarrierId
+                                true
+                        with
+                        | RecordReady record -> Some record
+                        | AwaitJournal
+                        | RecordUnavailable _ -> None
+
+                match workRecordOpt with
+                | Some workRecord ->
+                    do!
+                        sendSiblingSteerContinuations
+                            scope
+                            journal
+                            managerSessionId
+                            [ reviewerSessionId, workRecord ]
+                | None ->
+                    // Accounted sibling still undeliverable: Manager-visible
+                    // comment-only failure — do not pretend the evidence arrived.
+                    let directory = scope.DirectoryFor(SessionId.value managerSessionId)
+
+                    let! _ =
+                        HostSessionNudge.sendContinuation
+                            scope.Sessions
+                            managerSessionId
+                            FinalityPrompt.steerUnavailable
+                            PromptAuthority.ContinuationKind.FinalitySteer
+                            directory
+                            (Some journal)
+
+                    ()
+        }
+
+    let private steerSiblingRevisions
+        (scope: ToolRuntimeScope)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (requestId: FinalityRequestId)
+        (siblings: (SessionId * ReviewBarrierId) list)
+        : Task<unit> =
+        task {
+            for reviewerSessionId, _ in siblings do
+                do! replaySiblingSteer scope journal managerSessionId requestId reviewerSessionId
         }
 
     /// GLORY-060/061: every member confirmed. Re-validate the tree, materialize
@@ -535,8 +883,30 @@ module FinalityController =
                     Some(reviewerSessionId, barrierId)
                 | _ -> None))
 
+    /// Durable REVISE members other than the rejecting winner (GLORY-044 siblings).
+    let private durableRevisionSiblings
+        (snapshot: ProjectionSet)
+        (request: FinalityRequestProjection)
+        (rejectingReviewer: SessionId)
+        =
+        request.Members
+        |> Map.toList
+        |> List.choose (fun (reviewerSessionId, memberRef) ->
+            if reviewerSessionId = rejectingReviewer then
+                None
+            else
+                AgentProjection.tryFind reviewerSessionId snapshot.AgentProjections
+                |> Option.bind (fun session -> session.ReviewGuard)
+                |> Option.bind (fun guard ->
+                    match guard.CurrentBarrierId, guard.Witness with
+                    | Some barrierId, ReviewWitness.RevisionWitness _ when barrierId = memberRef.BarrierId ->
+                        Some(reviewerSessionId, barrierId)
+                    | _ -> None))
+
     /// GLORY-073: a replay resumes a durable REVISE at its frozen frontier. It
     /// never re-enlists the cohort or replays a Reviewer continuation.
+    /// GLORY-044: after/with concludeRejection, also steer durable sibling REVISE
+    /// and best-effort replay FinalitySiblingSteered continuations.
     let resumeDurableRevise
         (scope: ToolRuntimeScope)
         (managerSessionId: SessionId)
@@ -550,23 +920,36 @@ module FinalityController =
                 try
                     let snapshot = AgentJournal.snapshot journal
 
-                    let request =
+                    let lifeOpt =
                         AgentProjection.tryFind managerSessionId snapshot.AgentProjections
                         |> Option.bind (fun session -> session.ManagerLife)
                         |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
                         |> Option.filter (fun life -> life.LifeId = lifeId)
+
+                    let requestOpt =
+                        lifeOpt
                         |> Option.bind (fun life -> life.ActiveFinality)
                         |> Option.filter (fun active -> active.RequestId = requestId)
-                        |> Option.filter ManagerLifecycleProjection.isOpen
 
-                    match request with
+                    match requestOpt with
                     | None -> return None
-                    | Some activeRequest ->
+                    | Some activeRequest when ManagerLifecycleProjection.isOpen activeRequest ->
                         match pendingRevision snapshot activeRequest with
                         | None -> return None
                         | Some(reviewerSessionId, barrierId) ->
+                            // BEFORE sealing Rejected: account durable siblings
+                            // (journal ∪ prior SiblingSteers). Hard materialization
+                            // failure → Undecided (FinalityUndecided is Open-only).
+                            let siblings =
+                                durableRevisionSiblings snapshot activeRequest reviewerSessionId
+                                @ (activeRequest.SiblingSteers
+                                   |> Map.toList
+                                   |> List.map (fun (sid, evidence) -> sid, evidence.BarrierId)
+                                   |> List.filter (fun (sid, _) -> sid <> reviewerSessionId))
+                                |> List.distinctBy fst
+
                             let! outcome =
-                                concludeRejection
+                                concludeRejectionAccountingSiblings
                                     scope
                                     journal
                                     managerSessionId
@@ -575,8 +958,27 @@ module FinalityController =
                                     reviewerSessionId
                                     barrierId
                                     activeRequest.GitTreeHash
+                                    siblings
 
                             return Some outcome
+                    | Some activeRequest ->
+                        // Request already resolved: replay committed sibling steers only
+                        // (revise-close already fail-closed or fact-accounted them).
+                        let siblings =
+                            activeRequest.SiblingSteers
+                            |> Map.toList
+                            |> List.map (fun (sid, evidence) -> sid, evidence.BarrierId)
+
+                        if not (List.isEmpty siblings) then
+                            do!
+                                steerSiblingRevisions
+                                    scope
+                                    journal
+                                    managerSessionId
+                                    requestId
+                                    siblings
+
+                        return None
                 with _ ->
                     return Some(Undecided ManagerLifecyclePrompt.FinalityUndecidable)
         }
@@ -866,9 +1268,32 @@ module FinalityController =
                                 match outcome with
                                 | Choice1Of2(Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired(reviewerId,
                                                                                                      barrier,
-                                                                                                     _tree))) ->
+                                                                                                     _tree)),
+                                             allResults) ->
+                                    // Race allResults alone drops cancelled-but-durable
+                                    // siblings (awaitOrCancel Error). Union journal
+                                    // durableRevisionSiblings BEFORE sealing Rejected —
+                                    // FinalityUndecided is Open-only (GLORY-044 soft-drop).
+                                    let fromRace =
+                                        allResults
+                                        |> List.choose (function
+                                            | Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired(sid, bid, _)) when
+                                                sid <> reviewerId
+                                                ->
+                                                Some(sid, bid)
+                                            | _ -> None)
+
+                                    let before = AgentJournal.snapshot journal
+
+                                    let siblings =
+                                        match tryActiveFinality before managerSessionId requestId with
+                                        | Some activeRequest ->
+                                            durableRevisionSiblings before activeRequest reviewerId @ fromRace
+                                            |> List.distinctBy fst
+                                        | None -> fromRace
+
                                     return!
-                                        concludeRejection
+                                        concludeRejectionAccountingSiblings
                                             scope
                                             journal
                                             managerSessionId
@@ -877,6 +1302,7 @@ module FinalityController =
                                             reviewerId
                                             barrier
                                             requestTree
+                                            siblings
                                 | Choice2Of2 results when
                                     List.forall
                                         (function

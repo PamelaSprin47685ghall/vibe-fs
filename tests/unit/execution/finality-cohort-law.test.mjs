@@ -12,6 +12,14 @@
 //     - all Confirmed gathers all into one `FinalityBlessed` bundle
 //     - the short-circuit cancels the sibling driver before its next effect
 //       and never disposes a durable session
+//     - multi durable REVISE: first remains the suicide tool result; later
+//       durable REVISE LWRs steer the Manager as comment-only continuations
+//       (cancel-before-sibling-observe still yields FinalitySiblingSteered)
+//     - durable sibling REVISE + materialization RecordUnavailable (GLORY-074
+//       abandon): must not soft-fail vanish — steer, fail-closed Undecided, or
+//       refuse Rejected while siblings remain unaccounted (GLORY-044 / REVIEW-002)
+//     - crash after FinalitySiblingSteered / missing Manager FinalitySteer:
+//       resumeDurableRevise best-effort re-delivers steers; no new cohort
 //   ensureX (enlistMember)
 //     - an existing durable fact ⇒ zero physical send (session reused, no
 //       second fork, no duplicate enlistment)
@@ -36,6 +44,7 @@ import {
   observeTerminalSubscriptions,
   withExecutablePlugin,
 } from '../plugin/plugin-fixture.mjs'
+import { PER_TEST_TIMEOUT_MS } from '../../e2e/support/time-budget.js'
 import {
   agentFact,
   agentJournal,
@@ -84,6 +93,26 @@ import { ensureContinuation } from '../../../dist/Application/Review/ReviewerWor
 
 // Role.Reviewer is Fable case tag 6 (Kernel/Roles.fs order).
 const ROLE_REVIEWER = 6
+
+// Cap Finality reviewer awaits at the unit per-test bound so fixtures never
+// fall through to ExecutorSummarize.AwaitAgentTimeoutMs (600s). Canary-aligned
+// (≤ WATCHDOG / PER_TEST family); do not raise time-budget.js to paper races.
+const FINALITY_PLUGIN_OPTS = { finalityReviewerTimeoutMs: PER_TEST_TIMEOUT_MS }
+
+/**
+ * Hang backstop for cohort races (VERIFY-004): primary criterion is settlement
+ * or a causal waiter in `extra`; PER_TEST_TIMEOUT_MS is only the centralized
+ * wall-clock 兜底 (never a scattered ≥1000ms literal).
+ */
+const raceOrTimeout = (primary, extra = []) =>
+  Promise.race([
+    primary,
+    ...extra,
+    new Promise((resolve) => {
+      const timer = setTimeout(() => resolve({ kind: 'timeout' }), PER_TEST_TIMEOUT_MS)
+      timer.unref?.()
+    }),
+  ])
 
 // A visible sha256 stand-in for the challenge digest algebra (REVIEW-003): the
 // property under test is which text is digested, not the hash function.
@@ -276,10 +305,24 @@ const appendBlogCoverage = (journal, reviewerValue, { previous, next, label }) =
   assert.equal(appended.tag, 0, `BlogEntryCommitted append rejected: ${appended.fields?.[0]}`)
 }
 
+/** Projection RecordCoverage ingest head (PERSIST-010 previous cursor). */
+const ingestedThrough = (journal, reviewerValue) => {
+  const session = mapTryFind(sessionId(reviewerValue), sessionsOf(journal))
+  return Number(session?.Blog?.Coverage?.IngestedThroughSequence ?? 0n)
+}
+
 const makeRecordReady = (journal, reviewerValue, run, label) => {
   const frontier = terminalFrontier(journal, reviewerValue)
+  // Chain from live projection ingest — a reused reviewer already covered in a
+  // prior round must not re-commit previous:0 (PERSIST-010 cursor mismatch).
+  const previous = ingestedThrough(journal, reviewerValue)
   appendTerminalEvidence(journal, reviewerValue, run, `${label} terminal evidence`)
-  appendBlogCoverage(journal, reviewerValue, { previous: 0, next: frontier, label })
+  // Provenance-idempotent re-capture leaves frontier frozen: next==previous is
+  // refused (PERSIST-010). Terminal evidence alone suffices when coverage already
+  // reaches the exclusive head.
+  if (frontier > previous) {
+    appendBlogCoverage(journal, reviewerValue, { previous, next: frontier, label })
+  }
   return frontier
 }
 
@@ -466,7 +509,7 @@ test('GLORY_044_the_first_Revision_short_circuits_to_rejection_and_never_dispose
       1,
       'the rejected member stays enlisted for the next request',
     )
-  })
+  }, FINALITY_PLUGIN_OPTS)
 })
 
 test('GLORY_044_all_Confirmed_gathers_all_into_one_blessing_bundle', async () => {
@@ -527,7 +570,7 @@ test('GLORY_044_all_Confirmed_gathers_all_into_one_blessing_bundle', async () =>
     // GLORY-055/060: only the BLESSED path releases the physical sessions, and
     // only after the bundle landed.
     assert.deepEqual([...runtime.abortedIds].sort(), [historical, newcomer].sort())
-  })
+  }, FINALITY_PLUGIN_OPTS)
 })
 
 test('GLORY_044_a_Revision_short_circuit_cancels_the_sibling_before_its_next_effect', async () => {
@@ -584,7 +627,274 @@ test('GLORY_044_a_Revision_short_circuit_cancels_the_sibling_before_its_next_eff
     assert.equal(promptTexts.includes(reviewChallenge.text), false, 'the cancelled sibling must not receive the challenge continuation')
     // Cancellation never disposes a durable session.
     assert.deepEqual(runtime.abortedIds, [], 'the short-circuit must not dispose either durable session')
-  })
+  }, FINALITY_PLUGIN_OPTS)
+})
+
+test('GLORY_044_multi_REVISE_first_tool_result_rest_steered', async () => {
+  await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
+    commitWorkspace(directory)
+    acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
+    activateLife(runtime, 'mgr')
+
+    // Capture primary evidence in round 1: round-2 re-capture is provenance-
+    // idempotent and will not rewrite the historical reviewer's durable LWR.
+    const primaryEvidence = 'multi cohort primary unfinished work alpha'
+    const siblingEvidence = 'multi cohort sibling unfinished work beta'
+
+    // Round 1: rejection creates the historical reviewer.
+    const roundOne = hooks.tool.suicide.execute(
+      { last_words: 'first ending' },
+      suicideContext('call-multi-1', 'run-mgr-multi-1'),
+    )
+    const historical = await waitForSession(createdIds, 0)
+    await waitForPromptCount(runtime, historical, 1)
+    acceptLatestPrompt(runtime, historical)
+    captureWorkRecord(runtime.journal, historical, primaryEvidence)
+    makeRecordReady(runtime.journal, historical, 'run-multi-a-1', 'multi-round-one')
+    submitVerdict(runtime.journal, currentRequest(runtime.journal), historical, 'run-multi-a-1', 'call-multi-a-1', ReviewGuardVerdict.Revise)
+    notifyCompleted(runtime, historical, 'wide multi a', 'formal multi a', ROLE_REVIEWER)
+    await roundOne
+
+    // Round 2: two members both land durable REVISE. First closes the cohort as
+    // the suicide tool result; later durable REVISE must steer, not vanish.
+    // Historical is already covered from round 1 — makeRecordReady only rebinds
+    // terminal evidence (skips zero-advance BlogEntryCommitted). Newcomer needs
+    // first-time coverage, matching other dual-member GLORY_044 fixtures.
+    const roundTwo = hooks.tool.suicide.execute(
+      { last_words: 'second ending' },
+      suicideContext('call-multi-2', 'run-mgr-multi-2'),
+    )
+    const newcomer = await waitForSession(createdIds, 1)
+    await waitForPromptCount(runtime, historical, 2)
+    acceptLatestPrompt(runtime, historical)
+    await waitForPromptCount(runtime, newcomer, 1)
+    acceptLatestPrompt(runtime, newcomer)
+    captureWorkRecord(runtime.journal, newcomer, siblingEvidence)
+    makeRecordReady(runtime.journal, historical, 'run-multi-h-2', 'multi-primary-ready')
+    makeRecordReady(runtime.journal, newcomer, 'run-multi-n-2', 'multi-sibling-ready')
+
+    const request = currentRequest(runtime.journal)
+    assert.equal(mapEntries(request.Members).length, 2)
+    const requestIdValue = idValue.finalityRequest(request.RequestId)
+
+    // Deterministic cancel-before-sibling-observe (GLORY-044 race): both REVISE
+    // facts are durable first; only the winner's terminal wakes awaitOrCancel.
+    // Short-circuit cancel then fires while the sibling may already hold
+    // RevisionWitness / RevisionRequired but is still blocked in awaitOrCancel.
+    submitVerdict(runtime.journal, request, historical, 'run-multi-h-2', 'call-multi-h-2', ReviewGuardVerdict.Revise)
+    submitVerdict(runtime.journal, request, newcomer, 'run-multi-n-2', 'call-multi-n-2', ReviewGuardVerdict.Revise)
+    notifyCompleted(runtime, historical, 'wide multi h2', 'formal multi h2', ROLE_REVIEWER)
+    await awaitResolution(runtime.journal, request.RequestId, 'Rejected')
+    // Sibling terminal after cancel must not drop an already-durable REVISE.
+    notifyCompleted(runtime, newcomer, 'wide multi n2', 'formal multi n2', ROLE_REVIEWER)
+
+    const result = await roundTwo
+    assert.ok(result.startsWith('# Your ending has not accepted you.'), result)
+    assert.equal(caseOf(currentRequest(runtime.journal).Resolution), 'Rejected')
+    assert.equal(
+      rejectionsFor(runtime.journal, request.RequestId).length,
+      1,
+      'exactly one FinalityRejected closes the request',
+    )
+
+    const rejection = rejectionsFor(runtime.journal, request.RequestId)[0]
+    const rejectingSession = idValue.session(rejection.RejectingReviewerSessionId)
+    const siblingSteered = agentJournal
+      .persistedEnvelopes(runtime.journal)
+      .filter((envelope) => caseOf(envelope.Fact) === 'ManagerLifecycle')
+      .map((envelope) => payloadOf(envelope.Fact))
+      .filter((fact) => caseOf(fact) === 'FinalitySiblingSteered')
+      .map(payloadOf)
+      .filter((payload) => idValue.finalityRequest(payload.RequestId) === requestIdValue)
+    assert.ok(
+      siblingSteered.length >= 1,
+      'non-winning durable REVISE must append FinalitySiblingSteered',
+    )
+    assert.ok(
+      siblingSteered.some((payload) => idValue.session(payload.ReviewerSessionId) !== rejectingSession),
+      'FinalitySiblingSteered must target the non-winning sibling, not the rejecting winner',
+    )
+
+    const promptTextOf = (entry) => {
+      const part = entry?.body?.parts?.find((piece) => piece?.type === 'text')
+      return part?.text ?? entry?.body?.text ?? ''
+    }
+    const promptOriginOf = (entry) =>
+      entry?.body?.metadata?.wanxiangshu_origin
+      ?? entry?.body?.parts?.find((piece) => piece?.type === 'text')?.metadata?.wanxiangshu_origin
+    const isCommentOnly = (text) => {
+      const lines = text.replace(/\r\n/g, '\n').split('\n')
+      return lines.every((line) => line === '' || line.startsWith('#'))
+    }
+    // SURFACE-005: Host-owned instruction plane only; sealed opaque LWR is exempt.
+    const surfaceBanned = [
+      /\breview\b/i,
+      /\breviewer\b/i,
+      /\bverdict\b/i,
+      /\bPERFECT\b/,
+      /\bREVISE\b/,
+      /\bbarrier\b/i,
+      /\bwitness\b/i,
+      /\bconfirmation\b/i,
+    ]
+    const hostInstructionPlane = (text) => {
+      const normalized = text.replace(/\r\n/g, '\n')
+      const split = normalized.search(/\n\n# /)
+      return split >= 0 ? normalized.slice(0, split) : normalized
+    }
+    const isFinalitySteerEntry = (entry) => {
+      if ((entry?.path?.id ?? entry?.sessionID) !== 'mgr') return false
+      if (promptOriginOf(entry) === 'FinalitySteer') return true
+      const text = promptTextOf(entry)
+      if (!text || !isCommentOnly(text)) return false
+      if (text.includes('Now complete it yourself.') || text.includes('You are doing well.')) return false
+      return (
+        text.includes('Additional unfinished work evidence')
+        || text.includes(siblingEvidence)
+        || text.includes(primaryEvidence)
+      )
+    }
+
+    const steers = runtime.prompts.filter(isFinalitySteerEntry).map(promptTextOf)
+    assert.ok(
+      steers.length >= 1,
+      'later durable REVISE must deliver at least one Manager FinalitySteer continuation',
+    )
+
+    for (const steer of steers) {
+      assert.ok(isCommentOnly(steer), 'steer must be comment-only Synthetic TOML (ARCH-010)')
+      const instructions = hostInstructionPlane(steer)
+      for (const banned of surfaceBanned) {
+        assert.equal(
+          banned.test(instructions),
+          false,
+          `steer Host instructions must not contain SURFACE-005 banned token ${banned}: ${instructions.slice(0, 200)}`,
+        )
+      }
+    }
+
+    const primaryInTool = result.includes(primaryEvidence)
+    const siblingInTool = result.includes(siblingEvidence)
+    assert.ok(
+      primaryInTool || siblingInTool,
+      'suicide tool result must carry the first rejecting REVISE work record',
+    )
+    assert.equal(
+      primaryInTool && siblingInTool,
+      false,
+      'sibling REVISE must not be merged into the primary FinalityRejected tool result',
+    )
+    const steeredEvidence = primaryInTool ? siblingEvidence : primaryEvidence
+    assert.ok(
+      steers.some((text) => text.includes(steeredEvidence)),
+      `sibling durable REVISE evidence (${steeredEvidence}) must appear in a FinalitySteer, not only the tool result`,
+    )
+    assert.deepEqual(runtime.abortedIds, [], 'multi-REVISE short-circuit must not dispose durable sessions')
+  }, FINALITY_PLUGIN_OPTS)
+})
+
+// ── GLORY-044 + GLORY-074: durable sibling REVISE must not vanish on RecordUnavailable ─
+//
+// Primary rejecting Reviewer is record-ready (tool-result track). Sibling lands a
+// durable RevisionWitness but companion Blogger is Abandoned before steer
+// materialization (same RecordUnavailable path as GLORY_074). Hard sibling
+// materialization failure must fail-closed: Resolution=Undecided and a
+// FinalityUndecided fact (REVIEW-002 不得静默丢弃).
+
+test('GLORY_044_074_durable_sibling_REVISE_materialization_failure_must_not_silently_vanish', async () => {
+  await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
+    commitWorkspace(directory)
+    acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
+    activateLife(runtime, 'mgr')
+
+    const primaryEvidence = 'sibling-fail primary unfinished work alpha'
+    const siblingEvidence = 'sibling-fail sibling unfinished work beta'
+
+    const roundOne = hooks.tool.suicide.execute(
+      { last_words: 'sibling-fail first ending' },
+      suicideContext('call-sib-fail-1', 'run-mgr-sib-fail-1'),
+    )
+    const historical = await waitForSession(createdIds, 0)
+    await waitForPromptCount(runtime, historical, 1)
+    acceptLatestPrompt(runtime, historical)
+    captureWorkRecord(runtime.journal, historical, primaryEvidence)
+    makeRecordReady(runtime.journal, historical, 'run-sib-fail-a-1', 'sib-fail-round-one')
+    submitVerdict(
+      runtime.journal,
+      currentRequest(runtime.journal),
+      historical,
+      'run-sib-fail-a-1',
+      'call-sib-fail-a-1',
+      ReviewGuardVerdict.Revise,
+    )
+    notifyCompleted(runtime, historical, 'wide sib-fail a', 'formal sib-fail a', ROLE_REVIEWER)
+    await roundOne
+
+    const roundTwo = hooks.tool.suicide.execute(
+      { last_words: 'sibling-fail second ending' },
+      suicideContext('call-sib-fail-2', 'run-mgr-sib-fail-2'),
+    )
+    const newcomer = await waitForSession(createdIds, 1)
+    await waitForPromptCount(runtime, historical, 2)
+    acceptLatestPrompt(runtime, historical)
+    await waitForPromptCount(runtime, newcomer, 1)
+    acceptLatestPrompt(runtime, newcomer)
+
+    // Primary: materializable (tool-result track). Sibling: durable REVISE only —
+    // terminal frontier + abandoned companion Blogger ⇒ RecordUnavailable on steer.
+    captureWorkRecord(runtime.journal, newcomer, siblingEvidence)
+    makeRecordReady(runtime.journal, historical, 'run-sib-fail-h-2', 'sib-fail-primary-ready')
+    appendTerminalEvidence(runtime.journal, newcomer, 'run-sib-fail-n-2', 'sib-fail-sibling terminal evidence')
+    const { bloggerAgentId } = linkActiveCompanionBlogger(runtime.journal, newcomer)
+    abandonCompanionBlogger(runtime.journal, newcomer, bloggerAgentId)
+
+    const request = currentRequest(runtime.journal)
+    assert.equal(mapEntries(request.Members).length, 2)
+    const requestIdValue = idValue.finalityRequest(request.RequestId)
+
+    submitVerdict(runtime.journal, request, historical, 'run-sib-fail-h-2', 'call-sib-fail-h-2', ReviewGuardVerdict.Revise)
+    submitVerdict(runtime.journal, request, newcomer, 'run-sib-fail-n-2', 'call-sib-fail-n-2', ReviewGuardVerdict.Revise)
+    notifyCompleted(runtime, historical, 'wide sib-fail h2', 'formal sib-fail h2', ROLE_REVIEWER)
+    notifyCompleted(runtime, newcomer, 'wide sib-fail n2', 'formal sib-fail n2', ROLE_REVIEWER)
+
+    const siblingGuard = mapTryFind(sessionId(newcomer), sessionsOf(runtime.journal))?.ReviewGuard
+    assert.ok(siblingGuard, 'sibling must keep a ReviewGuard after durable REVISE')
+    assert.equal(
+      caseOf(siblingGuard.Witness),
+      'RevisionWitness',
+      'precondition: sibling REVISE must be durable before materialization failure',
+    )
+
+    const outcome = await raceOrTimeout(roundTwo.then((result) => ({ kind: 'settled', result })))
+    assert.notEqual(
+      outcome.kind,
+      'timeout',
+      `sibling materialization failure must settle within ${PER_TEST_TIMEOUT_MS}ms; must not hang on AwaitJournal`,
+    )
+    const result = outcome.result
+    const resolution = caseOf(currentRequest(runtime.journal).Resolution)
+
+    const undecidedFacts = agentJournal
+      .persistedEnvelopes(runtime.journal)
+      .filter((envelope) => caseOf(envelope.Fact) === 'ManagerLifecycle')
+      .map((envelope) => payloadOf(envelope.Fact))
+      .filter((fact) => caseOf(fact) === 'FinalityUndecided')
+      .map(payloadOf)
+      .filter((payload) => idValue.finalityRequest(payload.RequestId) === requestIdValue)
+
+    assert.equal(
+      resolution,
+      'Undecided',
+      'GLORY-044/REVIEW-002: durable sibling RecordUnavailable must fail-closed to Undecided (不得静默丢弃)',
+    )
+    assert.ok(
+      undecidedFacts.length >= 1,
+      'GLORY-044/REVIEW-002: abandoned-sibling materialization failure must append FinalityUndecided',
+    )
+    assert.ok(result.startsWith('# Your ending could not be decided.'), result)
+
+    assert.deepEqual(runtime.abortedIds, [], 'materialization failure must not dispose durable sessions')
+  }, FINALITY_PLUGIN_OPTS)
 })
 
 test('GLORY_044_072_073_REVISE_closes_the_cohort_but_waits_for_the_matching_covered_work_record', async () => {
@@ -665,10 +975,10 @@ test('GLORY_044_072_073_REVISE_closes_the_cohort_but_waits_for_the_matching_cove
       )
       notifyCompleted(runtime, newcomer, 'rejecting wide', 'rejecting formal', ROLE_REVIEWER)
 
-      const initialProgress = await Promise.race([
+      const initialProgress = await raceOrTimeout(
         secondRound.then((outcome) => ({ kind: 'settled', outcome })),
-        recordReadyWait.next().then(() => ({ kind: 'waiting' })),
-      ])
+        [recordReadyWait.next().then(() => ({ kind: 'waiting' }))],
+      )
       assert.equal(
         initialProgress.kind,
         'waiting',
@@ -691,10 +1001,10 @@ test('GLORY_044_072_073_REVISE_closes_the_cohort_but_waits_for_the_matching_cove
         next: frontier,
         label: 'mismatched-reviewer',
       })
-      const afterMismatch = await Promise.race([
+      const afterMismatch = await raceOrTimeout(
         secondRound.then((outcome) => ({ kind: 'settled', outcome })),
-        recordReadyWait.next().then(() => ({ kind: 'waiting' })),
-      ])
+        [recordReadyWait.next().then(() => ({ kind: 'waiting' }))],
+      )
       assert.equal(afterMismatch.kind, 'waiting', 'mismatched Blogger coverage must not unlock rejection')
       assert.equal(rejectionsFor(runtime.journal, request.RequestId).length, 0)
 
@@ -705,10 +1015,10 @@ test('GLORY_044_072_073_REVISE_closes_the_cohort_but_waits_for_the_matching_cove
         next: frontier - 1,
         label: 'older-target-frontier',
       })
-      const afterOlderCoverage = await Promise.race([
+      const afterOlderCoverage = await raceOrTimeout(
         secondRound.then((outcome) => ({ kind: 'settled', outcome })),
-        recordReadyWait.next().then(() => ({ kind: 'waiting' })),
-      ])
+        [recordReadyWait.next().then(() => ({ kind: 'waiting' }))],
+      )
       assert.equal(
         afterOlderCoverage.kind,
         'settled',
@@ -726,7 +1036,7 @@ test('GLORY_044_072_073_REVISE_closes_the_cohort_but_waits_for_the_matching_cove
     } finally {
       recordReadyWait.restore()
     }
-  })
+  }, FINALITY_PLUGIN_OPTS)
 })
 
 // ── GLORY-040/057: ensureX — the idempotent enlistment ──────────────────────
@@ -788,7 +1098,7 @@ test('GLORY_040_crash_between_request_and_enlistment_replays_the_ensure_idempote
     assert.ok(result.startsWith('# Your ending has not accepted you.'), result)
     assert.equal(caseOf(currentRequest(runtime.journal).Resolution), 'Rejected')
     assert.deepEqual(runtime.abortedIds, [])
-  })
+  }, FINALITY_PLUGIN_OPTS)
 })
 
 // ── GLORY-073 regression: real-reachable coverage must unlock rejection ───────
@@ -838,15 +1148,11 @@ test('GLORY_073_real_reachable_lastPart_coverage_unlocks_FinalityRejected_with_w
     )
     notifyCompleted(runtime, reviewer, 'real-reachable wide', 'real-reachable formal', ROLE_REVIEWER)
 
-    const BOUND_MS = 2500
-    const outcome = await Promise.race([
-      ending.then((result) => ({ kind: 'settled', result })),
-      new Promise((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), BOUND_MS)),
-    ])
+    const outcome = await raceOrTimeout(ending.then((result) => ({ kind: 'settled', result })))
     assert.notEqual(
       outcome.kind,
       'timeout',
-      `coverage=lastPart (${lastPart}) with a work-log frame must conclude FinalityRejected; hung for ${BOUND_MS}ms under coverage>=frontier`,
+      `coverage=lastPart (${lastPart}) with a work-log frame must conclude FinalityRejected; hung for ${PER_TEST_TIMEOUT_MS}ms under coverage>=frontier`,
     )
     assert.ok(outcome.result.startsWith('# Your ending has not accepted you.'), outcome.result)
     assert.equal(caseOf(currentRequest(runtime.journal).Resolution), 'Rejected')
@@ -855,7 +1161,7 @@ test('GLORY_073_real_reachable_lastPart_coverage_unlocks_FinalityRejected_with_w
     const record = agentJournal.readBlob(runtime.journal, rejections[0].WorkRecordRef)
     assert.equal(record.ok, true, record.ok ? '' : record.error)
     assert.match(record.value, /# Work log\n\S/, 'FinalityRejected must reference a non-empty work log')
-  })
+  }, FINALITY_PLUGIN_OPTS)
 })
 
 // ── GLORY-074: Abandoned Blogger during record-ready → Undecided, no partial rejection ─
@@ -902,12 +1208,10 @@ test('GLORY_074_blogger_abandonment_during_record_ready_concludes_undecided_no_p
       )
       notifyCompleted(runtime, reviewer, 'abandonment wide', 'abandonment formal', ROLE_REVIEWER)
 
-      const BOUND_MS = 2500
-      const initialProgress = await Promise.race([
+      const initialProgress = await raceOrTimeout(
         ending.then((result) => ({ kind: 'settled', result })),
-        recordReadyWait.next().then(() => ({ kind: 'waiting' })),
-        new Promise((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), BOUND_MS)),
-      ])
+        [recordReadyWait.next().then(() => ({ kind: 'waiting' }))],
+      )
       assert.equal(
         initialProgress.kind,
         'waiting',
@@ -918,14 +1222,11 @@ test('GLORY_074_blogger_abandonment_during_record_ready_concludes_undecided_no_p
 
       abandonCompanionBlogger(runtime.journal, reviewer, bloggerAgentId)
 
-      const outcome = await Promise.race([
-        ending.then((result) => ({ kind: 'settled', result })),
-        new Promise((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), BOUND_MS)),
-      ])
+      const outcome = await raceOrTimeout(ending.then((result) => ({ kind: 'settled', result })))
       assert.notEqual(
         outcome.kind,
         'timeout',
-        `Abandoned Blogger must conclude Undecided within ${BOUND_MS}ms; must not hang on AwaitJournal`,
+        `Abandoned Blogger must conclude Undecided within ${PER_TEST_TIMEOUT_MS}ms; must not hang on AwaitJournal`,
       )
       assert.ok(
         outcome.result.startsWith('# Your ending could not be decided.'),
@@ -946,7 +1247,7 @@ test('GLORY_074_blogger_abandonment_during_record_ready_concludes_undecided_no_p
     } finally {
       recordReadyWait.restore()
     }
-  })
+  }, FINALITY_PLUGIN_OPTS)
 })
 
 // ── GLORY-075: waiter crash → resumeDurableRevise from durable evidence, no timer poll ─
@@ -993,12 +1294,10 @@ test('GLORY_075_waiter_crash_resumes_from_durable_evidence_no_timer_poll', async
       )
       notifyCompleted(runtime, reviewer, 'crash-resume wide', 'crash-resume formal', ROLE_REVIEWER)
 
-      const BOUND_MS = 2500
-      const initialProgress = await Promise.race([
+      const initialProgress = await raceOrTimeout(
         firstEnding.then((result) => ({ kind: 'settled', result })),
-        firstWait.next().then(() => ({ kind: 'waiting' })),
-        new Promise((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), BOUND_MS)),
-      ])
+        [firstWait.next().then(() => ({ kind: 'waiting' }))],
+      )
       assert.equal(
         initialProgress.kind,
         'waiting',
@@ -1023,12 +1322,10 @@ test('GLORY_075_waiter_crash_resumes_from_durable_evidence_no_timer_poll', async
         suicideContext('call-075', 'run-075-resume'),
       )
 
-      const BOUND_MS = 2500
-      const afterResume = await Promise.race([
+      const afterResume = await raceOrTimeout(
         resumed.then((result) => ({ kind: 'settled', result })),
-        resumeWait.next().then(() => ({ kind: 'waiting' })),
-        new Promise((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), BOUND_MS)),
-      ])
+        [resumeWait.next().then(() => ({ kind: 'waiting' }))],
+      )
       assert.equal(
         afterResume.kind,
         'waiting',
@@ -1048,11 +1345,8 @@ test('GLORY_075_waiter_crash_resumes_from_durable_evidence_no_timer_poll', async
         label: 'crash-resume-lastPart',
       })
 
-      const outcome = await Promise.race([
-        resumed.then((result) => ({ kind: 'settled', result })),
-        new Promise((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), BOUND_MS)),
-      ])
-      assert.notEqual(outcome.kind, 'timeout', `resumed record-ready must settle within ${BOUND_MS}ms`)
+      const outcome = await raceOrTimeout(resumed.then((result) => ({ kind: 'settled', result })))
+      assert.notEqual(outcome.kind, 'timeout', `resumed record-ready must settle within ${PER_TEST_TIMEOUT_MS}ms`)
       assert.ok(outcome.result.startsWith('# Your ending has not accepted you.'), outcome.result)
       assert.equal(caseOf(currentRequest(runtime.journal).Resolution), 'Rejected')
       const rejections = rejectionsFor(runtime.journal, request.RequestId)
@@ -1063,5 +1357,215 @@ test('GLORY_075_waiter_crash_resumes_from_durable_evidence_no_timer_poll', async
     } finally {
       resumeWait.restore()
     }
-  })
+  }, FINALITY_PLUGIN_OPTS)
+})
+
+// ── GLORY-044/073: crash after FinalitySiblingSteered → resume replays FinalitySteer ─
+//
+// Multi-REVISE dual delivery leaves FinalityRejected + FinalitySiblingSteered and a
+// Manager FinalitySteer continuation. Process-local loss of that continuation (or
+// journal waiters) must not recruit a new cohort: same ToolCallId re-entry must
+// best-effort re-deliver sibling FinalitySteer via resumeDurableRevise while
+// Resolution stays Rejected (docs/how/glory.md crash matrix).
+
+test('GLORY_044_073_resume_replays_sibling_steer', async () => {
+  await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
+    commitWorkspace(directory)
+    acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
+    activateLife(runtime, 'mgr')
+
+    const primaryEvidence = 'resume-steer primary unfinished work alpha'
+    const siblingEvidence = 'resume-steer sibling unfinished work beta'
+
+    // Round 1: seed a historical reviewer (same fixture spine as GLORY_044 multi_REVISE).
+    const roundOne = hooks.tool.suicide.execute(
+      { last_words: 'first ending before steer resume' },
+      suicideContext('call-steer-resume-1', 'run-mgr-steer-resume-1'),
+    )
+    const historical = await waitForSession(createdIds, 0)
+    await waitForPromptCount(runtime, historical, 1)
+    acceptLatestPrompt(runtime, historical)
+    captureWorkRecord(runtime.journal, historical, primaryEvidence)
+    makeRecordReady(runtime.journal, historical, 'run-steer-resume-a-1', 'steer-resume-round-one')
+    submitVerdict(
+      runtime.journal,
+      currentRequest(runtime.journal),
+      historical,
+      'run-steer-resume-a-1',
+      'call-steer-resume-a-1',
+      ReviewGuardVerdict.Revise,
+    )
+    notifyCompleted(runtime, historical, 'wide steer-resume a', 'formal steer-resume a', ROLE_REVIEWER)
+    await roundOne
+
+    // Round 2: dual durable REVISE → primary tool rejection + sibling FinalitySteer.
+    const roundTwoCall = 'call-steer-resume-2'
+    const roundTwo = hooks.tool.suicide.execute(
+      { last_words: 'second ending with sibling steer' },
+      suicideContext(roundTwoCall, 'run-mgr-steer-resume-2'),
+    )
+    const newcomer = await waitForSession(createdIds, 1)
+    await waitForPromptCount(runtime, historical, 2)
+    acceptLatestPrompt(runtime, historical)
+    await waitForPromptCount(runtime, newcomer, 1)
+    acceptLatestPrompt(runtime, newcomer)
+    captureWorkRecord(runtime.journal, newcomer, siblingEvidence)
+    makeRecordReady(runtime.journal, historical, 'run-steer-resume-h-2', 'steer-resume-primary-ready')
+    makeRecordReady(runtime.journal, newcomer, 'run-steer-resume-n-2', 'steer-resume-sibling-ready')
+
+    const request = currentRequest(runtime.journal)
+    assert.equal(mapEntries(request.Members).length, 2)
+    const requestIdValue = idValue.finalityRequest(request.RequestId)
+
+    submitVerdict(runtime.journal, request, historical, 'run-steer-resume-h-2', 'call-steer-resume-h-2', ReviewGuardVerdict.Revise)
+    submitVerdict(runtime.journal, request, newcomer, 'run-steer-resume-n-2', 'call-steer-resume-n-2', ReviewGuardVerdict.Revise)
+    notifyCompleted(runtime, historical, 'wide steer-resume h2', 'formal steer-resume h2', ROLE_REVIEWER)
+    notifyCompleted(runtime, newcomer, 'wide steer-resume n2', 'formal steer-resume n2', ROLE_REVIEWER)
+
+    const firstResult = await roundTwo
+    assert.ok(firstResult.startsWith('# Your ending has not accepted you.'), firstResult)
+    assert.equal(caseOf(currentRequest(runtime.journal).Resolution), 'Rejected')
+    assert.equal(rejectionsFor(runtime.journal, request.RequestId).length, 1)
+
+    const siblingSteered = agentJournal
+      .persistedEnvelopes(runtime.journal)
+      .filter((envelope) => caseOf(envelope.Fact) === 'ManagerLifecycle')
+      .map((envelope) => payloadOf(envelope.Fact))
+      .filter((fact) => caseOf(fact) === 'FinalitySiblingSteered')
+      .map(payloadOf)
+      .filter((payload) => idValue.finalityRequest(payload.RequestId) === requestIdValue)
+    assert.ok(
+      siblingSteered.length >= 1,
+      'precondition: FinalitySiblingSteered must exist before crash/resume',
+    )
+
+    const promptTextOf = (entry) => {
+      const part = entry?.body?.parts?.find((piece) => piece?.type === 'text')
+      return part?.text ?? entry?.body?.text ?? ''
+    }
+    const promptOriginOf = (entry) =>
+      entry?.body?.metadata?.wanxiangshu_origin
+      ?? entry?.body?.parts?.find((piece) => piece?.type === 'text')?.metadata?.wanxiangshu_origin
+    const isCommentOnly = (text) => {
+      const lines = text.replace(/\r\n/g, '\n').split('\n')
+      return lines.every((line) => line === '' || line.startsWith('#'))
+    }
+    // SURFACE-005: Host-owned instruction plane only; sealed opaque LWR is exempt.
+    const surfaceBanned = [
+      /\breview\b/i,
+      /\breviewer\b/i,
+      /\bverdict\b/i,
+      /\bPERFECT\b/,
+      /\bREVISE\b/,
+      /\bbarrier\b/i,
+      /\bwitness\b/i,
+      /\bconfirmation\b/i,
+    ]
+    const hostInstructionPlane = (text) => {
+      const normalized = text.replace(/\r\n/g, '\n')
+      const split = normalized.search(/\n\n# /)
+      return split >= 0 ? normalized.slice(0, split) : normalized
+    }
+    const isFinalitySteerEntry = (entry) => {
+      if ((entry?.path?.id ?? entry?.sessionID) !== 'mgr') return false
+      if (promptOriginOf(entry) === 'FinalitySteer') return true
+      const text = promptTextOf(entry)
+      if (!text || !isCommentOnly(text)) return false
+      if (text.includes('Now complete it yourself.') || text.includes('You are doing well.')) return false
+      return (
+        text.includes('Additional unfinished work evidence')
+        || text.includes(siblingEvidence)
+        || text.includes(primaryEvidence)
+      )
+    }
+
+    const steersBeforeCrash = runtime.prompts.filter(isFinalitySteerEntry)
+    assert.ok(
+      steersBeforeCrash.length >= 1,
+      'precondition: Manager must have received at least one FinalitySteer before crash',
+    )
+    const steeredEvidence = firstResult.includes(primaryEvidence) ? siblingEvidence : primaryEvidence
+    assert.ok(
+      steersBeforeCrash.some((entry) => promptTextOf(entry).includes(steeredEvidence)),
+      `precondition: sibling evidence (${steeredEvidence}) must be in a FinalitySteer`,
+    )
+
+    // Simulate crash-after-fact: durable FinalitySiblingSteered remains; Manager
+    // continuation delivery is gone (process-local prompts / waiters).
+    for (let index = runtime.prompts.length - 1; index >= 0; index -= 1) {
+      if (isFinalitySteerEntry(runtime.prompts[index])) runtime.prompts.splice(index, 1)
+    }
+    assert.equal(
+      runtime.prompts.filter(isFinalitySteerEntry).length,
+      0,
+      'crash simulation must clear in-memory FinalitySteer continuations',
+    )
+    crashLocalJournalWaiters(runtime.journal)
+    assert.equal(
+      caseOf(currentRequest(runtime.journal).Resolution),
+      'Rejected',
+      'waiter/prompt crash must not reopen a Rejected request',
+    )
+    const membersBeforeResume = mapEntries(currentRequest(runtime.journal).Members).length
+    const createdBeforeResume = createdIds.length
+
+    const resumed = hooks.tool.suicide.execute(
+      { last_words: 'second ending with sibling steer' },
+      suicideContext(roundTwoCall, 'run-mgr-steer-resume-2-replay'),
+    )
+    const outcome = await raceOrTimeout(resumed.then((result) => ({ kind: 'settled', result })))
+    assert.notEqual(
+      outcome.kind,
+      'timeout',
+      `resumeDurableRevise sibling-steer replay must settle within ${PER_TEST_TIMEOUT_MS}ms without recruiting a new cohort wait`,
+    )
+
+    assert.equal(
+      caseOf(currentRequest(runtime.journal).Resolution),
+      'Rejected',
+      'resume must not change Resolution away from Rejected',
+    )
+    assert.equal(
+      idValue.finalityRequest(currentRequest(runtime.journal).RequestId),
+      requestIdValue,
+      'resume must continue the SAME FinalityRequest (no replacement cohort)',
+    )
+    assert.equal(
+      mapEntries(currentRequest(runtime.journal).Members).length,
+      membersBeforeResume,
+      'resume must not re-enlist / resize the cohort',
+    )
+    assert.equal(
+      createdIds.length,
+      createdBeforeResume,
+      'resume must not fork new Reviewer sessions',
+    )
+    assert.equal(
+      rejectionsFor(runtime.journal, request.RequestId).length,
+      1,
+      'resume must not append another FinalityRejected',
+    )
+
+    const steersAfterResume = runtime.prompts.filter(isFinalitySteerEntry)
+    assert.ok(
+      steersAfterResume.length >= 1,
+      'resumeDurableRevise must best-effort re-deliver sibling FinalitySteer continuation(s)',
+    )
+    assert.ok(
+      steersAfterResume.some((entry) => promptTextOf(entry).includes(steeredEvidence)),
+      `replayed FinalitySteer must carry sibling evidence (${steeredEvidence})`,
+    )
+    for (const entry of steersAfterResume) {
+      const steer = promptTextOf(entry)
+      assert.ok(isCommentOnly(steer), 'replayed steer must be comment-only Synthetic TOML (ARCH-010)')
+      const instructions = hostInstructionPlane(steer)
+      for (const banned of surfaceBanned) {
+        assert.equal(
+          banned.test(instructions),
+          false,
+          `replayed steer Host instructions must not contain SURFACE-005 banned token ${banned}: ${instructions.slice(0, 200)}`,
+        )
+      }
+    }
+  }, FINALITY_PLUGIN_OPTS)
 })
