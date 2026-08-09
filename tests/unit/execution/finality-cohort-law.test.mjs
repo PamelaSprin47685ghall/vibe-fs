@@ -945,14 +945,15 @@ test('GLORY_044_074_primary_fail_must_not_orphan_FinalitySiblingSteered_without_
     await waitForPromptCount(runtime, newcomer, 1)
     acceptLatestPrompt(runtime, newcomer)
 
-    // Sibling: fully materializable. Primary winner: durable REVISE frontier +
-    // abandoned companion ⇒ RecordUnavailable on primary preflight (before any
-    // FinalitySiblingSteered).
-    captureWorkRecord(runtime.journal, newcomer, siblingEvidence)
-    makeRecordReady(runtime.journal, newcomer, 'run-pri-fail-n-2', 'pri-fail-sibling-ready')
-    appendTerminalEvidence(runtime.journal, historical, 'run-pri-fail-h-2', 'pri-fail-primary terminal evidence')
-    const { bloggerAgentId } = linkActiveCompanionBlogger(runtime.journal, historical)
-    abandonCompanionBlogger(runtime.journal, historical, bloggerAgentId)
+    // Primary winner: durable REVISE frontier + abandoned companion ⇒
+    // RecordUnavailable on primary preflight (before any FinalitySiblingSteered).
+    // Sibling: fully materializable (would steer on the happy path).
+    captureWorkRecord(runtime.journal, historical, siblingEvidence)
+    makeRecordReady(runtime.journal, historical, 'run-pri-fail-h-2', 'pri-fail-sibling-ready')
+    captureWorkRecord(runtime.journal, newcomer, primaryEvidence)
+    appendTerminalEvidence(runtime.journal, newcomer, 'run-pri-fail-n-2', 'pri-fail-primary terminal evidence')
+    const { bloggerAgentId } = linkActiveCompanionBlogger(runtime.journal, newcomer)
+    abandonCompanionBlogger(runtime.journal, newcomer, bloggerAgentId)
 
     const request = currentRequest(runtime.journal)
     assert.equal(mapEntries(request.Members).length, 2)
@@ -960,10 +961,11 @@ test('GLORY_044_074_primary_fail_must_not_orphan_FinalitySiblingSteered_without_
 
     submitVerdict(runtime.journal, request, historical, 'run-pri-fail-h-2', 'call-pri-fail-h-2', ReviewGuardVerdict.Revise)
     submitVerdict(runtime.journal, request, newcomer, 'run-pri-fail-n-2', 'call-pri-fail-n-2', ReviewGuardVerdict.Revise)
-    notifyCompleted(runtime, historical, 'wide pri-fail h2', 'formal pri-fail h2', ROLE_REVIEWER)
+    // notify newcomer FIRST so it wins the short-circuit as rejectingReviewer.
     notifyCompleted(runtime, newcomer, 'wide pri-fail n2', 'formal pri-fail n2', ROLE_REVIEWER)
+    notifyCompleted(runtime, historical, 'wide pri-fail h2', 'formal pri-fail h2', ROLE_REVIEWER)
 
-    const primaryGuard = mapTryFind(sessionId(historical), sessionsOf(runtime.journal))?.ReviewGuard
+    const primaryGuard = mapTryFind(sessionId(newcomer), sessionsOf(runtime.journal))?.ReviewGuard
     assert.ok(primaryGuard, 'primary must keep a ReviewGuard after durable REVISE')
     assert.equal(
       caseOf(primaryGuard.Witness),
