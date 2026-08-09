@@ -273,13 +273,18 @@ module FinalityTool =
                                     match context.ToolCallId with
                                     | Some callId when callId = request.ToolCallId ->
                                         let! resumed =
-                                            FinalityController.resumePending scope sid life.LifeId request.RequestId
+                                            FinalityController.resumeDurableRevise
+                                                scope
+                                                sid
+                                                life.LifeId
+                                                request.RequestId
 
                                         match resumed with
                                         | Some(FinalityController.FinalityOutcome.Rejected prompt)
                                         | Some(FinalityController.FinalityOutcome.Blessed prompt)
                                         | Some(FinalityController.FinalityOutcome.Undecided prompt) -> return prompt
-                                        | None -> return ToolHostCodec.tomlObject [ "status", tString "already_received" ]
+                                        | None ->
+                                            return ToolHostCodec.tomlObject [ "status", tString "already_received" ]
                                     | _ ->
                                         // Crash recovery (docs/how/glory.md matrix):
                                         // a request with no enlisted Reviewer member

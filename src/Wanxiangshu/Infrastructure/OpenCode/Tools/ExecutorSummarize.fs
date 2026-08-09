@@ -59,23 +59,23 @@ module ExecutorSummarize =
     /// FamilyBlocked / real join timeout → ForkError.NotFound: hard fail, no retry.
     let awaitAgentWithPermit (runtime: IExecutorRuntime) (agentId: string) =
         let deadline = DateTimeOffset.UtcNow.AddMilliseconds(float AwaitAgentTimeoutMs)
-        let deadlineExpired (): RunCompletion =
+
+        let deadlineExpired () : RunCompletion =
             raise (
-                InvalidOperationException(
-                    sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
-                )
+                InvalidOperationException(sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs)
             )
 
-        let rec loop (): Task<RunCompletion> =
+        let rec loop () : Task<RunCompletion> =
             task {
                 let remainingMs = int (deadline - DateTimeOffset.UtcNow).TotalMilliseconds
 
                 if remainingMs <= 0 then
-                    return raise (
-                        InvalidOperationException(
-                            sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
+                    return
+                        raise (
+                            InvalidOperationException(
+                                sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
+                            )
                         )
-                    )
                 else
                     let fromRevision = runtime.CurrentJournalRevision()
                     let! joined = runtime.AwaitAgentWithPermit(agentId, Some remainingMs)
@@ -86,11 +86,12 @@ module ExecutorSummarize =
                         let remainingMs = int (deadline - DateTimeOffset.UtcNow).TotalMilliseconds
 
                         if remainingMs <= 0 then
-                            return raise (
-                                InvalidOperationException(
-                                    sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
+                            return
+                                raise (
+                                    InvalidOperationException(
+                                        sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
+                                    )
                                 )
-                            )
                         else
                             let changed = runtime.AwaitJournalChangeFrom fromRevision
                             let! journalAdvanced = awaitJournalAdvanceOrDeadline changed remainingMs
@@ -98,11 +99,15 @@ module ExecutorSummarize =
                             if journalAdvanced then
                                 return! loop ()
                             else
-                                return raise (
-                                    InvalidOperationException(
-                                        sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
+                                return
+                                    raise (
+                                        InvalidOperationException(
+                                            sprintf
+                                                "awaitAgent timed out for %s after %d ms"
+                                                agentId
+                                                AwaitAgentTimeoutMs
+                                        )
                                     )
-                                )
                     | Error error -> return raise (InvalidOperationException(error.ToString()))
             }
 

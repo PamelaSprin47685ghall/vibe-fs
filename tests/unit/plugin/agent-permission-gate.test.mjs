@@ -96,7 +96,7 @@ const mergedRules = (config, name) => [...hostDefaults(), ...rulesOf(config.agen
 
 const allowList = (config, name) => {
   const rules = mergedRules(config, name)
-  const tools = ['bash', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'inspector', 'executor', 'coder', 'fork', 'fork-manager', 'fork-pty', 'join', 'list', 'network', 'verdict', 'blog', 'teacher', 'return', 'suicide']
+  const tools = ['bash', 'bash-honeypot', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'inspector', 'executor', 'coder', 'fork', 'fork-manager', 'fork-pty', 'join', 'list', 'network', 'verdict', 'blog', 'teacher', 'return', 'suicide']
   return tools.filter((tool) => evaluate(rules, tool, '*').action === 'allow')
 }
 
@@ -104,7 +104,7 @@ const allowList = (config, name) => {
 const ROLE_ALLOW = {
   Manager: ['fork', 'join', 'list', 'suicide'],
   Orchestrator: ['fork-manager', 'join'],
-  Coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspector', 'mv', 'rm'],
+  Coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspector', 'mv', 'rm', 'bash-honeypot'],
   Inspector: ['read', 'glob', 'grep', 'executor'],
   Browser: ['read', 'glob', 'grep', 'network'],
   Meditator: ['read', 'glob', 'grep', 'inspector'],
@@ -227,6 +227,7 @@ test('roles.permissions_agree_with_the_host_schema_matrix', () => {
       grep: 'Grep',
       mv: 'Move',
       rm: 'Remove',
+      'bash-honeypot': 'BashHoneypot',
       inspector: 'Inspector',
       executor: 'Exec',
       coder: 'Coder',

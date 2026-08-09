@@ -20,8 +20,7 @@ module ReconcileProgram =
 
     /// Reconciliation-private. Not a publishable TurnOutcome case (HOST-004).
     /// finish=None stable snapshot observation; must not cross the publish boundary.
-    type SnapshotObservation =
-        | TurnUnknown
+    type SnapshotObservation = | TurnUnknown
 
     /// Stable production identity carried from snapshot classification to publish.
     type PublishTurn =
@@ -86,8 +85,7 @@ module ReconcileProgram =
         | "TurnFailed" -> TurnFailed "failed"
         | "TurnInProgress" -> TurnInProgress
         | "TurnNeedsContinuation" -> TurnNeedsContinuation "needs-continuation"
-        | "TurnUnknown" ->
-            invalidArg "name" "TurnUnknown is SnapshotObservation, not a TurnOutcome"
+        | "TurnUnknown" -> invalidArg "name" "TurnUnknown is SnapshotObservation, not a TurnOutcome"
         | other -> TurnFailed(sprintf "unknown-outcome:%s" other)
 
     let isTerminalOutcome (outcome: TurnOutcome) : bool =

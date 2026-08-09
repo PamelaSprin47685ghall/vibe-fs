@@ -174,23 +174,19 @@ module ManagedAgentConfig =
 
                                 let owned =
                                     match role with
-                                    | Role.Manager ->
-                                        StaticTools.managerAgentConfig (Some prompts.ManagerSystemPrompt)
+                                    | Role.Manager -> StaticTools.managerAgentConfig (Some prompts.ManagerSystemPrompt)
                                     | Role.Orchestrator ->
                                         StaticTools.orchestratorAgentConfig (Some prompts.OrchestratorSystemPrompt)
                                     | Role.Coder -> StaticTools.coderAgentConfig (Some prompts.CoderSystemPrompt)
                                     | Role.Inspector ->
                                         StaticTools.inspectorAgentConfig (Some prompts.InspectorSystemPrompt)
-                                    | Role.DevOps ->
-                                        StaticTools.devopsAgentConfig (Some prompts.DevopsSystemPrompt)
-                                    | Role.Browser ->
-                                        StaticTools.browserAgentConfig (Some prompts.BrowserSystemPrompt)
+                                    | Role.DevOps -> StaticTools.devopsAgentConfig (Some prompts.DevopsSystemPrompt)
+                                    | Role.Browser -> StaticTools.browserAgentConfig (Some prompts.BrowserSystemPrompt)
                                     | Role.Meditator ->
                                         StaticTools.meditatorAgentConfig (Some prompts.MeditatorSystemPrompt)
                                     | Role.Reviewer ->
                                         StaticTools.reviewerAgentConfig (Some prompts.ReviewerSystemPrompt)
-                                    | Role.Student ->
-                                        StaticTools.studentAgentConfig (Some prompts.StudentSystemPrompt)
+                                    | Role.Student -> StaticTools.studentAgentConfig (Some prompts.StudentSystemPrompt)
                                     | Role.Teacher -> StaticTools.teacherAgentConfig prompts.TeacherSystemPrompt
                                     | Role.Blogger -> StaticTools.bloggerAgentConfig prompts.BloggerSystemPrompt
                                     | Role.Executor -> StaticTools.executorAgentConfig prompts.ExecutorSystemPrompt

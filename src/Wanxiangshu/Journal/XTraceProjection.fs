@@ -138,7 +138,10 @@ module XTraceProjection =
         : Result<XTraceProjectionState, XTraceFoldRejection> =
         match state.Terminal with
         | Some(existingRef, existingDigest) when existingRef = textRef && existingDigest = textDigest -> Ok state
-        | _ -> Ok { state with Terminal = Some(textRef, textDigest) }
+        | _ ->
+            Ok
+                { state with
+                    Terminal = Some(textRef, textDigest) }
 
     /// Provenance generation: `g:N/...` after HOST-006 reanchor; legacy `turn:N/part:M` → 0.
     let provenanceGeneration (provenance: string) : int =

@@ -212,7 +212,8 @@ const awaitResolution = async (journal, requestId, resolution) => {
 
 const reviewerIds = (request) => mapEntries(request.Members).map(([reviewer]) => idValue.session(reviewer))
 
-/** XTrace.head is exclusive: coverage must reach one past the final part cursor. */
+/** Production TerminalFrontier.Sequence = lastPart + 1 (exclusive head).
+ *  Real Blogger IngestedThroughSequence max = lastPart (= this value - 1). */
 const terminalFrontier = (journal, reviewerValue) => {
   const session = mapTryFind(sessionId(reviewerValue), sessionsOf(journal))
   const parts = listItems(session?.XTrace?.Parts ?? [])
@@ -646,7 +647,8 @@ test('GLORY_044_072_073_REVISE_closes_the_cohort_but_waits_for_the_matching_cove
       assert.equal(afterMismatch.kind, 'waiting', 'mismatched Blogger coverage must not unlock rejection')
       assert.equal(rejectionsFor(runtime.journal, request.RequestId).length, 0)
 
-      // An older target frontier wakes the waiter but remains insufficient.
+      // Real-reachable coverage = lastPart = frontier-1 with a work-log frame
+      // unlocks rejection. Expecting 'waiting' here encoded the off-by-one hang.
       appendBlogCoverage(runtime.journal, newcomer, {
         previous: 0,
         next: frontier - 1,
@@ -656,23 +658,20 @@ test('GLORY_044_072_073_REVISE_closes_the_cohort_but_waits_for_the_matching_cove
         secondRound.then((outcome) => ({ kind: 'settled', outcome })),
         recordReadyWait.next().then(() => ({ kind: 'waiting' })),
       ])
-      assert.equal(afterOlderCoverage.kind, 'waiting', 'older Blogger coverage must not unlock rejection')
-      assert.equal(rejectionsFor(runtime.journal, request.RequestId).length, 0)
-
-      appendBlogCoverage(runtime.journal, newcomer, {
-        previous: frontier - 1,
-        next: frontier,
-        label: 'matching-terminal-frontier',
-      })
-      const result = await secondRound
+      assert.equal(
+        afterOlderCoverage.kind,
+        'settled',
+        'real-reachable lastPart coverage with a work log must unlock FinalityRejected',
+      )
+      const result = afterOlderCoverage.outcome
       assert.ok(result.startsWith('# Your ending has not accepted you.'), result)
 
       const rejections = rejectionsFor(runtime.journal, request.RequestId)
-      assert.equal(rejections.length, 1, 'matching coverage lands exactly one FinalityRejected')
+      assert.equal(rejections.length, 1, 'lastPart coverage lands exactly one FinalityRejected')
       const record = agentJournal.readBlob(runtime.journal, rejections[0].WorkRecordRef)
       assert.equal(record.ok, true, record.ok ? '' : record.error)
       assert.match(record.value, /# Work log\n\S/, 'FinalityRejected must reference a non-empty covered work log')
-      assert.match(record.value, /matching-terminal-frontier durable work log/)
+      assert.match(record.value, /older-target-frontier durable work log/)
     } finally {
       recordReadyWait.restore()
     }
@@ -738,5 +737,72 @@ test('GLORY_040_crash_between_request_and_enlistment_replays_the_ensure_idempote
     assert.ok(result.startsWith('# Your ending has not accepted you.'), result)
     assert.equal(caseOf(currentRequest(runtime.journal).Resolution), 'Rejected')
     assert.deepEqual(runtime.abortedIds, [])
+  })
+})
+
+// ── GLORY-073 regression: real-reachable coverage must unlock rejection ───────
+//
+// Production TerminalFrontier.Sequence = lastPart + 1. Real Blogger coverage
+// tops out at lastPart. makeRecordReady fakes next: frontier and masks the
+// recordReadiness `coverage >= frontier.Sequence` hang. This case uses only the
+// reachable lastPart and bounds the wait so a hang fails fast.
+
+test('GLORY_073_real_reachable_lastPart_coverage_unlocks_FinalityRejected_with_work_log', async () => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    commitWorkspace(directory)
+    acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
+    activateLife(runtime, 'mgr')
+
+    const subscriptions = observeTerminalSubscriptions(runtime)
+    const ending = hooks.tool.suicide.execute(
+      { last_words: 'real-reachable coverage ending' },
+      suicideContext('call-real-cov-1', 'run-real-cov-mgr'),
+    )
+    const request = await awaitOpenCohort(runtime.journal, 1)
+    const [reviewer] = reviewerIds(request)
+    assert.ok(reviewer, 'cohort must enlist one reviewer')
+    await awaitPrompted(reviewer)
+    acceptLatestPrompt(runtime, reviewer)
+    await awaitSubscriptions(subscriptions, 3)
+    subscriptions.restore()
+
+    captureWorkRecord(runtime.journal, reviewer, 'real-reachable deliberation')
+    const frontier = terminalFrontier(runtime.journal, reviewer)
+    assert.ok(frontier > 1, 'reviewer must have a two-part frontier')
+    const lastPart = frontier - 1
+    appendTerminalEvidence(runtime.journal, reviewer, 'run-real-cov-revise', 'real-reachable terminal evidence')
+    appendBlogCoverage(runtime.journal, reviewer, {
+      previous: 0,
+      next: lastPart,
+      label: 'real-reachable-lastPart',
+    })
+
+    submitVerdict(
+      runtime.journal,
+      request,
+      reviewer,
+      'run-real-cov-revise',
+      'call-real-cov-revise',
+      ReviewGuardVerdict.Revise,
+    )
+    notifyCompleted(runtime, reviewer, 'real-reachable wide', 'real-reachable formal', ROLE_REVIEWER)
+
+    const BOUND_MS = 2500
+    const outcome = await Promise.race([
+      ending.then((result) => ({ kind: 'settled', result })),
+      new Promise((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), BOUND_MS)),
+    ])
+    assert.notEqual(
+      outcome.kind,
+      'timeout',
+      `coverage=lastPart (${lastPart}) with a work-log frame must conclude FinalityRejected; hung for ${BOUND_MS}ms under coverage>=frontier`,
+    )
+    assert.ok(outcome.result.startsWith('# Your ending has not accepted you.'), outcome.result)
+    assert.equal(caseOf(currentRequest(runtime.journal).Resolution), 'Rejected')
+    const rejections = rejectionsFor(runtime.journal, request.RequestId)
+    assert.equal(rejections.length, 1, 'exactly one FinalityRejected')
+    const record = agentJournal.readBlob(runtime.journal, rejections[0].WorkRecordRef)
+    assert.equal(record.ok, true, record.ok ? '' : record.error)
+    assert.match(record.value, /# Work log\n\S/, 'FinalityRejected must reference a non-empty work log')
   })
 })

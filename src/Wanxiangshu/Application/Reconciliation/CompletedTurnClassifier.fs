@@ -162,8 +162,7 @@ module CompletedTurnClassifier =
             | :? ReconcileProgram.SnapshotObservation as obs ->
                 ReconcileProgram.TurnNeedsContinuation "private-snapshot-observation", Some obs
             | :? ReconcileProgram.TurnOutcome as o -> o, None
-            | _ ->
-                failwith "classifyOutcome returned neither TurnOutcome nor SnapshotObservation"
+            | _ -> failwith "classifyOutcome returned neither TurnOutcome nor SnapshotObservation"
 
         { SessionId = sessionId
           PhysicalUserMessageId = physicalUserMessageId

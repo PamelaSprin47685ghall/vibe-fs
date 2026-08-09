@@ -30,5 +30,4 @@ module AgentRoleIdentity =
     /// `ToString()`. A DU-name spelling is a compiler artefact: renaming a case
     /// would silently change the durable string, and every `roleOfString` read of
     /// an older journal would then answer `None`.
-    let roleName (role: Role) : string =
-        ManagedAgentCatalog.roleLabel role
+    let roleName (role: Role) : string = ManagedAgentCatalog.roleLabel role

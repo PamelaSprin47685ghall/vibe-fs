@@ -110,15 +110,15 @@ module FinalityController =
         (requiresWorkLog: bool)
         =
         let terminalOverride =
-            terminalFrontier |> Option.map (fun frontier -> frontier.TerminalRef, frontier.TerminalDigest)
+            terminalFrontier
+            |> Option.map (fun frontier -> frontier.TerminalRef, frontier.TerminalDigest)
 
         // Finality cohort LWR (blessing bundle / rejection wound) must be the
         // full canonical record from openingEnd — not the coverage-trimmed
         // incremental gap. Historical reviewers reused after REVISE already
         // have blog.Coverage at a prior frontier; trimming would drop their
         // deliberation from the blessing bundle (GLORY-044/060).
-        let fullCanonicalCoverage =
-            Some { IngestedThrough = XTrace.originCursor }
+        let fullCanonicalCoverage = Some { IngestedThrough = XTrace.originCursor }
 
         match
             XTraceCapture.lifecycleWorkRecordFromSnapshotWithTerminal
@@ -132,14 +132,13 @@ module FinalityController =
         | Some record when
             not (String.IsNullOrWhiteSpace record)
             && (not requiresWorkLog || hasRenderedWorkLog record)
-            -> RecordReady record
+            ->
+            RecordReady record
         | Some _ -> RecordUnavailable "canonical LWR has no rendered work log"
         | None -> RecordUnavailable "canonical LWR is unavailable"
 
     let private coverageCanAdvance (snapshot: ProjectionSet) (reviewerSessionId: SessionId) =
-        match
-            SessionAssociationProjection.tryBloggerOf reviewerSessionId snapshot.AgentProjections.Associations
-        with
+        match SessionAssociationProjection.tryBloggerOf reviewerSessionId snapshot.AgentProjections.Associations with
         | None -> true
         | Some bloggerSessionId ->
             match Map.tryFind bloggerSessionId snapshot.AgentProjections.HandleByChildSession with
@@ -166,17 +165,16 @@ module FinalityController =
                 | Some frontier when frontier.BarrierId <> barrierId ->
                     RecordUnavailable "terminal frontier no longer matches the finality barrier"
                 | Some frontier ->
-                    let coverage =
-                        session.Blog
-                        |> Option.map (fun blog -> blog.Coverage.IngestedThroughSequence)
-                        |> Option.defaultValue 0L
-
-                    if coverage >= frontier.Sequence then
-                        materializeRecord journal snapshot reviewerSessionId (Some frontier) true
-                    elif coverageCanAdvance snapshot reviewerSessionId then
-                        AwaitJournal
-                    else
-                        RecordUnavailable "the associated blogger can no longer cover the terminal frontier"
+                    // Readiness is materialize-of-work-log, not coverage >=
+                    // frontier.Sequence. Frontier is exclusive (lastPart+1);
+                    // real Blogger coverage tops out at lastPart, so the old
+                    // gate hung forever when coverageCanAdvance stayed true
+                    // (GLORY-073 / manager-unhappy-path FinalityRejected).
+                    match materializeRecord journal snapshot reviewerSessionId (Some frontier) true with
+                    | RecordReady record -> RecordReady record
+                    | RecordUnavailable _ when coverageCanAdvance snapshot reviewerSessionId -> AwaitJournal
+                    | RecordUnavailable reason -> RecordUnavailable reason
+                    | AwaitJournal -> AwaitJournal
                 | None when requiresTerminalFrontier -> AwaitJournal
                 | None -> materializeRecord journal snapshot reviewerSessionId None false
 
@@ -213,12 +211,7 @@ module FinalityController =
                     ordered
                     |> List.map (fun memberInfo ->
                         memberInfo,
-                        recordReadiness
-                            journal
-                            snapshot
-                            memberInfo.ReviewerSessionId
-                            memberInfo.BarrierId
-                            false)
+                        recordReadiness journal snapshot memberInfo.ReviewerSessionId memberInfo.BarrierId false)
 
                 let unavailable =
                     readiness
@@ -530,10 +523,7 @@ module FinalityController =
                         return Blessed(FinalityPrompt.blessedFromLogs logs)
         }
 
-    let private pendingRevision
-        (snapshot: ProjectionSet)
-        (request: FinalityRequestProjection)
-        =
+    let private pendingRevision (snapshot: ProjectionSet) (request: FinalityRequestProjection) =
         request.Members
         |> Map.toList
         |> List.tryPick (fun (reviewerSessionId, memberRef) ->
@@ -547,7 +537,7 @@ module FinalityController =
 
     /// GLORY-073: a replay resumes a durable REVISE at its frozen frontier. It
     /// never re-enlists the cohort or replays a Reviewer continuation.
-    let resumePending
+    let resumeDurableRevise
         (scope: ToolRuntimeScope)
         (managerSessionId: SessionId)
         (lifeId: ManagerLifeId)
@@ -875,8 +865,8 @@ module FinalityController =
 
                                 match outcome with
                                 | Choice1Of2(Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired(reviewerId,
-                                                                                                      barrier,
-                                                                                                      _tree))) ->
+                                                                                                     barrier,
+                                                                                                     _tree))) ->
                                     return!
                                         concludeRejection
                                             scope

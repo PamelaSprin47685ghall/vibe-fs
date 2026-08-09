@@ -47,6 +47,7 @@ module StaticTools =
         | ToolPermission.Grep -> "grep"
         | ToolPermission.Move -> "mv"
         | ToolPermission.Remove -> "rm"
+        | ToolPermission.BashHoneypot -> "bash-honeypot"
         | ToolPermission.Inspector -> "inspector"
         | ToolPermission.Coder -> "coder"
         | ToolPermission.Exec -> "executor"
@@ -74,6 +75,7 @@ module StaticTools =
           "grep"
           "mv"
           "rm"
+          "bash-honeypot"
           "inspector"
           "coder"
           "executor"
@@ -145,42 +147,30 @@ module StaticTools =
     let reviewerVerdictSchemaJson =
         """{"type":"object","properties":{"verdict":{"type":"string","enum":["PERFECT","REVISE"]}},"required":["verdict"],"additionalProperties":false}"""
 
-    let managerAgentConfig (prompt: string option) : obj =
-        primaryAgent Role.Manager prompt
+    let managerAgentConfig (prompt: string option) : obj = primaryAgent Role.Manager prompt
 
-    let orchestratorAgentConfig (prompt: string option) : obj =
-        primaryAgent Role.Orchestrator prompt
+    let orchestratorAgentConfig (prompt: string option) : obj = primaryAgent Role.Orchestrator prompt
 
-    let coderAgentConfig (prompt: string option) : obj =
-        primaryAgent Role.Coder prompt
+    let coderAgentConfig (prompt: string option) : obj = primaryAgent Role.Coder prompt
 
-    let reviewerAgentConfig (prompt: string option) : obj =
-        primaryAgent Role.Reviewer prompt
+    let reviewerAgentConfig (prompt: string option) : obj = primaryAgent Role.Reviewer prompt
 
     /// Companion Session Y: tool set is exactly { blog } (ENFORCER-010).
     /// System prompt for B-record distillation with blog tool protocol.
-    let bloggerAgentConfig (prompt: string) : obj =
-        hiddenAgent Role.Blogger prompt
+    let bloggerAgentConfig (prompt: string) : obj = hiddenAgent Role.Blogger prompt
 
     /// Role.Executor: no tools; system prompt for map/reduce output summarization.
     /// Distinct from Tool.executor (OS command tool used by Inspector/DevOps).
-    let executorAgentConfig (prompt: string) : obj =
-        hiddenAgent Role.Executor prompt
+    let executorAgentConfig (prompt: string) : obj = hiddenAgent Role.Executor prompt
 
-    let studentAgentConfig (prompt: string option) : obj =
-        primaryAgent Role.Student prompt
+    let studentAgentConfig (prompt: string option) : obj = primaryAgent Role.Student prompt
 
-    let teacherAgentConfig (prompt: string) : obj =
-        hiddenAgent Role.Teacher prompt
+    let teacherAgentConfig (prompt: string) : obj = hiddenAgent Role.Teacher prompt
 
-    let meditatorAgentConfig (prompt: string option) : obj =
-        primaryAgent Role.Meditator prompt
+    let meditatorAgentConfig (prompt: string option) : obj = primaryAgent Role.Meditator prompt
 
-    let browserAgentConfig (prompt: string option) : obj =
-        primaryAgent Role.Browser prompt
+    let browserAgentConfig (prompt: string option) : obj = primaryAgent Role.Browser prompt
 
-    let inspectorAgentConfig (prompt: string option) : obj =
-        primaryAgent Role.Inspector prompt
+    let inspectorAgentConfig (prompt: string option) : obj = primaryAgent Role.Inspector prompt
 
-    let devopsAgentConfig (prompt: string option) : obj =
-        primaryAgent Role.DevOps prompt
+    let devopsAgentConfig (prompt: string option) : obj = primaryAgent Role.DevOps prompt

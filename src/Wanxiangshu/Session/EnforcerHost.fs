@@ -107,9 +107,7 @@ module EnforcerHost =
                 with
                 | None -> None
                 | Some tip ->
-                    EnforcerCatalog.tryFindByField
-                        tip.FieldName
-                        (RuntimeResources.current().EnforcerRules)
+                    EnforcerCatalog.tryFindByField tip.FieldName (RuntimeResources.current().EnforcerRules)
                     |> Option.map (fun rule -> rule.Nudge)
 
     let private stopPhysicalRun (messages: obj list) (fallback: obj list) (reason: string) : ContinuationOutcome =

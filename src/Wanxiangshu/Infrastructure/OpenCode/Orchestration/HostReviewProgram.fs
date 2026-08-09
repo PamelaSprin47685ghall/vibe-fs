@@ -18,10 +18,7 @@ module HostReviewProgram =
     [<RequireQualifiedAccess>]
     type HostReviewOutcome =
         | Confirmed of reviewerSessionId: SessionId * barrierId: ReviewBarrierId * gitTreeHash: GitTreeHash
-        | RevisionRequired of
-            reviewerSessionId: SessionId *
-            barrierId: ReviewBarrierId *
-            gitTreeHash: GitTreeHash
+        | RevisionRequired of reviewerSessionId: SessionId * barrierId: ReviewBarrierId * gitTreeHash: GitTreeHash
 
     type HostReviewFailure =
         | CannotReadTree of string
@@ -43,7 +40,8 @@ module HostReviewProgram =
         : Result<HostReviewOutcome, HostReviewFailure> =
         match OrchestratorReviewRead.read journal reviewerSessionId tree with
         | OrchestratorReviewRead.Confirmed -> Ok(HostReviewOutcome.Confirmed(reviewerSessionId, barrierId, tree))
-        | OrchestratorReviewRead.RevisionRequired -> Ok(HostReviewOutcome.RevisionRequired(reviewerSessionId, barrierId, tree))
+        | OrchestratorReviewRead.RevisionRequired ->
+            Ok(HostReviewOutcome.RevisionRequired(reviewerSessionId, barrierId, tree))
         | OrchestratorReviewRead.PendingConfirmation -> Error HostReviewFailure.ConfirmationUnproven
         | OrchestratorReviewRead.NeedsReview -> Error HostReviewFailure.ReviewerProducedNoVerdict
 

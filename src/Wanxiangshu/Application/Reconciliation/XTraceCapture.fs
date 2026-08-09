@@ -103,8 +103,7 @@ module XTraceCapture =
 
                 let isReplay =
                     existing.Terminal
-                    |> Option.exists (fun (_, digest) ->
-                        HostDigest.sha256Hex text = BlobDigest.value digest)
+                    |> Option.exists (fun (_, digest) -> HostDigest.sha256Hex text = BlobDigest.value digest)
 
                 if not isReplay then
                     match durable.WriteBlob text with
@@ -168,8 +167,7 @@ module XTraceCapture =
                             match part.Kind with
                             | "text" -> Some(SemanticText body)
                             | "reasoning" -> Some(SemanticReasoning body)
-                            | "tool_call" ->
-                                part.ToolName |> Option.map (fun name -> SemanticToolCall(name, body))
+                            | "tool_call" -> part.ToolName |> Option.map (fun name -> SemanticToolCall(name, body))
                             | "tool_result" -> Some(SemanticToolResult body)
                             // COMPANION-003: omission markers are semantic parts of
                             // the XTrace; dropping them would make LWR gap/parent
@@ -206,8 +204,7 @@ module XTraceCapture =
                 let coverage =
                     match coverageOverride with
                     | Some forced -> forced
-                    | None ->
-                        { IngestedThrough = { Sequence = blog.Coverage.IngestedThroughSequence } }
+                    | None -> { IngestedThrough = { Sequence = blog.Coverage.IngestedThroughSequence } }
 
                 // The opening is the first XTrace part (turn:0/part:0, captured
                 // at the first transform), so the gap must start AFTER it —
@@ -257,7 +254,8 @@ module XTraceCapture =
         : string option =
         match journal with
         | None -> None
-        | Some durable -> lifecycleWorkRecordFromSnapshot durable (AgentJournal.snapshot durable) sessionId includeOpening
+        | Some durable ->
+            lifecycleWorkRecordFromSnapshot durable (AgentJournal.snapshot durable) sessionId includeOpening
 
     /// HOST-006: Host turn indices restart after reanchor; XTrace does not.
     /// Provenance must carry the reanchor generation or post-compaction turns

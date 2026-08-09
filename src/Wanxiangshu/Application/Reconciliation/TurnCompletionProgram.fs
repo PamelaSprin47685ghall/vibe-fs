@@ -229,14 +229,7 @@ module TurnCompletionProgram =
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
         : Task =
-        continueAfterProviderFailure
-            sliceTimer
-            sessionPort
-            eventPort
-            journal
-            turn
-            "loop-kill"
-            RuntimeNudge.loopContinue
+        continueAfterProviderFailure sliceTimer sessionPort eventPort journal turn "loop-kill" RuntimeNudge.loopContinue
 
     let private continueAfterOrdinaryFailure
         (sliceTimer: int -> Task<unit>)
@@ -246,14 +239,7 @@ module TurnCompletionProgram =
         (turn: ReconciledTurn)
         (error: string)
         : Task =
-        continueAfterProviderFailure
-            sliceTimer
-            sessionPort
-            eventPort
-            journal
-            turn
-            error
-            RuntimeNudge.providerRetry
+        continueAfterProviderFailure sliceTimer sessionPort eventPort journal turn error RuntimeNudge.providerRetry
 
 
     /// Physical cleanup and durable child-authority registration before routing.
@@ -433,7 +419,9 @@ module TurnCompletionProgram =
                     AsyncSupport.completedTask ()
                 elif joinOutstanding then
                     task {
-                        match! HostJoinGuard.nudge sessionPort journal joinGuardNudges turn.SessionId turn.Directory with
+                        match!
+                            HostJoinGuard.nudge sessionPort journal joinGuardNudges turn.SessionId turn.Directory
+                        with
                         | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
                             eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
                             |> ignore

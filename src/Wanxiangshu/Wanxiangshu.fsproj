@@ -249,6 +249,7 @@
     <Compile Include="Infrastructure/OpenCode/Tools/FinalityController.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FinalityTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FileMutationTools.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Tools/BashHoneypotTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/StudentTeacherTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ToolRegistry.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginHost.fs"/>

@@ -39,6 +39,7 @@
 |------|------|
 | Manager 无普通工具；Orchestrator 只 fork manager | AGENT-011、AGENT-015 |
 | mv/rm 仅 Coder；非空目录 rm 拒绝 | AGENT-016…018 |
+| bash-honeypot 仅 Coder；调用不跑 shell | AGENT-023 |
 | DevOps 独占 PTY；Reviewer 只读 | AGENT-013、AGENT-014 |
 
 代表测试：`tests/unit/agent/catalog.test.mjs`、`tests/unit/plugin/agent-permission-gate.test.mjs`、

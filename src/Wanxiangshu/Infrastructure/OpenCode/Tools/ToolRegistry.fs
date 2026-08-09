@@ -31,6 +31,7 @@ module ToolRegistry =
         | "inspector" -> fun r -> Roles.isAllowed r ToolPermission.Inspector
         | "mv" -> fun r -> Roles.isAllowed r ToolPermission.Move
         | "rm" -> fun r -> Roles.isAllowed r ToolPermission.Remove
+        | "bash-honeypot" -> fun r -> Roles.isAllowed r ToolPermission.BashHoneypot
         | "coder" -> fun r -> r = Role.DevOps
         | "blog" -> fun r -> r = Role.Blogger && BlogTool.hasLiveCycle parkedHost sessionId
         | "teacher" -> fun r -> r = Role.Student
@@ -93,6 +94,8 @@ module ToolRegistry =
               // AGENT-016/017/018: Coder-only POSIX mv/rm.
               yield FileMutationTools.mvSpec factory
               yield FileMutationTools.rmSpec factory
+              // Coder-only bash honeypot: visible denial, never a shell.
+              yield BashHoneypotTool.spec
               // ENFORCER-010: Blogger's tool set is exactly { blog }.
               // parkedHost + CurrentRequest gate request-scoped execute (InFlight).
               yield BlogTool.spec factory runtime parkedHost

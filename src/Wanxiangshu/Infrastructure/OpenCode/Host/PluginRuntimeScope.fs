@@ -342,8 +342,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     /// Cheap read for the common case: after the probe has run, every later reconcile
     /// pass skips the judgement entirely rather than building a verdict and discarding
     /// it.
-    member _.IsStartupProbeOpen =
-        lock startupProbeGate (fun () -> not startupProbeDone)
+    member _.IsStartupProbeOpen = lock startupProbeGate (fun () -> not startupProbeDone)
 
     member _.AttachToolRuntime(owner: ISessionRuntimeOwner) =
         lock toolRuntimeGate (fun () -> toolRuntime <- Some owner)

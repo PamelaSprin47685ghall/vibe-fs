@@ -65,6 +65,7 @@ const hostFinalConfig = () => {
 const EXPECTED_ARGUMENTS = {
   // ENFORCER-020 tip v2: required text + tip enum; optional evidence.
   // No 120 numeric score properties.
+  'bash-honeypot': {},
   blog: {
     text: 'required',
     tip: 'required',
@@ -161,6 +162,7 @@ const KNOWN_TOOL_KEYS = [
   'grep',
   'mv',
   'rm',
+  'bash-honeypot',
   'inspector',
   'coder',
   'executor',
@@ -176,7 +178,7 @@ const KNOWN_TOOL_KEYS = [
 const ALLOWED_TOOLS = {
   orchestrator: ['fork-manager', 'join'],
   manager: ['fork', 'join', 'list', 'suicide'],
-  coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspector', 'mv', 'rm'],
+  coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspector', 'mv', 'rm', 'bash-honeypot'],
   inspector: ['read', 'glob', 'grep', 'executor'],
   devops: ['fork-pty', 'join', 'list', 'read', 'glob', 'grep', 'inspector', 'coder', 'executor'],
   browser: ['read', 'glob', 'grep', 'network'],

@@ -69,7 +69,7 @@ reviewer-fast, fast_reviewer
 |------|------|
 | Orchestrator | `fork-manager`, `join` |
 | Manager | `fork-agent`, `join`, `list` |
-| Coder | `read`, `write`, `edit`, `glob`, `grep`, `inspector`, `mv`, `rm` |
+| Coder | `read`, `write`, `edit`, `glob`, `grep`, `inspector`, `mv`, `rm`, `bash-honeypot` |
 | Inspector | `read`, `glob`, `grep`, `executor` |
 | DevOps | `fork-pty`, `executor`, `read`, `glob`, `grep`, `inspector`, `coder`, `join`, `list` |
 | Browser | `read`, `glob`, `grep`, network tools |
@@ -137,6 +137,11 @@ POSIX `mv`：参数 `source`、`destination`；目标存在则覆盖；目录/�
 ## AGENT-018：rm 语义
 
 POSIX `rm`，但**禁止删非空目录**：文件与空目录可删，非空目录拒绝。参数 `path`。
+
+## AGENT-023：bash-honeypot 仅 Coder
+
+`bash-honeypot` 只进 Coder 矩阵。无参数；调用不执行任何 shell，只返回越权拒绝文本。  
+Host 内置 `bash` 对所有 managed role 仍保持 deny（AGENT-007）；本工具不是放行 bash。
 
 ## AGENT-020：Student / Teacher
 
