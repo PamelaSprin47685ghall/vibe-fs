@@ -1317,3 +1317,13 @@ DevOps 已实测 CLOSE_READY：`npm run check` 全量 exit 0、`tool-loop.test.m
 的第二个 Final outcome 取代该中间 OPEN 状态；归档提交 `2a67f451` 已落盘。该项语义闭合，不再视为
 OPEN。本文件审查后的剩余技术缺口统一登记于 `changes/completed/fix.md` 的 REVISE follow-up，并经
 `changes/active/fix-revise.md` 追踪，不在本文件重复登记。
+
+---
+
+# Reconciliation note（EXEC_025 工作树标注）
+
+上文 Remaining work 3 中「EXEC_025 three_teacher 全量 unit 挂起根因调查与修复，回归落盘 —
+**DONE（工作树）**」的「工作树」标注仅反映该快照时刻尚未提交的状态。该修复（
+`tests/unit/student-teacher/tool-loop.test.mjs` 的有界 `awaitPromptGrowth`）已随 CE 迁移归档提交
+`2a67f451`（fix/corrective close）及后续 `1b6d6986` / `df0e5e8b` 进入 HEAD，不再处于工作树，也
+不构成未提交债务。仅做语义归档同步，不重写上文历史。

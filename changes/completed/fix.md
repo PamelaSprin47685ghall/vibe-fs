@@ -559,3 +559,13 @@ DevOps 已实测 CLOSE_READY：`npm run check` 全量 exit 0、`tool-loop.test.m
 
 全量门禁 — **DONE**：`npm run check` 全量 exit 0（Lint / Build / 1837 unit / integration）；
 `manager-unhappy-path` 与 `devops-mechanical-repair-loop` e2e exit 0。本 REVISE 正式关闭。
+
+---
+
+# Reconciliation note（EXEC_025 工作树标注）
+
+上文 Remaining work 1 中「EXEC_025 three_teacher 全量 unit 挂起根因修复 — **DONE（工作树）**」
+的「工作树」标注仅反映该快照时刻尚未提交的状态。该修复（`tests/unit/student-teacher/
+tool-loop.test.mjs` 的有界 `awaitPromptGrowth`）已随 CE 迁移归档提交 `2a67f451`（fix/corrective
+close）及后续 `1b6d6986` / `df0e5e8b` 进入 HEAD，不再处于工作树，也不构成未提交债务。仅做语义
+归档同步，不重写上文历史。

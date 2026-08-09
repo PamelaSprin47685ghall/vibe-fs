@@ -12,7 +12,7 @@
 | Activation（20.2） | 合法规划 terminal 不完成 Manager；恰好一次 Activation；带 PromptKey；claim 后 crash 无第二逻辑发送；accepted 后写 WorkActivated；provider failure/empty terminal/用户中断不触发；ProtectedPrefixEnd 在 Activation 之后 |
 | 工作输入（20.3） | Activation 后用户消息不改写、不附加 tail/prefix、不创建新 Life、可进入正常 Y |
 | idle（20.4） | nudge 只有鼓励四行；不含 work record/issue；pending Finality 不发送；completed Life 不发送 |
-| 第二独立 Manager idle occasion（GLORY-029 / corrective reopen） | occasion A 保持 pending 时触发 occasion B；证明旧 pending 不压新 occasion；e2e 义务仍 OPEN |
+| 第二独立 Manager idle occasion（GLORY-029 / corrective reopen） | occasion A 保持 pending 时触发 occasion B；证明旧 pending 不压新 occasion；e2e **DONE**：`tests/e2e/cases/manager-unhappy-path.test.mjs`（`firstIdleReceipt`/`secondIdleReceipt`，finalOracle `idleClaims.length >= 2`）+ `tests/e2e/scenarios/manager-unhappy-path.toml`（dual `awaitIdle`） |
 | suicide（20.5） | Manager 看见 `suicide`；其他角色拒绝；Activation 前拒绝；空 last_words 拒绝；outstanding child / completed-awaiting-join / live PTY 拒绝；tree 不可读 fail closed；合法调用只写一个 FinalityRequested；ToolCallId 重放幂等；受理后 completion deferred；工具后 prose 不成 terminal |
 | Reviewer 隐藏（20.6） | Manager 不能 fork/复用 fast-/deep-reviewer；`list()` 不显示；`join()` 不返回；barrier 在 session 创建后、首次 prompt 前打开 |
 | 反馈（20.7） | REVISE 返回 `RevisionRequired` 非 Error；LWR `includeOpening=false`；Opening task 不回灌；Y/raw gap/terminal 保留；raw tool 不进入；digest 验证；绑定当前 request/Reviewer；空记录不伪装 wounds；feedback 后同一 Life |
@@ -35,6 +35,7 @@
 2. record-ready 由物化成功判定，而非 coverage 越过 frontier（GLORY-073 off-by-one 死锁）：在 snapshot 上以全量 origin coverage 物化含 `# Work log` 的 canonical LWR → `RecordReady`；物化失败且 `coverageCanAdvance` → `AwaitJournal`；否则 `RecordUnavailable` → undecided。随后恰好一次 `FinalityRejected`，其 blob 含对应 `# Work log`。
 3. 记录等待只由 `AgentJournal.awaitChangeFrom` 唤醒；结构与行为 proof 均拒绝 timer/sleep/re-probe 轮询。
 4. REVISE 后、coverage 前崩溃并恢复：不重开 cohort、不补发 challenge；后续 coverage 仍只落同一 rejection。`BloggerRequestAbandoned` 不得产出 partial rejection；无法重建证据时只能 undecided。
+5. §29 拒绝/崩溃恢复专项回归（`tests/unit/execution/finality-cohort-law.test.mjs`）：**GLORY_074** Blogger abandonment → `concludeRejection` fail-close 至 `Undecided`，绝不产出缺 `# Work log` 的 `FinalityRejected`/`WorkRecordRef`（无 partial rejection）；**GLORY_075** waiter 崩溃 → `resumeDurableRevise` 从 durable evidence 续等并经 `awaitChangeFrom` 唤醒（无 timer/sleep re-probe），coverage 后唯一 `FinalityRejected` 引用非空 `# Work log`。
 
 ## Golden Byte Fixtures（proposal 附录 A.16）
 
