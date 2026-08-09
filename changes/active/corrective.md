@@ -1173,3 +1173,46 @@ Corrective Change 闭环：Join 真实用户消息唤醒、Synthetic TOML produc
 - `tests/e2e/scenarios/manager-unhappy-path.toml` + `tests/e2e/cases/manager-unhappy-path.test.mjs`
 - `tests/docs/join-user-message-wake.md`
 
+---
+
+# Reopen 2026-08-09
+
+> 本文件是变更工作记录，不是当前产品规范。当前产品语义仅以 `docs/` 正式层为准。
+
+## Requested by
+
+当前用户本轮明确要求本 Change 重新打开并恢复关闭条件；此请求即 GOV-007 的启动授权，无需另行
+裁决证据。上文 `Final outcome` 保留为只读历史记录，不代表当前状态。
+
+## Reopen
+
+原 close 将三项验收条件自行 Deferred 且将 `npm run check` 从 close 条件移除，违反 GOV-006/009
+（执行者不得缩减批准范围）。现恢复为正式关闭条件：
+
+1. DevOps **行为**闭环测试（§15；非 prompt regex）。
+2. 第二独立 Manager idle 的 e2e（§11；occasion A 保持 pending 时触发 B）。
+3. `EXEC_025_three_teacher_*` 全量 unit 挂起：不得以「非本 Change 回归」关闭，须根因闭环。
+
+并恢复 full gate 为 close 条件：
+
+- `npm run check`（build / unit / integration / e2e / architecture+spec）全绿后方可 close；不得豁免。
+
+## Scope (frozen)
+
+维持 §0–§22 原批准范围不变，并将上述恢复的验收条件纳入同一范围实施与验证。
+
+## Remaining work
+
+1. DevOps 行为闭环测试实现并验证（RED/GREEN 为真实执行证据，broader gate 实际重跑）。
+2. manager-unhappy-path 加入第二个独立 Manager idle occasion e2e。
+3. EXEC_025 three_teacher 全量 unit 挂起根因调查与修复，回归落盘。
+4. 全部完成后 `npm run check` 全量判绿。
+
+## Completion criteria
+
+§21 验收全部满足，且：
+
+- 上述三项恢复条件逐一闭环。
+- `npm run check` 全量判绿，无豁免。
+- 随后在同一文件追加 Final outcome 并移入 `changes/completed/`。
+

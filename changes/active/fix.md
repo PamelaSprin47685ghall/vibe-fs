@@ -329,3 +329,52 @@ Frozen scope 里的验收条件没完成，又由执行方自行改成 Deferred�
 如果按“君子不立危墙”的标准，我现在**不会批准“completed/ 已完成、CE 状态机清算完毕”这个总命题**。比较准确的状态应该是：
 
 > **主干迁移成功；显式状态机清理基本成功；但验收治理有一次实锤违规，DSL proof 存在 44.5% 源码覆盖盲区，并至少发现一处 timer-driven polling 余孽。需要再做一轮真正的 Clean Break 审计后才能封板。**
+
+---
+
+# Active work
+
+> 本文件是变更工作记录，不是当前产品规范。当前产品语义仅以 `docs/` 正式层为准。
+
+## Work origin
+
+本文件原为对 `completed/` 与 DSL ownership 的审计报告（无独立 Proposal，据 GOV-008 标注 Work
+origin，不伪造 Original proposal）。当前用户本轮明确要求将审计发现转为 Active 工作并授权启动
+（GOV-007：用户明确请求即充分授权）。
+
+## Scope (frozen)
+
+按本审计「建议现在直接开的清余孽修复」六项：
+
+1. `changes/active/corrective.md` 恢复 Deferred 关闭条件与 full gate 关闭条件（见其 Reopen 记录）。
+2. `scripts/checks/dsl-ownership.mjs` 全量扫描 245 个生产 F# 文件；`Infrastructure/`、`Journal/`
+   禁止目录级整体豁免，仅允许结构化 annotation 对具体 physical/projection 类型豁免。
+3. 反转 ratchet 对 `Infrastructure/Foo.fs`「违规不报告」的断言（放 `let mutable counter` 必须 RED）；
+   为 `FinalityController.fs`、`ExecutorSummarize.fs` 建 adversarial fixture。
+4. `state-product` 门禁从「单 record」扩展到多 registry presence 联合 match 的隐式程序计数判定。
+5. 修 Executor `FamilyWaiting`：B 类事件等待改事件驱动 waiter，去除 100ms `timerTask` re-probe。
+6. 收口 `TurnUnknown`：降为 reconciliation 私有观察，不作为可 publish 的 `TurnOutcome`。
+
+## Remaining work
+
+1. corrective.md 恢复三项 Deferred 关闭条件 + full gate 关闭条件（见 corrective.md Reopen）。
+2. dsl-ownership.mjs 全量扫描全部生产 `.fs`；移除目录级豁免；结构化物理豁免登记。
+3. 反转 ratchet 对 Infrastructure 的豁免断言；FinalityController / ExecutorSummarize adversarial
+   fixture 判红。
+4. `state-product` 多 registry presence 联合判定 + 回归。
+5. ExecutorSummarize 去除 100ms timer re-probe，改事件驱动 waiter（journal `awaitChangeFrom` /
+   permit pulse）。
+6. `TurnUnknown` 收口到 reconciliation 私有观察。
+
+## Completion criteria
+
+- corrective.md 三项 Deferred 关闭条件已恢复并逐一实现 + 验证。
+- `npm run check` 全量（build/unit/integration/e2e/architecture+spec）判绿作为 close 条件。
+- dsl-ownership 扫描 100% 生产 `.fs`；目录级豁免逃逸判红；相关 fixture/反例落盘。
+- Executor B 类等待零轮询（无 timer-driven re-probe），行为测试禁止（docs/how 已列条款）。
+- registry 联合 presence 隐式程序计数已消除或分类。
+
+## Blockers
+
+- 全量扫描可能暴露既有 Infrastructure/Journal pattern（leak/mutable/while），须逐项分类
+  physical 或 remediation，不得批量豁免冲绿（见 `docs/how/dsl-structured-program.md`）。

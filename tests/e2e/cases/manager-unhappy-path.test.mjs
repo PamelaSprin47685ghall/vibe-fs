@@ -171,6 +171,12 @@ async function bindReviewers(scenario) {
         // then C1 can complete for the harvest join (mgr-labor.1).
         releaseChildC1?.();
         releaseChildC1 = null;
+      } else if (id === 'mgr-idle-a.0') {
+        // The same constant prompt represents a different occasion only after
+        // the first ProviderRun completes. Retire A before admitting B so the
+        // mock proves order without a matcher cursor.
+        setTurnFor('mgr-idle-a', '__manager-idle-a-retired__');
+        setTurnFor('mgr-idle-b', '# You are doing well.');
       } else if (id === 'reviewer-r1.1') {
         setTurnFor('reviewer-r1', REVIEWER_RETIRED);
         setTurnFor('reviewer-r1b', REVIEWER_OPENING);

@@ -56,6 +56,8 @@ type ReconciledTurn =
       Outcome: TurnOutcome }
 ```
 
+`TurnUnknown` 只是 reconciliation 观测（finish=None 的稳定 snapshot），不是业务结局。它禁止跨过稳定业务 turn 边界：`publishDecision` 对 `TurnUnknown` 恒返回 `shouldPublish = false`，既不写 stable（consumed）也不写 provisional seal。它唯一的业务作用是经 `decideStep` 在 `IdleWake` 下进入 `RepairMissingFinalReport`；`Retry` / `Failure` / `Abort` wake 只 StopPass。
+
 Host 的 `MessageAbortedError` / `finish=aborted` 先被 Reconciler 分类为 `TurnAborted`。`TurnCompletionProgram` 再消费这个控制面结局：
 
 ```text

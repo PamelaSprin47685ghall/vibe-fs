@@ -204,8 +204,9 @@ test('DSL_OWNERSHIP_exports_nine_named_gates', () => {
     'behaviour-bool',
     'bool-loop',
     'dup-cases',
+    'registry-joint-branch',
   ])
-  assert.equal(FORBIDDEN.length, 9)
+  assert.equal(FORBIDDEN.length, 10)
 })
 
 for (const sample of NEGATIVES) {
@@ -383,6 +384,17 @@ test('DSL_OWNERSHIP_ref_record_program_counter_fires_mutable_record_field', () =
   )
 })
 
+test('DSL_OWNERSHIP_joint_registry_match_with_effect_fires_registry_joint_branch', () => {
+  const hits = scanText(
+    readFixture('registry-joint-branch.fs'),
+    'src/Wanxiangshu/Session/StudentTeacherRuntime.fs',
+  )
+  assert.ok(
+    hits.some((hit) => hit.gate === 'registry-joint-branch'),
+    'a match jointly probing two mutable registries before an effect branch must fire registry-joint-branch',
+  )
+})
+
 test('DSL_OWNERSHIP_physical_state_record_mutable_fields_are_allowed', () => {
   const hits = scanText(readFixture('state-axes-physical.fs'), 'src/Wanxiangshu/Process/StateAxes.fs')
   assert.ok(
@@ -498,6 +510,73 @@ test('DSL_OWNERSHIP_single_file_duplicate_case_set_is_not_cross_file', () => {
     },
   ])
   assert.ok(!hits.some((v) => v.gate === 'dup-cases'))
+})
+
+test('DSL_OWNERSHIP_infrastructure_declared_mutable_is_accepted', () => {
+  // Infrastructure is a production physical layer: a `let mutable` immediately
+  // preceded by a valid `// DSL-MUTABLE: resource` declaration must be accepted
+  // (declaration-based exemption, mirroring Domain/Session/Application/Process).
+  const declared = [
+    'module Sample',
+    'let acquire () =',
+    '    // DSL-MUTABLE: resource — native handle lease',
+    '    let mutable handle = 0L',
+    '    handle',
+  ].join('\n')
+  assert.deepEqual(
+    scanText(declared, 'src/Wanxiangshu/Infrastructure/Resource.fs'),
+    [],
+    'a resource-declared mutable in Infrastructure must stay green',
+  )
+})
+
+test('DSL_OWNERSHIP_journal_declared_mutable_is_accepted', () => {
+  // Journal is a production persistence layer: a `let mutable` immediately
+  // preceded by a valid `// DSL-MUTABLE: resource` declaration must be accepted
+  // (declaration-based exemption, mirroring Infrastructure and
+  // Domain/Session/Application/Process).
+  const declared = [
+    'module Sample',
+    'let append () =',
+    '    // DSL-MUTABLE: resource — index cursor lease',
+    '    let mutable cursor = 0L',
+    '    cursor',
+  ].join('\n')
+  assert.deepEqual(
+    scanText(declared, 'src/Wanxiangshu/Journal/Writer.fs'),
+    [],
+    'a resource-declared mutable in Journal must stay green',
+  )
+})
+
+test('DSL_OWNERSHIP_journal_bare_mutable_still_fires', () => {
+  // Fail-closed baseline: without the declaration the same Journal mutable
+  // must still be reported.
+  const bare = [
+    'module Sample',
+    'let append () =',
+    '    let mutable cursor = 0L',
+    '    cursor',
+  ].join('\n')
+  assert.ok(
+    scanText(bare, 'src/Wanxiangshu/Journal/Writer.fs').some((h) => h.gate === 'mutable'),
+    'a bare mutable in Journal must fire',
+  )
+})
+
+test('DSL_OWNERSHIP_infrastructure_bare_mutable_still_fires', () => {
+  // Fail-closed baseline: without the declaration the same Infrastructure
+  // mutable must still be reported.
+  const bare = [
+    'module Sample',
+    'let acquire () =',
+    '    let mutable handle = 0L',
+    '    handle',
+  ].join('\n')
+  assert.ok(
+    scanText(bare, 'src/Wanxiangshu/Infrastructure/Resource.fs').some((h) => h.gate === 'mutable'),
+    'a bare mutable in Infrastructure must fire',
+  )
 })
 
 test('DSL_OWNERSHIP_cross_file_duplicate_case_set_exemption_stays_clean', () => {

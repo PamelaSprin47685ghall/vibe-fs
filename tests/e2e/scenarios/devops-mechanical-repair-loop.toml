@@ -1,0 +1,196 @@
+# corrective.md §15: executor failure → diagnosis → Coder RED evidence → Coder
+# GREEN evidence → broader gate → final report. The fixture uses Node's real test
+# runner and a one-file value correction, not prompt-text matching.
+
+scenario = "devops-mechanical-repair-loop"
+description = "DevOps closes an executor failure through a bounded Coder RED/GREEN repair loop without direct editing"
+pass = "DevOps mechanical repair loop canary passed."
+
+setup = { strict = true, project = { files = { "mechanical-target.txt" = "BROKEN\n", "mechanical-guard.test.mjs" = "import assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport test from 'node:test';\ntest('guard requires repaired value', () => assert.equal(fs.readFileSync('mechanical-target.txt', 'utf8'), 'REPAIRED\\n'));\n" } } }
+session = { agent = "fast-devops", bind = ["devops-title", "fast-devops"] }
+prompt = { agent = "fast-devops", text = "Run the deterministic mechanical repair fixture. Diagnose its failing gate, use Coder RED then GREEN for the one-file value correction, rerun the broader gate, and report the observed closure." }
+
+must = ["devops.0", "devops.1", "devops.2", "coder-red.0", "devops.3", "coder-green.0", "devops.5", "devops.6"]
+
+flow = [
+  { custom = "bindCoderChildren" },
+  { wait = "title" },
+  { wait = "devops.0" },
+  { wait = "devops.1" },
+  { wait = "devops.2" },
+  { wait = "devops.3" },
+  { wait = "devops.4" },
+  { wait = "devops.5" },
+  { wait = "devops.6" },
+  { custom = "assertMechanicalRepairLoop" },
+  { awaitTerminal = true, requireAssistantTerminal = true },
+  { expectSatisfied = true },
+]
+
+[[turn]]
+id = "devops"
+lane = "fast-devops"
+user = "Run the deterministic mechanical repair fixture. Diagnose its failing gate, use Coder RED then GREEN for the one-file value correction, rerun the broader gate, and report the observed closure."
+tools = ["fork-pty", "join", "list", "executor", "read", "glob", "grep", "inspector", "coder"]
+forbiddenTools = ["write", "edit"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "executor", args = { command = "node --test mechanical-guard.test.mjs", estimated_running_secs = 2, estimated_output_bytes = 4096, estimated_mem_usage = "low" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "read", args = { filePath = "mechanical-target.txt" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "coder", args = { agent = "fast-coder", tdd = "red", prompt = "Add mechanical-repair.test.mjs as a behavior-level regression test for mechanical-target.txt. It must require exactly REPAIRED\\n and must not edit mechanical-target.txt." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "executor", args = { command = "node --test mechanical-repair.test.mjs", estimated_running_secs = 2, estimated_output_bytes = 4096, estimated_mem_usage = "low" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "coder", args = { agent = "fast-coder", tdd = "green", prompt = "Change only mechanical-target.txt to exactly REPAIRED\\n so the established mechanical-repair.test.mjs passes." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "executor", args = { command = "node --test", estimated_running_secs = 2, estimated_output_bytes = 4096, estimated_mem_usage = "low" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "DevOps final report: initial gate and RED regression both failed on BROKEN; Coder GREEN repaired the fixture; broader node --test gate passed; DevOps made no direct edit." }
+
+[[turn]]
+id = "coder-red"
+lane = "fast-coder"
+user = [
+  "# TDD phase: RED. Add or update a behavior-level regression test that fails for the requested missing behavior. Do not implement the production fix.",
+  "# Add mechanical-repair.test.mjs as a behavior-level regression test",
+]
+tools = ["write"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "write", args = { filePath = "mechanical-repair.test.mjs", content = "import assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport test from 'node:test';\ntest('repair requires repaired value', () => assert.equal(fs.readFileSync('mechanical-target.txt', 'utf8'), 'REPAIRED\\n'));\n" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Coder RED evidence: mechanical-repair.test.mjs now fails against the unchanged BROKEN fixture." }
+
+[[turn]]
+id = "coder-green"
+lane = "fast-coder"
+user = [
+  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green.",
+  "# Change only mechanical-target.txt to exactly REPAIRED",
+]
+tools = ["write"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "write", args = { filePath = "mechanical-target.txt", content = "REPAIRED\n" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Coder GREEN evidence: the one-file value correction is ready for DevOps to rerun the gate." }
+
+[[turn]]
+id = "title"
+lane = "devops-title"
+kind = "title"
+user = "Run the deterministic mechanical repair fixture. Diagnose its failing gate, use Coder RED then GREEN for the one-file value correction, rerun the broader gate, and report the observed closure."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }
+
+[[turn]]
+id = "blogger"
+internal = true
+user = "# Write the dense work-log continuation now"
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair background.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair background continued.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 2.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 3.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 4.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 5.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 6.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 7.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 8.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 9.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 10.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Mechanical repair cycle 11.", tip = "primitive-obsession" } }
+
+[[epoch]]
+turn = "blogger"
+step = 0
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 1
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 2
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 3
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 4
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 5
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 6
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 7
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 8
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 9
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 10
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 11
+reason = "frame-commit"

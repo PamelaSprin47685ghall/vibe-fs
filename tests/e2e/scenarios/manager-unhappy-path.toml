@@ -19,9 +19,8 @@
 #    on the SAME turn. A new HumanRoot after Blessed opens a NEW Life (planning)
 #    once LifeCompleted — so minor work + final suicide stay on the blessing turn.
 # 5. mgr-guard remains defined for the operator-abort join-guard path but is
-#    unused in this flow. Optional IdleEncouragement (mgr-idle) may appear;
-#    a second independent idle occasion is unit-proven via
-#    TCP_completed_manager_idle_encouragement_occasion_dedupe.
+#    unused in this flow. mgr-idle-a and mgr-idle-b prove two independent
+#    Manager idle occasions under one Life.
 
 scenario = "manager-unhappy-path"
 description = "GLORY-070/EXEC-017/F2-F5: repair, join user_message wake, hidden reviewer rejections, 2N cohort blessing, rest in peace"
@@ -47,6 +46,8 @@ must = [
   "reviewer-r1.0",
   "reviewer-r2.0",
   "reviewer-r3.0",
+  "mgr-idle-a.0",
+  "mgr-idle-b.0",
 ]
 
 flow = [
@@ -177,14 +178,24 @@ tools = ["fork", "join", "list", "suicide"]
   respond = { type = "text", text = "The join was interrupted by the operator." }
 
 [[turn]]
-id = "mgr-idle"
+id = "mgr-idle-a"
 internal = true
-optional = true
 user = ["# You are doing well.", "# You have plenty of time.", "# You can continue.", "# When nothing useful remains, call suicide."]
 tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
   respond = { type = "text", text = "Manager continues." }
+
+[[turn]]
+id = "mgr-idle-b"
+internal = true
+# bindReviewers admits this full prompt only after mgr-idle-a.0. Keeping the
+# compiled declaration retired prevents same-prefix ambiguity before A.
+user = "__manager-idle-b-retired__"
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager continues after independent idle B." }
 
 [[turn]]
 id = "mgr-labor"

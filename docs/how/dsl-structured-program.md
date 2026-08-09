@@ -31,6 +31,9 @@
 
 - Reconciler 因果重读属 A 类：有界，≤3 次（HOST-004）；不得以墙钟退避推进。
 - Executor 定向等待属 B 类：permit-gated、Journal-authoritative；TCS/Pulse 仅作唤醒。
+  禁止 timer-driven re-probe：不得以 `timerTask → re-probe` 递归轮询等待就绪
+  （family recovery readiness 必须提供真实事件 waiter，如 journal `awaitChangeFrom`
+  或 permit pulse，而非每 ≤100ms 重新 `RequireFamilyRecovery`）。
 - SSE 心跳与 reconnect 属 C 类 one-shot silence deadline / 传输退避，经 ITimerPort 注入（生产=nodeTimerPort，测试=virtualTimerPort）；cancel/dispose 后回调零触发。
 
 ## Algorithm
@@ -104,9 +107,39 @@ Journal fold → Evidence → Decision/Permit → 普通 workflow 入口
 - 直接程序：`src/Wanxiangshu/Session/`、`src/Wanxiangshu/Application/`
 - 纯 evidence/decision/fold：`src/Wanxiangshu/Domain/`
 - 进程等待：`src/Wanxiangshu/Process/`
-- 静态所有权门禁：`scripts/checks/dsl-ownership.mjs`
+- 静态所有权门禁：`scripts/checks/dsl-ownership.mjs`（全量扫描，见「所有权门禁与精确豁免」）
 
 路径是目标责任区，不是当前文件数量或完成状态快照。
+
+## 所有权门禁与精确豁免
+
+`scripts/checks/dsl-ownership.mjs` 必须扫描全部生产 `src/Wanxiangshu/**/*.fs`，不得按目录整体豁免。
+`Infrastructure/`、`Journal/`、`Process/` 与业务目录一视同仁受程序计数、未声明 mutable、
+`state-product` 与 `ControlState` 结构门约束。以「目录在扫描范围之外」为由不报告违规即失效豁免。
+
+豁免只允许对**具体类型**用结构化 annotation 表达物理/投影归属
+（`DSL-state-combination: physical|domain` / `DSL-control-state-reason:`），禁止目录级或
+文件级整体豁免。目录级豁免逃逸 → RED。
+
+判据（review question 5 的机器下限）：长期字段/registry/DU 若主要回答「代码下一步跑哪里」
+而非「世界发生了什么 / 哪个物理资源存在」，即程序计数器，须消除或标注物理归属；未标注即红。
+
+## Registry 审计（隐式程序计数器）
+
+多个长期 registry / Dictionary / HashSet 的 presence 若被同一 `HandleTurn` / `observe`
+函数联合 match 决定下一步业务动作，即构成隐式程序计数器，等价于单 record 状态机。
+
+每个长期 registry 必须证明只代表一个 physical lifetime / 投影，且不被联合用于阶段推进；
+否则须消除或显式标注物理归属。两个已声明 registry 的 direct/try probe 被同一 `match`/`if`
+联合且 effect branch 被选中时，`registry-joint-branch` 作为确定语法反例判红。其它联合
+presence 只产出候选审计项；是否构成阶段推进由人工 proof 判定，不能把 registry 目录或
+annotation 当作自动证明。
+
+关闭条件：
+- 门禁全量扫描 100% 生产 `.fs`，无目录级豁免。
+- 目录级豁免逃逸与 direct registry joint-effect 语法反例有受控 fixture 证明仓库入口判红；
+  其它多 registry 联合 presence 有候选审计与人工 proof。
+- 全生产扫描暴露的既有 pattern 逐项分类为 physical 或 remediation，不得批量豁免冲绿。
 
 ## Review questions
 

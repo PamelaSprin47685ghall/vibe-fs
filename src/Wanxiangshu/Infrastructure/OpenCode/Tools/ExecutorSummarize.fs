@@ -4,7 +4,10 @@ open System
 open System.Collections.Generic
 open System.Text
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Host
+open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Process
 open Wanxiangshu.Session
@@ -46,32 +49,64 @@ module ExecutorSummarize =
     [<Literal>]
     let AwaitAgentTimeoutMs = 600_000
 
+    let private awaitJournalAdvanceOrDeadline (changed: Task<JournalChange>) (remainingMs: int) : Task<bool> =
+        emitJsExpr
+            (changed, PtyTiming.timerTask remainingMs)
+            "Promise.race([$0.then(function () { return true; }), $1.then(function () { return false; })])"
+
     /// Permit-gated targeted await (Journal-authoritative via HostForkRuntime).
-    /// FamilyWaiting → ForkError.TimedOut: throttle-retry within remainingMs budget.
+    /// FamilyWaiting → ForkError.TimedOut: wait for a journal advance within one deadline.
     /// FamilyBlocked / real join timeout → ForkError.NotFound: hard fail, no retry.
     let awaitAgentWithPermit (runtime: IExecutorRuntime) (agentId: string) =
-        let rec loop (remainingMs: int) =
-            task {
-                let! joined = runtime.AwaitAgentWithPermit(agentId, Some remainingMs)
+        let deadline = DateTimeOffset.UtcNow.AddMilliseconds(float AwaitAgentTimeoutMs)
+        let deadlineExpired (): RunCompletion =
+            raise (
+                InvalidOperationException(
+                    sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
+                )
+            )
 
-                match joined with
-                | Ok completion -> return completion
-                | Error ForkError.TimedOut when remainingMs > 0 ->
-                    // FamilyWaiting (RECOVERY_WAITING): B-class wait, not hard fail.
-                    let delayMs = min 100 remainingMs
-                    do! PtyTiming.timerTask delayMs
-                    return! loop (remainingMs - delayMs)
-                | Error ForkError.TimedOut ->
-                    return
-                        raise (
-                            InvalidOperationException(
-                                sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
-                            )
+        let rec loop (): Task<RunCompletion> =
+            task {
+                let remainingMs = int (deadline - DateTimeOffset.UtcNow).TotalMilliseconds
+
+                if remainingMs <= 0 then
+                    return raise (
+                        InvalidOperationException(
+                            sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
                         )
-                | Error error -> return raise (InvalidOperationException(error.ToString()))
+                    )
+                else
+                    let fromRevision = runtime.CurrentJournalRevision()
+                    let! joined = runtime.AwaitAgentWithPermit(agentId, Some remainingMs)
+
+                    match joined with
+                    | Ok completion -> return completion
+                    | Error ForkError.TimedOut ->
+                        let remainingMs = int (deadline - DateTimeOffset.UtcNow).TotalMilliseconds
+
+                        if remainingMs <= 0 then
+                            return raise (
+                                InvalidOperationException(
+                                    sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
+                                )
+                            )
+                        else
+                            let changed = runtime.AwaitJournalChangeFrom fromRevision
+                            let! journalAdvanced = awaitJournalAdvanceOrDeadline changed remainingMs
+
+                            if journalAdvanced then
+                                return! loop ()
+                            else
+                                return raise (
+                                    InvalidOperationException(
+                                        sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
+                                    )
+                                )
+                    | Error error -> return raise (InvalidOperationException(error.ToString()))
             }
 
-        loop AwaitAgentTimeoutMs
+        loop ()
 
     let runExecutorPrompt
         (runtime: IExecutorRuntime)

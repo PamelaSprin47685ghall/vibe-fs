@@ -4145,8 +4145,9 @@ export const executorSummarizeRuntime = (() => {
      * Fake IExecutorRuntime. JoinWithPermit / AwaitAgentWithPermit return Promise of Result.
      * Default → TimedOut so await fails after fork.
      */
-    fake: ({ fork, join, awaitAgent, cancel } = {}) => {
+    fake: ({ fork, join, awaitAgent, awaitRecoveryReadiness, cancel } = {}) => {
       const cancelled = []
+      let lastAwaitedAgent
       const joinOrAwait = (timeoutMs, agentId) => {
         if (typeof awaitAgent === 'function' && agentId !== undefined) {
           return awaitAgent(agentId, timeoutMs)
@@ -4160,7 +4161,15 @@ export const executorSummarizeRuntime = (() => {
         Fork: (agentId, _role, _prompt, _payload) =>
           Promise.resolve(typeof fork === 'function' ? fork(agentId) : okResult(new ForkResult(0, [agentId]))),
         JoinWithPermit: (timeoutMs) => Promise.resolve(joinOrAwait(timeoutMs)),
-        AwaitAgentWithPermit: (agentId, timeoutMs) => Promise.resolve(joinOrAwait(timeoutMs, agentId)),
+        AwaitAgentWithPermit: (agentId, timeoutMs) => {
+          lastAwaitedAgent = agentId
+          return Promise.resolve(joinOrAwait(timeoutMs, agentId))
+        },
+        CurrentJournalRevision: () => 0,
+        AwaitJournalChangeFrom: (_fromRevision) =>
+          Promise.resolve(
+            typeof awaitRecoveryReadiness === 'function' ? awaitRecoveryReadiness(lastAwaitedAgent) : undefined,
+          ),
         CancelAgent: (agentId) => {
           cancelled.push(agentId)
           if (typeof cancel === 'function') cancel(agentId)

@@ -6,8 +6,9 @@
 //
 // Proof plan #3: ordered/out-of-order agent completion only returns the target
 // agent; each chunk awaits once when Ready (no stash skip); FamilyWaiting
-// (TimedOut) retries until Ready within budget; FamilyBlocked (NotFound) hard
-// fails the chunk and cancelOwned without corrupting sibling targeted awaits.
+// waits for a readiness signal before one fresh permit check; FamilyBlocked
+// (NotFound) hard fails the chunk and cancelOwned without corrupting sibling
+// targeted awaits.
 
 import assert from 'node:assert/strict'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
@@ -216,21 +217,28 @@ test('EXEC_summarize_spool_await_not_found_hard_fail_collects_failure', async ()
   rmSync(dir, { recursive: true, force: true })
 })
 
-test('EXEC_summarize_spool_family_waiting_then_ready_succeeds', async () => {
+test('EXEC_summarize_spool_family_waiting_waits_for_readiness_before_one_fresh_permit_check', async () => {
   const { dir, spoolPath } = writeSpoolWithChunks(1)
   const awaitCalls = []
+  const callOrder = []
   const attemptsByAgent = new Map()
+  const readinessSignals = []
 
   const { runtime } = executorSummarizeRuntime.fake({
     fork: (agentId) => executorSummarizeRuntime.forkOk(agentId),
-    // FamilyWaiting / RECOVERY_WAITING → TimedOut: transient wait. Ready after
-    // two waits → completedRun. Production must retry (throttled) until Ready.
     awaitAgent: (agentId, timeoutMs) => {
+      callOrder.push(`permit:${agentId}`)
       awaitCalls.push({ agentId, timeoutMs })
       const n = (attemptsByAgent.get(agentId) ?? 0) + 1
       attemptsByAgent.set(agentId, n)
-      if (n <= 2) return executorSummarizeRuntime.timedOut()
+      if (n === 1) return executorSummarizeRuntime.timedOut()
       return completedOk(agentId)
+    },
+    // Contract required from IExecutorRuntime: this resolves only when the
+    // recovery owner publishes a readiness signal for the waiting family.
+    awaitRecoveryReadiness: (agentId) => {
+      callOrder.push(`readiness:${agentId}`)
+      readinessSignals.push(agentId)
     },
   })
 
@@ -245,15 +253,17 @@ test('EXEC_summarize_spool_family_waiting_then_ready_succeeds', async () => {
     summary.includes('summary-for-'),
     'Ready completion work record must appear in full summary',
   )
-  assert.ok(
-    awaitCalls.length >= 3,
-    `AwaitAgentWithPermit retried after Waiting; expected ≥3 calls, got ${awaitCalls.length}`,
-  )
   const targetId = awaitCalls[0]?.agentId
   assert.ok(targetId, 'map agent id recorded')
-  assert.ok(
-    awaitCalls.filter((c) => c.agentId === targetId).length >= 3,
-    `target agent ${targetId} awaited ≥3 times (2×TimedOut/Waiting then Ready)`,
+  assert.deepEqual(
+    readinessSignals,
+    [targetId],
+    'RECOVERY_WAITING waits for the family readiness signal',
+  )
+  assert.deepEqual(
+    callOrder,
+    [`permit:${targetId}`, `readiness:${targetId}`, `permit:${targetId}`],
+    'after readiness, exactly one fresh permit check/await occurs without timer-driven re-probes',
   )
 
   rmSync(dir, { recursive: true, force: true })

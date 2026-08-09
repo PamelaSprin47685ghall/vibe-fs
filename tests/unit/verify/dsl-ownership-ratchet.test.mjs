@@ -18,7 +18,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
-import { scanText } from '../../../scripts/checks/dsl-ownership.mjs'
+import { isProgramFile, scanText } from '../../../scripts/checks/dsl-ownership.mjs'
 
 const ROOT = new URL('../../../', import.meta.url).pathname
 const RATCHET_SCRIPT = join(ROOT, 'scripts/checks/dsl-ownership-ratchet.mjs')
@@ -123,24 +123,30 @@ test('DSL_OWNERSHIP_RATCHET_drop_below_baseline_exits_zero', async (t) => {
   assert.equal(result.code, 0, `expected exit 0, got ${result.code}: ${output(result)}`)
 })
 
-test('DSL_OWNERSHIP_RATCHET_ignores_non_program_dirs', async (t) => {
+test('DSL_OWNERSHIP_covers_infrastructure_and_journal_production_files', () => {
+  assert.equal(isProgramFile('src/Wanxiangshu/Infrastructure/Foo.fs'), true)
+  assert.equal(isProgramFile('src/Wanxiangshu/Journal/Foo.fs'), true)
+})
+
+test('DSL_OWNERSHIP_RATCHET_rejects_unannotated_mutable_in_infrastructure_and_journal', async (t) => {
   const fx = makeFixture()
   t.after(fx.dispose)
 
-  const file = 'Infrastructure/Foo.fs'
+  const files = ['Infrastructure/Foo.fs', 'Journal/Foo.fs']
   const source = ['module Foo', 'let mutable counter = 1'].join('\n')
-  fx.write(file, source)
+  for (const file of files) {
+    fx.write(file, source)
+    const hits = scanText(source, file).filter((v) => v.gate === 'mutable')
+    assert.equal(hits.length, 1)
+  }
 
-  // Fixture self-check: the violation exists; only the scan scope excludes it.
-  const hits = scanText(source, file).filter((v) => v.gate === 'mutable')
-  assert.equal(hits.length, 1)
-
-  // Infrastructure/ is outside PROGRAM_DIRS: never scanned, never reported.
   const baseline = fx.baseline({})
   const result = await runRatchet(baseline, fx.dir, fx.dir)
   const out = output(result)
-  assert.equal(result.code, 0, `expected exit 0, got ${result.code}: ${out}`)
-  assert.ok(!out.includes('Infrastructure'), `expected no Infrastructure output, got: ${out}`)
+  assert.notEqual(result.code, 0, `expected non-zero exit, got ${result.code}: ${out}`)
+  for (const file of files) {
+    assert.ok(out.includes(`${file} mutable 0 -> 1`), `expected ${file} hint in output, got: ${out}`)
+  }
 })
 
 test('DSL_OWNERSHIP_RATCHET_direct_task_workflow_is_allowed', async (t) => {

@@ -9,20 +9,11 @@
 // CI calls with --threshold to freeze the current backlog while preventing new violations.
 
 import { readFileSync } from 'node:fs'
-import { relative, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
 
 export const PRODUCTION_ROOT = 'src/Wanxiangshu'
-export const PROGRAM_DIRS = [
-  `${PRODUCTION_ROOT}/Agent/`,
-  `${PRODUCTION_ROOT}/Application/`,
-  `${PRODUCTION_ROOT}/Domain/`,
-  `${PRODUCTION_ROOT}/Kernel/`,
-  `${PRODUCTION_ROOT}/Process/`,
-  `${PRODUCTION_ROOT}/Session/`,
-]
-
 const norm = (p) => p.replace(/\\/g, '/')
 
 /**
@@ -48,6 +39,12 @@ export const isExternalProtocolPath = (file) => {
 export const isProcessPhysicalPath = (file) => {
   const rel = norm(String(file))
   return rel.includes('/Process/')
+}
+
+/** Infrastructure owns adapters to Process and sibling infrastructure resources. */
+export const isInfrastructurePath = (file) => {
+  const rel = norm(String(file))
+  return rel.includes('/Infrastructure/')
 }
 
 /** Pty/Node protocol command types are external protocol messages (FLOW-006),
@@ -78,21 +75,13 @@ export const isDslMutableDeclaration = (line) => {
 }
 
 /**
- * Paths where a DSL-MUTABLE declaration may legalize a `let mutable`.
- * Domain/Session/Application/Process and Kernel/Parallel carry physical or
- * algorithmic cells. Agent and non-Parallel Kernel stay fully fail-closed:
- * even a DSL-MUTABLE declaration cannot legalize a mutable there.
+ * Any production file may legalize a `let mutable` — but only via a precise
+ * `// DSL-MUTABLE: <category>` declaration on the immediately preceding 1-2
+ * lines (checked by hasDslMutableDeclaration). Directory membership is no
+ * longer an exemption; an unannotated `let mutable` fires fail-closed in every
+ * production file.
  */
-export const isMutableDeclarationAllowed = (file) => {
-  const rel = String(file).replace(/\\/g, '/')
-  return (
-    rel.includes('/Domain/') ||
-    rel.includes('/Session/') ||
-    rel.includes('/Application/') ||
-    rel.includes('/Process/') ||
-    /(?:^|\/)Kernel\/Parallel\.fs$/.test(rel)
-  )
-}
+export const isMutableDeclarationAllowed = (file) => true
 
 /** True when a `let mutable` at 1-based line `line` (index i in lines) is
  *  preceded within the prior 1-2 lines by a DSL-MUTABLE declaration. */
@@ -135,10 +124,9 @@ export const isHostBoundaryOpenPath = (file) => {
 
 export const FORBIDDEN = [
   // Mutable is now declaration-gated: a `let mutable` fires unless the prior
-  // 1-2 lines carry `// DSL-MUTABLE: <category>` AND the file is a declaration-
-  // allowed path (Domain/Session/Application/Process/Kernel/Parallel). Agent
-  // and non-Parallel Kernel stay fully fail-closed (no declaration can save
-  // them). The preceding-line check is applied in scanText.
+  // 1-2 lines carry a precise `// DSL-MUTABLE: <category>` declaration. Any
+  // production file may use the declaration; there is no path whitelist. The
+  // preceding-line check is applied in scanText.
   { gate: 'mutable', pattern: /\blet mutable\b/, label: 'let mutable without DSL-MUTABLE declaration', skipIf: () => false },
   { gate: 'flow-lift', pattern: /\bFlow\.(?:lift|create)\b/, label: 'Flow.lift / Flow.create' },
   {
@@ -167,7 +155,8 @@ export const FORBIDDEN = [
     pattern:
       /\b(?:open Wanxiangshu\.Infrastructure|open Wanxiangshu\.OpenCode|open Wanxiangshu\.Process)\b/,
     label: 'infrastructure namespace open',
-    skipIf: (file) => isHostBoundaryOpenPath(file) || isProcessPhysicalPath(file),
+    skipIf: (file) =>
+      isHostBoundaryOpenPath(file) || isProcessPhysicalPath(file) || isInfrastructurePath(file),
   },
   {
     gate: 'program-counter',
@@ -206,6 +195,13 @@ export const FORBIDDEN = [
     pattern: /$^/,
     label: 'duplicate DU case-name set',
   },
+  {
+    // A whole-source structural check in scanText. Kept in this list so the
+    // gate inventory and ratchet counts remain authoritative.
+    gate: 'registry-joint-branch',
+    pattern: /$^/,
+    label: 'joint direct registry probe selects an effect branch',
+  },
 ]
 
 // PR 9 item 6 exemptions — each entry names the FILE:DU whose case set may
@@ -223,8 +219,11 @@ export const DUP_CASES_EXEMPT = new Set([
 export const GATE_NAMES = FORBIDDEN.map((item) => item.gate)
 
 export const isProgramFile = (path) => {
-  const rel = norm(relative('.', path))
-  return PROGRAM_DIRS.some((dir) => rel.startsWith(dir)) && rel.endsWith('.fs')
+  const normalized = norm(String(path))
+  return (
+    normalized.endsWith('.fs') &&
+    (normalized.startsWith(`${PRODUCTION_ROOT}/`) || normalized.includes(`/${PRODUCTION_ROOT}/`))
+  )
 }
 
 /**
@@ -577,6 +576,48 @@ export const scanMutableRecordFields = (text, file = '<synthetic>') => {
   return violations
 }
 
+/**
+ * Detect the narrow, syntactically certain distributed-program-counter shape:
+ * two declared mutable registries are directly probed in one `match`/`if`, and
+ * a nearby selected branch invokes a named external-effect verb. This is a
+ * counterexample gate, not a proof that arbitrary registry composition is a
+ * state machine.
+ */
+export const scanRegistryJointBranches = (text, file = '<synthetic>') => {
+  const lines = text.split('\n')
+  const registries = new Set()
+  const registryDeclaration =
+    /^\s*let\s+(\w+)\s*=\s*(?:new\s+)?(?:Concurrent)?(?:Dictionary|HashSet)</
+  const probe = /\b(\w+)\.(?:TryGetValue|ContainsKey|TryFind|TryRemove)\b/g
+  const effect = /\b(?:send|dispatch|append|publish|write|emit|remove|add|start|stop|abort|create|delete)[A-Z]\w*\b/
+  const violations = []
+
+  for (const line of lines) {
+    const declaration = registryDeclaration.exec(line)
+    if (declaration) registries.add(declaration[1])
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const condition = lines[i]
+    if (!/^\s*(?:match|if)\b/.test(condition)) continue
+    const probed = new Set()
+    for (const match of condition.matchAll(probe)) {
+      if (registries.has(match[1])) probed.add(match[1])
+    }
+    if (probed.size < 2) continue
+
+    const branch = lines.slice(i, Math.min(i + 4, lines.length)).join('\n')
+    if (!effect.test(branch)) continue
+    violations.push({
+      gate: 'registry-joint-branch',
+      file,
+      line: i + 1,
+      text: `joint direct probes of ${[...probed].join(', ')} select an effect branch`,
+    })
+  }
+  return violations
+}
+
 /** Scan one source text. Returns [{gate, file, line, text}, ...]. */
 export const scanText = (text, file = '<synthetic>') => {
   const violations = []
@@ -586,6 +627,7 @@ export const scanText = (text, file = '<synthetic>') => {
   // once over the whole text rather than per line. Same for mutable-record-field.
   violations.push(...scanStateProducts(text, file))
   violations.push(...scanMutableRecordFields(text, file))
+  violations.push(...scanRegistryJointBranches(text, file))
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]

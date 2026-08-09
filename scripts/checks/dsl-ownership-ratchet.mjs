@@ -15,19 +15,9 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
-import { PRODUCTION_ROOT, PROGRAM_DIRS, scanFiles } from './dsl-ownership.mjs'
+import { PRODUCTION_ROOT, scanFiles } from './dsl-ownership.mjs'
 
 const norm = (p) => p.replace(/\\/g, '/')
-
-// PROGRAM_DIRS are repo-root paths ("src/Wanxiangshu/<Dir>/"); derive the
-// subdirectory names relative to --root (default src/Wanxiangshu).
-const PROGRAM_SUBDIRS = PROGRAM_DIRS.map((dir) =>
-  norm(dir.slice(PRODUCTION_ROOT.length + 1)).replace(/\/$/, ''),
-)
-
-/** True when relPath (POSIX, relative to --root) lives under a program directory. */
-export const isProgramRelPath = (relPath) =>
-  PROGRAM_SUBDIRS.some((dir) => relPath === dir || relPath.startsWith(dir + '/'))
 
 export const DEFAULT_OUT = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -60,7 +50,6 @@ export const countByFileGate = (violations) => {
 
 const scanRoot = (root) => {
   const files = walk(root, ['.fs'])
-  // isProgramRelPath filters on root-relative paths (e.g. Process/PtyTiming.fs).
   // scanFiles path predicates (isMutableDeclarationAllowed, isProcessPhysicalPath,
   // isProcessCommandPath) match '/Process/' etc., so entry.file must carry the
   // src/Wanxiangshu/ prefix used by dsl-ownership.mjs. Baseline keys stay
@@ -75,7 +64,6 @@ const scanRoot = (root) => {
         text: readFileSync(abs, 'utf8'),
       }
     })
-    .filter((entry) => isProgramRelPath(entry.rel))
   const violations = scanFiles(entries).map((v) => {
     const n = norm(v.file)
     return { ...v, file: n.startsWith(prefix) ? n.slice(prefix.length) : n }

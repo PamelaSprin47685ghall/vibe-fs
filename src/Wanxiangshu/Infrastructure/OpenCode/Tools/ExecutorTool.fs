@@ -145,31 +145,34 @@ module ExecutorTool =
 
                             // Hard-fail only on definitive FamilyBlocked. Waiting/incomplete
                             // must not abort map/reduce; JoinWithPermit retries requirePermit.
-                            match! requirePermit () with
-                            | Error msg when msg.StartsWith("RECOVERY_BLOCKED:", System.StringComparison.Ordinal) ->
-                                return error msg
-                            | Error _
-                            | Ok _ ->
-                                let runtime = scope.ExecutorRuntimeFor context
+                            match scope.Journal with
+                            | None -> return error "Executor map/reduce requires AgentJournal"
+                            | Some journal ->
+                                match! requirePermit () with
+                                | Error msg when msg.StartsWith("RECOVERY_BLOCKED:", System.StringComparison.Ordinal) ->
+                                    return error msg
+                                | Error _
+                                | Ok _ ->
+                                    let runtime = scope.ExecutorRuntimeFor context
 
-                                let! summary =
-                                    ExecutorSummarize.summarizeSpool
-                                        (ExecutorSummarize.asExecutorRuntime runtime requirePermit)
-                                        spoolPath
+                                    let! summary =
+                                        ExecutorSummarize.summarizeSpool
+                                            (ExecutorSummarize.asExecutorRuntime runtime journal requirePermit)
+                                            spoolPath
 
-                                let instructions =
-                                    if System.String.IsNullOrWhiteSpace summary then
-                                        []
-                                    else
-                                        [ summary ]
+                                    let instructions =
+                                        if System.String.IsNullOrWhiteSpace summary then
+                                            []
+                                        else
+                                            [ summary ]
 
-                                return
-                                    tomlObjectWithInstructions
-                                        instructions
-                                        [ "exit_code", TInt exitCode
-                                          "spool_path", TString spoolPath
-                                          "total_bytes", TInt64 totalBytes
-                                          "chunk_count", TInt chunkCount ]
+                                    return
+                                        tomlObjectWithInstructions
+                                            instructions
+                                            [ "exit_code", TInt exitCode
+                                              "spool_path", TString spoolPath
+                                              "total_bytes", TInt64 totalBytes
+                                              "chunk_count", TInt chunkCount ]
                     finally
                         Spool.delete spoolPath
         }

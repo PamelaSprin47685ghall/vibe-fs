@@ -1,8 +1,11 @@
 namespace Wanxiangshu.OpenCode
 
+open System
 open System.Threading.Tasks
 open Wanxiangshu.Domain.SessionRecovery
+open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Process
 open Wanxiangshu.Session
 
@@ -18,6 +21,10 @@ module ExecutorSummarizeRuntime =
         abstract JoinWithPermit: timeoutMs: int option -> Task<Result<RunCompletion, ForkError>>
         /// Targeted agent await: fresh permit → HostForkRuntime.AwaitAgentWithPermit.
         abstract AwaitAgentWithPermit: agentId: string * timeoutMs: int option -> Task<Result<RunCompletion, ForkError>>
+        /// Revision sampled before a permit check, closing the readiness-wait race.
+        abstract CurrentJournalRevision: unit -> JournalRevision
+        /// Check-subscribe-recheck wait for a journal advance from the sampled revision.
+        abstract AwaitJournalChangeFrom: JournalRevision -> Task<JournalChange>
         /// Cancel one owned map/reduce agent without tearing down the runtime.
         abstract CancelAgent: agentId: string -> unit
 
@@ -26,7 +33,11 @@ module ExecutorSummarizeRuntime =
     /// derived from a role — the role is a constant, not an inference.
     let private executorAgent = ManagedAgent.nameOf AgentTier.Fast Role.Executor
 
-    let asExecutorRuntime (runtime: HostForkRuntime) (requirePermit: RequirePermit) : IExecutorRuntime =
+    let asExecutorRuntime
+        (runtime: HostForkRuntime)
+        (journal: AgentJournal)
+        (requirePermit: RequirePermit)
+        : IExecutorRuntime =
         { new IExecutorRuntime with
             member _.Fork(agentId, role, prompt, payload) =
                 runtime.Fork(agentId, role, executorAgent, prompt, payload)
@@ -59,6 +70,11 @@ module ExecutorSummarizeRuntime =
                         | None -> return! runtime.AwaitAgentWithPermit(permit, agentId)
                 }
 
+            member _.CurrentJournalRevision() = AgentJournal.revision journal
+
+            member _.AwaitJournalChangeFrom(fromRevision) =
+                AgentJournal.awaitChangeFrom fromRevision journal
+
             member _.CancelAgent(agentId) = runtime.CancelAgent(agentId) }
 
     /// Pure ForkRuntime has no journal → cannot hold FamilyRecoveryPermit.
@@ -86,6 +102,18 @@ module ExecutorSummarizeRuntime =
                         Error(
                             ForkError.NotFound
                                 "pure ForkRuntime has no journal; agent AwaitAgentWithPermit requires FamilyRecoveryPermit"
+                        )
+                }
+
+            member _.CurrentJournalRevision() =
+                invalidOp "pure ForkRuntime has no journal; agent await requires journal revision"
+
+            member _.AwaitJournalChangeFrom(_fromRevision) =
+                task {
+                    return
+                        raise (
+                            InvalidOperationException
+                                "pure ForkRuntime has no journal; agent await requires journal change"
                         )
                 }
 

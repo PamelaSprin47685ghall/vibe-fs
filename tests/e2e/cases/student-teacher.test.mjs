@@ -127,9 +127,15 @@ try {
   const learnRequest = studentRequests.find(
     (request) => requestText(request).includes(rootText) && toolNames(request).includes('teacher'),
   );
-  const compileRequest = studentRequests.find(
+  const compileRequests = studentRequests.filter(
     (request) => requestText(request).includes('你已经结束向 Teacher 提问') && toolNames(request).includes('write'),
   );
+  assert.equal(
+    compileRequests.length,
+    1,
+    'one completed StudentLearn turn must cause exactly one StudentCompile request',
+  );
+  const compileRequest = compileRequests[0];
   assert.deepEqual(toolNames(learnRequest), ['teacher'], 'StudentLearn schema must contain only teacher');
   assert.deepEqual(
     toolNames(compileRequest).sort(),

@@ -204,18 +204,27 @@ module ReconcileProgram =
         let key = SessionId.value turn.SessionId
         let token = consumeKey turn
 
-        if isTerminalOutcome turn.Outcome then
-            match Map.tryFind key maps.Consumed with
-            | Some previous when previous = token -> {| shouldPublish = false; maps = maps |}
-            | _ ->
-                {| shouldPublish = true
-                   maps = PublishMaps(Map.add key token maps.Consumed, Map.remove key maps.Provisional) |}
-        else
-            match Map.tryFind key maps.Provisional with
-            | Some previous when previous = token -> {| shouldPublish = false; maps = maps |}
-            | _ ->
-                {| shouldPublish = true
-                   maps = PublishMaps(maps.Consumed, Map.add key token maps.Provisional) |}
+        match turn.Outcome with
+        | TurnUnknown ->
+            // HOST-004: TurnUnknown is a reconciliation observation only. It must
+            // never cross the stable business-turn boundary — no terminal (stable)
+            // and no incomplete (provisional) business-turn seal may be written.
+            // The distinct IdleWake → RepairMissingFinalReport path lives in
+            // decideStep and is untouched here.
+            {| shouldPublish = false; maps = maps |}
+        | _ ->
+            if isTerminalOutcome turn.Outcome then
+                match Map.tryFind key maps.Consumed with
+                | Some previous when previous = token -> {| shouldPublish = false; maps = maps |}
+                | _ ->
+                    {| shouldPublish = true
+                       maps = PublishMaps(Map.add key token maps.Consumed, Map.remove key maps.Provisional) |}
+            else
+                match Map.tryFind key maps.Provisional with
+                | Some previous when previous = token -> {| shouldPublish = false; maps = maps |}
+                | _ ->
+                    {| shouldPublish = true
+                       maps = PublishMaps(maps.Consumed, Map.add key token maps.Provisional) |}
 
     let clearProvisional (maps: PublishMaps) (sessionKey: string) : PublishMaps =
         PublishMaps(maps.Consumed, Map.remove sessionKey maps.Provisional)
