@@ -91,7 +91,18 @@ const productionFs = productionFiles.filter(isFs).map(norm)
   }
 }
 
-// ④ Kernel/Domain must not reference upper infrastructure namespaces
+// ④ Finality observes reviewer facts; ReviewerWorkflow is the sole continuation writer.
+{
+  const finalityPath = `${PRODUCTION_ROOT}/Infrastructure/OpenCode/Tools/FinalityController.fs`
+  const finality = read(finalityPath)
+  for (const token of ['HostReviewGuard', 'ReviewChallenge', 'requestPerfectConfirmation', 'nudgeReviewer', 'continueReviewer']) {
+    if (finality.includes(token)) {
+      fail('finality-reviewer-owner', `${finalityPath}: reviewer continuation token '${token}' is forbidden`)
+    }
+  }
+}
+
+// ⑤ Kernel/Domain must not reference upper infrastructure namespaces
 for (const file of productionFs) {
   if (!PURE_DIRS.some((dir) => file.startsWith(dir))) continue
   const text = read(file)
@@ -185,6 +196,63 @@ for (const file of productionFs) {
     const text = read(dsl)
     if (!/type FamilyRecoveryPermit\s*=\s*\n\s*private/.test(text) && !/FamilyRecoveryPermit\s*=\s*private/.test(text)) {
       fail('recovery-family', `${dsl}: FamilyRecoveryPermit must be private`)
+    }
+  }
+}
+
+// ⑩ TURN-COMPLETION-PLUMBING (ce.md §15): generic terminal plumbing may
+// classify outcomes and own physical completion, never bounded-context policy.
+{
+  const file = `${PRODUCTION_ROOT}/Application/Reconciliation/TurnCompletionProgram.fs`
+  const forbidden = [
+    'Role.Manager',
+    'Role.Reviewer',
+    'StudentTeacherRuntime',
+    'ManagerLifecycleGate',
+    'ReviewerGuardState',
+    'HostReviewGuard',
+    'Finality',
+    'ManagerIdleEncouragement',
+    'ReviewConfirmation',
+    'ReviewerGuard',
+  ]
+  const text = read(file)
+  for (const token of forbidden) {
+    if (text.includes(token)) {
+      fail('turn-completion-plumbing', `${file}: bounded-context token '${token}' is forbidden`)
+    }
+  }
+}
+
+// ⑪ FINALITY-REVIEW-OWNER (ce.md SEC4.3): the Finality workflow enlists a review
+// cohort and aggregates witnesses, but it must NOT own the reviewer continuation
+// decision — ReviewerWorkflow is the sole business owner of reviewer sends. If
+// a Finality file directly decides a reviewer continuation kind or drives the
+// reviewer-state machine, it is a second writer and the gate is RED.
+//
+// The allowed boundary: Finality may open barriers, send the INITIAL assignment,
+// wait for facts, aggregate, short-circuit REVISE, and collect confirmed witnesses.
+// It must not call the reviewer workflow or any continuation transport primitive.
+{
+  const finalityFiles = ['FinalityController', 'FinalityTool', 'FinalityReviewCohort']
+  const forbiddenReviewerDecision = [
+    'ReviewerGuardState',
+    'ReviewerWorkflow',
+    'requestPerfectConfirmation',
+    'nudgeReviewer',
+    'HostReviewGuard',
+    'ReviewerVerdictGuard',
+    'PromptAuthority.ContinuationKind.ReviewConfirmation',
+    'PromptAuthority.ContinuationKind.ReviewerGuard',
+  ]
+  for (const file of productionFs) {
+    const base = file.split('/').pop().replace('\.fs$', '')
+    if (!finalityFiles.some((name) => base === name)) continue
+    const text = read(file)
+    for (const token of forbiddenReviewerDecision) {
+      if (text.includes(token)) {
+        fail('finality-review-owner', `${file}: Finality must not own reviewer continuation '${token}'`)
+      }
     }
   }
 }

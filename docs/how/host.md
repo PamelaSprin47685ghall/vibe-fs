@@ -19,12 +19,13 @@ Host 适配、信号和共享状态边界见 `shape/host.md`。
 - 观测稳定性 ≠ 静止资格：重复 snapshot 相同只证明观测稳定，不证明发送瞬间仍 idle。idle-derived continuation 必须同时满足：
   1. snapshot / 业务决策认为 continuation 有用；
   2. 起源的 `QuiescencePermit` 在 side-effect 时刻仍 fresh（发送边界再次 `TryConsume`）。
-- 三层分离：snapshot 观测（ObservedTurn + StableObservation）→ idle wake evidence（`ReconcileWake = IdleWake of QuiescencePermit | RetryWake | FailureWake`）→ physical continuation admission（`ContinuationAdmission = Ordinary | RequiresQuiescence of QuiescencePermit`）。`materializeActive` 全程携带 wake 直到 publish；`onTurn` 收 `ReconciledTurnContext { Turn; Quiescence: QuiescencePermit option }`，仅 `IdleWake` 有 `Some permit`。
+- 三层分离：snapshot 观测（ObservedTurn + StableObservation）→ wake evidence（`ReconcileWake = IdleWake of QuiescencePermit | RetryWake | FailureWake | AbortWake`）→ physical continuation admission（`ContinuationAdmission = Ordinary | RequiresQuiescence of QuiescencePermit`）。`materializeActive` 全程携带 wake 直到 publish；`onTurn` 收 `ReconciledTurnContext { Turn; Quiescence: QuiescencePermit option }`，仅 `IdleWake` 有 `Some permit`。`AbortWake` 下 `Unknown` / `Provisional` 只能 StopPass，禁止构造 missing-final-report、interaction-repair 或裸 `#`。
 
 ### 接线
 
 - `BeginProviderAttempt(sessionId)`：在 `experimental.chat.messages.transform` 最早同步位置（sessionId 解析后、任何 `let!` 之前）调用，使旧 idle permit 在新 provider request 开始构建时立即失效。
 - `SessionIdle`：`LoopSensor.ResetDetector` 后 `ObserveIdle` 得 permit，随 `SignalIdle(sessionId, permit)` 进入 Reconciler。
+- `AttemptAborted`：先 `RevokeCurrentAttempt(sessionId)`，再原样 signal Reconciler 的 `AbortWake`；禁止改写成 `ProviderFailure`。
 - `SessionDeleted`：`DropSession`，旧 permit 永久失效。
 - 发送边界：`trySendIdleContinuation` / `trySendIdleInteractionRepair` 唯一封装——`TryConsume` 失败 → `Superseded`（不写 claim、不发消息）；成功 → 同一同步调用链直接进入 dispatcher，中间禁止 await。`TryConsume` 不得复制到多个 caller。
 

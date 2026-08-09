@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
+  awaitCausalObservation,
   runStaticGate,
   setupScenario,
   teardownScenario,
@@ -88,23 +89,34 @@ try {
       .map((line) => JSON.parse(line))
       .filter((fact) => JSON.stringify(fact).includes(factName));
   };
-  const deadline = Date.now() + WATCHDOG_TIMEOUT_MS;
-  while (Date.now() < deadline && runtimeFacts('BlogEntryCommitted').length < 1) {
-    await new Promise((r) => setTimeout(r, 50));
-    scenario.watchdog?.advance({ reason: 'blog-entry-wait', lane: 'manager-blogger', blocking: true });
-  }
-  assert.ok(runtimeFacts('BlogEntryCommitted').length >= 1, 'manager blogger must commit at least one BlogEntry');
+  const blogEntries = await awaitCausalObservation({
+    scenario,
+    id: 'manager-blog-entry',
+    reason: 'blog-entry-wait',
+    lane: 'manager-blogger',
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    read: async () => runtimeFacts('BlogEntryCommitted'),
+    token: (facts) => String(facts.length),
+    ready: (facts) => facts.length >= 1,
+  });
+  assert.ok(blogEntries.length >= 1, 'manager blogger must commit at least one BlogEntry');
 
   // The Activation continuation is composed by the reconcile pass after the
   // planning terminal settles; the provider request for the activation turn
   // lands a beat later. Wait for the declared must turns to be answered
   // (internal turns are excluded from `unanswered`, so poll `unmetMust`).
-  while (Date.now() < deadline && runtime.unmetMust().length > 0) {
-    await new Promise((r) => setTimeout(r, 50));
-    scenario.watchdog?.advance({ reason: 'must-wait', lane: 'manager', blocking: true });
-  }
+  const unmetMust = await awaitCausalObservation({
+    scenario,
+    id: 'manager-must',
+    reason: 'must-wait',
+    lane: 'manager',
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    read: async () => runtime.unmetMust(),
+    token: (must) => must.join('\u001f'),
+    ready: (must) => must.length === 0,
+  });
   assert.deepEqual(runtime.unanswered().map((entry) => entry.id), [], 'all non-internal scenario steps must complete');
-  assert.deepEqual(runtime.unmetMust(), [], 'all required scenario steps must complete');
+  assert.deepEqual(unmetMust, [], 'all required scenario steps must complete');
 
   console.log('Manager companion canary passed.');
 } catch (error) {

@@ -8,7 +8,8 @@
 |------|------|
 | 业务层无碎片事件处理 | HOST-001、HOST-002、ARCH-002 |
 | Domain 仅 typed HostSignal | HOST-003 |
-| chat.message 不进普通业务 | HOST-002 |
+| chat.message 不拼装 terminal；外部用户消息只 signal 当前 JoinAttempt，零 future wake | HOST-002、EXEC-017 |
+| `MessageAbortedError` / `AbortError` → typed `AttemptAborted` → revoke → `AbortWake`；零 ProviderFailure、零 repair/裸 `#` | `tests/unit/codec/signals.test.mjs`、`tests/unit/domain/reconcile-program.test.mjs`、`tests/unit/host/session-quiescence-gate.test.mjs`、`tests/e2e/cases/temporal-ownership-unhappy-path.test.mjs`（HOST-002、HOST-004） |
 | provider `TurnAborted` 保留到消费边界；无 Armed 不产生 Agent completion | HOST-004、LOOP-006、EXEC-020 |
 | Reconciler 无新信号时不产生 setTimeout/GetMessages（仅 ≤3 次因果重读） | HOST-004、A 类有界 |
 | 重复 snapshot 稳定只证明观测稳定；`Unknown` 无 `IdleWake` 不产生 idle-derived continuation | HOST-004 |

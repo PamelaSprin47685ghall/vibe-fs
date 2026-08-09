@@ -42,3 +42,6 @@ Thumbs.db
 
 # Runtime state
 /.codebuff-index
+
+# Local deepwork state
+.slim/deepwork/

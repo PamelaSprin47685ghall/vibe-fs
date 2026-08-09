@@ -134,7 +134,11 @@ module HostEventCodec =
                             unbox<string> error?name
 
                     if name = "MessageAbortedError" || name = "AbortError" then
-                        None
+                        // HOST-002/004: operator abort is a typed signal, not a
+                        // dropped event. It revokes the attempt's idle-derived
+                        // continuation capability; it must never be mistaken for
+                        // ProviderFailure (which would wrongly advance fallback).
+                        Some(AttemptAborted sessionId)
                     else
                         let reason =
                             if not (isNull error) && not (isNull error?message) then

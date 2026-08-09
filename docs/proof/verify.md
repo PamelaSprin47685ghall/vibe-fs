@@ -245,6 +245,8 @@ advance(blocking = true)   → 重置静默计时器
 advance(blocking = false)  → 只记录，不重置
 ```
 
+case 文件不得直接调用 `watchdog.advance`。自定义观测统一经 `support/causal-observation.js`：只有 observation token 相对上次真实变化才允许 blocking advance；同值 poll 只等待，不续命。`scripts/checks/e2e-watchdog-feed.mjs` 对 `tests/e2e/cases/**` 与顶层 e2e test fail closed。
+
 超时时先转储诊断（事件尾部、待命中的剧本步、最后一次进展的 reason 与 lane、最后一次背景进展距今多久），再退出非零。诊断必须包含「最后一次进展是什么」，否则 watchdog 只是一个更快的超时。
 
 计时器必须不持有事件循环：所有其它句柄关闭后进程自然退出，watchdog 只在仍有东西（挂死的 SSE 读者、泄漏的 server）维持事件循环时开火。这样它不会把干净结束的 scenario 拖到静默窗口结束。

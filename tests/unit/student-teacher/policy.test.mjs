@@ -5,7 +5,6 @@ import { ProviderRequestKind } from '../../../dist/Domain/PrefixCandidate.js'
 import {
   appendEntry,
   hasOpening,
-  mayInvokeTeacher,
   teacherAgentFor,
   toolsFor,
 } from '../../../dist/Domain/StudentTeacher.js'
@@ -36,19 +35,6 @@ test('AGENT_021_StudentLearn_and_StudentCompile_have_complete_disjoint_tool_maps
   assert.equal(compile.teacher, false)
   assert.equal(Object.keys(learn).length, Object.keys(compile).length)
   assert.equal(Object.keys(learn).length >= 20, true, 'request maps must explicitly deny the known complement')
-})
-
-test('AGENT_021_completed_teacher_return_closes_teacher_invocation_window', () => {
-  assert.equal(mayInvokeTeacher({ tag: 0 }), true)
-
-  // CompileDispatching is the state immediately after a completed Teacher
-  // return; it must remain ineligible until the compile handoff is complete.
-  assert.equal(mayInvokeTeacher({ tag: 2 }), false)
-
-  // TeacherWaiting and the remaining terminal handoff states are also closed.
-  for (const state of [{ tag: 1 }, { tag: 3 }, { tag: 4 }]) {
-    assert.equal(mayInvokeTeacher(state), false)
-  }
 })
 
 test('AGENT_020_Teacher_has_execution_tools_but_no_fork_list_join_or_PTY', () => {

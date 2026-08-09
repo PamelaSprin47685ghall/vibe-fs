@@ -13,6 +13,10 @@ type private Activity =
     | Running of attemptSerial: int64
     | Idle of attemptSerial: int64
     | IdleConsumed of attemptSerial: int64
+    /// HOST-004: operator abort permanently revokes the current attempt's
+    /// idle-derived continuation capability. Revoked blocks every existing permit
+    /// and does not mint a fresh one until the next real BeginProviderAttempt.
+    | Revoked of attemptSerial: int64
 
 /// HOST-004：process-local side-effect admission gate。
 ///
@@ -86,6 +90,23 @@ type SessionQuiescenceGate() =
                 activities <- Map.add key (Activity.IdleConsumed serial) activities
                 true
             | _ -> false)
+
+    /// HOST-004: operator abort immediately and permanently
+    /// revokes the current attempt's idle-derived continuation capability. All
+    /// existing permits fail; a delayed SessionIdle does not re-mint a usable
+    /// one. Only the next real `BeginProviderAttempt` (new serial) re-establishes
+    /// eligibility — never a stale idle observation.
+    member _.RevokeCurrentAttempt(sessionId: SessionId) : unit =
+        lock gate (fun () ->
+            let key = SessionId.value sessionId
+
+            let serial =
+                match Map.tryFind key serials with
+                | Some current -> current
+                | None -> 0L
+
+            serials <- Map.add key (serial + 1L) serials
+            activities <- Map.add key (Activity.Revoked(serial + 1L)) activities)
 
     /// `SessionDeleted` / session 清理时调用：旧 permit 永久失效。
     member _.DropSession(sessionId: SessionId) : unit =

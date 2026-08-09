@@ -52,7 +52,22 @@ module JoinTool =
             if String.IsNullOrWhiteSpace context.SessionId then
                 return ToolHostCodec.tomlObject [ "error", ToolHostCodec.TString "Missing sessionID" ]
             else
-                let root = SessionId.create context.SessionId
+                let sessionId = SessionId.create context.SessionId
+
+                // EXEC-017: Begin the attempt first — before RequireFamilyRecovery and
+                // before the mailbox wait — so a user-message signal that lands while
+                // recovery or setup is still running is recorded on THIS attempt's own
+                // TCS. There is no session-level future latch; Dispose unregisters.
+                let attempt = scope.JoinAttempts.Begin(sessionId, context.ToolCallId)
+                let detachAbort = context.AttachAbort attempt.SignalOperatorAbort
+
+                use _attempt = attempt
+
+                use _cleanup =
+                    { new IDisposable with
+                        member _.Dispose() = detachAbort () }
+
+                let root = sessionId
                 let! recovery = scope.RequireFamilyRecovery root
 
                 match recovery with
@@ -73,26 +88,13 @@ module JoinTool =
                                     "message",
                                     tString "family recovery incomplete: wait for FamilyReady before join drain" ] ]
                 | FamilyRecovery.FamilyReady permit ->
-                    let interrupt = JoinInterrupt.create ()
-
-                    let detachAbort =
-                        context.AttachAbort(fun () -> interrupt.Signal JoinInterruptReason.OperatorAbort)
-
-                    // Phase 4: register for external user-message wake before wait.
-                    // Dispose unregisters; never Cancel mailbox/runtime on user wake.
-                    let sessionId = SessionId.create context.SessionId
-
-                    use _registration = scope.JoinInterrupts.Register(sessionId, interrupt)
-
-                    use _cleanup =
-                        { new IDisposable with
-                            member _.Dispose() = detachAbort () }
-
+                    // NEVER Cancel mailbox/runtime on user wake (EXEC-017); the attempt's
+                    // Wait is the only interrupt channel. Completion still beats interrupt.
                     if scope.IsRole(context, Role.Orchestrator) then
                         let! outcome =
                             scope
                                 .OrchestratorHostFor(context.SessionId)
-                                .JoinPublishedAvailable(JoinBatch.Max, interrupt.Wait)
+                                .JoinPublishedAvailable(JoinBatch.Max, attempt.Wait)
 
                         match outcome with
                         | Error reason ->
@@ -113,11 +115,11 @@ module JoinTool =
                                     let timerTask = PtyTiming.timerTask DevOpsJoinTimeoutMs
 
                                     emitJsExpr
-                                        (interrupt.Wait,
+                                        (attempt.Wait,
                                          emitJsExpr timerTask "$0.then(function () { return 'DeadlineExpired'; })")
                                         "Promise.race([$0, $1])"
                                 else
-                                    interrupt.Wait
+                                    attempt.Wait
 
                             let! joined = Join.joinAvailable runtime permit JoinBatch.Max waitTask
 

@@ -65,7 +65,7 @@ module SpikePlugin =
                 if SharedState.RootWorkspace.IsNone then
                     SharedState.RootWorkspace <- workspaceDirectory
 
-                let! wired = HostSignalBootstrap.wire sessionPort eventPort snapshotOpt journal gitTreePort scope input
+                let! wired = HostSignalBootstrap.wire sessionPort eventPort snapshotOpt journal scope input
 
                 match journal, workspaceDirectory with
                 | Some durable, Some directory ->

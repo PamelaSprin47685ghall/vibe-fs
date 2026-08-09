@@ -7,6 +7,7 @@ open System.Text
 /// stdout/stderr aggregation, byte counting and spool-threshold handling.
 module ProcessOutput =
 
+    /// DSL-state-combination: physical — stdout/stderr byte-buffer spool state
     type OutputCollector =
         { mutable Stdout: List<byte[]>
           mutable Stderr: List<byte[]>

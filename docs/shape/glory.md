@@ -9,6 +9,7 @@
 | Life 事实与投影 | `Domain/ManagerLifecycle.fs` + `Journal/ManagerLifecycleProjection.fs` | 纯逻辑；事实经 `Fact.ManagerLifecycle` case 进入 journal（GLORY-010） |
 | Birth/Reawakening 改写 | `Infrastructure/OpenCode/Host/ManagerNarrativeTransform.fs` | 只在 provider-facing transcript 生效；durable X 保持原始（GLORY-013/014/064） |
 | 终结工具 | `Infrastructure/OpenCode/Tools/FinalityTool.fs` | `suicide` 唯一写入口：受理顺序见 GLORY-040 |
+| Manager terminal sequencing | `Application/Manager/ManagerWorkflow.fs` | 唯一判定 Activation、JoinGuard、Finality defer、Orchestrator handoff 与 idle encouragement；`TurnCompletionProgram` 只做普通 terminal plumbing（GLORY-018/029/070） |
 | 自动评审 | `Infrastructure/OpenCode/Orchestration/HostReviewProgram.fs` | 从 `OrchestratorHostReview` 提炼的通用 reverify（GLORY-042） |
 | 反馈渲染 | `Domain/FinalityPrompt.fs` | `SyntheticToml` 唯一渲染路径（GLORY-052，SURFACE-004） |
 | 冻结文本 | 各 Domain owner + `resources/prompts/*.md` | 每个固定文本恰好一个 owner（SURFACE-004） |
@@ -17,7 +18,7 @@
 
 ```text
 HumanRoot [X] → XTrace durable capture → ManagerNarrativeTransform 改写
-→ 规划回合 → TurnCompletionProgram 检测规划 terminal → ManagerWorkActivation continuation
+→ 规划回合 → ManagerWorkflow 检测规划 terminal → ManagerWorkActivation continuation
 → WorkActivated（写 ProtectedPrefixEnd）→ Labor
 → suicide(last_words) → FinalityRequested → HostReviewProgram（隐藏 Reviewer + barrier）
 → 全员双 PERFECT → 重读 tree → FinalityBlessed → minor-work continuation

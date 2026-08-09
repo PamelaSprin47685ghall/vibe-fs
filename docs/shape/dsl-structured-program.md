@@ -20,6 +20,7 @@ Infrastructure 只适配外部协议，不解释业务命令。
 - `NodeProcessWait` 拥有进程退出、deadline、取消和 kill acknowledgement 的完整等待作用域。
 - `BloggerRuntime` 的 material 协调入口是 `onMainMaterial`；物理 flight registry 拥有 busy 与 current request。
 - `Companion` 恢复机会由一次性物理 waiter 拥有；durable evidence 与 waiter 生命周期分离。
+- record `mutable` 与 `ref` 字段只可属于明确的 Session/Process 物理资源；Domain/Application 一律拒绝，未标注 physical owner 的 record 一律拒绝。
 - `SessionRecovery` 从 Journal evidence 派生 permit，再重入普通 workflow。
 - `AgentFact` 只负责 bounded-context family 分派；各 family 的纯 fold 拥有本域投影。
 

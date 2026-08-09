@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { compileScenario } from '../support/scenario-schema.js';
 import { ScenarioRuntime } from '../support/scenario-runtime.js';
 import {
+  awaitCausalObservation,
   getSessionId,
   runStaticGate,
   setupScenario,
@@ -83,27 +84,35 @@ try {
     requireIdleAfterActivity: true,
   });
 
-  const deadline = Date.now() + WATCHDOG_TIMEOUT_MS;
-  while (runtime.unmetMust().length > 0 && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    scenario.watchdog?.advance({ reason: 'student-teacher-must', lane: 'student', blocking: true });
-  }
-  assert.deepEqual(runtime.unmetMust(), []);
+  const unmet = await awaitCausalObservation({
+    scenario,
+    id: 'student-teacher-must',
+    reason: 'student-teacher-must',
+    lane: 'student',
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    read: async () => runtime.unmetMust(),
+    token: (must) => must.join('\u001f'),
+    ready: (must) => must.length === 0,
+  });
+  assert.deepEqual(unmet, []);
   await scenario.provider.waitForExpectation('student-compile.2', WATCHDOG_TIMEOUT_MS);
 
-  let messages = [];
-  const completionDeadline = Date.now() + WATCHDOG_TIMEOUT_MS;
-  while (Date.now() < completionDeadline) {
-    const response = await scenario.client.request('GET', `/session/${studentId}/message`);
-    assert.equal(response.ok, true, JSON.stringify(response.data));
-    messages = messagesOf(response);
-    const latest = Array.isArray(messages)
-      ? messages.filter((message) => message?.info?.role === 'assistant').map(messageText).at(-1)
-      : null;
-    if (latest === finalText) break;
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    scenario.watchdog?.advance({ reason: 'student-final-message', lane: 'student', blocking: true });
-  }
+  const messages = await awaitCausalObservation({
+    scenario,
+    id: 'student-final-message',
+    reason: 'student-final-message',
+    lane: 'student',
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    read: async () => {
+      const response = await scenario.client.request('GET', `/session/${studentId}/message`);
+      assert.equal(response.ok, true, JSON.stringify(response.data));
+      return messagesOf(response);
+    },
+    token: (snapshot) => JSON.stringify(snapshot),
+    ready: (snapshot) =>
+      Array.isArray(snapshot) &&
+      snapshot.filter((message) => message?.info?.role === 'assistant').map(messageText).at(-1) === finalText,
+  });
 
   const sessionResponse = await scenario.client.request('GET', '/session', { query: { scope: 'project' } });
   assert.equal(sessionResponse.ok, true, JSON.stringify(sessionResponse.data));

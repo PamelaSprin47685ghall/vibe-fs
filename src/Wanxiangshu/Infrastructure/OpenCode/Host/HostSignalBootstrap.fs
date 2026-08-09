@@ -44,7 +44,6 @@ module HostSignalBootstrap =
         (eventPort: IEventObservationPort)
         (snapshotOpt: ISessionSnapshotPort option)
         (journal: AgentJournal option)
-        (gitTreePort: GitTreePort option)
         (scope: PluginRuntimeScope)
         (input: obj)
         : Task<WiredSignals> =
@@ -78,19 +77,7 @@ module HostSignalBootstrap =
                     | FamilyRecovery.FamilyWaiting _
                     | FamilyRecovery.FamilyReady _ ->
                         // Ready = permit-eligible; Waiting = incomplete (no permit) but not hard
-                        // block. TurnCompletionProgram / EXEC-016 guard must still run so mid-
-                        // turn residual RecoveryIncomplete cannot suppress manager-guard.
-                        // Manager sessions run inside their own worktree, not the plugin's
-                        // root workspace. The review-guard tree check must resolve that
-                        // worktree's GitTreePort; otherwise it compares against a
-                        // different Git object graph and can never see the confirmed tree.
-                        let sessionKey = SessionId.value turn.SessionId
-
-                        let managerGitTreePort =
-                            match scope.SessionDirectories.TryGetValue sessionKey with
-                            | true, directory when not (String.IsNullOrWhiteSpace directory) ->
-                                Some(GitTree.create directory)
-                            | _ -> gitTreePort
+                        // block. Bounded-context workflows still observe the terminal.
 
                         match turn.Outcome with
                         | ReconcileProgram.TurnFailed _
@@ -111,24 +98,52 @@ module HostSignalBootstrap =
                         | ReconcileProgram.TurnUnknown -> ()
 
                         XWire.reconcileAttempt journal scope turn
+                        TurnCompletionProgram.prepareTurn journal scope.DisposeExecutorRuntime turn
 
                         let! studentTeacherHandled =
                             match scope.StudentTeacherRuntime with
                             | Some runtime -> runtime.HandleTurn(turn, context.Quiescence)
                             | None -> Task.FromResult false
 
-                        if not studentTeacherHandled then
+                        let! reviewerHandled =
+                            match turn.Role with
+                            | Some Role.Reviewer ->
+                                task {
+                                    do!
+                                        ReviewerWorkflow.observe
+                                            sessionPort
+                                            eventPort
+                                            journal
+                                            scope.NudgeSent
+                                            turn
+                                            (SessionId.value turn.SessionId)
+
+                                    return true
+                                }
+                            | _ -> Task.FromResult false
+
+                        let! managerHandled =
+                            match turn.Role with
+                            | Some Role.Manager ->
+                                ManagerWorkflow.tryObserve
+                                    sessionPort
+                                    eventPort
+                                    journal
+                                    scope.NudgeSent
+                                    scope.JoinGuardNudges
+                                    scope.HasLivePty
+                                    scope.AbortedSessions
+                                    scope.Quiescence
+                                    context
+                            | _ -> Task.FromResult false
+
+                        if not studentTeacherHandled && not reviewerHandled && not managerHandled then
                             do!
                                 TurnCompletionProgram.applyWithContinuation
                                     sessionPort
                                     eventPort
                                     journal
-                                    managerGitTreePort
-                                    scope.VerdictSessions
-                                    scope.NudgeSent
                                     scope.JoinGuardNudges
-                                    scope.SessionParents
-                                    scope.DisposeExecutorRuntime
                                     scope.HasLivePty
                                     scope.AbortedSessions
                                     (Some scope.LoopSensor)
@@ -195,6 +210,7 @@ module HostSignalBootstrap =
                             | Error reason ->
                                 HostCompactionGate.logReanchorFailure sessionId reason
                                 ()
+
                 }
 
             let reconciler =
@@ -227,6 +243,12 @@ module HostSignalBootstrap =
                     reconciler.SignalIdle(sessionId, permit)
                 | ProviderRetry _
                 | ProviderFailure _ -> reconciler.Signal signal
+                // HOST-002/004: operator abort immediately revokes the current
+                // attempt's idle permits, then routes to the
+                // reconciler. Never ProviderFailure — it does not advance fallback.
+                | AttemptAborted sessionId ->
+                    scope.Quiescence.RevokeCurrentAttempt sessionId
+                    reconciler.Signal signal
                 | SessionDeleted sessionId ->
                     scope.LoopSensor.DropSession sessionId
 
@@ -371,6 +393,10 @@ module HostSignalBootstrap =
                     match
                         decoded.SessionId, decoded.PhysicalUserMessageId, decoded.PromptKey, decoded.IsHostCompaction
                     with
+                    // An external user message interrupts ONLY the current active
+                    // join attempts; with none active it is dropped as a join wake
+                    // (the message itself stays in the normal Host queue). No future
+                    // join is latched or woken by this older message (EXEC-017).
                     | Some sessionId, Some _, None, false -> scope.JoinInterrupts.SignalUserMessage sessionId
                     | _ -> ()
 

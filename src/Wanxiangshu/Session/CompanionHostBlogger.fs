@@ -24,8 +24,6 @@ module internal CompanionHostBlogger =
           EnsureBlogger: unit -> Task<SessionId>
           Gate: obj
           Companion: Companion
-          RequestKind: ProviderRequestKind ref
-          SquashFrameCount: int option ref
           Journal: AgentJournal option
           EffectiveAgent: string
           RecordSquashPlan: SessionId -> ProviderRunIdentity -> unit
@@ -112,16 +110,12 @@ module internal CompanionHostBlogger =
 
             match ctx with
             | BloggerRequestContext.Main _ ->
-                deps.RequestKind.Value <- ProviderRequestKind.BloggerMain
-                deps.SquashFrameCount.Value <- None
                 // Physical claim is the stable normal instruction only. Delta Toml lives in
                 // CurrentRequest / durable materialize; transform rebuilds Working Record +
                 // New Work + instruction. Sending raw Toml as the claim body fails mock
                 // matching after restart when rebuild cannot run yet.
                 return! sendBloggerPrompt deps childId CompanionPrompt.NormalInstruction
-            | BloggerRequestContext.Squash squash ->
-                deps.RequestKind.Value <- ProviderRequestKind.BloggerSquash
-                deps.SquashFrameCount.Value <- Some squash.CoveredFrameCount
+            | BloggerRequestContext.Squash _ ->
                 // Physical claim body is the stable squash instruction only.
                 // Frames arrive via rebuildFromContext on the transform (no raw transcript).
                 return! sendBloggerPrompt deps childId CompanionPrompt.SquashInstruction

@@ -91,6 +91,7 @@ module NodeProcessHost =
     /// `Exited` is set ONLY by the close/error handlers. `Kill` must not set it:
     /// sending SIGKILL is not the process ending, and conflating the two makes
     /// "kill sent" look like "exit observed" to every waiter.
+    /// DSL-state-combination: physical — child process exit receipt and callback buffer.
     type ChildProcess =
         { Process: obj
           Exit: TaskCompletionSource<int>

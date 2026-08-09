@@ -47,7 +47,9 @@ module ReconcileSupervisor =
             | SessionIdle sessionId -> scheduler.SignalIdle(sessionId, quiescenceGate.ObserveIdle sessionId)
             | ProviderRetry _
             | ProviderFailure _
-            | SessionDeleted _ -> scheduler.Signal signal
+            | SessionDeleted _
+            // HOST-002/004: forward operator abort as typed wake; never ProviderFailure.
+            | AttemptAborted _ -> scheduler.Signal signal
 
         member _.BindUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId, ?agentRole: Role) =
             scheduler.BindUserMessage(sessionId, physical, ?agentRole = agentRole)

@@ -175,74 +175,6 @@ module FinalityController =
                     (emitJsExpr (finished, timedOut, cancelled) "Promise.race([$0, $1, $2])": Task<Result<unit, string>>)
         }
 
-    /// Send a reviewer continuation and wait for the NEXT terminal it produces.
-    ///
-    /// AG-LISTENER-BEFORE-SEND: subscription exists before SendPrompt.
-    /// Sticky replay is ignored the same way as `awaitReviewer` so a previous
-    /// PERFECT cannot satisfy the post-challenge await.
-    let private continueReviewer
-        (scope: ToolRuntimeScope)
-        (journal: AgentJournal)
-        (cancel: CancelToken)
-        (reviewerSessionId: SessionId)
-        (prompt: string)
-        =
-        task {
-            if cancel.IsCancelled then
-                return Error "review attempt cancelled"
-            else
-                let completed =
-                    TaskCompletionSource<TerminalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-                let accepting = ref false
-
-                use subscription =
-                    scope.Sessions.SubscribeTerminal(
-                        reviewerSessionId,
-                        fun _ outcome ->
-                            if accepting.Value then
-                                AsyncSupport.trySetResult completed outcome |> ignore
-                    )
-
-                accepting.Value <- true
-
-                let kind =
-                    if prompt = ReviewChallenge.Prompt then
-                        PromptAuthority.ContinuationKind.ReviewConfirmation
-                    else
-                        PromptAuthority.ContinuationKind.ReviewerGuard
-
-                let! sent =
-                    HostSessionNudge.sendContinuation
-                        scope.Sessions
-                        reviewerSessionId
-                        prompt
-                        kind
-                        (scope.DirectoryFor(SessionId.value reviewerSessionId))
-                        (Some journal)
-
-                match sent with
-                | Error error -> return Error error
-                | Ok _ ->
-                    let finished =
-                        task {
-                            let! outcome = completed.Task
-
-                            match outcome with
-                            | TerminalOutcome.Completed _ -> return Ok()
-                            | TerminalOutcome.Failed error -> return Error error
-                            | TerminalOutcome.Aborted reason -> return Error reason
-                        }
-
-                    let cancelled =
-                        task {
-                            do! cancel.Task
-                            return Error "review attempt cancelled"
-                        }
-
-                    return! emitJsExpr (finished, cancelled) "Promise.race([$0, $1])": Task<Result<unit, string>>
-        }
-
     /// GLORY-058/059: re-read the tree and require byte equality with the
     /// request's tree before any blessing lands.
     let private treeUnchanged (scope: ToolRuntimeScope) (managerSessionId: SessionId) (expected: GitTreeHash) =
@@ -255,10 +187,8 @@ module FinalityController =
         with _ ->
             false
 
-    /// One member's whole protocol on the shared HostReviewProgram: fork ports
-    /// are stubs (the cohort already enlisted), the await port is cancellable
-    /// (REVISE short-circuit), the continue port checks the cancel token before
-    /// every send so a rejected request never drives a sibling further.
+    /// One member's protocol: Finality enlists and waits; ReviewerWorkflow owns
+    /// every post-terminal continuation.
     let private driveMember
         (scope: ToolRuntimeScope)
         (journal: AgentJournal)
@@ -269,12 +199,6 @@ module FinalityController =
         (tree: GitTreeHash)
         (timeoutMs: int)
         : Task<Result<HostReviewProgram.HostReviewOutcome, HostReviewProgram.HostReviewFailure>> =
-        // Finality owns the await/continue ports: continue waits for the terminal
-        // it causes (listener-before-send), so reverify must re-read after Ok
-        // rather than awaiting a second time. HostReviewProgram.reverify still
-        // owns the verdict algebra. Cancel is re-checked after every await so a
-        // REVISE short-circuit that wins while this member is mid-step cannot
-        // still issue a challenge.
         let awaitOrCancel () =
             task {
                 match! awaitReviewer scope timeoutMs cancel memberInfo.ReviewerSessionId with
@@ -283,19 +207,10 @@ module FinalityController =
                 | Ok() -> return Ok()
             }
 
-        let continueOrCancel (prompt: string) =
-            task {
-                if cancel.IsCancelled then
-                    return Error "review attempt cancelled"
-                else
-                    return! continueReviewer scope journal cancel memberInfo.ReviewerSessionId prompt
-            }
-
         HostReviewProgram.reverify
             (Some journal)
             (fun () -> Task.FromResult(Ok memberInfo.ReviewerSessionId))
             awaitOrCancel
-            continueOrCancel
             managerSessionId
             memberInfo.BarrierId
             tree

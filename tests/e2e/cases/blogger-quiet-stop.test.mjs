@@ -27,7 +27,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { compileScenario } from '../support/scenario-schema.js';
 import { ScenarioRuntime } from '../support/scenario-runtime.js';
-import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../support/index.js';
+import { awaitCausalObservation, observeCausalProgress, runStaticGate, setupScenario, teardownScenario, getSessionId } from '../support/index.js';
 import { WATCHDOG_TIMEOUT_MS, ENFORCER_POLL_SLICE_MS } from '../support/time-budget.js';
 import { bindLaneSession } from '../support/lane.mjs';
 
@@ -52,19 +52,24 @@ function runtimeFacts(workDir, factName) {
 }
 
 function bloggerRequests(provider, bloggerId) {
-  return provider.requests.filter((request) => request.sessionID === bloggerId);
+  return provider.requests.filter((request) =>
+    request.sessionID === bloggerId ||
+    request.tools?.some((tool) => tool?.function?.name === 'blog' || tool?.name === 'blog'),
+  );
 }
 
-async function waitForCount(scenario, predicate, minCount, reason) {
-  const deadline = Date.now() + WATCHDOG_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    if (predicate()) {
-      scenario.watchdog?.advance({ reason, lane: 'provider', blocking: true });
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, ENFORCER_POLL_SLICE_MS));
-  }
-  assert.fail(`${reason}: condition not reached within ${WATCHDOG_TIMEOUT_MS}ms`);
+async function waitForCount(scenario, observe, minCount, reason) {
+  await awaitCausalObservation({
+    scenario,
+    id: reason,
+    reason,
+    lane: 'provider',
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    intervalMs: ENFORCER_POLL_SLICE_MS,
+    read: async () => observe(),
+    token: (count) => String(count),
+    ready: (count) => count >= minCount,
+  });
 }
 
 function printDiagnostics(scenario) {
@@ -126,7 +131,12 @@ try {
     requireAssistantTerminal: true,
     requireIdleAfterActivity: true,
   });
-  scenario.watchdog?.advance({ reason: 'main-turn-1', lane: 'manager', blocking: true });
+  observeCausalProgress(scenario, {
+    id: 'main-turn-1',
+    token: turn1.terminalSeq,
+    reason: 'main-turn-1',
+    lane: 'manager',
+  });
 
   await waitForCount(
     scenario,
@@ -144,7 +154,7 @@ try {
   assert.ok(bloggerId, 'a Blogger child session must be created');
 
   const blogRequests = () => bloggerRequests(scenario.provider, bloggerId);
-  await waitForCount(scenario, () => blogRequests().length >= 1, 1, 'blogger-request-1');
+  await waitForCount(scenario, () => blogRequests().length, 1, 'blogger-request-1');
 
   // ── 2. BlogEntryCommitted (≥1) ────────────────────────────────────────────
   await waitForCount(
@@ -173,9 +183,14 @@ try {
     requireAssistantTerminal: true,
     requireIdleAfterActivity: true,
   });
-  scenario.watchdog?.advance({ reason: 'main-turn-2', lane: 'manager', blocking: true });
+  observeCausalProgress(scenario, {
+    id: 'main-turn-2',
+    token: turn2.terminalSeq,
+    reason: 'main-turn-2',
+    lane: 'manager',
+  });
 
-  await waitForCount(scenario, () => blogRequests().length >= 2, 2, 'blogger-request-2');
+  await waitForCount(scenario, () => blogRequests().length, 2, 'blogger-request-2');
   assert.equal(
     blogRequests().length,
     2,

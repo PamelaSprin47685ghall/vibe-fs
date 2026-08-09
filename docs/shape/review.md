@@ -26,12 +26,15 @@ type ConfirmedReviewWitness =
 
 ## REVIEW-007：Manager 面无 Review Guard
 
-Manager completion **不**检查 review witness（GLORY-070）：`TurnCompletionProgram` 的 Manager
-分支只按序判 joinOutstanding → JoinGuard、finalityOutstanding → deferred、managerPlanning →
-Activation、managerJobHandedOff → 完成，其余 → `ManagerIdleEncouragement`。
+Manager completion **不**检查 review witness（GLORY-070）：`ManagerWorkflow` 只按序判
+joinOutstanding → JoinGuard、finalityOutstanding → deferred、managerPlanning → Activation、
+managerJobHandedOff → 完成，其余 → `ManagerIdleEncouragement`。`TurnCompletionProgram` 不引用
+Manager / Reviewer / Student–Teacher 业务。
 
-`HostReviewGuard` 仅保留 Reviewer 面（openBarrier / read / verdict）；REVIEW-006 的
-`ConfirmedReviewWitness` 只由 Reviewer 侧与 Finality cohort 消费。
+`ReviewerWorkflow` 是 Reviewer terminal 后 `ReviewerGuard` / `ReviewConfirmation` continuation 的
+唯一业务 writer；`HostReviewGuard` 只是 transport primitive。Finality cohort 只等待 durable verdict /
+witness，并在 request 关闭时撤销对应 Reviewer continuation capability，不发送 challenge 或 guard。
+REVIEW-006 的 `ConfirmedReviewWitness` 只由 Reviewer 侧与 Finality cohort 消费。
 
 ## REVIEW-010：ProviderInputSeal 的 fail-closed
 

@@ -44,6 +44,7 @@ module CompletionCell =
 /// One physical child run — single owner of the completion cell and
 /// cancellation lifetime.  The run is created for each fork/new-owner attempt;
 /// a busy nudge does not create a new run.
+/// DSL-state-combination: physical — ChildSessionId is a runtime resource cell
 type ChildRun =
     {
         /// Runtime identity used to key the agent in the ForkRuntime map.

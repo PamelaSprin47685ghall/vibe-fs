@@ -14,7 +14,7 @@ Seal 绑定与因果链算法见 `how/review.md`。
 
 ## REVIEW-002：REVISE
 
-任一 REVISE 立即生效：fact 落盘后当前 request 直接 `FinalityRejected`，无 confirmation、不等待 sibling；未完成的 PERFECT 确认链作废（GLORY-044/055）。
+任一 REVISE 立即生效：fact 落盘后当前 request 直接 `FinalityRejected`，无 confirmation、不等待 sibling；未完成的 PERFECT 确认链及其 Reviewer continuation capability 同时作废，关闭后不得补发 challenge（GLORY-044/055）。
 
 ## REVIEW-003：PERFECT 需要因果证明
 

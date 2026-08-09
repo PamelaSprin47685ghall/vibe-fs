@@ -15,3 +15,7 @@ Join 有界批次 + 稳定排序，把并发完成收敛成确定性 wire。ABOR
 **Join 输出：有界批次 + 稳定排序 vs 无序并发。** 拒无序：并发完成按 EXEC-018 收敛成确定性 wire，否则父流程无法稳定判断。
 
 **取消：ABORTED 当终态 vs 仅控制面。** 拒终态化：取消不是业务结果；洗成终态让恢复/fallback 走错分支（EXEC-020）。
+
+**Join 中断：session future latch vs JoinAttempt。** 拒 latch：零 waiter 时收到的用户消息没有可归属的 wait；保留它会把过去的 ingress 错接给未来 join。attempt 在工具入口先建立，用户消息只唤醒当时活动的 attempt；无 attempt 时只保留正常 Host 消息，不产生 join wake，也不取消 sub-session。Esc 是用户对当前父 attempt 的取消：当前 join 返回 operator_abort，父 TurnAborted cleanup 同时取消全部仍在运行的 sub-session。两种 ingress 不得混同（EXEC-017）。
+
+**Student–Teacher：生命周期 cell vs 独立物理 scope。** 拒 `RunState`、handoff 与 pending slot 合并：它们把调用栈位置藏进可变字段，terminal handler 必须猜下一步。Teacher call、return completion、Student final completion 与 skill mutation 各自只拥有一个物理 lifetime；业务顺序由 prompt facts 与 CE 调用结构表达（EXEC-026/027）。

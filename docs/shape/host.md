@@ -131,15 +131,17 @@ type private Activity =
     | Running of attemptSerial: int64
     | Idle of attemptSerial: int64
     | IdleConsumed of attemptSerial: int64
+    | Revoked of attemptSerial: int64
 ```
 
 唯一状态转换：
 
 ```text
-BeginProviderAttempt(session)  serial+1 → Running(serial)；任何旧 permit 立即失效
-ObserveIdle(session)            Running(serial) → Idle(serial)，返回 Permit(session, serial)
-TryConsume(permit)              state == Idle(permit.AttemptSerial) → IdleConsumed(serial) → true；否则 false
-DropSession(session)            清空该 session 状态，旧 permit 永久失效
+BeginProviderAttempt(session)   serial+1 → Running(serial)；任何旧 permit 立即失效
+ObserveIdle(session)             Running(serial) → Idle(serial)，返回 Permit(session, serial)
+TryConsume(permit)               state == Idle(permit.AttemptSerial) → IdleConsumed(serial) → true；否则 false
+RevokeCurrentAttempt(session)   当前 serial → Revoked(serial)；全部现存 permit 永久失效
+DropSession(session)             清空该 session 状态，旧 permit 永久失效
 ```
 
 `AttemptSerial` 只是进程内同步 token，**禁止写入 Journal**（HOST-007）。
@@ -148,6 +150,7 @@ DropSession(session)            清空该 session 状态，旧 permit 永久失�
 
 - `BeginProviderAttempt` 必须在每次 provider request 构建前的最早同步位置调用（`experimental.chat.messages.transform` 入口，任何 `let!` 之前），不得等 request 已运行。
 - `ObserveIdle` 在收到 `SessionIdle` 时调用；permit 从 idle 观察携带到 side-effect 边界（`ReconcileWake = IdleWake of QuiescencePermit`），禁止用 scheduler dispatch generation 冒充 provider attempt serial。
+- `AttemptAborted` 同步调用 `RevokeCurrentAttempt`，再发 `AbortWake`；即使延迟 `SessionIdle` 随后到达，Revoked 也不得退回 Idle。只有下一次真实 `BeginProviderAttempt` 才建立新 serial。
 - 最终物理发送前必须再次 `TryConsume`；`TryConsume` 与 dispatcher send 之间禁止 await（防 TOCTOU）。permit 失效 = `Superseded`，不是错误、不写 `PluginPromptClaimed`。
 
 idle-derived continuation（missing-final-report、interaction-repair、ManagerIdleEncouragement、TeacherIdleNudge、StudentCompileNudge）必须同时满足：业务决策认为值得继续 + fresh `QuiescencePermit`。`ProviderRetryAttempt`、`BusyAgentNudge`、显式用户 continuation、`FinalityRejected` 不由 idle 前提产生，不走 gate。

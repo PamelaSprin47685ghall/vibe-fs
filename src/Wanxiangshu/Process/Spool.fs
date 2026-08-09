@@ -10,6 +10,7 @@ module Spool =
     [<Literal>]
     let ChunkSizeBytes: int = 204800
 
+    /// DSL-state-combination: physical — BytesWritten is a byte-buffer spool counter
     type StreamingSpool =
         { Path: string
           mutable BytesWritten: int64 }

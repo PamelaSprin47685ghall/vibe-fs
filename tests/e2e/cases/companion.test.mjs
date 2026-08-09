@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { compileScenario } from '../support/scenario-schema.js';
 import { ScenarioRuntime } from '../support/scenario-runtime.js';
 import {
+  awaitCausalObservation,
   runStaticGate,
   setupScenario,
   teardownScenario,
@@ -77,16 +78,17 @@ async function runProjectionScenario(scenario) {
   // production behaviour; no clause names the park). Do not wait for
   // session.idle on the Blogger — a parked waiter keeps the child non-idle
   // until the next main offer. Provider request count is the observable.
-  const deadline1 = Date.now() + WATCHDOG_TIMEOUT_MS;
-  while (Date.now() < deadline1 && bloggerRequests(scenario.provider, bloggerId).length < 1) {
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  const firstBlogRequests = bloggerRequests(scenario.provider, bloggerId);
-  assert.ok(
-    firstBlogRequests.length >= 1,
-    'Companion gap: first primary projection did not emit a real Blogger child request',
-  );
-  scenario.watchdog?.advance({ reason: 'primary-blogger-request-1', lane: 'primary-blogger', blocking: true });
+  const firstBlogRequests = await awaitCausalObservation({
+    scenario,
+    id: 'primary-blogger-request-1',
+    reason: 'primary-blogger-request-1',
+    lane: 'primary-blogger',
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    read: async () => bloggerRequests(scenario.provider, bloggerId),
+    token: (requests) => String(requests.length),
+    ready: (requests) => requests.length >= 1,
+  });
+  assert.ok(firstBlogRequests.length >= 1, 'Companion gap: first primary projection did not emit a real Blogger child request');
 
   const secondTurn = scenario.turn.start(primaryId);
   const secondPrompt = await scenario.client.request('POST', `/session/${primaryId}/prompt_async`, {
@@ -100,13 +102,16 @@ async function runProjectionScenario(scenario) {
   await secondTurn.awaitTerminal({ timeoutMs: WATCHDOG_TIMEOUT_MS, requireActivity: true, requireAssistantTerminal: true, requireIdleAfterActivity: true });
 
   // Second main offer resumes parked Blogger → second provider request.
-  const deadline2 = Date.now() + WATCHDOG_TIMEOUT_MS;
-  while (Date.now() < deadline2 && bloggerRequests(scenario.provider, bloggerId).length < 2) {
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  scenario.watchdog?.advance({ reason: 'primary-blogger-request-2', lane: 'primary-blogger', blocking: true });
-
-  const allBlogRequests = bloggerRequests(scenario.provider, bloggerId);
+  const allBlogRequests = await awaitCausalObservation({
+    scenario,
+    id: 'primary-blogger-request-2',
+    reason: 'primary-blogger-request-2',
+    lane: 'primary-blogger',
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    read: async () => bloggerRequests(scenario.provider, bloggerId),
+    token: (requests) => String(requests.length),
+    ready: (requests) => requests.length >= 2,
+  });
   assert.equal(allBlogRequests.length, 2, 'two primary projections must produce exactly two Blogger requests');
   const childIdsAfterSecondProjection = [...new Set(sessionCreatedIds(scenario))].filter((id) => id !== primaryId);
   assert.deepEqual(

@@ -315,11 +315,17 @@ export function scanStateProducts(text, file = '<synthetic>') {
   // Walk each record definition and classify its state-typed fields.
   const recordStart = /^\s*(?:type|and)\s+(\w+)\s*=\s*\{\s*$/
   const recordEnd = /^\s*\}\s*$/
+  // ce.md §13.1: the field rule must also read `mutable Foo: Type` so a
+  // mutable-record state machine cannot slip past state-product. A plain
+  // `Foo: Type` keeps matching unchanged (the `mutable ` prefix only applies
+  // to the mutable form).
+  const mutableFieldLine = /^\s*mutable\s+(\w+)\s*:\s*([^=\[\]{}]+?)\s*$/
   const fieldLine = /^\s*(\w+)\s*:\s*([^=\[\]{}]+?)\s*$/
   const stateType = (type) => {
     const t = type.trim()
     if (t === 'bool') return true
     if (/^[\w.]+ option$/i.test(t)) return true
+    if (/\bref$/i.test(t)) return true
     return definedDus.has(t)
   }
 
@@ -358,9 +364,216 @@ export function scanStateProducts(text, file = '<synthetic>') {
       rec = null
       continue
     }
-    const fm = fieldLine.exec(lines[i])
-    if (fm) rec.fields.push({ name: fm[1], type: fm[2] })
+    const mf = mutableFieldLine.exec(lines[i])
+    const fm = mf ?? fieldLine.exec(lines[i])
+    if (fm) rec.fields.push({ name: fm[1], type: fm[2], isMutable: mf !== null })
   }
+  return violations
+}
+
+/**
+ * business mutable-record-field name: a record field whose name marks it as a
+ * business program counter / next-action token. ce.md §13.2/§5/§22: a mutable
+ * record field named State/Phase/Stage/Mode/RunState/Handoff/Should/Already/
+ * Next/Standing/Disposition/Status is a business stage — never a physical
+ * resource. Note `Pending*` slots are NOT listed here: a physical-annotated
+ * Session/Process record may legitimately carry a `Pending` queue or
+ * `Pending*` completion buffer (e.g. PtySession.Pending). An unannotated
+ * Session/Process record already fires regardless of field name (see emit), so
+ * StudentRunCell's PendingTeacherReturn/PendingFinal still fire through that
+ * branch, not through this business-token override.
+ */
+const BUSINESS_MUTABLE_FIELD_RE =
+  /^(?:State|Phase|Stage|Mode|RunState|Handoff|Should|Already|Next|Standing|Disposition|Status)$/
+
+const isDomainOrApplicationPath = (file) => {
+  const rel = norm(String(file))
+  return rel.includes('/Domain/') || rel.includes('/Application/')
+}
+
+/**
+ * mutable-record-field (ce.md §13.2/§14): a `mutable Foo: T` record field is a
+ * long-lived mutable state axis. Rule:
+ *   - business-stage field name → always a violation (no path exemption).
+ *   - Domain/Application path → always a violation (no annotation exemption).
+ *   - Session/Process path → violation unless the record carries a
+ *     `/// DSL-state-combination: physical` annotation proving each axis is a
+ *     real physical resource (ce.md §14 — an annotation alone is not proof; the
+ *     human proof accompanies it, but the annotation is the mechanical gate).
+ * This is the gate that should have caught StudentRunCell's mutable-slots; it
+ * is field-name independent for the business tokens.
+ */
+export const scanMutableRecordFields = (text, file = '<synthetic>') => {
+  const lines = text.split('\n')
+  const violations = []
+
+  // A record declaration may be `type X = {`, `type X =` (body `{` on a later
+  // line), `type private X = {`, `and X =`, etc. The `{` may or may not sit on
+  // the declaration line, and a `private|internal|public` modifier may prefix
+  // the name. A DU (`type X =` then `| Case`) is not a record — we only commit
+  // to a record once a body `{` appears before any `|` case line.
+  const declOpen = /^\s*(?:type|and)\s+(?:private\s+|internal\s+|public\s+)?(\w+)\s*=\s*$/
+  const declOpenInline = /^\s*(?:type|and)\s+(?:private\s+|internal\s+|public\s+)?(\w+)\s*=\s*\{\s*$/
+  const recordEnd = /^\s*\}\s*$/
+  const bodyOpen = /^\s*\{\s*$/
+  const caseLine = /^\s*\|/
+  // A mutable or `ref` field may carry the record's closing `}` on the same
+  // line. `ref` is mutable storage too; treating it as ordinary data would
+  // re-open the exact escape hatch this gate closes.
+  const recordFieldLine = /^\s*(mutable\s+)?(\w+)\s*:\s*([^=\[\]{}]+?)\s*(?:}|\Z|$)/
+
+  const collectDoc = (i) => {
+    const doc = []
+    for (let j = i - 1; j >= 0; j--) {
+      const t = lines[j].trim()
+      if (t === '') continue
+      if (/^\[</.test(t)) continue
+      if (/^\/\//.test(t) && !/^\/\/\//.test(t)) continue
+      if (!/^\/\/\//.test(t)) break
+      doc.unshift(lines[j])
+    }
+    return doc
+  }
+
+  const emit = (rec) => {
+    const hasPhysical = rec.doc.some((l) => l.includes('DSL-state-combination: physical'))
+    const classified = rec.doc.some((line) =>
+      STATE_COMBINATION_CATEGORIES.some((category) => line.includes(`DSL-state-combination: ${category}`)),
+    )
+    if (rec.fields.length >= 2 && !classified) {
+      violations.push({
+        gate: 'state-product',
+        file,
+        line: rec.line,
+        text: `record '${rec.name}' combines ${rec.fields.length} mutable/ref storage axes without a /// DSL-state-combination: domain|physical classification`,
+      })
+    }
+    const domainLayer = isDomainOrApplicationPath(file)
+    for (const field of rec.fields) {
+      // Domain/Application: any mutable storage field is a violation, with no
+      // annotation exemption (ce.md §13.2). `ref` is not a loophole.
+      if (domainLayer) {
+        violations.push({
+          gate: 'mutable-record-field',
+          file,
+          line: rec.line,
+          text:
+            `record '${rec.name}' ${field.storage} field '${field.name}' in Domain/Application is a program counter, not a physical resource`, // eslint-disable-line max-len
+        })
+        continue
+      }
+      const business = BUSINESS_MUTABLE_FIELD_RE.test(field.name)
+      // Session/Process physical-annotated + non-business → real resource, pass.
+      if (hasPhysical && !business) continue
+      const reason = business
+        ? `record '${rec.name}' has business ${field.storage} field '${field.name}' — a program counter, not a physical resource`
+        : `record '${rec.name}' ${field.storage} field '${field.name}' lacks a DSL-state-combination: physical proof of resource ownership` // eslint-disable-line max-len
+      violations.push({
+        gate: 'mutable-record-field',
+        file,
+        line: rec.line,
+        text: reason,
+      })
+    }
+  }
+
+  // pendingDecl: a `type/and ... =` line whose body has not yet resolved to a
+  // record `{` or a DU `|`. Only once a body `{` is seen (before any `|` at the
+  // same level) do we commit to a record and start collecting mutable fields.
+  let pendingDecl = null
+  let inRecord = null
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const trimmed = line.trim()
+
+    // A new declaration line starts (or resets) a pending declaration. If we
+    // are already inside a record body, a following `type/and` closes it first
+    // (each record's mutable fields must be attributed to their own record).
+    const openRe = /^\s*(?:type|and)\s+(?:private\s+|internal\s+|public\s+)?(\w+)/
+    if (openRe.test(line)) {
+      if (inRecord) {
+        emit(inRecord)
+        inRecord = null
+      }
+      const inline = declOpenInline.exec(line)
+      if (inline) {
+        inRecord = { name: inline[1], fields: [], line: i + 1, doc: collectDoc(i) }
+        pendingDecl = null
+        continue
+      }
+      const open = declOpen.exec(line)
+      if (open) {
+        pendingDecl = { name: open[1], line: i + 1, doc: collectDoc(i) }
+        continue
+      }
+      continue
+    }
+
+    if (inRecord) {
+      if (recordEnd.test(line)) {
+        emit(inRecord)
+        inRecord = null
+        pendingDecl = null
+        continue
+      }
+      const fm = recordFieldLine.exec(line)
+      if (fm) {
+        const isMutable = fm[1] !== undefined
+        const isRef = /\bref\s*$/i.test(fm[3])
+        if (isMutable || isRef) {
+          inRecord.fields.push({
+            name: fm[2],
+            type: fm[3],
+            storage: isMutable ? 'mutable' : 'ref',
+          })
+        }
+        // A trailing `}` on the same line closes the record body.
+        if (/\}\s*$/.test(line)) {
+          emit(inRecord)
+          inRecord = null
+          pendingDecl = null
+        }
+      }
+      continue
+    }
+
+    if (pendingDecl) {
+      if (bodyOpen.test(line)) {
+        inRecord = {
+          name: pendingDecl.name,
+          fields: [],
+          line: pendingDecl.line,
+          doc: pendingDecl.doc,
+        }
+        pendingDecl = null
+        continue
+      }
+      if (caseLine.test(line)) {
+        // A `|` case means this is a DU, not a record — discard the candidate.
+        pendingDecl = null
+        continue
+      }
+      if (trimmed !== '' && !trimmed.startsWith('//')) {
+        if (trimmed.includes('{')) {
+          inRecord = {
+            name: pendingDecl.name,
+            fields: [],
+            line: pendingDecl.line,
+            doc: pendingDecl.doc,
+          }
+          pendingDecl = null
+          continue
+        }
+        // A non-comment, non-`{`, non-`|` line means the declaration is not a
+        // body-opened record in the expected sense (e.g. a type abbreviation or
+        // a generic constraint) — stop hunting.
+        pendingDecl = null
+      }
+    }
+  }
+
+  if (inRecord) emit(inRecord)
   return violations
 }
 
@@ -370,8 +583,9 @@ export const scanText = (text, file = '<synthetic>') => {
   const lines = text.split('\n')
 
   // state-product is a structure parse, independent of field names, so it runs
-  // once over the whole text rather than per line.
+  // once over the whole text rather than per line. Same for mutable-record-field.
   violations.push(...scanStateProducts(text, file))
+  violations.push(...scanMutableRecordFields(text, file))
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]

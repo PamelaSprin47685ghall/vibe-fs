@@ -58,7 +58,9 @@ PTY completion **只**由 backend `onExit` 触发。禁止 stdout 启发式「�
 
 join 等待直至：completion 可用 / 本地 operator abort / external-user ingress 唤醒 / 适用的 DevOps deadline。中断是 `JoinWaitOutcome.Interrupted of JoinInterruptReason`，不是 ForkError。`JoinInterruptReason` = `OperatorAbort` \| `UserMessageArrived` \| `DeadlineExpired`。
 
-External-user ingress 只打断**当前** wait：不 cancel mailbox/runtime/session/child，也不本身授予 Prompt authority。任意 race 唤醒后，已可用的 completion 先 drain，再才发出 interrupt 结果。
+External-user ingress 只打断**当前** wait：不 cancel mailbox/runtime/session/child，也不本身授予 Prompt authority。每个 `join` 入口先建立一个 `JoinAttempt`；消息只 fan-out 给该 Session 当时 active 的 attempt。无 active attempt 的消息仍进入正常 Host 队列，但作为 join wake 丢弃，绝不 latched 给 future join。任意 race 唤醒后，已可用的 completion 先 drain，再才发出 interrupt 结果。
+
+operator abort 先打断当前 `JoinAttempt`，使 join 返回 `reason=operator_abort`；同一次 Esc 随后终止父 provider attempt，`TurnAborted` cleanup 必须取消该父全部仍在运行的 sub-session。已经完成并进入 `CompletedAwaitingJoin` 的结果仍可消费。与之相对，external-user ingress 不产生 `TurnAborted`，不得取消任何 sub-session。
 
 wire：operator abort → `status=interrupted, reason=operator_abort`；user message → `status=interrupted, reason=user_message`；DevOps 超时 → `ForkError.TimedOut`（`status="failed", code="TIMED_OUT"`，EXEC-004）。tool abort ≠ runtime.Cancel。中途用户消息可唤醒 join，不经 AcceptHumanRoot、不重置 LogicalRun、不新建 Manager Life（PROMPT-004 不变，fail-closed）。
 

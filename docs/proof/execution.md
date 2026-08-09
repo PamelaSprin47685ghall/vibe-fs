@@ -16,6 +16,8 @@
 |------|------|
 | JoinGuard 优先于其它 Manager completion 分支；Manager 面无 Review Guard | EXEC-016、GLORY-070 |
 | 中断 = interrupted（operator_abort 与 user_message）非 error；DevOps 超时 → TIMED_OUT；user wake 不 cancel 资源；completion 优先于 interrupt race；PromptKey continuation/compaction 不唤醒 | EXEC-017、EXEC-025 |
+| active JoinAttempt 收到 user message 会醒；zero-active 消息不唤醒 future join；attempt 建立后、mailbox wait 前的消息仍唤醒当前 attempt | EXEC-017 |
+| user_message 后的新 attempt 不继承旧 wake且不取消 child；Esc 返回当前 join 的 operator_abort并取消全部 running sub-session；新 child 的 completion 由后续 join 消费；全程零裸 `#` repair | `tests/e2e/cases/temporal-ownership-unhappy-path.test.mjs`（EXEC-017） |
 | EXEC-018 的批次上限、稳定排序、CAS | EXEC-018 |
 | blob v2；LegacyFalseAbort 永不 completion | EXEC-021 |
 | 假 completion 补偿路径 | EXEC-022 |
@@ -34,8 +36,9 @@
 
 | 证明 | 期望 | 条款 |
 |------|------|------|
-| teacher single-flight | 并发第二调用拒绝；问题已落盘不回滚 | EXEC-027、EXEC-026 |
-| return completion cell | 无 waiter/重复/错 Session fail closed；匹配正常 terminal 后只完成一个父调用 | EXEC-026 |
+| teacher call scope | 并发第二调用拒绝；问题已落盘不回滚；scope 释放后下一调用可开始 | EXEC-027、EXEC-026 |
+| return completion scope | 无 call/重复/错 Session fail closed；匹配正常 terminal 后只完成一个父调用 | EXEC-026 |
+| 静态所有权 | 无 mutable lifecycle record；scope fixture 的状态轴与业务字段均被 DSL gate 拒绝 | EXEC-026、FLOW-006 |
 | Teacher 正常结束 | return 后固定 completion 为 `TurnCompleted`；成功路径无 abort/interrupted | EXEC-026、EXEC-027、HOST-014 |
 | Teacher idle | 同 Session nudge；预算耗尽失败；普通正文不作答案 | EXEC-027 |
 | Student idle | Learn→Compile 一次；Compile idle nudge；不回 Learn | EXEC-027、PROMPT-012 |

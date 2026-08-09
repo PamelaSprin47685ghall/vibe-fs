@@ -35,8 +35,6 @@ type CompanionHost
     let mutable bloggerId: SessionId option = None
     // DSL-MUTABLE: resource — create-failure latch, cleared on retry
     let mutable bloggerCreateFailed = false
-    let bloggerRequestKind = ref ProviderRequestKind.BloggerMain
-    let bloggerSquashFrameCount = ref None
     // DSL-MUTABLE: resource — one-shot restored-blogger id consumption
     let mutable restoredBloggerIdOpt = restoredBloggerId
 
@@ -138,8 +136,6 @@ type CompanionHost
           EnsureBlogger = ensureBlogger
           Gate = gate
           Companion = companion
-          RequestKind = bloggerRequestKind
-          SquashFrameCount = bloggerSquashFrameCount
           Journal = journal
           EffectiveAgent = bloggerEffectiveAgent
           RecordSquashPlan = fun bloggerId providerRun -> this.RecordSquashPlan bloggerId providerRun

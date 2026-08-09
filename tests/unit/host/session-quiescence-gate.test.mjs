@@ -17,6 +17,7 @@ const {
   SessionQuiescenceGate__BeginProviderAttempt_Z31B28506: beginAttempt,
   SessionQuiescenceGate__ObserveIdle_Z31B28506: observeIdle,
   SessionQuiescenceGate__TryConsume_39B5CDAB: tryConsume,
+  SessionQuiescenceGate__RevokeCurrentAttempt_Z31B28506: revokeCurrentAttempt,
   SessionQuiescenceGate__DropSession_Z31B28506: dropSession,
 } = await import('../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js')
 
@@ -84,4 +85,36 @@ test('Q10_session_deleted_drops_every_permit', () => {
 
   dropSession(gate, S)
   assert.equal(tryConsume(gate, permit), false, 'a dropped session never sends on an old permit')
+})
+
+test('ESC_P0_2_operator_abort_revokes_unconsumed_idle_permit', () => {
+  // HOST-004: a permit is minted on fresh idle but not yet consumed; Esc
+  // revokes the attempt. A delayed
+  // Unknown-reconcile must NOT be able to consume the old permit (which is
+  // what would mint a bare `#` missing-final-report repair).
+  const gate = new SessionQuiescenceGate()
+  beginAttempt(gate, S)
+  const permit = observeIdle(gate, S)
+
+  revokeCurrentAttempt(gate, S)
+
+  assert.equal(tryConsume(gate, permit), false, 'abort must permanently void the pending idle permit')
+})
+
+test('ESC_P0_3_aborted_attempt_cannot_be_reminted_by_delayed_idle', () => {
+  // After Esc, a delayed SessionIdle must NOT re-establish a usable idle
+  // permit for the aborted attempt; eligibility returns only with the next
+  // real BeginProviderAttempt (HOST-004).
+  const gate = new SessionQuiescenceGate()
+  beginAttempt(gate, S)
+
+  revokeCurrentAttempt(gate, S)
+  const latePermit = observeIdle(gate, S)
+
+  assert.equal(tryConsume(gate, latePermit), false, 'revoked attempt must not mint a usable idle permit')
+
+  // A genuine new attempt restores eligibility.
+  beginAttempt(gate, S)
+  const freshPermit = observeIdle(gate, S)
+  assert.equal(tryConsume(gate, freshPermit), true, 'next real BeginProviderAttempt re-establishes idle rights')
 })

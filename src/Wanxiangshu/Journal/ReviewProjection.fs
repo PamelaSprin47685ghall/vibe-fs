@@ -41,6 +41,7 @@ type ProviderInputSeal =
 type ReviewGuardProjection =
     {
         CurrentBarrierId: ReviewBarrierId option
+        CurrentManagerSessionId: SessionId option
         LastGitTreeHash: GitTreeHash option
         Witness: ReviewWitness
         /// Set once the first PERFECT issued its challenge; cleared by REVISE or a
@@ -94,6 +95,7 @@ module ReviewProjection =
 
     let empty =
         { CurrentBarrierId = None
+          CurrentManagerSessionId = None
           LastGitTreeHash = None
           Witness = ReviewWitness.NoReview
           PendingChallenge = None
@@ -126,12 +128,18 @@ module ReviewProjection =
     /// is still asked against the current tree / barrier); unfinished revision
     /// or pending-PERFECT state is barrier-scoped and must not leak into the
     /// next request (GLORY-045 reuse of the same Reviewer session).
-    let startBarrier (barrierId: ReviewBarrierId) (gitTreeHash: GitTreeHash) (current: ReviewGuardProjection) =
+    let startBarrier
+        (managerSessionId: SessionId)
+        (barrierId: ReviewBarrierId)
+        (gitTreeHash: GitTreeHash)
+        (current: ReviewGuardProjection)
+        =
         if current.CurrentBarrierId = Some barrierId then
             current
         else
             { current with
                 CurrentBarrierId = Some barrierId
+                CurrentManagerSessionId = Some managerSessionId
                 LastGitTreeHash = Some gitTreeHash
                 PendingChallenge = None
                 ObservedAttemptKeys = []

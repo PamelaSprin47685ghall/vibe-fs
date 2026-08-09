@@ -343,6 +343,82 @@ test('DSL_OWNERSHIP_renamed_record_state_axes_are_reported', () => {
   )
 })
 
+// DSL-005/007: a record carrying `mutable foo:` state fields must produce a
+// state-product violation. A
+// production file with this fixture is therefore rejected by the CLI gate.
+test('DSL_OWNERSHIP_mutable_record_program_counter_fires_state_product', () => {
+  const hits = scanText(
+    readFixture('mutable-record-program-counter.fs'),
+    'src/Wanxiangshu/Session/StudentRunCell.fs',
+  )
+  assert.ok(
+    hits.some((hit) => hit.gate === 'state-product'),
+    'a mutable-record field set of >= 2 independent state axes must fire state-product (DSL-005/007)',
+  )
+})
+
+test('DSL_OWNERSHIP_mutable_record_program_counter_fires_mutable_record_field', () => {
+  const hits = scanText(
+    readFixture('mutable-record-program-counter.fs'),
+    'src/Wanxiangshu/Session/StudentRunCell.fs',
+  )
+  assert.ok(
+    hits.some((hit) => hit.gate === 'mutable-record-field'),
+    'State/Handoff are business tokens and Return/Final are Session mutable fields with no physical annotation, so the mutable-record-field gate must fire',
+  )
+})
+
+test('DSL_OWNERSHIP_ref_record_program_counter_fires_mutable_record_field', () => {
+  const hits = scanText(
+    readFixture('ref-record-program-counter.fs'),
+    'src/Wanxiangshu/Session/StudentRunCell.fs',
+  )
+  assert.ok(
+    hits.some((hit) => hit.gate === 'mutable-record-field'),
+    'ref storage must not bypass the mutable-record-field gate',
+  )
+  assert.ok(
+    hits.some((hit) => hit.gate === 'state-product'),
+    'ref storage must count as an independent state axis',
+  )
+})
+
+test('DSL_OWNERSHIP_physical_state_record_mutable_fields_are_allowed', () => {
+  const hits = scanText(readFixture('state-axes-physical.fs'), 'src/Wanxiangshu/Process/StateAxes.fs')
+  assert.ok(
+    hits.every((hit) => hit.gate !== 'mutable-record-field'),
+    'physical-annotated records must stay green under the mutable-record-field gate',
+  )
+})
+
+test('DSL_OWNERSHIP_session_mutable_requires_physical_annotation', () => {
+  // Production-style multi-line record body (mirrors ChildRun / PtySession).
+  const source = [
+    'module Sample',
+    'type Cell =',
+    '    {',
+    '      mutable Lease: SessionId option',
+    '    }',
+  ].join('\n')
+  const annotated = [
+    'module Sample',
+    '/// DSL-state-combination: physical — lease runtime resource',
+    'type Cell =',
+    '    {',
+    '      mutable Lease: SessionId option',
+    '    }',
+  ].join('\n')
+  const path = 'src/Wanxiangshu/Session/Cell.fs'
+  assert.ok(
+    scanText(source, path).some((hit) => hit.gate === 'mutable-record-field'),
+    'an unannotated Session mutable non-business field must fire mutable-record-field',
+  )
+  assert.ok(
+    !scanText(annotated, path).some((hit) => hit.gate === 'mutable-record-field'),
+    'a Session mutable non-business field behind a physical annotation must stay green',
+  )
+})
+
 test('DSL_OWNERSHIP_domain_state_combination_is_explicitly_allowed', () => {
   const hits = scanText(readFixture('state-axes-domain.fs'), 'src/Wanxiangshu/Domain/StateAxes.fs')
   assert.deepEqual(hits, [])

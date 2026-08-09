@@ -18,8 +18,20 @@ import {
   verdictMailbox,
 } from '../support/domain.mjs'
 import { JoinInterruptReason } from '../../../dist/Session/CompletionMailbox.js'
-import { JoinInterruptRegistry } from '../../../dist/Session/JoinInterruptRegistry.js'
+import {
+  JoinAttemptRegistry,
+  JoinAttemptLease__get_Wait as leaseWait,
+} from '../../../dist/Session/JoinInterruptRegistry.js'
 import { SessionIdModule_create } from '../../../dist/Kernel/Identity.js'
+
+const assertPending = async (wait, message) => {
+  let settled = false
+  wait.then(() => {
+    settled = true
+  })
+  await Promise.resolve()
+  assert.equal(settled, false, message)
+}
 
 const run = (id) =>
   agentCompletion.completedRun({
@@ -103,7 +115,6 @@ test('EXEC_017_wait_for_signal_operator_abort_returns_local_interrupt', async ()
   const box = completionMailbox.create(() => true)
   const interrupt = joinInterrupt.create()
   const pending = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
-  await new Promise((r) => setTimeout(r, 5))
   interrupt.Signal(JoinInterruptReason.OperatorAbort)
   const reason = await pending
   assert.equal(mailboxWakeReason.nameOf(reason), 'LocalInterrupt')
@@ -116,7 +127,6 @@ test('EXEC_017_wait_for_signal_user_message_returns_user_message_arrived', async
   const box = completionMailbox.create(() => true)
   const interrupt = joinInterrupt.create()
   const pending = completionMailbox.waitForSignal(box, joinInterrupt.wait(interrupt))
-  await new Promise((r) => setTimeout(r, 5))
   interrupt.Signal(JoinInterruptReason.UserMessageArrived)
   const reason = await pending
   assert.equal(mailboxWakeReason.nameOf(reason), 'LocalInterrupt')
@@ -138,18 +148,15 @@ test('EXEC_017_user_message_interrupt_does_not_cancel_mailbox', async () => {
   assert.equal(drained[0].AgentId, 'after-user-message')
 })
 
-// Registry fan-out: Register + SignalUserMessage fans UserMessageArrived to all
-// waiters for that session (HostSignalBootstrap → JoinInterruptRegistry path).
+// EXEC-017: two active attempts in one session both receive UserMessageArrived.
 test('EXEC_017_join_interrupt_registry_signal_user_message_fans_out', async () => {
-  const registry = new JoinInterruptRegistry()
+  const registry = new JoinAttemptRegistry()
   const session = SessionIdModule_create('ses-registry-fanout')
-  const first = joinInterrupt.create()
-  const second = joinInterrupt.create()
-  const reg1 = registry.Register(session, first)
-  const reg2 = registry.Register(session, second)
+  const a1 = registry.Begin(session, undefined)
+  const a2 = registry.Begin(session, undefined)
 
-  const wait1 = first.Wait
-  const wait2 = second.Wait
+  const wait1 = leaseWait(a1)
+  const wait2 = leaseWait(a2)
   registry.SignalUserMessage(session)
 
   const reason1 = await wait1
@@ -158,47 +165,83 @@ test('EXEC_017_join_interrupt_registry_signal_user_message_fans_out', async () =
   assert.equal(caseOf(reason2), 'UserMessageArrived')
   assert.notEqual(caseOf(reason1), 'OperatorAbort')
 
-  reg1.Dispose()
-  reg2.Dispose()
+  a1.Dispose()
+  a2.Dispose()
 })
 
-// Signal-before-Register race: pulse latched when zero waiters, consumed on Register.
-test('EXEC_017_join_interrupt_registry_signal_before_register_latches', async () => {
-  const registry = new JoinInterruptRegistry()
-  const session = SessionIdModule_create('ses-registry-latch')
-  const interrupt = joinInterrupt.create()
+// EXEC-017: a user message with no active attempt is dropped as a join wake;
+// a future join remains blocked until completion, a new user message, or Esc.
+test('EXEC_017_join_interrupt_registry_signal_with_no_active_attempt_does_not_wake_future_join', async () => {
+  const registry = new JoinAttemptRegistry()
+  const session = SessionIdModule_create('ses-registry-no-future-wake')
 
-  registry.SignalUserMessage(session) // before Register — must latch, not drop
-  const reg = registry.Register(session, interrupt)
-  const reason = await interrupt.Wait
-  assert.equal(caseOf(reason), 'UserMessageArrived')
+  registry.SignalUserMessage(session) // no active join attempt — dropped, not latched
+  const attempt = registry.Begin(session, undefined) // a FUTURE join begins later
 
-  reg.Dispose()
+  await assertPending(
+    leaseWait(attempt),
+    'an old user message must not wake a future join (EXEC-017)',
+  )
+
+  attempt.Dispose()
 })
 
-// SessionDeleted cleanup: ClearSession drops the latch so a later Register does not wake.
-test('EXEC_017_join_interrupt_registry_clear_session_drops_latch', async () => {
-  const registry = new JoinInterruptRegistry()
+// SessionDeleted cleanup: ClearSession removes active attempts without signaling, so a
+// later Begin stays blocked (no residual latch).
+test('EXEC_017_join_interrupt_registry_clear_session_removes_active_attempts', async () => {
+  const registry = new JoinAttemptRegistry()
   const session = SessionIdModule_create('ses-registry-clear')
 
-  registry.SignalUserMessage(session) // latches for zero waiters
+  const attempt = registry.Begin(session, undefined)
   registry.ClearSession(session)
 
-  const interrupt = joinInterrupt.create()
-  const reg = registry.Register(session, interrupt)
+  registry.SignalUserMessage(session)
 
-  let woke = false
-  const race = Promise.race([
-    interrupt.Wait.then((reason) => {
-      woke = true
-      return reason
-    }),
-    new Promise((resolve) => setTimeout(resolve, 30)),
-  ])
-  await race
-  assert.equal(woke, false, 'ClearSession must drop latch; Register must not signal UserMessageArrived')
+  await assertPending(
+    leaseWait(attempt),
+    'ClearSession must remove active attempts; no UserMessageArrived is delivered',
+  )
 
-  reg.Dispose()
+  attempt.Dispose()
+})
+
+// EXEC-017: Begin opens the attempt first, so a user signal arriving before
+// mailbox wait setup is recorded on this attempt's
+// own TCS and still wakes the current join. The signal-before-register race is
+// solved by the attempt scope, not by a session-level latch.
+test('EXEC_017_join_attempt_signal_before_mailbox_setup_wakes_current_join', async () => {
+  const registry = new JoinAttemptRegistry()
+  const session = SessionIdModule_create('ses-registry-p0-3')
+
+  // Begin the attempt first, exactly like JoinTool does; then a user signal lands
+  // before any mailbox registration is made — it must still resolve attempt.Wait.
+  const attempt = registry.Begin(session, undefined)
+  registry.SignalUserMessage(session)
+
+  // The mailbox wait is set up 'later'; the attempt is already awake.
+  const reason = await leaseWait(attempt)
+  assert.equal(caseOf(reason), 'UserMessageArrived', 'signal before mailbox setup must wake the current join')
+  assert.notEqual(caseOf(reason), 'OperatorAbort')
+
+  attempt.Dispose()
+})
+
+// EXEC-017: after join A disposes, later join B must not inherit A's signal.
+test('EXEC_017_join_attempt_old_signal_does_not_bleed_into_next_join', async () => {
+  const registry = new JoinAttemptRegistry()
+  const session = SessionIdModule_create('ses-registry-p0-4')
+
+  // join A active, user message wakes it, A ends (Dispose unregisters).
+  const a = registry.Begin(session, undefined)
+  registry.SignalUserMessage(session)
+  const reasonA = await leaseWait(a)
+  assert.equal(caseOf(reasonA), 'UserMessageArrived')
+  a.Dispose()
+
+  // join B begins later: it must NOT inherit A's user-message signal.
+  const b = registry.Begin(session, undefined)
+  await assertPending(leaseWait(b), 'join B must not inherit join A\'s user-message signal (EXEC-017)')
+  b.Dispose()
 })
 
 // ── 2: interrupt does not cancel mailbox / does not discard later publish ────

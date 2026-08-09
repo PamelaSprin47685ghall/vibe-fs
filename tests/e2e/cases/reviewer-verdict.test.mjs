@@ -169,7 +169,16 @@ async function oracleCheck(scenario, ctx, step) {
   const firstChallengeUserIdx = scenario.provider.requests.findIndex((request) =>
     lastUserText(request).startsWith("# Nope, let's re-evaluate:"));
   assert.ok(guardUserIdxs.length >= 1 && firstChallengeUserIdx >= 0, 'guard and challenge continuations must both appear on the wire');
-  assert.equal(firstChallengeUserIdx, guardUserIdxs.at(-1) + 1, 'skeptical challenge must immediately follow the guard request as adjacent steps');
+  const reviewerRequestIndexes = scenario.provider.requests
+    .map((request, index) =>
+      request.tools?.some((tool) => tool?.function?.name === 'verdict' || tool?.name === 'verdict') ? index : -1)
+    .filter((index) => index >= 0);
+  const guardReviewerPosition = reviewerRequestIndexes.indexOf(guardUserIdxs.at(-1));
+  assert.equal(
+    reviewerRequestIndexes[guardReviewerPosition + 1],
+    firstChallengeUserIdx,
+    'skeptical challenge must be the next Reviewer request; independent Blogger work may interleave physically',
+  );
   assert.equal(new Set(valuesOf(rvFacts, 'GitTreeHash')).size, 1, 'double PERFECT must bind one tree hash');
   assert.equal(factsIn(scenario.host.workDir, 'ConfirmedReviewWitness').length, 1, 'dual PERFECT must produce one durable confirmed witness');
 

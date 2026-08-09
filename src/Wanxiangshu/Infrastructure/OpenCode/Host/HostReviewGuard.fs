@@ -37,6 +37,14 @@ module HostReviewGuard =
     /// (REVIEW-007) emit the same fact through the same function.
     let openBarrier = ReviewBarrier.openBarrier
 
+    /// REVIEW-002/007: single-owner continuation classification. The prompt decides
+    /// which continuation kind; Finality must not re-decide it.
+    let reviewerContinuationKind (prompt: string) : PromptAuthority.ContinuationKind =
+        if prompt = ReviewChallenge.Prompt then
+            PromptAuthority.ContinuationKind.ReviewConfirmation
+        else
+            PromptAuthority.ContinuationKind.ReviewerGuard
+
     /// REVIEW-007: is a guard continuation for this session already outstanding.
     ///
     /// Derived from PROMPT-005 `PendingClaims`, which is the durable record of a

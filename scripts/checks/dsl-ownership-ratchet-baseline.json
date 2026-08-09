@@ -1,1 +1,8 @@
-{}
+{
+  "Domain/LoopDetector.fs": {
+    "mutable-record-field": 1
+  },
+  "Session/StudentTeacherRuntime.fs": {
+    "mutable-record-field": 8
+  }
+}

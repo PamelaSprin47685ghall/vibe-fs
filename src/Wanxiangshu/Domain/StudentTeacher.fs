@@ -48,25 +48,3 @@ module StudentTeacher =
     let hasOpening (existing: string) (opening: string) =
         existing = opening
         || existing.StartsWith(opening + "\n\n", StringComparison.Ordinal)
-
-    type RunState =
-        | LearnReady
-        | TeacherWaiting
-        | CompileDispatching
-        | CompileReady
-        | Closed
-
-    let mayInvokeTeacher =
-        function
-        | RunState.LearnReady -> true
-        | _ -> false
-
-    let mayCompile =
-        function
-        | RunState.LearnReady -> true
-        | _ -> false
-
-    let mayReturn =
-        function
-        | RunState.CompileReady -> true
-        | _ -> false

@@ -19,6 +19,9 @@ must = ["manager.0", "manager-activation", "finality-reviewer.0", "finality-revi
 
 flow = [
   { wait = "manager.0" },
+  { wait = "child-inspector.0" },
+  { wait = "child-browser.0" },
+  { wait = "child-meditator.0" },
   { wait = "manager-activation" },
   { bindChild = { agent = "fast-reviewer", bind = ["fast-reviewer"] } },
   { wait = "finality-reviewer.0" },

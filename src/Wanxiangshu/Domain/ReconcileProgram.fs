@@ -46,6 +46,10 @@ module ReconcileProgram =
         | IdleWake of QuiescencePermit
         | RetryWake
         | FailureWake
+        /// HOST-004: operator abort is a typed wake category, not a failure.
+        /// It never carries idle/repair rights: under it, Unknown / Provisional
+        /// must never produce RepairMissingFinalReport / InteractionRepair / "#".
+        | AbortWake
 
     [<RequireQualifiedAccess>]
     type ReconcileEvidence =
@@ -113,9 +117,16 @@ module ReconcileProgram =
             if rereadsRemaining > 1 then
                 ReconcileDecision.Reread(false, rereadsRemaining - 1)
             else
-                // F1: exhausted TurnNeedsContinuation / stalled tool-call turn must
-                // publish so the repair branch runs instead of dying in StopPass.
-                ReconcileDecision.Publish
+                match wake with
+                | ReconcileWake.AbortWake ->
+                    // HOST-004: under operator abort, stalled provisional must never
+                    // publish an idle/repair continuation (InteractionRepair /
+                    // "#"). StopPass and wait for the real TurnAborted terminal.
+                    ReconcileDecision.StopPass
+                | _ ->
+                    // F1: exhausted TurnNeedsContinuation / stalled tool-call turn must
+                    // publish so the repair branch runs instead of dying in StopPass.
+                    ReconcileDecision.Publish
         | ReconcileEvidence.Unknown _ ->
             if rereadsRemaining > 1 then
                 ReconcileDecision.Reread(true, rereadsRemaining - 1)
@@ -127,9 +138,12 @@ module ReconcileProgram =
                     // final report) or fail closed — never StopPass silently.
                     ReconcileDecision.RepairMissingFinalReport
                 | ReconcileWake.RetryWake
-                | ReconcileWake.FailureWake ->
-                    // Observation stability only. No idle evidence → no
-                    // idle-derived continuation; the next SessionIdle re-kicks.
+                | ReconcileWake.FailureWake
+                | ReconcileWake.AbortWake ->
+                    // NoIdle/Repair rights. Observation stability only, or an abort
+                    // that must not resurrect an idle-derived continuation; the next
+                    // real physical signal re-kicks, and a genuine TurnAborted
+                    // terminal publishes normally.
                     ReconcileDecision.StopPass
         | ReconcileEvidence.SessionCleared -> ReconcileDecision.StopPass
 

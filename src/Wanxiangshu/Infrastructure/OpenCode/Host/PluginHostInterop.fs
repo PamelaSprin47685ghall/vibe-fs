@@ -83,6 +83,7 @@ module PluginHostInterop =
 
         // P0-RECOVERY-JOIN-001: JoinTool RequireFamilyRecovery → PluginRuntimeScope.
         registration.Runtime.AttachFamilyRecovery(fun root -> scope.RequireFamilyRecovery root)
-        // Phase 4: JoinTool UserMessageArrived wake → same process-local registry.
-        registration.Runtime.AttachJoinInterrupts scope.JoinInterrupts
+        // EXEC-017: JoinTool Begin(user-message wake) shares this process-local
+        // attempt-scoped registry.
+        registration.Runtime.AttachJoinAttempts scope.JoinInterrupts
         registration

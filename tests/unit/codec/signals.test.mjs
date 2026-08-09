@@ -65,7 +65,23 @@ test('MISC_signals_try_adapt_idle_retry_deleted_and_failure', () => {
   assert.equal(tryAdapt(owned, { type: 'chat.message' }), undefined)
   assert.equal(tryAdapt(owned, { type: 'session.status', properties: { status: { type: 'idle' } } }), undefined, 'missing session id drops')
   assert.equal(tryAdapt(owned, { type: 'session.status', sessionID: 's', properties: { status: { type: 'running' } } }), undefined, 'unknown status drops')
-  assert.equal(tryAdapt(owned, { type: 'session.error', sessionID: 's', properties: { error: { name: 'AbortError' } } }), undefined, 'abort errors are classified away')
+  // HOST-002/004: operator abort remains typed so the idle capability can be revoked.
+  assert.equal(caseOf(tryAdapt(owned, { type: 'session.error', sessionID: 's', properties: { error: { name: 'AbortError' } } })), 'AttemptAborted', 'abort maps to AttemptAborted, not classified away')
+})
+
+// Given an upstream AbortError notification.
+// Trigger: HostSignalAdapter decodes the event.
+// Expected: typed AttemptAborted reaches capability revocation.
+// Forbidden: dropping it or converting it to ProviderFailure (HOST-002/004).
+test('R3_abort_error_adapts_to_attempt_aborted_not_dropped', () => {
+  const owned = () => true
+  const sig = tryAdapt(owned, {
+    type: 'session.error',
+    sessionID: 's',
+    properties: { error: { name: 'AbortError' } },
+  })
+  assert.notEqual(sig, undefined, 'operator abort must remain a typed signal (HOST-002/004)')
+  assert.equal(caseOf(sig), 'AttemptAborted')
 })
 
 test('MISC_signals_try_adapt_ownership_gate', () => {

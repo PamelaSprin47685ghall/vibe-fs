@@ -191,7 +191,8 @@ module Reconciler =
                                 match wake with
                                 | ReconcileProgram.ReconcileWake.IdleWake permit -> Some permit
                                 | ReconcileProgram.ReconcileWake.RetryWake
-                                | ReconcileProgram.ReconcileWake.FailureWake -> None
+                                | ReconcileProgram.ReconcileWake.FailureWake
+                                | ReconcileProgram.ReconcileWake.AbortWake -> None
 
                             let context: ReconciledTurnContext =
                                 { Turn = reconciled
@@ -398,6 +399,13 @@ module Reconciler =
             | ProviderFailure(sessionId, _) -> this.Kick(sessionId, ReconcileProgram.ReconcileWake.FailureWake)
             | ProviderRetry retry -> this.Kick(retry.SessionId, ReconcileProgram.ReconcileWake.RetryWake)
             | SessionDeleted sessionId -> this.ClearSession(sessionId)
+            // HOST-002/004: an operator abort is a typed wake, not a failure.
+            // AbortWake holds no idle rights (quiescence was already revoked via
+            // RevokeCurrentAttempt), and decideStep refuses
+            // RepairMissingFinalReport / InteractionRepair under it. The genuine
+            // TurnAborted terminal publishes normally; Unknown / Provisional
+            // StopPass instead of resurrecting an idle-derived continuation.
+            | AttemptAborted sessionId -> this.Kick(sessionId, ReconcileProgram.ReconcileWake.AbortWake)
 
         member _.BindUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId, ?agentRole: Role) =
             lock gate (fun () -> cleared.Remove(SessionId.value sessionId) |> ignore)

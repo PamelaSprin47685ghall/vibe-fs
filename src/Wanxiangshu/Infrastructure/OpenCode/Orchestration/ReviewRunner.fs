@@ -31,7 +31,6 @@ module OrchestratorHostReview =
         (journal: AgentJournal option)
         (forkReviewer: ManagerJobId -> WorktreePath -> string -> Task<Result<SessionId, string>>)
         (awaitReviewer: ManagerJobId -> Task<Result<unit, string>>)
-        (nudgeReviewer: ManagerJobId -> string -> Task<Result<unit, string>>)
         (jobId: ManagerJobId)
         (managerSessionId: SessionId)
         (worktree: WorktreePath)
@@ -49,12 +48,6 @@ module OrchestratorHostReview =
                     journal
                     (fun () -> forkReviewer jobId worktree OpeningPrompt)
                     (fun () -> awaitReviewer jobId)
-                    (fun prompt ->
-                        task {
-                            match! nudgeReviewer jobId prompt with
-                            | Error error -> return Error error
-                            | Ok() -> return! awaitReviewer jobId
-                        })
                     managerSessionId
                     barrierId
                     tree

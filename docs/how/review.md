@@ -70,6 +70,10 @@ PhysicalBound 未完成时禁止 same-root 猜测成功。
 
 ---
 
+## Reviewer continuation 唯一 writer
+
+`ReviewerWorkflow.observe` 是 reconciled Reviewer turn 的唯一业务决策入口：prose-only → `ReviewerGuard`；首个 PERFECT pending → `ReviewConfirmation`；confirmed witness → terminal completion。`HostReviewGuard` 只完成 claim / transport；`FinalityController` 与 `HostReviewProgram` 只等待 durable verdict，不发送 Reviewer continuation。Finality request 关闭后，`ReviewerGuardState.continuationOpen` 以 manager/request/barrier 关系撤销未发送 capability。
+
 ## 端到端顺序
 
 ```text

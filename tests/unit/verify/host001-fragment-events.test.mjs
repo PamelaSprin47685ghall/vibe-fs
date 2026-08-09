@@ -1,8 +1,7 @@
 // tests/unit/Verify/host001-fragment-events.test.mjs — HOST-001 event layering.
 //
-// Fragment events must be dropped at the codec boundary. Only coarse session
-// lifecycle signals (idle / retry / deleted / non-abort error) may cross into
-// the reconciler.
+// Fragment events must be dropped at the codec boundary. Coarse session
+// lifecycle signals, including typed attempt abort, cross into the reconciler.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -59,10 +58,11 @@ test('HOST_001_only_coarse_session_lifecycle_signals_cross_the_boundary', () => 
   assert.equal(idValue.session(payloadOf(error)[0]), SESSION)
   assert.equal(payloadOf(error)[1], 'broken')
 
-  // Abort errors are deliberately dropped, not turned into provider failures.
+  // Abort is a physical attempt fact, never a provider failure and never dropped.
   const abort = hostSignals.tryDecode({
     type: 'session.error',
     properties: { sessionID: SESSION, error: { name: 'MessageAbortedError' } },
   })
-  assert.equal(abort, undefined)
+  assert.equal(caseOf(abort), 'AttemptAborted')
+  assert.equal(idValue.session(payloadOf(abort)), SESSION)
 })

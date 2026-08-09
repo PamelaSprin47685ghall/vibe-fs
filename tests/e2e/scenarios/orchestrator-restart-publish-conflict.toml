@@ -542,14 +542,13 @@ tools = ["blog"]
   respond = { type = "tool-call", tool = "blog", args = { text = "Session background after repair continued.", tip = "primitive-obsession" } }
 
 
+# The repair turn is optional. Both deliveries admit a tools-fixed prefix
+# rewrite when it occurs, but neither declares a mandatory cold boundary.
 [[epoch]]
 turn = "blogger-repair"
 step = 0
-reason = "prefix-probe"
+reason = "frame-commit"
 
-# step=1 is optional (second poke). prefix-probe end-asserts "must break at least
-# once"; an unused step would unfire. frame-commit admits a tools-fixed prefix
-# rewrite without requiring the break.
 [[epoch]]
 turn = "blogger-repair"
 step = 1

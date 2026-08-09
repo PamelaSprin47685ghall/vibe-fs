@@ -33,7 +33,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { compileScenario } from '../support/scenario-schema.js';
 import { ScenarioRuntime } from '../support/scenario-runtime.js';
-import { runStaticGate, setupScenario, teardownScenario, getSessionId } from '../support/index.js';
+import { awaitCausalObservation, runStaticGate, setupScenario, teardownScenario, getSessionId } from '../support/index.js';
 import { WATCHDOG_TIMEOUT_MS, ENFORCER_POLL_SLICE_MS } from '../support/time-budget.js';
 import { bindLaneSession } from '../support/lane.mjs';
 
@@ -128,16 +128,19 @@ function toolNames(request) {
   return tools.map((tool) => tool?.function?.name ?? tool?.name);
 }
 
-async function waitForCount(scenario, predicate, minCount, reason) {
-  const deadline = Date.now() + WATCHDOG_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    if (predicate()) {
-      scenario.watchdog?.advance({ reason, lane: 'provider', blocking: true });
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, ENFORCER_POLL_SLICE_MS));
-  }
-  assert.fail(`${reason}: condition not reached within ${WATCHDOG_TIMEOUT_MS}ms`);
+async function waitForCount(scenario, observe, minCount, reason) {
+  await awaitCausalObservation({
+    scenario,
+    id: reason,
+    reason,
+    lane: 'provider',
+    timeoutMs: WATCHDOG_TIMEOUT_MS,
+    intervalMs: ENFORCER_POLL_SLICE_MS,
+    read: async () => observe(),
+    token: (observation) => String(observation),
+    ready: (observation) =>
+      typeof observation === 'boolean' ? observation : observation >= minCount,
+  });
 }
 
 function printDiagnostics(scenario) {
@@ -199,7 +202,6 @@ try {
     requireAssistantTerminal: true,
     requireIdleAfterActivity: true,
   });
-  scenario.watchdog?.advance({ reason: 'main-turn-1', lane: 'manager', blocking: true });
 
   // The Blogger child appears and its first provider request goes out.
   await waitForCount(
@@ -290,7 +292,6 @@ try {
     requireAssistantTerminal: true,
     requireIdleAfterActivity: true,
   });
-  scenario.watchdog?.advance({ reason: 'parallel-coder-done', lane: 'coder', blocking: true });
 
   // The Blogger transform must STILL be parked: only one request so far.
   assert.equal(
@@ -316,7 +317,6 @@ try {
     requireAssistantTerminal: true,
     requireIdleAfterActivity: true,
   });
-  scenario.watchdog?.advance({ reason: 'main-turn-2', lane: 'manager', blocking: true });
 
   // step 0.4/0.3: the SECOND Blogger request must arrive only AFTER the second
   // main turn — the offer resumed the parked transform. A failed park would
@@ -411,7 +411,6 @@ try {
     requireAssistantTerminal: true,
     requireIdleAfterActivity: true,
   });
-  scenario.watchdog?.advance({ reason: 'main-turn-3', lane: 'manager', blocking: true });
 
   // Single-flight: no second concurrent blogger request starts during the third
   // main turn's synchronous window (skip while InFlight). After the parked

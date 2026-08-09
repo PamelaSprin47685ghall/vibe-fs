@@ -7,10 +7,9 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
 /// GLORY-042/043/044: the ONE review program shared by the Orchestrator's
-/// post-rebase barrier and the Manager's Finality workflow. Fork a reviewer,
-/// open its barrier, await the first verdict, and — when the first verdict is a
-/// PERFECT — nudge the SAME reviewer with `ReviewChallenge.Prompt` and require
-/// a causally confirmed second PERFECT.
+/// post-rebase barrier and the Manager's Finality workflow. It forks/enlists,
+/// opens the barrier, and waits on durable reviewer evidence. ReviewerWorkflow
+/// alone sends a missing-verdict guard or the confirmation challenge.
 ///
 /// REVISE is a legal business outcome (`Ok(RevisionRequired ...)`), never an
 /// error (GLORY-044). Infrastructure failures are the only `Error`s.
@@ -73,7 +72,6 @@ module HostReviewProgram =
         (journal: AgentJournal option)
         (forkReviewer: unit -> Task<Result<SessionId, string>>)
         (awaitReviewer: unit -> Task<Result<unit, string>>)
-        (continueReviewer: string -> Task<Result<unit, string>>)
         (managerSessionId: SessionId)
         (barrierId: ReviewBarrierId)
         (tree: GitTreeHash)
@@ -85,29 +83,21 @@ module HostReviewProgram =
                 match HostReviewGuard.openBarrier journal managerSessionId reviewerSessionId barrierId tree with
                 | Error error -> return Error(HostReviewFailure.CannotOpenBarrier error)
                 | Ok() ->
-                    // One barrier = one CE:
-                    //   await terminal → read
-                    //   if nudge needed → continue (send + await its terminal) → re-read
-                    // Continue owns the post-nudge await so AG-LISTENER-BEFORE-SEND
-                    // holds and we never double-await the same terminal.
-                    match! awaitReviewer () with
-                    | Error error -> return Error(HostReviewFailure.CannotAwaitReviewer error)
-                    | Ok() ->
-                        match readOutcome journal managerSessionId barrierId reviewerSessionId tree with
-                        | Ok outcome -> return Ok outcome
-                        | Error HostReviewFailure.ReviewerProducedNoVerdict ->
-                            match! continueReviewer RuntimeNudge.reviewerVerdictGuard with
-                            | Error error -> return Error(HostReviewFailure.CannotSendPrompt error)
+                    // Finality owns the barrier and observes facts only. A reviewer
+                    // terminal wakes ReviewerWorkflow, the sole continuation writer;
+                    // this CE then waits for the next terminal until durable evidence
+                    // says Revision or Confirmed. It never sends a guard/challenge.
+                    let rec awaitWitness () =
+                        task {
+                            match! awaitReviewer () with
+                            | Error error -> return Error(HostReviewFailure.CannotAwaitReviewer error)
                             | Ok() ->
                                 match readOutcome journal managerSessionId barrierId reviewerSessionId tree with
                                 | Ok outcome -> return Ok outcome
+                                | Error HostReviewFailure.ReviewerProducedNoVerdict
+                                | Error HostReviewFailure.ConfirmationUnproven -> return! awaitWitness ()
                                 | Error failure -> return Error failure
-                        | Error HostReviewFailure.ConfirmationUnproven ->
-                            match! continueReviewer ReviewChallenge.Prompt with
-                            | Error error -> return Error(HostReviewFailure.CannotSendPrompt error)
-                            | Ok() ->
-                                match readOutcome journal managerSessionId barrierId reviewerSessionId tree with
-                                | Ok outcome -> return Ok outcome
-                                | Error _ -> return Error HostReviewFailure.ConfirmationUnproven
-                        | Error failure -> return Error failure
+                        }
+
+                    return! awaitWitness ()
         }

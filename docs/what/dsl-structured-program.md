@@ -48,13 +48,13 @@ F# 调用栈就是流程栈。禁止把「程序下一步去哪」编码为可�
 
 ## DSL-007：mutable 仅用于物理资源
 
-`let mutable` 只允许：
+`let mutable` 与 `ref` 都是可变存储，只允许：
 
 - 纯算法 scratch（局部函数内）；
 - `Kernel/Parallel.fs` 等并发原语；
 - 物理 Task / Dictionary / TaskCompletionSource / CancellationTokenRegistration / 锁对象。
 
-禁止用 `mutable` 表达业务阶段、`slotArmed`、行为 bool 等控制流状态。
+禁止用 `mutable` 或 `ref` 表达业务阶段、`slotArmed`、行为 bool 等控制流状态；record 的 `Foo: T ref` 与 `mutable Foo: T` 同受 state-product 与 physical-owner proof 约束。
 
 ## 相关条款定义位置
 

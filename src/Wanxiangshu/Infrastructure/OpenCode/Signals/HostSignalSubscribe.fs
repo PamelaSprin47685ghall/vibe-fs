@@ -6,10 +6,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Process
 
-    /// Subscribes coarse host signals from exactly one source per plugin instance:
-    /// local events.listen preferred; global SSE only when the local listener is
-    /// unavailable. Both unavailable is a hard failure — no dual delivery, no
-    /// silent degradation, and never a cross-instance connection.
+/// Subscribes coarse host signals from exactly one source per plugin instance:
+/// local events.listen preferred; global SSE only when the local listener is
+/// unavailable. Both unavailable is a hard failure — no dual delivery, no
+/// silent degradation, and never a cross-instance connection.
 ///
 /// Global SSE: supervised reconnect + heartbeat. Half-open TCP (no error, no end)
 /// is detected by silence timeout; errors surface via console.warn and Health.

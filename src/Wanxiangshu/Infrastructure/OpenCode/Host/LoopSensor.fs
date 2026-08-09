@@ -3,7 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Wanxiangshu.Domain
+open Wanxiangshu.Session
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 

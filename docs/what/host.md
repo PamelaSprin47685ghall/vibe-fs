@@ -20,12 +20,13 @@ Reconciler、Transform 绑定、compaction 程序见 `how/host.md`。
 ```text
 session.status = idle
 session.status = retry
+session.error = MessageAbortedError | AbortError
 session.deleted
 ```
 
-`chat.message` 通常只走 Prompt acknowledgement，不得拼装 terminal turn。唯一额外用途是
-PROMPT-012 的 Student HumanRoot bootstrap：在 Host 保存消息、调用 provider 前同步创建 QA 并写入原文；
-该 hook 不从正文判断意图，只认已解析的显式 Student Agent 与 Authority Root 身份。
+abort error 必须解码为 typed `AttemptAborted`，撤销当前 attempt 的全部 idle-derived continuation capability；它不是 `ProviderFailure`，不得推进 fallback。
+
+`chat.message` 通常只走 Prompt acknowledgement，不得拼装 terminal turn。两个额外用途都只认结构身份：PROMPT-012 的 Student HumanRoot bootstrap 在 Host 保存消息、调用 provider 前同步创建 QA 并写入原文；无 PromptKey 的真实外部用户消息 signal 当前 active `JoinAttempt`，零 active attempt 时不留下 future join wake（EXEC-017）。两者都不从正文判断意图。
 
 ## HOST-005：XTrace 是唯一原始语义轨迹
 

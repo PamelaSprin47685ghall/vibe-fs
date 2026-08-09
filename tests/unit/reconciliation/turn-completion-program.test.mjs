@@ -40,7 +40,9 @@ import {
 } from '../support/domain.mjs'
 import { buildTurn } from '../../../dist/Application/Reconciliation/CompletedTurnClassifier.js'
 import { SessionMessage } from '../../../dist/Infrastructure/OpenCode/Host/SessionSnapshotPort.js'
-import { applyWithContinuation } from '../../../dist/Application/Reconciliation/TurnCompletionProgram.js'
+import { applyWithContinuation, prepareTurn } from '../../../dist/Application/Reconciliation/TurnCompletionProgram.js'
+import { observe as observeReviewer } from '../../../dist/Application/Review/ReviewerWorkflow.js'
+import { tryObserve as observeManager } from '../../../dist/Application/Manager/ManagerWorkflow.js'
 import { LoopSensor, LoopSensor__IsArmed_Z31B28506, LoopSensor__TryArm_Z31B28506 } from '../../../dist/Infrastructure/OpenCode/Host/LoopSensor.js'
 import {
   SessionQuiescenceGate,
@@ -292,23 +294,52 @@ const harness = ({ journal, loopSensor = undefined, hasLivePty = () => false, ga
     return observeIdle(gate, sessionId(SESSION))
   }
 
-  const run = (turnValue, quiescence = undefined) =>
-    applyWithContinuation(
+  const run = (turnValue, quiescence = undefined) => {
+    prepareTurn(journal, (key) => disposed.push(key), turnValue)
+    return applyWithContinuation(
       sessionPort,
       eventPort,
       journal,
-      undefined,
-      verdictSessions,
-      nudgeSent,
       joinGuardNudges,
-      sessionParents,
-      (key) => disposed.push(key),
       hasLivePty,
       abortedSessions,
       loopSensor,
       gate,
       { Turn: turnValue, Quiescence: quiescence },
     )
+  }
+
+  const runReviewer = (turnValue) =>
+    observeReviewer(sessionPort, eventPort, journal, nudgeSent, turnValue, idValue.session(turnValue.SessionId))
+
+  const runManager = async (turnValue, quiescence = undefined) => {
+    prepareTurn(journal, (key) => disposed.push(key), turnValue)
+    const context = { Turn: turnValue, Quiescence: quiescence }
+    const handled = await observeManager(
+      sessionPort,
+      eventPort,
+      journal,
+      nudgeSent,
+      joinGuardNudges,
+      hasLivePty,
+      abortedSessions,
+      gate,
+      context,
+    )
+    if (!handled) {
+      await applyWithContinuation(
+        sessionPort,
+        eventPort,
+        journal,
+        joinGuardNudges,
+        hasLivePty,
+        abortedSessions,
+        loopSensor,
+        gate,
+        context,
+      )
+    }
+  }
 
   return {
     events,
@@ -320,6 +351,8 @@ const harness = ({ journal, loopSensor = undefined, hasLivePty = () => false, ga
     gate,
     freshPermit,
     run,
+    runReviewer,
+    runManager,
   }
 }
 
@@ -507,7 +540,7 @@ test('TCP_in_progress_confirmed_reviewer_completes_with_fallback_text', async ()
   const h = harness({ journal: live.journal })
 
   // A second PERFECT is often tool-only: empty parts, InProgress.
-  await h.run(turn({ roleAgent: 'fast-reviewer', finish: 'tool-calls', completed: false, parts: [] }))
+  await h.runReviewer(turn({ roleAgent: 'fast-reviewer', finish: 'tool-calls', completed: false, parts: [] }))
 
   assert.equal(eventCase(h.events), 0, 'Completed')
   const runResult = eventPayload(h.events)
@@ -521,10 +554,26 @@ test('TCP_needs_continuation_confirmed_reviewer_completes', async () => {
   seedConfirmedReviewer(live.append)
   const h = harness({ journal: live.journal })
 
-  await h.run(turn({ roleAgent: 'fast-reviewer', finish: 'length', completed: false, parts: [] }))
+  await h.runReviewer(turn({ roleAgent: 'fast-reviewer', finish: 'length', completed: false, parts: [] }))
 
   assert.equal(eventCase(h.events), 0)
   assert.equal(eventPayload(h.events).TerminalText, 'Review confirmed.')
+  live.cleanup()
+})
+
+// Given a prose-only, non-submitted, non-confirmed Reviewer observation.
+// Trigger: ReviewerWorkflow observes its terminal.
+// Expected: exactly one verdict-guard continuation.
+// Forbidden: NotifyTerminal(Completed) or a second continuation writer.
+test('REVIEW_P0_1_prose_only_non_submitted_reviewer_is_not_completed_and_sends_one_guard', async () => {
+  const live = liveJournal()
+  seedAuthority(live.append, { agent: 'fast-reviewer', role: 'reviewer' })
+  const h = harness({ journal: live.journal })
+
+  await h.runReviewer(turn({ roleAgent: 'fast-reviewer', finish: 'stop', completed: true, parts: [text('prose only, no verdict tool call')] }))
+
+  assert.equal(h.events.length, 0, 'a non-submitted review is not complete: no NotifyTerminal(Completed)')
+  assert.equal(sendCount(h.portCalls), 1, 'exactly one reporter verdict-guard nudge')
   live.cleanup()
 })
 
@@ -537,7 +586,10 @@ test('TCP_aborted_without_loop_sensor_reports_aborted', async () => {
   assert.equal(eventCase(h.events), 1, 'Aborted')
   assert.equal(eventPayload(h.events), 'finish=aborted')
   assert.ok(h.abortedSessions.has('ses_tcp'), 'aborted session is accumulated')
-  assert.ok(h.portCalls.some(([name]) => name === 'AbortChildren'), 'children are aborted')
+  assert.ok(
+    h.portCalls.some(([name]) => name === 'AbortChildren'),
+    'Esc abort cascades to every running sub-session',
+  )
 })
 
 test('TCP_aborted_with_armed_loop_sensor_bridges_to_failure', async () => {
@@ -608,8 +660,8 @@ test('TCP_completed_manager_idle_encouragement_deduped', async () => {
     id: 'asst-a',
   })
 
-  await h.run(managerTurn, h.freshPermit())
-  await h.run(managerTurn, h.freshPermit())
+  await h.runManager(managerTurn, h.freshPermit())
+  await h.runManager(managerTurn, h.freshPermit())
 
   assert.deepEqual(h.events, [], 'successful idle sends do not NotifyTerminal')
   assert.equal(sendCount(h.portCalls), 1, 'encouragement claimed once; replay is deduped by encouragementKey')
@@ -640,7 +692,7 @@ test('TCP_completed_manager_idle_encouragement_occasion_dedupe', async () => {
   })
 
   // A. ProviderRun A idle → exactly one encouragement A
-  await h.run(turnA, h.freshPermit())
+  await h.runManager(turnA, h.freshPermit())
   assert.equal(sendCount(h.portCalls), 1, 'A: exactly one encouragement')
   assert.deepEqual(h.events, [])
 
@@ -652,15 +704,15 @@ test('TCP_completed_manager_idle_encouragement_occasion_dedupe', async () => {
   assert.ok(pendingAfterA && pendingAfterA.size >= 1, 'A claim stays pending under Detached')
 
   // B. re-reconcile A → no duplicate (process-local + durable)
-  await h.run(turnA, h.freshPermit())
+  await h.runManager(turnA, h.freshPermit())
   assert.equal(sendCount(h.portCalls), 1, 'B: re-reconcile A sends nothing')
 
   // C. keep A claim pending + new ProviderRun B idle → exactly one B
-  await h.run(turnB, h.freshPermit())
+  await h.runManager(turnB, h.freshPermit())
   assert.equal(sendCount(h.portCalls), 2, 'C: pending A must not suppress B')
 
   // D. re-reconcile B → no duplicate
-  await h.run(turnB, h.freshPermit())
+  await h.runManager(turnB, h.freshPermit())
   assert.equal(sendCount(h.portCalls), 2, 'D: re-reconcile B sends nothing')
   assert.deepEqual(h.events, [])
   live.cleanup()
@@ -680,12 +732,12 @@ test('TCP_completed_manager_idle_encouragement_durable_claim_sequences', async (
     id: 'asst-a',
   })
 
-  await h.run(managerTurn, h.freshPermit())
+  await h.runManager(managerTurn, h.freshPermit())
   assert.equal(sendCount(h.portCalls), 1)
 
   // Simulate process restart: process-local nudgeSent is empty, ClaimSequences remains.
   h.nudgeSent.clear()
-  await h.run(managerTurn, h.freshPermit())
+  await h.runManager(managerTurn, h.freshPermit())
   assert.equal(sendCount(h.portCalls), 1, 'ClaimSequences keeps occasion at-most-once after restart')
   assert.deepEqual(h.events, [])
   live.cleanup()
@@ -696,7 +748,7 @@ test('Q09_manager_idle_encouragement_without_permit_sends_nothing', async () => 
   seedAuthority(live.append, { agent: 'fast-manager', role: 'manager' })
   seedActivatedManagerLife(live.journal)
   const h = harness({ journal: live.journal })
-  await h.run(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('progress')] }))
+  await h.runManager(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('progress')] }))
 
   assert.deepEqual(h.events, [], 'no idle evidence: ManagerIdleEncouragement must not fire')
   assert.equal(sendCount(h.portCalls), 0)
@@ -711,7 +763,7 @@ test('Q09_manager_idle_encouragement_with_stale_permit_sends_nothing', async () 
   const permit = h.freshPermit()
   beginProviderAttempt(h.gate, sessionId(SESSION))
 
-  await h.run(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('progress')] }), permit)
+  await h.runManager(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('progress')] }), permit)
 
   assert.deepEqual(h.events, [], 'stale permit: no stale IdleEncouragement')
   assert.equal(sendCount(h.portCalls), 0)
@@ -723,7 +775,7 @@ test('TCP_completed_manager_job_handed_off_completes_run', async () => {
   seedManagerJob(live.append, { progress: 'CandidateReady' })
   const h = harness({ journal: live.journal })
 
-  await h.run(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('job done')] }))
+  await h.runManager(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('job done')] }))
 
   assert.equal(eventCase(h.events), 0, 'the manager run completes once the Orchestrator owns the job (ORCH-006)')
   assert.equal(eventPayload(h.events).TerminalText, 'job done')
@@ -736,7 +788,7 @@ test('TCP_completed_manager_conflict_pending_notifies_terminal', async () => {
   seedManagerJob(live.append, { progress: 'ConflictPending' })
   const h = harness({ journal: live.journal })
 
-  await h.run(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('conflict turn')] }))
+  await h.runManager(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('conflict turn')] }))
 
   assert.equal(eventCase(h.events), 0, 'ConflictPending must NotifyTerminal so ResumeManager can finalizeWorktree')
   assert.equal(eventPayload(h.events).TerminalText, 'conflict turn')
@@ -749,7 +801,7 @@ test('TCP_in_progress_manager_conflict_pending_repairs_interaction', async () =>
   seedManagerJob(live.append, { progress: 'ConflictPending' })
   const h = harness({ journal: live.journal })
 
-  await h.run(turn({ roleAgent: 'fast-manager', finish: 'tool-calls', completed: false, parts: [text('guard round')] }), h.freshPermit())
+  await h.runManager(turn({ roleAgent: 'fast-manager', finish: 'tool-calls', completed: false, parts: [text('guard round')] }), h.freshPermit())
 
   assert.deepEqual(h.events, [], 'ConflictPending is not handed off for an in-progress manager: repair, not completion')
   assert.equal(h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync').length, 1)
@@ -779,7 +831,7 @@ test('TCP_completed_manager_planning_sends_work_activation', async () => {
   assert.equal(result.tag, 0, result.tag === 0 ? '' : JSON.stringify(result.fields))
   const h = harness({ journal: live.journal })
 
-  await h.run(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('planning done')] }))
+  await h.runManager(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('planning done')] }))
 
   assert.deepEqual(h.events, [], 'a planning terminal defers completion (GLORY-018)')
   const sends = h.portCalls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync')
@@ -792,7 +844,7 @@ test('TCP_completed_manager_deferred_encouragement_fails_closed_without_profile'
   const live = liveJournal()
   seedActivatedManagerLife(live.journal)
   const h = harness({ journal: live.journal, hasLivePty: () => true })
-  await h.run(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('done')] }), h.freshPermit())
+  await h.runManager(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('done')] }), h.freshPermit())
 
   assert.equal(h.events.length, 1, 'completion deferred (GLORY-070), encouragement attempt fails closed with a terminal')
   assert.equal(eventCase(h.events), 2)
@@ -810,7 +862,7 @@ test('TCP_completed_manager_idle_without_life_skips', async () => {
   const live = liveJournal()
   seedAuthority(live.append, { agent: 'fast-manager', role: 'manager' })
   const h = harness({ journal: live.journal })
-  await h.run(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('done')] }), h.freshPermit())
+  await h.runManager(turn({ roleAgent: 'fast-manager', finish: 'stop', completed: true, parts: [text('done')] }), h.freshPermit())
 
   assert.deepEqual(h.events, [], 'no open Life: idle encouragement is skipped closed')
   assert.equal(sendCount(h.portCalls), 0)

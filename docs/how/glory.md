@@ -19,7 +19,7 @@
 ## Slice B：Activation 与 X floor
 
 1. `PromptAuthority.ContinuationKind.ManagerWorkActivation` + `ManagerLifecyclePrompt.WorkActivation` 冻结文本（GLORY-019/020）。
-2. `TurnCompletionProgram.applyWithContinuation` 的 `TurnCompleted` 分支新增 Manager 规划分支：role=Manager、Life 已 LifeOpened、未 WorkActivated、无 pending activation claim（读 `PromptAuthority.PendingClaims`）、terminal 有合法正式文本（`CompletedTurnClassifier.partsText` 非空）、session 未被中断 → 发送 `ManagerWorkActivation` continuation（`HostSessionNudge.sendContinuationResult`，Detached）并 deferred completion（不 NotifyTerminal、不 captureTerminal）。其余 terminal 类型（TurnFailed/TurnAborted/TurnNeedsContinuation/empty）不触发（GLORY-018）。
+2. `ManagerWorkflow.tryObserve` 的 `TurnCompleted` 分支拥有 Manager 规划：Life 已 LifeOpened、未 WorkActivated、无 pending activation claim（读 `PromptAuthority.PendingClaims`）、terminal 有合法正式文本（`CompletedTurnClassifier.partsText` 非空）、session 未被中断 → 发送 `ManagerWorkActivation` continuation（`HostSessionNudge.sendContinuationResult`，Detached）并 deferred completion（不 NotifyTerminal、不 captureTerminal）。`HostSignalBootstrap` 只按 canonical Role 路由；`TurnCompletionProgram` 不判断 Manager 业务。其余 terminal 类型（TurnFailed/TurnAborted/TurnNeedsContinuation/empty）不触发（GLORY-018）。
 3. `WorkActivated` 写在 Activation 消息 physical acceptance 之后：transform 中检查 `PromptAuthority.AcceptedContinuationIds` 含 `ManagerWorkActivation` 且投影无 `WorkActivated` → append `WorkActivated (lifeId, activationPromptKey, protectedPrefixEnd = XTraceProjection.headSequence + 1)`（Activation 消息的 XTrace 末端之后，GLORY-021）。幂等：已有 WorkActivated 则跳过。
 4. Blogger floor（GLORY-023/024）：`BloggerCoordinator.nextMainContext` 中 `effectiveStartSeq = max blog.Coverage.IngestedThroughSequence life.ProtectedPrefixEnd.Sequence`，用它替代 `semanticCursorFor(IngestedThroughSequence)` 的输入；`CompanionTransform.hasMaterial` 预过滤同步（切片 G 前，无 Life 的 Manager 保持现状）。
 5. `XTraceCapture.lifecycleWorkRecord` 增加 Manager 变体：当 session 是 Manager 且有 Life 时，按 `# Opening task / # Birth record / # Work log / # Uncompressed tail / # Final output` 渲染（GLORY-025），Birth 部分逐字渲染 `Life Opening cursor → ProtectedPrefixEnd` 的 XTrace（GLORY-022）。
@@ -92,7 +92,7 @@ Orchestrator 衔接：ManagerJob 的 Manager 完成由现有 `AwaitManager` 路�
 | journal 状态 | 恢复动作 | 实现 |
 |------|------|------|
 | LifeOpened 缺 → provider request 前 | 无害；下个 transform 重开 | ✅ transform 幂等 |
-| LifeOpened 有 → 无 WorkActivated | 幂等改写 + Activation 逻辑继续 | ✅ transform + TurnCompletionProgram |
+| LifeOpened 有 → 无 WorkActivated | 幂等改写 + Activation 逻辑继续 | ✅ transform + ManagerWorkflow |
 | FinalityRequested 无 enlisted member | FinalityTool「in motion」分支重启同一 request 的 FinalityController；`rosterOf` 崩溃重入不重复造新 Reviewer | ✅ |
 | REVISE 已存在但无 FinalityRejected | 从 durable evidence 重建同一 Reviewer LWR；证据不足时 fail closed，不以当前快照改写目标算法 | 目标算法 |
 | confirmed witness 存在但无 FinalityBlessed | concludeBlessing 幂等（blessing 已存在/terminal 已记录则跳过） | ✅ |

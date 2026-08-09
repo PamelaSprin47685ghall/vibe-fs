@@ -321,21 +321,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             (fun _ path prompt ->
                 forkChild reviewerAgentId Role.Reviewer OrchestratorHostReview.DeepReviewerAgent path prompt)
             (fun _ -> awaitChild reviewerAgentId)
-            (fun _ prompt ->
-                task {
-                    match!
-                        runtime.Fork(
-                            reviewerAgentId,
-                            Role.Reviewer,
-                            OrchestratorHostReview.DeepReviewerAgent,
-                            prompt,
-                            None,
-                            firstPrompt = false
-                        )
-                    with
-                    | Error error -> return Error error
-                    | Ok _ -> return! awaitChild reviewerAgentId
-                })
             jobId
             managerSessionId
             worktree

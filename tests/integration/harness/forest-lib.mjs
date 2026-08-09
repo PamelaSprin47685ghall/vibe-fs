@@ -262,7 +262,13 @@ export function deriveRequests(scenario) {
   let previousMessages = null;
 
   turnGroups(scenario).forEach((group, groupIndex) => {
-    const first = group.entries[0];
+    // Internal prompts are composed by production after durable facts appear;
+    // they are not caller requests and therefore cannot be derived from the
+    // scenario's public request sequence. `unanswered()` excludes them too.
+    const entries = group.entries.filter((entry) => entry.internal !== true);
+    if (entries.length === 0) return;
+
+    const first = entries[0];
     // Derived from the declaration, not from a counter shared with other scenarios, so the
     // same scenario always yields the same ids no matter which order the forest is walked.
     // A cold-boundary turn continues the previous turn's session (see `hasBoundary`).
@@ -301,7 +307,7 @@ export function deriveRequests(scenario) {
           ? [user(TITLE_MARKER), user(text)]
           : [systemMessage(), user(text)];
 
-    for (const entry of group.entries) {
+    for (const entry of entries) {
       for (let delivery = 0; delivery < deliveryCount(scenario, entry); delivery += 1) {
         requests.push({
           expectedEntryId: entry.id,

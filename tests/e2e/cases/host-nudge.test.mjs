@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
-import { runStaticGate } from '../support/index.js';
+import { observeCausalProgress, runStaticGate } from '../support/index.js';
 import { runCanary } from '../support/scenario-driver.mjs';
 import { FORK_COMPLETION_WINDOW_MS, FORK_RECONCILE_SLICE_MS } from '../support/time-budget.js';
 
@@ -50,10 +50,11 @@ async function proveNudgeForkCompleted(scenario, ctx) {
       const prompt = args.prompt || args.Prompt || '';
       // Prefer nudge prompt when present; accept any completed fork if host shape omits args.
       if (!prompt || /nudge|continue|busy/i.test(String(prompt))) {
-        scenario.watchdog?.advance({
+        observeCausalProgress(scenario, {
+          id: 'nudge-fork-completed',
+          token: JSON.stringify(last),
           reason: 'nudge-fork-completed',
           lane: `session:${parentId}`,
-          blocking: true,
         });
         return;
       }

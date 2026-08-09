@@ -67,4 +67,4 @@ Transform input 为空对象是 Host 能力现实；绑定必须用「已创建�
 
 ### 14. idle-derived continuation：QuiescenceGate vs 重复读 snapshot / busy 状态
 - **被拒方案**：把 busy/running 加进业务 HostSignal 并在几十处维护 if/else——transport 状态机不得搬进 Domain（HOST-002 只允许 coarse wake 进入业务）；连续多读几次 snapshot 称为“仍 idle”——snapshot 只证明观测稳定，不证明发送瞬间仍 idle；给 `TurnUnknown` 加 `Task.Delay`；每发现新 race 加 `isXxxRun` 特判——把 symptom 类别清单当正确性证明，永远补不完。
-- **选择方案**：process-local `SessionQuiescenceGate`，唯一状态转换 `BeginProviderAttempt / ObserveIdle / TryConsume / DropSession`。permit 从 idle 观察随 reconcile 携带到发送边界，物理发送前再次 `TryConsume`（与 dispatcher send 之间零 await）。业务决策 × 物理发送资格 = 允许的副作用；stale permit → `Superseded`（不写 claim、不发消息）。不写 Journal、不参与 crash recovery、重启清空（安全侧失败）。
+- **选择方案**：process-local `SessionQuiescenceGate`，状态转换 `BeginProviderAttempt / ObserveIdle / TryConsume / RevokeCurrentAttempt / DropSession`。permit 从 idle 观察随 reconcile 携带到发送边界，物理发送前再次 `TryConsume`（与 dispatcher send 之间零 await）。typed `AttemptAborted` 立即 `RevokeCurrentAttempt` 并以 `AbortWake` 进入 Reconciler；该 wake 永远无 repair/idle rights。业务决策 × 物理发送资格 = 允许的副作用；stale 或 revoked permit → `Superseded`（不写 claim、不发消息）。不写 Journal、不参与 crash recovery、重启清空（安全侧失败）。

@@ -8,6 +8,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Session
 
+/// DSL-state-combination: physical — spawn fn + load task are runtime resource slots
 type PtySupervisor =
     { Gate: obj
       mutable SpawnFn: obj option

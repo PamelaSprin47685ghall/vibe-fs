@@ -2,82 +2,96 @@ namespace Wanxiangshu.Session
 
 open System
 open System.Collections.Generic
+open System.Threading.Tasks
 open Wanxiangshu.Kernel.Identity
 
-/// Process-local pulse that an external user message arrived for a session.
-/// Not journaled — wake-only (Phase 4 join interrupt publish).
-type ExternalUserIngressPulse =
-    { SessionId: SessionId
-      PhysicalMessageId: PhysicalUserMessageId }
+/// Attempt-scoped join interrupt registry (EXEC-017).
+///
+/// EXEC-017 semantics: an external user message interrupts ONLY the current
+/// active JoinAttempt. There is NO session-level future latch: a signal that
+/// arrives with zero active attempts is dropped as a join wake (the user
+/// message itself still stays in the normal Host queue — dropping only means
+/// we do not generate a join interruption for it).
+///
+/// `Begin(session, ?toolCall)` opens a per-attempt attempt; `SignalUserMessage`
+/// fans `UserMessageArrived` to every active attempt of the session and drops
+/// when none are active. `OperatorAbort` / `DeadlineExpired` are driven through
+/// the lease (JoinTool / timeout), not by the registry.
+type JoinAttemptLease(interrupt: JoinInterrupt, unregister: unit -> unit) =
 
-/// Session-scoped join wait registrations. SignalUserMessage fans out
-/// UserMessageArrived to every active JoinInterrupt for that session.
-/// When no waiters exist, the pulse is latched once so a later Register
-/// still wakes (Signal-before-Register race).
-type IJoinInterruptRegistry =
-    abstract Register: SessionId * JoinInterrupt -> IDisposable
+    member _.Wait: Task<JoinInterruptReason> = interrupt.Wait
+
+    member _.SignalOperatorAbort() =
+        interrupt.Signal JoinInterruptReason.OperatorAbort
+
+    member _.SignalUserMessage() =
+        interrupt.Signal JoinInterruptReason.UserMessageArrived
+
+    member _.SignalDeadline() =
+        interrupt.Signal JoinInterruptReason.DeadlineExpired
+
+    interface IDisposable with
+        member _.Dispose() = unregister ()
+
+type IJoinAttemptRegistry =
+    abstract Begin: SessionId * ToolCallId option -> JoinAttemptLease
+    /// External user message arrived for a session. Wakes every ACTIVE attempt;
+    /// zero active attempts → drop as a join wake (no future latch).
     abstract SignalUserMessage: SessionId -> unit
-    /// Drop waiter list + one-shot latch for a deleted session. Does not signal.
+    /// Drop active attempts for a deleted session. Does not signal.
     abstract ClearSession: SessionId -> unit
 
-/// Thread-safe process-local registry (Dictionary + lock).
-type JoinInterruptRegistry() =
+/// Thread-safe process-local attempt registry (Dictionary + lock).
+type JoinAttemptRegistry() =
     let gate = obj ()
-    let entries = Dictionary<string, ResizeArray<JoinInterrupt>>()
-    // One-shot latch: SignalUserMessage with zero waiters records the session;
-    // next Register consumes and signals. Not used for OperatorAbort.
-    let pendingUserMessage = HashSet<string>()
+    let active = Dictionary<string, ResizeArray<JoinAttemptLease>>()
 
-    interface IJoinInterruptRegistry with
-        member _.Register(sessionId: SessionId, interrupt: JoinInterrupt) : IDisposable =
+    let unregister (key: string) (lease: JoinAttemptLease) =
+        lock gate (fun () ->
+            match active.TryGetValue key with
+            | true, list ->
+                list.Remove lease |> ignore
+
+                if list.Count = 0 then
+                    active.Remove key |> ignore
+            | false, _ -> ())
+
+    interface IJoinAttemptRegistry with
+        member _.Begin(sessionId: SessionId, _toolCall: ToolCallId option) : JoinAttemptLease =
             let key = SessionId.value sessionId
+            let interrupt = JoinInterrupt.create ()
+            // A mutable cell lets the dispose closure reference the lease without a
+            // recursive-object construction (avoids F# warning 40 / TreatWarningsAsErrors).
+            let leaseRef = ref Unchecked.defaultof<JoinAttemptLease>
 
-            // Consume latch outside the lock so trySetResult is not under contention.
-            // (Avoid *Pending names: dsl-ownership behaviour-bool gate.)
-            if
-                lock gate (fun () ->
-                    match entries.TryGetValue key with
-                    | true, list -> list.Add interrupt
-                    | false, _ ->
-                        let list = ResizeArray<JoinInterrupt>()
-                        list.Add interrupt
-                        entries.[key] <- list
+            let lease =
+                new JoinAttemptLease(interrupt, (fun () -> unregister key leaseRef.Value))
 
-                    pendingUserMessage.Remove key)
-            then
-                interrupt.Signal JoinInterruptReason.UserMessageArrived
+            leaseRef.Value <- lease
 
-            { new IDisposable with
-                member _.Dispose() =
-                    lock gate (fun () ->
-                        match entries.TryGetValue key with
-                        | true, list ->
-                            list.Remove interrupt |> ignore
+            lock gate (fun () ->
+                match active.TryGetValue key with
+                | true, list -> list.Add lease
+                | false, _ ->
+                    let list = ResizeArray<JoinAttemptLease>()
+                    list.Add lease
+                    active.[key] <- list)
 
-                            if list.Count = 0 then
-                                entries.Remove key |> ignore
-                        | false, _ -> ()) }
+            lease
 
         member _.SignalUserMessage(sessionId: SessionId) : unit =
             let key = SessionId.value sessionId
 
-            let targets =
+            let attempts =
                 lock gate (fun () ->
-                    match entries.TryGetValue key with
-                    | true, list when list.Count > 0 ->
-                        // Active waiters: fan-out only; do not leave a latch for a later join.
-                        list |> Seq.toList
-                    | _ ->
-                        pendingUserMessage.Add key |> ignore
-                        [])
+                    match active.TryGetValue key with
+                    | true, list when list.Count > 0 -> list |> Seq.toList
+                    | _ -> [])
 
-            // trySetResult is idempotent on an already-completed TCS.
-            for interrupt in targets do
-                interrupt.Signal JoinInterruptReason.UserMessageArrived
+            // Only the CURRENT active attempts wake; none active → dropped.
+            for attempt in attempts do
+                attempt.SignalUserMessage()
 
         member _.ClearSession(sessionId: SessionId) : unit =
             let key = SessionId.value sessionId
-
-            lock gate (fun () ->
-                entries.Remove key |> ignore
-                pendingUserMessage.Remove key |> ignore)
+            lock gate (fun () -> active.Remove key |> ignore)

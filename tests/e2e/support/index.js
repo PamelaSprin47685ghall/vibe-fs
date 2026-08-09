@@ -9,3 +9,4 @@ export { EventProbe } from './event-probe.js';
 export { Scenario, setupScenario, teardownScenario, runScenario, FsOracle, HttpClient, getSessionId } from './scenario.js';
 export { gatherDiagnostics, formatDiagnostics, dumpDiagnostics } from './diagnostics.js';
 export { runStaticGate, runStabilityGate } from './stability-checker.js';
+export { awaitCausalObservation, observeCausalProgress } from './causal-observation.js';

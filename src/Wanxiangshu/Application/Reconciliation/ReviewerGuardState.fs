@@ -22,6 +22,30 @@ module ReviewerGuardState =
             AgentProjection.tryFind (SessionId.create reviewerKey) (AgentJournal.snapshot durable).AgentProjections
             |> Option.bind (fun session -> session.ReviewGuard)
 
+    /// Whether the barrier still authorizes reviewer continuation. Finality may
+    /// stop waiting after a sibling REVISE; that closed request must also revoke
+    /// the reviewer's challenge capability. Non-Finality review owners have no
+    /// ManagerLife projection and remain eligible.
+    let continuationOpen journal reviewerKey =
+        match journal, guard journal reviewerKey with
+        | Some durable, Some reviewGuard ->
+            match reviewGuard.CurrentManagerSessionId, reviewGuard.CurrentBarrierId with
+            | Some managerSessionId, Some barrierId ->
+                let managerLife =
+                    AgentProjection.tryFind managerSessionId (AgentJournal.snapshot durable).AgentProjections
+                    |> Option.bind (fun session -> session.ManagerLife)
+
+                match managerLife with
+                | None -> true
+                | Some lifecycle ->
+                    lifecycle.CurrentLife
+                    |> Option.bind (fun life -> life.ActiveFinality)
+                    |> Option.filter ManagerLifecycleProjection.isOpen
+                    |> Option.bind (fun request -> Map.tryFind (SessionId.create reviewerKey) request.Members)
+                    |> Option.exists (fun enlisted -> enlisted.BarrierId = barrierId)
+            | _ -> true
+        | _ -> true
+
     /// Whether this reviewer has produced any verdict for the current barrier.
     ///
     /// Asked of `ObservedAttemptKeys` rather than of the witness: REVIEW-004

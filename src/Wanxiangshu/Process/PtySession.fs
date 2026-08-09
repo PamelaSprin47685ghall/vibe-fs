@@ -7,6 +7,7 @@ open System.Threading.Tasks
 
 /// Per-PTY session aggregate. Replaces the dual live/pending maps with one
 /// value that carries its own output buffer, pending queue and exit signal.
+/// DSL-state-combination: physical — PTY backend/output/lifecycle runtime state
 type PtySession =
     { PtyId: string
       mutable Backend: obj

@@ -34,7 +34,7 @@ module NonEmptyBatch =
 
 /// EXEC-017 / EXEC-018: why a join wait ended without results. Typed local
 /// interruption only. A queued external user message CAN interrupt wait via
-/// UserMessageArrived (Phase 4); it does not cancel mailbox/runtime/child.
+/// UserMessageArrived; it does not cancel mailbox/runtime/child.
 /// Drain-before-interrupt remains: completions already available still win.
 [<RequireQualifiedAccess>]
 type JoinInterruptReason =

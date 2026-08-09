@@ -77,6 +77,18 @@ test('RECONCILE_PROGRAM_003: decideStep bounds causal rereads and stops on exhau
   assert.equal(name(3, reconcileProgram.evidence.terminal('TurnAborted')), 'Publish')
   assert.equal(name(3, reconcileProgram.evidence.terminal('TurnFailed')), 'Publish')
 
+  // HOST-004: an exhausted operator-abort wake must not resurrect an
+  // idle-derived RepairMissingFinalReport / InteractionRepair / bare "#";
+  // it StopPasses until the real TurnAborted terminal.
+  assert.equal(name(0, reconcileProgram.evidence.unknown(), reconcileWake.abortWake()), 'StopPass')
+  assert.equal(name(0, reconcileProgram.evidence.provisional('TurnInProgress'), reconcileWake.abortWake()), 'StopPass')
+  assert.equal(
+    name(0, reconcileProgram.evidence.provisional('TurnNeedsContinuation'), reconcileWake.abortWake()),
+    'StopPass',
+  )
+  // Bounded reread still allowed under abort so a genuine TurnAborted can settle.
+  assert.equal(name(3, reconcileProgram.evidence.unknown(), reconcileWake.abortWake()), 'Reread')
+
   // Session cleared → StopPass.
   assert.equal(name(3, reconcileProgram.evidence.sessionCleared()), 'StopPass')
 

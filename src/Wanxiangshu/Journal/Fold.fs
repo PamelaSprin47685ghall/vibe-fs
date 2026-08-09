@@ -353,7 +353,7 @@ module Fold =
             match review with
             | ReviewFactCases.ReviewBarrierStarted payload ->
                 let startBarrier =
-                    ReviewProjection.startBarrier payload.BarrierId payload.GitTreeHash
+                    ReviewProjection.startBarrier payload.ManagerSessionId payload.BarrierId payload.GitTreeHash
 
                 projection
                 |> updateReviewGuard payload.ReviewerSessionId startBarrier

@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Domain
+namespace Wanxiangshu.Session
 
 /// LOOP-003…005: low 4-gram-diversity loop detector.
 ///
@@ -52,6 +52,7 @@ module LoopDetector =
             Step: int
         }
 
+    /// DSL-state-combination: physical — one provider attempt's streaming detector; LoopSensor resets it at every attempt boundary.
     type Detector =
         { mutable Step: int
           Prefix: char[]

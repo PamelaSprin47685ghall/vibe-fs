@@ -211,7 +211,7 @@ const [
   prod('Application/Prompting/PromptDispatcher'),
   prod('Application/Prompting/PromptDispatcherSend'),
   prod('Infrastructure/OpenCode/Codec/HostEventCodec'),
-  prod('Domain/LoopDetector'),
+  prod('Session/LoopDetector'),
   prod('Infrastructure/OpenCode/Codec/LoopEventCodec'),
   prod('Infrastructure/OpenCode/Host/LoopSensor'),
   prod('Domain/RuntimeNudge'),
@@ -2656,7 +2656,7 @@ export const reviewProjection = (() => {
 
   return {
     empty: m.empty,
-    startBarrier: (barrier, tree, current) => m.startBarrier(barrier, tree, current),
+    startBarrier: (barrier, tree, current, manager = sessionId('mgr')) => m.startBarrier(manager, barrier, tree, current),
     applySeal: (seal, current) => m.applySeal(seal, current),
     applyChallengeIssued: (challenge, current) => m.applyChallengeIssued(challenge, current),
     applyVerdict: (attempt, value, current) => decided(m.applyVerdict(attempt, value, current)),
@@ -5074,7 +5074,7 @@ const JoinModule = await prod('Application/Reconciliation/Join')
 const AgentCompletionModule = AgentCompletionModuleEarly
 const JoinResultRendererModule = await prod('Infrastructure/OpenCode/Codec/JoinResultRenderer')
 const ManagerJobModule = await prod('Application/Orchestration/ManagerJob')
-// Phase 4: cases on CompletionMailboxModule (already loaded above).
+// EXEC-017 cases live on CompletionMailboxModule (already loaded above).
 const JoinInterruptReason = CompletionMailboxModule.JoinInterruptReason
 
 export const joinProgram = (() => {
@@ -5558,4 +5558,5 @@ export const reconcileWake = {
   idleWake: (permit) => buildReconcileWake('IdleWake', [permit]),
   retryWake: () => buildReconcileWake('RetryWake', []),
   failureWake: () => buildReconcileWake('FailureWake', []),
+  abortWake: () => buildReconcileWake('AbortWake', []),
 }

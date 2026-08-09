@@ -38,8 +38,10 @@ import {
   idValue,
   mapEntries,
   mapTryFind,
+  promptDispatcher,
   reviewChallenge,
   sessionId,
+  transportReceipt,
   xTraceCapture,
 } from '../support/domain.mjs'
 
@@ -63,6 +65,7 @@ import {
 import { contentDigest } from '../../../dist/Domain/ReviewChallenge.js'
 import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
 import { create as createGitTree } from '../../../dist/Infrastructure/OpenCode/Host/GitTree.js'
+import { ensureContinuation } from '../../../dist/Application/Review/ReviewerWorkflow.js'
 
 // Role.Reviewer is Fable case tag 6 (Kernel/Roles.fs order).
 const ROLE_REVIEWER = 6
@@ -212,6 +215,25 @@ const sealChallengeResponse = (journal, reviewerValue, run) => {
   assert.equal(result.tag, 0, `ProviderInputSealed append rejected: ${result.fields?.[0]}`)
 }
 
+const driveReviewerContinuation = async (journal, runtime, reviewerValue, run) => {
+  const sessionPort = {
+    SubscribeTerminal: () => ({ Dispose: () => {} }),
+    SendPrompt: async (sid, text, options) => {
+      runtime.prompts.push({ path: { id: idValue.session(sid) }, body: { text, options } })
+      return { tag: 0, fields: [promptDispatcher.admittedWithReceipt(transportReceipt(`receipt-${reviewerValue}-${run}`))] }
+    },
+  }
+  runtime.reviewerNudges ??= new Set()
+  return ensureContinuation(
+    sessionPort,
+    journal,
+    runtime.reviewerNudges,
+    sessionId(reviewerValue),
+    ProviderRunIdentityModule_create(run),
+    reviewerValue,
+  )
+}
+
 /** One member's causally confirmed dual PERFECT (REVIEW-003/010). */
 const dualPerfect = async (journal, runtime, request, reviewerValue, label) => {
   const challengeSeen = () =>
@@ -222,6 +244,7 @@ const dualPerfect = async (journal, runtime, request, reviewerValue, label) => {
 
   submitVerdict(journal, request, reviewerValue, `run-${label}-first`, `call-${label}-first`, ReviewGuardVerdict.Perfect)
   notifyCompleted(runtime, reviewerValue, `wide ${label} first`, `formal ${label} first`, ROLE_REVIEWER)
+  await driveReviewerContinuation(journal, runtime, reviewerValue, `run-${label}-first`)
 
   for (let attempt = 0; attempt < 200; attempt += 1) {
     if (challengeSeen()) break
@@ -375,6 +398,7 @@ test('GLORY_044_a_Revision_short_circuit_cancels_the_sibling_before_its_next_eff
     // member's terminal is delivered.
     await new Promise((resolve) => setTimeout(resolve, 10))
     notifyCompleted(runtime, historical, 'wide c1', 'formal c1', ROLE_REVIEWER)
+    await driveReviewerContinuation(runtime.journal, runtime, historical, 'run-c-1')
 
     const result = await roundTwo
     assert.ok(result.startsWith('# Your ending has not accepted you.'), result)

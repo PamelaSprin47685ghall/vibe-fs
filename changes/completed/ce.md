@@ -2522,3 +2522,76 @@ REVISE
 ```
 
 而不是再次宣布 Completed。
+
+---
+
+# Active work
+
+> 本文件是变更工作记录，不是当前产品规范。当前产品语义仅以 `docs/` 正式层为准。
+> Original proposal 已冻结，以下只追加剩余工作、blocker 与完成判据。
+
+用户已明确启动本 Proposal。实施按 ce.md §18 的 Phase 0–9 硬顺序，不得跳步。
+
+## Completion criteria（来自 §23）
+
+- Static：`npm run lint`；dsl ownership threshold=0；无 mutable-record program counter；
+  TurnCompletion forbidden-reference gate green；Finality reviewer-continuation ownership gate
+green；e2e direct-watchdog-feed gate green。
+- Unit：全部 unit 通过；zero known hang；zero "baseline also hangs" exemption。
+- Integration：chat.message 唤醒 active join；旧 chat.message 不唤醒 future join；Esc 撤销
+  repair；Reviewer 双 reconcile 只发一个 continuation；Student Teacher tool-return 终端握手。
+- E2E：student-teacher、reviewer-verdict、manager-unhappy-path、temporal-ownership-unhappy-path、
+  及受影响 restart variants 全绿。
+- Full gate：`npm run check` 真实通过。
+
+## Remaining work（按 PLAN phase 追踪）
+
+- [x] Phase 1 五个 RED 落地并全部看到 RED（R1 Reviewer 双发；R2 future join 被旧消息唤醒；
+      R3 Esc 不撤销 idle repair；R4 mutable-record DSL 门漏 fixture；R5 case 内 direct watchdog
+      feed 静态门）。未全红前禁止改 production。
+- [x] Phase 2 DSL gate 堵漏（field parser 识别 `mutable Foo:`；`mutable-record-field` gate；
+      EXEC-026 规范收口）。
+- [x] Phase 3 JoinAttempt clean break（无 pendingUserMessage / 无 future latch；attempt scope
+      Begin + 用户消息 producer drop-when-inactive；JOIN-P0-1..4）。
+- [x] Phase 4 Abort capability revocation（`HostSignal.AttemptAborted`；`Quiescence.RevokeCurrentAttempt`；
+      `AbortWake`；ESC-P0-1..3）。
+- [x] Phase 5 ReviewerWorkflow single owner（唯一 continuation writer；Finality 降权；REVIEW-P0-1..3）。
+- [x] Phase 6 StudentTeacher clean break（删除 RunState/TeacherReturnHandoff/PendingTeacherReturn/
+      PendingFinal/StudentRunCell；独立 physical scope 重建）。
+- [x] Phase 7 TurnCompletionProgram 去业务化（薄 router + forbidden-reference gate；ManagerWorkflow
+      迁出；ReconcileProgram 不膨胀）。
+- [x] Phase 8 Canary causal integrity（case 禁 direct watchdog feed；support causal primitive；
+      student-teacher 示范；全仓审计）。
+- [x] Phase 9 One-stroke unhappy path（temporal-ownership-unhappy-path）；full gate 收口；close。
+
+## Blockers
+
+- 无。`npm run check` 无 hang、无 baseline exemption、无 warning。
+
+## Review 判据（ce.md §24）
+
+Reviewer 只问四条可读性检验：删除业务 mutable state 后能否从 facts/capabilities/CE 结构读出完整
+happens-before；任意 auto-continuation 是否有唯一业务 owner；任意 interrupt 绑定 attempt/provider-run
+lifetime 而非 session；任意 watchdog renewal 由新 observation 证明因果前进而非又 poll 一次。任一为否 →
+REVISE。
+
+# Final outcome
+
+2026-08-09 完成全部九个 phase：
+
+- DSL gate 识别 `mutable Foo:` 与 record `ref` 可变存储；state-product 与 physical-owner 约束均有永久 fixture。
+- Join interrupt 改为 active `JoinAttempt` lease；零 active attempt 的 user message 不留 future wake。
+- `AttemptAborted` → quiescence revoke → `AbortWake`，禁止 missing-final-report / interaction-repair / 裸 `#`。
+- 按用户最终裁决，user message 不取消 sub-session；Esc 的当前 join 返回 `operator_abort`，父 `TurnAborted` 同时取消全部 running sub-session。
+- `ReviewerWorkflow` 成为 Reviewer continuation 唯一 writer；Finality 只等待 durable verdict/witness，request 关闭即撤销 continuation capability。
+- Student、Teacher call/completion 与 Student final completion 拆为独立 physical scope；旧 `RunState` 状态乘积删除。
+- `ManagerWorkflow` 接管 Manager terminal sequencing；`TurnCompletionProgram` 不含 Manager / Reviewer / Student–Teacher 业务引用。
+- E2E case 禁止直接 feed watchdog；`causal-observation` 仅在 observation token 真实变化时续期。
+- `temporal-ownership-unhappy-path` 一笔画覆盖 user-message wake、fresh join、Esc cancellation、取消 tombstone drain、replacement completion drain、Reviewer prose guard 与双 PERFECT 确认。
+
+最终 proof：
+
+- `npm run check`：通过；spec 347 clauses；architecture 245 files；DSL ownership 136 files；unit runner 165 files；integration 281 passed / 0 failed。
+- `npm run test:e2e`：26/26 bounded-parallel scenarios 全绿，含 Student–Teacher、Reviewer、Manager unhappy/restart 与 temporal ownership。
+- 无 hang、warning、threshold 上调、baseline exemption、compatibility shim 或 blocker。
+
