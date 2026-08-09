@@ -22,6 +22,15 @@
 | blob v2；LegacyFalseAbort 永不 completion | EXEC-021 |
 | 假 completion 补偿路径 | EXEC-022 |
 
+## One-shot
+
+| 证明 | 条款 |
+|------|------|
+| 同步 one-shot 返回 = LWR 注释（includeOpening=false）+ 末条 TurnFormalText；无字段式 work_record | EXEC-028 → tests/unit/tools/oneshot-tools.test.mjs |
+| Completed 无物化 LWR → 工具级 error=，不 soft-omit（fail-closed） | EXEC-028 → tests/unit/tools/oneshot-tools.test.mjs（`COD_completed_without_lifecycle_work_record_fails_closed`、`INSPECTOR_completed_without_lifecycle_work_record_fails_closed`） |
+| 真实 Journal 物化成功 → LWR + formal（Opening 捕获 → ChildWorkRecordFor 物化） | EXEC-028 → tests/unit/tools/oneshot-tools.test.mjs（`COD_completed_materializes_lifecycle_work_record_from_real_journal`） |
+| 生产链路 Opening 捕获 → ChildWorkRecordFor 物化 → LWR + formal（happy path，含真实 Opening） | EXEC-028 → tests/integration/plugin/manager-tool-contract.test.mjs（`EXEC_002`） |
+
 ## Mailbox / 恢复
 
 | 证明 | 条款 |

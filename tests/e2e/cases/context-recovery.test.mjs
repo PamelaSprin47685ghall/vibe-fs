@@ -150,15 +150,15 @@ function assertFrozenPrefixExcludesRawGap(workDir, label) {
     for (const ref of refs) {
       const body = readBlob(workDir, ref);
       assert.ok(
-        !body.includes('# Uncompressed tail'),
-        `${label}: RawGap (# Uncompressed tail) must not enter FrozenRecordPrefix`,
+        !body.includes('Uncompressed tail'),
+        `${label}: RawGap (Uncompressed tail) must not enter FrozenRecordPrefix`,
       );
       assert.ok(
-        !body.includes('# Final output'),
-        `${label}: Terminal (# Final output) must not enter FrozenRecordPrefix`,
+        !body.includes('Final output'),
+        `${label}: Terminal (Final output) must not enter FrozenRecordPrefix`,
       );
       assert.ok(
-        body.includes('# Opening task') || body.includes('# Work log'),
+        body.includes('Opening task') || body.includes('Work log'),
         `${label}: FrozenRecordPrefix must include Opening or Work log frames`,
       );
     }

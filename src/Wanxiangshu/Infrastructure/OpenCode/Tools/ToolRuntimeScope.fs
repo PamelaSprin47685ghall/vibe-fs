@@ -44,7 +44,7 @@ type ToolRuntimeScope
     let orchestratorHosts = Dictionary<string, OrchestratorHost>()
     let onCancelSignals = defaultArg cancelSignals ignore
     let onStarted = defaultArg onRunStarted (fun _ _ _ -> ())
-    // EXEC-006: parent→child keeps Opening; child→parent join omits it.
+    // COMPANION-003: parent→child keeps Opening; child→parent omits it (includeOpening=false).
     let parentRecord = defaultArg parentWorkRecordFor (fun _ -> None)
     let childRecord = defaultArg childWorkRecordFor (fun _ -> None)
     let terminalPort = eventPort

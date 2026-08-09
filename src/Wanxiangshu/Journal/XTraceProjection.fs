@@ -129,7 +129,7 @@ module XTraceProjection =
     /// COMPANION-003 / EXEC-009: capture the terminal output reference.
     /// Idempotent replay (same ref+digest) is a no-op; a different ref
     /// overwrites — subagent reuse produces a new terminal per work unit
-    /// on the same child session, and the LWR's `# Final output` must
+    /// on the same child session, and the LWR's Final output segment must
     /// reflect the latest terminal, not the first.
     let applyTerminal
         (textRef: BlobRef)

@@ -75,8 +75,12 @@ FIFO 排空，上限 32，与 EXEC-018 同界。
 
 ## Join wire（与 ARCH-010）
 
-LLM-visible join：顶层 status+count，再 `[[result]]` 表数组；agent 项前 entry-local LWR 注释。详见 synthetic-toml §9.6 与 EXEC-004。  
+LLM-visible join：顶层 status+count，再 `[[result]]` 表数组；agent 项前 entry-local LWR 注释。详见 synthetic-toml `### Join / fork` 与 EXEC-004。  
 中断 wire（EXEC-017）：本地 operator abort → `status="interrupted", reason="operator_abort"`；user message → `status="interrupted", reason="user_message"`；`interrupted` 不是 `ForkError` / `failed` / `aborted`。DevOps 超时仍走 `ForkError.TimedOut`（`status="failed", code="TIMED_OUT"`）。
+
+## One-shot 同步返回（EXEC-028）
+
+成功路径：COMPANION-003 物化 child LWR（`includeOpening=false`）→ `SyntheticToml.comment` 作 entry-local 注释，后接末条 TurnFormalText；禁止 `work_record` 字段。与 Join 共用物化器；wire 面独立于 `[[result]]` 批次。One-shot 子会话 Opening 在 send 前从原始 assignment 捕获（对齐 fork），以便物化成功；返回的 LWR 仍为 `includeOpening=false`。fail-closed：`Completed` 状态若无法物化出非空 LWR（captureOpening/强制 Terminal 物化后仍为空），返回工具级 `error=`，绝不静默退回仅 formal report 的成功。encode 的 soft-omit 仅覆盖非 Completed 的 soft Ok（如 send-failed）；Completed 缺 LWR 在 run 内 fail-closed，不改 encode 行为。
 
 ---
 

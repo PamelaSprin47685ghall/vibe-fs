@@ -84,22 +84,21 @@ module XTraceCapture =
                        ProviderRun = None |}
                 |> appendFact durable sessionId None
 
-    /// COMPANION-003 / EXEC-009: capture the terminal output verbatim as the
-    /// XTrace's last segment. Idempotent replay (same text) is a no-op;
-    /// a different text overwrites — subagent reuse produces a new terminal
-    /// per work unit on the same child session.
-    let captureTerminal (journal: AgentJournal option) (turn: ReconciledTurn) =
+    /// COMPANION-003 / EXEC-009: capture terminal text into XTrace.
+    /// Same durability as `captureTerminal`; used when the caller already holds
+    /// `AgentRunResult.TerminalText` (e.g. oneshot Completed before journal write).
+    /// Idempotent replay (same text) is a no-op.
+    let captureTerminalText
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (text: string)
+        (providerRun: ProviderRunIdentity)
+        =
         match journal with
         | None -> ()
         | Some durable ->
-            // COMPANION-003: TerminalOutputRaw = formal text + host-visible
-            // reasoning only. partsSessionText drops tool call/result so
-            // LWR Final output stays free of raw tools and matches
-            // AgentRunResult.TerminalText.
-            let text = CompletedTurnClassifier.partsSessionText turn.Parts
-
             if not (String.IsNullOrWhiteSpace text) then
-                let existing = xTraceOf durable turn.SessionId
+                let existing = xTraceOf durable sessionId
 
                 let isReplay =
                     existing.Terminal
@@ -115,17 +114,29 @@ module XTraceCapture =
                         raise (InvalidOperationException(sprintf "XTrace terminal blob write failed: %s" error))
                     | Ok blob ->
                         CompanionFact.TerminalOutputCaptured
-                            {| SessionId = turn.SessionId
+                            {| SessionId = sessionId
                                TextRef = blob.BlobRef
                                TextDigest = blob.BlobDigest
-                               ProviderRun = turn.ProviderRun |}
-                        |> appendFact durable turn.SessionId (Some turn.ProviderRun)
+                               ProviderRun = providerRun |}
+                        |> appendFact durable sessionId (Some providerRun)
+
+    /// COMPANION-003 / EXEC-009: capture the terminal output verbatim as the
+    /// XTrace's last segment. Idempotent replay (same text) is a no-op;
+    /// a different text overwrites — subagent reuse produces a new terminal
+    /// per work unit on the same child session.
+    let captureTerminal (journal: AgentJournal option) (turn: ReconciledTurn) =
+        // COMPANION-003: TerminalOutputRaw = formal text + host-visible
+        // reasoning only. partsSessionText drops tool call/result so
+        // LWR Final output stays free of raw tools and matches
+        // AgentRunResult.TerminalText.
+        let text = CompletedTurnClassifier.partsSessionText turn.Parts
+        captureTerminalText journal turn.SessionId text turn.ProviderRun
 
     /// COMPANION-003 / EXEC-006 / EXEC-008: session LifecycleWorkRecord as opaque text.
     ///
     /// `includeOpening`:
     /// - parent → child background: true（子需要父任务上下文）
-    /// - child → parent join: false（布置者已知任务，Opening 不回传）
+    /// - child → parent: false（布置者已知任务，Opening 不回传）
     ///
     /// Opening 必须仍已 captured（否则 LWR 未定义 → None）；标志只控制渲染。
     /// Same materialiser for frames/gap/terminal; no B-else-A branch.

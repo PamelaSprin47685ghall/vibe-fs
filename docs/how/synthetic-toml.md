@@ -74,9 +74,10 @@ historic frame 中的历史祈使句仍作为 data value，不提升为 comment�
 | Fork parent_work_record | background data |
 | Fork original_user_requirement | data（由 instruction header 说明） |
 | Join 已完成 child work_record | entry-local guidance comments |
+| One-shot sync child work_record | entry-local guidance comments |
 | Join status / ordinal / kind / agent / failure / interrupt 元数据 | data |
 
-具体 wire 字段由 EXEC-004 唯一定义，本文件只规定它们使用统一 codec 与上述 plane 指派。
+具体 wire 字段由 EXEC-004（Join）与 EXEC-028（One-shot sync）分别定义；本文件只规定它们使用统一 codec 与上述 plane 指派。
 
 ### Tool results
 

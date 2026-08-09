@@ -301,9 +301,9 @@ XTrace append-only；每 Life 以 cursor range 物化。
 
 拒绝 Reviewer 的 terminal frontier 是产生 durable REVISE 的 terminal evidence 所界定的 XTrace 边界；该边界必须能从 durable journal evidence 在恢复时重建，禁止以后来的 XTrace head 替换。
 
-`record-ready` 当且仅当**同一 journal snapshot**以全量 origin coverage 物化含 `# Work log` 的 canonical LWR（`XTraceCapture.lifecycleWorkRecord journal reviewerSessionId false` / `materializeRecord`）。就绪判定是「能否物化有效工作日志」，不是 `coverage >= frontier.Sequence`——frontier 为排他（lastPart+1），真实 Blogger coverage 上限只达 lastPart，旧 coverage 门禁会在 `coverageCanAdvance` 恒真时永远悬挂（GLORY-073 off-by-one 死锁）。
+`record-ready` 当且仅当**同一 journal snapshot**以全量 origin coverage 物化含 `Work log` 的 canonical LWR（`XTraceCapture.lifecycleWorkRecord journal reviewerSessionId false` / `materializeRecord`；raw 段标题为纯文本，`# ` 仅由 `SyntheticToml.comment` 在 wire 注入）。就绪判定是「能否物化有效工作日志」，不是 `coverage >= frontier.Sequence`——frontier 为排他（lastPart+1），真实 Blogger coverage 上限只达 lastPart，旧 coverage 门禁会在 `coverageCanAdvance` 恒真时永远悬挂（GLORY-073 off-by-one 死锁）。
 
-coverage 与 materialization 不同 revision 即不成立。只有 `record-ready` 的 LWR 可写 blob 并形成 `FinalityRejected.WorkRecordRef/Digest`；不得用缓存、较早/较晚 snapshot、raw tail 或摘要替代。已覆盖的 frame 未渲染为 `# Work log` 时是物化不一致，fail closed，不得写 rejection。
+coverage 与 materialization 不同 revision 即不成立。只有 `record-ready` 的 LWR 可写 blob 并形成 `FinalityRejected.WorkRecordRef/Digest`；不得用缓存、较早/较晚 snapshot、raw tail 或摘要替代。已覆盖的 frame 未渲染为 `Work log` 时是物化不一致，fail closed，不得写 rejection。
 
 ## GLORY-073：record-ready 等待、恢复与 abandonment
 

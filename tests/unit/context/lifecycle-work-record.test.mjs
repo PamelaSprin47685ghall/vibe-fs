@@ -19,8 +19,8 @@ test('LWR_opening_prompt_is_byte_exact_and_appears_exactly_once', () => {
 
   const rendered = lifecycleWorkRecord.materialize(opening(assignment), [], trace, { Sequence: 1 }, [], OPENING_END)
 
-  assert.equal(rendered.includes('# Opening task'), true)
-  // Opening 只出现在 # Opening task 段，不重复于 gap（openingEnd 之后的 gap 为空）
+  assert.equal(rendered.includes('Opening task'), true)
+  // Opening 只出现在 Opening task 段，不重复于 gap（openingEnd 之后的 gap 为空）
   assert.equal(rendered.split(assignment).length - 1, 1)
   // 首条 prompt 原文逐字，不 Trim、不重排
   assert.match(rendered, new RegExp(assignment.replace(/\n/g, '\\n')))
@@ -37,8 +37,8 @@ test('LWR_y_frames_cover_prefix_and_x_supplies_only_suffix', () => {
   // Y 已消化到 cursor 3：gap 只剩 [3, 4)
   const rendered = lifecycleWorkRecord.materialize(opening('task'), ['frame one'], trace, { Sequence: 3 }, [], OPENING_END)
 
-  assert.match(rendered, /# Work log\nframe one/)
-  assert.match(rendered, /# Uncompressed tail\nassistant: work c/)
+  assert.match(rendered, /Work log\nframe one/)
+  assert.match(rendered, /Uncompressed tail\nassistant: work c/)
   // 已压缩部分不重复出现于 gap
   assert.equal(rendered.includes('work a'), false)
   assert.equal(rendered.includes('work b'), false)
@@ -54,9 +54,9 @@ test('LWR_no_y_frames_means_opening_plus_raw_gap_not_alternate_A_path', () => {
   // 算法，无「无 B 则整个 A」的旁路分支（EXEC-008、方案 4.4）
   const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 0 }, [], OPENING_END)
 
-  assert.match(rendered, /# Uncompressed tail\nassistant: work a/)
-  assert.equal(rendered.includes('# Work log'), false)
-  // Opening 段一次（标题 # Opening task 不算内容）；gap 不含 opening
+  assert.match(rendered, /Uncompressed tail\nassistant: work a/)
+  assert.equal(rendered.includes('Work log'), false)
+  // Opening 段一次（标题 Opening task 不算内容）；gap 不含 opening
   assert.equal(rendered.split('\ntask\n').length - 1, 1)
 })
 
@@ -66,7 +66,7 @@ test('LWR_terminal_output_is_byte_exact_and_not_in_a_separate_field', () => {
 
   const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 1 }, terminal, OPENING_END)
 
-  assert.match(rendered, /# Final output\nFinal summary with detail/)  // terminal 不是独立字段；它只出现在 LWR 段内（EXEC-006）
+  assert.match(rendered, /Final output\nFinal summary with detail/)  // terminal 不是独立字段；它只出现在 LWR 段内（EXEC-006）
   assert.equal(rendered.includes('final_text'), false)
 })
 
@@ -86,10 +86,10 @@ test('LWR_empty_sections_are_omitted', () => {
 
   const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 1 }, [], OPENING_END)
   // gap 空、无 frames、无 terminal → 只有 Opening
-  assert.equal(rendered.includes('# Work log'), false)
-  assert.equal(rendered.includes('# Uncompressed tail'), false)
-  assert.equal(rendered.includes('# Final output'), false)
-  assert.equal(rendered.includes('# Opening task'), true)
+  assert.equal(rendered.includes('Work log'), false)
+  assert.equal(rendered.includes('Uncompressed tail'), false)
+  assert.equal(rendered.includes('Final output'), false)
+  assert.equal(rendered.includes('Opening task'), true)
 })
 
 test('LWR_child_opening_excludes_parent_work_record_envelope', () => {
@@ -162,7 +162,7 @@ test('LWR_terminal_excludes_raw_tool_parts', () => {
 
   const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 1 }, terminal, OPENING_END)
 
-  assert.match(rendered, /# Final output\nFinal summary with detail/)
+  assert.match(rendered, /Final output\nFinal summary with detail/)
   assert.match(rendered, /closing thought/)
   assert.equal(rendered.includes('[tool call]'), false)
   assert.equal(rendered.includes('[tool result]'), false)
@@ -182,9 +182,9 @@ test('LWR_parent_to_child_includes_opening', () => {
     true,
   )
 
-  assert.equal(rendered.includes('# Opening task'), true)
+  assert.equal(rendered.includes('Opening task'), true)
   assert.equal(rendered.includes('assigned task'), true)
-  assert.match(rendered, /# Work log\ndid work/)
+  assert.match(rendered, /Work log\ndid work/)
 })
 
 test('LWR_child_to_parent_omits_opening', () => {
@@ -199,8 +199,8 @@ test('LWR_child_to_parent_omits_opening', () => {
     false,
   )
 
-  assert.equal(rendered.includes('# Opening task'), false)
+  assert.equal(rendered.includes('Opening task'), false)
   assert.equal(rendered.includes('assigned task'), false)
-  assert.match(rendered, /# Work log\ndid work/)
-  assert.match(rendered, /# Final output\nFinal summary/)
+  assert.match(rendered, /Work log\ndid work/)
+  assert.match(rendered, /Final output\nFinal summary/)
 })

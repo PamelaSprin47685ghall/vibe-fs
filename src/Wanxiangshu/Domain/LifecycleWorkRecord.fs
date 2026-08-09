@@ -44,7 +44,9 @@ module LifecycleWorkRecord =
             heading + "\n" + body
 
     /// 稳定 Markdown 渲染。空段整段省略。
-    /// `includeOpening=false` 时省略 `# Opening task`（子→父 join）。
+    /// 段标题为纯文本（Opening task / Work log / …）；`# ` 仅由
+    /// `SyntheticToml.comment` 在 wire 注入，避免 `# # Work log`。
+    /// `includeOpening=false` 时省略 Opening task（子→父）。
     /// `Gap` 须已 `forWorkRecord`；render 再次过滤 fail-closed。
     let render (includeOpening: bool) (record: LifecycleWorkRecord) : string =
         let openingBody =
@@ -75,10 +77,10 @@ module LifecycleWorkRecord =
         let gapText = record.Gap |> XTrace.forWorkRecord |> XTrace.render
 
         let sections =
-            [ section "# Opening task" openingBody
-              section "# Work log" framesText
-              section "# Uncompressed tail" gapText
-              section "# Final output" (record.Terminal |> Option.defaultValue "") ]
+            [ section "Opening task" openingBody
+              section "Work log" framesText
+              section "Uncompressed tail" gapText
+              section "Final output" (record.Terminal |> Option.defaultValue "") ]
             |> List.filter (fun text -> text <> "")
 
         String.concat "\n\n" sections

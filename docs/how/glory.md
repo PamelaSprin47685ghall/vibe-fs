@@ -22,7 +22,7 @@
 2. `ManagerWorkflow.tryObserve` 的 `TurnCompleted` 分支拥有 Manager 规划：Life 已 LifeOpened、未 WorkActivated、无 pending activation claim（读 `PromptAuthority.PendingClaims`）、terminal 有合法正式文本（`CompletedTurnClassifier.partsText` 非空）、session 未被中断 → 发送 `ManagerWorkActivation` continuation（`HostSessionNudge.sendContinuationResult`，Detached）并 deferred completion（不 NotifyTerminal、不 captureTerminal）。`HostSignalBootstrap` 只按 canonical Role 路由；`TurnCompletionProgram` 不判断 Manager 业务。其余 terminal 类型（TurnFailed/TurnAborted/TurnNeedsContinuation/empty）不触发（GLORY-018）。
 3. `WorkActivated` 写在 Activation 消息 physical acceptance 之后：transform 中检查 `PromptAuthority.AcceptedContinuationIds` 含 `ManagerWorkActivation` 且投影无 `WorkActivated` → append `WorkActivated (lifeId, activationPromptKey, protectedPrefixEnd = XTraceProjection.headSequence + 1)`（Activation 消息的 XTrace 末端之后，GLORY-021）。幂等：已有 WorkActivated 则跳过。
 4. Blogger floor（GLORY-023/024）：`BloggerCoordinator.nextMainContext` 中 `effectiveStartSeq = max blog.Coverage.IngestedThroughSequence life.ProtectedPrefixEnd.Sequence`，用它替代 `semanticCursorFor(IngestedThroughSequence)` 的输入；`CompanionTransform.hasMaterial` 预过滤同步（切片 G 前，无 Life 的 Manager 保持现状）。
-5. `XTraceCapture.lifecycleWorkRecord` 增加 Manager 变体：当 session 是 Manager 且有 Life 时，按 `# Opening task / # Birth record / # Work log / # Uncompressed tail / # Final output` 渲染（GLORY-025），Birth 部分逐字渲染 `Life Opening cursor → ProtectedPrefixEnd` 的 XTrace（GLORY-022）。
+5. `XTraceCapture.lifecycleWorkRecord` 增加 Manager 变体：当 session 是 Manager 且有 Life 时，按纯文本段标题 `Opening task / Birth record / Work log / Uncompressed tail / Final output` 渲染（GLORY-025；`# ` 仅由 `SyntheticToml.comment` 在 wire 注入），Birth 部分逐字渲染 `Life Opening cursor → ProtectedPrefixEnd` 的 XTrace（GLORY-022）。
 
 ## Slice C：工具与角色边界
 
@@ -58,7 +58,7 @@ let reverify
 ## Slice E：失败反馈
 
 1. REVISE 首先关闭 cohort：撤销对应 Reviewer continuation capability、cancel sibling 的下一次 effect；不发 confirmation/challenge，不 Dispose 未 graduate session（GLORY-044/055）。该步骤不写 `FinalityRejected`。不等待尚未 durable-REVISE 的 sibling 新 terminal。取消时若成员已持有 durable `RevisionRequired`，`awaitOrCancel` 经 `hasDurableRevisionRequired` / `promoteCancelled` 提升为 `Ok`，避免已落定 sibling 在竞态中丢失。
-2. record-ready 等待（首个 rejecting Reviewer）：从 durable REVISE 重建 terminal frontier；原子取得 `(snapshot, revision)`，在该 snapshot 上以全量 origin coverage 物化 canonical LWR，并确认含 `# Work log`（`materializeRecord`）。就绪判定是「能否物化有效工作日志」，不是 `coverage >= frontier.Sequence`——frontier 为排他（lastPart+1），真实 Blogger coverage 上限只达 lastPart，旧 coverage 门禁会在 `coverageCanAdvance` 恒真时永远悬挂（GLORY-073 off-by-one 死锁）。物化成功 → `RecordReady`；物化失败但 `coverageCanAdvance`（Blogger 未 Abandoned/Retired）→ `AwaitJournal`，经 `AgentJournal.awaitChangeFrom revision` 事件驱动唤醒后重读，不得以 timer、sleep、timeout 或 re-probe 推进；否则 `RecordUnavailable` → `concludeUndecided`。就绪后才 `WriteBlob`，再 append `FinalityRejected`（`RejectingReviewerSessionId`），并将 `FinalityPrompt.rejected` 的拒绝 prompt 作为 `suicide` 工具结果返回（GLORY-052/053/072/073）。
+2. record-ready 等待（首个 rejecting Reviewer）：从 durable REVISE 重建 terminal frontier；原子取得 `(snapshot, revision)`，在该 snapshot 上以全量 origin coverage 物化 canonical LWR，并确认含 `Work log`（`materializeRecord`；raw 段标题无 `# `，wire 经 `SyntheticToml.comment` 才有单次 `# `）。就绪判定是「能否物化有效工作日志」，不是 `coverage >= frontier.Sequence`——frontier 为排他（lastPart+1），真实 Blogger coverage 上限只达 lastPart，旧 coverage 门禁会在 `coverageCanAdvance` 恒真时永远悬挂（GLORY-073 off-by-one 死锁）。物化成功 → `RecordReady`；物化失败但 `coverageCanAdvance`（Blogger 未 Abandoned/Retired）→ `AwaitJournal`，经 `AgentJournal.awaitChangeFrom revision` 事件驱动唤醒后重读，不得以 timer、sleep、timeout 或 re-probe 推进；否则 `RecordUnavailable` → `concludeUndecided`。就绪后才 `WriteBlob`，再 append `FinalityRejected`（`RejectingReviewerSessionId`），并将 `FinalityPrompt.rejected` 的拒绝 prompt 作为 `suicide` 工具结果返回（GLORY-052/053/072/073）。
 3. Sibling 预检与双轨交付（multi durable REVISE，GLORY-044/REVIEW-002）：`concurrentAllOrShortCircuit` 在 short-circuit 时仍将首个 `RevisionRequired` 记入 `results` 并 `cancel`；随后等待其余已启动的 driver 结束。durable sibling 并集 = 竞态 `RevisionRequired` ∪ journal `durableRevisionSiblings`（去重）。**在密封 `FinalityRejected` 之前**对并集逐员预检：硬 `RecordUnavailable`（含 abandoned companion / `coverageCannotAdvance`）→ `concludeUndecided`，不得在 sibling 未入账时落 `Rejected`；全部 `RecordReady` → 先对全部 sibling `WriteBlob`/prepare，再一次性 append 全部 `FinalitySiblingSteered`（仍 Open；中途 WriteBlob 失败不得留下部分 `FinalitySiblingSteered` 再 `Undecided`）→ 再 `concludeRejection`（首个工具结果）→ `FinalityPrompt.steer` + `HostSessionNudge.sendContinuation`（`ContinuationKind.FinalitySteer`）。禁止 `| None -> ()` 静默丢弃；sibling 文本不得并入工具结果。Steer 固定 instruction 示例：
 
     ```toml
@@ -68,7 +68,6 @@ let reverify
 
 4. `BloggerRequestAbandoned` 只令本次记录尝试失效；reconcile 以同一 durable frontier 重新建立机会。frontier 或同 snapshot LWR 无法证明时走 `concludeUndecided`，不得用当前 head 或局部 record 代替（GLORY-056/057/073）。
 5. dedupe / 崩溃恢复：`FinalityRejected` 与 `FinalitySteer` 使用不同 claim scope（GLORY-053）。`resumeDurableRevise` 在 Open 路径复用同一预检/入账顺序；已决议路径仅重放已提交的 `FinalitySiblingSteered` continuation（先 fact 再发送，便于 crash-after-fact 恢复）。
-
 
 ## Slice F：Finality 收束
 
@@ -103,7 +102,7 @@ Orchestrator 衔接：ManagerJob 的 Manager 完成由现有 `AwaitManager` 路�
 | LifeOpened 缺 → provider request 前 | 无害；下个 transform 重开 | ✅ transform 幂等 |
 | LifeOpened 有 → 无 WorkActivated | 幂等改写 + Activation 逻辑继续 | ✅ transform + ManagerWorkflow |
 | FinalityRequested 无 enlisted member | FinalityTool「in motion」分支重启同一 request 的 FinalityController；`rosterOf` 崩溃重入不重复造新 Reviewer | ✅ |
-| REVISE 已存在但无 FinalityRejected | 从 durable evidence 重建同一 terminal frontier；cohort 继续关闭，以全量 origin coverage 物化含 `# Work log` 的 canonical LWR；物化失败且 `coverageCanAdvance` 则等待 journal change；`BloggerRequestAbandoned` 重建记录机会，证据不足则 undecided | ✅ |
+| REVISE 已存在但无 FinalityRejected | 从 durable evidence 重建同一 terminal frontier；cohort 继续关闭，以全量 origin coverage 物化含 `Work log` 的 canonical LWR；物化失败且 `coverageCanAdvance` 则等待 journal change；`BloggerRequestAbandoned` 重建记录机会，证据不足则 undecided | ✅ |
 | FinalityRejected 已落盘且 `FinalitySiblingSteered` 已提交，但 Manager steer prompt 缺失 | 已决议路径**仅重放已提交** SiblingSteers：读 blob（缺失则从 journal rematerialize）→ `FinalityPrompt.steer` → `sendContinuation(FinalitySteer)`；仍不可得则 Manager-visible `FinalityPrompt.steerUnavailable`（不伪装成功）。不 append 新 fact、不改 `Resolution`。未入账 sibling 不在此路径补造（密封前会计 / Undecided fail-closed 已防；post-Rejected rematerialize+append 不是 happy path） | ✅ resumeDurableRevise 已决议分支 |
 | record-ready waiter 崩溃/Dispose | 不写 abandonment 或 lifecycle 终态；replay 后从 durable REVISE/frontier 重新订阅 journal change | ✅ resumeDurableRevise（GLORY_075） |
 | confirmed witness 存在但无 FinalityBlessed | concludeBlessing 幂等（blessing 已存在/terminal 已记录则跳过） | ✅ |
