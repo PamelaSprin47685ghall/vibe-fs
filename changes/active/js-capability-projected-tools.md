@@ -5338,11 +5338,12 @@ crash recovery 只从 EventStore facts/payloads 重建。
 - [x] ToolRegistry generated-name gate（`isGeneratedToolName` / `memberBinding`；forged call fail closed）
 - [x] 静态门禁：`scripts/checks/js-surface-gate.mjs` wired into `check.mjs`
 
-### Phase B — sandbox + transaction（Playbook §12.3 第二阶段）— PARTIAL（B-1/B-2/B-3 纯规则 DONE）
+### Phase B — sandbox + transaction（Playbook §12.3 第二阶段）— PARTIAL（B-1/B-2/B-3/B-4 DONE）
 - [x] sandbox runner（`Process/JsSandbox.fs`；vm 无 ambient authority；vm timeout + 递归 deadline proxy；output bound）
 - [x] failure algebra（`JsFailure` 按 proposal §77.1 稳定码）+ anchor 声明纯规则（`AnchorRules`；空锚点/非正 occurrence 拒绝）
 - [x] transaction 纯规则（`JsTransaction`：validateSingleIntent/validateTargets/validateFreshness/preflight/commitPlan/rollbackPlan）
-- [ ] fs adapter：file()/FileView（immutable snapshots）/ anchors 匹配 / glob()（bounded enumeration）/ rewrite()/write() staging（ephemeral）
+- [x] fs adapter（`Infrastructure/JsToolsFs.fs`：strict UTF-8 读、ordered anchors、bounded glob、两阶段 all-or-nothing commitPlan）
+- [x] runtime bindings（`Infrastructure/JsToolsBindings.fs`：file/glob/grep/rewrite/write；path boundary；staging-only；binding key 与 fragment 同源）
 - [ ] transaction engine Host 侧（preflight 执行 → durable prepare = EventStore only → commit → rollback → crash recovery）
 - [ ] return serializer（JSON-compatible；result validation 在 commit 前）
 - [ ] Synthetic TOML bridge（JS-016）
