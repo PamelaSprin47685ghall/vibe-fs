@@ -80,6 +80,7 @@
     <Compile Include="Domain/AttemptPlanner.fs"/>
     <Compile Include="Domain/EventStore.fs"/>
     <Compile Include="Domain/JsTools.fs"/>
+    <Compile Include="Domain/Casebook.fs"/>
     <Compile Include="Infrastructure/Persist/StoreTypes.fs"/>
     <Compile Include="Infrastructure/Persist/CanonicalEventCodec.fs"/>
     <Compile Include="Infrastructure/Persist/GitRawStore.fs"/>
