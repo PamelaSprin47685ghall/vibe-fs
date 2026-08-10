@@ -4905,3 +4905,369 @@ LifeOpened
 控制点来自**真正发生的工具事实**，不是人为维护的程序阶段。
 
 这应当成为本 Change 最重要的架构验收标准。
+
+# 宿主能力调研报告
+
+> 对照对象：附件中的 **Todo Checkpoint Protocol**（`todowrite` 作节拍器、`reviewing` 门禁、迟滞 1:1 process review、schema membrane、lag-1 Y-prefix rebase、dedicated reviewer → 终末 2N）。  
+> 调研对象：当前仓库 **OpenCode host**（`packages/opencode` + `packages/core` + `packages/plugin`）。  
+> 说明：设计稿中的 `HOST-013` / `GLORY-030` / `ARCH-004` / `PrefixCoverage` / `RecordCoverage` **本仓库无同名规范**；下文只报告 OpenCode 实际能力，并在必要时给出可对照的近似物。
+
+---
+
+## 0. 总裁决
+
+OpenCode **已经具备**在 V1 运行时上叠加 Todo Checkpoint Protocol 所需的三钩子骨架：
+
+| 钩子 | 状态 | 位置 |
+|---|---|---|
+| `tool.definition` | 已落地 | `packages/plugin/src/index.ts`；调用于 `packages/opencode/src/tool/registry.ts` |
+| `tool.execute.before` | 已落地 | 同上；主路径 `packages/opencode/src/session/tools.ts` |
+| `tool.execute.after` | 已落地 | 同上 |
+
+同时具备：
+
+- 内置 `todowrite`（V1 + V2 两套实现）
+- 可 resume / background 的 `task` 子代理
+- Context Epoch / compaction / `experimental.chat.messages.transform` 等前缀组装能力
+
+但协议核心语义大多 **不能开箱即用**，必须以外挂状态机 + 钩子膜实现，或改宿主：
+
+- 无 stable todo `id`，无 `reviewing`，无 transition law
+- 无 lag-1 process review、无 dedicated reviewer / Finality 2N
+- 无主动 TodoCheckpoint rebase；compaction 是另一条边界
+- V2 local settle **尚未**接 plugin tool hooks
+
+**结论：V1 上可做 overlay；完整协议需要宿主补若干契约，不能仅靠 prompt。**
+
+---
+
+## 1. `todowrite`：现状与缺口
+
+### 1.1 已有能力
+
+**V1**
+
+- 工具：`packages/opencode/src/tool/todo.ts`
+- 说明：`packages/opencode/src/tool/todowrite.txt`
+- 存储：`packages/opencode/src/session/todo.ts` → `TodoTable`
+- 行为：`permission: todowrite` → `Todo.update` → 返回 pretty JSON + metadata
+
+**V2**
+
+- 工具：`packages/core/src/tool/todowrite.ts`
+- 存储：`packages/core/src/session/todo.ts`
+- 行为：`PermissionV2.assert` → `SessionTodo.update` → `toModelOutput`
+
+**Schema**（`packages/schema/src/session-todo.ts`）：
+
+```ts
+{ content: string, status: string, priority: string }
+```
+
+- `status` / `priority` 是 **自由字符串**，文档写了 `pending | in_progress | completed | cancelled`，但 **没有 enum / Literals 硬约束**
+- **没有** `id` 字段；表主键是 `(session_id, position)`
+- `update` 语义是 **整表替换**：`DELETE` 全量再按 position `INSERT`
+- 事件：`todo.updated`
+- UI：session todo dock / TUI sidebar；timeline 里 todowrite part 常作 hidden
+
+### 1.2 相对协议的缺口
+
+| 协议要求 | 宿主现状 |
+|---|---|
+| stable item identity | **缺失**；身份只能靠 content/position 猜测 |
+| `reviewing` 状态 | **缺失**；字符串可写入，但无语义/校验/投影约定 |
+| `old≠completed ∧ proposed=completed ⇒ old 必须是 reviewing` | **缺失**；任何 status 字符串都可直接写成 completed |
+| settle / semanticMerge / REVISE preview | **缺失**；executor 原样回写输入 |
+| enriched tool result（上次 review 报告 + merge preview） | executor 只回 todos JSON；需 `tool.execute.after` 改写 |
+| canonical truth ≠ Host old executor | 现状 Host store **就是** truth；协议要求它降级为 compatibility sink |
+
+### 1.3 对实现的直接含义
+
+1. **新 schema 必须自带 stable `id`**，否则 merge 并集无法证明“同一条 todo”。  
+2. Host V1 store 若继续不认 `id` / `reviewing`，Magic Todo 必须自建 durable projection；Host `TodoTable` 最多存兼容投影（例如 `reviewing → in_progress`）。  
+3. 因为是 full replace，任何“并集保留旧未完成项”都必须在 before/after 之外的 fold 层完成，不能指望 `SessionTodo.update`。
+
+---
+
+## 2. Tool Definition / Before / After：可做的 membrane，与坑
+
+### 2.1 调度语义（已确认）
+
+`Plugin.trigger`（`packages/opencode/src/plugin/index.ts`）：
+
+- 按 plugin 注册顺序 **串行**调用同名 hook
+- 传入 **同一个 mutable `output` 对象**
+- 后写覆盖先写；`trigger` 的返回值在多数调用点被忽略，依赖 **原地 mutation**
+
+主工具路径（`packages/opencode/src/session/tools.ts`）：
+
+```text
+tool.execute.before({ tool, sessionID, callID }, { args })
+→ item.execute(args, ctx)
+→ tool.execute.after(..., output={ title, output, metadata, attachments? })
+→ return output
+```
+
+### 2.2 与协议“schema membrane”的映射
+
+| 协议步骤 | 宿主能力 | 判定 |
+|---|---|---|
+| `tool.definition` 把 todowrite 广告成 V2（含 reviewing / id） | 可改 `description` / `parameters` / `jsonSchema` | **可用** |
+| before 做 settle、transition check、V2→V1 投影 | 可改 `args`；可 async await（可阻塞等上一 review） | **可用** |
+| Host old executor 只吃 V1 | 内置 todowrite 仍按原 schema decode + full replace | **可用作 sink** |
+| after 恢复 V2 call shape + 富化 result + 启动 review | 可改 `output.output/title/metadata`；可旁路启动 task | **部分可用** |
+| before→after 用隐藏 JS 属性传 bridge | 同一次调用内可挂在闭包/`WeakMap`/非枚举属性上 | **模式存在**；但见下节坑 |
+
+### 2.3 关键宿主坑（协议落地前必须 canary）
+
+#### A. `output.args = newArgs` **不会**进入 executor
+
+before 收到的是 `{ args }` wrapper；本地 `execute(args, …)` 仍绑定原 `args` 引用。
+
+- ✅ `output.args.todos = projected` / 原地改字段 → execute 看得到  
+- ❌ `output.args = { todos: projected }` → **本地 args 不变**，executor 仍吃旧对象  
+- `trigger` 返回值未被 tools.ts 用来替换 args
+
+#### B. 持久化的 tool-call input 是 **before 之前** 的 provider args
+
+`processor` 在 `tool-call` 事件时写入 `part.state.input`；`completeToolCall` 仍用这份 input。  
+before 的投影 **不会写回** durable ToolPart。
+
+这对协议反而是好事：
+
+- 模型若按 V2 definition 发出 `reviewing`，历史里保留的是 V2 wire  
+- **不一定需要** after“恢复 call shape”来修 prefix（与设计稿假设的 Host 不同）  
+- 但仍需 canary：**execute 的 args 与 `part.state.input` 是否同引用**；若同引用且 before 原地改写，会污染历史
+
+#### C. `tool.definition` 改 schema ≠ 改 execute 校验器
+
+`registry.tools`：
+
+1. 先 `tool.definition` 改广告用 `parameters/jsonSchema`
+2. 返回的 `execute` 仍是 **init 时 wrap 好的原工具**
+3. wrap 内 `Schema.decodeUnknownEffect(ORIGINAL parameters)` 在 before **之后**执行
+
+因此：
+
+- 广告 V2、before 投影回 V1、再 decode V1 → 可行  
+- 若 before 未剥掉 V2 字段，而原 Struct 拒 unknown keys → 校验失败  
+- 当前 `status: Schema.String`，裸写 `reviewing` 也能过 decode；**门禁不会自动出现**，必须在 before 自建
+
+另外：`parameters === tool.parameters || jsonSchema !== tool.jsonSchema` 的三元逻辑意味着只换 `parameters` 引用时可能丢掉旧 `jsonSchema`；改 definition 时要同时维护两者。
+
+#### D. after 只能稳定改 `title` / `output` / `metadata`
+
+富化 review 报告应写进 `output.output`（模型可见字符串）或 `metadata`（偏 UI/内部）。  
+没有正式字段表达 `previousReview` / `revisePreview` 结构体。
+
+#### E. V2 runner 尚未接这些钩子
+
+- `packages/plugin/src/v2/effect/PLAN.md` 设计了 `ctx.tool.hook("execute.before"|"after")`
+- 当前 V2 PluginContext **没有 tool domain**
+- V2 local settle 路径 checklist 仍标 plugins 未接
+
+**若协议只挂在 V1 hooks 上，V2 settle 会绕过 membrane。**
+
+#### F. 同名 plugin tool 会盖掉内置 todowrite
+
+文档明确：plugin `tool` 与内置同名时 **plugin 优先**。  
+可选路线：整支替换 `todowrite`，而不是 membrane。代价是失去/重写 Host store / UI 事件契约。
+
+---
+
+## 3. “Manager 两阶段 → pair-programming 持续 todowrite”
+
+### 3.1 宿主近似物
+
+OpenCode 有 **plan → build**，不是 Manager Birth/Activation：
+
+- `plan` agent：禁 edit，允许 `plan_exit`
+- `plan_exit`：提问 → 切到 `build` + 合成用户消息 “Execute the plan”
+- `build`：默认主 agent，可 `todowrite`
+- `general` subagent：**显式 `todowrite: deny`**
+- 子 session：若自身规则未允许 todowrite，会注入 deny
+
+### 3.2 提示注入面
+
+| 机制 | 用途 | 相对 HOST-013 |
+|---|---|---|
+| agent `prompt` / config | 静态角色提示 | 可放持续 todowrite 纪律 |
+| `experimental.chat.system.transform` | 每轮改 system 数组 | **最接近**永久 pair guideline |
+| `chat.message` / `chat.params` | 改用户消息或采样参数 | 不适合当 gap-anchor 重放 |
+| 独立 HOST-013 pair-programming marker | — | **不存在** |
+
+### 3.3 裁决
+
+- “取消两阶段、工作时持续 todowrite”在 OpenCode 上 = **弱化/绕过 plan_exit 仪式 + 用 system.transform / agent prompt 注入纪律**  
+- 不是删除 `PlanningTail/WorkActivated` 那种正式 stage machine（本仓库本无这些对象）  
+- 若希望所有 primary agent 统一看到 guideline，优先 `experimental.chat.system.transform`，并对无 todowrite 权限的角色加 `When todowrite is available…` 守卫
+
+---
+
+## 4. 上下文压缩 / lag-1 Y rebase
+
+### 4.1 已有近似物（CONTEXT.md + 实现）
+
+| 协议词 | OpenCode 近似 |
+|---|---|
+| Opening / Baseline | Baseline System Context + Context Epoch |
+| 前缀不变区间 | Context Epoch（直到 compaction / session move / 不兼容切换） |
+| Record vs Prefix | Snapshot（model-hidden JSON）vs 送模历史裁剪 |
+| Overflow / Host compaction | `SessionCompaction`；history 从 latest compaction seq 切开 |
+| Mid-conversation 更新 | Mid-Conversation System Message + Snapshot 原子前进 |
+
+关键文件：
+
+- `CONTEXT.md`
+- `packages/core/src/session/context-epoch.ts`
+- `packages/core/src/session/history.ts`
+- `packages/core/src/session/compaction.ts`
+- `packages/opencode/src/session/compaction.ts`
+- hooks：`experimental.session.compacting` / `experimental.compaction.autocontinue`
+
+### 4.2 协议要的 “每次 todowrite 做 lag-1 主动 Y rebase”
+
+| 能力 | 判定 |
+|---|---|
+| 在 todowrite 边界主动改写下一轮 provider 前缀 | **无一等 API** |
+| 复用 compaction 消息当 Y | **部分**：那是 overflow/auto 路径，不是 TodoCheckpoint |
+| 仅本轮改写送给模型的 messages | **可用**：`experimental.chat.messages.transform` 在 `toModelMessagesEffect` 前触发；原地 splice/mutate `msgs` 生效；`output.messages = newArr` 不生效 |
+| 持久化 `TodoCheckpointRebaseCommitted` / PrefixEpoch | **缺失**；只有 Context Epoch + compaction seq |
+| Opening 永不被 Y 替换 | Baseline/System Context 机制可近似；但 todo checkpoint 不会自动保护 OpeningRaw transcript |
+
+### 4.3 裁决
+
+- **messages.transform = 无感、非持久的 request 组装钩子**，可做“看起来像 lag-1 Y”的演示  
+- **真正 durable、可崩溃恢复、可与 RecordCoverage 解耦的 TodoCheckpointRebase** 需要新事实类型 + history loader 认知该边界  
+- 不宜偷偷借用 `session.compacted` 冒充 TodoCheckpoint：compaction 会开新 Context Epoch，语义过重且与 overflow recovery 耦合
+
+---
+
+## 5. Dedicated reviewer / 迟滞 review / Finality
+
+### 5.1 可复用的子代理能力
+
+`task`（`packages/opencode/src/tool/task.ts`）：
+
+- `subagent_type`：可指向自定义 agent（config / 未来 plugin agent.transform）
+- `task_id`：**resume 同一子 session**（dedicated reviewer 的物理连续性）
+- `background: true`：异步返回（需 `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS`）
+- 完成通知走 background job / task_result 机制
+- 默认为子代理 deny `todowrite`（除非显式允许）——符合“reviewer 不改 manager todo store”
+
+### 5.2 协议缺口
+
+| 要求 | 宿主 |
+|---|---|
+| 首次 todowrite 自动 enlist dedicated reviewer | **无**；需 hook 旁路创建，不能让 Manager 自己 `task`（会暴露机制） |
+| review 输入 = Opening + 全量 Y + old/new todo | **无** Y-complete review projection；需自建 |
+| lag=1：本次 todowrite 消费上次 review，并启动本次 | before 可 await；after 可 launch；需自建 journal |
+| 上次未出结论则阻塞 | before 里 await Promise **可行**（hook 是 async） |
+| suicide 抽干最后一次 process review | **无 suicide/Finality**；无天然 tail drain 点 |
+| process PERFECT ≠ finality PERFECT | **无 Finality / 2N / dual-PERFECT** |
+| dedicated reviewer 进终末评审团 | **无 cohort / barrier / witness** |
+| Manager 可见 review outcome，不可见 reviewer identity | 无 GLORY-030；可用 after 文案控制可见面，但无强制隔离层 |
+
+本仓库仅有 `/review` 命令模板，不是过程评审协议。
+
+### 5.3 推荐落点（在现有宿主上）
+
+```text
+tool.execute.before(todowrite)
+  await previousReviewJournal.ready
+  settle Ck
+  enforce reviewing→completed
+  project V2→V1 args（原地）
+  stash bridge in module WeakMap[callID]
+
+Host todowrite executor
+  写入兼容 V1 list（非 canonical）
+
+tool.execute.after(todowrite)
+  rewrite output.output = enriched V2 result
+  fork/resume dedicated reviewer session（SDK/client，非模型可见 task）
+  persist TodoWriteSubmitted / start review
+```
+
+注意：`callID` 可作桥接键，但 **不是** durable ProviderRunIdentity；崩溃恢复必须靠 journal facts，不能靠 hidden property。
+
+---
+
+## 6. 隐藏属性 / 不变量模式
+
+宿主已有可借鉴模式：
+
+- Core `Tool.make`：`Object.freeze({})` + `WeakMap` 私有 runtime（`packages/core/src/tool/tool.ts`）
+- SystemContext：`Symbol.for` 隐藏 type id（`packages/core/src/system-context/index.ts`）
+- Context Snapshot：model-hidden 但 durable 的 JSON
+
+协议建议的 `Symbol` + non-enumerable property 可放在 before/after 共享的 hook output 上做 **进程内短桥**；但：
+
+- Host 不保证 after 与 before 看到同一 JS 对象之外的深克隆行为（当前实现是同一对象，仍需 canary）
+- 异常路径是否仍调 after：主路径在 execute 成功后才 after；execute 抛错时 after **可能不跑** → bridge 必须可 GC，且 review 启动不宜只活在 after 成功路径，或要明确失败语义
+
+---
+
+## 7. 按协议条目的能力矩阵
+
+| # | 协议条目 | 宿主判定 | 备注 |
+|---|---|---|---|
+| 1 | 取消 Manager 两阶段，改 pair 纪律 | **部分** | 有 plan→build；无 Manager stage；可用 system.transform |
+| 2 | `tool.definition` 广告 V2 schema | **有** | 不替换 execute 校验器 |
+| 3 | before 投影 V2→V1 | **有，有坑** | 必须原地改 `args` 字段 |
+| 4 | after 恢复 V2 / 富化 result | **部分** | 历史 input 本就预 before；result 可富化 |
+| 5 | hidden bridge before→after | **模式有** | WeakMap/Symbol；非 durable |
+| 6 | `reviewing` + 不可跳过 completed | **无** | status 自由字符串；无 transition law |
+| 7 | stable todo id + semanticMerge | **无** | 无 id 列；full replace |
+| 8 | lag-1 process review | **可叠加** | before await + after launch；协议本身缺失 |
+| 9 | dedicated reviewer session | **可叠加** | task resume/background；需旁路创建 |
+| 10 | review 看全量 Y + old/new todo | **无** | 无 Y-complete projection |
+| 11 | todowrite 触发 lag-1 Y rebase | **无（仅有 ephemeral transform）** | compaction ≠ TodoCheckpoint |
+| 12 | suicide drain last review | **无** | 无 suicide/Finality 钩子 |
+| 13 | 加入终末 2N | **无** | 无 Finality cohort |
+| 14 | Manager 只见 outcome 不见机制 | **弱** | 无正式隔离；可靠文案/隐藏 agent |
+| 15 | durable facts 而非程序计数器 | **部分** | 有 EventV2/Todo/Epoch；无 TodoWrite/Review facts |
+| 16 | V2 runner 同等 membrane | **缺失** | V2 tool hooks 未接线 |
+
+---
+
+## 8. 设计稿“留给 Host 的缺口”→ 本仓库实测答案
+
+设计稿末尾保留的实现缺口，实测如下：
+
+| 缺口 | OpenCode 答案 |
+|---|---|
+| V1 精确 schema | `{ content, status, priority }` 全是 string；无 id；无 reviewing |
+| hook object 真实形状 | before: `{ args }`；after: `{ title, output, metadata }`（+ attachments 运行时） |
+| before/after 是否同对象 | **是**同一 mutable output；靠原地 mutation |
+| 异常路径是否 after | 主路径 execute 成功后才 after；失败路径不保证 |
+| `reviewing` 兼容投影字段 | Host 不认识；若写入 store，只是普通字符串；UI/提示仍按四态描述 |
+| 旧 todo 是否已有稳定 identity | **无**；只有 session 内 position |
+
+补充实测：
+
+- 广告 schema 与 execute schema **可分叉**
+- 持久化 tool input = **pre-before**
+- plugin 可整支覆盖 `todowrite`
+- `general` / 默认子代理 **不能** todowrite
+
+---
+
+## 9. 建议的宿主协作面（实现前应冻结）
+
+若继续在本宿主上做 Magic Todo，建议与 Host 冻结最小契约，而不是继续猜测：
+
+1. **Canary**：before 与 `part.state.input` 是否共享引用；`output.args` 重绑定 vs 字段mutation；execute 失败时 after 是否调用。  
+2. **Identity**：是否允许扩展 SessionTodo schema 增加 `id`（及可选正式 `reviewing`），或明确 Host store 永远只是 sink。  
+3. **Result 合同**：after 改写的 `output.output` 是否保证进入下一轮 model history（当前路径是的）。  
+4. **Async review**：插件内创建/resume 子 session 的官方 API（避免模型可见 `task`）；background 完成如何在不下发机制细节的前提下进入下一次 todowrite。  
+5. **Rebase**：是否新增 `TodoCheckpointRebaseCommitted` 一等边界，或只允许 ephemeral `messages.transform`（接受不可崩溃恢复）。  
+6. **Lifecycle drain**：在无 suicide 的情况下，用什么会话结束钩子抽干最后一次 process review（例如 session idle / 显式 ship / 新 tool）。  
+7. **V2**：membrane 是只支持 V1，还是等 `ctx.tool.hook` 落地再双栈。
+
+---
+
+## 10. 一句话
+
+OpenCode 宿主给 Todo Checkpoint Protocol 准备好了 **V1 钩子三件套 + todowrite sink + task resume/background + 临时 messages 改写**；没有准备好 **id/reviewing 状态机、迟滞 review journal、Y-complete review 投影、TodoCheckpoint 级前缀 rebase、以及终末 2N/suicide drain**。  
+可在 V1 overlay 验证时钟与 membrane；完整协议仍需 Host 增量，不能只靠 Manager prompt。
