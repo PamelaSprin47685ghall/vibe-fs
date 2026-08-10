@@ -236,6 +236,21 @@ module JsToolsFs =
             | Ok _ -> Error JsFailure.AnchorNotUnique
             | Error _ -> Ok first
 
+    /// Resolve a tool path under root: relative paths join root; absolute
+    /// paths resolve as-is (the bindings enforce the inside-root boundary).
+    let resolveToolPath (root: string) (path: string) : string =
+        if pathIsAbsolute path then
+            pathResolve path
+        else
+            pathResolve (pathJoin root path)
+
+    /// Existence probe used by preflight (JS-013).
+    let existsPath (path: string) : bool =
+        try
+            existsSync path
+        with _ ->
+            false
+
     /// JS-013: apply a commit plan under root — two phases. Phase 1 reads every
     /// original snapshot; any read failure aborts BEFORE any write (a target
     /// that cannot be snapshotted cannot be rolled back). Phase 2 writes all
