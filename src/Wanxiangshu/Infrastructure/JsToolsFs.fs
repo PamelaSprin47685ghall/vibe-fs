@@ -343,3 +343,22 @@ module JsToolsFs =
                         unlinkSync full
             with _ ->
                 ()
+
+    /// JS-015: undo one mutation only when the disk still holds the text we
+    /// wrote (expectedCurrent). If the file was changed by someone else, or we
+    /// never wrote it, nothing is touched — recovery never clobbers external
+    /// edits.
+    let undoIfMatches (root: string) (path: string) (expectedCurrent: string) (restoreTo: string option) : unit =
+        let full = resolveToolPath root path
+
+        match readUtf8Classified full with
+        | Ok current when current = expectedCurrent ->
+            try
+                match restoreTo with
+                | Some text -> writeFileSync full text
+                | None ->
+                    if existsSync full then
+                        unlinkSync full
+            with _ ->
+                ()
+        | _ -> ()

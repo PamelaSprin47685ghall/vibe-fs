@@ -139,3 +139,31 @@ test('JS085_workflow_program_error_fails_without_commit', async () => {
     cleanup()
   }
 })
+
+test('JS012_workflow_with_store_persists_prepare_and_commit', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
+    const raw = (await import('../../../dist/Infrastructure/Persist/GitRawStore.js')).GitRawStore_createInMemory()
+    const store = (await import('../../../dist/Infrastructure/Persist/EventStore.js')).EventStore_create(raw)
+    const surface = generate('Coder', coderCaps)
+    const program = `class Js extends JsProgram {
+  async run() {
+    await this.rewrite('a.txt', { find: 'hello', replace: 'goodbye' });
+    return { done: true };
+  }
+}`
+    // F# option Some(tuple) → the tuple array itself
+    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20, [store, raw])
+    assert.equal(caseName(outcome), 'Succeeded')
+    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'goodbye world', 'committed to disk')
+
+    const storeModule = await import('../../../dist/Infrastructure/JsToolsTransactionStore.js')
+    const events = resultOf(storeModule.loadEvents(raw, store.OpenSnapshot()))
+    assert.equal(events.ok, true)
+    assert.deepEqual(listItems(events.value).map((e) => e.EventType), ['JsTransactionPrepared', 'JsTransactionCommitted'])
+    assert.deepEqual(listItems(storeModule.scanUncommitted(events.value)), [], 'no uncommitted after commit fact')
+  } finally {
+    cleanup()
+  }
+})

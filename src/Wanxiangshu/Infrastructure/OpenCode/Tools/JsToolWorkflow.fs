@@ -2,12 +2,15 @@ namespace Wanxiangshu.Infrastructure
 
 open System.Threading.Tasks
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.Process
 
 /// JS-085: one js-* tool invocation, end to end — the only orchestration of
-/// sandbox execution, staging, preflight and commit. Durable prepare facts
-/// are NOT written here yet (Phase B-5 next): the workflow is fully
-/// functional for ephemeral staging, and the commit is all-or-nothing.
+/// sandbox execution, staging, preflight, durable prepare, commit and the
+/// commit fact (JS-012/JS-013/JS-015). With `store = None` the workflow is
+/// ephemeral (no durable facts — tests); with a store, the transaction is
+/// Prepared BEFORE any filesystem effect and Committed AFTER, so crash
+/// recovery can undo only what was provably written.
 module JsToolWorkflow =
 
     /// Outcome of one invocation: the program's JSON result plus the commit
@@ -19,6 +22,8 @@ module JsToolWorkflow =
     /// Run a model program against root. `baseClassSource` is the generated
     /// JsProgram (JS-002); `modelSource` is the model's `class Js ... run()`.
     /// deadlineMs bounds the sandbox; outputBoundBytes bounds the result.
+    /// `persistence` enables the durable prepare/commit facts (JS-012): the
+    /// IEventStore appends facts; the IGitRawStore reads them back (merge).
     let run
         (root: string)
         (baseClassSource: string)
@@ -26,6 +31,7 @@ module JsToolWorkflow =
         (deadlineMs: int)
         (deadlineEpochMs: int64)
         (outputBoundBytes: int)
+        (persistence: (IEventStore * IGitRawStore) option)
         : Task<JsToolOutcome> =
         task {
             // 1. sandbox execution with staged-only bindings
@@ -51,26 +57,75 @@ module JsToolWorkflow =
 
                 match JsTransaction.preflight exists readCurrent mutations with
                 | Error failure -> return Failed failure
+                | Ok() when List.isEmpty mutations ->
+                    // pure query: no transaction, no durable facts (JS-085)
+                    return Succeeded(resultJson, [], [])
                 | Ok() ->
-                    // 3. commit: all-or-nothing
-                    let plan = JsTransaction.commitPlan mutations
+                    // 3. durable prepare BEFORE any filesystem effect (JS-012)
+                    let prepared =
+                        { TransactionId = JsTransactionId.generate ()
+                          WorkspaceRoot = root
+                          Mutations = JsTransactionFacts.ofStaged mutations }
 
-                    match JsToolsFs.commitPlan root plan with
-                    | Error failure -> return Failed failure
-                    | Ok() ->
-                        let written =
-                            mutations
-                            |> List.choose (fun m ->
-                                match m with
-                                | JsStagedMutation.Rewrite(path, _, _) -> Some path
-                                | JsStagedMutation.Create _ -> None)
+                    match persistence with
+                    | None ->
+                        // ephemeral path (tests / no store available)
+                        match JsToolsFs.commitPlan root (JsTransaction.commitPlan mutations) with
+                        | Error failure -> return Failed failure
+                        | Ok() ->
+                            let written =
+                                mutations
+                                |> List.choose (fun m ->
+                                    match m with
+                                    | JsStagedMutation.Rewrite(path, _, _) -> Some path
+                                    | JsStagedMutation.Create _ -> None)
 
-                        let created =
-                            mutations
-                            |> List.choose (fun m ->
-                                match m with
-                                | JsStagedMutation.Create(path, _) -> Some path
-                                | JsStagedMutation.Rewrite _ -> None)
+                            let created =
+                                mutations
+                                |> List.choose (fun m ->
+                                    match m with
+                                    | JsStagedMutation.Create(path, _) -> Some path
+                                    | JsStagedMutation.Rewrite _ -> None)
 
-                        return Succeeded(resultJson, written, created)
+                            return Succeeded(resultJson, written, created)
+                    | Some(eventStore, raw) ->
+                        let snapshot = eventStore.OpenSnapshot()
+
+                        let head =
+                            match JsToolsTransactionStore.loadEvents raw snapshot with
+                            | Ok events -> JsToolsTransactionStore.streamHead events
+                            | Error _ -> None
+
+                        match JsToolsTransactionStore.appendPrepared eventStore (Option.toList head) prepared with
+                        | Error _ -> return Failed JsFailure.TransactionPrepareFailed
+                        | Ok preparedEventId ->
+                            // 4. commit: all-or-nothing
+                            match JsToolsFs.commitPlan root (JsTransaction.commitPlan mutations) with
+                            | Error failure -> return Failed failure
+                            | Ok() ->
+                                // 5. the commit fact (JS-012): its absence after
+                                // Prepared is what recovery uses to undo
+                                match
+                                    JsToolsTransactionStore.appendCommitted
+                                        eventStore
+                                        [ preparedEventId ]
+                                        prepared.TransactionId
+                                with
+                                | Error _ -> return Failed JsFailure.TransactionCommitFailed
+                                | Ok _ ->
+                                    let written =
+                                        mutations
+                                        |> List.choose (fun m ->
+                                            match m with
+                                            | JsStagedMutation.Rewrite(path, _, _) -> Some path
+                                            | JsStagedMutation.Create _ -> None)
+
+                                    let created =
+                                        mutations
+                                        |> List.choose (fun m ->
+                                            match m with
+                                            | JsStagedMutation.Create(path, _) -> Some path
+                                            | JsStagedMutation.Rewrite _ -> None)
+
+                                    return Succeeded(resultJson, written, created)
         }

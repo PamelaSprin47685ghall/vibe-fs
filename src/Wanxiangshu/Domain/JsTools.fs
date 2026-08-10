@@ -422,3 +422,53 @@ module JsTransaction =
             match mutation with
             | JsStagedMutation.Rewrite(path, originalText, _) -> path, Some originalText
             | JsStagedMutation.Create(path, _) -> path, None)
+
+/// DSL-class: DurableFact — JS-012/015: identity of one js-* transaction.
+type JsTransactionId = private JsTransactionId of string
+
+module JsTransactionId =
+
+    let create (value: string) = JsTransactionId value
+    let value (JsTransactionId v) = v
+
+    let generate () =
+        JsTransactionId(System.Guid.NewGuid().ToString("N"))
+
+/// DSL-class: DurableFact — JS-015: one mutation as persisted in a prepared
+/// transaction, sufficient to undo it after a crash (original text for
+/// rewrites, absence for creates).
+type JsDurableMutation =
+    {
+        Path: string
+        /// Some = rewrite (rollback restores this text); None = create.
+        OriginalText: string option
+        NewText: string
+    }
+
+/// DSL-class: DurableFact — JS-012: the durable prepare fact. Written to the
+/// unified EventStore BEFORE any filesystem effect; a committed transaction
+/// is a pair (Prepared, Committed) on the same stream.
+type JsTransactionPrepared =
+    { TransactionId: JsTransactionId
+      WorkspaceRoot: string
+      Mutations: JsDurableMutation list }
+
+/// DSL-class: DurableFact — JS-012: the durable commit fact. Its presence
+/// after a Prepared fact is what makes the transaction committed.
+type JsTransactionCommitted = { TransactionId: JsTransactionId }
+
+module JsTransactionFacts =
+
+    /// Durable mutations from a staged set (JS-012).
+    let ofStaged (mutations: JsStagedMutation list) : JsDurableMutation list =
+        mutations
+        |> List.map (fun mutation ->
+            match mutation with
+            | JsStagedMutation.Rewrite(path, originalText, newText) ->
+                { Path = path
+                  OriginalText = Some originalText
+                  NewText = newText }
+            | JsStagedMutation.Create(path, text) ->
+                { Path = path
+                  OriginalText = None
+                  NewText = text })
