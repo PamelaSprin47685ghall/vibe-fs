@@ -19,9 +19,10 @@ module ManagerWorkflow =
         |> Option.bind (fun session -> session.ManagerLife)
         |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
 
-    /// Returns true when Manager business ownership consumed the observation.
-    /// Other outcomes fall through to generic terminal plumbing.
-    let tryObserve
+    /// Observe one Manager-role turn. Manager-specific business branches stay here;
+    /// non-Manager terminal semantics are delegated through the injected ordinary
+    /// workflow rather than returned as a handled-bool program counter.
+    let observe
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -30,23 +31,24 @@ module ManagerWorkflow =
         (hasLivePty: string -> bool)
         (abortedSessions: HashSet<string>)
         (quiescence: SessionQuiescenceGate)
+        (observeOrdinary: ReconciledTurnContext -> Task)
         (context: ReconciledTurnContext)
-        : Task<bool> =
+        : Task =
         task {
             let turn = context.Turn
 
             match! ManagerJobHandoff.completeIfTransferred eventPort journal abortedSessions turn with
-            | ManagerJobHandoff.HandoffOutcome.Transferred -> return true
+            | ManagerJobHandoff.HandoffOutcome.Transferred -> return ()
             | ManagerJobHandoff.HandoffOutcome.ManagerOwnsTurn ->
                 match turn.Outcome with
-                | ReconcileProgram.TurnInProgress -> return false
+                | ReconcileProgram.TurnInProgress -> return! observeOrdinary context
                 | ReconcileProgram.TurnCompleted ->
                     let sessionKey = SessionId.value turn.SessionId
                     let wasAborted = abortedSessions.Contains sessionKey
                     abortedSessions.Remove sessionKey |> ignore
 
                     if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
-                        return true
+                        return ()
                     else
                         match!
                             ManagerBackground.ensureSettled
@@ -57,19 +59,19 @@ module ManagerWorkflow =
                                 hasLivePty
                                 turn
                         with
-                        | ManagerBackground.BackgroundSettlement.Deferred -> return true
+                        | ManagerBackground.BackgroundSettlement.Deferred -> return ()
                         | ManagerBackground.BackgroundSettlement.Settled ->
                             match currentLife journal turn.SessionId with
                             | Some life when
                                 life.ActiveFinality
                                 |> Option.exists ManagerLifecycleProjection.isOpen
                                 ->
-                                return true
+                                return ()
                             | _ ->
                                 match!
                                     ManagerActivation.ensureAccepted sessionPort eventPort journal turn
                                 with
-                                | ManagerActivation.EnsureAcceptedResult.Deferred -> return true
+                                | ManagerActivation.EnsureAcceptedResult.Deferred -> return ()
                                 | ManagerActivation.EnsureAcceptedResult.Ready life ->
                                     do!
                                         ManagerIdle.encourageLabor
@@ -81,6 +83,6 @@ module ManagerWorkflow =
                                             context
                                             life
 
-                                    return true
-                | _ -> return false
+                                    return ()
+                | _ -> return! observeOrdinary context
         }

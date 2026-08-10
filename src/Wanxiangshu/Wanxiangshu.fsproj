@@ -138,7 +138,6 @@
     <Compile Include="Session/ForkRecovery.fs"/>
     <Compile Include="Session/ForkRuntime.fs"/>
     <Compile Include="Session/DurableFallback.fs"/>
-    <Compile Include="Session/FallbackController.fs"/>
     <Compile Include="Session/ReviewTypes.fs"/>
     <Compile Include="Process/Deadline.fs"/>
     <Compile Include="Process/ProcessRequest.fs"/>
@@ -254,6 +253,8 @@
     <Compile Include="Application/Review/ReviewerWorkflow.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/TerminalPolicy.fs"/>
     <Compile Include="Application/Reconciliation/TerminalReporter.fs"/>
+    <Compile Include="Application/Recovery/FallbackEvidence.fs"/>
+    <Compile Include="Application/Recovery/FallbackLedger.fs"/>
     <Compile Include="Application/Recovery/ProviderRecoveryWorkflow.fs"/>
     <Compile Include="Application/Reconciliation/InteractionRepairWorkflow.fs"/>
     <Compile Include="Application/Reconciliation/OrdinaryTurnWorkflow.fs"/>

@@ -6,6 +6,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Recovery
 open Wanxiangshu.Session
 
 /// Confirmed-failure recovery: wait for blogger coverage material, then continue.
@@ -93,7 +94,7 @@ module ProviderRecoveryWorkflow =
     ///
     /// The reconciled snapshot is what proves the attempt failed (HOST-004), so
     /// this is where the cursor advances — not in the Host retry event handler,
-    /// which only wakes. `FallbackController` is the single writer.
+    /// which only wakes. `FallbackLedger` is the Application single writer.
     ///
     /// FALLBACK-004 then decides whether a continuation follows: only when the
     /// budget still permits one. The continuation itself produces no second
@@ -116,7 +117,7 @@ module ProviderRecoveryWorkflow =
             | None -> fail error
             | Some durable ->
                 match
-                    FallbackController.recordConfirmedFailure
+                    FallbackLedger.recordConfirmedFailure
                         durable
                         AgentPairCursor.DefaultAutoRecoveryBudget
                         turn.SessionId
@@ -124,16 +125,13 @@ module ProviderRecoveryWorkflow =
                         error
                 with
                 | Error reason -> fail reason
-                // FALLBACK-005: only Exhausted forbids recovery and must kill the Host pending.
-                | Ok(FallbackController.AdvanceOutcome.Exhausted _) -> fail error
-                // ConfirmedFailurePort maps AlreadyRecorded / NoActiveRun → ContinueRecovery.
-                // A second observe of the same APIError must not NotifyTerminal Failed — that
-                // completes Orchestrator AwaitManager while Manager Life still recovers
-                // (long-stroke: LifeCompleted with zero CandidateReady).
-                | Ok(FallbackController.AdvanceOutcome.AlreadyRecorded _)
-                | Ok FallbackController.AdvanceOutcome.NoActiveRun -> ()
-                | Ok _ ->
-                    // Advanced: mayContinue — send A′ continuation.
+                | Ok ConfirmedFailureOutcome.RecoveryExhausted -> fail error
+                // A second observe of the same APIError must not NotifyTerminal Failed or
+                // issue a second continuation; the original admitted recovery remains owner.
+                | Ok ConfirmedFailureOutcome.AlreadyRecorded
+                | Ok ConfirmedFailureOutcome.NoActiveRun -> ()
+                | Ok ConfirmedFailureOutcome.RecoveryAdvanced ->
+                    // The cursor advanced and budget permits the A′ continuation.
                     // CTX-006: give the linked Blogger a chance to commit coverage
                     // before the armed A′/B′ continue is planned (XWire.applyTransform).
                     do! awaitRecoveryMaterial timerPort durable turn.SessionId

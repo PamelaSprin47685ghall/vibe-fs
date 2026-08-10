@@ -7,12 +7,20 @@ open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 
 [<RequireQualifiedAccess>]
+type ConfirmedFailureOutcome =
+    | RecoveryAdvanced
+    | RecoveryExhausted
+    | AlreadyRecorded
+    | NoActiveRun
+
+[<RequireQualifiedAccess>]
 type RecoveryAdmission =
     | ContinueRecovery
     | RecoveryExhausted
 
 /// FALLBACK-003 single writer: confirmed provider failure → durable dedupe →
-/// cursor advance/exhaust → recovery admission.
+/// cursor advance/exhaust. Callers may retain the precise single-attempt outcome
+/// or project it to host-facing RecoveryAdmission.
 module FallbackLedger =
 
     let recordConfirmedFailure
@@ -21,9 +29,9 @@ module FallbackLedger =
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
         (reason: string)
-        : Result<RecoveryAdmission, string> =
+        : Result<ConfirmedFailureOutcome, string> =
         match FallbackEvidence.tryCurrentState sessionId (AgentJournal.snapshot journal) with
-        | None -> Ok RecoveryAdmission.ContinueRecovery
+        | None -> Ok ConfirmedFailureOutcome.NoActiveRun
         | Some current ->
             let identity =
                 AgentPairCursor.attemptIdentity
@@ -43,10 +51,11 @@ module FallbackLedger =
                     current
             with
             | Error FallbackAdvanceRejection.AlreadyObserved
-            | Error FallbackAdvanceRejection.AlreadyExhausted
+            | Error FallbackAdvanceRejection.AlreadyExhausted ->
+                Ok ConfirmedFailureOutcome.AlreadyRecorded
             | Error FallbackAdvanceRejection.DifferentRun
             | Error FallbackAdvanceRejection.NoCursor ->
-                Ok RecoveryAdmission.ContinueRecovery
+                Ok ConfirmedFailureOutcome.NoActiveRun
             | Error FallbackAdvanceRejection.InvalidTransition ->
                 Error "Fallback advance violates FALLBACK-007 (offset or count is not the successor)"
             | Error(FallbackAdvanceRejection.InvalidFallbackOffset decodeError) ->
@@ -69,7 +78,7 @@ module FallbackLedger =
                 | Error failure -> Error(JournalAppendFailure.describe failure)
                 | Ok _ ->
                     match AgentPairCursor.recoveryVerdict budget next with
-                    | AgentPairCursor.MayContinue _ -> Ok RecoveryAdmission.ContinueRecovery
+                    | AgentPairCursor.MayContinue _ -> Ok ConfirmedFailureOutcome.RecoveryAdvanced
                     | AgentPairCursor.Exhausted cursor ->
                         let exhausted =
                             FallbackFact.FallbackExhausted
@@ -83,4 +92,12 @@ module FallbackLedger =
                             AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) exhausted journal
                         with
                         | Error failure -> Error(JournalAppendFailure.describe failure)
-                        | Ok _ -> Ok RecoveryAdmission.RecoveryExhausted
+                        | Ok _ -> Ok ConfirmedFailureOutcome.RecoveryExhausted
+
+    let admitConfirmedFailure journal budget sessionId providerRun reason =
+        recordConfirmedFailure journal budget sessionId providerRun reason
+        |> Result.map (function
+            | ConfirmedFailureOutcome.RecoveryExhausted -> RecoveryAdmission.RecoveryExhausted
+            | ConfirmedFailureOutcome.RecoveryAdvanced
+            | ConfirmedFailureOutcome.AlreadyRecorded
+            | ConfirmedFailureOutcome.NoActiveRun -> RecoveryAdmission.ContinueRecovery)

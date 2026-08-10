@@ -14,6 +14,7 @@ open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Recovery
 open Wanxiangshu.Session
 open PluginHostInterop
 
@@ -257,12 +258,21 @@ module SpikePlugin =
                                         let repairNudge: InteractionRepairNudge =
                                             HostSessionNudge.trySendInteractionRepair sessionPort
 
-                                        // rabbit §13.1 / S9.1: close journal + budget into ConfirmedFailurePort
-                                        // so EnforcerHost never hard-imports FallbackController.
+                                        // rabbit §13: Infrastructure closes Application fallback
+                                        // ledger + budget into the Session-facing admission capability.
                                         let confirmedFailure: ConfirmedFailurePort =
-                                            ConfirmedFailurePort.bind
-                                                durable
-                                                AgentPairCursor.DefaultAutoRecoveryBudget
+                                            fun targetSessionId providerRun reason ->
+                                                FallbackLedger.admitConfirmedFailure
+                                                    durable
+                                                    AgentPairCursor.DefaultAutoRecoveryBudget
+                                                    targetSessionId
+                                                    providerRun
+                                                    reason
+                                                |> Result.map (function
+                                                    | Wanxiangshu.Recovery.RecoveryAdmission.ContinueRecovery ->
+                                                        Wanxiangshu.Session.RecoveryAdmission.ContinueRecovery
+                                                    | Wanxiangshu.Recovery.RecoveryAdmission.RecoveryExhausted ->
+                                                        Wanxiangshu.Session.RecoveryAdmission.RecoveryExhausted)
 
                                         // ENFORCER-153: the recovery stage probe derives
                                         // nudge/AABB state from durable claim + transcript.
