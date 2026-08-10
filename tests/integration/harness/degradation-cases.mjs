@@ -155,14 +155,18 @@ export const degradationCases = [
         'check:release must not reintroduce a --repeat release-gate pool',
       );
 
-      // When G4R-4 has deleted the pool artifacts, pin that absence. During cutover the sole-entry
-      // scripts above already refuse to wire them; do not fail the harness solely because the
-      // files still sit on disk awaiting deletion.
-      if (!existsSync(`${REPO_ROOT}tests/e2e/run.mjs`) && !existsSync(`${REPO_ROOT}tests/e2e/support/manifest.mjs`)) {
-        assertTrue(true, 'multi-canary run.mjs and manifest.mjs are gone');
-      }
-
       const entry = readSource(SOLE_ENTRY);
+      // Pin absence when G4R-4 has already deleted the pool artifacts. Soft during cutover:
+      // sole-entry scripts above already refuse to wire them.
+      assertTrue(
+        !existsSync(`${REPO_ROOT}tests/e2e/run.mjs`) || !pkg.scripts['test:e2e'].includes('run.mjs'),
+        'multi-canary run.mjs must be gone, or at least unused by test:e2e',
+      );
+      assertTrue(
+        !existsSync(`${REPO_ROOT}tests/e2e/support/manifest.mjs`) || !/from\s*['"][^'"]*manifest/.test(entry),
+        'canary manifest must be gone, or at least unused by the sole entry',
+      );
+
       assertTrue(!/\bshuffle\b/.test(entry), 'the sole entry must not shuffle a canary pool');
       assertTrue(!entry.includes('--repeat'), 'the sole entry must not implement a repeat release gate');
       assertTrue(!entry.includes('MAX_PARALLEL'), 'the sole entry must not enforce a canary concurrency pool');

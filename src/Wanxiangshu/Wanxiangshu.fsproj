@@ -265,6 +265,11 @@
     <Compile Include="Application/Manager/ManagerWorkflow.fs"/>
     <Compile Include="Application/Finality/Types.fs"/>
     <Compile Include="Application/Finality/Ports.fs"/>
+    <Compile Include="Application/Finality/RecordWorkflow.fs"/>
+    <Compile Include="Application/Finality/CohortWorkflow.fs"/>
+    <Compile Include="Application/Finality/RevisionWorkflow.fs"/>
+    <Compile Include="Application/Finality/BlessingWorkflow.fs"/>
+    <Compile Include="Application/Finality/FinalityWorkflow.fs"/>
     <Compile Include="Application/Reconciliation/TurnWorkflow.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/GitTree.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostCompactionGate.fs"/>
@@ -283,6 +288,7 @@
     <Compile Include="Infrastructure/OpenCode/Codec/ToolHostCodec.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/JoinResultRenderer.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ToolRuntimeScope.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Tools/FinalityHostPort.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/OneShotAgentTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ForkTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/PtyTool.fs"/>
@@ -293,7 +299,6 @@
     <Compile Include="Infrastructure/OpenCode/Tools/CoderTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/BlogTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/VerdictTool.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Tools/FinalityController.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FinalityTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FileMutationTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/BashHoneypotTool.fs"/>
