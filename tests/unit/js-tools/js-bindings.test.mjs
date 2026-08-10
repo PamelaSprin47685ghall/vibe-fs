@@ -1,0 +1,163 @@
+// tests/unit/js-tools/js-bindings.test.mjs — G5 Phase B-4: runtime bindings +
+// sandbox integration.
+//
+// The api object is the only authority a model program sees (JS-011). Reads
+// and searches return JSON-compatible objects; mutations only stage (JS-012);
+// path boundary is PATH_DENIED (JS-007).
+
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { createApi } from '../../../dist/Infrastructure/JsToolsBindings.js'
+import { run, wrapProgram } from '../../../dist/Process/JsSandbox.js'
+import { JsToolGenerator_generate as generate } from '../../../dist/Domain/JsTools.js'
+import { ToolPermission } from '../../../dist/Kernel/Roles.js'
+import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Set.js'
+import { listItems, resultOf } from '../support/domain.mjs'
+
+const sandbox = () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-bindings-'))
+  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
+}
+
+const permissionComparer = { Compare: (a, b) => a.CompareTo(b) }
+const coderCaps = ofArray(
+  [ToolPermission.Read, ToolPermission.Write, ToolPermission.Edit, ToolPermission.Glob, ToolPermission.Grep],
+  permissionComparer,
+)
+
+test('JS005_bindings_file_reads_utf8', () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
+    const staging = []
+    const api = createApi(dir, staging)
+    const result = api.js.read('a.txt')
+    assert.equal(result.ok, true)
+    assert.equal(result.text, 'hello')
+    assert.equal(result.byteCount, 5)
+    const missing = api.js.read('nope.txt')
+    assert.equal(missing.ok, false)
+    assert.equal(missing.code, 'FILE_NOT_FOUND')
+  } finally {
+    cleanup()
+  }
+})
+
+test('JS007_bindings_path_boundary_denies_escape', () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const staging = []
+    const api = createApi(dir, staging)
+    const denied = api.js.read('../outside.txt')
+    assert.equal(denied.ok, false)
+    assert.equal(denied.code, 'PATH_DENIED')
+    const deniedWrite = api.js.write('../outside.txt', 'x')
+    assert.equal(deniedWrite.ok, false)
+    assert.equal(deniedWrite.code, 'PATH_DENIED')
+  } finally {
+    cleanup()
+  }
+})
+
+test('JS007_bindings_glob_lists_matching_paths', () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    mkdirSync(join(dir, 'src'))
+    writeFileSync(join(dir, 'src', 'a.fs'), 'x', 'utf8')
+    writeFileSync(join(dir, 'src', 'b.txt'), 'y', 'utf8')
+    const api = createApi(dir, [])
+    const result = api.js.glob('src/*.fs')
+    assert.equal(result.ok, true)
+    assert.deepEqual(result.paths, ['src/a.fs'])
+  } finally {
+    cleanup()
+  }
+})
+
+test('JS010_bindings_grep_returns_matches', () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'one two one', 'utf8')
+    const api = createApi(dir, [])
+    const result = api.js.grep('one', '*.txt')
+    assert.equal(result.ok, true)
+    assert.deepEqual(result.matches.map((m) => m.text), ['one', 'one'])
+    assert.deepEqual(result.matches.map((m) => m.path), ['a.txt', 'a.txt'])
+  } finally {
+    cleanup()
+  }
+})
+
+test('JS008_012_bindings_rewrite_stages_without_touching_disk', () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'old text', 'utf8')
+    const staging = []
+    const api = createApi(dir, staging)
+    const result = api.js.edit('a.txt', { find: 'old', replace: 'new' })
+    assert.equal(result.ok, true)
+    assert.equal(staging.length, 1)
+    // disk untouched — staging only (JS-012)
+    const disk = api.js.read('a.txt')
+    assert.equal(disk.text, 'old text')
+    // ambiguous anchor without occurrence → ANCHOR_NOT_UNIQUE
+    writeFileSync(join(dir, 'b.txt'), 'x x', 'utf8')
+    const dup = api.js.edit('b.txt', { find: 'x', replace: 'y' })
+    assert.equal(dup.ok, false)
+    assert.equal(dup.code, 'ANCHOR_NOT_UNIQUE')
+    // ordered occurrence resolves duplicates
+    const nth = api.js.edit('b.txt', { find: 'x', replace: 'y', occurrence: 2 })
+    assert.equal(nth.ok, true)
+    assert.equal(staging.length, 2)
+  } finally {
+    cleanup()
+  }
+})
+
+test('JS009_012_bindings_write_stages_create', () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const staging = []
+    const api = createApi(dir, staging)
+    const result = api.js.write('new.txt', 'fresh')
+    assert.equal(result.ok, true)
+    assert.equal(staging.length, 1)
+    assert.equal(staging[0].tag === 0 ? 'Rewrite' : 'Create', 'Create')
+    // disk untouched
+    const disk = api.js.read('new.txt')
+    assert.equal(disk.ok, false)
+  } finally {
+    cleanup()
+  }
+})
+
+test('JS011_sandbox_program_uses_bindings_end_to_end', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
+    const staging = []
+    const api = createApi(dir, staging)
+    const surface = generate('Coder', coderCaps)
+    const program = `class Js extends JsProgram {
+  async run() {
+    const view = await this.file('a.txt');
+    await this.rewrite('a.txt', { find: 'hello', replace: 'goodbye' });
+    return { before: view.text };
+  }
+}`
+    const wrapped = wrapProgram(surface.BaseClassSource, program, Date.now() + 60_000)
+    const result = resultOf(await run(wrapped, api, 2000, 1 << 20))
+    assert.equal(result.ok, true)
+    assert.deepEqual(JSON.parse(result.value), { before: 'hello world' })
+    assert.equal(staging.length, 1, 'rewrite staged through the binding')
+    // the mutation is staged but disk is untouched until commit
+    const disk = api.js.read('a.txt')
+    assert.equal(disk.text, 'hello world')
+  } finally {
+    cleanup()
+  }
+})

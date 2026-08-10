@@ -314,5 +314,7 @@
     <Compile Include="Infrastructure/OpenCode/Host/PluginHostInterop.fs"/>
     <Compile Include="Infrastructure/OpenCode/Plugin/SpikePlugin.fs"/>
     <Compile Include="Infrastructure/OpenCode/Plugin/Plugin.fs"/>
+    <Compile Include="Infrastructure/JsToolsFs.fs"/>
+    <Compile Include="Infrastructure/JsToolsBindings.fs"/>
   </ItemGroup>
 </Project>
