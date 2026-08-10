@@ -54,24 +54,24 @@ flow = [
 
   # stroke 1/2: planning → repair → activation
   { wait = "mgr.0" },
-  { wait = "mgr-repair.0", timeoutMs = 120000 },
+  { wait = "mgr-repair.0" },
   { wait = "mgr-activation.0" },
   { waitFact = { name = "WorkActivated", eq = 1 } },
 
   # stroke 3: join in flight → external user message wakes join (reason=user_message).
   # bindReviewers holds child-c1 SSE open until mgr-labor.0 so drain-before-interrupt
   # cannot harvest a completed child and skip interrupted/user_message.
-  { wait = "mgr-activation.1", timeoutMs = 120000 },
+  { wait = "mgr-activation.1" },
   { prompt = { agent = "fast-manager", text = "Also make sure src/main.txt has exactly the content 'done' before the end." } },
   # stroke 4/5/6: Labor — premature suicide, harvest, first legal suicide
   # (the prompt above is the wake; labor waits follow immediately)
-  { wait = "mgr-labor.0", timeoutMs = 120000 },
-  { wait = "child-c1.0", timeoutMs = 120000 },
+  { wait = "mgr-labor.0" },
+  { wait = "child-c1.0" },
   { waitFact = { name = "HandleCompleted", gte = 1 } },
   { wait = "mgr-labor.1", timeoutMs = 180000 },
-  { wait = "mgr-labor.2", timeoutMs = 120000 },
-  { wait = "reviewer-r1.0", timeoutMs = 120000 },
-  { wait = "reviewer-r1.1", timeoutMs = 120000 },
+  { wait = "mgr-labor.2" },
+  { wait = "reviewer-r1.0" },
+  { wait = "reviewer-r1.1" },
   { waitFact = { name = "FinalityRejected", eq = 1 } },
   { custom = "noWitnessAtFirstRejection" },
   # Controlled GLORY-029 phase: labor terminal → A receipt/provider terminal →
@@ -79,50 +79,50 @@ flow = [
   # the second barrier binds B's real provider lifecycle rather than reusing an
   # already-consumed delivery signal.
   { armIdle = { id = "mgr-idle-a.0", attempts = 2 } },
-  { awaitIdle = { after = "mgr-labor.3", arm = "mgr-idle-a.0", session = "self" }, timeoutMs = 120000 },
+  { awaitIdle = { after = "mgr-labor.3", arm = "mgr-idle-a.0", session = "self" } },
   { custom = "firstIdleReceipt" },
-  { awaitIdle = { after = "mgr-idle-a.0", attempts = 2, session = "self" }, timeoutMs = 120000 },
+  { awaitIdle = { after = "mgr-idle-a.0", attempts = 2, session = "self" } },
   { custom = "secondIdleReceipt" },
 
   # stroke 7/8: fix-one → second suicide → R1+R2
   { prompt = { agent = "fast-manager", text = "MARK-ISSUE-ONE: C1 is fixing issue one and will report back." } },
-  { wait = "mgr-fix1.0", timeoutMs = 120000 },
-  { wait = "child-fix1.0", timeoutMs = 120000 },
-  { wait = "mgr-fix1.1", timeoutMs = 120000 },
-  { wait = "mgr-fix1.2", timeoutMs = 120000 },
-  { wait = "reviewer-r1b.0", timeoutMs = 120000 },
-  { wait = "reviewer-r2.0", timeoutMs = 120000 },
-  { wait = "reviewer-r1b.1", timeoutMs = 120000 },
-  { wait = "reviewer-r2.1", timeoutMs = 120000 },
-  { wait = "reviewer-r1b.2", timeoutMs = 120000 },
-  { wait = "reviewer-r2.2", timeoutMs = 120000 },
+  { wait = "mgr-fix1.0" },
+  { wait = "child-fix1.0" },
+  { wait = "mgr-fix1.1" },
+  { wait = "mgr-fix1.2" },
+  { wait = "reviewer-r1b.0" },
+  { wait = "reviewer-r2.0" },
+  { wait = "reviewer-r1b.1" },
+  { wait = "reviewer-r2.1" },
+  { wait = "reviewer-r1b.2" },
+  { wait = "reviewer-r2.2" },
   { waitFact = { name = "FinalityRejected", eq = 2 } },
-  { wait = "mgr-fix1.3", timeoutMs = 120000 },
+  { wait = "mgr-fix1.3" },
 
   # stroke 9–13: fix-two → third suicide (2N bless) → minor → final rest in peace
   { prompt = { agent = "fast-manager", text = "MARK-ISSUE-TWO: C1 is fixing issue two and will verify before seeking the end." } },
-  { wait = "mgr-fix2.0", timeoutMs = 120000 },
-  { wait = "child-fix2.0", timeoutMs = 120000 },
-  { wait = "mgr-fix2.1", timeoutMs = 120000 },
-  { wait = "mgr-fix2.2", timeoutMs = 120000 },
+  { wait = "mgr-fix2.0" },
+  { wait = "child-fix2.0" },
+  { wait = "mgr-fix2.1" },
+  { wait = "mgr-fix2.2" },
   # Third suicide drives Host Finality to completion before the tool result returns,
   # so a mid-cohort "not yet blessed" custom races dual-PERFECT and is not stable.
   # finalOracle owns FinalityRejected>=2 + FinalityBlessed=1.
-  { wait = "reviewer-r2b.0", timeoutMs = 120000 },
-  { wait = "reviewer-r3.0", timeoutMs = 120000 },
-  { wait = "reviewer-r2b.1", timeoutMs = 120000 },
-  { wait = "reviewer-r3.1", timeoutMs = 120000 },
-  { wait = "reviewer-r2b.2", timeoutMs = 120000 },
-  { wait = "reviewer-r3.2", timeoutMs = 120000 },
+  { wait = "reviewer-r2b.0" },
+  { wait = "reviewer-r3.0" },
+  { wait = "reviewer-r2b.1" },
+  { wait = "reviewer-r3.1" },
+  { wait = "reviewer-r2b.2" },
+  { wait = "reviewer-r3.2" },
   # Blessing can lag while Companion/blogger still appends; bare waitFact keeps
   # the 5s silence window and dies on non-renewing journal noise. Widen window
   # and renew on intermediate finality/review facts (VERIFY-004 renewOn).
   { waitFact = { name = "FinalityBlessed", gte = 1, renewOn = ["ReviewVerdictRecorded", "ConfirmedReviewWitness", "FinalityReviewerEnlisted"] }, timeoutMs = 180000 },
   # Blessed tool result continues this same turn:
-  { wait = "mgr-fix2.3", timeoutMs = 120000 },
-  { wait = "child-minor.0", timeoutMs = 120000 },
-  { wait = "mgr-fix2.4", timeoutMs = 120000 },
-  { wait = "mgr-fix2.5", timeoutMs = 120000 },
+  { wait = "mgr-fix2.3" },
+  { wait = "child-minor.0" },
+  { wait = "mgr-fix2.4" },
+  { wait = "mgr-fix2.5" },
   { waitFact = { name = "LifeCompleted", gte = 1 } },
   { awaitTerminal = true, requireAssistantTerminal = true },
   { custom = "finalOracle" },

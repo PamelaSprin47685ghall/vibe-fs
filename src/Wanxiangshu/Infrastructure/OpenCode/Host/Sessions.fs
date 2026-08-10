@@ -154,6 +154,11 @@ type InjectedSessionPort
 
         member me.AbortSession(sessionId) =
             task {
+                // Who killed a turn is the first question a stalled run raises, and the answer used
+                // to be nowhere: every abort path was silent, so an interrupted tool call looked
+                // identical to a model that simply stopped. One record per abort, visible under
+                // WANXIANGSHU_DIAG=1.
+                Diagnostic.emit "session-abort" [ "session_id", SessionId.value sessionId ]
                 detachChild sessionId
                 do! abortChildren sessionId
 
