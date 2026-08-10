@@ -113,8 +113,7 @@ module SessionRecovery =
     /// `closureDigest mismatch: permit=…|A:P>C:h|… current=…|C:C>G|…` — the extra member was a
     /// live fork, and the join it refused was a legitimate one.
     type FamilyRecoveryPermit =
-        private
-        | FamilyRecoveryPermit of root: SessionId * journalSequence: int64 * closureMembers: Set<string>
+        private | FamilyRecoveryPermit of root: SessionId * journalSequence: int64 * closureMembers: Set<string>
 
     module FamilyRecoveryPermit =
         let root (FamilyRecoveryPermit(root, _, _)) = root
@@ -338,6 +337,7 @@ module SessionRecovery =
 
             match NonEmpty.ofList waits with
             | Some nonEmpty -> FamilyRecovery.FamilyWaiting nonEmpty
-            | None -> FamilyRecovery.FamilyReady(
+            | None ->
+                FamilyRecovery.FamilyReady(
                     FamilyRecoveryPermit(root, journalSequence, RecoveryClosure.members recovered.Closure)
                 )

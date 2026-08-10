@@ -27,23 +27,28 @@ Proposal 相互覆盖时如何落地
 
 Unified Storage / Session / Casebook 等 cutover 是 **clean break**：旧 Journal / Blob / feature-owned store 上的历史数据可以丢弃或留在原地不再读取；新世界只认最终 EventStore 语义。禁止为“迁旧数据”“双向兼容”“旧档可读性”投入工期。
 
-当前仓库同时存在多个 `proposed`，包括：
+**进度快照最后同步：** 2026-08-10（`ac41ef8f` HEAD；详见 §0）
+
+当前 Change 分布：
 
 ```text
-js-capability-projected-tools
-perm-inspector
-rulebook
-storage
-strength
-universal
+Active:
+  changes/active/universal.md      — G2/G3 DONE；G6 Casebook 待做
+  changes/active/storage.md        — G4 Phase 0–7 DONE；Phase 8 收口
+
+Completed（本 Playbook 相关）:
+  changes/completed/causal-ce-observability.md
+  changes/completed/orchestrator-e2e-timeout.md
+
+Proposed（尚未激活主线 Gate）:
+  js-capability-projected-tools
+  perm-inspector
+  rulebook
+  strength
+  magic-todo                    — 不在本 Playbook Gate 序列内；可独立 Lane
 ```
 
-并且还有正在进行的：
-
-```text
-causal-ce-observability
-orchestrator-e2e-timeout
-```
+已解决的历史 anomaly：`storage` 已从 `changes/proposed/` 迁至 `changes/active/storage.md`（G3.5 激活）。
 
 这些 Change 不能按照“每个 Proposal 自己从 Phase 0 一路做到完成”的方式独立实施。
 
@@ -68,6 +73,72 @@ Strength
 ```
 
 其中部分工作允许提前并行准备，但**最终 integration 顺序必须遵循本计划**。
+
+---
+
+# 0. 实施进度快照
+
+> 本节是 **living status**，随 `git log` 与 `changes/active/*.md` Active work 更新；不修改任何 Proposal 产品语义。
+
+## 0.1 Gate 总览
+
+| Gate | 状态 | 证据 / 备注 |
+|---|---|---|
+| **G0** Governance + Baseline | **DONE** | Storage path 唯一化；baseline 已建 |
+| **G1** Causal CE + Orchestrator canaries | **DONE** | `changes/completed/causal-ce-observability.md` + `orchestrator-e2e-timeout.md`；release **0.6.0** |
+| **G2** Universal Runtime Foundation | **DONE** | `ReuseScope` / `SessionOwnership` / `SyncDelegate` + CausalAwait dual-await；`ca9fd08a` |
+| **G3** Universal Clean Break | **DONE** | Student/Teacher/QA/SKILL 删除；Meditator → Inspector only；ratchet green |
+| **G3.5** Storage cutover scope 修订 | **DONE** | Amendment G3.5-A；Student QA retired；no migrator / dual-write |
+| **G4** Unified Storage | **IN PROGRESS（收口）** | Phase 0–7 **DONE**；Phase 8 性能 + harness EventStore cutover **DONE**；e2e **26/26** + `--repeat 3` 绿（`69235b5b`–`827411e3`）；Storage → completed **待 G4 Exit 清单确认** |
+| **G5** JS Capability-Projected Tools | **BLOCKED**（G4 Exit） | 有早期 prep（`8319771f` capability algebra）；**勿 activate** 直至 Storage completed |
+| **G6** perm-inspector + Casebook | **NOT STARTED** | Universal 仍 Active；CaseFinalize / CaseRefresh 未做 |
+| **G7** Rulebook | **NOT STARTED** | — |
+| **G8** Strength | **NOT STARTED** | — |
+| **G9** Global Convergence | **NOT STARTED** | — |
+
+**当前主线位置：** G4 收口 → Storage Active → `changes/completed/` → 再 activate G5。
+
+## 0.2 自 Playbook 落地以来关键 commit（`31d456ec` 之后）
+
+```text
+80009351  Causal Waits + Diagnostic Bridge
+e0de430e  release 0.6.0
+8319771f  capability-projected tools（prep only；G5 未激活）
+ca9fd08a  SyncDelegate tools + store feature checks
+f5c0f7e7  EventStore JournalEnvelope + codec
+dc6c0165  WorkspaceEventStore + EventStoreJournalWriter
+69235b5b  event-store gate facts + plugin fixture canary
+a2b71ec5  FALLBACK-013 abort residue fix
+41d7f1bc  Git ODB in-process（EventStore append 24→0 spawns）
+13d3cfcb  e2e wall 104s→33s（真实成本移除，非超时放宽）
+002e581c  session-recovery permit + PTY race fixes
+ac41ef8f  session abort diagnostic
+```
+
+## 0.3 当前证明状态（2026-08-10 EOD）
+
+| 证明切片 | 状态 |
+|---|---|
+| `scripts/check.mjs` 静态门（含 unified-store-gate / student-teacher-absence / causal-wait-boundary） | GREEN |
+| Unit（≈1951） | GREEN |
+| Integration（281 + persist leave-unread / dumb-server / object-identity） | GREEN |
+| E2e staggered（26 cases） | GREEN **26/26** |
+| `npm run test:e2e -- --repeat 3` | GREEN 3 轮 |
+| Storage G4 Exit Gate（§11.4 全清单 + move completed） | **待确认** |
+| 已知 residual | `manager-full-loop` 高并行下间歇 flake（join-guard→activation 链；**禁止**用提超时掩盖） |
+
+## 0.4 合法中间状态（现在）
+
+```text
+✓ Causal waits 可解释；orchestrator canaries 无历史 timeout
+✓ Student / Teacher / QA / SKILL = absent
+✓ Meditator = reasoning only；SyncDelegate reuse Session
+✓ Runtime durability = EventStore（Strategy A：AgentJournal 作 adapter surface）
+✓ 无 legacy NDJSON writer / 无 dual-write / 无 migrator
+✗ Casebook cold persistence / CaseFinalize（G6）
+✗ JS capability-projected file tools 全面迁移（G5）
+✗ Rulebook / Strength
+```
 
 ---
 
@@ -296,40 +367,19 @@ super-universal.md
 
 ---
 
-## 5.3 先解决一个当前 governance 异常
+## 5.3 ~~先解决一个当前 governance 异常~~ — RESOLVED（2026-08-10）
 
-当前：
+~~当前 `changes/proposed/storage.md` 正文声明 Active 但 path 仍为 Proposed。~~
 
-```text
-changes/proposed/storage.md
-```
-
-文件正文却已经声明：
+**已规范化：**
 
 ```text
-状态：Active
+changes/active/storage.md     ← Active work 唯一权威路径
+原 proposed 正文              ← 冻结于 active 文件上方
+Amendment G3.5-A              ← clean-break 语义已写入 Active work
 ```
 
-实际开始下一阶段前必须规范化：
-
-```text
-如果 Storage 已经正式启动：
-    move → changes/active/storage.md
-    原 proposal 冻结
-
-否则：
-    仍视为 Proposed
-    不允许从其 Active work 继续 production implementation
-```
-
-不要长期保持：
-
-```text
-path = proposed
-status = Active
-```
-
-这种双重事实。
+此后不得再出现 path/status 双重事实。
 
 ---
 
@@ -344,9 +394,7 @@ node tests/integration/run.mjs
 node tests/e2e/run.mjs
 ```
 
-已知 orchestrator 三个 canary 的 RED 单独记录，不得把它们归罪于后面的 Universal/Storage。
-
-当前 active Change 已经明确记录这三个 timeout 在 clean master 可复现。
+已知 orchestrator 三个 canary 的 RED **已在 G1 修复**（`SharedState.BloggerFlights`；见 `changes/completed/orchestrator-e2e-timeout.md`）。后续新增 RED 不得归罪于 Universal/Storage，除非能证明与 G0 baseline 无关。
 
 ### G0 Exit Gate
 
@@ -364,11 +412,15 @@ storage Active/Proposed 状态唯一化
 
 ---
 
-# 6. G1 — 先完成 Causal CE
+# 6. G1 — 先完成 Causal CE — **DONE**
+
+> **状态：DONE**（2026-08-10）。`causal-ce-observability` + `orchestrator-e2e-timeout` 均已 `changes/completed/`；G1 Exit Gate 已满足。
 
 这是第一项真正 production work。
 
-当前 `causal-ce-observability` 已经在 Active，Remaining work 明确还有：
+~~当前 `causal-ce-observability` 已经在 Active，Remaining work 明确还有：~~
+
+已完成项（摘要）：
 
 ```text
 Phase 1 RED
@@ -377,7 +429,7 @@ Phase 3 diagnostics bridge
 Phase 4 Student–Teacher pilot
 Phase 5 Orchestrator→Manager→Finality→Reviewer instrumentation
 Phase 6 canary root-cause repair
-Phase 7 Join/Recovery/Process waits
+Phase 7 Join/Recovery/Process waits（PARTIAL — Process 仍 physical）
 Phase 8 static gate + DSL docs
 Phase 9 full verification
 ```
@@ -494,25 +546,19 @@ npm run check:release
 
 也绿。
 
-**没有这一 Gate，不进入 Universal。**
+**没有这一 Gate，不进入 Universal。** — **已满足**（Universal 已 Active 且 G2/G3 完成）。
 
 ---
 
-# 7. G2 — Universal Runtime Foundation
+# 7. G2 — Universal Runtime Foundation — **DONE**
 
-现在才启动：
+> **状态：DONE**（2026-08-10）。`changes/active/universal.md` Active work G2 exit 已勾选；证据：`SyncDelegateRuntime`、dual-await、`inspector-oneshot` Q1/Q2 reuse e2e、`devops-mechanical-repair-loop`。
 
-```text
-changes/proposed/universal.md
-```
-
-移动到：
+~~现在才启动 `changes/proposed/universal.md` 并 move 到 active。~~ 已启动并冻结原文于：
 
 ```text
 changes/active/universal.md
 ```
-
-冻结原文。
 
 ---
 
@@ -697,11 +743,13 @@ owner cascade works
 causal frontier works
 ```
 
-通过后才能删 Student。
+通过后才能删 Student。 — **G2 Exit 已满足**（2026-08-10）。
 
 ---
 
-# 9. G3 — Universal Clean Break
+# 9. G3 — Universal Clean Break — **DONE**
+
+> **状态：DONE**（2026-08-10）。Student/Teacher/QA/SKILL 已从 production 删除；`scripts/checks/student-teacher-absence.mjs` fail-closed；Meditator = `{ Inspector }` only；catalog 24→20。
 
 这一阶段才做破坏性删除。
 
@@ -853,7 +901,9 @@ Casebook cold persistence 尚未实现
 
 ---
 
-# 10. G3.5 — 修订 Storage cutover scope（无旧档迁移义务）
+# 10. G3.5 — 修订 Storage cutover scope（无旧档迁移义务）— **DONE**
+
+> **状态：DONE**（2026-08-10）。Amendment **G3.5-A** 已写入 `changes/active/storage.md` Active work；Student QA 标记 retired；禁止 migrator / dual-write / LegacyProjection≡NewProjection。
 
 这是整个计划中必须显式处理的交叉点。
 
@@ -906,7 +956,9 @@ Student QA 是已退休 domain。
 
 ---
 
-# 11. G4 — Unified Storage
+# 11. G4 — Unified Storage — **IN PROGRESS（收口）**
+
+> **状态：IN PROGRESS**（2026-08-10）。Phase 0–7 **DONE**（inventory → EventStore core → GitGateway → clean-break policy → Wave-1 `AgentJournal` adapter → NDJSON substrate delete → proposed storage sections rewrite）。Phase 8：harness EventStore cutover + EventStore 性能（git ODB/ref CAS in-process）+ FALLBACK-013 **DONE**；e2e **26/26** + `--repeat 3` 绿。Storage → `changes/completed/` **待 G4 Exit 清单最终确认**。详情见 `changes/active/storage.md` Phase 8 Active notes。
 
 现在进入最大的基础设施 Change。
 
@@ -1112,9 +1164,13 @@ runtime 只认 EventStore
 旧 on-disk 历史不在兼容边界内
 ```
 
+**当前：** 上述证明切片在 Phase 8 已基本满足；**待办**为正式 G4 Exit 签收 + move `storage.md` → `changes/completed/`。
+
 ---
 
-# 12. G5 — JS Capability-Projected Tools
+# 12. G5 — JS Capability-Projected Tools — **BLOCKED（G4 Exit）**
+
+> **状态：BLOCKED**。G3 clean break 已完成，但 G4 Storage 尚未 completed。仓库中已有 **prep-only** 提交（`8319771f` capability algebra）；**禁止** move proposed → active 或按原文执行 `js-student` / `StudentCompile` 路径，直至 G4 Exit。
 
 到这里 Agent 世界已经稳定：
 
@@ -1314,7 +1370,9 @@ Casebook observation capture
 
 ---
 
-# 14. G6 — perm-inspector + Universal Casebook Completion
+# 14. G6 — perm-inspector + Universal Casebook Completion — **NOT STARTED**
+
+> **状态：NOT STARTED**。前置 G5（JS file primitive）尚未激活；Universal 仍 Active 等待 CaseFinalize / Casebook lifecycle。
 
 现在才正式启动 `perm-inspector`。
 
@@ -1976,49 +2034,34 @@ crash 后怎么 reconcile？
 
 可以分 Lane。
 
-## Lane A — Current Active / Liveness
+## Lane A — Current Active / Liveness — **DONE**
 
 ```text
-Causal CE
-Orchestrator timeout
+Causal CE              ✓ completed
+Orchestrator timeout   ✓ completed
 ```
 
-优先级最高。
+当前 liveness 焦点转为 G4 收口 residual flake（`manager-full-loop`）与 G4 Exit 证明。
 
 ---
 
-## Lane B — Universal Runtime
-
-G1 完成后：
+## Lane B — Universal Runtime — **G2/G3 DONE；G6 待做**
 
 ```text
-ReuseScope
-SessionOwnership
-SyncDelegate
+ReuseScope / SessionOwnership / SyncDelegate   ✓ DONE
+Student/Teacher clean break                     ✓ DONE
+Casebook / CaseFinalize                         ○ G6（Universal 仍 Active）
 ```
 
 ---
 
-## Lane C — Storage Foundation
-
-可与 G2 部分并行：
+## Lane C — Storage Foundation — **Phase 0–7 DONE；cutover 收口**
 
 ```text
-Inventory
-RED gate
-EventStore pure core
-K-way merge
-GitGateway unit work
+Inventory / RED gate / EventStore core / GitGateway   ✓ DONE
+Wave-1 adapter + NDJSON delete + proposed rewrite    ✓ DONE
+Phase 8 perf + harness EventStore cutover            ✓ DONE（G4 Exit 待签）
 ```
-
-但：
-
-```text
-clean break cutover
-（仍不要求读旧档 / 格式兼容）
-```
-
-必须等 G3。
 
 ---
 
@@ -2027,12 +2070,12 @@ clean break cutover
 以下不能重叠进入主线：
 
 ```text
-Universal destructive delete
-Storage cutover
-JS legacy tool removal
-Casebook observation integration
-Rulebook context migration
-Strength promotion
+Universal destructive delete          ✓ DONE（2026-08-10）
+Storage cutover                       ◐ IN PROGRESS（G4 收口）
+JS legacy tool removal                ○ BLOCKED（G4 Exit）
+Casebook observation integration      ○ NOT STARTED（G6）
+Rulebook context migration            ○ NOT STARTED
+Strength promotion                    ○ NOT STARTED
 ```
 
 每完成一个都先恢复：
@@ -2408,45 +2451,43 @@ Strength
 把整个过程压缩成一张执行图：
 
 ```text
-CURRENT
+CURRENT（2026-08-10；HEAD ac41ef8f）
 │
-├─ Active: Causal CE
-├─ Active: Orchestrator timeout
-├─ Proposed: Universal
-├─ Proposed/Active anomaly: Storage
-├─ Proposed: JS tools
+├─ Completed: Causal CE + Orchestrator timeout
+├─ Active: Universal（G2/G3 DONE；G6 Casebook 待做）
+├─ Active: Storage（G4 Phase 0–7 DONE；Phase 8 收口）
+├─ Proposed: JS tools（prep only；G4 Exit 前勿 activate）
 ├─ Proposed: perm-inspector
 ├─ Proposed: Rulebook
-└─ Proposed: Strength
+├─ Proposed: Strength
+└─ Proposed: magic-todo（Playbook 外；独立 Lane）
         │
         ▼
-[1] Causal CE
+[1] Causal CE                              ✓ DONE
         │
         ▼
-[2] Orchestrator canaries green
+[2] Orchestrator canaries green              ✓ DONE
         │
         ▼
-[3] Universal Session Architecture
-    ReuseScope
-    SessionOwnership
-    SyncDelegate
+[3] Universal Session Architecture           ✓ DONE
+    ReuseScope / SessionOwnership / SyncDelegate
         │
         ▼
-[4] Delete Student / Teacher / QA / SKILL
+[4] Delete Student / Teacher / QA / SKILL    ✓ DONE
     Meditator → Inspector only
         │
         ▼
-[5] Unified EventStore
+[5] Unified EventStore                       ◐ IN PROGRESS
     clean break cutover
     no disk-format compatibility
     no old-archive read
         │
         ▼
-[6] Capability-Projected JS Tools
+[6] Capability-Projected JS Tools            ○ BLOCKED (G4)
     final filesystem primitive
         │
         ▼
-[7] Inspector Casebook
+[7] Inspector Casebook                       ○ NOT STARTED
     EventStore
     CaseRefresh
     CaseFinalize
@@ -2455,19 +2496,15 @@ CURRENT
         └── perm-inspector closes
         │
         ▼
-[8] Rulebook
+[8] Rulebook                                 ○ NOT STARTED
     authored rules + Observation events
         │
         ▼
-[9] Strength
-    K0
-    shadow
-    dry run
-    K1
-    K2
+[9] Strength                                 ○ NOT STARTED
+    K0 / shadow / dry run / K1 / K2
         │
         ▼
-[10] Full ratchet + release
+[10] Full ratchet + release                  ○ NOT STARTED
 ```
 
 ---

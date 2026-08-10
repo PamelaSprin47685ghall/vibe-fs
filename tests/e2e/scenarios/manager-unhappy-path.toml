@@ -18,8 +18,9 @@
 # 4. After FinalityBlessed the suicide tool returns the minor-work continuation
 #    on the SAME turn. A new HumanRoot after Blessed opens a NEW Life (planning)
 #    once LifeCompleted — so minor work + final suicide stay on the blessing turn.
-# 5. mgr-guard remains defined for the operator-abort join-guard path but is
-#    unused in this flow. The controlled idle phase ties each Manager idle
+# 5. mgr-join-guard handles EXEC-016 while Companion blogger is outstanding (same as
+#    manager-full-loop). Esc/operator_abort is unit-tested separately.
+#    The controlled idle phase ties each Manager idle
 #    claim to a real provider terminal and keeps A physically pending through B.
 
 scenario = "manager-unhappy-path"
@@ -103,8 +104,8 @@ flow = [
   { prompt = { agent = "fast-manager", text = "MARK-ISSUE-TWO: C1 is fixing issue two and will verify before seeking the end." } },
   { wait = "mgr-fix2.0" },
   { wait = "child-fix2.0" },
-  { wait = "mgr-fix2.1" },
-  { wait = "mgr-fix2.2" },
+  { wait = "mgr-fix2.1", timeoutMs = 180000 },
+  { wait = "mgr-fix2.2", timeoutMs = 180000 },
   # Third suicide drives Host Finality to completion before the tool result returns,
   # so a mid-cohort "not yet blessed" custom races dual-PERFECT and is not stable.
   # finalOracle owns FinalityRejected>=2 + FinalityBlessed=1.
@@ -117,7 +118,7 @@ flow = [
   # Blessing can lag while Companion/blogger still appends; bare waitFact keeps
   # the 5s silence window and dies on non-renewing journal noise. Widen window
   # and renew on intermediate finality/review facts (VERIFY-004 renewOn).
-  { waitFact = { name = "FinalityBlessed", gte = 1, renewOn = ["ReviewVerdictRecorded", "ConfirmedReviewWitness", "FinalityReviewerEnlisted"] }, timeoutMs = 180000 },
+  { waitFact = { name = "FinalityBlessed", gte = 1, renewOn = ["ReviewVerdictRecorded", "ConfirmedReviewWitness", "FinalityReviewerEnlisted", "BlogEntryCommitted", "BloggerRequestMaterialized", "CompanionBloggerLinked"] }, timeoutMs = 180000 },
   # Blessed tool result continues this same turn:
   { wait = "mgr-fix2.3" },
   { wait = "child-minor.0" },
@@ -173,16 +174,20 @@ tools = ["fork", "join", "list", "suicide"]
   [[turn.step]]
   respond = { type = "tool-call", tool = "join", args = {} }
 
-# Optional/unused in this flow: operator-abort join guard (Esc path unit-tested).
+# EXEC-016: join-capable Manager tried to finish while background handles remain.
+# Same declaration as manager-full-loop manager-join-guard.
 [[turn]]
-id = "mgr-guard"
+id = "mgr-join-guard"
 internal = true
 optional = true
 user = ["# Background work is still outstanding.", "# Call join to collect completed results before finishing."]
 tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
-  respond = { type = "text", text = "The join was interrupted by the operator." }
+  respond = { type = "tool-call", tool = "join", args = {} }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager joined." }
 
 [[turn]]
 id = "mgr-idle-a"
@@ -422,7 +427,7 @@ tools = ["verdict"]
 [[turn]]
 id = "blogger"
 internal = true
-user = "# Write the dense work-log continuation now by calling the blog tool exactly once"
+user = "# Write the dense work-log continuation now"
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "blog", args = { text = "Manager unhappy path.", tip = "primitive-obsession" } }
@@ -437,10 +442,7 @@ user = "# Write the dense work-log continuation now by calling the blog tool exa
   respond = { type = "tool-call", tool = "blog", args = { text = "Manager unhappy path cycle 3.", tip = "primitive-obsession" } }
 
 # Missing-final-report nudge is bare "#" (RuntimeNudge.MissingFinalReport).
-# After mgr-repair gained tools=[fork/join/list/suicide], blogger no longer
-# falls into that catch-all; declare a blog-scoped optional continue.
-# Measured: bare-hash can land at step=1 with only blogger.1 as candidate when
-# blogger-continue had only step 0 — expand multi-step optional tool chain.
+# Blog-scoped optional continue (measured: bare-hash at step=1 needs multi-step chain).
 [[turn]]
 id = "blogger-continue"
 internal = true
@@ -460,25 +462,9 @@ tools = ["blog"]
   [[turn.step]]
   respond = { type = "tool-call", tool = "blog", args = { text = "Blogger continue step 3 after bare-hash nudge.", tip = "primitive-obsession" } }
 
-# Protocol repair after undeclared blogger stop (tools=["blog"]). Optional recovery;
-# not in must. Production lastUser starts with "# Protocol repair".
-[[turn]]
-id = "blogger-repair"
-internal = true
-optional = true
-user = "# Protocol repair"
-tools = ["blog"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "blog", args = { text = "Repair acknowledged.", tip = "primitive-obsession" } }
-
-[[epoch]]
-turn = "blogger-repair"
-step = 0
-reason = "frame-commit"
-
-# Bare "#" MissingFinalReport on blogger may rewrite message prefix while tools
-# stay blog-only (measured seal-undeclared without this boundary).
+# The Blogger transcript is append-only between deliveries (ARCH-004); frame
+# commits after Activation may legitimately insert assistant turns (same as
+# manager-full-loop / manager-companion).
 [[epoch]]
 turn = "blogger-continue"
 step = 0
