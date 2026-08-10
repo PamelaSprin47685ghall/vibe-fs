@@ -147,6 +147,11 @@ export async function setupScenarioParallel(opts, tmpDir) {
       pluginPaths,
       contextLimit: opts.contextLimit,
       extraEnv: {
+        // The Host env denylist drops `WANXIANG*` so plugin configuration is always explicit
+        // rather than inherited by accident. That also drops the diagnostics flag, so it is
+        // forwarded here on purpose: `WANXIANGSHU_DIAG=1 node tests/e2e/cases/x.test.mjs` then
+        // surfaces the plugin's own records in the Host stderr tail the watchdog already dumps.
+        ...(process.env.WANXIANGSHU_DIAG === '1' ? { WANXIANGSHU_DIAG: '1' } : {}),
         // Prefer the scenario's explicit contextLimit so canaries that shrink
         // the model budget also shrink Y's self-rebase threshold. A global
         // process env must not keep the production 32k default and prevent

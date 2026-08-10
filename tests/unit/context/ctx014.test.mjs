@@ -15,7 +15,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import { diagnostic as diag } from '../support/domain.mjs'
+import { diagnostic as diag, toList } from '../support/domain.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const NEXT_DIR = path.join(ROOT, 'src', 'Wanxiangshu')
@@ -110,6 +110,29 @@ test('CTX_014_diagnostic_emit_is_silent_by_default_and_observable_on_demand', ()
     assert.match(String(lines[0][1]), /reanchor_failed/)
   } finally {
     console.warn = w
+    console.error = e
+    if (previous === undefined) delete process.env.WANXIANGSHU_DIAG
+    else process.env.WANXIANGSHU_DIAG = previous
+  }
+})
+
+test('CTX_014_diagnostic_records_carry_their_fields', () => {
+  const lines = []
+  const e = console.error
+  const previous = process.env.WANXIANGSHU_DIAG
+  try {
+    console.error = (...a) => lines.push(a.join(' '))
+    process.env.WANXIANGSHU_DIAG = '1'
+    diag.emit('enforcer-cycle-repair', toList([['session_id', 'ses_x'], ['result', 'why it happened']]))
+    // A record that names its operation and drops its fields explains nothing, which is how a
+    // stalled session ends up with no diagnosis anywhere. The payload shape is pinned here.
+    const record = JSON.parse(lines[0])
+    assert.deepEqual(record, {
+      operation: 'enforcer-cycle-repair',
+      session_id: 'ses_x',
+      result: 'why it happened',
+    })
+  } finally {
     console.error = e
     if (previous === undefined) delete process.env.WANXIANGSHU_DIAG
     else process.env.WANXIANGSHU_DIAG = previous

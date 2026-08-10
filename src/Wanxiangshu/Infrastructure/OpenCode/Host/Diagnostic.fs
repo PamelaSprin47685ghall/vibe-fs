@@ -78,13 +78,19 @@ module Diagnostic =
         if not (List.isEmpty illegal) then
             failwith (sprintf "CTX-014: 诊断字段不在白名单: %A" illegal)
 
+    /// One JSON object: the operation plus its whitelisted fields.
+    ///
+    /// `Object.fromEntries` over explicit pairs rather than `createObj` over a tuple list: the
+    /// shape of what gets printed is the one thing a diagnostic cannot afford to get wrong, and
+    /// this spelling is checked by `CTX_014_diagnostic_records_carry_their_fields`.
+    [<Emit("Object.fromEntries([['operation', $0]].concat($1))")>]
+    let private payloadObject (operation: string) (entries: string array array) : obj = jsNative
+
     let private payload (operation: string) (fields: (string * string) list) : obj =
-        createObj (
-            Array.ofList (
-                ("operation", box operation)
-                :: (fields |> List.map (fun (name, value) -> name, box value))
-            )
-        )
+        fields
+        |> List.map (fun (name, value) -> [| name; value |])
+        |> List.toArray
+        |> payloadObject operation
 
     /// Expected / best-effort. Validates the CTX-014 whitelist.
     ///
