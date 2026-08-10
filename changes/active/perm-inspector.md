@@ -3317,3 +3317,104 @@ Persist converge failure isolation
    Casebook 产品表面应当像从未实现过一样消失
    （Persist store sync 不受 Casebook marker 左右）。
 ```
+
+---
+
+# Active work
+
+> 本文件为变更工作记录，不是当前产品规范。当前产品语义仅以 `docs/` 正式层为准。
+> Original proposal 原文冻结于上方；后续事实只追加于 Active work / Amendments / Blockers / Final outcome。
+
+## Work origin
+
+用户通过 `changes/proposed/entry.md` Implementation Playbook 明确启动：G5（JS Capability-Projected Tools）Exit 达成（`changes/completed/js-capability-projected-tools.md` Final outcome；54 单测 + `npm run check` + `check:release` + Long Stroke 全绿）后，按 Gate 顺序进入 **G6 perm-inspector + Universal Casebook completion**。
+
+## Cross-proposal prerequisites
+
+| Gate | Status | Evidence |
+|---|---|---|
+| G0–G4 | DONE | 见 `changes/completed/*`（storage Final outcome） |
+| G5 JS tools | DONE | `changes/completed/js-capability-projected-tools.md`；最终文件执行层已稳定 |
+| G4R testing | DONE | 单一 Long Stroke e2e；无新 canary |
+
+## Approved Amendments
+
+### Amendment G6-A — Storage（Playbook §14.1 A）
+
+```text
+Casebook 不再拥有自己的 storage（Git raw store / local CAS / remote / hook 全部
+SUPERSEDED——proposal §32–40 已 rebase 到统一 EventStore）。
+物理持久化 = InspectorCase* events（Captured/Refreshed/Accessed/Evicted）
+→ 统一 EventStore；大正文（Q/A/snapshot）经 PayloadRef → store payloads。
+禁止 feature ref / LWW / pin / Casebook hook。
+```
+
+### Amendment G6-B — Lifecycle（Playbook §14.1 B）
+
+```text
+非复用 Inspector scope → terminal → archive（InspectorCaseCaptured）。
+复用 Inspector scope → 调用期间只 capture（不逐次 finalize）；
+ReuseScope close → freeze draft → exactly one CaseFinalize → retire/release。
+禁止：每个 return finalize / 每个 owner turn finalize / idle / timer / token 阈值 finalize。
+```
+
+### Amendment G6-C — Bookkeeper（Playbook §14.1 C）
+
+```text
+同一个 Bookkeeper Agent 提供两个 request contract：CaseRefresh（changed evidence
+→ edit-qa* → stability verify → InspectorCaseRefreshed）与 CaseFinalize。
+不新建 LearningCompiler / CaseSynthesizer / StudentReplacement。
+```
+
+### Amendment G6-D — Ownership（Playbook §14.1 D + G5 后世界）
+
+```text
+Dedicated Inspector = Work + Attached；Bookkeeper = InternalLeaf + Attached。
+不再依赖旧 Satellite-only-WorkSession / Satellite 不可递归 语义。
+Observation capture 从最终执行层接（G5 后 = builtin read/glob/grep Host 执行
+的 typed observation；js-* bindings 捕获为可选扩展），不从 transcript 文本推断。
+```
+
+## Remaining work
+
+按 Playbook §14–21（G6-A..G6-G）+ proposal §58–63：
+
+### G6-A — Casebook Domain First（纯 Domain；无 Host I/O）
+- [ ] Formal docs：`docs/{why,what,shape,how,proof}/casebook.md`（Clause 前缀 `CASE-`）；`docs/README.md` 索引；spec.mjs 注册
+- [ ] `Case`（逻辑 Q/A/observations/snapshot refs）、`Observation`、`ObservationIdentity`、`ObservationReplayResult`
+- [ ] `CasebookProjection` fold（InspectorCaseCaptured/Refreshed/Accessed/Evicted → Case list + last_access）
+- [ ] `normalizeObservations` / `classifyReplay`（no-delta → fresh；delta → stale）/ `LruPrune`（projected last_access）
+- [ ] DomainConflict 表达（同 Case heads；禁止 revision/wall_clock LWW）
+
+### G6-B — Observation Capture（最终执行层）
+- [ ] captureReadObservation / captureGlobObservation / captureGrepObservation（typed，不从 transcript 推断）
+- [ ] executor 阅读容错（cat/head/tail/sed/grep 正例识别；命令替换/sh -c/复杂 pipeline 安全跳过；§63）
+
+### G6-C — Non-reusable Inspector Path
+- [ ] Inspector terminal → captured Q/A/evidence → `InspectorCaseCaptured`（EventStore append + PayloadRef）
+- [ ] 证明：archive failure ≠ Inspector call failure
+
+### G6-D — Fetch Hot Path
+- [ ] CasebookIndexSnapshot（PrefixEpoch 稳定；同 epoch 字节稳定）；fetch(session_id) 工具（conditional schema + ToolRegistry gate）
+- [ ] fetch → replay observations（当前 worktree）→ no-delta → exact A；delta → stale A + refresh 意图
+- [ ] same-worktree fetch single-flight
+
+### G6-E — CaseRefresh（Bookkeeper）
+- [ ] changed evidence → Bookkeeper CaseRefresh → edit-qa*（0..N in one provider transaction）→ stability verify → `InspectorCaseRefreshed`
+- [ ] maintenance failure ≠ fetch failure；失败保留旧 Case 返回旧 A
+
+### G6-F — CaseFinalize（Universal 核心）
+- [ ] ReuseScope close → freeze draft → exactly one CaseFinalize provider transaction → `InspectorCaseCaptured` → retire/release reusable Inspector
+- [ ] unexpected SessionDeleted → 仅 cleanup，不 reconstruct + synthesize
+
+### G6-G — Universal 最终关闭
+- [ ] Universal 最终 e2e（Meditator → same reusable Inspector → multiple questions → no Student/Teacher/QA/SKILL；ReuseScope close → one CaseFinalize → one Case；new Session → new Inspector → fetch → Case）
+- [ ] Universal + perm-inspector → completed（同一 integration window）
+
+## Completion criteria
+
+以 proposal §60–63 proof 清单（feature gating 双门 / Q-A 逐字性 / observation capture 覆盖 / executor parser 正负例）+ §107 式 Completion 全勾选 + Playbook G6 各段 Exit 为准；另以 `npm run check` + `npm run check:release` 全绿为准。
+
+## Blockers
+
+无（待实施中发现则追加）。
