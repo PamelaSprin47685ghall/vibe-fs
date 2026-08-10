@@ -3401,11 +3401,12 @@ Observation capture 从最终执行层接（G5 后 = builtin read/glob/grep Host
 - [x] fetch(session_id) 工具（`FetchTool.spec`：fresh/stale/no-case；`CasebookTools.buildSpecs` marker 门控 + 独立模块避免 dual-write token pair；ToolRegistry 经 casebookToolSpecs 接入）
 - [ ] CasebookIndexSnapshot（PrefixEpoch 稳定）与 same-worktree single-flight
 
-### G6-E — CaseRefresh（Bookkeeper）
-- [ ] changed evidence → Bookkeeper CaseRefresh → edit-qa*（0..N in one provider transaction）→ stability verify → `InspectorCaseRefreshed`
-- [ ] maintenance failure ≠ fetch failure；失败保留旧 Case 返回旧 A
+### G6-E — CaseRefresh（Bookkeeper）— PARTIAL（workflow DONE：99da36bb）
+- [x] `refreshCase`（append Refreshed，线性 parent）+ `needsRefresh`（replay 决策 Fresh/Stale/no-case）
+- [x] maintenance failure ≠ fetch failure（Result 语义；失败保留旧 Case）
+- [ ] Bookkeeper Agent 会话（InternalLeaf + Attached；`edit-qa` 工具 + prompt + 不可见 + single-flight）——Session 深度集成，独立阶段
 
-### G6-F — CaseFinalize（Universal 核心）
+### G6-F — CaseFinalize（Universal 核心）— NOT STARTED（ReuseScope 深度集成）
 - [ ] ReuseScope close → freeze draft → exactly one CaseFinalize provider transaction → `InspectorCaseCaptured` → retire/release reusable Inspector
 - [ ] unexpected SessionDeleted → 仅 cleanup，不 reconstruct + synthesize
 
