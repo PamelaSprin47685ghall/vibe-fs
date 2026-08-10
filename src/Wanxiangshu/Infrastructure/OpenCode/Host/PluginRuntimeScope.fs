@@ -82,10 +82,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let mutable loopSensor: LoopSensor option = None
     // DSL-MUTABLE: resource — satellite runtime attachment slot
     let mutable satelliteRuntime: SatelliteRuntime option = None
-    // DSL-MUTABLE: resource — student-teacher runtime attachment slot
-    let mutable studentTeacherRuntime: StudentTeacherRuntime option = None
-    // DSL-MUTABLE: resource — student-teacher unavailable reason latch
-    let mutable studentTeacherUnavailable: string option = None
+    // DSL-MUTABLE: resource — sync-delegate runtime attachment slot
+    let mutable syncDelegateRuntime: SyncDelegateRuntime option = None
 
     member _.Journal = journal
 
@@ -96,26 +94,10 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         | Some runtime -> runtime
         | None -> invalidOp "SatelliteRuntime has not been attached"
 
-    member _.AttachStudentTeacherRuntime(runtime: StudentTeacherRuntime) =
-        studentTeacherRuntime <- Some runtime
-        studentTeacherUnavailable <- None
+    member _.AttachSyncDelegateRuntime(runtime: SyncDelegateRuntime) = syncDelegateRuntime <- Some runtime
 
-    member _.MarkStudentTeacherUnavailable(reason: string) =
-        studentTeacherUnavailable <- Some reason
+    member _.SyncDelegateRuntime = syncDelegateRuntime
 
-    member _.StudentTeacherRuntime = studentTeacherRuntime
-
-    member _.ObserveStudentMessage(message: PromptIngressCodec.DecodedMessage) =
-        match studentTeacherRuntime with
-        | Some runtime -> runtime.ObserveChatMessage message
-        | None ->
-            match
-                message.ExplicitAgent
-                |> Option.bind (PromptAuthority.parseAgentName >> Result.toOption)
-            with
-            | Some(_, Role.Student, _, _) ->
-                Error(defaultArg studentTeacherUnavailable "Student–Teacher runtime is unavailable")
-            | _ -> Ok()
     // HOST-012: 跨实例共享（模块级单例）——worktree 独立插件实例的 fork→verdict
     // 链必须读写同一份。每实例独有状态（OwnedSessions、UserMessageBindings、
     // Companions 等）保持 per-instance。
@@ -438,8 +420,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                 (companion :> IDisposable).Dispose()
 
             this.Companions.Clear()
-            studentTeacherRuntime |> Option.iter (fun st -> st.Dispose())
-            studentTeacherRuntime <- None
+            syncDelegateRuntime |> Option.iter (fun sd -> sd.Dispose())
+            syncDelegateRuntime <- None
             SharedAgentJournal.release journal
             SharedTerminalBus.release sharedTerminalKey sharedTerminalPort
             sharedTerminalKey <- None

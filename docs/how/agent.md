@@ -12,9 +12,12 @@
 
 ## 启动装配
 
-1. 枚举 AGENT-002 二十四名；缺一 fail fast。
+1. 枚举 AGENT-002 **二十名**；缺一 fail fast。不得装入 `fast|deep-student|teacher`。
 2. 校验 `peer(fast)=deep` 对称；model 字符串非空且 pair 内互异。  
-3. 非法旧名（AGENT-004）在配置验证阶段拒绝，无 alias。
+3. 非法旧名（AGENT-004，含 `student`/`teacher`）在配置验证阶段拒绝，无 alias。
+4. 静态校验 SyncDelegate DAG（AGENT-024）无环：仅允许
+   `Meditator|Coder|DevOps → Inspector` 与 `DevOps → Coder`。
+5. SyncDelegate tier：owner effective tier 确定性映射到 delegate tier；配置不得提供 per-call 覆盖。
 
 ---
 
@@ -24,24 +27,25 @@
 2. Role 未定 → 模型可见插件工具集为空。  
 3. `external_directory="allow"` 仅经 `StaticTools.permissionObj` → `ManagedAgentConfig.applyOwnedFields` 写入每个 managed agent（AGENT-019）。  
 4. 禁止全局 permission 顶替 agent 级写入。
+5. `InvocationMode = SynchronousDelegate` 时在基线工具集上投影 `return`（profile，非 PC）；普通
+   WorkMain 调用不得因此常驻 `return`。
+6. Meditator 工具集仅为 `{ inspector }`（AGENT-025）。装配不得把 `read`/`glob`/`grep` 或其它
+   filesystem / executor / fork 面写回 Meditator。
 
 ---
 
 ## 可见性
 
-1. Blogger/Executor/Teacher 从一切 provider-visible enum/schema 剔除（AGENT-008）。
+1. Blogger/Executor 从一切 provider-visible enum/schema 剔除（AGENT-008）。
 2. fork schema 可见集合按 AGENT-009 **静态**构造，不从运行时「当前有哪些 agent」反推。  
 3. list() 只暴露 running handle，不是可创建目录。
+4. Catalog / Role DU / permission 矩阵不得再出现 Student/Teacher；旧名只进 legacy reject 集（AGENT-004）。
 
 ---
 
-## Student 请求工具面
+## Meditator prompt discipline
 
-1. HumanRoot 选择 Student 时，Agent 静态 permission 安装严格 `{ teacher }`。
-2. 学习 idle 后先构造 `StudentCompile` attempt，再经 PromptDispatcher 发送 continuation；发送 body 的
-   `tools` 对完整已知工具集显式 allow/deny，使 Host Session permission 原子替换为编译面。
-3. `PromptAuthority.toolCapabilitiesFor(role, requestKind)` 是两层权限的唯一纯函数；静态 Agent 配置、
-   provider request 与执行 gate 只做投影或校验。
-4. Teacher Agent 设置 `hidden=true`，并从所有可创建 enum 中剔除；Student 保持公开 primary。
-5. StudentCompile 的 write/edit gate 先调用 AGENT-022 路径解析器，再允许 Host 执行并记录目标；最终
-   `return` 以 fatal UTF-8 重读全部目标，逐个校验 frontmatter 与正文，全部成功后才删除 QA。
+1. Meditator system prompt（prompt SSOT）吸收原 Student epistemic style：形成理解、反例、委派
+   Inspector、证据/推论/不确定性区分、收敛前不草率终止（AGENT-025）。
+2. 不装配 LearningState / QA / Compile / MeditatorLearn|Compile / Student 式 final `return`。
+3. 事实调查只经 SyncDelegate `inspector` 工具路径；不给 Meditator 直读仓库工具。

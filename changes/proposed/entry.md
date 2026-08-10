@@ -975,7 +975,7 @@ GitGateway unit work
 
 ## 11.2 严格执行 Storage Phase
 
-顺序：
+顺序（与 `changes/active/storage.md` Phase 4 Active notes 对齐；**无 migrator**）：
 
 ```text
 代码/domain inventory
@@ -983,8 +983,9 @@ GitGateway unit work
 → EventStore core
 → GitGateway
 → dumb server
-→ clean break cutover
-→ surviving-domain rewrite onto EventStore
+→ Phase 4 clean-break policy / ratchets / docs
+→ Phase 6 surviving-domain rewrite onto IEventStore
+→ Phase 5 cutover delete Journal/Blob writers
 → proposal storage rewrite
 → full proof
 ```
@@ -994,6 +995,11 @@ GitGateway unit work
 ```text
 Inventory = 盘点代码与仍存活 domain 的权威落点
 不是 = 扫描并解析每一份旧 on-disk 历史
+
+Chicken-egg：
+禁止在 Application/Session 仍调用 AgentJournal 时删除 Journal Writer/Boot。
+因此 domain rewrite（Phase 6）必须先于 cutover delete（Phase 5）。
+Journal substrate 删除被阻断，直到 consumer lane 改写完成。
 ```
 
 没有完整 **代码/domain inventory** 禁止开始 cutover。  
@@ -1007,12 +1013,13 @@ legacy reader
 LegacyProjection == NewProjection
 ```
 
-激活后用 Active Amendment 收口为：
+激活后用 Active Amendment 收口为（**不恢复 migrator 义务**）：
 
 ```text
 clean break
 no disk-format compatibility
 no mandatory old-archive read
+no migrator / legacy reader / dual-write / LegacyProjection suite
 surviving domains 只在新 EventStore 上重新落盘/重建
 ```
 

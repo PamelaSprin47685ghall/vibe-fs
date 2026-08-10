@@ -68,3 +68,16 @@ Transform input 为空对象是 Host 能力现实；绑定必须用「已创建�
 ### 14. idle-derived continuation：QuiescenceGate vs 重复读 snapshot / busy 状态
 - **被拒方案**：把 busy/running 加进业务 HostSignal 并在几十处维护 if/else——transport 状态机不得搬进 Domain（HOST-002 只允许 coarse wake 进入业务）；连续多读几次 snapshot 称为“仍 idle”——snapshot 只证明观测稳定，不证明发送瞬间仍 idle；给 `TurnUnknown` 加 `Task.Delay`；每发现新 race 加 `isXxxRun` 特判——把 symptom 类别清单当正确性证明，永远补不完。
 - **选择方案**：process-local `SessionQuiescenceGate`，状态转换 `BeginProviderAttempt / ObserveIdle / TryConsume / RevokeCurrentAttempt / DropSession`。permit 从 idle 观察随 reconcile 携带到发送边界，物理发送前再次 `TryConsume`（与 dispatcher send 之间零 await）。typed `AttemptAborted` 立即 `RevokeCurrentAttempt` 并以 `AbortWake` 进入 Reconciler；该 wake 永远无 repair/idle rights。业务决策 × 物理发送资格 = 允许的副作用；stale 或 revoked permit → `Superseded`（不写 claim、不发消息）。不写 Journal、不参与 crash recovery、重启清空（安全侧失败）。
+
+### 15. HOST-008 所有权：ExecutionClass × Ownership vs SatelliteKind 单轴
+- **被拒方案**：继续以 `SatelliteKind = { Companion, Teacher }` 为唯一所有权模型，并把 SyncInspector /
+  SyncCoder / Bookkeeper 硬塞进 SatelliteKind。Dedicated Sync* 是长期 hot-knowledge Work Session，需要
+  Companion/context 能力；塞进 Teacher-style leaf/no-Companion 拓扑会在长上下文下撞容量，也与
+  Bookkeeper ephemeral leaf 混为一谈。
+- **被拒方案**：为 SyncDelegate 复制一套独立 parent/child map，或宣称 Teacher Satellite 已删除后只留新模型。
+  G2 只落地所有权正交化与 SyncDelegate 基础；Student/Teacher 删除属后续 gate。
+- **选择方案**：分离 `SessionExecutionClass`（Work | InternalLeaf）与 `SessionOwnership`
+  （Root | Attached of AttachmentKind）。Dedicated SyncInspector/SyncCoder = Work+Attached（MAY Companion）；
+  Companion/Bookkeeper = InternalLeaf+Attached。复用 Teacher 的 Returned→Completion 调用代数，不复用其
+  leaf/no-Companion Session 分类。G2 过渡期 Teacher 仍可作为 transitional InternalLeaf 存在（非长期
+  AttachmentKind）。HOST-015 物理扁平与恢复 fail-closed 不变：逻辑可嵌套 Attached，物理一律挂 family root。

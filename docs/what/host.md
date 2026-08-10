@@ -28,7 +28,7 @@ abort error 必须解码为 typed `AttemptAborted`，撤销当前 attempt 的全
 
 `finish=None` 的稳定 snapshot 分类为 reconciliation 私有观测 `TurnUnknown`（`SnapshotObservation`），**不是**可 publish 的 `TurnOutcome` case（HOST-004）。
 
-`chat.message` 通常只走 Prompt acknowledgement，不得拼装 terminal turn。两个额外用途都只认结构身份：PROMPT-012 的 Student HumanRoot bootstrap 在 Host 保存消息、调用 provider 前同步创建 QA 并写入原文；无 PromptKey 的真实外部用户消息 signal 当前 active `JoinAttempt`，零 active attempt 时不留下 future join wake（EXEC-017）。两者都不从正文判断意图。
+`chat.message` 通常只走 Prompt acknowledgement，不得拼装 terminal turn。额外用途只认结构身份：无 PromptKey 的真实外部用户消息 signal 当前 active `JoinAttempt`，零 active attempt 时不留下 future join wake（EXEC-017）。不从正文判断意图。历史 PROMPT-012 Student HumanRoot / QA bootstrap：**G3 已删除（absent）**。
 
 ## HOST-005：XTrace 是唯一原始语义轨迹
 
@@ -119,7 +119,11 @@ real history → synthetic call → synthetic result
 
 它**是**会影响 prompt bytes、Prefix Cache、ReviewSeal 的合成历史；**不是**私有思维、容量估算或通用恢复信号。
 
-**范围排除**：`ManagedSessionKind.SatelliteSession(_, Companion)`（Blogger）的 transform **禁止**注入、恢复或追加任何 auto-injected pair。Blogger 只消费 `blogger-system.md` + 工作日志 TOML；结对编程中文思考约束不得进入其 provider-facing 历史。判断依据是 durable SessionAssociation（`isCompanion`），禁止按 agent 名字猜测。
+**范围排除**：`AttachmentKind.Companion`（Blogger）的 transform **禁止**注入、恢复或追加任何
+auto-injected pair。Blogger 只消费 `blogger-system.md` + 工作日志 TOML；结对编程中文思考约束不得进入其
+provider-facing 历史。判断依据是 durable SessionAssociation（`Ownership = Attached(_, Companion)` /
+`isCompanion`），禁止按 agent 名字猜测。`SessionExecutionClass.Work`（含 Attached SyncInspector/SyncCoder）
+仍进入 HOST-013；InternalLeaf Bookkeeper 同 Companion 排除。
 
 **注入旁路**：下列任一成立时，非 Companion session 也不再追加新的 auto-injected pair；已落盘的历史 pair 仍按 durable gap anchor replay，以保持 append-only prefix：
 - 进程环境 `WANXIANGSHU_SKIP_AUTO_INJECTED=1`；
@@ -138,34 +142,29 @@ real history → synthetic call → synthetic result
 
 构造与链序见 `how/host.md`。
 
-## HOST-014：Student / Teacher Host 行为
+## HOST-014：（空缺）Student / Teacher Host 行为 — G3 已删除
 
-匹配生产依赖的 OpenCode `v1.18.14` 必须通过下列 source + runtime canary：
-
-1. `chat.message` 在用户消息保存与 provider effect 前完成，允许 PERSIST-011 先落盘。
-2. Prompt `tools` 被完整写为 Session permission；每个 provider step 由 Agent + Session permission
-   裁剪 provider-visible schema，并在执行时按同一 ruleset ask/deny。
-3. 普通 tool result 后同一 Host loop 会继续到 Assistant completion；Student `return` 可先删除 QA，
-   再把其 message 约束为用户最终回复。
-4. Teacher `return` 的普通 tool result 使同一 Host loop 继续到一个固定 Assistant completion；该 completion
-   正常结束并被 reconcile 后才完成等待中的父 `teacher` 工具。成功路径不得 abort、不得显示
-   `interrupted`，也不 retire Session；下一问题继续同一 Session。
-5. idle 只作 wake；Student/Teacher 策略必须从完整 snapshot、request profile 与 Satellite 关联决定 nudge。
-
-任一 canary 失败 → `HostContractUnsupported`，Student 功能 fail closed；不得影响其它 Agent。
+**编号永久空缺。** G3 clean-break 删除 Student/Teacher Host canary、QA bootstrap、`teacher` 工具双 await、
+Learn/Compile idle nudge 与 `StudentTeacherLinked`。无 alias、无 deprecated Host 路径。后继：SyncDelegate
+Inspector/Coder（HOST-008 / EXEC-026/028）；`return` **仅** SyncDelegate，无 StudentTeacher fallthrough。
 
 ## HOST-015：宿主 Session 树扁平，儿子的儿子是儿子
 
-任何 Managed child Session（fork child、one-shot child、Companion Blogger、Student↔Teacher 的
-Teacher）的 Host 物理 parent 恒为 family root：儿子再创建儿子时，新 child 物理重挂到 root 名下。
-Host 树深度恒为 2（root → child），不存在孙子。
+任何 Managed child Session（fork child、one-shot child、Companion Blogger、SyncInspector/SyncCoder、
+Bookkeeper）的 Host 物理 parent 恒为 family root：儿子再创建
+儿子时，新 child 物理重挂到 root 名下。Host 树深度恒为 2（root → child），不存在孙子。
 
 理由：UI 只渲染两层树；孙子在界面上不可见，等于脱管 Session。
 
-归属关系不由物理 parentID 承载：fork↔child、Work↔Companion、Student↔Teacher 关系只由 durable
-journal 事实（HandleLinked / CompanionBloggerLinked / StudentTeacherLinked）证明。恢复时按 journal
+归属关系不由物理 parentID 承载：fork↔child、Work↔Companion、Work↔Sync*、Work↔Bookkeeper
+关系只由 durable journal 事实（HandleLinked / CompanionBloggerLinked /
+SyncDelegate 关联）与 HOST-008 的 `SessionOwnership` 证明。历史 `StudentTeacherLinked`：**G3 gone**，
+不得当作现行关联。恢复时按 journal
 关联的 SessionId + agent + title 精确匹配；无 journal 关联则一律新建，不得按物理 parentID 推断
-归属、不得收养同 root 下他人的 child。
+归属、不得收养同 root 下他人的 child。查询失败、重复候选或归属冲突 → fail closed。
+
+逻辑上 Work+Attached（SyncInspector/SyncCoder）仍可再挂 InternalLeaf Companion（HOST-008）；
+物理上该 Companion 同样挂 family root，不形成 Host 孙子。
 
 ## HOST-016：空 Content 预防（行为）
 

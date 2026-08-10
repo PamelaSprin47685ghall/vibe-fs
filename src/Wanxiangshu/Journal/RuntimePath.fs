@@ -4,11 +4,9 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Host
+open Wanxiangshu.Infrastructure.Git
 
 module RuntimePath =
-
-    [<Import("execFileSync", "node:child_process")>]
-    let private execFileSync (command: string) (args: string array) (options: obj) : string = jsNative
 
     [<Import("isAbsolute", "node:path")>]
     let private isAbsolute (path: string) : bool = jsNative
@@ -50,13 +48,7 @@ module RuntimePath =
 
     let internal gitCommonDir (workspace: string) : string =
         try
-            let output =
-                execFileSync
-                    "git"
-                    [| "-C"; workspace; "rev-parse"; "--git-common-dir" |]
-                    (createObj [ "encoding", box "utf8" ])
-
-            let commonDirectory = output.Trim()
+            let commonDirectory = GitSubject.revParseGitCommonDir workspace
 
             let resolved =
                 if isAbsolute commonDirectory then
@@ -70,14 +62,7 @@ module RuntimePath =
 
     let forWorkspace workspace =
         try
-            let commonDirectory =
-                let output =
-                    execFileSync
-                        "git"
-                        [| "-C"; workspace; "rev-parse"; "--git-common-dir" |]
-                        (createObj [ "encoding", box "utf8" ])
-
-                output.Trim()
+            let commonDirectory = GitSubject.revParseGitCommonDir workspace
 
             let gitDirectory =
                 if isAbsolute commonDirectory then

@@ -38,14 +38,6 @@ module PromptAuthority =
         /// GLORY-044: a later durable sibling REVISE, delivered as steer
         /// continuation (not the suicide tool result).
         | FinalitySteer
-        /// PROMPT-012: another natural-language question to the same Teacher run.
-        | TeacherQuestion
-        /// PROMPT-012: Teacher became idle without calling return.
-        | TeacherIdleNudge
-        /// PROMPT-012: same Student run switches to its compile request kind.
-        | StudentCompile
-        /// PROMPT-012: compile turn became idle without final return.
-        | StudentCompileNudge
 
     type PromptOrigin =
         | AuthorityRoot of RootAuthorityKind
@@ -209,10 +201,6 @@ module PromptAuthority =
         | Continuation ManagerIdleEncouragement -> "ManagerIdleEncouragement"
         | Continuation FinalityRejected -> "FinalityRejected"
         | Continuation FinalitySteer -> "FinalitySteer"
-        | Continuation TeacherQuestion -> "TeacherQuestion"
-        | Continuation TeacherIdleNudge -> "TeacherIdleNudge"
-        | Continuation StudentCompile -> "StudentCompile"
-        | Continuation StudentCompileNudge -> "StudentCompileNudge"
         | HostInternal -> "HostInternal"
         | UnknownOrigin -> "UnknownOrigin"
 
@@ -229,10 +217,6 @@ module PromptAuthority =
         | "ManagerIdleEncouragement" -> Some ManagerIdleEncouragement
         | "FinalityRejected" -> Some FinalityRejected
         | "FinalitySteer" -> Some FinalitySteer
-        | "TeacherQuestion" -> Some TeacherQuestion
-        | "TeacherIdleNudge" -> Some TeacherIdleNudge
-        | "StudentCompile" -> Some StudentCompile
-        | "StudentCompileNudge" -> Some StudentCompileNudge
         | _ -> None
 
     /// Labels and tier/role tables live in `ManagedAgentCatalog` (AGENT-001…004).
@@ -501,23 +485,9 @@ module PromptAuthority =
     /// (AGENT-010) would stop being structurally guaranteed.
     let systemPromptIdFor (role: Role) : SystemPromptId = SystemPromptId.create (roleLabel role)
 
-    /// AGENT-020/021: request-specific tools are part of the immutable attempt,
-    /// not a mutable Student stage. Invalid role/kind pairs fail closed.
-    let toolCapabilitiesFor (role: Role) (requestKind: ProviderRequestKind) : Set<ToolPermission> =
-        match role, requestKind with
-        | Role.Student, ProviderRequestKind.StudentLearn -> set [ ToolPermission.Teacher ]
-        | Role.Student, ProviderRequestKind.StudentCompile ->
-            set
-                [ ToolPermission.Read
-                  ToolPermission.Glob
-                  ToolPermission.Grep
-                  ToolPermission.Write
-                  ToolPermission.Edit
-                  ToolPermission.Return ]
-        | Role.Student, _ -> Set.empty
-        | _, ProviderRequestKind.StudentLearn
-        | _, ProviderRequestKind.StudentCompile -> Set.empty
-        | _ -> Roles.permissions role
+    /// AGENT-007: tool capabilities are the role's permission set (AGENT-010).
+    let toolCapabilitiesFor (role: Role) (_requestKind: ProviderRequestKind) : Set<ToolPermission> =
+        Roles.permissions role
 
     /// The ONLY way to build an AttemptExecutionProfile (PROMPT-008).
     ///

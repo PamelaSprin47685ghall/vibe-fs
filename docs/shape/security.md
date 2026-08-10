@@ -12,7 +12,9 @@
 | join LWR | 子会话语境（EXEC-006 `includeOpening=false`） | Join 路径 | child LWR 禁带 parent Opening/越界上下文 → 拒绝构造 |
 | Reviewer input | Review Witness 自包含证据（REVIEW-006） | Reviewer | witness 不完整 → Reviewer/Manager Guard fail closed（REVIEW-003/007） |
 | Host transform output | `ProviderWireProjection`（COMPANION-012） | Canonical Renderer | transport-only 字段（timestamp/cost/usage/runtimeId）泄漏入模型输入 → fail closed |
-| Student QA | Git private `StudentQaStore`（PERSIST-011） | StudentRun 单写者 | 非 fatal UTF-8、权限非 0600、路径非 Git-private、原子提交未知 → 保留并 fail closed |
+
+> `StudentQaStore` / Student QA 视图：**G3 已删除（absent）**。无现行裁剪行、无 dual-write、无 legacy
+> reader；未来事件底座属 G4 EventStore（非正式现行规范）。
 
 ## 低信任上下文统一表
 
@@ -31,5 +33,3 @@
 - 可变件只被该泵访问、不外泄、无锁：LoopDetector 状态（how/loop.md 并发模型）、armed 标记（FALLBACK-012 执行局部）。
 - 崩溃恢复单调性由 Journal fold 保证（PERSIST-008/010），不由进程内可变内存保证——内存态进程级丢失是安全侧。
 - 敏感视图裁剪在服务端最后一公里完成；接收方（provider / child）不承担裁剪责任。
-- QA 正文不得进入 Blogger delta、Companion、XTrace、Journal、普通 Agent background、日志或最终回复；
-  Teacher 网络/外部工具仍按原有授权，不得把整个私有 QA/仓库作为无关外发载荷。

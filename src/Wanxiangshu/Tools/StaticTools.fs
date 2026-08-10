@@ -55,7 +55,6 @@ module StaticTools =
         | ToolPermission.Network -> "network"
         | ToolPermission.Verdict -> "verdict"
         | ToolPermission.Blog -> "blog"
-        | ToolPermission.Teacher -> "teacher"
         | ToolPermission.Return -> "return"
         | ToolPermission.Finality -> "suicide"
 
@@ -82,7 +81,6 @@ module StaticTools =
           "network"
           "verdict"
           "blog"
-          "teacher"
           "return"
           "suicide" ]
 
@@ -162,10 +160,6 @@ module StaticTools =
     /// Role.Executor: no tools; system prompt for map/reduce output summarization.
     /// Distinct from Tool.executor (OS command tool used by Inspector/DevOps).
     let executorAgentConfig (prompt: string) : obj = hiddenAgent Role.Executor prompt
-
-    let studentAgentConfig (prompt: string option) : obj = primaryAgent Role.Student prompt
-
-    let teacherAgentConfig (prompt: string) : obj = hiddenAgent Role.Teacher prompt
 
     let meditatorAgentConfig (prompt: string option) : obj = primaryAgent Role.Meditator prompt
 

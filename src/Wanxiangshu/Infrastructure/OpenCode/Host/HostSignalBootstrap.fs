@@ -100,8 +100,8 @@ module HostSignalBootstrap =
                         XWire.reconcileAttempt journal scope turn
                         TurnCompletionProgram.prepareTurn journal scope.DisposeExecutorRuntime turn
 
-                        let! studentTeacherHandled =
-                            match scope.StudentTeacherRuntime with
+                        let! syncDelegateHandled =
+                            match scope.SyncDelegateRuntime with
                             | Some runtime -> runtime.HandleTurn(turn, context.Quiescence)
                             | None -> Task.FromResult false
 
@@ -137,7 +137,7 @@ module HostSignalBootstrap =
                                     context
                             | _ -> Task.FromResult false
 
-                        if not studentTeacherHandled && not reviewerHandled && not managerHandled then
+                        if not syncDelegateHandled && not reviewerHandled && not managerHandled then
                             do!
                                 TurnCompletionProgram.applyWithContinuation
                                     PtyTiming.timerTask
@@ -254,8 +254,8 @@ module HostSignalBootstrap =
                 | SessionDeleted sessionId ->
                     scope.LoopSensor.DropSession sessionId
 
-                    scope.StudentTeacherRuntime
-                    |> Option.iter (fun runtime -> runtime.CancelSession sessionId |> ignore)
+                    scope.SyncDelegateRuntime
+                    |> Option.iter (fun runtime -> runtime.CancelSession sessionId)
 
                     scope.Quiescence.DropSession sessionId
                     scope.DisposeSession(SessionId.value sessionId)
@@ -386,7 +386,7 @@ module HostSignalBootstrap =
 
             let chatMessageHook =
                 fun (input: obj) (output: obj) ->
-                    // Decode once for wake + student; authority path re-decodes inside
+                    // Decode once for join wake; authority path re-decodes inside
                     // createHook (PROMPT-004 fail-closed unchanged). Signal even when
                     // mid-run UnknownOrigin — not only after AcceptHumanRoot.
                     // physical id + no PromptKey + not compaction → join wake.
@@ -403,10 +403,6 @@ module HostSignalBootstrap =
                     | _ -> ()
 
                     promptIngressHook input output
-
-                    match scope.ObserveStudentMessage decoded with
-                    | Ok() -> ()
-                    | Error error -> raise (InvalidOperationException error)
 
             let cancelSignals (ids: SessionId seq) =
                 ids

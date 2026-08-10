@@ -20,6 +20,8 @@
     <Compile Include="Kernel/DomainFlow.fs"/>
     <Compile Include="Kernel/AsyncSupport.fs"/>
     <Compile Include="Kernel/CausalWait.fs"/>
+    <Compile Include="Kernel/SessionOwnership.fs"/>
+    <Compile Include="Kernel/SyncDelegate.fs"/>
     <Compile Include="Kernel/Outcome.fs"/>
     <Compile Include="Kernel/Fact.fs"/>
     <Compile Include="Domain/AgentPairCursor.fs"/>
@@ -60,12 +62,18 @@
     <Compile Include="Domain/ReviewWitness.fs"/>
     <Compile Include="Domain/ReviewChallenge.fs"/>
     <Compile Include="Domain/ManagedAgentCatalog.fs"/>
-    <Compile Include="Domain/StudentTeacher.fs"/>
-    <Compile Include="Domain/StudentSkill.fs"/>
-    <Compile Include="Domain/StudentTeacherPrompt.fs"/>
+    <Compile Include="Domain/SyncDelegatePrompt.fs"/>
     <Compile Include="Domain/PromptAuthority.fs"/>
     <Compile Include="Domain/PromptAuthorityRun.fs"/>
     <Compile Include="Domain/AttemptPlanner.fs"/>
+    <Compile Include="Domain/EventStore.fs"/>
+    <Compile Include="Infrastructure/Persist/StoreTypes.fs"/>
+    <Compile Include="Infrastructure/Persist/CanonicalEventCodec.fs"/>
+    <Compile Include="Infrastructure/Persist/GitRawStore.fs"/>
+    <Compile Include="Infrastructure/Persist/EventStoreMerge.fs"/>
+    <Compile Include="Infrastructure/Persist/EventStoreFold.fs"/>
+    <Compile Include="Infrastructure/Persist/EventStore.fs"/>
+    <Compile Include="Infrastructure/Persist/ProcessGitRawStore.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ManagedAgent.fs"/>
     <Compile Include="Journal/FactCodec.fs"/>
     <Compile Include="Journal/Envelope.fs"/>
@@ -93,6 +101,7 @@
     <Compile Include="Journal/AgentJournal.fs"/>
     <Compile Include="Journal/ReviewBarrier.fs"/>
     <Compile Include="Journal/SharedAgentJournal.fs"/>
+    <Compile Include="Infrastructure/Git/GitSubject.fs"/>
     <Compile Include="Journal/RuntimePath.fs"/>
     <Compile Include="Agent/AgentProgram.fs"/>
     <Compile Include="Session/ForkTypes.fs"/>
@@ -107,6 +116,8 @@
     <Compile Include="Session/CausalWaitBridge.fs"/>
     <Compile Include="Session/CausalWaitRegistry.fs"/>
     <Compile Include="Session/CausalAwait.fs"/>
+    <Compile Include="Session/ReuseScope.fs"/>
+    <Compile Include="Session/AttachedSessionRuntime.fs"/>
     <Compile Include="Session/ForkRecovery.fs"/>
     <Compile Include="Session/ForkRuntime.fs"/>
     <Compile Include="Session/DurableFallback.fs"/>
@@ -139,6 +150,8 @@
     <Compile Include="Application/Orchestration/Program.fs"/>
     <Compile Include="Application/Orchestration/Runtime.fs"/>
     <Compile Include="Infrastructure/Git/GitOperations.fs"/>
+    <Compile Include="Infrastructure/Git/GitGateway.fs"/>
+    <Compile Include="Infrastructure/Git/HookDispatcher.fs"/>
     <Compile Include="Session/CompanionTypes.fs"/>
     <Compile Include="Session/Companion.fs"/>
     <Compile Include="Session/CompanionProgram.fs"/>
@@ -166,7 +179,6 @@
     <Compile Include="Infrastructure/OpenCode/Host/OpenCodePort.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Sessions.fs"/>
     <Compile Include="Session/SatelliteRuntime.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Host/StudentQaStore.fs"/>
     <Compile Include="Application/Prompting/PromptDispatcher.fs"/>
     <Compile Include="Application/Prompting/PromptDispatcherSend.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/PromptIngressCodec.fs"/>
@@ -175,7 +187,7 @@
     <Compile Include="Application/Reconciliation/XTraceCapture.fs"/>
     <Compile Include="Application/Prompting/PromptIngress.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SessionQuiescenceGate.fs"/>
-    <Compile Include="Session/StudentTeacherRuntime.fs"/>
+    <Compile Include="Session/SyncDelegateRuntime.fs"/>
     <Compile Include="Application/Reconciliation/PromptRecovery.fs"/>
     <Compile Include="Session/HostPendingRun.fs"/>
     <Compile Include="Session/HostForkBusyNudge.fs"/>
@@ -254,7 +266,7 @@
     <Compile Include="Infrastructure/OpenCode/Tools/FinalityTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FileMutationTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/BashHoneypotTool.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Tools/StudentTeacherTools.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Tools/SyncDelegateTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ToolRegistry.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginHost.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/ManagerConfig.fs"/>

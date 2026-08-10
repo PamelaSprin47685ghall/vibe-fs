@@ -46,7 +46,6 @@ test('HOST_008_linking_records_both_directions_at_once', () => {
     mainSessionId: undefined,
     satelliteKind: undefined,
     blogger: 'ses_y',
-    teacher: undefined,
     parent: undefined,
   })
 
@@ -55,7 +54,6 @@ test('HOST_008_linking_records_both_directions_at_once', () => {
     mainSessionId: 'ses_x',
     satelliteKind: 'Companion',
     blogger: undefined,
-    teacher: undefined,
     parent: 'ses_x',
   })
 

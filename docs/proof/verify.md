@@ -131,10 +131,12 @@ provider 失败、SSE 中断、超时、畸形参数属于传输层故障，不�
 ```text
 COMPANION-009  Epoch 切换：新 SealRoot，允许一次显式 prefix rebase
 FALLBACK-004   Fallback 换边：只改 EffectiveAgent，system prompt 因此可变
-AGENT-020 / PROMPT-012  StudentLearn → StudentCompile：只改 tools，message prefix 仍 append-only
 ```
 
-这三处必须由 scenario 显式声明发生位置。禁止由 mock 嗅探请求形状推断（例如「tools 与 system 未变即视为 epoch 切换」）——那会放过在不该切换处发生的切换。
+历史第三例外 `StudentLearn → StudentCompile`（AGENT-020 / PROMPT-012）：**G3 已删除（absent）**，
+不得再作冷边界或 scenario 声明位。
+
+上述两处必须由 scenario 显式声明发生位置。禁止由 mock 嗅探请求形状推断（例如「tools 与 system 未变即视为 epoch 切换」）——那会放过在不该切换处发生的切换。
 
 未声明处任何前缀断裂 fail closed。
 

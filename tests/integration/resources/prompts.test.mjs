@@ -1,7 +1,8 @@
 // tests/integration/resources/prompts.test.mjs — package prompt load contract.
 //
-// 12 role system prompts under resources/prompts/*-system.md load via
+// 10 role system prompts under resources/prompts/*-system.md load via
 // PromptResources / RuntimeResources; path is import.meta.url-relative, not cwd.
+// G3: Student/Teacher prompts deleted with the roles (AGENT-002 twenty-agent baseline).
 //
 // Not discovered by tests/unit/runner.mjs. Run standalone:
 //   node --test tests/integration/resources/prompts.test.mjs
@@ -20,29 +21,29 @@ const PROMPT_FIELDS = [
   'BrowserSystemPrompt',
   'MeditatorSystemPrompt',
   'OrchestratorSystemPrompt',
-  'StudentSystemPrompt',
-  'TeacherSystemPrompt',
   'ExecutorSystemPrompt',
   'BloggerSystemPrompt',
 ]
 
-const assertTwelveNonEmpty = (catalog, label) => {
+const assertTenNonEmpty = (catalog, label) => {
   for (const field of PROMPT_FIELDS) {
     const text = catalog[field]
     assert.equal(typeof text, 'string', `${label}: ${field} must be string`)
     assert.ok(text.trim().length > 0, `${label}: ${field} must be non-empty`)
   }
-  assert.equal(PROMPT_FIELDS.length, 12)
+  assert.equal(PROMPT_FIELDS.length, 10)
+  assert.equal(catalog.StudentSystemPrompt, undefined, `${label}: StudentSystemPrompt must be absent`)
+  assert.equal(catalog.TeacherSystemPrompt, undefined, `${label}: TeacherSystemPrompt must be absent`)
 }
 
-test('AGENT_002_resource_twelve_prompts_load_via_PromptResources', () => {
+test('AGENT_002_resource_ten_prompts_load_via_PromptResources', () => {
   const catalog = promptResources.load()
-  assertTwelveNonEmpty(catalog, 'PromptResources.load')
+  assertTenNonEmpty(catalog, 'PromptResources.load')
 })
 
-test('AGENT_002_resource_twelve_prompts_load_via_RuntimeResources', () => {
+test('AGENT_002_resource_ten_prompts_load_via_RuntimeResources', () => {
   const bundle = runtimeResources.load()
-  assertTwelveNonEmpty(bundle.Prompts, 'RuntimeResources.load().Prompts')
+  assertTenNonEmpty(bundle.Prompts, 'RuntimeResources.load().Prompts')
   assert.ok(bundle.EnforcerRules !== undefined)
 })
 
@@ -51,14 +52,13 @@ test('ENFORCER_resource_prompts_load_independent_of_process_cwd', () => {
   try {
     process.chdir('/')
     const catalog = promptResources.load()
-    assertTwelveNonEmpty(catalog, 'PromptResources.load after chdir(/)')
+    assertTenNonEmpty(catalog, 'PromptResources.load after chdir(/)')
     const bundle = runtimeResources.load()
-    assertTwelveNonEmpty(bundle.Prompts, 'RuntimeResources.load after chdir(/)')
+    assertTenNonEmpty(bundle.Prompts, 'RuntimeResources.load after chdir(/)')
   } finally {
     process.chdir(previous)
   }
 })
-
 test('PROMPT_manager_sub_session_reuse_algorithm_is_executable', () => {
   const text = promptResources.load().ManagerSystemPrompt
   // Semantic fragments only — not whole-block brittle match.

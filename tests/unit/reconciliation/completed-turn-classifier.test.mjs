@@ -192,7 +192,7 @@ test('RECON_needs_interactionRepair_role_by_outcome_table', () => {
   const failed = classifyOutcome(false, 'error', 'boom', [])
   const unknown = classifyOutcome(false, undefined, undefined, [])
 
-  for (const role of ['Manager', 'Orchestrator', 'Coder', 'Reviewer', 'Inspector', 'DevOps', 'Browser', 'Meditator', 'Student', 'Teacher']) {
+  for (const role of ['Manager', 'Orchestrator', 'Coder', 'Reviewer', 'Inspector', 'DevOps', 'Browser', 'Meditator']) {
     assert.equal(needsInteractionRepair(roles.of(role), inProgress, []), true, `${role} InProgress`)
     assert.equal(needsInteractionRepair(roles.of(role), needsMore, []), true, `${role} NeedsContinuation`)
     for (const [label, outcome] of [['Completed', completed], ['Aborted', aborted], ['Failed', failed], ['Unknown', unknown]]) {

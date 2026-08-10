@@ -5009,3 +5009,78 @@ Inspector Casebook（repository opt-in）
 > **Learning is no longer a special Agent program. It is ordinary reasoning plus persistent evidence reuse.**
 
 做到这里，Student/Teacher 才算真正被“吸收”进系统，而不是换名字继续活着。
+
+---
+
+# Active work
+
+> 本文件为变更工作记录，不是当前产品规范。当前产品语义仅以 `docs/` 正式层为准。
+> Original proposal 原文冻结于上方；后续事实只追加于 Active work / Amendments / Blockers / Final outcome。
+
+## Work origin
+
+用户通过 `changes/proposed/entry.md` Implementation Playbook 明确启动：G1（Causal CE + orchestrator canaries）已 completed 且本轮 `npm run check` + `npm run test:e2e` 全绿后，按 Gate 顺序进入 **G2 Universal Runtime Foundation**。
+
+## Cross-proposal prerequisites
+
+| Gate | Status | Evidence |
+|---|---|---|
+| G0 baseline | DONE | `npm run build` PASS; unit 1870 PASS; integration 281 PASS; `npm run check` PASS |
+| G0 storage lifecycle | DONE | path was Proposed at G0; **G3.5 activated** → `changes/active/storage.md` + Amendment G3.5-A |
+| G1 Causal CE | DONE | `changes/completed/causal-ce-observability.md` Final outcome |
+| G1 Orchestrator canaries | DONE | `changes/completed/orchestrator-e2e-timeout.md` + `evidence/orchestrator-frontier/ROOT-CAUSE.md`; e2e 27/27 PASS this run |
+| Known RED | none standing | one intermittent `manager-full-loop` flake under parallel stagger observed once, then green on solo + suite re-run |
+
+## Approved Amendments (for this Active Change)
+
+G2 阶段 **不**执行 Student/Teacher/QA/SKILL 删除，也 **不**落地 Casebook persistence / CaseFinalize。本阶段只交付：
+
+```text
+ReuseScope / SessionOwnership / SyncDelegate
++ CausalAwait dual-await on sync paths
++ Coder/Meditator/DevOps → Inspector
++ DevOps → Coder
+```
+
+G3+（destructive delete / Casebook / Storage rebase）另列 Remaining work，不得提前混入。
+
+## Remaining work
+
+### G2 — Runtime Foundation
+- [x] Formal docs: HOST-008 → SessionExecutionClass × SessionOwnership / AttachmentKind；SyncDelegate CE；glossary
+- [x] Types: ReuseScopeId / SyncDelegateRole / SessionExecutionClass / SessionOwnership / AttachmentKind
+- [x] SyncDelegateRuntime + AttachedSessionRuntime + caller-scope single-flight gate
+- [x] CausalAwait dual-await (Returned → Completion) for Inspector/Coder sync paths
+- [x] Work+Attached Companion path for dedicated Inspector/Coder（非 Teacher leaf）
+- [x] InspectorTool / CoderTool cutover from OneShot dispose-after（`return` injected via SyncDelegate profile toolMap）
+- [x] Proofs: reuse / single-flight / tier / dual-await unit；inspector Q1/Q2 e2e reuse；devops Coder SyncDelegate；`npm run check` + `npm run test:e2e` 27/27 PASS
+
+### G3 — Clean Break — DONE
+- [x] Meditator prompt absorbs Student epistemic style; drop Meditator filesystem（capability tests first）
+- [x] Delete Student/Teacher/QA/SKILL + lift Teacher CE tests into sync-delegate proofs
+- [x] Static ratchet: production zero for Role.Student/Teacher / fast|deep-student|teacher / StudentLearn|Compile|QaStore|StudentTeacherRuntime
+
+### G3.5 / G4 Storage Activation — DONE
+- [x] Storage Active Amendment G3.5-A: Student QA retired; no legacy reader / dual-write / LegacyProjection≡NewProjection
+- [x] Activated `changes/proposed/storage.md` → `changes/active/storage.md`（user: Activate now）
+
+### G3.5 / G6 Casebook / close（later）
+- [ ] Casebook lifecycle Amendments + CaseFinalize on ReuseScope close
+- [ ] Universal final e2e → completed
+
+## Completion criteria
+
+### G2 exit — DONE
+Evidence: SyncDelegateRuntime + tool cutover；unit `sync-delegate*.test.mjs`；e2e `inspector-oneshot` (Q1/Q2 same dedicated Inspector) + `devops-mechanical-repair-loop` + `student-teacher` still green；`npm run check` PASS；`npm run test:e2e` 27/27 PASS.
+
+### G3 exit — DONE
+Evidence（本轮）:
+- Meditator = `{ Inspector }` only；`resources/prompts/meditator-system.md` epistemic style；unit meditator-permissions + agent-permission-gate 14/14
+- Student/Teacher/QA/SKILL absent in production；`scripts/checks/student-teacher-absence.mjs` wired fail-closed in `scripts/check.mjs`
+- Teacher CE value preserved：`tests/unit/session/sync-delegate-ce-collapse.test.mjs` + SyncDelegate dual-await tools
+- Catalog 24→20；prompts 12→10；e2e student-teacher case deleted（suite now 26）
+- `npm run check` PASS（unit 1861 + integration 281）；`npm run test:e2e` **26/26 PASS**
+
+## Blockers
+
+无。

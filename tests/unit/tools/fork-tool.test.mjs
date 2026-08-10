@@ -207,16 +207,6 @@ test('FORK_hidden_role_by_name_is_denied_generically', async () => {
   assert.equal(result.error, 'Unknown or unavailable managed agent.')
 })
 
-test('FORK_known_but_not_forkable_role_is_explained', async () => {
-  const live = liveScope()
-  const spec = managerSpec(factory, live.scope)
-  // fast-student is public but not on the Manager fork surface (only coder,
-  // inspector, devops, browser, meditator are); the denial must explain that.
-  const result = parseToml(await runManager(spec, 'fast-student', 'learn something'))
-  assert.match(result.error, /not creatable via Manager fork/)
-  live.cleanup()
-})
-
 test('FORK_garbage_agent_name_reports_parse_error', async () => {
   const spec = managerSpec(factory, bareScope())
   const result = parseToml(await runManager(spec, 'not-an-agent-name!', 'do work'))

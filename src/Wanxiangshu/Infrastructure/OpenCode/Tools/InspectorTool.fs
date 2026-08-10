@@ -2,54 +2,76 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open Wanxiangshu.Domain
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Session
 open ToolHostCodec
 
-/// Synchronous read-only Inspector delegation used by Coder, Reviewer,
-/// Meditator, and DevOps. The child is always disposed after one terminal.
+/// Synchronous read-only Inspector delegation via reusable SyncDelegate Session
+/// (Returned → Completion). Dedicated Inspector is Work+Attached; not dispose-after.
 module InspectorTool =
 
-    let private encode (outcome: OneShotAgentTool.Outcome) =
-        let managed = outcome.Managed
-        let report = outcome.Output
+    let private tryAgentName (scope: ToolRuntimeScope) (ownerKey: string) =
+        match scope.Journal with
+        | None -> None
+        | Some journal ->
+            SyncDelegateTier.fromJournal journal (SessionId.create ownerKey)
+            |> Option.map (fun tier -> SyncDelegate.agentNameFor SyncDelegateRole.Inspector tier)
 
-        let instructions = if String.IsNullOrWhiteSpace report then [] else [ report ]
+    let private encode
+        (scope: ToolRuntimeScope)
+        (syncDelegate: SyncDelegateRuntime)
+        (ownerKey: string)
+        (answer: string)
+        =
+        let instructions = if String.IsNullOrWhiteSpace answer then [] else [ answer ]
 
-        // EXEC-028: entry-local LWR comment prefix (mirror JoinResultRenderer).
-        let body =
-            tomlObjectWithInstructions
-                instructions
-                [ "inspector_id", TString outcome.ChildId
-                  "agent", TString managed.Name
-                  "tier", TString(ManagedAgent.tierName managed.Tier)
-                  "fallback_peer", TString (ManagedAgent.peer managed).Name
-                  "parent_b_digest",
-                  outcome.ParentBackgroundDigest
-                  |> Option.map TString
-                  |> Option.defaultValue (TString "") ]
+        let inspectorId =
+            syncDelegate.TryFind(SessionId.create ownerKey, SyncDelegateRole.Inspector)
+            |> Option.map SessionId.value
 
-        // EXEC-028: Completed never reaches encode with empty WorkRecord (fail-closed in run);
-        // soft-omit arms remain for non-Completed soft Ok paths only
-        // (send-failed and parent-abort/cancel: succeed ... None).
-        match outcome.WorkRecord with
-        | Some wr when not (String.IsNullOrEmpty wr) -> SyntheticToml.comment wr + "\n" + body
-        | _ -> body
+        let fields =
+            [ match inspectorId with
+              | Some id -> yield "inspector_id", TString id
+              | None -> ()
+              match tryAgentName scope ownerKey with
+              | Some agent -> yield "agent", TString agent
+              | None -> () ]
 
-    let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
-        let request: OneShotAgentTool.Request =
-            { Agent = args.Text "agent"
-              Prompt = OneShotAgentTool.promptFrom args }
+        tomlObjectWithInstructions instructions fields
 
+    let private execute
+        (scope: ToolRuntimeScope)
+        (syncDelegate: SyncDelegateRuntime option)
+        (args: HostToolArguments)
+        (context: HostToolContext)
+        =
         task {
-            match! OneShotAgentTool.run scope context request ManagedAgent.inspectorToolNames "Inspector" with
-            | Ok outcome -> return encode outcome
-            | Error error -> return tomlObject [ "error", TString error ]
+            match syncDelegate with
+            | None -> return tomlObject [ "error", TString "SyncDelegate runtime unavailable" ]
+            | Some sd ->
+                if String.IsNullOrWhiteSpace context.SessionId then
+                    return tomlObject [ "error", TString "Missing sessionID" ]
+                else
+                    let prompt = OneShotAgentTool.promptFrom args
+
+                    if String.IsNullOrWhiteSpace prompt then
+                        return tomlObject [ "error", TString "inspector prompt required" ]
+                    else
+                        match! sd.Invoke(context.SessionId, SyncDelegateRole.Inspector, prompt) with
+                        | Ok answer -> return encode scope sd context.SessionId answer
+                        | Error error -> return tomlObject [ "error", TString error ]
         }
 
-    let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
+    let spec
+        (factory: HostToolFactory)
+        (scope: ToolRuntimeScope)
+        (syncDelegate: SyncDelegateRuntime option)
+        : ToolSpec =
         { Name = "inspector"
-          Description = "One-shot read-only investigation; session is disposed after return"
+          Description =
+            "Reusable dedicated Inspector Session (Returned→Completion); not dispose-after. Owner tier binds the delegate."
           Arguments =
-            [ "agent", ToolHostCodec.enumSchema ManagedAgent.inspectorToolNames factory
-              "prompt", ToolHostCodec.optionalStringSchema factory
+            [ "prompt", ToolHostCodec.optionalStringSchema factory
               "prompts", ToolHostCodec.optionalStringArraySchema factory ]
-          Execute = execute scope }
+          Execute = execute scope syncDelegate }

@@ -47,8 +47,6 @@ const ROLES = [
   'browser',
   'meditator',
   'reviewer',
-  'student',
-  'teacher',
   'blogger',
   'executor',
 ]
@@ -125,12 +123,7 @@ const HOOK_FIXTURES = {
   'experimental.text.complete': {
     input: { sessionID: SESSION, messageID: 'asst_probe', partID: 'part_probe' },
     output: { text: 'unchanged' },
-    assert: (output) => assert.equal(output.text, 'unchanged', 'non-Student text must be untouched'),
-  },
-
-  'tool.execute.before': {
-    input: { tool: 'read', sessionID: SESSION, callID: 'call_probe' },
-    output: { args: { filePath: 'README.md' } },
+    assert: (output) => assert.equal(output.text, 'unchanged', 'unrelated session text must be untouched'),
   },
 
   // The odd one out: `config` receives the live instance-state object ALONE and the
@@ -257,7 +250,6 @@ test('HOST_009_the_tool_registry_is_a_registry_not_a_triggered_hook', async () =
       'return',
       'rm',
       'suicide',
-      'teacher',
       'verdict',
     ])
 

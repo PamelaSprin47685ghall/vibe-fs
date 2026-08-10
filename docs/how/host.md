@@ -91,7 +91,7 @@ plugin start
 → dispose: cancel Tasks, kill PTY/process, dispose sessions
 ```
 
-Satellite 创建统一走（HOST-015 扁平拓扑）：
+Attached 创建统一走（HOST-015 扁平拓扑；HOST-008 ExecutionClass × Ownership）：
 
 ```text
 query family root children（owner ≠ root 时并查 owner children，兼容扁平前的物理位置）
@@ -101,9 +101,22 @@ query family root children（owner ≠ root 时并查 owner children，兼容扁
 → id 匹配但 agent/title 冲突、多个 id 匹配或查询失败：fail closed
 ```
 
-Companion 和 Teacher 都必须先登记 `ManagedSessionKind.SatelliteSession`，再发送首个 prompt。Transform
-先查 Session kind；任何 Satellite 都跳过 Companion 创建。owner 删除/取消时由 SatelliteRuntime 级联
-abort/retire，不进入公开 Handle/list/join。
+登记顺序：先写入 `SessionAssociation`（`ExecutionClass` + `Ownership`），再发送首个 prompt。
+
+```text
+Companion / Bookkeeper
+  → InternalLeaf + Attached；Transform 见 InternalLeaf 则跳过 Companion 创建
+
+SyncInspector / SyncCoder
+  → Work + Attached；MAY 再创建自己的 Companion（Work 能力路径）
+  → 复用 Teacher CE 代数（Returned → Completion），不登记为 InternalLeaf
+
+G2 过渡 Teacher
+  → 仍可作为 transitional InternalLeaf 创建/恢复（legacy 关联，非长期 AttachmentKind）；不得当作已删除
+```
+
+`AttachedSessionRuntime` 是 Attached 的唯一创建、恢复、级联 abort/retire owner；owner 删除/取消时
+级联清理，不进入公开 Handle/list/join。
 
 ---
 
@@ -241,7 +254,10 @@ XTraceCapture → Companion → XWire → EnforcerHost
 → PairProgrammingThoughtTransform → HostMessageProjection.sanitizeMessages (HOST-016) → ReviewSeal
 ```
 
-- 适用判定：仅非 Companion session 进入本程序。`journal` 存在时以 `SessionAssociationProjection.isCompanion sessionId` 为准；为 true（Blogger）则跳过 `PairProgrammingThoughtTransform`，不读 tip、不 append durable pair、不改 `messages`。无 journal / 无 association 时按非 Companion 处理（保持既有测试与未知 session 行为）。
+- 适用判定：仅 `SessionExecutionClass.Work` 进入本程序。`journal` 存在时以 SessionAssociation 为准：
+  `Ownership = Attached(_, Companion)`（或 `isCompanion`）→ 跳过 `PairProgrammingThoughtTransform`，不读 tip、
+  不 append durable pair、不改 `messages`。InternalLeaf Bookkeeper 同跳过。无 journal / 无 association 时按
+  非 Companion Work 处理（保持既有测试与未知 session 行为）。
 - 每次 transform 的 commit 顺序：读 durable anchored pair 序列 → strip raw 中已有 HOST-013 synthetic 消息（仅在 durable anchor 足够完整时）→ 校验（真实消息地址唯一）→ 过滤 placeable pairs（CallGap 与 ResultGap 的 anchor 均在当前真实消息中）→ 内存中 replay 可放置历史 → 决定本轮新 pair 的 placement（仅当该 placement 尚不存在）→ 内存构造候选 fact → 内存渲染完整 wire → 校验全部不变量 → append durable fact（失败 fail closed，禁止忽略后照发或降级为不注入）→ 返回已校验消息。
 - gap replay（禁止再出现 `historyBlock`）：输入真实消息 + durable synthetic entries，输出：
 

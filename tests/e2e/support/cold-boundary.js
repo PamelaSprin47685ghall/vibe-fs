@@ -78,7 +78,7 @@ export function boundaryFor(boundaries, entry) {
 const messagesStillAppendOnly = (previousWire, nextWire) =>
   isAppendOnlyPrefix(withModelOf(previousWire, nextWire), nextWire);
 
-/** Student Learn→Compile keeps model/system/messages and replaces only tools. */
+/** SyncDelegate Returned→Completion keeps model/system/messages and replaces only tools. */
 const requestKindKeepsPrefix = (previousWire, nextWire) =>
   isAppendOnlyPrefix({ ...previousWire, Tools: nextWire.Tools }, nextWire);
 
@@ -187,8 +187,8 @@ export function sealDecision({ previousWire, body, boundary }) {
         ? { resealed: 'frame-commit' }
         : { broken: 'frame-commit-rewrote-fixed' };
 
-    // AGENT-020 / PROMPT-012: one typed Student run switches from the
-    // StudentLearn schema to StudentCompile without replacing its transcript.
+    // SyncDelegate: a dedicated Inspector/Coder CE may swap the per-request
+    // tool map (Returned → Completion) without replacing its transcript.
     case 'request-kind-switch':
       return requestKindKeepsPrefix(previousWire, nextWire)
         ? { resealed: 'request-kind-switch' }

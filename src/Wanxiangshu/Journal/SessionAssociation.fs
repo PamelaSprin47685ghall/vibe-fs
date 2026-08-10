@@ -14,19 +14,34 @@ open Wanxiangshu.Kernel.Identity
 /// answerable in both directions from one keyed lookup (PERSIST-008). Storing only
 /// `WorkSession → BloggerSessionId` would force a scan of every session to discover
 /// whether a given id is somebody's Y.
+///
+/// Long-lived ownership is `SessionExecutionClass` × `SessionOwnership` /
+/// `AttachmentKind` in `Wanxiangshu.Kernel`. Dedicated SyncInspector/SyncCoder are
+/// Work+Attached and must not be stuffed into `SatelliteKind`. See
+/// `SessionOwnershipClassification` and `SyncDelegateAssociationHints`.
 [<RequireQualifiedAccess>]
-type SatelliteKind =
-    | Companion
-    | Teacher
+type SatelliteKind = | Companion
 
+/// Durable HOST-008 association kind (FactCodec / projection surface).
+///
+/// Map via `SessionOwnershipClassification` onto `SessionExecutionClass` ×
+/// `SessionOwnership` without changing these cases or the codec. `WorkSession` ≈
+/// Work (+ Root, or Attached Sync* when known outside this record);
+/// `SatelliteSession(_, Companion)` ≈ InternalLeaf+Attached(Companion).
 [<RequireQualifiedAccess>]
 type ManagedSessionKind =
     /// A session that can issue ordinary provider requests. Has exactly one Y.
+    /// G2: `SessionExecutionClass.Work` (Root, or Attached Sync* when proven elsewhere).
     | WorkSession
     /// HOST-008: every internal child is a leaf owned by one WorkSession.
+    /// Companion → `SessionExecutionClass.InternalLeaf` + Attached(Companion).
     | SatelliteSession of ownerSessionId: SessionId * kind: SatelliteKind
 
 /// HOST-008: the durable Work ↔ Companion relation for one session.
+///
+/// Record fields and FactCodec stay on the ManagedSessionKind model.
+/// Orthogonal ExecutionClass × Ownership is a derived view
+/// (`SessionOwnershipClassification`), not a durable rewrite.
 type SessionAssociation =
     {
         SessionId: SessionId
@@ -35,8 +50,6 @@ type SessionAssociation =
         /// `None` for a Companion session. The invariant is enforced by
         /// `SessionAssociationProjection.link`, not left to callers.
         BloggerSessionId: SessionId option
-        /// AGENT-020: one Teacher while a Student learning task is active.
-        TeacherSessionId: SessionId option
         ParentSessionId: SessionId option
     }
 
@@ -79,15 +92,37 @@ module SessionAssociationProjection =
         | Some { Kind = ManagedSessionKind.SatelliteSession(_, SatelliteKind.Companion) } -> true
         | _ -> false
 
-    let isTeacher (sessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
-        match tryFind sessionId current with
-        | Some { Kind = ManagedSessionKind.SatelliteSession(_, SatelliteKind.Teacher) } -> true
-        | _ -> false
-
     let isSatellite (sessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
         match tryFind sessionId current with
         | Some { Kind = ManagedSessionKind.SatelliteSession _ } -> true
         | _ -> false
+
+    /// HOST-008: WorkSession, or no association yet (lazy Y not created).
+    /// Unknown answers `true` for the same reason `isCompanion` answers `false`.
+    let isWorkSession (sessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
+        not (isSatellite sessionId current)
+
+    /// ManagedSessionKind → SessionExecutionClass (no Ownership yet).
+    let executionClassOf (kind: ManagedSessionKind) : SessionExecutionClass =
+        match kind with
+        | ManagedSessionKind.WorkSession -> SessionExecutionClass.Work
+        | ManagedSessionKind.SatelliteSession _ -> SessionExecutionClass.InternalLeaf
+
+    /// Journal-proven logical parent (`ParentSessionId`), if any.
+    let parentOf (entry: SessionAssociation) : SessionId option = entry.ParentSessionId
+
+    let tryParentOf (sessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
+        tryFind sessionId current |> Option.bind parentOf
+
+    /// Refuse when the session is already a satellite leaf (Companion).
+    let assertWorkSession
+        (sessionId: SessionId)
+        (current: Map<SessionId, SessionAssociation>)
+        : Result<unit, AssociationRejection> =
+        if isSatellite sessionId current then
+            Error(AssociationRejection.CompanionWouldRecurse sessionId)
+        else
+            Ok()
 
     /// COMPANION-002: the main session a Companion belongs to.
     let tryMainSessionOf (sessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
@@ -104,14 +139,10 @@ module SessionAssociationProjection =
     let tryBloggerOf (sessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
         tryFind sessionId current |> Option.bind (fun entry -> entry.BloggerSessionId)
 
-    let tryTeacherOf (sessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
-        tryFind sessionId current |> Option.bind (fun entry -> entry.TeacherSessionId)
-
-    let private workSession sessionId parent blogger teacher =
+    let private workSession sessionId parent blogger =
         { SessionId = sessionId
           Kind = ManagedSessionKind.WorkSession
           BloggerSessionId = blogger
-          TeacherSessionId = teacher
           ParentSessionId = parent }
 
     /// HOST-008: record one Work ↔ Companion link, both directions at once.
@@ -138,7 +169,6 @@ module SessionAssociationProjection =
             let existingSatellite =
                 match kind with
                 | SatelliteKind.Companion -> tryBloggerOf mainSessionId current
-                | SatelliteKind.Teacher -> tryTeacherOf mainSessionId current
 
             let existingOwner = tryOwnerOf satelliteSessionId current
 
@@ -158,30 +188,18 @@ module SessionAssociationProjection =
                         parentOfMain
                         |> Option.orElse (owner |> Option.bind (fun e -> e.ParentSessionId))
 
-                    let blogger = owner |> Option.bind (fun e -> e.BloggerSessionId)
-                    let teacher = owner |> Option.bind (fun e -> e.TeacherSessionId)
-
                     let nextBlogger =
-                        if kind = SatelliteKind.Companion then
-                            Some satelliteSessionId
-                        else
-                            blogger
-
-                    let nextTeacher =
-                        if kind = SatelliteKind.Teacher then
-                            Some satelliteSessionId
-                        else
-                            teacher
+                        match kind with
+                        | SatelliteKind.Companion -> Some satelliteSessionId
 
                     Ok(
                         current
-                        |> Map.add mainSessionId (workSession mainSessionId parent nextBlogger nextTeacher)
+                        |> Map.add mainSessionId (workSession mainSessionId parent nextBlogger)
                         |> Map.add
                             satelliteSessionId
                             { SessionId = satelliteSessionId
                               Kind = ManagedSessionKind.SatelliteSession(mainSessionId, kind)
                               BloggerSessionId = None
-                              TeacherSessionId = None
                               ParentSessionId = Some mainSessionId }
                     )
             | _ ->
@@ -191,38 +209,23 @@ module SessionAssociationProjection =
                     parentOfMain
                     |> Option.orElse (owner |> Option.bind (fun e -> e.ParentSessionId))
 
-                let blogger = owner |> Option.bind (fun e -> e.BloggerSessionId)
-                let teacher = owner |> Option.bind (fun e -> e.TeacherSessionId)
-
                 let nextBlogger =
-                    if kind = SatelliteKind.Companion then
-                        Some satelliteSessionId
-                    else
-                        blogger
-
-                let nextTeacher =
-                    if kind = SatelliteKind.Teacher then
-                        Some satelliteSessionId
-                    else
-                        teacher
+                    match kind with
+                    | SatelliteKind.Companion -> Some satelliteSessionId
 
                 Ok(
                     current
-                    |> Map.add mainSessionId (workSession mainSessionId parent nextBlogger nextTeacher)
+                    |> Map.add mainSessionId (workSession mainSessionId parent nextBlogger)
                     |> Map.add
                         satelliteSessionId
                         { SessionId = satelliteSessionId
                           Kind = ManagedSessionKind.SatelliteSession(mainSessionId, kind)
                           BloggerSessionId = None
-                          TeacherSessionId = None
                           ParentSessionId = Some mainSessionId }
                 )
 
     let link mainSessionId bloggerSessionId parentOfMain current =
         linkSatellite SatelliteKind.Companion mainSessionId bloggerSessionId parentOfMain current
-
-    let linkTeacher mainSessionId teacherSessionId parentOfMain current =
-        linkSatellite SatelliteKind.Teacher mainSessionId teacherSessionId parentOfMain current
 
     /// The Companion child was aborted. The Work session keeps its record and loses
     /// its Y, so the next transform creates a fresh one.
@@ -239,24 +242,9 @@ module SessionAssociationProjection =
             let parent =
                 tryFind mainSessionId current |> Option.bind (fun e -> e.ParentSessionId)
 
-            let teacher =
-                tryFind mainSessionId current |> Option.bind (fun e -> e.TeacherSessionId)
-
             current
             |> Map.remove blogger
-            |> Map.add mainSessionId (workSession mainSessionId parent None teacher)
-
-    let unlinkTeacher (mainSessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
-        match tryTeacherOf mainSessionId current with
-        | None -> current
-        | Some teacher ->
-            let owner = tryFind mainSessionId current
-            let parent = owner |> Option.bind (fun e -> e.ParentSessionId)
-            let blogger = owner |> Option.bind (fun e -> e.BloggerSessionId)
-
-            current
-            |> Map.remove teacher
-            |> Map.add mainSessionId (workSession mainSessionId parent blogger None)
+            |> Map.add mainSessionId (workSession mainSessionId parent None)
 
     let describe (rejection: AssociationRejection) =
         match rejection with
@@ -276,3 +264,42 @@ module SessionAssociationProjection =
                 (SessionId.value owner)
         | AssociationRejection.SatelliteKindConflict proposed ->
             sprintf "Satellite %s is already linked with a different kind (HOST-008)" (SessionId.value proposed)
+
+/// View over durable `SessionAssociation` → `SessionExecutionClass` × `SessionOwnership`.
+///
+/// Additive only: does not change `SessionAssociation` fields or FactCodec.
+/// Dedicated SyncInspector/SyncCoder are not represented on this durable record;
+/// use `SyncDelegateAssociationHints` when registering them as Work+Attached.
+module SessionOwnershipClassification =
+
+    let executionClassOf (kind: ManagedSessionKind) : SessionExecutionClass =
+        SessionAssociationProjection.executionClassOf kind
+
+    /// Map one durable association entry onto the orthogonal ExecutionClass × Ownership view.
+    ///
+    /// - WorkSession → Work × Root. `ParentSessionId` may still be set for fork
+    ///   children; that alone does not prove SyncInspector/SyncCoder Attached
+    ///   ownership, so we do not invent `Attached(_, Sync*)` here. Callers that
+    ///   know the SyncDelegate role should use `SyncDelegateAssociationHints`.
+    /// - Satellite Companion → InternalLeaf × Attached(owner, Companion).
+    let classifyLegacy (entry: SessionAssociation) : SessionExecutionClass * SessionOwnership option =
+        match entry.Kind with
+        | ManagedSessionKind.WorkSession -> SessionExecutionClass.Work, Some SessionOwnership.Root
+        | ManagedSessionKind.SatelliteSession(owner, SatelliteKind.Companion) ->
+            SessionExecutionClass.InternalLeaf, Some(SessionOwnership.Attached(owner, AttachmentKind.Companion))
+
+    let tryClassify
+        (sessionId: SessionId)
+        (current: Map<SessionId, SessionAssociation>)
+        : (SessionExecutionClass * SessionOwnership option) option =
+        SessionAssociationProjection.tryFind sessionId current
+        |> Option.map classifyLegacy
+
+/// Hints for SyncDelegateRuntime: dedicated Inspector/Coder are Work+Attached,
+/// not SatelliteKind InternalLeaf.
+module SyncDelegateAssociationHints =
+
+    let dedicatedExecutionClass = SessionExecutionClass.Work
+
+    let dedicatedOwnership (owner: SessionId) (role: SyncDelegateRole) : SessionOwnership =
+        SessionOwnership.Attached(owner, SyncDelegate.delegateRoleToAttachment role)

@@ -1,7 +1,9 @@
 # 文档导航
 
 本页只提供路由和索引，不定义产品行为。文档治理规则见
-[`GOV-`](what/document-governance.md)，术语见[词汇表](what/glossary.md)。
+[`GOV-`](what/document-governance.md)，术语见[词汇表](what/glossary.md)
+（含 HOST-008 改写后的 `SessionExecutionClass` × `SessionOwnership` / `AttachmentKind`，以及
+`ReuseScope` / `OwnerReuseScopeId` / `SyncDelegate` / `SyncInspector` / `SyncCoder`）。
 
 ## 体系与阅读顺序
 
@@ -39,9 +41,9 @@ what → shape → how → code/resources → proof
 | `FALLBACK-` Fallback | [what](what/fallback.md) · [shape](shape/fallback.md) · [how](how/fallback.md) · [proof](proof/fallback.md) · [why](why/fallback.md) |
 | `REVIEW-` Review | [what](what/review.md) · [shape](shape/review.md) · [how](how/review.md) · [proof](proof/review.md) · [why](why/review.md) |
 | `ORCH-` Orchestrator | [what](what/orchestrator.md) · [shape](shape/orchestrator.md) · [how](how/orchestrator.md) · [proof](proof/orchestrator.md) · [why](why/orchestrator.md) |
-| `HOST-` Host | [what](what/host.md) · [shape](shape/host.md) · [how](how/host.md) · [proof](proof/host.md) · [why](why/host.md) |
+| `HOST-` Host | [what](what/host.md) · [shape](shape/host.md) · [how](how/host.md) · [proof](proof/host.md) · [why](why/host.md)（HOST-008：ExecutionClass × Ownership；SyncDelegate 见词汇表） |
 | `COMPANION-` Companion | [what](what/companion.md) · [shape](shape/companion.md) · [how](how/companion.md) · [proof](proof/companion.md) · [why](why/companion.md) |
-| `EXEC-` Execution | [what](what/execution.md) · [shape](shape/execution.md) · [how](how/execution.md) · [proof](proof/execution.md) · [why](why/execution.md) |
+| `EXEC-` Execution | [what](what/execution.md) · [shape](shape/execution.md) · [how](how/execution.md) · [proof](proof/execution.md) · [why](why/execution.md)（EXEC-026/028：SyncDelegate） |
 | `VERIFY-` 验证 | [proof](proof/verify.md) |
 | `PERSIST-` 持久化 | [what](what/persist.md) · [shape](shape/persist.md) · [how](how/persist.md) · [proof](proof/persist.md) · [why](why/persist.md) |
 | `CTX-` 上下文 | [what](what/context.md) · [shape](shape/context.md) · [how](how/context.md) · [proof](proof/context.md) · [why](why/context.md) |

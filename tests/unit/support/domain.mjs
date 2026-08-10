@@ -1619,11 +1619,9 @@ export const sessionAssociation = (() => {
     'empty',
     'tryFind',
     'isCompanion',
-    'isTeacher',
     'isSatellite',
     'tryMainSessionOf',
     'tryBloggerOf',
-    'tryTeacherOf',
     'link',
     'unlink',
     'describe',
@@ -1633,7 +1631,6 @@ export const sessionAssociation = (() => {
     empty: m.empty,
 
     isCompanion: (id, current) => m.isCompanion(sessionId(id), current),
-    isTeacher: (id, current) => m.isTeacher(sessionId(id), current),
     isSatellite: (id, current) => m.isSatellite(sessionId(id), current),
 
     mainSessionOf: (id, current) => {
@@ -1658,7 +1655,6 @@ export const sessionAssociation = (() => {
         mainSessionId: kind === 'SatelliteSession' ? idValue.session(found.Kind.fields[0]) : undefined,
         satelliteKind: kind === 'SatelliteSession' ? caseOf(found.Kind.fields[1]) : undefined,
         blogger: isNone(found.BloggerSessionId) ? undefined : idValue.session(found.BloggerSessionId),
-        teacher: isNone(found.TeacherSessionId) ? undefined : idValue.session(found.TeacherSessionId),
         parent: isNone(found.ParentSessionId) ? undefined : idValue.session(found.ParentSessionId),
       }
     },
@@ -1888,6 +1884,68 @@ export const managedAgentCatalog = (() => {
     formatLegacyNameInConfig: (name) => m.formatLegacyNameInConfig(name),
   }
 })()
+
+// ── SyncDelegate vocabulary (EXEC-026 / HOST-008) ────────────────────────────
+// Types + pure helpers only. SyncDelegateRuntime is deliberately not surfaced.
+
+const SyncDelegateModule = await prod('Kernel/SyncDelegate')
+const SessionOwnershipModule = await prod('Kernel/SessionOwnership')
+
+const buildSyncDelegateRole = unionCase(SyncDelegateModule.SyncDelegateRole, 'SyncDelegateRole')
+const buildAttachmentKind = unionCase(SessionOwnershipModule.AttachmentKind, 'AttachmentKind')
+const buildSessionOwnership = unionCase(SessionOwnershipModule.SessionOwnership, 'SessionOwnership')
+const buildSessionExecutionClass = unionCase(
+  SessionOwnershipModule.SessionExecutionClass,
+  'SessionExecutionClass',
+)
+
+/** EXEC-026: reuse-scope half of a dedicated SyncDelegate key. */
+export const reuseScopeId = {
+  create: (value) => SyncDelegateModule.ReuseScopeIdModule_create(value),
+  value: (id) => SyncDelegateModule.ReuseScopeIdModule_value(id),
+  equals: (a, b) => SyncDelegateModule.ReuseScopeIdModule_equals(a, b),
+}
+
+/** EXEC-026: `(ReuseScopeId, SyncDelegateRole)` dedicated-session key. */
+export const dedicatedDelegateKey = {
+  create: (scope, role) => SyncDelegateModule.DedicatedDelegateKeyModule_create(scope, role),
+}
+
+/** HOST-008 AttachmentKind constructors (Bookkeeper carries a transaction id). */
+export const attachmentKind = {
+  of: (name, fields = []) => buildAttachmentKind(name, fields),
+  companion: () => SessionOwnershipModule.AttachmentKind.Companion,
+  syncInspector: () => SessionOwnershipModule.AttachmentKind.SyncInspector,
+  syncCoder: () => SessionOwnershipModule.AttachmentKind.SyncCoder,
+  bookkeeper: (transactionId) => buildAttachmentKind('Bookkeeper', [transactionId]),
+}
+
+/** HOST-008 SessionExecutionClass + predicates. */
+export const sessionExecutionClass = {
+  of: (name) => buildSessionExecutionClass(name, []),
+  isWork: (value) => SessionOwnershipModule.SessionExecutionClassModule_isWork(value),
+  isInternalLeaf: (value) => SessionOwnershipModule.SessionExecutionClassModule_isInternalLeaf(value),
+}
+
+/** HOST-008 SessionOwnership constructors + tryOwner / attachmentKind. */
+export const sessionOwnership = {
+  root: () => SessionOwnershipModule.SessionOwnership.Root,
+  attached: (ownerSessionId, attachment) => buildSessionOwnership('Attached', [ownerSessionId, attachment]),
+  tryOwner: (ownership) => unwrapOption(SessionOwnershipModule.SessionOwnershipModule_tryOwner(ownership)),
+  attachmentKind: (ownership) =>
+    unwrapOption(SessionOwnershipModule.SessionOwnershipModule_attachmentKind(ownership)),
+}
+
+/**
+ * EXEC-026 / HOST-008: SyncDelegateRole + pure mapping helpers.
+ * Role values are built by case name so a renamed DU case fails at construction.
+ */
+export const syncDelegate = {
+  role: (name) => buildSyncDelegateRole(name, []),
+  delegateRoleToAttachment: (role) => SyncDelegateModule.SyncDelegate_delegateRoleToAttachment(role),
+  tierForOwner: (ownerTier) => SyncDelegateModule.SyncDelegate_tierForOwner(ownerTier),
+  agentNameFor: (role, tier) => SyncDelegateModule.SyncDelegate_agentNameFor(role, tier),
+}
 
 /**
  * COMPANION-009 / CTX-010: which prefix X sends, as a `ProjectionIntent` (PROJ-005).
@@ -3356,6 +3414,14 @@ export const promptDispatcher = (() => {
 
     /** PROMPT-006: an `AdmittedWithReceipt` outcome for a stub port to return. */
     admittedWithReceipt: (receipt) => buildSendOutcome('AdmittedWithReceipt', [receipt]),
+    /**
+     * PROMPT-006: admission that also accepts the physical user message.
+     * Seeds ActiveLogicalRun (needed by SyncDelegateRuntime.Return).
+     */
+    admittedWithPhysicalMessage: (physical) =>
+      buildSendOutcome('AdmittedWithPhysicalMessage', [
+        typeof physical === 'string' ? physicalUser(physical) : physical,
+      ]),
     /** Explicit transport failure for InteractionRepair hard-fail paths. */
     retryable: (reason) => buildSendOutcome('Retryable', [reason]),
     fatal: (reason) => buildSendOutcome('Fatal', [reason]),

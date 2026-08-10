@@ -29,11 +29,10 @@ import {
   acceptAuthorityRoot,
   acceptChildAgentOwnerRoot,
   notifyCompleted,
-  awaitPrompted,
   activateLife,
 } from '../../unit/plugin/plugin-fixture.mjs'
 
-/** AGENT-002: the twenty-four managed agents, exactly as the Host-final config names them. */
+/** AGENT-002: the twenty managed agents, exactly as the Host-final config names them. */
 const ROLE_NAMES = [
   'orchestrator',
   'manager',
@@ -43,8 +42,6 @@ const ROLE_NAMES = [
   'browser',
   'meditator',
   'reviewer',
-  'student',
-  'teacher',
   'blogger',
   'executor',
 ]
@@ -71,7 +68,7 @@ const EXPECTED_ARGUMENTS = {
     tip: 'required',
     evidence: 'optional',
   },
-  coder: { agent: 'required', tdd: 'required', prompt: 'optional', prompts: 'optional' },
+  coder: { tdd: 'required', prompt: 'optional', prompts: 'optional' },
   executor: {
     command: 'required',
     estimated_mem_usage: 'required',
@@ -81,14 +78,13 @@ const EXPECTED_ARGUMENTS = {
   fork: { agent: 'required', prompt: 'optional', tdd: 'optional' },
   'fork-manager': { agent: 'required', prompt: 'required' },
   'fork-pty': { agent: 'required', prompt: 'optional', signal: 'optional' },
-  inspector: { agent: 'required', prompt: 'optional', prompts: 'optional' },
+  inspector: { prompt: 'optional', prompts: 'optional' },
   join: {},
   list: {},
   mv: { source: 'required', destination: 'required' },
   rm: { path: 'required' },
   return: { message: 'required' },
   suicide: { last_words: 'required' },
-  teacher: { message: 'required' },
   verdict: { verdict: 'required' },
 }
 
@@ -116,15 +112,13 @@ const EXPECTED_AGENT_ENUMS = {
     'fast-meditator',
   ],
   'fork-manager': ['deep-manager', 'fast-manager'],
-  inspector: ['deep-inspector', 'fast-inspector'],
-  coder: ['deep-coder', 'fast-coder'],
 }
 
 /**
  * The enum arm of an agent argument, whether or not it is wrapped in a union.
  *
- * `fork.agent` is `union([enum(...), string()])` while the other three are bare
- * enums (`ToolHostCodec.fs:90` vs `:78`). Measured consequence worth stating: the
+ * `fork.agent` is `union([enum(...), string()])` while `fork-manager.agent` is a bare
+ * enum (`ToolHostCodec.fs:90` vs `:78`). Measured consequence worth stating: the
  * string arm makes `fork.agent.safeParse('garbage')` SUCCEED, so this enum is a
  * provider-visible offer, not a validator. Rejecting an unknown agent happens inside
  * `execute` — which is the part of the original file that has never passed and is
@@ -169,7 +163,6 @@ const KNOWN_TOOL_KEYS = [
   'network',
   'verdict',
   'blog',
-  'teacher',
   'return',
   'suicide',
 ]
@@ -182,10 +175,8 @@ const ALLOWED_TOOLS = {
   inspector: ['read', 'glob', 'grep', 'executor'],
   devops: ['fork-pty', 'join', 'list', 'read', 'glob', 'grep', 'inspector', 'coder', 'executor'],
   browser: ['read', 'glob', 'grep', 'network'],
-  meditator: ['read', 'glob', 'grep', 'inspector'],
+  meditator: ['inspector'],
   reviewer: ['read', 'glob', 'grep', 'verdict'],
-  student: ['teacher'],
-  teacher: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'inspector', 'coder', 'executor', 'network', 'return'],
   // ENFORCER-010: Blogger's tool set is exactly { blog }.
   blogger: ['blog'],
   executor: [],
@@ -225,8 +216,6 @@ const FACADE_ROLE_CASES = {
   browser: 'Browser',
   meditator: 'Meditator',
   reviewer: 'Reviewer',
-  student: 'Student',
-  teacher: 'Teacher',
   blogger: 'Blogger',
   executor: 'Executor',
 }
@@ -373,28 +362,8 @@ const PROMPT_CLAUSES = {
     forbidden: [],
   },
 
-  'fast-student': {
-    required: [
-      /你是 Student/,
-      /学习阶段你只有 teacher 工具/,
-      /最终苏格拉底反证/,
-      /主动结束当前 turn 并进入 idle/,
-    ],
-    forbidden: [],
-  },
-
-  'fast-teacher': {
-    required: [
-      /你是 Teacher/,
-      /同一个 Student 会在持续 Session 中反复向你学习/,
-      /调查真实情况/,
-      /必须通过 return 工具返回/,
-    ],
-    forbidden: [],
-  },
-
-  // AGENT-008: Executor holds no tools; Blogger/Teacher are also internal but
-  // have their dedicated private tool surfaces.
+  // AGENT-008: Executor holds no tools; Blogger is also internal but
+  // has its dedicated private tool surface.
   'fast-executor': {
     required: [/Command Output Summarizer/, /AgentRole\.Executor/, /Tool Capability: \[\] \(NONE\)/],
     forbidden: [],
@@ -468,7 +437,7 @@ test('AGENT_008_009_every_agent_argument_offers_exactly_its_declared_agents', as
         hooks.tool[toolName].args.agent.safeParse(undefined).success,
       ]),
     )
-    assert.deepEqual(omitted, { fork: false, 'fork-manager': false, inspector: false, coder: false })
+    assert.deepEqual(omitted, { fork: false, 'fork-manager': false })
   })
 })
 
@@ -477,7 +446,7 @@ test('AGENT_004_006_010_config_gains_a_prompt_and_the_whole_permission_matrix', 
     const config = hostFinalConfig()
     hooks.config(config)
 
-    // AGENT-006: one whole-object comparison per agent. Twenty-four of them, because
+    // AGENT-006: one whole-object comparison per agent. Twenty of them, because
     // AGENT-010 makes fast and deep hold the same tools and a per-tier divergence has
     // to be visible rather than assumed.
     const permissions = {}
@@ -810,7 +779,7 @@ test('AGENT_007_unresolved_role_denies_all_tools', async () => {
 
     for (const [toolName, args] of [
       ['list', {}],
-      ['inspector', { agent: 'fast-inspector', prompts: ['git status'] }],
+      ['inspector', { prompts: ['git status'] }],
       ['fork', { agent: 'fast-coder', prompt: 'work' }],
     ]) {
       const result = parseToml(await hooks.tool[toolName].execute(args, context))
@@ -820,126 +789,36 @@ test('AGENT_007_unresolved_role_denies_all_tools', async () => {
   })
 })
 
-test('EXEC_002_one_shot_tools_return_the_managed_agent_and_the_turn_formal_text', async () => {
-  await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
-    // Meditator may hold inspector; DevOps (AGENT-015) may hold coder.
+test('EXEC_002_sync_delegate_inspector_coder_refuse_invalid_args_via_plugin', async () => {
+  // Happy-path Invoke→Return→Completion is proved in
+  // tests/unit/tools/sync-delegate-tools.test.mjs. This plugin contract pins the
+  // fail-closed argument surface (EXEC-026: no agent; required tdd / prompt) that
+  // still executes through initSpikePlugin without Host reconcile HandleTurn.
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'meditator-contract', 'fast-meditator')
     acceptAuthorityRoot(runtime, 'devops-contract', 'fast-devops')
 
-    const inspectorResultP = hooks.tool.inspector.execute(
-      { agent: 'fast-inspector', prompts: ['git status'] },
-      { sessionID: 'meditator-contract', agent: 'fast-meditator' },
-    )
-    // 订阅在 prompt 之前安装（OneShotAgentTool.fs:115 → send）：promptAsync 被调用即
-    // terminal 订阅就绪。此前直接 notify 与 execute 内部安装竞态——通知被丢弃则 execute
-    // 永远等不到结局（实测 1000ms 判据线）。
-    await awaitPrompted(createdIds[0])
-    notifyCompleted(runtime, createdIds[0], 'inspector session-wide A', 'inspector turn formal report')
-    const inspectorText = await inspectorResultP
-    const inspectorResult = parseToml(inspectorText)
+    const meditator = { sessionID: 'meditator-contract', agent: 'fast-meditator' }
+    const devops = { sessionID: 'devops-contract', agent: 'fast-devops' }
 
-    // Data-only fields of the TOML result. The natural-language output is carried
-    // as the leading instruction comment (docs/how/synthetic-toml.md), so it is asserted on the raw
-    // text rather than as a parsed field.
-    assert.deepEqual(inspectorResult, {
-      inspector_id: createdIds[0],
-      agent: 'fast-inspector',
-      tier: 'fast',
-      fallback_peer: 'deep-inspector',
-      parent_b_digest: '',
-    })
-    // EXEC-028: entry-local LWR (includeOpening=false) + TurnFormalText; no work_record field.
-    assert.match(inspectorText, /# (Work log|Final output|Uncompressed tail)/)
-    assert.ok(!inspectorText.includes('# Opening task'))
-    assert.doesNotMatch(inspectorText, /# # /)
-    assert.equal(inspectorResult.work_record, undefined)
-    assert.ok(!/(^|\n)\s*work_record\s*=/.test(inspectorText))
-    assert.ok(inspectorText.includes('inspector turn formal report'))
-    assert.equal(inspectorResult.error, undefined)
-
-    const coderResultP = hooks.tool.coder.execute(
-      { agent: 'fast-coder', tdd: 'green', prompts: ['apply the requested edit'] },
-      { sessionID: 'devops-contract', agent: 'fast-devops' },
-    )
-    await awaitPrompted(createdIds[1])
-    notifyCompleted(runtime, createdIds[1], 'coder session-wide A', 'coder turn formal report')
-    const coderText = await coderResultP
-    const coderResult = parseToml(coderText)
-
-    // CoderTool: data-only fields, natural-language output as leading comment (docs/how/synthetic-toml.md).
-    // tdd is the normalized wire name of the required phase.
-    assert.deepEqual(coderResult, {
-      coder_id: createdIds[1],
-      agent: 'fast-coder',
-      tier: 'fast',
-      fallback_peer: 'deep-coder',
-      tdd: 'green',
-      parent_b_digest: '',
-    })
-    assert.match(coderText, /# (Work log|Final output|Uncompressed tail)/)
-    assert.ok(!coderText.includes('# Opening task'))
-    assert.doesNotMatch(coderText, /# # /)
-    assert.equal(coderResult.work_record, undefined)
-    assert.ok(!/(^|\n)\s*work_record\s*=/.test(coderText))
-    assert.ok(coderText.includes('coder turn formal report'))
-    assert.equal(coderResult.error, undefined)
-
-    // Child assignment must carry the GREEN phase constraint (not metadata-only).
-    // OpenCodePort promptAsync shape: { path: { id }, body: { parts, … } }.
-    const promptTextFor = (sessionId) => {
-      const entry = runtime.prompts.find((p) => (p?.path?.id ?? p?.sessionID) === sessionId)
-      assert.ok(entry, `coder child ${sessionId} must receive a prompt`)
-      return entry.body.parts[0].text
+    for (const args of [{}, { prompt: '   ' }, { prompts: [] }]) {
+      const refused = parseToml(await hooks.tool.inspector.execute(args, meditator))
+      assert.equal(refused.error, 'inspector prompt required')
     }
-    const greenBody = promptTextFor(createdIds[1])
-    assert.match(greenBody, /TDD phase: GREEN/)
-    assert.match(greenBody, /Do not delete, skip, loosen, or rewrite the test/)
-    assert.match(greenBody, /apply the requested edit/)
 
-    // RED path: success + child prompt forbids production fix.
-    const redResultP = hooks.tool.coder.execute(
-      { agent: 'fast-coder', tdd: 'red', prompt: 'failing test for missing behavior' },
-      { sessionID: 'devops-contract', agent: 'fast-devops' },
-    )
-    await awaitPrompted(createdIds[2])
-    notifyCompleted(runtime, createdIds[2], 'red session-wide A', 'red turn formal report')
-    const redText = await redResultP
-    const redResult = parseToml(redText)
-    assert.equal(redResult.tdd, 'red')
-    assert.equal(redResult.error, undefined)
-    assert.match(redText, /# (Work log|Final output|Uncompressed tail)/)
-    assert.ok(!redText.includes('# Opening task'))
-    assert.doesNotMatch(redText, /# # /)
-    assert.equal(redResult.work_record, undefined)
-    assert.ok(!/(^|\n)\s*work_record\s*=/.test(redText))
-    assert.ok(redText.includes('red turn formal report'))
-    const redBody = promptTextFor(createdIds[2])
-    assert.match(redBody, /TDD phase: RED/)
-    assert.match(redBody, /Do not implement the production fix/)
-    assert.match(redBody, /failing test for missing behavior/)
-
-    // Missing / illegal tdd fail closed (no default green).
-    const missing = parseToml(
-      await hooks.tool.coder.execute(
-        { agent: 'fast-coder', prompts: ['no tdd'] },
-        { sessionID: 'devops-contract', agent: 'fast-devops' },
-      ),
-    )
-    assert.match(missing.error, /missing required argument: tdd/)
+    const missingTdd = parseToml(await hooks.tool.coder.execute({ prompts: ['no tdd'] }, devops))
+    assert.match(missingTdd.error, /missing required argument: tdd/)
 
     for (const bad of ['RED', 'test', 'refactor', 'blue', '']) {
-      const illegal = parseToml(
-        await hooks.tool.coder.execute(
-          { agent: 'fast-coder', tdd: bad, prompt: 'x' },
-          { sessionID: 'devops-contract', agent: 'fast-devops' },
-        ),
-      )
+      const illegal = parseToml(await hooks.tool.coder.execute({ tdd: bad, prompt: 'x' }, devops))
       assert.ok(illegal.error, `tdd=${JSON.stringify(bad)} must fail`)
       assert.match(illegal.error, /missing required argument: tdd|UnknownTddPhase/)
     }
+
+    const missingPrompt = parseToml(await hooks.tool.coder.execute({ tdd: 'green' }, devops))
+    assert.equal(missingPrompt.error, 'coder prompt required')
   })
 })
-
 test('GLORY_031_manager_fork_of_a_reviewer_is_denied_role_based', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'manager-reverted-root', 'fast-manager')

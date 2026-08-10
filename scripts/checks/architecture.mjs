@@ -207,7 +207,7 @@ for (const file of productionFs) {
   const forbidden = [
     'Role.Manager',
     'Role.Reviewer',
-    'StudentTeacherRuntime',
+    'SyncDelegateRuntime',
     'ManagerLifecycleGate',
     'ReviewerGuardState',
     'HostReviewGuard',

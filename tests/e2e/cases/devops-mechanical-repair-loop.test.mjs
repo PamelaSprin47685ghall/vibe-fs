@@ -10,14 +10,6 @@ function toolNames(request) {
   return (request?.tools ?? []).map((tool) => tool?.function?.name ?? tool?.name);
 }
 
-function bindCoderChildren(scenario) {
-  scenario.events.onEvent((event) => {
-    if (event.type === 'session.created' && event.sessionAgent === 'fast-coder' && event.sessionID) {
-      scenario.provider.bindSession('fast-coder', event.sessionID);
-    }
-  });
-}
-
 function assertMechanicalRepairLoop(scenario, ctx) {
   const devopsRequests = scenario.provider.requests.filter((request) => request.sessionID === ctx.sessionId);
   const devopsTools = devopsRequests.flatMap(toolNames);
@@ -43,5 +35,5 @@ if (!runStaticGate([fileURLToPath(import.meta.url)]).passed) {
 }
 
 process.exit(await runCanary('devops-mechanical-repair-loop', {
-  customs: { bindCoderChildren, assertMechanicalRepairLoop },
+  customs: { assertMechanicalRepairLoop },
 }));

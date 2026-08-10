@@ -65,8 +65,7 @@ type ProviderRequestKind =
     | BloggerMain
     | BloggerSquash
     | InteractionRepair
-    | StudentLearn
-    | StudentCompile
+    // StudentLearn / StudentCompile：编号与枚举臂永久空缺（G3；见 AGENT-020/021、PROMPT-012）
 ```
 
 `AuthorityExecutionProfile` 是原子 profile 内的稳定 Authority 子记录，不是第二个构造来源。下游需要更窄视图时只能从完整 profile 纯投影或直接传所需参数；禁止分别构造多个可矛盾的子记录再拼回 attempt。
@@ -82,11 +81,10 @@ type ProviderRequestKind =
 
 禁止从本 profile 派生 Companion 资格（COMPANION-002）。
 
-Student 的 `ToolCapabilitySet` 不是 `Roles.permissions Student` 的固定投影，而是
-`toolCapabilitiesFor(CanonicalRole, RequestKind)` 的结果（AGENT-020/021）。非 Student role 携带
-Student request kind、Student role 携带其它 kind，均得到空集合并拒绝发送。
+`StudentLearn` / `StudentCompile` 与 `toolCapabilitiesFor(CanonicalRole, RequestKind)` 的 Student 双门：
+**G3 已删除（absent）**（AGENT-020/021、PROMPT-012 空缺）。不得再按 request kind 投影 Student
+`ToolCapabilitySet`，也不得用可变“学习/编译状态”重建 attempt。后继工具面见 SyncDelegate /
+`InvocationMode`（AGENT-024、EXEC-026/028）。
 
-Host 在当前 provider assistant id 产生后才暴露 `ProviderRunIdentity`。因此 Student runtime 在发送前
-冻结除该物理 id 外的 request profile；transform/ToolContext 首次取得 id 时只允许把它绑定一次，随后
-provider schema、execution gate 与 terminal reconcile 均读取同一绑定。禁止按当前可变“学习/编译状态”
-临时重建已经开始的 attempt。
+Host 在当前 provider assistant id 产生后才暴露 `ProviderRunIdentity`。transform/ToolContext 首次取得 id
+时只允许把它绑定一次，随后 provider schema、execution gate 与 terminal reconcile 均读取同一绑定。

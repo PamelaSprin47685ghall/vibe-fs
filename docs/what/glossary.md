@@ -14,6 +14,7 @@
 | armedByFailure | FALLBACK-012：局部控制流事实，非持久状态 |
 | AttemptExecutionProfile | PROMPT-008：一次 provider request 的原子档案 |
 | Authority Root | PROMPT-002：有权改变执行档案的消息来源 |
+| AttachmentKind | HOST-008：Companion / SyncInspector / SyncCoder / Bookkeeper；Attached 所有权的附着种类 |
 
 ## B
 
@@ -33,7 +34,7 @@
 | Circuit Breaker | FALLBACK-005：达到有限正整数自动恢复预算时熔断；默认预算 12 |
 | Clean Gate | ORCH-002：工作区 dirty 拒绝用户消息 |
 | Companion | COMPANION-001：每个 Work Session 恰好一个叶子 Y |
-| CompanionSession | HOST-008：ManagedSessionKind 的叶子种类 |
+| CompanionSession | HOST-008：InternalLeaf + Attached(Companion)；Work+Root 恰好一个 |
 | Completion | EXEC-004：single-assignment completion cell；join 消费为有界 `[[result]]` 批次 |
 | ChildRecoveryResult | EXEC-023：RecoveredActive\|Terminal\|Abandoned\|RecoveryIncomplete\|RecoveryBlocked |
 | Continuation | PROMPT-003：无权改变执行档案 |
@@ -105,10 +106,16 @@
 
 | 术语 | 指向 |
 |------|------|
-| ManagedSessionKind | HOST-008：WorkSession / CompanionSession |
+| ManagedSessionKind | （历史）旧 HOST-008 二元模型；现由 SessionExecutionClass × SessionOwnership 取代 |
 | Manager Guard | GLORY-070：已删除的旧 review 门禁；仅历史行解析保留（PROMPT-003） |
 | Managed Agent | AGENT-002 定义的受管 Agent 身份 |
 | manual compaction | HOST-006：官方支持的用户动作，效果 best effort |
+
+## O
+
+| 术语 | 指向 |
+|------|------|
+| OwnerReuseScopeId | HOST-008 / EXEC-026：dedicated SyncDelegate 绑定键的 scope 半边；键为 `(OwnerReuseScopeId, role)` |
 
 ## P
 
@@ -146,6 +153,7 @@
 | Review Attempt Identity | REVIEW-004：Barrier + Tree + Session + Run + ToolCall |
 | Review Witness | REVIEW-006：自包含证据 |
 | Reviewer Guard | REVIEW-003：terminal 无 verdict 时自动 nudge |
+| ReuseScope | HOST-008 / EXEC-026：语义上仍允许复用同一上下文的最大生命周期；非 Session dispose 瞬时 |
 
 ## S
 
@@ -154,6 +162,11 @@
 | Seal Barrier | COMPANION-009：provider-visible bytes 一旦发出永久 sealed |
 | SealRoot | COMPANION-013：probe 生成后由 committed epoch 原样继承 |
 | SelectedAgent | PROMPT-002：由 Authority Root 冻结、Fallback 不得改写的 Agent |
+| SessionExecutionClass | HOST-008：Work / InternalLeaf |
+| SessionOwnership | HOST-008：Root / Attached(ownerSessionId, AttachmentKind) |
+| SyncCoder | HOST-008：AttachmentKind；EXEC-026 / EXEC-028：dedicated Coder SyncDelegate |
+| SyncDelegate | EXEC-026 / EXEC-028：同步委派（Returned→Completion）；AGENT-024：DAG 边 |
+| SyncInspector | HOST-008：AttachmentKind；EXEC-026 / EXEC-028：dedicated Inspector SyncDelegate |
 | Synthetic identity | COMPANION-013：由 SealRoot / frameEpoch / ordinal 等领域事实确定性派生 |
 
 ## T
@@ -169,7 +182,7 @@
 | 术语 | 指向 |
 |------|------|
 | Witness | REVIEW-006：双 PERFECT 的自包含证据 |
-| WorkSession | HOST-008：ManagedSessionKind 的主种类，恰好一个 Y |
+| WorkSession | HOST-008：SessionExecutionClass.Work（Root 或 Attached Sync*）；Root 恰好一个 Companion |
 | Worktree | ORCH-003：一个 Job 一个 worktree |
 
 ## X

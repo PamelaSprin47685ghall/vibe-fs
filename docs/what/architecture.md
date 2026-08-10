@@ -45,8 +45,9 @@ PrefixEpoch 只在下列**已发生事实**提交时切换（冷边界）：
 
 1. X prefix probe 提升（CTX-012）  
 2. Host compaction 后重锚（HOST-006）
-3. StudentLearn → StudentCompile 的 typed request-kind 切换（AGENT-020 / PROMPT-012）；只允许
-   provider tools 从学习面切到编译面，model、system 与既有 message prefix 必须不变。
+
+历史第三冷边界 `StudentLearn → StudentCompile`（AGENT-020 / PROMPT-012）：**G3 已删除（absent）**，
+不得再作 PrefixEpoch 例外。后继 SyncDelegate 不引入 owner-prefix 冷切换（EXEC-026/028）。
 
 Y BlogSquash 只推进 `FrameEpoch`（COMPANION-006），不得改 `PrefixEpoch`。
 

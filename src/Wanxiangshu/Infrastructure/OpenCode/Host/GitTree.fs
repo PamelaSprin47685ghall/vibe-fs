@@ -4,30 +4,21 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Host
+open Wanxiangshu.Infrastructure.Git
 open Wanxiangshu.Session
 
 module GitTree =
-    [<Import("execFileSync", "node:child_process")>]
-    let private execFileSync (fileName: string) (arguments: string array) (options: obj) : string = jsNative
-
     [<Import("join", "node:path")>]
     let private joinPath (directory: string) (fileName: string) : string = jsNative
 
     [<Import("readFileSync", "node:fs")>]
     let private readFileSync (path: string) (encoding: string) : string = jsNative
 
-    let private options = createObj [ "encoding", box "utf8" ]
-
-    let private command directory fileName arguments =
-        execFileSync fileName (Array.append [| "-C"; directory |] arguments) options
-
     /// Dirty payload only: empty when the worktree matches HEAD with no untracked files.
     let private dirtyPayload directory =
-        let diff =
-            command directory "git" [| "diff"; "HEAD"; "--binary"; "--no-ext-diff"; "--" |]
+        let diff = GitSubject.diffHeadBinary directory
 
-        let untracked =
-            command directory "git" [| "ls-files"; "--others"; "--exclude-standard" |]
+        let untracked = GitSubject.lsFilesUntracked directory
 
         let files =
             untracked.Split([| '\n'; '\r' |], StringSplitOptions.RemoveEmptyEntries)
@@ -44,7 +35,7 @@ module GitTree =
     let private treeHash directory =
         let headTree =
             try
-                (command directory "git" [| "rev-parse"; "HEAD^{tree}" |]).Trim()
+                GitSubject.revParseHeadTree directory
             with _ ->
                 "NO_HEAD_TREE"
 

@@ -78,7 +78,7 @@ module PluginHostInterop =
                 cancelSignals
                 eventPort
                 (Some(scope :> IParkedTransformHost))
-                scope.StudentTeacherRuntime
+                scope.SyncDelegateRuntime
                 finalityReviewerTimeoutMs
 
         // P0-RECOVERY-JOIN-001: JoinTool RequireFamilyRecovery → PluginRuntimeScope.

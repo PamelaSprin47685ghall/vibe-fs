@@ -14,6 +14,8 @@ const checks = [
   join(root, 'checks/dsl-ownership-ratchet.mjs'),
   join(root, 'checks/p0-recovery-join.mjs'),
   join(root, 'checks/causal-wait-boundary.mjs'),
+  join(root, 'checks/student-teacher-absence.mjs'),
+  join(root, 'checks/unified-store-gate.mjs'),
 ]
 
 for (const script of checks) {

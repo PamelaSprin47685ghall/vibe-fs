@@ -186,8 +186,6 @@ module ManagedAgentConfig =
                                         StaticTools.meditatorAgentConfig (Some prompts.MeditatorSystemPrompt)
                                     | Role.Reviewer ->
                                         StaticTools.reviewerAgentConfig (Some prompts.ReviewerSystemPrompt)
-                                    | Role.Student -> StaticTools.studentAgentConfig (Some prompts.StudentSystemPrompt)
-                                    | Role.Teacher -> StaticTools.teacherAgentConfig prompts.TeacherSystemPrompt
                                     | Role.Blogger -> StaticTools.bloggerAgentConfig prompts.BloggerSystemPrompt
                                     | Role.Executor -> StaticTools.executorAgentConfig prompts.ExecutorSystemPrompt
 

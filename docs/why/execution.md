@@ -19,3 +19,9 @@ Join 有界批次 + 稳定排序，把并发完成收敛成确定性 wire。ABOR
 **Join 中断：session future latch vs JoinAttempt。** 拒 latch：零 waiter 时收到的用户消息没有可归属的 wait；保留它会把过去的 ingress 错接给未来 join。attempt 在工具入口先建立，用户消息只唤醒当时活动的 attempt；无 attempt 时只保留正常 Host 消息，不产生 join wake，也不取消 sub-session。Esc 是用户对当前父 attempt 的取消：当前 join 返回 operator_abort，父 TurnAborted cleanup 同时取消全部仍在运行的 sub-session。两种 ingress 不得混同（EXEC-017）。
 
 **Student–Teacher：生命周期 cell vs 独立物理 scope。** 拒 `RunState`、handoff 与 pending slot 合并：它们把调用栈位置藏进可变字段，terminal handler 必须猜下一步。Teacher call、return completion、Student final completion 与 skill mutation 各自只拥有一个物理 lifetime；业务顺序由 prompt facts 与 CE 调用结构表达（EXEC-026/027）。
+
+**同步调用：OneShot dispose-after vs SyncDelegate dual-await。** 两路径互斥。Residual OneShot（若有）每次新建、terminal 后 abort/dispose，适合不复用 callee。Dedicated Inspector/Coder 必须走 SyncDelegate：`return` 只 resolve `Returned`，`Completion` 等 `TurnCompleted`，caller 双 await 都完成后才继续——否则下一同步调用会与上一 turn 尾部重叠，且无法保留 transcript/prefix 复用（EXEC-028）。Teacher 已证明该代数；通用 SyncDelegate 复用 CE，不复用 Teacher leaf / no-Companion 拓扑（EXEC-026、HOST-008）。
+
+**Serialization：immediate caller ReuseScope vs family-root gate。** 拒 family-root 单飞：`DevOps` 持 family gate 等 `Coder`，`Coder` 再要同一 gate 调 `Inspector` → deadlock。Gate 绑定 immediate caller ReuseScope，嵌套 `DevOps→Coder→Inspector` 合法；同 scope 仍禁止并发两路 sync delegate（EXEC-026）。
+
+**Delegate tier：owner 确定性绑定 vs 每轮自选 Agent。** 拒模型每轮选 fast/deep：否则 `(OwnerReuseScopeId, role)` 无法对应唯一 dedicated Session，prefix/context 复用崩溃。`fast→fast`、`deep→deep`（EXEC-026）。

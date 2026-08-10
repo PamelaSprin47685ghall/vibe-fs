@@ -7,9 +7,9 @@ open Wanxiangshu.Journal
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.OpenCode
 
-/// HOST-014: one recovery and ownership mechanism for every leaf satellite.
+/// HOST-014: one recovery and ownership mechanism for Companion leaf satellites.
 /// The runtime owns only physical Session lifecycle; semantic state remains in
-/// the caller's durable projection (Companion) or QA.md (Teacher).
+/// the caller's durable projection (Companion).
 type SatelliteOrigin =
     | Created
     | Reused
@@ -35,7 +35,6 @@ type SatelliteRuntime(sessions: ISessionHostPort) =
     let kindLabel =
         function
         | SatelliteKind.Companion -> "companion"
-        | SatelliteKind.Teacher -> "teacher"
 
     let key owner kind =
         SessionId.value owner + "\u001f" + kindLabel kind

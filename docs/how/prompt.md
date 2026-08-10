@@ -25,13 +25,13 @@ Authority、PromptKey 和发送 writer 边界见 `shape/prompt.md`。
 禁止设置 `Model`。Host 按 `config.agent[effectiveAgent].model` 解析。  
 PromptKey 必须写入 metadata（PROMPT-011）。
 
-`Tools=None` 是普通请求。Student 请求必须为完整 allow/deny map：Learn 只 allow `teacher`，Compile
-只 allow `read/glob/grep/write/edit/return`。不得发送局部 delta；Host 会把该 map 持久为 Session
-permission，局部 delta 会让上一 request kind 的 allow 泄漏到下一次请求。
+`Tools=None` 是普通请求。StudentLearn / StudentCompile 的完整 allow/deny map、`teacher` 工具面与
+Learn→Compile tools override：**G3 已删除（absent）**（PROMPT-012 / AGENT-020…022 空缺）。不得再发送
+Student request-kind 局部或完整 tools map。
 
-Teacher 首次问题走 `SendAgentOwnerRoot`，后续问题和 idle nudge 走 `SendContinuation`。Student compile
-与 compile nudge 同样走 `SendContinuation`；它们只通过受控参数把 request tool override 交给
-Dispatcher，不能旁路 Dispatcher 直接发送。
+SyncDelegate（dedicated Inspector/Coder）的首发与后续 continuation / idle nudge
+（`SyncDelegateIdleNudge`）仍经 `PromptDispatcher`（PROMPT-005）；不得旁路直接 `prompt_async`。
+`return` 工具面仅属 SyncDelegate（EXEC-026/028）。
 
 ---
 

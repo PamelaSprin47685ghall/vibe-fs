@@ -10,7 +10,7 @@
 | `scripts/checks/dsl-ownership.mjs --threshold=0` | 业务 Interpreter/Command-Reply 第二运行时、程序计数字段、未声明 mutable、record `ref` 可变存储、跨文件同构 DU、未分类的大 DU、未登记 Infrastructure leak、record 中≥2 个独立状态轴且无 `DSL-state-combination` 分类、无结构化理由的 `ControlState`、目录级整体豁免（Infrastructure/Journal/Process 以「不在扫描范围」不报告）、两个 declared registry 的 direct/try probe 联合选择 effect branch |
 | adversarial fixture（`FinalityController` 形） | 裸/未分类 `mutable`、程序计数 scratch（含并发 `ref`/`ResizeArray` 若未 structured-physical 分类）在 dsl-ownership / state-product 下必须 RED；目录级 Infrastructure 豁免不得掩盖 |
 | adversarial fixture（`ExecutorSummarize` 形） | 裸/未分类 `mutable` 在 dsl-ownership 下必须 RED；fixture 可含 `timerTask`→re-probe 文本作形状上下文，但静态判红触发是未分类 mutable（B 类零轮询由行为证明闭合，非此静态门禁，见下）；不得因文件落在 Infrastructure/ 而逃逸 |
-| `StudentTeacherRuntime.fs` 六 registry | **已人工分类证明（classified）**：`runs` / `teacherOwners` / `teacherCalls` / `teacherCompletions` / `studentFinalCompletions` / `skillMutations` 各为一物理 lifetime/resource mailbox（见下节 manual-proof）；`registry-joint-branch` 只抓同 match 联合 probe，分散 presence 不在 auto 范围、由本 proof 闭合 |
+| `SyncDelegateRuntime.fs` registries | **已人工分类证明（classified）**：`callsByOwnerScope` / `callsByDelegate` / `pendingCompletionTexts` / `inFlightScopes` 各为一物理 lifetime/resource mailbox（见下节 manual-proof）；`StudentTeacherRuntime` **G3 已删除**，证明义务迁到本 SyncDelegate 节；`registry-joint-branch` 只抓同 match 联合 probe，分散 presence 不在 auto 范围、由本 proof 闭合 |
 | `scripts/checks/architecture.mjs` | Domain 向上层依赖、源码根/fsproj 不一致、资源越界读取 |
 | `scripts/checks/spec.mjs` | DSL Clause 重复、悬空或 Change 影子定义 |
 | `scripts/checks/causal-wait-boundary.mjs` | Domain 引用 CausalWait 实现、Application 读 `IWaitSnapshotReader`、Fact/Journal 编码 wait、关键路径裸 `TCS.Task` await、Registry mutable 缺 DSL-MUTABLE |
@@ -64,39 +64,38 @@
 declared registry 的 direct/try probe 联合选择 effect branch 这一语法反例；其它多 registry
 联合 presence 的分散探测不在该自动门禁范围内，须由人工 proof 判断是否驱动阶段推进。
 
-### StudentTeacher registries — CE collapse + durable evidence
+### SyncDelegate registries — CE collapse（原 StudentTeacher 证明已迁此）
 
-参照上表 Blogger 正交物理槽位风格：`src/Wanxiangshu/Session/StudentTeacherRuntime.fs`
-声明的 registries **各拥有单一物理 lifetime / 投递地址**，且重构后**不存在**任何函数同时 probe
-两个 registry 的 presence 来选择 effect branch：
+`StudentTeacherRuntime` / `StudentQaStore` / Learn·Compile·SKILL **G3 已删除（absent）**，不得再作
+当前架构证明面。原 Teacher Returned→Completion CE 价值由
+`src/Wanxiangshu/Session/SyncDelegateRuntime.fs` 承接（EXEC-026/028）。
+
+参照上表 Blogger 正交物理槽位风格：SyncDelegate registries **各拥有单一物理 lifetime /
+投递地址**，且**不存在**任何函数同时 probe 两个 registry 的 presence 来选择 effect branch：
 
 | registry | 物理归属 | 消费方式 |
 |---|---|---|
-| `runs` | 活跃 Student run mailbox | `tryRun`；Student `HandleTurn` 只确认 run 存在 |
-| `teacherCalls` | 在途 Teacher 调用 / CE await 点 | `tryTeacherCall`；Teacher 路径只做投递（resolve / fail-closed），分支看 turn payload |
-| `pendingCompletionTexts` | TextComplete 改写武装 | 仅 `TextComplete` / `ValidateTool` / `Return` 重复拒绝；**不得**驱动 `HandleTurn` 阶段选择 |
-| `skillMutations` | skill 文档改动观测 | `validateTouchedSkills`；非阶段推进 |
+| `callsByOwnerScope` / `callsByDelegate` | 在途 SyncDelegate 调用（Returned + Completion 双 await） | `tryCallByOwnerScope` / `tryCallByDelegate`；`HandleTurn` 只在 Inspector/Coder + 活跃 call 上投递 |
+| `pendingCompletionTexts` | TextComplete 改写武装 | 仅 `TextComplete` / `Return` 重复拒绝；**不得**驱动 `HandleTurn` 阶段选择 |
+| `inFlightScopes` | immediate caller `ReuseScope` 单飞闩 | `Invoke` 并发第二路拒绝；Completion 后释放 |
 
-已删除：`teacherOwners`（durable `SessionAssociationProjection` 为唯一真理源）、
-`teacherCompletions`（含 `CompletionRun option` stage bit）。Student Compile 完成 vs idle 改读
-`StudentQaStore.Exists`（durable QA 存在性）+ `currentStudentRequestKind`（durable
-`AcceptedContinuationIds`），不再读 final-completion registry presence。
+`Invoke` 为单一 CE 栈：Acquire(ReuseScope) → GetOrCreate → Send → await `Returned` → await
+`Completion`。固定 completion 判据是 normalize 后的 turn payload 是否等于
+`SyncDelegatePrompt.SyncDelegateReturnCompletion`，不是 registry presence。自动恢复 nudge 受
+`AgentPairCursor.DefaultAutoRecoveryBudget` 有界。`return` 只 resolve Returned，不 dispose dedicated
+Session。
 
-Teacher `InvokeTeacher` 为单一 CE 栈（`Returned` 然后 `Completion`）；固定 completion 判据是
-normalize 后的 turn payload 是否等于 `TeacherReturnCompletion`，不是 registry presence。
-自动恢复 nudge 受 `AgentPairCursor.DefaultAutoRecoveryBudget` 有界。
-
-结构性证明目标：`HandleTurn` 对 Student 只 probe `runs`，对 Teacher 只 probe `teacherCalls`；
-`TextComplete` 只 probe `pendingCompletionTexts`。joint-branch 判据在结构上不可能成立，不再依赖
-人工「mailbox 因此无罪」兜底。诚实边界：`registry-joint-branch` 自动门禁仍只拦截同 match 内
-direct/try 联合；本小节以结构消除替代跨 helper detector。
+结构性证明目标：`HandleTurn` 对 SyncDelegate 只 probe call mailbox + turn payload；
+`TextComplete` 只 probe `pendingCompletionTexts`。joint-branch 判据在结构上不可能成立。诚实边界：
+`registry-joint-branch` 自动门禁仍只拦截同 match 内 direct/try 联合；本小节以结构消除替代跨 helper
+detector。
 
 举一反三（同仓联合 presence / park→bind 对照，2026-08 复审）：
 `BloggerRuntime.decideMaterial`、`PluginRuntimeScope` parked∩pendingOffer、`Reconciler` active∩queued、
 `BloggerCrashRecovery` 多 presence、`ReviewSeal` PendingReviewSeals park→bind 均属**物理资源路由 /
-投递握手 / 调度 latch**，不是 Student–Teacher 那种用 mailbox presence 推导 lifecycle stage 的 PC；
-保持 ACCEPT-as-physical，不套用 CE collapse。ReviewSeal 消费面是 VerdictTool fail-closed resolve，
-不是 HandleTurn 上的 nudge-vs-complete 分支。
+投递握手 / 调度 latch**，不是用 mailbox presence 推导 lifecycle stage 的 PC；保持 ACCEPT-as-physical，
+不套用 CE collapse。ReviewSeal 消费面是 VerdictTool fail-closed resolve，不是 HandleTurn 上的
+nudge-vs-complete 分支。
 
 永久 adversarial fixture 必须覆盖与 `FinalityController.fs`、`ExecutorSummarize.fs` 同构的
 反例形状（未分类 mutable / 程序计数 scratch），并在 dsl-ownership 与 state-product 规则下判红；

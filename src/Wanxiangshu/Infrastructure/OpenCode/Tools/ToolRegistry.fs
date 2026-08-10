@@ -34,8 +34,7 @@ module ToolRegistry =
         | "bash-honeypot" -> fun r -> Roles.isAllowed r ToolPermission.BashHoneypot
         | "coder" -> fun r -> r = Role.DevOps
         | "blog" -> fun r -> r = Role.Blogger && BlogTool.hasLiveCycle parkedHost sessionId
-        | "teacher" -> fun r -> r = Role.Student
-        | "return" -> fun r -> r = Role.Student || r = Role.Teacher
+        | "return" -> fun r -> r = Role.Inspector || r = Role.Coder
         | _ -> fun _ -> false
 
     let create
@@ -55,7 +54,7 @@ module ToolRegistry =
         (cancelSignals: (SessionId seq -> unit) option)
         (eventPort: IEventObservationPort option)
         (parkedHost: IParkedTransformHost option)
-        (studentTeacherRuntime: StudentTeacherRuntime option)
+        (syncDelegateRuntime: SyncDelegateRuntime option)
         (finalityReviewerTimeoutMs: int option)
         =
         let factory = ToolHostCodec.factory toolModule
@@ -89,8 +88,8 @@ module ToolRegistry =
               // GLORY-034/036: the Manager's end-of-life tool.
               yield FinalityTool.spec factory runtime
               yield ExecutorTool.spec factory runtime
-              yield InspectorTool.spec factory runtime
-              yield CoderTool.spec factory runtime
+              yield InspectorTool.spec factory runtime syncDelegateRuntime
+              yield CoderTool.spec factory runtime syncDelegateRuntime
               // AGENT-016/017/018: Coder-only POSIX mv/rm.
               yield FileMutationTools.mvSpec factory
               yield FileMutationTools.rmSpec factory
@@ -99,11 +98,8 @@ module ToolRegistry =
               // ENFORCER-010: Blogger's tool set is exactly { blog }.
               // parkedHost + CurrentRequest gate request-scoped execute (InFlight).
               yield BlogTool.spec factory runtime parkedHost
-              match studentTeacherRuntime with
-              | Some studentTeacher ->
-                  yield StudentTeacherTools.teacherSpec factory studentTeacher
-                  yield StudentTeacherTools.returnSpec factory studentTeacher
-              | None -> () ]
+              // SyncDelegate return: Inspector/Coder only.
+              yield SyncDelegateTools.returnSpec factory syncDelegateRuntime ]
 
         // Role-gated tools: agent permission schema and this execute gate agree on
         // CanonicalRole. blog is request-scoped on top of Role=Blogger: no live

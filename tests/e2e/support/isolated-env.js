@@ -73,10 +73,6 @@ function makeConfig(llmUrl, pluginPaths = [], opts = {}) {
     'deep-blogger': { model: 'test/test-model-b' },
     'fast-executor': { model: 'test/test-model' },
     'deep-executor': { model: 'test/test-model-b' },
-    'fast-student': { model: 'test/test-model' },
-    'deep-student': { model: 'test/test-model-b' },
-    'fast-teacher': { model: 'test/test-model' },
-    'deep-teacher': { model: 'test/test-model-b' },
   };
   return {
     formatter: false,

@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Threading
 open System.Threading.Tasks
+open Wanxiangshu.Infrastructure.Git
 open Wanxiangshu.Process
 
 /// Git command plumbing for the production Orchestrator host.
@@ -28,7 +29,7 @@ module OrchestratorGit =
         }
 
     let command (dir: string) (args: string list) : Command =
-        { FileName = "git"
+        { FileName = GitSubject.Executable
           Arguments = args
           WorkingDirectory = Some dir
           Environment = None

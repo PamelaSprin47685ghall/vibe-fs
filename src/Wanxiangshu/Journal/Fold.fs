@@ -739,23 +739,6 @@ module Fold =
                             Associations = SessionAssociationProjection.unlink payload.SessionId projection.Associations }
                 )
 
-            | CompanionFactCases.StudentTeacherLinked payload ->
-                SessionAssociationProjection.linkTeacher
-                    payload.SessionId
-                    payload.TeacherSessionId
-                    None
-                    projection.Associations
-                |> Result.map (fun associations ->
-                    { projection with
-                        Associations = associations })
-                |> associationOutcome "StudentTeacherLinked"
-
-            | CompanionFactCases.StudentTeacherClosed payload ->
-                Ok
-                    { projection with
-                        Associations =
-                            SessionAssociationProjection.unlinkTeacher payload.SessionId projection.Associations }
-
             // ── lifecycle work record (docs/what/companion.md, HOST-005) ──────────────────────
 
             | CompanionFactCases.OpeningPromptCaptured payload ->

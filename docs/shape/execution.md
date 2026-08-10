@@ -29,37 +29,65 @@ PTY 路径：PublishPty
 
 禁止把 agent completion 塞进 PTY 通道或反之。
 
-## EXEC-026：SatelliteRuntime 与 StudentRun 所有权
+## EXEC-026：SatelliteRuntime 与 SyncDelegate 所有权
 
-`SatelliteRuntime` 统一拥有 Companion/Teacher 的 child create、Host children reconcile、Session kind
-登记、abort、retire 与 owner 级联；不得复制 child Session map。
+`SatelliteRuntime` 统一拥有 Companion 的 child create、Host children reconcile、Session kind
+登记、abort、retire 与 owner 级联；不得复制 child Session map。`SatelliteKind` **仅** `Companion`。
 
-`StudentRun` 的 durable truth 只包括：PromptAuthority profile、QA 字节流、Student↔Teacher 关联。
-不存在一个同时容纳 request kind / 单飞 latch / pending return / pending final 的业务阶段轴的
-StudentRun cell —— 那是一个业务程序计数器。
+### Student / Teacher — G3 已删除（absent）
 
-物理 owner（投递地址，不得联合 presence 推导 lifecycle stage）：
+`StudentRun` / `teacherCalls` / `StudentQaStore` / Learn·Compile / `StudentCompile` idle nudge /
+`InvokeTeacher` / SKILL mutation evidence：**G3 已删除（absent）**（EXEC-027 / AGENT-020…022 空缺）。
+不得再列 `runs` / `teacherCalls` / `skillMutations` 为现行物理 owner，也不得用 registry presence
+充当业务阶段 PC。后继双 await 与 idle 见下节 SyncDelegate（及 `SyncDelegateIdleNudge`）。
 
-- `runs`：活跃 Student run lifetime
-- `teacherCalls`：进行中的一次 teacher 调用（`Returned` + `Completion` 两个 CE await 点；兼 EXEC-027 单飞）
-- `pendingCompletionTexts`：仅武装 `experimental.text.complete` 改写正文（TextComplete 查询；HandleTurn 分支不得靠其 presence 选 effect）
-- `skillMutations`：观测到的 skill 写/改证据
+### SyncDelegate 所有权
 
-已删除的伪 stage 槽位：`teacherOwners`（改读 durable `SessionAssociationProjection`）、
-`teacherCompletions` / `CompletionRun option`（回答进入 `TeacherCall.Returned`，固定 completion 由 turn
-payload 比对 resolve `Completion`）、以 `studentFinalCompletions` presence 充当 Compile 完成 PC
-（改读 QA.md 存在性）。
+通用 `SyncDelegate` 所有权（Dedicated Inspector / Dedicated Coder；原 Teacher CE 代数已迁此）。
+`SyncDelegateRuntime` 拥有 dedicated synchronous callee 的 create/reuse、Host children reconcile、abort、
+retire 与 OwnerReuseScope 级联；不得复制 child Session map，也不得把 SyncDelegate 伪装成 fork/handle/join。
 
-Teacher `InvokeTeacher` 是单一 CE 调用栈：`sendTeacherPrompt` → await `Returned` → await `Completion`。
-Host 边界退化为 resolve/查询：`return` 落盘后武装 pending text 并 resolve `Returned`；
-`TextComplete` 命中 pending 则改写；`HandleTurn` 对 Teacher 只比较 turn payload 是否为固定
-`TeacherReturnCompletion`（normalize 后），匹配则 resolve `Completion`，否则有界 nudge
+物理 owner：
+
+- `syncDelegateGate`：immediate caller ReuseScope 级单飞 lease（serialization key = **immediate caller
+  ReuseScope**，**不是** family root / repository / worktree）
+- `attachedSessions`：`(OwnerReuseScopeId, SyncDelegateRole)` → at most one live dedicated Session
+- `delegateCalls`：进行中的一次 sync delegate 调用（`Returned` + `Completion` 两个 CE await 点）
+- `pendingCompletionTexts`：仅武装 `experimental.text.complete` 改写正文（TextComplete 查询；HandleTurn
+  分支不得靠其 presence 选 effect）
+
+单一 CE 调用栈（业务 caller 不可见）：
+
+```text
+Acquire(immediate caller ReuseScope)
+→ GetOrCreate(OwnerReuseScopeId, role)
+→ Send
+→ await Returned
+→ await Completion
+```
+
+Host 边界退化为 resolve/查询：`return` 武装 pending text 并 resolve `Returned`；`TextComplete` 命中
+pending 则改写；`HandleTurn` 只比较 turn payload 是否为固定 `SyncDelegateReturnCompletion`
+（normalize 后），匹配则 resolve `Completion`，否则有界 `SyncDelegateIdleNudge`
 （`AgentPairCursor.DefaultAutoRecoveryBudget`）。无 flight、重复 return、错误 owner、固定正文不匹配
 或预算耗尽均 fail closed；成功路径不 abort。
 
-Student 最终 `return` 的 pending message 只存到同一 Host loop 完成；不是知识 Journal，也不能跨任务复用。
-完成信号必须核对 StudentCompile attempt 和 QA 已不存在，之后才 retire run。Compile idle nudge
-同样受 `DefaultAutoRecoveryBudget` 约束。
+不变量：
+
+1. **Serialization**：同一 immediate caller ReuseScope 同时最多一个 active sync delegate call。
+   嵌套合法且不得死锁：`DevOps → Coder → Inspector`（各层 gate 绑定各自 immediate caller ReuseScope）。
+   禁止按 family root 串行（父持 family gate 等子、子再要同一 family gate → deadlock）。
+2. **Reuse key**：`(OwnerReuseScopeId, SyncDelegateRole)`；同 scope 兼容续问复用同一 Session，
+   `return` 后不 retire / 不 dispose。
+3. **Tier**：owner effective tier → deterministic delegate tier（`fast→fast`，`deep→deep`）；
+   模型不可每轮选择 target Agent。
+4. **Dual await**：callee `return` 只 resolve `Returned`；reconciler 证明同 Host loop 的
+   `TurnCompleted` 后才 resolve `Completion`；caller 阻塞到两者都完成（详见 EXEC-028 SyncDelegate 路径）。
+5. **Lifetime**：Dedicated Session lifetime = OwnerReuseScope lifetime；graceful ReuseScope close 才
+   retire/release（Casebook synthesis 若启用见 Casebook 合同，不属本条所有权）。
+
+Dedicated Inspector/Coder = Work + Attached（可有 Companion），**不是**历史 Teacher-style InternalLeaf /
+no-Companion Satellite。Student/Teacher 路径已删除；通用 SyncDelegate 不继承该拓扑。
 
 ## 单一写入口（完成）
 

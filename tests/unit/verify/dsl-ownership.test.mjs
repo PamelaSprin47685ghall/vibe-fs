@@ -518,7 +518,7 @@ test('DSL_OWNERSHIP_ref_record_program_counter_fires_mutable_record_field', () =
 test('DSL_OWNERSHIP_joint_registry_match_with_effect_fires_registry_joint_branch', () => {
   const hits = scanText(
     readFixture('registry-joint-branch.fs'),
-    'src/Wanxiangshu/Session/StudentTeacherRuntime.fs',
+    'src/Wanxiangshu/Session/SyncDelegateRuntime.fs',
   )
   assert.ok(
     hits.some((hit) => hit.gate === 'registry-joint-branch'),
@@ -589,18 +589,21 @@ test('DSL_OWNERSHIP_host_boundary_open_is_not_gate_red', () => {
   const source = ['module Sample', 'open Wanxiangshu.OpenCode', 'open Wanxiangshu.Process'].join('\n')
   assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('HostForkRuntime.fs'))
   assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('SatelliteRuntime.fs'))
-  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('StudentTeacherRuntime.fs'))
+  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('SyncDelegateRuntime.fs'))
   assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('CompletionMailbox.fs'))
   assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('ForkRuntime.fs'))
   assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('EnforcerHost.fs'))
   assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('HandleCompletionCodec.fs'))
   assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('BloggerCoordinator.fs'))
+  assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('RuntimePath.fs'))
   assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Session/HostForkRuntime.fs'), true)
   assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Session/SatelliteRuntime.fs'), true)
-  assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Session/StudentTeacherRuntime.fs'), true)
+  assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Session/SyncDelegateRuntime.fs'), true)
   assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Session/BloggerCoordinator.fs'), true)
+  assert.equal(isHostBoundaryOpenPath('src/Wanxiangshu/Journal/RuntimePath.fs'), true)
   assert.deepEqual(scanText(source, 'src/Wanxiangshu/Session/HostForkRuntime.fs'), [])
   assert.deepEqual(scanText(source, 'src/Wanxiangshu/Session/BloggerCoordinator.fs'), [])
+  assert.deepEqual(scanText(source, 'src/Wanxiangshu/Journal/RuntimePath.fs'), [])
   assert.ok(scanText(source, 'src/Wanxiangshu/Agent/Sample.fs').some((h) => h.gate === 'infrastructure-leak'))
 })
 

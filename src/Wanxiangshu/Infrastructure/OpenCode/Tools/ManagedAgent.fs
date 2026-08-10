@@ -33,8 +33,7 @@ module ManagedAgent =
     let visibilityOf (role: Role) : AgentVisibility =
         match role with
         | Role.Blogger
-        | Role.Executor
-        | Role.Teacher -> AgentVisibility.Internal
+        | Role.Executor -> AgentVisibility.Internal
         | _ -> AgentVisibility.Public
 
     let make (tier: AgentTier) (role: Role) : ManagedAgent =

@@ -30,9 +30,51 @@ Join 消费当前 owner 可用 completion，有界批次 wire（status/count/`[[
 DevOps 角色的 `join` 在无完成项时包含 10s 超时预算（`DevOpsJoinTimeoutMs = 10_000`）；若 10s 内无 completion，返回超时错误 `ForkError.TimedOut`（`status="failed"`, `code="TIMED_OUT"`）。Orchestrator 与 Manager 角色的 `join` 维持无 10s 超时规则。  
 工具调用中止（operator abort）→ `status=interrupted, reason=operator_abort`；外部用户入站 → `status=interrupted, reason=user_message`；均非 error（EXEC-017）。
 
-## EXEC-028：同步 one-shot 返回语义
+## EXEC-028：同步返回语义（OneShot vs SyncDelegate）
 
-同步 one-shot agent 工具（如 `inspector`/`coder`）成功完成时：entry-local LWR 注释（`includeOpening=false`）+ 末条 TurnFormalText 报告；禁止字段式 `work_record`。LWR 物化与子→父方向同 COMPANION-003（与 EXEC-004 共用物化器，非 Join 批次 wire）。Opening 从原始 assignment 捕获（对齐 fork），以便 COMPANION-003 物化可运行；返回的 LWR 仍为 `includeOpening=false`。若 Completed 无法物化出非空 child LWR，则 fail-closed：返回工具级 `error=`（显式失败），绝不静默退回仅 formal report 的 soft success。
+同步 agent 工具有两条互斥生命周期路径。**不得**混用：OneShot 的 dispose-after 不得套在 dedicated
+SyncDelegate Session 上；SyncDelegate 的双 await 不得退化成单次 terminal 即放行。
+
+### A. Residual OneShot（dispose-after）
+
+仍用于**非 dedicated SyncDelegate** 的 residual one-shot callers（若有）：每次调用新建 child Session，
+成功完成后 abort/dispose child，不跨调用复用。
+
+成功完成时：entry-local LWR 注释（`includeOpening=false`）+ 末条 TurnFormalText 报告；禁止字段式
+`work_record`。LWR 物化与子→父方向同 COMPANION-003（与 EXEC-004 共用物化器，非 Join 批次 wire）。
+Opening 从原始 assignment 捕获（对齐 fork），以便 COMPANION-003 物化可运行；返回的 LWR 仍为
+`includeOpening=false`。若 Completed 无法物化出非空 child LWR，则 fail-closed：返回工具级 `error=`
+（显式失败），绝不静默退回仅 formal report 的 soft success。
+
+### B. Reusable SyncDelegate（Returned → Completion）
+
+Meditator / Coder / DevOps 的 dedicated `inspector` / `coder`（及同类 SyncDelegate）走本路径：
+
+```text
+callee return(message)
+→ resolve Returned only（答案已定，caller 仍阻塞）
+
+同 Host loop 继续固定 terminal assistant completion
+→ reconciler 证明 TurnCompleted
+→ resolve Completion
+
+caller 取得 tool result = message
+（须 Returned 与 Completion 均完成）
+```
+
+不变量：
+
+- `return` **只** resolve `Returned`；不得因 `return` 单独放行 caller 或 retire dedicated Session。
+- `Completion` 仅在 `TurnCompleted` 证明后 resolve；成功路径无 abort / interrupted。
+- caller 阻塞到 **Returned 且 Completion** 都完成，保证下一同步调用不与上一 turn 尾部重叠。
+- Session 按 `(OwnerReuseScopeId, role)` 复用（EXEC-026）；wire 仍可带 entry-local LWR 注释 + formal
+  report，但生命周期以双 await 为准，不以 OneShot dispose-after 为准。
+
+### Serialization 与 tier（行为面）
+
+- Serialization key = **immediate caller ReuseScope**（非 family root）。嵌套
+  `DevOps → Coder → Inspector` 合法；同 caller ReuseScope 禁止并发两个 active sync delegate calls。
+- Owner effective tier → deterministic delegate tier（`fast→fast`，`deep→deep`）；不可每轮选 Agent。
 
 ## EXEC-005：List 语义
 
@@ -87,32 +129,11 @@ schemaVersion=2；finality 仅 `completed|failed`。
 `HandleFalseCompletionRejected` → 确定性 replacement → parent correction。  
 禁止把历史假 abort 洗成成功。
 
-## EXEC-027：Student 学习与编译程序
+## EXEC-027：（空缺）Student 学习与编译程序 — G3 已删除
 
-只有显式 Student HumanRoot 启动本程序；其它 Agent 零副作用。
+**编号永久空缺。** G3 clean-break 删除 Student HumanRoot→QA→`StudentLearn`→`teacher`→
+`StudentCompile`→SKILL/`return` 程序，以及 Teacher/Compile idle nudge 与 `StudentQaStore`。
+无 alias、无 deprecated 执行路径。
 
-```text
-HumanRoot 原文先写 QA
-→ StudentLearn（工具严格 {teacher}）
-→ teacher(message)：问题先写 QA，再发同一 Teacher
-→ Teacher return：回答先写 QA，当前 Teacher turn 正常 completion 后再交付 Student
-→ Student learning idle：发送 StudentCompile continuation
-→ StudentCompile（读 QA，写一个或多个 AGENT-022 SKILL.md，工具含最终 return）
-→ return(message)：删除 QA 并确认不存在
-→ 同一 Host loop 的 Assistant completion 显示 message，Student Run 终止
-```
-
-Teacher 未 return 的 idle 只 nudge 同一 Teacher；自动恢复预算耗尽后父 `teacher` 失败，绝不从普通正文
-截取答案。Student compile 未 return 的 idle 只发 compilation nudge；第一版不返回学习。
-
-Teacher `return` 不 abort Session 或当前成功 turn。其 tool result 约束同一 Host loop 产生固定、无业务内容的
-Assistant completion；只有该 completion 被 reconcile 为 `TurnCompleted` 后，等待中的父 `teacher` 才取得
-已落盘答案。后续问题继续使用同一 Teacher Session；成功路径不得产生 `interrupted`。
-
-同一 Student Run 同时最多一个 teacher 调用、一个 Teacher provider run、一个 QA 写入和一个 compile
-continuation。异常并发明确拒绝。用户取消时 abort Student/Teacher、删除 QA、retire Teacher 关联；删除
-失败保留文件并报告清理错误。
-
-最终 `return` 先按 AGENT-022 校验全部触达制品，再删除 QA；任一步失败都不提交 terminal、不显示完成
-说明。QA 不存在视为删除成功，重试幂等。最终 message 只简述生成/修改了哪些 SKILL、提醒重启 OpenCode，
-不自动附带 QA/path。
+后继：SyncDelegate Returned→Completion（EXEC-026/028）；idle 为 `SyncDelegateIdleNudge`
+（PROMPT-003；`shape/host.md` quiescence gate）。`return` **仅** SyncDelegate。

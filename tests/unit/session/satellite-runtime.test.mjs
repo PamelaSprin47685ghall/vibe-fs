@@ -1,3 +1,9 @@
+// tests/unit/session/satellite-runtime.test.mjs — HOST-014 / HOST-015
+//
+// Companion-only SatelliteRuntime proofs. Teacher is not a SatelliteKind;
+// SessionOwnership / SyncDelegate association helpers live in kernel +
+// context/session-association tests.
+
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
@@ -17,16 +23,18 @@ import {
 } from '../../../dist/fable_modules/fable-library-js.5.13.0/Result.js'
 
 // HOST-015: satellites are physically parented to the family root ('root'),
-// never to their logical owner ('student'). Ownership is proven by the
+// never to their logical owner ('work'). Ownership is proven by the
 // journal-linked SessionId (spec.restored), never by Host parentID.
-const child = (id, parent = 'root', agent = 'fast-teacher', title = 'fast-teacher') =>
+const COMPANION_AGENT = 'fast-blogger'
+
+const child = (id, parent = 'root', agent = COMPANION_AGENT, title = COMPANION_AGENT) =>
   new OpenCodeChildInfo(sessionId(id), sessionId(parent), agent, title)
 
 const spec = ({ restored, linked = [] } = {}) =>
   new SatelliteSpec(
-    SatelliteKind.Teacher,
-    'fast-teacher',
-    'fast-teacher',
+    SatelliteKind.Companion,
+    COMPANION_AGENT,
+    COMPANION_AGENT,
     '/workspace',
     restored === undefined ? undefined : sessionId(restored),
     (owner, satellite, agent) => {
@@ -47,82 +55,87 @@ const host = (children, created = []) => ({
   FamilyRootOf: () => sessionId('root'),
 })
 
-test('HOST_015_satellite_recovery_reuses_journal_linked_child_under_flat_root', async () => {
+test('HOST_014_SatelliteKind_is_Companion_only', () => {
+  assert.deepEqual(SatelliteKind.Companion.cases(), ['Companion'])
+  assert.equal('Teacher' in SatelliteKind, false)
+})
+
+test('HOST_015_companion_satellite_recovery_reuses_journal_linked_child_under_flat_root', async () => {
   const linked = []
   const created = []
   // Physical parent is 'root', not the owner — reuse must not depend on parentID.
-  const runtime = createRuntime(host([child('teacher-1', 'root')], created))
+  const runtime = createRuntime(host([child('blogger-1', 'root')], created))
 
-  const result = await ensure(runtime, sessionId('student'), spec({ restored: 'teacher-1', linked }))
+  const result = await ensure(runtime, sessionId('work'), spec({ restored: 'blogger-1', linked }))
 
   assert.equal(result.tag, 0)
-  assert.equal(result.fields[0].SessionId.fields[0], 'teacher-1')
+  assert.equal(result.fields[0].SessionId.fields[0], 'blogger-1')
   assert.equal(result.fields[0].Origin.tag, SatelliteOrigin.Reused.tag)
   assert.deepEqual(created, [])
-  assert.deepEqual(linked, [['student', 'teacher-1', 'fast-teacher']])
+  assert.deepEqual(linked, [['work', 'blogger-1', COMPANION_AGENT]])
 })
 
-test('HOST_015_satellite_recovery_creates_an_explicit_replacement_when_the_old_child_is_gone', async () => {
+test('HOST_015_companion_satellite_recovery_creates_an_explicit_replacement_when_the_old_child_is_gone', async () => {
   const linked = []
   const created = []
   const runtime = createRuntime(host([], created))
 
-  const result = await ensure(runtime, sessionId('student'), spec({ restored: 'teacher-old', linked }))
+  const result = await ensure(runtime, sessionId('work'), spec({ restored: 'blogger-old', linked }))
 
   assert.equal(result.tag, 0)
   assert.equal(result.fields[0].SessionId.fields[0], 'created-1')
   assert.equal(result.fields[0].Origin.tag, SatelliteOrigin.Replacement.tag)
   assert.deepEqual(created, ['created-1'])
-  assert.deepEqual(linked, [['student', 'created-1', 'fast-teacher']])
+  assert.deepEqual(linked, [['work', 'created-1', COMPANION_AGENT]])
 })
 
-test('HOST_015_satellite_recovery_fails_closed_when_journal_linked_child_conflicts', async () => {
+test('HOST_015_companion_satellite_recovery_fails_closed_when_journal_linked_child_conflicts', async () => {
   const linked = []
   const created = []
-  // Journal links teacher-1, but the Host child with that id carries a
+  // Journal links blogger-1, but the Host child with that id carries a
   // different agent — ownership conflict, never reuse, never create.
-  const runtime = createRuntime(host([child('teacher-1', 'root', 'other-agent')], created))
+  const runtime = createRuntime(host([child('blogger-1', 'root', 'other-agent')], created))
 
-  const result = await ensure(runtime, sessionId('student'), spec({ restored: 'teacher-1', linked }))
+  const result = await ensure(runtime, sessionId('work'), spec({ restored: 'blogger-1', linked }))
 
   assert.equal(result.tag, 1)
-  assert.match(result.fields[0], /Conflicting teacher satellite recovery/)
+  assert.match(result.fields[0], /Conflicting companion satellite recovery/)
   assert.deepEqual(created, [])
   assert.deepEqual(linked, [])
 })
 
-test('HOST_015_satellite_recovery_never_adopts_same_agent_sibling_without_journal_link', async () => {
+test('HOST_015_companion_satellite_recovery_never_adopts_same_agent_sibling_without_journal_link', async () => {
   const linked = []
   const created = []
   // A same-agent/title child sits under the shared flat root (it belongs to
   // another work session). Without a journal link there is no proof of
   // ownership — always create a fresh child.
-  const runtime = createRuntime(host([child('teacher-1', 'root')], created))
+  const runtime = createRuntime(host([child('blogger-1', 'root')], created))
 
-  const result = await ensure(runtime, sessionId('student'), spec({ linked }))
+  const result = await ensure(runtime, sessionId('work'), spec({ linked }))
 
   assert.equal(result.tag, 0)
   assert.equal(result.fields[0].SessionId.fields[0], 'created-1')
   assert.equal(result.fields[0].Origin.tag, SatelliteOrigin.Created.tag)
   assert.deepEqual(created, ['created-1'])
-  assert.deepEqual(linked, [['student', 'created-1', 'fast-teacher']])
+  assert.deepEqual(linked, [['work', 'created-1', COMPANION_AGENT]])
 })
 
-test('HOST_015_satellite_recovery_replaces_without_adopting_same_agent_sibling', async () => {
+test('HOST_015_companion_satellite_recovery_replaces_without_adopting_same_agent_sibling', async () => {
   const linked = []
   const created = []
-  // Journal links teacher-old (gone from the Host); teacher-other is another
+  // Journal links blogger-old (gone from the Host); blogger-other is another
   // owner's satellite under the same flat root. Replacement must create a new
   // child and leave the sibling untouched.
-  const runtime = createRuntime(host([child('teacher-other', 'root')], created))
+  const runtime = createRuntime(host([child('blogger-other', 'root')], created))
 
-  const result = await ensure(runtime, sessionId('student'), spec({ restored: 'teacher-old', linked }))
+  const result = await ensure(runtime, sessionId('work'), spec({ restored: 'blogger-old', linked }))
 
   assert.equal(result.tag, 0)
   assert.equal(result.fields[0].SessionId.fields[0], 'created-1')
   assert.equal(result.fields[0].Origin.tag, SatelliteOrigin.Replacement.tag)
   assert.deepEqual(created, ['created-1'])
-  assert.deepEqual(linked, [['student', 'created-1', 'fast-teacher']])
+  assert.deepEqual(linked, [['work', 'created-1', COMPANION_AGENT]])
 })
 
 test('HOST_014_concurrent_first_ensure_is_single_flight_and_creates_one_child', async () => {
@@ -141,7 +154,7 @@ test('HOST_014_concurrent_first_ensure_is_single_flight_and_creates_one_child', 
     return ok(id)
   }
   const runtime = createRuntime(sessions)
-  const owner = sessionId('student')
+  const owner = sessionId('work')
   const satelliteSpec = spec()
 
   const first = ensure(runtime, owner, satelliteSpec)
@@ -162,9 +175,9 @@ test('HOST_014_children_query_failure_does_not_guess_or_create', async () => {
   sessions.ListChildren = async () => error('children unavailable')
   const runtime = createRuntime(sessions)
 
-  const result = await ensure(runtime, sessionId('student'), spec({ restored: 'teacher-old' }))
+  const result = await ensure(runtime, sessionId('work'), spec({ restored: 'blogger-old' }))
 
   assert.equal(result.tag, 1)
-  assert.match(result.fields[0], /Cannot recover teacher satellite: children unavailable/)
+  assert.match(result.fields[0], /Cannot recover companion satellite: children unavailable/)
   assert.deepEqual(created, [])
 })

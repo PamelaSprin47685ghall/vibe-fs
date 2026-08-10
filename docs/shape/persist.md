@@ -11,13 +11,11 @@ Runtime directory：0700
 Journal 文件：0600
 ```
 
-Student QA 位于当前项目 Git private directory 下的任务路径，天然不进入 index/worktree；目录 `0700`、
-文件 `0600`。路径由 workspace Git directory + Student SessionId + LogicalRunId 纯派生并校验，禁止接受
-模型提供的路径片段。无法证明 Git-private 路径时 Student bootstrap fail closed。
+## StudentQaStore — G3 已删除（retired）
 
-QA 写入口唯一是 `StudentQaStore`：同目录临时文件写入、file fsync、原子 rename、directory fsync。
-编译阶段 Student 只有 read 权限访问 QA；write/edit 仅用于 `.agent/skills`，最终 `return` 只调用 store
-删除，Teacher 与普通文件工具不能写 QA。
+`StudentQaStore` / 私有 `QA.md` filesystem backend **不存在于生产**（G3 clean-break）。无 dual-write、
+无 legacy reader、无编译期 QA 权限面。后继统一 durable 事件底座（若有）归属后续 EventStore cutover；
+正式层不得把尚未落地的存储 Proposal 当作现行规范。
 
 ## 写入口纪律
 

@@ -1,6 +1,10 @@
 # corrective.md §15: executor failure → diagnosis → Coder RED evidence → Coder
 # GREEN evidence → broader gate → final report. The fixture uses Node's real test
 # runner and a one-file value correction, not prompt-text matching.
+#
+# EXEC-026/028: DevOps `coder` is SyncDelegate (Returned → Completion), not
+# dispose-after OneShot. Required args are tdd+prompt only (no agent). Child
+# turns call return(message) then emit SyncDelegateReturnCompletion.
 
 scenario = "devops-mechanical-repair-loop"
 description = "DevOps closes an executor failure through a bounded Coder RED/GREEN repair loop without direct editing"
@@ -10,16 +14,18 @@ setup = { strict = true, project = { files = { "mechanical-target.txt" = "BROKEN
 session = { agent = "fast-devops", bind = ["devops-title", "fast-devops"] }
 prompt = { agent = "fast-devops", text = "Run the deterministic mechanical repair fixture. Diagnose its failing gate, use Coder RED then GREEN for the one-file value correction, rerun the broader gate, and report the observed closure." }
 
-must = ["devops.0", "devops.1", "devops.2", "coder-red.0", "devops.3", "devops.4", "coder-green.0", "devops.5", "devops.6"]
+must = ["devops.0", "devops.1", "devops.2", "coder-red", "devops.3", "devops.4", "coder-green", "devops.5", "devops.6"]
 
 flow = [
-  { custom = "bindCoderChildren" },
   { wait = "title" },
   { wait = "devops.0" },
   { wait = "devops.1" },
   { wait = "devops.2" },
+  { bindChild = { agent = "fast-coder", bind = ["fast-coder"] } },
+  { wait = "coder-red" },
   { wait = "devops.3" },
   { wait = "devops.4" },
+  { wait = "coder-green" },
   { wait = "devops.5" },
   { wait = "devops.6" },
   { custom = "assertMechanicalRepairLoop" },
@@ -41,13 +47,13 @@ forbiddenTools = ["write", "edit"]
   respond = { type = "tool-call", tool = "read", args = { filePath = "mechanical-target.txt" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "coder", args = { agent = "fast-coder", tdd = "red", prompt = "Add mechanical-repair.test.mjs as a behavior-level regression test for mechanical-target.txt. It must require exactly REPAIRED\\n and must not edit mechanical-target.txt." } }
+  respond = { type = "tool-call", tool = "coder", args = { tdd = "red", prompt = "Add mechanical-repair.test.mjs as a behavior-level regression test for mechanical-target.txt. It must require exactly REPAIRED\\n and must not edit mechanical-target.txt." } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "executor", args = { command = "node --test mechanical-repair.test.mjs", estimated_running_secs = 2, estimated_output_bytes = 4096, estimated_mem_usage = "low" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "coder", args = { agent = "fast-coder", tdd = "green", prompt = "Change only mechanical-target.txt to exactly REPAIRED\\n so the established mechanical-repair.test.mjs passes." } }
+  respond = { type = "tool-call", tool = "coder", args = { tdd = "green", prompt = "Change only mechanical-target.txt to exactly REPAIRED\\n so the established mechanical-repair.test.mjs passes." } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "executor", args = { command = "node --test", estimated_running_secs = 2, estimated_output_bytes = 4096, estimated_mem_usage = "low" } }
@@ -55,12 +61,16 @@ forbiddenTools = ["write", "edit"]
   [[turn.step]]
   respond = { type = "text", text = "DevOps final report: initial gate and RED regression both failed on BROKEN; Coder GREEN repaired the fixture; broader node --test gate passed; DevOps made no direct edit." }
 
+# SyncDelegate dual-await: write, then return(message), then fixed
+# SyncDelegateReturnCompletion. Lane bound via bindChild after first coder Invoke;
+# RED and GREEN reuse the same dedicated fast-coder Session.
+
 [[turn]]
 id = "coder-red"
 lane = "fast-coder"
 user = [
-  "# TDD phase: RED. Add or update a behavior-level regression test that fails for the requested missing behavior. Do not implement the production fix.",
-  "# Add mechanical-repair.test.mjs as a behavior-level regression test",
+  "TDD phase: RED. Add or update a behavior-level regression test that fails for the requested missing behavior. Do not implement the production fix.",
+  "Add mechanical-repair.test.mjs as a behavior-level regression test",
 ]
 tools = ["write"]
 
@@ -68,14 +78,17 @@ tools = ["write"]
   respond = { type = "tool-call", tool = "write", args = { filePath = "mechanical-repair.test.mjs", content = "import assert from 'node:assert/strict';\nimport fs from 'node:fs';\nimport test from 'node:test';\ntest('repair requires repaired value', () => assert.equal(fs.readFileSync('mechanical-target.txt', 'utf8'), 'REPAIRED\\n'));\n" } }
 
   [[turn.step]]
-  respond = { type = "text", text = "Coder RED evidence: mechanical-repair.test.mjs now fails against the unchanged BROKEN fixture." }
+  respond = { type = "tool-call", tool = "return", args = { message = "Coder RED evidence: mechanical-repair.test.mjs now fails against the unchanged BROKEN fixture." } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Sync delegate answer returned to caller." }
 
 [[turn]]
 id = "coder-green"
 lane = "fast-coder"
 user = [
-  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green.",
-  "# Change only mechanical-target.txt to exactly REPAIRED",
+  "TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green.",
+  "Change only mechanical-target.txt to exactly REPAIRED",
 ]
 tools = ["write"]
 
@@ -83,7 +96,10 @@ tools = ["write"]
   respond = { type = "tool-call", tool = "write", args = { filePath = "mechanical-target.txt", content = "REPAIRED\n" } }
 
   [[turn.step]]
-  respond = { type = "text", text = "Coder GREEN evidence: the one-file value correction is ready for DevOps to rerun the gate." }
+  respond = { type = "tool-call", tool = "return", args = { message = "Coder GREEN evidence: the one-file value correction is ready for DevOps to rerun the gate." } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Sync delegate answer returned to caller." }
 
 [[turn]]
 id = "title"

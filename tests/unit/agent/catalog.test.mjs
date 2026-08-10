@@ -1,7 +1,7 @@
 // tests/unit/Agent/catalog.test.mjs — AGENT-001/002/003/004 direct catalog tests (C5).
 //
 // ManagedAgentCatalog is the sole identity directory (AGENT-001…004):
-//   - 12 canonical roles × 2 tiers → exactly 24 required names (AGENT-002)
+//   - 10 canonical roles × 2 tiers → exactly 20 required names (AGENT-002)
 //   - peer = same role, opposite tier, symmetric for every name (AGENT-003)
 //   - legacy bare names rejected, version-agnostic prose (AGENT-004)
 //
@@ -22,8 +22,6 @@ const EXPECTED_ROLES = [
   'Browser',
   'Meditator',
   'Reviewer',
-  'Student',
-  'Teacher',
   'DevOps',
   'Executor',
   'Blogger',
@@ -61,15 +59,15 @@ const tierAndRoleOf = (name) => {
 
 // ── AGENT-001: Canonical Role and Agent Tier ─────────────────────────────────
 
-test('AGENT_001_catalog_has_exactly_twelve_canonical_roles_and_two_tiers', () => {
+test('AGENT_001_catalog_has_exactly_ten_canonical_roles_and_two_tiers', () => {
   const all = managedAgentCatalog.allRoles()
-  assert.equal(all.length, 12)
+  assert.equal(all.length, 10)
   assert.deepEqual(new Set(all), new Set(EXPECTED_ROLES))
 
-  // public + internal partition covers all 12 without overlap
+  // public + internal partition covers all 10 without overlap
   const publicRoles = managedAgentCatalog.allPublicRoles()
   const internalRoles = managedAgentCatalog.allInternalRoles()
-  assert.equal(publicRoles.length + internalRoles.length, 12)
+  assert.equal(publicRoles.length + internalRoles.length, 10)
   for (const role of publicRoles) assert.equal(internalRoles.includes(role), false)
 
   // every canonical role round-trips label → parse → label
@@ -88,12 +86,12 @@ test('AGENT_001_catalog_has_exactly_twelve_canonical_roles_and_two_tiers', () =>
   }
 })
 
-// ── AGENT-002: the 24 required agents ────────────────────────────────────────
+// ── AGENT-002: the 20 required agents ────────────────────────────────────────
 
-test('AGENT_002_required_names_are_exactly_twelve_roles_times_two_tiers', () => {
+test('AGENT_002_required_names_are_exactly_ten_roles_times_two_tiers', () => {
   const names = managedAgentCatalog.requiredNames()
-  assert.equal(names.length, 24)
-  assert.equal(new Set(names).size, 24)
+  assert.equal(names.length, 20)
+  assert.equal(new Set(names).size, 20)
 
   // two names per role label (one fast, one deep)
   const byRole = new Map()
@@ -102,7 +100,7 @@ test('AGENT_002_required_names_are_exactly_twelve_roles_times_two_tiers', () => 
     const role = name.slice(name.indexOf('-') + 1)
     byRole.set(role, (byRole.get(role) ?? 0) + 1)
   }
-  assert.equal(byRole.size, 12)
+  assert.equal(byRole.size, 10)
   for (const [role, count] of byRole) {
     assert.equal(count, 2, `role '${role}' must have fast- and deep- variants`)
   }

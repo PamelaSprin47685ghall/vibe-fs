@@ -71,30 +71,44 @@ module SpikePlugin =
 
                 let! wired = HostSignalBootstrap.wire sessionPort eventPort snapshotOpt journal scope input
 
-                match journal, workspaceDirectory with
-                | Some durable, Some directory ->
-                    match StudentQaStore.Create directory with
-                    | Error error -> scope.MarkStudentTeacherUnavailable error
-                    | Ok qaStore ->
-                        let registerTeacher teacherId _agent =
-                            wired.RegisterOwned(SessionId.value teacherId)
-                            wired.BindActiveRun teacherId Role.Teacher (Some directory)
+                match journal with
+                | Some durable ->
+                    // SyncDelegate attaches whenever the durable journal exists.
+                    let attached =
+                        AttachedSessionRuntime(
+                            registerParent =
+                                (fun owner child ->
+                                    scope.SessionParents.[SessionId.value child] <- SessionId.value owner),
+                            isUsable = (fun _ -> true)
+                        )
 
-                        let studentTeacher =
-                            new StudentTeacherRuntime(
-                                sessionPort,
-                                scope.Satellites,
-                                PromptDispatcher.forJournal durable,
-                                durable,
-                                qaStore,
-                                directory,
-                                registerTeacher,
-                                scope.Quiescence
-                            )
+                    let dispatcher = PromptDispatcher.forJournal durable
 
-                        scope.AttachStudentTeacherRuntime studentTeacher
-                | None, _ -> scope.MarkStudentTeacherUnavailable "Student requires the durable journal"
-                | _, None -> scope.MarkStudentTeacherUnavailable "Student requires a Git workspace directory"
+                    let registerDelegate (delegateId: SessionId) (agent: string) =
+                        wired.RegisterOwned(SessionId.value delegateId)
+
+                        let role =
+                            if agent.Contains "coder" then
+                                Role.Coder
+                            else
+                                Role.Inspector
+
+                        wired.BindActiveRun delegateId role workspaceDirectory
+
+                    let syncDelegate =
+                        new SyncDelegateRuntime(
+                            sessionPort,
+                            dispatcher,
+                            durable,
+                            attached,
+                            SyncDelegateTier.fromDispatcher dispatcher,
+                            registerDelegate,
+                            scope.Quiescence,
+                            ?workspaceDirectory = workspaceDirectory
+                        )
+
+                    scope.AttachSyncDelegateRuntime syncDelegate
+                | None -> ()
 
                 // GREEN-4: mandatory SessionRecoveryPorts. Real RestoreHandles/RecoverJobs.
                 // Missing journal or snapshot → leave ports unattached (RequireFamilyRecovery
@@ -451,20 +465,8 @@ module SpikePlugin =
                           box (
                               pairedHook (
                                   box (fun (textInput: obj) (textOutput: obj) ->
-                                      scope.StudentTeacherRuntime
+                                      scope.SyncDelegateRuntime
                                       |> Option.iter (fun runtime -> runtime.TextComplete(textInput, textOutput)))
-                              )
-                          )
-                          "tool.execute.before",
-                          box (
-                              pairedHook (
-                                  box (fun (toolInput: obj) (toolOutput: obj) ->
-                                      match scope.StudentTeacherRuntime with
-                                      | None -> ()
-                                      | Some runtime ->
-                                          match runtime.ValidateTool(toolInput, toolOutput) with
-                                          | Ok() -> ()
-                                          | Error error -> raise (InvalidOperationException error))
                               )
                           ) ]
 

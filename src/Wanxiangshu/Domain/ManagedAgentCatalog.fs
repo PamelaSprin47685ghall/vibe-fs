@@ -18,8 +18,6 @@ module ManagedAgentCatalog =
         | Role.Browser -> "browser"
         | Role.Meditator -> "meditator"
         | Role.Reviewer -> "reviewer"
-        | Role.Student -> "student"
-        | Role.Teacher -> "teacher"
         | Role.Executor -> "executor"
         | Role.Blogger -> "blogger"
 
@@ -33,8 +31,6 @@ module ManagedAgentCatalog =
         | "browser" -> Some Role.Browser
         | "meditator" -> Some Role.Meditator
         | "reviewer" -> Some Role.Reviewer
-        | "student" -> Some Role.Student
-        | "teacher" -> Some Role.Teacher
         | "executor" -> Some Role.Executor
         | "blogger" -> Some Role.Blogger
         | _ -> None
@@ -75,10 +71,9 @@ module ManagedAgentCatalog =
           Role.DevOps
           Role.Browser
           Role.Meditator
-          Role.Reviewer
-          Role.Student ]
+          Role.Reviewer ]
 
-    let allInternalRoles: Role list = [ Role.Blogger; Role.Executor; Role.Teacher ]
+    let allInternalRoles: Role list = [ Role.Blogger; Role.Executor ]
 
     let allRoles: Role list = allPublicRoles @ allInternalRoles
 
@@ -92,7 +87,7 @@ module ManagedAgentCatalog =
         roles
         |> List.collect (fun role -> [ nameOf AgentTier.Fast role; nameOf AgentTier.Deep role ])
 
-    /// AGENT-002: the required 24 managed agent names.
+    /// AGENT-002: the required 20 managed agent names.
     let requiredNames: string list = namesFor allRoles
 
     let managerForkableNames: string list = namesFor managerForkableRoles

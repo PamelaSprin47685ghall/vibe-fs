@@ -39,16 +39,20 @@
 
 ## Session 关联
 
-Work↔Companion 深度 1；关联非 Role（HOST-008、COMPANION-001/002）。
+Work↔Companion 深度逻辑 1（InternalLeaf）；Dedicated SyncInspector/SyncCoder = Work+Attached 且 MAY
+再挂 Companion；关联非 Role（HOST-008、COMPANION-001/002）。物理 parent 恒 family root（HOST-015）。
 
 代表：`tests/unit/plugin/host-hooks.test.mjs`、host-compaction unit、e2e compaction/reanchor 路径。
 
-## Satellite 与 Student/Teacher
+## Attached 所有权与 Student/Teacher（G2）
 
 | 证明 | 期望 | 条款 |
 |------|------|------|
-| kind 投影 | Work/Companion/Teacher 双向 O(1)；Satellite 无子 Satellite | HOST-008 |
-| Host children 恢复 | journal id 匹配复用、id 丢失 Replacement、无关联新建不收养、冲突/查询失败 fail closed；物理 parent 恒为 family root | HOST-008、HOST-014、HOST-015 |
+| 正交投影 | ExecutionClass×Ownership 可 O(1) 分辨 Work/InternalLeaf 与 Root/Attached；AttachmentKind 含 Companion/SyncInspector/SyncCoder/Bookkeeper | HOST-008 |
+| Sync* 分类 | Dedicated SyncInspector/SyncCoder = Work+Attached，可走 Companion 能力路径；不得实现成 Teacher-style InternalLeaf | HOST-008 |
+| InternalLeaf | Companion / Bookkeeper = InternalLeaf+Attached；不持有 Companion、不递归挂叶 | HOST-008 |
+| Host children 恢复 | journal id 匹配复用、id 丢失 Replacement、无关联新建不收养、冲突/查询失败 fail closed；物理 parent 恒为 family root | HOST-008、HOST-015 |
+| G2 Teacher 过渡 | Teacher 仍可作为 transitional InternalLeaf 存在（非长期 AttachmentKind）；Student/Teacher canary 与 HOST-014 继续有效；不得证明“已删除” | HOST-008、HOST-014 |
 | Teacher 三轮调用 | 同一 Teacher SessionId；普通正文不完成父工具 | HOST-014、AGENT-020 |
 | Teacher return | 文本只成为父 `teacher` 结果；固定 terminal 正常完成，无 abort/interrupted，Session 可继续 | HOST-014 |
 | Student final return | QA 删除先于最终 Assistant completion；message 成为最终回复 | HOST-014、EXEC-027 |

@@ -31,10 +31,8 @@ const NAMES = [
   'fast-browser', 'deep-browser',
   'fast-meditator', 'deep-meditator',
   'fast-reviewer', 'deep-reviewer',
-  'fast-student', 'deep-student',
   'fast-blogger', 'deep-blogger',
   'fast-executor', 'deep-executor',
-  'fast-teacher', 'deep-teacher',
 ]
 
 // model differs per tier so no pair collides
@@ -100,7 +98,7 @@ test('MACFG_validate_ok_builds_full_inventory_with_trimmed_models', () => {
   const bindings = bindingsOf(ok.value)
   assert.equal(bindings['fast-coder'].Model, 'trimmed-model')
   assert.equal(Object.keys(bindings).length, NAMES.length)
-  assert.equal(caseOf(bindings['deep-teacher'].Agent.Role), 'Teacher')
+  assert.equal(caseOf(bindings['deep-blogger'].Agent.Role), 'Blogger')
 })
 
 test('MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model', () => {
@@ -122,9 +120,9 @@ test('MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model', () => {
 test('MACFG_applyOwnedFields_skips_null_config_and_missing_agents', () => {
   applyOwnedFields(null, { Bindings: {} }) // must not throw
   const cfg = fullConfig()
-  delete cfg.agent['deep-teacher']
+  delete cfg.agent['deep-blogger']
   applyOwnedFields(cfg, { Bindings: {} })
-  assert.equal(cfg.agent['deep-teacher'], undefined, 'missing agents are not invented')
+  assert.equal(cfg.agent['deep-blogger'], undefined, 'missing agents are not invented')
   assert.equal(cfg.agent['fast-coder'].model, 'fast-model', 'unbound agents stay untouched')
 })
 

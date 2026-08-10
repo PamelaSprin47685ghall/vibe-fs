@@ -10,7 +10,7 @@ Canonical Role 决定工具权限与 system prompt。
 ```fsharp
 type Role =
     | Orchestrator | Manager | Coder | Inspector | DevOps
-    | Browser | Meditator | Reviewer | Student | Teacher
+    | Browser | Meditator | Reviewer
     | Blogger | Executor
 
 type AgentTier = Fast | Deep
@@ -20,7 +20,7 @@ Tier **只**改变模型绑定。fast-ROLE 与 deep-ROLE 的 system prompt、工
 
 Canonical Role **不**决定 Companion 资格（COMPANION-001/002）。
 
-## AGENT-002：必须存在的 24 个 Agent
+## AGENT-002：必须存在的 20 个 Agent
 
 ```text
 fast-orchestrator     deep-orchestrator
@@ -31,13 +31,15 @@ fast-devops           deep-devops
 fast-browser          deep-browser
 fast-meditator        deep-meditator
 fast-reviewer         deep-reviewer
-fast-student          deep-student
-fast-teacher          deep-teacher
 fast-blogger          deep-blogger
 fast-executor         deep-executor
 ```
 
 缺任一 → 启动失败。每个 Agent 必须有非空且 pair 内互异的 model 字符串。
+
+G3 clean-break：`Role.Student` / `Role.Teacher` 与 `fast|deep-student|teacher` **已删除**；无 alias。
+Mandatory baseline = 20（Casebook Bookkeeper pair 仍为条件性扩展，不计入本表）。
+推理职责由 Meditator（AGENT-025）承接。
 
 ## AGENT-003：Peer
 
@@ -54,9 +56,11 @@ Peer 名称必须在启动配置验证阶段证明存在。
 
 ```text
 orchestrator, manager, build, plan, coder, inspector, devops,
-browser, meditator, reviewer, blogger, executor, fast, deep,
-reviewer-fast, fast_reviewer
+browser, meditator, reviewer, student, teacher, blogger, executor,
+fast, deep, reviewer-fast, fast_reviewer
 ```
+
+`student` / `teacher` 及 `fast|deep-student|teacher` 一律 fail closed；不得映射到 Meditator / Inspector。
 
 ## AGENT-005：用户必须显式选择
 
@@ -73,16 +77,14 @@ reviewer-fast, fast_reviewer
 | Inspector | `read`, `glob`, `grep`, `executor` |
 | DevOps | `fork-pty`, `executor`, `read`, `glob`, `grep`, `inspector`, `coder`, `join`, `list` |
 | Browser | `read`, `glob`, `grep`, network tools |
-| Meditator | `read`, `glob`, `grep`, `inspector` |
+| Meditator | `inspector` only（见 AGENT-025） |
 | Reviewer | `read`, `glob`, `grep`, `verdict` |
-| Student | 由 AGENT-020 的 request kind 决定 |
-| Teacher | 普通执行工具全集 + `return`；不含 `fork-agent` / `fork-manager` / `join` / `list` / `fork-pty` |
 | Blogger | `blog` |
 | Executor | 无工具 |
 
 ## AGENT-008：内部 Agent 不可见
 
-Blogger、Executor、Teacher 不得出现在任何模型可见的 enum、schema 或工具参数提示中。
+Blogger、Executor 不得出现在任何模型可见的 enum、schema 或工具参数提示中。
 
 ## AGENT-009：示踪面可见集合
 
@@ -143,34 +145,62 @@ POSIX `rm`，但**禁止删非空目录**：文件与空目录可删，非空目
 `bash-honeypot` 只进 Coder 矩阵。无参数；调用不执行任何 shell，只返回越权拒绝文本。  
 Host 内置 `bash` 对所有 managed role 仍保持 deny（AGENT-007）；本工具不是放行 bash。
 
-## AGENT-020：Student / Teacher
+## AGENT-020：（空缺）Student / Teacher — G3 已删除
 
-`fast-student` / `deep-student` 是公开、只能由 HumanRoot 显式选择的主动学习 Agent；不得做
-意图识别、自动路由或从其它角色自动升级。`fast-teacher` / `deep-teacher` 是内部 Agent，只能由
-Student 的 `teacher` 工具创建或恢复。
+**编号永久空缺。** G3 clean-break 删除 `Role.Student` / `Role.Teacher`、`fast|deep-student|teacher`、
+Learn/Compile / QA / SKILL / `teacher` 工具协议。无 alias、无 deprecated mode。
+后继：推理 → Meditator（AGENT-025）；证据 → SyncDelegate Inspector（AGENT-024）。
 
-Student 与 Teacher 的 tier 固定相同；两者都由 Agent 配置解析 model，发送时始终
-`Agent = Some effectiveAgent`、`Model = None`。Teacher 是叶子 Satellite：无 Companion，不进入
-fork/list/join catalog，不创建新的 Satellite。
+## AGENT-022：（空缺）Student SKILL — G3 已删除
 
-Student 工具面由同一 `AttemptExecutionProfile.RequestKind` 原子决定：
+**编号永久空缺。** StudentCompile / `.agent/skills/.../SKILL.md` 制品门已删除。无 successor skill 协议。
+
+## AGENT-024：SyncDelegate DAG 与 InvocationMode
+
+允许的同步委派边（dedicated `inspector` / `coder` 工具 → SyncDelegate，见 EXEC-026/028）：
 
 ```text
-StudentLearn   → { teacher }
-StudentCompile → { read, glob, grep, write, edit, return }
+Meditator → Inspector
+Coder     → Inspector
+DevOps    → Inspector
+DevOps    → Coder
 ```
 
-学习面不得出现文件、执行、委派或最终 `return`；编译面不得出现 `teacher`、委派、PTY 或网络工具。
-Teacher 的 `return` 只把自由文本交还等待中的 `teacher` 工具，普通正文、reasoning、idle 或工具流
-都不是回答。Student 的最终 `return` 只在编译面可执行。
+图必须是 DAG。禁止反向或成环边（例如 `Inspector → Coder`、`Inspector → Meditator`、`Coder → DevOps`）。
+嵌套 `DevOps → Coder → Inspector` 合法。启动/配置须静态证明 sync delegate 图无环。
 
-## AGENT-022：Student SKILL 可加载制品
+`InvocationMode = SynchronousDelegate` 时，callee 在角色基线工具面之上增加 `return`：
+`return` 是 AttemptExecutionProfile / InvocationMode 投影，**不是**业务程序计数器（PC）或新阶段；
+只完成当前同步 invocation（Returned），dedicated Session 生命周期仍由 OwnerReuseScope 决定（HOST-008）。
 
-StudentCompile 的写入目标只能是精确形态 `.agent/skills/<skill-name>/SKILL.md`；不得把 `.md` 平铺在
-`skills` 目录，也不得写绝对路径、穿越路径、额外嵌套或其它文件。每个 `SKILL.md` 必须是 UTF-8，
-以 `---` 包围的 YAML frontmatter 开头，其中包含非空 `name` 与 `description`，且 `name` 与目录名完全
-相同；frontmatter 后必须有非空 Markdown 正文。
+本条只宣布 SyncDelegate DAG 与 `InvocationMode`。不得把 Teacher leaf / no-Companion 拓扑套到
+Dedicated Inspector/Coder（后者是 Work + Attached，HOST-008）。
 
-write/edit 在副作用前校验目标形态；Student 最终 `return` 前重新读取并校验本次触达的全部 SKILL，
-且至少触达一个。任一文件缺失、不可解码或不满足上述契约时不得删除 QA、不得进入最终 completion。
-新 SKILL 只保证供新的 OpenCode 进程/会话发现；最终说明必须提醒用户重启 OpenCode 后加载。
+## AGENT-025：Meditator 能力（inspector-only + epistemic style）
+
+正式工具面（普通 Work Session；事实调查只经 SyncDelegate）：
+
+```text
+Meditator → { inspector }
+```
+
+禁止再持有：`read` / `glob` / `grep` / `write` / `edit` / `executor` / `coder` /
+`fork-agent` / `fork-manager` / `fork-pty` / `join` / `list` / network，以及任何 filesystem 直读面。
+
+职责只有：reason / question / compare / challenge / synthesize。分层固定为
+`Meditator = reasoning`，`Inspector = evidence acquisition`（AGENT-024 边 `Meditator → Inspector`）。
+
+Prompt discipline 吸收原 Student **epistemic style**（不是 workflow protocol）：
+
+```text
+先形成当前理解
+主动寻找反例
+把事实问题委派 Inspector，并针对回答继续追问
+区分证据 / 推论 / 不确定性
+在理解收敛前避免草率终止
+```
+
+不得重新引入：`LearningState` / QA / Compile / `MeditatorLearn|Compile` / Student 式 final `return`
+作为 Meditator 业务阶段或 RequestKind。终端就是普通 Assistant completion。
+
+Student/Teacher 角色已删除（AGENT-020 空缺）；不得 alias 回本角色。
