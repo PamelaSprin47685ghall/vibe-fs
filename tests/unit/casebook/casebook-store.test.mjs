@@ -131,3 +131,29 @@ test('CASE004_005_workflow_archive_fetch_freshness', async () => {
   const stale = checkFreshness(caseObj, toList([fileRead('a.txt', 'h2')]))
   assert.equal(caseOf(stale), 'Stale')
 })
+
+test('CASE004_replay_detects_deltas_against_current_worktree', async () => {
+  const { replayAll } = await import('../../../dist/Infrastructure/CasebookReplay.js')
+  const { mkdtempSync, rmSync, writeFileSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { contentHash: hash } = await import('../../../dist/Infrastructure/CasebookCapture.js')
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-cbreplay-'))
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
+    // stored observation matches current content → replay keeps it identical
+    const stored = [fileRead('a.txt', hash('hello'))]
+    const replayed = listItems(replayAll(dir, toList(stored)))
+    assert.equal(replayed.length, 1)
+    assert.equal(caseOf(replayed[0]), 'FileRead')
+    // content changed → replayed hash differs → Stale downstream
+    writeFileSync(join(dir, 'a.txt'), 'changed!', 'utf8')
+    const replayed2 = listItems(replayAll(dir, toList(stored)))
+    assert.equal(replayed2[0].fields[1], hash('changed!'))
+    // file deleted → observation gone → Stale downstream
+    rmSync(join(dir, 'a.txt'))
+    assert.equal(listItems(replayAll(dir, toList(stored))).length, 0)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
