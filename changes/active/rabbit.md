@@ -1,3 +1,6 @@
+> **状态**：Active — 本文件为变更工作记录，不是当前产品规范。当前产品语义仅以 `docs/` 正式层为准。
+> 原始 Proposal 已冻结于下方；后续事实仅追加于 Active work / Blockers / Final outcome。
+
 # Proposal G4R-CE — Semantic CE Vocabulary
 
 ## 将军赶路：把生产程序重写成自说明的 F# 语义语言
@@ -297,7 +300,7 @@ docs/what/dsl-structured-program.md
 
 新增：
 
-## DSL-013 — Semantic Vocabulary
+## Target DSL-013 — Semantic Vocabulary
 
 定义：
 
@@ -339,7 +342,7 @@ REVISE。
 
 ---
 
-## DSL-014 — Semantic Compression
+## Target DSL-014 — Semantic Compression
 
 > 已被独立 proof 完整覆盖的机械时序允许被 Vocabulary 压缩。
 
@@ -372,7 +375,7 @@ publishEventually
 
 ---
 
-## DSL-015 — Decorator Boundary
+## Target DSL-015 — Decorator Boundary
 
 Decorator 分两类。
 
@@ -2751,3 +2754,34 @@ which event arrived first
 > **将军赶路，不追小兔。**
 
 也是“明显没有 Bug”在生产代码侧真正应该达到的形态。
+
+---
+
+## Active work
+
+> Original proposal 原文冻结于上方；后续事实只追加于 Active work / Amendments / Blockers / Final outcome。
+
+**Started**: 2026-08-10  
+**Work origin**: 用户明确启动 `changes/proposed/rabbit.md`（G4R-CE Semantic CE Vocabulary），并要求与 G4R One World 最大并行。
+
+**Specification impact**（正式 docs 将先于 production 改写）：
+- `docs/{what,shape,how,proof}/dsl-structured-program.md` → DSL-013 Semantic Vocabulary / DSL-014 Semantic Compression / DSL-015 Decorator Boundary
+- `docs/{what,shape,how,proof}/flow.md` → Evidence→Decision 降级为可用形式；主设计法改为 typed evidence/capability → semantic vocabulary → CE composition → effect
+- 静态门禁：obsolete controller absence、Domain/Application/Session raw-time allowlist（S0 RED scaffolding；Exit 后 harden）
+- Cross-Change：Depends on `changes/active/test.md`（G4R One World）；Blocks G4 Exit
+
+## Remaining work
+
+- [x] **S0 Formal docs + RED** — DSL-013/014/015 in what/shape/how/proof; flow docs demote Evidence→Decision; `scripts/checks/g4r-ce-vocabulary.mjs` soft phase + `tests/unit/verify/g4r-ce-vocabulary.test.mjs` (10/10)
+- [x] **S1 Temporal capability** — Kernel/Temporal.fs + PtyTiming adapters; CausalAwait.untilSignalOrDeadline + 4 theorems (`tests/unit/temporal/until-signal-or-deadline.test.mjs`); awaitCoverageBeforeRetry rewrite deferred to S2 ProviderRecovery
+- [ ] **S2 TurnCompletion split/delete** — TurnWorkflow / OrdinaryTurn / InteractionRepair / ProviderRecovery / TerminalReporter
+- [ ] **S3–S11** — Reconciler / Manager / Reviewer / Finality / Fallback / FamilyRecovery / Host collapse（按 proposal landing 顺序）
+- [ ] **S12–S14** — temporal proof migration；Long Stroke vocabulary narrative；static ratchet + <10s gate
+
+## Completion criteria
+
+以 Original proposal §31 G4R-CE Exit Criteria 全部勾选为准（Formal / Structural / Time / CE / Vocabulary / Proof / Physical / Performance），且不得缩减批准范围。
+
+## Blockers
+
+（无）

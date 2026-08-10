@@ -1,0 +1,925 @@
+# The Long Stroke — G4R-3 sole OpenCode world (changes/active/test.md §4 / §21).
+#
+# One continuous OpenCode lifetime. Never set afterExpectation.restart /
+# flow.restart (recovery = durable facts in the same PID; §12). Observe durable
+# facts + public results only — no internal program-counter choreography (§7).
+# Wall clock must stay short (§16).
+#
+# Outer shell = fast-orchestrator (fork-manager → join). Inner Manager walks the
+# adversity spine; publish conflict resumes the SAME Manager (ORCH-007).
+#
+# ── natural story (compressed from orch-unhappy + manager-unhappy + fallback) ─
+#
+#   Birth (Orchestrator)
+#     ↓
+#   fork-manager / ManagerJobCreated (AgentOwnerRoot; WorkActivated at first suicide)
+#     ↓
+#   Manager forks coder; join blocked; child held incomplete
+#     ↓
+#   external user_message wakes join (interrupted / reason=user_message)
+#     ↓
+#   harvest → sole provider-error → FallbackCursorAdvanced eq 1
+#     ↓
+#   first legal suicide → migration WorkActivated → Host finality REVISE → FinalityRejected
+#     ↓
+#   repair fork → dual PERFECT → FinalityBlessed → last_words → LifeCompleted
+#     ↓
+#   CandidateReady; gitConflictProof (no restart) already diverged target
+#     ↓
+#   ConflictDetected → conflict-resume (same Manager) → coder-resolve → Published
+#     ↓
+#   orch join / expectSatisfied / oracleLongStroke
+#
+# ── §21 adversity checklist (one representative path each) ───────────────────
+#
+#   [x] provider transient failure          — [[fault]] provider-error + assertProviderTransientFailure
+#   [x] fallback                            — continue + assertFallbackContinuation
+#   [x] join blocked then causally awakened — flow.prompt wake + assertJoinWakePath
+#   [x] reviewer REVISE                     — manager-finality-revise + assertReviewerRevise
+#   [x] interrupted/aborted child or session— holdChildC1UntilLabor + assertInterruptedJoin
+#   [x] finality temporarily blocked        — FinalityRejected + assertFinalityTemporarilyBlocked
+#   [x] durable recovery/continuation       — same PID FallbackCursorAdvanced + assertDurableRecovery
+#   [x] publish conflict / stale target     — gitConflictProof on manager.0 (no restart) + assertPublishConflict
+#   [x] successful reconciliation           — Orchestrator-tagged Published eq 1 + assertSuccessfulReconciliation
+#   [x] later successful finality           — FinalityBlessed + LifeCompleted + assertLaterSuccessfulFinality
+#
+# Yield / hang risks (estimated):
+#   - FinalityBlessed waitFact: widen via renewOn; journal noise without renew can trip silence
+#   - ConflictDetected / Published: rebase+barrier lag; timeouts mirror orch-unhappy (60–90s caps)
+#   - AgentOwnerRoot WorkActivated is migration-written on first suicide (FinalityTool
+#     ensureMigrationLife), NOT at fork — never waitFact WorkActivated before mgr-finish
+#   - interrupt requires holdChildC1UntilLabor; without hold, drain completes child and skips user_message
+#   - REVISE→PERFECT needs bindFinalityReviseThenPerfect retire/activate (same OpeningAssignment)
+#   - blogger pad undersize → unmatched companion requests (fail closed)
+#   - wall <6s target vs orch publish chain — risk of §16 miss until flesh/perf pass
+#
+# Anchors (lean extract, not a paste): orchestrator-unhappy-path (conflict→Published,
+# no restart), manager-unhappy (join wake / REVISE), fallback.toml (sole provider-error).
+
+scenario = "long-stroke"
+description = "G4R-3 The Long Stroke: orchestrator shell, one OpenCode world through adversity to clean shutdown"
+pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fallback, REVISE→FinalityRejected→Blessed→LifeCompleted, gitConflictProof→ConflictDetected→Published (no restart)."
+
+setup = { strict = true, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n" } } }
+session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
+prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
+
+must = [
+  "orch.0",
+  "manager.0",
+  "manager.1",
+  "mgr-labor.0",
+  "coder.0",
+  "continue.0",
+  "manager-finality-revise.0",
+  "mgr-finish.0",
+  "mgr-bless.0",
+  "manager-finality-reviewer.0",
+  "conflict-resume.0",
+  "coder-resolve.0",
+  "barrier-reviewer.0",
+  # Long adversity keeps Manager outstanding → EXEC-016 orch-join-guard completes the shell
+  # (orch.2 is the no-nudge race path; not required when join-guard fires).
+  "orch-join-guard.0",
+]
+
+flow = [
+  # External injections before any wait (register holds / retire hooks / conflict).
+  { custom = "holdChildC1UntilLabor" },
+  { custom = "bindFinalityReviseThenPerfect" },
+
+  # Stale-head AFTER manager worktree exists (orch-unhappy / restart-conflict canary note).
+  # gitConflictProof ONLY — zero restart fields (§12 one OpenCode lifetime).
+  { afterExpectation = { id = "manager.0", gitConflictProof = true } },
+
+  # Orchestrator Birth → ManagerJob
+  { wait = "orch.0" },
+  { waitFact = { name = "ManagerJobCreated", eq = 1 } },
+  { bindChild = { agent = "fast-manager", bind = ["fast-manager"] } },
+
+  # Manager fork + join tool-calls delivered; join stays in flight while child held.
+  # WorkActivated for AgentOwnerRoot arrives later (first suicide migration) — see mgr-finish.
+  # All Manager prompts MUST use session="child" (bindChild); default session is Orchestrator.
+  { wait = "manager.0" },
+  { wait = "manager.1" },
+  { prompt = { agent = "fast-manager", text = "Also make sure publish_proof.txt has exactly the content 'Published by long-stroke canary' before the end." }, session = "child" },
+
+  # Labor: premature suicide against held child → interrupted join wake → harvest
+  { wait = "mgr-labor.0" },
+  { wait = "coder.0" },
+  { waitFact = { name = "HandleCompleted", gte = 1 } },
+  { wait = "mgr-labor.1" },
+  { wait = "mgr-labor.2" },
+
+  # Sole provider-error (fallback.toml): fault never waits as expectation.
+  { prompt = { agent = "fast-manager", text = "Provider round for long-stroke fallback." }, session = "child" },
+  { awaitTerminal = true, requireAssistantTerminal = true, requireIdleAfterActivity = true, session = "child" },
+  { wait = "continue" },
+  { waitFact = { name = "FallbackCursorAdvanced", eq = 1 } },
+
+  # First legal suicide → AgentOwnerRoot migration Life (WorkActivated) → Host finality REVISE
+  # After FinalityRejected Host may idle-nudge (manager-guard) instead of mgr-finish.1 text;
+  # repair continues via a fresh MARK-REPAIR HumanRoot (manager-unhappy shape).
+  { prompt = { agent = "fast-manager", text = "Continue the long stroke: seek a legal ending for publish_proof.txt after fallback." }, session = "child" },
+  { wait = "mgr-finish.0" },
+  { waitFact = { name = "WorkActivated", eq = 1 } },
+  { wait = "manager-finality-revise.0" },
+  { wait = "manager-finality-revise.1" },
+  { waitFact = { name = "FinalityRejected", gte = 1 } },
+
+  # Repair → dual PERFECT → Blessed → last_words / LifeCompleted
+  { prompt = { agent = "fast-manager", text = "MARK-REPAIR: ensure publish_proof.txt is exact, then seek a blessed ending." }, session = "child" },
+  { wait = "mgr-bless.0" },
+  { wait = "coder-fix.0" },
+  { wait = "mgr-bless.1" },
+  { wait = "mgr-bless.2" },
+  { wait = "manager-finality-reviewer.0", timeoutMs = 30000 },
+  { wait = "manager-finality-reviewer.1", timeoutMs = 30000 },
+  { waitFact = { name = "FinalityBlessed", gte = 1, renewOn = ["ReviewVerdictRecorded", "ConfirmedReviewWitness", "FinalityReviewerEnlisted", "BlogEntryCommitted"] }, timeoutMs = 180000 },
+  { wait = "mgr-bless.3", timeoutMs = 30000 },
+  { wait = "mgr-bless.4", timeoutMs = 30000 },
+  { waitFact = { name = "LifeCompleted", gte = 1 } },
+  { waitFact = { name = "CandidateReady", eq = 1 }, timeoutMs = 60000 },
+
+  # Conflict resume on SAME Manager (no task restart) → resolve → Published
+  { waitFact = { name = "ConflictDetected", gte = 1 }, timeoutMs = 60000 },
+  { wait = "conflict-resume.0", timeoutMs = 60000 },
+  { wait = "coder-resolve.0", timeoutMs = 60000 },
+  { wait = "coder-resolve.1", timeoutMs = 60000 },
+  { wait = "conflict-resume.1", timeoutMs = 60000 },
+  { wait = "conflict-resume.2", timeoutMs = 60000 },
+  { waitFact = { name = "RebasedCandidateReady", gte = 1 }, timeoutMs = 90000 },
+  # Bare "Published" false-matches assignment text; pin Orchestrator case tag.
+  { waitFact = { name = "\"Orchestrator\",[\"Published\"", eq = 1 }, timeoutMs = 90000 },
+
+  # EXEC-016 join-guard holds orch join until Manager Published; then final text.
+  { wait = "orch-join-guard.1", timeoutMs = 60000 },
+  { awaitTerminal = true, requireAssistantTerminal = false },
+  { custom = "oracleLongStroke" },
+  { expectSatisfied = true },
+]
+
+[[turn]]
+id = "title"
+lane = "title"
+kind = "title"
+user = "Ship publish_proof.txt to the target branch through the long stroke."
+
+  [[turn.step]]
+  respond = { type = "title", text = "Long Stroke" }
+
+[[turn]]
+id = "orch"
+lane = "fast-orchestrator"
+user = "Ship publish_proof.txt to the target branch through the long stroke."
+tools = ["fork-manager", "join"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork-manager", args = { agent = "fast-manager", prompt = "Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept REVISE then reach a blessed ending so publish can reconcile." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  # No-nudge race: join stays blocked until Manager Published, then this text.
+  # Long adversity usually takes orch-join-guard instead — keep optional.
+  [[turn.step]]
+  optional = true
+  respond = { type = "text", text = "Long stroke publish completed after conflict resume." }
+
+# AgentOwnerRoot Manager (opening is "#" + orch fork prompt). Fork + join; join
+# stays blocked while holdChild keeps coder incomplete for user_message wake.
+[[turn]]
+id = "manager"
+lane = "fast-manager"
+user = "# Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept REVISE then reach a blessed ending so publish can reconcile."
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Write publish_proof.txt." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+[[turn]]
+id = "mgr-labor"
+lane = "fast-manager"
+user = "Also make sure publish_proof.txt has exactly the content 'Published by long-stroke canary' before the end."
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "premature" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join", args = {} }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Join harvested after user_message wake; continue." }
+
+# Faulted delivery — not in must / wait= (fallback.toml).
+[[turn]]
+id = "provider-fail"
+lane = "fast-manager"
+user = "Provider round for long-stroke fallback."
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "unreachable: the first delivery is refused" }
+
+[[turn]]
+id = "continue"
+internal = true
+user = "# Continue after provider failure."
+
+  [[turn.step]]
+  respond = { type = "text", text = "long-stroke fallback continuation completed." }
+
+[[epoch]]
+turn = "continue"
+step = 0
+reason = "prefix-probe"
+
+# After fallback: first legal suicide → REVISE (text ends this turn).
+[[turn]]
+id = "mgr-finish"
+lane = "fast-manager"
+user = "Continue the long stroke: seek a legal ending for publish_proof.txt after fallback."
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "first ending" } }
+
+  # Optional: same-turn text after REVISE; Host often idle-nudges instead (manager-guard).
+  [[turn.step]]
+  optional = true
+  respond = { type = "text", text = "First ending rejected after REVISE; repairing." }
+
+# Fallback continuation + Host rebuild can rewrite the Manager prefix before first legal suicide.
+[[epoch]]
+turn = "mgr-finish"
+step = 0
+reason = "prefix-probe"
+
+# Fresh HumanRoot after REVISE: repair coder + Host dual-PERFECT blessing + last_words.
+[[turn]]
+id = "mgr-bless"
+lane = "fast-manager"
+user = "MARK-REPAIR: ensure publish_proof.txt is exact, then seek a blessed ending."
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Ensure publish_proof.txt contains exactly: Published by long-stroke canary" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join", args = {} }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "suicide", args = { last_words = "publish_proof.txt is ready." } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager rest in peace." }
+
+[[turn]]
+id = "coder"
+lane = "fast-coder"
+user = [
+  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
+  "# Write publish_proof.txt.",
+]
+tools = ["write"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "write", args = { filePath = "publish_proof.txt", content = "Published by long-stroke canary\n" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Coder finished." }
+
+[[turn]]
+id = "coder-fix"
+lane = "fast-coder"
+user = [
+  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
+  "# Ensure publish_proof.txt contains exactly: Published by long-stroke canary",
+]
+tools = ["write"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "write", args = { filePath = "publish_proof.txt", content = "Published by long-stroke canary\n" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Coder repaired proof file." }
+
+# Host finality OpeningAssignment. bindFinalityReviseThenPerfect retires REVISE
+# after .1 and activates dual-PERFECT turn (same OpeningAssignment otherwise ties).
+[[turn]]
+id = "manager-finality-revise"
+internal = true
+user = "# Review the current worktree against all authoritative user requirements."
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "REVISE" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Finality reviewer rejects the ending." }
+
+[[turn]]
+id = "manager-finality-reviewer"
+internal = true
+user = "# Review RETIRED long-stroke finality — inactive until revise cohort ends."
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager finality reviewer confirmed." }
+
+[[turn]]
+id = "manager-guard"
+internal = true
+optional = true
+user = ["# You are doing well.", "# You have plenty of time.", "# You can continue.", "# When nothing useful remains, call suicide."]
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager continues." }
+
+[[turn]]
+id = "mgr-join-guard"
+internal = true
+optional = true
+user = ["# Background work is still outstanding.", "# Call join to collect completed results before finishing."]
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join", args = {} }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager joined." }
+
+# EXEC-016 twin on Orchestrator while ManagerJob is still outstanding (orch-restart-publish).
+# Long Stroke adversity keeps the Manager alive long enough that this path is the shell
+# completion (join blocks until Published; step 1 is the clean shutdown text).
+[[turn]]
+id = "orch-join-guard"
+internal = true
+optional = true
+user = ["# Background work is still outstanding.", "# Call join to collect completed results before finishing."]
+tools = ["fork-manager", "join"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Long stroke publish completed after conflict resume." }
+
+[[turn]]
+id = "manager-repair"
+internal = true
+optional = true
+user = "#"
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "text", text = "Manager continues after repair." }
+
+[[turn]]
+id = "reviewer-repair"
+internal = true
+optional = true
+user = ["# Your previous response did not submit a verdict.", "# Continue the review and submit PERFECT or REVISE with the verdict tool."]
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Repaired Reviewer submitted the tool verdict." }
+
+# ORCH-007 conflict resume — same Manager session; do NOT restart original task.
+[[turn]]
+id = "conflict-resume"
+internal = true
+user = "[CONFLICT RESUMPTION] An in-progress rebase hit conflicts. Conflicted files:"
+tools = ["fork", "join", "list", "suicide"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Conflict resolved; rebase can continue." }
+
+[[turn]]
+id = "coder-resolve"
+lane = "fast-coder"
+user = [
+  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
+  "# Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary",
+]
+tools = ["write"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "write", args = { filePath = "publish_proof.txt", content = "Published by long-stroke canary\n" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Conflict file resolved." }
+
+[[turn]]
+id = "barrier-reviewer"
+internal = true
+user = "# Review the current worktree for correctness. Submit your verdict with the verdict tool."
+tools = ["glob", "grep", "read", "verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Barrier reviewer completed the double PERFECT." }
+
+[[turn]]
+id = "reviewer-confirm"
+internal = true
+user = "# Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
+tools = ["verdict"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Reviewer confirmed the tree." }
+
+
+[[turn]]
+id = "blogger"
+internal = true
+user = "# Write the dense work-log continuation now"
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Long stroke.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Long stroke continued.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 2.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 3.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 4.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 5.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 6.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 7.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 8.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 9.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 10.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 11.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 12.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 13.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 14.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 15.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 16.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 17.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 18.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 19.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 20.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 21.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 22.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 23.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 24.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 25.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 26.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 27.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 28.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 29.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 30.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 31.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 32.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 33.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 34.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 35.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 36.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 37.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 38.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 39.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 40.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 41.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 42.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 43.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 44.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 45.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 46.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 47.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 48.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 49.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 50.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 51.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 52.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 53.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 54.", tip = "primitive-obsession" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "blog", args = { text = "Blogger cycle 55.", tip = "primitive-obsession" } }
+
+
+[[epoch]]
+turn = "blogger"
+step = 0
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 1
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 2
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 3
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 4
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 5
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 6
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 7
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 8
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 9
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 10
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 11
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 12
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 13
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 14
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 15
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 16
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 17
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 18
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 19
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 20
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 21
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 22
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 23
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 24
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 25
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 26
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 27
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 28
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 29
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 30
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 31
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 32
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 33
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 34
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 35
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 36
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 37
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 38
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 39
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 40
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 41
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 42
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 43
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 44
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 45
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 46
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 47
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 48
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 49
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 50
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 51
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 52
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 53
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 54
+reason = "frame-commit"
+
+[[epoch]]
+turn = "blogger"
+step = 55
+reason = "frame-commit"
+
+# Sole physical fault: one settled non-retryable provider-error (no AABB here).
+[[fault]]
+turn = "provider-fail"
+step = 0
+delivery = "provider-error"
+status = 400
+retryable = false
+attempts = [1]

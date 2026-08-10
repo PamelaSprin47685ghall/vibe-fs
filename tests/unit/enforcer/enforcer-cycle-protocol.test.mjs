@@ -52,6 +52,8 @@ const {
   resolveCycleContext,
 } = await import('../../../dist/Session/EnforcerHost.js')
 const HostSessionNudge = await import('../../../dist/Infrastructure/OpenCode/Host/HostSessionNudge.js')
+const ConfirmedFailurePort = await import('../../../dist/Session/ConfirmedFailurePort.js')
+const AgentPairCursor = await import('../../../dist/Domain/AgentPairCursor.js')
 const BloggerRecoveryProbe = await import('../../../dist/Application/Reconciliation/BloggerRecoveryProbe.js')
 const { lastAssistantStep } = await import('../../../dist/Session/EnforcerHost.js')
 const BlogTool = await import('../../../dist/Infrastructure/OpenCode/Tools/BlogTool.js')
@@ -70,6 +72,31 @@ const repairNudgeOf = (sessionPort) => {
   return (sessionId, prompt, directory, journal, terminalRun, repairKind) =>
     send(sessionPort, sessionId, prompt, directory, journal, terminalRun, repairKind)
 }
+
+/**
+ * Production wiring: close journal + budget into ConfirmedFailurePort (rabbit §13.1 / S9.1).
+ * Fable emits `module ConfirmedFailurePort` bind as ConfirmedFailurePortModule_bind
+ * (flattened arity); wrap as the 3-arg port EnforcerHost invokes.
+ */
+const confirmedFailureOf = (journal) => {
+  if (!journal) return undefined
+  const bind =
+    ConfirmedFailurePort.ConfirmedFailurePortModule_bind ?? ConfirmedFailurePort.bind
+  if (typeof bind !== 'function') {
+    throw new Error('ConfirmedFailurePort.bind missing from dist')
+  }
+  const budget = AgentPairCursor.DefaultAutoRecoveryBudget ?? 12
+  return (sessionId, providerRun, reason) => {
+    // Fable may emit bind as (journal,budget)=>port or flattened 5-arg.
+    if (bind.length <= 2) {
+      const port = bind(journal, budget)
+      return typeof port === 'function' ? port(sessionId, providerRun, reason) : port
+    }
+    return bind(journal, budget, sessionId, providerRun, reason)
+  }
+}
+
+
 
 const MAIN = 'ses-main'
 const BLOG = 'ses-blog'
@@ -160,6 +187,7 @@ const withHarness = async (fn, { portMode = 'ok' } = {}) => {
           fail: portMode === 'fail',
         })
   const repairNudge = repairNudgeOf(sessionPort)
+  const confirmedFailure = confirmedFailureOf(journal)
 
   // Expected paths are silent (no console). Unexpected paths print via console.error
   // then would kill the process — under node:test the kill is gated off.
@@ -223,7 +251,7 @@ const withHarness = async (fn, { portMode = 'ok' } = {}) => {
   let transcript = []
   const run = async (messages) => {
     const input = toList([...transcript, ...listItems(messages)])
-    const out = await handleContinuation(scope, journal, repairNudge, recoveryProbe, blog, input)
+    const out = await handleContinuation(scope, journal, repairNudge, confirmedFailure, recoveryProbe, blog, input)
     transcript = [...transcript, ...outcomeMessages(out)]
     return out
   }
@@ -1009,7 +1037,7 @@ test('ENFORCER_068_aabb_repair_advances_primary_cursor_through_one_writer', asyn
     assert.equal(accepted.tag ?? 0, 0, `AcceptHumanRoot failed: ${accepted.fields?.[0] ?? JSON.stringify(accepted)}`)
 
     // Empty-text repair path → the bridge records the confirmed failure on the
-    // PRIMARY cursor (ENFORCER-062/067/068), through FallbackController — the
+    // PRIMARY cursor (ENFORCER-062/067/068), through ConfirmedFailurePort → FallbackController — the
     // one writer.
     const out = await run(liveBlog('asst-1', 'c1', { text: '' }))
     assert.equal(hasRepairMessage(out), true, 'budget permits, repair still injected')

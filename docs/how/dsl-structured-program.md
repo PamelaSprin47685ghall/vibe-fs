@@ -10,8 +10,11 @@
 - DSL-006
 - DSL-007
 - DSL-012
+- DSL-013
+- DSL-014
+- DSL-015
 
-另见 shape 层所有权条款：DSL-008、DSL-009、DSL-010、DSL-011（定义见 [`../shape/dsl-structured-program.md`](../shape/dsl-structured-program.md)）。本文件不把上述 shape-only 条款伪造成 how 实现算法。
+另见 shape 层所有权条款：DSL-008、DSL-009、DSL-010、DSL-011（定义见 [`../shape/dsl-structured-program.md`](../shape/dsl-structured-program.md)）。本文件不把上述 shape-only 条款伪造成 how 实现算法。Vocabulary / Decorator 落点亦见该 shape 文件。
 
 ## Ownership
 
@@ -50,7 +53,25 @@ descriptor 必含 owner / producer / escapes。E2E 通过 `.wanxiangshu/diagnost
 
 ## Algorithm
 
-业务流程直接执行：
+### 推荐主设计法（DSL-013 / DSL-014）
+
+复杂业务时序的推荐形状：
+
+```text
+typed evidence / capability
+→ semantic vocabulary
+→ CE bind / recursion / higher-order composition
+→ effect
+```
+
+也就是：先拿到类型化的 evidence 或 capability，再调用具名 Semantic Vocabulary（完整业务承诺），用 `let!` / `match!` / `return!` / 有界递归 / 高阶组合把故事串起来，最后经 typed port 产生效果。已被独立 proof 覆盖的机械时序可压缩进 Vocabulary（DSL-014）；调用点不追内部小兔。
+
+异步顺序由 `task {}`、`let!`、`do!`、`use!` 表达；资源清理留在拥有该资源的同一作用域。
+等待使用真实 Task/TCS/进程信号，不能用可持久字段保存 continuation 或下一阶段。
+
+### 可用形式：Evidence → Decision
+
+下列仍是**合法且常用**的一种形态（尤其 Domain 纯规则与简单 Application 分支），但不再是唯一理想形式：
 
 ```text
 读取 evidence
@@ -60,10 +81,9 @@ descriptor 必含 owner / producer / escapes。E2E 通过 `.wanxiangshu/diagnost
 → 以 return! 或有界递归继续
 ```
 
-异步顺序由 `task {}`、`let!`、`do!`、`use!` 表达；资源清理留在拥有该资源的同一作用域。
-等待使用真实 Task/TCS/进程信号，不能用可持久字段保存 continuation 或下一阶段。
+当 Decision 只是世界真实结果或许可（而非程序计数器）时，穷尽 `match` 完全合法。复杂时序应优先升格为 Semantic Vocabulary，而不是把流程压成巨大 Decision 表。
 
-### 线性流程
+### 线性流程（Evidence → Decision 形式）
 
 ```fsharp
 let run ports input =
@@ -75,6 +95,26 @@ let run ports input =
             return Completed result
     }
 ```
+
+### 语义词汇叙事（推荐形式）
+
+```fsharp
+let rec runLife env life =
+    task {
+        do! Background.awaitSettled env life
+        let! activation = Activation.ensureAccepted env life
+        let! work = Labor.performResiliently env activation
+        let! judgement = Cohort.reviewUntilSettled env work
+        match judgement with
+        | Revision feedback ->
+            let! revised = Labor.revise env feedback
+            return! runLife env revised.Life
+        | Confirmed witness ->
+            return! Finality.finalizeWhenSafe env life witness
+    }
+```
+
+调用点名字必须通过 DSL-013 判据；内部复杂时序由该 Vocabulary 的 proof 覆盖（DSL-014）。
 
 ### 有界重试
 
@@ -92,15 +132,26 @@ let rec runRound ports remaining input =
 ```
 
 递归参数只能承载下一轮真实输入或有限预算，不能承载 `Stage`、`NextAction`、
-`isRunning` 等程序位置。
+`isRunning` 等程序位置。有界递归本身可以是 Vocabulary 内部实现；对外仍应暴露完整承诺名字。
+
+### Decorator 叠加（DSL-015）
+
+```fsharp
+let port =
+    rawPort
+    |> Port.withProtocolNormalization
+    |> Port.withCausalObservation waits
+```
+
+transparent decorator 可叠加；改变 trace 的 retry/fallback/recovery 等必须是具名 Semantic Vocabulary 或调用点具名，不得匿名 middleware。
 
 ### 崩溃恢复
 
 ```text
-Journal fold → Evidence → Decision/Permit → 普通 workflow 入口
+Journal fold → Evidence → Decision/Permit → 普通 workflow / Vocabulary 入口
 ```
 
-不得恢复 continuation、interpreter cursor 或 runtime stage。
+不得恢复 continuation、interpreter cursor 或 runtime stage。恢复重入的是普通 CE 与 Vocabulary，不是压缩前的机械步骤指针。
 
 ## Failure handling
 
@@ -156,9 +207,10 @@ annotation 当作自动证明。
 ## Review questions
 
 1. 字段表示真实事物，还是程序下一步？
-2. Decision 是否可由纯函数从 evidence 得到？
+2. Decision 是否可由纯函数从 evidence 得到？（若走 Vocabulary 路径：调用点名字是否声明完整业务承诺？）
 3. 等待是否对应真实信号并由单一作用域拥有？
-4. 恢复是否重入普通 workflow，而非恢复执行位置？
+4. 恢复是否重入普通 workflow / Vocabulary，而非恢复执行位置？
 5. mutable 是否只管理物理资源或局部算法 scratch？
+6. 改变 trace 的 decorator 是否具名 Vocabulary，抑或匿名 middleware？
 
 证明义务和反例见 `proof/dsl-structured-program.md`。

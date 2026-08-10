@@ -11,7 +11,7 @@ open Wanxiangshu.Kernel.Identity
 ///
 /// Owns per-session detectors and the process-local LoopKillArmed set.
 /// Abort is fire-and-forget; the AABB bridge happens later on TurnAborted
-/// when the armed mark is still present (TurnCompletionProgram).
+/// when the armed mark is still present (OrdinaryTurnWorkflow).
 type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Result<unit, string>>) =
 
     let gate = obj ()

@@ -19,7 +19,7 @@ type AgentRunResult =
         /// The worktree this run executed in, when it has one.
         ///
         /// `option`, not `""`. An empty path is not a directory, and every consumer
-        /// had to re-test for blankness to find that out — `TurnCompletionProgram`
+        /// had to re-test for blankness to find that out — terminal completion
         /// did exactly that before passing it on, which means the sentinel was
         /// converted back into an option one layer later anyway.
         Directory: string option

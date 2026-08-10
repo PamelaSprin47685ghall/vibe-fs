@@ -12,6 +12,7 @@ open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
+open Wanxiangshu.Process
 
 /// Restart recovery for linked children. Terminal path: ChildRecoveryWorkflow
 /// → ChildRecoveryResult → recordCompletion → PulseAgentHandle. Fail closed on proof.
@@ -42,7 +43,8 @@ module HostForkRestart =
           // resolveChild → RecoveredActive (recovery work done; child continues).
           // Do not inject RecoveryInFlight — that forced RecoveryIncomplete and blocked permit.
           Observations = [ HostObservation.SessionActive ]
-          Pulse = Some(fun () -> runtime.PulseAgentHandle(AgentHandleId.create agentId)) }
+          Pulse = Some(fun () -> runtime.PulseAgentHandle(AgentHandleId.create agentId))
+          Clock = PtyTiming.nodeClockPort () }
 
     /// Active handle: Domain recoverChild via production interpreter.
     let recoverChild

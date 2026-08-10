@@ -116,9 +116,46 @@ Infrastructure 目录级豁免不得隐藏它们。
 
 测试必须走公共契约面并断言可观察结果或端口调用；不得只断言内部 tag。
 
+## Vocabulary naming review（DSL-013 / DSL-014 / DSL-015）
+
+不做愚蠢的单词黑名单。每个新增 Application public function（尤其拟作为 Semantic Vocabulary 暴露的入口）必须在 review / Change proof 中回答下表；回答不出则 REVISE。
+
+| # | 必须回答 |
+|---|---|
+| 1 | 它的名字声明了什么业务承诺？ |
+| 2 | 它隐藏了哪些时序？ |
+| 3 | 哪个 temporal / behavioral proof 证明这些时序？ |
+| 4 | 它改变 trace 集，还是 transparent decorator？ |
+| 5 | crash 后从什么 durable evidence 重入？ |
+
+判据与 what 层一致：只看调用点名字 + 参数 + 返回类型，能否合理知道调用者在等待什么语义。Transparent decorator（DSL-015）不改变业务 trace，仍须标明不改变 trace；Semantic decorator / 压缩 Vocabulary 必须能指出对应 proof（DSL-014）。
+
+## 高阶 Vocabulary 证明义务（DSL-013 / DSL-014）
+
+每个高阶 Vocabulary 必须有对应 temporal / behavioral proof；生产入口落地时按下表闭合（名称为目标语义合同，实现可迁文件但不得无 proof 压缩时序）：
+
+| Vocabulary | 必须证明 |
+|---|---|
+| `ManagerActivation.ensureAccepted` | exactly-once activation traces |
+| `ManagerBackground.ensureSettled` | completion / join / wake permutations |
+| `ManagerIdle.encourageLabor` | independent idle occasions / stale permit |
+| `ReviewerContinuation.ensurePerfectConfirmed` | first PERFECT / challenge / second PERFECT |
+| `ReviewBarrierWorkflow.reverify` | verdict absence / revision / confirmation |
+| `FallbackLedger.recordConfirmedFailure` | dedupe / AABB / exhaustion |
+| `ProviderRecoveryWorkflow.continueAfterConfirmedFailure` | failure → material → continuation |
+| `FinalityCohort.reviewUntilFirstRevisionOrAllConfirmed` | cohort interleavings |
+| `FinalityRevision.rejectAndSteer` | sibling accounting / replay |
+| `FinalityBlessing.blessIfTreeUnchanged` | tree movement / canonical records |
+| `SessionRecoveryWorkflow.recoverFamilyDirect` | closure orders / missing evidence |
+| `FamilyRecoveryCoordinator.runOnce` | physical single-flight only（非业务语义） |
+| `Orchestrator.publishEventually` | target movement recursion |
+
+新增高阶 Vocabulary 必须追加本表一行，并挂上可观察效果测试（fake/deterministic ports + 真实生产 Vocabulary），不得只断言内部 tag 或墙钟竞态。
+
 ## 完成判据
 
 1. Active Change 所列完成条件全部满足，并在同一文件追加 Final outcome 后移入 Completed。
 2. 静态门禁无阈值上调或永久豁免逃逸。
 3. 相关 unit、integration 与 canary 按 `proof/verify.md` 通过。
 4. 删除旧状态后不存在双写、adapter facade 或仅为旧测试保留的旁路。
+5. 每个高阶 Vocabulary 通过上表 naming review，且改变 trace 的压缩均有对应 temporal proof；transparent decorator 不改变可观察业务 traces。

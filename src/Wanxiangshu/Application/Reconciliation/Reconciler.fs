@@ -48,9 +48,13 @@ module Reconciler =
         | Some value ->
             match value.Observation with
             | Some ReconcileProgram.TurnUnknown ->
-                // HOST-004: finish=None is SnapshotObservation — evidence Unknown,
-                // no PublishTurn (publishDecision must not see TurnUnknown).
-                ReconcileProgram.ReconcileEvidence.Unknown None
+                // HOST-004 / rabbit §7: finish=None is SnapshotObservation evidence
+                // (Unknown), wake-gated in decideStep. PublishTurn carries the
+                // placeholder Outcome only — never TurnUnknown — so publishDecision
+                // can seal/dedupe the handoff to TurnWorkflow / InteractionRepair.
+                ReconcileProgram.ReconcileEvidence.Unknown(
+                    Some(ReconcileProgram.observedTurn (publishTurnOf value))
+                )
             | None ->
                 let observed = ReconcileProgram.observedTurn (publishTurnOf value)
 
@@ -278,12 +282,12 @@ module Reconciler =
                             let decision = ReconcileProgram.decideStep wake rereadsRemaining evidence
 
                             match decision with
-                            | ReconcileProgram.ReconcileDecision.Publish
-                            | ReconcileProgram.ReconcileDecision.RepairMissingFinalReport ->
-                                // RepairMissingFinalReport publishes the observed
-                                // Unknown turn as-is; TurnCompletionProgram turns it
-                                // into the missing-final-report repair (GLORY-070),
-                                // gated on the pass's quiescence evidence.
+                            | ReconcileProgram.ReconcileDecision.Publish ->
+                                // Stable observation handoff only (rabbit §7).
+                                // Unknown under IdleWake Publishes the observed turn
+                                // as-is; TurnWorkflow / InteractionRepair owns any
+                                // missing-final-report repair (GLORY-070), gated on
+                                // the pass's quiescence evidence.
                                 let publishable =
                                     match evidence with
                                     | ReconcileProgram.ReconcileEvidence.Terminal observed -> observed.PublishTurn
@@ -406,10 +410,11 @@ module Reconciler =
             | SessionDeleted sessionId -> this.ClearSession(sessionId)
             // HOST-002/004: an operator abort is a typed wake, not a failure.
             // AbortWake holds no idle rights (quiescence was already revoked via
-            // RevokeCurrentAttempt), and decideStep refuses
-            // RepairMissingFinalReport / InteractionRepair under it. The genuine
-            // TurnAborted terminal publishes normally; Unknown / Provisional
-            // StopPass instead of resurrecting an idle-derived continuation.
+            // RevokeCurrentAttempt), and decideStep refuses to Publish Unknown /
+            // Provisional under it so business cannot mint InteractionRepair.
+            // The genuine TurnAborted terminal publishes normally; Unknown /
+            // Provisional StopPass instead of resurrecting an idle-derived
+            // continuation.
             | AttemptAborted sessionId -> this.Kick(sessionId, ReconcileProgram.ReconcileWake.AbortWake)
 
         member _.BindUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId, ?agentRole: Role) =

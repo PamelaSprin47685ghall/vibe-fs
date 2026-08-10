@@ -10,6 +10,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
+open Wanxiangshu.Finality
 
 /// GLORY-003/040/042/044/045/060/061: the Manager Finality workflow, driven by
 /// the Host after a legal `suicide`.
@@ -24,17 +25,11 @@ open Wanxiangshu.Session
 /// working on minor problems until its second suicide (GLORY-061/062).
 module FinalityController =
 
-    type FinalityOutcome =
-        | Rejected of prompt: string
-        | Blessed of prompt: string
-        | Undecided of prompt: string
-
-    /// One enlisted cohort member with the durable identities the driver needs.
-    type EnlistedMember =
-        { ReviewerSessionId: SessionId
-          BarrierId: ReviewBarrierId
-          ReviewerOrdinal: int
-          AgentId: string }
+    // Temporary re-exports — Application/Finality owns these (rabbit §12.2).
+    // Call sites keep `FinalityController.FinalityOutcome` until the controller
+    // body itself moves and this module is deleted.
+    type FinalityOutcome = Wanxiangshu.Finality.FinalityOutcome
+    type EnlistedMember = Wanxiangshu.Finality.EnlistedMember
 
     /// Cooperative cancellation for sibling drivers on a REVISE short-circuit:
     /// stops their NEXT effect, never touches their durable sessions.

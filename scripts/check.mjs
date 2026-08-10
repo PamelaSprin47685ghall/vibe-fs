@@ -17,6 +17,12 @@ const checks = [
   join(root, 'checks/student-teacher-absence.mjs'),
   join(root, 'checks/unified-store-gate.mjs'),
   join(root, 'checks/g4r-freeze.mjs'),
+  // G4R-CE-S0: obsolete-controller / raw-time detectors live in
+  // checks/g4r-ce-vocabulary.mjs. NOT hard-wired here — production still has
+  // TurnCompletionProgram / FinalityController / ReviewController / … and Session
+  // raw time. Unit tests prove RED on synthetic trees; CLI default --phase=s0-soft
+  // is warn-only. Harden + add to this list at S14 (--phase=hard).
+  // join(root, 'checks/g4r-ce-vocabulary.mjs'),
 ]
 
 for (const script of checks) {

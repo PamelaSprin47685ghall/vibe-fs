@@ -15,7 +15,7 @@ Host 适配、信号和共享状态边界见 `shape/host.md`。
 - Single-flight：同一 session 同时最多一次 reconcile。  
 - Dirty：idle 到达设 dirty。  
 - 有界因果重读：每次 idle 至多 3 次因果重读（`rereadsRemaining = maxCausalRereads + 1`）。  
-- `decideStep`（GLORY-070 / HOST-004 rev.3）：因果重读耗尽后 `Provisional` → `Publish`；只有 `SnapshotError` / `NoTurn` 保持 `StopPass`（无对象可作用，等下一粗粒度信号重新入队）。`Unknown` 不再由重读耗尽直接推导 continuation：`RepairMissingFinalReport` 只在带 `IdleWake`（fresh `QuiescencePermit`）evidence 时可构造；`Retry` / `Failure` wake 下的 `Unknown` 不产生 idle-derived continuation。
+- `decideStep`（GLORY-070 / HOST-004 rev.3 / rabbit §7）：因果重读耗尽后 `Provisional` → `Publish`；只有 `SnapshotError` / `NoTurn` 保持 `StopPass`（无对象可作用，等下一粗粒度信号重新入队）。`Unknown` 不再由重读耗尽直接推导业务 repair：带 `IdleWake`（fresh `QuiescencePermit`）evidence 时 `Publish` 稳定观测给业务（TurnWorkflow / InteractionRepair 决定是否 missing-final-report）；`Retry` / `Failure` wake 下的 `Unknown` 不交接（`StopPass`）。`ReconcileDecision` 只有 observation vocabulary（`Reread` / `Publish` / `StopPass`），不含业务 repair 名字。
 - 观测稳定性 ≠ 静止资格：重复 snapshot 相同只证明观测稳定，不证明发送瞬间仍 idle。idle-derived continuation 必须同时满足：
   1. snapshot / 业务决策认为 continuation 有用；
   2. 起源的 `QuiescencePermit` 在 side-effect 时刻仍 fresh（发送边界再次 `TryConsume`）。
@@ -59,7 +59,7 @@ type ReconciledTurn =
       Outcome: TurnOutcome }
 ```
 
-行为不变：`IdleWake` 下因果重读耗尽仍为 `TurnUnknown` → `RepairMissingFinalReport`（禁止静默 StopPass）；无 idle 权限的 `Retry` / `Failure` / `Abort` wake 只 StopPass，等待下一真实信号。`publishDecision` 不得接收 `TurnUnknown`（类型上已不可达）；既不写 stable（consumed）也不写 provisional seal。
+行为不变（语义分层后）：`IdleWake` 下因果重读耗尽仍为 `TurnUnknown` → `Publish` 稳定观测交接（禁止静默 StopPass）；业务侧 TurnWorkflow / InteractionRepair 在有 quiescence 时才发 missing-final-report。无 idle 权限的 `Retry` / `Failure` / `Abort` wake 只 StopPass，等待下一真实信号。`publishDecision` 不得接收 `TurnUnknown` 作为 Outcome（类型上已不可达）；Unknown 交接用 placeholder Outcome 做 provisional seal / dedupe。
 
 Host 的 `MessageAbortedError` / `finish=aborted` 先被 Reconciler 分类为 `TurnAborted`。`TurnCompletionProgram` 再消费这个控制面结局：
 

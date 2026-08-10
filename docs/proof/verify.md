@@ -10,33 +10,37 @@
 
 | 条款 | 回答的问题 |
 |------|------------|
-| VERIFY-001 | 测试金字塔层级（0–5） |
-| VERIFY-002 | 晋级阶梯，禁止跨级 |
+| VERIFY-001 | 测试金字塔：Pure laws → Temporal → Adapter → Long Stroke → Release |
+| VERIFY-002 | 晋级阶梯，禁止跨级；禁止语义分支直跳 E2E |
 | VERIFY-003 | Canary mock 剧本：键、匹配、幂等、故障轴、冷边界 |
-| VERIFY-004 | 因果推进门禁与**禁止退化清单**（机器解析锚点） |
+| VERIFY-004 | 因果推进门禁、One Physical World 目标与**禁止退化清单**（机器解析锚点） |
 | VERIFY-005 | Architecture gates / 单一写入口 / Host 边界 |
 | VERIFY-006 | No-Go 发布否决 |
 | VERIFY-007 | Wire / Semantic / BloggerDelta 三种投影 |
 | VERIFY-008 | 测试语言边界（`.fs` 生产 / `.mjs` 契约面） |
 
-读顺序建议：001→002 定层；008 定入口；003+007 定 canary；004 定挂死语义；005+006 定发布门。
+读顺序建议：001→002 定层；008 定入口；003+007 定 canary/契约面；004 定挂死语义与 One World；005+006 定发布门。
 
 ## VERIFY-001：测试金字塔
 
+权威形态（G4R One World / Pure Time 目标）：
+
 ```text
-0. 静态检查（规范一致性、旧符号灭绝、架构门禁）— 不是测试，不需要产物
-1. 纯函数测试（Fallback fold、authority fold、review witness）
-2. 资源契约测试（Flow Using、Completion Channel、Process pumps）
-3. Fake Host 轨迹（blogger busy skip、nudge、fallback、guard）
-4. OpenCode E2E（canary，real OpenCode Host + mock provider）
-5. 发布门禁（三轮 × 全部 e2e + package + packing）
+0. Static architecture/proof gates
+1. Pure laws（无 Host / clock / process / network）
+2. Temporal（Deterministic temporal workflow proof：production workflow + virtual ports + explicit traces；可穷举/有界交错）
+3. Adapter（Single physical adapter contract：恰好一个物理边界）
+4. Long Stroke（恰好 1 个真实 OpenCode E2E，恰好 1 次 OpenCode lifetime）
+5. Release（一次确定性 full proof + build/package/packing）
 ```
 
 第 0 层是纯文本与文件系统检查，永远不依赖编译产物，因此在任何阶段都可运行。第 1–3 层的语言与入口由 VERIFY-008 规定。
 
 ### G4R 迁移中（One World / Pure Time）
 
-在 One World / Pure Time 迁移完成前，第 0 层额外执行 `scripts/checks/g4r-freeze.mjs`：
+上表是 **目标权威**，不是「迁移已完成」的声称。在 cutover 完成前，仓库仍可能短暂保留旧 multi-canary / Fake Host 轨迹 / 三轮 shuffle 形态的 harness 实现；那些形态 **不得** 再被当作目标金字塔，也不得与上表长期双真。
+
+迁移完成前，第 0 层额外执行 `scripts/checks/g4r-freeze.mjs`：
 
 ```text
 E2E case 数量不得越过冻结天花板（只降不升）
@@ -45,28 +49,29 @@ time-budget.js 命名预算不得抬高
 禁止新增顶层 E2E entry（唯一 Long Stroke 入口在 cutover 时落地）
 ```
 
-目标金字塔（cutover 后生效，替换上表第 3–5 层的 multi-canary / 三轮 shuffle 形态）：
-
-```text
-0. Static architecture/proof gates
-1. Pure laws（无 Host / clock / process / network）
-2. Deterministic temporal workflow proof（production workflow + virtual ports + explicit traces）
-3. Single physical adapter contract
-4. The Long Stroke（恰好 1 个真实 OpenCode E2E，恰好 1 次 lifetime）
-5. Release（一次确定性 full proof + build/package/packing）
-```
-
 迁移期间不得以新增 E2E、抬 timeout、retry-until-pass、降低 parallelism、或精修旧 scenario choreography 作为修复路径。Race 证明迁入显式 temporal algebra；物理组合证明收敛为唯一 Long Stroke。
 
 ## VERIFY-002：五级晋级阶梯
 
-不允许跨级。
+不允许跨级。目标阶梯（与 VERIFY-001 对齐）：
 
-1. 纯状态测试：不涉及 Host、事件、网络
-2. 单边界集成：一次 Host signal -> 一次 durable fact -> 一次 dispatcher
-3. 录制事件重放：确定性重放，不依赖真实 SSE
-4. 单 canary：`CANARY_REPEAT=1`
-5. 发布门禁：三轮 x 完整 check:release
+```text
+1. Pure law
+2. Deterministic temporal trace
+3. Single physical adapter contract
+4. One Long Stroke
+5. Release
+```
+
+禁止把 semantic branch 直接晋级到 E2E。
+
+若某分支声称「必须由 OpenCode 才能验证」，作者必须先回答：
+
+```text
+它到底依赖哪个不可模拟的 physical contract？
+```
+
+答不出 → REVISE（降回 Pure law / Temporal / Adapter，不得以 E2E 顶替）。不得用「场景复杂」「历史如此」「先挂 canary 再说」代替物理契约论证。
 
 ## VERIFY-003：Canary Mock 剧本
 
@@ -219,7 +224,13 @@ TOML 语法要求根级键值对先于任何表头，否则会被静默归属到
 
 本条款描述的是原理，不是现有实现。
 
-原理必须继承并发扬，任何重构不得丢弃或降级。现有落点包括 `tests/e2e/support/watchdog.js`、`tests/e2e/support/readiness.js`、`tests/e2e/support/stability-checker.js`、`tests/unit/support/run-inner.mjs` 与 `tests/unit/support/verdict-feed.mjs`；实现不因先存在而获得权威。
+原理必须继承并发扬，任何重构不得丢弃或降级：**因果进展、semantic watchdog、死前诊断、时间注入、禁止固定 sleep、禁止 timeout padding、禁止 repeat-until-pass** 永久保留。
+
+G4R One World 目标另增：One Physical World、OpenCode Spawn Exactly Once、Semantic Race 的 deterministic trace、Temporal 用 Virtual Time、No Wall-Clock Semantic Assertion、Long Stroke 只观察公开/可持久语义（见下文各节）。
+
+旧 multi-canary 的 scenario parallelism / startup width / bark chain / shuffle / 三轮 E2E repeat / one process per canary：**superseded，target-delete**——不得再写成目标形态；迁移期若旧 harness 仍在，只许收敛、不许加固。
+
+现有落点包括 `tests/e2e/support/watchdog.js`、`tests/e2e/support/readiness.js`、`tests/e2e/support/stability-checker.js`、`tests/unit/support/run-inner.mjs` 与 `tests/unit/support/verdict-feed.mjs`；实现不因先存在而获得权威。
 
 判断标准始终是本条款文字，不是当前代码的行为。
 
@@ -301,37 +312,89 @@ watchdog 装好之前的窗口同样需要因果判据。启动阶段（进程�
 
 若运行器声称「断言投喂心跳」，则该心跳必须真实连通并有测试证明。声明了但未接线的心跳等于没有心跳，且比没有更坏——它让读者相信存在一层不存在的保护。
 
-### 事件交错启动
+### 事件交错启动（superseded / migration — target-delete）
 
-E2E canary 全并行运行在一个池里。canary N+1 的启动条件是 canary N 输出了精确的就绪标记，而不是固定 sleep。
+> **G4R One World：本节描述的 multi-canary 并行池 / startup-width bark chain 是旧拓扑事故机制，目标态删除。**  
+> 迁移完成前，若旧 harness 仍在运行，下列纪律仍约束它，防止退化成固定 sleep；cutover 后本节整体作废，由下方 One Physical World / Spawn Once 取代。
+
+旧形态（target-delete）：E2E canary 全并行运行在一个池里；canary N+1 的启动条件是 canary N 输出了精确的就绪标记，而不是固定 sleep。
 
 ```text
-必须：因果 bark（就绪标记出现即启动下一个）
-禁止：按序号计算的固定延迟
+（迁移期仍有效，目标删除）必须：因果 bark（就绪标记出现即启动下一个）
+（迁移期仍有效，目标删除）禁止：按序号计算的固定延迟
+（目标删除）MAX_PARALLEL / CANARY_STARTUP_WIDTH / bark stagger / parallel worker pool
 ```
 
-理由与 watchdog 相同：固定延迟在快机器上浪费时间，在慢机器上仍然撞车，且两种情况都不可诊断。因果启动自动适配机器速度。
-
-配套的两个门禁：
+配套的两个门禁（迁移期仍有效，随 multi-canary 拓扑一并 target-delete）：
 
 ```text
 就绪门禁：未在有限窗口内输出就绪标记 → 该 canary 失败（不是放行）
 早退门禁：在输出就绪标记之前退出 → 该 canary 失败
 ```
 
-第二条防止「进程秒退所以看起来很快就绪」被当成成功。
+### Release gate（superseded / migration — target-delete）
 
-### Release gate
+> **G4R One World：三轮 × shuffle × 多 canary 的 Release 形状已 superseded。**  
+> 目标 Release = 一次确定性 full proof + build/package/packing（见 VERIFY-001 第 5 层）。  
+> 「禁止 repeat-until-pass」作为因果纪律永久保留；「恰好 3 轮 / 每轮 shuffle」随旧拓扑 target-delete。
+
+旧形态（superseded，不得再当作目标）：
 
 ```text
-恰好 3 轮，不是「最多 3 轮」也不是「直到通过」
-每轮独立 shuffle 启动顺序
-禁止 repeat-until-pass
+（superseded）恰好 3 轮，不是「最多 3 轮」也不是「直到通过」
+（superseded / target-delete）每轮独立 shuffle 启动顺序
+（永久保留）禁止 repeat-until-pass
 ```
 
-shuffle 的作用是暴露隐式顺序依赖。固定顺序下的绿灯只证明「这个顺序可以」。
+清单单一事实来源仍永久成立：用于日志或断言的数量常量必须从清单派生，不得独立维护。目标态下清单收敛为唯一 Long Stroke（及静态/纯时序入口），而不是多-canary 枚举。
 
-canary 清单必须是单一事实来源。用于日志或断言的数量常量必须从清单派生，不得独立维护。
+### One Physical World（目标）
+
+```text
+VERIFY-004 One Physical World
+  证明世界至多一个：不得用并行 multi-canary / multi-process fan-out 冒充覆盖面
+  语义命题在 Pure / Temporal 层证明；物理世界只承担不可模拟的组合契约
+```
+
+### OpenCode Spawn Exactly Once（目标）
+
+```text
+VERIFY-004 OpenCode Spawn Exactly Once
+  Long Stroke 全程恰好一次 OpenCode lifetime / spawn site
+  禁止 per-canary 一进程、禁止为「再跑一遍」二次拉起真实 Host
+```
+
+### Semantic Race Has Deterministic Trace Proof（目标）
+
+```text
+VERIFY-004 Semantic Race Has Deterministic Trace Proof
+  race / 交错命题必须有显式 deterministic trace（virtual ports + 有界交错）
+  禁止把真实 scheduler 碰巧顺序当作 race 证明
+```
+
+### Temporal Tests Use Virtual Time（目标）
+
+```text
+VERIFY-004 Temporal Tests Use Virtual Time
+  Temporal 层测试必须走虚拟时间 / 注入时钟，不得依赖真实墙钟推进语义
+  生产墙钟只允许经声明的 physical time / timer adapter
+```
+
+### No Wall-Clock Semantic Assertion（目标）
+
+```text
+VERIFY-004 No Wall-Clock Semantic Assertion
+  禁止用 wall-clock 时长、固定 sleep、或「等够 N 秒」断言语义成立
+  wall-clock 只可作挂死兜底，不可作语义判据（与因果 watchdog 同构）
+```
+
+### Long Stroke Observes Public/Durable Semantics（目标）
+
+```text
+VERIFY-004 Long Stroke Observes Public/Durable Semantics
+  Long Stroke 只观察公开/可持久语义面（journal、投影、契约出口）
+  禁止导演 production 私有状态或断言内部 helper 时序
+```
 
 ### 泄漏检查
 
@@ -349,7 +412,9 @@ harness 内的静态检查（禁止固定 sleep 等）其路径判据必须与�
 
 ### 禁止退化清单
 
-以下任一出现即为门禁退化，等同于 VERIFY-006 的 No-Go：
+以下任一出现即为门禁退化，等同于 VERIFY-006 的 No-Go。
+
+机器解析锚点（下列 ```text 块内条目文本不得无故改写；解析器按整行绑定 id）。其中「因果 bark 交错启动 / 就绪早退 / Release 轮次」条目在迁移期仍约束旧 multi-canary harness；cutover 后随该拓扑删除，不得借改写条目把退化合法化——应删拓扑，不改禁令语义为「允许 until-pass」。
 
 ```text
 把 wall-clock 总超时当作唯一挂死判据
@@ -368,6 +433,17 @@ Release gate 变成「最多 N 轮」或「重跑直到通过」
 ```
 
 最后一条是最隐蔽的：调大超时永远能让红灯变绿，而它消灭的是发现问题的能力，不是问题。
+
+One World 目标态下，下列形状同样视为退化（与上文各目标节同义；待静态 ratchet 落地后可并入机器锚点，现以条款正文为准）：
+
+```text
+并行 multi-canary / worker pool 冒充证明覆盖面（违反 One Physical World）
+Long Stroke 内二次 spawn OpenCode（违反 Spawn Exactly Once）
+用真实 scheduler 碰巧顺序证明 semantic race（缺少 deterministic trace）
+Temporal 测试依赖真实墙钟推进语义（违反 Virtual Time）
+用 wall-clock / sleep 断言语义成立（违反 No Wall-Clock Semantic Assertion）
+Long Stroke 断言 production 私有状态或内部 helper 时序
+```
 
 ## VERIFY-005：Architecture Gates
 

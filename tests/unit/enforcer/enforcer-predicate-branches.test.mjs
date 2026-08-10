@@ -114,7 +114,7 @@ const withHarness = async (fn, { link = true, material = 0 } = {}) => {
   let transcript = []
   const run = async (messages) => {
     const input = toList([...transcript, ...listItems(messages)])
-    const out = await handleContinuation(scope, journal, undefined, probe, sessionId(BLOG), input)
+    const out = await handleContinuation(scope, journal, undefined, undefined, probe, sessionId(BLOG), input)
     transcript = [...transcript, ...outcomeMessages(out)]
     return out
   }

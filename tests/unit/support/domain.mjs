@@ -4624,6 +4624,9 @@ export const causalAwait = {
     CausalAwaitModule.awaitUnit(observer, descriptor, pending),
   race: (observer, descriptor, primary, escape) =>
     CausalAwaitModule.race(observer, descriptor, primary, escape),
+  /** G4R-CE S1: tryRead → race signal OR one IDeadlineHandle (no slice poll). */
+  untilSignalOrDeadline: (observer, descriptor, deadline, tryRead, awaitSignal) =>
+    CausalAwaitModule.untilSignalOrDeadline(observer, descriptor, deadline, tryRead, awaitSignal),
 }
 
 /**

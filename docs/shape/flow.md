@@ -15,6 +15,8 @@ observeSnapshot
 
 每操作一种结果类型。禁止泛化 `execute Command` 与大 Reply DU 吞掉不可能分支。
 
+含复杂时序的领域承诺用具名 Semantic Vocabulary 表达（定义见 [`DSL-013`](../what/dsl-structured-program.md)；压缩与 Decorator 边界见 [`DSL-014`](../what/dsl-structured-program.md) / [`DSL-015`](../what/dsl-structured-program.md)）。Vocabulary 条款归属 DSL，本层不另立 `FLOW-` ID。
+
 ## FLOW-006：禁止第二运行时
 
 下列形态禁止引入或保留：

@@ -257,6 +257,13 @@ module SpikePlugin =
                                         let repairNudge: InteractionRepairNudge =
                                             HostSessionNudge.trySendInteractionRepair sessionPort
 
+                                        // rabbit §13.1 / S9.1: close journal + budget into ConfirmedFailurePort
+                                        // so EnforcerHost never hard-imports FallbackController.
+                                        let confirmedFailure: ConfirmedFailurePort =
+                                            ConfirmedFailurePort.bind
+                                                durable
+                                                AgentPairCursor.DefaultAutoRecoveryBudget
+
                                         // ENFORCER-153: the recovery stage probe derives
                                         // nudge/AABB state from durable claim + transcript.
                                         let recoveryProbe
@@ -288,6 +295,7 @@ module SpikePlugin =
                                                 scope
                                                 journal
                                                 (Some repairNudge)
+                                                (Some confirmedFailure)
                                                 recoveryProbe
                                                 sid
                                                 bloggerMessages

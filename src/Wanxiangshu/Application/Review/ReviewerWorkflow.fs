@@ -13,11 +13,10 @@ open Wanxiangshu.Host
 /// The single business owner of a reconciled Reviewer turn's continuation
 /// (REVIEW-002/007).
 ///
-/// `observe` is the one writer that decides what a reconciled reviewer turn
-/// needs. It reads only durable witness facts (`ReviewerGuardState`) — there is
-/// no stored State/Stage counter. `HostReviewGuard` is a transport primitive
-/// here: every reviewer send funnels through it, but the decision to send
-/// belongs to this module, not to the guard.
+/// `observe` is the story: durable `ReviewerEvidence` facts choose the branch;
+/// `ReviewerContinuation` owns the named send promises; `HostReviewGuard` is
+/// only the transport primitive underneath those verbs. There is no stored
+/// State/Stage counter.
 module ReviewerWorkflow =
 
     /// Build the `AgentRunResult`, validate via `runResult.IsValid`, capture the
@@ -77,39 +76,22 @@ module ReviewerWorkflow =
                 eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with empty terminal output")
                 |> ignore
 
-    /// The only continuation writer. Finality and terminal plumbing may observe
-    /// facts, but they never choose or send a reviewer continuation.
-    let ensureContinuation
-        (sessionPort: ISessionHostPort)
-        (journal: AgentJournal option)
-        (nudgeSent: HashSet<string>)
+    let private reportContinuationFailure
+        (eventPort: IEventObservationPort)
         (sessionId: SessionId)
-        (providerRun: ProviderRunIdentity)
-        (reviewerKey: string)
-        : Task<Result<unit, string>> =
-        task {
-            if not (ReviewerGuardState.continuationOpen journal reviewerKey) then
-                return Ok()
-            elif ReviewerGuardState.pendingConfirmation journal reviewerKey then
-                let! outcome =
-                    HostReviewGuard.requestPerfectConfirmation sessionPort journal nudgeSent sessionId providerRun
-
-                match outcome with
-                | HostReviewGuard.GuardNudgeOutcome.Failed reason -> return Error reason
-                | _ -> return Ok()
-            elif not (ReviewerGuardState.submitted journal reviewerKey) then
-                let! _ = HostReviewGuard.nudgeReviewer sessionPort journal nudgeSent sessionId providerRun
-                return Ok()
-            else
-                return Ok()
-        }
+        (outcome: Result<unit, string>)
+        =
+        match outcome with
+        | Error reason ->
+            eventPort.NotifyTerminal sessionId (TerminalOutcome.Failed reason)
+            |> ignore
+        | Ok() -> ()
 
     /// The single writer deciding what a reconciled reviewer turn needs.
     ///
     /// Witness-driven, NOT a program counter: every branch reads a durable
-    /// `ReviewerGuardState` fact. Completion reports the run; the two guard
-    /// branches send exactly-once through `HostReviewGuard` and fail closed on a
-    /// `Failed` send.
+    /// `ReviewerEvidence` classification. Completion reports the run; continuation
+    /// branches call named Vocabulary and fail closed on a `Failed` send.
     let observe
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -118,27 +100,39 @@ module ReviewerWorkflow =
         (turn: ReconciledTurn)
         (reviewerKey: string)
         : Task =
-        // 1. Confirmed reviewer (dual-PERFECT witness) → complete. A confirmed
-        //    double-PERFECT often ends tool-only; expose the minimal A.
-        if ReviewerGuardState.isConfirmedReviewer journal reviewerKey then
+        match ReviewerEvidence.classifyNeed journal reviewerKey with
+        | ReviewerEvidence.Need.CompleteConfirmed ->
+            // Confirmed dual-PERFECT often ends tool-only; expose the minimal A.
             completeReviewer eventPort journal turn true
             AsyncSupport.completedTask ()
-        // 2. First PERFECT awaiting its causal confirmation round-trip → send the
-        //    confirmation challenge exactly once. With no continuation in flight
-        //    the run would wait forever — fail closed on a failed send.
-        elif
-            ReviewerGuardState.pendingConfirmation journal reviewerKey
-            || not (ReviewerGuardState.submitted journal reviewerKey)
-        then
+        | ReviewerEvidence.Need.EnsurePerfectConfirmed ->
             task {
-                match! ensureContinuation sessionPort journal nudgeSent turn.SessionId turn.ProviderRun reviewerKey with
-                | Error reason ->
-                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
-                    |> ignore
-                | Ok() -> ()
+                let! outcome =
+                    ReviewerContinuation.ensurePerfectConfirmed
+                        sessionPort
+                        journal
+                        nudgeSent
+                        turn.SessionId
+                        turn.ProviderRun
+                        reviewerKey
+
+                reportContinuationFailure eventPort turn.SessionId outcome
             }
             :> Task
-        // 4. Revision / already-handled (a verdict is on record) → completion path.
-        else
+        | ReviewerEvidence.Need.EnsureVerdictSubmitted ->
+            task {
+                let! outcome =
+                    ReviewerContinuation.ensureVerdictSubmitted
+                        sessionPort
+                        journal
+                        nudgeSent
+                        turn.SessionId
+                        turn.ProviderRun
+                        reviewerKey
+
+                reportContinuationFailure eventPort turn.SessionId outcome
+            }
+            :> Task
+        | ReviewerEvidence.Need.CompleteRevision ->
             completeReviewer eventPort journal turn false
             AsyncSupport.completedTask ()

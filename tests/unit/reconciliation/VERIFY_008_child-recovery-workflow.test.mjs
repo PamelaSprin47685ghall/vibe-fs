@@ -7,6 +7,7 @@ import {
   agentJournal,
   caseOf,
   childRecovery,
+  clockPort,
   errorResult,
   handleController,
   handleId,
@@ -36,6 +37,7 @@ const withJournal = async (body) => {
 const linkedPorts = (journal, messages, observations, pulse = undefined, snapshotResult = okResult(toList(messages))) => {
   const linked = handleController.link(journal, PARENT, AGENT_ID, CHILD, 'fast-coder', roles.of('Coder'))
   assert.equal(linked.ok, true, linked.ok ? '' : linked.error)
+  const clock = clockPort.createVirtual()
   return new Ports(
     journal,
     PARENT,
@@ -47,6 +49,7 @@ const linkedPorts = (journal, messages, observations, pulse = undefined, snapsho
     'fast-coder',
     toList(observations),
     pulse,
+    clock.rawPort,
   )
 }
 

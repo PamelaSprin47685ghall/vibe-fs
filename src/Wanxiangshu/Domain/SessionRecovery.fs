@@ -279,6 +279,38 @@ module SessionRecovery =
             )
         | JobFamilyRecovery.JobsBlocked blocks -> SessionRecovery.Blocked blocks
 
+    /// Priority fold over per-port outcomes (rabbit §14.2):
+    /// Blocked > Waiting > Recovered > other (first within a tier wins).
+    let combine (outcomes: SessionRecovery list) : SessionRecovery =
+        match
+            outcomes
+            |> List.tryPick (function
+                | SessionRecovery.Blocked bs -> Some(SessionRecovery.Blocked bs)
+                | _ -> None)
+        with
+        | Some blocked -> blocked
+        | None ->
+            match
+                outcomes
+                |> List.tryPick (function
+                    | SessionRecovery.Waiting ws -> Some(SessionRecovery.Waiting ws)
+                    | _ -> None)
+            with
+            | Some waiting -> waiting
+            | None ->
+                match
+                    outcomes
+                    |> List.tryPick (function
+                        | SessionRecovery.Recovered r -> Some(SessionRecovery.Recovered r)
+                        | _ -> None)
+                with
+                | Some recovered -> recovered
+                | None ->
+                    match outcomes with
+                    | head :: _ -> head
+                    | [] ->
+                        SessionRecovery.NoRecoveryRequired(RecoveryReceipt.create (SessionId.create "") 0L None [] [])
+
     let private sessionOfNode =
         function
         | RecoveryNode.WorkSession id

@@ -50,9 +50,9 @@ test('RECONCILE_PROGRAM_003: decideStep bounds causal rereads and stops on exhau
 
   // Non-terminal with budget exhausted → fail closed per evidence kind: nothing
   // to act on (SnapshotError/NoTurn) keeps StopPass; Provisional publishes the
-  // stop text; Unknown repairs the missing final report only when the pass
-  // carries idle evidence (HOST-004 rev.3) — retry/failure wakes prove
-  // observation stability, not quiescence, and never repair.
+  // stop text; Unknown Publishes a stable observation only when the pass
+  // carries idle evidence (HOST-004 rev.3 / rabbit §7) — retry/failure wakes
+  // prove observation stability, not quiescence, and never hand off.
   assert.equal(name(0, reconcileProgram.evidence.snapshotError('transient')), 'StopPass')
   assert.equal(name(0, reconcileProgram.evidence.noTurn()), 'StopPass')
   assert.equal(name(0, reconcileProgram.evidence.provisional('TurnInProgress')), 'Publish')
@@ -61,7 +61,7 @@ test('RECONCILE_PROGRAM_003: decideStep bounds causal rereads and stops on exhau
   assert.equal(name(0, reconcileProgram.evidence.unknown(), reconcileWake.failureWake()), 'StopPass')
   assert.equal(
     name(0, reconcileProgram.evidence.unknown(), reconcileWake.idleWake(quiescencePermit.create('ses-a', 1))),
-    'RepairMissingFinalReport',
+    'Publish',
   )
 
   // Unknown clears continuation candidate; provisional keeps it.
@@ -87,8 +87,8 @@ test('RECONCILE_PROGRAM_003: decideStep bounds causal rereads and stops on exhau
   assert.equal(name(3, reconcileProgram.evidence.terminal('TurnAborted')), 'Publish')
   assert.equal(name(3, reconcileProgram.evidence.terminal('TurnFailed')), 'Publish')
 
-  // HOST-004: an exhausted operator-abort wake must not resurrect an
-  // idle-derived RepairMissingFinalReport / InteractionRepair / bare "#";
+  // HOST-004: an exhausted operator-abort wake must not Publish Unknown /
+  // Provisional (business must not mint InteractionRepair / bare "#");
   // it StopPasses until the real TurnAborted terminal.
   assert.equal(name(0, reconcileProgram.evidence.unknown(), reconcileWake.abortWake()), 'StopPass')
   assert.equal(name(0, reconcileProgram.evidence.provisional('TurnInProgress'), reconcileWake.abortWake()), 'StopPass')
@@ -166,15 +166,15 @@ test('RECONCILE_PROGRAM_004: publishDecision gates already-published terminal an
 })
 
 test('RECONCILE_PROGRAM_005: TurnUnknown never crosses the stable business-turn boundary', async () => {
-  // HOST-004 Clean Break: TurnUnknown is type-unreachable for publishDecision
-  // (not a TurnOutcome). Publish silence is structural; IdleWake retains the
-  // distinct missing-final-report repair path via ReconcileEvidence.Unknown.
-  const repair = reconcileProgram.decideStep(
+  // HOST-004 / rabbit §7: TurnUnknown is type-unreachable for publishDecision
+  // (not a TurnOutcome). IdleWake + exhausted Unknown → Publish (observation
+  // handoff only); business repair lives in TurnWorkflow / InteractionRepair.
+  const handoff = reconcileProgram.decideStep(
     reconcileWake.idleWake(quiescencePermit.create('ses-a', 1)),
     0,
     reconcileProgram.evidence.unknown(),
   )
-  assert.equal(reconcileProgram.decisionName(repair), 'RepairMissingFinalReport')
+  assert.equal(reconcileProgram.decisionName(handoff), 'Publish')
 
   // HOST-004 Clean Break: TurnUnknown must leave TurnOutcome entirely and live
   // only as reconciliation-private SnapshotObservation (type-unreachable for

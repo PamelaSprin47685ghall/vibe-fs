@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Kernel
 open Wanxiangshu.Process
 
 /// Subscribes coarse host signals from exactly one source per plugin instance:

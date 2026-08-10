@@ -71,7 +71,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     /// Family recovery coordinator ports (PROMPT-011 + C5 + RECOVERY-FAMILY).
     ///
     /// Attached after `createHost`. First business entry point runs
-    /// SessionRecoveryWorkflow; later callers await the same single-flight task.
+    /// SessionRecoveryWorkflow.recoverFamilyDirect under FamilyRecoveryCoordinator
+    /// single-flight; later callers await the same task.
     // DSL-MUTABLE: resource — family recovery ports attachment slot
     let mutable familyRecoveryPorts: SessionRecoveryWorkflow.Ports option = None
     let recoveryGateLock = obj ()
@@ -145,7 +146,11 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             match lock recoveryGateLock (fun () -> familyRecoveryPorts) with
             | None ->
                 return FamilyRecovery.FamilyBlocked(NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root))
-            | Some ports -> return! SessionRecoveryWorkflow.Coordinator.recoverFamily ports root
+            | Some ports ->
+                return!
+                    FamilyRecoveryCoordinator.runOnce
+                        (SessionRecoveryWorkflow.recoverFamilyDirect ports)
+                        root
         }
 
     /// Await family recovery before business effects. Returns FamilyRecovery so

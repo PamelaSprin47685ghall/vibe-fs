@@ -132,7 +132,7 @@ const withHarness = async (parts, fn) => {
   ])
 
   try {
-    await handleContinuation(scope, journal, undefined, () => undefined, blog, rawMessages)
+    await handleContinuation(scope, journal, undefined, undefined, () => undefined, blog, rawMessages)
     await fn({
       fatals,
       lastFatal: () => fatals.at(-1),

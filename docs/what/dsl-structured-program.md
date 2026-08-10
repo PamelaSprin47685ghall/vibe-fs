@@ -69,6 +69,83 @@ F# 调用栈就是流程栈。禁止把「程序下一步去哪」编码为可�
 
 落点：`CausalWait` / `CausalWaitRegistry` / `CausalAwait`（Session），E2E watchdog 的 `CAUSAL FRONTIER` 一屏展示。
 
+## DSL-013：Semantic Vocabulary（语义词汇）
+
+业务 CE 可以调用内部包含复杂时序的具名 Vocabulary。Vocabulary 的名字必须描述完整业务承诺，而不是实现动作。
+
+允许（示例）：
+
+```text
+reviewUntilPerfect
+publishEventually
+recoverDurably
+awaitChildrenSettled
+finalizeWhenSafe
+fallbackAcross
+```
+
+拒绝（示例）：
+
+```text
+executeSafe
+process
+handle
+doRetry
+runReliable
+withPolicy
+continue2
+```
+
+判据：只看调用点名字 + 参数 + 返回类型，reviewer 是否能够合理知道调用者在等待什么语义？若不能，则该名字不合格。
+
+原则：任何聪明都必须有名字；任何名字都必须有 law。所有权与落点见 `shape/dsl-structured-program.md`；命名 review 与 proof 义务见 `proof/dsl-structured-program.md`。
+
+## DSL-014：Semantic Compression（语义压缩）
+
+已被独立 proof 完整覆盖的机械时序允许被 Vocabulary 压缩。
+
+调用点可以隐藏内部机械步骤（例如 read head → rebase → review → CAS → target moved → 再 rebase/review…），但被压缩的 Vocabulary 必须拥有自己的 temporal / behavioral proof。无对应 proof 不得压缩。
+
+压缩不改变 DSL-001：调用栈仍是 F# CE；隐藏的是已证明的机械时序，不是程序计数器。
+
+## DSL-015：Decorator Boundary（装饰器边界）
+
+Port Decorator 分两类。
+
+### Transparent Decorator
+
+不改变业务 trace 集，例如：
+
+```text
+diagnostics
+metrics
+causal observation
+protocol normalization
+exception normalization
+```
+
+可自由叠加。
+
+### Semantic Decorator
+
+改变业务 trace 集，例如：
+
+```text
+retry
+fallback
+recovery
+dedupe
+claim
+deadline policy
+```
+
+必须满足以下之一：
+
+1. 自身已经是有正式 law 的 Semantic Vocabulary（DSL-013）；
+2. 在业务 CE 调用点拥有明确语义名字。
+
+禁止匿名 middleware 魔法，以及全局 `DecoratorBase` / `MiddlewarePipeline` / `IWorkflowDecorator` 一类框架。局部 module decorator 叠加允许，边界见 `shape/dsl-structured-program.md`。
+
 ## 相关条款定义位置
 
 以下条款按 GOV-011 定义于 shape，本表仅为导航，不重复定义。
@@ -83,6 +160,9 @@ F# 调用栈就是流程栈。禁止把「程序下一步去哪」编码为可�
 | DSL-006 | 本文件 |
 | DSL-007 | 本文件 |
 | DSL-012 | 本文件 |
+| DSL-013 | 本文件 |
+| DSL-014 | 本文件 |
+| DSL-015 | 本文件 |
 | DSL-008 | [`shape/dsl-structured-program.md`](../shape/dsl-structured-program.md)（DSL-008：分层所有权） |
 | DSL-009 | [`shape/dsl-structured-program.md`](../shape/dsl-structured-program.md)（DSL-009：模块与职责） |
 | DSL-010 | [`shape/dsl-structured-program.md`](../shape/dsl-structured-program.md)（DSL-010：Host 边界白名单） |

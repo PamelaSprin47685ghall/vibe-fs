@@ -1,6 +1,5 @@
 namespace Wanxiangshu.OpenCode
 
-open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Journal
@@ -40,36 +39,6 @@ module SessionRecoveryWorkflow =
         | RecoveryNode.Blogger(_, id)
         | RecoveryNode.ManagerJob(_, id)
         | RecoveryNode.Reviewer(_, id) -> id
-
-    let private mergeOutcomes (outcomes: SessionRecovery list) : SessionRecovery =
-        match
-            outcomes
-            |> List.tryPick (function
-                | SessionRecovery.Blocked bs -> Some(SessionRecovery.Blocked bs)
-                | _ -> None)
-        with
-        | Some blocked -> blocked
-        | None ->
-            match
-                outcomes
-                |> List.tryPick (function
-                    | SessionRecovery.Waiting ws -> Some(SessionRecovery.Waiting ws)
-                    | _ -> None)
-            with
-            | Some waiting -> waiting
-            | None ->
-                match
-                    outcomes
-                    |> List.tryPick (function
-                        | SessionRecovery.Recovered r -> Some(SessionRecovery.Recovered r)
-                        | _ -> None)
-                with
-                | Some recovered -> recovered
-                | None ->
-                    match outcomes with
-                    | head :: _ -> head
-                    | [] ->
-                        SessionRecovery.NoRecoveryRequired(RecoveryReceipt.create (SessionId.create "") 0L None [] [])
 
     /// Default RecoverBlogger implementation using BloggerCrashRecovery.
     let defaultRecoverBlogger
@@ -232,7 +201,7 @@ module SessionRecoveryWorkflow =
                                     }
 
                             let merged =
-                                mergeOutcomes (claimOutcome :: bloggerOutcome :: handleOutcome :: jobParts)
+                                combine (claimOutcome :: bloggerOutcome :: handleOutcome :: jobParts)
 
                             return! recoverNodes rest (Map.add sessionId merged acc)
                     }
@@ -242,25 +211,3 @@ module SessionRecoveryWorkflow =
                 let recovered = { Closure = closed; Results = results }
                 return authorizeFamilyResume parentSession closed.JournalSequence recovered
         }
-
-    module Coordinator =
-        let private gate = obj ()
-        let private inflight = Dictionary<string, Task<FamilyRecovery>>()
-
-        let recoverFamily (ports: SessionRecoveryPorts) (root: SessionId) : Task<FamilyRecovery> =
-            let key = SessionId.value root
-
-            lock gate (fun () ->
-                match inflight.TryGetValue key with
-                | true, existing -> existing
-                | false, _ ->
-                    let started =
-                        task {
-                            try
-                                return! recoverFamilyDirect ports root
-                            finally
-                                lock gate (fun () -> inflight.Remove key |> ignore)
-                        }
-
-                    inflight.[key] <- started
-                    started)

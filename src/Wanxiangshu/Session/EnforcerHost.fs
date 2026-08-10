@@ -1266,10 +1266,15 @@ module EnforcerHost =
     /// mirror, and this module must never grow one.
     type RecoveryStageProbe = BloggerRequestContext -> BloggerToolRecovery
 
+    /// rabbit §13.1 / S9.1: `confirmedFailure` is the injected FALLBACK-003 writer
+    /// adapter (ConfirmedFailurePort). EnforcerHost must not call
+    /// FallbackController.recordConfirmedFailure directly — journal + budget are
+    /// closed at the wiring site (SpikePlugin / test harness).
     let handleContinuation
         (scope: IParkedTransformHost)
         (journal: AgentJournal option)
         (repairNudge: InteractionRepairNudge option)
+        (confirmedFailure: ConfirmedFailurePort option)
         (recoveryProbe: AgentJournal -> SessionId -> obj list -> RecoveryStageProbe)
         (bloggerSessionId: SessionId)
         (rawMessages: obj list)
@@ -1378,42 +1383,41 @@ module EnforcerHost =
                         BloggerRuntimeHost.forceSealRuntime scope key
                         project rawMessages
                     else
-                        // ENFORCER-062/067/068 bridge: the confirmed failure advances the
-                        // primary A/A/B/B cursor through the ONE writer. Exhaustion forbids
-                        // the next automatic attempt — the repair projection is then NOT
-                        // injected (it would re-arm the same run). The same terminal run
-                        // observed twice stays AlreadyRecorded: it advances once.
+                        // ENFORCER-062/067/068 bridge via ConfirmedFailurePort (rabbit §13.1):
+                        // injected adapter advances the primary cursor through the ONE
+                        // writer. RecoveryExhausted forbids the next automatic attempt —
+                        // the repair projection is then NOT injected. ContinueRecovery
+                        // covers Advanced / AlreadyRecorded / NoActiveRun (FALLBACK-001).
                         let providerRun =
                             match lastAssistantStep rawMessages with
                             | Some(messageId, _, _) when not (String.IsNullOrWhiteSpace messageId) ->
                                 ProviderRunIdentity.create messageId
                             | _ -> ProviderRunIdentity.create "unknown-prose-run"
 
-                        let advanceOutcome =
-                            match
-                                FallbackController.recordConfirmedFailure
-                                    durable
-                                    AgentPairCursor.DefaultAutoRecoveryBudget
-                                    owner
-                                    providerRun
-                                    reason
-                            with
-                            | Ok outcome -> Some outcome
-                            | Error err ->
+                        let admission =
+                            match confirmedFailure with
+                            | None ->
                                 Diagnostic.emit
                                     "enforcer-aabb-bridge"
-                                    [ "session_id", key; "result", "recordConfirmedFailure rejected: " + err ]
+                                    [ "session_id", key; "result", "no confirmed failure port; " + reason ]
 
                                 None
+                            | Some record ->
+                                match record owner providerRun reason with
+                                | Ok result -> Some result
+                                | Error err ->
+                                    Diagnostic.emit
+                                        "enforcer-aabb-bridge"
+                                        [ "session_id", key
+                                          "result", "confirmedFailure port rejected: " + err ]
 
-                        match advanceOutcome with
-                        | Some(FallbackController.AdvanceOutcome.Exhausted _) ->
+                                    None
+
+                        match admission with
+                        | Some RecoveryAdmission.RecoveryExhausted ->
                             Diagnostic.emit "enforcer-aabb-exhausted" [ "session_id", key; "result", reason ]
                             fatalEnd "blog aabb exhausted; auto-recovery budget spent"
-                        | _ ->
-                            // Advanced / AlreadyRecorded / NoActiveRun: repair continues
-                            // (NoActiveRun = no accepted primary root, FALLBACK-001).
-                            projectRepairInstruction ctx reason
+                        | _ -> projectRepairInstruction ctx reason
 
                 /// ENFORCER-066: durable InteractionRepair. No AABB transcript refresh.
                 /// repairNudge is injected from HostSessionNudge (compile-order port).
@@ -1741,33 +1745,37 @@ module EnforcerHost =
 
                     match disposition with
                     | CycleDisposition.InjectRepair ctx ->
-                        // ENFORCER-062/067/068 bridge (empty text): the confirmed
-                        // failure advances the primary A/A/B/B cursor through the ONE
-                        // writer. Exhaustion forbids the automatic next attempt — no
-                        // repair projection is injected. Replay of the same terminal
-                        // run stays AlreadyRecorded and advances once.
-                        let advanceOutcome =
-                            match
-                                FallbackController.recordConfirmedFailure
-                                    durable
-                                    AgentPairCursor.DefaultAutoRecoveryBudget
-                                    mainSessionId
-                                    (ProviderRunIdentity.create messageId)
-                                    "blog empty text (ENFORCER-061)"
-                            with
-                            | Ok outcome -> Some outcome
-                            | Error err ->
+                        // ENFORCER-062/067/068 bridge (empty text) via ConfirmedFailurePort
+                        // (rabbit §13.1). RecoveryExhausted forbids automatic repair;
+                        // ContinueRecovery covers Advanced / AlreadyRecorded / NoActiveRun.
+                        let emptyReason = "blog empty text (ENFORCER-061)"
+
+                        let admission =
+                            match confirmedFailure with
+                            | None ->
                                 Diagnostic.emit
                                     "enforcer-aabb-bridge"
-                                    [ "session_id", key; "result", "recordConfirmedFailure rejected: " + err ]
+                                    [ "session_id", key; "result", "no confirmed failure port; " + emptyReason ]
 
                                 None
+                            | Some record ->
+                                match
+                                    record mainSessionId (ProviderRunIdentity.create messageId) emptyReason
+                                with
+                                | Ok result -> Some result
+                                | Error err ->
+                                    Diagnostic.emit
+                                        "enforcer-aabb-bridge"
+                                        [ "session_id", key
+                                          "result", "confirmedFailure port rejected: " + err ]
 
-                        match advanceOutcome with
-                        | Some(FallbackController.AdvanceOutcome.Exhausted _) ->
+                                    None
+
+                        match admission with
+                        | Some RecoveryAdmission.RecoveryExhausted ->
                             Diagnostic.emit
                                 "enforcer-aabb-exhausted"
-                                [ "session_id", key; "result", "blog empty text (ENFORCER-061)" ]
+                                [ "session_id", key; "result", emptyReason ]
 
                             fatalEnd "blog aabb exhausted; auto-recovery budget spent"
                             return failwith "unreachable: fatalEnd ends the cycle"

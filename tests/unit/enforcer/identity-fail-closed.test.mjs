@@ -136,7 +136,7 @@ const withHarness = async (fn, { messageId = 'asst-identity' } = {}) => {
     ])
 
   const run = async (parts) => {
-    await handleContinuation(scope, journal, undefined, () => undefined, blog, rawMessagesFor(parts))
+    await handleContinuation(scope, journal, undefined, undefined, () => undefined, blog, rawMessagesFor(parts))
   }
 
   // Owned commit with no further XTrace material reaches ParkTransform; settle it

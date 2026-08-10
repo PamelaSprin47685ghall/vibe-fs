@@ -77,3 +77,51 @@ module CausalAwait =
                 lease.MarkExit exit
                 return Error exit
         }
+
+    /// G4R-CE S1 / rabbit.md §5.3 — mechanism Vocabulary:
+    /// tryRead first; else race one real signal against one IDeadlineHandle.
+    /// Signal → re-read (same deadline). Deadline → Error WaitTimedOut.
+    /// No slice timer, no polling interval, no UtcNow loop.
+    let untilSignalOrDeadline
+        (observer: IWaitObserver)
+        (descriptor: DiagnosticWait)
+        (deadline: IDeadlineHandle)
+        (tryRead: unit -> 'T option)
+        (awaitSignal: unit -> Task<unit>)
+        : Task<Result<'T, DiagnosticWaitExit>> =
+        task {
+            use lease = observer.Enter descriptor
+
+            let rec loop () =
+                task {
+                    match tryRead () with
+                    | Some value ->
+                        deadline.Cancel()
+                        lease.MarkExit DiagnosticWaitExit.WaitResolved
+                        return Ok value
+                    | None ->
+                        let taggedSignal: Task<obj> =
+                            task {
+                                do! awaitSignal ()
+                                return box (Choice1Of2 ())
+                            }
+
+                        let taggedDeadline: Task<obj> =
+                            task {
+                                do! deadline.Delay
+                                return box (Choice2Of2 ())
+                            }
+
+                        let! winnerObj =
+                            emitJsExpr (taggedSignal, taggedDeadline) "Promise.race([$0, $1])"
+                            : Task<obj>
+
+                        match unbox<Choice<unit, unit>> winnerObj with
+                        | Choice1Of2 () -> return! loop ()
+                        | Choice2Of2 () ->
+                            lease.MarkExit DiagnosticWaitExit.WaitTimedOut
+                            return Error DiagnosticWaitExit.WaitTimedOut
+                }
+
+            return! loop ()
+        }

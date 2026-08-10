@@ -141,7 +141,7 @@ const withHarness = async (fn, { material = 0 } = {}) => {
   let transcript = []
   const run = async (messages) => {
     const input = toList([...transcript, ...listItems(messages)])
-    const out = await handleContinuation(scope, journal, undefined, probe, sessionId(BLOG), input)
+    const out = await handleContinuation(scope, journal, undefined, undefined, probe, sessionId(BLOG), input)
     transcript = [...transcript, ...outcomeMessages(out)]
     return out
   }
@@ -623,7 +623,7 @@ test('ENFORCER_no_journal_projects_raw_messages', async () => {
     const input = toList([
       { info: { id: 'u-1', role: 'user' }, parts: [{ type: 'text', text: 'hello' }] },
     ])
-    const out = await handleContinuation(scope2, undefined, undefined, probe, sessionId(BLOG), input)
+    const out = await handleContinuation(scope2, undefined, undefined, undefined, probe, sessionId(BLOG), input)
     assert.equal(caseOf(out), 'ProjectMessages')
     assert.deepEqual(listItems(out.fields[0]), listItems(input))
   })
@@ -634,6 +634,7 @@ test('ENFORCER_no_journal_empty_messages_is_empty_projection_fatal', async () =>
     const probe = () => 'NoRecovery'
     const out = await handleContinuation(
       parkedTransform.scope(),
+      undefined,
       undefined,
       undefined,
       probe,
@@ -667,7 +668,7 @@ test('ENFORCER_first_request_rebuilds_from_typed_context', async () => {
     const input = toList([
       { info: { id: 'u-1', role: 'user' }, parts: [{ type: 'text', text: 'raw toml here' }] },
     ])
-    const out = await handleContinuation(scope, journal, undefined, () => 'NoRecovery', sessionId(BLOG), input)
+    const out = await handleContinuation(scope, journal, undefined, undefined, () => 'NoRecovery', sessionId(BLOG), input)
     assert.equal(caseOf(out), 'ProjectMessages')
     const msgs = listItems(out.fields[0])
     assert.ok(msgs.length > 0, 'rebuilt view is non-empty')

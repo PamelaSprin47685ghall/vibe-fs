@@ -56,6 +56,10 @@ module HostSignalBootstrap =
                         member _.GetMessages _ =
                             Task.FromResult(Ok([]: SessionMessage list)) }
 
+            // One ITimerPort for provider-recovery deadlines (G4R-CE S2).
+            // Application awaits via IDeadlineHandle; Host owns the Node adapter.
+            let recoveryTimerPort = PtyTiming.nodeTimerPort ()
+
             let resolveProjection (sessionId: SessionId) : AgentProjectionSet option =
                 match journal with
                 | None -> None
@@ -98,59 +102,25 @@ module HostSignalBootstrap =
 
 
                         XWire.reconcileAttempt journal scope turn
-                        TurnCompletionProgram.prepareTurn journal scope.DisposeExecutorRuntime turn
+                        TurnRuntimePreparation.prepare journal scope.DisposeExecutorRuntime turn
 
-                        let! syncDelegateHandled =
-                            match scope.SyncDelegateRuntime with
-                            | Some runtime -> runtime.HandleTurn(turn, context.Quiescence)
-                            | None -> Task.FromResult false
-
-                        let! reviewerHandled =
-                            match turn.Role with
-                            | Some Role.Reviewer ->
-                                task {
-                                    do!
-                                        ReviewerWorkflow.observe
-                                            sessionPort
-                                            eventPort
-                                            journal
-                                            scope.NudgeSent
-                                            turn
-                                            (SessionId.value turn.SessionId)
-
-                                    return true
-                                }
-                            | _ -> Task.FromResult false
-
-                        let! managerHandled =
-                            match turn.Role with
-                            | Some Role.Manager ->
-                                ManagerWorkflow.tryObserve
-                                    sessionPort
-                                    eventPort
-                                    journal
-                                    scope.NudgeSent
-                                    scope.JoinGuardNudges
-                                    scope.HasLivePty
-                                    scope.AbortedSessions
-                                    scope.Quiescence
-                                    context
-                            | _ -> Task.FromResult false
-
-                        if not syncDelegateHandled && not reviewerHandled && not managerHandled then
-                            do!
-                                TurnCompletionProgram.applyWithContinuation
-                                    PtyTiming.timerTask
-                                    Pty.abortParent
-                                    sessionPort
-                                    eventPort
-                                    journal
-                                    scope.JoinGuardNudges
-                                    scope.HasLivePty
-                                    scope.AbortedSessions
-                                    (Some scope.LoopSensor)
-                                    scope.Quiescence
-                                    context
+                        // Sole Application turn entry (rabbit §6.5 / §18): Host no longer
+                        // multiplexes SyncDelegate / Reviewer / Manager handled-bools.
+                        do!
+                            TurnWorkflow.observe
+                                recoveryTimerPort
+                                Pty.abortParent
+                                sessionPort
+                                eventPort
+                                journal
+                                scope.SyncDelegateRuntime
+                                scope.NudgeSent
+                                scope.JoinGuardNudges
+                                scope.HasLivePty
+                                scope.AbortedSessions
+                                (Some scope.LoopSensor)
+                                scope.Quiescence
+                                context
                 }
 
             /// HOST-006 containment: observe every reconciled snapshot for compaction
@@ -234,7 +204,7 @@ module HostSignalBootstrap =
                 match signal with
                 | SessionIdle sessionId ->
                     // LOOP-005: idle ends the attempt → fresh detector for the next stream.
-                    // LoopKillArmed must stay until TurnCompletionProgram bridges TurnAborted
+                    // LoopKillArmed must stay until OrdinaryTurnWorkflow bridges TurnAborted
                     // (ResetDetector deliberately does not clear it; LOOP-006).
                     scope.LoopSensor.ResetDetector sessionId
 
@@ -262,7 +232,7 @@ module HostSignalBootstrap =
                     reconciler.Signal signal
 
             // LOOP-002/006: edge sensor shares the same event subscription, aborts via
-            // the session port, and leaves AABB to TurnCompletionProgram on TurnAborted.
+            // the session port, and leaves AABB to OrdinaryTurnWorkflow on TurnAborted.
             let loopSensor =
                 LoopSensor(
                     (fun sessionId -> scope.OwnedSessions.Contains(SessionId.value sessionId)),

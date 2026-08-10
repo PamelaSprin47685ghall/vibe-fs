@@ -34,6 +34,7 @@ import {
   sealDigest,
   sessionId,
   stream,
+  timerPort,
   toolCallId,
   transportReceipt,
   xTraceCapture,
@@ -294,13 +295,15 @@ const harness = ({ journal, loopSensor = undefined, hasLivePty = () => false, ga
     return observeIdle(gate, sessionId(SESSION))
   }
 
-  const sliceTimer = (ms) => new Promise((resolve) => setTimeout(resolve, ms | 0))
+  // G4R-CE S2: ProviderRecoveryWorkflow.awaitRecoveryMaterial takes ITimerPort
+  // (one IDeadlineHandle), not a 25ms sliceTimer. Virtual clock — no wall poll.
+  const { rawPort: recoveryTimerPort } = timerPort.createVirtual()
   const abortParent = () => {}
 
   const run = (turnValue, quiescence = undefined) => {
     prepareTurn(journal, (key) => disposed.push(key), turnValue)
     return applyWithContinuation(
-      sliceTimer,
+      recoveryTimerPort,
       abortParent,
       sessionPort,
       eventPort,
@@ -333,7 +336,7 @@ const harness = ({ journal, loopSensor = undefined, hasLivePty = () => false, ga
     )
     if (!handled) {
       await applyWithContinuation(
-        sliceTimer,
+        recoveryTimerPort,
         abortParent,
         sessionPort,
         eventPort,

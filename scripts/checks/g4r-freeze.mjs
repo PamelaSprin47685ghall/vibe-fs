@@ -6,7 +6,8 @@
  *   - E2E case count must not grow (ceiling only decreases)
  *   - Named wall-clock budgets in time-budget.js must not inflate
  *   - No per-basename / per-case canary timeout maps
- *   - No extra top-level E2E entry tests outside cases/ (Long Stroke lands later as entry.test.mjs)
+ *   - Top-level E2E entry: zero OK (pre-cutover); when present must be exactly
+ *     tests/e2e/entry.test.mjs (required-exactly-one-when-present; Long Stroke)
  *
  * Final one-world ratchets (count == 1, spawn == 1, …) arrive in G4R-4/G4R-6 — not here.
  *
@@ -20,7 +21,11 @@ import { walk } from '../lib/walk.mjs'
 
 export const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 
-/** Freeze ceiling: current multi-canary population. May decrease; must never increase. */
+/**
+ * Freeze ceiling: current multi-canary population. May decrease; must never increase.
+ * When E2E cases are deleted at cutover, ratchet via `nextCaseCeiling` (do not raise).
+ * LONG_STROKE_ENTRY_REL path is already documented for the sole top-level entry.
+ */
 export const E2E_CASE_CEILING = 31
 
 /** Named budgets in tests/e2e/support/time-budget.js — freeze ceilings (defaults only). */
@@ -39,6 +44,8 @@ export const TIMEOUT_CEILINGS = Object.freeze({
 export const TIME_BUDGET_REL = 'tests/e2e/support/time-budget.js'
 export const E2E_CASES_REL = 'tests/e2e/cases'
 export const E2E_ROOT_REL = 'tests/e2e'
+/** Sole allowed top-level E2E entry once Long Stroke cutover lands. */
+export const LONG_STROKE_ENTRY_REL = 'tests/e2e/entry.test.mjs'
 
 const norm = (p) => p.replace(/\\/g, '/')
 
@@ -72,6 +79,22 @@ export const parseTimeBudgetDefaults = (source) => {
     found[m[1]] = Number(m[2])
   }
   return found
+}
+
+/**
+ * Next freeze ceiling after deleting E2E cases (cutover ratchet helper).
+ * Ceiling may only decrease: never returns a value above `ceiling`.
+ * @param {{ caseCount: number, ceiling?: number }} input
+ * @returns {number}
+ */
+export const nextCaseCeiling = ({ caseCount, ceiling = E2E_CASE_CEILING }) => {
+  if (!Number.isInteger(caseCount) || caseCount < 0) {
+    throw new Error(`e2e case count is not a non-negative integer: ${caseCount}`)
+  }
+  if (!Number.isInteger(ceiling) || ceiling < 0) {
+    throw new Error(`e2e case ceiling is not a non-negative integer: ${ceiling}`)
+  }
+  return Math.min(caseCount, ceiling)
 }
 
 /**
@@ -141,17 +164,30 @@ export const scanPerCaseTimeoutMaps = (entries) => {
 }
 
 /**
- * Top-level tests/e2e/*.test.mjs are forbidden until Long Stroke lands as the sole entry.
+ * Top-level tests/e2e/*.test.mjs cutover path (Long Stroke):
+ *   - zero files → OK (pre-cutover freeze)
+ *   - when present → required-exactly-one: must be LONG_STROKE_ENTRY_REL
  * Nested cases/ are counted by the ceiling; support/ is not an entry.
  * @param {string[]} topLevelTestFiles absolute or relative paths
  * @returns {string[]}
  */
 export const scanTopLevelE2EEntries = (topLevelTestFiles) => {
   if (topLevelTestFiles.length === 0) return []
+  const normalized = topLevelTestFiles.map((f) => {
+    const n = norm(f)
+    // Accept absolute paths that end with the canonical relative entry.
+    if (n === LONG_STROKE_ENTRY_REL || n.endsWith(`/${LONG_STROKE_ENTRY_REL}`)) {
+      return LONG_STROKE_ENTRY_REL
+    }
+    return n
+  })
+  if (normalized.length === 1 && normalized[0] === LONG_STROKE_ENTRY_REL) {
+    return []
+  }
   return [
-    `unexpected top-level E2E entr${topLevelTestFiles.length === 1 ? 'y' : 'ies'} ` +
-      `(G4R-0 freeze; Long Stroke will be the sole entry later): ` +
-      topLevelTestFiles.map((f) => basename(f)).join(', '),
+    `top-level E2E entry must be exactly ${LONG_STROKE_ENTRY_REL} when present ` +
+      `(required-exactly-one-when-present; Long Stroke cutover); got: ` +
+      normalized.map((f) => basename(f)).join(', '),
   ]
 }
 
@@ -235,7 +271,7 @@ const runCli = () => {
 
   if (violations.length === 0) {
     console.log(
-      `g4r-freeze: OK — cases ${caseCount}/${E2E_CASE_CEILING}; timeout ceilings held; no per-case timeout maps; no top-level E2E entry`,
+      `g4r-freeze: OK — cases ${caseCount}/${E2E_CASE_CEILING}; timeout ceilings held; no per-case timeout maps; top-level entry none-or-exactly ${LONG_STROKE_ENTRY_REL}`,
     )
     process.exit(0)
   }

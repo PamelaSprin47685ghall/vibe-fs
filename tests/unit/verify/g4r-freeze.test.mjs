@@ -6,7 +6,9 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   E2E_CASE_CEILING,
+  LONG_STROKE_ENTRY_REL,
   TIMEOUT_CEILINGS,
+  nextCaseCeiling,
   parseTimeBudgetDefaults,
   scanCaseCeiling,
   scanG4RFreeze,
@@ -31,6 +33,24 @@ test('G4R_FREEZE_case_ceiling_rejects_growth', () => {
   const over = scanCaseCeiling({ caseCount: E2E_CASE_CEILING + 1 })
   assert.equal(over.length, 1)
   assert.match(over[0], /exceeds G4R-0 freeze ceiling/)
+})
+
+test('G4R_FREEZE_case_ceiling_may_only_decrease', () => {
+  const ceiling = E2E_CASE_CEILING
+  // No deletions: ceiling stays put.
+  assert.equal(nextCaseCeiling({ caseCount: ceiling, ceiling }), ceiling)
+  // Cases deleted: ratchet down to remaining count.
+  assert.equal(nextCaseCeiling({ caseCount: ceiling - 1, ceiling }), ceiling - 1)
+  assert.equal(nextCaseCeiling({ caseCount: 0, ceiling }), 0)
+  // Never raise — even if caseCount somehow exceeds the freeze bar.
+  assert.equal(nextCaseCeiling({ caseCount: ceiling + 5, ceiling }), ceiling)
+  // Monotone: successive deletions only lower (or hold) the ceiling.
+  let current = ceiling
+  for (const remaining of [ceiling, ceiling - 3, ceiling - 10, 1, 0]) {
+    const next = nextCaseCeiling({ caseCount: remaining, ceiling: current })
+    assert.ok(next <= current, `ceiling rose: ${current} → ${next}`)
+    current = next
+  }
 })
 
 test('G4R_FREEZE_timeout_ceiling_rejects_inflation', () => {
@@ -72,9 +92,21 @@ test('G4R_FREEZE_per_case_timeout_map_detector', () => {
   assert.match(dirty[0].pattern, /CANARY_TIMEOUT_BY_BASENAME/)
 })
 
-test('G4R_FREEZE_top_level_entry_forbidden_during_freeze', () => {
+test('G4R_FREEZE_top_level_entry_required_exactly_one_when_present', () => {
+  // Pre-cutover: zero top-level *.test.mjs is OK.
   assert.equal(scanTopLevelE2EEntries([]).length, 0)
-  const hits = scanTopLevelE2EEntries(['tests/e2e/entry.test.mjs'])
-  assert.equal(hits.length, 1)
-  assert.match(hits[0], /unexpected top-level E2E entry/)
+  // Cutover: sole Long Stroke entry is OK.
+  assert.equal(scanTopLevelE2EEntries([LONG_STROKE_ENTRY_REL]).length, 0)
+
+  const wrongName = scanTopLevelE2EEntries(['tests/e2e/other.test.mjs'])
+  assert.equal(wrongName.length, 1)
+  assert.match(wrongName[0], /required-exactly-one-when-present/)
+  assert.match(wrongName[0], /entry\.test\.mjs/)
+
+  const tooMany = scanTopLevelE2EEntries([
+    LONG_STROKE_ENTRY_REL,
+    'tests/e2e/other.test.mjs',
+  ])
+  assert.equal(tooMany.length, 1)
+  assert.match(tooMany[0], /required-exactly-one-when-present/)
 })

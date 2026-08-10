@@ -29,6 +29,19 @@ export const OPENCODE_BIN = process.env.OPENCODE_BIN || defaultOpencodeBin();
 const STDOUT_RING_MAX = 100;
 const activeChildPids = new Set();
 
+/** In-process OpenCode serve spawn counter (G4R §2: exactly one lifetime). */
+let opencodeServeSpawnCount = 0;
+
+/** How many times `spawnOpencodeServe` succeeded in creating a child with a pid. */
+export function getOpencodeSpawnCount() {
+  return opencodeServeSpawnCount;
+}
+
+/** Test-only reset between isolated harness cases (not used by Long Stroke). */
+export function resetOpencodeSpawnCount() {
+  opencodeServeSpawnCount = 0;
+}
+
 export const READY_POLL_INTERVAL_MS = 100;
 export const READY_POLL_MAX_TRIES = 50;
 
@@ -137,6 +150,7 @@ export function spawnOpencodeServe(workDir, env, hooks) {
   );
   if (child.pid) {
     activeChildPids.add(child.pid);
+    opencodeServeSpawnCount += 1;
     recordSpawn(child.pid, `opencode serve ${workDir}`);
   }
   child.stdout.on("data", (chunk) => hooks.onStdoutChunk(chunk.toString()));

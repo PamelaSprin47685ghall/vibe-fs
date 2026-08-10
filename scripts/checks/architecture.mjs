@@ -200,27 +200,44 @@ for (const file of productionFs) {
   }
 }
 
-// ⑩ TURN-COMPLETION-PLUMBING (ce.md §15): generic terminal plumbing may
-// classify outcomes and own physical completion, never bounded-context policy.
+// ⑩ TURN-COMPLETION-PLUMBING (ce.md §15 / rabbit S2): OrdinaryTurnWorkflow may
+// classify outcomes and TerminalReporter owns physical completion. Neither may
+// hold bounded-context Manager/Reviewer/Finality policy. TurnCompletionProgram deleted.
 {
-  const file = `${PRODUCTION_ROOT}/Application/Reconciliation/TurnCompletionProgram.fs`
+  const plumbingFiles = [
+    `${PRODUCTION_ROOT}/Application/Reconciliation/OrdinaryTurnWorkflow.fs`,
+    `${PRODUCTION_ROOT}/Application/Reconciliation/TerminalReporter.fs`,
+  ]
   const forbidden = [
     'Role.Manager',
     'Role.Reviewer',
     'SyncDelegateRuntime',
     'ManagerLifecycleGate',
+    'ManagerActivation',
     'ReviewerGuardState',
+    'ReviewerEvidence',
     'HostReviewGuard',
     'Finality',
     'ManagerIdleEncouragement',
     'ReviewConfirmation',
     'ReviewerGuard',
   ]
-  const text = read(file)
-  for (const token of forbidden) {
-    if (text.includes(token)) {
-      fail('turn-completion-plumbing', `${file}: bounded-context token '${token}' is forbidden`)
+  for (const file of plumbingFiles) {
+    const text = read(file)
+    for (const token of forbidden) {
+      // OrdinaryTurnWorkflow legitimately matches Role only via Turn.Role option
+      // for loop-kill/path routing — forbid Manager/Reviewer *business* tokens above.
+      if (token === 'Role.Manager' || token === 'Role.Reviewer') continue
+      if (text.includes(token)) {
+        fail('turn-completion-plumbing', `${file}: bounded-context token '${token}' is forbidden`)
+      }
     }
+  }
+  if (existsSync(`${PRODUCTION_ROOT}/Application/Reconciliation/TurnCompletionProgram.fs`)) {
+    fail(
+      'turn-completion-plumbing',
+      `${PRODUCTION_ROOT}/Application/Reconciliation/TurnCompletionProgram.fs must be deleted (rabbit S2)`,
+    )
   }
 }
 
@@ -237,6 +254,7 @@ for (const file of productionFs) {
   const finalityFiles = ['FinalityController', 'FinalityTool', 'FinalityReviewCohort']
   const forbiddenReviewerDecision = [
     'ReviewerGuardState',
+    'ReviewerEvidence',
     'ReviewerWorkflow',
     'requestPerfectConfirmation',
     'nudgeReviewer',

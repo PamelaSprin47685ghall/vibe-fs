@@ -54,6 +54,36 @@ test('RECOVERY_FAMILY_plugin_attaches_family_ports_not_local_gates', () => {
   assert.match(ports, /RestoreHandles:\s*SessionId\s*->\s*Task<HandleFamilyRecovery>/)
   assert.match(scope, /RequireFamilyRecovery/)
   assert.doesNotMatch(scope, /bloggerRecoveryGate|PromptRecovery\.RecoveryGate/)
+  // rabbit §14.3: physical single-flight lives in Session, not Application.
+  assert.doesNotMatch(ports, /module Coordinator/)
+  assert.doesNotMatch(ports, /mergeOutcomes/)
+  assert.match(scope, /FamilyRecoveryCoordinator\.runOnce/)
+  assert.match(scope, /SessionRecoveryWorkflow\.recoverFamilyDirect/)
+})
+
+test('RECOVERY_FAMILY_combine_and_coordinator_ownership_moved', () => {
+  const domain = readFileSync(join(ROOT, 'src/Wanxiangshu/Domain/SessionRecovery.fs'), 'utf8')
+  const workflow = readFileSync(
+    join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/SessionRecoveryWorkflow.fs'),
+    'utf8',
+  )
+  const coordinator = readFileSync(
+    join(ROOT, 'src/Wanxiangshu/Session/FamilyRecoveryCoordinator.fs'),
+    'utf8',
+  )
+  const fsproj = readFileSync(join(ROOT, 'src/Wanxiangshu/Wanxiangshu.fsproj'), 'utf8')
+
+  // rabbit §14.2
+  assert.match(domain, /let combine \(outcomes: SessionRecovery list\)/)
+  assert.match(workflow, /\bcombine\b/)
+  assert.doesNotMatch(workflow, /let private mergeOutcomes/)
+
+  // rabbit §14.3
+  assert.match(coordinator, /module FamilyRecoveryCoordinator/)
+  assert.match(coordinator, /let runOnce/)
+  assert.doesNotMatch(coordinator, /recoverFamilyDirect|SessionRecoveryPorts|authorizeFamilyResume/)
+  assert.doesNotMatch(workflow, /module Coordinator/)
+  assert.match(fsproj, /Session\/FamilyRecoveryCoordinator\.fs/)
 })
 
 test('RECOVERY_FAMILY_handle_family_types_and_permit_rules', () => {

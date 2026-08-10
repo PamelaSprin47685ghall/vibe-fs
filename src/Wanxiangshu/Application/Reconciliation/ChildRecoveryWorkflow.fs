@@ -28,6 +28,8 @@ module ChildRecoveryWorkflow =
             Observations: HostObservation list
             /// Process-local agent wake after durable commit. None = durable only.
             Pulse: (unit -> unit) option
+            /// Injectable wall clock (rabbit §15 / G4R-CE S11) — no raw UtcNow.
+            Clock: IClockPort
         }
 
     let private textOfParts (parts: MessagePart array) =
@@ -146,7 +148,7 @@ module ChildRecoveryWorkflow =
             | Some id -> AgentHandleId.value id
             | None -> ports.AgentId
 
-        HandleController.recordAbandon ports.Journal ports.ParentId agentId reason DateTimeOffset.UtcNow
+        HandleController.recordAbandon ports.Journal ports.ParentId agentId reason (ports.Clock.UtcNow())
 
     /// Resolve one child and commit through the single write entry.
     /// GREEN-4: ChildRecoveryResult (RecoveredActive ≠ RecoveryIncomplete).

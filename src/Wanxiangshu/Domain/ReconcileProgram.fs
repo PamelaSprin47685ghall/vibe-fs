@@ -51,7 +51,8 @@ module ReconcileProgram =
         | FailureWake
         /// HOST-004: operator abort is a typed wake category, not a failure.
         /// It never carries idle/repair rights: under it, Unknown / Provisional
-        /// must never produce RepairMissingFinalReport / InteractionRepair / "#".
+        /// must never Publish a stable observation that business could turn into
+        /// InteractionRepair / "#".
         | AbortWake
 
     [<RequireQualifiedAccess>]
@@ -63,17 +64,13 @@ module ReconcileProgram =
         | Terminal of ObservedTurn
         | SessionCleared
 
+    /// Pure observation vocabulary (rabbit §7 / S3): Reconcile answers only
+    /// whether an observation is stable enough to hand to business — never
+    /// which repair prompt business should send.
     [<RequireQualifiedAccess>]
     type ReconcileDecision =
         | Reread of clearContinuationCandidate: bool * rereadsRemaining: int
         | Publish
-        /// GLORY-070 / HOST-004 rev.3: a stable idle that never settled into a
-        /// terminal (finish=None) must produce the missing-final-report repair
-        /// instead of a silent StopPass black hole — but only when the pass
-        /// actually carries idle evidence. Without an `IdleWake`, `Unknown` is
-        /// observation stability only, not quiescence: no idle-derived
-        /// continuation may be constructed.
-        | RepairMissingFinalReport
         | StopPass
 
     // ── pure classifiers ─────────────────────────────────────────────────────
@@ -98,14 +95,14 @@ module ReconcileProgram =
 
     /// 有界因果重读：rereadsRemaining = 还能进行多少次读取判定（初始 = maxCausalRereads + 1）。
     ///
-    /// 不变量（GLORY-070 / HOST-004 rev.3）：SessionIdle 被消费后只允许产生一个
-    /// 稳定业务决定或明确 fail closed；因果重读耗尽绝不静默 StopPass 一个带 idle
-    /// evidence 的稳定 `Unknown`。`Unknown`（finish=None）耗尽后只有在 `IdleWake`
-    /// 下进入 `RepairMissingFinalReport`；`Retry` / `Failure` wake 只证明观测稳定、
-    /// 不证明静止——不产生 idle-derived continuation（StopPass，等下一个 signal）。
-    /// `Provisional`（finish=stop 无合法正文 / tool-calls 停滞）耗尽后发布；只有
-    /// `SnapshotError` / `NoTurn` 保持 StopPass（没有任何可作用的对象，等待下一个
-    /// Host signal 重踢）。
+    /// 不变量（GLORY-070 / HOST-004 rev.3 / rabbit §7）：SessionIdle 被消费后只允许
+    /// 产生一个稳定观测交接或明确 fail closed；因果重读耗尽绝不静默 StopPass 一个带
+    /// idle evidence 的稳定 `Unknown`。`Unknown`（finish=None）耗尽后只有在 `IdleWake`
+    /// 下 `Publish` 给业务（TurnWorkflow / InteractionRepair 决定是否 repair）；
+    /// `Retry` / `Failure` wake 只证明观测稳定、不证明静止——不交接（StopPass，等
+    /// 下一个 signal）。`Provisional`（finish=stop 无合法正文 / tool-calls 停滞）
+    /// 耗尽后发布；只有 `SnapshotError` / `NoTurn` 保持 StopPass（没有任何可作用的
+    /// 对象，等待下一个 Host signal 重踢）。
     let decideStep (wake: ReconcileWake) (rereadsRemaining: int) (evidence: ReconcileEvidence) : ReconcileDecision =
         match evidence with
         | ReconcileEvidence.Terminal _ -> ReconcileDecision.Publish
@@ -122,12 +119,14 @@ module ReconcileProgram =
                 match wake with
                 | ReconcileWake.AbortWake ->
                     // HOST-004: under operator abort, stalled provisional must never
-                    // publish an idle/repair continuation (InteractionRepair /
-                    // "#"). StopPass and wait for the real TurnAborted terminal.
+                    // publish an observation that business could turn into
+                    // InteractionRepair / "#". StopPass and wait for the real
+                    // TurnAborted terminal.
                     ReconcileDecision.StopPass
                 | _ ->
                     // F1: exhausted TurnNeedsContinuation / stalled tool-call turn must
-                    // publish so the repair branch runs instead of dying in StopPass.
+                    // publish so the business repair branch runs instead of dying in
+                    // StopPass.
                     ReconcileDecision.Publish
         | ReconcileEvidence.Unknown _ ->
             if rereadsRemaining > 1 then
@@ -135,15 +134,16 @@ module ReconcileProgram =
             else
                 match wake with
                 | ReconcileWake.IdleWake _ ->
-                    // The classic black hole: SessionIdle + assistant reasoning +
-                    // finish=None + rereads exhausted. Must auto-continue (missing
-                    // final report) or fail closed — never StopPass silently.
-                    ReconcileDecision.RepairMissingFinalReport
+                    // Classic black hole: SessionIdle + assistant reasoning +
+                    // finish=None + rereads exhausted. Observation is stable —
+                    // Publish to business; never StopPass silently. Whether to
+                    // send missing-final-report is TurnWorkflow / InteractionRepair.
+                    ReconcileDecision.Publish
                 | ReconcileWake.RetryWake
                 | ReconcileWake.FailureWake
                 | ReconcileWake.AbortWake ->
-                    // NoIdle/Repair rights. Observation stability only, or an abort
-                    // that must not resurrect an idle-derived continuation; the next
+                    // No idle rights. Observation stability only, or an abort that
+                    // must not resurrect an idle-derived continuation; the next
                     // real physical signal re-kicks, and a genuine TurnAborted
                     // terminal publishes normally.
                     ReconcileDecision.StopPass
@@ -153,14 +153,12 @@ module ReconcileProgram =
         match decision with
         | ReconcileDecision.Reread _ -> "Reread"
         | ReconcileDecision.Publish -> "Publish"
-        | ReconcileDecision.RepairMissingFinalReport -> "RepairMissingFinalReport"
         | ReconcileDecision.StopPass -> "StopPass"
 
     let clearsContinuationCandidate (decision: ReconcileDecision) : bool =
         match decision with
         | ReconcileDecision.Reread(clear, _) -> clear
         | ReconcileDecision.Publish
-        | ReconcileDecision.RepairMissingFinalReport
         | ReconcileDecision.StopPass -> false
 
     let consumeKey (turn: PublishTurn) : string =
@@ -207,7 +205,8 @@ module ReconcileProgram =
         let token = consumeKey turn
 
         // HOST-004: TurnUnknown is SnapshotObservation — type-unreachable here.
-        // IdleWake → RepairMissingFinalReport lives in decideStep (evidence layer).
+        // IdleWake → Publish (stable Unknown handoff) lives in decideStep; business
+        // repair is TurnWorkflow / InteractionRepair, not this seal layer.
         if isTerminalOutcome turn.Outcome then
             match Map.tryFind key maps.Consumed with
             | Some previous when previous = token -> {| shouldPublish = false; maps = maps |}

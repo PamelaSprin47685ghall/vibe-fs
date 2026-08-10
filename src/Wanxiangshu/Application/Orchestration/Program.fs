@@ -236,7 +236,7 @@ module OrchestratorProgram =
     /// ORCH-005: rebase → fresh dual PERFECT → short-gate ff. On a moved target the
     /// whole round repeats, and the previous post-rebase witness is abandoned
     /// (REVIEW-008) rather than reused.
-    let rec private rebaseReviewPublish (deps: OrchestratorProgramDeps) (job: ManagerJob) (round: int) =
+    let rec private publishEventually (deps: OrchestratorProgramDeps) (job: ManagerJob) (round: int) =
         task {
             match! deps.Git.GetTargetHead job.TargetRef with
             | Error error -> return failed job (sprintf "Git target head lookup failed: %s" error)
@@ -252,7 +252,7 @@ module OrchestratorProgram =
                         | Ok() ->
                             match! publishUnderGate deps job targetHead with
                             | Error verdict -> return verdict
-                            | Ok TargetMoved -> return! rebaseReviewPublish deps job (round + 1)
+                            | Ok TargetMoved -> return! publishEventually deps job (round + 1)
                             | Ok(Landed commit) ->
                                 match! releaseTerminalWorktree deps job with
                                 | Ok() -> return OrchestratorVerdict.Published(job.JobId, commit)
@@ -273,24 +273,24 @@ module OrchestratorProgram =
     /// `recoveryAction` decides; this only executes. Adding a second condition here
     /// would put the recovery decision in two places, and ORCH-007's fixed branch
     /// order only holds if there is one.
-    let rec private resume (deps: OrchestratorProgramDeps) (job: ManagerJob) (action: JobRecoveryAction) =
+    let rec private resumeFromDurableFacts (deps: OrchestratorProgramDeps) (job: ManagerJob) (action: JobRecoveryAction) =
         task {
             match action with
             | ResumeManager ->
                 match! deps.Manager.AwaitManager job.JobId with
                 | Error error -> return failed job (sprintf "Manager run failed: %s" error)
                 | Ok() -> return! afterManager deps job
-            | RebaseReviewPublish _ -> return! rebaseReviewPublish deps job 0
+            | RebaseReviewPublish _ -> return! publishEventually deps job 0
             | ResumeConflictResolution conflict ->
                 let prompt = OrchestratorPrompts.buildConflictResumePrompt conflict.ConflictFiles
 
                 match! deps.Manager.ResumeManager job.JobId job.Worktree.Path prompt with
                 | Error error -> return failed job (sprintf "Conflict resolution failed: %s" error)
-                | Ok() -> return! rebaseReviewPublish deps job 0
+                | Ok() -> return! publishEventually deps job 0
             | AttemptPublish claim ->
                 match! publishUnderGate deps job claim.ExpectedHead with
                 | Error verdict -> return verdict
-                | Ok TargetMoved -> return! rebaseReviewPublish deps job 0
+                | Ok TargetMoved -> return! publishEventually deps job 0
                 | Ok(Landed commit) ->
                     match! releaseTerminalWorktree deps job with
                     | Ok() -> return OrchestratorVerdict.Published(job.JobId, commit)
@@ -316,7 +316,7 @@ module OrchestratorProgram =
                     match! releaseTerminalWorktree deps job with
                     | Ok() -> return OrchestratorVerdict.Published(job.JobId, landed.ResultingTargetHead)
                     | Error error -> return failed job (sprintf "Backfilled Published but cleanup failed: %s" error)
-            | RebaseAndReviewAgain -> return! rebaseReviewPublish deps job 0
+            | RebaseAndReviewAgain -> return! publishEventually deps job 0
             | CleanUp ->
                 match! releaseTerminalWorktree deps job with
                 | Ok() -> return OrchestratorVerdict.Empty
@@ -333,7 +333,7 @@ module OrchestratorProgram =
             | Ok() ->
                 match! recordCandidateReady deps job 0 with
                 | Error verdict -> return verdict
-                | Ok() -> return! rebaseReviewPublish deps job 0
+                | Ok() -> return! publishEventually deps job 0
         }
 
     /// ORCH-007: the recovery action for a job that already has durable progress.
@@ -370,7 +370,7 @@ module OrchestratorProgram =
             let! action = recoveryFor deps job
 
             match action with
-            | Some recoveryAction -> return! resume deps job recoveryAction
+            | Some recoveryAction -> return! resumeFromDurableFacts deps job recoveryAction
             | None ->
                 match! deps.Manager.AwaitManager job.JobId with
                 | Error error -> return failed job (sprintf "Manager run failed: %s" error)
