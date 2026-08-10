@@ -213,10 +213,10 @@ export const forestLibCases = [
     name: 'VERIFY-003 two runs of one derived sequence serialise to identical text',
     fn: () => {
       // The forest-wide property K10 rests on (`design-script-forest.md:581`), proven here on
-      // the largest scenario only — K10 owns the all-fifteen case.
-      const scenario = scenarioOf('manager-full-loop.toml');
+      // the sole One World scenario — K10 owns the all-on-disk case.
+      const scenario = scenarioOf('long-stroke.toml');
       const derived = deriveRequests(scenario);
-      assertEq(derived.underivable, undefined, 'manager-full-loop must be derivable');
+      assertEq(derived.underivable, undefined, 'long-stroke must be derivable');
 
       const first = runForest(scenario, derived);
       const second = runForest(scenario, derived);
@@ -225,9 +225,12 @@ export const forestLibCases = [
       assertEq(first.mismatches.join(' | '), '', 'every request resolved to the entry it was derived for');
 
       // Non-vacuity, because a serialiser that returned a constant would satisfy the above.
-      // Two different scenarios must not serialise alike, and the text must carry per-request
-      // lines rather than a summary.
-      const other = runForest(scenarioOf('process-stress.toml'), deriveRequests(scenarioOf('process-stress.toml')));
+      // A second scenario is INLINE (TWO_STEPS) — do not add another TOML on disk.
+      const inline = compileScenario(TWO_STEPS, { name: 'inline-two-steps.toml' });
+      assertTrue(inline.ok, `inline fixture must compile: ${inline.ok ? '' : inline.problems.join(' | ')}`);
+      const otherDerived = deriveRequests(inline.scenario);
+      assertEq(otherDerived.underivable, undefined, 'inline TWO_STEPS must be derivable');
+      const other = runForest(inline.scenario, otherDerived);
       assertTrue(other.text !== first.text, 'two different scenarios may not serialise identically');
       assertEq(
         first.text.trimEnd().split('\n').length,
@@ -236,7 +239,7 @@ export const forestLibCases = [
       );
       assertEq(
         first.text.split('\n')[0],
-        `scenario manager-full-loop requests ${derived.requests.length}`,
+        `scenario long-stroke requests ${derived.requests.length}`,
         'the header names the scenario and the count, so two empty runs cannot agree',
       );
     },

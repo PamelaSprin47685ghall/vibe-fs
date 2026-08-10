@@ -35,28 +35,20 @@
  * comments or strings: under-reporting IS the degradation being removed, so the two error
  * directions are not symmetric. The cost is that this file's own fixtures assemble their
  * declarations from parts instead of spelling them (see `declarationSource`).
+ *
+ * One World note: the live multi-canary manifest / cases-on-disk suite is retired. This file
+ * keeps the pure scanner and fixture cases; it does not import `manifest.mjs` or assert a
+ * canary directory population.
  */
 
-import { readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { availableParallelism } from 'node:os';
-import { basename, isAbsolute, join, relative } from 'node:path';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertEq, assertTrue, tmpScenarioDir } from './lib.mjs';
 import { walk } from '../../../scripts/lib/walk.mjs';
-import {
-  CANARY_DIR,
-  CANARY_MAX_PARALLEL,
-  CANARY_SUFFIX,
-  CANARY_TESTS,
-  nonConformingCanaryNames,
-  readCanaryTests,
-} from '../../e2e/support/manifest.mjs';
 
 /** Resolution base, derived from this file rather than from `cwd`, so the gate is location-free. */
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
-
-/** The one consumer whose hand-maintained registry this package replaced. */
-const RUNNER = 'tests/e2e/run.mjs';
 
 /** The harness and its scripts: where a scenario registry and its consumers live. */
 const SCOPE = [
@@ -257,17 +249,6 @@ const accepts = (source, why) => {
   assertEq(problems.length, 0, `${why}: ${problems.join(' | ')}`);
 };
 
-/** Build a temp tree, hand its root to `body`, and remove it whatever `body` does. */
-const withTree = (files, body) => {
-  const dir = tmpScenarioDir();
-  try {
-    for (const [name, content] of Object.entries(files)) writeFileSync(join(dir, name), content);
-    return body(dir);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-};
-
 export const singleSourceCases = [
   {
     name: 'VERIFY-004 no cardinality is maintained beside the collection it counts',
@@ -374,115 +355,6 @@ export const singleSourceCases = [
         '2',
         'commas inside a nested object are not separators of the outer collection',
       );
-    },
-  },
-
-  // ── the manifest: the derivation itself, and its two fail-closed refusals ──
-
-  {
-    name: 'VERIFY-004 canary parallelism follows available CPUs',
-    fn: () => {
-      assertEq(
-        CANARY_MAX_PARALLEL,
-        Math.min(Math.max(1, Math.floor(availableParallelism() / 2)), CANARY_TESTS.length),
-        'one canary slot must reserve one CPU each for its Host and scenario/provider process',
-      );
-    },
-  },
-
-  {
-    name: 'VERIFY-004 the canary suite is exactly the -canary.mjs files on disk',
-    fn: () => {
-      // The other direction of the same rule. The count case above catches a reintroduced
-      // `CANARY_COUNT`; this catches a reintroduced LIST — a hand-written array with no count
-      // constant beside it would satisfy every assertion so far while quietly omitting a canary.
-      //
-      // Read with `readdirSync` rather than with the manifest's own `walk`, so the comparison is
-      // against the filesystem and not against the manifest agreeing with itself.
-      const onDisk = readdirSync(CANARY_DIR)
-        .filter((name) => name.endsWith(CANARY_SUFFIX))
-        .sort();
-
-      assertTrue(onDisk.length > 0, `no ${CANARY_SUFFIX} file under ${CANARY_DIR}`);
-      assertEq(
-        JSON.stringify(CANARY_TESTS.map((file) => basename(file))),
-        JSON.stringify(onDisk),
-        'the manifest and the directory must be the same set, in the same order',
-      );
-
-      // Absolute, because the manifest resolves its own root: a repo-relative path would make the
-      // suite depend on the caller's cwd, which the derivation itself does not.
-      assertTrue(CANARY_TESTS.every((file) => isAbsolute(file)), 'every entry must be an absolute path');
-      assertTrue(Object.isFrozen(CANARY_TESTS), 'the single source may not be mutated by a consumer');
-    },
-  },
-
-  {
-    name: 'VERIFY-004 the staggered runner keeps no canary list of its own',
-    fn: () => {
-      // A gate that only counted would be satisfied by pasting the array back without its
-      // constant. The runner is allowed exactly one way to know what the suite is.
-      const runner = readFileSync(join(REPO_ROOT, RUNNER), 'utf8');
-
-      assertTrue(/from\s*['"][^'"]*manifest/.test(runner), `${RUNNER} must import the manifest`);
-
-      const pasted = runner
-        .split('\n')
-        .map((text, at) => ({ line: at + 1, text }))
-        .filter(({ text }) => new RegExp(`['"\`][^'"\`]*${CANARY_SUFFIX.replace('.', '\\.')}`).test(text));
-
-      assertEq(
-        pasted.length,
-        0,
-        `${RUNNER} names scenario case files directly: ${pasted.map(({ line, text }) => `${line} ${text.trim()}`).join(' | ')}`,
-      );
-    },
-  },
-
-  {
-    name: 'VERIFY-004 an empty or missing canary directory is refused, not read as a suite of zero',
-    fn: () => {
-      // 「一个能对错误实现给出绿灯的验证装置，比没有验证装置更危险」. A manifest returning `[]` would let
-      // the release gate run its 恰好 3 轮 over nothing and exit 0 — the strongest possible green,
-      // proving nothing. Both failing trees are exercised because they need different fixes and the
-      // message is the only thing that distinguishes them.
-      withTree({ 'gate-lib.mjs': 'export const x = 1;\n' }, (empty) => {
-        for (const [why, dir] of Object.entries({ empty, missing: join(empty, 'gone') })) {
-          let refusal = null;
-          try {
-            readCanaryTests(dir);
-          } catch (err) {
-            refusal = err.message;
-          }
-
-          assertTrue(refusal !== null, `a ${why} directory must throw, not return an empty suite`);
-          assertTrue(refusal.includes(dir), `the refusal must name where it looked: ${refusal}`);
-          assertTrue(refusal.includes(CANARY_SUFFIX), `and what it looked for: ${refusal}`);
-        }
-      });
-    },
-  },
-
-  {
-    name: 'VERIFY-004 a file that claims to be a canary must match the convention',
-    fn: () => {
-      // The silent-omission hazard one level up from a stale array. Legacy `*-canary.mjs` stems claim
-      // canary identity without matching `*.test.mjs`, so they would shrink the suite and stay green.
-      // Reported rather than thrown at import: a narrower suite is a failing harness case, while
-      // taking every scenario run down over an unluckily named helper is not proportionate.
-      const claims = ['real.test.mjs', 'scenario-driver.mjs', 'underscore_canary.mjs', 'legacy-canary.mjs'];
-
-      withTree(Object.fromEntries(claims.map((name) => [name, 'export const x = 1;\n'])), (dir) => {
-        assertEq(
-          JSON.stringify(nonConformingCanaryNames(dir)),
-          JSON.stringify(['legacy-canary.mjs', 'underscore_canary.mjs']),
-          'a stem ending in canary must use the case suffix; a file merely ABOUT scenarios claims nothing',
-        );
-        assertEq(JSON.stringify(readCanaryTests(dir).map((file) => basename(file))), JSON.stringify(['real.test.mjs']));
-      });
-
-      // And the real directory obeys it.
-      assertEq(JSON.stringify(nonConformingCanaryNames()), '[]', 'rename it to end in the suffix, or stop claiming to be one');
     },
   },
 ];

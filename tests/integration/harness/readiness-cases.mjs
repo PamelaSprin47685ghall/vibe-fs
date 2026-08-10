@@ -32,7 +32,6 @@ const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 /** The two files that print the stage lines. Nothing else may own a stage marker. */
 const STAGE_SOURCES = ['tests/e2e/support/scenario-parallel.js', 'tests/e2e/support/process-host.js'];
-const LAUNCHER = 'tests/e2e/run.mjs';
 
 const readSource = (relative) => readFileSync(`${REPO_ROOT}${relative}`, 'utf8');
 
@@ -269,47 +268,13 @@ export const readinessCases = [
   },
 
   {
-    name: 'VERIFY-004 the launcher re-arms per stage and keeps the total ceiling separate',
-    fn: () => {
-      // The wiring, checked at the source for the same reason `gate-unit-runner-cases.mjs` checks the
-      // runner's header: an absence has no input that exhibits it. A ladder that is imported and
-      // never fed is 「声明了判据但未接线」 — the exact defect W4 measured in its own first draft,
-      // where a disconnected verdict feed left four behavioural cases green.
-      const source = readSource(LAUNCHER);
-
-      assertTrue(source.includes('new ReadinessLadder()'), 'the launcher must construct a ladder per canary');
-      assertTrue(
-        /ladder\.observe\([^)]*\)\.length > 0\) armStage\(\)/.test(source),
-        'reaching a stage must re-arm the stage budget, or the ladder is decorative',
-      );
-      assertTrue(
-        source.includes('}, READINESS_STAGE_MS);'),
-        'the per-stage timer must be armed with READINESS_STAGE_MS',
-      );
-      assertTrue(
-        source.includes('}, CANARY_READY_MS);'),
-        'the total startup ceiling must survive as a distinct 兜底 timer',
-      );
-
-      // The accumulated buffer, not the chunk. A marker split across two pipe reads appears in
-      // neither, and the symptom is the stage budget expiring on a healthy startup.
-      assertTrue(
-        source.includes('checkBark(stdout)') && source.includes('checkBark(stderr)'),
-        'the ladder must be fed the accumulated buffer; a chunk boundary would swallow a marker',
-      );
-      assertTrue(
-        !/checkBark\(chunk\)/.test(source),
-        'feeding the raw chunk reintroduces the split-marker hole',
-      );
-    },
-  },
-
-  {
     name: 'VERIFY-004 the stage budget is tighter than the total startup ceiling',
     fn: () => {
       // Detection of the one degradation no static check can prevent: 「延长静默窗口以掩盖竞态」.
       // Stated as the relation rather than the value so raising the stage budget past the ceiling —
       // which would restore the flat window the clause forbids — fails with the reason attached.
+      // This relation case does not read the retired multi-canary launcher; the budgets live in
+      // time-budget.js regardless of which process feeds the ladder.
       assertTrue(
         READINESS_STAGE_MS < CANARY_READY_MS,
         `the stage budget (${READINESS_STAGE_MS}ms) must be tighter than the total ceiling ` +

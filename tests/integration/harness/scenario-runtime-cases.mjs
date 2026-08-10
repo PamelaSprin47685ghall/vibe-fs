@@ -467,20 +467,42 @@ user = "# Review is required before completion."
     },
   },
 
-  // ── the real forest, end to end ───────────────────────────────────────────
+  // ── a real compiled conversation (inline; no retired canary basename) ─────
 
   {
     name: 'VERIFY-003 a real scenario drives its whole declared conversation',
     fn: () => {
-      // `process-stress` is the smallest converted scenario: one turn, two provider steps,
-      // plus a title. Driving it through the runtime proves the pieces agree on a file a
-      // human wrote, not only on fixtures written to suit them.
+      // Long Stroke is too large for this deliver()-style unit proof, so an INLINE fixture
+      // carries the same shape the old smallest converted scenario used: one chat turn with
+      // two provider steps plus a title on a shared session. Do not recreate a second TOML
+      // on disk — One World keeps long-stroke.toml as the sole product scenario.
       // `session = { bind = ["inspector-title", "fast-inspector"] }` — both aliases point at
       // the one session the Host mints, which is why `lanesOf` returns a set.
-      const runtime = runtimeOf(
-        readFileSync('tests/e2e/scenarios/process-stress.toml', 'utf8'),
-        'fast-inspector',
-      );
+      const INLINE_RUNTIME = `scenario = "inline-runtime"
+prompt = { text = "Run the command and report if it timed out." }
+
+[[turn]]
+id = "inspector"
+lane = "fast-inspector"
+user = "Run the command and report if it timed out."
+tools = ["executor"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "executor", args = { command = "true" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "timeout observed." }
+
+[[turn]]
+id = "title"
+lane = "inspector-title"
+kind = "title"
+user = "Run the command and report if it timed out."
+
+  [[turn.step]]
+  respond = { type = "title", text = "E2E Test Session" }
+`;
+      const runtime = runtimeOf(INLINE_RUNTIME, 'fast-inspector');
       runtime.bind('inspector-title', SESSION);
       const prompt = 'Run the command and report if it timed out.';
 

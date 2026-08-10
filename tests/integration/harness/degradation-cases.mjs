@@ -23,14 +23,12 @@
  * clause both ways: a binding only proves anything if both ends are held.
  *
  * The covering cases are mostly elsewhere — the unit runner, the verdict feed, the readiness ladder,
- * the budget relations — because that is where each degradation's mechanism lives. Three have no home
- * yet (fixed-sleep launch stagger, ready-timeout-as-pass, release-gate-rounds) and are written here
- * as source-level cases, the established shape for an absence: an absence has no input that exhibits
- * it, so it is asserted at the source. They are detection, not prevention — the comment on each says
- * so rather than overclaiming.
+ * the budget relations — because that is where each degradation's mechanism lives. Pool / launcher
+ * degradations that belonged to the retired multi-canary runner are covered here as source-level
+ * One World topology checks (sole entry, no shuffle-repeat pool).
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { assertEq, assertTrue } from './lib.mjs';
@@ -43,7 +41,7 @@ import { singleSourceCases } from './single-source-cases.mjs';
 import { pathCriterionCases } from './path-criterion-cases.mjs';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
-const LAUNCHER = 'tests/e2e/run.mjs';
+const SOLE_ENTRY = 'tests/e2e/entry.test.mjs';
 const VERDICT_FEED_TEST = 'tests/unit/verdict-feed.test.mjs';
 
 const readSource = (relative) => readFileSync(`${REPO_ROOT}${relative}`, 'utf8');
@@ -103,27 +101,27 @@ const DEGRADATION_COVERAGE = new Map([
   ['VERIFY_004_D_WATCHDOG_TIMER_HOLDS_EVENT_LOOP', ['VERIFY-004 a clean run is not held to the end of the silence window']],
   [
     'VERIFY_004_D_WINDOW_GUARDED_ONLY_BY_TOTAL_TIMEOUT',
-    [
-      'VERIFY-004 the launcher re-arms per stage and keeps the total ceiling separate',
-      'VERIFY-004 the stage budget is tighter than the total startup ceiling',
-    ],
+    ['VERIFY-004 the stage budget is tighter than the total startup ceiling'],
   ],
   [
     'VERIFY_004_D_DECLARED_HEARTBEAT_NOT_WIRED',
     ['VERIFY-004 verdicts actually renew the window, so legitimate slow work is not killed'],
   ],
-  ['VERIFY_004_D_FIXED_SLEEP_REPLACES_CAUSAL_BARK', ['VERIFY-004 launch stagger is causal bark, not a fixed sleep']],
+  [
+    'VERIFY_004_D_FIXED_SLEEP_REPLACES_CAUSAL_BARK',
+    ['VERIFY-004 One World sole entry has no multi-canary shuffle-repeat pool'],
+  ],
   [
     'VERIFY_004_D_READY_TIMEOUT_OR_EARLY_EXIT_PASSES',
-    ['VERIFY-004 a canary that never reaches ready, or exits before it, is failed not passed'],
+    ['VERIFY-004 One World sole entry has no multi-canary shuffle-repeat pool'],
   ],
-  ['VERIFY_004_D_RELEASE_GATE_BECOMES_AT_MOST_N_ROUNDS', ['VERIFY-004 the release gate is exactly three rounds, never until-pass']],
+  [
+    'VERIFY_004_D_RELEASE_GATE_BECOMES_AT_MOST_N_ROUNDS',
+    ['VERIFY-004 One World sole entry has no multi-canary shuffle-repeat pool'],
+  ],
   [
     'VERIFY_004_D_COUNT_CONSTANT_MAINTAINED_APART_FROM_LIST',
-    [
-      'VERIFY-004 no cardinality is maintained beside the collection it counts',
-      'VERIFY-004 the canary suite is exactly the -canary.mjs files on disk',
-    ],
+    ['VERIFY-004 no cardinality is maintained beside the collection it counts'],
   ],
   ['VERIFY_004_D_STATIC_GATE_PATH_DOES_NOT_EXIST', ['VERIFY-004 every path criterion in the harness resolves on disk']],
   ['VERIFY_004_D_WINDOW_WIDENED_TO_HIDE_A_RACE', ['VERIFY-004 no budget is 兜底-only for a criterion that has a causal signal']],
@@ -131,60 +129,41 @@ const DEGRADATION_COVERAGE = new Map([
 
 export const degradationCases = [
   {
-    name: 'VERIFY-004 launch stagger is causal bark, not a fixed sleep',
+    name: 'VERIFY-004 One World sole entry has no multi-canary shuffle-repeat pool',
     fn: () => {
-      // Covers VERIFY_004_D_FIXED_SLEEP_REPLACES_CAUSAL_BARK. DETECTION, not prevention: nothing
-      // stops an edit adding a sleep; what this arranges is that the edit cannot land without a
-      // red line naming the degradation it reintroduces.
-      //
-      // The positive half is the mechanism: canary N launches only once canary N-1 has barked, so the
-      // stagger is an event, not a duration. The negative half is the degradation: a fixed per-launch
-      // sleep is exactly what this replaces, and `setTimeout` is the only primitive a launch stagger
-      // would use — the timers that remain in this file are the watchdog's, all fed by the ladder.
-      const source = readSource(LAUNCHER);
+      // Covers the pool/launcher degradations that belonged to the retired multi-canary runner
+      // (fixed-sleep bark stagger, ready-timeout-as-pass, release-gate --repeat 1..3). One World
+      // replaces that topology with a sole entry: there is no stagger to sleep-replace, no pool
+      // pass condition to omit ready terms from, and no --repeat release gate to raise into
+      // until-pass. Detection at the source — an absence has no input that exhibits it.
+      assertTrue(
+        existsSync(`${REPO_ROOT}${SOLE_ENTRY}`),
+        `${SOLE_ENTRY} must exist as the sole top-level E2E entry`,
+      );
+      assertTrue(
+        !existsSync(`${REPO_ROOT}tests/e2e/run.mjs`),
+        'tests/e2e/run.mjs (multi-canary launcher) must be gone',
+      );
+      assertTrue(
+        !existsSync(`${REPO_ROOT}tests/e2e/support/manifest.mjs`),
+        'tests/e2e/support/manifest.mjs (canary suite list) must be gone',
+      );
 
+      const pkg = JSON.parse(readSource('package.json'));
       assertTrue(
-        source.includes('await currentPrevBark'),
-        'launch N must wait on the previous canary\'s bark, or the stagger is not event-driven',
+        typeof pkg.scripts?.['test:e2e'] === 'string' && pkg.scripts['test:e2e'].includes('entry.test.mjs'),
+        'package.json test:e2e must point at entry.test.mjs',
       );
       assertTrue(
-        source.includes('const onBark = () => triggerBark()'),
-        'the bark that releases the next launch must be the readiness signal, not a timer firing',
+        typeof pkg.scripts?.['check:release'] === 'string' && !pkg.scripts['check:release'].includes('--repeat'),
+        'check:release must not reintroduce a --repeat release-gate pool',
       );
-      // The bark a launch waits on may be several positions back (CANARY_STARTUP_WIDTH), which is
-      // still an event and still a bound. What must never appear is a duration in its place.
-      assertTrue(
-        source.includes('barkPromises[index - STARTUP_WIDTH]'),
-        'the stagger width must come from the declared startup bound, not be improvised per launch',
-      );
-      assertTrue(
-        !/setTimeout\([^)]*\)\s*;\s*\n\s*console\.log\("\[Launch\]/.test(source),
-        'a fixed sleep before [Launch] is the degradation this case forbids',
-      );
-      assertTrue(
-        !/await new Promise\(\(?resolve\)? => setTimeout\(resolve/.test(source),
-        'a sleep promise used as a launch gate is a fixed sleep by another name',
-      );
-    },
-  },
 
-  {
-    name: 'VERIFY-004 canary launch enforces its declared concurrency bound',
-    fn: () => {
-      const source = readSource(LAUNCHER);
-
-      assertTrue(
-        source.includes('await Promise.all(Array.from({ length: MAX_PARALLEL }, runWorker))'),
-        'the launcher must create exactly MAX_PARALLEL workers',
-      );
-      assertTrue(
-        source.includes('results[index] = await runScenarioChild(file, onBark)'),
-        'each worker must finish its current canary before taking another slot',
-      );
-      assertTrue(
-        !source.includes('canaryPromises.push'),
-        'collecting one live promise per canary bypasses MAX_PARALLEL',
-      );
+      const entry = readSource(SOLE_ENTRY);
+      assertTrue(!/\bshuffle\b/.test(entry), 'the sole entry must not shuffle a canary pool');
+      assertTrue(!entry.includes('--repeat'), 'the sole entry must not implement a repeat release gate');
+      assertTrue(!entry.includes('MAX_PARALLEL'), 'the sole entry must not enforce a canary concurrency pool');
+      assertTrue(!entry.includes('STARTUP_WIDTH'), 'the sole entry must not stagger launches by startup width');
     },
   },
 
@@ -236,68 +215,6 @@ export const degradationCases = [
       assertTrue(
         !providerSource.includes('timeoutMs = WATCHDOG_TIMEOUT_MS'),
         'provider wait helpers must not default every flow wait to the silence window as a total deadline',
-      );
-    },
-  },
-
-  {
-    name: 'VERIFY-004 a canary that never reaches ready, or exits before it, is failed not passed',
-    fn: () => {
-      // Covers VERIFY_004_D_READY_TIMEOUT_OR_EARLY_EXIT_PASSES. The pass line is a conjunction, and
-      // every failure shape must be one of its negated terms: a canary that times out reaching ready,
-      // or exits before barking, has to land in the else branch and take the suite to exit 1. The
-      // degradation is a pass condition that omits one of these terms — 「就绪超时或就绪前退出被当作
-      // 通过」 — which reads as a green suite over a canary that never started.
-      const source = readSource(LAUNCHER);
-
-      assertTrue(
-        source.includes('r.code === 0 && r.barked && !r.barkTimeout && !r.processTimeout && !r.exitedBeforeBark && !readyGateFailures.has(r.file)'),
-        'the pass condition must reject every not-ready shape: barkTimeout, processTimeout, exitedBeforeBark, and the ready-gate failure set',
-      );
-      assertTrue(
-        /else \{\s*\n\s*failed = true;/.test(source),
-        'anything short of the full conjunction must set failed, not fall through to a pass',
-      );
-      assertTrue(
-        /if \(failed\) \{[\s\S]*?process\.exit\(1\);/.test(source),
-        'a failed iteration must exit 1; a suite that reports failure and exits 0 is the degradation',
-      );
-      assertTrue(
-        source.includes('exited before [setupScenario] ready'),
-        'an early exit must be named as a failure reason, not absorbed into a generic code',
-      );
-    },
-  },
-
-  {
-    name: 'VERIFY-004 the release gate is exactly three rounds, never until-pass',
-    fn: () => {
-      // Covers VERIFY_004_D_RELEASE_GATE_BECOMES_AT_MOST_N_ROUNDS. Two halves, matching the clause's
-      // two shapes. 「最多 N 轮」: the round count is bounded at 3 and a value above it is refused, so
-      // it cannot be raised to 「run until it passes」 by configuration. 「重跑直到通过」: the loop runs
-      // a FIXED number of iterations and exits 1 on the first failed one — there is no while-not-green
-      // anywhere, because a gate that retries a failure into a pass is not a gate.
-      const source = readSource(LAUNCHER);
-
-      assertTrue(
-        source.includes('n < 1 || n > 3') || source.includes('repeats < 1 || repeats > 3'),
-        '--repeat must be bounded at 3, or the release gate becomes 「at most N rounds」 for arbitrary N',
-      );
-      assertTrue(
-        source.includes('--repeat must be an integer from 1 through 3') || source.includes('CANARY_REPEAT must be'),
-        'out-of-range --repeat must refuse with an explicit bound message',
-      );
-      assertTrue(
-        source.includes('for (let rep = 1; rep <= repeats; rep++)'),
-        'the round loop must be a fixed-count for, bounded by the validated repeat count',
-      );
-      assertTrue(
-        !/while\s*\(\s*(!?failed|true|.*pass)/.test(source),
-        'a while loop keyed on failure or success is 「重跑直到通过」 — the release gate must not retry',
-      );
-      assertTrue(
-        /if \(failed\) \{[\s\S]*?process\.exit\(1\);/.test(source),
-        'the first failed round must stop the gate; continuing past a failure is the until-pass shape',
       );
     },
   },
