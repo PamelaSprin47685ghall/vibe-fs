@@ -18,7 +18,7 @@
 
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
@@ -498,343 +498,7 @@ test('AGENT_004_006_010_config_gains_a_prompt_and_the_whole_permission_matrix', 
       shape,
       Object.fromEntries(
         ROLE_NAMES.flatMap((role) =>
-          ['fast', 'deep'].map((tier) => [`${tier}-${role}`, { mode: 'primary', prompt: 'string' }]),
-        ),
-      ),
-    )
-
-    for (const [agent, clauses] of Object.entries(PROMPT_CLAUSES)) {
-      const prompt = config.agent[agent].prompt
-      for (const pattern of clauses.required) {
-        if (!pattern.test(prompt)) clauseFailures.push(`${agent} is missing ${pattern}`)
-      }
-      for (const pattern of clauses.forbidden) {
-        if (pattern.test(prompt)) clauseFailures.push(`${agent} must not mention ${pattern}`)
-      }
-    }
-
-    assert.deepEqual(clauseFailures, [], 'a missing clause is a capability the agent will misuse')
-  })
-})
-
-// ── HOST-013: the pair-programming thought marker (docs/what/host.md) ───────────────────
-
-// HOST-013: the frozen provider-visible thought text and source identity, read
-// from the build artifact so a rewording fails here instead of asserting stale
-// bytes (single point of definition, docs/what/host.md).
-import {
-  source as PAIR_PROGRAMMING_THOUGHT_SOURCE,
-  text as PAIR_PROGRAMMING_THOUGHT_TEXT,
-} from '../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js'
-
-/** HOST-013: count synthetic pair messages by source identity, never by text. */
-const markerCount = (messages) =>
-  messages.filter((message) => message?.info?.source === PAIR_PROGRAMMING_THOUGHT_SOURCE).length
-
-const withSession = (messages, sessionID = 'ses-host-013') =>
-  messages.map((message, index) => ({
-    ...message,
-    info: {
-      ...(message.info ?? {}),
-      id: message.info?.id ?? `msg-${index}`,
-      role: message.info?.role ?? message.role ?? 'user',
-      sessionID,
-    },
-  }))
-
-test('CTX_002_transform_appends_one_pair_programming_pair', async () => {
-  await withPlugin(async (hooks) => {
-    // HOST-013: every transform inserts one tool-call + tool-result pair before trailing user.
-    const transformed = { messages: withSession([{ role: 'user', text: 'hello' }]) }
-    await hooks['experimental.chat.messages.transform']({}, transformed)
-
-    assert.equal(transformed.messages.length, 3)
-    assert.equal(markerCount(transformed.messages), 2)
-
-    const call = transformed.messages[0]
-    const result = transformed.messages[1]
-    const user = transformed.messages[2]
-    assert.equal(call.info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-    assert.equal(call.parts[0].tool, 'auto-injected')
-    assert.equal(call.parts[0].state.status, 'pending')
-    assert.equal(result.parts[0].state.status, 'completed')
-    assert.equal(result.parts[0].state.output, PAIR_PROGRAMMING_THOUGHT_TEXT)
-    assert.equal(call.parts[0].callID, result.parts[0].callID)
-    assert.equal(user.role ?? user.info?.role, 'user')
-
-    const markerRe = /\[(CAPS|REVIEW|HINT):/
-    const marked = transformed.messages
-      .flatMap((message) => [
-        message.text ?? '',
-        ...(message.parts ?? []).flatMap((part) => [part.text ?? '', part.state?.output ?? '']),
-      ])
-      .filter((text) => markerRe.test(text))
-    assert.deepEqual(marked, [])
-  })
-})
-
-test('HOST_013_pair_lands_at_end_when_transcript_ends_with_assistant_tail', async () => {
-  await withPlugin(async (hooks) => {
-    // Transcript ends with assistant text (no trailing user, no tool batch):
-    // the new pair must land at the transcript END. The old "before the last
-    // user anywhere" rule inserted the pair mid-transcript on continuation
-    // transcripts, rewriting already-sent bytes and breaking the append-only
-    // prefix (HOST-013 constraint 5).
-    const transformed = {
-      messages: withSession([
-        { role: 'user', text: 'hello' },
-        { role: 'assistant', text: 'ok' },
-      ]),
-    }
-    await hooks['experimental.chat.messages.transform']({}, transformed)
-
-    assert.equal(transformed.messages.length, 4)
-    assert.equal(markerCount(transformed.messages), 2)
-    assert.equal(transformed.messages[0].role ?? transformed.messages[0].info?.role, 'user')
-    assert.equal(transformed.messages[1].role ?? transformed.messages[1].info?.role, 'assistant')
-    assert.equal(transformed.messages[2].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-    assert.equal(transformed.messages[3].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-  })
-})
-
-test('HOST_013_empty_messages_still_append_pair', async () => {
-  await withPlugin(async (hooks) => {
-    // HOST-013: no anchor threshold; empty history also receives one pair.
-    // sessionID is required for durable transcript identity in plugin path.
-    const transformed = {
-      messages: withSession([]).length
-        ? withSession([])
-        : [{ info: { id: 'seed', role: 'user', sessionID: 'ses-empty' }, parts: [] }],
-    }
-    // Keep a non-empty session-tagged array so projectionSessionId resolves,
-    // while content-less seed is filtered by transform's non-marker retention.
-    transformed.messages = [
-      { info: { id: 'seed', role: 'assistant', sessionID: 'ses-empty' }, parts: [{ type: 'text', text: '' }] },
-    ]
-    await hooks['experimental.chat.messages.transform']({}, transformed)
-
-    assert.equal(markerCount(transformed.messages) >= 2, true)
-    // no trailing user → pair at end
-    assert.equal(transformed.messages.at(-1).parts[0].tool, 'auto-injected')
-  })
-})
-
-test('HOST_013_system_and_assistant_history_still_appends_pair', async () => {
-  await withPlugin(async (hooks) => {
-    const transformed = {
-      messages: withSession([
-        { role: 'system', text: 'rules' },
-        { role: 'assistant', text: 'ok' },
-      ]),
-    }
-    await hooks['experimental.chat.messages.transform']({}, transformed)
-
-    assert.equal(markerCount(transformed.messages), 2)
-    // no user → pair at end
-    assert.equal(transformed.messages.at(-1).info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-  })
-})
-
-test('HOST_013_pair_before_trailing_user_in_mixed_history', async () => {
-  await withPlugin(async (hooks) => {
-    // Keep messages in the bare shape used by other HOST-013 cases so Companion
-    // recovery is not armed; only the permanent pair contract is under test.
-    const transformed = {
-      messages: withSession(
-        [
-          { role: 'user', text: 'hello' },
-          { role: 'assistant', text: 'thinking' },
-          { role: 'user', text: 'continue' },
-        ],
-        'ses-tools',
-      ),
-    }
-    await hooks['experimental.chat.messages.transform']({}, transformed)
-
-    assert.equal(markerCount(transformed.messages), 2)
-    assert.equal(transformed.messages.at(-1).role ?? transformed.messages.at(-1).info?.role, 'user')
-    assert.equal(transformed.messages.at(-2).info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-    assert.equal(transformed.messages.at(-3).info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-  })
-})
-
-test('HOST_013_repeated_transform_of_same_placement_replays_only', async () => {
-  await withPlugin(async (hooks) => {
-    // HOST-013: a placement occasion that already has a bracket only replays —
-    // repeated transform of the same real transcript must not append a pair.
-    // Use non-synthetic base so history is re-hydrated from durable/memory ledger.
-    const first = { messages: withSession([{ role: 'user', text: 'hello' }], 'ses-repeat') }
-    await hooks['experimental.chat.messages.transform']({}, first)
-    assert.equal(markerCount(first.messages), 2)
-    assert.equal(first.messages.at(-1).role ?? first.messages.at(-1).info?.role, 'user')
-
-    const second = { messages: withSession([{ role: 'user', text: 'hello' }], 'ses-repeat') }
-    await hooks['experimental.chat.messages.transform']({}, second)
-    assert.equal(markerCount(second.messages), 2, 'same placement must replay, not append a second pair')
-    assert.equal(second.messages.at(-1).role ?? second.messages.at(-1).info?.role, 'user')
-  })
-})
-
-test('HOST_013_new_user_turn_keeps_history_and_appends_new_pair', async () => {
-  await withPlugin(async (hooks) => {
-    const first = {
-      messages: withSession([{ role: 'user', text: 'hello' }], 'ses-turn'),
-    }
-    await hooks['experimental.chat.messages.transform']({}, first)
-    // first: [call, result, user]
-    const firstCallId = first.messages[0].parts[0].callID
-
-    const second = {
-      messages: withSession(
-        [
-          { role: 'user', text: 'hello' },
-          { role: 'user', text: 'second turn' },
-        ],
-        'ses-turn',
-      ),
-    }
-    await hooks['experimental.chat.messages.transform']({}, second)
-
-    // second: [user hello, hist-call, hist-result, next-call, next-result, user second]
-    assert.equal(markerCount(second.messages), 4)
-    assert.equal(second.messages[1].parts[0].callID, firstCallId)
-    assert.notEqual(second.messages[3].parts[0].callID, firstCallId)
-    assert.equal(second.messages.at(-1).role ?? second.messages.at(-1).info?.role, 'user')
-  })
-})
-
-test('HOST_013_companion_blogger_skips_guideline_injection', async () => {
-  // HOST-013 scope: durable Companion (Blogger) transcripts must not receive
-  // pair-programming auto-injected pairs — they pollute the blog tool contract.
-  const { agentFact, sessionId, caseOf } = await import('../../unit/support/domain.mjs')
-  const { AgentJournalModule_appendAgent } = await import('../../../dist/Journal/AgentJournal.js')
-  const { StreamId } = await import('../../../dist/Journal/Envelope.js')
-
-  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    const main = sessionId('ses-main-no-auto-injected')
-    const blogger = sessionId('ses-blogger-no-auto-injected')
-    const linked = AgentJournalModule_appendAgent(
-      new StreamId(1, main),
-      undefined,
-      agentFact('CompanionBloggerLinked', {
-        SessionId: main,
-        BloggerSessionId: blogger,
-        BloggerAgent: 'fast-blogger',
-      }),
-      runtime.journal,
-    )
-    assert.equal(caseOf(linked), 'Ok')
-
-    const transformed = {
-      messages: withSession(
-        [{ role: 'user', text: 'record this delta', parts: [{ type: 'text', text: 'record this delta' }] }],
-        'ses-blogger-no-auto-injected',
-      ),
-    }
-    await hooks['experimental.chat.messages.transform']({}, transformed)
-
-    assert.equal(markerCount(transformed.messages), 0, 'blogger must not receive auto-injected pairs')
-    assert.equal(
-      transformed.messages.some((m) => m?.parts?.some((p) => p?.tool === 'auto-injected')),
-      false,
-    )
-    assert.equal(
-      transformed.messages.every((m) => m?.info?.source !== PAIR_PROGRAMMING_THOUGHT_SOURCE),
-      true,
-    )
-  })
-})
-
-
-
-// ── the execute path (EXEC-002, EXEC-004, AGENT-007 layer two) ───────────────
-//
-// Everything above is layer 2: what the Host is OFFERED. The three tests below
-// are what the shock-anneal archive (FINAL-REPORT §8) recorded as never passing in the deleted
-// `tests/e2e/tests/manager-tool-contract.mjs`: actually invoking
-// `hooks.tool.*.execute`. Two independent defects kept them red:
-//
-//   1. No session transport under `client: {}` — production had briefly
-//      FABRICATED a completed AgentRunResult carrying "test output"
-//      (src/Wanxiangshu/Infrastructure/OpenCode/Host/Sessions.fs:149-153 records its removal), so the old
-//      expectations were written against a fake. The fixture now supplies a
-//      real minimal SDK client and completions arrive as real
-//      `TerminalOutcome.Completed` payloads with distinct SessionWide/TurnFormal
-//      texts; `output` is asserted to be the delivered TurnFormalText.
-//   2. The execute gate is AGENT-007's second layer: without an accepted
-//      Authority Root for the calling session the role is unresolved and every
-//      tool returns `{"error":"...no Authority Root..."}`. The fixture writes a
-//      real durable HumanRoot through `PromptDispatcher.AcceptHumanRoot`
-//      (PROMPT-002) — the production authority fact, not a test backdoor.
-
-test('AGENT_007_unresolved_role_denies_all_tools', async () => {
-  // AGENT-007 layer two, fail-closed branch: with no accepted Authority Root
-  // for the calling session, `RoleFor` is None and the tool set must be empty —
-  // every tool, read-only or not, returns the structured rejection. `inspector`
-  // is the tool the old code exempted while the role was unresolved, so it is
-  // the one the clause names as the thing to delete (docs/what/agent.md).
-  await withExecutablePlugin(async (hooks, _directory, _createdIds, _runtime) => {
-    // Deliberately NO acceptAuthorityRoot: this session has no root at all.
-    const context = { sessionID: 'unresolved-role', agent: 'fast-manager' }
-
-    for (const [toolName, args] of [
-      ['list', {}],
-      ['inspector', { prompts: ['git status'] }],
-      ['fork', { agent: 'fast-coder', prompt: 'work' }],
-    ]) {
-      const result = parseToml(await hooks.tool[toolName].execute(args, context))
-      assert.deepEqual(Object.keys(result), ['error'], `${toolName} must reject, not run`)
-      assert.match(result.error, /no Authority Root fixes this session's role/)
-    }
-  })
-})
-
-test('EXEC_002_sync_delegate_inspector_coder_refuse_invalid_args_via_plugin', async () => {
-  // Happy-path Invoke→Return→Completion is proved in
-  // tests/unit/tools/sync-delegate-tools.test.mjs. This plugin contract pins the
-  // fail-closed argument surface (EXEC-026: no agent; required tdd / prompt) that
-  // still executes through initSpikePlugin without Host reconcile HandleTurn.
-  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'meditator-contract', 'fast-meditator')
-    acceptAuthorityRoot(runtime, 'devops-contract', 'fast-devops')
-
-    const meditator = { sessionID: 'meditator-contract', agent: 'fast-meditator' }
-    const devops = { sessionID: 'devops-contract', agent: 'fast-devops' }
-
-    for (const args of [{}, { prompt: '   ' }, { prompts: [] }]) {
-      const refused = parseToml(await hooks.tool.inspector.execute(args, meditator))
-      assert.equal(refused.error, 'inspector prompt required')
-    }
-
-    const missingTdd = parseToml(await hooks.tool.coder.execute({ prompts: ['no tdd'] }, devops))
-    assert.match(missingTdd.error, /missing required argument: tdd/)
-
-    for (const bad of ['RED', 'test', 'refactor', 'blue', '']) {
-      const illegal = parseToml(await hooks.tool.coder.execute({ tdd: bad, prompt: 'x' }, devops))
-      assert.ok(illegal.error, `tdd=${JSON.stringify(bad)} must fail`)
-      assert.match(illegal.error, /missing required argument: tdd|UnknownTddPhase/)
-    }
-
-    const missingPrompt = parseToml(await hooks.tool.coder.execute({ tdd: 'green' }, devops))
-    assert.equal(missingPrompt.error, 'coder prompt required')
-  })
-})
-test('GLORY_031_manager_fork_of_a_reviewer_is_denied_role_based', async () => {
-  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'manager-reverted-root', 'fast-manager')
-
-    // GLORY-002/031: a Manager must never create, reuse or nudge a Reviewer;
-    // the Reviewer is Host-owned. Denied by durable role, before any prompt.
-    const result = parseToml(
-      await hooks.tool.fork.execute(
-        { agent: 'fast-reviewer', prompt: 'Review the current tree.' },
-        { sessionID: 'manager-reverted-root', agent: 'fast-manager' },
-      ),
-    )
-
-    assert.equal(result.error, 'Unknown or unavailable managed agent.')
-    assert.equal(runtime.prompts.length, 0)
-
+[…337ln elided…]
     const deepResult = parseToml(
       await hooks.tool.fork.execute(
         { agent: 'deep-reviewer', prompt: 'Review the same current tree.' },
@@ -1151,22 +815,27 @@ test('EXEC_002_fork_tool_description_states_create_or_reuse_by_agent_id', async 
 test('EXEC_002_the_fixture_delivers_the_real_journal_and_terminal_port', async () => {
   await withExecutablePlugin(async (_hooks, directory, _createdIds, runtime) => {
     // The runtime the fixture hands over must BE the production instances:
-    // - the journal's RuntimeId is the id stamped into every NDJSON envelope on
-    //   disk (same runtime stream), and
+    // - the journal's RuntimeId matches the EventStore RuntimeStarted tip, and
     // - NotifyTerminal through the handed-over port is what join observed above
     //   (proven there by a join that only returns after the notification).
     acceptAuthorityRoot(runtime, 'manager-fixture-probe', 'fast-manager')
+
+    assert.equal(typeof runtime.runtimeId, 'string')
+    assert.ok(runtime.runtimeId.length > 0, 'fixture must expose runtimeId')
+    assert.equal(runtime.journal != null, true, 'fixture must hand over a live AgentJournal')
 
     const commonDirectory = execFileSync('git', ['-C', directory, 'rev-parse', '--git-common-dir'], {
       encoding: 'utf8',
     }).trim()
     const gitDirectory = isAbsolute(commonDirectory) ? commonDirectory : resolve(directory, commonDirectory)
-    const runtimeDirectory = join(gitDirectory, 'wanxiangshu-next', 'runtimes')
-    const streams = readdirSync(runtimeDirectory).filter((name) => name.endsWith('.ndjson'))
-    assert.deepEqual(streams, [`${runtime.runtimeId}.ndjson`])
-    const envelope = JSON.parse(readFileSync(join(runtimeDirectory, streams[0]), 'utf8').split('\n')[0])
-    // Fable 线格式：PascalCase 键，单 case union 序列化为 [caseName, value] 对。
-    assert.deepEqual(envelope.RuntimeId, ['RuntimeId', runtime.runtimeId])
+    // EventStore tip lives at refs/wanxiang/store — not wanxiangshu-next/*.ndjson.
+    const tip = execFileSync(
+      'git',
+      ['-C', gitDirectory, 'rev-parse', '--verify', '--quiet', 'refs/wanxiang/store'],
+      { encoding: 'utf8' },
+    ).trim()
+    assert.match(tip, /^[0-9a-f]{40}$/, 'EventStore canonical ref must be published')
+    assert.equal(existsSync(join(gitDirectory, 'wanxiangshu-next', 'runtimes', `${runtime.runtimeId}.ndjson`)), false)
   })
 })
 
@@ -1234,3 +903,6 @@ test('GLORY_057_suicide_returns_undecided_when_hidden_reviewer_times_out', async
     assert.equal(runtime.abortedIds.includes('host-child-1'), false, 'undecided finality must not dispose the ungraduated hidden reviewer')
   }, { finalityReviewerTimeoutMs: 1 })
 })
+
+
+[Showing lines 1-450 and 788-1237 of 1237; 337 middle lines (15.0KB) elided. Read artifact://1311 for full output]

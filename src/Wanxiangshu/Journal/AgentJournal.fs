@@ -64,7 +64,7 @@ module JournalAppendFailure =
 /// Revision subscription: append+fsync → fold → revision advances → wake waiters.
 /// Correctness does not require every wake to be delivered: Join uses
 /// check → subscribe → recheck → await (see `AwaitChangeFrom`).
-type AgentJournal internal (writer: JournalWriter, initialProjection: ProjectionSet) =
+type AgentJournal internal (writer: IJournalWriter, initialProjection: ProjectionSet) =
     let gate = obj ()
     // DSL-MUTABLE: resource — in-memory projection after last committed fold
     let mutable projection = initialProjection
@@ -215,56 +215,30 @@ type AgentJournal internal (writer: JournalWriter, initialProjection: Projection
         result
 
     interface IDisposable with
-        member _.Dispose() = (writer :> IDisposable).Dispose()
+        member _.Dispose() = writer.Release()
 
     interface IAsyncDisposable with
-        member _.DisposeAsync() =
-            (writer :> IAsyncDisposable).DisposeAsync()
+        member _.DisposeAsync() = writer.ReleaseAsync()
 
 module AgentJournal =
 
-    /// PERSIST-004: a journal that cannot be folded stops startup. Recovering
-    /// "as much as folded cleanly" would build the runtime on a prefix no writer
-    /// ever produced.
-    ///
-    /// Boot.Diagnostics non-empty means at least one runtime stream was truncated
-    /// mid-file (parse/legacy refusal). Folding the partial prefix invents open
-    /// BloggerRequest slots whose commits never arrived — then a later materialize
-    /// rejects with "already has open request" and the plugin refuses to load.
-    /// Fail closed on diagnostics first; the operator must archive the journal.
-    let createFromBoot
-        (directory: string)
-        (runtimeId: RuntimeId)
-        (processId: int)
-        (startedAt: DateTimeOffset)
-        (boot: BootSnapshot)
+    /// EventStore-backed journal for empty init-only tests. Caller builds the
+    /// writer via the EventStore journal writer factory (keeps this module free
+    /// of store write tokens for the unified-store dual-write gate).
+    let createFromEventStore
+        (writer: IJournalWriter)
+        (initEnvelope: Envelope)
         : Result<AgentJournal, FoldRejection> =
-        match boot.Diagnostics with
-        | [] ->
-            Fold.apply Fold.empty boot.Envelopes
-            |> Result.bind (fun replayed ->
-                let writer, initEnvelope =
-                    JournalWriter.create directory runtimeId processId startedAt
-
-                Fold.foldEnvelope replayed initEnvelope
-                |> Result.map (fun withRuntime -> new AgentJournal(writer, withRuntime)))
-        | _ ->
-            // Prefer the first diagnostic (often tip-v2 / pre-0.5.0 clean break).
-            // Concatenate a short tail so multi-file poison is still visible.
-            let reason = boot.Diagnostics |> List.truncate 5 |> String.concat "\n"
-            Error { Fact = "Boot"; Reason = reason }
-
-    let create
-        (directory: string)
-        (runtimeId: RuntimeId)
-        (processId: int)
-        (startedAt: DateTimeOffset)
-        : Result<AgentJournal, FoldRejection> =
-        let writer, initEnvelope =
-            JournalWriter.create directory runtimeId processId startedAt
-
         Fold.foldEnvelope Fold.empty initEnvelope
         |> Result.map (fun projection -> new AgentJournal(writer, projection))
+
+    /// Attach a writer to a projection already folded at EventStore boot
+    /// (`resumeOrCreate`). Does not re-fold; does not open a store.
+    let createFromProjection
+        (writer: IJournalWriter)
+        (projection: ProjectionSet)
+        : Result<AgentJournal, FoldRejection> =
+        Ok(new AgentJournal(writer, projection))
 
     let appendAgent
         (stream: StreamId)

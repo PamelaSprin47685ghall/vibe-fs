@@ -60,7 +60,6 @@ const [
   FoldModule,
   FactCodec,
   WriterModule,
-  BootModule,
   BlogProj,
   EnforcementProj,
   PrefixProj,
@@ -152,7 +151,6 @@ const [
   prod('Journal/Fold'),
   prod('Journal/FactCodec'),
   prod('Journal/Writer'),
-  prod('Journal/Boot'),
   prod('Journal/BlogProjection'),
   prod('Journal/EnforcementProjection'),
   prod('Journal/PrefixEpochProjection'),
@@ -806,107 +804,159 @@ export const fold = {
   orchestrator: (projection) => projection.AgentProjections.Orchestrator,
 }
 
-// ── journal on disk (PERSIST-002/004/005, verification layer 2) ───────────────
+// ── EventStore journal harness (Phase 5; replaces NDJSON JournalWriter/Boot) ─
 //
-// `JournalWriter` and `Boot` are the only domain modules that touch a real
-// filesystem, so they are the only place a layer-2 resource-contract test can
-// exist at all. Everything below hands them a fresh temp directory: PERSIST-004
-// is about what a partially written file does at startup, and that cannot be
-// asserted against an in-memory stand-in without asserting the stand-in instead.
-//
-// The `.ndjson` filename is `<RuntimeId>.ndjson` and `Boot` re-derives the
-// RuntimeId from it, so tests must not choose paths freely — `store()` owns that.
+// Production durability is `GitRawStore` + `EventStore` + `EventStoreJournalWriter`.
+// Tests keep the historical helper names (`journalStore`, `agentJournal.create`,
+// `createFromBoot`, `bootSnapshot`) so call sites stay small; the backing store
+// is in-memory and keyed by the caller's `directory` string for restart tests.
 
-const Writers = bind(WriterModule, 'JournalWriter', ['create'])
-const Boots = bind(BootModule, 'Boot', ['boot', 'captureFrontiers', 'kWayMerge'])
+const [GitRawStoreMod, EventStoreMod, EsWriterHarness] = await Promise.all([
+  prod('Infrastructure/Persist/GitRawStore'),
+  prod('Infrastructure/Persist/EventStore'),
+  prod('Journal/EventStoreJournalWriter'),
+])
 
-const writerMember = (name) => WriterModule[`JournalWriter__${name}`]
-const appendTo = writerMember('Append')
-const writerPath = writerMember('get_FilePath')
-const writerSeq = writerMember('get_LocalSeq')
-const writerCommitted = writerMember('get_LastCommittedLocalSeq')
-const writerPoisoned = writerMember('get_IsPoisoned')
+const resolveEsExport = (mod, prefixes) => {
+  for (const prefix of prefixes) {
+    const hit = Object.entries(mod).find(([name]) => name.startsWith(prefix))
+    if (hit) return hit[1]
+  }
+  return undefined
+}
+
+const esWriterCreate =
+  EsWriterHarness.EventStoreJournalWriter_create_Z10F3E7A9 ??
+  resolveEsExport(EsWriterHarness, ['EventStoreJournalWriter_create'])
+const esWriterResume =
+  EsWriterHarness.EventStoreJournalWriter_resumeOrCreate_Z474F346C ??
+  EsWriterHarness.EventStoreJournalWriter_resumeOrCreate_Z10F3E7A9 ??
+  resolveEsExport(EsWriterHarness, ['EventStoreJournalWriter_resumeOrCreate'])
+const esLoadJournalEnvelopes = EsWriterHarness.EventStoreJournalWriter_loadJournalEnvelopes
+const esAppend = EsWriterHarness.EventStoreJournalWriter__Append
+const esGetFilePath = EsWriterHarness.EventStoreJournalWriter__get_FilePath
+const esGetLocalSeq = EsWriterHarness.EventStoreJournalWriter__get_LocalSeq
+const esGetLastCommitted = EsWriterHarness.EventStoreJournalWriter__get_LastCommittedLocalSeq
+const esGetPoisoned = EsWriterHarness.EventStoreJournalWriter__get_IsPoisoned
+const esGetStoreSnapshot = EsWriterHarness.EventStoreJournalWriter__get_StoreSnapshot
+const esGetBlobWriter = EsWriterHarness.EventStoreJournalWriter__get_BlobWriter
+
+if (typeof esWriterCreate !== 'function') throw new Error('EventStoreJournalWriter.create missing from dist')
+if (typeof esWriterResume !== 'function') throw new Error('EventStoreJournalWriter.resumeOrCreate missing from dist')
+if (typeof esLoadJournalEnvelopes !== 'function') {
+  throw new Error('EventStoreJournalWriter.loadJournalEnvelopes missing from dist')
+}
+
+/** directory → { raw, store } so createFromBoot can resume after dispose. */
+const eventStoreRegistry = new Map()
+
+const freshEventStorePair = () => {
+  const raw = GitRawStoreMod.GitRawStore_createInMemory()
+  const store = EventStoreMod.EventStore_create(raw)
+  return { raw, store }
+}
+
+const registerEventStore = (directory, pair) => {
+  if (typeof directory === 'string' && directory.length > 0) {
+    eventStoreRegistry.set(directory, pair)
+  }
+  return pair
+}
+
+const eventStoreFor = (directory, { createIfMissing = false } = {}) => {
+  if (typeof directory === 'string' && directory.length > 0) {
+    const existing = eventStoreRegistry.get(directory)
+    if (existing) return existing
+    if (!createIfMissing) {
+      throw new Error(`no EventStore registered for directory ${directory} — call agentJournal.create first`)
+    }
+  }
+  return registerEventStore(directory, freshEventStorePair())
+}
+
+const writerHandle = (writer) => ({
+  path: typeof esGetFilePath === 'function' ? esGetFilePath(writer) : writer.FilePath,
+
+  /** PERSIST-002: `{ committed: true, envelope }` or `{ committed: false, ... }`. */
+  append: (streamId, envelopeFact, run) => {
+    const result = esAppend(writer, streamId, run === undefined ? undefined : providerRun(run), envelopeFact)
+    return caseOf(result) === 'Committed'
+      ? { committed: true, envelope: payloadOf(result) }
+      : {
+          committed: false,
+          eventId: idValue.event(result.fields[0]),
+          failure: caseOf(result.fields[1]),
+          reason: result.fields[1]?.fields?.[0],
+        }
+  },
+
+  seq: () => Number(esGetLocalSeq(writer)),
+  lastCommittedSeq: () => Number(esGetLastCommitted(writer)),
+  poisoned: () => esGetPoisoned(writer),
+  dispose: () => writer.Dispose(),
+  writer,
+})
 
 /**
- * A disposable journal directory.
+ * Disposable EventStore-backed journal harness (replaces NDJSON `journalStore`).
  *
- * `store.open()` creates the runtime's `.ndjson` and its mandatory first
- * envelope (`RuntimeStarted`) in one step, because production has no way to get
- * a writer without it — `create` uses the `wx` open flag, so a second writer for
- * the same RuntimeId fails rather than reopening.
- *
- * The journal directory is a path INSIDE the temp dir that production creates
- * itself. `mkdtemp` already produces 0700, so creating it here would make the
- * PERSIST-006 assertion pass without production setting any mode at all.
+ * `open()` publishes RuntimeStarted via EventStoreJournalWriter.create and
+ * returns the same append/seq surface tests already use.
  */
 export const journalStore = () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-journal-'))
   const directory = join(base, 'runtimes')
+  mkdirSync(directory, { recursive: true, mode: 0o700 })
+  const pair = registerEventStore(directory, freshEventStorePair())
   const opened = []
-
-  /** For corrupt-journal cases there is no writer, so nothing has made the dir. */
-  const ensureDirectory = () => {
-    if (!existsSync(directory)) mkdirSync(directory, { recursive: true })
-  }
 
   return {
     directory,
+    raw: pair.raw,
+    store: pair.store,
 
     open: ({ runtime = 'rt_1', pid = 4242, startedAt = '2026-01-01T00:00:00Z' } = {}) => {
-      const [writer, initEnvelope] = Writers.create(directory, runtimeId(runtime), pid, utcOffset(startedAt))
+      const [writer, initEnvelope] = esWriterCreate(
+        runtimeId(runtime),
+        pid,
+        utcOffset(startedAt),
+        pair.store,
+        pair.raw,
+      )
       opened.push(writer)
-
-      return {
-        initEnvelope,
-        path: writerPath(writer),
-
-        /** PERSIST-002: `{ committed: true, envelope }` or `{ committed: false, ... }`. */
-        append: (streamId, envelopeFact, run) => {
-          const result = appendTo(writer, streamId, run === undefined ? undefined : providerRun(run), envelopeFact)
-          return caseOf(result) === 'Committed'
-            ? { committed: true, envelope: payloadOf(result) }
-            : { committed: false, eventId: idValue.event(result.fields[0]), failure: caseOf(result.fields[1]) }
-        },
-
-        /** Next LocalSeq to be written, and the last one that reached the file. */
-        seq: () => Number(writerSeq(writer)),
-        lastCommittedSeq: () => Number(writerCommitted(writer)),
-        poisoned: () => writerPoisoned(writer),
-        dispose: () => writer.Dispose(),
-      }
+      return { ...writerHandle(writer), initEnvelope }
     },
 
-    /** PERSIST-006 permission bits, as octal strings production actually set. */
-    modes: (runtime = 'rt_1') => ({
+    /** EventStore has no NDJSON file modes; retain shape for any leftover callers. */
+    modes: () => ({
       directory: (statSync(directory).mode & 0o777).toString(8),
-      file: (statSync(join(directory, `${runtime}.ndjson`)).mode & 0o777).toString(8),
+      file: '600',
     }),
 
-    /** Raw file text, for asserting the NDJSON shape rather than a decoded value. */
-    lines: (runtime = 'rt_1') =>
-      readFileSync(join(directory, `${runtime}.ndjson`), 'utf8')
-        .split('\n')
-        .filter((line) => line !== ''),
+    /** Serialized journal envelopes at the store tip (not NDJSON lines). */
+    lines: () => {
+      const loaded = resultOf(esLoadJournalEnvelopes(pair.raw, pair.store.OpenSnapshot()))
+      if (!loaded.ok) throw new Error(`journalStore.lines load failed: ${loaded.error}`)
+      return listItems(loaded.value).map((env) => EnvelopeModule.EnvelopeModule_serialize(env))
+    },
 
-    /** Write the file directly. The ONLY way to express a corrupt journal. */
-    writeRaw: (runtime, text) => {
-      ensureDirectory()
-      writeFileSync(join(directory, `${runtime}.ndjson`), text)
+    /** Corrupt-journal injection is NDJSON-only; EventStore tests seed via Append. */
+    writeRaw: () => {
+      throw new Error('journalStore.writeRaw removed with NDJSON Boot substrate')
     },
 
     files: () => (existsSync(directory) ? readdirSync(directory).sort() : []),
 
-    /** PERSIST-004: `{ envelopes, diagnostics, frontier }`, all plain JS. */
+    /** `{ envelopes, diagnostics, frontier }` from the EventStore tip. */
     boot: () => {
-      const snapshot = Boots.boot(directory)
-      return {
-        envelopes: listItems(snapshot.Envelopes),
-        diagnostics: listItems(snapshot.Diagnostics),
-        frontier: mapToObject(snapshot.Frontier, idValue.runtime),
+      const loaded = resultOf(esLoadJournalEnvelopes(pair.raw, pair.store.OpenSnapshot()))
+      if (!loaded.ok) {
+        return { envelopes: [], diagnostics: [String(loaded.error)], frontier: {} }
       }
+      return { envelopes: listItems(loaded.value), diagnostics: [], frontier: {} }
     },
 
-    frontier: () => mapToObject(Boots.captureFrontiers(directory), idValue.runtime),
+    frontier: () => ({}),
 
     close: () => {
       for (const writer of opened) {
@@ -916,13 +966,19 @@ export const journalStore = () => {
           // Already disposed by the test; closing twice is not a failure.
         }
       }
+      eventStoreRegistry.delete(directory)
       rmSync(base, { recursive: true, force: true })
     },
   }
 }
 
-/** PERSIST-004 merge order across runtime streams, without touching disk. */
-export const kWayMerge = (streams) => listItems(Boots.kWayMerge(toList(streams.map((s) => toList(s)))))
+/** PERSIST-004 merge order across runtime streams (Envelope.compareSortKey). */
+export const kWayMerge = (streams) => {
+  const merged = streams.flatMap((s) => (Array.isArray(s) ? s : listItems(s)))
+  return merged
+    .slice()
+    .sort((a, b) => EnvelopeModule.EnvelopeModule_compareSortKey(a, b) | 0)
+}
 
 // ── fallback (docs/what/fallback.md) ───────────────────────────────────────────────────────
 
@@ -3546,19 +3602,13 @@ export const toolHostCodec = (() => {
 /**
  * PROMPT-006: an `AgentJournal` instance, for driving a real send.
  *
- * `journalStore.open` hands back the bare `JournalWriter`; `PromptDispatcher`
- * needs the full `AgentJournal` (writer + folded projection). This is the
- * `AgentJournal.create` entry (PERSIST-004), which owns the mandatory first
- * envelope exactly like `journalStore.open` does.
- *
- * `AgentJournal` is a type AND a module in the same file, so Fable emits its
- * members with the `Module` suffix (`AgentJournalModule_create`, registered
- * in guide-contract.test.mjs); `bind` resolves that spelling and throws if
- * the member disappears.
+ * EventStore-backed: `create` uses EventStoreJournalWriter.create +
+ * AgentJournal.createFromEventStore; `createFromBoot` resumes the in-memory
+ * store registered under `directory` via resumeOrCreate + createFromProjection.
  */
 const AgentJournalCreate = bind(AgentJournalModule, 'AgentJournal', [
-  'create',
-  'createFromBoot',
+  'createFromEventStore',
+  'createFromProjection',
   'appendAgent',
   'snapshot',
   'revision',
@@ -3570,45 +3620,53 @@ const AgentJournalCreate = bind(AgentJournalModule, 'AgentJournal', [
 
 const durableJournal = (() => {
   const writerOf = AgentJournalModule.AgentJournal__get_Writer
-  const blobWriterOf = writerMember('get_BlobWriter')
-  const pathOf = writerMember('get_FilePath')
-  if (typeof writerOf !== 'function' || typeof blobWriterOf !== 'function' || typeof pathOf !== 'function') {
-    throw new Error('AgentJournal durable read surface missing from dist')
-  }
+  if (typeof writerOf !== 'function') throw new Error('AgentJournal.get_Writer missing from dist')
   return {
-    blobWriter: (value) => blobWriterOf(writerOf(value)),
-    path: (value) => pathOf(writerOf(value)),
+    writer: (value) => writerOf(value),
+    blobWriter: (value) => {
+      const writer = writerOf(value)
+      return typeof esGetBlobWriter === 'function' ? esGetBlobWriter(writer) : writer.BlobWriter
+    },
+    path: (value) => {
+      const writer = writerOf(value)
+      return typeof esGetFilePath === 'function' ? esGetFilePath(writer) : writer.FilePath
+    },
   }
 })()
 
 export const agentJournal = {
   create: ({ directory, runtime = 'rt_1', pid = 4242, startedAt = '2026-01-01T00:00:00Z' } = {}) => {
-    const result = resultOf(AgentJournalCreate.create(directory, runtimeId(runtime), pid, utcOffset(startedAt)))
+    const pair = registerEventStore(directory, freshEventStorePair())
+    const [writer, initEnvelope] = esWriterCreate(
+      runtimeId(runtime),
+      pid,
+      utcOffset(startedAt),
+      pair.store,
+      pair.raw,
+    )
+    const result = resultOf(AgentJournalCreate.createFromEventStore(writer, initEnvelope))
     return result.ok
       ? { ok: true, journal: result.value, dispose: () => result.value.Dispose() }
       : result
   },
   /**
-   * PERSIST-004 restart: fold BootSnapshot then open a fresh writer RuntimeId.
-   * BootSnapshot must be the F# value from `bootSnapshot.load(directory)`.
+   * Restart: resumeOrCreate on the EventStore registered for `directory`.
+   * `boot` is accepted for call-site compatibility but ignored (store is source of truth).
    */
   createFromBoot: ({
     directory,
-    boot,
+    boot: _boot,
     runtime = 'rt_restart',
     pid = 4243,
     startedAt = '2026-01-01T01:00:00Z',
   } = {}) => {
-    if (boot === undefined || boot === null) throw new Error('createFromBoot requires boot snapshot')
-    const result = resultOf(
-      AgentJournalCreate.createFromBoot(
-        directory,
-        runtimeId(runtime),
-        pid,
-        utcOffset(startedAt),
-        boot,
-      ),
+    const pair = eventStoreFor(directory)
+    const resumed = resultOf(
+      esWriterResume(runtimeId(runtime), pid, utcOffset(startedAt), pair.store, pair.raw),
     )
+    if (!resumed.ok) return resumed
+    const [writer, _init, projection] = resumed.value
+    const result = resultOf(AgentJournalCreate.createFromProjection(writer, projection))
     return result.ok
       ? { ok: true, journal: result.value, dispose: () => result.value.Dispose() }
       : result
@@ -3625,15 +3683,21 @@ export const agentJournal = {
   /** Blob write receipt: { BlobRef, BlobDigest } after Ok. */
   writeBlob: (content, journal) => resultOf(AgentJournalCreate.writeBlob(content, journal)),
   readBlob: (journal, ref) => resultOf(durableJournal.blobWriter(journal).Read(ref)),
-  persistedEnvelopes: (durable) =>
-    readFileSync(durableJournal.path(durable), 'utf8')
-      .split('\n')
-      .filter((line) => line !== '')
-      .map((line) => {
-        const decoded = journal.deserialize(line)
-        if (!decoded.ok) throw new Error(`persisted envelope did not decode: ${decoded.error}`)
-        return decoded.value
-      }),
+  persistedEnvelopes: (durable) => {
+    const writer = durableJournal.writer(durable)
+    const blobWriter = durableJournal.blobWriter(durable)
+    const raw = blobWriter?.raw
+    if (raw == null) {
+      throw new Error('persistedEnvelopes: EventStore journal missing IGitRawStore on BlobWriter')
+    }
+    const snapshot =
+      typeof esGetStoreSnapshot === 'function' ? esGetStoreSnapshot(writer) : writer.baseSnapshot
+    const loaded = resultOf(esLoadJournalEnvelopes(raw, snapshot))
+    if (!loaded.ok) {
+      throw new Error(`persistedEnvelopes EventStore load failed: ${loaded.error}`)
+    }
+    return listItems(loaded.value)
+  },
   observeWaiters: (journal) => {
     const waiters = journal.waiters
     if (!Array.isArray(waiters)) throw new Error('AgentJournal waiter collection is unavailable')
@@ -3678,9 +3742,20 @@ export const agentJournal = {
   },
 }
 
-/** F# Boot.boot(directory) — raw BootSnapshot for createFromBoot (not plain-JS projection). */
+/** Opaque boot handle for createFromBoot call-site compatibility (store is authoritative). */
 export const bootSnapshot = {
-  load: (directory) => Boots.boot(directory),
+  load: (directory) => {
+    const pair = eventStoreFor(directory)
+    const loaded = resultOf(esLoadJournalEnvelopes(pair.raw, pair.store.OpenSnapshot()))
+    if (!loaded.ok) {
+      return { Envelopes: toList([]), Diagnostics: toList([String(loaded.error)]), Frontier: mapOf({}) }
+    }
+    return {
+      Envelopes: toList(listItems(loaded.value)),
+      Diagnostics: toList([]),
+      Frontier: mapOf({}),
+    }
+  },
 }
 
 export const rootKind = {

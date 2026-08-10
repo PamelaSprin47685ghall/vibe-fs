@@ -694,7 +694,7 @@ Per §0 / Phase 0 table / **Amendment G3.5-A**: Student QA is **retired / do-not
 - [x] Phase 2 Git Raw EventStore 核心（Domain/Persist/GitRawStore/EventStore/Fold/Merge + unit；Converge wired in Phase 3）
 - [x] Phase 3 GitGateway + HookDispatcher + Dumb Server proof（`GitGateway.fs` / `HookDispatcher.fs` / `GitSubject.fs` / `ProcessGitRawStore.fs`；`EventStore.Converge` → gateway；`unified-store-gate` `GIT_BYPASS_ALLOWLIST` cleared；`tests/integration/persist/dumb-server.test.mjs` 7/7：object upload/fetch、two-client merge、lease rejection+retry）
 - [x] Phase 4 Clean-break policy / order / ownership map / doNotBuild（**docs/policy only**；supersedes frozen §Phase4 migrator / LegacyProjection via Amendment G3.5-A + Phase 4 Active notes below；**no** code cutover yet）
-- [ ] Phase 5 Cutover（正常 runtime 仅 EventStore；删除 Journal/Blob writers；旧 StudentQa file backend 不打开）
+- [x] Phase 5 Cutover（正常 runtime 仅 EventStore；删除 Journal/Blob NDJSON writers；旧 StudentQa file backend 不打开；**Strategy A `AgentJournal` surface retained** via EventStore adapter）
 - [ ] Phase 6 现有 Domain 改用统一 Store（仅仍存活 domain；Application/Session 改写到 `IEventStore`）
 - [ ] Phase 7 重写 Proposed Storage Sections（perm-inspector/rulebook/strength）
 - [ ] Phase 8 Full Proof（`spec`/`architecture`/`dsl-ownership`/`unified-store-gate` + build + unit/integration/e2e + dumb-server + `npm run check`；**无** legacy migrator suite for Student QA）
@@ -781,6 +781,32 @@ doNotBuild:
 ```
 
 Any PR introducing the above is out of scope for G4 Active and must be rejected under Amendment G3.5-A.
+
+### Phase 6 Wave-1 — IN PROGRESS（Strategy A：EventStore-backed journal adapter；无 dual-write）
+
+**Policy：** Keep `AgentJournal` surface; swap durability substrate to `IEventStore`. Amendment G3.5-A forbids dual-write / migrators / legacy NDJSON readers. Chicken-egg order remains Phase6 Wave-1 → Phase5 delete NDJSON writers.
+
+| Unit | Status | Notes |
+|---|---|---|
+| W1-vocab | DONE（G4U18） | `JournalEnvelope` in AuthoritativeEventTypes |
+| W1-codec | DONE（G4U19） | `EventStoreJournalCodec` Envelope ↔ EventEnvelope |
+| W1-writer | DONE（G4U20） | `EventStoreJournalWriter` + `createFromEventStore`; success path no `.ndjson` / no `blobs/` dir |
+| W1-boot | DONE（G4U21） | `loadJournalEnvelopes` + `resumeOrCreate` + `createFromProjection`; boot tests 4/4; gate OK |
+| W1-host | DONE（G4U22） | `WorkspaceEventStore` + `IJournalEventStoreBoot` + SharedAgentJournal factory + PluginHost；leave-unread host tests 2/2；dual-write clean |
+| W1-proof | DONE（unlocked Phase 5） | host leave-unread green；Phase 5 NDJSON substrate deletion unblocked |
+
+**dual-write seam：** `EventStoreJournalWriter` may name `IEventStore` but not `AgentJournal`; `AgentJournal` may not name `IEventStore`; composition root must not co-locate both token classes in one `.fs` file（`unified-store-gate` `scanDualWrite`）.
+
+### Phase 5 — Active notes（P5U1；NDJSON substrate deletion DONE）
+
+**Status：** production NDJSON / Boot / dir-blob writer cutover **DONE**（W1-proof unlocked）. Strategy A `AgentJournal` surface **remains**（EventStore-backed via `EventStoreJournalWriter` + `createFromProjection` / `createFromEventStore`）.
+
+验收（P5U1 exclusive）：
+- Deleted `Journal/Boot.fs`；fsproj Compile removed
+- `Writer.fs`：removed NDJSON `JournalWriter` + dir `BlobWriter`；kept `IBlobWriter` + `IJournalWriter`（+ `Frontier` type for `RuntimeSnapshot`）
+- `AgentJournal`：removed `createFromBoot` + directory `create`；kept `createFromProjection` / `createFromEventStore` / append*
+- Production grep：zero callable `Boot.boot` / `JournalWriter.create` / `createFromBoot` / `AgentJournal.create(directory)`
+- Unit/e2e NDJSON harness cleanup owned by **P5U2**（not this unit）
 
 **Blockers**：无（待实施中发现则追加）。
 

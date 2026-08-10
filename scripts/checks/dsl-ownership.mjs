@@ -121,6 +121,8 @@ export const HOST_BOUNDARY_OPEN_BASENAMES = new Set([
   'RuntimePath.fs',
   'SatelliteRuntime.fs',
   'SyncDelegateRuntime.fs',
+  // W1 EventStore-backed journal adapter (Journal IJournalWriter over IEventStore).
+  'EventStoreJournalWriter.fs',
 ])
 
 export const isHostBoundaryOpenPath = (file) => {
@@ -925,3 +927,4 @@ const isMain =
   resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1])
 
 if (isMain) runCli()
+

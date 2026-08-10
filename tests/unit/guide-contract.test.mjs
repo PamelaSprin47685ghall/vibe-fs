@@ -150,17 +150,17 @@ test('VERIFY_005_the_Parallel_kernel_publishes_only_bounded_parallelism', async 
 // ── the journal surface every program writes through ────────────────────────
 
 test('VERIFY_005_the_journal_publishes_boot_append_and_snapshot', async () => {
-  const [journal, boot, envelope, codec, state] = await Promise.all([
+  const [journal, esWriter, envelope, codec, state] = await Promise.all([
     load('Journal/AgentJournal'),
-    load('Journal/Boot'),
+    load('Journal/EventStoreJournalWriter'),
     load('Journal/Envelope'),
     load('Journal/FactCodec'),
     load('Journal/ProjectionState'),
   ])
 
   assertCallable(journal, 'Journal/AgentJournal', [
-    'AgentJournalModule_create',
-    'AgentJournalModule_createFromBoot',
+    'AgentJournalModule_createFromEventStore',
+    'AgentJournalModule_createFromProjection',
     'AgentJournalModule_appendAgent',
     'AgentJournalModule_snapshot',
     'AgentJournalModule_revision',
@@ -169,7 +169,14 @@ test('VERIFY_005_the_journal_publishes_boot_append_and_snapshot', async () => {
     'AgentJournalModule_isPoisoned',
   ])
 
-  assertCallable(boot, 'Journal/Boot', ['Boot_boot', 'Boot_captureFrontiers', 'Boot_kWayMerge'])
+  const hasCreate = Object.keys(esWriter).some((name) => name.startsWith('EventStoreJournalWriter_create'))
+  const hasResume = Object.keys(esWriter).some((name) =>
+    name.startsWith('EventStoreJournalWriter_resumeOrCreate'),
+  )
+  assert.equal(hasCreate, true, 'EventStoreJournalWriter.create must be published')
+  assert.equal(hasResume, true, 'EventStoreJournalWriter.resumeOrCreate must be published')
+  assert.equal(typeof esWriter.EventStoreJournalWriter_loadJournalEnvelopes, 'function')
+
   assertCallable(envelope, 'Journal/Envelope', [
     'EnvelopeModule_serialize',
     'EnvelopeModule_deserialize',

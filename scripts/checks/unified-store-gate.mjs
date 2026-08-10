@@ -14,11 +14,13 @@
  *   5. no-migrator — one-shot legacy importer / LegacyProjection≡NewProjection tooling
  *   6. dual-write — same production module writing EventStore AND Journal NDJSON
  *
- * Dual-write note (Phase5 deferral): live Journal NDJSON substrate is still the runtime
- * writer until Phase 5 cutover. Journal-only modules are NOT dual-write. Persist/EventStore-only
- * modules are NOT dual-write. This scanner only flags detectable same-module bridges that
- * write both surfaces. DUAL_WRITE_ALLOWLIST stays empty unless a documented false-positive
- * must be named; do not use it to park real bridges.
+ * Dual-write note (Phase 5 DONE for NDJSON substrate): production Boot / NDJSON
+ * JournalWriter / dir BlobWriter are deleted. Strategy A keeps AgentJournal as an
+ * EventStore-backed surface — AgentJournal-only modules are NOT dual-write.
+ * Persist/EventStore-only modules are NOT dual-write. This scanner only flags
+ * detectable same-module bridges that write both surfaces. DUAL_WRITE_ALLOWLIST
+ * stays empty unless a documented false-positive must be named; do not use it to
+ * park real bridges.
  *
  * Modes:
  *   node scripts/checks/unified-store-gate.mjs           scan production + clean-break roots
@@ -58,8 +60,8 @@ export const NON_STORE_SCHEMA_VERSION_SITES = Object.freeze([
 
 /**
  * Documented dual-write false-positive allowlist (posix paths relative to repo root).
- * Keep empty: live Journal-only code is not a hit; do not allowlist real EventStore+Journal
- * bridges. Phase 5 deletes Journal writers — until then only same-module dual writers RED.
+ * Keep empty: Strategy A AgentJournal-only code is not a hit; do not allowlist real
+ * EventStore+Journal bridges. Phase 5 deleted NDJSON writers — only same-module dual writers RED.
  */
 export const DUAL_WRITE_ALLOWLIST = Object.freeze([])
 
@@ -453,8 +455,9 @@ export const scanNoMigrator = (text, file = '<synthetic>') => {
 }
 
 /**
- * dual-write: same production module writes EventStore AND Journal NDJSON.
- * Live Journal-only code remains OK until Phase 5; Persist/EventStore-only OK.
+ * dual-write: same production module writes EventStore AND Journal surface tokens.
+ * Strategy A AgentJournal-only (EventStore-backed) is OK; Persist/EventStore-only OK.
+ * NDJSON JournalWriter/Boot production APIs are deleted (Phase 5).
  * @param {string} text
  * @param {string} [file]
  * @returns {Violation[]}
@@ -487,7 +490,7 @@ export const scanDualWrite = (text, file = '<synthetic>') => {
       file,
       line: lineIdx + 1,
       label:
-        'dual-write bridge: same module writes EventStore and Journal NDJSON (forbidden; Journal-only OK until Phase5, EventStore-only OK)',
+        'dual-write bridge: same module writes EventStore and Journal surface (forbidden; AgentJournal-only OK, EventStore-only OK)',
       text: (lines[lineIdx] || '').trim(),
     },
   ]

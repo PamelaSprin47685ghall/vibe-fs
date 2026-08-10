@@ -95,10 +95,11 @@
     <Compile Include="Journal/FinalityReviewCohort.fs"/>
     <Compile Include="Journal/RecoveryClosureProjection.fs"/>
     <Compile Include="Journal/PromptAuthorityLedger.fs"/>
-    <Compile Include="Journal/Boot.fs"/>
-    <Compile Include="Journal/ProjectionState.fs"/>
     <Compile Include="Journal/Writer.fs"/>
+    <Compile Include="Journal/ProjectionState.fs"/>
     <Compile Include="Journal/Fold.fs"/>
+    <Compile Include="Journal/JournalEventStoreBoot.fs"/>
+    <Compile Include="Journal/EventStoreJournalWriter.fs"/>
     <Compile Include="Journal/AgentJournal.fs"/>
     <Compile Include="Journal/ReviewBarrier.fs"/>
     <Compile Include="Journal/SharedAgentJournal.fs"/>
@@ -269,6 +270,7 @@
     <Compile Include="Infrastructure/OpenCode/Tools/BashHoneypotTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/SyncDelegateTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ToolRegistry.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/WorkspaceEventStore.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginHost.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/ManagerConfig.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/ChatParamsHook.fs"/>

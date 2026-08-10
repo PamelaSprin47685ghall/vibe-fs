@@ -29,10 +29,13 @@ const { initSpikePlugin } = await import('../../../dist/Infrastructure/OpenCode/
 // HostEventPort `initSpikePlugin` wired. No production export or visibility was
 // widened for this (VERIFY-008); the same-import precedent is this file's own
 // `initSpikePlugin` line.
-const { forWorkspace } = await import('../../../dist/Journal/RuntimePath.js')
+const { forWorkspace, gitCommonDir } = await import('../../../dist/Journal/RuntimePath.js')
 const { acquire: acquireJournal, release: releaseJournal } = await import('../../../dist/Journal/SharedAgentJournal.js')
 const { acquire: acquireTerminalBus } = await import('../../../dist/Infrastructure/OpenCode/Host/SharedTerminalBus.js')
-const { AgentJournalModule_runtimeId } = await import('../../../dist/Journal/AgentJournal.js')
+const { bootPort } = await import('../../../dist/Infrastructure/OpenCode/Host/WorkspaceEventStore.js')
+const { AgentJournalModule_runtimeId, AgentJournalModule_createFromProjection } = await import(
+  '../../../dist/Journal/AgentJournal.js'
+)
 const { forJournal, Runtime__AcceptHumanRoot, Runtime__AcceptAgentOwnerRoot } = await import(
   '../../../dist/Application/Prompting/PromptDispatcher.js'
 )
@@ -234,7 +237,15 @@ export const withExecutablePlugin = async (body, options = {}) => {
     let runtime
     try {
       const runtimePath = forWorkspace(directory)
-      const journalResult = acquireJournal(runtimePath, process.pid, new Date())
+      const port = bootPort(gitCommonDir(directory))
+      // Fable uncurries openJournal to (runtimeId, processId, startedAt) => Result.
+      const openJournal = (runtimeId, processId, startedAt) => {
+        const resumed = port.ResumeOrCreate(runtimeId, processId, startedAt)
+        if (resumed.tag !== 0) return resumed
+        const [writer, , projection] = resumed.fields[0]
+        return AgentJournalModule_createFromProjection(writer, projection)
+      }
+      const journalResult = acquireJournal(runtimePath, process.pid, new Date(), openJournal)
       // Fable Result: tag 0 is Ok, and `fields` is the fields ARRAY — the
       // journal itself is fields[0].
       if (journalResult.tag !== 0) throw new Error(`journal acquire rejected: ${journalResult.fields?.[0]?.Reason}`)
