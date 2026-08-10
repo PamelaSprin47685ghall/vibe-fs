@@ -17,6 +17,16 @@
 Proposal 相互覆盖时如何落地
 ```
 
+并明确一条贯穿全程的持久化立场：
+
+```text
+不必保留磁盘格式兼容性
+不必保留与现有 on-disk format 的兼容性
+甚至不需要读旧档
+```
+
+Unified Storage / Session / Casebook 等 cutover 是 **clean break**：旧 Journal / Blob / feature-owned store 上的历史数据可以丢弃或留在原地不再读取；新世界只认最终 EventStore 语义。禁止为“迁旧数据”“双向兼容”“旧档可读性”投入工期。
+
 当前仓库同时存在多个 `proposed`，包括：
 
 ```text
@@ -78,7 +88,8 @@ G3  Universal Clean Break
     Meditator capability collapse
 
 G4  Unified Storage
-    EventStore / migration / clean cutover
+    EventStore / clean break cutover
+    （无磁盘格式兼容；不读旧档）
 
 G5  JS Capability-Projected Tools
     在最终 Agent/Capability 世界上实施
@@ -96,7 +107,7 @@ G9  Global Convergence / Ratchet / Release
 
 一句话：
 
-> **先把“怎么看见时序”修好，再把“Session 怎么拥有 Session”修好；然后删掉确定会消失的 Student 系统；再统一持久化；再统一文件工具；最后才实现依赖这些基础设施的持久知识、Rulebook 和 Strength。**
+> **先把“怎么看见时序”修好，再把“Session 怎么拥有 Session”修好；然后删掉确定会消失的 Student 系统；再以 clean break 统一持久化（不必兼容旧磁盘格式，甚至不需要读旧档）；再统一文件工具；最后才实现依赖这些基础设施的持久知识、Rulebook 和 Strength。**
 
 ---
 
@@ -842,7 +853,7 @@ Casebook cold persistence 尚未实现
 
 ---
 
-# 10. G3.5 — 修订 Storage migration scope
+# 10. G3.5 — 修订 Storage cutover scope（无旧档迁移义务）
 
 这是整个计划中必须显式处理的交叉点。
 
@@ -852,36 +863,46 @@ Casebook cold persistence 尚未实现
 Student QA
 ```
 
-列为要迁入统一 EventStore 的 domain。
+列为要迁入统一 EventStore 的 domain，并可能隐含：
 
-但 G3 之后 Student/QA 已经被产品 Clean Break 删除。
+```text
+读旧盘
+→ 投影等价
+→ 迁入新店
+```
+
+但本 Playbook 的持久化立场更强：
+
+> **不必保留磁盘格式兼容性；甚至不需要读旧档。G4 是 clean break，不是 format-preserving migration。**
+
+同时 G3 之后 Student/QA 已经被产品 Clean Break 删除。
 
 因此：
 
-> **绝对不要先把 Student QA 搬进 EventStore，再下一阶段删掉。**
+> **绝对不要先把 Student QA 搬进 EventStore，再下一阶段删掉。也绝对不要为任何已退休或即将被 EventStore 取代的旧 on-disk 状态编写 reader / importer / dual-write bridge。**
 
 在 Storage 真正 cutover 前，必须把它的 Active Amendment 写清：
 
 ```text
 Student QA 是已退休 domain。
 
-旧 Student QA：
-- migration inventory 必须能发现
+旧 Student QA / 旧 Journal / 旧 Blob / 旧 feature store：
+- 不要求可读
+- 不要求可迁
 - 不进入新 active domain projection
 - 不作为新 EventStore ongoing vocabulary
-- 按 Universal CleanBreak 的 legacy cleanup contract 处理
-- 不得 silent ignore
+- 不要求 LegacyProjection == NewProjection
+- 允许丢弃或原地留存但 runtime 永不打开
+- 代码与测试中的旧路径按 CleanBreak 删除，不得 silent 保留兼容 shim
 ```
 
-同时把：
+这是 Cross-Proposal integration adjustment：
 
 ```text
-LegacyProjection == NewProjection
+不是恢复 Student
+也不是“先迁再删”
+而是承认旧磁盘世界不在兼容边界内
 ```
-
-比较集合中的 Student QA active-domain equivalence 删除/重定义为 explicit retired-domain cleanup proof。
-
-这是 Cross-Proposal integration adjustment，不是重新恢复 Student。
 
 ---
 
@@ -901,6 +922,32 @@ Strength candidate material
 → 全部依赖它
 ```
 
+本 Playbook 额外冻结 cutover 边界：
+
+```text
+新 EventStore = 唯一 runtime 可读可写的 dynamic durability
+
+旧磁盘格式：
+    不要求兼容
+    不要求 round-trip
+    不要求读旧档
+    不要求把历史状态搬进 EventStore
+
+允许：
+    丢弃旧 Journal / Blob / feature-owned store 内容
+    或留在磁盘但永不被 runtime / migration tool 打开
+
+禁止：
+    dual write
+    fallback old store
+    “临时兼容一层读旧格式”
+    为证明 LegacyProjection == NewProjection 而写旧档 reader
+```
+
+一句话：
+
+> **G4 交付的是最终持久化世界，不是旧世界的翻译器。**
+
 ---
 
 ## 11.1 可以提前并行做什么
@@ -908,7 +955,7 @@ Strength candidate material
 实际上 Storage 的以下工作可以从 G2 时就由独立 lane 开始：
 
 ```text
-Inventory
+代码/domain inventory（不是旧档扫描义务）
 RED architecture gates
 EventStore pure domain
 K-way merge unit tests
@@ -920,9 +967,9 @@ GitGateway unit work
 
 但：
 
-> **Storage migration/cutover 不得早于 G3 Student deletion。**
+> **Storage clean-break cutover 不得早于 G3 Student deletion。**
 
-否则又会遇到 Student QA。
+否则又会遇到 Student QA 这种本应直接消失、而不是被读档迁入的 domain。
 
 ---
 
@@ -931,19 +978,43 @@ GitGateway unit work
 顺序：
 
 ```text
-Inventory
+代码/domain inventory
 → RED gates
 → EventStore core
 → GitGateway
 → dumb server
-→ migration tooling
-→ clean cutover
-→ domain migration
+→ clean break cutover
+→ surviving-domain rewrite onto EventStore
 → proposal storage rewrite
 → full proof
 ```
 
-Storage 自己已经规定，没有完整 inventory 禁止开始迁移。
+说明：
+
+```text
+Inventory = 盘点代码与仍存活 domain 的权威落点
+不是 = 扫描并解析每一份旧 on-disk 历史
+```
+
+没有完整 **代码/domain inventory** 禁止开始 cutover。  
+但 inventory **不派生**“必须实现旧格式 reader”的义务。
+
+若 Storage Proposal 原文仍写：
+
+```text
+migration tooling
+legacy reader
+LegacyProjection == NewProjection
+```
+
+激活后用 Active Amendment 收口为：
+
+```text
+clean break
+no disk-format compatibility
+no mandatory old-archive read
+surviving domains 只在新 EventStore 上重新落盘/重建
+```
 
 ---
 
@@ -954,13 +1025,22 @@ Storage 自己已经规定，没有完整 inventory 禁止开始迁移。
 ```text
 legacy Journal writer
 legacy runtime reader
+任何为兼容而存在的旧格式 reader
 RuntimePath blob writer
 Student QA backend
 dual write
 fallback old store
+migration tool 里的旧档 importer（也不需要）
 ```
 
-只允许 migration tool 自己拥有 legacy reader。
+注意：
+
+```text
+不是“只允许 migration tool 拥有 legacy reader”
+而是“legacy reader 整体不需要存在”
+```
+
+旧档若仍留在磁盘上，那是废弃物，不是兼容面。
 
 ---
 
@@ -1008,13 +1088,22 @@ unified-store-gate
 build
 unit
 integration
-migration
 dumb-server
 e2e
 npm run check
 ```
 
 全绿。
+
+并且证明：
+
+```text
+runtime 只认 EventStore
+无 legacy disk-format reader
+无 dual write / fallback
+无“为迁旧档而存在”的 tooling 依赖
+旧 on-disk 历史不在兼容边界内
+```
 
 ---
 
@@ -1584,10 +1673,12 @@ authored directory loader
 → Main delivery
 → squash/recovery
 → context/synthetic surfaces
-→ migration from old catalog
+→ authored catalog rewrite（不是读旧 runtime 磁盘格式）
 → static gates
 → e2e
 ```
+
+说明：这里的 catalog rewrite 只触及 **repository 里的 authored Markdown source**，不恢复、不读取、不兼容旧 Rulebook runtime journal/blob。
 
 ---
 
@@ -1796,7 +1887,17 @@ raw Git storage primitives
 transport convergence
 ```
 
-Storage Proposal 已明确要求 architecture gate 防止 feature 再长出自己的 storage。
+并且 production 中不存在：
+
+```text
+legacy Journal/Blob reader
+旧 on-disk format compatibility layer
+dual write / fallback old store
+“临时迁旧档” tooling 依赖
+```
+
+Storage Proposal 已明确要求 architecture gate 防止 feature 再长出自己的 storage。  
+本 Playbook 额外要求：旧磁盘世界不在兼容边界内。
 
 ---
 
@@ -1906,8 +2007,8 @@ GitGateway unit work
 但：
 
 ```text
-migration
-cutover
+clean break cutover
+（仍不要求读旧档 / 格式兼容）
 ```
 
 必须等 G3。
@@ -2079,6 +2180,14 @@ custom sync
 
 全部让路。
 
+并且 Storage cutover 本身也遵守：
+
+```text
+不必保留旧磁盘格式兼容性
+甚至不需要读旧档
+无 dual write / fallback / legacy reader 义务
+```
+
 ---
 
 ## File-tool execution surface
@@ -2202,7 +2311,31 @@ pure domain unit work
 
 ---
 
-# 31. 最关键的四个不要返工规则
+# 31. 最关键的五个不要返工规则
+
+## Rule 0
+
+> **不必保留磁盘格式兼容性；甚至不需要读旧档。**
+
+所以：
+
+```text
+旧 Journal / Blob / Casebook custom store / feature-owned refs
+```
+
+都不是兼容面。
+
+G4 cutover：
+
+```text
+直接进入最终 EventStore
+→ 旧档可丢弃或原地废弃
+→ 不写 legacy reader
+→ 不写 dual-write / fallback
+→ 不证明旧盘投影 ≡ 新盘投影
+```
+
+---
 
 ## Rule 1
 
@@ -2214,7 +2347,8 @@ pure domain unit work
 Student QA
 ```
 
-先删 domain，再 Storage cutover。
+先删 domain，再 Storage cutover。  
+连“读旧 QA 档再清理”都不必做——旧档不在可读兼容边界内。
 
 ---
 
@@ -2296,8 +2430,9 @@ CURRENT
         │
         ▼
 [5] Unified EventStore
-    migrate surviving domains
-    clean cutover
+    clean break cutover
+    no disk-format compatibility
+    no old-archive read
         │
         ▼
 [6] Capability-Projected JS Tools
@@ -2348,6 +2483,9 @@ Inspector = evidence
 Sync specialists reuse Session
 
 所有 dynamic durability = one EventStore
+no legacy disk-format reader
+no old-archive migration requirement
+no dual write / fallback old store
 
 File capability = exact generated projection
 legacy five tool implementation = absent
@@ -2394,11 +2532,13 @@ zero known hang
 zero compatibility shim
 zero "temporary old path"
 zero planned cleanup left behind
+zero mandatory old-disk reader
+zero format-preserving migration debt
 ```
 
 ---
 
-# 34. 实施者每天只需要问五个问题
+# 34. 实施者每天只需要问六个问题
 
 开始任何下一项工作前，只问：
 
@@ -2412,7 +2552,10 @@ zero planned cleanup left behind
 4. 我是不是正在为某个 feature 新建
    storage / authority / permission matrix / session runtime？
 
-5. 这一 Gate 完成后，仓库能不能重新回到一个可解释的全绿状态？
+5. 我是不是在为旧磁盘格式做兼容、读旧档、dual-write 或 fallback？
+   （答案应为否；G4 是 clean break。）
+
+6. 这一 Gate 完成后，仓库能不能重新回到一个可解释的全绿状态？
 ```
 
 任何答案不理想：
@@ -2443,7 +2586,7 @@ zero planned cleanup left behind
 
 而是建立一个简单的架构施工原则：
 
-> **先稳定底层事实，再实施上层语义；先删除确定会消失的旧世界，再迁移仍然存在的世界；所有优化都建立在最终 ownership、persistence 和 capability substrate 上。**
+> **先稳定底层事实，再实施上层语义；先删除确定会消失的旧世界，再实现仍然存在的世界；不必保留磁盘格式兼容性，甚至不需要读旧档；所有优化都建立在最终 ownership、persistence 和 capability substrate 上。**
 
 按这个顺序，最终不是把六个 Proposal “都做一遍”。
 

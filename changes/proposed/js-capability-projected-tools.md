@@ -2,29 +2,7 @@
 
 ## Summary
 
-用一个**能力投影生成器**统一万象术传统的文件工具：
-
-```text
-read
-edit
-write
-glob
-grep
-```
-
-系统不再分别实现五套工具语义。
-
-真正的 primitive 是：
-
-> **一个由当前 Attempt 实际权限机械生成的、受 capability 约束的 JavaScript SDK。**
-
-对于每次 provider request，万象术从唯一权威：
-
-```text
-AttemptExecutionProfile.ToolCapabilitySet
-```
-
-生成一个与当前 Agent、当前 RequestKind 实际能力**完全同构**的主工具，例如：
+用一个**能力投影生成器**为万象术新增可编程文件系统工具面：
 
 ```text
 js-coder
@@ -37,6 +15,41 @@ js-student
 js-teacher
 ```
 
+真正的 primitive 是：
+
+> **一个由当前 Attempt 实际权限机械生成的、受 capability 约束的 JavaScript SDK。**
+
+**内置文件工具不被替换。**
+
+```text
+read
+edit
+write
+glob
+grep
+```
+
+继续保留各自原有 schema、原有 Host 实现、原有执行语义。
+
+它们与 `js-*` **共存**：
+
+```text
+builtin filesystem tools  = 既有 RPC 工具（含 read/edit/write/glob/grep/patch；deprecated，仍可执行）
+js-ROLE                   = 新增 capability-projected JS SDK（强烈推荐）
+```
+
+引流方式不是 alias，也不是 clean break，而是：
+
+> **Tool Definition 钩子：在内置工具的工具描述中极力、强力鼓吹并推荐当前可见的 `js-ROLE`。**
+
+对于每次 provider request，万象术从唯一权威：
+
+```text
+AttemptExecutionProfile.ToolCapabilitySet
+```
+
+生成与当前 Agent、当前 RequestKind 实际能力**完全同构**的 `js-*` 主工具。
+
 生成结果同时包含：
 
 ```text
@@ -46,11 +59,11 @@ js-teacher
 JsProgram 基类
 允许出现的成员函数
 canonical examples
-read/edit/write/glob/grep aliases
 runtime capability bindings
+BuiltinToolDescriptionHook 注入文案（写入仍可见的内置工具 description）
 ```
 
-模型只需要完成一种任务：
+模型应优先完成一种任务：
 
 ```js
 class Js extends JsProgram {
@@ -60,7 +73,7 @@ class Js extends JsProgram {
 }
 ```
 
-模型不再阅读一张权限矩阵，也不再记忆五种不同的 RPC 协议。
+模型不再需要阅读一张权限矩阵，也不再需要记忆五种不同的 RPC 协议来完成复杂工作。
 
 它只对一个准确生成的 SDK 编程。
 
@@ -73,22 +86,24 @@ class Js extends JsProgram {
 > **If a method is present, the capability exists.
 > If a method is absent, it does not.**
 
-最强不变量（五层同构）：
+最强不变量（四层同构，针对 `js-*`）：
 
-> 没有某能力 → 生成的基类里没有该方法 → 工具描述里不出现该方法 → canonical examples 里不出现该方法 → 对应 alias 不可见 → 即使伪造底层调用，runtime gate 仍 fail closed。
+> 没有某能力 → 生成的基类里没有该方法 → 工具描述里不出现该方法 → canonical examples 里不出现该方法 → 即使伪造底层调用，runtime gate 仍 fail closed。
 
-本 Change 只有两个核心不变量：
+本 Change 只有三个核心不变量：
 
 1. **LLM-visible SDK 与 executable authority 完全同构**；
-2. **一次 JS 工具调用 = 一个 all-or-nothing mutation transaction**（纯查询除外）。
+2. **一次 JS 工具调用 = 一个 all-or-nothing mutation transaction**（纯查询除外）；
+3. **内置文件系统工具不被替换**：`read` / `edit` / `write` / `glob` / `grep` / `patch`（凡存在者）原 schema / 原实现保留；仅通过 Tool Definition 钩子在其 description 中 **deprecated + 极力推荐 `js-ROLE`**。
 
-Compatibility：**Clean break**。五个 legacy 工具实现与其 schema 全部移除；`read/edit/write/glob/grep` 五个名字保留，但全部变成 generated aliases（见 # 71 / # 72）。不允许任何 legacy 兼容模式。
+Compatibility：**Additive coexistence**。不移除内置 `read` / `edit` / `write` / `glob` / `grep` / `patch`；不把它们变成 `js-*` alias；不改它们的顶层 RPC schema。`js-*` 是新增表面。迁移靠描述钩子把模型流量推到 `js-*`（见 # 7 / # 71 / # 72）。
 
-### 模型侧使用合同（必须写进工具描述）
+### 模型侧使用合同（必须写进 `js-*` 工具描述；内置工具钩子文案须同向鼓吹）
 
-1. **只要需要就并行调用多个工具**：并行读取、并行编辑、同文件、异文件全部绝对安全（Host 侧合同见 # 55.1）；
-2. **强烈鼓励对同文件与异文件提交大量并行编辑**，不要因为担心冲突而串行等待；
-3. **强烈鼓励模型写很复杂的 JavaScript 脚本**处理工作：一次 program 内批量读、批量变换、批量 rewrite/write，Host 保证整个 program 是单个事务。
+1. **优先使用当前可见的 `js-ROLE`**，不要继续用 `read` / `edit` / `write` / `glob` / `grep` / `patch` 完成可被 JS SDK 表达的工作；
+2. **只要需要就并行调用多个工具**：并行读取、并行编辑、同文件、异文件全部绝对安全（Host 侧合同见 # 55.1）；
+3. **强烈鼓励对同文件与异文件提交大量并行编辑**，不要因为担心冲突而串行等待；
+4. **强烈鼓励模型写很复杂的 JavaScript 脚本**处理工作：一次 program 内批量读、批量变换、批量 rewrite/write，Host 保证整个 program 是单个事务。
 
 ---
 
@@ -211,38 +226,45 @@ JsToolGenerator
        ├── exact JsProgram base class
        ├── exact description
        ├── legal examples
-       ├── familiar aliases
-       └── runtime capability bindings
+       ├── runtime capability bindings
+       └── BuiltinToolDescriptionHook payloads
+              │
+              ▼
+       inject into still-visible builtin
+       read/edit/write/glob/grep/patch descriptions
 ```
 
-所有结果必须来自同一 registry。
+`js-*` 的全部结果必须来自同一 registry。
 
 禁止：
 
 ```text
 权限表一份
-tool description 一份
+js tool description 一份
 base class 一份
 runtime switch 一份
-alias 表再一份
+builtin 推荐文案再一份手写
 ```
 
 这种设计最终一定漂移。
 
-### 2.1 最强不变量：5 层投影
+Builtin 文件系统工具（含 `patch`，凡存在者）的 **schema / 执行实现** 继续由既有 ToolRegistry 拥有；Generator 只通过钩子改写它们的 **description 推荐层**，不得改写它们的 schema 或执行入口。
 
-对于当前 Attempt 的每一个 capability，以下五层必须完全同构：
+### 2.1 最强不变量：4 层投影（`js-*`）
+
+对于当前 Attempt 的每一个 JS filesystem capability，以下四层必须完全同构：
 
 ```text
 没有该 capability
 → 1. 生成的基类中没有对应方法
-→ 2. 工具描述中不出现该方法
+→ 2. js-* 工具描述中不出现该方法
 → 3. canonical examples 中不出现该方法
-→ 4. 对应 alias 不可见
-→ 5. 即使伪造底层调用，runtime gate 仍 fail closed
+→ 4. 即使伪造底层调用，runtime gate 仍 fail closed
 ```
 
-模型的认知负担因此为零：不需要记“文档里有但你不能用”。
+模型对 `js-*` 的认知负担因此为零：不需要记“文档里有但你不能用”。
+
+内置 `read` / `edit` / `write` / `glob` / `grep` / `patch` 是否可见，仍由既有 ToolPermission / Attempt profile 决定；它们**不是** JS capability projection 的第五层，也**不是** alias。
 
 ---
 
@@ -279,7 +301,8 @@ Role 和 RequestKind 已经在 profile 构造阶段完成解释。
 查当前注册了哪些工具
 猜 Agent name
 观察 provider schema 后反推权限
-根据 alias 再推权限
+根据 builtin 工具名再推权限
+根据钩子推荐文案反推权限
 ```
 
 输入已经是 canonical profile，输出只是 projection。
@@ -405,32 +428,25 @@ Grep
 
 它是：
 
-> **derived affordance**
+> **JS SDK 内的 derived affordance**
 
-也就是给 LLM 的熟悉入口。
+也就是：在 `js-*` 程序里，grep 可由 `glob() + file() + RegExp` 自然表达。
+
+**内置 `grep` 工具本身继续独立存在**（原 schema / 原实现），与 derived affordance 无关。
 
 逻辑：
 
 ```text
-grep alias visible
+js-* description 可教 grep-style example
 ⇔ Read && Glob
+
+builtin grep tool visible
+⇔ 既有 ToolPermission.Grep（或等价既有规则）
 ```
 
-第一版迁移期间如果现有 `ToolPermission.Grep` 尚未删除，它只能作为 compatibility assertion：
+第一版若仍保留 `ToolPermission.Grep`，它只管辖内置 `grep` 工具可见性；**不**成为 `js-*` runtime authority。
 
-```text
-legacy Grep bit
-==
-derived(Read && Glob)
-```
-
-任何 canonical profile 不满足这一等式：
-
-```text
-启动配置 fail fast
-```
-
-最终 runtime authority 不依赖 `Grep` bit。
+`js-*` 最终 runtime authority 不依赖 `Grep` bit。
 
 ---
 
@@ -489,132 +505,168 @@ schema
 base class
 description
 examples
-aliases
 runtime bindings
+BuiltinToolDescriptionHook payloads
 ```
 
 Tier 只改变模型绑定。
 
 ---
 
-# 7. Alias Surface
+# 7. Builtin Tools Coexist — Not Replaced
 
-传统名字继续全部保留，作为 LLM-facing affordances。
+传统名字继续全部保留，并且**继续是真正的内置工具**，不是 `js-*` 的 alias。
 
-例如 Coder：
+例如 Coder provider surface：
 
 ```text
-js-coder
+js-coder          ← 新增 capability-projected JS SDK
+read              ← 原内置工具（deprecated + 钩子强推 js-coder）
+glob              ← 原内置工具（deprecated + 钩子强推 js-coder）
+grep              ← 原内置工具（deprecated + 钩子强推 js-coder）
+edit              ← 原内置工具（deprecated + 钩子强推 js-coder）
+write             ← 原内置工具（deprecated + 钩子强推 js-coder）
+patch             ← 原内置工具（若可见；deprecated + 钩子强推 js-coder）
+```
+
+其中（凡 provider 仍可见者）：
+
+```text
 read
 glob
 grep
 edit
 write
+patch
 ```
 
-其中：
+继续满足：
 
 ```text
-read
-glob
-grep
-edit
-write
+原 schema 不变
+原 Host 实现不变
+原执行入口不变
+原权限规则不变
+仍可被模型直接调用并成功执行
 ```
 
-全都是 `js-coder` 的 alias。
+它们与 `js-coder` **不是同一工具的不同名字**。
 
-它们：
+禁止：
 
 ```text
-schema 相同
-description 除一句 alias 指引外无独立内容
-执行入口相同
-生成的 JsProgram 相同
-runtime capabilities 相同
-事务语义相同
+把 builtin filesystem 工具（含 patch）改成 { program: string }
+把它们的执行入口接到 JsProgram
+把它们从 provider surface 删除
+用 alias 伪装成“同一个工具”
 ```
 
-推荐完整 alias description：
+本 Change 的迁移策略是：
 
-```text
-Alias of js-coder. Same schema and semantics; see js-coder.
-```
-
-Inspector：
-
-```text
-Alias of js-inspector. Same schema and semantics; see js-inspector.
-```
-
-依此类推。
+> **共存 + deprecated + Tool Definition 钩子极力推荐 `js-ROLE`。**
 
 ---
 
-# 8. Alias 不是 Capability Scope
+# 8. Tool Definition 钩子：在内置工具描述中强力鼓吹新工具
 
-Alias 只解决模型的工具选择习惯。
+引流不靠替换实现，靠 **Tool Definition 钩子**。
 
-它不是 security scope。
+定义：
 
-Coder 即使调用：
+> **BuiltinToolDescriptionHook** 在组装最终 provider-visible tool specs 时运行：若当前 Attempt 已生成 `js-ROLE`，则对仍可见的内置文件系统工具（`read` / `edit` / `write` / `glob` / `grep` / `patch`）description 注入 deprecated 声明与极力推荐文案；**绝不修改**这些工具的 name / schema / executor。
 
-```text
-read
-```
-
-然后 program 中使用：
-
-```js
-this.rewrite(...)
-```
-
-也合法。
-
-因为：
+数据流：
 
 ```text
-read
+AttemptExecutionProfile
+       │
+       ▼
+JsToolGenerator.generate(profile)
+       │
+       ├── JsToolSpec(js-ROLE, schema={program}, full description, ...)
+       └── BuiltinRecommendationPayload(js-ROLE, targets=[...])
+              │
+              ▼
+ToolSurfaceAssembler
+       │
+       ├── emit js-ROLE as-is
+       └── for each visible builtin in {read,edit,write,glob,grep,patch}:
+             description := Hook(originalDescription, payload)
+             schema/executor untouched
 ```
 
-确实只是：
+### 8.1 钩子必须做到的事
+
+对每个被命中的内置工具 description：
+
+1. **明确标为 deprecated**（保留可执行，不隐藏工具）；
+2. **极力、强力、反复鼓吹**改用当前可见的 `js-ROLE`；
+3. 说明 `js-ROLE` 能一次完成批量读/搜/改/写，且是单个事务；
+4. 说明并行调用 `js-ROLE` 绝对安全；
+5. **不得**把内置工具 schema 字段删掉或改成 `program`；
+6. **不得**声称“本工具只是 alias / 已无独立实现”。
+
+### 8.2 推荐完整钩子文案（canonical）
+
+钩子应把以下块注入到内置工具 description 的**最前面**（允许按工具名做极小措辞替换，但语气强度不得削弱）：
+
+```text
+DEPRECATED. Prefer js-coder for all filesystem work.
+
+Do not use this legacy tool for new work when js-coder is available.
+js-coder is the capability-projected JavaScript filesystem SDK for this
+request. It can read, search, transform, rewrite, and create files in one
+transactional program — including large parallel batches.
+
+Strongly recommended:
+1. Call js-coder instead of read/edit/write/glob/grep/patch whenever possible.
+2. Write complex JavaScript in one js-coder program rather than many legacy RPCs.
+3. Parallel js-coder calls are absolutely safe for same-file and cross-file edits.
+
+This legacy tool remains executable only for compatibility with old habits.
+Its schema and semantics are unchanged. New work should target js-coder.
+```
+
+Inspector 等角色把 `js-coder` 换成对应 `js-ROLE`：
+
+```text
+DEPRECATED. Prefer js-inspector for all filesystem work.
+...
+```
+
+### 8.3 钩子不是 security scope
+
+模型即使忽略推荐、继续调用：
+
+```text
+edit
+```
+
+或：
+
+```text
+patch
+```
+
+Host 仍按**原内置工具语义**执行。
+
+模型调用：
 
 ```text
 js-coder
 ```
 
-的另一个入口名字。
-
-反过来，Inspector 调：
-
-```text
-read
-```
-
-时获得的是：
-
-```text
-js-inspector
-```
-
-生成出来的 SDK。
-
-其基类里根本没有：
-
-```js
-rewrite()
-write()
-```
+才进入 JS SDK / transaction / runtime gate。
 
 因此：
 
 ```text
-alias name
+builtin tool name
 ```
 
-永远不决定执行权限。
+永远不决定 `js-*` 执行权限。
 
-决定权限的是：
+决定 `js-*` 权限的是：
 
 ```text
 当前 Attempt 生成出来的 capability projection
@@ -622,65 +674,74 @@ alias name
 
 ---
 
-# 9. Alias Visibility
+# 9. Hook Visibility
 
-机械生成：
+机械规则：
 
 ```text
-Read
-→ read
+js-ROLE 已生成且可见
+→ 对当前 surface 中仍可见的 builtin ∈ {read, edit, write, glob, grep, patch}
+  全部注入 BuiltinToolDescriptionHook(js-ROLE)
 
-Glob
-→ glob
-
-Read + Glob
-→ grep
-
-Edit
-→ edit
-
-Write
-→ write
+js-ROLE 未生成
+→ 不注入任何“Prefer js-*”钩子
+→ 内置工具保持原 description（若它们本身可见）
 ```
 
 并有硬不变量：
 
 ```text
-任意 filesystem alias 可见
-→ 对应 js-ROLE primary tool 必须同时可见
+钩子文案提到 js-ROLE
+→ 同一 provider request 必须同时暴露该 js-ROLE
 ```
 
 不能出现：
 
 ```text
-read
-glob
-grep
+read/edit/... description 都说 Prefer js-inspector
+但 provider 没有暴露 js-inspector
 ```
 
-都说：
+### 9.1 内置工具可见性 ≠ JS capability advertisement
+
+模型判断“当前 JS SDK 能做什么”，只看：
 
 ```text
-see js-inspector
+js-ROLE 生成的基类方法是否存在
 ```
 
-但 provider 没有暴露 `js-inspector`。
+不要用内置工具是否可见来推断 JS capability。
 
-### 9.1 alias 集合 = capability advertisement
+例如某些 profile 可能仍暴露只读内置工具，但若 `js-*` 因 filesystem primitive set 为空而未生成，则**不得**注入 Prefer 钩子。
 
-模型看到的 alias 集合本身就是一张能力公告。
+反过来：Coder 同时看到 `edit` / `patch` 与 `js-coder.rewrite()` 时，钩子必须把流量导向 `js-coder`；`edit` / `patch` 仍可执行，但 description 把它们标成 deprecated。
 
-`js-ROLE` description 应说明：
+`patch` 是**可选**钩子目标：仅当它确实出现在当前 provider surface 时才注入 Prefer 文案；本 Change **不**要求新增 `patch` 实现，也**不**把缺席的 `patch` 凭空暴露出来。
 
-> 当前可见的 aliases 表示本次 request 可用的 filesystem capabilities。
+### 9.2 钩子文案由 Generator 拥有
 
-模型看到没有 `edit` / `write` alias，自然知道这是只读 JS 环境；不需要再读权限表。
+禁止在 `read` / `edit` / `write` / `glob` / `grep` / `patch` 各自定义里手写互不相同的“请改用 js-*”长文。
+
+唯一 owner：
+
+```text
+JsToolGenerator / BuiltinToolDescriptionHook renderer
+```
+
+输入：
+
+```text
+primaryName = js-ROLE
+visibleBuiltins = intersection(provider builtins, {read,edit,write,glob,grep,patch})
+```
+
+输出：byte-stable recommendation block。
 
 ---
 
 # 10. Schema
 
-所有生成的主工具与 alias 使用完全相同 schema：
+**只有**生成的 `js-*` 主工具使用：
 
 ```ts
 type JsToolInput = {
@@ -688,19 +749,30 @@ type JsToolInput = {
 }
 ```
 
-没有：
+内置文件系统工具**继续使用各自原有 schema**，例如既有：
 
 ```text
-path
-oldString
-newString
-pattern
-query
+read(path, ...)
+edit(path, oldString, newString, ...)
+write(path, content, ...)
+glob(pattern, ...)
+grep(pattern, path?, ...)
+patch(...)          # 若该 builtin 存在于当前正式工具面
 ```
 
-等顶层 RPC 参数。
+（具体字段以现有正式 what/how 为准；本 Change 不改写它们。`patch` 只要出现在 provider surface，就纳入钩子目标，不要求本 Change 新建其实现。）
 
-这些都是 program 自己通过生成 SDK 表达的内容。
+禁止：
+
+```text
+把 builtin schema 改成 { program: string }
+为 builtin 增加隐藏 dual schema
+让同一个工具名同时暴露两套 schema
+```
+
+`path` / `oldString` / `newString` / `pattern` / `query` 等顶层 RPC 参数继续属于内置工具。
+
+这些内容在 `js-*` 里由 program 通过生成 SDK 表达。
 
 ---
 
@@ -1936,7 +2008,7 @@ type JsCapabilityFragment =
     { Capability: JsPrimitiveCapability
       Members: JsMemberSpec list
       RuntimeBindings: JsRuntimeBinding list
-      Aliases: JsAliasSpec list
+      BuiltinRecommendationTargets: BuiltinToolName list
       Description: DescriptionFragment list
       Examples: JsExample list }
 ```
@@ -1953,7 +2025,7 @@ Members
 RuntimeBindings
 = immutable UTF-8 snapshot reader
 
-Aliases
+BuiltinRecommendationTargets
 = read
 
 Description
@@ -1975,8 +2047,9 @@ Members
 RuntimeBindings
 = stage replacement of existing file
 
-Aliases
+BuiltinRecommendationTargets
 = edit
+  patch   # if visible; same Edit-family recommendation
 ```
 
 Write fragment：
@@ -1991,7 +2064,7 @@ Members
 RuntimeBindings
 = stage creation of absent file
 
-Aliases
+BuiltinRecommendationTargets
 = write
 ```
 
@@ -2007,13 +2080,13 @@ Members
 RuntimeBindings
 = bounded path matcher
 
-Aliases
+BuiltinRecommendationTargets
 = glob
 ```
 
 Grep 不拥有 runtime fragment。
 
-它是 Read+Glob 的 derived alias/example.
+它是 Read+Glob 的 derived example；若 Read+Glob 都在，钩子对仍可见的内置 `grep` 一并注入 Prefer `js-ROLE`。
 
 ---
 
@@ -2135,12 +2208,20 @@ Write
 
 ```text
 js-coder
+```
+
+同时保留既有内置工具（若 profile 原本可见）：
+
+```text
 read
 glob
 grep
 edit
 write
+patch
 ```
+
+并由 BuiltinToolDescriptionHook 在它们的 description 中 **deprecated + 极力推荐 js-coder**。
 
 基类：
 
@@ -2177,10 +2258,17 @@ Glob
 
 ```text
 js-inspector
+```
+
+既有只读内置工具继续保留：
+
+```text
 read
 glob
 grep
 ```
+
+钩子：Prefer `js-inspector`。
 
 基类：
 
@@ -2207,19 +2295,26 @@ Glob
 
 ```text
 js-devops
+```
+
+既有只读内置工具继续保留：
+
+```text
 read
 glob
 grep
 ```
+
+钩子：Prefer `js-devops`。
 
 没有：
 
 ```text
 rewrite
 write
-edit alias
-write alias
 ```
+
+因此也不对 `edit` / `write` 注入“可用”暗示；若这些内置工具本就不可见，钩子不会凭空制造它们。
 
 PTY、executor、coder、join/list 等继续独立。
 
@@ -2233,10 +2328,9 @@ DevOps 仍不能直接修改文件。
 
 ```text
 js-browser
-read
-glob
-grep
 ```
+
+既有只读内置工具继续保留；钩子 Prefer `js-browser`。
 
 网络工具仍独立。
 
@@ -2248,10 +2342,9 @@ grep
 
 ```text
 js-meditator
-read
-glob
-grep
 ```
+
+既有只读内置工具继续保留；钩子 Prefer `js-meditator`。
 
 其它委派能力独立。
 
@@ -2263,10 +2356,9 @@ grep
 
 ```text
 js-reviewer
-read
-glob
-grep
 ```
+
+既有只读内置工具继续保留；钩子 Prefer `js-reviewer`。
 
 基类是只读 SDK。
 
@@ -2282,7 +2374,7 @@ filesystem primitive capability 为空。
 
 ```text
 不生成 js-student
-不生成 read/edit/write/glob/grep aliases
+不注入任何 Prefer js-* 钩子
 ```
 
 保持：
@@ -2290,6 +2382,8 @@ filesystem primitive capability 为空。
 ```text
 teacher
 ```
+
+（StudentLearn 本就不暴露文件系统内置工具时，继续如此。）
 
 ---
 
@@ -2308,12 +2402,9 @@ Write
 
 ```text
 js-student
-read
-glob
-grep
-edit
-write
 ```
+
+既有文件系统内置工具若在该 profile 可见则继续保留；钩子 Prefer `js-student`。
 
 Student 专用终态：
 
@@ -2341,7 +2432,7 @@ return
 
 ```text
 无 js-* 工具
-无五大 aliases
+无 Prefer js-* 钩子注入
 ```
 
 ---
@@ -2446,7 +2537,7 @@ runtime gate
 
 # 51. Execution Binding
 
-ToolRegistry 收到：
+Provider surface 可能同时包含：
 
 ```text
 js-coder
@@ -2455,12 +2546,14 @@ edit
 ...
 ```
 
-任一生成工具调用时：
+其中 `read` / `edit` / ... 走**既有 builtin executor**（钩子只改过 description）。
+
+任一 **`js-*` 生成工具**调用时：
 
 1. 用 `ToolContext.messageID` 找到准确 Attempt；
 2. 读取该 Attempt 的 immutable execution profile；
 3. 重新得到或取缓存的 `GeneratedJsSurface`；
-4. 验证 invoked tool name 属于该 surface；
+4. 验证 invoked tool name 属于该 surface 的 `js-*` 主工具名；
 5. 建立该 surface 对应的 `JsRuntimeCapabilities`；
 6. 执行 program。
 
@@ -2703,7 +2796,7 @@ kill 后等待 process reap
 
 ```text
 operation = js-*
-tool name / alias
+tool name
 path
 result
 failure_code
@@ -2732,7 +2825,7 @@ secrets
 每一次：
 
 ```text
-js-* / alias tool call
+js-* tool call
 ```
 
 对应恰好一个：
@@ -2767,7 +2860,7 @@ run()
 
 ### 55.1 同一消息内的并行工具调用由 Host 串行化
 
-模型可以在一次 assistant 消息中并行发出任意多个 js-* / alias 调用（同文件、异文件均可）。
+模型可以在一次 assistant 消息中并行发出任意多个 `js-*` 与/或内置工具调用（同文件、异文件均可）。
 
 Host 对同一消息内的工具调用按**确定性顺序逐个执行**：
 
@@ -3271,9 +3364,17 @@ JS tool 不建立第二套 unlimited read channel。
 js-ROLE
 ```
 
-拥有完整描述。
+拥有完整 JS SDK 描述。
 
-Aliases 永远一句话。
+内置 `read` / `edit` / `write` / `glob` / `grep` / `patch`（凡存在者）：
+
+```text
+保留各自原有简短 schema/语义说明
++
+由 BuiltinToolDescriptionHook 注入的 Prefer js-ROLE 推荐块
+```
+
+禁止在这些内置工具里复制整份 anchors/transaction/examples 长文。
 
 所以关于：
 
@@ -3289,6 +3390,12 @@ examples
 
 ```text
 Capability Registry / description renderer
+```
+
+钩子推荐块的任何修改只改：
+
+```text
+BuiltinToolDescriptionHook renderer
 ```
 
 不存在五份文档同步。
@@ -3324,9 +3431,9 @@ system prompt 说只读
 
 ---
 
-# 71. Legacy Tool Implementations
+# 71. Builtin Tools Remain — Additive `js-*`
 
-这是 clean break。
+这不是 clean break，而是 **additive coexistence**。
 
 最终 provider surface 中：
 
@@ -3336,11 +3443,22 @@ edit
 write
 glob
 grep
+patch   # 若该名字已存在于正式工具面
 ```
 
-名称仍然存在。
+名称仍然存在，并且继续是**真正的内置工具**：
 
-但它们全部是 generated aliases。
+```text
+原 schema
+原 Host/native 实现
+原执行语义
+```
+
+同时，当 filesystem primitive set 非空时，额外暴露：
+
+```text
+js-ROLE
+```
 
 旧 Host/native：
 
@@ -3352,12 +3470,14 @@ glob(pattern)
 grep(pattern,path)
 ```
 
-schema 不得继续同时暴露。
+schema **必须继续暴露**（与现有正式合同一致）。
 
 必须证明：
 
 ```text
-provider-visible name count == 1
+每个 builtin 名字恰好一个 spec
+js-ROLE 是另一个独立 spec
+builtin schema ≠ { program: string }
 ```
 
 例如：
@@ -3370,41 +3490,45 @@ edit
 
 ```text
 legacy edit
-generated edit alias
+generated edit alias pretending to be edit
 ```
+
+也不能把 `edit` 偷换成 `js-coder` 的第二个名字。
 
 ---
 
-# 72. No Compatibility Schema
+# 72. No Alias / No Dual Schema Takeover
 
 不接受：
 
 ```text
-read({path})
+把 read/edit/write/glob/grep/patch 改成 Alias of js-ROLE
+（patch 只要可见，同样禁止 alias takeover）
 ```
 
 也不接受：
 
 ```text
-edit({
-  oldString,
-  newString
-})
+同一工具名同时接受
+  { path, oldString, newString }
+与
+  { program }
 ```
 
-作为隐藏兼容模式。
+作为 dual semantics。
 
-所有五个 alias schema 都变成：
+本 Change 的唯一迁移阀门是：
 
-```ts
-{
-  program: string
-}
+```text
+BuiltinToolDescriptionHook
+→ deprecated
+→ Prefer js-ROLE
+→ 极力鼓吹复杂 JS program / 并行调用
 ```
 
-如果需要迁移 fixture/canary，统一迁移。
+内置工具继续可执行；新工作靠描述层把模型推到 `js-*`。
 
-不保留 dual semantics。
+如果需要迁移 fixture/canary，优先新增 `js-*` 路径；不要靠删除 builtin schema 强迫迁移。
 
 ---
 
@@ -3429,13 +3553,19 @@ js-reviewer
 
 ```text
 JsToolGenerator
++
+BuiltinToolDescriptionHook
 ```
 
 普通 Attempt：
 
 ```text
 profile
-→ generate static-equivalent surface
+→ generate js-* surface (if any)
+→ assemble provider tools =
+     existing builtins
+   + generated js-ROLE
+→ hook rewrites visible builtin filesystem descriptions
 ```
 
 Student：
@@ -3443,9 +3573,11 @@ Student：
 ```text
 StudentLearn profile
 → no JS surface
+→ no Prefer js-* hook
 
 StudentCompile profile
-→ js-student + aliases
+→ js-student
+→ hook Prefer js-student on still-visible filesystem builtins
 ```
 
 切换 Compile 前必须先生成完整新 surface，再随整套 permission 原子安装。
@@ -3502,7 +3634,7 @@ primary schema
 base class
 description
 examples
-alias specs
+BuiltinToolDescriptionHook payloads
 runtime binding set
 ```
 
@@ -3827,7 +3959,7 @@ JS-
 ```text
 JS-001  Capability-projected tool surface
 JS-002  Primary js-ROLE generation
-JS-003  Alias projection
+JS-003  Builtin coexistence + description hook
 JS-004  Generated base-class exactness
 JS-005  file()/FileView
 JS-006  Ordered string/RegExp anchors
@@ -3841,7 +3973,7 @@ JS-013  Multi-file all-or-nothing commit
 JS-014  Conflict detection
 JS-015  Rollback/recovery
 JS-016  Synthetic TOML result
-JS-017  Clean break from legacy five tools
+JS-017  Builtin tools remain (no alias takeover)
 JS-018  Student request/path projection
 ```
 
@@ -3863,19 +3995,19 @@ docs/README.md
 
 重点记录：
 
-### 为什么不是五个独立实现
+### 为什么不把可编程面再做成五套独立实现
 
-拒绝：
+拒绝为 `js-*` 再分别发明：
 
 ```text
-read implementation
-edit implementation
-write implementation
-glob implementation
-grep implementation
+js-read implementation
+js-edit implementation
+js-write implementation
+js-glob implementation
+js-grep implementation
 ```
 
-因为它们共享：
+因为可编程路径共享：
 
 ```text
 path boundary
@@ -3884,9 +4016,12 @@ result rendering
 permissions
 snapshot
 string computation
+transaction
 ```
 
 会重复并漂移。
+
+既有 builtin `read/edit/write/glob/grep/patch` RPC 实现（凡存在者）继续保留；本 Change 统一的是新增的 capability-projected JS surface，不是删掉 builtin。
 
 ### 为什么是 generated SDK
 
@@ -3900,7 +4035,7 @@ string computation
 
 本身就增加模型认知负担和误调用率。
 
-### 为什么保留 aliases
+### 为什么保留内置文件系统工具（而不是 alias / clean break）
 
 因为：
 
@@ -3910,17 +4045,26 @@ edit
 write
 glob
 grep
+patch
 ```
 
-是 LLM 训练中极强的工具选择 affordances。
+是 LLM 训练中极强的工具选择 affordances（或正式工具面已有名字），且既有 schema/实现已是正式合同。
 
-保留名字对模型友好。
+本 Change **不替换**它们。
 
-但实现语义不必跟着重复。
+同时新增 `js-ROLE`，并用 Tool Definition 钩子在内置工具 description 中：
+
+```text
+DEPRECATED
++
+Prefer js-ROLE
++
+极力鼓吹复杂 JS program / 并行调用
+```
 
 总结：
 
-> **Alias 是 LLM UX，不是程序架构。**
+> **Builtin `read`/`edit`/`write`/`glob`/`grep`/`patch` 是兼容面；`js-*` 是推荐面；钩子是引流面。三者不是 alias。**
 
 ---
 
@@ -3940,7 +4084,7 @@ rewrite/create distinction
 JSON return
 transaction all-or-nothing
 errors
-legacy clean break
+builtin coexistence + description hook
 ```
 
 不要放内部模块名。
@@ -3959,7 +4103,10 @@ JsToolGenerator
 = projection owner
 
 Capability Registry
-= SDK/runtime/alias description owner
+= SDK/runtime/description owner
+
+BuiltinToolDescriptionHook
+= builtin Prefer js-ROLE recommendation owner
 
 Sandbox Runner
 = arbitrary JS process owner
@@ -3976,7 +4123,8 @@ SyntheticToml
 ```text
 Generator 不重新决定权限
 Runtime 不从 description 解析权限
-Alias 不决定权限
+Builtin 工具名不决定 js-* 权限
+Description 钩子不改变 builtin schema/executor
 Model JS 不拥有 ambient OS authority
 Transaction engine 不执行模型 JavaScript
 ```
@@ -3990,10 +4138,12 @@ Transaction engine 不执行模型 JavaScript
 ```text
 resolve Attempt
 → get immutable profile
-→ generate surface
-→ provider sees generated tools
-→ model invokes primary/alias
-→ ToolRegistry verifies invoked name belongs to same Attempt surface
+→ generate js-* surface (if any)
+→ assemble builtins + js-ROLE
+→ BuiltinToolDescriptionHook rewrites visible builtin filesystem descriptions
+→ provider sees tools
+→ model preferably invokes js-ROLE (builtins still executable)
+→ if js-*: ToolRegistry verifies invoked name belongs to same Attempt surface
 → create sandbox with generated runtime bindings
 → execute class Js
 → collect return + ReadSet + WriteSet
@@ -4027,9 +4177,17 @@ members implied by primitive capabilities
 以及：
 
 ```text
-GeneratedAliases(profile)
-==
-aliases implied by primitive capabilities
+HookTargets(profile)
+⊆
+visibleBuiltinFilesystemTools(profile)
+```
+
+以及：
+
+```text
+Hook mentions js-ROLE
+⇒
+js-ROLE is provider-visible in the same request
 ```
 
 以及：
@@ -4101,8 +4259,16 @@ base class 无 rewrite()
 再例如：
 
 ```text
-edit alias 可见
-base class 无 rewrite()
+builtin edit description 被钩子 Prefer js-coder
+但 provider 未暴露 js-coder
+```
+
+必须红。
+
+再例如：
+
+```text
+钩子把 builtin edit schema 改成 { program }
 ```
 
 必须红。
@@ -4113,40 +4279,64 @@ base class 无 rewrite()
 
 ---
 
-# 88. Alias Tests
+# 88. Builtin Coexistence + Hook Tests
 
 证明：
 
 ```text
-primary tool schema
-==
-every alias schema
+builtin read/edit/write/glob/grep/patch schema unchanged
+when js-ROLE is added
 ```
 
 证明：
 
 ```text
-alias execution
-==
-primary execution
+builtin executors still succeed
+after Prefer js-ROLE hook injection
+```
+
+证明：
+
+```text
+hook injects DEPRECATED + Prefer js-ROLE
+at the front of each visible builtin filesystem tool description
+```
+
+证明：
+
+```text
+hook never rewrites schema or executor
 ```
 
 特别测试：
 
 ```text
-Coder invokes "read"
-program uses rewrite()
-→ succeeds
+Coder invokes builtin "edit"
+→ succeeds with legacy semantics
+
+Coder invokes builtin "patch" (if present)
+→ succeeds with legacy patch semantics
+→ description still Prefer js-coder
+
+Coder invokes js-coder with rewrite()
+→ succeeds with JS transaction semantics
 ```
 
-因为 alias 不是 scope。
+因为 builtin 与 js-* 是两个独立工具。
 
 同时：
 
 ```text
-Inspector invokes "read"
+Inspector invokes js-inspector
 forged program attempts rewrite
 → runtime fail closed
+```
+
+以及：
+
+```text
+js-ROLE absent
+→ no Prefer js-* hook text in builtin descriptions
 ```
 
 ---
@@ -4445,7 +4635,7 @@ resource bound
 
 ---
 
-# 97. Clean-break Tests
+# 97. Coexistence / No-Alias-Takeover Tests
 
 Provider-visible：
 
@@ -4455,26 +4645,24 @@ edit
 write
 glob
 grep
+patch    # if present on the formal tool surface
+js-ROLE
 ```
 
-每个名字恰好一个 spec。
+每个 builtin 名字恰好一个 spec；`js-ROLE` 是额外独立 spec。
 
-它们全部 schema：
+builtin schema **必须保留**既有字段（不得变成 `{ program }`）。
+
+禁止：
 
 ```text
-program
+把 builtin 变成 alias of js-ROLE
+同一名字 dual schema
+hook 删除 builtin 可执行性
 ```
 
-禁止 legacy fields：
-
-```text
-oldString
-newString
-path-as-top-level-read-arg
-grep-query-schema
-```
-
-`js-ROLE` description 是唯一完整文档 owner。
+`js-ROLE` description 是 JS SDK 唯一完整文档 owner；
+builtin description 只允许叠加 Prefer 钩子，不复制整份 SDK 文档。
 
 ---
 
@@ -4675,8 +4863,10 @@ outside.txt
 ```text
 generated SDK member registry 单一 owner
 无 per-role handwritten JsProgram templates
-无 legacy five-tool implementation specs
-alias description 无复制长文
+builtin read/edit/write/glob/grep/patch 仍有独立 implementation specs（凡存在者）
+BuiltinToolDescriptionHook 是 Prefer 文案唯一 owner
+builtin description 无复制整份 JS SDK 长文
+禁止把 builtin 注册成 js-* alias
 ```
 
 受控反例：
@@ -4720,8 +4910,8 @@ alias description 无复制长文
 16. Synthetic TOML bridge
 17. Agent surface migration
 18. StudentCompile migration
-19. suppress legacy five tools
-20. aliases
+19. BuiltinToolDescriptionHook (deprecated + Prefer js-ROLE)
+20. keep builtin read/edit/write/glob/grep/patch executable with original schemas
 21. unit tests
 22. transaction/recovery tests
 23. sandbox tests
@@ -4791,23 +4981,20 @@ Git
 permission
 public member
 runtime binding
-aliases
+BuiltinRecommendationTargets (optional)
 description fragment
 examples
 ```
 
 Generator 自动为合法 Agent surface 投影。
 
-是否增加一个传统 alias：
+是否对仍存在的传统工具（如未来的 `rm` / `mv`）注入 Prefer 钩子：
 
 ```text
-rm
-mv
+只是 LLM UX / 迁移引流决策
 ```
 
-只是 LLM UX 决策。
-
-不是新的系统 primitive。
+不是新的系统 primitive，也不是 alias takeover。
 
 ---
 
@@ -4836,12 +5023,14 @@ mv
 * member presence 与 runtime binding 同构；
 * capability 缺失的方法不出现在 description/examples。
 
-## Alias
+## Builtin Coexistence + Hook
 
-* read/edit/write/glob/grep 全为 generated aliases；
-* aliases 与 primary schema/semantics 完全相同；
-* alias 不形成 security scope；
-* primary js-ROLE 始终与 aliases 同时可见。
+* read/edit/write/glob/grep/patch 继续是独立内置工具（凡存在者；原 schema / 原实现）；
+* 不把它们变成 `js-*` alias，不改成 `{ program }`；
+* `js-ROLE` 作为新增工具与它们共存；
+* 当 `js-ROLE` 可见时，BuiltinToolDescriptionHook 在内置工具 description 中 **deprecated + 极力推荐 js-ROLE**；
+* 钩子不形成 security scope，也不改变 builtin 可执行性；
+* 钩子文案提到的 `js-ROLE` 必须同时 provider-visible。
 
 ## File API
 
@@ -4899,10 +5088,11 @@ mv
 
 ## Migration
 
-* 五个 legacy implementations 移除；
-* 五个 familiar names 保留为 aliases；
-* legacy schemas 移除；
-* provider 同名 spec 无重复。
+* builtin `read` / `edit` / `write` / `glob` / `grep` / `patch` implementations **保留**（凡存在者）；
+* 这些 familiar names **保留为真正内置工具**；
+* builtin schemas **保留**；
+* 新增 `js-ROLE`；靠 description 钩子引流，不做 alias takeover；
+* provider 同名 spec 无重复（builtin 与 js-* 名字本就不同）。
 
 ## Parallel
 
@@ -4916,7 +5106,7 @@ mv
 
 * generator equivalence；
 * lying-generator counterexample；
-* alias semantics；
+* builtin coexistence + Prefer hook semantics；
 * anchor/regex；
 * read/glob/grep；
 * write/rewrite；
@@ -4988,7 +5178,7 @@ write()
 
 不需要额外理解权限表。
 
-传统五大工具：
+传统/既有文件系统工具：
 
 ```text
 read
@@ -4996,13 +5186,14 @@ edit
 write
 glob
 grep
+patch
 ```
 
-仍然存在，是因为这些名字对 LLM 极其友好。
+仍然存在（凡正式工具面已有者），并继续是可执行的内置 RPC 工具。
 
-但它们只是进入同一个精确生成 SDK 的五扇熟悉的门。
+它们的 description 会被钩子标成 deprecated，并极力推荐当前的 `js-ROLE`。
 
-系统内部只有一个真正的抽象：
+系统新增的真正抽象是：
 
 > **Capability-projected JavaScript program.**
 
