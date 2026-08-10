@@ -846,6 +846,14 @@ tests/integration/harness/{timeout-cases,event-store-gate-facts,degradation-case
 **下一步不是加超时也不是加 renewOn**（用户明确否决：opencode 很快，5s 无进展说明生产代码仍有优化空间），而是继续压 per-step 成本，并 root-cause 两个真实竞态：
 1. `manager-full-loop` 的 join-guard → activation 停摆（frontier Empty，非 contention：solo 加压 14/14 绿）。
 2. `orchestrator-publish` / `orchestrator-unhappy-path` 在 7–8 并发下 flow 等待与 Host 实际推进顺序错位（等 `coder.0` 时背景已到 `barrier-reviewer.2`）。
+
+### Phase 8 — OpenCode snapshot machinery 不能关（实验结论）
+
+剩余 git 里最大一块（`-c core.autocrlf=false` 62 次 + snapshot gitdir 22 次 ≈160ms/canary）来自 OpenCode 自己的 file-snapshot 追踪。OpenCode 确实提供开关（`snapshot/index.ts:169`：`(yield* config.get()).snapshot !== false`），在 harness config 里设 `snapshot: false` 后单 canary git 降到 **40 次 / 85ms**（相对起点 −97%），单跑全绿。
+
+但整套 e2e **变红**且可复现：两次运行分别 7 个 / 3 个 case 失败，`manager-unhappy-path` 甚至撞到 90s 进程上限，`temporal-ownership-unhappy-path` 在 `HandleAbandoned` 之后静默 5s。恢复默认（snapshot 开启）同一命令回到 38.9s、仅剩已知的 `manager-full-loop` flake。
+
+结论：**snapshot 不是免费开关**——publish / rebase / handle-abandon 一类路径依赖 Host 的文件快照事实。已回滚该 harness 改动。要真正拿掉这块成本，得先搞清依赖的是哪一条事实（属于产品语义调查，不是测试配置调参）。
 ### Phase 3 — DONE（G4U8–G4U12；2026-08-10）
 
 验收：
