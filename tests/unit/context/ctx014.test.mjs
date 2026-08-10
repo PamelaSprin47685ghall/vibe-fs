@@ -90,18 +90,29 @@ test('CTX_014_enforcer_protocol_violation_fields_are_whitelisted', () => {
   assert.doesNotThrow(() => diag.emit('enforcer-protocol-violation', [['call_count', '7']]))
 })
 
-test('CTX_014_diagnostic_emit_is_silent', () => {
+test('CTX_014_diagnostic_emit_is_silent_by_default_and_observable_on_demand', () => {
   const lines = []
   const w = console.warn
   const e = console.error
   console.warn = (...a) => lines.push(['warn', ...a])
   console.error = (...a) => lines.push(['error', ...a])
+  const previous = process.env.WANXIANGSHU_DIAG
   try {
+    delete process.env.WANXIANGSHU_DIAG
     diag.emit('reanchor_failed', [['session_id', 'ses_x']])
-    assert.equal(lines.length, 0, 'expected diagnostics must not print')
+    assert.equal(lines.length, 0, 'expected diagnostics must not print by default')
+
+    // HOST-007 is about a log line never becoming a recovery protocol, not about being
+    // undebuggable: an explicit env flag surfaces the same records and changes no decision.
+    process.env.WANXIANGSHU_DIAG = '1'
+    diag.emit('reanchor_failed', [['session_id', 'ses_x']])
+    assert.equal(lines.length, 1, 'WANXIANGSHU_DIAG=1 must surface the record')
+    assert.match(String(lines[0][1]), /reanchor_failed/)
   } finally {
     console.warn = w
     console.error = e
+    if (previous === undefined) delete process.env.WANXIANGSHU_DIAG
+    else process.env.WANXIANGSHU_DIAG = previous
   }
 })
 

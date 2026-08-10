@@ -20,22 +20,7 @@ module RecoveryClosureProjection =
 
     let private digestOf (root: SessionId) (nodes: RecoveryNode list) =
         nodes
-        |> List.map (fun node ->
-            match node with
-            | RecoveryNode.WorkSession id -> "W:" + SessionId.value id
-            | RecoveryNode.AgentChild(parent, child, handle) ->
-                "A:"
-                + SessionId.value parent
-                + ">"
-                + SessionId.value child
-                + ":"
-                + AgentHandleId.value handle
-            | RecoveryNode.Companion(main, companion) -> "C:" + SessionId.value main + ">" + SessionId.value companion
-            | RecoveryNode.Blogger(main, blogger) -> "B:" + SessionId.value main + ">" + SessionId.value blogger
-            | RecoveryNode.ManagerJob(jobId, manager) ->
-                "M:" + ManagerJobId.value jobId + ":" + SessionId.value manager
-            | RecoveryNode.Reviewer(jobId, reviewer) ->
-                "R:" + ManagerJobId.value jobId + ":" + SessionId.value reviewer)
+        |> List.map RecoveryNode.token
         |> fun parts -> String.Join("|", SessionId.value root :: parts)
 
     let private rootHandles (root: SessionId) (projection: AgentProjectionSet) =

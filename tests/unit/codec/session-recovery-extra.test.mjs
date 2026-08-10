@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { caseOf, resultOf, sessionRecovery, sessionId } from '../support/domain.mjs'
+import { caseOf, resultOf, sessionRecovery, sessionId, setItems } from '../support/domain.mjs'
 
 const {
   sessionRecoveryOfHandleFamily: ofHandleFamily,
@@ -123,7 +123,10 @@ test('MISC_recovery_authorize_aggregates_blocks_waits_ready', () => {
   assert.equal(caseOf(ready), 'FamilyReady')
   assert.equal(ready.fields[0].fields[0].fields[0], 'root1')
   assert.equal(ready.fields[0].fields[1], 9n)
-  assert.equal(ready.fields[0].fields[2], '', 'permit carries the closure digest verbatim')
+  // EXEC-023: the permit carries the closure's MEMBERSHIP, not a digest of it. Admission asks
+  // "is everything I recovered still here", which a member set can answer and a digest cannot —
+  // a digest also changes when the family merely grows.
+  assert.deepEqual(setItems(ready.fields[0].fields[2]), [], 'permit carries the closure members')
 })
 
 test('MISC_recovery_receipt_accessors_and_nonempty_helpers', () => {

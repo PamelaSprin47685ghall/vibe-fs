@@ -46,6 +46,25 @@ module SessionRecovery =
         | ManagerJob of ManagerJobId * manager: SessionId
         | Reviewer of ManagerJobId * reviewer: SessionId
 
+    module RecoveryNode =
+        /// One member's stable token. Owned here rather than in the projection because two things
+        /// read it — the closure digest and a permit's membership check — and a member identity
+        /// spelled twice is a member identity that can disagree with itself.
+        let token (node: RecoveryNode) : string =
+            match node with
+            | RecoveryNode.WorkSession id -> "W:" + SessionId.value id
+            | RecoveryNode.AgentChild(parent, child, handle) ->
+                "A:"
+                + SessionId.value parent
+                + ">"
+                + SessionId.value child
+                + ":"
+                + AgentHandleId.value handle
+            | RecoveryNode.Companion(main, companion) -> "C:" + SessionId.value main + ">" + SessionId.value companion
+            | RecoveryNode.Blogger(main, blogger) -> "B:" + SessionId.value main + ">" + SessionId.value blogger
+            | RecoveryNode.ManagerJob(jobId, manager) -> "M:" + ManagerJobId.value jobId + ":" + SessionId.value manager
+            | RecoveryNode.Reviewer(jobId, reviewer) -> "R:" + ManagerJobId.value jobId + ":" + SessionId.value reviewer
+
     type RecoveryReceipt =
         private
             { SessionId: SessionId
@@ -83,13 +102,35 @@ module SessionRecovery =
         | Blocked of NonEmpty<RecoveryBlock>
 
     /// Private: only authorizeFamilyResume may construct.
+    /// EXEC-023: proof that this family's recovery closed. Carries the closure it closed over —
+    /// the member tokens, not only their digest — because the question a consumer must answer is
+    /// "is everything I recovered still here", and a digest can only answer "is the family
+    /// byte-identical to what it was".
+    ///
+    /// Those are different questions, and the difference was a race: a child forking a grandchild
+    /// while the parent joins changes the digest without invalidating any recovery. Measured in
+    /// `temporal-ownership-unhappy-path`, which failed deterministically with
+    /// `closureDigest mismatch: permit=…|A:P>C:h|… current=…|C:C>G|…` — the extra member was a
+    /// live fork, and the join it refused was a legitimate one.
     type FamilyRecoveryPermit =
-        private | FamilyRecoveryPermit of root: SessionId * journalSequence: int64 * closureDigest: string
+        private
+        | FamilyRecoveryPermit of root: SessionId * journalSequence: int64 * closureMembers: Set<string>
 
     module FamilyRecoveryPermit =
         let root (FamilyRecoveryPermit(root, _, _)) = root
         let journalSequence (FamilyRecoveryPermit(_, sequence, _)) = sequence
-        let closureDigest (FamilyRecoveryPermit(_, _, digest)) = digest
+        let closureMembers (FamilyRecoveryPermit(_, _, members)) = members
+
+        /// Stable rendering for diagnostics. Sorted, so two permits over the same closure read the
+        /// same regardless of discovery order.
+        let describeClosure (permit: FamilyRecoveryPermit) =
+            closureMembers permit |> Set.toList |> String.concat "|"
+
+        /// Monotone admission: every member the permit recovered must still be in the family.
+        /// New members are legal — a session created after recovery closed was never in need of
+        /// recovery — so growth is admitted and only loss is refused.
+        let missingFrom (current: Set<string>) (permit: FamilyRecoveryPermit) : string list =
+            Set.difference (closureMembers permit) current |> Set.toList
 
     [<RequireQualifiedAccess>]
     type FamilyRecovery =
@@ -108,6 +149,11 @@ module SessionRecovery =
         }
 
     type ValidatedClosure = private ValidatedClosure of RecoveryClosure
+
+    module RecoveryClosure =
+        /// The closure as a membership set. What a permit must still find, member by member.
+        let members (closure: RecoveryClosure) : Set<string> =
+            closure.Nodes |> List.map RecoveryNode.token |> Set.ofList
 
     module ValidatedClosure =
         let value (ValidatedClosure closure) = closure
@@ -292,4 +338,6 @@ module SessionRecovery =
 
             match NonEmpty.ofList waits with
             | Some nonEmpty -> FamilyRecovery.FamilyWaiting nonEmpty
-            | None -> FamilyRecovery.FamilyReady(FamilyRecoveryPermit(root, journalSequence, recovered.Closure.Digest))
+            | None -> FamilyRecovery.FamilyReady(
+                    FamilyRecoveryPermit(root, journalSequence, RecoveryClosure.members recovered.Closure)
+                )

@@ -77,6 +77,12 @@ function makeConfig(llmUrl, pluginPaths = [], opts = {}) {
   return {
     formatter: false,
     lsp: false,
+    // OpenCode's file-snapshot tracking exists to power revert, and no scenario asserts on it.
+    // It costs the Host ~84 synchronous `git` spawns per canary (measured: 62
+    // `-c core.autocrlf=false` plus 22 against the snapshot gitdir, ~160ms) on the very event loop
+    // the run needs, so the harness runs without it. Anything that goes red with it off is a
+    // dependency to fix, not a reason to turn it back on.
+    snapshot: false,
     permission: { '*': 'allow' },
     model: opts.model || 'test/test-model',
     provider: {

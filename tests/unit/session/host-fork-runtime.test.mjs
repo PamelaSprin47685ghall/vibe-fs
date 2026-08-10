@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { agentJournal, caseOf, listItems, sessionId, toList } from '../support/domain.mjs'
+import { agentJournal, caseOf, listItems, sessionId, setItems, stringSet, toList } from '../support/domain.mjs'
 
 const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
 const {
@@ -47,6 +47,8 @@ const { ForkError, AgentStatus } = await import('../../../dist/Session/ForkTypes
 const { Role } = await import('../../../dist/Kernel/Roles.js')
 const {
   FamilyRecoveryPermit,
+  FamilyRecoveryPermitModule_missingFrom,
+  RecoveryClosureModule_members,
 } = await import('../../../dist/Domain/SessionRecovery.js')
 const { AgentJournalModule_revision, AgentJournalModule_snapshot } = await import(
   '../../../dist/Journal/AgentJournal.js'
@@ -100,10 +102,15 @@ const link = (j, agentId, child, agent = 'fast-coder', role = Role.Coder) => {
 }
 
 /** Permit that validates against the journal's CURRENT closure. */
+const closureOf = (j) => {
+  const sequence = JournalRevisionModule_value(AgentJournalModule_revision(j))
+  return discover(PARENT, AgentJournalModule_snapshot(j).AgentProjections, sequence)
+}
+
+/** A permit over the family as it stands: its member set, which is what admission reads. */
 const validPermit = (j) => {
   const sequence = JournalRevisionModule_value(AgentJournalModule_revision(j))
-  const closure = discover(PARENT, AgentJournalModule_snapshot(j).AgentProjections, sequence)
-  return new FamilyRecoveryPermit(PARENT, sequence, closure.Digest)
+  return new FamilyRecoveryPermit(PARENT, sequence, RecoveryClosureModule_members(closureOf(j)))
 }
 
 const deferred = () => {
@@ -277,7 +284,7 @@ test('HFRT_join_cancelled_runtime_returns_cancelled', async () => {
 
 test('HFRT_join_with_permit_root_mismatch_is_not_found', async () => {
   const liveCtx = live()
-  const permit = new FamilyRecoveryPermit(sessionId('ses_other'), 0n, '')
+  const permit = new FamilyRecoveryPermit(sessionId('ses_other'), 0n, stringSet([]))
   const result = await joinWithPermit(liveCtx.runtime, permit)
   assert.equal(result.tag, 1)
   const err = result.fields[0]
@@ -289,7 +296,7 @@ test('HFRT_join_with_permit_root_mismatch_is_not_found', async () => {
 test('HFRT_join_with_permit_stale_journal_sequence_is_not_found', async () => {
   const liveCtx = live()
   const current = JournalRevisionModule_value(AgentJournalModule_revision(liveCtx.journal))
-  const permit = new FamilyRecoveryPermit(PARENT, current + 1000n, '')
+  const permit = new FamilyRecoveryPermit(PARENT, current + 1000n, stringSet([]))
   const result = await joinWithPermit(liveCtx.runtime, permit)
   const err = result.fields[0]
   assert.equal(caseOf(err), 'NotFound')
@@ -297,14 +304,35 @@ test('HFRT_join_with_permit_stale_journal_sequence_is_not_found', async () => {
   liveCtx.cleanup()
 })
 
-test('HFRT_join_with_permit_closure_digest_mismatch_is_not_found', async () => {
+test('EXEC_023_permit_whose_recovered_member_is_gone_is_not_found', async () => {
   const liveCtx = live()
   const sequence = JournalRevisionModule_value(AgentJournalModule_revision(liveCtx.journal))
-  const permit = new FamilyRecoveryPermit(PARENT, sequence, 'deadbeef')
+  // A member the family no longer has: recovery closed over something that has since vanished,
+  // which is the only thing that may invalidate a permit.
+  const permit = new FamilyRecoveryPermit(PARENT, sequence, stringSet(['W:ses_vanished']))
   const result = await joinAvailableWithPermit(liveCtx.runtime, permit, 5, new Promise(() => {}))
   const err = result.fields[0]
   assert.equal(caseOf(err), 'NotFound')
-  assert.match(err.fields[0], /family recovery permit closureDigest mismatch: permit=deadbeef current=/)
+  assert.match(err.fields[0], /closure lost members: missing=W:ses_vanished/)
+  liveCtx.cleanup()
+})
+
+test('EXEC_023_permit_survives_family_growth_after_recovery_closed', async () => {
+  const liveCtx = live()
+  const permit = validPermit(liveCtx.journal)
+
+  // A grandchild appearing mid-join grows the closure. It was created live, so it needed no
+  // recovery, and the permit must still admit the join: digest equality refused exactly this and
+  // made `temporal-ownership-unhappy-path` fail whenever the fork landed inside the window.
+  const grown = stringSet([
+    ...setItems(RecoveryClosureModule_members(closureOf(liveCtx.journal))),
+    'C:ses_child>ses_grandchild',
+  ])
+  assert.deepEqual(listItems(FamilyRecoveryPermitModule_missingFrom(grown, permit)), [])
+
+  const result = await joinWithPermit(liveCtx.runtime, permit, 10)
+  assert.equal(result.tag, 1)
+  assert.equal(caseOf(result.fields[0]), 'NothingToJoin', 'growth must not revoke the permit')
   liveCtx.cleanup()
 })
 
@@ -329,7 +357,7 @@ test('HFRT_await_agent_unknown_id_is_error', async () => {
 
 test('HFRT_await_agent_with_permit_validation_error_maps_to_not_found', async () => {
   const liveCtx = live()
-  const permit = new FamilyRecoveryPermit(sessionId('ses_other'), 0n, '')
+  const permit = new FamilyRecoveryPermit(sessionId('ses_other'), 0n, stringSet([]))
   const result = await awaitAgentWithPermit(liveCtx.runtime, permit, 'ag9')
   assert.equal(result.tag, 1)
   assert.equal(caseOf(result.fields[0]), 'NotFound')

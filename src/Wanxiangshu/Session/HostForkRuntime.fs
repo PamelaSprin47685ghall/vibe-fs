@@ -296,7 +296,6 @@ type HostForkRuntime
     member private this.validatePermit(permit: FamilyRecoveryPermit) : Result<unit, ForkError> =
         let root = FamilyRecoveryPermit.root permit
         let permitSeq = FamilyRecoveryPermit.journalSequence permit
-        let permitDigest = FamilyRecoveryPermit.closureDigest permit
 
         if root <> parentId then
             Error(
@@ -333,17 +332,23 @@ type HostForkRuntime
                             (AgentJournal.snapshot durable).AgentProjections
                             currentSeq
 
-                    if current.Digest <> permitDigest then
+                    // EXEC-023 monotone admission: the permit proves the family it recovered is
+                    // closed, so what invalidates it is a member GOING MISSING — not the family
+                    // growing. A child forking a grandchild mid-join changes the closure digest
+                    // while invalidating no recovery, and comparing digests refused exactly those
+                    // legitimate joins (`temporal-ownership-unhappy-path`, deterministically).
+                    match FamilyRecoveryPermit.missingFrom (RecoveryClosure.members current) permit with
+                    | [] -> Ok()
+                    | missing ->
                         Error(
                             ForkError.NotFound(
                                 sprintf
-                                    "family recovery permit closureDigest mismatch: permit=%s current=%s"
-                                    permitDigest
+                                    "family recovery permit closure lost members: missing=%s permit=%s current=%s"
+                                    (String.concat "," missing)
+                                    (FamilyRecoveryPermit.describeClosure permit)
                                     current.Digest
                             )
                         )
-                    else
-                        Ok()
 
     /// P0-RECOVERY-JOIN-001 + GREEN-4: permit-gated single-result join.
     /// Validates root / journalSequence lower bound / closureDigest only; never starts recovery.

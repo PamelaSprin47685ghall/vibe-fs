@@ -17,6 +17,12 @@ type PtySupervisor =
 
 module PtySupervisor =
 
+    /// PTY-READ-FIRST-BYTE: how long a read waits for an open terminal to say anything before it
+    /// answers "". A slice, not a budget: the criterion is the byte arriving (`onData` resolves the
+    /// parked reader immediately), and this only bounds silence so a quiet terminal still answers.
+    [<Literal>]
+    let PtyReadFirstByteMs = 250
+
     let create () : PtySupervisor =
         { Gate = obj ()
           SpawnFn = None
@@ -191,10 +197,42 @@ module PtySupervisor =
                     with ex ->
                         return Error ex.Message
                 | PtyCommand.Read ->
-                    let text = session.OutputBuffer.ToString()
-                    session.OutputBuffer.Clear() |> ignore
-                    port.ReadResult(id, text, session.Closed)
-                    return Ok()
+                    let buffered = session.OutputBuffer.ToString()
+
+                    if buffered <> "" || session.Closed then
+                        session.OutputBuffer.Clear() |> ignore
+                        port.ReadResult(id, buffered, session.Closed)
+                        return Ok()
+                    else
+                        // PTY-READ-FIRST-BYTE: an open terminal with nothing buffered has not
+                        // answered yet, and answering "" instantly makes the obvious agent
+                        // sequence — write a command, read its output — return nothing whenever
+                        // the shell has not echoed within the same tick. Measured: `pty-stress`
+                        // reads eleven times and every read came back empty under suite load,
+                        // while the echo turned up later in the join outcome.
+                        //
+                        // So the read waits for the next byte instead of guessing. Event-driven:
+                        // `onData` resolves the parked reader as soon as the terminal speaks. The
+                        // timer is only the answer for a genuinely silent terminal, which must
+                        // still get "" rather than hang.
+                        session.AwaitingFirstByte <- true
+
+                        // Answer on silence, in a task rather than a continuation so the shape is
+                        // the same `task { }` the rest of this file uses.
+                        task {
+                            do! PtyTiming.timerTask PtyReadFirstByteMs
+
+                            match tryGet supervisor id with
+                            | Some s when s.AwaitingFirstByte ->
+                                s.AwaitingFirstByte <- false
+                                let text = s.OutputBuffer.ToString()
+                                s.OutputBuffer.Clear() |> ignore
+                                port.ReadResult(id, text, s.Closed)
+                            | _ -> ()
+                        }
+                        |> ignore
+
+                        return Ok()
                 | PtyCommand.Signal signal ->
                     try
                         killProcessTree session.Backend (signalName signal)
@@ -249,7 +287,17 @@ module PtySupervisor =
             match tryGet supervisor id with
             | None -> ()
             | Some s when s.Closed -> ()
-            | Some s -> s.OutputBuffer.Append data |> ignore)
+            | Some s ->
+                s.OutputBuffer.Append data |> ignore
+
+                // PTY-READ-FIRST-BYTE: a read parked on an empty buffer is answered by the
+                // terminal speaking, not by a timer expiring. Draining here is what makes
+                // write-then-read deterministic instead of a race against the shell's echo.
+                if s.AwaitingFirstByte then
+                    s.AwaitingFirstByte <- false
+                    let text = s.OutputBuffer.ToString()
+                    s.OutputBuffer.Clear() |> ignore
+                    port.ReadResult(id, text, s.Closed))
         |> ignore
 
         term?onExit (fun (_event: obj) ->

@@ -54,6 +54,9 @@ module Diagnostic =
     [<Emit("console.error($0)")>]
     let private error (message: string) : unit = jsNative
 
+    [<Emit("process.env.WANXIANGSHU_DIAG === '1'")>]
+    let private diagnosticsVisible () : bool = jsNative
+
     [<Emit("JSON.stringify($0)")>]
     let private stringify (value: obj) : string = jsNative
 
@@ -83,8 +86,19 @@ module Diagnostic =
             )
         )
 
-    /// Expected / best-effort. Validates CTX-014 whitelist; never prints.
-    let emit (operation: string) (fields: (string * string) list) : unit = validate fields
+    /// Expected / best-effort. Validates the CTX-014 whitelist.
+    ///
+    /// Silent by default, and that default is the clause: HOST-007 forbids a log line from
+    /// becoming a recovery protocol, and code that prints on the happy path invites exactly that.
+    /// `WANXIANGSHU_DIAG=1` makes the same records observable without changing a single decision —
+    /// which is what a stalled run needs, because the alternative measured in practice is a
+    /// session parked with no explanation anywhere: every branch that could explain it emitted
+    /// into silence.
+    let emit (operation: string) (fields: (string * string) list) : unit =
+        validate fields
+
+        if diagnosticsVisible () then
+            error (stringify (payload operation fields))
 
     /// Unexpected invariant break. Print one JSON line, then kill the process.
     let fatal (operation: string) (fields: (string * string) list) : unit =
