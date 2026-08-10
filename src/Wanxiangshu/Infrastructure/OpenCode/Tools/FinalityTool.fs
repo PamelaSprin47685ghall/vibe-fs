@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Domain
+open Wanxiangshu.Finality
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
@@ -17,7 +18,7 @@ open Wanxiangshu.Tools
 /// mentions review, the reviewer, PERFECT, or the barrier (SURFACE-005). A
 /// legal call is accepted in GLORY-040 order — validate, read tree, write
 /// last_words blob, append `FinalityRequested`, park the Manager completion,
-/// start the Host-owned `FinalityController`. Every precondition failure
+/// enter Application `FinalityWorkflow`. Every precondition failure
 /// returns a narrative refusal and never writes `FinalityRequested`
 /// (GLORY-038/039).
 module FinalityTool =
@@ -45,7 +46,7 @@ module FinalityTool =
               "request", FinalityRequestId.value requestId ]
             (WorkflowProducer(
                 CausalOwner.create
-                    "FinalityController"
+                    "FinalityWorkflow"
                     [ "request", FinalityRequestId.value requestId; "session", SessionId.value sid ]
             ))
             [ WaitEscape.SessionLifetime
@@ -57,9 +58,15 @@ module FinalityTool =
         (lifeId: ManagerLifeId)
         (requestId: FinalityRequestId)
         (source: string)
-        (pending: Task<FinalityController.FinalityOutcome>)
-        : Task<FinalityController.FinalityOutcome> =
+        (pending: Task<FinalityOutcome>)
+        : Task<FinalityOutcome> =
         CausalAwait.awaitTask CausalWaitHub.observer (describeFinalityRequest sid lifeId requestId source) pending
+
+    let private finalityPorts (scope: ToolRuntimeScope) (sessionId: SessionId) =
+        FinalityHostPort.create
+            scope
+            sessionId
+            (defaultArg scope.FinalityReviewerTimeoutMs ExecutorSummarize.AwaitAgentTimeoutMs)
 
     let private treeOf (scope: ToolRuntimeScope) (sessionId: string) =
         match scope.TreePortFor sessionId with
@@ -307,17 +314,20 @@ module FinalityTool =
 
                                     match context.ToolCallId with
                                     | Some callId when callId = request.ToolCallId ->
+                                        let reviewerPort, _ = finalityPorts scope sid
+
                                         let! resumed =
-                                            FinalityController.resumeDurableRevise
-                                                scope
+                                            FinalityWorkflow.resume
+                                                reviewerPort
+                                                scope.Journal
                                                 sid
                                                 life.LifeId
                                                 request.RequestId
 
                                         match resumed with
-                                        | Some(FinalityController.FinalityOutcome.Rejected prompt)
-                                        | Some(FinalityController.FinalityOutcome.Blessed prompt)
-                                        | Some(FinalityController.FinalityOutcome.Undecided prompt) -> return prompt
+                                        | Some(FinalityOutcome.Rejected prompt)
+                                        | Some(FinalityOutcome.Blessed prompt)
+                                        | Some(FinalityOutcome.Undecided prompt) -> return prompt
                                         | None ->
                                             return ToolHostCodec.tomlObject [ "status", tString "already_received" ]
                                     | _ ->
@@ -328,29 +338,30 @@ module FinalityTool =
                                         // fold keeps the request open until the
                                         // restart lands a terminal fact.
                                         if Map.isEmpty request.Members then
+                                            let reviewerPort, treePort = finalityPorts scope sid
+
                                             let! outcome =
                                                 awaitFinalityStart
                                                     sid
                                                     life.LifeId
                                                     request.RequestId
                                                     "FinalityTool.recoverEmptyMembers"
-                                                    (FinalityController.start
-                                                        scope
+                                                    (FinalityWorkflow.start
+                                                        reviewerPort
+                                                        treePort
+                                                        scope.Journal
                                                         sid
                                                         life.LifeId
                                                         request.RequestId
                                                         request.GitTreeHash
                                                         request.LastWordsRef
                                                         request.LastWordsDigest
-                                                        request.ProviderRun
-                                                        (defaultArg
-                                                            scope.FinalityReviewerTimeoutMs
-                                                            ExecutorSummarize.AwaitAgentTimeoutMs))
+                                                        request.ProviderRun)
 
                                             match outcome with
-                                            | FinalityController.FinalityOutcome.Rejected prompt
-                                            | FinalityController.FinalityOutcome.Blessed prompt
-                                            | FinalityController.FinalityOutcome.Undecided prompt -> return prompt
+                                            | FinalityOutcome.Rejected prompt
+                                            | FinalityOutcome.Blessed prompt
+                                            | FinalityOutcome.Undecided prompt -> return prompt
                                         else
                                             return
                                                 ToolHostCodec.tomlObjectWithInstructions
@@ -361,13 +372,15 @@ module FinalityTool =
                                      | Some callId -> callId = request.ToolCallId
                                      | None -> false)
                                     ->
+                                    let reviewerPort, _ = finalityPorts scope sid
+
                                     let! resumed =
-                                        FinalityController.resumeDurableRevise scope sid life.LifeId request.RequestId
+                                        FinalityWorkflow.resume reviewerPort scope.Journal sid life.LifeId request.RequestId
 
                                     match resumed with
-                                    | Some(FinalityController.FinalityOutcome.Rejected prompt)
-                                    | Some(FinalityController.FinalityOutcome.Blessed prompt)
-                                    | Some(FinalityController.FinalityOutcome.Undecided prompt) -> return prompt
+                                    | Some(FinalityOutcome.Rejected prompt)
+                                    | Some(FinalityOutcome.Blessed prompt)
+                                    | Some(FinalityOutcome.Undecided prompt) -> return prompt
                                     | None -> return ToolHostCodec.tomlObject [ "status", tString "already_received" ]
                                 | _ ->
                                     if String.IsNullOrWhiteSpace lastWords then
@@ -441,29 +454,30 @@ module FinalityTool =
                                                         ))
                                                     |> ignore
 
+                                                    let reviewerPort, treePort = finalityPorts scope sid
+
                                                     let! outcome =
                                                         awaitFinalityStart
                                                             sid
                                                             life.LifeId
                                                             requestId
                                                             "FinalityTool.acceptSuicide"
-                                                            (FinalityController.start
-                                                                scope
+                                                            (FinalityWorkflow.start
+                                                                reviewerPort
+                                                                treePort
+                                                                scope.Journal
                                                                 sid
                                                                 life.LifeId
                                                                 requestId
                                                                 tree
                                                                 blob.BlobRef
                                                                 blob.BlobDigest
-                                                                context.ProviderRunId.Value
-                                                                (defaultArg
-                                                                    scope.FinalityReviewerTimeoutMs
-                                                                    ExecutorSummarize.AwaitAgentTimeoutMs))
+                                                                context.ProviderRunId.Value)
 
                                                     match outcome with
-                                                    | FinalityController.FinalityOutcome.Rejected prompt
-                                                    | FinalityController.FinalityOutcome.Blessed prompt
-                                                    | FinalityController.FinalityOutcome.Undecided prompt ->
+                                                    | FinalityOutcome.Rejected prompt
+                                                    | FinalityOutcome.Blessed prompt
+                                                    | FinalityOutcome.Undecided prompt ->
                                                         return prompt
                             }
 

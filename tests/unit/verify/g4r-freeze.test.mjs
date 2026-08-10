@@ -39,18 +39,22 @@ test('G4R_FREEZE_case_ceiling_may_only_decrease', () => {
   const ceiling = E2E_CASE_CEILING
   // No deletions: ceiling stays put.
   assert.equal(nextCaseCeiling({ caseCount: ceiling, ceiling }), ceiling)
-  // Cases deleted: ratchet down to remaining count.
-  assert.equal(nextCaseCeiling({ caseCount: ceiling - 1, ceiling }), ceiling - 1)
+  // Cases deleted: ratchet down to remaining count (G4R-4: already 0).
+  if (ceiling > 0) {
+    assert.equal(nextCaseCeiling({ caseCount: ceiling - 1, ceiling }), ceiling - 1)
+  }
   assert.equal(nextCaseCeiling({ caseCount: 0, ceiling }), 0)
   // Never raise — even if caseCount somehow exceeds the freeze bar.
   assert.equal(nextCaseCeiling({ caseCount: ceiling + 5, ceiling }), ceiling)
   // Monotone: successive deletions only lower (or hold) the ceiling.
-  let current = ceiling
-  for (const remaining of [ceiling, ceiling - 3, ceiling - 10, 1, 0]) {
+  // Exercise from a positive historical bar so the ratchet path stays covered at 0.
+  let current = Math.max(ceiling, 31)
+  for (const remaining of [current, current - 3, current - 10, 1, 0]) {
     const next = nextCaseCeiling({ caseCount: remaining, ceiling: current })
     assert.ok(next <= current, `ceiling rose: ${current} → ${next}`)
     current = next
   }
+  assert.equal(current, 0)
 })
 
 test('G4R_FREEZE_timeout_ceiling_rejects_inflation', () => {

@@ -9,7 +9,7 @@
  *   - Top-level E2E entry: zero OK (pre-cutover); when present must be exactly
  *     tests/e2e/entry.test.mjs (required-exactly-one-when-present; Long Stroke)
  *
- * Final one-world ratchets (count == 1, spawn == 1, …) arrive in G4R-4/G4R-6 — not here.
+ * G4R-4: cases ceiling is 0 (multi-canary retired); sole entry is LONG_STROKE_ENTRY_REL.
  *
  * Usage: node scripts/checks/g4r-freeze.mjs
  */
@@ -22,11 +22,11 @@ import { walk } from '../lib/walk.mjs'
 export const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 
 /**
- * Freeze ceiling: current multi-canary population. May decrease; must never increase.
- * When E2E cases are deleted at cutover, ratchet via `nextCaseCeiling` (do not raise).
- * LONG_STROKE_ENTRY_REL path is already documented for the sole top-level entry.
+ * Freeze ceiling: multi-canary cases/ population. May decrease; must never increase.
+ * G4R-4 cutover: cases retired → 0; sole world is LONG_STROKE_ENTRY_REL (not counted here).
+ * Ratchet via `nextCaseCeiling` only (do not raise).
  */
-export const E2E_CASE_CEILING = 31
+export const E2E_CASE_CEILING = 0
 
 /** Named budgets in tests/e2e/support/time-budget.js — freeze ceilings (defaults only). */
 export const TIMEOUT_CEILINGS = Object.freeze({
@@ -193,12 +193,11 @@ export const scanTopLevelE2EEntries = (topLevelTestFiles) => {
 
 /**
  * Count *.test.mjs under casesDir (non-recursive flat dir is fine; walk is used for safety).
+ * Missing or empty cases/ counts as 0 (G4R-4 one-world: sole entry is top-level).
  * @param {string} casesDir
  */
 export const countE2ECases = (casesDir) => {
-  if (!existsSync(casesDir)) {
-    throw new Error(`g4r-freeze: missing cases directory ${casesDir}`)
-  }
+  if (!existsSync(casesDir)) return 0
   return walk(casesDir, ['.test.mjs']).length
 }
 
