@@ -16,7 +16,14 @@ type EnlistedMember =
     { ReviewerSessionId: SessionId
       BarrierId: ReviewBarrierId
       ReviewerOrdinal: int
-      AgentId: string }
+      AgentId: string
+      IsNew: bool }
+
+/// Physical reviewer session prepared by the Host before Application records
+/// enlistment and opens the barrier.
+type PreparedReviewer =
+    { ReviewerSessionId: SessionId
+      IsNew: bool }
 
 /// One Reviewer's terminal business result for a Finality member round.
 /// REVISE is a legal result (`RevisionRequired`), never an infrastructure error.

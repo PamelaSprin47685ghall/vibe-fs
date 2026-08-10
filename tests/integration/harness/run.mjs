@@ -39,7 +39,8 @@ import { bindHarnessFeed } from './progress.mjs';
 // parallel execution from changing semantics.
 //
 // Eight is measured for this suite, whose cases are mostly pure/local and never fan out one
-// OpenCode process per slot. It is intentionally independent from CANARY_MAX_PARALLEL.
+// OpenCode process per slot. This harness concurrency is local to integration quality gates
+// and is not an E2E canary pool bound (One World has a sole entry, not a parallel canary set).
 // Concurrency counts are not durations and therefore do not belong in time-budget.js.
 const GATE_CASE_CONCURRENCY = 8;
 

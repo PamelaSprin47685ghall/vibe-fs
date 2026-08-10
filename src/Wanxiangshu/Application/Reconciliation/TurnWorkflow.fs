@@ -46,6 +46,20 @@ module TurnWorkflow =
             if syncDelegateHandled then
                 return ()
 
+            let observeOrdinary current =
+                OrdinaryTurnWorkflow.observe
+                    timerPort
+                    abortParent
+                    sessionPort
+                    eventPort
+                    journal
+                    joinGuardNudges
+                    hasLivePty
+                    abortedSessions
+                    loopSensor
+                    quiescence
+                    current
+
             match turn.Role with
             | Some Role.Reviewer ->
                 do!
@@ -57,12 +71,8 @@ module TurnWorkflow =
                         turn
                         (SessionId.value turn.SessionId)
             | Some Role.Manager ->
-                // TODO(TurnWorkflow): ManagerWorkflow.tryObserve still returns a
-                // handled-bool for Ordinary fallthrough (ManagerStarted /
-                // ConflictPending / non-completed outcomes). Collapse when Manager
-                // owns every Manager-role observation without bool multiplexing.
-                let! managerHandled =
-                    ManagerWorkflow.tryObserve
+                do!
+                    ManagerWorkflow.observe
                         sessionPort
                         eventPort
                         journal
@@ -71,35 +81,8 @@ module TurnWorkflow =
                         hasLivePty
                         abortedSessions
                         quiescence
+                        observeOrdinary
                         context
-
-                if not managerHandled then
-                    do!
-                        OrdinaryTurnWorkflow.observe
-                            timerPort
-                            abortParent
-                            sessionPort
-                            eventPort
-                            journal
-                            joinGuardNudges
-                            hasLivePty
-                            abortedSessions
-                            loopSensor
-                            quiescence
-                            context
-            | _ ->
-                do!
-                    OrdinaryTurnWorkflow.observe
-                        timerPort
-                        abortParent
-                        sessionPort
-                        eventPort
-                        journal
-                        joinGuardNudges
-                        hasLivePty
-                        abortedSessions
-                        loopSensor
-                        quiescence
-                        context
+            | _ -> do! observeOrdinary context
         }
         :> Task
