@@ -39,7 +39,18 @@
     <Compile Include="Domain/HostCompactionPolicy.fs"/>
     <Compile Include="Domain/ProviderProjection.fs"/>
     <Compile Include="Domain/XTrace.fs"/>
+    <Compile Include="Domain/MagicTodo.fs"/>
+    <Compile Include="Domain/MagicTodoFacts.fs"/>
+    <Compile Include="Domain/MagicTodoPrefixEpoch.fs"/>
+    <Compile Include="Domain/MagicTodoSurface.fs"/>
+    <Compile Include="Domain/MagicTodoAdmission.fs"/>
+    <Compile Include="Domain/MagicTodoAfter.fs"/>
+    <Compile Include="Domain/MagicTodoProcessReview.fs"/>
+    <Compile Include="Domain/MagicTodoSuicide.fs"/>
     <Compile Include="Domain/LifecycleWorkRecord.fs"/>
+    <Compile Include="Domain/MagicTodoLwr.fs"/>
+    <Compile Include="Domain/MagicTodoLegacySeed.fs"/>
+    <Compile Include="Domain/MagicTodoFinalityCohort.fs"/>
     <Compile Include="Domain/SyntheticToml.fs"/>
     <Compile Include="Domain/ManagerNarrative.fs"/>
     <Compile Include="Domain/ManagerLifecyclePrompt.fs"/>
@@ -81,6 +92,8 @@
     <Compile Include="Journal/CompanionProjection.fs"/>
     <Compile Include="Journal/XTraceProjection.fs"/>
     <Compile Include="Journal/ManagerLifecycleProjection.fs"/>
+    <Compile Include="Journal/MagicTodoProjection.fs"/>
+    <Compile Include="Journal/MagicTodoFactCodec.fs"/>
     <Compile Include="Journal/BlogProjection.fs"/>
     <Compile Include="Journal/PrefixEpochProjection.fs"/>
     <Compile Include="Journal/FallbackProjection.fs"/>
