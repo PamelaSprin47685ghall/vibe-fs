@@ -39,10 +39,10 @@ flow = [
   # A non-retryable provider error does not emit a scenario response signal. The
   # settled assistant snapshot is the only legal wake-up for FALLBACK-003.
   { awaitTerminal = true, requireAssistantTerminal = true, requireIdleAfterActivity = true },
-  # gte not eq: EventStore append is fast enough that the Host can land the
-  # fourth (and sometimes a fifth) cursor advance between waitFact polls; exact
-  # eq=4 then deadlocks with named already past the target (VERIFY-004 silence).
-  { waitFact = { name = "FallbackCursorAdvanced", gte = 4 } },
+  # Exactly four. One Logical Run's four settled provider failures are the only
+  # advances: LOOP-006 keeps Host abort cleanup (the interrupted Blogger blog call
+  # this run also produces) out of the primary cursor, so no fifth wrap can appear.
+  { waitFact = { name = "FallbackCursorAdvanced", eq = 4 } },
 
   # First continue match only. StrictMockSignals permanent-consume makes wait="continue"
   # return immediately after the first continue delivery — it cannot barrier multi-delivery

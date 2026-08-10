@@ -75,7 +75,7 @@ fast/deep blogger 共用 authoritative system（见资源文件）；工具合�
 
 ## ENFORCER-062：Fallback 切换
 
-失败与 Fallback 切换规则不另造预算；走统一 FallbackController。
+失败与 Fallback 切换规则不另造预算；走统一 FallbackController。abort 清理残留不算失败（FALLBACK-013）。
 
 ## ENFORCER-063：成功关闭恢复窗口
 

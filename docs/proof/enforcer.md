@@ -84,7 +84,8 @@
 |------|----------|
 | pure prose / 空 text 只一次 InteractionRepair opportunity；相同 terminal 重放不重复 nudge | `tests/unit/enforcer/enforcer-cycle-protocol.test.mjs`（`ENFORCER_060_pure_prose_first_issues_interaction_nudge_not_aabb`、`ENFORCER_060_pure_prose_same_terminal_reentry_does_not_aabb`、`ENFORCER_060_already_claimed_pure_prose_is_nudge_not_aabb_no_second_send`） |
 | 新无效 terminal 才证明 repair 失败 → AABB / fatal | `tests/unit/enforcer/enforcer-cycle-protocol.test.mjs`（`ENFORCER_060_pure_prose_second_terminal_triggers_aabb`、`ENFORCER_061_second_empty_text_exhausts_repair_and_fatals`） |
-| tool failure / repair 耗尽进入统一 Fallback，主 cursor 经单一 writer 推进 | `tests/unit/enforcer/enforcer-cycle-protocol.test.mjs`（`ENFORCER_068_aabb_repair_advances_primary_cursor_through_one_writer`、`ENFORCER_068_aabb_repair_path_advances_primary_cursor_once`） |
+| tool failure / repair 耗尽进入统一 Fallback，主 cursor 经单一 writer 推进 | `tests/unit/enforcer/enforcer-cycle-protocol.test.mjs`（`ENFORCER_068_aabb_repair_advances_primary_cursor_through_one_writer`、`ENFORCER_068_aabb_repair_path_advances_primary_cursor_once`、`ENFORCER_065_tool_execution_error_blog_advances_primary_cursor_once`） |
+| abort 清理残留只注入 repair，不推进主 cursor / 不消耗预算 | `tests/unit/enforcer/enforcer-cycle-protocol.test.mjs`（`LOOP_006_interrupted_blog_repairs_without_advancing_primary_cursor`）；`tests/e2e/cases/fallback-aabb-trace.test.mjs`（`FallbackCursorAdvanced` 恰好 4 次） |
 | recovery marker 不退化成整数 counter（从 durable claim + transcript 派生） | `tests/unit/enforcer/blogger-crash-recovery.test.mjs`（`ENFORCER_153_*`） |
 
 ## 明确删除的语义不复活

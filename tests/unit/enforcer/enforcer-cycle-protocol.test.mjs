@@ -336,6 +336,31 @@ const interruptedBlog = (id, callId) =>
 
 const pureProse = (id, text) => assistantStep(id, [{ type: 'text', text }], { completed: true })
 
+/**
+ * ENFORCER-065 ToolExecutionError: the blog call itself failed. `status: 'error'`
+ * with no `interrupted` metadata is the discriminator — Host abort cleanup always
+ * stamps `interrupted: true` (processor.ts:589), so its absence means the tool, not
+ * the turn, is what failed.
+ */
+const erroredBlog = (id, callId) =>
+  assistantStep(
+    id,
+    [
+      {
+        type: 'tool',
+        tool: 'blog',
+        callID: callId,
+        state: {
+          status: 'error',
+          error: 'blog tool crashed',
+          input: { text: 'was writing' },
+          time: { start: 1, end: 2 },
+        },
+      },
+    ],
+    { completed: true },
+  )
+
 /** Outbound shell: Host created assistant before provider; not a terminal. */
 const outboundShell = (id) => assistantStep(id, [], { completed: false })
 
@@ -1036,4 +1061,46 @@ test('ENFORCER_068_aabb_repair_path_advances_primary_cursor_once', async () => {
     },
     { portMode: 'none' },
   )
+})
+
+test('LOOP_006_interrupted_blog_repairs_without_advancing_primary_cursor', async () => {
+  await withHarness(async ({ journal, fatals, run, main }) => {
+    // FALLBACK-001: an accepted primary root creates the primary cursor (Fork0).
+    const runtime = promptDispatcher.forJournal(journal)
+    const accepted = PromptDispatcher.Runtime__AcceptHumanRoot(runtime, main, physicalUser('msg-u1'), 'fast-coder')
+    assert.equal(accepted.tag ?? 0, 0, `AcceptHumanRoot failed: ${JSON.stringify(accepted)}`)
+
+    // Host abort cleanup (processor.ts:589) stamps status=error + interrupted=true on
+    // the hanging blog call. LOOP-006: cleanup aborts must not auto-AABB, so the owner
+    // keeps its offset and budget — otherwise the owner provider failure that caused the
+    // abort is charged twice and FALLBACK-002's A/A/B/B order becomes a race.
+    const out = await run(interruptedBlog('asst-killed', 'blog-hang'))
+    assert.equal(hasRepairMessage(out), true, 'repair is still injected')
+    assert.equal(isAabb(messagesOf(out)), true)
+    assert.equal(fatals.length, 0)
+
+    const primary = fold.session(AgentJournalModule_snapshot(journal), MAIN)
+    assert.ok(primary?.Fallback !== undefined, 'primary fallback cursor exists')
+    assert.equal(fallbackProjection.read(primary.Fallback).offset, 0, 'abort residue leaves Fork0')
+    assert.equal(fallbackProjection.read(primary.Fallback).failures, 0, 'abort residue is not a confirmed failure')
+  })
+})
+
+test('ENFORCER_065_tool_execution_error_blog_advances_primary_cursor_once', async () => {
+  await withHarness(async ({ journal, fatals, run, main }) => {
+    const runtime = promptDispatcher.forJournal(journal)
+    const accepted = PromptDispatcher.Runtime__AcceptHumanRoot(runtime, main, physicalUser('msg-u1'), 'fast-coder')
+    assert.equal(accepted.tag ?? 0, 0, `AcceptHumanRoot failed: ${JSON.stringify(accepted)}`)
+
+    // status=error without `interrupted` is ENFORCER-065 ToolExecutionError: a real
+    // invalid cycle, which skips the nudge and spends one AABB (ENFORCER-062/068).
+    const out = await run(erroredBlog('asst-tool-error', 'blog-crash'))
+    assert.equal(hasRepairMessage(out), true, 'tool error injects repair')
+    assert.equal(isAabb(messagesOf(out)), true)
+    assert.equal(fatals.length, 0)
+
+    const primary = fold.session(AgentJournalModule_snapshot(journal), MAIN)
+    assert.equal(fallbackProjection.read(primary.Fallback).offset, 1, 'tool error advances Fork0→Fork1')
+    assert.equal(fallbackProjection.read(primary.Fallback).failures, 1, 'one confirmed failure')
+  })
 })

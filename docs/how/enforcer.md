@@ -65,7 +65,8 @@ Cycle 结果从归并后的 canonical call 派生。
 | `NoToolCall` | 模型仅输出普通文本/代码，未调用 `blog` | **是** | `NoRecovery` 时发送 Nudge Continuation |
 | `InvalidTip` | 提供了 `blog` 调用但 `tip` 缺失或不在 catalog | **是** | `NoRecovery` 时发送 Nudge Continuation |
 | `EmptyText` | 提供了 `blog` 调用但 `text` 规范化后为空 | **是** | `NoRecovery` 时发送 Nudge Continuation |
-| `ToolExecutionError` | 工具解析崩溃或语法严重错乱 | **否** | 跳过 Nudge，直接进入 Fallback 流程 |
+| `ToolExecutionError` | 工具解析崩溃或语法严重错乱（`status=error` 且无 `interrupted`） | **否** | 跳过 Nudge，直接进入 Fallback 流程 |
+| `AbortResidue` | Host abort 清理残留（`status=error` ∧ `metadata.interrupted=true`） | **否** | 注入一次 repair；**不推进 cursor**（FALLBACK-013 / LOOP-006） |
 
 ---
 
@@ -108,8 +109,11 @@ canonical cycle 无效 ∧ InteractionNudgeIssued(run) ∧ 当前 terminal ≠ r
 | 上述无效 Cycle 且 terminal run 等于 `InteractionNudgeIssued` 中的 run | 幂等等待，不重复副作用 |
 | 上述无效 Cycle 且 terminal run 不同 | Nudge 已产生新无效响应；调用 `FallbackController.recordConfirmedFailure` |
 | `ToolExecutionError` | 不 Nudge，调用 `FallbackController.recordConfirmedFailure` |
+| `AbortResidue`（blog 调用被 abort 清理打断） | 注入一次 repair，**不调用 `recordConfirmedFailure`**；repair marker 已注入则终局（FALLBACK-013） |
 | Fallback 返回 `MayContinue` | 按新的 `EffectiveAgent` 发送物理 attempt |
 | Fallback 返回 `Exhausted` | 停止自动请求，等待新 Authority Root 或显式恢复 |
+
+repair 注入本身就是预算标记（ENFORCER-153 派生），因此 `AbortResidue` 不推进 cursor 也仍然有界：同一 cycle 第二次 abort 残留即终局。
 
 ---
 

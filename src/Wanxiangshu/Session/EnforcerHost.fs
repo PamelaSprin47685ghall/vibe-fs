@@ -978,8 +978,12 @@ module EnforcerHost =
                 | null -> false
                 | value -> unbox<bool> value = true
 
-    /// Abort/cleanup terminal: blog attempted but never completed successfully.
-    let private hasFailedBlogAttempt (rawMessages: obj list) : bool =
+    /// Host abort/cleanup terminal: `SessionProcessor.cleanup` marks every hanging
+    /// tool `status=error` + `metadata.interrupted=true`
+    /// (`../opencode/packages/opencode/src/session/processor.ts:589`). That is the
+    /// owner turn being killed, not the Blogger producing a bad cycle, so LOOP-006
+    /// forbids it from spending the primary A/A/B/B budget.
+    let private hasAbortedBlogAttempt (rawMessages: obj list) : bool =
         match lastAssistantStep rawMessages with
         | None -> false
         | Some(_, parts, _) ->
@@ -988,10 +992,23 @@ module EnforcerHost =
                 isBlogToolPart part
                 && match blogPartStatus part with
                    | Some "completed" -> false
-                   | Some "error" -> true
                    | Some "pending"
                    | Some "running" -> false
                    | _ -> blogPartInterrupted part)
+
+    /// ENFORCER-065 `ToolExecutionError`: the blog call itself failed without an
+    /// abort — a real invalid cycle, which skips the nudge and goes to Fallback.
+    let private hasErroredBlogAttempt (rawMessages: obj list) : bool =
+        match lastAssistantStep rawMessages with
+        | None -> false
+        | Some(_, parts, _) ->
+            parts
+            |> List.exists (fun part ->
+                isBlogToolPart part
+                && not (blogPartInterrupted part)
+                && match blogPartStatus part with
+                   | Some "error" -> true
+                   | _ -> false)
 
     /// Extract the requestKey from an interaction-repair synthetic user message.
     let private repairRequestKey (message: obj) : string option =
@@ -1315,15 +1332,49 @@ module EnforcerHost =
                     scope.ClearCurrentRequest key
                     project rawMessages
 
-                /// ENFORCER-068 AABB: refresh transcript + inject repair. The injected
-                /// synthetic message IS the consumed marker (ENFORCER-153 derivation).
-                /// Not used on first pure-prose (that is InteractionNudge). Used for: nudge
-                /// hard-fail, second pure prose, interrupted tool, ENFORCER-061 empty text.
+                /// A sealed main run has nowhere to deliver a repaired cycle; the runtime
+                /// is force-sealed instead of repaired. Shared by both repair entries so
+                /// the seal decision cannot drift between them.
+                let mainSealedNow () =
+                    AgentProjection.mainSealedForBlogger owner (AgentJournal.snapshot durable).AgentProjections
+                    && not (scope.IsDrainOpen key)
+
+                /// The repair projection alone: refresh the transcript from durable frames
+                /// and inject the protocol-repair instruction. The injected synthetic
+                /// message IS the consumed marker (ENFORCER-153 derivation), so this call
+                /// is what bounds the repair budget — not the fallback cursor.
+                ///
+                /// No cursor movement here. Whether the observed terminal is a confirmed
+                /// model failure (ENFORCER-065/068) or Host abort residue (LOOP-006) is the
+                /// caller's evidence to read, and only the former may spend AABB.
+                let projectRepairInstruction (ctx: BloggerRequestContext) (reason: string) =
+                    if mainSealedNow () then
+                        BloggerRuntimeHost.forceSealRuntime scope key
+                        project rawMessages
+                    else
+                        let fresh =
+                            tryRefreshMainContextFromJournal scope durable owner bloggerSessionId
+                            |> Option.defaultValue ctx
+
+                        scope.SetCurrentRequest(key, fresh)
+
+                        Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
+                        let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId fresh)
+
+                        let rebuilt =
+                            tryRebuildFromContext durable bloggerSessionId fresh
+                            |> Option.defaultValue rawMessages
+
+                        project (withRepairInstruction rebuilt requestKey)
+
+                /// ENFORCER-068 AABB: record the confirmed failure on the primary cursor,
+                /// then inject the repair. Used for: nudge hard-fail, second pure prose,
+                /// ENFORCER-061 empty text, ENFORCER-065 ToolExecutionError.
+                ///
+                /// NOT used for Host abort residue — an interrupted tool call is a cleanup
+                /// abort, and LOOP-006 forbids cleanup aborts from spending AABB.
                 let aabbRepair (ctx: BloggerRequestContext) (reason: string) =
-                    if
-                        AgentProjection.mainSealedForBlogger owner (AgentJournal.snapshot durable).AgentProjections
-                        && not (scope.IsDrainOpen key)
-                    then
+                    if mainSealedNow () then
                         BloggerRuntimeHost.forceSealRuntime scope key
                         project rawMessages
                     else
@@ -1362,20 +1413,7 @@ module EnforcerHost =
                         | _ ->
                             // Advanced / AlreadyRecorded / NoActiveRun: repair continues
                             // (NoActiveRun = no accepted primary root, FALLBACK-001).
-                            let fresh =
-                                tryRefreshMainContextFromJournal scope durable owner bloggerSessionId
-                                |> Option.defaultValue ctx
-
-                            scope.SetCurrentRequest(key, fresh)
-
-                            Diagnostic.emit "enforcer-cycle-repair" [ "session_id", key; "result", reason ]
-                            let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId fresh)
-
-                            let rebuilt =
-                                tryRebuildFromContext durable bloggerSessionId fresh
-                                |> Option.defaultValue rawMessages
-
-                            project (withRepairInstruction rebuilt requestKey)
+                            projectRepairInstruction ctx reason
 
                 /// ENFORCER-066: durable InteractionRepair. No AABB transcript refresh.
                 /// repairNudge is injected from HostSessionNudge (compile-order port).
@@ -1419,19 +1457,33 @@ module EnforcerHost =
 
                 if hasIncompleteBlogTool rawMessages then
                     return project rawMessages
-                elif hasFailedBlogAttempt rawMessages then
-                    // Interrupted tool call is NOT pure-prose nudge (ENFORCER-060/065).
-                    // Original recovery: one AABB, then exhaust.
+                elif hasAbortedBlogAttempt rawMessages then
+                    // LOOP-006: an interrupted tool call is Host cleanup after abort, so it
+                    // is not a confirmed model failure and must not consume the owner's
+                    // A/A/B/B offset or budget — otherwise one owner provider failure is
+                    // charged twice (once here, once by its own provider-failure path) and
+                    // FALLBACK-002's provider-visible A/A/B/B order becomes a race.
+                    // The repair is still injected; ENFORCER-153's transcript marker bounds
+                    // it to one, and the second interrupt is terminal.
                     match liveCtx with
                     | Some ctx ->
                         match recoveryProbe durable bloggerSessionId rawMessages ctx with
                         | BloggerToolRecovery.AabbRepairConsumed ->
-                            return fatalEnd "blog tool interrupted; aabb exhausted"
-                        | _ -> return aabbRepair ctx "blog tool interrupted without completed call"
+                            return fatalEnd "blog tool interrupted; repair already consumed"
+                        | _ -> return projectRepairInstruction ctx "blog tool interrupted without completed call"
                     | None ->
                         // No live cycle: interrupted blog without authority is stop/abort residue,
                         // not a repair opportunity. Stop, never inject # Protocol repair.
                         return stop "unowned-interrupted-blog-without-CurrentRequest"
+                elif hasErroredBlogAttempt rawMessages then
+                    // ENFORCER-065 ToolExecutionError: a genuine failed cycle → unified
+                    // Fallback (ENFORCER-062), one AABB, then exhaust.
+                    match liveCtx with
+                    | Some ctx ->
+                        match recoveryProbe durable bloggerSessionId rawMessages ctx with
+                        | BloggerToolRecovery.AabbRepairConsumed -> return fatalEnd "blog tool error; aabb exhausted"
+                        | _ -> return aabbRepair ctx "blog tool error without completed call"
+                    | None -> return stop "unowned-errored-blog-without-CurrentRequest"
                 elif hasAnyBlogToolPart rawMessages then
                     return project (rebuild ())
                 elif not assistantCompleted then

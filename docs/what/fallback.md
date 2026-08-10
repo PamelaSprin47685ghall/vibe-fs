@@ -54,6 +54,21 @@ Fallback 不是 Session 永久状态，也不是「模型槽位」。
 空 terminal 或 XML-only terminal 不计入 A/B 失败推进。  
 至多允许一次 Interaction Repair continuation；不得因此推进 Fallback cursor。
 
+## FALLBACK-013：Host abort / cleanup 残留不计入推进
+
+Host 因 abort 清理而把在途工具调用标记为失败（`status=error` 且 `metadata.interrupted=true`）不是已确认的 provider attempt 失败，不得推进任何 cursor，也不得消耗自动恢复预算。
+
+判据只看 Host 标记，不看错误散文（CTX-005）：
+
+| 证据 | 是否推进 |
+|------|---------|
+| `status=error` ∧ `interrupted=true`（abort 清理残留） | 否 |
+| `status=error` ∧ 无 `interrupted`（工具本身失败） | 是 |
+
+原因：一次 owner attempt 失败会同时被两个观察者看到——它自己的 provider 失败路径，以及被同一次 abort 清理打断的 Companion cycle。两者的 `ProviderRunIdentity` 来自不同 Session，FALLBACK-003 的去重无法折叠，结果是同一次失败被记两次，并让 FALLBACK-002 的 provider 可见 A/A/B/B 顺序取决于两次 append 的竞争。
+
+与 LOOP-006 一致：用户中止与清理中止不得自动 AABB。Companion 侧的具体分派见 `how/enforcer.md` ENFORCER-065/068。
+
 ## FALLBACK-010：Host Attempt 不是领域计数
 
 `HostSignal.ProviderRetry.Attempt` 是 Host 自己的重试序号，语义由 OpenCode 决定，可重置、可重复。

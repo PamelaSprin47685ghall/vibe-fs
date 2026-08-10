@@ -104,19 +104,19 @@ async function assertFailureEvidence(scenario, ctx) {
   const settledFailures = assistants.filter((message) => completedTime(message) !== undefined && errorName(message));
   assert.equal(settledFailures.length, 4, 'AABB must settle exactly four assistant failures');
 
-  // Prefer the four consecutive AABB advances (ConsecutiveFailureCount 1..4).
-  // A faster Host may record a fifth wrap (0→1, count 5) before the success
-  // delivery is observed; the No-Go evidence is the first modulo-4 cycle.
-  const byConsec = new Map();
-  for (const payload of factPayloads(scenario.host.workDir, 'FallbackCursorAdvanced')) {
-    const consec = String(payload?.ConsecutiveFailureCount ?? '');
-    if (consec !== '' && !byConsec.has(consec)) byConsec.set(consec, payload);
-  }
-  const aabbPayloads = ['1', '2', '3', '4'].map((c) => {
-    assert.ok(byConsec.has(c), `AABB missing ConsecutiveFailureCount=${c}`);
-    return byConsec.get(c);
-  });
-  assert.equal(aabbPayloads.length, 4, 'AABB must write the four cursor advances of one modulo-4 cycle');
+  // Exactly the four advances of one modulo-4 cycle. A fifth would mean something
+  // other than a settled provider failure spent the owner's cursor — the defect this
+  // canary now pins: Host abort cleanup interrupts the Companion's blog call, and
+  // LOOP-006 forbids that cleanup from advancing the primary A/A/B/B cursor.
+  const payloads = factPayloads(scenario.host.workDir, 'FallbackCursorAdvanced');
+  assert.equal(
+    payloads.length,
+    4,
+    `AABB must write exactly the four cursor advances of one modulo-4 cycle: ${JSON.stringify(payloads)}`,
+  );
+  const aabbPayloads = [...payloads].sort(
+    (left, right) => Number(left?.ConsecutiveFailureCount) - Number(right?.ConsecutiveFailureCount),
+  );
   assert.equal(new Set(fieldValues(aabbPayloads, 'LogicalRunId')).size, 1, 'all AABB failures stay in one Logical Run');
   assert.equal(new Set(fieldValues(aabbPayloads, 'ProviderRun')).size, 4, 'each failed ProviderRun is distinct before dedupe');
   assert.deepEqual(fieldValues(aabbPayloads, 'PreviousOffset'), ['0', '1', '2', '3'], 'AABB previous offsets');

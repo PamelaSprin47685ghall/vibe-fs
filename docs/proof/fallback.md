@@ -27,5 +27,12 @@
 | 维护子请求成功不清零 count | FALLBACK-011 |
 | armed = 紧邻失败 ∧ 奇数 Offset；禁止仅奇偶 | FALLBACK-012 |
 | 空/XML-only 不进 A/B 计数 | FALLBACK-008 |
+| Host abort 清理残留（`interrupted=true`）不进 A/B 计数 | FALLBACK-013 |
+
+FALLBACK-013 证据：`tests/unit/enforcer/enforcer-cycle-protocol.test.mjs`
+（`LOOP_006_interrupted_blog_repairs_without_advancing_primary_cursor`、
+`ENFORCER_065_tool_execution_error_blog_advances_primary_cursor_once`）；
+provider 可见 A/A/B/B 的端到端固定：`tests/e2e/cases/fallback-aabb-trace.test.mjs`
+（`waitFact FallbackCursorAdvanced eq = 4` + 恰好四次推进）。
 
 Fold 拒绝非法 NextOffset / 超预算 / Exhausted 后再 Advanced（FALLBACK-007）。
