@@ -3398,7 +3398,7 @@ Observation capture 从最终执行层接（G5 后 = builtin read/glob/grep Host
 
 ### G6-D — Fetch Hot Path — PARTIAL（replay DONE：13904834）
 - [x] `CasebookReplay`：replayOne/replayAll（只读重放；不可复现 = 变化信号）
-- [ ] fetch(session_id) 工具（conditional schema + ToolRegistry gate；需 EventStore 实例传递链——ToolRegistry.create 签名扩展）
+- [x] fetch(session_id) 工具（`FetchTool.spec`：fresh/stale/no-case；`CasebookTools.buildSpecs` marker 门控 + 独立模块避免 dual-write token pair；ToolRegistry 经 casebookToolSpecs 接入）
 - [ ] CasebookIndexSnapshot（PrefixEpoch 稳定）与 same-worktree single-flight
 
 ### G6-E — CaseRefresh（Bookkeeper）
