@@ -1,8 +1,8 @@
-# Magic Todo Checkpoint Protocol — Formal Review Candidate
+# Magic Todo Checkpoint Protocol — Final
 
 ## 以 `todowrite` 为 Manager 节拍器的持续规划、迟滞过程评审、主动 Y 重基与终末 2N 整合
 
-**Status:** Formal Review Candidate
+**Status:** Final（P0/P1 freeze-pass accepted；语义冻结；实现以 Host canary 为准）
 **Priority:** P0 — lifecycle / review / context protocol
 **Compatibility strategy:** OpenCode V1 hook overlay；不修改 OpenCode 本体
 **Protocol SSOT（六源）:**
@@ -10,7 +10,7 @@
 2. `TodoWriteAccepted` → checkpoint 与 process-review obligation；
 3. `MagicTodoProjection` → canonical todo list；
 4. frontier/request-range bounded canonical LWR → 工作与评审证据；
-5. `PrefixCoverage` → lag-1 X→Y replacement 证明；
+5. `PrefixCoverage` + 既有 `ActivePrefixEpoch`（TodoCheckpoint evidence）→ lag-1 X→Y replacement 证明；
 6. 既有 Finality witness/cohort → 终末性质量证明。
 **Evidence SSOT:** Process review input / reviewer report / Finality work record 一律复用既有 canonical `LifecycleWorkRecord`（LWR）；禁止为 Magic Todo 另造平行工作记录投影。
 **Coverage split:** Process review 使用 `RecordCoverage` / LWR（允许 canonical RawGap）；Manager lag-1 prefix rebase 使用 `PrefixCoverage` / proven Y only（禁止 RawGap）。二者不得互转。
@@ -53,7 +53,7 @@ HumanRoot
 
 > **每一次成功受理的 `todowrite` 都是一个 Todo Checkpoint。**
 
-每个 checkpoint 原子地承担五件事：
+每个 checkpoint **因果上绑定 / 必然派生** 五项义务（不是单次原子写）：
 
 ```text
 1. 消费上一 checkpoint 的过程性 review 结论；
@@ -78,11 +78,25 @@ Review(k) 不阻塞 TodoWrite(k) 等待自己的结论；Manager 可以立即执
 ```text
 Review(k) 尚未形成 ConsumableReview
 → TodoWrite(k+1) 必须阻塞
-→ 直到 durable PERFECT / REVISE 已产生
-   AND 该 verdict frontier 的 canonical Reviewer LWR 已 record-ready
+→ 直到 TodoReviewConcluded(k) 已 durable
 ```
 
-`VerdictKnown` 立即决定业务 outcome；`ConsumableReview` 才允许下一 TodoWrite 消费上一报告。
+两段式事实分型：
+
+```text
+VerdictKnown(k)
+    = Reviewer 域已有 durable process verdict 事实
+    → 立即决定业务 outcome（PERFECT / REVISE）
+
+TodoReviewConcluded(k)
+    = ConsumableReview(k)
+    = VerdictKnown(k)
+      AND 该 verdict frontier 的 canonical ProcessReviewLWR 已 record-ready
+      AND 同 snapshot 物化 WorkRecordRef / Digest
+    → 才允许下一 TodoWrite / suicide drain 消费上一报告
+```
+
+禁止用同一个 `TodoReviewConcluded` 同时假装“只有 verdict、尚无 report”的中间态。
 
 这形成严格的 **lag = 1**。
 
@@ -92,20 +106,29 @@ Review(k) 尚未形成 ConsumableReview
 同一 Manager Life
 同时最多一个新的 Todo Checkpoint admission
 
-同一 provider turn 多个不同 todowrite
-→ 按 canonical ToolPart ordinal 只 admit 第一个
-→ 其余 fail closed
+同一 assistant message 出现 >1 个不同 ToolCallId 的 todowrite
+→ 全部 fail closed
+→ 不进行 ordinal winner arbitration
 
 相同 ToolCallId 的 Host replay
 → 同一 TodoWriteId / 同一 obligation
+→ 输入 digest 必须与既有 Prepared 一致，否则 identity corruption fail closed
 → 不新增 checkpoint / review
+
+first unblessed suicide
+→ 本 Life 至少存在一个 TodoWriteAccepted
+→ 否则 fail closed（零 checkpoint 不得绕过协议进入 Finality）
 ```
 
 Host executor 与 Journal 非原子双写通过：
 
 ```text
 TodoWritePrepared  →  before 已通过 Magic 校验
-TodoWriteAccepted  →  physical tool completed 后 durable checkpoint
+TodoWriteAccepted  →  双路径证明 physical success 后 durable checkpoint
+                       live path: 原 executor 成功返回并进入 after
+                       recovery path: 完整 SDK snapshot 中 completed ToolPart
+                       两条路径必须收敛到同一
+                       TodoWriteId + input digest + output digest
 ```
 
 恢复，而不是靠“下次覆盖”。
@@ -236,8 +259,8 @@ Wanxiangshu
 6. 每次 `TodoWriteAccepted` 恰好派生一次 process-review obligation；
 7. 本次调用消费上次 ConsumableReview；
 8. 上次 review 尚未形成 ConsumableReview 时本次调用阻塞；
-9. 同一 Manager Life 同时最多一个新 checkpoint admission；同 turn 多 `todowrite` 按 ToolPart ordinal 只 admit 第一个；
-10. 相同 `ToolCallId` replay 幂等为同一 checkpoint；不同 `ToolCallId` 即使 list 相同也是新 checkpoint；
+9. 同一 Manager Life 同时最多一个新 checkpoint admission；同一 assistant message 出现 >1 个 `todowrite` 则全部拒绝（无 ordinal winner）；
+10. 相同 `ToolCallId` replay 幂等为同一 checkpoint，且必须通过 input/Life/BaseTodo/ordinal digest 一致性校验；不同 `ToolCallId` 即使 list 相同也是新 checkpoint；
 11. REVISE 时 canonical list 使用 union + progress-min + 明确字段裁决的 semantic merge；
 12. PERFECT 时 proposed list 完全替换 old list；
 13. tool result 返回上次 review 的 canonical ProcessReviewLWR；
@@ -246,16 +269,17 @@ Wanxiangshu
 16. dedicated process reviewer 跨整个 Manager Life 持续复用，并至少保留到 `LifeCompleted`；
 17. reviewer 每次看到 OpeningRaw + 当前 Manager Life 截止冻结 `ReviewFrontier` 的 canonical LWR（`includeOpening=false`；以有效 Y 为主体并保留未覆盖 RawGap）+ old todo + proposed todo；
 18. 前一 checkpoint 被 review 时 Manager 可并行执行后续独立工作；
-19. 每次 accepted todowrite 使下一 provider turn 的 desired lag-1 prefix cutoff 可推导；真实采用后才写 PrefixRebaseCommitted；rebase 只消费 PrefixCoverage 可证明的 Y prefix；
+19. 每次 accepted todowrite 使下一 provider turn 的 desired lag-1 prefix cutoff 可推导；在下一 provider attempt 被 seal/绑定之前原子提交既有 `PrefixEpoch`（evidence=`TodoCheckpoint`）；provider 成败不回滚 epoch；rebase 只消费 PrefixCoverage 可证明的 Y prefix；
 20. Opening 永不被 Y 替换，且不经 LWR 再复制一次 Opening；
-21. `suicide` 抽干最后一个尚未被下一次 todowrite 消费的 process review；
+21. `suicide` 抽干最后一个尚未被下一次 todowrite 消费的 process review；**first unblessed suicide 至少要求本 Life 存在一个 `TodoWriteAccepted`**；
 22. dedicated reviewer 在首次进入 terminal Finality 时作为 cohort member enlist，之后遵循 ordinary graduate 规则；
-23. process PERFECT 不计入 terminal dual-PERFECT；
-24. 全部恢复逻辑只从事实重建（Prepared/Accepted/physical ToolPart）；
-25. Manager 可看到过程 review outcome/report，但不可知道隐藏 reviewer/session/barrier/witness/2N 编排；
+23. process PERFECT 不计入 terminal dual-PERFECT；但 PERFECT 与 REVISE 在 verdict 前都必须产生本 request 的 canonical ProcessReviewLWR；
+24. 全部恢复逻辑只从事实重建（Prepared/Accepted live-or-recovery / physical ToolPart）；
+25. Manager 可看到过程 review outcome/report，但不可知道隐藏 reviewer/session/barrier/witness/2N 编排；ProcessReviewLWR 复用既有 Finality safety-seal：canonical LWR 不 regex 清洗；无法证明 Manager-facing safety 时 fail closed；
 26. process review report / Finality dedicated reviewer record 都是 request-range bounded canonical LWR，不得取 session head；
-27. 下一 TodoWrite 消费上一 review 需要 `ConsumableReview`：verdict 已知且同 snapshot 下 canonical Reviewer LWR record-ready；
-28. 正常新 Life 的 MagicTodo canonical 初始为空；仅升级瞬间的 legacy open Life 允许一次 `LegacyTodoSeedAdopted`。
+27. 下一 TodoWrite 消费上一 review 需要 `ConsumableReview ≡ TodoReviewConcluded`；`VerdictKnown` 复用 Reviewer 域 durable verdict，不得另造中间 bool/Stage；
+28. 正常新 Life 的 MagicTodo canonical 初始为空；仅升级瞬间的 legacy open Life 允许一次 `LegacyTodoSeedAdopted`，且必须在该 Life 首次 Magic provider request **之前**完成并把带 ID 的 current list 注入 Manager；
+29. REVISE 被消费、canonical settlement 改变后，Host TodoTable 必须幂等投影到 settled current（compatibility sink reconciliation）；该项 repair 不产生 checkpoint / review。
 
 ---
 
@@ -280,8 +304,11 @@ Wanxiangshu
 - 不用 `id?: string` 靠缺字段猜新旧；
 - 不发明 Dedicated reviewer 永不 graduate / 每轮 Finality 强制回流特例；
 - 不发明 Finality mechanical terminal-todo completeness gate；
-- 不把 desired rebase 写成 Requested Stage / 未实际采用就 committed；
-- 不把 Host TodoTable 在同 session 后续新 Life 中再次反推为 canonical seed。
+- 不把 desired rebase 写成 Requested Stage / 未 seal 就声称已 committed，也不把 provider 成功当作 epoch commit 条件；
+- 不把 Host TodoTable 在同 session 后续新 Life 中再次反推为 canonical seed；
+- 不在 `TodoReviewConcluded` 中表达“只有 verdict、尚无 report”的中间态；
+- 不另造第二套 PrefixEpoch / ActivePrefixEpoch SSOT；TodoCheckpoint rebase 必须进入既有 PrefixEpoch 合同；
+- 不允许零 TodoWriteAccepted 的 first unblessed suicide 进入 Finality。
 ```
 
 ---
@@ -484,7 +511,8 @@ next-stage work. Do not idle merely waiting for that review.
 
 Each accepted todowrite synchronizes the preceding checkpoint review
 and starts the next checkpoint review.
-Do not emit multiple concurrent todowrite calls in the same turn.
+Do not emit multiple todowrite calls in the same assistant message;
+any such batch is rejected entirely.
 ```
 
 这里只暴露：
@@ -686,7 +714,21 @@ completed   → completed   ✅
 
 这是 Host execution gate，不是 prompt 建议。
 
-非法 transition：
+---
+
+## 8.2 其它 transition
+
+除了 §8.1 的 completed gate 之外：
+
+```text
+其它 status 转移在 Host 层均允许
+（含 completed→in_progress、cancelled→pending、reviewing→cancelled 等）
+真实性由 process review 判断
+```
+
+正式稿不在 Host 层维护完整合法转移矩阵；若未来要机械拒绝更多转移，必须另开明确 Change。
+
+非法 completed transition：
 
 ```text
 before hook 直接失败
@@ -864,7 +906,7 @@ description 必须解释：
 - completed gate
 - keep list current
 - process review lag semantics
-- do not emit concurrent todowrite in one turn
+- do not emit multiple todowrite in one assistant message; all are rejected
 ```
 
 但不能出现：
@@ -895,7 +937,7 @@ tool.execute.before(
 
 ---
 
-## 11.1 并发 / 同 turn 多 todowrite admission
+## 11.1 并发 / 同 message 多 todowrite admission
 
 lag-1 公式隐含单链：
 
@@ -919,18 +961,47 @@ T5b reads C5
 规则冻结为：
 
 ```text
-同一 provider turn 出现多个不同 ToolCallId 的 todowrite
-→ 按 canonical ToolPart ordinal 只允许第一个
-→ 其余 fail closed
-
-不得按 hook 到达顺序 / wall-clock / Map 抢锁决定胜者
+同一 assistant message 出现多个不同 ToolCallId 的 todowrite
+→ 全部 fail closed
+→ 不按 ToolPart ordinal 选 winner
+→ 不按 hook 到达顺序 / wall-clock / Map 抢锁决定胜者
 
 相同 ToolCallId 的 Host replay
 → 幂等视为同一 Prepared/Accepted checkpoint
+→ 但必须通过 digest 一致性（见 §11.2.1）
 → 不新增 review
 ```
 
-“第一个”必须来自 durable ToolPart ordinal / 已证明的 Host ordering，而不是 process-local race。
+不再做“只 admit 第一个”的 winner arbitration；多 todowrite 本身就是协议违规。
+
+### 11.1.1 before 身份定位合同
+
+Host 正式边界：
+
+```text
+executor ToolContext
+    → 同时有 message id + call id
+
+tool.execute.before / after
+    → 只有 sessionID + callID
+```
+
+禁止用 callID 到别处“猜配” messageID。
+
+因此 before 要冻结 `ToolPartOrdinal` / `ReviewFrontier` / assistant-message 归属，必须先通过 **blocking Host contract canary**：
+
+```text
+sessionID + callID
+→ 通过完整 SDK snapshot
+→ 唯一定位
+     原 ToolPart
+     assistant message
+     provider run
+     ToolPart ordinal
+     其 XTrace range
+```
+
+不能唯一证明 → fail closed；不得上线 membrane。
 
 ---
 
@@ -957,6 +1028,28 @@ different ToolCallId
 
 禁止“相同 list 去重优化”。
 
+### 11.2.1 Same-ToolCallId digest collision
+
+若同一 `TodoWriteId` 已有 `TodoWritePrepared`，而 replay 观察到任一不一致：
+
+```text
+provider input digest
+ManagerLifeId
+BaseTodoDigest
+ToolPartOrdinal
+```
+
+则视为 **identity corruption**：
+
+```text
+fail closed
+不得因为 ToolCallId 相同就接受新内容
+不得覆盖既有 Prepared / Accepted
+不得另开第二 checkpoint
+```
+
+Accepted 的 live/recovery 双路径还必须额外收敛到同一 `output digest`。
+
 ---
 
 ## 11.3 before 程序
@@ -964,7 +1057,7 @@ different ToolCallId
 ```fsharp
 todoCheckpointBefore {
     let! life = requireOpenManagerLife()
-    do! admitSingleCheckpointOrFail life callId // ToolPart ordinal rule
+    do! admitSingleCheckpointOrFail life callId // >1 todowrite in same assistant message → all reject
 
     let! old = settlePreviousCheckpointIfAny life // awaits ConsumableReview(k-1)
 
@@ -1239,11 +1332,26 @@ Provider V2：
 
 # 15. Tool After：Accepted + ensureReview + enriched result
 
+`TodoWriteAccepted` 的 physical success 证明是**双路径**，不得只依赖“after 运行时 ToolPart 已 durable completed”这一未证命题：
+
+```text
+live path
+    = 原 executor 成功返回并进入 tool.execute.after
+    → after 可 ensure Accepted
+
+recovery path
+    = 完整 SDK snapshot 中该 call 的 ToolPart 已 completed
+    → restart / ensure 可 Accepted
+
+两条路径必须收敛到同一
+    TodoWriteId + provider input digest + output digest
+```
+
 只有：
 
 ```text
 TodoWritePrepared exists
-AND Host physical ToolPart completed successfully
+AND（live path 成功 OR recovery path 证明 completed ToolPart）
 ```
 
 之后，after / recovery 才能 `ensure TodoWriteAccepted`。
@@ -1251,17 +1359,17 @@ AND Host physical ToolPart completed successfully
 顺序严格：
 
 ```text
-1. recover hidden bridge / or rebuild from Prepared + physical ToolPart
+1. recover hidden bridge / or rebuild from Prepared + physical evidence
 2. ensure TodoWriteAccepted（幂等；含已冻结 ReviewFrontier）
 3. ensure DedicatedTodoReviewer
 4. ensureReview(Tk)
-   = 若尚无 TodoReviewConcluded
+   = 若尚无 TodoReviewConcluded（≡ ConsumableReview）
      → 必然义务
      → ensure TodoProcessReviewAssigned
      → 提交/续跑 reviewer
    （ManagerCheckpointLWR 可含 RawGap；不要求 Manager Y 追平）
 5. desired lag-1 prefix cutoff 由 Accepted checkpoints 纯推导
-   （此时还不写 PrefixRebaseCommitted）
+   （此时还不提交 PrefixEpoch）
 6. render enriched tool result
 7. cleanup bridge
 8. return
@@ -1346,7 +1454,10 @@ TodoWriteAccepted of
       TodoWriteId
       ToolCallId
       PreparedFactRef
-      PhysicalToolCompletedEvidence
+      InputDigest
+      OutputDigest
+      PhysicalSuccessEvidence
+        // LiveAfterSuccess | RecoveredCompletedToolPart
       SemanticVersion }
 ```
 
@@ -1355,7 +1466,11 @@ TodoWriteAccepted of
 ```text
 Prepared
 +
-Host physical todowrite ToolPart completed successfully
+live path（executor 成功返回并进入 after）
+  OR
+recovery path（完整 SDK snapshot 中 completed ToolPart）
++
+同一 TodoWriteId / input digest / output digest
 ```
 
 才能 Accepted。
@@ -1374,6 +1489,8 @@ AND TodoReviewConcluded(Tk) missing
 → Rk 必然存在，可被任意 ensureReview 重入
 ```
 
+注意：Rk obligation pending 看的是缺失 `TodoReviewConcluded`（≡ ConsumableReview），不是缺失 `VerdictKnown`。`VerdictKnown` 可先于 Concluded 出现，但还不能被下一 TodoWrite 消费。
+
 `BaseTodo` / `Proposed` / `ReviewFrontier` 以对应 `Prepared` 为准；不能未来用新 merge 算法重新猜。
 
 `ReviewFrontier` 禁止：
@@ -1390,10 +1507,10 @@ After(TodoWrite result)
 Crash 裂缝的正式恢复：
 
 ```text
-Prepared + physical tool completed
-→ ensure Accepted
+Prepared + live-or-recovery physical success
+→ ensure Accepted（digest 必须与 Prepared 对齐）
 
-Prepared + physical tool failed / absent
+Prepared + physical tool failed / absent / digest mismatch
 → 不 Accepted
 → Host TodoTable 若已乐观写成 Pk
   也不构成 canonical checkpoint
@@ -1413,15 +1530,53 @@ TodoProcessReviewAssigned of
       TodoReviewId
       DedicatedReviewerId
       ReviewerSessionId
-      AssignmentStartCursor : XTraceCursor
+      // Exclusive end after this assignment's provider-visible authority
+      // has fully landed in XTrace. Does NOT include the assignment prompt itself.
+      ReviewWorkStartCursor : XTraceCursor
       ManagerReviewFrontier : XTraceCursor }
 ```
 
 同一 `TodoReviewId` 的 assignment 必须幂等；crash recovery 只能重建同一个 range，不得另开第二段 assignment。
 
+命名冻结：
+
+```text
+ReviewWorkStartCursor
+≠ session Opening
+≠ “assignment opening cursor”
+```
+
+`includeOpening=false` 只排除 session Opening；不能排除后续每次 assignment prompt。因此本 cursor 必须是 **本次 assignment authority 完整落 XTrace 后的 exclusive end**。Finality bounded LWR 采用同一规则。
+
 ---
 
-## 16.4 TodoReviewConcluded
+## 16.3.1 VerdictKnown（复用 Reviewer 域，不新增 Magic Todo Stage）
+
+```text
+VerdictKnown(k)
+= Reviewer 域已有、针对 TodoProcessReview(k) 的 durable verdict 事实
+  （PERFECT | REVISE）
+```
+
+它：
+
+```text
+立即决定业务 outcome
+不单独构成 ConsumableReview
+不携带 WorkRecordRef
+不进入 Finality dual-PERFECT witness algebra
+```
+
+禁止为 Magic Todo 再造：
+
+```text
+TodoVerdictKnown bool
+AwaitingReport Stage
+```
+
+---
+
+## 16.4 TodoReviewConcluded ≡ ConsumableReview
 
 ```fsharp
 TodoReviewConcluded of
@@ -1434,6 +1589,7 @@ TodoReviewConcluded of
       Verdict : PERFECT | REVISE
 
       // Canonical ProcessReviewLWR for this request range only.
+      // Append ONLY when this LWR is record-ready in the same snapshot.
       WorkRecordRef
       WorkRecordDigest
 
@@ -1442,16 +1598,29 @@ TodoReviewConcluded of
       ToolCallId }
 ```
 
-Process review 只需要一个 verdict。
+类型层冻结：
 
-它不进入 Finality dual-PERFECT witness algebra。
+```text
+ConsumableReview(k) ≡ TodoReviewConcluded(k)
+```
+
+因此 `TodoReviewConcluded` **不得**在 “verdict 已知但 report 未 record-ready” 时提前 append。顺序必须是：
+
+```text
+VerdictKnown(k)
+→ await canonical ProcessReviewLWR(k) record-ready
+→ append TodoReviewConcluded(k) with WorkRecordRef/Digest
+→ 下一 TodoWrite / suicide 才可消费
+```
+
+Process review 只需要一个 verdict；它不进入 Finality dual-PERFECT witness algebra。
 
 `WorkRecordRef` 的唯一来源是：
 
 ```text
 canonical Reviewer LWR
 range =
-    AssignmentStartCursor
+    ReviewWorkStartCursor
     through ReviewerRecordFrontier
 includeOpening = false
 ```
@@ -1469,6 +1638,16 @@ tree diff
 另造 review report。
 
 Manager 在下一次 `todowrite` 中看到的 `Previous checkpoint review report` 即该 `WorkRecordRef`。
+
+Manager-facing safety 复用既有 Finality safety-seal：
+
+```text
+canonical ProcessReviewLWR 不 regex / 任意清洗
+无法证明对 Manager 安全
+→ fail closed
+不得伪造“洗过的报告”
+仅放宽 process protocol 本身允许的 PERFECT / REVISE / review 词
+```
 
 ---
 
@@ -1512,7 +1691,7 @@ OpeningRaw
 
 ---
 
-## 16.7 TodoCheckpointPrefixRebaseCommitted
+## 16.7 PrefixEpoch commit（TodoCheckpoint evidence）
 
 Accepted checkpoints **已经**使 desired lag-1 cutoff 可纯推导：
 
@@ -1522,42 +1701,83 @@ desiredCutoff(Tk) = Before(T(k-1))   // T1 无 prior
 
 这**不需要** durable Requested / NeedRebase fact。
 
-只有下一次真实 provider request **成功采用**该 projection 时，才写：
+**禁止**另造只能重建 todo id / Y digest、却不足以驱动 `ActivePrefixEpoch` 的第二真相源。
+
+正式选择：
+
+```text
+泛化既有 PrefixRebaseCommitted / ActivePrefixEpoch 合同
+EvidenceKind = Probe | TodoCheckpoint
+```
+
+TodoCheckpoint rebase commit 必须拥有与既有 PrefixEpoch **同等级**的字段，至少包括：
 
 ```fsharp
-TodoCheckpointPrefixRebaseCommitted of
+PrefixRebaseCommitted of
     { ManagerLifeId
-      TriggerTodoWriteId
+      EpochId
+      EvidenceKind : Probe | TodoCheckpoint
+      TriggerTodoWriteId              // when TodoCheckpoint
       CoveredBeforeTodoWriteId : TodoWriteId option
+      PrefixSnapshot
+      Cutoff
+      SealRoot
+      SyntheticIdentity
       YBundleRef
       YBundleDigest
       ProviderPrefixDigest }
 ```
 
-它描述的是：
+同步修改既有：
 
-> “某次真实 provider projection 已采用这个 checkpoint rebase。”
+```text
+ARCH-004
+COMPANION-009
+PERSIST-010
+```
 
-不是意图，也不是下一步程序位置。
+使 `ActivePrefixEpoch` 唯一承认这条 commit 事实；不得出现“todo 事实说 rebase 了，PrefixEpoch SSOT 仍认为 epoch 未变”。
 
-因此：
+### Commit 时点（冻结）
+
+```text
+Accepted(Tk) 导出 mandatory desired cutoff
+→ 在下一 provider attempt 被 seal / 绑定之前
+→ 原子提交新的 PrefixEpoch（EvidenceKind=TodoCheckpoint）
+→ 该 attempt 及其所有 retry 都使用这一 epoch
+→ provider 成功与否不回滚 epoch
+```
+
+因此正式语义是：
 
 ```text
 Accepted checkpoints
 = desired prefix policy 的事实源
 
-PrefixRebaseCommitted
-= 某次实际 provider projection 的证明
+PrefixRebaseCommitted / ActivePrefixEpoch
+= 下一 attempt seal 前已生效的 epoch 证明
+≠ provider 成功回执
 ```
 
-todowrite 后马上 crash：
+禁止旧表述造成的因果倒置：
 
 ```text
-不得声称 rebase 已 committed
+render → 先发出新 prefix → 之后才说 committed
+或
+provider 成功后才 commit，失败则假装 epoch 从未切换
+```
+
+todowrite 后马上 crash、下一 attempt 尚未 seal：
+
+```text
+不得声称 epoch 已 committed
 只需在下次 provider transform 按 Accepted 链重算 desired cutoff
+并在 seal 前原子 commit
 ```
 
 `YBundleRef` 必须来自 PrefixCoverage 可证明的 complete-turn Y prefix；不得嵌入 LWR RawGap。
+
+若实现暂时保留 `TodoCheckpointPrefixRebaseCommitted` 作为命名包装，它也必须是上述 PrefixEpoch 合同的等价投影，而不是缺字段的旁路事实。
 
 ---
 
@@ -1585,18 +1805,22 @@ ResumeAtTodo
 TodoWriteAccepted exists
 AND matching TodoReviewConcluded does not yet exist
 → review obligation pending
+  （即便 VerdictKnown 已出现，只要尚未 Concluded，仍 pending）
 
 TodoWriteAccepted exists
-AND matching ConsumableReview does not yet exist
+AND matching TodoReviewConcluded does not yet exist
 → next TodoWrite must await consumability
 ```
 
-其中 `ConsumableReview` 要求：
+其中：
 
 ```text
-matching TodoReviewConcluded exists
-AND WorkRecordRef record-ready
-AND verdict / frontier / LWR 来自同一 Journal snapshot
+ConsumableReview(k) ≡ TodoReviewConcluded(k)
+
+TodoReviewConcluded 仅在以下条件同时成立时 append：
+    VerdictKnown
+    AND canonical ProcessReviewLWR record-ready
+    AND verdict / frontier / LWR 来自同一 Journal snapshot
 ```
 
 不得用 `HasPendingReview` bool 或 Stage 代替。
@@ -1808,17 +2032,17 @@ Dedicated reviewer 物理 session 可以跨多个 Todo Checkpoint 复用，但�
 对于 `Rk`：
 
 ```text
-ReviewerRecordStart(k)
+ReviewWorkStartCursor(k)
 =
-本次 process-review assignment 的 durable opening cursor
-（来自 TodoProcessReviewAssigned）
+本次 assignment authority 完整落 XTrace 后的 exclusive end
+（来自 TodoProcessReviewAssigned；不含 assignment prompt 自身）
 
 ReviewerRecordFrontier(k)
 =
 本次 PERFECT / REVISE verdict 对应的 durable terminal frontier
 ```
 
-上一轮、下一轮 process-review material 不得进入本轮 report。
+上一轮、下一轮 process-review material 不得进入本轮 report；assignment prompt 自身也不得进入。
 
 本轮 review report 的唯一来源为：
 
@@ -1828,7 +2052,7 @@ ProcessReviewLWR(k)
 canonical LWR
 includeOpening = false
 range =
-    ReviewerRecordStart(k)
+    ReviewWorkStartCursor(k)
     through ReviewerRecordFrontier(k)
 ```
 
@@ -1846,29 +2070,26 @@ lifecycleWorkRecord(dedicatedReviewer, includeOpening=false)
 
 ## 18.6 Process Review 的可消费结论
 
-Process reviewer 的 PERFECT / REVISE 一旦 durable，即立即决定该 checkpoint 的业务 verdict；不存在第二次 confirmation。
+Process reviewer 的 PERFECT / REVISE 一旦作为 Reviewer 域 durable `VerdictKnown` 落盘，即立即决定该 checkpoint 的业务 verdict；不存在第二次 confirmation。
 
-但下一 TodoWrite 要消费上一 Review 时，需要的不是只有 `VerdictKnown`，而是：
+但下一 TodoWrite 要消费上一 Review 时，需要的是：
 
 ```text
-ConsumableReview(k)
+ConsumableReview(k) ≡ TodoReviewConcluded(k)
 =
-durable verdict exists
-AND
-the canonical ProcessReviewLWR(k)
-is record-ready
-AND
-verdict / frontier / LWR
-come from one causally consistent journal snapshot
+VerdictKnown(k)
+AND canonical ProcessReviewLWR(k) record-ready
+AND 同 snapshot 已 append TodoReviewConcluded
+   （含 WorkRecordRef / Digest）
 ```
 
-若 verdict 已知但 canonical LWR 尚未 record-ready：
+若 `VerdictKnown` 已出现但尚未 `TodoReviewConcluded`：
 
 ```text
 TodoWrite(k+1)
 → 等待 AgentJournal change
 → 重读同一普通 projection
-→ 重新判断 record-ready
+→ 仅当 TodoReviewConcluded 出现后才消费
 ```
 
 等待方式直接复用 GLORY-072/073：
@@ -1877,6 +2098,7 @@ TodoWrite(k+1)
 同一个 Journal snapshot
 → 判断 record-ready
 → 在同 snapshot materialize canonical LWR
+→ append TodoReviewConcluded
 → 不 ready 就 await Journal change
 ```
 
@@ -1889,9 +2111,10 @@ wall-clock polling
 用较晚 XTrace head 替换 frozen frontier
 用 raw terminal 或 summary 临时顶替 LWR
 coverage snapshot 与 LWR materialization 分两次读取
+在尚无 record-ready LWR 时提前 append TodoReviewConcluded
 ```
 
-Process-local waiter 的消失或进程重启不构成 review abandonment；恢复必须从 durable assignment、verdict 和 frontier 重建同一个等待。
+Process-local waiter 的消失或进程重启不构成 review abandonment；恢复必须从 durable assignment、VerdictKnown 和 frontier 重建同一个等待。
 
 两段式语义必须分开：
 
@@ -1902,12 +2125,13 @@ Manager → Reviewer:
     Rk 可及时启动
 
 Reviewer → Manager report:
+    VerdictKnown 可先落
     为生成 canonical reviewer LWR
     Reviewer 自己的 Y/Blogger 可能还在追 verdict frontier
-    所以 T(k+1) consume Rk 前必须 record-ready
+    所以必须等 TodoReviewConcluded 才允许 T(k+1) / suicide 消费
 ```
 
-业务 verdict 立即关闭逻辑判断；work-record materialization 稍后因果同步。二者不得混为一个 Stage。
+业务 verdict 立即关闭逻辑判断；ConsumableReview / TodoReviewConcluded 稍后因果同步。二者不得混为一个 Stage，也不得挤进同一个过早的 Concluded 事实。
 
 ---
 
@@ -1982,9 +2206,14 @@ REVISE
 when any defect, omission, overclaim, missed work, incorrect progress,
 unsafe transition, unresolved issue, or required correction remains.
 
-For REVISE, provide a concrete report inside this review turn.
+Before emitting either PERFECT or REVISE, produce this request's concrete
+review work record in prose inside this review turn.
+For REVISE: state defects and required corrections.
+For PERFECT: briefly state what was checked and which material problems
+were not found.
 The Host will persist the canonical ProcessReviewLWR for this request range
 as the durable review report; do not invent a second report channel.
+A PERFECT with no prose work record is invalid.
 
 Do not describe hidden orchestration mechanics, session identity, barriers,
 finality cohorts, or who consumes this report.
@@ -2001,6 +2230,19 @@ first PERFECT
 ```
 
 那是 Finality 专属语义。
+
+硬要求：
+
+```text
+PERFECT 与 REVISE 在 verdict 前
+都必须产生本 request 的 canonical review work record
+
+否则 ProcessReviewLWR 可能永不 record-ready
+→ ConsumableReview 永不成立
+→ 后续 TodoWrite / suicide 永久阻塞
+```
+
+必须有 adversarial test：`PERFECT-with-no-prose` fail closed。
 
 ---
 
@@ -2030,7 +2272,7 @@ Manager 不应因为：
 Tk+1
 ```
 
-如果 Rk 尚未形成 ConsumableReview（verdict + record-ready Reviewer LWR）：
+如果 Rk 尚未形成 ConsumableReview（≡ TodoReviewConcluded）：
 
 ```text
 Tk+1 blocks
@@ -2112,7 +2354,7 @@ Working Proposal
 = Manager 当前正在执行的最新工作视图
 ```
 
-Host TodoTable 可以立即显示：
+Host TodoTable 在 Accepted(Tk) 后可以立即显示：
 
 ```text
 Pk compatibility projection
@@ -2130,6 +2372,36 @@ Rk REVISE  → merge(Ck,Pk)
 
 Host store 绝不能反向成为 canonical truth。
 
+## 23.1 Compatibility sink reconciliation（P0）
+
+若 `Rk = REVISE`，随后：
+
+```text
+T(k+1) 因 transition invalid / admission reject 在 before 失败
+或
+suicide 消费 REVISE 后暂无新的 Accepted
+```
+
+则 Host TodoTable 可能仍停留在已被否决的 `Pk`，而 canonical 已变成 `merge(Ck,Pk)`。
+
+正式要求 **compatibility sink reconciliation**：
+
+```text
+一旦 REVISE 被消费、canonical settlement 改变
+→ Host TodoTable 必须幂等投影到 settled current
+→ 若同一合法 T(k+1) 随后 Accepted
+  → 原 executor 再覆盖成新的 P(k+1)
+```
+
+该项 repair：
+
+```text
+不产生 checkpoint
+不触发 process review
+不改 canonical truth
+只修 compatibility sink
+```
+
 ---
 
 # 24. Lag-1 Y Prefix Rebase
@@ -2138,13 +2410,15 @@ Host store 绝不能反向成为 canonical truth。
 
 当前正式 ARCH-004 原本只允许少数 cold boundary 改 active prefix，并明确普通回合保持 X prefix 字节稳定。
 
-本 Change 增加一种合法 cold boundary：
+本 Change 增加一种合法 cold boundary evidence：
 
 ```text
-TodoCheckpointPrefixRebaseCommitted
+PrefixRebaseCommitted.EvidenceKind = TodoCheckpoint
 ```
 
-注意：Accepted checkpoints 只使 desired cutoff 可推导；只有实际 provider projection 采用后才产生这条 committed fact。
+它进入**既有** `ActivePrefixEpoch` SSOT，而不是平行的 todo-only rebase 事实。同步修改 ARCH-004 / COMPANION-009 / PERSIST-010。
+
+注意：Accepted checkpoints 只使 desired cutoff 可推导；只有下一 provider attempt 在 seal/绑定前原子提交新 PrefixEpoch 后，该 cutoff 才成为 active epoch。
 
 第 `k` 个 checkpoint 同时拥有两个不同 frontier 用途：
 
@@ -2276,7 +2550,8 @@ durable TodoWriteAccepted facts
 +
 durable Y frames
 +
-TodoCheckpointPrefixRebaseCommitted
+PrefixRebaseCommitted（EvidenceKind=TodoCheckpoint）
+  → 既有 ActivePrefixEpoch SSOT
 +
 deterministic messages.transform
 ```
@@ -2296,6 +2571,7 @@ messages.transform = renderer
 Boot fold
 → derive latest required checkpoint cutoff
 → materialize same Y bundle
+→ seal 前确保 ActivePrefixEpoch 与 desired cutoff 一致
 → deterministic transform
 ```
 
@@ -2389,23 +2665,33 @@ messages.transform
 → 计算 latest required Todo cutoff
 → 如果对应 Y 尚未 ready：
        await Journal/Y coverage
-→ materialize
-→ render
-→ append TodoCheckpointPrefixRebaseCommitted
+→ materialize PrefixCoverage-proven Y prefix
+→ 在 attempt seal / 绑定之前
+   原子 append PrefixRebaseCommitted
+   （EvidenceKind=TodoCheckpoint；含 EpochId/PrefixSnapshot/Cutoff/SealRoot/...）
+→ ActivePrefixEpoch 切换
+→ 该 attempt 与所有 retry 使用新 epoch
 → provider request
 ```
 
-todowrite after 本身**不**写 PrefixRebaseCommitted；只让 desired cutoff 可从 Accepted 链推导。
+todowrite after 本身**不**提交 PrefixEpoch；只让 desired cutoff 可从 Accepted 链推导。
 
 因此绝无：
 
 ```text
 TodoWrite 已 Accepted
 → 下一 model request 偷跑旧 prefix
+
 或
-尚未实际采用 projection
-→ 却声称 rebase committed
+先用新 prefix 发出去
+→ 之后才说 epoch committed
+
+或
+provider 失败
+→ 回滚已经 seal 的 PrefixEpoch
 ```
+
+provider 成败不影响已提交 epoch；下一次仍按 ActivePrefixEpoch + Accepted 链投影。
 
 ---
 
@@ -2445,14 +2731,30 @@ suicide
 ```text
 suicide
 ↓
+if first unblessed Finality path
+   AND this Life has zero TodoWriteAccepted:
+      fail closed
+      （零 checkpoint 不得绕过 Magic Todo 协议）
+↓
 find latest accepted TodoWrite
 ↓
-if its Rk not yet ConsumableReview:
+if its Rk not yet ConsumableReview（≡ TodoReviewConcluded）:
     ensureAssignment / ensureReview
     await ConsumableReview(Rk)
 ↓
 settle latest checkpoint
+→ 若 settlement 改变 canonical
+  → Host TodoTable compatibility sink reconciliation（§23.1）
 ```
+
+说明：
+
+```text
+要求至少一次 TodoWriteAccepted
+≠ 机械要求 todos 全 completed
+```
+
+后者已正确删除；前者只证明 Manager 至少进入过一次必需 checkpoint protocol。
 
 如果：
 
@@ -2617,11 +2919,14 @@ R3 process
 Dedicated reviewer 在 Finality 中必须有：
 
 ```text
-FinalityAssignmentStart
+FinalityReviewWorkStartCursor
 → FinalityVerdictFrontier
 ```
 
 的 bounded canonical LWR（`includeOpening=false`）。
+
+`FinalityReviewWorkStartCursor` 与 process-review `ReviewWorkStartCursor` 同规则：
+本次 Finality assignment authority 完整落 XTrace 后的 exclusive end，不含 assignment prompt 自身。
 
 同一 renderer，三个用途：
 
@@ -2848,10 +3153,11 @@ RequestKind 必须来自 typed authority。
 下次 before 从 Journal canonical 覆盖 Host TodoTable
 ```
 
-### Prepared + physical tool completed，Accepted 尚无
+### Prepared + live/recovery physical success，Accepted 尚无
 
 ```text
 ensure TodoWriteAccepted
+（input/output digest 必须与 Prepared 对齐）
 → 然后走 Accepted 恢复路径
 ```
 
@@ -2887,6 +3193,36 @@ derive pending process-review obligation from Accepted
 
 不确定
 → fail closed
+```
+
+---
+
+## 35.2.1 Process-review infrastructure failure
+
+除“永久丢失 reviewer → replacement / 不确定 → fail closed”外，正式冻结普通基础设施失败语义：
+
+```text
+create / resume / assignment / Y-LWR materialization
+等 infrastructure failure
+
+永远不是 REVISE / PERFECT
+不伪造 semantic merge
+不推进 ConsumableReview
+```
+
+处理：
+
+```text
+Accepted obligation 保持 outstanding
+
+可证明可恢复
+→ event-driven ensureReview / ensureAssignment
+→ 禁止 wall-clock polling
+
+不可证明 / Host contract 破坏
+→ 当前操作返回 typed infrastructure failure
+→ Finality 不得越过
+→ 下一 TodoWrite 继续阻塞在同一 outstanding Rk
 ```
 
 ---
@@ -2935,42 +3271,46 @@ Host TodoTable 不拥有恢复权；“以后覆盖”必须建立在 Prepared/A
 
 ---
 
-## 35.5 TodoCheckpoint rebase 未 commit
+## 35.5 TodoCheckpoint PrefixEpoch 未 commit
 
 下一 provider transform：
 
 ```text
 derive desired cutoff from accepted checkpoints
-→ materialize Y
-→ retry ordinary projection
+→ materialize PrefixCoverage-proven Y
+→ seal 前原子 PrefixRebaseCommitted（EvidenceKind=TodoCheckpoint）
+→ ActivePrefixEpoch 切换
+→ ordinary projection / retries 使用新 epoch
 ```
 
 无：
 
 ```text
 RebasePending Stage
+provider-success-gated epoch commit
 ```
 
 ---
 
-## 35.6 Verdict 已落 / waiter 丢失 / LWR 尚未 record-ready
+## 35.6 VerdictKnown 已落 / waiter 丢失 / 尚未 TodoReviewConcluded
 
-若 `TodoReviewConcluded` 与 `WorkRecordRef` 均已 durable 且同 snapshot 可证明：
+若 `TodoReviewConcluded`（≡ ConsumableReview）已 durable：
 
 ```text
-下一 before 直接消费 ConsumableReview
+下一 before / suicide 直接消费
 → 不等待
 ```
 
-若只有 verdict、canonical ProcessReviewLWR 尚未 record-ready：
+若只有 `VerdictKnown`、canonical ProcessReviewLWR 尚未 record-ready：
 
 ```text
 从 durable assignment + ReviewerRecordFrontier 重建同一个等待
 → await Journal change
 → 同 snapshot 再判 record-ready
+→ 然后才 append TodoReviewConcluded
 ```
 
-禁止用 raw terminal / summary 临时顶替 `WorkRecordRef`。
+禁止用 raw terminal / summary 临时顶替 `WorkRecordRef`；也禁止提前 append 空壳 Concluded。
 
 ---
 
@@ -3089,6 +3429,41 @@ after 是否运行
 
 ---
 
+## Canary G — after vs ToolPart durable completion 顺序
+
+blocking canary：
+
+```text
+tool.execute.after 运行时
+durable ToolPart 是否已经 completed
+```
+
+正式协议采取双路径 Accepted，不把单一顺序当公理；
+但本 canary 必须冻结真实 Host 顺序，防止实现误绑。
+
+---
+
+## Canary H — sessionID+callID 唯一身份定位
+
+blocking canary：
+
+```text
+before/after 仅有的 sessionID + callID
+→ 完整 SDK snapshot
+→ 能否唯一定位
+     ToolPart / assistant message / provider run / ordinal / XTrace range
+```
+
+不能唯一证明 → fail closed；membrane 不得上线。
+
+---
+
+## Canary I — reviewing / fifth-status consumers
+
+（承接 Canary D；若 UI 不稳，强制 compatibility in_progress。）
+
+---
+
 # 38. Domain 实现建议
 
 以下文件名是目标模块建议；本附件没有完整 `src/**` 树，因此实现者应按仓库现有命名放入对应 Domain/Application/Infrastructure 层，**不可因为路径不同改变 ownership**。
@@ -3191,15 +3566,15 @@ let rec awaitConsumableReview ports checkpoint =
         let! snap =
             ports.readJournalSnapshot checkpoint
 
-        match snap.tryConsumableReview checkpoint.TodoReviewId with
-        | Some consumable ->
-            // verdict + WorkRecordRef from SAME snapshot
-            return consumable
+        match snap.tryTodoReviewConcluded checkpoint.TodoReviewId with
+        | Some concluded ->
+            // ConsumableReview ≡ TodoReviewConcluded
+            return concluded
 
         | None ->
             do! ports.ensureProcessReviewAssigned checkpoint
 
-            match snap.tryVerdict checkpoint.TodoReviewId with
+            match snap.tryVerdictKnown checkpoint.TodoReviewId with
             | None ->
                 let! evidence =
                     materializeManagerCheckpointLwr ports checkpoint
@@ -3211,6 +3586,7 @@ let rec awaitConsumableReview ports checkpoint =
 
             | Some _ ->
                 // VerdictKnown but ProcessReviewLWR not record-ready yet
+                // DO NOT append TodoReviewConcluded here
                 ()
 
             return!
@@ -3235,8 +3611,12 @@ let rec awaitConsumableReview ports checkpoint =
 `suicide` 前增加：
 
 ```fsharp
+do! requireAtLeastOneTodoWriteAcceptedOnFirstUnblessed life
+
 let! todo =
     TodoCheckpointProgram.drainLatestProcessReview life
+
+do! reconcileHostTodoTableIfNeeded life todo
 
 match todo with
 | NeedsRevision report ->
@@ -3309,7 +3689,7 @@ Review1 obligation exactly once
 
 ---
 
-## Stroke 3 — R1 仍在跑，Manager 继续下一 lane；同 turn 双 todowrite fail closed
+## Stroke 3 — R1 仍在跑，Manager 继续下一 lane；同 message 双 todowrite 全拒
 
 ```text
 R1 pending
@@ -3318,19 +3698,18 @@ Manager:
 fork / read / edit / test...
 ```
 
-另测同一 provider turn 两个不同 ToolCallId todowrite：
+另测同一 assistant message 两个不同 ToolCallId todowrite：
 
 ```text
-ordinal-first admitted
-second fail closed
-Accepted count += 1 only
+both fail closed
+Accepted count unchanged
 ```
 
 断言：
 
 ```text
 Manager 未因 review pending 被停住
-concurrent second todowrite 不产生第二 checkpoint
+同 message 多 todowrite 不产生任何新 checkpoint
 ```
 
 ---
@@ -3345,8 +3724,9 @@ T2 enters before
 随后 reviewer：
 
 ```text
-R1 REVISE
+R1 VerdictKnown = REVISE
 + ProcessReviewLWR(R1) record-ready
+→ TodoReviewConcluded(R1)
 ```
 
 T2 继续。
@@ -3356,7 +3736,8 @@ T2 继续。
 ```text
 previous report = ProcessReviewLWR(R1)
 C2 = merge(C1,P1)
-VerdictKnown alone without record-ready LWR still blocks
+Host TodoTable reconciled to C2
+VerdictKnown alone without TodoReviewConcluded still blocks
 ```
 
 ---
@@ -3618,6 +3999,9 @@ in_progress→completed rejected
 new→completed rejected
 reviewing→completed accepted
 completed→completed accepted
+non-completed transitions allowed at Host
+（completed→in_progress / cancelled→pending / reviewing→cancelled 等）
+authenticity left to process review
 ```
 
 ### Merge
@@ -3640,14 +4024,17 @@ no auto-cancel / no auto-resurrect without PERFECT
 Accepted count == process review obligation count
 rejected / non-admitted physical tool call creates no review
 same ToolCallId replay creates no second review
+same ToolCallId replay with digest mismatch fail closed
 different ToolCallId same list creates new review
-same-turn second todowrite fail closed by ToolPart ordinal
+same-message multiple todowrite all rejected
 Tk consumes only R(k-1)
 Tk never waits Rk
-Tk+1 waits until ConsumableReview(k)
-VerdictKnown alone is insufficient without record-ready LWR
-Prepared + completed ToolPart recovers to Accepted
+Tk+1 waits until TodoReviewConcluded(k) ≡ ConsumableReview(k)
+VerdictKnown alone is insufficient; Concluded not yet appendable without LWR
+PERFECT-with-no-prose never becomes ConsumableReview
+Prepared + live/recovery success recovers to Accepted
 Prepared + failed ToolPart never Accepts
+infra failure is not REVISE/PERFECT; obligation remains outstanding
 ```
 
 ### Dedicated reviewer
@@ -3660,7 +4047,7 @@ process review input = OpeningRaw + bounded Manager LWR + Ck + Pk
 process PERFECT not terminal witness
 first Finality enlist then ordinary graduate
 process session retained until LifeCompleted
-Finality LWR bounded by FinalityAssignmentStart..VerdictFrontier
+Finality LWR bounded by FinalityReviewWorkStartCursor..VerdictFrontier
 ```
 
 ### Rebase / coverage split / Opening floor
@@ -3670,7 +4057,9 @@ Opening byte-identical forever
 WorkRecordStart excludes Opening from Blogger Y
 T1 no prior replacement
 desired cutoff derived from Accepted chain without Requested fact
-PrefixRebaseCommitted only after real provider adoption
+PrefixEpoch commit before next attempt seal/bind
+EvidenceKind=TodoCheckpoint enters existing ActivePrefixEpoch SSOT
+provider failure does not roll back epoch
 Tk cutoff == before T(k-1)
 latest interval remains raw X
 restart reproduces same projection
@@ -3684,17 +4073,21 @@ RecordCoverage must not imply PrefixCoverage
 ```text
 ManagerCheckpointLWR(k) never crosses ReviewFrontier(k)
 concurrent Manager work after Tk does not leak into Rk evidence
-ProcessReviewLWR(k) excludes R(k-1) history
+ProcessReviewLWR(k) excludes R(k-1) history and assignment prompt itself
+ReviewWorkStartCursor = exclusive end after assignment authority lands
 dedicated reviewer head LWR is not used as report
 OpeningRaw is separate; LWR includeOpening=false
 Rk may start while Manager Y lags frontier (RawGap present)
+Manager-facing ProcessReviewLWR uses Finality safety-seal; no regex wash
 ```
 
 ### Finality
 
 ```text
+first unblessed suicide without TodoWriteAccepted fail closed
 suicide drains latest process review
 process REVISE prevents FinalityRequest
+REVISE settlement triggers Host TodoTable reconciliation
 no mechanical terminal-todo completeness gate
 D joins first eligible Finality as ordinary member
 D needs fresh dual PERFECT when enlisted
@@ -3840,8 +4233,9 @@ Process review input、process review report、Finality reviewer work record 一
 
 ```text
 id?: string optional-id schema 回流
-同 turn 多 todowrite 抢锁 admission
+同 message 多 todowrite winner-arbitration admission
 相同 list 去重跳过新 ToolCallId 的 review
+same ToolCallId digest mismatch 仍 Accepted
 ```
 
 ---
@@ -3859,13 +4253,44 @@ WorkRecordStart
 
 ---
 
-## 43.11 Desired rebase ≠ committed rebase
+## 43.11 Desired rebase ≠ committed PrefixEpoch
 
 禁止：
 
 ```text
 Accepted 后立刻写 PrefixRebaseCommitted
 NeedRebase / RebaseRequested Stage
+todo-only rebase 事实却缺少 EpochId / PrefixSnapshot / SealRoot
+另造第二套 ActivePrefixEpoch
+provider 成功才 commit / 失败回滚 epoch
+先发新 prefix 后补 committed
+```
+
+## 43.12 ConsumableReview typing
+
+禁止：
+
+```text
+TodoReviewConcluded 在尚无 record-ready WorkRecordRef 时 append
+另造 AwaitingReport / VerdictOnly Stage
+把 VerdictKnown 直接当 ConsumableReview
+```
+
+## 43.13 Zero-checkpoint Finality bypass
+
+禁止：
+
+```text
+first unblessed suicide without TodoWriteAccepted 进入 Finality
+```
+
+## 43.14 Host sink reconciliation
+
+禁止：
+
+```text
+REVISE settlement 后永久留下否决的 Pk 在 Host TodoTable
+把 sink repair 写成新的 checkpoint / review
 ```
 
 ---
@@ -3913,11 +4338,16 @@ docs/{what,why,shape,how,proof}/todo.md
 ```text
 Process review → RecordCoverage / bounded LWR
 Prefix rebase → PrefixCoverage / proven Y only
-ConsumableReview → verdict + record-ready Reviewer LWR
-TodoWritePrepared / TodoWriteAccepted crash protocol
+PrefixEpoch EvidenceKind=TodoCheckpoint（既有 ActivePrefixEpoch）
+ConsumableReview ≡ TodoReviewConcluded
+VerdictKnown = Reviewer-domain durable verdict
+TodoWritePrepared / TodoWriteAccepted live+recovery crash protocol
 WorkRecordStart Opening floor
 tagged existing/new identity
-single-admission ToolPart ordinal rule
+same-message multi-todowrite all-reject
+ReviewWorkStartCursor exclusive-end rule
+legacy seed before first Magic provider request
+Host TodoTable reconciliation after REVISE settlement
 Dedicated process retention until LifeCompleted
 Dedicated Finality enlist then ordinary graduate
 ```
@@ -3993,20 +4423,36 @@ content
 
 猜成 durable identity。
 
-对该 legacy open Life 的第一轮 Magic Todo checkpoint：
+也禁止鸡蛋问题：
 
 ```text
-Host old TodoTable
-→ 作为 legacy seed list
-→ Host 分配全新 Magic Todo ids
-→ tool result 将 IDs 正式交给 Manager
-→ append LegacyTodoSeedAdopted
+等第一轮 V2 todowrite 才 adopt 并分配 ID
+但 provider 在调用前根本还没见过这些 ID
+→ 模型无法 kind:"existing" 复用它尚未见过的 id
 ```
 
-该 adoption checkpoint 后：
+正式 bootstrap（二选一中的冻结选择）：
 
 ```text
+在该 legacy open Life 的首次 Magic provider request **之前**
+→ Host old TodoTable 作为 legacy seed list
+→ Host 分配全新 Magic Todo ids
+→ append LegacyTodoSeedAdopted
+→ 把带 ID 的 current list 注入 Manager provider-visible context
+```
+
+然后：
+
+```text
+Manager 第一轮 todowrite 即可 kind:"existing" 回传这些 id
 只认 Magic Todo ids
+```
+
+备选（本稿不采用，若改需另开 Change）：
+
+```text
+legacy active Life 也从空 canonical 开始
+完全忽略旧 Host TodoTable
 ```
 
 同 session 后续新 Life：
@@ -4031,11 +4477,14 @@ decoder
 reviewing UI
 after history
 error path
+after vs ToolPart durable completion order
+sessionID+callID unique ToolPart/message/run/ordinal/XTrace localization
 ```
 
 **任何 blocking canary 未证明前，不写 production membrane。**
 
 Host alias canary 仍是 P0 blocker：必须证明 before 原地 mutation 不会污染 durable ToolPart.input。
+Canary G/H 同样是 blocking：Accepted 双路径与 before 身份冻结都依赖它们。
 
 ---
 
@@ -4049,7 +4498,7 @@ TodoItemId
 status transition
 semanticMerge（含 cancelled 保守语义 + content/priority 裁决）
 settlement
-single-admission ordinal rule
+same-message multi-todowrite all-reject
 checkpoint projection
 ```
 
@@ -4063,13 +4512,13 @@ checkpoint projection
 
 ```text
 TodoWritePrepared（含冻结 ReviewFrontier）
-TodoWriteAccepted
-TodoProcessReviewAssigned
-TodoReviewConcluded（WorkRecordRef / WorkRecordDigest）
+TodoWriteAccepted（InputDigest/OutputDigest + live/recovery evidence）
+TodoProcessReviewAssigned（ReviewWorkStartCursor）
+TodoReviewConcluded ≡ ConsumableReview（仅 record-ready 后 append）
 DedicatedTodoReviewerEnlisted
 DedicatedTodoReviewerReplaced
-TodoCheckpointPrefixRebaseCommitted
-LegacyTodoSeedAdopted（仅升级路径）
+PrefixRebaseCommitted EvidenceKind=TodoCheckpoint（既有 PrefixEpoch SSOT）
+LegacyTodoSeedAdopted（仅升级路径；首次 Magic provider request 前）
 ```
 
 Boot Fold / crash tests先绿。
@@ -4123,11 +4572,12 @@ enriched result
 desired cutoff derivation
 PrefixCoverage-only Y materialization
 messages.transform
-commit proof
+seal-前原子 PrefixEpoch commit（EvidenceKind=TodoCheckpoint）
+ActivePrefixEpoch 同步
 restart replay
 ```
 
-明确 fail closed：LWR RawGap 不得进入 rebase。
+明确 fail closed：LWR RawGap 不得进入 rebase；不得另造缺字段的 todo-only epoch。
 
 ---
 
@@ -4201,9 +4651,9 @@ V2 runner parity 仍然 fail closed：没有等价 hook contract 前，MagicTodo
 7. reviewing 是正式状态；pending/in_progress/new→completed 被 Host 拒绝。
 8. 每个 `TodoWriteAccepted` 恰好一个 process-review obligation。
 9. rejected / 非 admission 的 todowrite 不创建 review。
-10. 同 turn 多 todowrite 按 ToolPart ordinal 只 admit 第一个，其余 fail closed。
-11. 相同 ToolCallId replay 幂等；不同 ToolCallId 即使 list 相同也新开 checkpoint。
-12. Tk 消费 R(k-1)；Tk 不等待 Rk；Tk+1 等待 ConsumableReview(k)。
+10. 同一 assistant message 多 todowrite 全部 fail closed；无 ordinal winner。
+11. 相同 ToolCallId replay 幂等且 digest 一致；digest 冲突 fail closed；不同 ToolCallId 即使 list 相同也新开 checkpoint。
+12. Tk 消费 R(k-1)；Tk 不等待 Rk；Tk+1 等待 TodoReviewConcluded(k) ≡ ConsumableReview(k)。
 13. REVISE = union + progress min + content/priority=proposed 裁决；unilateral cancelled 保留 old.status。
 14. PERFECT = proposed exact replace。
 15. tool result 返回上一 review 的 ProcessReviewLWR，以及当前 REVISE preview / PERFECT 规则。
@@ -4212,28 +4662,29 @@ V2 runner parity 仍然 fail closed：没有等价 hook contract 前，MagicTodo
 18. reviewer input = OpeningRaw + frontier-bounded Manager LWR(`includeOpening=false`) + old/new todo。
 19. process-review LWR 允许 RawGap；不得等 Manager Y 追平才启动。
 20. ProcessReviewLWR / Finality dedicated LWR 都不得用 session head。
-21. desired lag-1 cutoff 由 Accepted 链推导；PrefixRebaseCommitted 仅在真实 provider adoption 后写入。
-22. T2/T3... 只替换 proven Y prefix；LWR RawGap 不得进入 prefix replacement。
+21. desired lag-1 cutoff 由 Accepted 链推导；PrefixEpoch 在下一 attempt seal 前原子提交（EvidenceKind=TodoCheckpoint）；provider 成败不回滚。
+22. T2/T3... 只替换 proven Y prefix；LWR RawGap 不得进入 prefix replacement；不另造第二套 ActivePrefixEpoch。
 23. Opening 永远 raw、byte-stable，且不经 LWR 重复。
-24. Prepared + completed ToolPart 可恢复为 Accepted；Prepared + failed 永不 Accepted。
-25. suicide drain latest ConsumableReview；process REVISE 不得进入 Finality。
+24. Prepared + live/recovery success 可恢复为 Accepted；digest mismatch / failed 永不 Accepted。
+25. first unblessed suicide 至少要求一个 TodoWriteAccepted；suicide drain latest ConsumableReview；process REVISE 不得进入 Finality。
 26. 无机械 Finality terminal-todo completeness gate。
 27. Dedicated 首次进入 Finality 后遵循 ordinary graduate；不强制每轮回流。
 28. process PERFECT 不计 terminal PERFECT；enlisted 时仍需 fresh dual-PERFECT。
 29. FinalityBlessed 后仍可 todowrite；Dedicated process session 不因 Blessing 释放。
 30. second suicide 不创建新 2N，但仍 drain process review。
-31. 正常新 Life canonical todo 为空；仅 legacy open Life 一次 seed adopt。
-32. Manager 看不到 dedicated reviewer / barrier / witness / 2N。
-33. Host TodoTable 不参与 canonical recovery；bridge 只是 ephemeral。
-34. alias canary 与 V2 runner fail-closed 成立。
-35. 无独立 process-review work-record projection；Record/Prefix coverage 分型成立。
-36. one-stroke unhappy path / docs / static gates / 全量 check 通过。
+31. 正常新 Life canonical todo 为空；仅 legacy open Life 一次 seed adopt，且在首次 Magic provider request 前完成并把带 ID list 注入 Manager。
+32. Manager 看不到 dedicated reviewer / barrier / witness / 2N；ProcessReviewLWR 用 safety-seal，不 regex 清洗。
+33. Host TodoTable 不参与 canonical recovery；REVISE settlement 后必须 sink reconciliation；bridge 只是 ephemeral。
+34. alias / after-vs-ToolPart-order / sessionID+callID localization canary 与 V2 runner fail-closed 成立。
+35. 无独立 process-review work-record projection；Record/Prefix coverage 分型成立；PERFECT 与 REVISE 都必须有 prose work record。
+36. ConsumableReview ≡ TodoReviewConcluded；VerdictKnown 不得冒充可消费结论。
+37. one-stroke unhappy path / docs / static gates / 全量 check 通过。
 
 ---
 
-# 48. 审阅时请重点攻击的五个问题
+# 48. 已冻结裁决（原 Formal Review 攻击面）
 
-本稿已经给出默认裁决，Reviewer 如果反对应直接针对这些点给出反例：
+以下裁决已纳入最终稿，变更须另开明确 Change：
 
 ### A. Dedicated reviewer 是否应每轮 Finality 都 mandatory？
 
@@ -4253,11 +4704,11 @@ V2 runner parity 仍然 fail closed：没有等价 hook contract 前，MagicTodo
 
 ### D. Host TodoTable 应显示 canonical Ck 还是 working Pk？
 
-本稿：**显示 working Pk compatibility projection；canonical 只由 MagicTodo Journal 拥有。**
+本稿：**Accepted 后显示 working Pk；但 REVISE 被消费后必须 reconcile 到 settled current。** canonical 只由 MagicTodo Journal 拥有；sink repair 不产生 checkpoint。
 
 ### E. lag-1 rebase 是否可以只用 plugin Journal + messages.transform？
 
-本稿：**可以，但 desired cutoff ≠ committed proof；且只消费 PrefixCoverage 可证明的 Y prefix。**
+本稿：**可以，但必须进入既有 PrefixEpoch/ActivePrefixEpoch SSOT；desired cutoff ≠ seal 前 commit；provider 成败不回滚 epoch；只消费 PrefixCoverage 可证明的 Y prefix。**
 
 ### F. V2 runner / before alias 怎么办？
 
@@ -4269,7 +4720,15 @@ V2 runner parity 仍然 fail closed：没有等价 hook contract 前，MagicTodo
 
 ### H. 要不要 Finality mechanical terminal-todo gate？
 
-本稿：**不要。** 未完成工作真实性交给 process reviewer PERFECT/REVISE。
+本稿：**不要。** 未完成工作真实性交给 process reviewer PERFECT/REVISE。但 first unblessed suicide 仍至少要求一个 `TodoWriteAccepted`。
+
+### I. VerdictKnown 与 ConsumableReview 如何分型？
+
+本稿：**VerdictKnown 复用 Reviewer 域 durable verdict；ConsumableReview ≡ TodoReviewConcluded，且仅在 record-ready LWR 后 append。**
+
+### J. 同 message 多 todowrite 要不要 ordinal winner？
+
+本稿：**不要。** 全部拒绝，少一个不必要的仲裁面。
 
 ---
 
@@ -4285,30 +4744,30 @@ HumanRoot
 │    └─ Blogger effectiveStart = max(RecordCoverage, WorkRecordStart)
 │
 ├─ T1 todowrite
-│    ├─ admit by ToolPart ordinal（同 turn 其它 todowrite fail closed）
+│    ├─ same assistant message >1 todowrite → all reject
 │    ├─ decode kind existing/new
-│    ├─ transition gate
+│    ├─ transition gate（仅 completed 需 reviewing）
 │    ├─ TodoWritePrepared（freeze ReviewFrontier）
 │    ├─ Host executor
-│    ├─ TodoWriteAccepted
+│    ├─ TodoWriteAccepted（live after-success / recovery completed ToolPart）
 │    ├─ enlist Dedicated D
 │    ├─ ensureReview(R1) obligation
-│    └─ desired cutoff becomes derivable（尚未 committed）
+│    └─ desired cutoff becomes derivable（尚未 seal/commit PrefixEpoch）
 │
 ├──────── Manager work ────────┐
 │                              │
 │                         D reviews R1
-│                         (verdict → later record-ready LWR)
+│                         (VerdictKnown → later TodoReviewConcluded)
 │                              │
 ├─ T2 todowrite                │
-│    ├─ if R1 not ConsumableReview ──┘ wait
+│    ├─ if R1 not TodoReviewConcluded ──┘ wait
 │    ├─ settle:
 │    │    PERFECT → P1
-│    │    REVISE  → merge(C1,P1)
+│    │    REVISE  → merge(C1,P1) + Host TodoTable reconcile
 │    ├─ return R1 ProcessReviewLWR
 │    ├─ Prepared/Accepted T2
 │    ├─ ensureReview(R2)
-│    └─ next provider prefix（采用后才 PrefixRebaseCommitted）:
+│    └─ next provider attempt seal 前 PrefixEpoch commit:
 │         Opening
 │         + proven Y(before T1)
 │         + raw X[T1..T2]
@@ -4318,8 +4777,9 @@ HumanRoot
 ├─ T3 ...
 │
 ├─ suicide
-│    ├─ drain latest ConsumableReview
-│    ├─ REVISE → continue Life
+│    ├─ require ≥1 TodoWriteAccepted on first unblessed path
+│    ├─ drain latest ConsumableReview ≡ TodoReviewConcluded
+│    ├─ REVISE → reconcile sink → continue Life
 │    └─ PERFECT → existing Finality preconditions
 │          └─ Finality cohort:
 │               Dedicated D（若尚未 graduate）
@@ -4396,15 +4856,18 @@ existing Finality witness/cohort
 而仍然保持：
 
 ```text
-真实世界 = durable facts（Prepared/Accepted/Concluded/...）
+真实世界 = durable facts（Prepared/Accepted/VerdictKnown/Concluded/...）
 程序流程 = recursive CE
-Host TodoTable = compatibility projection
+Host TodoTable = compatibility projection + settlement reconciliation
 隐藏 bridge = ephemeral transport detail
 Manager = 不知道 reviewer 身份
-Process review = 一次 verdict
+Process review = 一次 verdict + 必需 prose work record
+ConsumableReview ≡ TodoReviewConcluded
+PrefixEpoch = 既有 ActivePrefixEpoch + TodoCheckpoint evidence
 Terminal review = fresh 2N dual-PERFECT（无 dedicated 永不 graduate 特例）
 不发明第五种工作记录
 不发明机械 terminal-todo Finality gate
+但 first unblessed suicide 仍要求至少一次 TodoWriteAccepted
 ```
 
 这使原来的：
