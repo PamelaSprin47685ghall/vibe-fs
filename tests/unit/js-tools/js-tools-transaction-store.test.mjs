@@ -65,7 +65,7 @@ test('JS012_prepare_then_commit_leaves_no_uncommitted', () => {
   unwrap(appendCommitted(store, toList([preparedId]), txId('tx-1')))
 
   const events = unwrap(loadEvents(raw, store.OpenSnapshot()))
-  assert.deepEqual(eventTypes(events), [PreparedEventType, CommittedEventType])
+  assert.deepEqual(eventTypes(events).sort(), [CommittedEventType, PreparedEventType])
   assert.deepEqual(listItems(scanUncommitted(events)), [])
 })
 

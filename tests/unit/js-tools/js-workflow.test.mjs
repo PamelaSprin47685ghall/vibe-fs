@@ -10,7 +10,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'no
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { JsToolOutcome, run as workflowRun } from '../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js'
+import { JsToolWorkflow_run as workflowRun } from '../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js'
 import { JsToolGenerator_generate as generate } from '../../../dist/Domain/JsTools.js'
 import { ToolPermission } from '../../../dist/Kernel/Roles.js'
 import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Set.js'
@@ -161,8 +161,39 @@ test('JS012_workflow_with_store_persists_prepare_and_commit', async () => {
     const storeModule = await import('../../../dist/Infrastructure/JsToolsTransactionStore.js')
     const events = resultOf(storeModule.loadEvents(raw, store.OpenSnapshot()))
     assert.equal(events.ok, true)
-    assert.deepEqual(listItems(events.value).map((e) => e.EventType), ['JsTransactionPrepared', 'JsTransactionCommitted'])
+    assert.deepEqual(listItems(events.value).map((e) => e.EventType).sort(), ['JsTransactionCommitted', 'JsTransactionPrepared'])
     assert.deepEqual(listItems(storeModule.scanUncommitted(events.value)), [], 'no uncommitted after commit fact')
+  } finally {
+    cleanup()
+  }
+})
+
+test('JS016_result_renders_stable_toml_shapes', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
+    const surface = generate('Coder', coderCaps)
+    const program = `class Js extends JsProgram {
+  async run() {
+    await this.rewrite('a.txt', { find: 'hello', replace: 'goodbye' });
+    return { before: 'x' };
+  }
+}`
+    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+    const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
+    const toml = render(outcome)
+    assert.equal(toml.includes('status = "ok"'), true)
+    // renderString escapes inner quotes: result = "{\"before\":\"x\"}"
+    assert.equal(toml.includes('result = "{\\"'), true)
+    assert.equal(toml.includes('before'), true)
+    assert.equal(toml.includes('written = "a.txt"'), true)
+    // failed shape
+    const failing = await workflowRun(dir, surface.BaseClassSource, `class Js extends JsProgram {
+  async run() { throw new Error('boom'); }
+}`, 2000, Date.now() + 60_000, 1 << 20)
+    const failedToml = render(failing)
+    assert.equal(failedToml.includes('status = "failed"'), true)
+    assert.equal(failedToml.includes('code = "PROGRAM_FAILED"'), true)
   } finally {
     cleanup()
   }

@@ -129,3 +129,24 @@ module JsToolWorkflow =
 
                                     return Succeeded(resultJson, written, created)
         }
+
+/// JS-016/JS-078.1: stable LLM-visible result shapes, rendered as Synthetic
+/// TOML (the only rendering owner; ARCH-010). Success carries the program
+/// JSON plus the commit report; failure carries the stable code + reason.
+module JsToolsResult =
+
+    let render (outcome: JsToolWorkflow.JsToolOutcome) : string =
+        match outcome with
+        | JsToolWorkflow.JsToolOutcome.Succeeded(resultJson, written, created) ->
+            SyntheticToml.document
+                []
+                [ SyntheticToml.field "status" (SyntheticToml.renderString "ok")
+                  SyntheticToml.field "result" (SyntheticToml.renderString resultJson)
+                  SyntheticToml.field "written" (SyntheticToml.renderString (String.concat "," written))
+                  SyntheticToml.field "created" (SyntheticToml.renderString (String.concat "," created)) ]
+        | JsToolWorkflow.JsToolOutcome.Failed failure ->
+            SyntheticToml.document
+                []
+                [ SyntheticToml.field "status" (SyntheticToml.renderString "failed")
+                  SyntheticToml.field "code" (SyntheticToml.renderString (JsFailure.code failure))
+                  SyntheticToml.field "reason" (SyntheticToml.renderString (JsFailure.reason failure)) ]
