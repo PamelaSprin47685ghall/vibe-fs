@@ -182,6 +182,25 @@ tools = ["fork", "join", "list", "suicide"]
   [[turn.step]]
   respond = { type = "text", text = "Manager continues." }
 
+# EXEC-016: the Orchestrator's ending is deferred while its forked Manager is still
+# outstanding, so an idle Orchestrator gets the join guard. Optional because whether it
+# arrives is a race between the Orchestrator reaching idle and the Manager completing —
+# and that race moved when the EventStore stopped spending ~45ms of `git` spawns per
+# journal append. The nudge is real production behaviour (`host-restart` and
+# `manager-full-loop` declare the Manager-side twin), so it is declared, never suppressed.
+[[turn]]
+id = "orch-join-guard"
+internal = true
+optional = true
+user = ["# Background work is still outstanding.", "# Call join to collect completed results before finishing."]
+tools = ["fork-manager", "join"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "join" }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Publish completed." }
+
 [[turn]]
 id = "coder"
 lane = "fast-coder"

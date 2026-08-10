@@ -10,18 +10,7 @@
  * 100% Event-driven; ZERO polling loops.
  */
 
-function isIdleEvent(e) {
-  // Quiescence signal only (transport-level), not the product-correctness oracle.
-  if (e.type === 'session.idle') return true;
-  if (e.type === 'session.status') {
-    const s = e.status ?? e.properties?.status;
-    if (s === 'idle') return true;
-    if (s && typeof s === 'object') {
-      return s.type === 'idle' || s.status === 'idle';
-    }
-  }
-  return false;
-}
+import { isIdleEvent } from './session-quiescence.js';
 
 export function createScenarioTurn(scenario) {
   return {

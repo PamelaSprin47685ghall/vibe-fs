@@ -115,3 +115,20 @@ export const CANARY_MAX_PARALLEL = Math.min(
   Math.max(1, Math.floor(availableParallelism() / 2)),
   CANARY_TESTS.length,
 );
+
+/**
+ * How many scenarios may be INSIDE STARTUP at once (the launch stagger's width).
+ *
+ * The stagger is causal: a launch waits for an earlier launch's readiness bark, never for a
+ * timer. What this number decides is how far back that bark is — with 1, launches are strictly
+ * serialized, so the suite cannot finish faster than the sum of every startup: measured 31 cases
+ * × ~1.6s ≈ 50s of pure launch chain, against ~21s of actual work at 8 slots. The pool sat at
+ * 3.4 of 8 for exactly that reason.
+ *
+ * Widening it does not reintroduce the thundering herd the stagger exists to prevent: three
+ * concurrent `opencode serve` boots is still a bound, and the readiness ladder's per-stage budget
+ * (`READINESS_STAGE_MS`) is the criterion that would fail if the machine could not carry them.
+ * It stays well under `CANARY_MAX_PARALLEL` so steady-state parallelism, not startup, remains
+ * what the pool bound governs.
+ */
+export const CANARY_STARTUP_WIDTH = Math.min(3, CANARY_MAX_PARALLEL);

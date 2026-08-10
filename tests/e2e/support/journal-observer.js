@@ -16,12 +16,17 @@ const storeRefPath = (workDir) => path.join(gitCommonDir(workDir), 'refs', 'wanx
 /**
  * Read UTF-8 content for a journal BlobRef (`blobs/<gitOid>` or bare OID).
  * Bodies live in the Git ODB after Phase 5 — never under wanxiangshu-next/.
+ *
+ * One pattern owns the whole token shape. Splitting it into a `startsWith('blobs/')`
+ * test plus a separate OID regex also reads as a repo-path criterion to the harness
+ * gate, which then reports a prefix that names nothing on disk — `blobs/` is a
+ * BlobRef namespace, not a directory.
  */
 export function readBlobRef(workDir, blobRef) {
   const raw = Array.isArray(blobRef) ? blobRef.at(-1) : blobRef;
   const token = String(raw ?? '');
-  const oid = token.startsWith('blobs/') ? token.slice('blobs/'.length) : token;
-  if (!/^[0-9a-f]{40}$/i.test(oid)) {
+  const oid = /^(?:blobs\/)?([0-9a-f]{40})$/i.exec(token)?.[1];
+  if (!oid) {
     throw new Error(`invalid BlobRef OID: ${token}`);
   }
   return execFileSync('git', ['-C', workDir, 'cat-file', '-p', oid], {

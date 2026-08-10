@@ -1,11 +1,10 @@
 /**
- * context-recovery — C10 layer-4 evidence for docs/what/context.md (X-A…X-D).
+ * context-recovery-oracles.mjs — the X-A…X-D probe/promote oracles, owned once.
  *
- * Four static scenarios, one driver (orchestrator-restart-publish pattern):
- *   x-a-probe-before-crash        arming lost; no probe send; no promote
- *   x-b-probe-sent-unaccepted     probe once; restart before promote; no re-send
- *   x-c-accepted-before-promote   probe completed + restart; XTrace/coverage hold
- *   x-d-promote-then-restart      PrefixRebaseCommitted durable; no re-promote
+ * The four scenarios are separate case files so the runner's bounded pool can schedule them in
+ * parallel (it schedules case FILES; four scenarios behind one file were four Host lifetimes
+ * inside one slot, and that file was the suite's critical path). Their assertions are shared
+ * knowledge about the same clause set, so they live here rather than being copied per file.
  *
  * Invariants (D2):
  *   - RawGap must not enter FrozenRecordPrefix (Opening+frames only)
@@ -15,18 +14,7 @@
  * HostSignalBootstrap → XWire.reconcileAttempt. No domain algorithm changes.
  */
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
-import { journalEventLines, readBlobRef } from '../support/journal-observer.js';
-
-import { runCanary } from '../support/scenario-driver.mjs';
-import { runStaticGate } from '../support/index.js';
-
-const SCENARIOS = [
-  'x-a-probe-before-crash',
-  'x-b-probe-sent-unaccepted',
-  'x-c-accepted-before-promote',
-  'x-d-promote-then-restart',
-];
+import { journalEventLines, readBlobRef } from './journal-observer.js';
 
 function readBlob(workDir, blobRef) {
   return readBlobRef(workDir, blobRef);
@@ -312,7 +300,7 @@ async function oracleXd(scenario, ctx) {
   assertFrameProbeIndependent(workDir, 'X-D', ctx.preRestart);
 }
 
-const CUSTOMS = {
+export const CUSTOMS = {
   'x-a-probe-before-crash': {
     oracle: oracleXa,
   },
@@ -329,17 +317,3 @@ const CUSTOMS = {
     oracle: oracleXd,
   },
 };
-
-if (!runStaticGate([fileURLToPath(import.meta.url)]).passed) {
-  throw new Error('x-recovery canary static gate failed');
-}
-
-let code = 0;
-for (const name of SCENARIOS) {
-  const exit = await runCanary(name, { customs: CUSTOMS[name] });
-  if (exit !== 0) {
-    code = exit;
-    break;
-  }
-}
-process.exit(code);

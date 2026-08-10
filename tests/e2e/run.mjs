@@ -19,7 +19,12 @@ import {
   READINESS_STAGE_MS,
 } from "./support/time-budget.js";
 import { ReadinessLadder, READINESS_STAGES } from "./support/readiness.js";
-import { CANARY_TESTS, CANARY_SUFFIX, CANARY_MAX_PARALLEL } from "./support/manifest.mjs";
+import {
+  CANARY_TESTS,
+  CANARY_SUFFIX,
+  CANARY_MAX_PARALLEL,
+  CANARY_STARTUP_WIDTH,
+} from "./support/manifest.mjs";
 
 const E2E_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -72,6 +77,12 @@ const MAX_PARALLEL = parsePositiveInt(
   CANARY_MAX_PARALLEL,
   "MAX_PARALLEL_CANARIES",
 );
+/** Launch-stagger width: how many scenarios may be inside startup at once (manifest-owned). */
+const STARTUP_WIDTH = parsePositiveInt(
+  process.env.CANARY_STARTUP_WIDTH,
+  CANARY_STARTUP_WIDTH,
+  "CANARY_STARTUP_WIDTH",
+);
 const activeCanaryPids = new Set();
 const readyGateFailures = new Set();
 
@@ -94,6 +105,8 @@ process.on("SIGTERM", () => { cleanupCanaries(); process.exit(143); });
 function runScenarioChild(file, onBarkSignal) {
   return new Promise((resolve) => {
     const name = path.basename(file);
+    const startedAt = Date.now();
+    let readyAt = null;
     const child = spawn(process.execPath, [file], {
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, WANXIANG_RUN_ID: RUN_ID, CANARY_VERBOSE: "1" },
@@ -115,6 +128,7 @@ function runScenarioChild(file, onBarkSignal) {
       if (!barked) {
         barked = true;
         if (isTimeout) barkTimeout = true;
+        if (readyAt === null) readyAt = Date.now();
         onBarkSignal?.();
       }
     };
@@ -173,6 +187,8 @@ function runScenarioChild(file, onBarkSignal) {
         barkTimeout: !hadBark,
         processTimeout: true,
         exitedBeforeBark: !hadBark,
+        wallMs: Date.now() - startedAt,
+        startupMs: readyAt === null ? null : readyAt - startedAt,
       });
     }, canaryProcessTimeoutMs);
 
@@ -223,13 +239,49 @@ function runScenarioChild(file, onBarkSignal) {
         processTimeout: false,
         exitedBeforeBark,
         stageStall,
+        wallMs: Date.now() - startedAt,
+        startupMs: readyAt === null ? null : readyAt - startedAt,
       });
     });
   });
 }
 
-async function main() {
-  const repeats = parseRepeat(process.argv.slice(2));
+const seconds = (ms) => (ms / 1000).toFixed(1) + "s";
+
+/**
+ * Per-case wall time, split at the ready bark.
+ *
+ * `startup` is the ladder's cost (cold binary, host listen, health, event source) and `work` is the
+ * scenario itself. One number for both would make "the suite got slower" unattributable: a slower
+ * startup is machine/bootstrap work, a slower body is scenario logic, and they are fixed in
+ * different places.
+ */
+function timing(result) {
+  if (result.startupMs === null) return `(${seconds(result.wallMs)} total, never ready)`;
+  return `(${seconds(result.wallMs)} total = ${seconds(result.startupMs)} startup + ${seconds(
+    result.wallMs - result.startupMs,
+  )} work)`;
+}
+
+/**
+ * The five slowest cases plus the pool's occupancy, printed every iteration.
+ *
+ * Critical path, not average: with a bounded pool the iteration cannot finish before its longest
+ * case, so a wall-time budget is spent by a handful of scenarios. Occupancy (sum of case wall time
+ * over iteration wall time) says whether the remedy is a faster case or a fuller pool — under
+ * MAX_PARALLEL it means slots sat idle waiting for the stagger, above it means cases overlapped.
+ */
+function reportSlowest(results, iterationMs) {
+  const ranked = [...results].sort((left, right) => right.wallMs - left.wallMs);
+  const totalCaseMs = results.reduce((sum, r) => sum + r.wallMs, 0);
+  console.log(
+    `\n  iteration ${seconds(iterationMs)} wall; occupancy ${(totalCaseMs / iterationMs).toFixed(1)}` +
+      ` of ${MAX_PARALLEL} slots; slowest:`,
+  );
+  for (const r of ranked.slice(0, 5)) console.log("    " + r.name + " " + timing(r));
+}
+
+async function main() {  const repeats = parseRepeat(process.argv.slice(2));
   // Pay cold-binary cost once before any ProcessHost spawn competes for timeouts.
   {
     const warm = spawnSync(process.execPath, [path.join(E2E_ROOT, "scripts/warmup-opencode.mjs")], {
@@ -255,28 +307,33 @@ async function main() {
     // fact, what `MAX_PARALLEL_CANARIES` resolved to, and it is labelled as one.
     console.log(
       "\nSuite: " + CANARY_TESTS.length + " scenarios (every " + CANARY_SUFFIX + " under the manifest directory)" +
-        ", MAX_PARALLEL_CANARIES=" + MAX_PARALLEL + "\n",
+        ", MAX_PARALLEL_CANARIES=" + MAX_PARALLEL + ", startup width=" + STARTUP_WIDTH + "\n",
     );
 
     const testsToRun = shuffle(CANARY_TESTS);
     const results = Array(testsToRun.length);
     let nextIndex = 0;
-    let previousBarkPromise = Promise.resolve();
+    // Bark promises in launch order. A launch waits on the bark `CANARY_STARTUP_WIDTH` positions
+    // back, so at most that many scenarios are inside startup at once: still causal (a readiness
+    // bark, never a timer), just not single-file. Width 1 is the strict serialization this
+    // replaces, which made the suite's wall clock the SUM of every startup.
+    const barkPromises = [];
+    const iterationStartedAt = Date.now();
 
     const runWorker = async () => {
       while (nextIndex < testsToRun.length) {
         const index = nextIndex++;
         const file = testsToRun[index];
-        const currentPrevBark = previousBarkPromise;
+        const currentPrevBark = barkPromises[index - STARTUP_WIDTH] ?? Promise.resolve();
 
         let triggerBark;
         const currentBarkPromise = new Promise((resolve) => {
           triggerBark = resolve;
         });
         const onBark = () => triggerBark();
-        previousBarkPromise = currentBarkPromise;
+        barkPromises[index] = currentBarkPromise;
 
-        if (index > 0) {
+        if (index >= STARTUP_WIDTH) {
           await currentPrevBark;
         }
         console.log("[Launch] " + path.basename(file));
@@ -289,7 +346,7 @@ async function main() {
     let failed = false;
     for (const r of results) {
       if (r.code === 0 && r.barked && !r.barkTimeout && !r.processTimeout && !r.exitedBeforeBark && !readyGateFailures.has(r.file)) {
-        console.log("  ✓ " + r.name + " passed");
+        console.log("  ✓ " + r.name + " passed " + timing(r));
       } else {
         failed = true;
         let failReason = `code ${r.code}, signal ${r.signal}`;
@@ -301,11 +358,13 @@ async function main() {
         else if (readyGateFailures.has(r.file) || r.barkTimeout) {
           failReason = `startup stalled (${r.stageStall ?? `no stage reached, ${READINESS_STAGES.length} expected`})`;
         }
-        console.error("  ✗ " + r.name + " FAILED (" + failReason + ")");
+        console.error("  ✗ " + r.name + " FAILED (" + failReason + ") " + timing(r));
         if (r.stdout) console.error("── stdout ──\n" + r.stdout);
         if (r.stderr) console.error("── stderr ──\n" + r.stderr);
       }
     }
+
+    reportSlowest(results, Date.now() - iterationStartedAt);
 
     if (failed) {
       console.error("\nStaggered parallel e2e suite failed on iteration " + rep + ".");

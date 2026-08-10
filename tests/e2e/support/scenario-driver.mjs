@@ -36,6 +36,7 @@ import { bindLaneSession } from './lane.mjs';
 import { compileScenario } from './scenario-schema.js';
 import { ScenarioRuntime } from './scenario-runtime.js';
 import { readJournal, watchJournal } from './journal-observer.js';
+import { isIdleEvent } from './session-quiescence.js';
 import { createNodeDelayPort } from './delay-port.mjs';
 import { kindOf } from './runtime-key.js';
 import { parse as parseToml } from 'smol-toml';
@@ -248,12 +249,6 @@ export async function awaitFactBarrier(scenario, step) {
   }
 }
 
-function isIdleEvent(event) {
-  if (event.type === 'session.idle') return true;
-  const status = event.status ?? event.properties?.status;
-  return status === 'idle' || status?.type === 'idle' || status?.status === 'idle';
-}
-
 const idleBarrierKey = (target, attempts) => `${target}@${attempts}`;
 
 function armIdleBarrier(scenario, ctx, target, attempts = 1) {
@@ -306,9 +301,24 @@ async function awaitIdleBarrier(scenario, ctx, step) {
   }
 }
 
+/**
+ * A flow step's own name, for the verbose step trace. Steps are one-key objects in almost every
+ * case, so the key IS the verb; a step with several keys reports all of them rather than whichever
+ * one `Object.keys` happened to return first.
+ */
+const stepLabel = (step) =>
+  Object.entries(step)
+    .filter(([, value]) => value !== false && value !== undefined)
+    .map(([key, value]) => (typeof value === 'string' ? `${key}=${value}` : key))
+    .join(',');
+
 async function runFlow(scenario, doc, ctx) {
   const flow = doc.flow || [];
-  for (const step of flow) {
+  const traceSteps = process.env.CANARY_VERBOSE === '1';
+  const flowStartedAt = Date.now();
+
+  /** One flow step. Nested so the verbs keep reading `scenario` / `doc` / `ctx` directly. */
+  const runStep = async (step) => {
     if (step.wait) {
       // VERIFY-004: an explicitly-bounded wait is a declared slow step — the
       // watchdog silence window widens to its timeoutMs so a legitimate
@@ -327,19 +337,19 @@ async function runFlow(scenario, doc, ctx) {
           blocking: step.blocking !== false,
         });
       }
-      continue;
+      return;
     }
     if (step.waitFact) {
       await awaitFactBarrier(scenario, step);
-      continue;
+      return;
     }
     if (step.armIdle) {
       armIdleBarrier(scenario, ctx, step.armIdle.id, step.armIdle.attempts ?? 1);
-      continue;
+      return;
     }
     if (step.awaitIdle) {
       await awaitIdleBarrier(scenario, ctx, step);
-      continue;
+      return;
     }
     if (step.prompt) {
       const sid = step.session === 'child' ? ctx.childId
@@ -351,11 +361,11 @@ async function runFlow(scenario, doc, ctx) {
         ctx.turn = scenario.turn.start(sid, step.afterSeq ? { afterSeq: step.afterSeq } : undefined);
       }
       await sendPrompt(scenario, sid, step.prompt);
-      continue;
+      return;
     }
     if (step.restart) {
       await scenario.restart();
-      continue;
+      return;
     }
     if (step.awaitTerminal) {
       const sid = step.session === 'child' ? ctx.childId
@@ -369,11 +379,11 @@ async function runFlow(scenario, doc, ctx) {
         requireAssistantTerminal: step.requireAssistantTerminal === true,
         requireIdleAfterActivity: step.requireIdleAfterActivity !== false,
       });
-      continue;
+      return;
     }
     if (step.expectSatisfied) {
       scenario.provider.expectSatisfied();
-      continue;
+      return;
     }
     if (step.abort) {
       const sid = step.session === 'child' ? ctx.childId
@@ -381,7 +391,7 @@ async function runFlow(scenario, doc, ctx) {
         : step.session === 'nudge' ? (ctx.nudgeId || ctx.sessions?.nudge)
         : (step.session && ctx.sessions?.[step.session]) || ctx.sessionId;
       await scenario.client.request('POST', `/session/${sid}/abort`, { body: {} }).catch(() => {});
-      continue;
+      return;
     }
     if (step.bindChild) {
       // Host physical parents are flattened to the family root. Read the project-wide
@@ -400,7 +410,7 @@ async function runFlow(scenario, doc, ctx) {
         lane: `session:${ctx.childId}`,
         blocking: true,
       });
-      continue;
+      return;
     }
     if (step.createSession) {
       const created = await scenario.client.createSession({ agent: step.createSession.agent });
@@ -415,7 +425,7 @@ async function runFlow(scenario, doc, ctx) {
       if (key === 'guard') ctx.guardId = sid;
       if (key === 'nudge') ctx.nudgeId = sid;
       scenario.watchdog?.advance({ reason: `create-session-${key}`, lane: `session:${sid}`, blocking: true });
-      continue;
+      return;
     }
     if (step.createChild) {
       const parentId = ctx.sessionId;
@@ -438,7 +448,7 @@ async function runFlow(scenario, doc, ctx) {
         lane: `session:${ctx.childId}`,
         blocking: true,
       });
-      continue;
+      return;
     }
     if (step.afterExpectation) {
       let resolveRestart;
@@ -469,7 +479,7 @@ async function runFlow(scenario, doc, ctx) {
           throw error;
         }
       }, step.afterExpectation.attempts ?? 1);
-      continue;
+      return;
     }
     if (step.awaitRestart) {
       assert.ok(ctx.restartPromise, 'awaitRestart without afterExpectation restart');
@@ -484,7 +494,7 @@ async function runFlow(scenario, doc, ctx) {
       } finally {
         scenario.watchdog?.setWindow(null);
       }
-      continue;
+      return;
     }
     if (step.assertFacts) {
       const n = countFact(scenario.host.workDir, step.assertFacts.name);
@@ -494,7 +504,7 @@ async function runFlow(scenario, doc, ctx) {
       if (step.assertFacts.gte !== undefined) {
         assert.ok(n >= step.assertFacts.gte, `${step.assertFacts.name} expected >= ${step.assertFacts.gte}, got ${n}`);
       }
-      continue;
+      return;
     }
     if (step.assertDeliveries) {
       const { id, eq, gte, lte } = step.assertDeliveries;
@@ -506,14 +516,14 @@ async function runFlow(scenario, doc, ctx) {
       if (eq !== undefined) assert.equal(n, eq, `${id} delivery count`);
       if (gte !== undefined) assert.ok(n >= gte, `${id} expected >= ${gte} deliveries, got ${n}`);
       if (lte !== undefined) assert.ok(n <= lte, `${id} expected <= ${lte} deliveries, got ${n}`);
-      continue;
+      return;
     }
     if (step.assertActiveRequests) {
       const n = scenario.provider.activeRequestCount;
       if (step.assertActiveRequests.gte !== undefined) {
         assert.ok(n >= step.assertActiveRequests.gte, `activeRequestCount ${n}`);
       }
-      continue;
+      return;
     }
     if (step.awaitEvent) {
       const afterSeq = scenario.events.lastSeq;
@@ -531,7 +541,7 @@ async function runFlow(scenario, doc, ctx) {
         lane: `session:${ctx.sessionId}`,
         blocking: true,
       });
-      continue;
+      return;
     }
     if (step.assertFile) {
       const full = path.join(scenario.host.workDir, step.assertFile.path);
@@ -543,7 +553,7 @@ async function runFlow(scenario, doc, ctx) {
       if (step.assertFile.includes !== undefined) {
         assert.ok(body.includes(step.assertFile.includes), `file ${step.assertFile.path} missing ${step.assertFile.includes}`);
       }
-      continue;
+      return;
     }
     if (step.assertGitLogContains) {
       const log = execFileSync('git', ['log', '--format=%s', 'HEAD'], {
@@ -551,7 +561,7 @@ async function runFlow(scenario, doc, ctx) {
         encoding: 'utf8',
       });
       assert.ok(log.includes(step.assertGitLogContains), `git log missing ${step.assertGitLogContains}: ${log}`);
-      continue;
+      return;
     }
     if (step.assertWorktreeClean) {
       const status = execFileSync('git', ['status', '--porcelain'], {
@@ -566,7 +576,7 @@ async function runFlow(scenario, doc, ctx) {
       const extra = worktrees.split('\n').filter((line) =>
         line.startsWith('worktree ') && !line.includes(scenario.host.workDir));
       assert.equal(extra.length, 0, `extra worktrees remain: ${worktrees}`);
-      continue;
+      return;
     }
     if (step.assertModelTrajectory) {
       // FALLBACK-002's provider-visible A/A/B/B evidence, as an assertion rather than a
@@ -665,7 +675,7 @@ async function runFlow(scenario, doc, ctx) {
           };
         });
       }
-      continue;
+      return;
     }
     if (step.assertPtyEcho) {
       const results = [];
@@ -687,15 +697,34 @@ async function runFlow(scenario, doc, ctx) {
       const listResult = results.find((r) => Array.isArray(r?.item) || (r && typeof r === 'object' && Object.keys(r).length === 0));
       assert.ok(listResult, `list must return item table: ${JSON.stringify(results)}`);
       assert.ok(!listResult.item || !listResult.item.some((e) => e && e.kind === 'pty'), `leaked pty: ${JSON.stringify(listResult)}`);
-      continue;
+      return;
     }
     if (step.custom) {
       const fn = ctx.customs?.[step.custom];
       assert.ok(typeof fn === 'function', `unknown custom step ${step.custom}`);
       await fn(scenario, ctx, step);
-      continue;
+      return;
     }
     throw new Error(`unknown flow step: ${JSON.stringify(step)}`);
+  };
+
+  for (const step of flow) {
+    const stepStartedAt = Date.now();
+    try {
+      await runStep(step);
+    } finally {
+      // Per-step wall time, under the flag that already prints setup timings. Without it a 50s
+      // canary reports one number and "which wait spends the wall clock" is answered by reading
+      // the scenario and guessing — the measurement step this repository forbids skipping.
+      if (traceSteps) {
+        const now = Date.now();
+        console.log(
+          `[flow +${((now - flowStartedAt) / 1000).toFixed(1)}s] ${stepLabel(step)} took ${
+            now - stepStartedAt
+          }ms`,
+        );
+      }
+    }
   }
 }
 

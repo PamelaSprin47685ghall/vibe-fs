@@ -151,6 +151,12 @@ export const degradationCases = [
         source.includes('const onBark = () => triggerBark()'),
         'the bark that releases the next launch must be the readiness signal, not a timer firing',
       );
+      // The bark a launch waits on may be several positions back (CANARY_STARTUP_WIDTH), which is
+      // still an event and still a bound. What must never appear is a duration in its place.
+      assertTrue(
+        source.includes('barkPromises[index - STARTUP_WIDTH]'),
+        'the stagger width must come from the declared startup bound, not be improvised per launch',
+      );
       assertTrue(
         !/setTimeout\([^)]*\)\s*;\s*\n\s*console\.log\("\[Launch\]/.test(source),
         'a fixed sleep before [Launch] is the degradation this case forbids',

@@ -112,26 +112,6 @@ export class HttpClient {
   }
   async abort(sessionID) { return this.request('POST', `/session/${sessionID}/abort`, { body: {} }); }
 
-  async waitForSessionIdle(sessionID, timeoutMs = DEFAULT_AWAIT_TIMEOUT_MS) {
-    const deadline = Date.now() + timeoutMs;
-    let sawNonIdle = false;
-    while (Date.now() < deadline) {
-      const res = await this.request('GET', '/session/status');
-      if (res.ok && res.data) {
-        const statusMap = res.data.data || res.data || {};
-        const status = statusMap[sessionID];
-        if (status) {
-          if (status.type === 'idle' || status.status === 'idle') {
-            if (sawNonIdle) return true;
-          } else {
-            sawNonIdle = true;
-          }
-        }
-      }
-      await new Promise((r) => setTimeout(r, 100));
-    }
-    throw new Error(`waitForSessionIdle timed out or failed to transition to idle for session ${sessionID}`);
-  }
 }
 
 export function getSessionId(sess) {

@@ -18,6 +18,7 @@ import path from 'node:path';
 import { FsOracle, HttpClient, getSessionId } from './scenario-http.js';
 import { runScenarioTests } from './scenario-runner.js';
 import { setupScenarioParallel, Scenario } from './scenario-parallel.js';
+import { awaitSessionSettled } from './session-quiescence.js';
 import { TEARDOWN_IDLE_MS } from './time-budget.js';
 
 function tmpDir() {
@@ -51,26 +52,29 @@ export async function teardownScenario(scenario, { keepOnFailure = false } = {})
     errors.push(`stopMocking: ${e.message}`);
   }
 
-  // 2. abort SSE reader
-  // 3. 等待 SSE reader 正常退出
+  // 4. 请求或触发 session abort
+  // 5. 等待 session settle（idle 事件，或已不再被报告）
+  //
+  // Per session and concurrent: the sessions are independent, so serial waits multiplied one
+  // settle budget by the session count. Both calls swallow — a session that refuses to settle is
+  // caught by the host-stop leak assertions below, with a better diagnostic than a bare timeout.
+  //
+  // Runs BEFORE the SSE reader closes (step 3 below moved after this): the idle transition IS an
+  // event, so the observation channel has to still be open to see it.
+  await Promise.all(
+    scenario.sessionIds.map(async (sid) => {
+      try { await scenario.client.abort(sid); } catch {}
+      try { await awaitSessionSettled(scenario, sid, TEARDOWN_IDLE_MS); } catch {}
+    }),
+  );
+
+  // 3. abort SSE reader + 等待其正常退出
   try {
     if (scenario.events) {
       await scenario.events.close();
     }
   } catch (e) {
     errors.push(`EventProbe: ${e.message}`);
-  }
-
-  // 4. 请求或触发 session abort
-  for (const sid of scenario.sessionIds) {
-    try { await scenario.client.abort(sid); } catch {}
-  }
-
-  // 5. 等待 session idle / terminated
-  for (const sid of scenario.sessionIds) {
-    try {
-      await scenario.client.waitForSessionIdle(sid, TEARDOWN_IDLE_MS);
-    } catch {}
   }
 
   // 6. kill 所有 PTY
