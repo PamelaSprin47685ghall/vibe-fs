@@ -48,10 +48,15 @@ type ParkedTransform(sessionId: string, lifetime: TimeSpan, ?timerPort: ITimerPo
         let ms = max 1 (int lifetime.TotalMilliseconds)
         let handle = timers.Delay ms
         deadline <- Some handle
-        // Success-only continuation: Cancel leaves Delay pending, so settle-false
-        // never runs after Resume/Cancel — matches prior clearTimeout semantics.
-        emitJsExpr (handle.Delay, (fun () -> this.TrySettle false)) "$0.then(function () { $1(); })"
-        |> ignore
+
+        let arm () =
+            task {
+                do! handle.Delay
+                this.TrySettle false
+            }
+            :> Task
+
+        arm () |> ignore
 
     member _.SessionId = sessionId
 

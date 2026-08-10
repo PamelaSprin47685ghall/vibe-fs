@@ -20,7 +20,7 @@ module HostReviewGuard =
     /// in flight, so a deferred completion must not be left waiting on a nudge
     /// that never landed.
     [<RequireQualifiedAccess>]
-    type private GuardNudgeOutcome =
+    type GuardNudgeOutcome =
         | Sent of PromptKey
         | AlreadyOutstanding
         | NoLongerRequired
@@ -152,7 +152,7 @@ module HostReviewGuard =
                             return GuardNudgeOutcome.Failed error
         }
 
-    let private nudgeReviewer
+    let nudgeReviewer
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (nudgeKeys: HashSet<string>)
@@ -209,7 +209,7 @@ module HostReviewGuard =
                     | _ -> None))
             |> Option.defaultValue ReviewChallenge.Prompt
 
-    let private requestPerfectConfirmation
+    let requestPerfectConfirmation
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (nudgeKeys: HashSet<string>)

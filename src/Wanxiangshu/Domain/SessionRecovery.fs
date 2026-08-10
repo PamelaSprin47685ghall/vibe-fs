@@ -284,7 +284,7 @@ module SessionRecovery =
     let combine (outcomes: SessionRecovery list) : SessionRecovery =
         match
             outcomes
-            |> List.tryPick (function
+            |> Seq.tryPick (function
                 | SessionRecovery.Blocked bs -> Some(SessionRecovery.Blocked bs)
                 | _ -> None)
         with
@@ -292,7 +292,7 @@ module SessionRecovery =
         | None ->
             match
                 outcomes
-                |> List.tryPick (function
+                |> Seq.tryPick (function
                     | SessionRecovery.Waiting ws -> Some(SessionRecovery.Waiting ws)
                     | _ -> None)
             with
@@ -300,15 +300,15 @@ module SessionRecovery =
             | None ->
                 match
                     outcomes
-                    |> List.tryPick (function
+                    |> Seq.tryPick (function
                         | SessionRecovery.Recovered r -> Some(SessionRecovery.Recovered r)
                         | _ -> None)
                 with
                 | Some recovered -> recovered
                 | None ->
-                    match outcomes with
-                    | head :: _ -> head
-                    | [] ->
+                    match Seq.tryHead outcomes with
+                    | Some head -> head
+                    | None ->
                         SessionRecovery.NoRecoveryRequired(RecoveryReceipt.create (SessionId.create "") 0L None [] [])
 
     let private sessionOfNode =

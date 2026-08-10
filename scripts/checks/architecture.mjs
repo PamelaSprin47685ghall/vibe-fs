@@ -94,11 +94,8 @@ const productionFs = productionFiles.filter(isFs).map(norm)
 // ④ Finality observes reviewer facts; ReviewerWorkflow is the sole continuation writer.
 {
   const finalityPath = `${PRODUCTION_ROOT}/Infrastructure/OpenCode/Tools/FinalityController.fs`
-  const finality = read(finalityPath)
-  for (const token of ['HostReviewGuard', 'ReviewChallenge', 'requestPerfectConfirmation', 'nudgeReviewer', 'continueReviewer']) {
-    if (finality.includes(token)) {
-      fail('finality-reviewer-owner', `${finalityPath}: reviewer continuation token '${token}' is forbidden`)
-    }
+  if (existsSync(finalityPath)) {
+    fail('obsolete-controller', `${finalityPath} must be deleted (rabbit S7/S8)`)
   }
 }
 

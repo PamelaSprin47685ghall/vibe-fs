@@ -11,8 +11,9 @@ import {
   stream, caseOf, promptDispatcher, transportReceipt, reviewBarrierId, gitTreeHash,
 } from '../support/domain.mjs'
 
-const { nudgeReviewer, requestPerfectConfirmation, openBarrier } =
+const { nudgeReviewer, requestPerfectConfirmation } =
   await import('../../../dist/Infrastructure/OpenCode/Host/HostReviewGuard.js')
+const { openBarrier } = await import('../../../dist/Journal/ReviewBarrier.js')
 const { AgentJournalModule_appendAgent } = await import('../../../dist/Journal/AgentJournal.js')
 const { SessionDirectories } = await import('../../../dist/Infrastructure/OpenCode/Host/SharedState.js')
 
@@ -150,7 +151,7 @@ test('RVGD_openBarrier_is_the_shared_review_barrier_writer', async () => {
   const opened = agentJournal.create({ directory: dir })
   assert.equal(opened.ok, true)
   try {
-    const barrier = openBarrier(opened.journal)(sessionId('ses_mgr'))(sessionId('ses_rv5'))(reviewBarrierId('bar_1'))(gitTreeHash('tree_1'))
+    const barrier = openBarrier(opened.journal, sessionId('ses_mgr'), sessionId('ses_rv5'), reviewBarrierId('bar_1'), gitTreeHash('tree_1'))
     assert.equal(barrier.tag, 0, `barrier must open: ${JSON.stringify(barrier)}`)
   } finally {
     opened.dispose()

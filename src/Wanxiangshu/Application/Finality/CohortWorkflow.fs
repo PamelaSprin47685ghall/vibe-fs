@@ -24,6 +24,7 @@ type CohortJudgement =
 module CohortWorkflow =
 
     type private CancelToken() =
+        // DSL-MUTABLE: cancellation — cooperative cancellation token state
         let mutable cancelled = false
 
         let tcs =

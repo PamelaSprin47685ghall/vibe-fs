@@ -75,11 +75,11 @@ for (const name of ['Session/PromptDispatcher.fs', 'Application/Reconciliation/T
 // 5. Critical migrated sites — no bare `return! xxx.Task` / `do! xxx.Task` outside CausalAwait lines
 const critical = [
   'Session/SyncDelegateRuntime.fs',
-  'Infrastructure/OpenCode/Tools/FinalityController.fs',
+  'Application/Finality/CohortWorkflow.fs',
   'Infrastructure/OpenCode/Tools/FinalityTool.fs',
   'Infrastructure/OpenCode/Tools/JoinTool.fs',
   'Infrastructure/OpenCode/Orchestration/Host.fs',
-  'Infrastructure/OpenCode/Orchestration/HostReviewProgram.fs',
+  'Application/Review/ReviewBarrierWorkflow.fs',
   'Application/Orchestration/ManagerJob.fs',
 ]
 

@@ -52,7 +52,7 @@ const {
   resolveCycleContext,
 } = await import('../../../dist/Session/EnforcerHost.js')
 const HostSessionNudge = await import('../../../dist/Infrastructure/OpenCode/Host/HostSessionNudge.js')
-const ConfirmedFailurePort = await import('../../../dist/Session/ConfirmedFailurePort.js')
+const FallbackLedger = await import('../../../dist/Application/Recovery/FallbackLedger.js')
 const AgentPairCursor = await import('../../../dist/Domain/AgentPairCursor.js')
 const BloggerRecoveryProbe = await import('../../../dist/Application/Reconciliation/BloggerRecoveryProbe.js')
 const { lastAssistantStep } = await import('../../../dist/Session/EnforcerHost.js')
@@ -75,25 +75,15 @@ const repairNudgeOf = (sessionPort) => {
 
 /**
  * Production wiring: close journal + budget into ConfirmedFailurePort (rabbit §13.1 / S9.1).
- * Fable emits `module ConfirmedFailurePort` bind as ConfirmedFailurePortModule_bind
- * (flattened arity); wrap as the 3-arg port EnforcerHost invokes.
+ * Injected 3-arg port EnforcerHost invokes.
  */
 const confirmedFailureOf = (journal) => {
   if (!journal) return undefined
-  const bind =
-    ConfirmedFailurePort.ConfirmedFailurePortModule_bind ?? ConfirmedFailurePort.bind
-  if (typeof bind !== 'function') {
-    throw new Error('ConfirmedFailurePort.bind missing from dist')
-  }
+  const admit =
+    FallbackLedger.FallbackLedger_admitConfirmedFailure ?? FallbackLedger.admitConfirmedFailure
   const budget = AgentPairCursor.DefaultAutoRecoveryBudget ?? 12
-  return (sessionId, providerRun, reason) => {
-    // Fable may emit bind as (journal,budget)=>port or flattened 5-arg.
-    if (bind.length <= 2) {
-      const port = bind(journal, budget)
-      return typeof port === 'function' ? port(sessionId, providerRun, reason) : port
-    }
-    return bind(journal, budget, sessionId, providerRun, reason)
-  }
+  return (sessionId, providerRun, reason) =>
+    admit(journal, budget, sessionId, providerRun, reason)
 }
 
 
