@@ -47,9 +47,7 @@ module EventParents =
 module PayloadRefs =
     /// §7.1 / §5.0: dedupe, then opaque-ref text order (OID text once Persist maps).
     let canonicalize (refs: PayloadRef list) : PayloadRef list =
-        refs
-        |> List.distinct
-        |> List.sortWith PayloadRef.compare
+        refs |> List.distinct |> List.sortWith PayloadRef.compare
 
 module EventEnvelope =
     /// Normalize set-shaped fields so identity bytes do not depend on caller order.

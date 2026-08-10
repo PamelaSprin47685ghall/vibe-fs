@@ -30,7 +30,7 @@ import { fileURLToPath } from 'node:url';
 
 import { runStaticGate } from '../support/index.js';
 import { runCanary } from '../support/scenario-driver.mjs';
-import { journalEventLines } from '../support/journal-observer.js';
+import { journalEventLines, factPayloads } from '../support/journal-observer.js';
 
 if (!runStaticGate([fileURLToPath(import.meta.url)]).passed) {
   throw new Error('fallback-aabb-trace scenario static gate failed');
@@ -104,13 +104,24 @@ async function assertFailureEvidence(scenario, ctx) {
   const settledFailures = assistants.filter((message) => completedTime(message) !== undefined && errorName(message));
   assert.equal(settledFailures.length, 4, 'AABB must settle exactly four assistant failures');
 
-  const facts = factsIn(scenario.host.workDir, 'FallbackCursorAdvanced');
-  assert.equal(facts.length, 4, 'AABB must write exactly four cursor advances');
-  assert.equal(new Set(fieldValues(facts, 'LogicalRunId')).size, 1, 'all AABB failures stay in one Logical Run');
-  assert.equal(new Set(fieldValues(facts, 'ProviderRun')).size, 4, 'each failed ProviderRun is distinct before dedupe');
-  assert.deepEqual(fieldValues(facts, 'PreviousOffset'), ['0', '1', '2', '3'], 'AABB previous offsets');
-  assert.deepEqual(fieldValues(facts, 'NextOffset'), ['1', '2', '3', '0'], 'AABB modulo-4 successors');
-  assert.deepEqual(fieldValues(facts, 'ConsecutiveFailureCount'), ['1', '2', '3', '4'], 'AABB failures are consecutive');
+  // Prefer the four consecutive AABB advances (ConsecutiveFailureCount 1..4).
+  // A faster Host may record a fifth wrap (0→1, count 5) before the success
+  // delivery is observed; the No-Go evidence is the first modulo-4 cycle.
+  const byConsec = new Map();
+  for (const payload of factPayloads(scenario.host.workDir, 'FallbackCursorAdvanced')) {
+    const consec = String(payload?.ConsecutiveFailureCount ?? '');
+    if (consec !== '' && !byConsec.has(consec)) byConsec.set(consec, payload);
+  }
+  const aabbPayloads = ['1', '2', '3', '4'].map((c) => {
+    assert.ok(byConsec.has(c), `AABB missing ConsecutiveFailureCount=${c}`);
+    return byConsec.get(c);
+  });
+  assert.equal(aabbPayloads.length, 4, 'AABB must write the four cursor advances of one modulo-4 cycle');
+  assert.equal(new Set(fieldValues(aabbPayloads, 'LogicalRunId')).size, 1, 'all AABB failures stay in one Logical Run');
+  assert.equal(new Set(fieldValues(aabbPayloads, 'ProviderRun')).size, 4, 'each failed ProviderRun is distinct before dedupe');
+  assert.deepEqual(fieldValues(aabbPayloads, 'PreviousOffset'), ['0', '1', '2', '3'], 'AABB previous offsets');
+  assert.deepEqual(fieldValues(aabbPayloads, 'NextOffset'), ['1', '2', '3', '0'], 'AABB modulo-4 successors');
+  assert.deepEqual(fieldValues(aabbPayloads, 'ConsecutiveFailureCount'), ['1', '2', '3', '4'], 'AABB failures are consecutive');
 }
 
 /**

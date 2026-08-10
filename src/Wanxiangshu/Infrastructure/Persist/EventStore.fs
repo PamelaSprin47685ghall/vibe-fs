@@ -65,14 +65,6 @@ module EventStore =
                 | Ok merged -> Ok merged
                 | Error(MergeError.StorageInvalid err) -> Error err
 
-    let private loadAllEvents
-        (store: IGitRawStore)
-        (snapshot: StoreSnapshot)
-        : Result<EventEnvelope list, StorageInvalid> =
-        match EventStoreMergeSpec.merge store (MergeInput.ofList [ snapshot ]) with
-        | Ok events -> Ok events
-        | Error(MergeError.StorageInvalid err) -> Error err
-
     let private eventsAlreadyCommitted
         (store: IGitRawStore)
         (snapshot: StoreSnapshot)
@@ -94,20 +86,88 @@ module EventStore =
 
         loop events
 
+    /// Incremental append validation — O(|new|) against the tip, not O(|history|).
+    ///
+    /// Prior shape reloaded every event via `loadAllEvents` + full `EventStoreFold.validate`,
+    /// so AgentJournal append latency grew linearly with history (~85ms@1 → ~500ms@40) and
+    /// Finality Perfect (2 appends) burned ~800–960ms. Snapshot projection is already cached;
+    /// do not re-fold the store on every CAS attempt.
     let private validateAppendSet
         (store: IGitRawStore)
         (baseSnapshot: StoreSnapshot)
         (events: EventEnvelope list)
         : Result<EventEnvelope list, StorageInvalid> =
-        match loadAllEvents store baseSnapshot with
-        | Error err -> Error err
-        | Ok existing ->
-            match CanonicalEventCodec.mergeByIdentity (existing @ events) with
+        match events with
+        | [] -> Ok []
+        | _ ->
+            match CanonicalEventCodec.mergeByIdentity events with
             | Error err -> Error err
-            | Ok unioned ->
-                match EventStoreFold.validate unioned with
-                | Error(FoldError.StorageInvalid err) -> Error err
-                | Ok() -> Ok unioned
+            | Ok normalized ->
+                let batchIds =
+                    normalized
+                    |> List.map (fun envelope -> EventId.value envelope.EventId)
+                    |> Set.ofList
+
+                let rec checkVocabulary remaining =
+                    match remaining with
+                    | [] -> Ok()
+                    | head :: tail ->
+                        if AuthoritativeEventTypes.isKnown head.EventType then
+                            checkVocabulary tail
+                        else
+                            Error(StorageInvalid.UnknownEventType head.EventType)
+
+                let rec checkIdentities remaining =
+                    match remaining with
+                    | [] -> Ok()
+                    | head :: tail ->
+                        let normalizedHead = EventEnvelope.normalize head
+
+                        match GitRawStore.tryReadEvent store baseSnapshot.RootOid normalizedHead.EventId with
+                        | Error err -> Error err
+                        | Ok None -> checkIdentities tail
+                        | Ok(Some existing) ->
+                            match CanonicalEventCodec.checkIdentity normalizedHead existing with
+                            | Error err -> Error err
+                            | Ok() -> checkIdentities tail
+
+                let rec checkParents remaining =
+                    match remaining with
+                    | [] -> Ok()
+                    | head :: tail ->
+                        let rec parentsLeft parents =
+                            match parents with
+                            | [] -> checkParents tail
+                            | parent :: rest ->
+                                if Set.contains (EventId.value parent) batchIds then
+                                    parentsLeft rest
+                                else
+                                    match GitRawStore.tryReadEvent store baseSnapshot.RootOid parent with
+                                    | Error err -> Error err
+                                    | Ok None -> Error(StorageInvalid.MissingParent parent)
+                                    | Ok(Some _) -> parentsLeft rest
+
+                        parentsLeft head.Parents
+
+                /// Intra-batch cycle detection. Parents outside the batch are store-backed
+                /// (checked above) and do not contribute indegree — see Fold.validateBatchDag.
+                let checkBatchDag (batch: EventEnvelope list) : Result<unit, StorageInvalid> =
+                    match EventStoreFold.validateBatchDag batch with
+                    | Error(FoldError.StorageInvalid err) -> Error err
+                    | Ok() -> Ok()
+
+                match checkVocabulary normalized with
+                | Error err -> Error err
+                | Ok() ->
+                    match checkIdentities normalized with
+                    | Error err -> Error err
+                    | Ok() ->
+                        match checkParents normalized with
+                        | Error err -> Error err
+                        | Ok() ->
+                            match checkBatchDag normalized with
+                            | Error err -> Error err
+                            | Ok() -> Ok normalized
 
     let append
         (store: IGitRawStore)

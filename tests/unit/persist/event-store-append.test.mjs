@@ -187,3 +187,158 @@ test('Append_identity_collision_fail_closed', () => {
   assert.equal(caseOf(err), 'StorageInvalid')
   assert.equal(caseOf(payloadOf(err)), 'IdentityCollision')
 })
+
+const hexId = (n) => n.toString(16).padStart(40, '0')
+
+/** Count IGitRawStore traffic; proves append validation does not rescan history. */
+const countingRaw = (inner) => {
+  const counts = { readObject: 0, readTree: 0, writeBlob: 0, writeTree: 0 }
+  return {
+    counts,
+    reset() {
+      counts.readObject = 0
+      counts.readTree = 0
+      counts.writeBlob = 0
+      counts.writeTree = 0
+    },
+    WriteBlob(content) {
+      counts.writeBlob += 1
+      return inner.WriteBlob(content)
+    },
+    WriteTree(entries) {
+      counts.writeTree += 1
+      return inner.WriteTree(entries)
+    },
+    ReadObject(oid) {
+      counts.readObject += 1
+      return inner.ReadObject(oid)
+    },
+    ReadTree(oid) {
+      counts.readTree += 1
+      return inner.ReadTree(oid)
+    },
+    ReadRef(refName) {
+      return inner.ReadRef(refName)
+    },
+    CompareAndSwapRef(refName, expectedOld, newOid) {
+      return inner.CompareAndSwapRef(refName, expectedOld, newOid)
+    },
+  }
+}
+
+const seedLinearHistory = (es, count) => {
+  let snap = es.OpenSnapshot()
+  let prev = null
+  for (let i = 0; i < count; i += 1) {
+    const id = hexId(i + 1)
+    const parents = prev ? [prev] : []
+    snap = mustOk(
+      es.Append(
+        snap,
+        toList([
+          envelope({
+            id,
+            parents,
+            payload: { n: i + 1 },
+          }),
+        ]),
+      ),
+      `seed ${i + 1}`,
+    )
+    prev = id
+  }
+  return { snap, tipId: prev }
+}
+
+test('Append_missing_parent_fail_closed_without_history_reload', () => {
+  const raw = createRaw()
+  const es = createStore(raw)
+  const base = es.OpenSnapshot()
+  const orphan = envelope({
+    id: hexId(9),
+    parents: [hexId(8)],
+  })
+  const err = mustErr(es.Append(base, toList([orphan])))
+  assert.equal(caseOf(err), 'StorageInvalid')
+  assert.equal(caseOf(payloadOf(err)), 'MissingParent')
+})
+
+test('Append_batch_cycle_fail_closed', () => {
+  const raw = createRaw()
+  const es = createStore(raw)
+  const base = es.OpenSnapshot()
+  const a = envelope({ id: hexId(0xa), parents: [hexId(0xb)] })
+  const b = envelope({ id: hexId(0xb), parents: [hexId(0xa)] })
+  const err = mustErr(es.Append(base, toList([a, b])))
+  assert.equal(caseOf(err), 'StorageInvalid')
+  assert.equal(caseOf(payloadOf(err)), 'CyclicParents')
+})
+
+test('Append_unknown_event_type_fail_closed', () => {
+  const raw = createRaw()
+  const es = createStore(raw)
+  const base = es.OpenSnapshot()
+  const bad = envelope({ id: hexId(0xc), eventType: 'TotallyUnknownEventType' })
+  const err = mustErr(es.Append(base, toList([bad])))
+  assert.equal(caseOf(err), 'StorageInvalid')
+  assert.equal(caseOf(payloadOf(err)), 'UnknownEventType')
+})
+
+test('Append_incremental_validation_object_traffic_does_not_scale_with_history', () => {
+  // Structural gate: after large history, one new append must not ReadObject every
+  // prior event blob (old validateAppendSet/loadAllEvents). Tip lookups + delta
+  // materialize/merge only — ReadObject stays near-constant vs history size.
+  const measureTailAppend = (historySize) => {
+    const raw = countingRaw(createRaw())
+    const es = createStore(raw)
+    const { tipId } = seedLinearHistory(es, historySize)
+    raw.reset()
+    const next = envelope({
+      id: hexId(historySize + 1),
+      parents: [tipId],
+      payload: { n: historySize + 1 },
+    })
+    mustOk(es.Append(es.Refresh(), toList([next])), `tail append @${historySize}`)
+    return { ...raw.counts }
+  }
+
+  const small = measureTailAppend(8)
+  const large = measureTailAppend(64)
+
+  // Old O(n) path decoded ≥ historySize event blobs on validate alone.
+  assert.ok(
+    large.readObject < 64,
+    `expected no full-history blob decode; readObject=${large.readObject} at history=64`,
+  )
+  // Tip parent + identity lookups + merge reads stay within a small multiple of the
+  // small-history case; forbid linear growth (64/8 = 8×).
+  assert.ok(
+    large.readObject <= small.readObject * 3 + 8,
+    `readObject grew too fast: small=${small.readObject} large=${large.readObject}`,
+  )
+  assert.ok(
+    large.readTree <= small.readTree * 3 + 16,
+    `readTree grew too fast: small=${small.readTree} large=${large.readTree}`,
+  )
+  // Delta write: new event blob + a few trees (shard / events / payloads / root), not O(n) re-encode.
+  assert.ok(
+    large.writeBlob <= 4,
+    `expected O(1) WriteBlob for one event, got ${large.writeBlob}`,
+  )
+  assert.ok(
+    large.writeTree <= 12,
+    `expected O(1) WriteTree for tip merge, got ${large.writeTree}`,
+  )
+})
+
+test('Append_parent_in_tip_accepted_without_reloading_siblings', () => {
+  const raw = countingRaw(createRaw())
+  const es = createStore(raw)
+  const { tipId } = seedLinearHistory(es, 20)
+  raw.reset()
+  const child = envelope({ id: hexId(100), parents: [tipId], payload: { branch: true } })
+  const published = mustOk(es.Append(es.Refresh(), toList([child])))
+  const blobs = mustOk(GitRaw.GitRawStore_listEventBlobs(raw, published.RootOid))
+  assert.equal(listItems(blobs).length, 21)
+  assert.ok(raw.counts.readObject < 20, `must not decode full history; got readObject=${raw.counts.readObject}`)
+})

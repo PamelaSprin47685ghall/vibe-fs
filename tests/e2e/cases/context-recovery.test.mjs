@@ -15,11 +15,8 @@
  * HostSignalBootstrap → XWire.reconcileAttempt. No domain algorithm changes.
  */
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { journalEventLines } from '../support/journal-observer.js';
+import { journalEventLines, readBlobRef } from '../support/journal-observer.js';
 
 import { runCanary } from '../support/scenario-driver.mjs';
 import { runStaticGate } from '../support/index.js';
@@ -31,22 +28,8 @@ const SCENARIOS = [
   'x-d-promote-then-restart',
 ];
 
-function runtimeRoot(workDir) {
-  const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], {
-    encoding: 'utf8',
-  }).trim();
-  return path.join(
-    path.isAbsolute(common) ? common : path.resolve(workDir, common),
-    'wanxiangshu-next',
-    'runtimes',
-  );
-}
-
 function readBlob(workDir, blobRef) {
-  const hash = String(blobRef).replace(/^blobs\//, '');
-  const blobPath = path.join(runtimeRoot(workDir), 'blobs', hash);
-  assert.ok(fs.existsSync(blobPath), `blob missing: ${blobPath}`);
-  return fs.readFileSync(blobPath, 'utf8');
+  return readBlobRef(workDir, blobRef);
 }
 
 function runtimeFacts(workDir, factName) {

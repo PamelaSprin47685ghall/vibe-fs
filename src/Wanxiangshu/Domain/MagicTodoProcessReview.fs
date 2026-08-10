@@ -16,15 +16,17 @@ module MagicTodoProcessReview =
         | FinalityTerminal
 
     type ProcessReviewRequest =
-        { TodoReviewId: TodoReviewId
-          TodoWriteId: TodoWriteId
-          ManagerLifeId: ManagerLifeId
-          /// OpeningRaw authority text (separate from LWR; includeOpening=false on LWR).
-          OpeningRaw: string
-          /// Frontier-bounded ManagerCheckpointLWR text (Y + canonical RawGap).
-          ManagerCheckpointLwr: string
-          OldTodo: MagicTodoList
-          ProposedTodo: MagicTodoList }
+        {
+            TodoReviewId: TodoReviewId
+            TodoWriteId: TodoWriteId
+            ManagerLifeId: ManagerLifeId
+            /// OpeningRaw authority text (separate from LWR; includeOpening=false on LWR).
+            OpeningRaw: string
+            /// Frontier-bounded ManagerCheckpointLWR text (Y + canonical RawGap).
+            ManagerCheckpointLwr: string
+            OldTodo: MagicTodoList
+            ProposedTodo: MagicTodoList
+        }
 
     let renderAssignmentUserMessage (req: ProcessReviewRequest) : string =
         String.concat

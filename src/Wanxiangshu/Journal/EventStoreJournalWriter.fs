@@ -73,7 +73,8 @@ type private UnavailableBlobWriter() =
 
 /// EventStore-backed journal writer (W1). Success path never writes NDJSON or
 /// `blobs/<sha>` files — only `IEventStore` / `IGitRawStore`.
-type EventStoreJournalWriter private
+type EventStoreJournalWriter
+    private
     (
         runtimeId: RuntimeId,
         blobWriter: IBlobWriter,
@@ -104,13 +105,13 @@ type EventStoreJournalWriter private
     member this.IsPoisoned = lock gate (fun () -> poisoned)
     member _.StoreSnapshot = lock gate (fun () -> baseSnapshot)
 
-    static member private formatAppendError (error: AppendError) : string =
+    static member private formatAppendError(error: AppendError) : string =
         match error with
         | AppendError.StorageInvalid detail -> sprintf "storage invalid: %A" detail
         | AppendError.AppendCasRejected -> "append CAS rejected"
         | AppendError.AppendRetryExhausted -> "append retry exhausted"
 
-    static member private streamKey (stream: StreamId) : string =
+    static member private streamKey(stream: StreamId) : string =
         EventStreamId.value (EventStoreJournalCodec.encodeStreamId stream)
 
     static member private commitEnvelope
@@ -131,10 +132,7 @@ type EventStoreJournalWriter private
 
     /// Load journal envelopes from a store snapshot (W1-boot).
     /// Non-journal EventTypes (Job*, etc.) are skipped; decode failures fail closed.
-    static member loadJournalEnvelopes
-        (raw: IGitRawStore)
-        (snapshot: StoreSnapshot)
-        : Result<Envelope list, string> =
+    static member loadJournalEnvelopes (raw: IGitRawStore) (snapshot: StoreSnapshot) : Result<Envelope list, string> =
         match EventStoreMergeSpec.merge raw (MergeInput.ofList [ snapshot ]) with
         | Error(MergeError.StorageInvalid detail) -> Error(sprintf "storage invalid: %A" detail)
         | Ok events ->
@@ -157,13 +155,9 @@ type EventStoreJournalWriter private
     /// create(runtimeId, processId, startedAt, store, raw) → writer * RuntimeStarted envelope.
     /// Pass `None` for raw when blob writes are unavailable (tests that only append facts).
     static member create
-        (
-            runtimeId: RuntimeId,
-            processId: int,
-            startedAt: DateTimeOffset,
-            store: IEventStore,
-            raw: IGitRawStore option
-        ) : IJournalWriter * Envelope =
+        (runtimeId: RuntimeId, processId: int, startedAt: DateTimeOffset, store: IEventStore, raw: IGitRawStore option) : IJournalWriter *
+                                                                                                                          Envelope
+        =
         let blobWriter =
             match raw with
             | Some gitRaw -> EventStoreBlobWriter.Create gitRaw
@@ -210,13 +204,13 @@ type EventStoreJournalWriter private
     /// Replays prior journal envelopes, publishes a fresh RuntimeStarted, and
     /// returns writer + init envelope + folded projection.
     static member resumeOrCreate
-        (
-            runtimeId: RuntimeId,
-            processId: int,
-            startedAt: DateTimeOffset,
-            store: IEventStore,
-            raw: IGitRawStore
-        ) : Result<IJournalWriter * Envelope * ProjectionSet, FoldRejection> =
+        (runtimeId: RuntimeId, processId: int, startedAt: DateTimeOffset, store: IEventStore, raw: IGitRawStore) : Result<
+                                                                                                                       IJournalWriter *
+                                                                                                                       Envelope *
+                                                                                                                       ProjectionSet,
+                                                                                                                       FoldRejection
+                                                                                                                    >
+        =
         let blobWriter = EventStoreBlobWriter.Create raw
         let baseSnapshot = store.OpenSnapshot()
 

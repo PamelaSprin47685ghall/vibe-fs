@@ -39,7 +39,10 @@ flow = [
   # A non-retryable provider error does not emit a scenario response signal. The
   # settled assistant snapshot is the only legal wake-up for FALLBACK-003.
   { awaitTerminal = true, requireAssistantTerminal = true, requireIdleAfterActivity = true },
-  { waitFact = { name = "FallbackCursorAdvanced", eq = 4 } },
+  # gte not eq: EventStore append is fast enough that the Host can land the
+  # fourth (and sometimes a fifth) cursor advance between waitFact polls; exact
+  # eq=4 then deadlocks with named already past the target (VERIFY-004 silence).
+  { waitFact = { name = "FallbackCursorAdvanced", gte = 4 } },
 
   # First continue match only. StrictMockSignals permanent-consume makes wait="continue"
   # return immediately after the first continue delivery — it cannot barrier multi-delivery

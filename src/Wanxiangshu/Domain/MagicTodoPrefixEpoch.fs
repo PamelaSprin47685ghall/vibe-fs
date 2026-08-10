@@ -23,16 +23,12 @@ module MagicTodoPrefixEpoch =
         findPrev acceptedInOrder
 
     /// Build TodoCheckpoint EvidenceKind for the next provider attempt seal.
-    let todoCheckpointEvidence
-        (acceptedInOrder: TodoWriteId list)
-        (trigger: TodoWriteId)
-        : PrefixEvidenceKind =
+    let todoCheckpointEvidence (acceptedInOrder: TodoWriteId list) (trigger: TodoWriteId) : PrefixEvidenceKind =
         PrefixEvidenceKind.TodoCheckpoint(trigger, coveredBefore acceptedInOrder trigger)
 
     /// Whether a desired TodoCheckpoint rebase is mandatory after Accepted(Tk).
     /// T1 → false (no prior). Tk (k≥2) → true.
-    let requiresLag1Rebase (acceptedInOrder: TodoWriteId list) : bool =
-        List.length acceptedInOrder >= 2
+    let requiresLag1Rebase (acceptedInOrder: TodoWriteId list) : bool = List.length acceptedInOrder >= 2
 
     /// Assemble speculative V2 commit payload. Caller supplies PrefixCoverage-
     /// proven Y bundle (never LWR RawGap) and snapshot fields.

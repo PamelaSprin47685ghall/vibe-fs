@@ -233,8 +233,7 @@ module MagicTodoFactCodec =
                           TodoWriteId = get.Required.Field "TodoWriteId" todoWriteIdDecoder
                           TodoReviewId = get.Required.Field "TodoReviewId" todoReviewIdDecoder
                           DedicatedReviewerId = get.Required.Field "DedicatedReviewerId" dedicatedIdDecoder
-                          ReviewerSessionId =
-                            SessionId.create (get.Required.Field "ReviewerSessionId" Decode.string)
+                          ReviewerSessionId = SessionId.create (get.Required.Field "ReviewerSessionId" Decode.string)
                           ReviewWorkStartCursor = get.Required.Field "ReviewWorkStartCursor" cursorDecoder
                           ManagerReviewFrontier = get.Required.Field "ManagerReviewFrontier" cursorDecoder }
                 | "TodoReviewConcluded" ->
@@ -243,22 +242,18 @@ module MagicTodoFactCodec =
                           TodoWriteId = get.Required.Field "TodoWriteId" todoWriteIdDecoder
                           TodoReviewId = get.Required.Field "TodoReviewId" todoReviewIdDecoder
                           DedicatedReviewerId = get.Required.Field "DedicatedReviewerId" dedicatedIdDecoder
-                          ReviewerSessionId =
-                            SessionId.create (get.Required.Field "ReviewerSessionId" Decode.string)
+                          ReviewerSessionId = SessionId.create (get.Required.Field "ReviewerSessionId" Decode.string)
                           Verdict = get.Required.Field "Verdict" verdictDecoder
                           WorkRecordRef = BlobRef.create (get.Required.Field "WorkRecordRef" Decode.string)
-                          WorkRecordDigest =
-                            BlobDigest.create (get.Required.Field "WorkRecordDigest" Decode.string)
+                          WorkRecordDigest = BlobDigest.create (get.Required.Field "WorkRecordDigest" Decode.string)
                           ReviewerRecordFrontier = get.Required.Field "ReviewerRecordFrontier" cursorDecoder
-                          ProviderRunId =
-                            ProviderRunIdentity.create (get.Required.Field "ProviderRunId" Decode.string)
+                          ProviderRunId = ProviderRunIdentity.create (get.Required.Field "ProviderRunId" Decode.string)
                           ToolCallId = ToolCallId.create (get.Required.Field "ToolCallId" Decode.string) }
                 | "DedicatedTodoReviewerEnlisted" ->
                     MagicTodoFact.DedicatedTodoReviewerEnlisted
                         { ManagerLifeId = ManagerLifeId.create (get.Required.Field "ManagerLifeId" Decode.string)
                           DedicatedReviewerId = get.Required.Field "DedicatedReviewerId" dedicatedIdDecoder
-                          ReviewerSessionId =
-                            SessionId.create (get.Required.Field "ReviewerSessionId" Decode.string) }
+                          ReviewerSessionId = SessionId.create (get.Required.Field "ReviewerSessionId" Decode.string) }
                 | "DedicatedTodoReviewerReplaced" ->
                     MagicTodoFact.DedicatedTodoReviewerReplaced
                         { ManagerLifeId = ManagerLifeId.create (get.Required.Field "ManagerLifeId" Decode.string)
@@ -268,8 +263,7 @@ module MagicTodoFactCodec =
                           EvidenceRef = BlobRef.create (get.Required.Field "EvidenceRef" Decode.string) }
                 | "LegacyTodoSeedAdopted" ->
                     MagicTodoFact.LegacyTodoSeedAdopted
-                        { ManagerSessionId =
-                            SessionId.create (get.Required.Field "ManagerSessionId" Decode.string)
+                        { ManagerSessionId = SessionId.create (get.Required.Field "ManagerSessionId" Decode.string)
                           ManagerLifeId = ManagerLifeId.create (get.Required.Field "ManagerLifeId" Decode.string)
                           SeedTodoRef = BlobRef.create (get.Required.Field "SeedTodoRef" Decode.string)
                           SeedTodoDigest = BlobDigest.create (get.Required.Field "SeedTodoDigest" Decode.string)

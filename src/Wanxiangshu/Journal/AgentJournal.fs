@@ -225,10 +225,7 @@ module AgentJournal =
     /// EventStore-backed journal for empty init-only tests. Caller builds the
     /// writer via the EventStore journal writer factory (keeps this module free
     /// of store write tokens for the unified-store dual-write gate).
-    let createFromEventStore
-        (writer: IJournalWriter)
-        (initEnvelope: Envelope)
-        : Result<AgentJournal, FoldRejection> =
+    let createFromEventStore (writer: IJournalWriter) (initEnvelope: Envelope) : Result<AgentJournal, FoldRejection> =
         Fold.foldEnvelope Fold.empty initEnvelope
         |> Result.map (fun projection -> new AgentJournal(writer, projection))
 

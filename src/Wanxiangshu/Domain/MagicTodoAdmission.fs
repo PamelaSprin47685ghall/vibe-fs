@@ -9,12 +9,14 @@ open Wanxiangshu.Kernel.Identity
 module MagicTodoAdmission =
 
     type LocalizedToolCall =
-        { ToolCallId: ToolCallId
-          ToolPartOrdinal: int
-          /// Other todowrite ToolCallIds in the same assistant message (incl. self).
-          TodowriteCallIdsInMessage: ToolCallId list
-          ReviewFrontier: XTraceCursor
-          ProviderInputDigest: string }
+        {
+            ToolCallId: ToolCallId
+            ToolPartOrdinal: int
+            /// Other todowrite ToolCallIds in the same assistant message (incl. self).
+            TodowriteCallIdsInMessage: ToolCallId list
+            ReviewFrontier: XTraceCursor
+            ProviderInputDigest: string
+        }
 
     type PrepareSuccess =
         { TodoWriteId: TodoWriteId

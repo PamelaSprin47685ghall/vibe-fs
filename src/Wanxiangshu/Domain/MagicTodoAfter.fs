@@ -17,13 +17,15 @@ module MagicTodoAfter =
         | NotPhysicallySuccessful
 
     type AcceptPlan =
-        { Accepted: TodoWriteAccepted
-          /// True when DedicatedTodoReviewerEnlisted must be ensured first.
-          NeedsDedicatedEnlist: bool
-          /// True when TodoProcessReviewAssigned / reviewer submit must be ensured.
-          NeedsEnsureReview: bool
-          EnrichedResult: string
-          CompatibilityRows: CompatibilityTodoRow list }
+        {
+            Accepted: TodoWriteAccepted
+            /// True when DedicatedTodoReviewerEnlisted must be ensured first.
+            NeedsDedicatedEnlist: bool
+            /// True when TodoProcessReviewAssigned / reviewer submit must be ensured.
+            NeedsEnsureReview: bool
+            EnrichedResult: string
+            CompatibilityRows: CompatibilityTodoRow list
+        }
 
     /// Build TodoWriteAccepted once Prepared + physical success + digests converge.
     /// `inputDigest` is the provider-input digest frozen at prepare time.
@@ -55,8 +57,7 @@ module MagicTodoAfter =
                   SemanticVersion = prepared.SemanticVersion }
 
             let enriched =
-                buildEnrichedResult previous settledCurrent submitted
-                |> renderEnrichedResult
+                buildEnrichedResult previous settledCurrent submitted |> renderEnrichedResult
 
             Ok
                 { Accepted = accepted
@@ -72,7 +73,8 @@ module MagicTodoAfter =
         (dedicated: DedicatedTodoReviewerEnlisted)
         (reviewWorkStart: XTraceCursor)
         : TodoProcessReviewAssigned =
-        let reviewId = MagicTodo.todoReviewId sha256 prepared.ManagerLifeId prepared.TodoWriteId
+        let reviewId =
+            MagicTodo.todoReviewId sha256 prepared.ManagerLifeId prepared.TodoWriteId
 
         { ManagerLifeId = prepared.ManagerLifeId
           TodoWriteId = prepared.TodoWriteId

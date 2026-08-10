@@ -10,8 +10,7 @@ open Wanxiangshu.Kernel.Identity
 [<RequireQualifiedAccess>]
 module EventStoreMergeSpec =
 
-    let private asMergeError (error: StorageInvalid) : MergeError =
-        MergeError.StorageInvalid error
+    let private asMergeError (error: StorageInvalid) : MergeError = MergeError.StorageInvalid error
 
     /// Pure event-set oracle. EventId sort is physical tie-break only (§5.0).
     let mergeEvents (events: EventEnvelope list) : Result<EventEnvelope list, MergeError> =
@@ -45,11 +44,7 @@ module EventStoreMergeSpec =
                                 | Ok envelope ->
                                     match EventIdShard.tryParseEventId path with
                                     | Some pathId when pathId <> envelope.EventId ->
-                                        Error(
-                                            asMergeError (
-                                                StorageInvalid.NonCanonical "event path EventId mismatch"
-                                            )
-                                        )
+                                        Error(asMergeError (StorageInvalid.NonCanonical "event path EventId mismatch"))
                                     | _ -> decodeBlobs tail (decoded @ [ envelope ])
 
                     decodeBlobs blobs []
@@ -61,8 +56,7 @@ module EventStoreMergeSpec =
 [<RequireQualifiedAccess>]
 module EventStoreMerge =
 
-    let private asMergeError (error: StorageInvalid) : MergeError =
-        MergeError.StorageInvalid error
+    let private asMergeError (error: StorageInvalid) : MergeError = MergeError.StorageInvalid error
 
     let private collisionAt (path: string) : MergeError =
         match EventIdShard.tryParseEventId path with
@@ -90,11 +84,7 @@ module EventStoreMerge =
             match acc with
             | Error e -> Error e
             | Ok collected ->
-                let path =
-                    if pathPrefix = "" then
-                        name
-                    else
-                        pathPrefix + "/" + name
+                let path = if pathPrefix = "" then name else pathPrefix + "/" + name
 
                 let normalized =
                     group
@@ -102,34 +92,23 @@ module EventStoreMerge =
                         { entry with
                             Mode = StoreTree.normalizeMode entry.Mode })
 
-                let modes =
-                    normalized
-                    |> List.map (fun e -> e.Mode)
-                    |> List.distinct
+                let modes = normalized |> List.map (fun e -> e.Mode) |> List.distinct
 
                 match modes with
                 | [ mode ] when StoreTree.isTreeMode mode ->
                     let childOids =
-                        normalized
-                        |> List.map (fun e -> e.Oid)
-                        |> List.distinctBy GitObjectId.value
+                        normalized |> List.map (fun e -> e.Oid) |> List.distinctBy GitObjectId.value
 
                     match childOids with
                     | [ oid ] ->
                         Ok(
                             collected
-                            @ [
-                                {
-                                    Mode = StoreTree.TreeMode
-                                    Name = name
-                                    Oid = oid
-                                }
-                            ]
+                            @ [ { Mode = StoreTree.TreeMode
+                                  Name = name
+                                  Oid = oid } ]
                         )
                     | many ->
-                        let childTrees =
-                            many
-                            |> List.choose (fun oid -> store.ReadTree oid)
+                        let childTrees = many |> List.choose (fun oid -> store.ReadTree oid)
 
                         if childTrees.Length <> many.Length then
                             Error(asMergeError (StorageInvalid.MalformedEnvelope(sprintf "missing tree at %s" path)))
@@ -141,13 +120,9 @@ module EventStoreMerge =
 
                                 Ok(
                                     collected
-                                    @ [
-                                        {
-                                            Mode = StoreTree.TreeMode
-                                            Name = name
-                                            Oid = oid
-                                        }
-                                    ]
+                                    @ [ { Mode = StoreTree.TreeMode
+                                          Name = name
+                                          Oid = oid } ]
                                 )
                 | [ mode ] ->
                     let oids =
@@ -157,44 +132,21 @@ module EventStoreMerge =
                         |> List.sortWith GitObjectId.compare
 
                     match oids with
-                    | [ oid ] ->
-                        Ok(
-                            collected
-                            @ [
-                                {
-                                    Mode = mode
-                                    Name = name
-                                    Oid = oid
-                                }
-                            ]
-                        )
+                    | [ oid ] -> Ok(collected @ [ { Mode = mode; Name = name; Oid = oid } ])
                     | many ->
-                        let bodies =
-                            many
-                            |> List.map (fun oid -> oid, store.ReadObject oid)
+                        let bodies = many |> List.map (fun oid -> oid, store.ReadObject oid)
 
                         if bodies |> List.exists (fun (_, body) -> Option.isNone body) then
                             Error(asMergeError (StorageInvalid.MalformedEnvelope(sprintf "missing blob at %s" path)))
                         else
-                            let contents =
-                                bodies
-                                |> List.map (fun (oid, body) -> oid, Option.get body)
+                            let contents = bodies |> List.map (fun (oid, body) -> oid, Option.get body)
 
                             let firstBytes = contents |> List.head |> snd
 
                             if contents |> List.forall (fun (_, bytes) -> bytesEqual firstBytes bytes) then
                                 let oid = contents |> List.head |> fst
 
-                                Ok(
-                                    collected
-                                    @ [
-                                        {
-                                            Mode = mode
-                                            Name = name
-                                            Oid = oid
-                                        }
-                                    ]
-                                )
+                                Ok(collected @ [ { Mode = mode; Name = name; Oid = oid } ])
                             elif path.StartsWith(StoreTree.EventsDir + "/") then
                                 Error(collisionAt path)
                             else
@@ -207,10 +159,7 @@ module EventStoreMerge =
 
         List.fold folder (Ok []) byName
 
-    let private readRootEntries
-        (store: IGitRawStore)
-        (snapshot: StoreSnapshot)
-        : Result<TreeEntry list, MergeError> =
+    let private readRootEntries (store: IGitRawStore) (snapshot: StoreSnapshot) : Result<TreeEntry list, MergeError> =
         match store.ReadTree(RootOid.value snapshot.RootOid) with
         | None -> Error(asMergeError (StorageInvalid.MalformedEnvelope "missing store root tree"))
         | Some entries -> Ok entries

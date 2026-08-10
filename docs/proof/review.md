@@ -31,6 +31,6 @@ JoinGuard 优先于其它 Manager completion 分支（EXEC-016）；Manager comp
 witness，Manager 面无 Review Guard（REVIEW-007、GLORY-070）。`ReviewerWorkflow` 是 ReviewerGuard /
 ReviewConfirmation 唯一 writer；durable REVISE 关闭 cohort 后不补发 challenge，record-ready 等待不重开该路径。代表：
 `tests/unit/reconciliation/turn-completion-program.test.mjs`、
-`tests/unit/execution/finality-cohort-law.test.mjs`、e2e `reviewer-verdict.test.mjs` 与
+`tests/e2e/cases/finality-cohort-law.test.mjs`（canary）、e2e `reviewer-verdict.test.mjs` 与
 `temporal-ownership-unhappy-path.test.mjs`。
 Post-rebase 必须新双 PERFECT（REVIEW-009、ORCH）。

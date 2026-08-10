@@ -202,12 +202,22 @@ export async function awaitFactBarrier(scenario, step) {
   scenario.watchdog?.setWindow(step.timeoutMs ?? null);
   try {
   let observed = readJournal(scenario.host.workDir, name, renewOn);
+  if (step.waitFact.eq !== undefined && observed.named > need) {
+    assert.fail(
+      `waitFact ${name} overshot eq ${need} (got ${observed.named}); use gte when the producer can race past the exact count`,
+    );
+  }
   while (!cmp(observed.named) && Date.now() < deadline) {
     const remaining = Math.max(1, deadline - Date.now());
     // Journal watch wakes on refs/wanxiang/store tip change; ≤FACT_WAKE_GUARD_MS wall guard is fallback only.
     await wakeOnJournal(scenario.host.workDir, Math.min(remaining, FACT_WAKE_GUARD_MS));
 
     const next = readJournal(scenario.host.workDir, name, renewOn);
+    if (step.waitFact.eq !== undefined && next.named > need) {
+      assert.fail(
+        `waitFact ${name} overshot eq ${need} (got ${next.named}); use gte when the producer can race past the exact count`,
+      );
+    }
     // VERIFY-004 / waitFact causal renewal: only the awaited count OR an explicitly
     // declared renewOn fact is causal blocking progress. Any other journal growth is
     // background traffic — recorded for diagnosis, never renewing the silence window.

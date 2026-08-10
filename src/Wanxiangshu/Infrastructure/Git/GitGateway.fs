@@ -121,8 +121,7 @@ module GitGateway =
         let leaseArg =
             match expectedRemote with
             | None -> "--force-with-lease=" + StoreRef.canonical + ":"
-            | Some oid ->
-                "--force-with-lease=" + StoreRef.canonical + ":" + GitObjectId.value oid
+            | Some oid -> "--force-with-lease=" + StoreRef.canonical + ":" + GitObjectId.value oid
 
         runOk run [ "push"; leaseArg; remote; dest ] (withSyncGuard None)
 
@@ -245,7 +244,9 @@ module GitGateway =
         (maxRetries: int)
         : IGitGateway =
         ignore repoPath
-        let converge remote = convergeStore store run maxRetries remote
+
+        let converge remote =
+            convergeStore store run maxRetries remote
 
         { new IGitGateway with
             member _.Fetch(remote) =

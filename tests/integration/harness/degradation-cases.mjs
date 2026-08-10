@@ -225,6 +225,12 @@ export const degradationCases = [
         !turnSource.includes('timeoutMs: opts.timeoutMs || WATCHDOG_TIMEOUT_MS'),
         'Turn must leave its local timeout absent unless the scenario explicitly declares one',
       );
+
+      const providerSource = readSource('tests/e2e/support/strict-mock-provider.js');
+      assertTrue(
+        !providerSource.includes('timeoutMs = WATCHDOG_TIMEOUT_MS'),
+        'provider wait helpers must not default every flow wait to the silence window as a total deadline',
+      );
     },
   },
 

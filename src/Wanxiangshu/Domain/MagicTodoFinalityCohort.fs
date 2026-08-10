@@ -11,10 +11,12 @@ module MagicTodoFinalityCohort =
     /// Ordinary graduation: after first dual-PERFECT on a FinalityRequest,
     /// Dedicated is NOT force-re-enlisted by Magic Todo on later requests.
     type DedicatedFinalityPolicy =
-        { /// Physical session still retained for process-review until LifeCompleted.
-          RetainProcessSessionUntilLifeCompleted: bool
-          /// Enlist on first terminal Finality only if not yet graduated.
-          EnlistOnFirstFinalityIfUngraduated: bool }
+        {
+            /// Physical session still retained for process-review until LifeCompleted.
+            RetainProcessSessionUntilLifeCompleted: bool
+            /// Enlist on first terminal Finality only if not yet graduated.
+            EnlistOnFirstFinalityIfUngraduated: bool
+        }
 
     let defaultPolicy: DedicatedFinalityPolicy =
         { RetainProcessSessionUntilLifeCompleted = true
@@ -28,9 +30,7 @@ module MagicTodoFinalityCohort =
         : bool =
         match dedicated with
         | None -> false
-        | Some _ ->
-            policy.EnlistOnFirstFinalityIfUngraduated
-            && not alreadyGraduated
+        | Some _ -> policy.EnlistOnFirstFinalityIfUngraduated && not alreadyGraduated
 
     /// Process PERFECT must not count as terminal first PERFECT / dual-PERFECT.
     let processPerfectIsTerminalWitness = false
@@ -43,5 +43,4 @@ module MagicTodoFinalityCohort =
         : bool =
         let _ = graduatedFromFinality
 
-        policy.RetainProcessSessionUntilLifeCompleted
-        && not lifeCompleted
+        policy.RetainProcessSessionUntilLifeCompleted && not lifeCompleted

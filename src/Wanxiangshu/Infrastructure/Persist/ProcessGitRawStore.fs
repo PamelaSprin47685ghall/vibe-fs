@@ -42,11 +42,7 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawSyncRunner) =
 
     let ensureOk (label: string) (code: int) (stdout: string) (stderr: string) =
         if code <> 0 then
-            let detail =
-                if String.IsNullOrWhiteSpace stderr then
-                    stdout
-                else
-                    stderr
+            let detail = if String.IsNullOrWhiteSpace stderr then stdout else stderr
 
             failwith (sprintf "git %s failed (%d): %s" label code (detail.Trim()))
 
@@ -82,17 +78,12 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawSyncRunner) =
                         else
                             entry.Mode
 
-                    let objectType =
-                        if StoreTree.isTreeMode entry.Mode then
-                            "tree"
-                        else
-                            "blob"
+                    let objectType = if StoreTree.isTreeMode entry.Mode then "tree" else "blob"
 
                     sprintf "%s %s %s\t%s" mode objectType (GitObjectId.value entry.Oid) entry.Name)
                 |> String.concat "\n"
 
-            let payload =
-                Encoding.UTF8.GetBytes(if lines = "" then "" else lines + "\n")
+            let payload = Encoding.UTF8.GetBytes(if lines = "" then "" else lines + "\n")
 
             let code, stdout, stderr = runWithStdin [ "mktree" ] payload
             ensureOk "mktree" code stdout stderr
@@ -179,8 +170,7 @@ module ProcessGitRawStore =
                             [ "encoding", box "buffer"
                               "input", box bytes
                               "maxBuffer", box (64 * 1024 * 1024) ]
-                    | None ->
-                        createObj [ "encoding", box "buffer"; "maxBuffer", box (64 * 1024 * 1024) ]
+                    | None -> createObj [ "encoding", box "buffer"; "maxBuffer", box (64 * 1024 * 1024) ]
 
                 let stdoutObj = execFileSync "git" argv options
                 let stdout: byte[] = emitJsExpr stdoutObj "Buffer.from($0)"

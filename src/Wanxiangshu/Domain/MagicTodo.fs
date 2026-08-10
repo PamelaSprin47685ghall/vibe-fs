@@ -147,11 +147,7 @@ module MagicTodo =
     // ── Identity digests (§7.2 / §11.2 / §18) ───────────────────────────────
 
     /// TodoWriteId = digest(ManagerLifeId + ToolCallId)
-    let todoWriteId
-        (sha256: string -> string)
-        (lifeId: ManagerLifeId)
-        (toolCallId: ToolCallId)
-        : TodoWriteId =
+    let todoWriteId (sha256: string -> string) (lifeId: ManagerLifeId) (toolCallId: ToolCallId) : TodoWriteId =
         TodoWriteId.create (
             sha256 (String.concat "|" [ ManagerLifeId.value lifeId; ToolCallId.value toolCallId; "todo-write" ])
         )
@@ -182,7 +178,9 @@ module MagicTodo =
 
     /// Logical dedicated reviewer id for the Life (stable across physical replacement).
     let dedicatedReviewerId (sha256: string -> string) (lifeId: ManagerLifeId) : DedicatedReviewerId =
-        DedicatedReviewerId.create (sha256 (String.concat "|" [ ManagerLifeId.value lifeId; "dedicated-todo-reviewer" ]))
+        DedicatedReviewerId.create (
+            sha256 (String.concat "|" [ ManagerLifeId.value lifeId; "dedicated-todo-reviewer" ])
+        )
 
     /// Canonical list digest for BaseTodoDigest / ProposedTodoDigest / identity checks.
     let listDigest (sha256: string -> string) (items: MagicTodoList) : string =
@@ -223,11 +221,14 @@ module MagicTodo =
         (inputs: MagicTodoInputItem list)
         : Result<MagicTodoList, MagicTodoReject> =
         let oldById =
-            old
-            |> List.map (fun item -> TodoItemId.value item.Id, item)
-            |> Map.ofList
+            old |> List.map (fun item -> TodoItemId.value item.Id, item) |> Map.ofList
 
-        let rec loop (remaining: MagicTodoInputItem list) (newOrdinal: int) (acc: MagicTodoItem list) (seen: Set<string>) =
+        let rec loop
+            (remaining: MagicTodoInputItem list)
+            (newOrdinal: int)
+            (acc: MagicTodoItem list)
+            (seen: Set<string>)
+            =
             match remaining with
             | [] -> Ok(List.rev acc)
             | MagicTodoInputItem.Existing(id, content, status, priority) :: rest ->
@@ -300,11 +301,10 @@ module MagicTodo =
     /// proposed order; intersection items appear at proposed position with merged fields.
     let semanticMerge (old: MagicTodoList) (proposed: MagicTodoList) : MagicTodoList =
         let oldById =
-            old
-            |> List.map (fun item -> TodoItemId.value item.Id, item)
-            |> Map.ofList
+            old |> List.map (fun item -> TodoItemId.value item.Id, item) |> Map.ofList
 
-        let proposedIds = proposed |> List.map (fun item -> TodoItemId.value item.Id) |> Set.ofList
+        let proposedIds =
+            proposed |> List.map (fun item -> TodoItemId.value item.Id) |> Set.ofList
 
         let oldOnly =
             old
@@ -334,10 +334,7 @@ module MagicTodo =
     /// >1 distinct ToolCallId todowrite in one assistant message → all fail closed.
     /// No ordinal winner arbitration.
     let admitTodowriteBatch (toolCallIdsInMessage: ToolCallId list) : Result<unit, MagicTodoReject> =
-        let distinct =
-            toolCallIdsInMessage
-            |> List.map ToolCallId.value
-            |> List.distinct
+        let distinct = toolCallIdsInMessage |> List.map ToolCallId.value |> List.distinct
 
         if List.length distinct > 1 then
             Error(MagicTodoReject.MultipleTodowriteInMessage distinct)

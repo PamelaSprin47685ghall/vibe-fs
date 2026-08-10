@@ -702,9 +702,66 @@ Per §0 / Phase 0 table / **Amendment G3.5-A**: Student QA is **retired / do-not
 
 Proposed storage sections rewritten to EventStore-only (`refs/wanxiang/store` / `payload_refs` / no feature-owned refs/LWW/private journals). js-capability durable prepare/crash recovery → EventStore; js-student/js-teacher annotated as Universal G3 rebase debt only.
 
-- [ ] Phase 8 Full Proof（`spec`/`architecture`/`dsl-ownership`/`unified-store-gate` + build + unit/integration/e2e + dumb-server + `npm run check`；**无** legacy migrator suite for Student QA）
-- [x] Formal docs 重写（`docs/{why,what,shape,how,proof}/persist.md` — EventStore world；G4PersistDocs；spec gate green）
 
+### Phase 8 — IN PROGRESS（EOD 2026-08-10 freeze）
+
+**Policy（hard）：** 不准再提升超时，只准优化性能。`CANARY_TIMEOUT_MS=90000` / `PER_TEST_TIMEOUT_MS=2500` 保持 HEAD 默认；**禁止** `FINALITY_COHORT_*` / per-basename canary ceiling。生产+测试优先事件驱动 / 时间注入（VERIFY-004）。用户澄清：**超时根不在 git**（git CLI 本身很快）。
+
+#### Done this session（landed in working tree；**未 commit**）
+
+1. **GLORY demotion** — unit `finality-cohort-law` → e2e canary `tests/e2e/cases/finality-cohort-law.test.mjs` + `plugin-fixture-canary.mjs`；proof paths updated。
+2. **Append O(n) root cause + fix** — `EventStore.validateAppendSet` 曾每 append `loadAllEvents` + 全量 `EventStoreFold.validate`。改为 tip `tryReadEvent`（identity/parents）+ `EventStoreFold.validateBatchDag`（仅新 batch）。
+   - Before: append ~85ms@1 → ~500ms@40；Perfect≈800–960ms；blessing≈15s；canary serial ≈112–120s。
+   - After: append flat；blessing≈3.5s；**finality-cohort 12/12 ≈39–40s** under default 90s。
+3. **Observation / harness EventStore cutover**
+   - `journal-observer.js`：解包 `payload.Fact`；`readBlobRef` 读 Git ODB（不再读 `wanxiangshu-next/blobs`）；tip 级 `ls-tree`+blob cache（避免 waitFact 轮询 O(n) `git show`）。
+   - `path-criterion`：`events/` tip-tree 前缀拼装，避免误扫成 repo 路径。
+   - VERIFY waitFact：`event-store-gate-facts.mjs` + timeout-cases 改种 EventStore facts（leave-unread NDJSON）。
+   - canaries：`temporal` / `orchestrator` / `manager-unhappy` / `context-recovery` 改用 `factPayloads` / `readBlobRef`。
+4. **waitFact eq race** — `fallback-aabb-trace` `eq=4` → `gte=4`（EventStore 更快时会越过精确值导致死等）；driver 对 eq overshoot fail-fast。
+5. **VERIFY-004** — provider `waitForExpectation` 不再默认 `WATCHDOG_TIMEOUT_MS` 作为竞态 total deadline；degradation 门绿。
+
+#### Proof table（as of EOD）
+
+| Proof slice | Status |
+|---|---|
+| Static gates / build / fantomas | GREEN（`npm run check` 曾全绿含 integration） |
+| Persist leave-unread + dumb-server | GREEN 11/11 |
+| GLORY demotion + finality canary ≤90s | DONE — alone/serial 12/12 ≈39–40s |
+| Append O(n) fix + unit scaling | DONE |
+| Unit suite | GREEN ≈1951/0 |
+| Integration harness | GREEN **281/0** |
+| Full e2e suite | **RED / residual** — see Remaining |
+| Storage Active → completed | **BLOCKED** on full e2e green |
+
+**Latest suite evidence (EOD, `/tmp/e2e-clean.txt` / bg_11)：** staggered e2e **26 passed / 1 failed** — sole hard red `fallback-aabb-trace.test.mjs`; other canaries green under parallel. Wall ~131s. Earlier noisier reds (manager-full-loop watchdog / restart 143 / finality SIGTERM) look suite-cascade once aabb (or another) fails first.
+
+#### Remaining（next session — do not raise timeouts）
+
+1. **`fallback-aabb-trace` 模型轨迹发散（当前唯一硬红）**
+   - Symptom: `assertModelTrajectory` got `A,A,B,A,A` vs expected `A,A,B,B,A`（index 3）。
+   - Alone 有时也红；`waitFact gte=4` 已落地，但仍可能在第 4 次失败前/后 Side 选择与成功交付交错。
+   - Next: 对照 FALLBACK-002 Offset `(n+1) mod 4` 与 AttemptExecutionProfile 在 EventStore 加速后的时序；**不要**用 timeout 或轨迹 normalize（VERIFY-002）糊过去。
+2. **并行连带** — 先修 aabb；再确认 manager-full-loop / restart / finality 在 aabb 绿后是否仍单独复现。
+3. **Close G4** — full e2e + `npm run check` 全绿 → Storage Active → `changes/completed/` → 再激活 G5（scout 已完成，**勿提前 activate**）。
+
+#### Key files touched（resume here）
+
+```
+src/Wanxiangshu/Infrastructure/Persist/EventStore.fs
+src/Wanxiangshu/Infrastructure/Persist/EventStoreFold.fs
+tests/unit/persist/event-store-append.test.mjs
+tests/e2e/cases/finality-cohort-law.test.mjs          (new)
+tests/e2e/support/plugin-fixture-canary.mjs           (new)
+tests/e2e/support/journal-observer.js
+tests/e2e/support/scenario-driver.mjs
+tests/e2e/support/strict-mock-provider.js
+tests/e2e/scenarios/fallback-aabb-trace.toml
+tests/e2e/cases/{fallback-aabb-trace,manager-unhappy-path,orchestrator-unhappy-path,temporal-ownership-unhappy-path,context-recovery}.test.mjs
+tests/integration/harness/{timeout-cases,event-store-gate-facts,degradation-cases}.mjs
+```
+
+**doNotBuild still：** migrator / legacy reader / dual-write / `LegacyProjection≡NewProjection` / timeout padding as “proof”。
 ### Phase 3 — DONE（G4U8–G4U12；2026-08-10）
 
 验收：

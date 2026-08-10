@@ -226,6 +226,21 @@ module EventStoreFold =
                     | Error e -> Error e
                     | Ok _ -> Ok()
 
+    /// Append-path DAG for a *new* batch only.
+    ///
+    /// Parents outside the batch are assumed already present on the store tip
+    /// (caller checked via `tryReadEvent`). Unlike `validate`, this does not
+    /// require every parent to appear in `byId` — that requirement forced
+    /// `validateAppendSet` to reload full history. Store-backed parents contribute
+    /// no indegree (same rule as `topologicalOrder` when parent ∉ byId).
+    let validateBatchDag (events: EventEnvelope list) : Result<unit, FoldError> =
+        match indexById events with
+        | Error e -> Error e
+        | Ok byId ->
+            match topologicalOrder byId with
+            | Error e -> Error e
+            | Ok _ -> Ok()
+
     /// Full projection fold: topo order + per-stream DomainConflict (§5.3).
     let fold (events: EventEnvelope list) : Result<EventStoreProjection, FoldError> =
         match indexById events with

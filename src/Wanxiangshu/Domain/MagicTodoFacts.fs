@@ -22,42 +22,48 @@ module MagicTodoFacts =
     /// Prepared: Magic validation passed; Base/Proposed/ReviewFrontier frozen.
     /// Not yet a checkpoint; does not derive review obligation.
     type TodoWritePrepared =
-        { ManagerSessionId: SessionId
-          ManagerLifeId: ManagerLifeId
-          TodoWriteId: TodoWriteId
-          ToolCallId: ToolCallId
-          ToolPartOrdinal: int
-          BaseTodoRef: BlobRef
-          BaseTodoDigest: BlobDigest
-          ProposedTodoRef: BlobRef
-          ProposedTodoDigest: BlobDigest
-          /// Exclusive frontier immediately before this tool-call in the Life.
-          ReviewFrontier: XTraceCursor
-          SemanticVersion: string }
+        {
+            ManagerSessionId: SessionId
+            ManagerLifeId: ManagerLifeId
+            TodoWriteId: TodoWriteId
+            ToolCallId: ToolCallId
+            ToolPartOrdinal: int
+            BaseTodoRef: BlobRef
+            BaseTodoDigest: BlobDigest
+            ProposedTodoRef: BlobRef
+            ProposedTodoDigest: BlobDigest
+            /// Exclusive frontier immediately before this tool-call in the Life.
+            ReviewFrontier: XTraceCursor
+            SemanticVersion: string
+        }
 
     /// Accepted: checkpoint SSOT + process-review obligation SSOT.
     type TodoWriteAccepted =
-        { ManagerLifeId: ManagerLifeId
-          TodoWriteId: TodoWriteId
-          ToolCallId: ToolCallId
-          /// Journal line / envelope identity of the matching Prepared (opaque ref).
-          PreparedFactRef: string
-          InputDigest: string
-          OutputDigest: string
-          PhysicalSuccessEvidence: PhysicalSuccessEvidence
-          SemanticVersion: string }
+        {
+            ManagerLifeId: ManagerLifeId
+            TodoWriteId: TodoWriteId
+            ToolCallId: ToolCallId
+            /// Journal line / envelope identity of the matching Prepared (opaque ref).
+            PreparedFactRef: string
+            InputDigest: string
+            OutputDigest: string
+            PhysicalSuccessEvidence: PhysicalSuccessEvidence
+            SemanticVersion: string
+        }
 
     /// Assignment freezes reviewer request-range start (not session Opening).
     type TodoProcessReviewAssigned =
-        { ManagerLifeId: ManagerLifeId
-          TodoWriteId: TodoWriteId
-          TodoReviewId: TodoReviewId
-          DedicatedReviewerId: DedicatedReviewerId
-          ReviewerSessionId: SessionId
-          /// Exclusive end after assignment authority landed in XTrace.
-          /// Does NOT include the assignment prompt itself.
-          ReviewWorkStartCursor: XTraceCursor
-          ManagerReviewFrontier: XTraceCursor }
+        {
+            ManagerLifeId: ManagerLifeId
+            TodoWriteId: TodoWriteId
+            TodoReviewId: TodoReviewId
+            DedicatedReviewerId: DedicatedReviewerId
+            ReviewerSessionId: SessionId
+            /// Exclusive end after assignment authority landed in XTrace.
+            /// Does NOT include the assignment prompt itself.
+            ReviewWorkStartCursor: XTraceCursor
+            ManagerReviewFrontier: XTraceCursor
+        }
 
     /// ConsumableReview ≡ TodoReviewConcluded.
     /// Append ONLY when VerdictKnown ∧ ProcessReviewLWR record-ready in same snapshot.
@@ -90,12 +96,14 @@ module MagicTodoFacts =
     /// Upgrade-path only: seed legacy open Life before first Magic provider request.
     /// Forbidden for subsequent Lives in the same Host session.
     type LegacyTodoSeedAdopted =
-        { ManagerSessionId: SessionId
-          ManagerLifeId: ManagerLifeId
-          SeedTodoRef: BlobRef
-          SeedTodoDigest: BlobDigest
-          /// Host-assigned Magic ids for each legacy row (position → TodoItemId).
-          SeedItemIds: TodoItemId list }
+        {
+            ManagerSessionId: SessionId
+            ManagerLifeId: ManagerLifeId
+            SeedTodoRef: BlobRef
+            SeedTodoDigest: BlobDigest
+            /// Host-assigned Magic ids for each legacy row (position → TodoItemId).
+            SeedItemIds: TodoItemId list
+        }
 
     /// EvidenceKind for PrefixRebaseCommitted generalization (protocol §16.7).
     /// TodoCheckpoint rebase must enter existing ActivePrefixEpoch SSOT — not a
@@ -103,30 +111,30 @@ module MagicTodoFacts =
     [<RequireQualifiedAccess>]
     type PrefixEvidenceKind =
         | Probe of probeId: string
-        | TodoCheckpoint of
-            triggerTodoWriteId: TodoWriteId *
-            coveredBeforeTodoWriteId: TodoWriteId option
+        | TodoCheckpoint of triggerTodoWriteId: TodoWriteId * coveredBeforeTodoWriteId: TodoWriteId option
 
     /// Speculative PrefixRebaseCommitted payload with EvidenceKind.
     /// When wired, replaces / extends ContextFactCases.PrefixRebaseCommitted.
     type PrefixRebaseCommittedV2 =
-        { SessionId: SessionId
-          ManagerLifeId: ManagerLifeId option
-          PreviousEpochId: PrefixEpochId
-          NextEpochId: PrefixEpochId
-          EvidenceKind: PrefixEvidenceKind
-          FrozenRecordPrefixRef: BlobRef
-          FrozenRecordPrefixDigest: BlobDigest
-          CutoffExclusive: int
-          CoveredPrefixDigest: string
-          SealRoot: string
-          SyntheticMessageId: string
-          /// Y bundle proving PrefixCoverage complete-turn prefix (no LWR RawGap).
-          YBundleRef: BlobRef option
-          YBundleDigest: BlobDigest option
-          ProviderPrefixDigest: string option
-          /// Probe path only: solving run that promoted the candidate.
-          SolvingProviderRun: ProviderRunIdentity option }
+        {
+            SessionId: SessionId
+            ManagerLifeId: ManagerLifeId option
+            PreviousEpochId: PrefixEpochId
+            NextEpochId: PrefixEpochId
+            EvidenceKind: PrefixEvidenceKind
+            FrozenRecordPrefixRef: BlobRef
+            FrozenRecordPrefixDigest: BlobDigest
+            CutoffExclusive: int
+            CoveredPrefixDigest: string
+            SealRoot: string
+            SyntheticMessageId: string
+            /// Y bundle proving PrefixCoverage complete-turn prefix (no LWR RawGap).
+            YBundleRef: BlobRef option
+            YBundleDigest: BlobDigest option
+            ProviderPrefixDigest: string option
+            /// Probe path only: solving run that promoted the candidate.
+            SolvingProviderRun: ProviderRunIdentity option
+        }
 
     /// One Magic Todo journal line. Parallel to Fact.AgentFact until wired.
     [<RequireQualifiedAccess>]
@@ -142,11 +150,9 @@ module MagicTodoFacts =
 
     /// Constructor surface mirroring Fact.* modules.
     module Fact =
-        let inline TodoWritePrepared (payload: TodoWritePrepared) =
-            MagicTodoFact.TodoWritePrepared payload
+        let inline TodoWritePrepared (payload: TodoWritePrepared) = MagicTodoFact.TodoWritePrepared payload
 
-        let inline TodoWriteAccepted (payload: TodoWriteAccepted) =
-            MagicTodoFact.TodoWriteAccepted payload
+        let inline TodoWriteAccepted (payload: TodoWriteAccepted) = MagicTodoFact.TodoWriteAccepted payload
 
         let inline TodoProcessReviewAssigned (payload: TodoProcessReviewAssigned) =
             MagicTodoFact.TodoProcessReviewAssigned payload

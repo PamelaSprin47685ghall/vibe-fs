@@ -81,31 +81,20 @@ module EventStoreJournalCodec =
     ///   same-stream predecessor later); canonicalized via EventParents.
     /// - payloadRefs: opaque large-body handles (writer fills later); codec
     ///   never materializes RuntimePath blobs/.
-    let encode
-        (parents: EventId list)
-        (payloadRefs: PayloadRef list)
-        (envelope: Envelope)
-        : EventEnvelope =
+    let encode (parents: EventId list) (payloadRefs: PayloadRef list) (envelope: Envelope) : EventEnvelope =
         EventEnvelope.normalize
-            {
-                EventId = envelope.EventId
-                StreamId = encodeStreamId envelope.Stream
-                EventType = JournalEnvelopeEventType
-                Parents = parents
-                Payload = payloadFromEnvelope envelope
-                PayloadRefs = payloadRefs
-            }
+            { EventId = envelope.EventId
+              StreamId = encodeStreamId envelope.Stream
+              EventType = JournalEnvelopeEventType
+              Parents = parents
+              Payload = payloadFromEnvelope envelope
+              PayloadRefs = payloadRefs }
 
     /// Decode a Domain EventEnvelope back to a journal Envelope.
     /// Requires EventType = JournalEnvelope; EventId / Stream must agree with payload.
     let tryDecode (event: EventEnvelope) : Result<Envelope, string> =
         if event.EventType <> JournalEnvelopeEventType then
-            Error(
-                sprintf
-                    "expected EventType %s, got %s"
-                    JournalEnvelopeEventType
-                    event.EventType
-            )
+            Error(sprintf "expected EventType %s, got %s" JournalEnvelopeEventType event.EventType)
         else
             match envelopeFromPayload event.Payload with
             | Error err -> Error err

@@ -27,6 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { assertEq, assertTrue, tmpScenarioDir } from './lib.mjs';
 import { EventProbe } from '../../e2e/support/event-probe.js';
 import { WAIT_FACT_WINDOW_MS, WATCHDOG_TIMEOUT_MS } from '../../e2e/support/time-budget.js';
+import { journalEventLines } from '../../e2e/support/journal-observer.js';
 import { walk } from '../../../scripts/lib/walk.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -34,6 +35,7 @@ const execFileAsync = promisify(execFile);
 const watchdogUrl = new URL('../../e2e/support/watchdog.js', import.meta.url).href;
 const budgetUrl = new URL('../../e2e/support/time-budget.js', import.meta.url).href;
 const driverUrl = new URL('../../e2e/support/scenario-driver.mjs', import.meta.url).href;
+const gateFactsUrl = new URL('./event-store-gate-facts.mjs', import.meta.url).href;
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 /**
@@ -390,19 +392,17 @@ async function runWaitFactRenewsOnDeclaredFactAndCountsPrecisely() {
   const budgetEnv = { WATCHDOG_TIMEOUT_MS: String(scaledWatchdogMs) };
   const workDir = tmpScenarioDir();
   execFileSync('git', ['-C', workDir, 'init', '-q'], { encoding: 'utf8' });
-  const journalDir = join(workDir, '.git', 'wanxiangshu-next', 'runtimes');
-  mkdirSync(journalDir, { recursive: true });
-  const journalFile = join(journalDir, 'gate.ndjson');
-  writeFileSync(journalFile, '');
+  // EventStore tip is the only renew surface after G4 leave-unread (no NDJSON).
   const result = await runWatchdogChild(
-    `import { appendFileSync } from 'node:fs';\n` +
+    `import { openGateFactStore } from ${JSON.stringify(gateFactsUrl)};\n` +
+      `const gate = openGateFactStore(${JSON.stringify(workDir)});\n` +
       `let appended = 0;\n` +
-       `const iv = setInterval(() => {\n` +
-       `  appended += 1;\n` +
-       `  const fact = appended < 6 ? 'CandidateReady' : appended < 8 ? 'Published' : 'UnrelatedProgressFact';\n` +
-       `  appendFileSync(${JSON.stringify(journalFile)}, JSON.stringify({ type: fact, n: appended }) + '\\n');\n` +
-       `  if (appended === 7) clearInterval(iv);\n` +
-       `}, ${Math.floor(scaledWatchdogMs / 4)});\n` +
+      `const iv = setInterval(() => {\n` +
+      `  appended += 1;\n` +
+      `  const fact = appended < 6 ? 'CandidateReady' : appended < 8 ? 'Published' : 'UnrelatedProgressFact';\n` +
+      `  gate.appendNamedFact(fact, appended);\n` +
+      `  if (appended === 7) clearInterval(iv);\n` +
+      `}, ${Math.floor(scaledWatchdogMs / 4)});\n` +
       factBarrierScript(workDir, 'Published', 'gate-wait-fact-renew-on').replace(
         `{ waitFact: { name: ${JSON.stringify('Published')}, eq: 1 }, lane: 'fact-lane' }`,
         `{ waitFact: { name: 'Published', eq: 2, renewOn: ['CandidateReady'] }, lane: 'fact-lane' }`,
@@ -411,14 +411,26 @@ async function runWaitFactRenewsOnDeclaredFactAndCountsPrecisely() {
       `console.log('barrier returned after ' + appended + ' appends');\n`,
     WAIT_FACT_WINDOW_MS,
     budgetEnv,
-   );
-   assertEq(result.code, 0, `renewOn facts must keep the barrier alive: ${result.stderr}`);
-   assertEq(result.stdout.trim(), 'barrier returned after 7 appends', 'eq must wait for the exact target count');
-   const facts = readFileSync(journalFile, 'utf8').trim().split('\n').map(JSON.parse);
-   assertEq(facts.filter((fact) => fact.type === 'Published').length, 2, 'eq must stop at two Published facts');
-   assertEq(facts.filter((fact) => fact.type === 'CandidateReady').length, 5, 'CandidateReady must renew before Published');
-   assertEq(facts.length, 7, 'background facts must not advance the target count');
- }
+  );
+  assertEq(result.code, 0, `renewOn facts must keep the barrier alive: ${result.stderr}`);
+  assertEq(result.stdout.trim(), 'barrier returned after 7 appends', 'eq must wait for the exact target count');
+  const texts = journalEventLines(workDir);
+  const types = texts.map((text) => {
+    try {
+      const event = JSON.parse(text);
+      return event?.payload?.type ?? event?.type ?? '';
+    } catch {
+      return '';
+    }
+  });
+  assertEq(types.filter((type) => type === 'Published').length, 2, 'eq must stop at two Published facts');
+  assertEq(
+    types.filter((type) => type === 'CandidateReady').length,
+    5,
+    'CandidateReady must renew before Published',
+  );
+  assertEq(types.length, 7, 'background facts must not advance the target count');
+}
 
 /** The child body both halves share: the real barrier, a real watchdog, a fake event source. */
 function factBarrierScript(workDir, factName, label) {

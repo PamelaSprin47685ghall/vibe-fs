@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { awaitCausalObservation, runStaticGate } from '../support/index.js';
 import { runCanary } from '../support/scenario-driver.mjs';
 import { FORK_COMPLETION_WINDOW_MS } from '../support/time-budget.js';
-import { journalEventLines } from '../support/journal-observer.js';
+import { journalEventLines, factPayloads } from '../support/journal-observer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const WAKE_PROMPT = 'The first join was interrupted; start a fresh join and keep waiting for the same child.';
@@ -186,20 +186,6 @@ async function assertJoinTrajectory(scenario, ctx) {
 
 function journalLines(workDir) {
   return journalEventLines(workDir);
-}
-
-function factPayloads(lines, caseName) {
-  const payloads = [];
-  const visit = (value) => {
-    if (Array.isArray(value)) {
-      if (value[0] === caseName) payloads.push(value[1]);
-      for (const child of value) visit(child);
-    } else if (value && typeof value === 'object') {
-      for (const child of Object.values(value)) visit(child);
-    }
-  };
-  for (const line of lines) visit(line.Fact);
-  return payloads;
 }
 
 async function assertReviewerTrajectory(scenario) {

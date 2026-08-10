@@ -11,10 +11,12 @@ module MagicTodoLwr =
 
     /// Exclusive range on XTrace for one LWR materialization.
     type BoundedRange =
-        { /// Inclusive start cursor (often WorkRecordStart / ReviewWorkStartCursor).
-          StartInclusive: XTraceCursor
-          /// Exclusive end frontier (ReviewFrontier / ReviewerRecordFrontier).
-          EndExclusive: XTraceCursor }
+        {
+            /// Inclusive start cursor (often WorkRecordStart / ReviewWorkStartCursor).
+            StartInclusive: XTraceCursor
+            /// Exclusive end frontier (ReviewFrontier / ReviewerRecordFrontier).
+            EndExclusive: XTraceCursor
+        }
 
     /// ManagerCheckpointLWR(k): Opening excluded; range = WorkRecordStart .. ReviewFrontier(k).
     let managerCheckpointRange (workRecordStart: XTraceCursor) (reviewFrontier: XTraceCursor) : BoundedRange =

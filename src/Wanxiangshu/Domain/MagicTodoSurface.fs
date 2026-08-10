@@ -217,10 +217,7 @@ module MagicTodoSurface =
             (jsonString item.Priority)
 
     let renderListWire (items: MagicTodoList) : string =
-        items
-        |> List.map renderItemWire
-        |> String.concat ",\n"
-        |> sprintf "[\n%s\n]"
+        items |> List.map renderItemWire |> String.concat ",\n" |> sprintf "[\n%s\n]"
     // ── Enriched tool result (§22) — byte-stable renderer ──────────────────
 
     type PreviousReviewView =
@@ -241,7 +238,9 @@ module MagicTodoSurface =
         match view.Previous with
         | None -> sb.AppendLine("None — this is the first checkpoint.") |> ignore
         | Some prev ->
-            sb.Append("Verdict: ").AppendLine(ProcessReviewVerdict.wire prev.Verdict) |> ignore
+            sb.Append("Verdict: ").AppendLine(ProcessReviewVerdict.wire prev.Verdict)
+            |> ignore
+
             sb.AppendLine() |> ignore
             sb.AppendLine("Report:") |> ignore
             sb.AppendLine(prev.ReportText) |> ignore
@@ -260,10 +259,14 @@ module MagicTodoSurface =
         sb.AppendLine("IMPORTANT:") |> ignore
         sb.AppendLine("The list above is only the REVISE preview.") |> ignore
         sb.AppendLine("If this checkpoint receives PERFECT,") |> ignore
-        sb.AppendLine("your submitted todo list will replace the settled list exactly.") |> ignore
+
+        sb.AppendLine("your submitted todo list will replace the settled list exactly.")
+        |> ignore
+
         sb.AppendLine() |> ignore
         sb.AppendLine("This checkpoint is now being reviewed.") |> ignore
         sb.AppendLine("Continue useful independent next-stage work.") |> ignore
+
         sb.AppendLine("Your next todowrite call will synchronize with this review if necessary.")
         |> ignore
 

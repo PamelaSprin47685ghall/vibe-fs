@@ -36,18 +36,20 @@ module MagicTodoProjection =
 
     /// Per-Life Magic Todo derived view.
     type LifeMagicTodoState =
-        { LifeId: ManagerLifeId
-          /// Settled current (Ck for the next prepare). Empty for a normal new Life.
-          SettledCurrent: MagicTodoList
-          /// Optimistic working proposal after latest Accepted, if any (Pk).
-          /// Canonical settlement still waits for Concluded of that checkpoint.
-          WorkingProposal: MagicTodoList option
-          /// Accepted chain in order (lag-1 desired cutoff source).
-          AcceptedOrder: TodoWriteId list
-          Checkpoints: Map<string, CheckpointRecord>
-          Dedicated: DedicatedReviewerState option
-          /// Blob list bodies live in the blob store; projection keeps digests/refs.
-          LegacySeedAdopted: bool }
+        {
+            LifeId: ManagerLifeId
+            /// Settled current (Ck for the next prepare). Empty for a normal new Life.
+            SettledCurrent: MagicTodoList
+            /// Optimistic working proposal after latest Accepted, if any (Pk).
+            /// Canonical settlement still waits for Concluded of that checkpoint.
+            WorkingProposal: MagicTodoList option
+            /// Accepted chain in order (lag-1 desired cutoff source).
+            AcceptedOrder: TodoWriteId list
+            Checkpoints: Map<string, CheckpointRecord>
+            Dedicated: DedicatedReviewerState option
+            /// Blob list bodies live in the blob store; projection keeps digests/refs.
+            LegacySeedAdopted: bool
+        }
 
     type MagicTodoProjectionState =
         { ByLife: Map<string, LifeMagicTodoState> }
@@ -81,7 +83,10 @@ module MagicTodoProjection =
     let tryLife (lifeId: ManagerLifeId) (state: MagicTodoProjectionState) : LifeMagicTodoState option =
         Map.tryFind (lifeKey lifeId) state.ByLife
 
-    let ensureLife (lifeId: ManagerLifeId) (state: MagicTodoProjectionState) : LifeMagicTodoState * MagicTodoProjectionState =
+    let ensureLife
+        (lifeId: ManagerLifeId)
+        (state: MagicTodoProjectionState)
+        : LifeMagicTodoState * MagicTodoProjectionState =
         match tryLife lifeId state with
         | Some life -> life, state
         | None ->
@@ -114,8 +119,7 @@ module MagicTodoProjection =
     let mayAdmitNewCheckpoint (life: LifeMagicTodoState) : Result<unit, MagicTodoReject> =
         match pendingReviewObligation life with
         | None -> Ok()
-        | Some cp ->
-            Error(MagicTodoReject.AwaitingConsumableReview(TodoWriteId.value cp.TodoWriteId))
+        | Some cp -> Error(MagicTodoReject.AwaitingConsumableReview(TodoWriteId.value cp.TodoWriteId))
 
     /// Desired lag-1 cutoff from Accepted chain (no Requested fact).
     let desiredLag1 (life: LifeMagicTodoState) : TodoWriteId option =
@@ -137,7 +141,10 @@ module MagicTodoProjection =
             // Working proposal cleared once settled; next Accepted sets a new one.
             WorkingProposal = None }
 
-    let foldPrepared (payload: TodoWritePrepared) (state: MagicTodoProjectionState) : Result<MagicTodoProjectionState, MagicTodoFoldRejection> =
+    let foldPrepared
+        (payload: TodoWritePrepared)
+        (state: MagicTodoProjectionState)
+        : Result<MagicTodoProjectionState, MagicTodoFoldRejection> =
         let life, state = ensureLife payload.ManagerLifeId state
         let key = writeKey payload.TodoWriteId
 
@@ -172,9 +179,17 @@ module MagicTodoProjection =
                   Assignment = None
                   Concluded = None }
 
-            Ok(putLife { life with Checkpoints = Map.add key cp life.Checkpoints } state)
+            Ok(
+                putLife
+                    { life with
+                        Checkpoints = Map.add key cp life.Checkpoints }
+                    state
+            )
 
-    let foldAccepted (payload: TodoWriteAccepted) (state: MagicTodoProjectionState) : Result<MagicTodoProjectionState, MagicTodoFoldRejection> =
+    let foldAccepted
+        (payload: TodoWriteAccepted)
+        (state: MagicTodoProjectionState)
+        : Result<MagicTodoProjectionState, MagicTodoFoldRejection> =
         let life, state = ensureLife payload.ManagerLifeId state
         let key = writeKey payload.TodoWriteId
 
@@ -192,7 +207,12 @@ module MagicTodoProjection =
                         InputDigest = Some payload.InputDigest
                         OutputDigest = Some payload.OutputDigest }
 
-                Ok(putLife { life with Checkpoints = Map.add key cp life.Checkpoints } state)
+                Ok(
+                    putLife
+                        { life with
+                            Checkpoints = Map.add key cp life.Checkpoints }
+                        state
+                )
         | Some cp ->
             let cp =
                 { cp with
@@ -219,9 +239,16 @@ module MagicTodoProjection =
     let withWorkingProposal (lifeId: ManagerLifeId) (proposed: MagicTodoList) (state: MagicTodoProjectionState) =
         match tryLife lifeId state with
         | None -> state
-        | Some life -> putLife { life with WorkingProposal = Some proposed } state
+        | Some life ->
+            putLife
+                { life with
+                    WorkingProposal = Some proposed }
+                state
 
-    let foldAssigned (payload: TodoProcessReviewAssigned) (state: MagicTodoProjectionState) : Result<MagicTodoProjectionState, MagicTodoFoldRejection> =
+    let foldAssigned
+        (payload: TodoProcessReviewAssigned)
+        (state: MagicTodoProjectionState)
+        : Result<MagicTodoProjectionState, MagicTodoFoldRejection> =
         let life, state = ensureLife payload.ManagerLifeId state
         let key = writeKey payload.TodoWriteId
 
@@ -254,7 +281,10 @@ module MagicTodoProjection =
         | Some { Concluded = Some _ } -> Error(MagicTodoFoldRejection.DuplicateConcluded key)
         | Some cp ->
             let cp = { cp with Concluded = Some payload }
-            let life = { life with Checkpoints = Map.add key cp life.Checkpoints }
+
+            let life =
+                { life with
+                    Checkpoints = Map.add key cp life.Checkpoints }
             // Settlement applies when Concluded becomes durable — next prepare
             // reads SettledCurrent as C(k+1). Suicide drain uses the same path.
             let life = applySettlement decodeList life cp payload
@@ -264,7 +294,10 @@ module MagicTodoProjection =
         let life, state = ensureLife payload.ManagerLifeId state
 
         match life.Dedicated with
-        | Some d when d.DedicatedReviewerId = payload.DedicatedReviewerId && d.ReviewerSessionId = payload.ReviewerSessionId ->
+        | Some d when
+            d.DedicatedReviewerId = payload.DedicatedReviewerId
+            && d.ReviewerSessionId = payload.ReviewerSessionId
+            ->
             Ok state
         | Some d when d.DedicatedReviewerId = payload.DedicatedReviewerId ->
             // Same logical id, physical session change must go through Replaced.

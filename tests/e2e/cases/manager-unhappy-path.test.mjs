@@ -9,13 +9,18 @@
  * and the terminal text contract.
  */
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate } from '../support/index.js';
 import { runCanary } from '../support/scenario-driver.mjs';
-import { readJournal, watchJournal, journalEventLines } from '../support/journal-observer.js';
+import {
+  readJournal,
+  watchJournal,
+  journalEventLines,
+  factPayloads,
+  countFactCase,
+  readBlobRef,
+} from '../support/journal-observer.js';
 import { WAIT_FACT_WINDOW_MS } from '../support/time-budget.js';
 
 const ROOT_PROMPT = 'Run the full unhappy path in one turn.';
@@ -34,22 +39,7 @@ function journalLines(workDir) {
   return journalEventLines(workDir);
 }
 
-/** The payload of the named fact case wherever it nests inside the envelope. */
-function factPayloads(lines, caseName) {
-  const found = [];
-  const walk = (value) => {
-    if (Array.isArray(value)) {
-      if (typeof value[0] === 'string' && value[0] === caseName) found.push(value[1]);
-      for (const item of value) walk(item);
-    } else if (value && typeof value === 'object') {
-      for (const child of Object.values(value)) walk(child);
-    }
-  };
-  for (const line of lines) walk(line.Fact);
-  return found;
-}
-
-const countCase = (lines, caseName) => factPayloads(lines, caseName).length;
+const countCase = (lines, caseName) => countFactCase(lines, caseName);
 
 const promptKeyOf = (payload) => {
   const key = payload?.PromptKey;
@@ -502,16 +492,16 @@ async function finalOracle(scenario, ctx) {
   assert.equal(lifeCompleted.length, 1, 'exactly one LifeCompleted');
   const terminalDigest =
     lifeCompleted[0].TerminalDigest?.[1] ?? lifeCompleted[0].TerminalDigest;
+  const terminalRef = lifeCompleted[0].TerminalRef?.[1] ?? lifeCompleted[0].TerminalRef;
   assert.ok(terminalDigest, 'LifeCompleted carries TerminalDigest');
-  const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
-  const blobPath = path.join(
-    path.isAbsolute(common) ? common : path.resolve(workDir, common),
-    'wanxiangshu-next',
-    'runtimes',
-    'blobs',
-    String(terminalDigest),
+  assert.ok(terminalRef, 'LifeCompleted carries TerminalRef (Git ODB BlobRef)');
+  const terminalBody = readBlobRef(workDir, terminalRef);
+  assert.equal(terminalBody, FINAL_WORDS, 'terminal last_words must be verbatim FINAL');
+  assert.equal(
+    terminalDigest,
+    createHash('sha256').update(FINAL_WORDS, 'utf8').digest('hex'),
+    'TerminalDigest must match HostDigest of FINAL',
   );
-  assert.equal(fs.readFileSync(blobPath, 'utf8'), FINAL_WORDS, 'terminal last_words must be verbatim FINAL');
 
   assert.equal(readJournal(workDir, 'LifeCompleted').named, 1, 'journal must record exactly one LifeCompleted');
 }

@@ -42,20 +42,13 @@ module CanonicalEventCodec =
         let normalized = EventEnvelope.normalize envelope
 
         createObj
-            [
-                "event_id" ==> EventId.value normalized.EventId
-                "stream_id" ==> EventStreamId.value normalized.StreamId
-                "event_type" ==> normalized.EventType
-                "parents"
-                ==> (normalized.Parents
-                     |> List.map EventId.value
-                     |> Array.ofList)
-                "payload" ==> normalized.Payload
-                "payload_refs"
-                ==> (normalized.PayloadRefs
-                     |> List.map PayloadRef.value
-                     |> Array.ofList)
-            ]
+            [ "event_id" ==> EventId.value normalized.EventId
+              "stream_id" ==> EventStreamId.value normalized.StreamId
+              "event_type" ==> normalized.EventType
+              "parents" ==> (normalized.Parents |> List.map EventId.value |> Array.ofList)
+              "payload" ==> normalized.Payload
+              "payload_refs"
+              ==> (normalized.PayloadRefs |> List.map PayloadRef.value |> Array.ofList) ]
 
     /// Canonical JSON text including exactly one trailing LF (§5.0).
     let encode (envelope: EventEnvelope) : string =
@@ -63,18 +56,14 @@ module CanonicalEventCodec =
         json + "\n"
 
     /// UTF-8 bytes of canonical JSON+LF (no BOM).
-    let encodeUtf8 (envelope: EventEnvelope) : byte[] =
-        Encoding.UTF8.GetBytes(encode envelope)
+    let encodeUtf8 (envelope: EventEnvelope) : byte[] = Encoding.UTF8.GetBytes(encode envelope)
 
     /// Same EventId with different canonical bytes → IdentityCollision (§5.3).
     /// Distinct EventIds are not a collision (Ok).
     let checkIdentity (left: EventEnvelope) (right: EventEnvelope) : Result<unit, StorageInvalid> =
-        if left.EventId <> right.EventId then
-            Ok()
-        elif encode left = encode right then
-            Ok()
-        else
-            Error(StorageInvalid.IdentityCollision left.EventId)
+        if left.EventId <> right.EventId then Ok()
+        elif encode left = encode right then Ok()
+        else Error(StorageInvalid.IdentityCollision left.EventId)
 
     /// Set-union by EventId with identity dedupe. Collision → fail closed.
     /// Used by EventStoreMergeSpec (Wave B oracle) and materializeSnapshot.
@@ -119,9 +108,7 @@ module CanonicalEventCodec =
                     Error(StorageInvalid.MalformedEnvelope "event JSON missing required fields")
                 else
                     let parents =
-                        (unbox<string[]> parsed?parents)
-                        |> Array.toList
-                        |> List.map EventId.create
+                        (unbox<string[]> parsed?parents) |> Array.toList |> List.map EventId.create
 
                     let payloadRefs =
                         (unbox<string[]> parsed?payload_refs)
@@ -129,14 +116,12 @@ module CanonicalEventCodec =
                         |> List.map PayloadRef.create
 
                     let envelope =
-                        {
-                            EventId = EventId.create (unbox<string> parsed?event_id)
-                            StreamId = EventStreamId.create (unbox<string> parsed?stream_id)
-                            EventType = unbox<string> parsed?event_type
-                            Parents = parents
-                            Payload = parsed?payload
-                            PayloadRefs = payloadRefs
-                        }
+                        { EventId = EventId.create (unbox<string> parsed?event_id)
+                          StreamId = EventStreamId.create (unbox<string> parsed?stream_id)
+                          EventType = unbox<string> parsed?event_type
+                          Parents = parents
+                          Payload = parsed?payload
+                          PayloadRefs = payloadRefs }
 
                     let normalized = EventEnvelope.normalize envelope
 

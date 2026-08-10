@@ -16,27 +16,13 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate } from '../support/index.js';
 import { runCanary } from '../support/scenario-driver.mjs';
-import { readJournal, journalEventLines } from '../support/journal-observer.js';
+import { readJournal, journalEventLines, factPayloads, countFactCase } from '../support/journal-observer.js';
 
 function journalLines(workDir) {
   return journalEventLines(workDir);
 }
 
-function factPayloads(lines, caseName) {
-  const found = [];
-  const walk = (value) => {
-    if (Array.isArray(value)) {
-      if (typeof value[0] === 'string' && value[0] === caseName) found.push(value[1]);
-      for (const item of value) walk(item);
-    } else if (value && typeof value === 'object') {
-      for (const child of Object.values(value)) walk(child);
-    }
-  };
-  for (const line of lines) walk(line.Fact);
-  return found;
-}
-
-const countCase = (lines, caseName) => factPayloads(lines, caseName).length;
+const countCase = (lines, caseName) => countFactCase(lines, caseName);
 
 function lastUserText(request) {
   const users = (request?.messages ?? []).filter((message) => message?.role === 'user');

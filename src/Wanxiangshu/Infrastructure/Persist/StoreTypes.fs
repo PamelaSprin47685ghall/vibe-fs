@@ -24,11 +24,9 @@ type StoreSnapshot = { RootOid: RootOid }
 
 /// Candidate publication: base snapshot + new events + Persist-side payload blobs.
 type AppendCandidate =
-    {
-        BaseSnapshot: StoreSnapshot
-        NewEvents: EventEnvelope list
-        NewPayloads: (GitObjectId * byte[]) list
-    }
+    { BaseSnapshot: StoreSnapshot
+      NewEvents: EventEnvelope list
+      NewPayloads: (GitObjectId * byte[]) list }
 
 /// Inputs to K-way merge (set of snapshots to union).
 type MergeInput = MergeInput of StoreSnapshot list
@@ -39,11 +37,9 @@ module MergeInput =
 
 /// Git tree entry for IGitRawStore.WriteTree / ReadTree.
 type TreeEntry =
-    {
-        Mode: string
-        Name: string
-        Oid: GitObjectId
-    }
+    { Mode: string
+      Name: string
+      Oid: GitObjectId }
 
 /// Canonical store ref — Persist/Git ownership only (unified-store-gate).
 [<RequireQualifiedAccess>]
@@ -75,10 +71,10 @@ type StorageInvalid =
 /// DomainConflict — physically legal concurrent fork; projection conflict state (§5.3).
 /// Never escalate to StorageInvalid / global fail-closed.
 [<RequireQualifiedAccess>]
-type DomainConflict = | ConcurrentHeads of streamId: EventStreamId * heads: EventId list
+type DomainConflict = ConcurrentHeads of streamId: EventStreamId * heads: EventId list
 
 [<RequireQualifiedAccess>]
-type MergeError = | StorageInvalid of StorageInvalid
+type MergeError = StorageInvalid of StorageInvalid
 
 [<RequireQualifiedAccess>]
 type AppendError =
@@ -94,7 +90,7 @@ type PublishError =
     | IncompletePayloadClosure
 
 [<RequireQualifiedAccess>]
-type FoldError = | StorageInvalid of StorageInvalid
+type FoldError = StorageInvalid of StorageInvalid
 
 [<RequireQualifiedAccess>]
 type ConvergeError =

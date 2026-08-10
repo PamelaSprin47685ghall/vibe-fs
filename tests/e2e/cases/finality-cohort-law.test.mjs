@@ -1,4 +1,9 @@
-// tests/unit/execution/finality-cohort-law.test.mjs — GLORY-040/042/044/045/055/060/072/073/074/075.
+// tests/e2e/cases/finality-cohort-law.test.mjs — GLORY-040/042/044/045/055/060/072/073/074/075.
+//
+// Real e2e canary (VERIFY demotion): multi-round Finality/GLORY cohort laws through the
+// Host surface via withExecutablePlugin. Not a unit file — exceeds PER_TEST_TIMEOUT_MS.
+// Process bound remains default CANARY_TIMEOUT_MS (no raised per-basename budget).
+// Perf root: EventStore/journal append must stay near-O(1); do not paper over with timeouts.
 //
 // The combinator law tests of the timing-control-flow proposal §18, asserted on
 // the observable behaviour of the Finality cohort through the real Host surface
@@ -36,8 +41,6 @@
 
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import test from 'node:test'
-
 import {
   acceptAuthorityRoot,
   acceptChildAgentOwnerRoot,
@@ -46,8 +49,13 @@ import {
   notifyCompleted,
   observeTerminalSubscriptions,
   withExecutablePlugin,
-} from '../plugin/plugin-fixture.mjs'
-import { PER_TEST_TIMEOUT_MS } from '../../e2e/support/time-budget.js'
+} from '../../unit/plugin/plugin-fixture.mjs'
+import { PER_TEST_TIMEOUT_MS } from '../support/time-budget.js'
+import {
+  barkPluginFixtureReady,
+  isMainModule,
+  runSequentialCases,
+} from '../support/plugin-fixture-canary.mjs'
 import {
   agentFact,
   agentJournal,
@@ -68,7 +76,7 @@ import {
   transportReceipt,
   utcOffset,
   xTraceCapture,
-} from '../support/domain.mjs'
+} from '../../unit/support/domain.mjs'
 
 import { ReviewController_submit, VerdictSubmission } from '../../../dist/Session/ReviewController.js'
 import { AgentFact, ManagerLifecycleFact, ReviewFactCases, ReviewGuardVerdict } from '../../../dist/Kernel/Fact.js'
@@ -481,7 +489,10 @@ const dualPerfect = async (journal, runtime, request, reviewerValue, label) => {
 
 // ── GLORY-044: concurrentAllOrShortCircuit ──────────────────────────────────
 
-test('GLORY_044_the_first_Revision_short_circuits_to_rejection_and_never_disposes', async () => {
+const cases = [
+  {
+    name: "GLORY_044_the_first_Revision_short_circuits_to_rejection_and_never_disposes",
+    fn: async () => {
   await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
     commitWorkspace(directory)
     acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
@@ -513,9 +524,11 @@ test('GLORY_044_the_first_Revision_short_circuits_to_rejection_and_never_dispose
       'the rejected member stays enlisted for the next request',
     )
   }, FINALITY_PLUGIN_OPTS)
-})
-
-test('GLORY_044_all_Confirmed_gathers_all_into_one_blessing_bundle', async () => {
+    },
+  },
+  {
+    name: "GLORY_044_all_Confirmed_gathers_all_into_one_blessing_bundle",
+    fn: async () => {
   await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
     commitWorkspace(directory)
     acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
@@ -574,9 +587,11 @@ test('GLORY_044_all_Confirmed_gathers_all_into_one_blessing_bundle', async () =>
     // only after the bundle landed.
     assert.deepEqual([...runtime.abortedIds].sort(), [historical, newcomer].sort())
   }, FINALITY_PLUGIN_OPTS)
-})
-
-test('GLORY_044_a_Revision_short_circuit_cancels_the_sibling_before_its_next_effect', async () => {
+    },
+  },
+  {
+    name: "GLORY_044_a_Revision_short_circuit_cancels_the_sibling_before_its_next_effect",
+    fn: async () => {
   await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
     commitWorkspace(directory)
     acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
@@ -631,9 +646,11 @@ test('GLORY_044_a_Revision_short_circuit_cancels_the_sibling_before_its_next_eff
     // Cancellation never disposes a durable session.
     assert.deepEqual(runtime.abortedIds, [], 'the short-circuit must not dispose either durable session')
   }, FINALITY_PLUGIN_OPTS)
-})
-
-test('GLORY_044_multi_REVISE_first_tool_result_rest_steered', async () => {
+    },
+  },
+  {
+    name: "GLORY_044_multi_REVISE_first_tool_result_rest_steered",
+    fn: async () => {
   await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
     commitWorkspace(directory)
     acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
@@ -794,17 +811,11 @@ test('GLORY_044_multi_REVISE_first_tool_result_rest_steered', async () => {
     )
     assert.deepEqual(runtime.abortedIds, [], 'multi-REVISE short-circuit must not dispose durable sessions')
   }, FINALITY_PLUGIN_OPTS)
-})
-
-// ── GLORY-044 + GLORY-074: durable sibling REVISE must not vanish on RecordUnavailable ─
-//
-// Primary rejecting Reviewer is record-ready (tool-result track). Sibling lands a
-// durable RevisionWitness but companion Blogger is Abandoned before steer
-// materialization (same RecordUnavailable path as GLORY_074). Hard sibling
-// materialization failure must fail-closed: Resolution=Undecided and a
-// FinalityUndecided fact (REVIEW-002 不得静默丢弃).
-
-test('GLORY_044_074_durable_sibling_REVISE_materialization_failure_must_not_silently_vanish', async () => {
+    },
+  },
+  {
+    name: "GLORY_044_074_durable_sibling_REVISE_materialization_failure_must_not_silently_vanish",
+    fn: async () => {
   await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
     commitWorkspace(directory)
     acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
@@ -898,15 +909,11 @@ test('GLORY_044_074_durable_sibling_REVISE_materialization_failure_must_not_sile
 
     assert.deepEqual(runtime.abortedIds, [], 'materialization failure must not dispose durable sessions')
   }, FINALITY_PLUGIN_OPTS)
-})
-
-// ── GLORY-044/074 inverse: primary RecordUnavailable must not orphan SiblingSteered ─
-//
-// Sibling is durable+ready (would steer on happy path). Primary rejecting winner
-// is abandoned → RecordUnavailable. Resolution must be Undecided with zero
-// FinalitySiblingSteered (primary staged before any SiblingSteered append).
-
-test('GLORY_044_074_primary_fail_must_not_orphan_FinalitySiblingSteered_without_steers', async () => {
+    },
+  },
+  {
+    name: "GLORY_044_074_primary_fail_must_not_orphan_FinalitySiblingSteered_without_steers",
+    fn: async () => {
   await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
     commitWorkspace(directory)
     acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
@@ -1020,9 +1027,11 @@ test('GLORY_044_074_primary_fail_must_not_orphan_FinalitySiblingSteered_without_
     )
     assert.deepEqual(runtime.abortedIds, [], 'primary materialization failure must not dispose durable sessions')
   }, FINALITY_PLUGIN_OPTS)
-})
-
-test('GLORY_044_072_073_REVISE_closes_the_cohort_but_waits_for_the_matching_covered_work_record', async () => {
+    },
+  },
+  {
+    name: "GLORY_044_072_073_REVISE_closes_the_cohort_but_waits_for_the_matching_covered_work_record",
+    fn: async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     commitWorkspace(directory)
     acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
@@ -1162,11 +1171,11 @@ test('GLORY_044_072_073_REVISE_closes_the_cohort_but_waits_for_the_matching_cove
       recordReadyWait.restore()
     }
   }, FINALITY_PLUGIN_OPTS)
-})
-
-// ── GLORY-040/057: ensureX — the idempotent enlistment ──────────────────────
-
-test('GLORY_040_crash_between_request_and_enlistment_replays_the_ensure_idempotently', async () => {
+    },
+  },
+  {
+    name: "GLORY_040_crash_between_request_and_enlistment_replays_the_ensure_idempotently",
+    fn: async () => {
   await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
     commitWorkspace(directory)
     acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
@@ -1224,16 +1233,11 @@ test('GLORY_040_crash_between_request_and_enlistment_replays_the_ensure_idempote
     assert.equal(caseOf(currentRequest(runtime.journal).Resolution), 'Rejected')
     assert.deepEqual(runtime.abortedIds, [])
   }, FINALITY_PLUGIN_OPTS)
-})
-
-// ── GLORY-073 regression: real-reachable coverage must unlock rejection ───────
-//
-// Production TerminalFrontier.Sequence = lastPart + 1. Real Blogger coverage
-// tops out at lastPart. makeRecordReady fakes next: frontier and masks the
-// recordReadiness `coverage >= frontier.Sequence` hang. This case uses only the
-// reachable lastPart and bounds the wait so a hang fails fast.
-
-test('GLORY_073_real_reachable_lastPart_coverage_unlocks_FinalityRejected_with_work_log', async () => {
+    },
+  },
+  {
+    name: "GLORY_073_real_reachable_lastPart_coverage_unlocks_FinalityRejected_with_work_log",
+    fn: async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     commitWorkspace(directory)
     acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
@@ -1287,16 +1291,11 @@ test('GLORY_073_real_reachable_lastPart_coverage_unlocks_FinalityRejected_with_w
     assert.equal(record.ok, true, record.ok ? '' : record.error)
     assert.match(record.value, /Work log\n\S/, 'FinalityRejected must reference a non-empty work log')
   }, FINALITY_PLUGIN_OPTS)
-})
-
-// ── GLORY-074: Abandoned Blogger during record-ready → Undecided, no partial rejection ─
-//
-// coverageCanAdvance becomes false when the companion Blogger handle is Abandoned.
-// Without a materializable `Work log`, recordReadiness is RecordUnavailable and
-// concludeRejection fail-closes to FinalityUndecided — never a WorkRecordRef-less
-// FinalityRejected.
-
-test('GLORY_074_blogger_abandonment_during_record_ready_concludes_undecided_no_partial_rejection', async () => {
+    },
+  },
+  {
+    name: "GLORY_074_blogger_abandonment_during_record_ready_concludes_undecided_no_partial_rejection",
+    fn: async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     commitWorkspace(directory)
     acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
@@ -1373,14 +1372,11 @@ test('GLORY_074_blogger_abandonment_during_record_ready_concludes_undecided_no_p
       recordReadyWait.restore()
     }
   }, FINALITY_PLUGIN_OPTS)
-})
-
-// ── GLORY-075: waiter crash → resumeDurableRevise from durable evidence, no timer poll ─
-//
-// Local waiter disposal is not durable abandonment. Re-entry with the same ToolCallId
-// resumes concludeRejection / awaitRecordReady via awaitChangeFrom only.
-
-test('GLORY_075_waiter_crash_resumes_from_durable_evidence_no_timer_poll', async () => {
+    },
+  },
+  {
+    name: "GLORY_075_waiter_crash_resumes_from_durable_evidence_no_timer_poll",
+    fn: async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     commitWorkspace(directory)
     acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
@@ -1483,17 +1479,11 @@ test('GLORY_075_waiter_crash_resumes_from_durable_evidence_no_timer_poll', async
       resumeWait.restore()
     }
   }, FINALITY_PLUGIN_OPTS)
-})
-
-// ── GLORY-044/073: crash after FinalitySiblingSteered → resume replays FinalitySteer ─
-//
-// Multi-REVISE dual delivery leaves FinalityRejected + FinalitySiblingSteered and a
-// Manager FinalitySteer continuation. Process-local loss of that continuation (or
-// journal waiters) must not recruit a new cohort: same ToolCallId re-entry must
-// best-effort re-deliver sibling FinalitySteer via resumeDurableRevise while
-// Resolution stays Rejected (docs/how/glory.md crash matrix).
-
-test('GLORY_044_073_resume_replays_sibling_steer', async () => {
+    },
+  },
+  {
+    name: "GLORY_044_073_resume_replays_sibling_steer",
+    fn: async () => {
   await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
     commitWorkspace(directory)
     acceptAuthorityRoot(runtime, 'mgr', 'fast-manager')
@@ -1693,4 +1683,14 @@ test('GLORY_044_073_resume_replays_sibling_steer', async () => {
       }
     }
   }, FINALITY_PLUGIN_OPTS)
-})
+    },
+  },
+]
+
+if (isMainModule(import.meta.url)) {
+  // Bark the readiness ladder BEFORE heavy plugin work so tests/e2e/run.mjs launch stagger
+  // does not treat this non-setupScenario canary as a hung startup.
+  barkPluginFixtureReady()
+  console.log('finality-cohort-law: running ' + cases.length + ' cohort laws sequentially')
+  process.exit(await runSequentialCases(cases, { label: 'finality-cohort-law' }))
+}

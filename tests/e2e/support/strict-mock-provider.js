@@ -28,7 +28,6 @@ import { faultBody } from './delivery-plan.js';
 import { wireOf } from './provider-wire.js';
 import { createHash } from 'node:crypto';
 import { StrictMockSignals } from './strict-mock-signals.js';
-import { WATCHDOG_TIMEOUT_MS } from './time-budget.js';
 import { respond } from './strict-mock-responses.js';
 import {
   createState,
@@ -151,13 +150,17 @@ export class StrictMockProvider {
     return this._state.sessionBindings.get(alias) || null;
   }
 
-  waitForExpectation(id, timeoutMs = WATCHDOG_TIMEOUT_MS) {
+  // VERIFY-004: no competing absolute timeout on flow waits. When timeoutMs is
+  // omitted, wait until the expectation matches; the scenario Watchdog owns
+  // silence detection. Do not default to WATCHDOG_TIMEOUT_MS here — that turned
+  // every unbounded `wait = "..."` into a 5s wall clock under parallel load.
+  waitForExpectation(id, timeoutMs) {
     return this._signals.waitForExpectation(id, timeoutMs);
   }
-  waitForExpectationAttempt(id, attempts, timeoutMs = WATCHDOG_TIMEOUT_MS) {
+  waitForExpectationAttempt(id, attempts, timeoutMs) {
     return this._signals.waitForExpectationAttempt(id, attempts, timeoutMs);
   }
-  waitForIdle(timeoutMs = WATCHDOG_TIMEOUT_MS) { return this._signals.waitForIdle(timeoutMs); }
+  waitForIdle(timeoutMs) { return this._signals.waitForIdle(timeoutMs); }
   matchCount(id) { return this._signals.matchCount(id); }
   afterExpectation(id, callback, attempts = 1) {
     if (!Number.isInteger(attempts) || attempts < 1) {

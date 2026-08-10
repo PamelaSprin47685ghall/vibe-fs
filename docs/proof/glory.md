@@ -35,7 +35,7 @@
 2. record-ready 由物化成功判定，而非 coverage 越过 frontier（GLORY-073 off-by-one 死锁）：在 snapshot 上以全量 origin coverage 物化含 `Work log` 的 canonical LWR（raw 纯文本段标题）→ `RecordReady`；物化失败且 `coverageCanAdvance` → `AwaitJournal`；否则 `RecordUnavailable` → undecided。随后恰好一次 `FinalityRejected`，其 blob 含对应 `Work log`；经 `FinalityPrompt.rejected` / `SyntheticToml.comment` 的 wire 为单次 `# Work log`。
 3. 记录等待只由 `AgentJournal.awaitChangeFrom` 唤醒；结构与行为 proof 均拒绝 timer/sleep/re-probe 轮询。
 4. REVISE 后、coverage 前崩溃并恢复：不重开 cohort、不补发 challenge；后续 coverage 仍只落同一 rejection。`BloggerRequestAbandoned` 不得产出 partial rejection；无法重建证据时只能 undecided。
-5. §29 拒绝/崩溃恢复专项回归（`tests/unit/execution/finality-cohort-law.test.mjs`）：**GLORY_074** Blogger abandonment → `concludeRejection` fail-close 至 `Undecided`，绝不产出缺 `Work log` 的 `FinalityRejected`/`WorkRecordRef`（无 partial rejection）；**GLORY_075** waiter 崩溃 → `resumeDurableRevise` 从 durable evidence 续等并经 `awaitChangeFrom` 唤醒（无 timer/sleep re-probe），coverage 后唯一 `FinalityRejected` 引用非空 `Work log`。
+5. §29 拒绝/崩溃恢复专项回归（`tests/e2e/cases/finality-cohort-law.test.mjs` canary）：**GLORY_074** Blogger abandonment → `concludeRejection` fail-close 至 `Undecided`，绝不产出缺 `Work log` 的 `FinalityRejected`/`WorkRecordRef`（无 partial rejection）；**GLORY_075** waiter 崩溃 → `resumeDurableRevise` 从 durable evidence 续等并经 `awaitChangeFrom` 唤醒（无 timer/sleep re-probe），coverage 后唯一 `FinalityRejected` 引用非空 `Work log`。
 
 ## Golden Byte Fixtures（proposal 附录 A.16）
 

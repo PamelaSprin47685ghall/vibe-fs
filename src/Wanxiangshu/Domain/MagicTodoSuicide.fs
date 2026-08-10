@@ -9,13 +9,15 @@ open Wanxiangshu.Kernel.Identity
 module MagicTodoSuicide =
 
     type DrainResult =
-        { /// Settled current after consuming the latest ConsumableReview, if any.
-          SettledCurrent: MagicTodoList
-          /// Latest consumable process review drained into Manager-facing evidence.
-          DrainedReview: TodoReviewConcluded option
-          /// Compatibility sink should be reconciled to SettledCurrent when REVISE
-          /// was consumed and no fresh Accepted follows immediately (§23.1).
-          NeedsCompatibilityReconcile: bool }
+        {
+            /// Settled current after consuming the latest ConsumableReview, if any.
+            SettledCurrent: MagicTodoList
+            /// Latest consumable process review drained into Manager-facing evidence.
+            DrainedReview: TodoReviewConcluded option
+            /// Compatibility sink should be reconciled to SettledCurrent when REVISE
+            /// was consumed and no fresh Accepted follows immediately (§23.1).
+            NeedsCompatibilityReconcile: bool
+        }
 
     /// Consume latest TodoReviewConcluded into settlement without creating a checkpoint.
     let drainLatestConsumable

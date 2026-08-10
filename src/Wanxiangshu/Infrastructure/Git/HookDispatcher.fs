@@ -25,19 +25,15 @@ module HookDispatcher =
     type ConvergeObserved = string -> StoreSnapshot -> Task<Result<StoreSnapshot, ConvergeError>>
 
     type HookDispatcherDeps =
-        {
-            ConvergeFull: ConvergeFull
-            ConvergeObserved: ConvergeObserved
-            SyncRemote: string
-        }
+        { ConvergeFull: ConvergeFull
+          ConvergeObserved: ConvergeObserved
+          SyncRemote: string }
 
     type ReferenceUpdate =
-        {
-            RefName: string
-            OldOid: string option
-            NewOid: string option
-            IsCommitted: bool
-        }
+        { RefName: string
+          OldOid: string option
+          NewOid: string option
+          IsCommitted: bool }
 
     type HookDispatchResult =
         | NoOp of reason: string
@@ -82,15 +78,13 @@ module HookDispatcher =
         (convergeObserved: ConvergeObserved)
         (syncRemote: string)
         : HookDispatcherDeps =
-        {
-            ConvergeFull = convergeFull
-            ConvergeObserved = convergeObserved
-            SyncRemote =
-                if String.IsNullOrWhiteSpace syncRemote then
-                    "origin"
-                else
-                    syncRemote
-        }
+        { ConvergeFull = convergeFull
+          ConvergeObserved = convergeObserved
+          SyncRemote =
+            if String.IsNullOrWhiteSpace syncRemote then
+                "origin"
+            else
+                syncRemote }
 
     let private isAbsentOid (oid: string option) : bool =
         match oid with
@@ -122,11 +116,7 @@ module HookDispatcher =
             if isSyncActive () then
                 return NoOp "recursion guard"
             else
-                match
-                    updates
-                    |> List.choose (matchingStoreUpdate deps.SyncRemote)
-                    |> List.tryLast
-                with
+                match updates |> List.choose (matchingStoreUpdate deps.SyncRemote) |> List.tryLast with
                 | None -> return NoOp "no store remote-tracking update"
                 | Some oid ->
                     let! result = deps.ConvergeObserved deps.SyncRemote (observedSnapshot oid)
@@ -208,12 +198,9 @@ module HookDispatcher =
             | AlreadyOwned ->
                 writeShim path shimBody
                 AlreadyOwned
-            | ForeignHook _ ->
-                DiagnoseIncomplete(sprintf "%s: foreign hook at %s" IncompleteDiagnosis path)
+            | ForeignHook _ -> DiagnoseIncomplete(sprintf "%s: foreign hook at %s" IncompleteDiagnosis path)
             | DiagnoseIncomplete reason -> DiagnoseIncomplete reason
 
     /// Canonical shim header body fragment (tests / install callers embed this).
     let shimHeaderComment: string =
-        sprintf
-            "# %s\n# ownership: Wanxiangshu HookDispatcher — do not replace with unrelated hooks"
-            OwnershipMarker
+        sprintf "# %s\n# ownership: Wanxiangshu HookDispatcher — do not replace with unrelated hooks" OwnershipMarker

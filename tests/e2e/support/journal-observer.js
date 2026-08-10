@@ -13,6 +13,23 @@ const gitCommonDir = (workDir) => {
 
 const storeRefPath = (workDir) => path.join(gitCommonDir(workDir), 'refs', 'wanxiang', 'store');
 
+/**
+ * Read UTF-8 content for a journal BlobRef (`blobs/<gitOid>` or bare OID).
+ * Bodies live in the Git ODB after Phase 5 — never under wanxiangshu-next/.
+ */
+export function readBlobRef(workDir, blobRef) {
+  const raw = Array.isArray(blobRef) ? blobRef.at(-1) : blobRef;
+  const token = String(raw ?? '');
+  const oid = token.startsWith('blobs/') ? token.slice('blobs/'.length) : token;
+  if (!/^[0-9a-f]{40}$/i.test(oid)) {
+    throw new Error(`invalid BlobRef OID: ${token}`);
+  }
+  return execFileSync('git', ['-C', workDir, 'cat-file', '-p', oid], {
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
+  });
+}
+
 /** Current EventStore tip OID, or null when the canonical ref is absent. */
 export function storeTip(workDir) {
   try {
@@ -27,71 +44,201 @@ export function storeTip(workDir) {
   }
 }
 
-/** Canonical event JSON texts under refs/wanxiang/store (events/ shard jsonl blobs). */
-export const journalEventLines = (workDir) => {
-  const tip = storeTip(workDir);
-  if (!tip) return [];
+const tipSnapshotCache = new Map(); // `${workDir}\0${tip}` -> { lines, factCounts }
+const blobTextCache = new Map(); // git blob oid -> utf8 text
+
+const eventShardPrefix = ['events', ''].join('/'); // tip-tree prefix, not a repo-root path
+
+/** Journal Envelope object nested under EventStore `payload`, or null. */
+export function journalEnvelopeFromEventText(text) {
+  try {
+    const event = JSON.parse(text);
+    if (event && typeof event === 'object' && event.payload && typeof event.payload === 'object') {
+      return event.payload;
+    }
+    // Pre-EventStore / harness shapes already look like Envelope.
+    if (event && typeof event === 'object' && Object.prototype.hasOwnProperty.call(event, 'Fact')) {
+      return event;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+const loadBlobText = (workDir, oid) => {
+  const cached = blobTextCache.get(oid);
+  if (cached !== undefined) return cached;
+  const text = execFileSync('git', ['-C', workDir, 'cat-file', 'blob', oid], {
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  blobTextCache.set(oid, text);
+  return text;
+};
+
+const tallyFactNames = (fact, counts) => {
+  if (Array.isArray(fact)) {
+    if (typeof fact[0] === 'string') {
+      counts.set(fact[0], (counts.get(fact[0]) ?? 0) + 1);
+    }
+    for (const child of fact) tallyFactNames(child, counts);
+  } else if (fact && typeof fact === 'object') {
+    for (const child of Object.values(fact)) tallyFactNames(child, counts);
+  }
+};
+
+const snapshotForTip = (workDir, tip) => {
+  const key = `${workDir}\0${tip}`;
+  const hit = tipSnapshotCache.get(key);
+  if (hit) return hit;
+
   let listing = '';
   try {
-    listing = execFileSync('git', ['-C', workDir, 'ls-tree', '-r', '--name-only', tip], {
+    listing = execFileSync('git', ['-C', workDir, 'ls-tree', '-r', tip], {
       encoding: 'utf8',
     });
   } catch {
-    return [];
+    const empty = { lines: [], factCounts: new Map() };
+    tipSnapshotCache.set(key, empty);
+    return empty;
   }
-  return listing
-    .split('\n')
-    .filter((entry) => entry.startsWith('events/') && entry.endsWith('.jsonl'))
-    .map((entry) => {
-      try {
-        return execFileSync('git', ['-C', workDir, 'show', `${tip}:${entry}`], {
-          encoding: 'utf8',
-          maxBuffer: 16 * 1024 * 1024,
-        });
-      } catch {
-        return '';
+
+  const lines = [];
+  for (const row of listing.split('\n')) {
+    if (row === '') continue;
+    // "100644 blob <oid>\t<path>"
+    const tab = row.indexOf('\t');
+    if (tab < 0) continue;
+    const meta = row.slice(0, tab);
+    const pathName = row.slice(tab + 1);
+    if (!pathName.startsWith(eventShardPrefix) || !pathName.endsWith('.jsonl')) continue;
+    const parts = meta.split(/\s+/);
+    const oid = parts[2];
+    if (!oid) continue;
+    try {
+      const text = loadBlobText(workDir, oid);
+      for (const line of text.split('\n')) {
+        const trimmed = line.trim();
+        if (trimmed !== '') lines.push(trimmed);
       }
-    })
-    .filter((text) => text.trim() !== '');
+    } catch {
+      // ignore unreadable blob
+    }
+  }
+
+  const factCounts = new Map();
+  for (const line of lines) {
+    const envelope = journalEnvelopeFromEventText(line);
+    if (envelope?.Fact !== undefined) tallyFactNames(envelope.Fact, factCounts);
+  }
+
+  const snap = { lines, factCounts };
+  tipSnapshotCache.set(key, snap);
+  // Keep only the latest tip snapshot per workDir (tips are append-only CAS).
+  for (const existing of tipSnapshotCache.keys()) {
+    if (existing.startsWith(`${workDir}\0`) && existing !== key) tipSnapshotCache.delete(existing);
+  }
+  return snap;
+};
+
+/** Canonical event JSON texts under refs/wanxiang/store (one string per jsonl event line). */
+export const journalEventLines = (workDir) => {
+  const tip = storeTip(workDir);
+  if (!tip) return [];
+  return snapshotForTip(workDir, tip).lines;
 };
 
 const journalEventTexts = journalEventLines;
 
+/**
+ * Payloads of the named fact case wherever it nests inside EventStore journal envelopes.
+ * Accepts either workDir or an array of event JSON texts / Envelope-like objects.
+ */
+export function factPayloads(workDirOrLines, caseName) {
+  const lines = typeof workDirOrLines === 'string' ? journalEventLines(workDirOrLines) : workDirOrLines;
+  const found = [];
+  const walk = (value) => {
+    if (Array.isArray(value)) {
+      if (typeof value[0] === 'string' && value[0] === caseName) found.push(value[1]);
+      for (const item of value) walk(item);
+    } else if (value && typeof value === 'object') {
+      for (const child of Object.values(value)) walk(child);
+    }
+  };
+  for (const line of lines) {
+    const envelope =
+      typeof line === 'string'
+        ? journalEnvelopeFromEventText(line)
+        : line && typeof line === 'object'
+          ? line.payload && typeof line.payload === 'object'
+            ? line.payload
+            : line
+          : null;
+    if (envelope) walk(envelope.Fact);
+  }
+  return found;
+}
+
+export const countFactCase = (workDirOrLines, caseName) => {
+  if (typeof workDirOrLines === 'string') {
+    const tip = storeTip(workDirOrLines);
+    if (!tip) return 0;
+    return snapshotForTip(workDirOrLines, tip).factCounts.get(caseName) ?? 0;
+  }
+  return factPayloads(workDirOrLines, caseName).length;
+};
+
+const digFactLabel = (fact) => {
+  if (typeof fact === 'string') return fact;
+  if (!Array.isArray(fact) || typeof fact[0] !== 'string') return null;
+  if (fact.length >= 2 && Array.isArray(fact[1]) && typeof fact[1][0] === 'string') {
+    return digFactLabel(fact[1]) ?? fact[0];
+  }
+  return fact[0];
+};
+
 const factLabelFromEvent = (text) => {
   try {
-    const event = JSON.parse(text);
-    const payload = event?.payload;
-    const fact = payload?.Fact;
-    if (Array.isArray(fact) && typeof fact[0] === 'string') return fact[0];
-    if (Array.isArray(fact) && Array.isArray(fact[1]) && typeof fact[1][0] === 'string') {
-      return fact[1][0];
-    }
-    if (typeof fact === 'string') return fact;
+    const envelope = journalEnvelopeFromEventText(text);
+    const label = digFactLabel(envelope?.Fact);
+    if (label) return label;
     // Fall back to scanning nested AgentFact case names.
-    const match = text.match(/"(?:Prompt|Fallback|Review|Execution|Orchestrator|Companion|Context|Host|Runtime)[^"]*"|([A-Z][A-Za-z0-9]+)/);
-    return match?.[1] ?? 'UnknownFact';
+    const match = text.match(
+      /"(?:Plugin|Prompt|Fallback|Review|Execution|Orchestrator|Companion|Context|Host|Runtime|Life|Handle|Pair)[A-Za-z0-9]+"/,
+    );
+    return match?.[0]?.slice(1, -1) ?? 'UnknownFact';
   } catch {
     return 'malformed';
   }
 };
 
 export function readJournal(workDir, factName, renewOn = []) {
-  const texts = journalEventTexts(workDir);
+  const tip = storeTip(workDir);
+  if (!tip) return { named: 0, total: 0, renew: 0, tip: null };
+  const snap = snapshotForTip(workDir, tip);
+  const texts = snap.lines;
   let named = 0;
-  let renew = 0;
-  const renewNames = renewOn.length > 0 ? new Set(renewOn) : null;
-  for (const text of texts) {
-    if (factName !== undefined && text.includes(factName)) named += 1;
-    if (renewNames !== null) {
-      for (const name of renewNames) {
-        if (text.includes(name)) {
-          renew += 1;
-          break;
-        }
-      }
+  if (factName !== undefined) {
+    named = snap.factCounts.get(factName) ?? 0;
+    if (named === 0) {
+      // Harness / non-Envelope plantings (e.g. payload.type) still match by substring.
+      named = texts.filter((text) => text.includes(factName)).length;
     }
   }
-  return { named, total: texts.length, renew, tip: storeTip(workDir) };
+  let renew = 0;
+  const renewNames = renewOn.length > 0 ? new Set(renewOn) : null;
+  if (renewNames !== null) {
+    for (const name of renewNames) {
+      const counted = snap.factCounts.get(name) ?? 0;
+      if (counted > 0) {
+        renew += counted;
+        continue;
+      }
+      renew += texts.filter((text) => text.includes(name)).length;
+    }
+  }
+  return { named, total: texts.length, renew, tip };
 }
 
 export function journalFactTail(workDir, limit) {
