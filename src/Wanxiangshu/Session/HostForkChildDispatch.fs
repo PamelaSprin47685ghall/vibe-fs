@@ -190,7 +190,13 @@ module HostForkChildDispatch =
         // EXEC-009: durable abandon before aborting. A crash mid-Cancel must not
         // leave a session aborted but still Active/joinable. A leaked abort is
         // recoverable; a leaked live handle is not.
-        match HandleController.cancelChildren journal parentId (owned |> List.map fst) with
+        match
+            HandleController.cancelChildren
+                journal
+                parentId
+                (owned |> List.map fst)
+                System.DateTimeOffset.UtcNow
+        with
         | Error err ->
             // Journal failure during abandon is a durable-state bug; surface it.
             async { return raise (InvalidOperationException(sprintf "Parent handle abandon failed: %s" err)) }

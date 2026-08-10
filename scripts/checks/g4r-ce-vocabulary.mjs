@@ -71,11 +71,22 @@ export const RAW_TIME_TOKENS = Object.freeze([
  * layers (posix paths relative to src/Wanxiangshu/, or repo-relative).
  * Exact file match OR prefix (trailing `/`).
  *
- * Keep empty until a named physical port must stay under Session/Application
- * with an explicit G4R-CE justification. Process/ + Infrastructure/ are already
- * outside RAW_TIME_SCAN_LAYERS.
+ * Exact Session files below are physical runtime/codec/mailbox implementations,
+ * not Application business workflows. They own Host timestamps or timer waits;
+ * ChildRecovery/HandleController business decisions receive time as data instead.
+ * Process/ + Infrastructure/ are already outside RAW_TIME_SCAN_LAYERS.
  */
-export const RAW_TIME_ALLOWLIST = Object.freeze([])
+export const RAW_TIME_ALLOWLIST = Object.freeze([
+  'Session/AgentCompletion.fs',
+  'Session/ChildRun.fs',
+  'Session/CompletionMailbox.fs',
+  'Session/HandleCompletionCodec.fs',
+  'Session/HostForkChildDispatch.fs',
+  'Session/HostForkPty.fs',
+  'Session/HostForkRuntime.fs',
+  'Session/JoinDrain.fs',
+  'Session/ParkedTransform.fs',
+])
 
 export const PHASES = Object.freeze(['s0-soft', 'hard'])
 

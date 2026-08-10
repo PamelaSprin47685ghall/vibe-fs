@@ -201,9 +201,8 @@ module HandleController =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (agentIds: string list)
+        (abandonedAt: System.DateTimeOffset)
         : Result<unit, string> =
-        let abandonedAt = System.DateTimeOffset.UtcNow
-
         let rec loop ids =
             match ids with
             | [] -> Ok()

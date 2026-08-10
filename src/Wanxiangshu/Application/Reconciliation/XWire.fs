@@ -11,6 +11,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Recovery
 open Wanxiangshu.Session
 
 module XWire =
@@ -144,7 +145,7 @@ module XWire =
 
                                 match
                                     PromptAuthorityLedger.activeProfile sessionId projections.AgentProjections,
-                                    DurableFallback.tryCurrentState sessionId projections,
+                                    FallbackEvidence.tryCurrentState sessionId projections,
                                     sessionProjection durable sessionId
                                 with
                                 | Some authority, Some fallback, Some state ->

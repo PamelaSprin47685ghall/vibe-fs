@@ -6,6 +6,7 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
+open Wanxiangshu.Recovery
 
 /// EXEC-002 busy-agent nudge, as a PROMPT-003 Continuation.
 module HostForkBusyNudge =
@@ -38,7 +39,7 @@ module HostForkBusyNudge =
                 | None -> return Error "Busy nudge requires ActiveLogicalRun on child session"
                 | Some profile ->
                     let busyAgent =
-                        DurableFallback.effectiveAgentForActiveCursor childId snapshot profile
+                        FallbackEvidence.effectiveAgent childId snapshot profile
 
                     let rt = PromptDispatcher.forJournal j
 

@@ -7,6 +7,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
+open Wanxiangshu.Recovery
 open Wanxiangshu.Session
 
 /// Continuation sends against an already-accepted Authority Root.
@@ -37,7 +38,7 @@ module HostSessionNudge =
         =
         journal
         |> Option.map (fun j ->
-            DurableFallback.effectiveAgentForActiveCursor sessionId (AgentJournal.snapshot j) profile)
+            FallbackEvidence.effectiveAgent sessionId (AgentJournal.snapshot j) profile)
         |> Option.defaultValue profile.SelectedAgent
 
     /// Reconciled linked children have a host-proven root user message even when

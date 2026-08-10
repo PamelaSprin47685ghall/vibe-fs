@@ -11,6 +11,7 @@ open Wanxiangshu.Kernel.Identity
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ProviderProjection
+open Wanxiangshu.Recovery
 
 type CompanionHost
     (
@@ -184,7 +185,7 @@ type CompanionHost
     member this.BloggerCursorOffset() : AgentPairCursor.FallbackOffset =
         match journal with
         | Some j ->
-            match DurableFallback.tryCurrentState primaryId (AgentJournal.snapshot j) with
+            match FallbackEvidence.tryCurrentState primaryId (AgentJournal.snapshot j) with
             | Some current -> current.Cursor.Offset
             | None -> AgentPairCursor.FallbackOffset.Fork0
         | None -> AgentPairCursor.FallbackOffset.Fork0
