@@ -89,14 +89,14 @@ Strength
 | **G2** Universal Runtime Foundation | **DONE** | `ReuseScope` / `SessionOwnership` / `SyncDelegate` + CausalAwait dual-await；`ca9fd08a` |
 | **G3** Universal Clean Break | **DONE** | Student/Teacher/QA/SKILL 删除；Meditator → Inspector only；ratchet green |
 | **G3.5** Storage cutover scope 修订 | **DONE** | Amendment G3.5-A；Student QA retired；no migrator / dual-write |
-| **G4** Unified Storage | **IN PROGRESS（收口）** | Phase 0–7 **DONE**；Phase 8 性能 + harness EventStore cutover **DONE**；e2e **26/26** + `--repeat 3` 绿（`69235b5b`–`827411e3`）；Storage → completed **待 G4 Exit 清单确认** |
-| **G5** JS Capability-Projected Tools | **BLOCKED**（G4 Exit） | 有早期 prep（`8319771f` capability algebra）；**勿 activate** 直至 Storage completed |
+| **G4** Unified Storage | **DONE** | `changes/completed/storage.md` Final outcome；G4R（`changes/completed/test.md`）后验证：`npm run check` GREEN + Long Stroke GREEN（48 steps / 5.0s / ceilings 367/367）；`check:release` GREEN |
+| **G5** JS Capability-Projected Tools | **READY（待 activate）** | G4 Exit 达成；有早期 prep（`8319771f` capability algebra）；按 §27 标准动作激活 |
 | **G6** perm-inspector + Casebook | **NOT STARTED** | Universal 仍 Active；CaseFinalize / CaseRefresh 未做 |
 | **G7** Rulebook | **NOT STARTED** | — |
 | **G8** Strength | **NOT STARTED** | — |
 | **G9** Global Convergence | **NOT STARTED** | — |
 
-**当前主线位置：** G4 收口 → Storage Active → `changes/completed/` → 再 activate G5。
+**当前主线位置：** G4 已 completed → **activate G5**（js-capability-projected-tools）。
 
 ## 0.2 自 Playbook 落地以来关键 commit（`31d456ec` 之后）
 
@@ -113,19 +113,19 @@ a2b71ec5  FALLBACK-013 abort residue fix
 13d3cfcb  e2e wall 104s→33s（真实成本移除，非超时放宽）
 002e581c  session-recovery permit + PTY race fixes
 ac41ef8f  session abort diagnostic
+40d4905a  G4R proposal（unified E2E framework；G4 exit blocker）
+17d583cb  G4R implemented（Long Stroke 唯一 e2e；旧 canary 全删）
 ```
 
 ## 0.3 当前证明状态（2026-08-10 EOD）
 
 | 证明切片 | 状态 |
 |---|---|
-| `scripts/check.mjs` 静态门（含 unified-store-gate / student-teacher-absence / causal-wait-boundary） | GREEN |
-| Unit（≈1951） | GREEN |
-| Integration（281 + persist leave-unread / dumb-server / object-identity） | GREEN |
-| E2e staggered（26 cases） | GREEN **26/26** |
-| `npm run test:e2e -- --repeat 3` | GREEN 3 轮 |
-| Storage G4 Exit Gate（§11.4 全清单 + move completed） | **待确认** |
-| 已知 residual | `manager-full-loop` 高并行下间歇 flake（join-guard→activation 链；**禁止**用提超时掩盖） |
+| `npm run check`（静态门 + build + unit + integration；含 unified-store-gate / student-teacher-absence / g4r-freeze） | GREEN |
+| `npm run test:e2e` Long Stroke（`tests/e2e/entry.test.mjs` 唯一入口；spawn==1） | GREEN（48 steps / 5.0s；ceilings 367/367） |
+| `npm run check:release` | GREEN（G4R Final outcome） |
+| Storage G4 Exit Gate（§43 + §48，受 G3.5-A 修订；move completed） | **DONE**（`changes/completed/storage.md`） |
+| 已知 residual | 无（旧 multi-canary 世界已删除；`manager-full-loop` flake 随旧 e2e 拓扑消失） |
 
 ## 0.4 合法中间状态（现在）
 
@@ -135,6 +135,7 @@ ac41ef8f  session abort diagnostic
 ✓ Meditator = reasoning only；SyncDelegate reuse Session
 ✓ Runtime durability = EventStore（Strategy A：AgentJournal 作 adapter surface）
 ✓ 无 legacy NDJSON writer / 无 dual-write / 无 migrator
+✓ Storage completed（G4）
 ✗ Casebook cold persistence / CaseFinalize（G6）
 ✗ JS capability-projected file tools 全面迁移（G5）
 ✗ Rulebook / Strength
@@ -2055,12 +2056,13 @@ Casebook / CaseFinalize                         ○ G6（Universal 仍 Active）
 
 ---
 
-## Lane C — Storage Foundation — **Phase 0–7 DONE；cutover 收口**
+## Lane C — Storage Foundation — **DONE（G4 completed）**
 
 ```text
 Inventory / RED gate / EventStore core / GitGateway   ✓ DONE
 Wave-1 adapter + NDJSON delete + proposed rewrite    ✓ DONE
-Phase 8 perf + harness EventStore cutover            ✓ DONE（G4 Exit 待签）
+Phase 8 perf + harness EventStore cutover            ✓ DONE
+G4 Exit（§43+§48，G3.5-A 修订）→ changes/completed/  ✓ DONE（2026-08-10）
 ```
 
 ---
@@ -2071,8 +2073,8 @@ Phase 8 perf + harness EventStore cutover            ✓ DONE（G4 Exit 待签�
 
 ```text
 Universal destructive delete          ✓ DONE（2026-08-10）
-Storage cutover                       ◐ IN PROGRESS（G4 收口）
-JS legacy tool removal                ○ BLOCKED（G4 Exit）
+Storage cutover                       ✓ DONE（2026-08-10，G4 completed）
+JS legacy tool removal                ○ ACTIVE（G5，本节 activate）
 Casebook observation integration      ○ NOT STARTED（G6）
 Rulebook context migration            ○ NOT STARTED
 Strength promotion                    ○ NOT STARTED
@@ -2477,13 +2479,13 @@ CURRENT（2026-08-10；HEAD ac41ef8f）
     Meditator → Inspector only
         │
         ▼
-[5] Unified EventStore                       ◐ IN PROGRESS
+[5] Unified EventStore                       ✓ DONE
     clean break cutover
     no disk-format compatibility
     no old-archive read
         │
         ▼
-[6] Capability-Projected JS Tools            ○ BLOCKED (G4)
+[6] Capability-Projected JS Tools            ◐ ACTIVE（G5）
     final filesystem primitive
         │
         ▼

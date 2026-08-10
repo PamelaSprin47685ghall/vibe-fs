@@ -2157,3 +2157,21 @@ Any PR introducing the above is out of scope for G4 Active and must be rejected 
 
 **Completion criteria**：见 §43 + §48，**并受 Amendment G3.5-A 约束**；另以 `npm run check` 全绿为准。
 
+
+---
+
+## Final outcome
+
+**G4（Unified Storage）已收口**（2026-08-10，`17d583cb` 后核实）：
+
+1. **全部 Phase DONE**：Phase 0 Inventory / Phase 1 RED gates / Phase 2 Git Raw EventStore 核心 / Phase 3 GitGateway + HookDispatcher + dumb-server / Phase 4 clean-break policy / Phase 6 Wave-1 EventStore-backed `AgentJournal` adapter / Phase 5 NDJSON/Boot/dir-blob writer 删除 / Phase 7 Proposed storage sections 重写（perm-inspector/rulebook/strength + js-capability audit）/ Phase 8 性能与 cutover 收口。
+2. **§43 Exit 清单（受 Amendment G3.5-A 修订）确认**：唯一 durable substrate = `IEventStore`（canonical JSON blob per event，one event = one immutable Git blob）；唯一 canonical store ref；无 feature-owned refs / RuntimePath blob / Student QA 文件 / schemaVersion / dual reader / dual write / migrator；GitGateway 是生产 Git 必经入口；dumb server 无 Domain 依赖；Casebook/Rulebook/Strength 不再拥有自有 storage；payload closure 保证 committed payloads reachable；EventId CAS 解决 crash ambiguity。
+3. **§48 并发不变量确认**：无 leader / 无 repository-wide mutex / frozen StoreSnapshot / append-only delta / K-way merge（assoc+commut+idempot+deterministic）/ 同 EventId 异 bytes fail closed / 不同 EventId 永不因 replica conflict 丢失 / projection = snapshot-local derived state / 同 merged snapshot 同 projection。
+4. **migrator 相关条目（§43「ExplicitMigration / LegacyProjection ≡ NewProjection」）由 Amendment G3.5-A supersede**：旧 Journal/Blob/Student QA 磁盘历史 leave-unread，无格式保持迁移义务（Playbook Rule 0）。
+5. **最终验证（G4R One World 测试架构下）**：
+   - `npm run check` GREEN（static gates + build + unit + integration all passed）
+   - `npm run test:e2e` GREEN：Long Stroke 48 steps / 5.0s；event ceilings journal=367/367、sse=1729/1730（heartbeats excluded）；spawn==1
+   - `npm run check:release` GREEN（G4R Final outcome 记录）
+6. **G4R 关系**：`changes/completed/test.md`（G4R）是本 Change Phase 8 的 exit blocker；其交付后旧 multi-canary 拓扑删除，e2e 收敛为单一 Long Stroke，本 Change 的「Phase 8 继续精修旧 canary choreography」路径随之冻结。
+
+**Gate 移交**：G4 Exit 达成 → 按 Playbook §11.4/§0.1，激活 G5（js-capability-projected-tools），此前不得提前实施（prep `8319771f` 仅 capability algebra 草稿）。
