@@ -738,12 +738,37 @@ Proposed storage sections rewritten to EventStore-only (`refs/wanxiang/store` / 
 
 #### Remaining（next session — do not raise timeouts）
 
-1. **`fallback-aabb-trace` 模型轨迹发散（当前唯一硬红）**
-   - Symptom: `assertModelTrajectory` got `A,A,B,A,A` vs expected `A,A,B,B,A`（index 3）。
-   - Alone 有时也红；`waitFact gte=4` 已落地，但仍可能在第 4 次失败前/后 Side 选择与成功交付交错。
-   - Next: 对照 FALLBACK-002 Offset `(n+1) mod 4` 与 AttemptExecutionProfile 在 EventStore 加速后的时序；**不要**用 timeout 或轨迹 normalize（VERIFY-002）糊过去。
-2. **并行连带** — 先修 aabb；再确认 manager-full-loop / restart / finality 在 aabb 绿后是否仍单独复现。
+1. ~~**`fallback-aabb-trace` 模型轨迹发散**~~ — **FIXED**，见下节 root cause。
+2. **并行连带** — aabb 绿后 full suite 26/26 一次通过；`--repeat 3` 见下节证据。
 3. **Close G4** — full e2e + `npm run check` 全绿 → Storage Active → `changes/completed/` → 再激活 G5（scout 已完成，**勿提前 activate**）。
+
+### Phase 8 — `fallback-aabb-trace` root cause（abort 残留双记；FALLBACK-013）
+
+**Symptom：** `assertModelTrajectory` 间歇 `A,A,B,A,A` vs `A,A,B,B,A`（index 3），单跑 ~1/6 复现（`/tmp/aabb-run6.txt`）。
+
+**Root cause（因果证据，不是猜测）：** 合并 wire+EventStore 时间线显示，红/绿两种运行都对同一 Logical Run 写了 **5** 次 `FallbackCursorAdvanced`——4 次 provider `APIError` + 1 次 `reason="blog tool interrupted without completed call"`。第 5 次来自 `EnforcerHost.handleContinuation` 的 abort 残留分支：owner 的 400 失败触发 Host `SessionProcessor.cleanup`（`processor.ts:589`）把 Companion 在途 `blog` 调用标成 `status=error` + `metadata.interrupted=true`，该分支再调用 `FallbackController.recordConfirmedFailure`，用 **Blogger** 的 assistant id 作 `ProviderRunIdentity`。跨 Session 身份让 FALLBACK-003 去重无法折叠 → 同一次 owner 失败被记两次；两次 append 的先后决定 offset 归属，于是 provider 可见 A/A/B/B 顺序变成竞态（绿只是残留那次恰好排在四次之后）。
+
+**Fix（产品语义，非测试放宽）：**
+- 新条款 `FALLBACK-013`（`docs/what/fallback.md`）：Host abort/cleanup 残留（`status=error` ∧ `interrupted=true`）不推进任何 cursor、不消耗预算；与 LOOP-006「清理中止不得自动 AABB」一致。判据只看 Host 标记（CTX-005）。
+- `EnforcerHost`：`hasFailedBlogAttempt` 拆成 `hasAbortedBlogAttempt`（interrupted → `projectRepairInstruction`，只注入 repair，不推进）与 `hasErroredBlogAttempt`（ENFORCER-065 `ToolExecutionError` → 仍走 `aabbRepair` 推进）；`aabbRepair` 与 repair 投影分离，seal 短路共用。有界性仍由 ENFORCER-153 transcript marker 保证（第二次残留即终局），不靠 fallback 预算。
+- `docs/how/enforcer.md` ENFORCER-065/068 表新增 `AbortResidue` 行；`docs/what/enforcer.md` ENFORCER-062 指向 FALLBACK-013；proof 表更新。
+
+**Gate 收紧（不是放宽）：** `fallback-aabb-trace.toml` `waitFact FallbackCursorAdvanced` 由 `gte=4` 收回 `eq=4`；case 内 `assertFailureEvidence` 去掉「可能有第五次 wrap」的容忍，改为断言恰好 4 条推进 + counts 1..4 + offsets 0,1,2,3→1,2,3,0。
+
+**Red→green 证据：**
+- unit：`LOOP_006_interrupted_blog_repairs_without_advancing_primary_cursor` 在 stash 掉 `EnforcerHost.fs` 后 RED（`abort residue leaves Fork0`），恢复后 GREEN；`ENFORCER_065_tool_execution_error_blog_advances_primary_cursor_once` 两侧均 GREEN（区分两条路径）。
+- e2e：stash 生产改动后 `fallback-aabb-trace` RED（`waitFact FallbackCursorAdvanced overshot eq 4 (got 5)`）；恢复后单跑 8/8 GREEN，full suite 26/26 GREEN。
+
+**顺带修掉的 HEAD 级 integration 红：** `tests/e2e/support/journal-observer.js` 的 `token.startsWith('blobs/')` 被 harness path-criterion 门判为「命名不存在的 repo 路径」（HEAD 69235b5b 起 280/1）。改为单一 `^(?:blobs\/)?[0-9a-f]{40}$` 正则解析 → integration 回到 281/0。
+
+#### Proof table（updated）
+
+| Proof slice | Status |
+|---|---|
+| `npm run check`（lint+build+unit 1951+integration 281） | GREEN |
+| Full e2e suite（staggered parallel） | GREEN **26/26** |
+| `npm run test:e2e -- --repeat 3` | GREEN 3 轮（`/tmp/e2e-repeat3.log`） |
+| Storage Active → completed | 待 G4 收口清单确认 |
 
 #### Key files touched（resume here）
 
@@ -762,6 +787,65 @@ tests/integration/harness/{timeout-cases,event-store-gate-facts,degradation-case
 ```
 
 **doNotBuild still：** migrator / legacy reader / dual-write / `LegacyProjection≡NewProjection` / timeout padding as “proof”。
+
+### Phase 8 — EventStore 写入延迟根因（git CLI 进程数，非 OpenCode）
+
+**用户质疑：** per-turn 1–1.5s 不正常；既非 CPU-bound 也非 IO-bound，怀疑 OpenCode 隔离不到位或存在隐式集中式访问。**结论：根因在万象术的 git-CLI raw store，不在 OpenCode。**
+
+**测量（先证据后动手）：**
+
+| 测量 | 结果 |
+|---|---|
+| 纯 OpenCode 一次 turn（`plugin: false` + strict mock，`/tmp/turn-latency.mjs`） | prompt→wire 22–27ms；wire→idle ~68ms；**总 ~95ms** |
+| `EventStore.Append` 单事件（`ProcessGitRawStore` 真 git） | **24 次同步 `git` 子进程 / ~60ms** |
+| 同一 EventStore 逻辑（`GitRawStore_createInMemory`） | **0.5ms** |
+| 一个 `fallback-aabb-trace` canary（PATH 挂 git 计时 shim） | **1197 次 git 调用 / 2447ms**（占 5.3s 墙钟 ~46%）：`ls-tree` 442、`mktree` 299、`cat-file` 163、`rev-parse` 93、`hash-object` 65、`update-ref` 49 |
+
+24 次里有 12 次是同一批 tree oid 的重复 `ls-tree`、7 次 `mktree` 重复写同一 shard 路径（delta 快照与 merge 各建一遍）。`execFileSync` 同步阻塞 Node 事件循环，所以每次 append 期间 Host 内**所有** session 串行等待——这就是「隐式集中式访问」，也解释了为什么既不吃 CPU 也不吃 IO。
+
+**修复（语义不变，物理层替换）：**
+1. `ProcessGitRawStore` 实例级 memo：object/tree 读缓存 + `mktree` 结果缓存。Git 对象内容寻址且不可变 → 缓存是精确的，不是启发式；**不缓存缺失**（尚未写入的对象之后可能出现）。24 → 11 spawns / 29ms。
+2. 新 `GitObjectDatabase`（`Infrastructure/Persist/GitObjectDatabase.fs`）：直接读写 loose object（`sha1` + `zlib` + `objects/xx/yyyy`，tmp+rename），tree body 用 Git 规范序（`StoreTree.canonicalOrder`，目录按 `name + "/"` 排序）。packed 对象（`gc` 之后）仍回落 CLI——那是物理 fallback，不是兼容 shim。11 → **2 spawns / ~7.5ms**（仅剩 `rev-parse` + `update-ref`）。
+
+**证明：** `tests/integration/persist/object-identity.test.mjs`（新）把「我们的 oid 就是 git 的 oid」钉在真实二进制上：blob/tree oid 与 `git hash-object` / `git mktree` 逐一相等、`git cat-file` 能读回我们写的字节、嵌套 tree 命名序、缺失对象返回 None 而不是伪造空对象。
+
+**顺带修掉的门禁洞：** `tests/integration/persist/{leave-unread,dumb-server}.test.mjs` 从未挂进 `tests/integration/run.mjs`（只能手跑）。现已连同 `object-identity` 一起进入标准入口（persist step 14 passed）。
+
+### Phase 8 — e2e 套件墙钟 104s → 33s（全部为真实原因，非放宽）
+
+| 动作 | 证据 |
+|---|---|
+| 每个 case 报告 `total = startup + work`，并打印最慢五名与 pool occupancy | `tests/e2e/run.mjs`；`[flow +Ns] <step> took Nms` per-step 追踪在 `scenario-driver.mjs`（`CANARY_VERBOSE=1`） |
+| teardown 的 session settle 由「必须先看到非 idle」轮询改为**事件驱动**（先订阅、再一次确认读），并按 session 并发 | `tests/e2e/support/session-quiescence.js`（新，`isIdleEvent` 三处重复收敛为一处）；旧实现对已 idle 的 session **必然**烧完 2s 预算再抛进空 catch，每 scenario 每 session 一次 |
+| EventStore ODB 修复（上一节） | `finality-cohort-law` 38.4s → **5.7s**；`context-recovery` 44.6s → 22.6s；`orchestrator-restart-publish` 51.8s → 23.4s |
+| 多 scenario case 拆分为一 scenario 一 case 文件（pool 调度的是 case 文件） | `context-recovery.test.mjs` → `context-recovery-x-{a,b,c,d}.test.mjs` + 共享 `support/context-recovery-oracles.mjs`；`orchestrator-restart-publish` 拆出 `-conflict` |
+| launch stagger 宽度由 1 放宽为 `CANARY_STARTUP_WIDTH=3`（仍是 bark 事件，不是 sleep） | 串行 bark 链使墙钟 ≥ Σ startup（31 × ~1.6s ≈ 50s）；occupancy 3.4/8 → **6.4–6.7/8**；degradation 门禁加断言钉住「宽度来自声明常量」 |
+
+**墙钟：** 104.4s（基线，26 cases）→ 47.8s（ODB）→ 50.2s（拆分后，31 cases）→ **33.1s / 35.6s**（stagger 宽度 3，两轮）。
+
+**副产品红灯（真实行为暴露，非放宽）：** `orchestrator-restart-publish` 在加速后会真的收到 idle join-guard nudge（EXEC-016 产品行为），原 scenario 未声明 → strict mock fail-closed。按 `host-restart` / `manager-full-loop` 的既有写法声明 `orch-join-guard`（`optional`），不抑制 nudge。
+
+**Remaining：** `manager-full-loop` 在高并行下间歇 watchdog silence（frontier Empty / blocked expectations 空 / 最后进展 `expectation:blogger.0`，背景 `manager-join-guard.1`）。该 flake 在本轮性能工作之前即已记录（universal.md「one intermittent manager-full-loop flake under parallel stagger」），加速只是提高了复现率。正在按 join-guard → activation 续期链定位：是 (a) guard nudge 之后 Activation 不再发出的产品 liveness 洞，还是 (b) scenario 对第二次 guard 的罐头回答把 run 停死。**不得**用提升超时或降低并行掩盖。
+
+### Phase 8 — ref/CAS 也进程内化；剩余 git 已是 OpenCode 自己的
+
+`rev-parse --verify` + `update-ref` 是 append 路径上最后两次 spawn。ref 是 41 字节文件，更新协议是 lockfile，两者都按 Git 原样实现（`GitObjectDatabase.tryReadRef` / `compareAndSwapRef`：`<ref>.lock` 用 `wx` 独占创建 → 复核当前值 → 写入 → rename），因此并发的 `git` 进程、另一个插件实例与本代码仍然通过同一把锁串行。packed-refs 也读（`pack-refs` 之后）。
+
+另外两处「同一路径的同一事实反复问 git」也收敛为进程内缓存：`ProcessGitLayout`（`--git-path objects` / `--git-common-dir`）与 `RuntimePath.askGitCommonDir`（此前每次 store open 都 spawn 一次，单 canary 69 次）。
+
+| 指标 | 起点 | memo | ODB | ref/CAS + layout cache |
+|---|---|---|---|---|
+| 单事件 append | 24 spawns / ~60ms | 11 / ~29ms | 2 / ~7.5ms | **0 / ~1.2ms** |
+| 一个 `fallback-aabb-trace` canary 的 git | 1197 次 / 2447ms | 696 / 1530ms | 339 / 659ms | **150 次 / 289ms** |
+| 该 canary 墙钟 | 5.3s | — | 3.9s | **3.1s** |
+
+剩余 150 次里 ~110 次（`-c core.autocrlf=false` 62、opencode snapshot `--git-dir` 22、`rev-parse --path-format=absolute` 25）来自 **OpenCode 自身的 snapshot/git 工具**，不是万象术；我们的份额已降到个位数。参照：纯 OpenCode（`plugin: false`）一次 turn ~95ms；in-memory raw store 上同一 EventStore 逻辑 0.5ms。
+
+**per-step 现状（回答「非 git 部分是否慢」）：** 绿跑的 journal 相邻事实最大间隔已降到 ~800ms 且多数在 100–300ms（`/tmp/gaps.mjs` 对三个 workdir 的实测），其中包含真实 provider 往返。也就是说不存在「某一步耗数秒」的热点；高并行下 5s 静默窗口被**多步合法工作**填满（例如 `ConfirmedReviewWitness gte=2` 需要第二次 reviewer fork + 完整评审轮），而 watchdog 只认被等待事实本身作为续期。诊断实验（`WATCHDOG_TIMEOUT_MS=15000`，仅实验不入库）两轮全绿、墙钟 32s，证明是「慢而有进展」不是「死」。
+
+**下一步不是加超时也不是加 renewOn**（用户明确否决：opencode 很快，5s 无进展说明生产代码仍有优化空间），而是继续压 per-step 成本，并 root-cause 两个真实竞态：
+1. `manager-full-loop` 的 join-guard → activation 停摆（frontier Empty，非 contention：solo 加压 14/14 绿）。
+2. `orchestrator-publish` / `orchestrator-unhappy-path` 在 7–8 并发下 flow 等待与 Host 实际推进顺序错位（等 `coder.0` 时背景已到 `barrier-reviewer.2`）。
 ### Phase 3 — DONE（G4U8–G4U12；2026-08-10）
 
 验收：

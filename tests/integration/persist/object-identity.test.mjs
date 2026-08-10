@@ -130,3 +130,43 @@ test('ODB reads back its own trees; a packed object is reported absent, not gues
     assert.equal(git(['cat-file', '-t', treeOid]), 'tree')
   })
 })
+
+test('ODB ref write is git-visible, and CAS refuses a stale expectation or a held lock', () => {
+  withRepo(({ git, objects, dir }) => {
+    const ref = 'refs/wanxiang/store'
+    const gitDir = join(dir, '.git')
+    const first = Odb.writeTree(objects, toList([]))
+    const second = Odb.writeBlob(objects, Buffer.from('second\n', 'utf8'))
+
+    // Absent → create. Expectation is "no ref", spelled as None.
+    assert.equal(Odb.compareAndSwapRef(gitDir, ref, undefined, first), true, 'create must succeed')
+    assert.equal(git(['rev-parse', '--verify', ref]), first, 'git must resolve the ref we wrote')
+    assert.equal(Odb.tryReadRef(gitDir, ref), first, 'our reader must agree with git')
+
+    // Stale expectation → refused, ref unchanged. This is the lease that makes concurrent
+    // appends safe; a silent overwrite here would lose an event.
+    assert.equal(Odb.compareAndSwapRef(gitDir, ref, second, second), false, 'stale CAS must refuse')
+    assert.equal(git(['rev-parse', '--verify', ref]), first, 'refused CAS must not move the ref')
+
+    // Current expectation → swap, and git sees the new value.
+    assert.equal(Odb.compareAndSwapRef(gitDir, ref, first, second), true, 'matching CAS must swap')
+    assert.equal(git(['rev-parse', '--verify', ref]), second)
+
+    // A lock held by anyone else (git itself uses the same path) → refused, not overwritten.
+    writeFileSync(join(gitDir, ref + '.lock'), '')
+    assert.equal(Odb.compareAndSwapRef(gitDir, ref, second, first), false, 'held lock must refuse')
+    assert.equal(git(['rev-parse', '--verify', ref]), second, 'a refused CAS leaves the ref alone')
+  })
+})
+
+test('ODB ref reader resolves a packed ref after git pack-refs', () => {
+  withRepo(({ git, objects, dir }) => {
+    const ref = 'refs/wanxiang/store'
+    const gitDir = join(dir, '.git')
+    const oid = Odb.writeBlob(objects, Buffer.from('packed\n', 'utf8'))
+    assert.equal(Odb.compareAndSwapRef(gitDir, ref, undefined, oid), true)
+
+    git(['pack-refs', '--all'])
+    assert.equal(Odb.tryReadRef(gitDir, ref), oid, 'a packed ref must still resolve')
+  })
+})

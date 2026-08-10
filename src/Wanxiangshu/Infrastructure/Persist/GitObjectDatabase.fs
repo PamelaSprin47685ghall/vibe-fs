@@ -198,3 +198,98 @@ module GitObjectDatabase =
         match tryReadLoose objectsDir oid with
         | Some("tree", body) -> Some(parseTree body)
         | _ -> None
+
+    // ── refs ────────────────────────────────────────────────────────────────
+    //
+    // `rev-parse --verify` + `update-ref` were the last two spawns left on the append path
+    // (~4ms of the ~7.5ms). A ref is a 41-byte file and the update protocol is a lockfile, both
+    // documented and both used verbatim here — so a concurrent `git` process, another plugin
+    // instance and this code all serialize through the same `<ref>.lock`, exactly as before.
+
+    [<Import("openSync", "node:fs")>]
+    let private openSync (path: string) (flags: string) : int = jsNative
+
+    [<Import("writeSync", "node:fs")>]
+    let private writeSync (fd: int) (data: obj) : int = jsNative
+
+    [<Import("closeSync", "node:fs")>]
+    let private closeSync (fd: int) : unit = jsNative
+
+    [<Import("unlinkSync", "node:fs")>]
+    let private unlinkSync (path: string) : unit = jsNative
+
+    [<Import("readFileSync", "node:fs")>]
+    let private readFileText (path: string) (encoding: string) : string = jsNative
+
+    [<Emit("(() => { try { return $0(); } catch { return null; } })()")>]
+    let private tryOrNull (thunk: unit -> 'T) : 'T = jsNative
+
+    let private isOid (text: string) =
+        text.Length = 40
+        && text |> Seq.forall (fun c -> Char.IsDigit c || (c >= 'a' && c <= 'f'))
+
+    /// The ref's value: the loose ref file first, then `packed-refs` (a `gc`/`pack-refs` may have
+    /// moved it there). Symrefs are not a store shape and are not followed.
+    let tryReadRef (gitDir: string) (refName: string) : string option =
+        let loose = gitDir + "/" + refName
+
+        let fromLoose =
+            if existsSync loose then
+                let text = (readFileText loose "utf8").Trim()
+                if isOid text then Some text else None
+            else
+                None
+
+        match fromLoose with
+        | Some oid -> Some oid
+        | None ->
+            let packed = gitDir + "/packed-refs"
+
+            if not (existsSync packed) then
+                None
+            else
+                (readFileText packed "utf8").Split('\n')
+                |> Array.tryPick (fun line ->
+                    let row = line.Trim()
+
+                    if row = "" || row.StartsWith "#" || row.StartsWith "^" then
+                        None
+                    else
+                        match row.Split(' ') with
+                        | [| oid; name |] when name = refName && isOid oid -> Some oid
+                        | _ -> None)
+
+    /// Git's own lockfile protocol: create `<ref>.lock` exclusively, verify the current value is
+    /// still what the caller expected, write the new value into the lock, rename it over the ref.
+    /// A lost race — lock taken, or the ref moved — returns false, which is the CAS answer.
+    let compareAndSwapRef (gitDir: string) (refName: string) (expectedOld: string option) (newOid: string) : bool =
+        let refPath = gitDir + "/" + refName
+        let lockPath = refPath + ".lock"
+        ensureDirectory (refPath.Substring(0, refPath.LastIndexOf '/'))
+
+        let fd = tryOrNull (fun () -> box (openSync lockPath "wx"))
+
+        if isNull fd then
+            false
+        else
+            let descriptor = unbox<int> fd
+
+            let release () =
+                closeSync descriptor
+                tryOrNull (fun () -> box (unlinkSync lockPath)) |> ignore
+
+            let current = tryReadRef gitDir refName
+
+            if current <> expectedOld then
+                release ()
+                false
+            else
+                writeSync descriptor (latin1Buffer (newOid + "\n")) |> ignore
+                closeSync descriptor
+                let renamed = tryOrNull (fun () -> box (renameSync lockPath refPath))
+
+                if isNull renamed && not (existsSync refPath) then
+                    tryOrNull (fun () -> box (unlinkSync lockPath)) |> ignore
+                    false
+                else
+                    true

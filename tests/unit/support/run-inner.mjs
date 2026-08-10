@@ -125,7 +125,18 @@ for (const type of [
   'test:stdout',
 ]) {
   stream.on(type, (data) => {
-    process.send?.({ type, data: { name: data?.name, file: data?.file, nesting: data?.nesting } })
+    process.send?.({
+      type,
+      data: {
+        name: data?.name,
+        file: data?.file,
+        nesting: data?.nesting,
+        // Duration rides along with the verdict so the parent can report the tier's timing
+        // distribution. One number per verdict, measured by node:test — the alternative was a
+        // second timing mechanism in the parent for something already measured here.
+        durationMs: data?.details?.duration_ms,
+      },
+    })
   })
 }
 

@@ -264,21 +264,35 @@ function timing(result) {
 }
 
 /**
- * The five slowest cases plus the pool's occupancy, printed every iteration.
+ * The iteration's timing distribution, printed every run.
  *
  * Critical path, not average: with a bounded pool the iteration cannot finish before its longest
- * case, so a wall-time budget is spent by a handful of scenarios. Occupancy (sum of case wall time
- * over iteration wall time) says whether the remedy is a faster case or a fuller pool — under
- * MAX_PARALLEL it means slots sat idle waiting for the stagger, above it means cases overlapped.
+ * case, so a wall-time budget is spent by a handful of scenarios. Percentiles say whether the
+ * suite is uniformly slow or has a tail; occupancy (sum of case wall time over iteration wall
+ * time) says whether the remedy is a faster case or a fuller pool — under MAX_PARALLEL means slots
+ * sat idle waiting on the launch stagger, at MAX_PARALLEL means the pool is the bound.
+ *
+ * Always on. A performance number behind a flag is a number nobody reads, and the state this
+ * replaces — no per-case timing at all — is why a 50s case stayed 50s.
  */
-function reportSlowest(results, iterationMs) {
+function reportDistribution(results, iterationMs) {
   const ranked = [...results].sort((left, right) => right.wallMs - left.wallMs);
   const totalCaseMs = results.reduce((sum, r) => sum + r.wallMs, 0);
+  const startupMs = results.reduce((sum, r) => sum + (r.startupMs ?? 0), 0);
+  const at = (fraction) => ranked[Math.min(ranked.length - 1, Math.floor(ranked.length * fraction))].wallMs;
+
   console.log(
-    `\n  iteration ${seconds(iterationMs)} wall; occupancy ${(totalCaseMs / iterationMs).toFixed(1)}` +
-      ` of ${MAX_PARALLEL} slots; slowest:`,
+    `\n  iteration ${seconds(iterationMs)} wall; ${results.length} cases, ${seconds(totalCaseMs)} case time` +
+      ` (${seconds(startupMs)} of it startup); occupancy ${(totalCaseMs / iterationMs).toFixed(1)}` +
+      ` of ${MAX_PARALLEL} slots`,
   );
-  for (const r of ranked.slice(0, 5)) console.log("    " + r.name + " " + timing(r));
+  console.log(
+    `  case wall: max ${seconds(ranked[0].wallMs)}, p90 ${seconds(at(0.1))}, median ${seconds(at(0.5))}, min ${seconds(
+      ranked[ranked.length - 1].wallMs,
+    )}`,
+  );
+  console.log('  slowest:');
+  for (const r of ranked.slice(0, 5)) console.log('    ' + r.name + ' ' + timing(r));
 }
 
 async function main() {  const repeats = parseRepeat(process.argv.slice(2));
@@ -364,7 +378,7 @@ async function main() {  const repeats = parseRepeat(process.argv.slice(2));
       }
     }
 
-    reportSlowest(results, Date.now() - iterationStartedAt);
+    reportDistribution(results, Date.now() - iterationStartedAt);
 
     if (failed) {
       console.error("\nStaggered parallel e2e suite failed on iteration " + rep + ".");

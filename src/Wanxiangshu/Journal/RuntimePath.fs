@@ -35,6 +35,22 @@ module RuntimePath =
         with _ ->
             path
 
+    /// `git rev-parse --git-common-dir` for a workspace, asked once per process.
+    ///
+    /// A checkout's common dir cannot move while the Host runs, and this is on the hot path: the
+    /// journal resolves it on every store open, which showed up as ~69 `git` spawns in a single
+    /// canary — synchronous ones, so each blocked the whole event loop for a fact that had not
+    /// changed since the first answer.
+    let private commonDirAnswers = Collections.Generic.Dictionary<string, string>()
+
+    let private askGitCommonDir (workspace: string) : string =
+        match commonDirAnswers.TryGetValue workspace with
+        | true, cached -> cached
+        | _ ->
+            let answer = GitSubject.revParseGitCommonDir workspace
+            commonDirAnswers.[workspace] <- answer
+            answer
+
     let private stateDirectory workspace =
         let stateRoot =
             let configured = xdgStateHome ()
@@ -48,7 +64,7 @@ module RuntimePath =
 
     let gitCommonDir (workspace: string) : string =
         try
-            let commonDirectory = GitSubject.revParseGitCommonDir workspace
+            let commonDirectory = askGitCommonDir workspace
 
             let resolved =
                 if isAbsolute commonDirectory then
@@ -62,7 +78,7 @@ module RuntimePath =
 
     let forWorkspace workspace =
         try
-            let commonDirectory = GitSubject.revParseGitCommonDir workspace
+            let commonDirectory = askGitCommonDir workspace
 
             let gitDirectory =
                 if isAbsolute commonDirectory then

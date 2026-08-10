@@ -12,6 +12,21 @@ type GitRawSyncRunner = string list * byte[] option -> int * byte[] * string
 module private ProcessGitTree =
     let sortEntries (entries: TreeEntry list) : TreeEntry list = StoreTree.canonicalOrder entries
 
+/// Where a repository keeps its objects and refs: immutable facts about a path, so they are
+/// resolved once per repository per process. Asking `git rev-parse` per store instance meant one
+/// process spawn every time a session opened the store — measured 27 `--git-common-dir` spawns in
+/// a single canary, all answering the same question about the same directory.
+module private ProcessGitLayout =
+    let private answers = Collections.Generic.Dictionary<string, string option>()
+
+    let resolve (key: string) (ask: unit -> string option) : string option =
+        match answers.TryGetValue key with
+        | true, cached -> cached
+        | _ ->
+            let answer = ask ()
+            answers.[key] <- answer
+            answer
+
 /// Production `IGitRawStore` over a real Git object database + refs (§2.3 / §9).
 /// Plumbing only (`hash-object` / `mktree` / `cat-file` / `ls-tree` / `update-ref`).
 /// Never touches HEAD, index, commits, branches, or tags as store history.
@@ -69,12 +84,29 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawSyncRunner) =
     /// assembled from `_repoPath`.
     let objectsDirectory =
         lazy
-            (let code, stdout, _ = runText [ "rev-parse"; "--git-path"; "objects" ]
-             let trimmed = stdout.Trim()
+            (ProcessGitLayout.resolve (_repoPath + "\u001fobjects") (fun () ->
+                let code, stdout, _ = runText [ "rev-parse"; "--git-path"; "objects" ]
+                let trimmed = stdout.Trim()
 
-             if code <> 0 || trimmed = "" then None
-             elif trimmed.StartsWith "/" then Some trimmed
-             else Some(_repoPath + "/" + trimmed))
+                if code <> 0 || trimmed = "" then None
+                elif trimmed.StartsWith "/" then Some trimmed
+                else Some(_repoPath + "/" + trimmed)))
+
+    /// The git directory that owns refs, resolved once. `--git-common-dir` rather than
+    /// `--git-dir`: a linked worktree keeps its own HEAD but shares `refs/`, and the store ref is
+    /// shared state, not per-worktree state.
+    let refsDirectory =
+        lazy
+            (ProcessGitLayout.resolve (_repoPath + "\u001fcommon") (fun () ->
+                let code, stdout, _ =
+                    runText [ "rev-parse"; "--path-format=absolute"; "--git-common-dir" ]
+
+                let trimmed = stdout.Trim()
+
+                if code <> 0 || not (trimmed.StartsWith "/") then
+                    None
+                else
+                    Some trimmed))
 
     interface IGitRawStore with
         member _.WriteBlob(content: byte[]) =
@@ -207,19 +239,26 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawSyncRunner) =
                         Some sorted
 
         member _.ReadRef(refName: string) =
-            let code, stdout, _ = runText [ "rev-parse"; "--verify"; "--quiet"; refName ]
-            oidOrNone code stdout
+            match refsDirectory.Force() with
+            | Some gitDir -> GitObjectDatabase.tryReadRef gitDir refName |> Option.map GitObjectId.create
+            | None ->
+                let code, stdout, _ = runText [ "rev-parse"; "--verify"; "--quiet"; refName ]
+                oidOrNone code stdout
 
         member _.CompareAndSwapRef(refName, expectedOld, newOid) =
             let next = GitObjectId.value newOid
 
-            let expected =
-                match expectedOld with
-                | None -> zeroOid
-                | Some oid -> GitObjectId.value oid
+            match refsDirectory.Force() with
+            | Some gitDir ->
+                GitObjectDatabase.compareAndSwapRef gitDir refName (expectedOld |> Option.map GitObjectId.value) next
+            | None ->
+                let expected =
+                    match expectedOld with
+                    | None -> zeroOid
+                    | Some oid -> GitObjectId.value oid
 
-            let code, _, _ = runText [ "update-ref"; refName; next; expected ]
-            code = 0
+                let code, _, _ = runText [ "update-ref"; refName; next; expected ]
+                code = 0
 
 [<RequireQualifiedAccess>]
 module ProcessGitRawStore =

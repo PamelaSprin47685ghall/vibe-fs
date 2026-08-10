@@ -316,6 +316,8 @@ async function runFlow(scenario, doc, ctx) {
   const flow = doc.flow || [];
   const traceSteps = process.env.CANARY_VERBOSE === '1';
   const flowStartedAt = Date.now();
+  /** Every step's wall time, so the distribution can be reported rather than reconstructed. */
+  const stepTimings = [];
 
   /** One flow step. Nested so the verbs keep reading `scenario` / `doc` / `ctx` directly. */
   const runStep = async (step) => {
@@ -713,11 +715,10 @@ async function runFlow(scenario, doc, ctx) {
     try {
       await runStep(step);
     } finally {
-      // Per-step wall time, under the flag that already prints setup timings. Without it a 50s
-      // canary reports one number and "which wait spends the wall clock" is answered by reading
-      // the scenario and guessing — the measurement step this repository forbids skipping.
+      const now = Date.now();
+      stepTimings.push({ label: stepLabel(step), ms: now - stepStartedAt });
+      // Per-step lines are verbose; the distribution below is not, and prints always.
       if (traceSteps) {
-        const now = Date.now();
         console.log(
           `[flow +${((now - flowStartedAt) / 1000).toFixed(1)}s] ${stepLabel(step)} took ${
             now - stepStartedAt
@@ -726,6 +727,29 @@ async function runFlow(scenario, doc, ctx) {
       }
     }
   }
+
+  reportFlowDistribution(doc.name ?? '<scenario>', stepTimings, Date.now() - flowStartedAt);
+}
+
+/**
+ * One always-printed line per scenario: how long the flow took and which steps spent it.
+ *
+ * Default output rather than a flag, because a number nobody sees is a number nobody defends. The
+ * previous state — no timing at all — is how a 50s canary stayed a 50s canary: every diagnosis
+ * had to start by rebuilding the measurement, so most never started.
+ */
+function reportFlowDistribution(name, timings, totalMs) {
+  if (timings.length === 0) return;
+  const ranked = [...timings].sort((left, right) => right.ms - left.ms);
+  const top = ranked
+    .slice(0, 3)
+    .filter((entry) => entry.ms > 0)
+    .map((entry) => `${entry.label} ${(entry.ms / 1000).toFixed(1)}s`)
+    .join(', ');
+  console.log(
+    `[flow-profile] ${name}: ${timings.length} steps in ${(totalMs / 1000).toFixed(1)}s` +
+      (top === '' ? '' : `; slowest: ${top}`),
+  );
 }
 
 export async function runCanary(scriptName, { customs } = {}) {

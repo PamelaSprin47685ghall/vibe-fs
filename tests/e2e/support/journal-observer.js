@@ -1,17 +1,39 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { execFileSync } from 'node:child_process';
 
 const STORE_REF = 'refs/wanxiang/store';
 
+const commonDirCache = new Map(); // workDir -> git common dir (immutable per checkout)
+
 const gitCommonDir = (workDir) => {
+  const cached = commonDirCache.get(workDir);
+  if (cached !== undefined) return cached;
   const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], {
     encoding: 'utf8',
   }).trim();
-  return path.isAbsolute(common) ? common : path.resolve(workDir, common);
+  const resolved = path.isAbsolute(common) ? common : path.resolve(workDir, common);
+  commonDirCache.set(workDir, resolved);
+  return resolved;
 };
 
 const storeRefPath = (workDir) => path.join(gitCommonDir(workDir), 'refs', 'wanxiang', 'store');
+
+/**
+ * A loose Git object's body, read in this process, or null when it is packed / absent.
+ *
+ * `zlib(<type> <len>\0<body>)` at `objects/xx/yyyy` is the same format production now writes,
+ * and reading it here removes one `git cat-file` spawn per observed blob — measured 60 spawns
+ * (~127ms) in a single canary, paid by the observer while it polled for facts.
+ */
+const looseObjectBody = (workDir, oid) => {
+  const file = path.join(gitCommonDir(workDir), 'objects', oid.slice(0, 2), oid.slice(2));
+  if (!fs.existsSync(file)) return null;
+  const framed = zlib.inflateSync(fs.readFileSync(file));
+  const separator = framed.indexOf(0);
+  return separator < 0 ? null : framed.subarray(separator + 1);
+};
 
 /**
  * Read UTF-8 content for a journal BlobRef (`blobs/<gitOid>` or bare OID).
@@ -29,6 +51,8 @@ export function readBlobRef(workDir, blobRef) {
   if (!oid) {
     throw new Error(`invalid BlobRef OID: ${token}`);
   }
+  const loose = looseObjectBody(workDir, oid);
+  if (loose !== null) return loose.toString('utf8');
   return execFileSync('git', ['-C', workDir, 'cat-file', '-p', oid], {
     encoding: 'utf8',
     maxBuffer: 16 * 1024 * 1024,
@@ -74,10 +98,13 @@ export function journalEnvelopeFromEventText(text) {
 const loadBlobText = (workDir, oid) => {
   const cached = blobTextCache.get(oid);
   if (cached !== undefined) return cached;
-  const text = execFileSync('git', ['-C', workDir, 'cat-file', 'blob', oid], {
-    encoding: 'utf8',
-    maxBuffer: 16 * 1024 * 1024,
-  });
+  const loose = looseObjectBody(workDir, oid);
+  const text = loose !== null
+    ? loose.toString('utf8')
+    : execFileSync('git', ['-C', workDir, 'cat-file', 'blob', oid], {
+      encoding: 'utf8',
+      maxBuffer: 16 * 1024 * 1024,
+    });
   blobTextCache.set(oid, text);
   return text;
 };
