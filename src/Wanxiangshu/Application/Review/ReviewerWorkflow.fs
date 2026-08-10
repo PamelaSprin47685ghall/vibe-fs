@@ -1,12 +1,12 @@
 namespace Wanxiangshu.OpenCode
 
 open System
-open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
+open Wanxiangshu.Review
 open Wanxiangshu.Session
 open Wanxiangshu.Host
 
@@ -14,9 +14,8 @@ open Wanxiangshu.Host
 /// (REVIEW-002/007).
 ///
 /// `observe` is the story: durable `ReviewerEvidence` facts choose the branch;
-/// `ReviewerContinuation` owns the named send promises; `HostReviewGuard` is
-/// only the transport primitive underneath those verbs. There is no stored
-/// State/Stage counter.
+/// `ReviewerContinuation` owns the named send promises; physical delivery is an
+/// injected Review port. There is no stored State/Stage counter.
 module ReviewerWorkflow =
 
     /// Build the `AgentRunResult`, validate via `runResult.IsValid`, capture the
@@ -45,7 +44,7 @@ module ReviewerWorkflow =
                 sessionWide
 
         // REVIEW-006: nothing is written here. Confirmation is a fact
-        // ReviewController already journalled from the seal evidence, so the
+        // VerdictWorkflow already journalled from the seal evidence, so the
         // completion path only reports the run.
         // PROMPT-008: the Role comes from the reconciled turn, and there is no
         // default.
@@ -93,10 +92,9 @@ module ReviewerWorkflow =
     /// `ReviewerEvidence` classification. Completion reports the run; continuation
     /// branches call named Vocabulary and fail closed on a `Failed` send.
     let observe
-        (sessionPort: ISessionHostPort)
+        (continuationPort: ReviewerContinuationPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
-        (nudgeSent: HashSet<string>)
         (turn: ReconciledTurn)
         (reviewerKey: string)
         : Task =
@@ -109,9 +107,8 @@ module ReviewerWorkflow =
             task {
                 let! outcome =
                     ReviewerContinuation.ensurePerfectConfirmed
-                        sessionPort
+                        continuationPort
                         journal
-                        nudgeSent
                         turn.SessionId
                         turn.ProviderRun
                         reviewerKey
@@ -123,9 +120,8 @@ module ReviewerWorkflow =
             task {
                 let! outcome =
                     ReviewerContinuation.ensureVerdictSubmitted
-                        sessionPort
+                        continuationPort
                         journal
-                        nudgeSent
                         turn.SessionId
                         turn.ProviderRun
                         reviewerKey

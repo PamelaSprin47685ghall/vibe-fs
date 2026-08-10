@@ -4,9 +4,9 @@
  * One scenario = one temp HOME + one temp XDG + one workspace
  *               + one StrictMockProvider + one opencode serve process.
  *
- * No shared-host mode. The runner auto-calls expectSatisfied() after
- * each test fn returns and aborts the test as failed if cleanup errors.
- * Cleanup errors are test errors, not warnings.
+ * No shared-host / multi-suite runner. Long Stroke drives one scenario via
+ * scenario-driver + setupScenario/teardownScenario. Cleanup errors are test
+ * errors, not warnings.
  *
  * Setup runs provider start, project-file write, git init, and host
  * start in parallel where dependencies allow (see scenario-parallel.js).
@@ -16,7 +16,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { FsOracle, HttpClient, getSessionId } from './scenario-http.js';
-import { runScenarioTests } from './scenario-runner.js';
 import { setupScenarioParallel, Scenario } from './scenario-parallel.js';
 import { awaitSessionSettled } from './session-quiescence.js';
 import { TEARDOWN_IDLE_MS } from './time-budget.js';
@@ -124,10 +123,6 @@ export async function teardownScenario(scenario, { keepOnFailure = false } = {})
   if (errors.length > 0) {
     throw new Error(`E2E cleanup failed: ${errors.join('; ')}`);
   }
-}
-
-export async function runScenario(opts, tests) {
-  return runScenarioTests(opts, tests, setupScenario);
 }
 
 export { FsOracle, HttpClient, getSessionId };

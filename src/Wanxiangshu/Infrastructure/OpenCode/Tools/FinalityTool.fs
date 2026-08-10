@@ -96,80 +96,9 @@ module FinalityTool =
 
         durableOutstanding || runtimeOutstanding
 
-    /// GLORY-068/069: an AgentOwnerRoot Manager (an Orchestrator's ManagerJob)
-    /// has no HumanRoot and therefore no Life. Its ending still goes through
-    /// suicide; build the migration Life on acceptance so the Finality workflow
-    /// has an identity. Idempotent: a current Life is returned as-is; a
-    /// completed (archived) Life is a closed chapter, and ORCH-007 recovery may
-    /// resume the Manager — a new migration Life is opened for the new ending.
-    let private ensureMigrationLife (journal: AgentJournal) (sessionId: string) : ManagerLifeId option =
-        let sid = SessionId.create sessionId
-        let snapshot = AgentJournal.snapshot journal
-
-        let openLife (xTrace: XTraceProjectionState option) : ManagerLifeId option =
-            match xTrace with
-            | None -> None
-            | Some xTrace ->
-                match xTrace.Opening with
-                | None -> None
-                | Some opening ->
-                    match journal.WriteBlob opening.AssignmentText with
-                    | Error _ -> None
-                    | Ok blob ->
-                        let lifeId = ManagerLifeId.create (Guid.NewGuid().ToString("N"))
-
-                        AgentJournal.appendManagerLifecycle
-                            (StreamId.Session sid)
-                            (ManagerLifecycleFact.LifeOpened
-                                {| SessionId = sid
-                                   LifeId = lifeId
-                                   OpeningUserMessageId = PhysicalUserMessageId.create sessionId
-                                   OpeningTextRef = blob.BlobRef
-                                   OpeningTextDigest = blob.BlobDigest
-                                   OpeningCursorSequence = 0L |})
-                            journal
-                        |> Result.mapError (fun failure ->
-                            raise (
-                                InvalidOperationException(
-                                    sprintf "Life migration append failed: %s" (JournalAppendFailure.describe failure)
-                                )
-                            ))
-                        |> ignore
-
-                        AgentJournal.appendManagerLifecycle
-                            (StreamId.Session sid)
-                            (ManagerLifecycleFact.WorkActivated
-                                {| SessionId = sid
-                                   LifeId = lifeId
-                                   ActivationPromptKey = PromptKey.create ""
-                                   ProtectedPrefixEndSequence = XTraceProjection.headSequence xTrace + 1L |})
-                            journal
-                        |> Result.mapError (fun failure ->
-                            raise (
-                                InvalidOperationException(
-                                    sprintf
-                                        "Life migration activation failed: %s"
-                                        (JournalAppendFailure.describe failure)
-                                )
-                            ))
-                        |> ignore
-
-                        Some lifeId
-
-        match AgentProjection.tryFind sid snapshot.AgentProjections with
-        | None -> None
-        | Some session ->
-            match session.ManagerLife with
-            | Some existing ->
-                match existing.CurrentLife with
-                | Some life -> Some life.LifeId
-                | None -> openLife session.XTrace
-            | None -> openLife session.XTrace
-
-    /// GLORY-062: the second suicide of a blessed Life. Resource safety first
-    /// (GLORY-037); then NO tree read, NO Reviewer/barrier/witness. The NEW
-    /// last_words becomes the terminal; the tool result is the frozen
-    /// rest-in-peace instruction.
+    /// GLORY-062 physical half of the second suicide. Application owns every
+    /// durable Life transition; this adapter only publishes the resulting Host
+    /// terminal after `LifeCompleted` has landed.
     let private completeBlessedLife
         (scope: ToolRuntimeScope)
         (journal: AgentJournal)
@@ -180,74 +109,27 @@ module FinalityTool =
         (lastWords: string)
         : Task<string> =
         task {
-            match journal.WriteBlob lastWords with
-            | Error _ -> return ToolHostCodec.tomlObjectWithInstructions [ "Continue working and try again later." ] []
-            | Ok blob ->
-                let providerRun = context.ProviderRunId.Value
+            let providerRun = context.ProviderRunId.Value
 
-                let alreadyCompleted =
-                    AgentProjection.tryFind sid (AgentJournal.snapshot journal).AgentProjections
-                    |> Option.bind (fun session -> session.ManagerLife)
-                    |> Option.exists (fun lifecycle ->
-                        (lifecycle.CurrentLife
-                         |> Option.exists (fun current -> current.LifeId = life.LifeId && current.Completed))
-                        || lifecycle.CompletedLives
-                           |> List.exists (fun completed -> completed.LifeId = life.LifeId))
+            match ManagerLifeWorkflow.completeBlessedLife journal sid life blessing lastWords providerRun with
+            | Error _ ->
+                return ToolHostCodec.tomlObjectWithInstructions [ "Continue working and try again later." ] []
+            | Ok BlessedLifeCompletion.AlreadyCompleted ->
+                return ToolHostCodec.tomlObjectWithInstructions RestInPeaceInstructions []
+            | Ok(BlessedLifeCompletion.Completed authorityRoot) ->
+                match scope.EventPort with
+                | Some eventPort ->
+                    let runResult: AgentRunResult =
+                        { SessionId = sid
+                          AuthorityRootUserMessageId = authorityRoot
+                          ProviderRun = providerRun
+                          Role = Role.Manager
+                          Directory = scope.DirectoryFor(SessionId.value sid)
+                          TerminalText = lastWords
+                          TurnFormalText = lastWords }
 
-                let terminalRecorded =
-                    AgentProjection.tryFind sid (AgentJournal.snapshot journal).AgentProjections
-                    |> Option.bind (fun session -> session.XTrace)
-                    |> Option.exists (fun state -> state.Terminal.IsSome)
-
-                if not alreadyCompleted then
-                    AgentJournal.appendManagerLifecycle
-                        (StreamId.Session sid)
-                        (ManagerLifecycleFact.LifeCompleted
-                            {| SessionId = sid
-                               LifeId = life.LifeId
-                               RequestId = blessing.RequestId
-                               TerminalRef = blob.BlobRef
-                               TerminalDigest = blob.BlobDigest |})
-                        journal
-                    |> Result.mapError (fun failure ->
-                        raise (
-                            InvalidOperationException(
-                                sprintf "LifeCompleted append failed: %s" (JournalAppendFailure.describe failure)
-                            )
-                        ))
-                    |> ignore
-
-                    // GLORY-062: LifeCompleted BEFORE the terminal is published.
-                    // Only the FIRST Life may occupy the single XTrace terminal
-                    // slot; later Lives' terminals live in LifeCompleted only.
-                    if not terminalRecorded then
-                        AgentJournal.appendAgent
-                            (StreamId.Session sid)
-                            (Some providerRun)
-                            (CompanionFact.TerminalOutputCaptured
-                                {| SessionId = sid
-                                   TextRef = blob.BlobRef
-                                   TextDigest = blob.BlobDigest
-                                   ProviderRun = providerRun |})
-                            journal
-                        |> ignore
-
-                    match scope.EventPort with
-                    | Some eventPort ->
-                        let runResult: AgentRunResult =
-                            { SessionId = sid
-                              AuthorityRootUserMessageId =
-                                PromptAuthorityLedger.activeProfile sid (AgentJournal.snapshot journal).AgentProjections
-                                |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
-                                |> Option.defaultValue (AuthorityRootUserMessageId.create "")
-                              ProviderRun = providerRun
-                              Role = Role.Manager
-                              Directory = scope.DirectoryFor(SessionId.value sid)
-                              TerminalText = lastWords
-                              TurnFormalText = lastWords }
-
-                        eventPort.NotifyTerminal sid (TerminalOutcome.Completed runResult) |> ignore
-                    | None -> ()
+                    eventPort.NotifyTerminal sid (TerminalOutcome.Completed runResult) |> ignore
+                | None -> ()
 
                 return ToolHostCodec.tomlObjectWithInstructions RestInPeaceInstructions []
         }
@@ -292,7 +174,7 @@ module FinalityTool =
 
                             match authorityKind with
                             | Some kind when kind <> PromptAuthority.RootAuthorityKind.HumanRoot ->
-                                ensureMigrationLife journal sessionId |> ignore
+                                ManagerLifeWorkflow.ensureMigrationLife journal sid |> ignore
 
                                 effectiveLife <-
                                     AgentProjection.tryFind sid (AgentJournal.snapshot journal).AgentProjections
@@ -300,194 +182,146 @@ module FinalityTool =
                                     |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
                             | _ -> ()
 
+                        let renderOutcome outcome =
+                            match outcome with
+                            | FinalityOutcome.Rejected prompt
+                            | FinalityOutcome.Blessed prompt
+                            | FinalityOutcome.Undecided prompt -> prompt
+
                         let acceptSuicide (life: LifeProjection) =
                             task {
-                                // GLORY-037.7: an open request. The same ToolCallId is a
-                                // replay (idempotent); a different one waits (or restarts
-                                // empty-members). GLORY-073: resolved + same ToolCallId
-                                // resumes durable revise (sibling-steer replay /
-                                // already_received). GLORY-055: resolved + different
-                                // ToolCallId replaces the closed request — same path as
-                                // ActiveFinality = None.
-                                match life.ActiveFinality with
-                                | Some request when ManagerLifecycleProjection.isOpen request ->
+                                match ManagerFinality.classifyEnding context.ToolCallId life with
+                                | ManagerFinality.EndingDisposition.ContinuePlanning ->
+                                    return ToolHostCodec.tomlObjectWithInstructions [ "Continue working." ] []
 
-                                    match context.ToolCallId with
-                                    | Some callId when callId = request.ToolCallId ->
-                                        let reviewerPort, _ = finalityPorts scope sid
+                                | ManagerFinality.EndingDisposition.AlreadyCompleted ->
+                                    return ToolHostCodec.tomlObject [ "status", tString "already_completed" ]
 
-                                        let! resumed =
-                                            FinalityWorkflow.resume
+                                | ManagerFinality.EndingDisposition.ResumeRequest request ->
+                                    let reviewerPort, _ = finalityPorts scope sid
+
+                                    match!
+                                        FinalityWorkflow.resume
+                                            reviewerPort
+                                            scope.Journal
+                                            sid
+                                            life.LifeId
+                                            request.RequestId
+                                    with
+                                    | Some outcome -> return renderOutcome outcome
+                                    | None -> return ToolHostCodec.tomlObject [ "status", tString "already_received" ]
+
+                                | ManagerFinality.EndingDisposition.RecoverRequestWithoutReviewers request ->
+                                    let reviewerPort, treePort = finalityPorts scope sid
+
+                                    let! outcome =
+                                        awaitFinalityStart
+                                            sid
+                                            life.LifeId
+                                            request.RequestId
+                                            "FinalityTool.recoverEmptyMembers"
+                                            (FinalityWorkflow.start
                                                 reviewerPort
+                                                treePort
                                                 scope.Journal
                                                 sid
                                                 life.LifeId
                                                 request.RequestId
+                                                request.GitTreeHash
+                                                request.LastWordsRef
+                                                request.LastWordsDigest
+                                                request.ProviderRun
+                                                request.ToolCallId)
 
-                                        match resumed with
-                                        | Some(FinalityOutcome.Rejected prompt)
-                                        | Some(FinalityOutcome.Blessed prompt)
-                                        | Some(FinalityOutcome.Undecided prompt) -> return prompt
-                                        | None ->
-                                            return ToolHostCodec.tomlObject [ "status", tString "already_received" ]
-                                    | _ ->
-                                        // Crash recovery (docs/how/glory.md matrix):
-                                        // a request with no enlisted Reviewer member
-                                        // died before the first enlistment. Restart the
-                                        // Finality workflow on the SAME request; the
-                                        // fold keeps the request open until the
-                                        // restart lands a terminal fact.
-                                        if Map.isEmpty request.Members then
-                                            let reviewerPort, treePort = finalityPorts scope sid
+                                    return renderOutcome outcome
 
-                                            let! outcome =
-                                                awaitFinalityStart
-                                                    sid
-                                                    life.LifeId
-                                                    request.RequestId
-                                                    "FinalityTool.recoverEmptyMembers"
-                                                    (FinalityWorkflow.start
-                                                        reviewerPort
-                                                        treePort
-                                                        scope.Journal
-                                                        sid
-                                                        life.LifeId
-                                                        request.RequestId
-                                                        request.GitTreeHash
-                                                        request.LastWordsRef
-                                                        request.LastWordsDigest
-                                                        request.ProviderRun)
+                                | ManagerFinality.EndingDisposition.WaitForCurrentRequest ->
+                                    return
+                                        ToolHostCodec.tomlObjectWithInstructions
+                                            [ "Wait for the current ending to resolve." ]
+                                            []
 
-                                            match outcome with
-                                            | FinalityOutcome.Rejected prompt
-                                            | FinalityOutcome.Blessed prompt
-                                            | FinalityOutcome.Undecided prompt -> return prompt
-                                        else
-                                            return
-                                                ToolHostCodec.tomlObjectWithInstructions
-                                                    [ "Wait for the current ending to resolve." ]
-                                                    []
-                                | Some request when
-                                    (match context.ToolCallId with
-                                     | Some callId -> callId = request.ToolCallId
-                                     | None -> false)
-                                    ->
-                                    let reviewerPort, _ = finalityPorts scope sid
-
-                                    let! resumed =
-                                        FinalityWorkflow.resume reviewerPort scope.Journal sid life.LifeId request.RequestId
-
-                                    match resumed with
-                                    | Some(FinalityOutcome.Rejected prompt)
-                                    | Some(FinalityOutcome.Blessed prompt)
-                                    | Some(FinalityOutcome.Undecided prompt) -> return prompt
-                                    | None -> return ToolHostCodec.tomlObject [ "status", tString "already_received" ]
-                                | _ ->
+                                // Split arms (no `(A|B) as disposition`) — Fable FS0038 double-bind.
+                                | ManagerFinality.EndingDisposition.CompleteBlessedLife blessing ->
                                     if String.IsNullOrWhiteSpace lastWords then
                                         return
                                             ToolHostCodec.tomlObjectWithInstructions
                                                 [ "Call suicide again with non-empty last_words." ]
                                                 []
-                                    elif context.ToolCallId.IsNone then
-                                        return
-                                            ToolHostCodec.tomlObjectWithInstructions
-                                                [ "Continue working and try again later." ]
-                                                []
-                                    elif context.ProviderRunId.IsNone then
+                                    elif context.ToolCallId.IsNone || context.ProviderRunId.IsNone then
                                         return
                                             ToolHostCodec.tomlObjectWithInstructions
                                                 [ "Continue working and try again later." ]
                                                 []
                                     elif outstandingWork scope context then
-                                        // GLORY-038: background work still walks the world.
                                         return
                                             ToolHostCodec.tomlObjectWithInstructions
                                                 [ "Call join before seeking your end." ]
                                                 []
                                     else
-                                        // GLORY-062: a blessed Life ends without a
-                                        // second review — resource safety only.
-                                        match life.LastBlessing with
-                                        | Some blessing ->
-                                            return!
-                                                completeBlessedLife scope journal context sid life blessing lastWords
+                                        return!
+                                            completeBlessedLife scope journal context sid life blessing lastWords
+
+                                | ManagerFinality.EndingDisposition.BeginFinality ->
+                                    if String.IsNullOrWhiteSpace lastWords then
+                                        return
+                                            ToolHostCodec.tomlObjectWithInstructions
+                                                [ "Call suicide again with non-empty last_words." ]
+                                                []
+                                    elif context.ToolCallId.IsNone || context.ProviderRunId.IsNone then
+                                        return
+                                            ToolHostCodec.tomlObjectWithInstructions
+                                                [ "Continue working and try again later." ]
+                                                []
+                                    elif outstandingWork scope context then
+                                        return
+                                            ToolHostCodec.tomlObjectWithInstructions
+                                                [ "Call join before seeking your end." ]
+                                                []
+                                    else
+                                        match treeOf scope sessionId with
                                         | None ->
-                                            // GLORY-037.14/15: the tree must be readable.
-                                            match treeOf scope sessionId with
-                                            | None ->
+                                            return
+                                                ToolHostCodec.tomlObjectWithInstructions
+                                                    [ "Continue working and seek your end again when you are ready." ]
+                                                    []
+                                        | Some tree ->
+                                            match journal.WriteBlob lastWords with
+                                            | Error _ ->
                                                 return
                                                     ToolHostCodec.tomlObjectWithInstructions
                                                         [ "Continue working and seek your end again when you are ready." ]
                                                         []
-                                            | Some tree ->
-                                                match journal.WriteBlob lastWords with
-                                                | Error _ ->
-                                                    return
-                                                        ToolHostCodec.tomlObjectWithInstructions
-                                                            [ "Continue working and seek your end again when you are ready." ]
-                                                            []
-                                                | Ok blob ->
-                                                    // GLORY-040: accept in order. Synchronously wait for the Finality
-                                                    // workflow to complete; every outcome lands on the journal before any side effect.
-                                                    let requestId =
-                                                        FinalityRequestId.create (Guid.NewGuid().ToString("N"))
+                                            | Ok blob ->
+                                                let requestId =
+                                                    FinalityRequestId.create (Guid.NewGuid().ToString("N"))
 
-                                                    AgentJournal.appendManagerLifecycle
-                                                        (StreamId.Session sid)
-                                                        (ManagerLifecycleFact.FinalityRequested
-                                                            {| SessionId = sid
-                                                               LifeId = life.LifeId
-                                                               RequestId = requestId
-                                                               GitTreeHash = tree
-                                                               LastWordsRef = blob.BlobRef
-                                                               LastWordsDigest = blob.BlobDigest
-                                                               ProviderRun = context.ProviderRunId.Value
-                                                               ToolCallId = context.ToolCallId.Value |})
-                                                        journal
-                                                    |> Result.mapError (fun failure ->
-                                                        raise (
-                                                            InvalidOperationException(
-                                                                sprintf
-                                                                    "FinalityRequested append failed: %s"
-                                                                    (JournalAppendFailure.describe failure)
-                                                            )
-                                                        ))
-                                                    |> ignore
+                                                let reviewerPort, treePort = finalityPorts scope sid
 
-                                                    let reviewerPort, treePort = finalityPorts scope sid
-
-                                                    let! outcome =
-                                                        awaitFinalityStart
+                                                let! outcome =
+                                                    awaitFinalityStart
+                                                        sid
+                                                        life.LifeId
+                                                        requestId
+                                                        "FinalityTool.acceptSuicide"
+                                                        (FinalityWorkflow.start
+                                                            reviewerPort
+                                                            treePort
+                                                            scope.Journal
                                                             sid
                                                             life.LifeId
                                                             requestId
-                                                            "FinalityTool.acceptSuicide"
-                                                            (FinalityWorkflow.start
-                                                                reviewerPort
-                                                                treePort
-                                                                scope.Journal
-                                                                sid
-                                                                life.LifeId
-                                                                requestId
-                                                                tree
-                                                                blob.BlobRef
-                                                                blob.BlobDigest
-                                                                context.ProviderRunId.Value)
+                                                            tree
+                                                            blob.BlobRef
+                                                            blob.BlobDigest
+                                                            context.ProviderRunId.Value
+                                                            context.ToolCallId.Value)
 
-                                                    match outcome with
-                                                    | FinalityOutcome.Rejected prompt
-                                                    | FinalityOutcome.Blessed prompt
-                                                    | FinalityOutcome.Undecided prompt ->
-                                                        return prompt
+                                                return renderOutcome outcome
                             }
 
                         match effectiveLife with
-                        // GLORY-039: still no Life — the HumanRoot Manager is planning.
                         | None -> return ToolHostCodec.tomlObjectWithInstructions [ "Continue working." ] []
-                        | Some life when life.ProtectedPrefixEnd.IsNone ->
-                            return ToolHostCodec.tomlObjectWithInstructions [ "Continue working." ] []
-                        | Some life when life.Completed ->
-                            return ToolHostCodec.tomlObject [ "status", tString "already_completed" ]
                         | Some life -> return! acceptSuicide life
             | Some _ -> return ToolHostCodec.tomlObjectWithInstructions [ "Do not call suicide from this role." ] []
             | None -> return ToolHostCodec.tomlObjectWithInstructions [ "Continue working and try again later." ] []

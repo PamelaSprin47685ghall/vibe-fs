@@ -225,7 +225,8 @@ module PtyJoinItem =
     /// never map abort to a generic business AgentFailed without that discriminant.
     let abortedCode = "PTY_ABORTED"
 
-    let toRunCompletion (item: PtyJoinItem) : RunCompletion =
+    /// `completedAt` is caller-minted (IClockPort at composition) — no wall-clock reads here.
+    let toRunCompletion (item: PtyJoinItem) (completedAt: DateTimeOffset) : RunCompletion =
         let id = ptyId item
         let role = Role.DevOps
 
@@ -236,14 +237,14 @@ module PtyJoinItem =
               AgentName = id
               Role = role
               Outcome = AgentCompletion.ofSimpleText id id role e.Outcome
-              CompletedAt = DateTimeOffset.UtcNow }
+              CompletedAt = completedAt }
         | PtyFailed f ->
             { RunId = id
               AgentId = id
               AgentName = id
               Role = role
               Outcome = AgentCompletion.failed id id (Some role) None f.Code f.Message
-              CompletedAt = DateTimeOffset.UtcNow }
+              CompletedAt = completedAt }
         | PtyAborted a ->
             { RunId = id
               AgentId = id
@@ -260,7 +261,7 @@ module PtyJoinItem =
                          a.Outcome
                      else
                          a.Message)
-              CompletedAt = DateTimeOffset.UtcNow }
+              CompletedAt = completedAt }
 
 /// Project RunCompletion into typed JoinItem (agent vs PTY).
 module JoinItem =

@@ -41,33 +41,6 @@ module HostSessionNudge =
             FallbackEvidence.effectiveAgent sessionId (AgentJournal.snapshot j) profile)
         |> Option.defaultValue profile.SelectedAgent
 
-    /// Reconciled linked children have a host-proven root user message even when
-    /// the host omitted agent metadata from `chat.message`. Register that real
-    /// AgentOwner authority once; never use this for an unlinked/unknown session.
-    /// `agent` must be a Managed Agent name (fast-* / deep-*).
-    let ensureAgentOwnerAuthority
-        (journal: AgentJournal option)
-        (sessionId: SessionId)
-        (rootUserMessageId: PhysicalUserMessageId)
-        (agent: string)
-        : Result<unit, string> =
-        match journal with
-        | None -> Error "No journal: an Authority Root cannot be accepted without somewhere to record it"
-        | Some durable ->
-            match tryActiveProfile journal sessionId with
-            | Some _ -> Ok()
-            | None ->
-                let rt = PromptDispatcher.forJournal durable
-
-                PromptAuthorityRun.createAuthorityRoot
-                    HostDigest.sha256Hex
-                    rt.RuntimeId
-                    sessionId
-                    PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-                    rootUserMessageId
-                    agent
-                |> Result.bind rt.RegisterAuthority
-
     /// The continuation target directory.
     ///
     /// ORCH-006: guard nudges now pass the root workspace explicitly. The

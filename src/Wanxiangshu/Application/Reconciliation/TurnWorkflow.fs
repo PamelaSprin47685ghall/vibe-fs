@@ -7,6 +7,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Review
 open Wanxiangshu.Session
 
 /// Sole Application entry for a reconciled turn observation (rabbit §6.5).
@@ -25,6 +26,7 @@ module TurnWorkflow =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (syncDelegate: SyncDelegateRuntime option)
+        (reviewerContinuationPort: ReviewerContinuationPort)
         (nudgeSent: HashSet<string>)
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
@@ -35,6 +37,10 @@ module TurnWorkflow =
         : Task =
         task {
             let turn = context.Turn
+
+            // Linked-child prompt authority is Application ownership: establish it
+            // from durable linkage before any bounded-context workflow observes the turn.
+            ChildPromptAuthority.ensureForLinkedChild journal turn |> ignore
 
             // SyncDelegate path stays first and exclusive when it claims the turn
             // (Inspector/Coder dedicated sessions). Do not break this ownership.
@@ -64,10 +70,9 @@ module TurnWorkflow =
             | Some Role.Reviewer ->
                 do!
                     ReviewerWorkflow.observe
-                        sessionPort
+                        reviewerContinuationPort
                         eventPort
                         journal
-                        nudgeSent
                         turn
                         (SessionId.value turn.SessionId)
             | Some Role.Manager ->

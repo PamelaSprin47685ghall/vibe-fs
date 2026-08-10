@@ -13,7 +13,7 @@
 | VERIFY-001 | 测试金字塔：Pure laws → Temporal → Adapter → Long Stroke → Release |
 | VERIFY-002 | 晋级阶梯，禁止跨级；禁止语义分支直跳 E2E |
 | VERIFY-003 | Canary mock 剧本：键、匹配、幂等、故障轴、冷边界 |
-| VERIFY-004 | 因果推进门禁、One Physical World 目标与**禁止退化清单**（机器解析锚点） |
+| VERIFY-004 | 因果推进门禁、One Physical World 与**禁止退化清单**（机器解析锚点） |
 | VERIFY-005 | Architecture gates / 单一写入口 / Host 边界 |
 | VERIFY-006 | No-Go 发布否决 |
 | VERIFY-007 | Wire / Semantic / BloggerDelta 三种投影 |
@@ -23,7 +23,7 @@
 
 ## VERIFY-001：测试金字塔
 
-权威形态（G4R One World / Pure Time 目标）：
+权威形态（G4R One World / Pure Time；G4R-4 cutover 后唯一事实）：
 
 ```text
 0. Static architecture/proof gates
@@ -36,24 +36,24 @@
 
 第 0 层是纯文本与文件系统检查，永远不依赖编译产物，因此在任何阶段都可运行。第 1–3 层的语言与入口由 VERIFY-008 规定。
 
-### G4R 迁移中（One World / Pure Time）
+### G4R One World 事实（post-G4R-4）
 
-上表是 **目标权威**，不是「迁移已完成」的声称。在 cutover 完成前，仓库仍可能短暂保留旧 multi-canary / Fake Host 轨迹 / 三轮 shuffle 形态的 harness 实现；那些形态 **不得** 再被当作目标金字塔，也不得与上表长期双真。
+上表即现行唯一权威。Cutover 事实：`tests/e2e/cases/**` 已删除（gone）；唯一 Long Stroke 入口为 `tests/e2e/entry.test.mjs`；`E2E_CASE_CEILING = 0`。旧 multi-canary / Fake Host 轨迹 / 三轮 shuffle harness **不得**回潮，亦不得与上表双真。
 
-迁移完成前，第 0 层额外执行 `scripts/checks/g4r-freeze.mjs`：
+第 0 层永久执行 `scripts/checks/g4r-freeze.mjs`（永久 ratchet，非迁移期临时门；天花板只降不升）：
 
 ```text
-E2E case 数量不得越过冻结天花板（只降不升）
+E2E case 数量不得越过冻结天花板（当前 0；只降不升）
 time-budget.js 命名预算不得抬高
 禁止 per-basename / per-case canary timeout map
-禁止新增顶层 E2E entry（唯一 Long Stroke 入口在 cutover 时落地）
+顶层 E2E entry 必须恰好为 tests/e2e/entry.test.mjs（唯一 Long Stroke）
 ```
 
-迁移期间不得以新增 E2E、抬 timeout、retry-until-pass、降低 parallelism、或精修旧 scenario choreography 作为修复路径。Race 证明迁入显式 temporal algebra；物理组合证明收敛为唯一 Long Stroke。
+不得以新增 E2E、抬 timeout、retry-until-pass、恢复 multi-canary 拓扑、或精修已删除 scenario choreography 作为修复路径。Race 证明在显式 temporal algebra；物理组合证明是唯一 Long Stroke。
 
 ## VERIFY-002：五级晋级阶梯
 
-不允许跨级。目标阶梯（与 VERIFY-001 对齐）：
+不允许跨级。阶梯（与 VERIFY-001 对齐；唯一 Long Stroke，无 multi-canary 晋级通道）：
 
 ```text
 1. Pure law
@@ -63,7 +63,7 @@ time-budget.js 命名预算不得抬高
 5. Release
 ```
 
-禁止把 semantic branch 直接晋级到 E2E。
+禁止把 semantic branch 直接晋级到 E2E。禁止把语义命题「晋级」成并行 multi-canary / 多进程 fan-out 冒充覆盖。
 
 若某分支声称「必须由 OpenCode 才能验证」，作者必须先回答：
 
@@ -71,7 +71,7 @@ time-budget.js 命名预算不得抬高
 它到底依赖哪个不可模拟的 physical contract？
 ```
 
-答不出 → REVISE（降回 Pure law / Temporal / Adapter，不得以 E2E 顶替）。不得用「场景复杂」「历史如此」「先挂 canary 再说」代替物理契约论证。
+答不出 → REVISE（降回 Pure law / Temporal / Adapter，不得以 E2E 顶替）。不得用「场景复杂」「历史如此」「先挂一个 canary 再说」代替物理契约论证。
 
 ## VERIFY-003：Canary Mock 剧本
 

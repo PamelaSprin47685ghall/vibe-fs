@@ -169,6 +169,7 @@ module HostForkChildDispatch =
         (durableHandles: AgentLinkageProjection option)
         (parentId: SessionId)
         (complete: PendingHostRun -> TerminalOutcome -> unit)
+        (abandonedAt: DateTimeOffset)
         : Async<unit> =
         // Synchronous: make sure observers (runtime.Join, tests, parent abort
         // callbacks) see cancellation immediately.
@@ -195,7 +196,7 @@ module HostForkChildDispatch =
                 journal
                 parentId
                 (owned |> List.map fst)
-                System.DateTimeOffset.UtcNow
+                abandonedAt
         with
         | Error err ->
             // Journal failure during abandon is a durable-state bug; surface it.

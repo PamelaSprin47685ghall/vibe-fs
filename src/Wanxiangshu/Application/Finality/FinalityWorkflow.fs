@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Journal
+open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 
 /// Manager Finality story: enlist cohort → review → reject+steer OR bless.
@@ -27,9 +28,10 @@ module FinalityWorkflow =
         (lifeId: ManagerLifeId)
         (requestId: FinalityRequestId)
         (requestTree: GitTreeHash)
-        (_lastWordsRef: BlobRef)
-        (_lastWordsDigest: BlobDigest)
-        (_providerRun: ProviderRunIdentity)
+        (lastWordsRef: BlobRef)
+        (lastWordsDigest: BlobDigest)
+        (providerRun: ProviderRunIdentity)
+        (toolCallId: ToolCallId)
         : Task<FinalityOutcome> =
         task {
             match journal with
@@ -44,10 +46,33 @@ module FinalityWorkflow =
                         |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
                         |> Option.filter (fun life -> life.LifeId = lifeId)
 
-                    let requestOpt =
+                    let existingRequest =
                         lifeOpt
                         |> Option.bind (fun life -> life.ActiveFinality)
                         |> Option.filter (fun request -> request.RequestId = requestId)
+
+                    let requestOpt =
+                        match lifeOpt, existingRequest with
+                        | _, Some request -> Some request
+                        | Some _, None ->
+                            FinalityJournal.appendLifecycle
+                                durable
+                                (ManagerLifecycleFact.FinalityRequested
+                                    {| SessionId = managerSessionId
+                                       LifeId = lifeId
+                                       RequestId = requestId
+                                       GitTreeHash = requestTree
+                                       LastWordsRef = lastWordsRef
+                                       LastWordsDigest = lastWordsDigest
+                                       ProviderRun = providerRun
+                                       ToolCallId = toolCallId |})
+
+                            AgentProjection.tryFind managerSessionId (AgentJournal.snapshot durable).AgentProjections
+                            |> Option.bind (fun session -> session.ManagerLife)
+                            |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+                            |> Option.bind (fun life -> life.ActiveFinality)
+                            |> Option.filter (fun request -> request.RequestId = requestId)
+                        | None, None -> None
 
                     match lifeOpt, requestOpt with
                     | Some life, Some request ->

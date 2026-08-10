@@ -79,7 +79,15 @@ type ChildRun =
 module ChildRun =
 
     /// Create a new ChildRun with the given identity and agent metadata.
-    let create (agentId: string) (runId: string) (agentName: string) (role: Role) (prompt: string) : ChildRun =
+    /// `createdAt` is caller-minted (IClockPort at composition) — no wall-clock reads here.
+    let create
+        (agentId: string)
+        (runId: string)
+        (agentName: string)
+        (role: Role)
+        (prompt: string)
+        (createdAt: DateTimeOffset)
+        : ChildRun =
         { AgentId = agentId
           RunId = runId
           AgentName = agentName
@@ -88,7 +96,7 @@ module ChildRun =
           ChildSessionId = None
           Completion = CompletionCell.create ()
           Cancellation = new CancellationTokenSource()
-          CreatedAt = DateTimeOffset.UtcNow }
+          CreatedAt = createdAt }
 
     let isActive (run: ChildRun) : bool =
         not run.Cancellation.IsCancellationRequested && not (run.Completion.IsCompleted)
@@ -104,21 +112,21 @@ module ChildRun =
 
     let bindSession (run: ChildRun) (sessionId: SessionId) : unit = run.ChildSessionId <- Some sessionId
 
-    let makeCompleted (run: ChildRun) (outcome: AgentCompletionOutcome) : RunCompletion =
+    let makeCompleted (run: ChildRun) (outcome: AgentCompletionOutcome) (completedAt: DateTimeOffset) : RunCompletion =
         { RunId = run.RunId
           AgentId = run.AgentId
           AgentName = run.AgentName
           Role = run.Role
           Outcome = AgentCompletion.withRunIdentity run.AgentId run.RunId run.Role outcome
-          CompletedAt = DateTimeOffset.UtcNow }
+          CompletedAt = completedAt }
 
-    let makeFailed (run: ChildRun) (message: string) : RunCompletion =
+    let makeFailed (run: ChildRun) (message: string) (completedAt: DateTimeOffset) : RunCompletion =
         { RunId = run.RunId
           AgentId = run.AgentId
           AgentName = run.AgentName
           Role = run.Role
           Outcome = AgentCompletion.failed run.AgentId run.RunId (Some run.Role) run.ChildSessionId "ERROR" message
-          CompletedAt = DateTimeOffset.UtcNow }
+          CompletedAt = completedAt }
 
     /// Try to complete this run with the given RunCompletion.  Returns true
     /// if this is the first (and only) write.  Idempotent no-op after first set.
@@ -131,10 +139,12 @@ module ChildRunProgram =
 
     /// Run `work` and return the resulting RunCompletion.
     /// Cancellation and exceptions are mapped into the Result channel.
+    /// `now` stamps CompletedAt (composition supplies IClockPort).
     let run
         (run: ChildRun)
         (work: CancellationToken -> Task<AgentCompletionOutcome>)
         (ct: CancellationToken)
+        (now: unit -> DateTimeOffset)
         : Task<Result<RunCompletion, AgentError>> =
         task {
             if ct.IsCancellationRequested then
@@ -151,7 +161,7 @@ module ChildRunProgram =
                     match identityResult with
                     | Ok true ->
                         let! outcome = work ct
-                        return Ok(ChildRun.makeCompleted run outcome)
+                        return Ok(ChildRun.makeCompleted run outcome (now()))
                     | _ -> return Error(AgentError.InvalidFork "Child run identity does not match managed agent")
                 with
                 | :? OperationCanceledException -> return Error AgentError.ParentCancelled

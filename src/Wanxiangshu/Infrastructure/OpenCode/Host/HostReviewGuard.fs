@@ -10,40 +10,21 @@ open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
+open Wanxiangshu.Review
 open Wanxiangshu.Session
 
 module HostReviewGuard =
-
-    type ReviewGuardAvailability =
-        | ReviewGuardMissing of treeHash: string
-        | ReviewGuardConfirmed
-        | ReviewGuardNotRequired
-        | ReviewGuardUnavailable of reason: string
 
     /// What a guard nudge send resolved to. `AlreadyOutstanding` is not a failure:
     /// the in-flight claim still drives the next turn. `Failed` means nothing is
     /// in flight, so a deferred completion must not be left waiting on a nudge
     /// that never landed.
     [<RequireQualifiedAccess>]
-    type GuardNudgeOutcome =
+    type private GuardNudgeOutcome =
         | Sent of PromptKey
         | AlreadyOutstanding
         | NoLongerRequired
         | Failed of reason: string
-
-    /// REVIEW-003's shared barrier writer lives in `ReviewBarrier.openBarrier`
-    /// (Journal layer, compiled before the fork paths). Both the Orchestrator's
-    /// review barrier (ORCH-006) and a Manager's own guard-path review fork
-    /// (REVIEW-007) emit the same fact through the same function.
-    let openBarrier = ReviewBarrier.openBarrier
-
-    /// REVIEW-002/007: single-owner continuation classification. The prompt decides
-    /// which continuation kind; Finality must not re-decide it.
-    let reviewerContinuationKind (prompt: string) : PromptAuthority.ContinuationKind =
-        if prompt = ReviewChallenge.Prompt then
-            PromptAuthority.ContinuationKind.ReviewConfirmation
-        else
-            PromptAuthority.ContinuationKind.ReviewerGuard
 
     /// REVIEW-007: is a guard continuation for this session already outstanding.
     ///
@@ -171,7 +152,7 @@ module HostReviewGuard =
                             return GuardNudgeOutcome.Failed error
         }
 
-    let nudgeReviewer
+    let private nudgeReviewer
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (nudgeKeys: HashSet<string>)
@@ -228,7 +209,7 @@ module HostReviewGuard =
                     | _ -> None))
             |> Option.defaultValue ReviewChallenge.Prompt
 
-    let requestPerfectConfirmation
+    let private requestPerfectConfirmation
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (nudgeKeys: HashSet<string>)
@@ -244,3 +225,26 @@ module HostReviewGuard =
             "confirm-perfect"
             (reviewChallengeVisibleBytes ())
             "reviewer"
+
+    /// Infrastructure adapter only: expose Host delivery/dedupe as the typed
+    /// ReviewerContinuationPort consumed by Application ReviewerWorkflow.
+    let continuationPort
+        (sessionPort: ISessionHostPort)
+        (journal: AgentJournal option)
+        (nudgeKeys: HashSet<string>)
+        : ReviewerContinuationPort =
+        { NudgeMissingVerdict =
+            fun sessionId providerRun ->
+                task {
+                    let! _ = nudgeReviewer sessionPort journal nudgeKeys sessionId providerRun
+                    // Preserve existing boundary: missing-verdict send failure was
+                    // not terminal; the next durable observation may re-enter.
+                    return Ok()
+                }
+          SendPerfectChallenge =
+            fun sessionId providerRun ->
+                task {
+                    match! requestPerfectConfirmation sessionPort journal nudgeKeys sessionId providerRun with
+                    | GuardNudgeOutcome.Failed reason -> return Error reason
+                    | _ -> return Ok()
+                } }

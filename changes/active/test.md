@@ -1314,7 +1314,7 @@ one tortured real world
 - [x] **G4R-2 Race Extraction** — temporal theorems landed: `fallback-aabb-confluence` / `finality-cohort-law` / `manager-unhappy-exactly-once` / `orchestrator-conflict-confluence` (35/35 green under `tests/unit/temporal/`)
 - [x] **G4R-3 The Long Stroke** — green (run11/13): `entry.test.mjs` + orch-shell `long-stroke.toml` + oracles; spawn===1; wall ~5.8s; event ceilings `maxJournalEvents=367` (exact) / `maxSseEvents=1724` (measured SSE max); ProviderRecovery AlreadyRecorded/NoActiveRun no-op; orch.2 harvest; §21 adversity covered
 - [x] **G4R-4 Delete Old Canary World** — deleted `tests/e2e/cases/**` (31), `run.mjs` pool/shuffle/repeat, `manifest.mjs`, obsolete scenario TOMLs (kept `long-stroke.toml`); `E2E_CASE_CEILING` 31→0 (0 cases + sole `entry.test.mjs`)
-- [ ] **G4R-5 Time Boundary** — semantic 层清除 raw `Date.now` / `UtcNow` / `setTimeout` / sleep（仅声明的物理 timer adapter 例外）
+- [x] **G4R-5 Time Boundary** — Domain/Application/Session raw-time=0 (`g4r-ce-vocabulary --phase=s0-soft`); Session stamps via IClockPort/ITimerPort; RAW_TIME_ALLOWLIST cleared; Infrastructure JoinResultRenderer UtcNow out of scan layers
 - [ ] **G4R-6 10s Gate + VERIFY revise** — VERIFY-001/002/004 改写；obsolete parallel-canary static gates 删除；`npm semantic full < 10s`；Long Stroke `< 6s`；`npm run check` 全绿
 
 ## Completion criteria

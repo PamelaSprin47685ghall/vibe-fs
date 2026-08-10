@@ -20,7 +20,11 @@ type ForkRuntime
     (
         ?runner: string -> Role -> string option -> Task<AgentCompletionOutcome>,
         ?listener: RunCompletion -> unit,
-        ?cleanup: string -> unit
+        ?cleanup: string -> unit,
+        /// Injectable wall clock (PtyTiming.nodeClockPort at Host/Session composition).
+        ?clock: IClockPort,
+        /// Join budget timer (G4R-CE) — default Node timer port.
+        ?timerPort: ITimerPort
     ) =
 
     let childRunner =
@@ -29,6 +33,8 @@ type ForkRuntime
 
     let terminalListener = defaultArg listener ignore
     let cleanupPort = defaultArg cleanup ignore
+    let clockPort = defaultArg clock (PtyTiming.nodeClockPort ())
+    let timers = defaultArg timerPort (PtyTiming.nodeTimerPort ())
 
     // DSL-MUTABLE: resource — live child agent registry under lockObj
     let mutable agents: Map<string, ChildRun> = Map.empty
@@ -39,9 +45,11 @@ type ForkRuntime
     let mailbox =
         CompletionMailbox(
             lockObj,
-            fun () ->
+            (fun () ->
                 agents |> Map.exists (fun _ run -> ChildRun.isActive run)
-                || not (Map.isEmpty ptys)
+                || not (Map.isEmpty ptys)),
+            timerPort = timers,
+            clockPort = clockPort
         )
 
     /// Start a new child run: create the ChildRun and return a thunk that
@@ -56,7 +64,7 @@ type ForkRuntime
         =
         let promptVal = defaultArg promptOpt ""
         let runId = "run-" + Guid.NewGuid().ToString("N").Substring(0, 8)
-        let childRun = ChildRun.create agentId runId agentName role promptVal
+        let childRun = ChildRun.create agentId runId agentName role promptVal (clockPort.UtcNow())
 
         let runTask () =
             task {
@@ -70,7 +78,8 @@ type ForkRuntime
                             return AgentCompletion.ofSimpleError agentId runId role ex.Message
                     }
 
-                let! result = ChildRunProgram.run childRun work childRun.Cancellation.Token
+                let! result =
+                    ChildRunProgram.run childRun work childRun.Cancellation.Token clockPort.UtcNow
 
                 // P0-RECOVERY-JOIN-001: ParentCancelled → durable HandleAbandoned
                 // (cancelChildren). Do not mint aborted cell / SetResult.
@@ -81,7 +90,8 @@ type ForkRuntime
                     | Ok value -> Some value
                     | Error(AgentError.InvalidFork message)
                     | Error(AgentError.HostFailure message)
-                    | Error(AgentError.SessionDead message) -> Some(ChildRun.makeFailed childRun message)
+                    | Error(AgentError.SessionDead message) ->
+                        Some(ChildRun.makeFailed childRun message (clockPort.UtcNow()))
 
                 match completionOpt with
                 | None -> ()
@@ -194,7 +204,9 @@ type ForkRuntime
 
         lock lockObj (fun () ->
             if not (Map.containsKey agentId agents) then
-                agents <- ForkRecovery.restore agentId agentName role agents)
+                agents <- ForkRecovery.restore agentId agentName role (clockPort.UtcNow()) agents)
+
+    member internal _.Clock = clockPort
 
     member _.MarkInterrupted(agentId: string, reason: string) : unit =
         lock lockObj (fun () -> agents <- ForkRecovery.markInterrupted agentId reason agents)

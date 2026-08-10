@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Session
 
+open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
@@ -76,7 +77,11 @@ module JoinInterrupt =
 /// Dual-channel completion mailbox (GREEN-5 / ARCH-002).
 /// Agent channel: wake-only (HandleMayHaveChanged) — Journal is agent fact source.
 /// PTY channel: physical PtyJoinItem queue — backend onExit sole writer (EXEC-015).
-type CompletionMailbox(gate: obj, hasActive: unit -> bool) =
+/// Join budget uses injected ITimerPort + IClockPort + Deadline.nextWaitMs (G4R-CE).
+type CompletionMailbox
+    (gate: obj, hasActive: unit -> bool, ?timerPort: ITimerPort, ?clockPort: IClockPort) =
+    let timers = defaultArg timerPort (PtyTiming.nodeTimerPort ())
+    let clock = defaultArg clockPort (PtyTiming.nodeClockPort ())
     let agentWakes = Queue<AgentHandleId>()
     let ptyCompletions = Queue<PtyJoinItem>()
     let waiters = Queue<TaskCompletionSource<MailboxWakeReason>>()
@@ -187,47 +192,55 @@ type CompletionMailbox(gate: obj, hasActive: unit -> bool) =
 
     /// Compatibility: wait once, drain at most one PTY completion (or ForkError).
     /// Agent results never leave this mailbox — Journal is the agent fact source.
+    /// Budget is an absolute Deadline; each wait arms ITimerPort.Delay(nextWaitMs).
     member this.Join(?timeoutMs: int) : Task<Result<RunCompletion, ForkError>> =
         let budgetMs = defaultArg timeoutMs 600_000
+        let clockFn = fun () -> clock.UtcNow()
 
-        let rec loop (remainingMs: int) =
+        let expires =
+            Deadline.ofBudget (clockFn ()) (TimeSpan.FromMilliseconds(float budgetMs))
+
+        let rec loop () =
             task {
                 // Clear stale agent wakes so WaitForWake does not spin.
                 ignore (this.DrainAgentWakes JoinBatch.Max)
                 let drained = this.DrainPtyCompletions 1
 
                 match drained with
-                | item :: _ -> return Ok(PtyJoinItem.toRunCompletion item)
+                | item :: _ -> return Ok(PtyJoinItem.toRunCompletion item (clock.UtcNow()))
                 | [] ->
                     if lock gate (fun () -> cancelled) then
                         return Error ForkError.Cancelled
                     elif not (hasActive ()) then
                         return Error ForkError.NothingToJoin
-                    elif remainingMs <= 0 then
-                        return Error ForkError.TimedOut
                     else
-                        let timerTask = PtyTiming.timerTask remainingMs
+                        match Deadline.nextWaitMs clockFn expires with
+                        | 0 -> return Error ForkError.TimedOut
+                        | waitMs ->
+                            let handle = timers.Delay waitMs
 
-                        let interrupt: Task<JoinInterruptReason> =
-                            emitJsExpr timerTask "$0.then(function () { return 'DeadlineExpired'; })"
+                            let interrupt: Task<JoinInterruptReason> =
+                                emitJsExpr
+                                    handle.Delay
+                                    "$0.then(function () { return 'DeadlineExpired'; })"
 
-                        let started = System.DateTimeOffset.UtcNow
-                        let! reason = this.WaitForSignal interrupt
-                        let elapsed = int (System.DateTimeOffset.UtcNow - started).TotalMilliseconds
-                        let next = max 0 (remainingMs - max 0 elapsed)
+                            let! reason = this.WaitForSignal interrupt
+                            // Wake won or interrupt settled — Cancel drops the Node timer.
+                            // (Cancel leaves Delay permanently pending by contract.)
+                            handle.Cancel()
 
-                        match reason with
-                        | MailboxCancelled -> return Error ForkError.Cancelled
-                        | LocalInterrupt _ ->
-                            ignore (this.DrainAgentWakes JoinBatch.Max)
+                            match reason with
+                            | MailboxCancelled -> return Error ForkError.Cancelled
+                            | LocalInterrupt _ ->
+                                ignore (this.DrainAgentWakes JoinBatch.Max)
 
-                            match this.DrainPtyCompletions 1 with
-                            | item :: _ -> return Ok(PtyJoinItem.toRunCompletion item)
-                            | [] -> return Error ForkError.TimedOut
-                        | CompletionMayBeAvailable -> return! loop next
+                                match this.DrainPtyCompletions 1 with
+                                | item :: _ -> return Ok(PtyJoinItem.toRunCompletion item (clock.UtcNow()))
+                                | [] -> return Error ForkError.TimedOut
+                            | CompletionMayBeAvailable -> return! loop ()
             }
 
-        loop budgetMs
+        loop ()
 
     /// Lifecycle termination only — not tool-call abort (EXEC-017).
     member _.Cancel() =

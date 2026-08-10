@@ -14,7 +14,6 @@ type RecoveryAdmission =
 /// Injected capability: record one confirmed failure and return admission.
 ///
 /// Journal + auto-recovery budget are closed at the wiring site so Session hosts
-/// stay free of FallbackController.recordConfirmedFailure (dependency inversion;
-/// controller itself stays in Session until §13.2).
+/// stay free of Application FallbackLedger details (dependency inversion).
 type ConfirmedFailurePort =
     SessionId -> ProviderRunIdentity -> string -> Result<RecoveryAdmission, string>

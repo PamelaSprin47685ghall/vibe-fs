@@ -45,9 +45,15 @@ type HostForkRuntime
         /// GLORY-002 / SURFACE-006: ownership of every handle this runtime forks.
         /// The hidden Finality workflow passes `HostOwnedHidden` so its Reviewer
         /// never enters the Manager's list/join/guard or parent recovery.
-        ?ownership: Fact.HandleOwnership
+        ?ownership: Fact.HandleOwnership,
+        /// Injectable wall clock (PtyTiming.nodeClockPort at Host/Session composition).
+        ?clock: IClockPort,
+        /// Join one-shot deadline port (G4R-CE) — Host may inject; default Node timer.
+        ?timerPort: ITimerPort
     ) as this =
-    let runtime = ForkRuntime()
+    let clockPort = defaultArg clock (PtyTiming.nodeClockPort ())
+    let timers = defaultArg timerPort (PtyTiming.nodeTimerPort ())
+    let runtime = ForkRuntime(clock = clockPort, timerPort = timers)
     let children = Dictionary<string, SessionId>()
     let pendingRuns = Dictionary<string, PendingHostRun>()
     let ptyRuns = HashSet<string>()
@@ -105,6 +111,9 @@ type HostForkRuntime
     member internal _.PtyRuns = ptyRuns
     member internal _.HandleOwnership = handleOwnership
     member internal _.DeferredFirstPrompts = deferredFirstPrompts
+    member internal _.Clock = clockPort
+    /// Wall-clock read for Session extension modules (avoids raw DateTimeOffset stamps).
+    member internal _.Now() = clockPort.UtcNow()
 
     /// GLORY-045: re-enlist a still-ungraduated historical Reviewer into this
     /// runtime before Fork, so Fork's existing-child path reuses the SAME Host
@@ -236,6 +245,7 @@ type HostForkRuntime
                  |> Option.map (fun durable -> AgentJournal.handleProjection durable parentId))
                 parentId
                 (fun run outcome -> this.Complete(run, outcome))
+                (clockPort.UtcNow())
         )
 
     /// EXEC-009 + EXEC-018 + GREEN-5: agent facts from Journal; PTY from mailbox as PtyJoinItem.
@@ -274,7 +284,7 @@ type HostForkRuntime
                     | Some batch -> Some(Ok(ResultsAvailable batch))
                     | None -> None
             | Some durable ->
-                match JoinDrain.drainFromJournal durable parentId cap with
+                match JoinDrain.drainFromJournal durable parentId cap (clockPort.UtcNow()) with
                 | Error e -> Some(Error e)
                 | Ok durableBatch ->
                     // PTY channel only (EXEC-015). Leftover stays queued for next join.
@@ -490,6 +500,8 @@ type HostForkRuntime
         let budgetMs = timeoutMs
 
         let headAsRunCompletion (batch: NonEmptyBatch<JoinItem>) : RunCompletion =
+            let completedAt = clockPort.UtcNow()
+
             match NonEmptyBatch.toList batch |> List.head with
             | AgentItem(AgentCompletedItem payload) ->
                 { RunId = payload.RunId
@@ -497,47 +509,56 @@ type HostForkRuntime
                   AgentName = payload.AgentId
                   Role = payload.Role
                   Outcome = AgentCompleted payload
-                  CompletedAt = DateTimeOffset.UtcNow }
+                  CompletedAt = completedAt }
             | AgentItem(AgentFailedItem payload) ->
                 { RunId = payload.RunId
                   AgentId = payload.AgentId
                   AgentName = payload.AgentId
                   Role = defaultArg payload.Role Role.Executor
                   Outcome = AgentFailed payload
-                  CompletedAt = DateTimeOffset.UtcNow }
+                  CompletedAt = completedAt }
             | AgentItem(AgentAbandonedItem(agentId, reason)) ->
                 { RunId = "abandoned-" + agentId
                   AgentId = agentId
                   AgentName = agentId
                   Role = Role.Executor
                   Outcome = AgentAbandoned(agentId, reason)
-                  CompletedAt = DateTimeOffset.UtcNow }
-            | PtyItem item -> PtyJoinItem.toRunCompletion item
+                  CompletedAt = completedAt }
+            | PtyItem item -> PtyJoinItem.toRunCompletion item completedAt
 
         task {
-            let interrupt: Task<JoinInterruptReason> =
+            let deadlineHandle, interrupt: IDeadlineHandle option * Task<JoinInterruptReason> =
                 match budgetMs with
                 | Some milliseconds ->
-                    let timerTask = PtyTiming.timerTask milliseconds
-                    emitJsExpr timerTask "$0.then(function () { return 'DeadlineExpired'; })"
+                    let handle = timers.Delay milliseconds
+
+                    let arm =
+                        emitJsExpr
+                            handle.Delay
+                            "$0.then(function () { return 'DeadlineExpired'; })"
+
+                    Some handle, arm
                 | None ->
                     let tcs =
                         TaskCompletionSource<JoinInterruptReason>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-                    tcs.Task
+                    None, tcs.Task
 
-            let! outcome = this.JoinAvailable(1, interrupt)
+            try
+                let! outcome = this.JoinAvailable(1, interrupt)
 
-            match outcome with
-            | Error e -> return Error e
-            | Ok(Interrupted _) ->
-                // Timer interrupt under legacy Join API → TimedOut after final drain.
-                match this.tryDrainAvailable 1 with
-                | Some(Ok(ResultsAvailable batch)) -> return Ok(headAsRunCompletion batch)
-                | Some(Error e) -> return Error e
-                | Some(Ok(Interrupted _))
-                | None -> return Error ForkError.TimedOut
-            | Ok(ResultsAvailable batch) -> return Ok(headAsRunCompletion batch)
+                match outcome with
+                | Error e -> return Error e
+                | Ok(Interrupted _) ->
+                    // Deadline interrupt under legacy Join API → TimedOut after final drain.
+                    match this.tryDrainAvailable 1 with
+                    | Some(Ok(ResultsAvailable batch)) -> return Ok(headAsRunCompletion batch)
+                    | Some(Error e) -> return Error e
+                    | Some(Ok(Interrupted _))
+                    | None -> return Error ForkError.TimedOut
+                | Ok(ResultsAvailable batch) -> return Ok(headAsRunCompletion batch)
+            finally
+                deadlineHandle |> Option.iter (fun h -> h.Cancel())
         }
 
     member this.AwaitAgent(agentId: string, ?timeoutMs: int) : Task<Result<RunCompletion, string>> =

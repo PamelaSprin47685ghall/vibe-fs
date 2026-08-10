@@ -60,6 +60,9 @@ module HostSignalBootstrap =
             // Application awaits via IDeadlineHandle; Host owns the Node adapter.
             let recoveryTimerPort = PtyTiming.nodeTimerPort ()
 
+            let reviewerContinuationPort =
+                HostReviewGuard.continuationPort sessionPort journal scope.NudgeSent
+
             let resolveProjection (sessionId: SessionId) : AgentProjectionSet option =
                 match journal with
                 | None -> None
@@ -102,7 +105,7 @@ module HostSignalBootstrap =
 
 
                         XWire.reconcileAttempt journal scope turn
-                        TurnRuntimePreparation.prepare journal scope.DisposeExecutorRuntime turn
+                        TurnRuntimePreparation.prepare scope.DisposeExecutorRuntime turn
 
                         // Sole Application turn entry (rabbit §6.5 / §18): Host no longer
                         // multiplexes SyncDelegate / Reviewer / Manager handled-bools.
@@ -114,6 +117,7 @@ module HostSignalBootstrap =
                                 eventPort
                                 journal
                                 scope.SyncDelegateRuntime
+                                reviewerContinuationPort
                                 scope.NudgeSent
                                 scope.JoinGuardNudges
                                 scope.HasLivePty

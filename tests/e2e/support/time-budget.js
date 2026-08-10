@@ -100,16 +100,16 @@ export const CANARY_READY_MS = 10000;
  * from one still compiling.
  *
  * Per stage rather than per startup, so total startup time is unbounded in the same way a healthy
- * canary's runtime is — what is bounded is silence. Four seconds because the slowest observed stage
- * is `host.start`'s health wait, and it must survive fifteen canaries competing for one machine.
+ * scenario's runtime is — what is bounded is silence. Four seconds because the slowest observed
+ * stage is `host.start`'s health wait under the sole Long Stroke entry (G4R-4; no multi-canary pool).
  */
 export const READINESS_STAGE_MS = 4000;
 
 /**
- * Fallback ceiling for one canary process: the 兜底 VERIFY-004 permits so long as it is not the
- * primary criterion, which the watchdog is. Dual-script restart canaries need roughly 45s solo,
- * doubled for parallel host load. Still overridable through the CANARY_TIMEOUT_MS environment
- * variable; the env read stays at the call site so this module reads no process state.
+ * Fallback ceiling for one Host process: the 兜底 VERIFY-004 permits so long as it is not the
+ * primary criterion, which the watchdog is. Restart-heavy strokes need roughly 45s solo headroom;
+ * the bound stays generous as a backstop only. Still overridable through the CANARY_TIMEOUT_MS
+ * environment variable; the env read stays at the call site so this module reads no process state.
  */
 export const CANARY_TIMEOUT_MS = 90000;
 
@@ -258,23 +258,6 @@ export const ORPHAN_MIN_AGE_MS = 5000;
  */
 export const LEDGER_ENTRY_TTL_MS = 1800000;
 
-// ── suite-level loops ───────────────────────────────────────────────────────
-
-/**
- * Outer window for a whole canary scenario suite, chosen to fire before the 600s CI ceiling so
- * the failure is reported by the harness with diagnostics rather than by a killed process.
- */
-export const SCENARIO_SUITE_WINDOW_MS = 500000;
-
-/** Per-run ceiling in the stability gate, which repeats one scenario up to three times. */
-export const STABILITY_SCENARIO_TIMEOUT_MS = 30000;
-
-/** Outer window for all runs of the stability gate together. */
-export const STABILITY_GATE_WINDOW_MS = 300000;
-
-/**
- * Least remaining time worth starting another stability run with. Below this the gate stops
- * early and says so, rather than starting a run it knows the outer window will cut short — a
- * truncated run would be reported as a failure it did not have.
- */
-export const STABILITY_MIN_RUN_MS = 5000;
+// Suite-level multi-canary / stability-repeat windows (SCENARIO_SUITE_WINDOW_MS,
+// STABILITY_*) were retired with G4R-4. Long Stroke is one continuous Host lifetime;
+// silence + causal progress (WATCHDOG_TIMEOUT_MS / WAIT_FACT_WINDOW_MS) are the bounds.

@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { agentJournal, caseOf, listItems, sessionId, toList } from '../support/domain.mjs'
+import { agentJournal, caseOf, listItems, sessionId, toList, utcOffset } from '../support/domain.mjs'
 
 const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
 const {
@@ -154,7 +154,7 @@ test('HFA_fork_send_failure_fails_the_pending_run', async () => {
   assert.equal(pendingRunCount(liveCtx.runtime), 0, 'the run must be failed, not left pending')
 
   // The failure was written durably: the handle is joinable with a failed item.
-  const drained = JoinDrain_drainFromJournal(liveCtx.journal, PARENT, 5)
+  const drained = JoinDrain_drainFromJournal(liveCtx.journal, PARENT, 5, utcOffset('2024-01-01T00:00:00.000Z'))
   assert.equal(drained.tag, 0, drained.tag === 1 ? drained.fields[0] : '')
   const items = listItems(drained.fields[0])
   assert.equal(items.length, 1)

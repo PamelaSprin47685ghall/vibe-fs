@@ -175,10 +175,12 @@ module HandleCompletionCodec =
             Invalid(CompletionDecodeError.InvalidJson ex.Message)
 
     /// Materialise RunCompletion only from Current v2 (or pre-v2 completed/failed).
+    /// `completedAt` is caller-minted — codec must not invent wall time.
     let tryMaterialiseRunCompletion
         (record: HandleRecord)
         (agentId: string)
         (decoded: DurableAgentCompletionV2)
+        (completedAt: DateTimeOffset)
         : RunCompletion =
         let role = AgentRoleIdentity.ofRole record.CanonicalRole
 
@@ -208,7 +210,7 @@ module HandleCompletionCodec =
                             None
                         else
                             Some payload.Directory }
-              CompletedAt = DateTimeOffset.UtcNow }
+              CompletedAt = completedAt }
         | FailedV2 payload ->
             let runId =
                 if String.IsNullOrWhiteSpace payload.RunId then
@@ -228,13 +230,19 @@ module HandleCompletionCodec =
                       Role = Some role
                       Code = payload.Code
                       Message = payload.Message }
-              CompletedAt = DateTimeOffset.UtcNow }
+              CompletedAt = completedAt }
 
     /// Rebuild a `RunCompletion` from durable handle identity + blob body.
     /// Legacy abort → Error (never agent aborted finality).
-    let tryDecode (record: HandleRecord) (agentId: string) (json: string) : Result<RunCompletion, string> =
+    /// `completedAt` is caller-minted — codec must not invent wall time.
+    let tryDecode
+        (record: HandleRecord)
+        (agentId: string)
+        (json: string)
+        (completedAt: DateTimeOffset)
+        : Result<RunCompletion, string> =
         match decodeBody json with
-        | Current decoded -> Ok(tryMaterialiseRunCompletion record agentId decoded)
+        | Current decoded -> Ok(tryMaterialiseRunCompletion record agentId decoded completedAt)
         | LegacyFalseAbort _ -> Error "legacy false abort is not a joinable completion"
         | Invalid err ->
             let reason =
@@ -253,6 +261,7 @@ module HandleCompletionCodec =
         (journal: AgentJournal)
         (record: HandleRecord)
         (agentId: string)
+        (completedAt: DateTimeOffset)
         : Result<RunCompletion option, string> =
         match record.Lifecycle with
         | HandleLifecycle.CompletedAwaitingJoin completion ->
@@ -265,7 +274,7 @@ module HandleCompletionCodec =
                     if HostDigest.sha256Hex body <> BlobDigest.value expectedDigest then
                         Error(sprintf "completion blob digest mismatch: %s" (BlobDigest.value expectedDigest))
                     else
-                        tryDecode record agentId body |> Result.map Some
+                        tryDecode record agentId body completedAt |> Result.map Some
             | Some _, None
             | None, Some _ -> Error "completion blob ref/digest pair is incomplete"
         | HandleLifecycle.Active

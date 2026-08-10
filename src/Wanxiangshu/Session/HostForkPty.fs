@@ -20,7 +20,7 @@ module HostForkRuntimePty =
                 { PtyId = id.Value
                   AgentId = id.Value
                   Command = command
-                  StartedAt = DateTimeOffset.UtcNow }
+                  StartedAt = this.Now() }
 
         member this.UntrackPtyRun(id: string) =
             lock this.Gate (fun () -> this.PtyRuns.Remove id |> ignore)

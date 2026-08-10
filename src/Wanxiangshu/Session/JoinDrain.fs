@@ -32,10 +32,12 @@ module JoinDrain =
         |> List.sortBy stableJoinKey
 
     /// Materialise Abandoned as a batch item and CAS-retire (single report).
+    /// `completedAt` is caller-minted (IClockPort at composition).
     let tryConsumeOneAbandoned
         (durable: AgentJournal)
         (parentId: SessionId)
         (record: HandleRecord)
+        (completedAt: DateTimeOffset)
         : Result<RunCompletion, ForkError> option =
         match record.Lifecycle, HandleId.tryAgent record.Handle with
         | HandleLifecycle.Abandoned reason, Some agentHandleId ->
@@ -58,7 +60,7 @@ module JoinDrain =
                           AgentName = record.TargetAgent
                           Role = role
                           Outcome = AgentCompletion.abandoned agentId reasonText
-                          CompletedAt = DateTimeOffset.UtcNow }
+                          CompletedAt = completedAt }
                 )
             | Error AlreadyRetired -> None
             | Error(NotJoinable _) -> None
@@ -155,10 +157,12 @@ module JoinDrain =
             | Error err -> Some(Error(ForkError.NotFound err))
 
     /// One durable completed handle: decode first, then prove, then CAS.
+    /// `completedAt` is caller-minted (IClockPort at composition).
     let tryConsumeOneDurable
         (durable: AgentJournal)
         (parentId: SessionId)
         (record: HandleRecord)
+        (completedAt: DateTimeOffset)
         : Result<RunCompletion, ForkError> option =
         match HandleId.tryAgent record.Handle with
         | None -> None
@@ -182,7 +186,7 @@ module JoinDrain =
                         JoinableCompletion.fromDecoded agentId record.Handle record.ChildSessionId decoded body
 
                     let completion =
-                        HandleCompletionCodec.tryMaterialiseRunCompletion record agentId decoded
+                        HandleCompletionCodec.tryMaterialiseRunCompletion record agentId decoded completedAt
 
                     // Proof must agree with materialised finality before CAS.
                     match JoinableCompletion.finality proof with
@@ -206,11 +210,12 @@ module JoinDrain =
     let tryConsumeOne
         (durable: AgentJournal)
         (parentId: SessionId)
+        (completedAt: DateTimeOffset)
         (record: HandleRecord)
         : Result<RunCompletion, ForkError> option =
         match record.Lifecycle with
-        | HandleLifecycle.Abandoned _ -> tryConsumeOneAbandoned durable parentId record
-        | HandleLifecycle.CompletedAwaitingJoin _ -> tryConsumeOneDurable durable parentId record
+        | HandleLifecycle.Abandoned _ -> tryConsumeOneAbandoned durable parentId record completedAt
+        | HandleLifecycle.CompletedAwaitingJoin _ -> tryConsumeOneDurable durable parentId record completedAt
         | _ -> None
 
     /// Core drain loop: ordered candidates, CAS consume, refresh on race/skip.
@@ -313,13 +318,15 @@ module JoinDrain =
             | _ -> ()
 
     /// Production entry: reconcile false aborts, then drain joinable.
+    /// `completedAt` stamps every materialised RunCompletion (IClockPort at composition).
     let drainFromJournal
         (durable: AgentJournal)
         (parentId: SessionId)
         (maxCount: int)
+        (completedAt: DateTimeOffset)
         : Result<RunCompletion list, ForkError> =
         reconcileFalseAborts durable parentId
         let projection = AgentJournal.handleProjection durable parentId
 
-        drainJoinableBatch maxCount projection (tryConsumeOne durable parentId) (fun () ->
+        drainJoinableBatch maxCount projection (tryConsumeOne durable parentId completedAt) (fun () ->
             AgentJournal.handleProjection durable parentId)

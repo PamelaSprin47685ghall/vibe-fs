@@ -77,15 +77,8 @@ export const RAW_TIME_TOKENS = Object.freeze([
  * Process/ + Infrastructure/ are already outside RAW_TIME_SCAN_LAYERS.
  */
 export const RAW_TIME_ALLOWLIST = Object.freeze([
-  'Session/AgentCompletion.fs',
-  'Session/ChildRun.fs',
-  'Session/CompletionMailbox.fs',
-  'Session/HandleCompletionCodec.fs',
-  'Session/HostForkChildDispatch.fs',
-  'Session/HostForkPty.fs',
-  'Session/HostForkRuntime.fs',
-  'Session/JoinDrain.fs',
-  'Session/ParkedTransform.fs',
+  // G4R-5: Session CompletedAt/CreatedAt/timers sink to IClockPort/ITimerPort.
+  // Keep empty; re-add only with explicit physical-adapter justification.
 ])
 
 export const PHASES = Object.freeze(['s0-soft', 'hard'])

@@ -62,10 +62,7 @@ module ManagerWorkflow =
                         | ManagerBackground.BackgroundSettlement.Deferred -> return ()
                         | ManagerBackground.BackgroundSettlement.Settled ->
                             match currentLife journal turn.SessionId with
-                            | Some life when
-                                life.ActiveFinality
-                                |> Option.exists ManagerLifecycleProjection.isOpen
-                                ->
+                            | Some life when ManagerFinality.admitLabor life = ManagerFinality.LaborAdmission.FinalityOwnsLife ->
                                 return ()
                             | _ ->
                                 match!
@@ -73,16 +70,19 @@ module ManagerWorkflow =
                                 with
                                 | ManagerActivation.EnsureAcceptedResult.Deferred -> return ()
                                 | ManagerActivation.EnsureAcceptedResult.Ready life ->
-                                    do!
-                                        ManagerIdle.encourageLabor
-                                            sessionPort
-                                            eventPort
-                                            journal
-                                            nudgeSent
-                                            quiescence
-                                            context
-                                            life
+                                    match ManagerFinality.admitLabor life with
+                                    | ManagerFinality.LaborAdmission.FinalityOwnsLife -> return ()
+                                    | ManagerFinality.LaborAdmission.LaborMayContinue ->
+                                        do!
+                                            ManagerIdle.encourageLabor
+                                                sessionPort
+                                                eventPort
+                                                journal
+                                                nudgeSent
+                                                quiescence
+                                                context
+                                                life
 
-                                    return ()
+                                        return ()
                 | _ -> return! observeOrdinary context
         }

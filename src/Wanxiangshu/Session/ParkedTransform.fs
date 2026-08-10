@@ -2,17 +2,10 @@ namespace Wanxiangshu.Session
 
 open System
 open System.Threading.Tasks
-open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
-
-module internal ParkedTransformInterop =
-
-    [<Emit("setTimeout($0, $1)")>]
-    let setTimeoutJs (fn: unit -> unit) (ms: float) : obj = jsNative
-
-    [<Emit("clearTimeout($0)")>]
-    let clearTimeoutJs (handle: obj) : unit = jsNative
+open Wanxiangshu.Kernel
+open Wanxiangshu.Process
 
 /// Parking + dual request slots (ENFORCER-047/050/160).
 ///
@@ -39,18 +32,26 @@ type IParkedTransformHost =
     abstract IsDrainOpen: string -> bool
 
 /// One parkable transform wait for one session (ENFORCER-160).
-type ParkedTransform(sessionId: string, lifetime: TimeSpan) as this =
+/// Lifetime armed via ITimerPort.Delay; Cancel on settle (physical timer stays in Process).
+type ParkedTransform(sessionId: string, lifetime: TimeSpan, ?timerPort: ITimerPort) as this =
+    let timers = defaultArg timerPort (PtyTiming.nodeTimerPort ())
+
     let completion =
         TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously)
 
     // DSL-MUTABLE: resource — one-shot settle latch for the transform wait
     let mutable settled = false
-    // DSL-MUTABLE: resource — JS timeout handle (cleared on settle)
-    let mutable timerHandle: obj option = None
+    // DSL-MUTABLE: resource — injectable deadline (cleared / Cancelled on settle)
+    let mutable deadline: IDeadlineHandle option = None
 
     do
-        let ms = max 1.0 lifetime.TotalMilliseconds
-        timerHandle <- Some(ParkedTransformInterop.setTimeoutJs (fun () -> this.TrySettle false) ms)
+        let ms = max 1 (int lifetime.TotalMilliseconds)
+        let handle = timers.Delay ms
+        deadline <- Some handle
+        // Success-only continuation: Cancel leaves Delay pending, so settle-false
+        // never runs after Resume/Cancel — matches prior clearTimeout semantics.
+        emitJsExpr (handle.Delay, fun () -> this.TrySettle false) "$0.then(function () { $1(); })"
+        |> ignore
 
     member _.SessionId = sessionId
 
@@ -59,8 +60,8 @@ type ParkedTransform(sessionId: string, lifetime: TimeSpan) as this =
     member private _.TrySettle(result: bool) =
         if not settled then
             settled <- true
-            timerHandle |> Option.iter ParkedTransformInterop.clearTimeoutJs
-            timerHandle <- None
+            deadline |> Option.iter (fun h -> h.Cancel())
+            deadline <- None
             completion.SetResult result
 
     member _.TryResume() = this.TrySettle true
