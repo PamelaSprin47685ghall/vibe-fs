@@ -1,26 +1,34 @@
 /**
- * VERIFY-004 permanent gate: e2e case files and top-level e2e tests must NOT
- * call `watchdog.advance(` / `watchdog?.advance(` directly. Only
+ * VERIFY-004 permanent gate: top-level e2e tests must NOT call
+ * `watchdog.advance(` / `watchdog?.advance(` directly. Only
  * tests/e2e/support/* causal primitives may feed the watchdog.
+ *
+ * One World scope: sole top-level entry (tests/e2e/*.test.mjs). Does not
+ * require tests/e2e/cases/; missing or empty cases/ must not throw.
  */
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
 import test from 'node:test'
-import { walk } from '../../../scripts/lib/walk.mjs'
-import { scanE2EWatchdogFeed } from '../../../scripts/checks/e2e-watchdog-feed.mjs'
+import {
+  e2eTestCaseFiles,
+  scanE2EWatchdogFeed,
+} from '../../../scripts/checks/e2e-watchdog-feed.mjs'
 
 test('E2E_WATCHDOG_FEED_case_files_do_not_feed_watchdog_directly', () => {
-  // VERIFY-004 scope: tests/e2e/cases/** plus top-level tests/e2e/*.test.mjs.
-  // Filter out tests/e2e/support/* — the allowed causal feeders.
-  const caseFiles = walk('tests/e2e/cases', ['.test.mjs'])
-  const e2eFiles = walk('tests/e2e', ['.test.mjs']).filter(
-    (p) => !p.includes('/support/') && !caseFiles.includes(p),
-  )
-  const files = [...new Set([...caseFiles, ...e2eFiles])]
+  // Top-level only — walk must not recurse into cases/ or support/.
+  const files = e2eTestCaseFiles()
 
-  // Every listed file must exist before we read it — fail loudly on a wrong path.
+  // Sole entry path is the required-exactly-one-when-present cutover target.
+  assert.ok(
+    files.some((file) => file.endsWith('/tests/e2e/entry.test.mjs') || file.endsWith('tests/e2e/entry.test.mjs')),
+    'expected top-level sole entry tests/e2e/entry.test.mjs in scope',
+  )
+
+  // Missing/empty cases/ must be tolerated: do not walk or require that directory.
+  // (If it happens to exist, it is simply out of scope.)
+
   for (const file of files) {
-    assert.ok(existsSync(file), `e2e case file missing: ${file}`)
+    assert.ok(existsSync(file), `e2e top-level test file missing: ${file}`)
   }
 
   const violations = []
@@ -31,7 +39,7 @@ test('E2E_WATCHDOG_FEED_case_files_do_not_feed_watchdog_directly', () => {
   assert.equal(
     violations.length,
     0,
-    'e2e case files must not call watchdog.advance directly (VERIFY-004); they must use support causal primitives only. Violations: ' +
+    'e2e top-level tests must not call watchdog.advance directly (VERIFY-004); they must use support causal primitives only. Violations: ' +
       JSON.stringify(violations),
   )
 })

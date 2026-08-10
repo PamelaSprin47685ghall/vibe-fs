@@ -11,8 +11,6 @@
  * that landed on the wrong layer.
  */
 
-import { readFileSync } from 'node:fs';
-
 import { assertEq, assertTrue } from './lib.mjs';
 import { contextOf } from './forest-lib.mjs';
 import { compileScenario } from '../../e2e/support/scenario-schema.js';

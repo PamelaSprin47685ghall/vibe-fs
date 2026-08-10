@@ -3,9 +3,9 @@
 // Proves orchestrator conflict / restart-publish algebra on production Fold +
 // OrchestratorProjection.recoveryAction. No Host. No invented business rules.
 //
-// Feedstock (E2E remains the Host-level canary; this file restates the algebra):
-//   tests/e2e/scenarios/orchestrator-restart-publish.toml
-//   tests/e2e/scenarios/orchestrator-restart-publish-conflict.toml
+// Feedstock (Host-level Long Stroke / temporal algebra; TOML canaries retired in G4R-4):
+//   tests/e2e/entry.test.mjs + scenarios/long-stroke.toml (publish-conflict stroke)
+//   Former multi-canary TOMLs orchestrator-restart-publish{,-conflict}.toml deleted.
 //
 // Production symbols:
 //   Fold.foldEnvelope / Fold.apply          — Journal/Fold.fs

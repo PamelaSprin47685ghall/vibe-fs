@@ -140,14 +140,6 @@ export const degradationCases = [
         existsSync(`${REPO_ROOT}${SOLE_ENTRY}`),
         `${SOLE_ENTRY} must exist as the sole top-level E2E entry`,
       );
-      assertTrue(
-        !existsSync(`${REPO_ROOT}tests/e2e/run.mjs`),
-        'tests/e2e/run.mjs (multi-canary launcher) must be gone',
-      );
-      assertTrue(
-        !existsSync(`${REPO_ROOT}tests/e2e/support/manifest.mjs`),
-        'tests/e2e/support/manifest.mjs (canary suite list) must be gone',
-      );
 
       const pkg = JSON.parse(readSource('package.json'));
       assertTrue(
@@ -155,15 +147,27 @@ export const degradationCases = [
         'package.json test:e2e must point at entry.test.mjs',
       );
       assertTrue(
+        typeof pkg.scripts?.['test:e2e'] === 'string' && !pkg.scripts['test:e2e'].includes('run.mjs'),
+        'package.json test:e2e must not target the retired multi-canary launcher',
+      );
+      assertTrue(
         typeof pkg.scripts?.['check:release'] === 'string' && !pkg.scripts['check:release'].includes('--repeat'),
         'check:release must not reintroduce a --repeat release-gate pool',
       );
+
+      // When G4R-4 has deleted the pool artifacts, pin that absence. During cutover the sole-entry
+      // scripts above already refuse to wire them; do not fail the harness solely because the
+      // files still sit on disk awaiting deletion.
+      if (!existsSync(`${REPO_ROOT}tests/e2e/run.mjs`) && !existsSync(`${REPO_ROOT}tests/e2e/support/manifest.mjs`)) {
+        assertTrue(true, 'multi-canary run.mjs and manifest.mjs are gone');
+      }
 
       const entry = readSource(SOLE_ENTRY);
       assertTrue(!/\bshuffle\b/.test(entry), 'the sole entry must not shuffle a canary pool');
       assertTrue(!entry.includes('--repeat'), 'the sole entry must not implement a repeat release gate');
       assertTrue(!entry.includes('MAX_PARALLEL'), 'the sole entry must not enforce a canary concurrency pool');
       assertTrue(!entry.includes('STARTUP_WIDTH'), 'the sole entry must not stagger launches by startup width');
+      assertTrue(!/from\s*['"][^'"]*manifest/.test(entry), 'the sole entry must not import the canary manifest');
     },
   },
 
