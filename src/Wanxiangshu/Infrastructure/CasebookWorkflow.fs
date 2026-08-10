@@ -101,3 +101,13 @@ module CasebookWorkflow =
             match checkFreshness case replayed with
             | ReplayResult.Fresh -> Ok false
             | ReplayResult.Stale -> Ok true
+
+    /// CASE-010: exactly-one CaseFinalize — a reusable Inspector scope archives
+    /// at most once (ReuseScope close → freeze draft → one finalize). A second
+    /// finalize for the same session id is refused; unexpected SessionDeleted
+    /// must not reconstruct a pending finalize (the caller just cleans up).
+    let finalizeCase (store: IEventStore) (raw: IGitRawStore) (case: Case) : Result<unit, string> =
+        match fetchCase store raw 0 case.SessionId with
+        | Error err -> Error err
+        | Ok(Some _) -> Error(sprintf "case already finalized for scope %s" case.SessionId)
+        | Ok None -> archiveInspectorResult store raw case

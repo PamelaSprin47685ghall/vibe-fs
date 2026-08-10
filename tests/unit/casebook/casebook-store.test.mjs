@@ -197,3 +197,17 @@ test('CASE006_refresh_publishes_revision_and_needsRefresh_detects_stale', async 
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('CASE010_finalize_is_exactly_once_per_scope', async () => {
+  const { CasebookWorkflow_finalizeCase: finalizeCase } = await import('../../../dist/Infrastructure/CasebookWorkflow.js')
+  const raw = createRaw()
+  const store = createStore(raw)
+  const first = resultOf(finalizeCase(store, raw, caseRec('scope-1', 'Q', 'A', [])))
+  assert.equal(first.ok, true, `first finalize ok, got ${JSON.stringify(first.error)}`)
+  const second = resultOf(finalizeCase(store, raw, caseRec('scope-1', 'Q', 'A2', [])))
+  assert.equal(second.ok, false, 'second finalize must be refused')
+  assert.equal(second.error.includes('already finalized'), true)
+  // a different scope still archives
+  const other = resultOf(finalizeCase(store, raw, caseRec('scope-2', 'Q', 'A', [])))
+  assert.equal(other.ok, true)
+})
