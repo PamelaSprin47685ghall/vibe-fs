@@ -3379,25 +3379,27 @@ Observation capture 从最终执行层接（G5 后 = builtin read/glob/grep Host
 
 按 Playbook §14–21（G6-A..G6-G）+ proposal §58–63：
 
-### G6-A — Casebook Domain First（纯 Domain；无 Host I/O）
-- [ ] Formal docs：`docs/{why,what,shape,how,proof}/casebook.md`（Clause 前缀 `CASE-`）；`docs/README.md` 索引；spec.mjs 注册
-- [ ] `Case`（逻辑 Q/A/observations/snapshot refs）、`Observation`、`ObservationIdentity`、`ObservationReplayResult`
-- [ ] `CasebookProjection` fold（InspectorCaseCaptured/Refreshed/Accessed/Evicted → Case list + last_access）
-- [ ] `normalizeObservations` / `classifyReplay`（no-delta → fresh；delta → stale）/ `LruPrune`（projected last_access）
-- [ ] DomainConflict 表达（同 Case heads；禁止 revision/wall_clock LWW）
+### G6-A — Casebook Domain First（纯 Domain；无 Host I/O）— DONE（d9d15d5f）
+- [x] Formal docs：`docs/{why,what,shape,how,proof}/casebook.md`（CASE-001..012）；`docs/README.md` 索引；spec.mjs 注册（389 clauses）
+- [x] `Case`（逻辑 Q/A/observations）、`Observation`（FileRead/GlobResult/GrepResult）、`ObservationIdentity`（normalize 去重）
+- [x] `CasebookProjection` fold（Captured/Refreshed/Accessed/Evicted → Map<sessionId, Case> + 派生单调 last_access）
+- [x] `Observations.normalize` / `classifyReplay`（Fresh 仅 exact normalized equality）/ `evict`（LRU，victims 返回供 Evicted tombstone）
+- [x] DomainConflict 由 EventStore 层表达；Domain 无 revision/wall_clock（CASE-011）
 
-### G6-B — Observation Capture（最终执行层）
-- [ ] captureReadObservation / captureGlobObservation / captureGrepObservation（typed，不从 transcript 推断）
-- [ ] executor 阅读容错（cat/head/tail/sed/grep 正例识别；命令替换/sh -c/复杂 pipeline 安全跳过；§63）
+### G6-B — Observation Capture（最终执行层）— DONE（dbfd7660）
+- [x] `CasebookCapture.capture`（read → FileRead+sha256；glob → GlobResult；grep → GrepResult；未知工具 None）
+- [x] executor 阅读容错（§63 正例 cat/head/tail/sed 含选项跳过 + cat|grep pipeline；负例 sh -c/bash -c/命令替换安全跳过）
 
-### G6-C — Non-reusable Inspector Path
-- [ ] Inspector terminal → captured Q/A/evidence → `InspectorCaseCaptured`（EventStore append + PayloadRef）
-- [ ] 证明：archive failure ≠ Inspector call failure
+### G6-C — Non-reusable Inspector Path — PARTIAL（store/workflow DONE：28969e1d + 871f8092）
+- [x] `CasebookStore`：InspectorCaseCaptured/Refreshed/Accessed/Evicted 事件 + payload codec + topoSort 因果序 + project（fold+LRU）；AuthoritativeEventTypes 扩展
+- [x] `CasebookFeature` marker gating（.wanxiang/casebook/ 目录存在；CASE-009）
+- [x] `CasebookWorkflow`：archiveInspectorResult / fetchCase / checkFreshness；全部返回 Result（archive failure ≠ Inspector call failure）
+- [ ] Inspector terminal → archive 的 Host 接线（ToolRegistry fetch 工具 + 事件采集钩子）
 
-### G6-D — Fetch Hot Path
-- [ ] CasebookIndexSnapshot（PrefixEpoch 稳定；同 epoch 字节稳定）；fetch(session_id) 工具（conditional schema + ToolRegistry gate）
-- [ ] fetch → replay observations（当前 worktree）→ no-delta → exact A；delta → stale A + refresh 意图
-- [ ] same-worktree fetch single-flight
+### G6-D — Fetch Hot Path — PARTIAL（replay DONE：13904834）
+- [x] `CasebookReplay`：replayOne/replayAll（只读重放；不可复现 = 变化信号）
+- [ ] fetch(session_id) 工具（conditional schema + ToolRegistry gate；需 EventStore 实例传递链——ToolRegistry.create 签名扩展）
+- [ ] CasebookIndexSnapshot（PrefixEpoch 稳定）与 same-worktree single-flight
 
 ### G6-E — CaseRefresh（Bookkeeper）
 - [ ] changed evidence → Bookkeeper CaseRefresh → edit-qa*（0..N in one provider transaction）→ stability verify → `InspectorCaseRefreshed`
