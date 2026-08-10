@@ -102,6 +102,26 @@ module CasebookWorkflow =
             | ReplayResult.Fresh -> Ok false
             | ReplayResult.Stale -> Ok true
 
+    /// ponytail: drain+archive wiring — single helper for Inspector terminal; full SessionDeleted wiring if throughput matters
+    let drainCollectorAndArchive
+        (collector: ObservationCollector)
+        (store: IEventStore)
+        (raw: IGitRawStore)
+        (sessionId: string)
+        (q: string)
+        (a: string)
+        : Result<unit, string> =
+        let observations = collector.Drain sessionId
+
+        let case: Case =
+            { SessionId = sessionId
+              Q = q
+              A = a
+              Observations = observations
+              LastAccessOrder = 0L }
+
+        archiveInspectorResult store raw case
+
     /// CASE-010: exactly-one CaseFinalize — a reusable Inspector scope archives
     /// at most once (ReuseScope close → freeze draft → one finalize). A second
     /// finalize for the same session id is refused; unexpected SessionDeleted
