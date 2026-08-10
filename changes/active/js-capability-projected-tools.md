@@ -5344,6 +5344,7 @@ crash recovery 只从 EventStore facts/payloads 重建。
 - [x] transaction 纯规则（`JsTransaction`：validateSingleIntent/validateTargets/validateFreshness/preflight/commitPlan/rollbackPlan）
 - [x] fs adapter（`Infrastructure/JsToolsFs.fs`：strict UTF-8 读、ordered anchors、bounded glob、两阶段 all-or-nothing commitPlan）
 - [x] runtime bindings（`Infrastructure/JsToolsBindings.fs`：file/glob/grep/rewrite/write；path boundary；staging-only；binding key 与 fragment 同源）
+- [x] js-* 工具工作流（`Infrastructure/OpenCode/Tools/JsToolWorkflow.fs`：sandbox → staging → preflight（活 fs 事实）→ all-or-nothing commit → 提交报告；binding 失败为可检查对象）
 - [ ] transaction engine Host 侧（preflight 执行 → durable prepare = EventStore only → commit → rollback → crash recovery）
 - [ ] return serializer（JSON-compatible；result validation 在 commit 前）
 - [ ] Synthetic TOML bridge（JS-016）
