@@ -11,6 +11,7 @@ open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 open Wanxiangshu.Finality
+open Wanxiangshu.Review
 
 /// GLORY-003/040/042/044/045/060/061: the Manager Finality workflow, driven by
 /// the Host after a legal `suicide`.
@@ -380,7 +381,7 @@ module FinalityController =
         (memberInfo: EnlistedMember)
         (tree: GitTreeHash)
         (timeoutMs: int)
-        : Task<Result<HostReviewProgram.HostReviewOutcome, HostReviewProgram.HostReviewFailure>> =
+        : Task<Result<ReviewBarrierOutcome, ReviewBarrierFailure>> =
         let awaitOrCancel () =
             task {
                 // Cancel after a durable REVISE must still return Ok so reverify
@@ -398,10 +399,10 @@ module FinalityController =
                 | Ok() -> return Ok()
             }
 
-        HostReviewProgram.reverify
+        ReviewBarrierWorkflow.reverify
             (Some journal)
-            (fun () -> Task.FromResult(Ok memberInfo.ReviewerSessionId))
-            awaitOrCancel
+            { ForkReviewer = fun () -> Task.FromResult(Ok memberInfo.ReviewerSessionId)
+              AwaitReviewer = awaitOrCancel }
             managerSessionId
             memberInfo.BarrierId
             tree
@@ -1268,8 +1269,8 @@ module FinalityController =
                                     concurrentAllOrShortCircuit
                                         cancel
                                         (function
-                                        | Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired _) -> true
-                                        | Ok(HostReviewProgram.HostReviewOutcome.Confirmed _) -> false
+                                        | Ok(ReviewBarrierOutcome.RevisionRequired _) -> true
+                                        | Ok(ReviewBarrierOutcome.Confirmed _) -> false
                                         | Error _ -> false)
                                         memberTasks
 
@@ -1278,9 +1279,9 @@ module FinalityController =
                                 cancel.Cancel()
 
                                 match outcome with
-                                | Choice1Of2(Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired(reviewerId,
-                                                                                                     barrier,
-                                                                                                     _tree)),
+                                | Choice1Of2(Ok(ReviewBarrierOutcome.RevisionRequired(reviewerId,
+                                                                                      barrier,
+                                                                                      _tree)),
                                              allResults) ->
                                     // Race allResults alone drops cancelled-but-durable
                                     // siblings (awaitOrCancel Error). Union journal
@@ -1289,7 +1290,7 @@ module FinalityController =
                                     let fromRace =
                                         allResults
                                         |> List.choose (function
-                                            | Ok(HostReviewProgram.HostReviewOutcome.RevisionRequired(sid, bid, _)) when
+                                            | Ok(ReviewBarrierOutcome.RevisionRequired(sid, bid, _)) when
                                                 sid <> reviewerId
                                                 ->
                                                 Some(sid, bid)
@@ -1318,7 +1319,7 @@ module FinalityController =
                                 | Choice2Of2 results when
                                     List.forall
                                         (function
-                                        | Ok(HostReviewProgram.HostReviewOutcome.Confirmed _) -> true
+                                        | Ok(ReviewBarrierOutcome.Confirmed _) -> true
                                         | _ -> false)
                                         results
                                     ->

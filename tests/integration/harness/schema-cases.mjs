@@ -988,9 +988,9 @@ user = "go"
       rejects(withSetup('{ maxJournalEvents = 0 }'), 'setup.maxJournalEvents must be a positive integer');
       rejects(withSetup('{ maxSseEvents = -1 }'), 'setup.maxSseEvents must be a positive integer');
       rejects(withSetup('{ maxJournalEvents = 1.5 }'), 'setup.maxJournalEvents must be a positive integer');
-      const ok = accepts(withSetup('{ strict = true, maxJournalEvents = 312, maxSseEvents = 1800 }'));
-      assertEq(ok.setup.maxJournalEvents, 312);
-      assertEq(ok.setup.maxSseEvents, 1800);
+      const ok = accepts(withSetup('{ strict = true, maxJournalEvents = 367, maxSseEvents = 1724 }'));
+      assertEq(ok.setup.maxJournalEvents, 367);
+      assertEq(ok.setup.maxSseEvents, 1724);
     },
   },
 

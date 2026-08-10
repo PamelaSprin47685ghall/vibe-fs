@@ -60,15 +60,12 @@ scenario = "long-stroke"
 description = "G4R-3 The Long Stroke: orchestrator shell, one OpenCode world through adversity to clean shutdown"
 pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fallback, REVISE→FinalityRejected→Blessed→LifeCompleted, gitConflictProof→ConflictDetected→Published (no restart)."
 
-# Theoretical exact event ceilings (fail-closed on dead loops; primary over silence):
-#   maxJournalEvents — EventStore envelope count
-#   maxSseEvents     — OpenCode SSE frames excluding server.heartbeat
-# Derivation (G4R-3 adversity spine + publish conflict resume):
-#   LifeCompleted reached at 264 envelopes on long-stroke run6 (CandidateReady absent).
-#   Publish path CandidateReady→ConflictDetected→RebasedCandidateReady→Published
-#   composed at +48 envelopes → theory 312.
-#   SSE non-heartbeat at LifeCompleted ≈1318; conflict-resume composition +482 → theory 1800.
-setup = { strict = true, maxJournalEvents = 312, maxSseEvents = 1800, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n" } } }
+# Event ceilings (fail-closed on dead loops; primary over silence watchdog):
+#   maxJournalEvents — EventStore envelope count = exact theoretical trigger count (367)
+#   maxSseEvents     — OpenCode SSE excluding server.heartbeat; transport-noisy so this
+#                      is the measured max fail-closed bound (1716–1724 across green runs),
+#                      not a DU-algebra equality. Journal is the exact semantic pin.
+setup = { strict = true, maxJournalEvents = 367, maxSseEvents = 1724, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 
@@ -86,9 +83,9 @@ must = [
   "conflict-resume.0",
   "coder-resolve.0",
   "barrier-reviewer.0",
-  # Long adversity keeps Manager outstanding → EXEC-016 orch-join-guard completes the shell
-  # (orch.2 is the no-nudge race path; not required when join-guard fires).
-  "orch-join-guard.0",
+  # orch.2 = join harvest text after Published (orch-unhappy Stroke 6). EXEC-016
+  # orch-join-guard remains declared optional for the outstanding-Manager race.
+  "orch.2",
 ]
 
 flow = [
@@ -160,8 +157,8 @@ flow = [
   # Bare "Published" false-matches assignment text; pin Orchestrator case tag.
   { waitFact = { name = "\"Orchestrator\",[\"Published\"", eq = 1 }, timeoutMs = 90000 },
 
-  # EXEC-016 join-guard holds orch join until Manager Published; then final text.
-  { wait = "orch-join-guard.1", timeoutMs = 60000 },
+  # Stroke 6 — Orchestrator harvest (same as orch-unhappy: orch.2 after Published).
+  { wait = "orch.2", timeoutMs = 60000 },
   { awaitTerminal = true, requireAssistantTerminal = false },
   { custom = "oracleLongStroke" },
   { expectSatisfied = true },
@@ -188,10 +185,8 @@ tools = ["fork-manager", "join"]
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
 
-  # No-nudge race: join stays blocked until Manager Published, then this text.
-  # Long adversity usually takes orch-join-guard instead — keep optional.
+  # Join stays blocked until Manager Published; then this harvest text (required).
   [[turn.step]]
-  optional = true
   respond = { type = "text", text = "Long stroke publish completed after conflict resume." }
 
 # AgentOwnerRoot Manager (opening is "#" + orch fork prompt). Fork + join; join

@@ -247,10 +247,12 @@ export function assertPublishConflict(workDir, label = 'long-stroke') {
   );
 }
 
-/** §21: successful reconciliation — Orchestrator-tagged Published exactly once. */
+/** §21: successful reconciliation — Orchestrator Published case exactly once. */
 export function assertSuccessfulReconciliation(workDir, label = 'long-stroke') {
-  // Bare "Published" false-matches assignment text in journal lines; pin the case tag.
-  const published = countFactCase(workDir, '"Orchestrator",["Published"');
+  // countFactCase digs to the innermost DU case name (`Published`). Do NOT pass the
+  // waitFact substring `"Orchestrator",["Published"` — that is only for readJournal
+  // line matching; as a case key it never hits factCounts.
+  const published = countFactCase(workDir, 'Published');
   assert.equal(
     published,
     1,

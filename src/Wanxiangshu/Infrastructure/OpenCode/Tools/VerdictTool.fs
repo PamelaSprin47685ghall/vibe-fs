@@ -9,6 +9,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Review
 open Wanxiangshu.Session
 open Wanxiangshu.Tools
 
@@ -16,8 +17,8 @@ open Wanxiangshu.Tools
 /// are explicit witnesses; assistant prose never determines a verdict.
 ///
 /// This module only gathers identities and reports. Every judgement — dedupe,
-/// causal proof, witness construction — belongs to `ReviewController`, which is
-/// the single writer (REVIEW-003/006).
+/// causal proof, witness construction — belongs to `VerdictWorkflow`, the
+/// Application single writer (REVIEW-003/006).
 module VerdictTool =
 
     /// The Manager that owns this reviewer.
@@ -151,7 +152,7 @@ module VerdictTool =
                     // projection. The previous version notified inline and built the
                     // root from this tool's physical user message id — fabricating a
                     // PROMPT-002 identity from a PROMPT-001 one.
-                    match ReviewController.submit journal HostDigest.sha256Hex submission with
+                    match VerdictWorkflow.submit journal HostDigest.sha256Hex submission with
                     | Ok VerdictDecision.ChallengeUnproven ->
                         // submit once more. The tool's `context.ProviderRunId` is the
                         // only reliable binding key — the reconcile `onTurn` run
@@ -181,7 +182,7 @@ module VerdictTool =
                                               bindFailure
                                       ) ]
                         | Ok _ ->
-                            match ReviewController.submit journal HostDigest.sha256Hex submission with
+                            match VerdictWorkflow.submit journal HostDigest.sha256Hex submission with
                             | Error retryError ->
                                 return
                                     ToolHostCodec.tomlObject

@@ -124,11 +124,16 @@ module ProviderRecoveryWorkflow =
                         error
                 with
                 | Error reason -> fail reason
-                | Ok outcome when not (FallbackController.mayContinue outcome) ->
-                    // FALLBACK-005: budget spent, or no proven authority. Either way
-                    // no further automatic physical request may be issued.
-                    fail error
+                // FALLBACK-005: only Exhausted forbids recovery and must kill the Host pending.
+                | Ok(FallbackController.AdvanceOutcome.Exhausted _) -> fail error
+                // ConfirmedFailurePort maps AlreadyRecorded / NoActiveRun → ContinueRecovery.
+                // A second observe of the same APIError must not NotifyTerminal Failed — that
+                // completes Orchestrator AwaitManager while Manager Life still recovers
+                // (long-stroke: LifeCompleted with zero CandidateReady).
+                | Ok(FallbackController.AdvanceOutcome.AlreadyRecorded _)
+                | Ok FallbackController.AdvanceOutcome.NoActiveRun -> ()
                 | Ok _ ->
+                    // Advanced: mayContinue — send A′ continuation.
                     // CTX-006: give the linked Blogger a chance to commit coverage
                     // before the armed A′/B′ continue is planned (XWire.applyTransform).
                     do! awaitRecoveryMaterial timerPort durable turn.SessionId

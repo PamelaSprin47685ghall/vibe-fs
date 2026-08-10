@@ -140,7 +140,6 @@
     <Compile Include="Session/DurableFallback.fs"/>
     <Compile Include="Session/FallbackController.fs"/>
     <Compile Include="Session/ReviewTypes.fs"/>
-    <Compile Include="Session/ReviewController.fs"/>
     <Compile Include="Process/Deadline.fs"/>
     <Compile Include="Process/ProcessRequest.fs"/>
     <Compile Include="Process/LargeGate.fs"/>
@@ -247,6 +246,9 @@
     <Compile Include="Application/Reconciliation/TurnReconcile.fs"/>
     <Compile Include="Application/Reconciliation/Reconciler.fs"/>
     <Compile Include="Application/Reconciliation/ReconcileSupervisor.fs"/>
+    <Compile Include="Application/Review/Ports.fs"/>
+    <Compile Include="Application/Review/VerdictWorkflow.fs"/>
+    <Compile Include="Application/Review/ReviewBarrierWorkflow.fs"/>
     <Compile Include="Application/Review/ReviewerEvidence.fs"/>
     <Compile Include="Application/Review/ReviewerContinuation.fs"/>
     <Compile Include="Application/Review/ReviewerWorkflow.fs"/>
@@ -274,9 +276,7 @@
     <Compile Include="Infrastructure/OpenCode/Orchestration/WorktreeCleanup.fs"/>
     <Compile Include="Infrastructure/OpenCode/Orchestration/Types.fs"/>
     <Compile Include="Infrastructure/OpenCode/Orchestration/SessionDirectories.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Orchestration/ReviewState.fs"/>
     <Compile Include="Infrastructure/OpenCode/Orchestration/JobRecovery.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Orchestration/HostReviewProgram.fs"/>
     <Compile Include="Infrastructure/OpenCode/Orchestration/ReviewRunner.fs"/>
     <Compile Include="Infrastructure/OpenCode/Orchestration/Host.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/ToolHostCodec.fs"/>
