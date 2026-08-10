@@ -5,6 +5,7 @@ open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Review
 open Wanxiangshu.Session
 
 module OrchestratorSessionDirectories =

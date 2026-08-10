@@ -10,6 +10,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Review
 open Wanxiangshu.Session
 open CompanionProjection
 

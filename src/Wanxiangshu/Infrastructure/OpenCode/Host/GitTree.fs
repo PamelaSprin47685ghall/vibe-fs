@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure.Git
+open Wanxiangshu.Review
 open Wanxiangshu.Session
 
 module GitTree =

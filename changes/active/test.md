@@ -1309,11 +1309,11 @@ one tortured real world
 
 ## Remaining work
 
-- [x] **G4R-0 Freeze** — `scripts/checks/g4r-freeze.mjs` wired into `scripts/check.mjs`; case ceiling 31 (只降不升); timeout ceilings; no per-case timeout maps; no top-level E2E entry during freeze; unit `tests/unit/verify/g4r-freeze.test.mjs`
+- [x] **G4R-0 Freeze** — `scripts/checks/g4r-freeze.mjs` wired into `scripts/check.mjs`; case ceiling 0 (只降不升; G4R-4 multi-canary deleted); timeout ceilings; no per-case timeout maps; no top-level E2E entry during freeze; unit `tests/unit/verify/g4r-freeze.test.mjs`
 - [x] **G4R-1 Temporal Kernel** — `tests/unit/temporal/harness.mjs`（VirtualClock / DeterministicCompletion / DeterministicEventQueue / InMemory durable / RecordedProvider / dropEphemeral / runTrace）+ `fallback-aabb-confluence.test.mjs`（12 theorems；production fold/projection）
 - [x] **G4R-2 Race Extraction** — temporal theorems landed: `fallback-aabb-confluence` / `finality-cohort-law` / `manager-unhappy-exactly-once` / `orchestrator-conflict-confluence` (35/35 green under `tests/unit/temporal/`)
 - [x] **G4R-3 The Long Stroke** — green (run11/13): `entry.test.mjs` + orch-shell `long-stroke.toml` + oracles; spawn===1; wall ~5.8s; event ceilings `maxJournalEvents=367` (exact) / `maxSseEvents=1724` (measured SSE max); ProviderRecovery AlreadyRecorded/NoActiveRun no-op; orch.2 harvest; §21 adversity covered
-- [ ] **G4R-4 Delete Old Canary World** — 删除旧 case runner / pool / stagger / per-case watchdog / shuffle/repeat / 大型 TOML choreography；freeze ceiling → 1
+- [x] **G4R-4 Delete Old Canary World** — deleted `tests/e2e/cases/**` (31), `run.mjs` pool/shuffle/repeat, `manifest.mjs`, obsolete scenario TOMLs (kept `long-stroke.toml`); `E2E_CASE_CEILING` 31→0 (0 cases + sole `entry.test.mjs`)
 - [ ] **G4R-5 Time Boundary** — semantic 层清除 raw `Date.now` / `UtcNow` / `setTimeout` / sleep（仅声明的物理 timer adapter 例外）
 - [ ] **G4R-6 10s Gate + VERIFY revise** — VERIFY-001/002/004 改写；obsolete parallel-canary static gates 删除；`npm semantic full < 10s`；Long Stroke `< 6s`；`npm run check` 全绿
 

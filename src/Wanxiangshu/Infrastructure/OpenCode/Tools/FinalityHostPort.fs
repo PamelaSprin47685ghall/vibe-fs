@@ -120,7 +120,7 @@ module FinalityHostPort =
                         "new Promise(function (resolve) { var t = setTimeout(function () { resolve({ tag: 1, fields: ['await reviewer timed out'] }); }, $0); if (t && typeof t.unref === 'function') t.unref(); })"
 
                 return!
-                    emitJsExpr (finished, timedOut) "Promise.race([$0, $1])": Task<Result<unit, string>>
+                    (emitJsExpr (finished, timedOut) "Promise.race([$0, $1])": Task<Result<unit, string>>)
             }
 
         let sendRevisionSteer targetSessionId prompt =

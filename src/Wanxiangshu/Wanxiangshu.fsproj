@@ -138,7 +138,7 @@
     <Compile Include="Session/ForkRecovery.fs"/>
     <Compile Include="Session/ForkRuntime.fs"/>
     <Compile Include="Session/DurableFallback.fs"/>
-    <Compile Include="Session/ReviewTypes.fs"/>
+    <Compile Include="Application/Review/Ports.fs"/>
     <Compile Include="Process/Deadline.fs"/>
     <Compile Include="Process/ProcessRequest.fs"/>
     <Compile Include="Process/LargeGate.fs"/>
@@ -245,7 +245,6 @@
     <Compile Include="Application/Reconciliation/TurnReconcile.fs"/>
     <Compile Include="Application/Reconciliation/Reconciler.fs"/>
     <Compile Include="Application/Reconciliation/ReconcileSupervisor.fs"/>
-    <Compile Include="Application/Review/Ports.fs"/>
     <Compile Include="Application/Review/VerdictWorkflow.fs"/>
     <Compile Include="Application/Review/ReviewBarrierWorkflow.fs"/>
     <Compile Include="Application/Review/ReviewerEvidence.fs"/>

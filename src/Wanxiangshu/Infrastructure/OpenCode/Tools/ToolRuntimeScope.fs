@@ -9,6 +9,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Process
+open Wanxiangshu.Review
 open Wanxiangshu.Session
 
 /// Owns every per-session tool runtime.

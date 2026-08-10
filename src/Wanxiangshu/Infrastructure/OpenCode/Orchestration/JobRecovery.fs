@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
 open Wanxiangshu.Orchestrator
+open Wanxiangshu.Review
 open Wanxiangshu.Session
 
 /// Lazy journal recovery for persisted ManagerJobs.
