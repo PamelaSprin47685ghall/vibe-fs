@@ -10,25 +10,32 @@ open Fable.Core.JsInterop
 type GitRawSyncRunner = string list * byte[] option -> int * byte[] * string
 
 module private ProcessGitTree =
-    let sortEntries (entries: TreeEntry list) : TreeEntry list =
-        entries
-        |> List.map (fun entry ->
-            { entry with
-                Mode = StoreTree.normalizeMode entry.Mode })
-        |> List.sortWith (fun a b ->
-            let key (entry: TreeEntry) =
-                if StoreTree.isTreeMode entry.Mode then
-                    entry.Name + "/"
-                else
-                    entry.Name
-
-            compare (key a) (key b))
+    let sortEntries (entries: TreeEntry list) : TreeEntry list = StoreTree.canonicalOrder entries
 
 /// Production `IGitRawStore` over a real Git object database + refs (§2.3 / §9).
 /// Plumbing only (`hash-object` / `mktree` / `cat-file` / `ls-tree` / `update-ref`).
 /// Never touches HEAD, index, commits, branches, or tags as store history.
+///
+/// ── why this instance memoizes ───────────────────────────────────────────────
+///
+/// Every primitive is one synchronous `git` process (~2.5ms), and a single-event append
+/// measured **24 spawns / ~60ms** against 0.5ms for the identical EventStore logic on the
+/// in-memory raw store. Twelve of those spawns were `ls-tree` of six distinct oids and seven
+/// were `mktree` of trees already written moments earlier: the delta snapshot and the merge
+/// rebuild the same shard path, so the same immutable object was re-read and re-written through
+/// a fresh process each time. Since the spawn is synchronous it blocks the Host event loop, so
+/// per-turn journal appends serialize every session behind them.
+///
+/// Git objects are content-addressed and immutable, which is what makes memoization exact
+/// rather than a heuristic: an oid's bytes cannot change, and `mktree` of the same entry list
+/// cannot yield a different oid. Absence is deliberately NOT cached — an object we have not
+/// written yet may appear later.
 type ProcessGitRawStore(_repoPath: string, run: GitRawSyncRunner) =
     let zeroOid = String('0', 40)
+
+    let objectCache = Collections.Generic.Dictionary<string, byte[]>()
+    let treeCache = Collections.Generic.Dictionary<string, TreeEntry list>()
+    let writtenTreeCache = Collections.Generic.Dictionary<string, GitObjectId>()
 
     let utf8 (bytes: byte[]) = Encoding.UTF8.GetString(bytes)
 
@@ -57,14 +64,29 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawSyncRunner) =
             else
                 Some(GitObjectId.create trimmed)
 
+    /// The ODB directory, resolved once. `--git-path objects` answers correctly for a worktree,
+    /// a bare repo and an alternates-free submodule alike, which is why it is asked rather than
+    /// assembled from `_repoPath`.
+    let objectsDirectory =
+        lazy
+            (let code, stdout, _ = runText [ "rev-parse"; "--git-path"; "objects" ]
+             let trimmed = stdout.Trim()
+
+             if code <> 0 || trimmed = "" then None
+             elif trimmed.StartsWith "/" then Some trimmed
+             else Some(_repoPath + "/" + trimmed))
+
     interface IGitRawStore with
         member _.WriteBlob(content: byte[]) =
-            let code, stdout, stderr = runWithStdin [ "hash-object"; "-w"; "--stdin" ] content
-            ensureOk "hash-object" code stdout stderr
+            match objectsDirectory.Force() with
+            | Some objects -> GitObjectId.create (GitObjectDatabase.writeBlob objects content)
+            | None ->
+                let code, stdout, stderr = runWithStdin [ "hash-object"; "-w"; "--stdin" ] content
+                ensureOk "hash-object" code stdout stderr
 
-            match oidOrNone code stdout with
-            | Some oid -> oid
-            | None -> failwith (sprintf "hash-object returned invalid oid: %s" (stdout.Trim()))
+                match oidOrNone code stdout with
+                | Some oid -> oid
+                | None -> failwith (sprintf "hash-object returned invalid oid: %s" (stdout.Trim()))
 
         member _.WriteTree(entries: TreeEntry list) =
             let sorted = ProcessGitTree.sortEntries entries
@@ -83,59 +105,106 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawSyncRunner) =
                     sprintf "%s %s %s\t%s" mode objectType (GitObjectId.value entry.Oid) entry.Name)
                 |> String.concat "\n"
 
-            let payload = Encoding.UTF8.GetBytes(if lines = "" then "" else lines + "\n")
+            match writtenTreeCache.TryGetValue lines with
+            | true, oid -> oid
+            | _ ->
+                let written =
+                    match objectsDirectory.Force() with
+                    | Some objects -> Some(GitObjectId.create (GitObjectDatabase.writeTree objects sorted))
+                    | None ->
+                        let payload = Encoding.UTF8.GetBytes(if lines = "" then "" else lines + "\n")
+                        let code, stdout, stderr = runWithStdin [ "mktree" ] payload
+                        ensureOk "mktree" code stdout stderr
+                        oidOrNone code stdout
 
-            let code, stdout, stderr = runWithStdin [ "mktree" ] payload
-            ensureOk "mktree" code stdout stderr
-
-            match oidOrNone code stdout with
-            | Some oid -> oid
-            | None -> failwith (sprintf "mktree returned invalid oid: %s" (stdout.Trim()))
+                match written with
+                | Some oid ->
+                    writtenTreeCache.[lines] <- oid
+                    treeCache.[GitObjectId.value oid] <- sorted
+                    oid
+                | None -> failwith "tree write returned an invalid oid"
 
         member _.ReadObject(oid: GitObjectId) =
             let tip = GitObjectId.value oid
-            let typeCode, typeOut, _ = runText [ "cat-file"; "-t"; tip ]
 
-            if typeCode <> 0 then
-                None
-            else
-                match typeOut.Trim() with
-                | "blob"
-                | "tree" as objectType ->
-                    let code, stdoutBytes, _ = run ([ "cat-file"; objectType; tip ], None)
+            match objectCache.TryGetValue tip with
+            | true, bytes -> Some bytes
+            | _ ->
+                let loose =
+                    objectsDirectory.Force()
+                    |> Option.bind (fun objects -> GitObjectDatabase.tryReadObject objects tip)
 
-                    if code <> 0 then None else Some stdoutBytes
-                | _ -> None
+                match loose with
+                | Some bytes ->
+                    objectCache.[tip] <- bytes
+                    Some bytes
+                | None ->
+
+                    // Packed (post-`gc`) or genuinely absent: the CLI is the only pack reader.
+                    let typeCode, typeOut, _ = runText [ "cat-file"; "-t"; tip ]
+
+                    if typeCode <> 0 then
+                        None
+                    else
+                        match typeOut.Trim() with
+                        | "blob"
+                        | "tree" as objectType ->
+                            let code, stdoutBytes, _ = run ([ "cat-file"; objectType; tip ], None)
+
+                            if code <> 0 then
+                                None
+                            else
+                                objectCache.[tip] <- stdoutBytes
+                                Some stdoutBytes
+                        | _ -> None
 
         member _.ReadTree(oid: GitObjectId) =
             let tip = GitObjectId.value oid
-            let code, stdout, _ = runText [ "ls-tree"; "--full-tree"; "-z"; tip ]
 
-            if code <> 0 then
-                None
-            else
-                let entries =
-                    stdout.Split([| '\u0000' |], StringSplitOptions.RemoveEmptyEntries)
-                    |> Array.choose (fun row ->
-                        let tab = row.IndexOf('\t')
+            match treeCache.TryGetValue tip with
+            | true, entries -> Some entries
+            | _ ->
 
-                        if tab < 0 then
-                            None
-                        else
-                            let meta = row.Substring(0, tab)
-                            let name = row.Substring(tab + 1)
-                            let parts = meta.Split([| ' ' |], StringSplitOptions.RemoveEmptyEntries)
+                let loose =
+                    objectsDirectory.Force()
+                    |> Option.bind (fun objects -> GitObjectDatabase.tryReadTree objects tip)
 
-                            match parts with
-                            | [| mode; _objectType; oidText |] when oidText.Length = 40 ->
-                                Some
-                                    { Mode = StoreTree.normalizeMode mode
-                                      Name = name
-                                      Oid = GitObjectId.create oidText }
-                            | _ -> None)
-                    |> Array.toList
+                match loose with
+                | Some entries ->
+                    let sorted = ProcessGitTree.sortEntries entries
+                    treeCache.[tip] <- sorted
+                    Some sorted
+                | None ->
 
-                Some(ProcessGitTree.sortEntries entries)
+                    let code, stdout, _ = runText [ "ls-tree"; "--full-tree"; "-z"; tip ]
+
+                    if code <> 0 then
+                        None
+                    else
+                        let entries =
+                            stdout.Split([| '\u0000' |], StringSplitOptions.RemoveEmptyEntries)
+                            |> Array.choose (fun row ->
+                                let tab = row.IndexOf('\t')
+
+                                if tab < 0 then
+                                    None
+                                else
+                                    let meta = row.Substring(0, tab)
+                                    let name = row.Substring(tab + 1)
+                                    let parts = meta.Split([| ' ' |], StringSplitOptions.RemoveEmptyEntries)
+
+                                    match parts with
+                                    | [| mode; _objectType; oidText |] when oidText.Length = 40 ->
+                                        Some
+                                            { Mode = StoreTree.normalizeMode mode
+                                              Name = name
+                                              Oid = GitObjectId.create oidText }
+                                    | _ -> None)
+                            |> Array.toList
+
+                        let sorted = ProcessGitTree.sortEntries entries
+                        treeCache.[tip] <- sorted
+                        Some sorted
 
         member _.ReadRef(refName: string) =
             let code, stdout, _ = runText [ "rev-parse"; "--verify"; "--quiet"; refName ]

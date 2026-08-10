@@ -84,6 +84,7 @@
     <Compile Include="Infrastructure/Persist/EventStoreMerge.fs"/>
     <Compile Include="Infrastructure/Persist/EventStoreFold.fs"/>
     <Compile Include="Infrastructure/Persist/EventStore.fs"/>
+    <Compile Include="Infrastructure/Persist/GitObjectDatabase.fs"/>
     <Compile Include="Infrastructure/Persist/ProcessGitRawStore.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ManagedAgent.fs"/>
     <Compile Include="Journal/FactCodec.fs"/>

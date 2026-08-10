@@ -58,6 +58,17 @@ const nodeTestSteps = [
     label: 'plugin/file-mutation-tools.test.mjs',
     files: [path.join(here, 'plugin/file-mutation-tools.test.mjs')],
   },
+  // Persist owns the only durable substrate, and these three files were reachable only by
+  // running them by hand — a self-test outside the gate is not a gate. `object-identity` in
+  // particular pins our in-process Git object writer against the real binary.
+  {
+    label: 'persist',
+    files: [
+      path.join(here, 'persist/object-identity.test.mjs'),
+      path.join(here, 'persist/leave-unread.test.mjs'),
+      path.join(here, 'persist/dumb-server.test.mjs'),
+    ],
+  },
 ]
 
 /** Child entrypoints that already own their silence criterion. */

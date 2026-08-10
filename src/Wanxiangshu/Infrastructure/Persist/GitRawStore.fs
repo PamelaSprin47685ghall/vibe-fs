@@ -76,6 +76,24 @@ module StoreTree =
         let m = normalizeMode mode
         m = TreeMode
 
+    /// Git's canonical tree-entry order, which is part of the object format rather than a
+    /// presentation choice: entries sort by name, and a directory sorts as `name + "/"`, so
+    /// `events` precedes `events.meta`. Get this wrong and the tree oid differs from the one
+    /// `git mktree` would produce for the same content.
+    let canonicalOrder (entries: TreeEntry list) : TreeEntry list =
+        entries
+        |> List.map (fun entry ->
+            { entry with
+                Mode = normalizeMode entry.Mode })
+        |> List.sortWith (fun a b ->
+            let key (entry: TreeEntry) =
+                if isTreeMode entry.Mode then
+                    entry.Name + "/"
+                else
+                    entry.Name
+
+            compare (key a) (key b))
+
 /// §7.1: committed payloads/ == ⋃ events.payload_refs (no dangling, no extras).
 [<RequireQualifiedAccess>]
 module PayloadClosure =
