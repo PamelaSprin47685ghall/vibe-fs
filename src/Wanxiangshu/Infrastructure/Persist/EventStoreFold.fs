@@ -17,7 +17,11 @@ module AuthoritativeEventTypes =
               "JobConflictResolved"
               "JournalEnvelope"
               "JsTransactionPrepared"
-              "JsTransactionCommitted" ]
+              "JsTransactionCommitted"
+              "InspectorCaseCaptured"
+              "InspectorCaseRefreshed"
+              "InspectorCaseAccessed"
+              "InspectorCaseEvicted" ]
 
     let isKnown (eventType: string) : bool = builtins.Contains eventType
 
