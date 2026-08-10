@@ -106,6 +106,14 @@ export async function initGitWorkspace(workDir) {
     execSync("git init", { cwd: workDir, stdio: "ignore" });
     execSync("git config user.email test@example.com", { cwd: workDir, stdio: "ignore" });
     execSync("git config user.name test", { cwd: workDir, stdio: "ignore" });
+    // Diagnostic bridge + local runtime dirs must never trip Orchestrator IsDirty.
+    const excludePath = path.join(gitDir, "info", "exclude");
+    fs.mkdirSync(path.dirname(excludePath), { recursive: true });
+    fs.appendFileSync(
+      excludePath,
+      "\n# wanxiangshu e2e / diagnostic non-authoritative paths\n.wanxiangshu/\n",
+      "utf8",
+    );
     // Stage any fixture files already written by setupScenario, then commit.
     // --allow-empty keeps an empty initial commit when the canary has no files.
     execSync("git add -A", { cwd: workDir, stdio: "ignore" });

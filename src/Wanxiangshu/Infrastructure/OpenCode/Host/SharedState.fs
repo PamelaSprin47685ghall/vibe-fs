@@ -12,7 +12,9 @@ open Wanxiangshu.Kernel.Identity
 /// 第二个插件实例），而 fork→verdict 因果链跨越实例边界（主实例的 reverify
 /// fork 的 worktree 子会话由 worktree 实例的工具处理）。这三个集合被这条链的
 /// 两端读写，per-instance 时必然失配——实测 deep-reviewer 的 `VerdictTool`
-/// 读不到主实例注册的 `SessionParents`，REVIEW-008 fail closed 拒绝 verdict。
+/// 读不到主实例注册的 `SessionParents`，REVIEW-008 fail closed 拒绝 verdict；
+/// worktree 上 SetCurrentRequest 的 blogger flight 读不到 root 实例 BlogTool 的
+/// HasFlight，会 AbortSession → Finality journal-work-log hang。
 ///
 /// 每实例独有（不得放进这里）：AgentJournal（独立 runtimeId 文件）、Companions、
 /// OwnedSessions、UserMessageBindings、hook 订阅。
@@ -45,3 +47,17 @@ module SharedState =
     /// manager worktree release at publish.
     // DSL-MUTABLE: resource — process-local root workspace pin for worktree plugin instances
     let mutable RootWorkspace: string option = None
+
+    /// Physical Blogger flight ownership (HasFlight / SetCurrentRequest).
+    ///
+    /// Same cross-instance rule as SessionParents: the worktree plugin materializes
+    /// the companion request (SetCurrentRequest) while the blogger session itself
+    /// lives under RootWorkspace, so BlogTool runs on the root plugin instance.
+    /// Per-instance flights made HasFlight miss → AbortSession → no BlogEntryCommitted
+    /// → Finality hung on journal-work-log (orchestrator-publish frontier).
+    let BloggerFlightGate = obj ()
+    let BloggerFlights = Dictionary<string, BloggerRequestContext>()
+
+    /// Unit-test isolation only: production Dispose must not wipe cross-instance flights.
+    let clearBloggerFlightsForTests () =
+        lock BloggerFlightGate (fun () -> BloggerFlights.Clear())

@@ -47,8 +47,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     // CurrentRequest ownership = physical flight registry (entry = in-flight).
     // PendingOffer = separate dictionary for the next Main material while Parked.
     let pendingOffer = Dictionary<string, BloggerRequestContext>()
-    // DSL-MUTABLE: single-flight — physical Blogger request ownership registry
-    let bloggerFlights = Dictionary<string, BloggerRequestContext>()
+    // Physical Blogger flight ownership lives in SharedState (cross worktree/root).
     // DSL-MUTABLE: single-flight — physical drain-window slot
     let drainWindows = Dictionary<string, DrainWindow>()
 
@@ -249,32 +248,32 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                 // Park cancel/timeout leaves the logical Blogger idle, not disposed.
                 // Seal is durable: park cancel clears flight; the next entry's
                 // durable check re-blocks when still sealed. Drain slot is preserved.
-                bloggerFlights.Remove sessionId |> ignore)
+                lock SharedState.BloggerFlightGate (fun () -> SharedState.BloggerFlights.Remove sessionId |> ignore))
 
         member this.HasParked(sessionId: string) : bool =
             lock parkedGate (fun () -> parked.ContainsKey sessionId)
 
         // Physical flight ownership (PR7 knife 1): entry present = single-flight request.
         member this.HasFlight(sessionId: string) : bool =
-            lock parkedGate (fun () -> bloggerFlights.ContainsKey sessionId)
+            lock SharedState.BloggerFlightGate (fun () -> SharedState.BloggerFlights.ContainsKey sessionId)
 
         member this.TryGetFlight(sessionId: string) : BloggerRequestContext option =
-            lock parkedGate (fun () ->
-                match bloggerFlights.TryGetValue sessionId with
+            lock SharedState.BloggerFlightGate (fun () ->
+                match SharedState.BloggerFlights.TryGetValue sessionId with
                 | true, ctx -> Some ctx
                 | false, _ -> None)
 
         member this.SetCurrentRequest(sessionId: string, context: BloggerRequestContext) : unit =
-            lock parkedGate (fun () -> bloggerFlights.[sessionId] <- context)
+            lock SharedState.BloggerFlightGate (fun () -> SharedState.BloggerFlights.[sessionId] <- context)
 
         member this.TryPeekCurrentRequest(sessionId: string) : BloggerRequestContext option =
-            lock parkedGate (fun () ->
-                match bloggerFlights.TryGetValue sessionId with
+            lock SharedState.BloggerFlightGate (fun () ->
+                match SharedState.BloggerFlights.TryGetValue sessionId with
                 | true, ctx -> Some ctx
                 | false, _ -> None)
 
         member this.ClearCurrentRequest(sessionId: string) : unit =
-            lock parkedGate (fun () -> bloggerFlights.Remove sessionId |> ignore)
+            lock SharedState.BloggerFlightGate (fun () -> SharedState.BloggerFlights.Remove sessionId |> ignore)
 
         member this.SetPendingOffer(sessionId: string, context: BloggerRequestContext) : bool =
             lock parkedGate (fun () ->
@@ -404,9 +403,9 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         for key in cancelKeys do
             (this :> IParkedTransformHost).CancelParked key
 
-            lock parkedGate (fun () ->
-                bloggerFlights.Remove key |> ignore
-                drainWindows.Remove key |> ignore)
+            lock SharedState.BloggerFlightGate (fun () -> SharedState.BloggerFlights.Remove key |> ignore)
+
+            lock parkedGate (fun () -> drainWindows.Remove key |> ignore)
 
             this.AttemptPlans.Keys
             |> Seq.filter (fun planKey -> planKey.StartsWith(key + "\u001f", StringComparison.Ordinal))
@@ -428,7 +427,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
                 parked.Clear()
                 pendingOffer.Clear()
-                bloggerFlights.Clear()
+                // BloggerFlights are SharedState — do not clear on one instance dispose.
                 drainWindows.Clear())
 
             lock toolRuntimeGate (fun () ->

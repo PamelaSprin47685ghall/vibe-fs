@@ -94,8 +94,10 @@ module HostForkRuntimePty =
                         // Agents often omit the trailing Enter; shells then hang waiting
                         // for it. Ensure write ends with LF unless CR/LF is already present.
                         let payload =
-                            if prompt.EndsWith("\n", StringComparison.Ordinal)
-                               || prompt.EndsWith("\r", StringComparison.Ordinal) then
+                            if
+                                prompt.EndsWith("\n", StringComparison.Ordinal)
+                                || prompt.EndsWith("\r", StringComparison.Ordinal)
+                            then
                                 prompt
                             else
                                 prompt + "\n"

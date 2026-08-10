@@ -233,7 +233,28 @@ module FinalityController =
                             | _ -> false)
 
                     if pending then
-                        let! _ = AgentJournal.awaitChangeFrom revision journal
+                        let pendingMembers =
+                            readiness
+                            |> List.choose (fun (memberInfo, state) ->
+                                match state with
+                                | AwaitJournal -> Some("reviewer", SessionId.value memberInfo.ReviewerSessionId)
+                                | _ -> None)
+
+                        let descriptor =
+                            DiagnosticWait.create
+                                "finality-blessing-records"
+                                (CausalOwner.create "FinalityController" [])
+                                pendingMembers
+                                (ExternalProducer("journal-work-log", pendingMembers))
+                                [ WaitEscape.ProcessLifetime; WaitEscape.OpenEndedExternal ]
+                                "FinalityController.awaitBlessingRecords"
+
+                        let! _ =
+                            CausalAwait.awaitTask
+                                CausalWaitHub.observer
+                                descriptor
+                                (AgentJournal.awaitChangeFrom revision journal)
+
                         return! loop ()
                     else
                         let records =
@@ -305,8 +326,24 @@ module FinalityController =
                         return Error "review attempt cancelled"
                     }
 
+                let descriptor =
+                    DiagnosticWait.create
+                        "reviewer-terminal"
+                        (CausalOwner.create "finality-request" [ "reviewer", SessionId.value reviewerSessionId ])
+                        [ "reviewer", SessionId.value reviewerSessionId ]
+                        (WorkflowProducer(
+                            CausalOwner.create "reviewer-workflow" [ "session", SessionId.value reviewerSessionId ]
+                        ))
+                        [ WaitEscape.DeadlineAt(DateTimeOffset.UtcNow.AddMilliseconds(float timeoutMs))
+                          WaitEscape.CancelledBy(CausalOwner.create "finality-cancel" []) ]
+                        "FinalityController.awaitReviewer"
+
                 return!
-                    (emitJsExpr (finished, timedOut, cancelled) "Promise.race([$0, $1, $2])": Task<Result<unit, string>>)
+                    CausalAwait.awaitTask
+                        CausalWaitHub.observer
+                        descriptor
+                        (emitJsExpr (finished, timedOut, cancelled) "Promise.race([$0, $1, $2])"
+                        : Task<Result<unit, string>>)
         }
 
     /// GLORY-058/059: re-read the tree and require byte equality with the

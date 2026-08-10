@@ -2,17 +2,17 @@
   "version": 1,
   "isRoot": true,
   "tools": {
-    "fable": {
-      "version": "5.13.0",
-      "commands": [
-        "fable"
-      ],
-      "rollForward": false
-    },
     "fantomas": {
       "version": "6.3.0",
       "commands": [
         "fantomas"
+      ],
+      "rollForward": false
+    },
+    "fable": {
+      "version": "5.13.0",
+      "commands": [
+        "fable"
       ],
       "rollForward": false
     }

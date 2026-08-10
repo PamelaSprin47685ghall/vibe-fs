@@ -19,6 +19,7 @@
     <Compile Include="Kernel/Parallel.fs"/>
     <Compile Include="Kernel/DomainFlow.fs"/>
     <Compile Include="Kernel/AsyncSupport.fs"/>
+    <Compile Include="Kernel/CausalWait.fs"/>
     <Compile Include="Kernel/Outcome.fs"/>
     <Compile Include="Kernel/Fact.fs"/>
     <Compile Include="Domain/AgentPairCursor.fs"/>
@@ -103,6 +104,9 @@
     <Compile Include="Process/PtyTiming.fs"/>
     <Compile Include="Session/CompletionMailbox.fs"/>
     <Compile Include="Session/JoinInterruptRegistry.fs"/>
+    <Compile Include="Session/CausalWaitBridge.fs"/>
+    <Compile Include="Session/CausalWaitRegistry.fs"/>
+    <Compile Include="Session/CausalAwait.fs"/>
     <Compile Include="Session/ForkRecovery.fs"/>
     <Compile Include="Session/ForkRuntime.fs"/>
     <Compile Include="Session/DurableFallback.fs"/>

@@ -13,6 +13,7 @@ const checks = [
   join(root, 'checks/dsl-ownership.mjs'),
   join(root, 'checks/dsl-ownership-ratchet.mjs'),
   join(root, 'checks/p0-recovery-join.mjs'),
+  join(root, 'checks/causal-wait-boundary.mjs'),
 ]
 
 for (const script of checks) {

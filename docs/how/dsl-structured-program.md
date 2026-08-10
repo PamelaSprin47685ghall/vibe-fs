@@ -9,6 +9,7 @@
 - DSL-005
 - DSL-006
 - DSL-007
+- DSL-012
 
 另见 shape 层所有权条款：DSL-008、DSL-009、DSL-010、DSL-011（定义见 [`../shape/dsl-structured-program.md`](../shape/dsl-structured-program.md)）。本文件不把上述 shape-only 条款伪造成 how 实现算法。
 
@@ -35,6 +36,17 @@
   （family recovery readiness 必须提供真实事件 waiter，如 journal `awaitChangeFrom`
   或 permit pulse，而非每 ≤100ms 重新 `RequireFamilyRecovery`）。
 - SSE 心跳与 reconnect 属 C 类 one-shot silence deadline / 传输退避，经 ITimerPort 注入（生产=nodeTimerPort，测试=virtualTimerPort）；cancel/dispose 后回调零触发。
+
+
+## Causal wait observation（DSL-012）
+
+业务 `await` 经 `CausalAwait.awaitTask`（或等价）进入 process-local registry：
+
+```text
+enter(descriptor) → await underlying Task → resolve|cancel|fail → leave
+```
+
+descriptor 必含 owner / producer / escapes。E2E 通过 `.wanxiangshu/diagnostics/causal-waits.json` 读取 frontier；不得把 snapshot 喂回 PromptDispatcher。
 
 ## Algorithm
 

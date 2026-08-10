@@ -192,7 +192,7 @@ test('HFP_send_pty_write_forwards_write_command', async () => {
   const send = liveCtx.port.calls.find(([name, , tag]) => name === 'handler' && tag === 1)
   assert.equal(send[1], ptyIdValue(id))
   assert.equal(send[2], 1, 'PtyCommand.Write')
-  assert.deepEqual(send[3], [Uint8Array.from([...'echo hi'].map((c) => c.charCodeAt(0)))])
+  assert.deepEqual(send[3], [Uint8Array.from([...'echo hi\n'].map((c) => c.charCodeAt(0)))])
   liveCtx.cleanup()
 })
 

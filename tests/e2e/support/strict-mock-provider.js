@@ -179,7 +179,7 @@ export class StrictMockProvider {
     return this._scenario.unanswered().map((entry) => ({
       id: entry.id,
       lane: `${entry.id}@${entry.lane ?? '(any)'}/${entry.kind}/step-${entry.step}`,
-      blocking: entry.internal !== true,
+      blocking: entry.internal !== true || entry.turnId === 'blogger',
     }));
   }
   get activeRequestCount() { return this._signals.activeRequestCount; }
@@ -356,7 +356,7 @@ export class StrictMockProvider {
     this.onExpectationConsumed?.({
       id: entry.id,
       lane: { scenario: this._scenario.scenario.name, session: entry.lane, role: entry.turnId, requestKind: entry.kind },
-      blocking: entry.internal !== true,
+      blocking: entry.internal !== true || entry.turnId === 'blogger',
       requestKind: entry.kind,
     });
 

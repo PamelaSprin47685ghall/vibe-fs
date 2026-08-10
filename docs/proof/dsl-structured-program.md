@@ -13,6 +13,7 @@
 | `StudentTeacherRuntime.fs` 六 registry | **已人工分类证明（classified）**：`runs` / `teacherOwners` / `teacherCalls` / `teacherCompletions` / `studentFinalCompletions` / `skillMutations` 各为一物理 lifetime/resource mailbox（见下节 manual-proof）；`registry-joint-branch` 只抓同 match 联合 probe，分散 presence 不在 auto 范围、由本 proof 闭合 |
 | `scripts/checks/architecture.mjs` | Domain 向上层依赖、源码根/fsproj 不一致、资源越界读取 |
 | `scripts/checks/spec.mjs` | DSL Clause 重复、悬空或 Change 影子定义 |
+| `scripts/checks/causal-wait-boundary.mjs` | Domain 引用 CausalWait 实现、Application 读 `IWaitSnapshotReader`、Fact/Journal 编码 wait、关键路径裸 `TCS.Task` await、Registry mutable 缺 DSL-MUTABLE |
 
 每项新增静态规则必须有永久 fixture，并曾用故意反例证明仓库入口会失败。
 

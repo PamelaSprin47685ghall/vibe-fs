@@ -36,3 +36,14 @@ Infrastructure 只适配外部协议，不解释业务命令。
 
 测试对 Fable 产物形状的适配只属于 `tests/unit/support/domain.mjs`。
 新增公共契约先在该 facade 开口；不得仅为测试便利新增生产 export。
+
+## 因果 wait 观测边界（落实 DSL-012）
+
+因果 wait observation 属于 Session/Infrastructure 诊断面：
+
+- Domain / Application decision 不得读取 wait snapshot；
+- Journal / Fact codec 不得编码 CausalWait；
+- 静态边界：`scripts/checks/causal-wait-boundary.mjs`。
+
+正式条款定义见 [`what/dsl-structured-program.md`](../what/dsl-structured-program.md)（DSL-012）。
+

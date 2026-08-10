@@ -124,7 +124,8 @@ test('C0_CurrentRequest_and_PendingOffer_are_separate_slots', () => {
   const scope = prodText('src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs')
   assert.equal(/parkedOffer/.test(scope), false, 'parkedOffer single-slot is forbidden')
   assert.match(scope, /pendingOffer/, 'PendingOffer dictionary required')
-  assert.match(scope, /bloggerFlights/, 'physical flight registry required')
+  // Flights are process-shared (HOST-012 / worktree↔root BlogTool) via SharedState.
+  assert.match(scope, /SharedState\.BloggerFlights/, 'physical flight registry is SharedState.BloggerFlights')
   assert.equal(
     /\blet currentRequest\b/.test(scope),
     false,
@@ -138,8 +139,8 @@ test('C0_CurrentRequest_and_PendingOffer_are_separate_slots', () => {
   assert.match(scope, /HasFlight/, 'HasFlight ownership API required')
   assert.match(
     scope,
-    /bloggerFlights\.TryGetValue/,
-    'TryPeekCurrentRequest / TryGetFlight must read bloggerFlights only',
+    /SharedState\.BloggerFlights\.TryGetValue/,
+    'TryPeekCurrentRequest / TryGetFlight must read SharedState.BloggerFlights only',
   )
 })
 

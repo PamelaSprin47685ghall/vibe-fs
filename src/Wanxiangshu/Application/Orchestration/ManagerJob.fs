@@ -1,9 +1,9 @@
 namespace Wanxiangshu.Orchestrator
 
+open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
-open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
@@ -88,7 +88,17 @@ type VerdictMailbox() =
 
         match pending with
         | Choice1Of2() -> Task.FromResult()
-        | Choice2Of2 waiter -> waiter.Task
+        | Choice2Of2 waiter ->
+            let descriptor =
+                DiagnosticWait.create
+                    "manager-job-completion"
+                    (CausalOwner.create "OrchestratorJob" [])
+                    [ "mailbox", "verdict" ]
+                    (WorkflowProducer(CausalOwner.create "ManagerWorkflow" []))
+                    [ WaitEscape.ProcessLifetime ]
+                    "VerdictMailbox.awaitSignal"
+
+            CausalAwait.awaitTask CausalWaitHub.observer descriptor waiter.Task
 
     /// Remove this join's waiter from the queue (interrupt won). Completing alone is not enough:
     /// a completed TCS left in the queue would absorb the next Publish wake.
@@ -159,8 +169,22 @@ type VerdictMailbox() =
             let interruptTask: Task<obj> =
                 emitJsExpr interrupt "$0.then(function (r) { return { kind: 1, reason: r }; })"
 
+            let descriptor =
+                DiagnosticWait.create
+                    "orchestrator-manager-join"
+                    (CausalOwner.create "OrchestratorJob" [])
+                    [ "mailbox", "verdict" ]
+                    (WorkflowProducer(CausalOwner.create "ManagerWorkflow" []))
+                    [ WaitEscape.CancelledBy(CausalOwner.create "orchestrator-join-interrupt" [])
+                      WaitEscape.ProcessLifetime ]
+                    "VerdictMailbox.JoinAvailable"
+
             task {
-                let! winner = emitJsExpr (waitTask, interruptTask) "Promise.race([$0, $1])": Task<obj>
+                let! winner =
+                    CausalAwait.awaitTask
+                        CausalWaitHub.observer
+                        descriptor
+                        (emitJsExpr (waitTask, interruptTask) "Promise.race([$0, $1])": Task<obj>)
 
                 // Always re-drain first (EXEC-018).
                 let after = this.DrainAvailable cap

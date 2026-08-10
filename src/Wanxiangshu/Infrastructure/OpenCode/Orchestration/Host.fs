@@ -175,7 +175,19 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         task {
             let agentId = managerAgentId jobId
 
-            match! awaitChild agentId with
+            let descriptor =
+                DiagnosticWait.create
+                    "manager-job-completion"
+                    (CausalOwner.create "OrchestratorJob" [ "job", ManagerJobId.value jobId ])
+                    [ "job", ManagerJobId.value jobId; "manager_agent", agentId ]
+                    (WorkflowProducer(CausalOwner.create "ManagerWorkflow" [ "agent", agentId ]))
+                    [ WaitEscape.DeadlineAt(
+                          DateTimeOffset.UtcNow.AddMilliseconds(float ExecutorSummarize.AwaitAgentTimeoutMs)
+                      )
+                      WaitEscape.ProcessLifetime ]
+                    "OrchestratorHost.awaitManager"
+
+            match! CausalAwait.awaitTask CausalWaitHub.observer descriptor (awaitChild agentId) with
             | Error error -> return Error error
             | Ok() ->
                 match worktrees.TryGetValue agentId with
@@ -377,7 +389,21 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
                     // Sweep orphaned manager artifacts before resuming jobs, so a
                     // resumed job never adopts a worktree the sweep is about to remove.
-                    match! OrchestratorSweep.sweepLocked sweepLockPath gitPort activeJobs with
+                    let sweepDescriptor =
+                        DiagnosticWait.create
+                            "orchestrator-engine-sweep"
+                            (CausalOwner.create "OrchestratorWorkflow" [ "session", SessionId.value orchestratorId ])
+                            [ "lock", sweepLockPath; "target", TargetRef.value target ]
+                            (ExternalProducer("integration-gate", [ "lock", sweepLockPath ]))
+                            [ WaitEscape.ProcessLifetime ]
+                            "OrchestratorHost.initializeEngine.sweepLocked"
+
+                    match!
+                        CausalAwait.awaitTask
+                            CausalWaitHub.observer
+                            sweepDescriptor
+                            (OrchestratorSweep.sweepLocked sweepLockPath gitPort activeJobs)
+                    with
                     | Error error -> return Error(sprintf "orchestrator cleanup failed: %s" error)
                     | Ok() ->
                         let value =
@@ -420,12 +446,26 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     member _.ForkManagerJob(jobId: ManagerJobId, managerAgent: string, prompt: string) : Task<Result<string, string>> =
         task {
-            match! engine () with
-            | Error reason -> return Error reason
-            | Ok engine ->
-                match! engine.ForkManager(jobId, managerAgent, prompt) with
-                | Error verdict -> return Error(sprintf "%A" verdict)
-                | Ok handle -> return Ok(WorktreePath.value handle.WorktreePath)
+            let descriptor =
+                DiagnosticWait.create
+                    "fork-manager-job"
+                    (CausalOwner.create "OrchestratorWorkflow" [ "session", SessionId.value orchestratorId ])
+                    [ "job", ManagerJobId.value jobId; "manager_agent", managerAgent ]
+                    (ExternalProducer("orchestrator-engine", [ "job", ManagerJobId.value jobId ]))
+                    [ WaitEscape.ProcessLifetime; WaitEscape.SessionLifetime ]
+                    "OrchestratorHost.ForkManagerJob"
+
+            let pending =
+                task {
+                    match! engine () with
+                    | Error reason -> return Error reason
+                    | Ok engine ->
+                        match! engine.ForkManager(jobId, managerAgent, prompt) with
+                        | Error verdict -> return Error(sprintf "%A" verdict)
+                        | Ok handle -> return Ok(WorktreePath.value handle.WorktreePath)
+                }
+
+            return! CausalAwait.awaitTask CausalWaitHub.observer descriptor pending
         }
 
     /// GLORY-068: `fork-manager(existing_job_id, prompt)` — continue the SAME

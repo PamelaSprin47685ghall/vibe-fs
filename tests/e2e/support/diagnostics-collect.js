@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { PROCESS_TREE_TIMEOUT_MS } from './time-budget.js';
+import { collectCausalWaits } from './diagnostics-causal.js';
 
 const TAIL_EVENT_LIMIT = 100;
 const TAIL_NDJSON_LINES = 30;
@@ -43,6 +44,7 @@ export async function gatherDiagnostics(scenario) {
   collectStderrStdout(diag, scenario);
   collectProcessTree(diag, scenario);
   collectWorkspaceFiles(diag, scenario);
+  collectCausalWaits(diag, scenario);
   return diag;
 }
 

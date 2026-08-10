@@ -91,10 +91,25 @@ module JoinTool =
                     // NEVER Cancel mailbox/runtime on user wake (EXEC-017); the attempt's
                     // Wait is the only interrupt channel. Completion still beats interrupt.
                     if scope.IsRole(context, Role.Orchestrator) then
+                        let joinDescriptor =
+                            DiagnosticWait.create
+                                "orchestrator-join"
+                                (CausalOwner.create "OrchestratorWorkflow" [ "session", SessionId.value sessionId ])
+                                [ "session", SessionId.value sessionId; "tool", "join" ]
+                                (WorkflowProducer(CausalOwner.create "ManagerWorkflow" []))
+                                [ WaitEscape.CancelledBy(
+                                      CausalOwner.create "JoinAttempt" [ "session", SessionId.value sessionId ]
+                                  )
+                                  WaitEscape.SessionLifetime ]
+                                "JoinTool.Orchestrator.JoinPublishedAvailable"
+
                         let! outcome =
-                            scope
-                                .OrchestratorHostFor(context.SessionId)
-                                .JoinPublishedAvailable(JoinBatch.Max, attempt.Wait)
+                            CausalAwait.awaitTask
+                                CausalWaitHub.observer
+                                joinDescriptor
+                                (scope
+                                    .OrchestratorHostFor(context.SessionId)
+                                    .JoinPublishedAvailable(JoinBatch.Max, attempt.Wait))
 
                         match outcome with
                         | Error reason ->
@@ -121,7 +136,23 @@ module JoinTool =
                                 else
                                     attempt.Wait
 
-                            let! joined = Join.joinAvailable runtime permit JoinBatch.Max waitTask
+                            let joinDescriptor =
+                                DiagnosticWait.create
+                                    "agent-join"
+                                    (CausalOwner.create "JoinTool" [ "session", SessionId.value sessionId ])
+                                    [ "session", SessionId.value sessionId; "tool", "join" ]
+                                    (ExternalProducer("child-completion", [ "session", SessionId.value sessionId ]))
+                                    [ WaitEscape.CancelledBy(
+                                          CausalOwner.create "JoinAttempt" [ "session", SessionId.value sessionId ]
+                                      )
+                                      WaitEscape.SessionLifetime ]
+                                    "JoinTool.joinAvailable"
+
+                            let! joined =
+                                CausalAwait.awaitTask
+                                    CausalWaitHub.observer
+                                    joinDescriptor
+                                    (Join.joinAvailable runtime permit JoinBatch.Max waitTask)
 
                             match joined with
                             | Ok(Interrupted reason) ->

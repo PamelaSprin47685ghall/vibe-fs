@@ -116,6 +116,7 @@ const [
   BloggerRuntimeModule,
   ParkedTransformModule,
   PluginRuntimeScopeModule,
+  SharedStateModule,
   AgentJournalModule,
   PromptDispatcherModule,
   PromptDispatcherSendModule,
@@ -207,6 +208,7 @@ const [
   prod('Session/BloggerRuntimeState'),
   prod('Session/ParkedTransform'),
   prod('Infrastructure/OpenCode/Host/PluginRuntimeScope'),
+  prod('Infrastructure/OpenCode/Host/SharedState'),
   prod('Journal/AgentJournal'),
   prod('Application/Prompting/PromptDispatcher'),
   prod('Application/Prompting/PromptDispatcherSend'),
@@ -4344,6 +4346,97 @@ export const parallel = {
     listItems(await FlowModule.Parallel_mapBounded(maxConcurrency, cancellation, action, items)),
 }
 
+// ── causal wait diagnostics (DSL-012) ────────────────────────────────────────
+// JoinAttemptRegistry is re-exported as the class from dist; CausalWaitRegistry
+// follows the same shape. Construction helpers absorb Fable list/union spellings.
+
+const CausalWaitModule = await prod('Kernel/CausalWait')
+const CausalWaitRegistryModule = await prod('Session/CausalWaitRegistry')
+const CausalAwaitModule = await prod('Session/CausalAwait')
+
+const buildCausalProducer = unionCase(CausalWaitModule.CausalProducerRef, 'CausalProducerRef')
+const buildWaitEscape = unionCase(CausalWaitModule.WaitEscape, 'WaitEscape')
+
+/** DSL-012 descriptor builders + pure frontier algorithm. */
+export const causalWait = {
+  owner: (kind, identity = []) => CausalWaitModule.CausalOwner_create(kind, toList(identity)),
+  ownerKey: (owner) => CausalWaitModule.CausalOwner_key(owner),
+  workflowProducer: (owner) => buildCausalProducer('WorkflowProducer', [owner]),
+  externalProducer: (kind, identity = []) =>
+    buildCausalProducer('ExternalProducer', [kind, toList(identity)]),
+  producerKey: (producer) => CausalWaitModule.CausalProducer_key(producer),
+  escape: {
+    processLifetime: () => CausalWaitModule.WaitEscape.ProcessLifetime,
+    sessionLifetime: () => CausalWaitModule.WaitEscape.SessionLifetime,
+    openEndedExternal: () => CausalWaitModule.WaitEscape.OpenEndedExternal,
+    cancelledBy: (owner) => buildWaitEscape('CancelledBy', [owner]),
+  },
+  exit: {
+    resolved: () => CausalWaitModule.DiagnosticWaitExit.WaitResolved,
+    failed: () => CausalWaitModule.DiagnosticWaitExit.WaitFailed,
+    cancelled: () => CausalWaitModule.DiagnosticWaitExit.WaitCancelled,
+    timedOut: () => CausalWaitModule.DiagnosticWaitExit.WaitTimedOut,
+    disposed: () => CausalWaitModule.DiagnosticWaitExit.WaitDisposed,
+  },
+  create: ({
+    waitKind,
+    owner,
+    subject = [],
+    producer,
+    escapes = [CausalWaitModule.WaitEscape.OpenEndedExternal],
+    source = 'test',
+  }) =>
+    CausalWaitModule.DiagnosticWaitModule_create(
+      waitKind,
+      owner,
+      toList(subject),
+      producer,
+      toList(escapes),
+      source,
+    ),
+  snapshotOf: ({ active = [], history = [], sequence = 0n } = {}) =>
+    new CausalWaitModule.DiagnosticWaitSnapshot(toList(active), toList(history), sequence),
+  frontiersOf: (snapshot) => listItems(CausalWaitModule.CausalFrontierModule_ofSnapshot(snapshot)),
+}
+
+/** Process-local registry class (mirror of JoinAttemptRegistry dist re-export). */
+export const CausalWaitRegistry = CausalWaitRegistryModule.CausalWaitRegistry
+
+/**
+ * Process-local hub. Application code holds `observer` (Enter only);
+ * diagnostics read via `reader` / `snapshot` / `frontiers`.
+ */
+export const causalWaitHub = {
+  observer: CausalWaitRegistryModule.CausalWaitHub_observer,
+  reader: CausalWaitRegistryModule.CausalWaitHub_reader,
+  snapshot: () => CausalWaitRegistryModule.CausalWaitHub_snapshot(),
+  frontiers: () => listItems(CausalWaitRegistryModule.CausalWaitHub_frontiers()),
+}
+
+/** Bracket helpers: register a diagnostic wait around a real Task. */
+export const causalAwait = {
+  awaitTask: (observer, descriptor, pending) =>
+    CausalAwaitModule.awaitTask(observer, descriptor, pending),
+  awaitUnit: (observer, descriptor, pending) =>
+    CausalAwaitModule.awaitUnit(observer, descriptor, pending),
+  race: (observer, descriptor, primary, escape) =>
+    CausalAwaitModule.race(observer, descriptor, primary, escape),
+}
+
+/**
+ * Pending Fable Task via TaskCompletionSource (same surface as processWait /
+ * join completion tests). `task()` is Promise-shaped under Fable.
+ */
+export const taskSource = () => {
+  const tcs = new FableTask.TaskCompletionSource()
+  return {
+    task: () => tcs.get_Task(),
+    resolve: (value) => tcs.SetResult(value),
+    reject: (error) => tcs.SetException(error),
+    cancel: () => tcs.SetCancelled(),
+  }
+}
+
 /** A `CancellationToken`. `cancelled()` is already-cancelled at construction. */
 export const liveToken = () => new AsyncBuilder.CancellationToken(false)
 export const cancelledToken = () => new AsyncBuilder.CancellationToken(true)
@@ -5015,7 +5108,12 @@ export const parkedTransform = (() => {
     create: (sessionId, lifetimeMs) => entry(new ParkedTransform(sessionId, lifetimeMs)),
     resume: (value) => value.TryResume(),
     cancel: (value) => value.TryCancel(),
-    scope: () => new PluginRuntimeScope(null),
+    scope: () => {
+      // Blogger flights are process-shared (SharedState). Isolate each unit-test
+      // scope so a prior KEY flight does not leak across PluginRuntimeScope instances.
+      SharedStateModule.clearBloggerFlightsForTests()
+      return new PluginRuntimeScope(null)
+    },
     park: (scope, sessionId, lifetimeMs) => scope.ParkTransform(sessionId, lifetimeMs),
     resumeParked: (scope, sessionId) => scope.ResumeParked(sessionId),
     cancelParked: (scope, sessionId) => scope.CancelParked(sessionId),

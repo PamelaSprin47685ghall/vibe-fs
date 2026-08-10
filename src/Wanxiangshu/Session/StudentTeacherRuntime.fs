@@ -49,6 +49,11 @@ type private PendingCompletionText =
     { Text: string
       ToolRun: ProviderRunIdentity }
 
+/// Typed Student–Teacher wait reasons; degraded to DiagnosticWait for observation only.
+type private TeacherWait =
+    | ReturnFromTeacher of student: SessionId * teacher: SessionId
+    | TeacherCompletionTerminal of student: SessionId * teacher: SessionId * toolRun: ProviderRunIdentity
+
 /// Registries after CE collapse / durable-evidence revise:
 /// - `runs` — physical Student lifetime + delivery address
 /// - `teacherCalls` — in-flight teacher call delivery + EXEC-027 single-flight latch
@@ -76,6 +81,37 @@ type StudentTeacherRuntime
     let recoveryBudget = AgentPairCursor.DefaultAutoRecoveryBudget
 
     let sessionKey (sessionId: SessionId) = SessionId.value sessionId
+
+    let describeTeacherWait (wait: TeacherWait) : DiagnosticWait =
+        let toolOwner (student: SessionId) =
+            CausalOwner.create "student-teacher-tool" [ "session", SessionId.value student ]
+
+        let teacherProducer (teacher: SessionId) =
+            WorkflowProducer(CausalOwner.create "teacher-session-workflow" [ "session", SessionId.value teacher ])
+
+        let cancelEscape (student: SessionId) =
+            WaitEscape.CancelledBy(CausalOwner.create "student-session" [ "session", SessionId.value student ])
+
+        match wait with
+        | ReturnFromTeacher(student, teacher) ->
+            DiagnosticWait.create
+                "teacher-return"
+                (toolOwner student)
+                [ "student", SessionId.value student; "teacher", SessionId.value teacher ]
+                (teacherProducer teacher)
+                [ cancelEscape student; WaitEscape.SessionLifetime ]
+                "StudentTeacherRuntime.InvokeTeacher"
+
+        | TeacherCompletionTerminal(student, teacher, toolRun) ->
+            DiagnosticWait.create
+                "teacher-completion"
+                (toolOwner student)
+                [ "student", SessionId.value student
+                  "teacher", SessionId.value teacher
+                  "tool_run", ProviderRunIdentity.value toolRun ]
+                (teacherProducer teacher)
+                [ cancelEscape student; WaitEscape.SessionLifetime ]
+                "StudentTeacherRuntime.InvokeTeacher"
 
     let normalizePayload (text: string) = if isNull text then "" else text.Trim()
 
@@ -439,12 +475,22 @@ type StudentTeacherRuntime
                                 return Error error
                             | Ok _ ->
                                 // CE stack owns the handshake: return payload then fixed completion.
-                                let! returned = call.Returned.Task
+                                let! returned =
+                                    CausalAwait.awaitTask
+                                        CausalWaitHub.observer
+                                        (describeTeacherWait (ReturnFromTeacher(run.SessionId, call.Teacher)))
+                                        call.Returned.Task
 
                                 match returned with
                                 | Error error -> return Error error
                                 | Ok answer ->
-                                    let! confirmed = call.Completion.Task
+                                    let! confirmed =
+                                        CausalAwait.awaitTask
+                                            CausalWaitHub.observer
+                                            (describeTeacherWait (
+                                                TeacherCompletionTerminal(run.SessionId, call.Teacher, answer.ToolRun)
+                                            ))
+                                            call.Completion.Task
 
                                     return
                                         confirmed

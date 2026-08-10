@@ -5,6 +5,7 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Session
 
 /// GLORY-042/043/044: the ONE review program shared by the Orchestrator's
 /// post-rebase barrier and the Manager's Finality workflow. It forks/enlists,
@@ -75,7 +76,31 @@ module HostReviewProgram =
                     // says Revision or Confirmed. It never sends a guard/challenge.
                     let rec awaitWitness () =
                         task {
-                            match! awaitReviewer () with
+                            let descriptor =
+                                DiagnosticWait.create
+                                    "reviewer-terminal"
+                                    (CausalOwner.create
+                                        "HostReviewProgram"
+                                        [ "manager", SessionId.value managerSessionId
+                                          "barrier", ReviewBarrierId.value barrierId ])
+                                    [ "manager", SessionId.value managerSessionId
+                                      "reviewer", SessionId.value reviewerSessionId
+                                      "barrier", ReviewBarrierId.value barrierId ]
+                                    (WorkflowProducer(
+                                        CausalOwner.create
+                                            "ReviewerWorkflow"
+                                            [ "session", SessionId.value reviewerSessionId
+                                              "barrier", ReviewBarrierId.value barrierId ]
+                                    ))
+                                    [ WaitEscape.SessionLifetime
+                                      WaitEscape.CancelledBy(
+                                          CausalOwner.create
+                                              "HostReviewProgram"
+                                              [ "manager", SessionId.value managerSessionId ]
+                                      ) ]
+                                    "HostReviewProgram.awaitWitness"
+
+                            match! CausalAwait.awaitTask CausalWaitHub.observer descriptor (awaitReviewer ()) with
                             | Error error -> return Error(HostReviewFailure.CannotAwaitReviewer error)
                             | Ok() ->
                                 match readOutcome journal managerSessionId barrierId reviewerSessionId tree with

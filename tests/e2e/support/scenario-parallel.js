@@ -12,6 +12,7 @@ import { Watchdog } from './watchdog.js';
 import { journalFactTail, readJournal, watchJournal } from './journal-observer.js';
 import { createNodeDelayPort } from './delay-port.mjs';
 import { WATCHDOG_TIMEOUT_MS, DIAGNOSTIC_RACE_MS } from './time-budget.js';
+import { collectCausalWaits, formatCausalSection } from './diagnostics-causal.js';
 
 const JOURNAL_WAKE_GUARD_MS = 50;
 const delayPort = createNodeDelayPort();
@@ -204,6 +205,15 @@ export async function setupScenarioParallel(opts, tmpDir) {
       timeoutMs: watchdogTimeout,
       label: opts.watchdogLabel || "canary",
       onTimeout: async () => {
+        try {
+          const diag = {};
+          collectCausalWaits(diag, scenario);
+          const lines = formatCausalSection(diag);
+          if (lines.length) console.error(lines.join('\n'));
+          else console.error('════════════ CAUSAL FRONTIER ════════════\n(no causal-waits.json)');
+        } catch (e) {
+          console.error(`CAUSAL FRONTIER unavailable: ${e.message}`);
+        }
         console.error(`── watchdog event tail ──\n${events.dump(20)}`);
         console.error(`── watchdog Host stdout tail ──\n${host.stdoutLog.split('\n').slice(-20).join('\n')}`);
         console.error(`── watchdog Host stderr tail ──\n${host.stderrLog.split('\n').slice(-20).join('\n')}`);

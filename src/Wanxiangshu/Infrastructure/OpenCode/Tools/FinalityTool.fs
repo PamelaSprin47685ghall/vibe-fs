@@ -31,6 +31,36 @@ module FinalityTool =
 
     let private tString = ToolHostCodec.TString
 
+    let private describeFinalityRequest
+        (sid: SessionId)
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        (source: string)
+        : DiagnosticWait =
+        DiagnosticWait.create
+            "finality-request"
+            (CausalOwner.create "ManagerWorkflow" [ "session", SessionId.value sid; "life", ManagerLifeId.value lifeId ])
+            [ "session", SessionId.value sid
+              "life", ManagerLifeId.value lifeId
+              "request", FinalityRequestId.value requestId ]
+            (WorkflowProducer(
+                CausalOwner.create
+                    "FinalityController"
+                    [ "request", FinalityRequestId.value requestId; "session", SessionId.value sid ]
+            ))
+            [ WaitEscape.SessionLifetime
+              WaitEscape.CancelledBy(CausalOwner.create "ManagerWorkflow" [ "session", SessionId.value sid ]) ]
+            source
+
+    let private awaitFinalityStart
+        (sid: SessionId)
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        (source: string)
+        (pending: Task<FinalityController.FinalityOutcome>)
+        : Task<FinalityController.FinalityOutcome> =
+        CausalAwait.awaitTask CausalWaitHub.observer (describeFinalityRequest sid lifeId requestId source) pending
+
     let private treeOf (scope: ToolRuntimeScope) (sessionId: string) =
         match scope.TreePortFor sessionId with
         | None -> None
@@ -299,18 +329,23 @@ module FinalityTool =
                                         // restart lands a terminal fact.
                                         if Map.isEmpty request.Members then
                                             let! outcome =
-                                                FinalityController.start
-                                                    scope
+                                                awaitFinalityStart
                                                     sid
                                                     life.LifeId
                                                     request.RequestId
-                                                    request.GitTreeHash
-                                                    request.LastWordsRef
-                                                    request.LastWordsDigest
-                                                    request.ProviderRun
-                                                    (defaultArg
-                                                        scope.FinalityReviewerTimeoutMs
-                                                        ExecutorSummarize.AwaitAgentTimeoutMs)
+                                                    "FinalityTool.recoverEmptyMembers"
+                                                    (FinalityController.start
+                                                        scope
+                                                        sid
+                                                        life.LifeId
+                                                        request.RequestId
+                                                        request.GitTreeHash
+                                                        request.LastWordsRef
+                                                        request.LastWordsDigest
+                                                        request.ProviderRun
+                                                        (defaultArg
+                                                            scope.FinalityReviewerTimeoutMs
+                                                            ExecutorSummarize.AwaitAgentTimeoutMs))
 
                                             match outcome with
                                             | FinalityController.FinalityOutcome.Rejected prompt
@@ -407,18 +442,23 @@ module FinalityTool =
                                                     |> ignore
 
                                                     let! outcome =
-                                                        FinalityController.start
-                                                            scope
+                                                        awaitFinalityStart
                                                             sid
                                                             life.LifeId
                                                             requestId
-                                                            tree
-                                                            blob.BlobRef
-                                                            blob.BlobDigest
-                                                            context.ProviderRunId.Value
-                                                            (defaultArg
-                                                                scope.FinalityReviewerTimeoutMs
-                                                                ExecutorSummarize.AwaitAgentTimeoutMs)
+                                                            "FinalityTool.acceptSuicide"
+                                                            (FinalityController.start
+                                                                scope
+                                                                sid
+                                                                life.LifeId
+                                                                requestId
+                                                                tree
+                                                                blob.BlobRef
+                                                                blob.BlobDigest
+                                                                context.ProviderRunId.Value
+                                                                (defaultArg
+                                                                    scope.FinalityReviewerTimeoutMs
+                                                                    ExecutorSummarize.AwaitAgentTimeoutMs))
 
                                                     match outcome with
                                                     | FinalityController.FinalityOutcome.Rejected prompt

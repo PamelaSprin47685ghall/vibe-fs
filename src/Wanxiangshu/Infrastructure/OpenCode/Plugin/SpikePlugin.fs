@@ -62,8 +62,12 @@ module SpikePlugin =
                 // instance starts before the manager worktree instances.
                 let workspaceDirectory = PluginHost.workspaceDirectory input
 
+                // Causal wait bridge must stay on the root workspace so E2E
+                // diagnostics (host.workDir) can read active waits. Later worktree
+                // plugin boots must not redirect the process-local hub.
                 if SharedState.RootWorkspace.IsNone then
                     SharedState.RootWorkspace <- workspaceDirectory
+                    CausalWaitHub.setWorkspace workspaceDirectory
 
                 let! wired = HostSignalBootstrap.wire sessionPort eventPort snapshotOpt journal scope input
 

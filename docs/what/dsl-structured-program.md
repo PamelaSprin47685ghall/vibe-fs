@@ -56,6 +56,19 @@ F# 调用栈就是流程栈。禁止把「程序下一步去哪」编码为可�
 
 禁止用 `mutable` 或 `ref` 表达业务阶段、`slotArmed`、行为 bool 等控制流状态；record 的 `Foo: T ref` 与 `mutable Foo: T` 同受 state-product 与 physical-owner proof 约束。
 
+
+## DSL-012：业务异步等待必须具有非权威因果观测
+
+任何跨业务 owner、跨 Host turn、跨 provider attempt 或跨 physical capability 的业务等待，都必须能够生成一个 process-local diagnostic wait observation。
+
+该 observation：
+
+- 可以描述当前 wait、owner、producer、causal identity、cancellation/deadline；
+- **不得**成为决策权威、Journal fact、或 Prompt/decision 输入；
+- Application 不得持有 `IWaitSnapshotReader`；Domain 不得引用 CausalWait 实现。
+
+落点：`CausalWait` / `CausalWaitRegistry` / `CausalAwait`（Session），E2E watchdog 的 `CAUSAL FRONTIER` 一屏展示。
+
 ## 相关条款定义位置
 
 以下条款按 GOV-011 定义于 shape，本表仅为导航，不重复定义。
@@ -69,6 +82,7 @@ F# 调用栈就是流程栈。禁止把「程序下一步去哪」编码为可�
 | DSL-005 | 本文件 |
 | DSL-006 | 本文件 |
 | DSL-007 | 本文件 |
+| DSL-012 | 本文件 |
 | DSL-008 | [`shape/dsl-structured-program.md`](../shape/dsl-structured-program.md)（DSL-008：分层所有权） |
 | DSL-009 | [`shape/dsl-structured-program.md`](../shape/dsl-structured-program.md)（DSL-009：模块与职责） |
 | DSL-010 | [`shape/dsl-structured-program.md`](../shape/dsl-structured-program.md)（DSL-010：Host 边界白名单） |

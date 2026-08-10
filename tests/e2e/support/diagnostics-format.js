@@ -6,6 +6,7 @@
  */
 
 import { DIAG_CONSTANTS } from './diagnostics-collect.js';
+import { formatCausalSection } from './diagnostics-causal.js';
 
 const { MAX_UNEXPECTED_PREVIEW, MAX_WORKSPACE_FILES } = DIAG_CONSTANTS;
 
@@ -126,6 +127,7 @@ export function formatDiagnostics(diag) {
   if (!diag) return 'No diagnostic data available.';
   if (diag.error) return `Diagnostic collection failed: ${diag.error}`;
   return [
+    ...formatCausalSection(diag),
     '══════════════════════ E2E DIAGNOSTICS ══════════════════════',
     ...formatEvents(diag),
     ...formatMockRequests(diag),
