@@ -30,11 +30,7 @@ module ReviewBarrierWorkflow =
         | NeedsReview
         | RevisionRequired
 
-    let private readStatus
-        (journal: AgentJournal option)
-        (reviewerSessionId: SessionId)
-        (tree: GitTreeHash)
-        =
+    let private readStatus (journal: AgentJournal option) (reviewerSessionId: SessionId) (tree: GitTreeHash) =
         let guard =
             journal
             |> Option.bind (fun durable ->
@@ -52,7 +48,10 @@ module ReviewBarrierWorkflow =
                 && value.CurrentBarrierId.IsSome
             then
                 ReviewStatus.RevisionRequired
-            elif ReviewWitness.isPerfectPending value.Witness && value.LastGitTreeHash = Some tree then
+            elif
+                ReviewWitness.isPerfectPending value.Witness
+                && value.LastGitTreeHash = Some tree
+            then
                 ReviewStatus.PendingConfirmation
             else
                 ReviewStatus.NeedsReview
@@ -65,8 +64,7 @@ module ReviewBarrierWorkflow =
         : Result<ReviewBarrierOutcome, ReviewBarrierFailure> =
         match readStatus journal reviewerSessionId tree with
         | ReviewStatus.Confirmed -> Ok(ReviewBarrierOutcome.Confirmed(reviewerSessionId, barrierId, tree))
-        | ReviewStatus.RevisionRequired ->
-            Ok(ReviewBarrierOutcome.RevisionRequired(reviewerSessionId, barrierId, tree))
+        | ReviewStatus.RevisionRequired -> Ok(ReviewBarrierOutcome.RevisionRequired(reviewerSessionId, barrierId, tree))
         | ReviewStatus.PendingConfirmation -> Error ReviewBarrierFailure.ConfirmationUnproven
         | ReviewStatus.NeedsReview -> Error ReviewBarrierFailure.ReviewerProducedNoVerdict
 
@@ -80,7 +78,7 @@ module ReviewBarrierWorkflow =
         (tree: GitTreeHash)
         : Task<Result<ReviewBarrierOutcome, ReviewBarrierFailure>> =
         task {
-            match! host.ForkReviewer () with
+            match! host.ForkReviewer() with
             | Error error -> return Error(ReviewBarrierFailure.CannotCreateReviewer error)
             | Ok reviewerSessionId ->
                 match ReviewBarrier.openBarrier journal managerSessionId reviewerSessionId barrierId tree with
@@ -112,7 +110,7 @@ module ReviewBarrierWorkflow =
                                       ) ]
                                     "ReviewBarrierWorkflow.awaitWitness"
 
-                            match! CausalAwait.awaitTask CausalWaitHub.observer descriptor (host.AwaitReviewer ()) with
+                            match! CausalAwait.awaitTask CausalWaitHub.observer descriptor (host.AwaitReviewer()) with
                             | Error error -> return Error(ReviewBarrierFailure.CannotAwaitReviewer error)
                             | Ok() ->
                                 match readOutcome journal barrierId reviewerSessionId tree with

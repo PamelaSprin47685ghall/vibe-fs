@@ -1279,9 +1279,7 @@ module FinalityController =
                                 cancel.Cancel()
 
                                 match outcome with
-                                | Choice1Of2(Ok(ReviewBarrierOutcome.RevisionRequired(reviewerId,
-                                                                                      barrier,
-                                                                                      _tree)),
+                                | Choice1Of2(Ok(ReviewBarrierOutcome.RevisionRequired(reviewerId, barrier, _tree)),
                                              allResults) ->
                                     // Race allResults alone drops cancelled-but-durable
                                     // siblings (awaitOrCancel Error). Union journal

@@ -527,15 +527,13 @@ type HostForkRuntime
             | PtyItem item -> PtyJoinItem.toRunCompletion item completedAt
 
         task {
-            let deadlineHandle, interrupt: IDeadlineHandle option * Task<JoinInterruptReason> =
+            let deadlineHandle, interrupt =
                 match budgetMs with
                 | Some milliseconds ->
                     let handle = timers.Delay milliseconds
 
                     let arm =
-                        emitJsExpr
-                            handle.Delay
-                            "$0.then(function () { return 'DeadlineExpired'; })"
+                        emitJsExpr handle.Delay "$0.then(function () { return 'DeadlineExpired'; })"
 
                     Some handle, arm
                 | None ->

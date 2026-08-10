@@ -244,7 +244,7 @@ test('LOOP_010_loop_kill_diagnostic_fields_are_whitelisted', () => {
 
   for (const rel of [
     ['Infrastructure', 'OpenCode', 'Host', 'LoopSensor.fs'],
-    ['Application', 'Reconciliation', 'TurnCompletionProgram.fs'],
+    ['Application', 'Recovery', 'ProviderRecoveryWorkflow.fs'],
   ]) {
     const sitePath = path.join(NEXT_DIR, ...rel)
     const siteBody = fs.readFileSync(sitePath, 'utf8')

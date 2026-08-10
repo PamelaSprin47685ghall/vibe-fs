@@ -48,8 +48,7 @@ module OrchestratorHostReview =
                 { ForkReviewer = fun () -> forkReviewer jobId worktree OpeningPrompt
                   AwaitReviewer = fun () -> awaitReviewer jobId }
 
-            let! outcome =
-                ReviewBarrierWorkflow.reverify journal host managerSessionId barrierId tree
+            let! outcome = ReviewBarrierWorkflow.reverify journal host managerSessionId barrierId tree
 
             match outcome with
             | Ok(ReviewBarrierOutcome.Confirmed _) -> return Ok()

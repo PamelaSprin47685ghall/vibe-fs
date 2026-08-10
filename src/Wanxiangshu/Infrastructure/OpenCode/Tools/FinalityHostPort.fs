@@ -32,8 +32,7 @@ module FinalityHostPort =
                         |> Option.iter (fun path -> scope.RegisterDirectory(SessionId.value childId, path))),
                 directoryFor = (fun _ -> scope.DirectoryFor(SessionId.value managerSessionId)),
                 onRunStarted = scope.RunStarted,
-                parentWorkRecordFor =
-                    (fun _ -> XTraceCapture.lifecycleWorkRecord scope.Journal managerSessionId true),
+                parentWorkRecordFor = (fun _ -> XTraceCapture.lifecycleWorkRecord scope.Journal managerSessionId true),
                 childWorkRecordFor = (fun _ -> None),
                 ?sessionSnapshot = scope.Snapshot,
                 managerOpensReviewBarrier = false,
@@ -51,7 +50,11 @@ module FinalityHostPort =
                 match request.ReviewerSessionId with
                 | Some existing ->
                     runtime.AdoptChild(request.AgentId, existing)
-                    return Ok { ReviewerSessionId = existing; IsNew = false }
+
+                    return
+                        Ok
+                            { ReviewerSessionId = existing
+                              IsNew = false }
                 | None ->
                     match!
                         runtime.Fork(
@@ -68,7 +71,11 @@ module FinalityHostPort =
                     | Ok _ ->
                         match runtime.TryChildSession request.AgentId with
                         | None -> return Error "reviewer session was not created"
-                        | Some childId -> return Ok { ReviewerSessionId = childId; IsNew = true }
+                        | Some childId ->
+                            return
+                                Ok
+                                    { ReviewerSessionId = childId
+                                      IsNew = true }
             }
 
         let startReview (memberInfo: EnlistedMember) =
@@ -119,8 +126,7 @@ module FinalityHostPort =
                         reviewerTimeoutMs
                         "new Promise(function (resolve) { var t = setTimeout(function () { resolve({ tag: 1, fields: ['await reviewer timed out'] }); }, $0); if (t && typeof t.unref === 'function') t.unref(); })"
 
-                return!
-                    (emitJsExpr (finished, timedOut) "Promise.race([$0, $1])": Task<Result<unit, string>>)
+                return! (emitJsExpr (finished, timedOut) "Promise.race([$0, $1])": Task<Result<unit, string>>)
             }
 
         let sendRevisionSteer targetSessionId prompt =

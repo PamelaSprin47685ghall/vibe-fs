@@ -11,17 +11,11 @@ module FallbackEvidence =
         AgentProjection.tryFind sessionId projection.AgentProjections
         |> Option.bind (fun session -> session.Fallback)
 
-    let currentCursor
-        (sessionId: SessionId)
-        (projection: ProjectionSet)
-        : AgentPairCursor.FallbackCursor option =
+    let currentCursor (sessionId: SessionId) (projection: ProjectionSet) : AgentPairCursor.FallbackCursor option =
         tryCurrentState sessionId projection
         |> Option.map (fun fallback -> fallback.Cursor)
 
-    let currentSide
-        (sessionId: SessionId)
-        (projection: ProjectionSet)
-        : AgentPairCursor.ModelSide option =
+    let currentSide (sessionId: SessionId) (projection: ProjectionSet) : AgentPairCursor.ModelSide option =
         currentCursor sessionId projection
         |> Option.map (fun cursor -> AgentPairCursor.side cursor.Offset)
 

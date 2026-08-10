@@ -10,10 +10,7 @@ open Wanxiangshu.Kernel.Identity
 /// Manager Finality story: enlist cohort → review → reject+steer OR bless.
 module FinalityWorkflow =
 
-    let private undecidedMember
-        (managerSessionId: SessionId)
-        (request: FinalityRequestProjection)
-        =
+    let private undecidedMember (managerSessionId: SessionId) (request: FinalityRequestProjection) =
         request.Members
         |> Map.toList
         |> List.tryHead
@@ -76,7 +73,9 @@ module FinalityWorkflow =
 
                     match lifeOpt, requestOpt with
                     | Some life, Some request ->
-                        match! CohortWorkflow.enlistRequiredReviewers reviewerPort durable managerSessionId life request with
+                        match!
+                            CohortWorkflow.enlistRequiredReviewers reviewerPort durable managerSessionId life request
+                        with
                         | Error _ ->
                             let reviewer, barrier = undecidedMember managerSessionId request
 
@@ -104,7 +103,8 @@ module FinalityWorkflow =
                                 let siblings =
                                     match RevisionWorkflow.tryActiveFinality before managerSessionId requestId with
                                     | Some activeRequest ->
-                                        RevisionWorkflow.durableRevisionSiblings before activeRequest reviewerId @ fromRace
+                                        RevisionWorkflow.durableRevisionSiblings before activeRequest reviewerId
+                                        @ fromRace
                                         |> List.distinctBy fst
                                     | None -> fromRace
 
@@ -159,5 +159,4 @@ module FinalityWorkflow =
         : Task<FinalityOutcome option> =
         match journal with
         | None -> Task.FromResult None
-        | Some durable ->
-            RevisionWorkflow.resumeRejectedRequest reviewerPort durable managerSessionId lifeId requestId
+        | Some durable -> RevisionWorkflow.resumeRejectedRequest reviewerPort durable managerSessionId lifeId requestId

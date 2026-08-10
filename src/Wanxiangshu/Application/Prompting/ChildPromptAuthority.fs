@@ -11,10 +11,7 @@ module ChildPromptAuthority =
 
     /// Register AgentOwnerRoot authority for one proven linked child, idempotently.
     /// The durable handle is the only source of TargetAgent; no role-to-agent rebuild.
-    let ensureForLinkedChild
-        (journal: AgentJournal option)
-        (turn: ReconciledTurn)
-        : Result<unit, string> =
+    let ensureForLinkedChild (journal: AgentJournal option) (turn: ReconciledTurn) : Result<unit, string> =
         match journal with
         | None -> Ok()
         | Some durable ->

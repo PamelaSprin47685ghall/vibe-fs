@@ -2772,11 +2772,18 @@ which event arrived first
 
 ## Remaining work
 
-- [x] **S0 Formal docs + RED** — DSL-013/014/015 in what/shape/how/proof; flow docs demote Evidence→Decision; `scripts/checks/g4r-ce-vocabulary.mjs` soft phase + `tests/unit/verify/g4r-ce-vocabulary.test.mjs` (10/10)
-- [x] **S1 Temporal capability** — Kernel/Temporal.fs + PtyTiming adapters; CausalAwait.untilSignalOrDeadline + 4 theorems (`tests/unit/temporal/until-signal-or-deadline.test.mjs`); awaitCoverageBeforeRetry rewrite deferred to S2 ProviderRecovery
-- [ ] **S2 TurnCompletion split/delete** — TurnWorkflow / OrdinaryTurn / InteractionRepair / ProviderRecovery / TerminalReporter
-- [ ] **S3–S11** — Reconciler / Manager / Reviewer / Finality / Fallback / FamilyRecovery / Host collapse（按 proposal landing 顺序）
-- [ ] **S12–S14** — temporal proof migration；Long Stroke vocabulary narrative；static ratchet + <10s gate
+- [x] **S0 Formal docs + RED** — DSL-013/014/015 in what/shape/how/proof; flow docs demote Evidence→Decision; `scripts/checks/g4r-ce-vocabulary.mjs` soft phase + detector proof already landed before this continuation.
+- [x] **S1 Temporal capability foundation** — Kernel temporal capability / CausalAwait foundation already present before this continuation. Further time/raw-clock cleanup is now owned by the concurrent time agent; this worker will not touch that surface again.
+- [x] **S2 TurnCompletion split/delete (production graph)** — `TurnWorkflow` / `OrdinaryTurnWorkflow` / `InteractionRepairWorkflow` / `ProviderRecoveryWorkflow` / `TerminalReporter` own the story; `TurnCompletionProgram.fs` is absent.
+- [x] **S3 Reconciler boundary** — `ReconcileDecision = Reread | Publish | StopPass`; no repair-effect decision remains in ReconcileProgram.
+- [x] **S4 Manager Vocabulary** — activation/background/idle/job-handoff split; handled-bool removed; open-Finality interpretation lives in `ManagerFinality`; durable Life transitions moved to `ManagerLifeWorkflow`.
+- [x] **S5–S7 Review ownership** — `ReviewerEvidence` / `ReviewerContinuation` / `VerdictWorkflow` / `ReviewBarrierWorkflow`; Application Review consumes typed continuation ports instead of `HostReviewGuard`; old Review controller/program entries removed from fsproj.
+- [x] **Finality ownership migration** — Application `RecordWorkflow` / `CohortWorkflow` / `RevisionWorkflow` / `BlessingWorkflow` / `FinalityWorkflow`; Infrastructure `FinalityHostPort` is physical adapter; `FinalityTool` no longer writes/interprets Manager lifecycle facts; old `FinalityController` removed from fsproj.
+- [x] **Fallback / FamilyRecovery ownership** — `FallbackEvidence` + `FallbackLedger` are Application owners; Session only sees `ConfirmedFailurePort`; `FamilyRecoveryCoordinator` owns physical single-flight; `SessionRecovery.combine` owns merge algebra.
+- [x] **Orchestrator / Host composition** — `publishEventually` / `resumeFromDurableFacts`; Host turn path has one Application entry (`TurnWorkflow.observe`); `TurnRuntimePreparation` is physical cleanup only; linked-child authority moved to `Application/Prompting/ChildPromptAuthority`.
+- [ ] **Time / §24.2** — explicitly handed to the concurrent time agent per user instruction; avoid overlapping edits.
+- [ ] **S12–S14 proof / Long Stroke / final ratchet** — coordinated with `changes/active/test.md`; this worker does not touch its tests/e2e/proof migration and did not run tests/build/compile.
+- [ ] **Physical obsolete-file deletion** — three obsolete source files remain physically present but are outside the production compile graph; see Blockers.
 
 ## Completion criteria
 
@@ -2784,4 +2791,9 @@ which event arrived first
 
 ## Blockers
 
-（无）
+- **Physical deletion tool gap**: Devspace exposes no delete-file action, and its shell contract explicitly forbids modifying project files through bash. Therefore the following obsolete files cannot be physically removed by this worker even though all production callers and fsproj entries have been removed:
+  - `Infrastructure/OpenCode/Tools/FinalityController.fs`
+  - `Session/ReviewController.fs`
+  - `Infrastructure/OpenCode/Orchestration/HostReviewProgram.fs`
+- The rabbit hard static scan was reduced to exactly those three obsolete-path hits before time work was handed to the concurrent agent; raw-time cleanup is no longer owned by this worker.
+- Per user instruction, no git operation, build, compile, or test execution is performed by this worker.

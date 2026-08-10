@@ -117,11 +117,7 @@ module RevisionWorkflow =
 
         loop ()
 
-    let tryActiveFinality
-        (snapshot: ProjectionSet)
-        (managerSessionId: SessionId)
-        (requestId: FinalityRequestId)
-        =
+    let tryActiveFinality (snapshot: ProjectionSet) (managerSessionId: SessionId) (requestId: FinalityRequestId) =
         AgentProjection.tryFind managerSessionId snapshot.AgentProjections
         |> Option.bind (fun session -> session.ManagerLife)
         |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
@@ -207,14 +203,7 @@ module RevisionWorkflow =
             match! awaitDurableSiblingRecords journal siblings with
             | Error _ ->
                 return!
-                    concludeUndecided
-                        journal
-                        managerSessionId
-                        lifeId
-                        requestId
-                        requestTree
-                        rejectingReviewer
-                        barrierId
+                    concludeUndecided journal managerSessionId lifeId requestId requestTree rejectingReviewer barrierId
             | Ok records ->
                 match! stagePrimaryRejectionRecord journal rejectingReviewer barrierId with
                 | Error _ ->
@@ -276,14 +265,7 @@ module RevisionWorkflow =
                     match journal.Writer.BlobWriter.Read evidence.WorkRecordRef with
                     | Ok workRecord -> Some workRecord
                     | Error _ ->
-                        match
-                            RecordWorkflow.readiness
-                                journal
-                                snapshot
-                                reviewerSessionId
-                                evidence.BarrierId
-                                true
-                        with
+                        match RecordWorkflow.readiness journal snapshot reviewerSessionId evidence.BarrierId true with
                         | RecordReadiness.Ready record -> Some record
                         | _ -> None
 

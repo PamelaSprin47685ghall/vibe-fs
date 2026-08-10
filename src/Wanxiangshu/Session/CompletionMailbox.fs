@@ -78,8 +78,7 @@ module JoinInterrupt =
 /// Agent channel: wake-only (HandleMayHaveChanged) — Journal is agent fact source.
 /// PTY channel: physical PtyJoinItem queue — backend onExit sole writer (EXEC-015).
 /// Join budget uses injected ITimerPort + IClockPort + Deadline.nextWaitMs (G4R-CE).
-type CompletionMailbox
-    (gate: obj, hasActive: unit -> bool, ?timerPort: ITimerPort, ?clockPort: IClockPort) =
+type CompletionMailbox(gate: obj, hasActive: unit -> bool, ?timerPort: ITimerPort, ?clockPort: IClockPort) =
     let timers = defaultArg timerPort (PtyTiming.nodeTimerPort ())
     let clock = defaultArg clockPort (PtyTiming.nodeClockPort ())
     let agentWakes = Queue<AgentHandleId>()
@@ -220,9 +219,7 @@ type CompletionMailbox
                             let handle = timers.Delay waitMs
 
                             let interrupt: Task<JoinInterruptReason> =
-                                emitJsExpr
-                                    handle.Delay
-                                    "$0.then(function () { return 'DeadlineExpired'; })"
+                                emitJsExpr handle.Delay "$0.then(function () { return 'DeadlineExpired'; })"
 
                             let! reason = this.WaitForSignal interrupt
                             // Wake won or interrupt settled — Cancel drops the Node timer.

@@ -10,11 +10,7 @@ open Wanxiangshu.Kernel.Identity
 /// All-confirmed convergence: canonical records + stable tree → blessing.
 module BlessingWorkflow =
 
-    let private treeUnchanged
-        (treePort: FinalityTreePort)
-        (managerSessionId: SessionId)
-        (expected: GitTreeHash)
-        =
+    let private treeUnchanged (treePort: FinalityTreePort) (managerSessionId: SessionId) (expected: GitTreeHash) =
         match treePort.ReadManagerTree managerSessionId with
         | Ok current -> current = expected
         | Error _ -> false
@@ -72,6 +68,8 @@ module BlessingWorkflow =
                                    WorkRecordBundleRef = blob.BlobRef
                                    WorkRecordBundleDigest = blob.BlobDigest |})
 
-                        members |> List.iter (fun memberInfo -> reviewerPort.AbortReviewer memberInfo.ReviewerSessionId)
+                        members
+                        |> List.iter (fun memberInfo -> reviewerPort.AbortReviewer memberInfo.ReviewerSessionId)
+
                         return FinalityOutcome.Blessed(FinalityPrompt.blessedFromLogs logs)
         }

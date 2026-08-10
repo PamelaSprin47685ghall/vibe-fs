@@ -36,31 +36,16 @@ module OrdinaryTurnWorkflow =
 
         match turn.Observation with
         | Some ReconcileProgram.TurnUnknown ->
-            InteractionRepairWorkflow.repairMissingFinalReport
-                quiescence
-                context
-                sessionPort
-                eventPort
-                journal
+            InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
         | None ->
             match turn.Outcome with
             | ReconcileProgram.TurnInProgress ->
-                InteractionRepairWorkflow.repairIncompleteInteraction
-                    quiescence
-                    context
-                    sessionPort
-                    eventPort
-                    journal
+                InteractionRepairWorkflow.repairIncompleteInteraction quiescence context sessionPort eventPort journal
             | ReconcileProgram.TurnNeedsContinuation _ ->
                 // Absorb text and reasoning into the XTrace even though this turn is
                 // not completable, then ask for the missing report. Still not fallback.
                 // (The XTrace parts are captured at the transform boundary.)
-                InteractionRepairWorkflow.repairMissingFinalReport
-                    quiescence
-                    context
-                    sessionPort
-                    eventPort
-                    journal
+                InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
             | ReconcileProgram.TurnAborted reason ->
                 // LOOP-006: our own kill is bridged into the provider-failure AABB path.
                 // User / cleanup aborts still report Aborted and do not advance the cursor.
@@ -72,12 +57,7 @@ module OrdinaryTurnWorkflow =
                     | _ -> false
 
                 if loopKill then
-                    ProviderRecoveryWorkflow.continueAfterLoopKill
-                        timerPort
-                        sessionPort
-                        eventPort
-                        journal
-                        turn
+                    ProviderRecoveryWorkflow.continueAfterLoopKill timerPort sessionPort eventPort journal turn
                 else
                     abortedSessions.Add sessionKey |> ignore
                     abortParent sessionKey

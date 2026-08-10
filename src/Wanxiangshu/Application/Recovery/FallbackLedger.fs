@@ -51,11 +51,9 @@ module FallbackLedger =
                     current
             with
             | Error FallbackAdvanceRejection.AlreadyObserved
-            | Error FallbackAdvanceRejection.AlreadyExhausted ->
-                Ok ConfirmedFailureOutcome.AlreadyRecorded
+            | Error FallbackAdvanceRejection.AlreadyExhausted -> Ok ConfirmedFailureOutcome.AlreadyRecorded
             | Error FallbackAdvanceRejection.DifferentRun
-            | Error FallbackAdvanceRejection.NoCursor ->
-                Ok ConfirmedFailureOutcome.NoActiveRun
+            | Error FallbackAdvanceRejection.NoCursor -> Ok ConfirmedFailureOutcome.NoActiveRun
             | Error FallbackAdvanceRejection.InvalidTransition ->
                 Error "Fallback advance violates FALLBACK-007 (offset or count is not the successor)"
             | Error(FallbackAdvanceRejection.InvalidFallbackOffset decodeError) ->

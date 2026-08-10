@@ -147,10 +147,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             | None ->
                 return FamilyRecovery.FamilyBlocked(NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root))
             | Some ports ->
-                return!
-                    FamilyRecoveryCoordinator.runOnce
-                        (SessionRecoveryWorkflow.recoverFamilyDirect ports)
-                        root
+                return! FamilyRecoveryCoordinator.runOnce (SessionRecoveryWorkflow.recoverFamilyDirect ports) root
         }
 
     /// Await family recovery before business effects. Returns FamilyRecovery so

@@ -6,9 +6,7 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Finality
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
-open Fable.Core.JsInterop
 open Wanxiangshu.Session
 open Wanxiangshu.Tools
 
@@ -16,10 +14,10 @@ open Wanxiangshu.Tools
 ///
 /// The tool is deliberately opaque to the Manager: the description never
 /// mentions review, the reviewer, PERFECT, or the barrier (SURFACE-005). A
-/// legal call is accepted in GLORY-040 order — validate, read tree, write
-/// last_words blob, append `FinalityRequested`, park the Manager completion,
-/// enter Application `FinalityWorkflow`. Every precondition failure
-/// returns a narrative refusal and never writes `FinalityRequested`
+/// legal call validates the immediate contract, persists submitted last_words,
+/// builds Host ports, and enters Application `FinalityWorkflow`; Application owns
+/// `FinalityRequested` and every later lifecycle fact. Every precondition failure
+/// returns a narrative refusal before a new Finality request is admitted
 /// (GLORY-038/039).
 module FinalityTool =
 
@@ -112,8 +110,7 @@ module FinalityTool =
             let providerRun = context.ProviderRunId.Value
 
             match ManagerLifeWorkflow.completeBlessedLife journal sid life blessing lastWords providerRun with
-            | Error _ ->
-                return ToolHostCodec.tomlObjectWithInstructions [ "Continue working and try again later." ] []
+            | Error _ -> return ToolHostCodec.tomlObjectWithInstructions [ "Continue working and try again later." ] []
             | Ok BlessedLifeCompletion.AlreadyCompleted ->
                 return ToolHostCodec.tomlObjectWithInstructions RestInPeaceInstructions []
             | Ok(BlessedLifeCompletion.Completed authorityRoot) ->
@@ -259,8 +256,7 @@ module FinalityTool =
                                                 [ "Call join before seeking your end." ]
                                                 []
                                     else
-                                        return!
-                                            completeBlessedLife scope journal context sid life blessing lastWords
+                                        return! completeBlessedLife scope journal context sid life blessing lastWords
 
                                 | ManagerFinality.EndingDisposition.BeginFinality ->
                                     if String.IsNullOrWhiteSpace lastWords then
@@ -293,8 +289,7 @@ module FinalityTool =
                                                         [ "Continue working and seek your end again when you are ready." ]
                                                         []
                                             | Ok blob ->
-                                                let requestId =
-                                                    FinalityRequestId.create (Guid.NewGuid().ToString("N"))
+                                                let requestId = FinalityRequestId.create (Guid.NewGuid().ToString("N"))
 
                                                 let reviewerPort, treePort = finalityPorts scope sid
 

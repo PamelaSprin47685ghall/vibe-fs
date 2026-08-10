@@ -81,9 +81,7 @@ module ReviewerWorkflow =
         (outcome: Result<unit, string>)
         =
         match outcome with
-        | Error reason ->
-            eventPort.NotifyTerminal sessionId (TerminalOutcome.Failed reason)
-            |> ignore
+        | Error reason -> eventPort.NotifyTerminal sessionId (TerminalOutcome.Failed reason) |> ignore
         | Ok() -> ()
 
     /// The single writer deciding what a reconciled reviewer turn needs.

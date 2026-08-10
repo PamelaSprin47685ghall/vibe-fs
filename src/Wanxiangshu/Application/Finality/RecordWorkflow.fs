@@ -44,7 +44,9 @@ module RecordWorkflow =
     let private hasRenderedWorkLog (record: string) =
         let marker = "Work log\n"
         let start = record.IndexOf(marker, StringComparison.Ordinal)
-        start >= 0 && not (String.IsNullOrWhiteSpace(record.Substring(start + marker.Length)))
+
+        start >= 0
+        && not (String.IsNullOrWhiteSpace(record.Substring(start + marker.Length)))
 
     let private materialize
         (journal: AgentJournal)
@@ -144,8 +146,7 @@ module RecordWorkflow =
                 let states =
                     ordered
                     |> List.map (fun memberInfo ->
-                        memberInfo,
-                        readiness journal snapshot memberInfo.ReviewerSessionId memberInfo.BarrierId false)
+                        memberInfo, readiness journal snapshot memberInfo.ReviewerSessionId memberInfo.BarrierId false)
 
                 match
                     states
@@ -155,10 +156,7 @@ module RecordWorkflow =
                         | _ -> None)
                 with
                 | Some reason -> return Error reason
-                | None when
-                    states
-                    |> List.exists (fun (_, state) -> state = RecordReadiness.AwaitJournal)
-                    ->
+                | None when states |> List.exists (fun (_, state) -> state = RecordReadiness.AwaitJournal) ->
                     let descriptor =
                         DiagnosticWait.create
                             "finality-blessing-records"
@@ -174,7 +172,10 @@ module RecordWorkflow =
                             "RecordWorkflow.awaitCanonicalCohortRecords"
 
                     let! _ =
-                        CausalAwait.awaitTask CausalWaitHub.observer descriptor (AgentJournal.awaitChangeFrom revision journal)
+                        CausalAwait.awaitTask
+                            CausalWaitHub.observer
+                            descriptor
+                            (AgentJournal.awaitChangeFrom revision journal)
 
                     return! loop ()
                 | None ->

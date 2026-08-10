@@ -103,22 +103,20 @@ module CausalAwait =
                         let taggedSignal: Task<obj> =
                             task {
                                 do! awaitSignal ()
-                                return box (Choice1Of2 ())
+                                return box (Choice1Of2())
                             }
 
                         let taggedDeadline: Task<obj> =
                             task {
                                 do! deadline.Delay
-                                return box (Choice2Of2 ())
+                                return box (Choice2Of2())
                             }
 
-                        let! winnerObj =
-                            emitJsExpr (taggedSignal, taggedDeadline) "Promise.race([$0, $1])"
-                            : Task<obj>
+                        let! winnerObj = emitJsExpr (taggedSignal, taggedDeadline) "Promise.race([$0, $1])": Task<obj>
 
                         match unbox<Choice<unit, unit>> winnerObj with
-                        | Choice1Of2 () -> return! loop ()
-                        | Choice2Of2 () ->
+                        | Choice1Of2() -> return! loop ()
+                        | Choice2Of2() ->
                             lease.MarkExit DiagnosticWaitExit.WaitTimedOut
                             return Error DiagnosticWaitExit.WaitTimedOut
                 }

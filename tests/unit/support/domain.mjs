@@ -215,7 +215,7 @@ const [
   prod('Infrastructure/OpenCode/Codec/LoopEventCodec'),
   prod('Infrastructure/OpenCode/Host/LoopSensor'),
   prod('Domain/RuntimeNudge'),
-  Promise.resolve({}), // Session/FallbackController removed from fsproj; keep slot alignment
+  prod('Application/Recovery/FallbackLedger'),
   prod('Session/HandleController'),
   prod('Session/HandleCompletionCodec'),
   prod('Session/JoinDrain'),
@@ -4936,8 +4936,7 @@ export const runtimeNudge = (() => {
 })()
 
 export const fallbackController = (() => {
-  const recordConfirmedFailure = member(FallbackControllerModule, 'FallbackController', 'recordConfirmedFailure')
-  const mayContinue = member(FallbackControllerModule, 'FallbackController', 'mayContinue')
+  const recordConfirmedFailure = member(FallbackControllerModule, 'FallbackLedger', 'recordConfirmedFailure')
 
   return {
     /**
@@ -4949,9 +4948,18 @@ export const fallbackController = (() => {
         recordConfirmedFailure(journal, budget, sessionId(session), providerRun(run), reason),
       )
       if (!result.ok) return result
-      return { ok: true, outcome: caseOf(result.value) }
+      let outcome = caseOf(result.value)
+      if (outcome === 'RecoveryAdvanced') outcome = 'Advanced'
+      else if (outcome === 'RecoveryExhausted') outcome = 'Exhausted'
+      return { ok: true, outcome }
     },
-    mayContinue: (outcomeUnion) => Boolean(mayContinue(outcomeUnion)),
+    mayContinue: (outcomeUnion) => {
+      if (typeof outcomeUnion === 'string') {
+        return outcomeUnion === 'Advanced' || outcomeUnion === 'RecoveryAdvanced' || outcomeUnion === 'AlreadyRecorded' || outcomeUnion === 'NoActiveRun'
+      }
+      const tag = outcomeUnion?.tag ?? 0
+      return tag === 0 || tag === 2 || tag === 3
+    },
   }
 })()
 

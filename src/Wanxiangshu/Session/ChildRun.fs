@@ -161,7 +161,7 @@ module ChildRunProgram =
                     match identityResult with
                     | Ok true ->
                         let! outcome = work ct
-                        return Ok(ChildRun.makeCompleted run outcome (now()))
+                        return Ok(ChildRun.makeCompleted run outcome (now ()))
                     | _ -> return Error(AgentError.InvalidFork "Child run identity does not match managed agent")
                 with
                 | :? OperationCanceledException -> return Error AgentError.ParentCancelled

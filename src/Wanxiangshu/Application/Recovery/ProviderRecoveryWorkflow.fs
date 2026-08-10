@@ -39,11 +39,7 @@ module ProviderRecoveryWorkflow =
     /// Wait on journal folds until coverage exists or the injectable deadline
     /// fires. Fail open: WaitTimedOut still sends the ordinary main
     /// (CTX-011 no-candidate path).
-    let awaitRecoveryMaterial
-        (timerPort: ITimerPort)
-        (durable: AgentJournal)
-        (sessionId: SessionId)
-        : Task =
+    let awaitRecoveryMaterial (timerPort: ITimerPort) (durable: AgentJournal) (sessionId: SessionId) : Task =
         task {
             if not (expectsCoverage durable sessionId) then
                 return ()
@@ -78,12 +74,7 @@ module ProviderRecoveryWorkflow =
                         }
 
                     match!
-                        CausalAwait.untilSignalOrDeadline
-                            CausalWaitHub.observer
-                            descriptor
-                            deadline
-                            tryRead
-                            awaitSignal
+                        CausalAwait.untilSignalOrDeadline CausalWaitHub.observer descriptor deadline tryRead awaitSignal
                     with
                     | Ok() -> return ()
                     | Error DiagnosticWaitExit.WaitTimedOut -> return ()
@@ -165,11 +156,4 @@ module ProviderRecoveryWorkflow =
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
         : Task =
-        continueAfterConfirmedFailure
-            timerPort
-            sessionPort
-            eventPort
-            journal
-            turn
-            "loop-kill"
-            RuntimeNudge.loopContinue
+        continueAfterConfirmedFailure timerPort sessionPort eventPort journal turn "loop-kill" RuntimeNudge.loopContinue

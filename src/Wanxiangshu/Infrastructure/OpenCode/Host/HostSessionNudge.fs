@@ -37,8 +37,7 @@ module HostSessionNudge =
         (profile: PromptAuthority.AuthorityExecutionProfile)
         =
         journal
-        |> Option.map (fun j ->
-            FallbackEvidence.effectiveAgent sessionId (AgentJournal.snapshot j) profile)
+        |> Option.map (fun j -> FallbackEvidence.effectiveAgent sessionId (AgentJournal.snapshot j) profile)
         |> Option.defaultValue profile.SelectedAgent
 
     /// The continuation target directory.

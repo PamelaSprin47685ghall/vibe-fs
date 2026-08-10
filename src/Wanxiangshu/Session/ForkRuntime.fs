@@ -64,7 +64,9 @@ type ForkRuntime
         =
         let promptVal = defaultArg promptOpt ""
         let runId = "run-" + Guid.NewGuid().ToString("N").Substring(0, 8)
-        let childRun = ChildRun.create agentId runId agentName role promptVal (clockPort.UtcNow())
+
+        let childRun =
+            ChildRun.create agentId runId agentName role promptVal (clockPort.UtcNow())
 
         let runTask () =
             task {
@@ -78,8 +80,7 @@ type ForkRuntime
                             return AgentCompletion.ofSimpleError agentId runId role ex.Message
                     }
 
-                let! result =
-                    ChildRunProgram.run childRun work childRun.Cancellation.Token clockPort.UtcNow
+                let! result = ChildRunProgram.run childRun work childRun.Cancellation.Token clockPort.UtcNow
 
                 // P0-RECOVERY-JOIN-001: ParentCancelled → durable HandleAbandoned
                 // (cancelChildren). Do not mint aborted cell / SetResult.

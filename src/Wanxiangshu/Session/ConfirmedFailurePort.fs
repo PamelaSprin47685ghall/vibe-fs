@@ -15,5 +15,4 @@ type RecoveryAdmission =
 ///
 /// Journal + auto-recovery budget are closed at the wiring site so Session hosts
 /// stay free of Application FallbackLedger details (dependency inversion).
-type ConfirmedFailurePort =
-    SessionId -> ProviderRunIdentity -> string -> Result<RecoveryAdmission, string>
+type ConfirmedFailurePort = SessionId -> ProviderRunIdentity -> string -> Result<RecoveryAdmission, string>

@@ -62,12 +62,12 @@ module ManagerWorkflow =
                         | ManagerBackground.BackgroundSettlement.Deferred -> return ()
                         | ManagerBackground.BackgroundSettlement.Settled ->
                             match currentLife journal turn.SessionId with
-                            | Some life when ManagerFinality.admitLabor life = ManagerFinality.LaborAdmission.FinalityOwnsLife ->
+                            | Some life when
+                                ManagerFinality.admitLabor life = ManagerFinality.LaborAdmission.FinalityOwnsLife
+                                ->
                                 return ()
                             | _ ->
-                                match!
-                                    ManagerActivation.ensureAccepted sessionPort eventPort journal turn
-                                with
+                                match! ManagerActivation.ensureAccepted sessionPort eventPort journal turn with
                                 | ManagerActivation.EnsureAcceptedResult.Deferred -> return ()
                                 | ManagerActivation.EnsureAcceptedResult.Ready life ->
                                     match ManagerFinality.admitLabor life with

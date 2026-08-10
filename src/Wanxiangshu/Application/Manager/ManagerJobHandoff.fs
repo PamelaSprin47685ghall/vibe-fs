@@ -66,8 +66,7 @@ module ManagerJobHandoff =
             | ReconcileProgram.TurnInProgress ->
                 match tryJobProgress journal turn.SessionId with
                 | Some progress when isTransferred turn.Outcome progress ->
-                    TerminalReporter.complete eventPort journal abortedSessions turn
-                    |> ignore
+                    TerminalReporter.complete eventPort journal abortedSessions turn |> ignore
 
                     return HandoffOutcome.Transferred
                 | _ -> return HandoffOutcome.ManagerOwnsTurn

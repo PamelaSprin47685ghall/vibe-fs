@@ -13,7 +13,10 @@ module ForkRecovery =
     /// `createdAt` is caller-minted (IClockPort at composition).
     let restore agentId agentName role (createdAt: DateTimeOffset) agents =
         let runId = "restored-" + agentId
-        let run = ChildRun.create agentId runId agentName role "(restored from journal)" createdAt
+
+        let run =
+            ChildRun.create agentId runId agentName role "(restored from journal)" createdAt
+
         Map.add agentId run agents
 
     /// Cancel in-flight busy work only. Keep handle Active; do not fill completion.

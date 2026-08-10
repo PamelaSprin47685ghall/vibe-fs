@@ -161,7 +161,5 @@ module PtyTiming =
                 member _.UtcNow() = now }
 
         { Port = port
-          AdvanceMs =
-            fun ms ->
-                now <- now.AddMilliseconds(float (max 0 ms))
+          AdvanceMs = fun ms -> now <- now.AddMilliseconds(float (max 0 ms))
           Set = fun value -> now <- value }

@@ -200,8 +200,7 @@ module SessionRecoveryWorkflow =
                                         return [ jobOutcome ]
                                     }
 
-                            let merged =
-                                combine (claimOutcome :: bloggerOutcome :: handleOutcome :: jobParts)
+                            let merged = combine (claimOutcome :: bloggerOutcome :: handleOutcome :: jobParts)
 
                             return! recoverNodes rest (Map.add sessionId merged acc)
                     }

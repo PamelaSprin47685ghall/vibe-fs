@@ -38,8 +38,7 @@ module HostForkBusyNudge =
                 match PromptAuthorityLedger.activeProfile childId snapshot.AgentProjections with
                 | None -> return Error "Busy nudge requires ActiveLogicalRun on child session"
                 | Some profile ->
-                    let busyAgent =
-                        FallbackEvidence.effectiveAgent childId snapshot profile
+                    let busyAgent = FallbackEvidence.effectiveAgent childId snapshot profile
 
                     let rt = PromptDispatcher.forJournal j
 

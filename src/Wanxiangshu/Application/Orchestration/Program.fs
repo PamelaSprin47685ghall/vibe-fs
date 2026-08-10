@@ -273,7 +273,11 @@ module OrchestratorProgram =
     /// `recoveryAction` decides; this only executes. Adding a second condition here
     /// would put the recovery decision in two places, and ORCH-007's fixed branch
     /// order only holds if there is one.
-    let rec private resumeFromDurableFacts (deps: OrchestratorProgramDeps) (job: ManagerJob) (action: JobRecoveryAction) =
+    let rec private resumeFromDurableFacts
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (action: JobRecoveryAction)
+        =
         task {
             match action with
             | ResumeManager ->

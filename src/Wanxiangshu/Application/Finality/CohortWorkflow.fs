@@ -13,7 +13,10 @@ open Wanxiangshu.Review
 
 [<RequireQualifiedAccess>]
 type CohortJudgement =
-    | RevisionRequired of rejectingReviewer: SessionId * barrierId: ReviewBarrierId * siblings: (SessionId * ReviewBarrierId) list
+    | RevisionRequired of
+        rejectingReviewer: SessionId *
+        barrierId: ReviewBarrierId *
+        siblings: (SessionId * ReviewBarrierId) list
     | AllConfirmed
     | Undecided
 
@@ -22,7 +25,9 @@ module CohortWorkflow =
 
     type private CancelToken() =
         let mutable cancelled = false
-        let tcs = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+        let tcs =
+            TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
 
         member _.Task = tcs.Task
         member _.IsCancelled = cancelled
@@ -149,7 +154,8 @@ module CohortWorkflow =
         (life: LifeProjection)
         (request: FinalityRequestProjection)
         : Task<Result<EnlistedMember list, string>> =
-        let slots = FinalityReviewCohort.rosterOf (AgentJournal.snapshot journal).AgentProjections life request
+        let slots =
+            FinalityReviewCohort.rosterOf (AgentJournal.snapshot journal).AgentProjections life request
 
         slots
         |> List.fold
@@ -246,7 +252,8 @@ module CohortWorkflow =
                 let siblings =
                     allResults
                     |> List.choose (function
-                        | Ok(ReviewBarrierOutcome.RevisionRequired(sid, bid, _)) when sid <> reviewerId -> Some(sid, bid)
+                        | Ok(ReviewBarrierOutcome.RevisionRequired(sid, bid, _)) when sid <> reviewerId ->
+                            Some(sid, bid)
                         | _ -> None)
                     |> List.distinctBy fst
 

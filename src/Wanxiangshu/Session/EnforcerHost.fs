@@ -1408,8 +1408,7 @@ module EnforcerHost =
                                 | Error err ->
                                     Diagnostic.emit
                                         "enforcer-aabb-bridge"
-                                        [ "session_id", key
-                                          "result", "confirmedFailure port rejected: " + err ]
+                                        [ "session_id", key; "result", "confirmedFailure port rejected: " + err ]
 
                                     None
 
@@ -1759,23 +1758,18 @@ module EnforcerHost =
 
                                 None
                             | Some record ->
-                                match
-                                    record mainSessionId (ProviderRunIdentity.create messageId) emptyReason
-                                with
+                                match record mainSessionId (ProviderRunIdentity.create messageId) emptyReason with
                                 | Ok result -> Some result
                                 | Error err ->
                                     Diagnostic.emit
                                         "enforcer-aabb-bridge"
-                                        [ "session_id", key
-                                          "result", "confirmedFailure port rejected: " + err ]
+                                        [ "session_id", key; "result", "confirmedFailure port rejected: " + err ]
 
                                     None
 
                         match admission with
                         | Some RecoveryAdmission.RecoveryExhausted ->
-                            Diagnostic.emit
-                                "enforcer-aabb-exhausted"
-                                [ "session_id", key; "result", emptyReason ]
+                            Diagnostic.emit "enforcer-aabb-exhausted" [ "session_id", key; "result", emptyReason ]
 
                             fatalEnd "blog aabb exhausted; auto-recovery budget spent"
                             return failwith "unreachable: fatalEnd ends the cycle"

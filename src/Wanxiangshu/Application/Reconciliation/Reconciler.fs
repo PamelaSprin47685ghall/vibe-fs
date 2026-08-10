@@ -52,9 +52,7 @@ module Reconciler =
                 // (Unknown), wake-gated in decideStep. PublishTurn carries the
                 // placeholder Outcome only — never TurnUnknown — so publishDecision
                 // can seal/dedupe the handoff to TurnWorkflow / InteractionRepair.
-                ReconcileProgram.ReconcileEvidence.Unknown(
-                    Some(ReconcileProgram.observedTurn (publishTurnOf value))
-                )
+                ReconcileProgram.ReconcileEvidence.Unknown(Some(ReconcileProgram.observedTurn (publishTurnOf value)))
             | None ->
                 let observed = ReconcileProgram.observedTurn (publishTurnOf value)
 
