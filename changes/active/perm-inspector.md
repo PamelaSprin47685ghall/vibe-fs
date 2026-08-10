@@ -3394,7 +3394,8 @@ Observation capture 从最终执行层接（G5 后 = builtin read/glob/grep Host
 - [x] `CasebookStore`：InspectorCaseCaptured/Refreshed/Accessed/Evicted 事件 + payload codec + topoSort 因果序 + project（fold+LRU）；AuthoritativeEventTypes 扩展
 - [x] `CasebookFeature` marker gating（.wanxiang/casebook/ 目录存在；CASE-009）
 - [x] `CasebookWorkflow`：archiveInspectorResult / fetchCase / checkFreshness；全部返回 Result（archive failure ≠ Inspector call failure）
-- [ ] Inspector terminal → archive 的 Host 接线（ToolRegistry fetch 工具 + 事件采集钩子）
+- [x] Host 采集钩子：`tool.execute.after`（SpikePlugin；marker 门控；read/glob/grep typed capture → `ObservationCollector` per-session buffer；不改变工具结果）
+- [ ] Inspector terminal → drain + archive 的会话终结接线（SyncDelegate/AttachedSession 退役路径）
 
 ### G6-D — Fetch Hot Path — PARTIAL（replay DONE：13904834）
 - [x] `CasebookReplay`：replayOne/replayAll（只读重放；不可复现 = 变化信号）
