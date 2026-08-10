@@ -5366,7 +5366,11 @@ crash recovery 只从 EventStore facts/payloads 重建。
 
 ## Blockers
 
-- **C-3（Active）**：`BuiltinToolDescriptionHook` 运行时接入。hook 文案生成/幂等/可见性校验已交付并测试；改写 provider 可见的内置工具 description 需要定位 Host chat.params/transform 的 tools 数组注入点（SpikePlugin transform 当前无 tools 操作），涉及 Host 请求结构调查。§107「Builtin Coexistence + Hook」在接入前不得勾选。
+- **C-3（Active；平台限制调查结论）**：`BuiltinToolDescriptionHook` 运行时接入。
+  - 调查：OpenCode 插件 API 中 `chat.params` output 无 tools 数组；`tool.definition` hook（`@opencode-ai/plugin` `index.d.ts:314`）可以改写 description，但其 `input` 只有 `{ toolID }`——**无 agent/session 上下文**。hook 无法知道当前 Attempt 的角色，也就无法推荐"当前 provider 可见的 js-ROLE"。
+  - 冲突：proposal §72 / JS-003「钩子文案提到的 js-ROLE 必须同时 provider-visible」在无 agent 上下文下无法满足；列出全部 js-* 名会向 Meditator 等无 fs 角色推荐不可见工具（说谎钩子）。
+  - 按 Playbook §28（同 ownership plane 冲突 STOP → Active blocker）：**需要用户裁决**——接受「钩子不接入、builtin 共存保持」作为 §107 Builtin Coexistence 的满足方式，或指定其它引流机制（如 agent 系统提示注入 Prefer js-ROLE 文案）。
+  - 已交付且可复用：`BuiltinToolDescriptionHook.annotate` / `validateRecommendation` / `hookSuffix`（纯函数 + 测试），接入点确定后直接挂 `tool.definition`。
 
 ## Completion criteria
 
