@@ -424,6 +424,16 @@ module SpikePlugin =
 
                 let chatParams = ChatParamsHook.create journal
 
+                // CASE-003: typed capture at the tool boundary — the collector
+                // instance and the marker flag are read by the tool.execute.after
+                // hook registered in the hooks object below.
+                let observationCollector = ObservationCollector()
+
+                let casebookEnabled =
+                    match PluginHost.workspaceDirectory input with
+                    | Some ws -> CasebookFeature.isEnabled ws
+                    | None -> false
+
                 // HOST-009: the object handed to the Host carries Host hooks and
                 // nothing else.
                 //
@@ -487,6 +497,35 @@ module SpikePlugin =
                                   box (fun (textInput: obj) (textOutput: obj) ->
                                       scope.SyncDelegateRuntime
                                       |> Option.iter (fun runtime -> runtime.TextComplete(textInput, textOutput)))
+                              )
+                          )
+                          // CASE-003: typed observation capture at the tool
+                          // execution boundary (read/glob/grep). Best-effort —
+                          // unparseable executions are skipped, capture never
+                          // changes the tool result. Registered only when the
+                          // Casebook marker exists.
+                          "tool.execute.after",
+                          box (
+                              pairedHook (
+                                  box (fun (toolInput: obj) (toolOutput: obj) ->
+                                      if casebookEnabled then
+                                          let toolName = if isNull toolInput then "" else string (toolInput?tool)
+
+                                          let sessionId =
+                                              if isNull toolInput then
+                                                  ""
+                                              else
+                                                  string (toolInput?sessionID)
+
+                                          let rendered = if isNull toolOutput then "" else string (toolOutput?output)
+
+                                          if not (System.String.IsNullOrWhiteSpace sessionId) then
+                                              observationCollector.Collect(
+                                                  sessionId,
+                                                  toolName,
+                                                  toolInput?args,
+                                                  rendered
+                                              ))
                               )
                           ) ]
 

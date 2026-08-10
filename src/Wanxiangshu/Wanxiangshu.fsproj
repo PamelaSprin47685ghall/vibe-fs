@@ -311,6 +311,7 @@
     <Compile Include="Infrastructure/CasebookCapture.fs"/>
     <Compile Include="Infrastructure/CasebookStore.fs"/>
     <Compile Include="Infrastructure/CasebookReplay.fs"/>
+    <Compile Include="Infrastructure/ObservationCollector.fs"/>
     <Compile Include="Infrastructure/CasebookWorkflow.fs"/>
     <Compile Include="Infrastructure/JsToolsBindings.fs"/>
     <Compile Include="Infrastructure/JsToolsTransactionStore.fs"/>

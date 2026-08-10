@@ -211,3 +211,26 @@ test('CASE010_finalize_is_exactly_once_per_scope', async () => {
   const other = resultOf(finalizeCase(store, raw, caseRec('scope-2', 'Q', 'A', [])))
   assert.equal(other.ok, true)
 })
+
+test('CASE003_collector_buffers_and_drains_per_session', async () => {
+  const {
+    ObservationCollector_$ctor: ObservationCollector_$ctor,
+    ObservationCollector__Collect_Z15AE2BE0: ObservationCollector__Collect_Z15AE2BE0,
+    ObservationCollector__Drain_Z721C83C5: ObservationCollector__Drain_Z721C83C5,
+    ObservationCollector__Count_Z721C83C5: ObservationCollector__Count_Z721C83C5,
+  } = await import('../../../dist/Infrastructure/ObservationCollector.js')
+  const collector = ObservationCollector_$ctor()
+  // read + glob observations for one session; a write is not captured
+  ObservationCollector__Collect_Z15AE2BE0(collector, 'ses-a', 'read', { path: 'a.txt' }, 'hello')
+  ObservationCollector__Collect_Z15AE2BE0(collector, 'ses-a', 'glob', { pattern: '*.fs' }, 'a.fs\nb.fs\n')
+  ObservationCollector__Collect_Z15AE2BE0(collector, 'ses-a', 'write', { path: 'x' }, 'x')
+  ObservationCollector__Collect_Z15AE2BE0(collector, 'ses-b', 'read', { path: 'b.txt' }, 'other')
+  assert.equal(ObservationCollector__Count_Z721C83C5(collector, 'ses-a'), 2)
+  assert.equal(ObservationCollector__Count_Z721C83C5(collector, 'ses-b'), 1)
+  const drained = listItems(ObservationCollector__Drain_Z721C83C5(collector, 'ses-a'))
+  assert.equal(drained.length, 2)
+  assert.equal(ObservationCollector__Count_Z721C83C5(collector, 'ses-a'), 0, 'drain empties the buffer')
+  assert.equal(ObservationCollector__Count_Z721C83C5(collector, 'ses-b'), 1, 'other session untouched')
+  // drain of an empty session is []
+  assert.deepEqual(listItems(ObservationCollector__Drain_Z721C83C5(collector, 'ses-unknown')), [])
+})

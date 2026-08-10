@@ -137,6 +137,14 @@ const HOOK_FIXTURES = {
       assert.equal(typeof input.agent['fast-coder'].prompt, 'string')
     },
   },
+
+  // CASE-003: typed observation capture — must accept the Host call shape and
+  // never throw; the Casebook marker is absent in the fixture workspace, so the
+  // collector path is inert.
+  'tool.execute.after': {
+    input: { tool: 'read', sessionID: SESSION, callID: 'call_x', args: { path: 'a.txt' } },
+    output: { title: 'read', output: 'hello', metadata: undefined },
+  },
 }
 
 const toolContext = (sessionID, messageID = 'msg_tool_probe') => ({
