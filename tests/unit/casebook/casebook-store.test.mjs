@@ -91,3 +91,43 @@ test('CASE007_loadEnvelopes_keeps_event_ids_for_linear_parents', () => {
   // the second append's parent chain is preserved: head is the last event
   assert.equal(second !== undefined, true)
 })
+
+test('CASE009_marker_gates_the_surface', async () => {
+  const { CasebookFeature_isEnabled: isEnabled } = await import('../../../dist/Infrastructure/CasebookWorkflow.js')
+  const { mkdtempSync, rmSync, mkdirSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-cbmarker-'))
+  try {
+    assert.equal(isEnabled(dir), false, 'no marker → disabled')
+    mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
+    assert.equal(isEnabled(dir), true, 'marker dir exists → enabled')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('CASE004_005_workflow_archive_fetch_freshness', async () => {
+  const {
+    CasebookWorkflow_archiveInspectorResult: archive,
+    CasebookWorkflow_fetchCase: fetchCase,
+    CasebookWorkflow_checkFreshness: checkFreshness,
+  } = await import('../../../dist/Infrastructure/CasebookWorkflow.js')
+  const raw = createRaw()
+  const store = createStore(raw)
+
+  const archived = archive(store, raw, caseRec('s1', 'Q1', 'A1', [fileRead('a.txt', 'h1')]))
+  assert.equal(resultOf(archived).ok, true, `archive ok, got ${JSON.stringify(resultOf(archived).error)}`)
+
+  const fetched = fetchCase(store, raw, 10, 's1')
+  assert.equal(resultOf(fetched).ok, true)
+  const caseObj = resultOf(fetched).value
+  assert.equal(caseObj !== undefined, true)
+  assert.equal(caseObj.A, 'A1')
+
+  // replay identical → Fresh; changed → Stale
+  const fresh = checkFreshness(caseObj, toList([fileRead('a.txt', 'h1')]))
+  assert.equal(caseOf(fresh), 'Fresh')
+  const stale = checkFreshness(caseObj, toList([fileRead('a.txt', 'h2')]))
+  assert.equal(caseOf(stale), 'Stale')
+})
