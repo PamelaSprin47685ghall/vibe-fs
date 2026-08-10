@@ -1,3 +1,6 @@
+> **状态**：Active — 本文件为变更工作记录，不是当前产品规范。当前产品语义仅以 `docs/` 正式层为准。
+> 原始 Proposal 已冻结于下方；后续事实仅追加于 Active work / Blockers / Final outcome。
+
 # Proposal G4R — 明显没有 Bug
 
 ## One World, Pure Time：唯一真实长河与纯时序证明体系
@@ -1287,3 +1290,37 @@ one tortured real world
 这才叫：
 
 # 明显没有 Bug。
+
+---
+
+## Active work
+
+> Original proposal 原文冻结于上方；后续事实只追加于 Active work / Amendments / Blockers / Final outcome。
+
+**Started**: 2026-08-10  
+**Work origin**: 用户明确启动 `changes/proposed/test.md`（G4R / G4 Exit Blocker）。
+
+**Specification impact**（正式 docs 将随阶段改写，不以 Change 定义 Clause）：
+- `docs/proof/verify.md` VERIFY-001 / VERIFY-002 / VERIFY-004 → One World / Pure Temporal pyramid（目标态；迁移完成前不得与旧 multi-canary harness 长期双真）
+- 静态门禁：G4R freeze + 最终 one-world ratchets
+- E2E 拓扑：`tests/e2e/entry.test.mjs` 唯一；旧 cases/scenarios/pool/shuffle/repeat 删除
+
+**Cross-Change**：本 Change **Supersedes** 现有多-canary E2E topology / parallel pool / shuffle/repeat / 以真实调度覆盖 race 的证明方式。`changes/active/storage.md` Phase 8 中「继续精修旧 canary choreography / 调并行」路径对本 Change 冻结；性能只能通过消灭真实成本与迁入 temporal proof 改善，不得 timeout inflation。
+
+## Remaining work
+
+- [x] **G4R-0 Freeze** — `scripts/checks/g4r-freeze.mjs` wired into `scripts/check.mjs`; case ceiling 31 (只降不升); timeout ceilings; no per-case timeout maps; no top-level E2E entry during freeze; unit `tests/unit/verify/g4r-freeze.test.mjs`
+- [x] **G4R-1 Temporal Kernel** — `tests/unit/temporal/harness.mjs`（VirtualClock / DeterministicCompletion / DeterministicEventQueue / InMemory durable / RecordedProvider / dropEphemeral / runTrace）+ `fallback-aabb-confluence.test.mjs`（12 theorems；production fold/projection）
+- [ ] **G4R-2 Race Extraction** — 迁移 manager-unhappy / full-loop / fallback-aabb / join guard / context recovery / orchestrator conflict/restart / finality cohort 为显式 temporal theorems
+- [ ] **G4R-3 The Long Stroke** — 唯一真实 OpenCode 世界的坎坷一笔画（多 adversity class；观察 public/durable 语义）
+- [ ] **G4R-4 Delete Old Canary World** — 删除旧 case runner / pool / stagger / per-case watchdog / shuffle/repeat / 大型 TOML choreography
+- [ ] **G4R-5 Time Boundary** — semantic 层清除 raw `Date.now` / `UtcNow` / `setTimeout` / sleep（仅声明的物理 timer adapter 例外）
+- [ ] **G4R-6 10s Gate + VERIFY revise** — VERIFY-001/002/004 改写；obsolete parallel-canary static gates 删除；`npm semantic full < 10s`；Long Stroke `< 6s`；`npm run check` 全绿
+
+## Completion criteria
+
+以 Original proposal §21 G4R Exit Criteria 全部勾选为准（Correctness / Physical / Adversity / Architecture / Performance / Proof），且不得缩减批准范围。
+
+## Blockers
+
+（无）

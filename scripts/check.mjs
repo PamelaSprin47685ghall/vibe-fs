@@ -16,6 +16,7 @@ const checks = [
   join(root, 'checks/causal-wait-boundary.mjs'),
   join(root, 'checks/student-teacher-absence.mjs'),
   join(root, 'checks/unified-store-gate.mjs'),
+  join(root, 'checks/g4r-freeze.mjs'),
 ]
 
 for (const script of checks) {

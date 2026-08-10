@@ -34,6 +34,30 @@
 
 第 0 层是纯文本与文件系统检查，永远不依赖编译产物，因此在任何阶段都可运行。第 1–3 层的语言与入口由 VERIFY-008 规定。
 
+### G4R 迁移中（One World / Pure Time）
+
+在 One World / Pure Time 迁移完成前，第 0 层额外执行 `scripts/checks/g4r-freeze.mjs`：
+
+```text
+E2E case 数量不得越过冻结天花板（只降不升）
+time-budget.js 命名预算不得抬高
+禁止 per-basename / per-case canary timeout map
+禁止新增顶层 E2E entry（唯一 Long Stroke 入口在 cutover 时落地）
+```
+
+目标金字塔（cutover 后生效，替换上表第 3–5 层的 multi-canary / 三轮 shuffle 形态）：
+
+```text
+0. Static architecture/proof gates
+1. Pure laws（无 Host / clock / process / network）
+2. Deterministic temporal workflow proof（production workflow + virtual ports + explicit traces）
+3. Single physical adapter contract
+4. The Long Stroke（恰好 1 个真实 OpenCode E2E，恰好 1 次 lifetime）
+5. Release（一次确定性 full proof + build/package/packing）
+```
+
+迁移期间不得以新增 E2E、抬 timeout、retry-until-pass、降低 parallelism、或精修旧 scenario choreography 作为修复路径。Race 证明迁入显式 temporal algebra；物理组合证明收敛为唯一 Long Stroke。
+
 ## VERIFY-002：五级晋级阶梯
 
 不允许跨级。
