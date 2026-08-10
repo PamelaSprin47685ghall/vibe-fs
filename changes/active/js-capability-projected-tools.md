@@ -5349,10 +5349,12 @@ crash recovery 只从 EventStore facts/payloads 重建。
 - [ ] return serializer（JSON-compatible；result validation 在 commit 前）
 - [ ] Synthetic TOML bridge（JS-016）
 
-### Phase C — Agent surface + coexistence（Playbook §12.5–12.6 第三阶段）
-- [ ] Agent surface migration（仅存活 catalog；generated surface 注册进 ToolRegistry）
-- [ ] BuiltinToolDescriptionHook（deprecated + Prefer js-ROLE；仅 description，不改变 builtin schema/executor）
-- [ ] 保留 builtin read/edit/write/glob/grep/patch 原 schema / 原实现（no alias takeover）
+### Phase C — Agent surface + coexistence（Playbook §12.5–12.6 第三阶段）— PARTIAL（C-1/C-2 DONE）
+- [x] Agent surface migration（`ToolRegistry` baseSpecs 按角色矩阵经 `JsToolGenerator` + `JsToolSpec.create` 生成 js-* specs；无手写 spec；`rolePredicate` js-* gate：角色名 + fs capability 双重校验）
+- [x] 权限矩阵（`StaticTools` knownToolNames + permissionObj：角色拥有 fs capability 时 allow 其 js-* 工具；Meditator 无 fs → deny；`js-surface-gate` 更新为矩阵静态名单合法）
+- [x] `BuiltinToolDescriptionHook`（deprecated + Prefer js-ROLE 文案生成 + 幂等 annotate + 不可见工具推荐 fail-closed；纯函数 + 测试）
+- [ ] hook 文案接入 Host transform（改写 provider 可见的内置工具 description；SpikePlugin transform 高风险区，独立处理）
+- [x] 保留 builtin read/edit/write/glob/grep/patch 原 schema / 原实现（no alias takeover；契约测试更新）
 
 ### Phase D — proof（第四阶段）
 - [ ] unit：generator equivalence / lying-generator counterexample / anchor / read/glob/grep / mutation / transaction / recovery / return / sandbox / coexistence
