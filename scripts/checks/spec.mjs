@@ -44,6 +44,7 @@ const PREFIX_OWNER = {
   DSL: 'what/dsl-structured-program.md',
   GLORY: 'what/glory.md',
   SURFACE: 'what/glory.md',
+  JS: 'what/js-tools.md',
 }
 
 /** Prefixes allowed to split definitions across listed files; individual IDs remain unique. */
@@ -80,6 +81,7 @@ const PREFIX_SPLIT_OWNERS = {
   VERIFY: ['proof/verify.md'],
   GLORY: ['what/glory.md', 'shape/glory.md', 'how/glory.md', 'proof/glory.md', 'why/glory.md'],
   SURFACE: ['what/glory.md'],
+  JS: ['what/js-tools.md', 'shape/js-tools.md', 'how/js-tools.md', 'proof/js-tools.md', 'why/js-tools.md'],
 }
 
 const PREFIXES = Object.keys(PREFIX_OWNER)

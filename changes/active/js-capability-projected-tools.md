@@ -5275,3 +5275,92 @@ Edit 不是 `oldString → newString`。
 最终整个设计可以浓缩为一句话：
 
 > **Wanxiangshu projects authority into an exact JavaScript SDK, and the LLM simply programs against the SDK it is given.**
+
+---
+
+# Active work
+
+> 本文件为变更工作记录，不是当前产品规范。当前产品语义仅以 `docs/` 正式层为准。
+> Original proposal 原文冻结于上方；后续事实只追加于 Active work / Amendments / Blockers / Final outcome。
+
+## Work origin
+
+用户通过 `changes/proposed/entry.md` Implementation Playbook 明确启动：G4（Unified Storage）Exit 达成（`changes/completed/storage.md` Final outcome；`npm run check` + Long Stroke e2e GREEN）后，按 Gate 顺序进入 **G5 JS Capability-Projected Tools**。
+
+## Cross-proposal prerequisites
+
+| Gate | Status | Evidence |
+|---|---|---|
+| G0–G3.5 | DONE | 见 `changes/completed/*` |
+| G4 Unified Storage | DONE | `changes/completed/storage.md`；唯一 durable substrate = EventStore |
+| G4R One World testing | DONE | `changes/completed/test.md`；e2e = 单一 Long Stroke（`tests/e2e/entry.test.mjs`）；无新 canary |
+
+## Approved Amendments
+
+### Amendment JS-G3 — Universal G3 rebase debt 不复活（proposal §18 / §49 / §107 Student 部分）
+
+```text
+js-student / js-teacher / StudentLearn / StudentCompile / Teacher 专属表面
+= 不得实现、不得迁回、不得以兼容别名复活。
+Student request kind 不产生 js-* surface（或与普通 profile 同规则，无 Student 专属分支）。
+```
+
+实施输入只认当时仍存活的 Agent catalog（Manager/Orchestrator/Coder/Inspector/Browser/Meditator/Reviewer/DevOps/Executor/Blogger）+ `AttemptExecutionProfile.ToolCapabilitySet`。
+
+### Amendment JS-G4R — 时间边界与证明形式
+
+```text
+- e2e 证明 = Long Stroke 单一入口（G4R freeze）；不新增 per-feature canary。
+- 新代码遵守 g4r-ce-vocabulary：Domain/Application/Session 零 raw time；deadline 走 Capability Port。
+- 性能：Long Stroke 墙钟目标维持 <10s（npm run check:release 门禁），不得因 G5 工具注册提升超时。
+```
+
+### Amendment JS-G4S — durable transaction facts 只经 EventStore
+
+proposal §66/§107 Transaction 已明确；Active 强制：
+
+```text
+js-transaction.db / transaction-v2.json / special feature ref / feature-owned durable store
+= doNotBuild（unified-store-gate 同族禁制）。
+crash recovery 只从 EventStore facts/payloads 重建。
+```
+
+## Remaining work
+
+按 proposal §104 Implementation Order（Student/Teacher 项按 Amendment JS-G3 删除）：
+
+### Phase A — capability algebra + generator（Playbook §12.2 第一阶段）
+- [ ] Formal docs：`docs/{why,what,shape,how,proof}/js-tools.md`（Clause 前缀 `JS-`）；`docs/README.md` 索引
+- [ ] Domain capability algebra（`src/Wanxiangshu/Domain/JsTools/`）：primitive capability × anchor rules × surface projection rules × failure algebra
+- [ ] Capability Fragment Registry（`JsCapabilityFragment`；member/description/example/runtime binding 同源）
+- [ ] `JsToolGenerator`：从 `AttemptExecutionProfile.ToolCapabilitySet` 确定性生成 js-ROLE（name/schema/description/base class/examples/runtime bindings）
+- [ ] generated description / base-class renderer
+- [ ] ToolRegistry generated-name gate（运行时校验 invoked name 属于当前 Attempt 生成 surface；forged call fail closed）
+- [ ] 静态门禁：no handwritten role→JS matrix（`scripts/checks/`）
+
+### Phase B — sandbox + transaction（Playbook §12.3 第二阶段）
+- [ ] sandbox runner（Process/；无 ambient authority；deadline/kill/reap；memory/output bounded）
+- [ ] `file()` / FileView（immutable snapshots）/ anchors（ordered string/RegExp；5 类拒绝）
+- [ ] `glob()`（bounded deterministic enumeration）
+- [ ] `rewrite()` / `write()` staging（ephemeral；durability 不在此步）
+- [ ] transaction engine（preflight → prepare → commit → rollback；durable prepare = EventStore only；crash recovery）
+- [ ] return serializer（JSON-compatible；result validation 在 commit 前）
+- [ ] Synthetic TOML bridge（JS-016）
+
+### Phase C — Agent surface + coexistence（Playbook §12.5–12.6 第三阶段）
+- [ ] Agent surface migration（仅存活 catalog；generated surface 注册进 ToolRegistry）
+- [ ] BuiltinToolDescriptionHook（deprecated + Prefer js-ROLE；仅 description，不改变 builtin schema/executor）
+- [ ] 保留 builtin read/edit/write/glob/grep/patch 原 schema / 原实现（no alias takeover）
+
+### Phase D — proof（第四阶段）
+- [ ] unit：generator equivalence / lying-generator counterexample / anchor / read/glob/grep / mutation / transaction / recovery / return / sandbox / coexistence
+- [ ] Long Stroke 受影响路径回归；`npm run check` + `npm run check:release` GREEN
+- [ ] proposal §107 Completion Criteria 全勾选 → Final outcome → completed
+
+## Completion criteria
+
+以 proposal §107（Authority/Generator/SDK/Builtin Coexistence + Hook/File API/Primitive Semantics/Return/Transaction/Security/Migration/Parallel/Proof；Student 部分按 Amendment JS-G3 排除）+ Playbook G5 Exit Gate（no handwritten role→JS matrix / no Student/Teacher JS / no Meditator filesystem JS / five-layer equivalence / transaction atomicity / crash recovery / sandbox escape RED / legacy implementation absent）为准；另以 `npm run check` 全绿为准。
+
+## Blockers
+
+无（待实施中发现则追加）。

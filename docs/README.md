@@ -53,6 +53,7 @@ what → shape → how → code/resources → proof
 | `LOOP-` Loop | [what](what/loop.md) · [shape](shape/loop.md) · [how](how/loop.md) · [proof](proof/loop.md) · [why](why/loop.md) |
 | `DSL-` DSL 结构化程序 | [what](what/dsl-structured-program.md) · [shape](shape/dsl-structured-program.md) · [how](how/dsl-structured-program.md) · [proof](proof/dsl-structured-program.md) · [why](why/dsl-structured-program.md) |
 | `GLORY-` / `SURFACE-` Glory | [what](what/glory.md) · [shape](shape/glory.md) · [how](how/glory.md) · [proof](proof/glory.md) · [why](why/glory.md) |
+| `JS-` JS Tools | [what](what/js-tools.md) · [shape](shape/js-tools.md) · [how](how/js-tools.md) · [proof](proof/js-tools.md) · [why](why/js-tools.md) |
 | Synthetic TOML（`ARCH-010` / `ARCH-011`） | [what](what/synthetic-toml.md) · [shape](shape/synthetic-toml.md) · [how](how/synthetic-toml.md) · [proof](proof/synthetic-toml.md) · [why](why/synthetic-toml.md) |
 | Security 边界 | [shape](shape/security.md) |
 
