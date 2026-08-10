@@ -30,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 
 import { runStaticGate } from '../support/index.js';
 import { runCanary } from '../support/scenario-driver.mjs';
+import { journalEventLines } from '../support/journal-observer.js';
 
 if (!runStaticGate([fileURLToPath(import.meta.url)]).passed) {
   throw new Error('fallback-aabb-trace scenario static gate failed');
@@ -37,22 +38,11 @@ if (!runStaticGate([fileURLToPath(import.meta.url)]).passed) {
 
 /** Read the real journal envelopes carrying a fact name. */
 function factsIn(workDir, name) {
-  const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], {
-    encoding: 'utf8',
-  }).trim();
-  const runtimeDir = path.join(
-    path.isAbsolute(common) ? common : path.resolve(workDir, common),
-    'wanxiangshu-next',
-    'runtimes',
-  );
-  if (!fs.existsSync(runtimeDir)) return [];
-
-  return fs.readdirSync(runtimeDir)
-    .filter((file) => file.endsWith('.ndjson'))
-    .flatMap((file) => fs.readFileSync(path.join(runtimeDir, file), 'utf8').split('\n'))
-    .filter((line) => line.trim() !== '')
-    .map((line) => JSON.parse(line))
-    .filter((fact) => JSON.stringify(fact).includes(name));
+  return journalEventLines(workDir)
+    .map((line) => {
+      try { return JSON.parse(line); } catch { return null; }
+    })
+    .filter((fact) => fact && JSON.stringify(fact).includes(name));
 }
 
 function countFact(workDir, name) {

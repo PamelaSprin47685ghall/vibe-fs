@@ -27,17 +27,25 @@ module SharedAgentJournal =
     /// Returns the rejection instead of throwing, so the composition root decides
     /// how to fail closed — it is the only layer that knows how to report a
     /// startup refusal to the Host.
-    let acquire (directory: string) (processId: int) (startedAt: DateTimeOffset) : Result<AgentJournal, FoldRejection> =
+    ///
+    /// `openJournal` is supplied by the composition root (EventStore boot port +
+    /// `AgentJournal.createFromProjection`). This module stays free of
+    /// `IEventStore` / `AppendCandidate` / `EventStore.create*` tokens.
+    let acquire
+        (directory: string)
+        (processId: int)
+        (startedAt: DateTimeOffset)
+        (openJournal: RuntimeId -> int -> DateTimeOffset -> Result<AgentJournal, FoldRejection>)
+        : Result<AgentJournal, FoldRejection> =
         lock gate (fun () ->
             match shared.TryGetValue directory with
             | true, entry ->
                 entry.RefCount <- entry.RefCount + 1
                 Ok entry.Journal
             | false, _ ->
-                let boot = Boot.boot directory
                 let runtimeId = RuntimeId.create (Guid.NewGuid().ToString("N").Substring(0, 12))
 
-                AgentJournal.createFromBoot directory runtimeId processId startedAt boot
+                openJournal runtimeId processId startedAt
                 |> Result.map (fun journal ->
                     shared.[directory] <- { Journal = journal; RefCount = 1 }
                     journal))

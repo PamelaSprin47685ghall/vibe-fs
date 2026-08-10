@@ -2,7 +2,7 @@
 //
 // The NDJSON line and the fold that reads it back. Everything here is pure: no
 // file is touched, so a failure names the codec or the fold and nothing else.
-// The on-disk behaviour those two enable lives in `boot.test.mjs`.
+// EventStore boot/resume coverage lives in `event-store-journal-boot.test.mjs`.
 //
 // Why full-text assertions rather than field probes: mjs has no compile-time
 // rename protection, so `env.LocalSeq` becoming `env.Seq` would read `undefined`

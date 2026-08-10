@@ -9,6 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate } from '../support/index.js';
 import { runCanary } from '../support/scenario-driver.mjs';
+import { journalEventLines } from '../support/journal-observer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const TREE_FILE = 'review_target.txt';
@@ -36,12 +37,11 @@ function valuesOf(value, fieldName, values = []) {
 }
 
 function factsIn(workDir, needle) {
-  const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
-  const dir = path.join(path.isAbsolute(common) ? common : path.resolve(workDir, common), 'wanxiangshu-next', 'runtimes');
-  if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir).filter(f => f.endsWith('.ndjson')).flatMap(f =>
-    fs.readFileSync(path.join(dir, f), 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l))
-  ).filter(fact => JSON.stringify(fact).includes(needle));
+  return journalEventLines(workDir)
+    .map((line) => {
+      try { return JSON.parse(line); } catch { return null; }
+    })
+    .filter((fact) => fact && JSON.stringify(fact).includes(needle));
 }
 
 function toolNames(request) {

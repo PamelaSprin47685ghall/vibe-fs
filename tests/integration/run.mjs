@@ -51,10 +51,6 @@ const nodeTestSteps = [
     files: [path.join(here, 'resources/enforcer-catalog.test.mjs')],
   },
   {
-    label: 'journal/boot.test.mjs',
-    files: [path.join(here, 'journal/boot.test.mjs')],
-  },
-  {
     label: 'plugin/manager-tool-contract.test.mjs',
     files: [path.join(here, 'plugin/manager-tool-contract.test.mjs')],
   },

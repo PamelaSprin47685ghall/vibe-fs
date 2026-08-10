@@ -32,12 +32,20 @@ module PluginHost =
         match workspaceDirectory input with
         | None -> Ok None
         | Some workspace ->
-            let dir = RuntimePath.forWorkspace workspace
+            let commonDir = RuntimePath.gitCommonDir workspace
+            let runtimeDir = RuntimePath.forWorkspace workspace
+            let port = WorkspaceEventStore.bootPort commonDir
 
-            match SharedAgentJournal.acquire dir processId DateTimeOffset.UtcNow with
+            let openJournal (runtimeId: RuntimeId) (processId: int) (startedAt: DateTimeOffset) =
+                port.ResumeOrCreate(runtimeId, processId, startedAt)
+                |> Result.bind (fun (writer, _, projection) -> AgentJournal.createFromProjection writer projection)
+
+            match SharedAgentJournal.acquire runtimeDir processId DateTimeOffset.UtcNow openJournal with
             | Ok journal -> Ok(Some journal)
             | Error rejection ->
-                Error(sprintf "journal boot rejected at %s: %s (%s)" dir rejection.Reason rejection.Fact)
+                Error(
+                    sprintf "journal boot rejected at %s: %s (%s)" runtimeDir rejection.Reason rejection.Fact
+                )
 
 
     let restoreSessionParents (journal: AgentJournal option) (sessionParents: Dictionary<string, string>) =

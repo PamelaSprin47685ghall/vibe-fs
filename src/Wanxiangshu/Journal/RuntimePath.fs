@@ -46,7 +46,7 @@ module RuntimePath =
 
         runtimeDirectory (joinPath stateRoot (HostDigest.sha256Hex workspace))
 
-    let internal gitCommonDir (workspace: string) : string =
+    let gitCommonDir (workspace: string) : string =
         try
             let commonDirectory = GitSubject.revParseGitCommonDir workspace
 
