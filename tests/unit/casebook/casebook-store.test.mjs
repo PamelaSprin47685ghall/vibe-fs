@@ -134,10 +134,10 @@ test('CASE004_005_workflow_archive_fetch_freshness', async () => {
 
 test('CASE004_replay_detects_deltas_against_current_worktree', async () => {
   const { replayAll } = await import('../../../dist/Infrastructure/CasebookReplay.js')
+  const { contentHash: hash } = await import('../../../dist/Infrastructure/CasebookCapture.js')
   const { mkdtempSync, rmSync, writeFileSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
-  const { contentHash: hash } = await import('../../../dist/Infrastructure/CasebookCapture.js')
   const dir = mkdtempSync(join(tmpdir(), 'wxs-cbreplay-'))
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
@@ -153,6 +153,46 @@ test('CASE004_replay_detects_deltas_against_current_worktree', async () => {
     // file deleted → observation gone → Stale downstream
     rmSync(join(dir, 'a.txt'))
     assert.equal(listItems(replayAll(dir, toList(stored))).length, 0)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('CASE006_refresh_publishes_revision_and_needsRefresh_detects_stale', async () => {
+  const {
+    CasebookWorkflow_archiveInspectorResult: archive,
+    CasebookWorkflow_fetchCase: fetchCase,
+    CasebookWorkflow_refreshCase: refreshCase,
+    CasebookWorkflow_needsRefresh: needsRefresh,
+  } = await import('../../../dist/Infrastructure/CasebookWorkflow.js')
+  const { contentHash: hash } = await import('../../../dist/Infrastructure/CasebookCapture.js')
+  const { mkdtempSync, rmSync, writeFileSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-cbrefresh-'))
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
+    const raw = createRaw()
+    const store = createStore(raw)
+    // archive with observation matching current content
+    resultOf(archive(store, raw, caseRec('s1', 'Q1', 'A1', [fileRead('a.txt', hash('hello'))])))
+    // still fresh → no refresh needed
+    const fresh = resultOf(needsRefresh(store, raw, 10, 's1', dir))
+    assert.equal(fresh.ok, true)
+    assert.equal(fresh.value, false)
+    // content changed → refresh needed
+    writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
+    const stale = resultOf(needsRefresh(store, raw, 10, 's1', dir))
+    assert.equal(stale.ok, true)
+    assert.equal(stale.value, true)
+    // Bookkeeper revises → Refreshed lands and the projection carries new A
+    const refreshed = resultOf(refreshCase(store, raw, 's1', 'Q1b', 'A1b', toList([fileRead('a.txt', hash('changed'))])))
+    assert.equal(refreshed.ok, true, `refresh ok, got ${JSON.stringify(refreshed.error)}`)
+    const fetched = resultOf(fetchCase(store, raw, 10, 's1'))
+    assert.equal(fetched.value.A, 'A1b')
+    // after revision matches the current worktree again → no refresh needed
+    const settled = resultOf(needsRefresh(store, raw, 10, 's1', dir))
+    assert.equal(settled.value, false)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

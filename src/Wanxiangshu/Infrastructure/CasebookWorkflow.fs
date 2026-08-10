@@ -60,3 +60,44 @@ module CasebookWorkflow =
     /// equality of stored vs replayed observations.
     let checkFreshness (stored: Case) (replayed: Observation list) : ReplayResult =
         Observations.classifyReplay stored.Observations replayed
+
+    /// CASE-006: publish a Bookkeeper revision as InspectorCaseRefreshed
+    /// (linear parent). The caller (Bookkeeper orchestration) supplies the
+    /// revised Q/A and the re-stabilized observations; failure keeps the old
+    /// Case intact — maintenance failure is never a fetch failure.
+    let refreshCase
+        (store: IEventStore)
+        (raw: IGitRawStore)
+        (sessionId: string)
+        (q: string)
+        (a: string)
+        (observations: Observation list)
+        : Result<unit, string> =
+        match CasebookStore.loadEnvelopes raw (store.OpenSnapshot()) with
+        | Error err -> Error err
+        | Ok envelopes ->
+            let parents = CasebookStore.headOf envelopes |> Option.toList
+
+            match CasebookStore.appendRefreshed store parents sessionId q a observations with
+            | Ok _ -> Ok()
+            | Error err -> Error err
+
+    /// CASE-006: the full refresh decision — fetch the Case, replay against
+    /// the current worktree, and report whether a Bookkeeper revision is
+    /// needed (Stale) or the old answer still matches (Fresh / no-case).
+    let needsRefresh
+        (store: IEventStore)
+        (raw: IGitRawStore)
+        (capacity: int)
+        (sessionId: string)
+        (root: string)
+        : Result<bool, string> =
+        match fetchCase store raw capacity sessionId with
+        | Error err -> Error err
+        | Ok None -> Ok false
+        | Ok(Some case) ->
+            let replayed = CasebookReplay.replayAll root case.Observations
+
+            match checkFreshness case replayed with
+            | ReplayResult.Fresh -> Ok false
+            | ReplayResult.Stale -> Ok true
