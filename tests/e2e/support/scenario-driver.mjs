@@ -34,6 +34,7 @@ import {
 import { WAIT_FACT_WINDOW_MS } from './time-budget.js';
 import { bindLaneSession } from './lane.mjs';
 import { compileScenario } from './scenario-schema.js';
+import { attachEventCeilings, normalizeEventCeilings } from './event-ceiling.js';
 import { ScenarioRuntime } from './scenario-runtime.js';
 import { readJournal, watchJournal } from './journal-observer.js';
 import { isIdleEvent } from './session-quiescence.js';
@@ -214,6 +215,9 @@ export async function awaitFactBarrier(scenario, step) {
     await wakeOnJournal(scenario.host.workDir, Math.min(remaining, FACT_WAKE_GUARD_MS));
 
     const next = readJournal(scenario.host.workDir, name, renewOn);
+    // Livelock guard: journal growth without the awaited fact still trips the
+    // scenario's declared exact event ceiling (primary over silence alone).
+    scenario.eventCeilings?.checkJournal?.();
     if (step.waitFact.eq !== undefined && next.named > need) {
       assert.fail(
         `waitFact ${name} overshot eq ${need} (got ${next.named}); use gte when the producer can race past the exact count`,
@@ -765,6 +769,9 @@ export async function runCanary(scriptName, { customs } = {}) {
       watchdogLabel: doc.setup?.watchdogLabel || doc.name,
     });
 
+    const eventCeilings = normalizeEventCeilings(doc.setup ?? {});
+    attachEventCeilings(scenario, eventCeilings);
+
     scenario.provider.attachScenario(new ScenarioRuntime(doc));
 
     const agent = doc.session?.agent || doc.prompt?.agent;
@@ -783,6 +790,14 @@ export async function runCanary(scriptName, { customs } = {}) {
     }
 
     await runFlow(scenario, doc, ctx);
+
+    const ceilingSnap = scenario.eventCeilings?.snapshot?.();
+    if (ceilingSnap && (ceilingSnap.maxJournalEvents != null || ceilingSnap.maxSseEvents != null)) {
+      console.log(
+        `[event-ceiling] ${doc.name}: journal=${ceilingSnap.journalEvents}/${ceilingSnap.maxJournalEvents ?? '—'} ` +
+          `sse=${ceilingSnap.sseEvents}/${ceilingSnap.maxSseEvents ?? '—'} (heartbeats excluded)`,
+      );
+    }
 
     console.log(doc.pass ?? `${doc.name} scenario passed.`);
 

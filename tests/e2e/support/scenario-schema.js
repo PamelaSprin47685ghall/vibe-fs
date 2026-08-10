@@ -29,6 +29,7 @@ import { parse as parseToml } from 'smol-toml';
 import { retiredFieldProblems } from './legacy-fields.js';
 import { turnFragments } from './runtime-key.js';
 import { validateFault } from './delivery-plan.js';
+import { eventCeilingSetupProblems } from './event-ceiling.js';
 
 // ── the TOML root-key trap ──────────────────────────────────────────────────
 
@@ -844,6 +845,7 @@ export function compileScenario(source, { name = '<inline>' } = {}) {
     ...afterExpectationProblems(raw.flow),
     ...waitFactRenewOnProblems(raw.flow),
     ...assertDeliveriesProblems(raw.flow),
+    ...eventCeilingSetupProblems(raw.setup),
     ...malformedFaults(raw),
     ...providerErrorProblems(raw),
     ...conflictingFaults(entries, raw),

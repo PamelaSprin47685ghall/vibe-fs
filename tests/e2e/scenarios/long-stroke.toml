@@ -60,7 +60,15 @@ scenario = "long-stroke"
 description = "G4R-3 The Long Stroke: orchestrator shell, one OpenCode world through adversity to clean shutdown"
 pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fallback, REVISE→FinalityRejected→Blessed→LifeCompleted, gitConflictProof→ConflictDetected→Published (no restart)."
 
-setup = { strict = true, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n" } } }
+# Theoretical exact event ceilings (fail-closed on dead loops; primary over silence):
+#   maxJournalEvents — EventStore envelope count
+#   maxSseEvents     — OpenCode SSE frames excluding server.heartbeat
+# Derivation (G4R-3 adversity spine + publish conflict resume):
+#   LifeCompleted reached at 264 envelopes on long-stroke run6 (CandidateReady absent).
+#   Publish path CandidateReady→ConflictDetected→RebasedCandidateReady→Published
+#   composed at +48 envelopes → theory 312.
+#   SSE non-heartbeat at LifeCompleted ≈1318; conflict-resume composition +482 → theory 1800.
+setup = { strict = true, maxJournalEvents = 312, maxSseEvents = 1800, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 

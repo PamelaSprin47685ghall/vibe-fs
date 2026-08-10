@@ -971,6 +971,30 @@ user = "go"
   },
 
   {
+    name: 'VERIFY-003 setup event ceilings are positive theoretical exact trigger counts',
+    fn: () => {
+      const withSetup = (setup) => `scenario = "p"
+setup = ${setup}
+flow = [ { prompt = { text = "go" } } ]
+
+[[turn]]
+id = "a"
+user = "go"
+
+  [[turn.step]]
+  respond = { type = "text", text = "ok" }
+`;
+
+      rejects(withSetup('{ maxJournalEvents = 0 }'), 'setup.maxJournalEvents must be a positive integer');
+      rejects(withSetup('{ maxSseEvents = -1 }'), 'setup.maxSseEvents must be a positive integer');
+      rejects(withSetup('{ maxJournalEvents = 1.5 }'), 'setup.maxJournalEvents must be a positive integer');
+      const ok = accepts(withSetup('{ strict = true, maxJournalEvents = 312, maxSseEvents = 1800 }'));
+      assertEq(ok.setup.maxJournalEvents, 312);
+      assertEq(ok.setup.maxSseEvents, 1800);
+    },
+  },
+
+  {
     name: 'VERIFY-003 a rejected scenario yields no partial result',
     fn: () => {
       // A scenario that half-loads is a scenario whose author believes something is

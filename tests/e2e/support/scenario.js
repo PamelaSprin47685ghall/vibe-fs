@@ -35,6 +35,9 @@ export async function teardownScenario(scenario, { keepOnFailure = false } = {})
   if (scenario._tornDown) return;
   scenario._tornDown = true;
   scenario.watchdog?.stop();
+  try {
+    scenario.eventCeilings?.stop?.();
+  } catch {}
   const errors = [];
 
   try {
