@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure
+open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
@@ -76,6 +77,7 @@ module ToolRegistry =
         (parkedHost: IParkedTransformHost option)
         (syncDelegateRuntime: SyncDelegateRuntime option)
         (finalityReviewerTimeoutMs: int option)
+        (casebookToolSpecs: ToolSpec list)
         =
         let factory = ToolHostCodec.factory toolModule
 
@@ -120,6 +122,10 @@ module ToolRegistry =
               yield BlogTool.spec factory runtime parkedHost
               // SyncDelegate return: Inspector/Coder only.
               yield SyncDelegateTools.returnSpec factory syncDelegateRuntime
+              // CASE-009: the conditional fetch tool — registered only when the
+              // marker exists AND an EventStore is available (schema + execution
+              // both gated).
+              yield! casebookToolSpecs
               // JS-001/JS-073: the capability-projected js-* tools. The surface
               // is generated from the role matrix (AGENT-007: profile capability
               // set == Roles.permissions), so a role without filesystem

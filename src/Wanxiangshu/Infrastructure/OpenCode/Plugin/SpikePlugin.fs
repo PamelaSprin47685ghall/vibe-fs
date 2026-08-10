@@ -9,7 +9,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ProviderProjection
+open Wanxiangshu.Host
 open Wanxiangshu.Domain.SessionRecovery
+open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
@@ -523,6 +525,11 @@ module SpikePlugin =
                             else
                                 Some(unbox<int> configured)
 
+                        let casebookToolSpecs =
+                            match PluginHost.workspaceDirectory input with
+                            | Some ws -> CasebookTools.buildSpecs (ToolHostCodec.factory toolModule) ws
+                            | None -> []
+
                         let toolRegistration =
                             toolHooks
                                 toolModule
@@ -539,6 +546,7 @@ module SpikePlugin =
                                 (Some wired.CancelSignals)
                                 (Some eventPort)
                                 finalityReviewerTimeoutMs
+                                casebookToolSpecs
 
                         scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
                         hooks?tool <- toolRegistration.Tools

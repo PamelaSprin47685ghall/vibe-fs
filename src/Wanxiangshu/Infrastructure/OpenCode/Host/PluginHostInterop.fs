@@ -7,6 +7,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
@@ -60,6 +61,7 @@ module PluginHostInterop =
         (cancelSignals: (SessionId seq -> unit) option)
         (eventPort: IEventObservationPort option)
         (finalityReviewerTimeoutMs: int option)
+        (casebookToolSpecs: ToolSpec list)
         : ToolRegistration =
         let registration =
             ToolRegistry.create
@@ -81,6 +83,7 @@ module PluginHostInterop =
                 (Some(scope :> IParkedTransformHost))
                 scope.SyncDelegateRuntime
                 finalityReviewerTimeoutMs
+                casebookToolSpecs
 
         // P0-RECOVERY-JOIN-001: JoinTool RequireFamilyRecovery → PluginRuntimeScope.
         registration.Runtime.AttachFamilyRecovery(fun root -> scope.RequireFamilyRecovery root)
