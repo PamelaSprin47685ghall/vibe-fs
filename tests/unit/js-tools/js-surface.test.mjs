@@ -161,3 +161,24 @@ test('JS004_fast_deep_profiles_generate_identical_surfaces', () => {
   assert.equal(fast.BaseClassSource, deep.BaseClassSource)
   assert.equal(fast.Description, deep.Description)
 })
+
+test('JS004_lying_generator_counterexample_is_rejected', () => {
+  // A "lying" surface advertises a member with no runtime binding — the exact
+  // failure mode the four-layer invariant exists to make impossible. The gate
+  // must refuse the member: memberBinding returns undefined for it, so a
+  // forged call cannot resolve an executor (JS-004).
+  const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
+  // lie: 'rewrite' is NOT in this surface's bindings (Inspector has no Edit)
+  assert.equal(memberBinding('Inspector', perms, 'rewrite'), undefined)
+  assert.equal(memberBinding('Inspector', perms, 'write'), undefined)
+  // the honest members resolve
+  assert.equal(memberBinding('Inspector', perms, 'file'), 'js.read')
+  // a lying description would name methods the surface lacks; the generator
+  // never does — prove the surface itself contains no unbounded members
+  const result = generate('Inspector', perms)
+  const names = listItems(result.Members).map((f) => f.MemberName)
+  for (const name of names) {
+    assert.notEqual(memberBinding('Inspector', perms, name), undefined, `${name} must resolve`)
+  }
+  assert.equal(names.includes('rewrite'), false)
+})

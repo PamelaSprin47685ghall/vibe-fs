@@ -5356,10 +5356,17 @@ crash recovery 只从 EventStore facts/payloads 重建。
 - [ ] hook 文案接入 Host transform（改写 provider 可见的内置工具 description；SpikePlugin transform 高风险区，独立处理）
 - [x] 保留 builtin read/edit/write/glob/grep/patch 原 schema / 原实现（no alias takeover；契约测试更新）
 
-### Phase D — proof（第四阶段）
-- [ ] unit：generator equivalence / lying-generator counterexample / anchor / read/glob/grep / mutation / transaction / recovery / return / sandbox / coexistence
-- [ ] Long Stroke 受影响路径回归；`npm run check` + `npm run check:release` GREEN
+### Phase D — proof（第四阶段）— PARTIAL（unit 全绿；§107 未全勾选）
+- [x] unit：generator equivalence / lying-generator counterexample（JS004 反例）/ four-layer exactness / anchor / read/glob/grep / mutation / transaction / recovery（EventStore facts）/ return / sandbox / coexistence（53 个 js-tools 单测全绿）
+- [x] Long Stroke 受影响路径回归；`npm run check` GREEN（多次）
+- [ ] `npm run check:release`（最终门禁，收口前跑）
 - [ ] proposal §107 Completion Criteria 全勾选 → Final outcome → completed
+  - 满足：Authority / Generator / SDK / File API / Primitive Semantics / Return / Transaction（含 EventStore durable）/ Security / Migration / Proof 各项
+  - **未满足：Builtin Coexistence + Hook 的运行时接入**（C-3：hook 纯函数 + 测试已交付，但 provider 可见的内置工具 description 改写未接入 Host transform——SpikePlugin transform 无 tools 数组操作点，接入需独立调查 Host request 结构，属高风险改动，列为 Active blocker，不得伪造完成）
+
+## Blockers
+
+- **C-3（Active）**：`BuiltinToolDescriptionHook` 运行时接入。hook 文案生成/幂等/可见性校验已交付并测试；改写 provider 可见的内置工具 description 需要定位 Host chat.params/transform 的 tools 数组注入点（SpikePlugin transform 当前无 tools 操作），涉及 Host 请求结构调查。§107「Builtin Coexistence + Hook」在接入前不得勾选。
 
 ## Completion criteria
 
