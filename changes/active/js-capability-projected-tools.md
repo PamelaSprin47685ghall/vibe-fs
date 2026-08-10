@@ -5329,21 +5329,21 @@ crash recovery 只从 EventStore facts/payloads 重建。
 
 按 proposal §104 Implementation Order（Student/Teacher 项按 Amendment JS-G3 删除）：
 
-### Phase A — capability algebra + generator（Playbook §12.2 第一阶段）
-- [ ] Formal docs：`docs/{why,what,shape,how,proof}/js-tools.md`（Clause 前缀 `JS-`）；`docs/README.md` 索引
-- [ ] Domain capability algebra（`src/Wanxiangshu/Domain/JsTools/`）：primitive capability × anchor rules × surface projection rules × failure algebra
-- [ ] Capability Fragment Registry（`JsCapabilityFragment`；member/description/example/runtime binding 同源）
-- [ ] `JsToolGenerator`：从 `AttemptExecutionProfile.ToolCapabilitySet` 确定性生成 js-ROLE（name/schema/description/base class/examples/runtime bindings）
-- [ ] generated description / base-class renderer
-- [ ] ToolRegistry generated-name gate（运行时校验 invoked name 属于当前 Attempt 生成 surface；forged call fail closed）
-- [ ] 静态门禁：no handwritten role→JS matrix（`scripts/checks/`）
+### Phase A — capability algebra + generator（Playbook §12.2 第一阶段）— DONE（6085ae6a）
+- [x] Formal docs：`docs/{why,what,shape,how,proof}/js-tools.md`（Clause 前缀 `JS-`）；`docs/README.md` 索引
+- [x] Domain capability algebra（`src/Wanxiangshu/Domain/JsTools.fs`）：primitive capability × anchor rules × surface projection rules × failure algebra
+- [x] Capability Fragment Registry（`JsFragmentRegistry`；member/description/example/runtime binding 同源）
+- [x] `JsToolGenerator`：从 `AttemptExecutionProfile.ToolCapabilitySet` 确定性生成 js-ROLE（name/schema/description/base class/examples/runtime bindings）
+- [x] generated description / base-class renderer
+- [x] ToolRegistry generated-name gate（`isGeneratedToolName` / `memberBinding`；forged call fail closed）
+- [x] 静态门禁：`scripts/checks/js-surface-gate.mjs` wired into `check.mjs`
 
-### Phase B — sandbox + transaction（Playbook §12.3 第二阶段）
-- [ ] sandbox runner（Process/；无 ambient authority；deadline/kill/reap；memory/output bounded）
-- [ ] `file()` / FileView（immutable snapshots）/ anchors（ordered string/RegExp；5 类拒绝）
-- [ ] `glob()`（bounded deterministic enumeration）
-- [ ] `rewrite()` / `write()` staging（ephemeral；durability 不在此步）
-- [ ] transaction engine（preflight → prepare → commit → rollback；durable prepare = EventStore only；crash recovery）
+### Phase B — sandbox + transaction（Playbook §12.3 第二阶段）— PARTIAL（B-1/B-2/B-3 纯规则 DONE）
+- [x] sandbox runner（`Process/JsSandbox.fs`；vm 无 ambient authority；vm timeout + 递归 deadline proxy；output bound）
+- [x] failure algebra（`JsFailure` 按 proposal §77.1 稳定码）+ anchor 声明纯规则（`AnchorRules`；空锚点/非正 occurrence 拒绝）
+- [x] transaction 纯规则（`JsTransaction`：validateSingleIntent/validateTargets/validateFreshness/preflight/commitPlan/rollbackPlan）
+- [ ] fs adapter：file()/FileView（immutable snapshots）/ anchors 匹配 / glob()（bounded enumeration）/ rewrite()/write() staging（ephemeral）
+- [ ] transaction engine Host 侧（preflight 执行 → durable prepare = EventStore only → commit → rollback → crash recovery）
 - [ ] return serializer（JSON-compatible；result validation 在 commit 前）
 - [ ] Synthetic TOML bridge（JS-016）
 
