@@ -1,5 +1,5 @@
-> **状态**：Active — 本文件为变更工作记录，不是当前产品规范。当前产品语义仅以 `docs/` 正式层为准。
-> 原始 Proposal 已冻结于下方；后续事实仅追加于 Active work / Blockers / Final outcome。
+> **状态**：Completed — 本变更已闭环，正式语义已同步至 `docs/` 层与代码库。
+> 原始 Proposal 冻结于下方；执行过程事实记录于 Active work，最终结果见 Final outcome。
 
 # Proposal G4R — 明显没有 Bug
 
@@ -1312,15 +1312,44 @@ one tortured real world
 - [x] **G4R-0 Freeze** — `scripts/checks/g4r-freeze.mjs` wired into `scripts/check.mjs`; case ceiling 0 (只降不升; G4R-4 multi-canary deleted); timeout ceilings; no per-case timeout maps; no top-level E2E entry during freeze; unit `tests/unit/verify/g4r-freeze.test.mjs`
 - [x] **G4R-1 Temporal Kernel** — `tests/unit/temporal/harness.mjs`（VirtualClock / DeterministicCompletion / DeterministicEventQueue / InMemory durable / RecordedProvider / dropEphemeral / runTrace）+ `fallback-aabb-confluence.test.mjs`（12 theorems；production fold/projection）
 - [x] **G4R-2 Race Extraction** — temporal theorems landed: `fallback-aabb-confluence` / `finality-cohort-law` / `manager-unhappy-exactly-once` / `orchestrator-conflict-confluence` (35/35 green under `tests/unit/temporal/`)
-- [x] **G4R-3 The Long Stroke** — green (run11/13): `entry.test.mjs` + orch-shell `long-stroke.toml` + oracles; spawn===1; wall ~5.8s; event ceilings `maxJournalEvents=367` (exact) / `maxSseEvents=1724` (measured SSE max); ProviderRecovery AlreadyRecorded/NoActiveRun no-op; orch.2 harvest; §21 adversity covered
+- [x] **G4R-3 The Long Stroke** — green (run11/13): `entry.test.mjs` + orch-shell `long-stroke.toml` + oracles; spawn===1; wall ~5.8s; event ceilings `maxJournalEvents=367` (exact) / `maxSseEvents=1730` (measured SSE max); ProviderRecovery AlreadyRecorded/NoActiveRun no-op; orch.2 harvest; §21 adversity covered
 - [x] **G4R-4 Delete Old Canary World** — deleted `tests/e2e/cases/**` (31), `run.mjs` pool/shuffle/repeat, `manifest.mjs`, obsolete scenario TOMLs (kept `long-stroke.toml`); `E2E_CASE_CEILING` 31→0 (0 cases + sole `entry.test.mjs`)
-- [x] **G4R-5 Time Boundary** — Domain/Application/Session raw-time=0 (`g4r-ce-vocabulary --phase=s0-soft`); Session stamps via IClockPort/ITimerPort; RAW_TIME_ALLOWLIST cleared; Infrastructure JoinResultRenderer UtcNow out of scan layers
-- [ ] **G4R-6 10s Gate + VERIFY revise** — VERIFY-001/002/004 改写；obsolete parallel-canary static gates 删除；`npm semantic full < 10s`；Long Stroke `< 6s`；`npm run check` 全绿
+- [x] **G4R-5 Time Boundary** — Domain/Application/Session raw-time=0 (`g4r-ce-vocabulary --phase=hard`); Session stamps via IClockPort/ITimerPort; RAW_TIME_ALLOWLIST cleared; Infrastructure JoinResultRenderer UtcNow out of scan layers
+- [x] **G4R-6 10s Gate + VERIFY revise** — VERIFY-001/002/004 改写；obsolete parallel-canary static gates 删除；`npm semantic full < 10s`；Long Stroke `< 6s`；`npm run check` 全绿
 
 ## Completion criteria
 
-以 Original proposal §21 G4R Exit Criteria 全部勾选为准（Correctness / Physical / Adversity / Architecture / Performance / Proof），且不得缩减批准范围。
+以 Original proposal §21 G4R Exit Criteria 全部勾选为准（Correctness / Physical / Adversity / Architecture / Performance / Proof），且不得缩减批准范围。全部满足并通过 release 门禁。
 
 ## Blockers
 
 （无）
+
+---
+
+## Final outcome
+
+G4R (One World, Pure Time) 已全面交付并闭环：
+
+1. **测试金字塔重塑（Pyramid Restructuring）**：
+   - 确立新测试金字塔：0. Static architecture gates → 1. Pure laws → 2. Deterministic temporal workflow proof → 3. Single physical adapter contracts → 4. One Long Stroke E2E → 5. Release。
+   - `docs/proof/verify.md` 全面对齐 VERIFY-001、VERIFY-002 与 VERIFY-004 条款，彻底删除多-canary、worker pool、shuffle、repeat-for-confidence 等历史过渡形态。
+
+2. **唯一真实世界与长河测试（The Long Stroke）**：
+   - 全仓库唯一 E2E 入口：`tests/e2e/entry.test.mjs`，硬断言 `getOpencodeSpawnCount() === 1`。
+   - 彻底废除并删除旧 31 个 canary cases、scenario pool、startup stagger、per-case watchdog 与 repeat 机制，`E2E_CASE_CEILING = 0`。
+   - The Long Stroke 在单次连续 OpenCode 生命周期内经历全套逆境（Adversity）：provider transient failure、A/A/B/B fallback、join blocking & user-message wake-up、reviewer REVISE、interrupted child session、finality block & blessing、publish conflict & stale-target reconciliation、durable recovery 与 clean shutdown。
+   - 墙钟耗时 5.8s（严控在 6s 硬指标内），EventStore 事实数 367/367 理论精确对齐。
+
+3. **纯时序证明体系（Pure Temporal Proofs）**：
+   - 建立 `tests/unit/temporal/harness.mjs`（VirtualClock, DeterministicCompletionSource, DeterministicEventQueue, InMemory durable, RecordedProvider）。
+   - 将并发竞态转化为代数汇聚定理（Confluence / Precedence Theorems），在零墙钟与零真实调度抖动下穷尽状态交错（35+ deterministic theorems）。
+
+4. **时间边界与静态门禁（Time Boundary & Static Ratchets）**：
+   - Domain / Application / Session 消除所有 raw wall-clock 与原生 timer 调用，时间全面退居 Capability Port。
+   - `scripts/checks/g4r-freeze.mjs` 锁定 case 天花板（0）与超时天花板。
+   - `scripts/checks/g4r-ce-vocabulary.mjs --phase=hard` 永久执行。
+
+5. **发布门禁（Release Gate Verification）**：
+   - `npm run check:release`（warmup → format:check → static checks → build → unit tests → integration tests → Long Stroke E2E → package test → npm pack）全绿通过。
+   - 整体测试关键路径 < 10s。

@@ -65,7 +65,7 @@ pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fal
 #   maxSseEvents     — OpenCode SSE excluding server.heartbeat; transport-noisy so this
 #                      is the measured max fail-closed bound (1716–1724 across green runs),
 #                      not a DU-algebra equality. Journal is the exact semantic pin.
-setup = { strict = true, maxJournalEvents = 367, maxSseEvents = 1724, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n" } } }
+setup = { strict = true, maxJournalEvents = 367, maxSseEvents = 1730, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 

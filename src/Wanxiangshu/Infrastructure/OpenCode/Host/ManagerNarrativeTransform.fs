@@ -232,7 +232,7 @@ module ManagerNarrativeTransform =
             // never stacks a second tail. Migration Lives (AgentOwnerRoot
             // managers) are never rewritten — the Host's assignment is not a
             // Birth (GLORY-012/068).
-            | Some life when isHumanRootManager durable sid ->
+            | Some life ->
                 let openingId = PhysicalUserMessageId.value life.OpeningUserMessageId
 
                 rawMessages
@@ -264,7 +264,6 @@ module ManagerNarrativeTransform =
                                 ManagerNarrative.reawakening rawText
 
                         Some(rewriteMessage rawMessages messageIndex narrative))
-            | Some _ -> None
             // No open Life: a new HumanRoot opens one (GLORY-012/063).
             | None ->
                 if not (isHumanRootManager durable sid) then
