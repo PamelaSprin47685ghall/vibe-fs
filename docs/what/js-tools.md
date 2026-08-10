@@ -32,7 +32,7 @@ Clause 前缀 `JS-`。本页只冻结 observable semantics，不规定内部模�
 
 ## JS-008 rewrite()
 
-改写已存在文件。与 `write()`（创建缺失文件）语义分离：目标不存在时 `rewrite()` 失败为 `FILE_MISSING`，目标已存在时 `write()` 失败为 `FILE_EXISTS`。
+改写已存在文件。与 `write()`（创建缺失文件）语义分离：目标不存在时 `rewrite()` 失败为 `FILE_NOT_FOUND`，目标已存在时 `write()` 失败为 `FILE_ALREADY_EXISTS`。
 
 ## JS-009 write()
 
@@ -76,4 +76,4 @@ normal 失败路径回滚全部 staged 效果。crash 恢复只从 EventStore fa
 
 ## JS-019 Failure algebra
 
-失败以稳定失败码表达（如 `FILE_MISSING` / `FILE_EXISTS` / `FILE_CHANGED` / `FILE_NOT_UTF8` / `ANCHOR_*` / `CAPABILITY_DENIED` / `SANDBOX_*`），LLM-visible errors 可读且稳定；不把程序可预见失败伪装成异常。
+失败以稳定失败码表达（proposal §77.1：`INVALID_PROGRAM` / `PROGRAM_FAILED` / `PROGRAM_TIMEOUT` / `PERMISSION_DENIED` / `PATH_DENIED` / `FILE_NOT_FOUND` / `FILE_ALREADY_EXISTS` / `INVALID_UTF8` / `ANCHOR_NOT_FOUND` / `ANCHOR_NOT_UNIQUE` / `DUPLICATE_MUTATION_TARGET` / `RESULT_TOO_LARGE` / `INVALID_RETURN_VALUE` / `FILE_CHANGED` / `TRANSACTION_*` / `UNKNOWN_MEMBER`），LLM-visible errors 可读且稳定；不把程序可预见失败伪装成异常，不从 exception message 反推业务错误种类。

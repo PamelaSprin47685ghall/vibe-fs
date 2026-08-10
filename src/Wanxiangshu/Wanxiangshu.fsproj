@@ -148,6 +148,7 @@
     <Compile Include="Process/Spool.fs"/>
     <Compile Include="Process/ProcessOutput.fs"/>
     <Compile Include="Process/ProcessRunner.fs"/>
+    <Compile Include="Process/JsSandbox.fs"/>
     <Compile Include="Process/PtyTypes.fs"/>
     <Compile Include="Process/PtySession.fs"/>
     <Compile Include="Process/Pty.fs"/>

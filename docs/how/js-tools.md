@@ -68,4 +68,4 @@ runner 只获得显式注入的数据（路径字符串、FileView 内容、glob
 
 ## Failure algebra
 
-程序可预见失败 = 稳定失败码返回（`FILE_MISSING` / `FILE_EXISTS` / `FILE_CHANGED` / `FILE_NOT_UTF8` / `ANCHOR_*` / `CAPABILITY_DENIED` / `SANDBOX_*`）。异常只留给程序无法继续的事故（进程崩溃、Host 故障）。
+程序可预见失败 = 稳定失败码返回（proposal §77.1：`FILE_NOT_FOUND` / `FILE_ALREADY_EXISTS` / `FILE_CHANGED` / `INVALID_UTF8` / `ANCHOR_*` / `PERMISSION_DENIED` / `PATH_DENIED` / `PROGRAM_*` / `TRANSACTION_*` / `DUPLICATE_MUTATION_TARGET` / `RESULT_TOO_LARGE` / `INVALID_RETURN_VALUE`）。异常只留给程序无法继续的事故（进程崩溃、Host 故障）；不从 exception message 反推业务错误种类。
