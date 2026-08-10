@@ -5356,21 +5356,17 @@ crash recovery 只从 EventStore facts/payloads 重建。
 - [ ] hook 文案接入 Host transform（改写 provider 可见的内置工具 description；SpikePlugin transform 高风险区，独立处理）
 - [x] 保留 builtin read/edit/write/glob/grep/patch 原 schema / 原实现（no alias takeover；契约测试更新）
 
-### Phase D — proof（第四阶段）— PARTIAL（unit 全绿；§107 未全勾选）
-- [x] unit：generator equivalence / lying-generator counterexample（JS004 反例）/ four-layer exactness / anchor / read/glob/grep / mutation / transaction / recovery（EventStore facts）/ return / sandbox / coexistence（53 个 js-tools 单测全绿）
+### Phase D — proof（第四阶段）— DONE
+- [x] unit：generator equivalence / lying-generator counterexample（JS004 反例）/ four-layer exactness / anchor / read/glob/grep / mutation / transaction / recovery（EventStore facts）/ return / sandbox / coexistence（54 个 js-tools 单测全绿）
 - [x] Long Stroke 受影响路径回归；`npm run check` GREEN（多次）
-- [ ] `npm run check:release`（最终门禁，收口前跑）
-- [ ] proposal §107 Completion Criteria 全勾选 → Final outcome → completed
-  - 满足：Authority / Generator / SDK / File API / Primitive Semantics / Return / Transaction（含 EventStore durable）/ Security / Migration / Proof 各项
-  - **未满足：Builtin Coexistence + Hook 的运行时接入**（C-3：hook 纯函数 + 测试已交付，但 provider 可见的内置工具 description 改写未接入 Host transform——SpikePlugin transform 无 tools 数组操作点，接入需独立调查 Host request 结构，属高风险改动，列为 Active blocker，不得伪造完成）
+- [x] `npm run check:release` GREEN（EXIT 0：warmup → check → Long Stroke → package → npm pack）
+- [x] proposal §107 Completion Criteria 勾选（用户裁决 2026-08-10：C-3 按共存满足，见 Blockers）
 
 ## Blockers
 
-- **C-3（Active；平台限制调查结论）**：`BuiltinToolDescriptionHook` 运行时接入。
-  - 调查：OpenCode 插件 API 中 `chat.params` output 无 tools 数组；`tool.definition` hook（`@opencode-ai/plugin` `index.d.ts:314`）可以改写 description，但其 `input` 只有 `{ toolID }`——**无 agent/session 上下文**。hook 无法知道当前 Attempt 的角色，也就无法推荐"当前 provider 可见的 js-ROLE"。
-  - 冲突：proposal §72 / JS-003「钩子文案提到的 js-ROLE 必须同时 provider-visible」在无 agent 上下文下无法满足；列出全部 js-* 名会向 Meditator 等无 fs 角色推荐不可见工具（说谎钩子）。
-  - 按 Playbook §28（同 ownership plane 冲突 STOP → Active blocker）：**需要用户裁决**——接受「钩子不接入、builtin 共存保持」作为 §107 Builtin Coexistence 的满足方式，或指定其它引流机制（如 agent 系统提示注入 Prefer js-ROLE 文案）。
-  - 已交付且可复用：`BuiltinToolDescriptionHook.annotate` / `validateRecommendation` / `hookSuffix`（纯函数 + 测试），接入点确定后直接挂 `tool.definition`。
+- **C-3（RESOLVED — 用户裁决，2026-08-10）**：`BuiltinToolDescriptionHook` 运行时接入。
+  - 调查：OpenCode 插件 API 的 `chat.params` output 无 tools 数组；`tool.definition` hook（`@opencode-ai/plugin` `index.d.ts:314`）可改写 description，但 input 只有 `{ toolID }`——无 agent/session 上下文，无法推荐"当前 provider 可见的 js-ROLE"，会违反 JS-003 可见性约束。
+  - **裁决：接受「钩子不接入、builtin 共存保持」作为 §107 Builtin Coexistence 的满足方式**。builtin read/edit/write/glob/grep/patch 原 schema / 原实现保留，与 js-* 并存（权限矩阵 + 契约测试 + host-hooks 测试证明）；`BuiltinToolDescriptionHook.annotate` / `validateRecommendation` / `hookSuffix` 保留为已交付纯函数（幂等 + 不可见推荐 fail-closed），接入点（`tool.definition`）确定后可直接挂载。
 
 ## Completion criteria
 
@@ -5379,3 +5375,21 @@ crash recovery 只从 EventStore facts/payloads 重建。
 ## Blockers
 
 无（待实施中发现则追加）。
+
+---
+
+## Final outcome
+
+**G5（JS Capability-Projected Tools）已收口**（2026-08-10；用户裁决 C-3 后）：
+
+1. **Capability-projected surface 全链路交付**：`AttemptExecutionProfile.ToolCapabilitySet` → `JsToolGenerator` 确定性生成 js-ROLE（name/schema/description/base class/examples/runtime bindings，四层同构）→ `ToolRegistry` 按角色矩阵注册（无手写 spec）→ `rolePredicate` js-* gate（角色名 + fs capability 双重校验，forged fail-closed）→ `StaticTools` 权限矩阵（js-* allow 仅当角色有 fs capability）→ vm sandbox 执行（无 ambient authority；vm timeout + 递归 deadline proxy；output bound）→ bindings（path boundary；staging-only）→ preflight（同路径单意图/目标存在性/新鲜度）→ EventStore durable facts（`JsTransactionPrepared`/`JsTransactionCommitted`；Prepared 先于任何 fs 效果、Committed 后置；crash recovery 仅撤销可证明写入的效果）→ all-or-nothing commit → Synthetic TOML 稳定结果形状（JS-016）。
+2. **Builtin coexistence**：read/edit/write/glob/grep/patch 原 schema / 原实现保留（契约测试 + host-hooks 证明），与 js-* 并存，无 alias takeover；引流钩子按用户裁决不接入运行时（平台限制：`tool.definition` 无 agent 上下文），`BuiltinToolDescriptionHook` 保留为已交付纯函数。
+3. **G3 rebase debt 未复活**：js-student / js-teacher 无任何实现；Meditator 无 filesystem js 面（`js-meditator` deny + 无 spec）；`js-surface-gate` 静态门禁 fail-closed。
+4. **最终验证**：
+   - js-tools 单测 54 个全绿（surface 10 / sandbox 8 / anchors 3 / transaction 5 / fs 8 / bindings 7 / workflow 7 / tx-store 4 / host 3）
+   - `npm run check` GREEN（多次）
+   - `npm run check:release` GREEN（EXIT 0）
+   - Long Stroke e2e GREEN（48 steps / 5s 级 / ceilings 367/367；无回归）
+5. **§107 满足性（用户裁决后）**：Authority / Generator / SDK / File API / Primitive Semantics / Return / Transaction（含 EventStore durable + crash recovery）/ Security / Migration / Parallel（Host 串行合同）/ Proof 全勾选；Builtin Coexistence + Hook 按「共存 + 钩子函数交付、不接入运行时」满足；Student 项按 Amendment JS-G3 排除。
+
+**Gate 移交**：G5 Exit 达成 → 按 Playbook §0.1/§14，下一步 G6（perm-inspector + Universal Casebook completion）。

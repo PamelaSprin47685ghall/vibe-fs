@@ -90,13 +90,13 @@ Strength
 | **G3** Universal Clean Break | **DONE** | Student/Teacher/QA/SKILL 删除；Meditator → Inspector only；ratchet green |
 | **G3.5** Storage cutover scope 修订 | **DONE** | Amendment G3.5-A；Student QA retired；no migrator / dual-write |
 | **G4** Unified Storage | **DONE** | `changes/completed/storage.md` Final outcome；G4R（`changes/completed/test.md`）后验证：`npm run check` GREEN + Long Stroke GREEN（48 steps / 5.0s / ceilings 367/367）；`check:release` GREEN |
-| **G5** JS Capability-Projected Tools | **READY（待 activate）** | G4 Exit 达成；有早期 prep（`8319771f` capability algebra）；按 §27 标准动作激活 |
-| **G6** perm-inspector + Casebook | **NOT STARTED** | Universal 仍 Active；CaseFinalize / CaseRefresh 未做 |
+| **G5** JS Capability-Projected Tools | **DONE** | `changes/completed/js-capability-projected-tools.md` Final outcome；54 js-tools 单测 + `npm run check` + `check:release` + Long Stroke 全绿；C-3 按用户裁决（共存满足 §107，钩子不接入） |
+| **G6** perm-inspector + Casebook | **READY（待 activate）** | G5 Exit 达成；Universal 仍 Active（CaseFinalize / CaseRefresh 未做） |
 | **G7** Rulebook | **NOT STARTED** | — |
 | **G8** Strength | **NOT STARTED** | — |
 | **G9** Global Convergence | **NOT STARTED** | — |
 
-**当前主线位置：** G4 已 completed → **activate G5**（js-capability-projected-tools）。
+**当前主线位置：** G5 已 completed → **activate G6**（perm-inspector + Universal Casebook completion）。
 
 ## 0.2 自 Playbook 落地以来关键 commit（`31d456ec` 之后）
 
@@ -136,8 +136,8 @@ ac41ef8f  session abort diagnostic
 ✓ Runtime durability = EventStore（Strategy A：AgentJournal 作 adapter surface）
 ✓ 无 legacy NDJSON writer / 无 dual-write / 无 migrator
 ✓ Storage completed（G4）
+✓ JS capability-projected tools（G5；builtin 共存 + js-* 全链路）
 ✗ Casebook cold persistence / CaseFinalize（G6）
-✗ JS capability-projected file tools 全面迁移（G5）
 ✗ Rulebook / Strength
 ```
 
@@ -2074,7 +2074,7 @@ G4 Exit（§43+§48，G3.5-A 修订）→ changes/completed/  ✓ DONE（2026-08
 ```text
 Universal destructive delete          ✓ DONE（2026-08-10）
 Storage cutover                       ✓ DONE（2026-08-10，G4 completed）
-JS legacy tool removal                ○ ACTIVE（G5，本节 activate）
+JS legacy tool removal                ✓ DONE（2026-08-10，G5 completed）
 Casebook observation integration      ○ NOT STARTED（G6）
 Rulebook context migration            ○ NOT STARTED
 Strength promotion                    ○ NOT STARTED
@@ -2485,11 +2485,11 @@ CURRENT（2026-08-10；HEAD ac41ef8f）
     no old-archive read
         │
         ▼
-[6] Capability-Projected JS Tools            ◐ ACTIVE（G5）
+[6] Capability-Projected JS Tools            ✓ DONE
     final filesystem primitive
         │
         ▼
-[7] Inspector Casebook                       ○ NOT STARTED
+[7] Inspector Casebook                       ◐ ACTIVE（G6）
     EventStore
     CaseRefresh
     CaseFinalize
