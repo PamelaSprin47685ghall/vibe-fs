@@ -17,16 +17,13 @@ const checks = [
   join(root, 'checks/student-teacher-absence.mjs'),
   join(root, 'checks/unified-store-gate.mjs'),
   join(root, 'checks/g4r-freeze.mjs'),
-  // G4R-CE-S0: obsolete-controller / raw-time detectors live in
-  // checks/g4r-ce-vocabulary.mjs. NOT hard-wired here — production still has
-  // TurnCompletionProgram / FinalityController / ReviewController / … and Session
-  // raw time. Unit tests prove RED on synthetic trees; CLI default --phase=s0-soft
-  // is warn-only. Harden + add to this list at S14 (--phase=hard).
-  // join(root, 'checks/g4r-ce-vocabulary.mjs'),
+  join(root, 'checks/g4r-ce-vocabulary.mjs'),
 ]
 
 for (const script of checks) {
   const args = [script]
+  // G4R-CE static ratchet in hard mode (S14 / Exit).
+  if (script.endsWith('g4r-ce-vocabulary.mjs')) args.push('--phase=hard')
   // --threshold freezes current Direct-CE debt baseline; must only ever decrease.
   // P0→P2-3c: 157→13. P2-2 Host boundary open allowlist: 13→0.
   if (script.endsWith('dsl-ownership.mjs')) args.push('--threshold=0')

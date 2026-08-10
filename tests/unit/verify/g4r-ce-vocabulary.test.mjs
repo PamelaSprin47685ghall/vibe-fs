@@ -152,13 +152,10 @@ test('G4R_CE_S0_parse_phase_defaults_to_soft', () => {
   assert.throws(() => parsePhase(['--phase=nope']), /unknown --phase/)
 })
 
-test('G4R_CE_S0_production_may_still_be_dirty_soft_scaffolding', () => {
-  // Document current world: detectors run, but S0 does not require a clean tree.
-  const { obsolete, rawTime } = scanG4RCeVocabulary()
-  assert.ok(
-    obsolete.length >= 1,
-    'S0 expects obsolete controllers still present in production (do not delete yet)',
-  )
-  // Session still has UtcNow / timerTask — raw-time debt is expected until S1+.
-  assert.ok(Array.isArray(rawTime), 'raw-time scanner must return an array against production')
+test('G4R_CE_S14_production_is_clean_in_hard_phase', () => {
+  // Production tree is clean of obsolete controllers and raw-time tokens.
+  const { obsolete, rawTime, violations } = scanG4RCeVocabulary()
+  assert.equal(obsolete.length, 0, 'all obsolete controllers must be deleted')
+  assert.equal(rawTime.length, 0, 'no raw wall-clock / timer tokens allowed in Domain/Application/Session')
+  assert.equal(violations.length, 0, 'production is clean under hard phase')
 })

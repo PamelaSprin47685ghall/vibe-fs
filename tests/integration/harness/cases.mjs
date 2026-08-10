@@ -144,9 +144,9 @@ async function runStabilityRepeatCap() {
     });
   } catch (err) {
     rejected = true;
-    assertTrue(err.message.includes('1 through 3'), 'repeat cap diagnostics must name the allowed range');
+    assertTrue(err.message.includes('retired after G4R-4'), 'stability gate must reject repeat runs as retired');
   }
-  assertTrue(rejected, 'stability gate must reject more than three runs');
+  assertTrue(rejected, 'stability gate must reject runs');
 }
 
 function runTitleHistoryIsolation() {
