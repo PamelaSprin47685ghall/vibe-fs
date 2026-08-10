@@ -3406,11 +3406,11 @@ Observation capture 从最终执行层接（G5 后 = builtin read/glob/grep Host
 - [x] maintenance failure ≠ fetch failure（Result 语义；失败保留旧 Case）
 - [ ] Bookkeeper Agent 会话（InternalLeaf + Attached；`edit-qa` 工具 + prompt + 不可见 + single-flight）——Session 深度集成，独立阶段
 
-### G6-F — CaseFinalize（Universal 核心）— NOT STARTED（ReuseScope 深度集成）
-- [ ] ReuseScope close → freeze draft → exactly one CaseFinalize provider transaction → `InspectorCaseCaptured` → retire/release reusable Inspector
-- [ ] unexpected SessionDeleted → 仅 cleanup，不 reconstruct + synthesize
+### G6-F — CaseFinalize（Universal 核心）— PARTIAL（workflow DONE：5e4a721b）
+- [x] `finalizeCase`：exactly-one guard（同 scope 二次 finalize 拒绝；unexpected SessionDeleted 不 reconstruct）
+- [ ] ReuseScope close → freeze draft → retire/release 的 Session 层接线（SyncDelegate 专用 Inspector 会话退役路径）——独立阶段
 
-### G6-G — Universal 最终关闭
+### G6-G — Universal 最终关闭 — NOT STARTED（待 E/F Session 接线）
 - [ ] Universal 最终 e2e（Meditator → same reusable Inspector → multiple questions → no Student/Teacher/QA/SKILL；ReuseScope close → one CaseFinalize → one Case；new Session → new Inspector → fetch → Case）
 - [ ] Universal + perm-inspector → completed（同一 integration window）
 

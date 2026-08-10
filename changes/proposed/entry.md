@@ -91,7 +91,7 @@ Strength
 | **G3.5** Storage cutover scope 修订 | **DONE** | Amendment G3.5-A；Student QA retired；no migrator / dual-write |
 | **G4** Unified Storage | **DONE** | `changes/completed/storage.md` Final outcome；G4R（`changes/completed/test.md`）后验证：`npm run check` GREEN + Long Stroke GREEN（48 steps / 5.0s / ceilings 367/367）；`check:release` GREEN |
 | **G5** JS Capability-Projected Tools | **DONE** | `changes/completed/js-capability-projected-tools.md` Final outcome；54 js-tools 单测 + `npm run check` + `check:release` + Long Stroke 全绿；C-3 按用户裁决（共存满足 §107，钩子不接入） |
-| **G6** perm-inspector + Casebook | **READY（待 activate）** | G5 Exit 达成；Universal 仍 Active（CaseFinalize / CaseRefresh 未做） |
+| **G6** perm-inspector + Casebook | **IN PROGRESS** | G6-A..F-workflow DONE（Casebook domain/capture/store/archive/fetch/replay/fetch-tool/refresh/finalize workflow）；剩余 Session 层接线（Bookkeeper Agent 会话、ReuseScope close 集成）+ Universal 最终 e2e |
 | **G7** Rulebook | **NOT STARTED** | — |
 | **G8** Strength | **NOT STARTED** | — |
 | **G9** Global Convergence | **NOT STARTED** | — |
