@@ -1,16 +1,16 @@
 # Proposal：Dedicated Inspector Learning Collapse — 删除 Student/Teacher，以 Meditator + Dedicated Inspector + Exit-time Casebook Synthesis 统一学习与知识复用
 
-**Status:** Proposed
+**Status:** Proposed（精修：引入 ReuseScope / SessionOwnership；non-reusable vs reusable；CaseFinalize）
 **Priority:** P0 / architecture + capability simplification + context reuse + persistent knowledge reuse
-**Scope:** Agent roles / Meditator / Inspector / synchronous delegation / dedicated Session / Casebook / Student–Teacher removal / Prefix Cache / persistence integration
-**Compatibility:** Clean break for Student / Teacher public and internal role semantics；Casebook feature-disabled repository 继续保持 Casebook 静默
+**Scope:** Agent roles / Meditator / Inspector / synchronous delegation / ReuseScope / dedicated Session ownership / Casebook lifecycle / Student–Teacher removal / Prefix Cache / persistence integration
+**Compatibility:** Clean break for Student / Teacher public and internal role semantics；Dedicated/reusable Inspector 为 baseline；Casebook 继续 repository opt-in 静默；本 Change 同时重构 Session ownership（Work/InternalLeaf × Root/Attached）
 **Related proposals:** `changes/proposed/perm-inspector.md`、`changes/proposed/storage.md`、`changes/proposed/js-capability-projected-tools.md`
 
 ---
 
 # 0. Executive Decision
 
-本 Change 做四个不可分割的裁决。
+本 Change 做四个不可分割的裁决，并引入 `ReuseScope` 与 Session ownership 正式模型（见 §0.5 / §11 / §13.5）。
 
 ## 0.1 删除 Student 与 Teacher
 
@@ -98,7 +98,7 @@ Teacher ≈ Inspector
 
 ---
 
-## 0.3 Inspector 调用改成 caller-owned dedicated Session
+## 0.3 Inspector 调用改成 caller-owned reusable dedicated Session
 
 对所有同步 Inspector caller：
 
@@ -113,14 +113,14 @@ DevOps    → Inspector
 而是：
 
 ```text
-一个 owner Session
+一个 OwnerReuseScope
 +
 Inspector role
 =
 一个 dedicated Inspector Session
 ```
 
-同一 owner 生命周期内：
+同一 ReuseScope 内：
 
 ```text
 inspector(Q1)
@@ -135,9 +135,11 @@ inspector(Q3)
 
 Session、transcript、PrefixEpoch、调查历史持续复用。
 
+> **Dedicated 的 owner 不是“物理 Session 永远”，而是“可证明语义兼容的 ReuseScope”。**
+
 ---
 
-## 0.4 Dedicated Inspector 不再每次调用归档 Case
+## 0.4 Reusable Inspector 不再每次调用归档 Case
 
 这是对 `perm-inspector.md` 最重要的修改。
 
@@ -154,26 +156,26 @@ Session、transcript、PrefixEpoch、调查历史持续复用。
 
 并规定新 Case 的 `Q.md` 是单次 Inspector invocation 的完整 initial prompt，`A.md` 是实际返回 caller 的 bounded ToolResult。
 
-Dedicated Inspector 落地后，该模型不再成立。
+Reusable dedicated Inspector 落地后，该模型不再成立。
 
 新的裁决：
 
 ```text
-owner Session alive
+OwnerReuseScope alive / compatible
 → dedicated Inspector 可被同步调用很多次
 → 每次只积累 ephemeral Case Draft
 → 不 publication
 
-owner Session 最终退出
-→ 对该 dedicated Inspector 的整个生命周期
-→ 做且只做一次 Case synthesis
+ReuseScope 被证明关闭（graceful）
+→ freeze Inspector draft
+→ synthesize once
 → publication 一个 canonical Case
-→ retire Inspector
+→ retire/release dedicated Inspector
 ```
 
 也就是说：
 
-> **Hot knowledge 留在 dedicated Inspector transcript；cold reusable knowledge 只在 owner 退出时编译一次进入 Casebook。**
+> **Hot knowledge 留在 dedicated Inspector transcript；cold reusable knowledge 只在 ReuseScope 关闭时编译一次进入 Casebook。**
 
 这正好取代过去：
 
@@ -191,6 +193,37 @@ Student 学习全过程
 ```text
 Inspector Casebook Case
 ```
+
+同时正式裁决产品边界：
+
+```text
+Dedicated / reusable Inspector Session = baseline capability
+
+Persistent Casebook = repository opt-in
+（`.wanxiang/casebook/` 不存在时 feature 整体静默）
+```
+
+因此“替代 SKILL”应表述为：
+
+> **在启用 persistent Inspector knowledge 的 repository 中，Casebook 取代过去 Student SKILL 的跨任务知识复用职责。**
+
+不是声称所有场景完全等价。
+
+
+# 0.5 旧→新映射（先看这张表）
+
+| 删除的旧概念 | 新归属 |
+| --- | --- |
+| Student reasoning | Meditator（保留 epistemic style，删除 workflow protocol） |
+| Teacher evidence | Inspector |
+| Teacher persistent session | reusable dedicated Inspector（Work Session，非 leaf Satellite） |
+| Teacher CE algebra | generic sync delegate CE（Returned → Completion） |
+| Teacher leaf / no-Companion topology | **不保留** |
+| QA hot knowledge | owner + Inspector transcripts |
+| Compile / SKILL | 删除；cold knowledge → Casebook（opt-in） |
+| one-shot vs dedicated 二分措辞 | non-reusable vs reusable Inspector knowledge lifetime |
+| `(owner SessionId, role)` | `(OwnerReuseScopeId, role)` |
+| owner Session retire → synthesis | graceful ReuseScope close → synthesis once；unexpected `SessionDeleted` / crash → cleanup only |
 
 ---
 
@@ -271,7 +304,7 @@ caller
 无 join
 无 list
 callee Session 长期复用
-caller lifetime ownership
+OwnerReuseScope lifetime ownership
 ```
 
 ---
@@ -353,14 +386,14 @@ Manager concurrency
 与：
 
 ```text
-per-owner synchronous delegate serialization
+per-caller-ReuseScope synchronous delegate serialization
 ```
 
 不存在冲突。
 
 ---
 
-# 4. Agent Catalog：24 → 20
+# 4. Agent Catalog：mandatory baseline 24 → 20
 
 当前正式 Agent 有 Student / Teacher fast/deep pair，因此是 24 个。
 
@@ -380,7 +413,7 @@ type Role =
     | Executor
 ```
 
-因此固定 Agent 数改为：
+因此 **mandatory baseline Agent 数**改为：
 
 ```text
 20
@@ -418,11 +451,24 @@ fail closed
 
 不做 alias。
 
+`perm-inspector` 已定义的 conditional Bookkeeper pair 保持不变：
+
+```text
+Mandatory baseline agents = 20
+
+Casebook enabled:
+  + conditional fast-bookkeeper / deep-bookkeeper pair
+```
+
+**不要写“系统 Agent 总数固定 20”。**
+
+Casebook disabled 时不要求存在 Bookkeeper；enabled 时两者都必须配置。
+
 ---
 
-# 5. Meditator 最终能力：纯 Reasoner
+# 5. Meditator 最终能力：纯 Reasoner + Student epistemic style
 
-目标：
+目标工具面：
 
 ```text
 Meditator
@@ -462,6 +508,32 @@ synthesize
 Meditator
 → Inspector
 ```
+
+删除 Student 后，**不得只改工具矩阵**。最终稿必须正式合并 Student 的认知姿态到 Meditator prompt：
+
+```text
+先形成当前理解
+主动寻找反例
+把事实问题委派 Inspector
+针对 Inspector 回答继续追问
+区分证据 / 推论 / 不确定性
+在理解收敛前避免草率终止
+```
+
+这些只是 prompt discipline。
+
+不得重新出现：
+
+```text
+LearningState
+Compile
+QA
+return
+```
+
+也就是说：
+
+> **保留 Student 的 epistemic style，删除 Student 的 workflow protocol。**
 
 ---
 
@@ -646,11 +718,13 @@ InspectorSkill
 CasebookSkill
 ```
 
-永久学习产物唯一变为：
+在 Casebook 启用的 repository 中，永久学习产物唯一变为：
 
 ```text
 Inspector Casebook Case
 ```
+
+Casebook 未启用时，没有 cold persistent learning artifact；只有 ReuseScope 内的 hot transcript reuse。
 
 ---
 
@@ -683,14 +757,14 @@ caller 如何使用 Inspector answer
 负责：
 
 ```text
-该 owner 已经问过什么
+该 ReuseScope 已经问过什么
 Inspector 已调查过什么
 哪些路径读过
 之前的解释是什么
 新问题和旧调查怎样关联
 ```
 
-在 owner 活着时：
+在 ReuseScope 活着时：
 
 > **这是最高效的知识复用层。**
 
@@ -702,10 +776,10 @@ Inspector 已调查过什么
 
 ## 10.3 Casebook cold memory
 
-owner 最终退出后：
+ReuseScope 最终优雅关闭后：
 
 ```text
-整个 Inspector lifetime
+整个 reusable Inspector lifetime
 → synthesis once
 → one reusable Case
 ```
@@ -721,33 +795,95 @@ owner 最终退出后：
 
 这才是跨 Session / 跨 owner 的知识层。
 
+Casebook 仍是 repository opt-in；未启用时只有 10.1 + 10.2。
+
 ---
 
-# 11. Dedicated Inspector identity
+# 11. ReuseScope：Dedicated 绑定的真正生命周期
+
+本 Change 最重要的概念升级：
+
+```text
+ReuseScope
+=
+这段工作在语义上仍允许复用同一上下文的最大生命周期
+```
+
+典型映射：
+
+```text
+普通 HumanRoot 工作
+→ Logical Run / 可继续多轮的同一语义工作上下文
+
+Manager fork 后反复 fork(existing agent_id, compatible requirement)
+→ 同一个 reusable child scope
+
+Meditator / Coder / DevOps 的一次可复用工作上下文
+→ 对应 reusable agent scope
+```
+
+因此 dedicated key 不是：
+
+```text
+(owner SessionId, Inspector)
+```
+
+而是：
+
+```text
+(OwnerReuseScopeId, SyncDelegateRole)
+```
+
+Host 明确区分：
+
+```text
+普通 completion
+Session 生命周期继续
+SessionDeleted
+```
+
+Teacher 成功 completion 后 Session 不 retire；下一问题继续同一 Session。Manager child join 退休后仍可用同一个 agent id reopen，同一 Session/context 继续使用。所以：
+
+> **不能把 owner Session 进入最终 retire/dispose 直接等同 ReuseScope 终结。**
+
+只有 **ReuseScope 被证明关闭** 时，才：
+
+```text
+freeze Inspector draft
+→ synthesize once
+→ publish
+→ retire/release dedicated Inspector
+```
+
+这样既能及时得到 Case，也不会等到用户物理删除 Chat Session 才保存知识。
+
+---
+
+## 11.1 Dedicated Inspector identity
 
 定义：
 
 ```text
-DedicatedInspector(owner SessionId)
+DedicatedInspector(OwnerReuseScopeId)
 ```
 
 唯一物理绑定：
 
 ```text
-(owner SessionId, Inspector)
+(OwnerReuseScopeId, Inspector)
 → at most one live Inspector Session
 ```
 
 例如：
 
 ```text
-Meditator M1
+Meditator M1 scope
 → Inspector I1
 
-Coder C1
+Coder C1 scope
 → Inspector I2
 
-DevOps D1
+DevOps D1 scope
 → Inspector I3
 ```
 
@@ -759,23 +895,69 @@ DevOps D1
       → Inspector I2
 ```
 
-逻辑 ownership 可以嵌套。
+逻辑 ownership / ReuseScope 可以嵌套。
 
 Host 物理 parent 仍遵守现有 family-root flattening。
 
 ---
 
-# 12. 同 owner 所有同步 delegate 必须串行
+## 11.2 Reuse compatibility 合同
 
-建议全局 invariant：
+Case identity 继续是 Inspector SessionId（见后文），不新造 KnowledgeId。
+
+因此必须有强合同：
 
 ```text
-一个 owner Session
+Reuse same Inspector session
+iff
+new work is compatible with accumulated semantic context.
+```
+
+不兼容：
+
+```text
+close old reuse scope
+→ synthesize old Case
+→ new Inspector session
+```
+
+如果一个 Inspector Session 被用于十个完全不相关任务：
+
+```text
+数据库 → CSS → OAuth → F#
+```
+
+最后硬合成一个 Q/A Case 就会废掉。
+
+这恰好与现有 Manager “compatible context 才 reuse”的原则一致：不兼容则应新开。
+
+---
+
+# 12. 同 caller ReuseScope 所有同步 delegate 必须串行
+
+全局 invariant：
+
+```text
+一个 immediate caller ReuseScope
 同一时刻
 最多一个 active synchronous delegate call
 ```
 
-不是：
+serialization key：
+
+```text
+immediate caller ReuseScope
+```
+
+**不是**：
+
+```text
+family root
+repository
+worktree
+```
+
+也不是：
 
 ```text
 每个 delegate 各自 single-flight
@@ -784,10 +966,25 @@ Host 物理 parent 仍遵守现有 family-root flattening。
 而是：
 
 ```text
-owner-level single-flight
+caller-scope-level single-flight
 ```
 
-例如 DevOps：
+因此嵌套同步调用合法且不会死锁：
+
+```text
+DevOps D waits Coder C
+Coder C independently waits Inspector I
+```
+
+若错误按 family root 串行：
+
+```text
+D 持 family gate 等 C
+C 想拿同一个 family gate 调 I
+→ deadlock
+```
+
+例如同一 DevOps scope：
 
 合法：
 
@@ -859,7 +1056,140 @@ Inspector waits Coder
 
 ---
 
-# 14. Inspector 作为 dedicated callee 时增加 return
+## 13.5 Session ownership 模型重构：Work vs InternalLeaf，Root vs Attached
+
+当前正式 HOST-008 明确：
+
+```text
+Satellite
+→ 只属于 WorkSession
+→ Satellite 不递归
+```
+
+但新结构天然会出现：
+
+```text
+DevOps
+  → dedicated Coder
+      → dedicated Inspector
+          → fetch()
+              → ephemeral Bookkeeper
+```
+
+而 `perm-inspector` 自己又已经提出：
+
+```text
+Inspector WorkSession
+  └─ Bookkeeper Satellite
+```
+
+因此本 Change 必须升级为 **session ownership 模型重构**，不能继续往 `SatelliteKind` 里塞 case。
+
+分离两个正交维度：
+
+```fsharp
+type SessionExecutionClass =
+    | Work
+    | InternalLeaf
+
+type SessionOwnership =
+    | Root
+    | Attached of
+        ownerSessionId: SessionId *
+        attachment: AttachmentKind
+
+type AttachmentKind =
+    | Companion
+    | SyncInspector
+    | SyncCoder
+    | Bookkeeper of transactionId
+```
+
+于是：
+
+```text
+Dedicated Inspector
+= Work execution class
++ Attached ownership
+```
+
+它仍可以获得正常 WorkSession 的 context / Companion 能力。
+
+而：
+
+```text
+Bookkeeper
+= InternalLeaf
++ Attached ownership
+```
+
+仍然是 ephemeral leaf。
+
+这比“所有 attached child 都叫 Satellite”干净得多。
+
+---
+
+## 13.6 复用 Teacher 的调用代数，不复用 Teacher 的 Session 分类
+
+Teacher 当前是特殊叶子、无 Companion。
+
+Dedicated Inspector 却是**故意长期存在**的 hot knowledge session。如果把它也做成无 Companion 的 Satellite，长上下文迟早会撞 context 问题。
+
+现架构规定 Work Session 有自己的 Companion，而 Satellite 是叶子。
+
+因此最终稿明确：
+
+```text
+Teacher 被删除。
+
+保留的是：
+  synchronous CE protocol
+  （send prompt → await Returned → await Completion）
+
+不保留的是：
+  Teacher 的 leaf / no-Companion topology
+```
+
+也就是说：
+
+> **复用 Teacher 的调用代数，不复用 Teacher 的 Session 分类。**
+
+Dedicated Inspector 最好继续是 Work Session，不应该继承 Teacher 的“无 Companion 叶子”性质。
+
+---
+
+## 13.7 Sync delegate 的 tier 绑定必须钉死
+
+Dedicated Session 要吃 prefix/context reuse，就不能每次：
+
+```text
+inspector(fast)
+inspector(deep)
+```
+
+乱切。
+
+第一版裁决：
+
+```text
+owner effective tier
+→ deterministic delegate tier
+```
+
+具体：
+
+```text
+fast owner → fast Inspector / fast Coder
+deep owner → deep Inspector / deep Coder
+```
+
+模型不可每轮选择 target Agent。
+
+否则“一个 dedicated Inspector”这个不变量本身就不成立。
+
+---
+
+# 14. Dedicated Inspector 的 `return` 是 execution profile，不是新业务阶段
 
 普通 Inspector Work Session：
 
@@ -871,7 +1201,18 @@ executor
 fetch?    // Casebook enabled 时
 ```
 
-Dedicated Inspector：
+作为 synchronous dedicated callee 时：
+
+```text
+Role = Inspector
+InvocationMode = SynchronousDelegate
+
+base capabilities
++
+return
+```
+
+工具面：
 
 ```text
 read
@@ -888,23 +1229,27 @@ return
 只完成当前同步 Inspector invocation
 ```
 
-普通 assistant 正文：
+普通 assistant 正文 / idle / reasoning：
 
 ```text
 不得成为 tool result
 ```
 
-idle：
+删除：
 
 ```text
-不得成为 tool result
+StudentLearn
+StudentCompile
 ```
 
-reasoning：
+以后不要再造：
 
 ```text
-不得成为 tool result
+InspectorNormal
+InspectorDelegatePhase
 ```
+
+这是正交 capability / execution profile，不是 lifecycle PC。这点应写进 DSL proof。
 
 这直接推广当前 Teacher 已经验证过的：
 
@@ -913,7 +1258,7 @@ Returned
 → Completion
 ```
 
-协议。
+协议——但不再继承 Teacher Satellite 特例。
 
 ---
 
@@ -923,14 +1268,14 @@ Returned
 
 ```fsharp
 task {
-    use! ownerLease =
-        syncDelegateGate.Acquire(owner)
+    use! scopeLease =
+        syncDelegateGate.Acquire(ownerReuseScope)
 
     let! inspector =
-        attachedSessions.GetOrCreateInspector(owner)
+        attachedSessions.GetOrCreateInspector(ownerReuseScope)
 
     use call =
-        inspectorCalls.Begin(owner, inspector)
+        inspectorCalls.Begin(ownerReuseScope, inspector)
 
     do!
         promptDispatcher.Send(
@@ -956,6 +1301,7 @@ inspector(message): string
 看不到：
 
 ```text
+ReuseScope create/close
 Session create
 Session recovery
 TCS
@@ -963,7 +1309,10 @@ Returned
 Completion
 idle nudge
 Host reconcile
+tier selection
 ```
+
+delegate Agent 由 owner effective tier 确定性绑定，模型不可每轮选择。
 
 ---
 
@@ -996,7 +1345,7 @@ inspector(Q2)
 
 ---
 
-# 17. Dedicated Inspector Session lifetime = owner lifetime
+# 17. Dedicated Inspector Session lifetime = OwnerReuseScope lifetime
 
 不得：
 
@@ -1019,7 +1368,7 @@ return 后 retire Inspector
 正常路径：
 
 ```text
-owner alive
+ReuseScope alive / compatible
 → Inspector alive
 
 owner asks Q1
@@ -1031,9 +1380,17 @@ owner asks Q2
 owner asks Q3
 → same I
 
-owner terminal/retire
-→ finalize Case
-→ retire I
+ReuseScope graceful close
+→ finalize Case once
+→ retire/release I
+```
+
+不兼容新工作时：
+
+```text
+close old ReuseScope
+→ synthesize old Case
+→ open new Inspector under new ReuseScope
 ```
 
 ---
@@ -1080,7 +1437,7 @@ Session transcript 自己就是 hot context。
 
 ---
 
-# 19. `perm-inspector` 必须引入两种 Case lifecycle
+# 19. `perm-inspector` 必须引入两种 Inspector knowledge lifetime
 
 当前 Proposal 默认：
 
@@ -1089,14 +1446,20 @@ Inspector completion
 → Case creation
 ```
 
-修改为：
-
-## 19.1 One-shot Inspector
-
-例如异步独立 Inspector Work Session：
+修改为——**不要再叫 “one-shot vs dedicated”**，而叫：
 
 ```text
-one-shot / non-dedicated Inspector
+Non-reusable Inspector scope
+vs
+Reusable Inspector scope
+```
+
+## 19.1 Non-reusable Inspector scope
+
+例如异步独立 Inspector Work Session，terminal 后不再被兼容 reopen：
+
+```text
+terminal 后可直接 archive
 ```
 
 继续保留旧行为：
@@ -1106,14 +1469,20 @@ Inspector terminal
 → initial Case archive
 ```
 
----
+## 19.2 Reusable Inspector scope
 
-## 19.2 Dedicated reusable Inspector
+包括但不限于：
+
+```text
+Meditator / Coder / DevOps 的 dedicated Inspector
+Manager fork 后可通过 existing agent_id 继续 reopen 的 Inspector
+```
 
 新行为：
 
 ```text
-每个 invocation return
+每个 assignment / return
+→ capture only
 → 不 publication
 
 每个 invocation completion
@@ -1125,13 +1494,15 @@ Inspector idle
 owner 普通一个 turn 完成
 → 不 publication
 
-owner 继续下一用户 turn
+owner 继续下一用户 turn（同一 ReuseScope）
 → 不 publication
 
-只有 owner Session 最终 retire
-→ final synthesis
+只有 ReuseScope 最终被证明关闭
+→ final synthesis exactly once
 → publication once
 ```
+
+于是 Meditator dedicated Inspector 只是 reusable Inspector 的一个生产者，不是 Casebook 特例。
 
 这是本 Proposal 最重要的 Casebook 改动。
 
@@ -1177,7 +1548,7 @@ LRU 噪声
 
 # 21. 新增 Ephemeral `InspectorCaseDraft`
 
-Dedicated Inspector 活着期间，需要一个**非权威、进程内、可丢失**的 capture resource。
+Reusable Inspector 活着期间，需要一个**非权威、进程内、可丢失**的 capture resource。
 
 示意：
 
@@ -1189,7 +1560,7 @@ type InspectorCallCapture =
       Observations: CapturedObservation list }
 
 type InspectorCaseDraft =
-    { OwnerSession: SessionId
+    { OwnerReuseScope: ReuseScopeId
       InspectorSession: SessionId
       OwnerOpening: string option
       Calls: ResizeArray<InspectorCallCapture>
@@ -1297,7 +1668,7 @@ I read file2
 I grep file3
 ```
 
-owner exit synthesis 后的新 Case：
+ReuseScope-close synthesis 后的新 Case：
 
 ```text
 observations =
@@ -1314,17 +1685,22 @@ Case B depends-on Case A runtime graph
 
 ---
 
-# 25. Owner exit 时到底 synthesize 什么
+# 25. ReuseScope close 时到底 synthesize 什么
 
-Finalization 输入至少包括：
+Finalization 的 evidence base：
 
 ```text
-1. Owner opening / assignment
+1. Owner opening / assignment（若有）
 2. 按调用顺序排列的全部 Inspector questions
 3. 每个 Inspector 实际返回 caller 的 bounded Answer
-4. Owner terminal output
-5. 全生命周期 flatten 后的 captured observations
-6. 对应 evidence snapshot
+4. 全生命周期 flatten 后的 captured observations
+5. 对应 evidence snapshot
+```
+
+可选低信任 hint：
+
+```text
+6. Owner terminal output（optional low-trust organizational hint）
 ```
 
 注意：
@@ -1337,13 +1713,23 @@ Owner hidden reasoning
 
 知识传递仍只使用真实 transcript/tool boundary 已存在的内容。
 
+正式证据边界：
+
+```text
+Inspector Q/A + observations
+= synthesis evidence base
+
+owner terminal
+= optional low-trust synthesis hint
+```
+
+> **任何进入 canonical A 的 repository factual claim，不得仅因 owner terminal 出现就被视为 evidence-backed。**
+
 ---
 
-# 26. 为什么要包含 Owner terminal output
+# 26. Owner terminal 为何只是低信任 hint
 
-原 Student/SKILL 的价值不只是 Teacher 的局部回答。
-
-还有 Student 最后的综合。
+原 Student/SKILL 的价值不只是 Teacher 的局部回答，还有 Student 最后的综合。
 
 删除 Student 后，该综合现在发生在：
 
@@ -1351,17 +1737,37 @@ Owner hidden reasoning
 Meditator final answer
 ```
 
-如果 exit-time synthesis 只看 Inspector Q/A：
+Meditator 最终回答可能包含：
 
 ```text
-会漏掉 owner 对这些证据的最终组合关系。
+推论
+取舍
+用户偏好
+未经 Inspector 证明的组织性判断
 ```
 
-因此 normal owner terminal output 应作为低信任 synthesis input。
-
-Bookkeeper 可吸收其中有复用价值的部分。
+因此 exit-time synthesis **可以**把 owner terminal 作为低信任 organizational hint，帮助 Bookkeeper 理解“主人最终认为哪些知识重要”。
 
 但它不是 evidence。
+
+如果只看 Inspector Q/A：
+
+```text
+可能漏掉 owner 对这些证据的最终组合关系
+```
+
+但若把 owner terminal 提升为必需 evidence：
+
+```text
+会破坏 Inspector Casebook 的证据边界
+```
+
+所以正确姿态是：
+
+```text
+保留 Student 最终综合的味道
+不破坏 Inspector Casebook 的 evidence-backed 边界
+```
 
 ---
 
@@ -1398,7 +1804,7 @@ snapshot
 
 ---
 
-# 28. 直接复用现有 Bookkeeper，不新增 Learner/Compiler Agent
+# 28. 直接复用现有 Bookkeeper，但正式增加两种 request contract
 
 不得新建：
 
@@ -1408,6 +1814,9 @@ LearningCompiler
 CaseSynthesizerAgent
 StudentReplacement
 TeacherReplacement
+Learner
+Compiler
+Synthesizer Agent
 ```
 
 直接复用 `perm-inspector` 已经定义的私有 Bookkeeper 机制。
@@ -1421,11 +1830,45 @@ A
 
 且 subject repository 对 Inspector 仍保持只读；Bookkeeper 的 Q/A 修改只发生在 staged Case documents 中。
 
-因此 exit synthesis 就是 Bookkeeper 的一个新入口。
+但现有 Bookkeeper 是为：
+
+```text
+old Q/A
++
+evidence delta
+→ refresh current Q/A
+```
+
+设计的。
+
+新场景是：
+
+```text
+many Q/A
++
+full accumulated evidence
+→ create one canonical Q/A
+```
+
+这不是同一个 prompt。
+
+因此最终稿明确：
+
+```text
+same Bookkeeper Agent
+same edit-qa tool
+same security boundary
+
+but two request contracts:
+  CaseRefresh
+  CaseFinalize
+```
+
+不要假装 refresh prompt 原封不动就能承担 synthesis。
 
 ---
 
-# 29. Exit synthesis staging
+# 29. Exit synthesis staging（CaseFinalize）
 
 建议机械 seed：
 
@@ -1440,15 +1883,15 @@ Staged A
 =
 ordered bounded Inspector answers
 +
-Owner terminal output
+optional Owner terminal hint（low-trust, clearly labeled）
 ```
 
 明确使用结构化低信任 data container。
 
-然后给 Bookkeeper 固定 trusted instruction：
+然后给 Bookkeeper 固定 trusted instruction（CaseFinalize contract）：
 
 ```text
-Convert this completed owner/Inspector working session into one reusable
+Convert this completed reusable Inspector scope into one reusable
 Inspector Case.
 
 Rewrite Q into the smallest faithful canonical inquiry that describes
@@ -1457,7 +1900,10 @@ the durable subject investigated.
 Rewrite A into a self-contained reusable answer containing the
 architecture, constraints, evidence-backed findings, important
 counterexamples and operational consequences that remain useful
-outside this original session.
+outside this original scope.
+
+Treat owner terminal, if present, as an optional organizational hint
+only. Do not treat it as evidence.
 
 Remove conversational scaffolding, task coordination, repeated
 questions, acknowledgements and temporary progress narration.
@@ -1470,25 +1916,49 @@ Do not modify the subject repository.
 
 ---
 
-# 30. Bookkeeper 只能执行一次 synthesis provider call
+# 30. “Bookkeeper exactly once”= 一次 provider transaction
 
 这是用户要求的核心约束：
 
-> **可复用 Inspector 只在主人最后退出时合并处理一次。**
+> **可复用 Inspector 只在 ReuseScope 最后关闭时合并处理一次。**
 
-所以 initial dedicated finalization：
+所以 reusable Inspector finalization：
 
 ```text
-exactly one Bookkeeper synthesis attempt
+at most one Bookkeeper provider transaction
+```
+
+现 Bookkeeper 合法多次调用 `edit-qa`。
+
+因此最终稿不要写得让 Reviewer 误解成：
+
+```text
+只能 edit 一次
+```
+
+正确写法：
+
+```text
+Reusable Inspector finalization:
+  at most one Bookkeeper provider transaction
+
+inside that transaction:
+  edit-qa may be called zero or more times
 ```
 
 禁止：
 
 ```text
-每次 Inspector return 都 Bookkeeper
+每次 Inspector return 都启动 Bookkeeper provider transaction
 每次 owner turn 都 Bookkeeper
 owner idle 时 Bookkeeper
-连续 retry 3 次 Bookkeeper 直到满意
+连续启动第二次 Bookkeeper provider transaction 直到满意
+```
+
+publication CAS 可以纯函数式有限 retry，但：
+
+```text
+不得启动第二次 Bookkeeper provider transaction
 ```
 
 ---
@@ -1498,7 +1968,7 @@ owner idle 时 Bookkeeper
 需要区分：
 
 ```text
-semantic synthesis
+semantic synthesis provider transaction
 ```
 
 与：
@@ -1507,7 +1977,7 @@ semantic synthesis
 storage CAS
 ```
 
-Bookkeeper：
+Bookkeeper provider transaction：
 
 ```text
 最多 1 次
@@ -1538,11 +2008,11 @@ freeze old Case
 → publication
 ```
 
-Dedicated initial synthesis 同样要求：
+Reusable initial synthesis（CaseFinalize）同样要求：
 
 ```text
 freeze final draft
-→ Bookkeeper once
+→ Bookkeeper once（one provider transaction）
 → replay/verify captured observations against current worktree
 ```
 
@@ -1553,7 +2023,7 @@ discard candidate
 do not publish
 ```
 
-**不得第二次启动 Bookkeeper。**
+**不得第二次启动 Bookkeeper provider transaction。**
 
 因为 Casebook 是 best-effort cache。
 
@@ -1561,7 +2031,7 @@ do not publish
 
 ---
 
-# 33. Dedicated synthesis 失败语义
+# 33. Reusable CaseFinalize 失败语义
 
 以下任一失败：
 
@@ -1631,7 +2101,7 @@ Casebook Case = authoritative learned truth
 
 ---
 
-# 35. Dedicated Case 的 Q.md 语义必须修改
+# 35. Reusable Case 的 Q.md 语义必须修改
 
 旧规则：
 
@@ -1640,11 +2110,11 @@ Q.md
 = Inspector invocation 的完整 initial prompt
 ```
 
-这只适用于 one-shot Inspector。
+这只适用于 non-reusable Inspector。
 
 新规则：
 
-## One-shot Inspector
+## Non-reusable Inspector scope
 
 ```text
 Q.md initial
@@ -1653,11 +2123,11 @@ Q.md initial
 
 保持不变。
 
-## Dedicated Inspector
+## Reusable Inspector scope
 
 ```text
 Q.md
-= owner-exit Bookkeeper synthesis 得到的 current canonical inquiry
+= ReuseScope-close Bookkeeper CaseFinalize 得到的 current canonical inquiry
 ```
 
 它不是：
@@ -1671,7 +2141,7 @@ owner prompt 原文
 
 ---
 
-# 36. Dedicated Case 的 A.md 语义
+# 36. Reusable Case 的 A.md 语义
 
 旧规则要求：
 
@@ -1680,9 +2150,9 @@ A.md
 = caller 实际得到的 bounded answer
 ```
 
-这是单轮 Inspector 合理语义。
+这是单轮 / non-reusable Inspector 合理语义。
 
-Dedicated Case 改成：
+Reusable Case 改成：
 
 ```text
 A.md
@@ -1741,13 +2211,13 @@ source = meditator
 reader 不需要知道 Case 是：
 
 ```text
-one-shot
+non-reusable archived
 ```
 
 还是：
 
 ```text
-dedicated synthesized
+reusable synthesized
 ```
 
 它们最终都是：
@@ -1780,17 +2250,17 @@ OwnerKnowledgeId
 Case key = Inspector SessionId
 ```
 
-one-shot：
+non-reusable：
 
 ```text
 I1 → Case I1
 ```
 
-dedicated：
+reusable：
 
 ```text
-I2 被 owner 使用 12 次
-→ owner exit
+I2 在同一 ReuseScope 被使用 12 次
+→ ReuseScope graceful close
 → Case I2
 ```
 
@@ -1803,6 +2273,10 @@ fetch(session_id)
 
 模型保持成立。现 Proposal 当前就是以 Inspector SessionId 确定 Case path 与 fetch identity。
 
+这个设计很好，不建议再造 KnowledgeId。
+
+但它依赖 §11.2 的 reuse compatibility 合同：不兼容工作必须关闭旧 scope 并新开 Inspector，否则一个 Session 混入无关主题会毁掉 Case 质量。
+
 ---
 
 # 39. Dedicated Session Replacement
@@ -1810,7 +2284,7 @@ fetch(session_id)
 如果 dedicated Inspector 可证明永久丢失：
 
 ```text
-owner
+same OwnerReuseScope
 → replacement Inspector I2
 ```
 
@@ -1827,7 +2301,7 @@ replacement：
 
 owner finalization：
   使用当前仍可获得的所有 draft fragments
-  最终 publication key = final active Inspector SessionId
+  最终 publication key = final active Inspector SessionId（同一 ReuseScope）
 ```
 
 不得伪造：
@@ -1861,7 +2335,7 @@ ephemeral Draft：
 恢复 dedicated Inspector Session：
 
 ```text
-按 Attached Session recovery 规则
+按 Attached Work Session recovery 规则
 ```
 
 但 Case Draft：
@@ -1874,7 +2348,7 @@ ephemeral Draft：
 
 ---
 
-## 40.2 Crash 发生在 owner exit synthesis 之前
+## 40.2 Crash 发生在 ReuseScope close synthesis 之前
 
 本次新 Case 可能不存在。
 
@@ -1912,14 +2386,25 @@ initial finalization = no-op / AlreadyPublished
 后续修改只能通过正常：
 
 ```text
-fetch → refresh
+fetch → CaseRefresh
 ```
 
 协议。
 
 ---
 
-# 41. Owner 什么情况下算“最后退出”
+## 40.4 unexpected SessionDeleted
+
+```text
+cleanup only
+no reconstruction synthesis
+```
+
+与 graceful ReuseScope close 分流。详见 §42。
+
+---
+
+# 41. 什么情况下算 ReuseScope“最后关闭”
 
 不能使用：
 
@@ -1935,37 +2420,70 @@ idle
 一次 Assistant completion
 ```
 
-因为同一个 Session 可以多轮。
+因为同一个 Session / 同一个 ReuseScope 可以多轮。
 
-正确 trigger 是：
+也不能简单写成：
 
 ```text
 owner Session 进入最终 retire/dispose
 ```
 
-也就是：
+因为 Host 明确区分普通 completion 与 Session 生命周期；Teacher 成功 completion 后 Session 不 retire。更麻烦的是 Manager child join 退休后仍可用同一个 agent id reopen，同一 Session/context 继续使用。还有独立的 `SessionDeleted`。
 
-> **可以证明以后不会再向该 owner Session 发送新的业务 prompt。**
+正确 trigger 是：
 
-只有这个边界之后，才能开始 dedicated Case synthesis。
+```text
+OwnerReuseScope 被证明关闭，并且以后不会再向该 scope 发送兼容的业务 prompt
+```
+
+只有这个边界之后，才能开始 reusable Case synthesis。
 
 ---
 
-# 42. 正常退出顺序必须固定
+# 42. Graceful finalize 与外部 `SessionDeleted` 必须分开
+
+## 42.1 正常退出顺序（graceful scope close）
 
 推荐：
 
 ```text
-Owner terminal output 已确定
+Owner terminal output 已确定（若有）
 → 禁止新的 SyncDelegate call
 → freeze InspectorCaseDraft
-→ Bookkeeper synthesis once
+→ Bookkeeper CaseFinalize once（one provider transaction）
 → evidence stability verify
 → best-effort local publication
 → best-effort remote sync / store replication
 → retire dedicated Inspector
 → dispose draft
 → owner physical teardown 完成
+```
+
+## 42.2 unexpected physical deletion / crash
+
+如果收到的是：
+
+```text
+HostSignal.SessionDeleted
+```
+
+或 hard crash / ambiguous teardown：
+
+```text
+cleanup only
+no reconstruction synthesis
+```
+
+说明物理 Session 可能已经没了，此时不应该假装还能完成 synthesis。
+
+这也符合“不为了 cache 建第二套恢复 runtime”的方向。
+
+```text
+graceful scope close
+→ best-effort synthesis
+
+unexpected SessionDeleted / crash
+→ cleanup only, no reconstruction synthesis
 ```
 
 ---
@@ -1996,12 +2514,12 @@ remote offline
 
 ---
 
-# 44. 非正常 owner exit
+# 44. 非正常 ReuseScope exit
 
 第一版建议：
 
 ```text
-normal proven terminal
+normal proven graceful ReuseScope close
 → synthesize
 
 operator abort
@@ -2009,6 +2527,7 @@ failed
 abandoned
 ambiguous teardown
 hard crash
+unexpected SessionDeleted
 → do not synthesize
 ```
 
@@ -2045,7 +2564,7 @@ publish
 save_knowledge
 ```
 
-知识 publication 完全由 Session lifecycle 自动触发。
+知识 publication 完全由 ReuseScope lifecycle 自动触发。
 
 模型不负责“记得保存”。
 
@@ -2124,8 +2643,8 @@ session_id -- full Q
 
 ```text
 调查/学习
-→ owner exit synthesis
-→ Casebook
+→ ReuseScope close synthesis
+→ Casebook（repository opt-in）
 → 后续 Inspector 按相关性 fetch
 → Meditator 通过 Inspector 间接复用
 ```
@@ -2151,6 +2670,12 @@ Case = evidence-backed semantic cache
 新方案权限更窄。
 
 不会把一次调查自动升级成未来所有 Agent 的 trusted instruction。
+
+正式表述：
+
+> **在启用 persistent Inspector knowledge 的 repository 中，Casebook 取代过去 Student SKILL 的跨任务知识复用职责。**
+
+未启用 Casebook 时，只有 hot-session reuse，没有 cold knowledge——这是刻意的产品边界，不是遗漏。
 
 ---
 
@@ -2329,7 +2854,7 @@ Student QA domain
 
 ---
 
-# 55. Casebook feature disabled
+# 55. Casebook feature disabled：显式裁决
 
 现 `perm-inspector` 是 opt-in：
 
@@ -2347,7 +2872,17 @@ observation capture 不做
 Casebook publication 不做
 ```
 
-保持。
+**本 Change 继续保持 Casebook opt-in。**
+
+理由：Meditator 已经成为普通公共 reasoner；如果每次 Coder/Meditator/DevOps 使用 Inspector 都默认永久写知识，这是比旧 Student 大得多的行为扩张。
+
+正式裁决：
+
+```text
+Dedicated / reusable Inspector = baseline
+
+Persistent Casebook = repository opt-in
+```
 
 Dedicated Inspector 本身：
 
@@ -2357,7 +2892,7 @@ Dedicated Inspector 本身：
 仍然获得 prefix/history benefit
 ```
 
-只是 owner exit：
+只是 ReuseScope close：
 
 ```text
 不 synthesize
@@ -2376,7 +2911,7 @@ Casebook 只是它的 optional cold persistence。
 
 ---
 
-# 56. Casebook enabled 时 active dedicated Session 不 publish self-case
+# 56. Casebook enabled 时 active reusable Session 不 publish self-case
 
 需要专门写测试保证：
 
@@ -2394,14 +2929,14 @@ M asks Q3
 I returns
 Casebook root unchanged for I
 
-M still alive
+ReuseScope still alive
 Case I absent
 ```
 
 只有：
 
 ```text
-M retires normally
+ReuseScope retires normally / graceful close
 ```
 
 之后：
@@ -2414,10 +2949,10 @@ Case I present
 
 # 57. Dedicated Inspector 可以正常 fetch 其它 Case
 
-“owner exit 才合并一次”只约束：
+“ReuseScope close 才合并一次”只约束：
 
 ```text
-这个 dedicated Inspector 自己产生的新 Case
+这个 reusable Inspector 自己产生的新 Case
 ```
 
 不禁止它：
@@ -2429,12 +2964,17 @@ fetch(existingCase)
 而 `fetch(existingCase)` 如果发现旧 evidence changed：
 
 ```text
-仍可按 perm-inspector refresh 规则启动 Bookkeeper
+仍可按 perm-inspector refresh 规则启动 Bookkeeper CaseRefresh
 ```
 
-因为那是在维护**旧 Case**，不是把当前 dedicated Session 每轮归档。
+因为那是在维护**旧 Case**，不是把当前 reusable Session 每轮归档。
 
-两个机制必须分清。
+两个机制必须分清：
+
+```text
+CaseRefresh  = 维护已存在旧 Case
+CaseFinalize = 关闭 reusable scope 时一次性创建新 Case
+```
 
 ---
 
@@ -2469,7 +3009,7 @@ Exit-time publication 发生时：
 
 ---
 
-# 59. Casebook Index 不因 owner exit 强制刷新其它 Inspector
+# 59. Casebook Index 不因 ReuseScope close 强制刷新其它 Inspector
 
 禁止：
 
@@ -2498,10 +3038,10 @@ Casebook 是 eventual knowledge cache。
 例如：
 
 ```text
-Coder C1
+Coder C1 ReuseScope
 → dedicated Inspector I1
 → 多轮调查
-→ C1 最终完成
+→ C1 ReuseScope graceful close
 → synthesize Case I1 once
 ```
 
@@ -2583,17 +3123,26 @@ Coder
 它的长期上下文仅用于：
 
 ```text
-同 DevOps Session 内继续修改工作
+同 DevOps ReuseScope 内继续修改工作
 ```
 
 它自己如果调用 Inspector：
 
 ```text
-Coder C
+Coder C ReuseScope
 → dedicated Inspector I
 ```
 
-则 I 在 C retire 时 synthesis。
+则 I 在 C 的 ReuseScope graceful close 时 synthesis。
+
+Coder 同样是：
+
+```text
+Work execution class
++ Attached ownership
+```
+
+不是 Teacher-style leaf Satellite。
 
 ---
 
@@ -2638,15 +3187,31 @@ type SyncDelegateRole =
     | Inspector
     | Coder
 
+type ReuseScopeId = ReuseScopeId of string
+
 type DedicatedDelegateKey =
-    { Owner: SessionId
+    { OwnerReuseScope: ReuseScopeId
       Role: SyncDelegateRole }
 
 type DedicatedDelegate =
-    { Owner: SessionId
+    { OwnerReuseScope: ReuseScopeId
       Session: SessionId
       Role: SyncDelegateRole
       Agent: AgentId }
+
+type SessionExecutionClass =
+    | Work
+    | InternalLeaf
+
+type AttachmentKind =
+    | Companion
+    | SyncInspector
+    | SyncCoder
+    | Bookkeeper of transactionId: string
+
+type SessionOwnership =
+    | Root
+    | Attached of ownerSessionId: SessionId * attachment: AttachmentKind
 
 type InspectorCallCapture =
     { Ordinal: int64
@@ -2655,11 +3220,15 @@ type InspectorCallCapture =
       Observations: CapturedObservation list }
 
 type InspectorCaseDraft =
-    { Owner: SessionId
+    { OwnerReuseScope: ReuseScopeId
       Inspector: SessionId
       OwnerOpening: string option
       Calls: ResizeArray<InspectorCallCapture>
       Evidence: ObservationAccumulator }
+
+type BookkeeperRequest =
+    | CaseRefresh
+    | CaseFinalize
 ```
 
 ---
@@ -2669,7 +3238,7 @@ type InspectorCaseDraft =
 ```fsharp
 type ISyncDelegateRuntime =
     abstract Invoke:
-        owner: SessionId *
+        ownerReuseScope: ReuseScopeId *
         role: SyncDelegateRole *
         message: string *
         cancellationToken: CancellationToken
@@ -2689,9 +3258,9 @@ type IInspectorCaseCapture =
 
 type IInspectorCaseFinalizer =
     abstract Finalize:
-        owner: SessionId *
+        ownerReuseScope: ReuseScopeId *
         inspector: SessionId *
-        ownerTerminal: string
+        ownerTerminalHint: string option
             -> Task<unit>
 ```
 
@@ -2713,7 +3282,7 @@ publication API
 try
     return! runOwnerSession ()
 finally
-    do! finalizeDedicatedInspectorBestEffort ()
+    do! finalizeReusableInspectorBestEffort ()
     do! retireAttachedDelegates ()
 ```
 
@@ -2757,9 +3326,9 @@ Meditator M1
 Owner exit synthesis 如果等待 Bookkeeper：
 
 ```text
-Owner teardown
-→ waits Casebook synthesis
-→ Bookkeeper provider attempt
+ReuseScope teardown
+→ waits Casebook CaseFinalize
+→ Bookkeeper provider transaction
 ```
 
 但这仍是：
@@ -2800,7 +3369,7 @@ finish teardown
 不要：
 
 ```text
-owner exits
+ReuseScope closes
 → Task.Run(finalize)
 → owner runtime disappears
 ```
@@ -2818,7 +3387,7 @@ owner exits
 Finalization 必须属于：
 
 ```text
-owner teardown CE
+ReuseScope teardown CE
 ```
 
 只是其失败不反向改变已冻结的 terminal output。
@@ -2844,7 +3413,7 @@ list
 background completion
 ```
 
-只是 owner resource teardown 的 bounded cleanup。
+只是 ReuseScope teardown 的 bounded cleanup。
 
 ---
 
@@ -2900,33 +3469,35 @@ StudentCompileNudge
 
 ## SYNC-004
 
-Dedicated Inspector invocation 不得创建新 Session when existing compatible binding exists。
+Dedicated Inspector invocation 不得创建新 Session when existing compatible ReuseScope binding exists。
 
 ---
 
 ## SYNC-005
 
-同 owner 不得同时存在两个 active sync delegate calls。
+同 immediate caller ReuseScope 不得同时存在两个 active sync delegate calls。
 
 ---
 
 ## SYNC-006
 
-Dedicated Inspector 每次 invocation completion 不得调用：
+Reusable Inspector 每次 invocation completion 不得调用：
 
 ```text
-Casebook initial publication
+Casebook initial publication / CaseFinalize
 ```
 
 ---
 
 ## SYNC-007
 
-Dedicated Casebook initial synthesis 唯一调用点属于：
+Reusable Casebook initial synthesis 唯一调用点属于：
 
 ```text
-owner final retirement path
+graceful OwnerReuseScope close path
 ```
+
+unexpected `SessionDeleted` / crash path 不得 synthesis。
 
 ---
 
@@ -2946,6 +3517,36 @@ business decision
 ## SYNC-009
 
 Casebook persistence implementation 不得从 Meditator/SyncDelegate business runtime 直接访问。
+
+---
+
+## SYNC-010
+
+Dedicated Inspector：
+
+```text
+SessionExecutionClass = Work
+```
+
+不得被实现成 Teacher-style InternalLeaf / no-Companion Satellite。
+
+---
+
+## SYNC-011
+
+Sync delegate tier：
+
+```text
+owner effective tier → deterministic delegate tier
+```
+
+模型不可每轮选择 target Agent。
+
+---
+
+## SYNC-012
+
+Mandatory baseline agents = 20；Casebook enabled 时必须额外配置 conditional Bookkeeper pair。不得把系统 Agent 总数误写成固定 20。
 
 ---
 
@@ -3051,7 +3652,7 @@ caller receives A
 
 ---
 
-## RED-7 — No per-call archive
+## RED-7 — No per-call archive（reusable scope）
 
 Casebook enabled：
 
@@ -3059,7 +3660,7 @@ Casebook enabled：
 Q1 returned
 Q2 returned
 Q3 returned
-owner alive
+ReuseScope alive
 ```
 
 Case key：
@@ -3072,10 +3673,11 @@ absent
 
 ## RED-8 — Exit synthesis exactly once
 
-owner normal retire：
+ReuseScope graceful close：
 
 ```text
-Bookkeeper calls = 1
+Bookkeeper provider transactions = 1
+edit-qa calls >= 0 within that transaction
 Case publication = 1
 ```
 
@@ -3083,13 +3685,13 @@ Case publication = 1
 
 ## RED-9 — No synthesis retry on evidence drift
 
-Bookkeeper 后制造 subject drift。
+Bookkeeper CaseFinalize 后制造 subject drift。
 
 断言：
 
 ```text
 publication absent
-Bookkeeper calls = 1
+Bookkeeper provider transactions = 1
 owner success unchanged
 ```
 
@@ -3158,10 +3760,11 @@ Dedicated reuse：
 
 ## RED-14 — Abnormal exit does not publish
 
-owner operator abort：
+owner operator abort / unexpected SessionDeleted：
 
 ```text
 Case absent
+cleanup only
 ```
 
 ---
@@ -3172,6 +3775,77 @@ publication failure：
 
 ```text
 user-visible terminal == baseline
+```
+
+---
+
+---
+
+## RED-16 — ReuseScope incompatibility opens new Inspector
+
+同一 caller 连续提交语义不兼容任务：
+
+```text
+database investigation
+→ CSS investigation
+```
+
+断言：
+
+```text
+old ReuseScope closed
+old Case synthesized once（Casebook enabled）
+new Inspector SessionId
+```
+
+---
+
+## RED-17 — Nested serialization has no family-root deadlock
+
+```text
+DevOps waits Coder
+Coder waits Inspector
+```
+
+断言：
+
+```text
+both complete
+no deadlock
+serialization keys are immediate caller ReuseScopes
+```
+
+---
+
+## RED-18 — Dedicated Inspector is Work Session
+
+断言：
+
+```text
+Dedicated Inspector has Companion capability path
+not InternalLeaf Satellite
+```
+
+---
+
+## RED-19 — Tier is deterministic
+
+```text
+fast-meditator → fast-inspector only
+deep-meditator → deep-inspector only
+```
+
+模型无法在同 scope 内切换。
+
+---
+
+## RED-20 — Casebook disabled still reuses dedicated Session
+
+```text
+no marker dir
+dedicated reuse works
+0 CaseFinalize
+0 publication
 ```
 
 ---
@@ -3215,7 +3889,7 @@ User selects Meditator
 Meditator asks Inspector multiple related questions
 Inspector reads several repository files
 Meditator returns final synthesis
-Session is retired
+ReuseScope gracefully closes
 ```
 
 验证：
@@ -3227,7 +3901,7 @@ no QA
 no SKILL
 
 one Inspector Session
-one exit Bookkeeper
+one CaseFinalize provider transaction
 one Case
 
 Case Q:
@@ -3338,30 +4012,55 @@ docs/README.md
 
 ## `changes/proposed/perm-inspector.md`
 
-需要系统性重写：
+需要系统性重写；最终稿写成 patch-level checklist，避免只说“需要重写”：
 
 ```text
-Summary
-Case lifecycle
-Q semantics
-A semantics
-Inspector completion archive
-Bookkeeper invocation
-initial publication
-tests
-completion criteria
-implementation order
+perm-inspector §Summary
+  “一次 invocation = Case”
+  → “one reusable Inspector scope = Case”
+     （non-reusable scope 仍可 terminal 后直接 archive）
+
+§6 Q.md
+  initial prompt
+  → non-reusable: full invocation prompt
+  → reusable: canonicalized scope inquiry after CaseFinalize
+
+§6 A.md
+  one ToolResult
+  → non-reusable: bounded ToolResult
+  → reusable: finalized reusable answer after CaseFinalize
+
+§24 Bookkeeper
+  + CaseRefresh request contract（existing refresh）
+  + CaseFinalize request contract（reusable scope close）
+  same agent / edit-qa / security boundary
+
+§41 Inspector completion → Case creation
+  split:
+    non-reusable completion → archive
+    reusable scope close → finalize once
+    active reusable scope completion → capture only, no publication
+
+§ ownership / Satellite
+  Dedicated Inspector is Work + Attached
+  Bookkeeper remains InternalLeaf + Attached
+  do not stuff SyncInspector into old SatelliteKind alone
+
+§81 completion criteria
+  replace per-completion archive assertions
+  add reusable-scope close assertions
+  add “no CaseFinalize on unexpected SessionDeleted”
 ```
 
-明确增加：
+并明确：
 
 ```text
-one-shot Inspector
+Non-reusable Inspector scope
 vs
-dedicated Inspector
+Reusable Inspector scope
 ```
 
-二分。
+二分；不要继续写 “one-shot vs dedicated” 作为正式术语。
 
 ---
 
@@ -3432,7 +4131,7 @@ StudentLearn
 StudentCompile
 QA
 SKILL
-Teacher Satellite
+Teacher Satellite leaf topology
 Teacher return
 Student final return
 idle → compile
@@ -3441,11 +4140,13 @@ idle → compile
 ## 提升成通用 Sync Delegate
 
 ```text
-same Session reuse
+same Session reuse under ReuseScope
 Returned → Completion
-single flight
+caller-ReuseScope single flight
+deterministic tier binding
+Work + Attached ownership（非 Teacher leaf）
 replacement/fail closed
-owner cascade
+owner/scope cascade
 ```
 
 ## 提升成 Casebook
@@ -3597,7 +4298,7 @@ context 达到某大小
 正确边界只有：
 
 ```text
-owner final retirement
+graceful OwnerReuseScope close
 ```
 
 容量问题只能导致：
@@ -3809,9 +4510,10 @@ owner alive → no Case
 
 ```text
 freeze draft
-Bookkeeper once
+Bookkeeper CaseFinalize once（one provider transaction）
 stability verify
 publish best effort
+unexpected SessionDeleted → cleanup only
 ```
 
 先做 unit/integration。
@@ -3823,9 +4525,10 @@ publish best effort
 正式修改：
 
 ```text
-one-shot lifecycle
-dedicated lifecycle
+non-reusable vs reusable Inspector knowledge lifetime
+CaseRefresh + CaseFinalize
 Q/A canonical semantics
+Work+Attached ownership for dedicated Inspector
 completion criteria
 proof
 ```
@@ -3911,9 +4614,15 @@ npm run check:release
 [ ] SKILL compilation 不存在
 [ ] Meditator 无 filesystem tools
 [ ] Meditator 只有 inspector sync delegation
-[ ] Dedicated Inspector owner-local
-[ ] 同 owner sync calls 串行
+[ ] Meditator prompt 合并 Student epistemic style，无 Learning workflow protocol
+[ ] Dedicated key = (OwnerReuseScopeId, role)
+[ ] Dedicated Inspector = Work + Attached，非 Teacher leaf
+[ ] Sync delegate tier 由 owner effective tier 确定性绑定
+[ ] 同 immediate caller ReuseScope sync calls 串行
+[ ] 嵌套 DevOps→Coder→Inspector 无 family-root deadlock
+[ ] Inspector return 是 SynchronousDelegate execution profile
 [ ] Inspector return→completion 双 await
+[ ] Mandatory baseline agents = 20；Casebook enabled 另需 Bookkeeper pair
 [ ] Manager async semantics 未被改变
 ```
 
@@ -3922,19 +4631,24 @@ npm run check:release
 # 92. Completion Criteria — Casebook
 
 ```text
-[ ] one-shot Inspector 可按原生命周期 archive
-[ ] dedicated Inspector 每轮不 archive
-[ ] dedicated Inspector owner exit 才 synthesis
-[ ] 一次 exit 最多一次 Bookkeeper synthesis
-[ ] evidence drift 不重跑 synthesis
+[ ] non-reusable Inspector 可按原生命周期 archive
+[ ] reusable Inspector 每轮不 archive
+[ ] reusable Inspector 仅在 graceful ReuseScope close 时 CaseFinalize
+[ ] 一次 close 最多一次 Bookkeeper provider transaction
+[ ] 该 transaction 内 edit-qa 可多次
+[ ] evidence drift 不重跑 CaseFinalize provider transaction
+[ ] unexpected SessionDeleted / crash：cleanup only，不 synthesis
 [ ] synthesis failure 不影响 owner terminal
+[ ] owner terminal 最多作为 low-trust hint，不得单独支撑 factual claim
 [ ] final Case Q 是 canonical inquiry
 [ ] final Case A 是 bounded reusable answer
 [ ] observations 全生命周期 flatten
 [ ] current worktree stability verify
 [ ] publication atomic
 [ ] active Inspector prefix 不因 publication 改写
-[ ] Casebook disabled 时零附加行为
+[ ] Casebook disabled 时零附加 cold-persistence 行为
+[ ] Dedicated Inspector baseline 在 Casebook disabled 时仍复用 Session
+[ ] Case identity 仍是 Inspector SessionId，并靠 reuse compatibility 保证质量
 ```
 
 ---
@@ -3954,11 +4668,12 @@ npm run check:release
 # 94. Completion Criteria — Recovery
 
 ```text
-[ ] dedicated Inspector 可按 existing attached-session contract reuse/replacement
+[ ] dedicated Inspector 可按 existing attached Work Session contract reuse/replacement
 [ ] Case Draft crash 可丢
 [ ] 无 PendingCase durable workflow
 [ ] hard crash 后不扫描 closed Session 补 synthesis
-[ ] publication 后 teardown crash 不重复 initial synthesis
+[ ] unexpected SessionDeleted 不 reconstruction synthesis
+[ ] publication 后 teardown crash 不重复 initial CaseFinalize
 ```
 
 ---
@@ -3971,14 +4686,19 @@ npm run check:release
 给 Meditator 加 read
 重新加 Student role
 per-call Inspector Session
-两个 sync call 并发
+两个 sync call 在同一 ReuseScope 并发
+按 family root 串行导致嵌套死锁
 return 后不等 completion
 每轮 archive Case
-每轮 Bookkeeper
+每轮 Bookkeeper provider transaction
 timer flush Case
 Draft 写 Journal
+把 Dedicated Inspector 做成 no-Companion leaf
+模型每轮切换 fast/deep Inspector
+把 owner Session retire 直接当唯一 synthesis trigger
 Case 自动注入 Meditator system
 Case 决定业务 workflow
+把系统 Agent 总数误固定为 20（忽略 conditional Bookkeeper）
 ```
 
 ---
@@ -4033,23 +4753,25 @@ Case publication
 
 ---
 
-# 97. 旧系统与新系统的对应表
+# 97. 旧系统与新系统的对应表（复述）
 
-| 旧概念                            | 新概念                                      |
-| ------------------------------ | ---------------------------------------- |
-| Student                        | Meditator                                |
-| Teacher                        | Inspector                                |
-| teacher tool                   | inspector tool                           |
-| Teacher persistent Session     | Dedicated Inspector Session              |
-| Student↔Teacher multiple Q/A   | Meditator↔Inspector multiple sync calls  |
-| QA.md                          | 删除；hot knowledge 留 transcript            |
-| StudentCompile                 | 删除                                       |
-| SKILL synthesis                | Owner-exit Casebook synthesis            |
-| SKILL artifact                 | Inspector canonical Case                 |
-| future SKILL loading           | future Inspector index + fetch           |
-| Teacher Returned→Completion    | generic SyncDelegate Returned→Completion |
-| Teacher Satellite lifetime     | generic attached dedicated Session       |
-| Student learning state machine | 删除                                       |
+完整映射已提前放在 §0.5。此处仅作 Reviewer 收尾复述：
+
+| 旧概念 | 新概念 |
+| --- | --- |
+| Student | Meditator（epistemic style only） |
+| Teacher | Inspector |
+| teacher tool | inspector tool |
+| Teacher persistent Session | reusable dedicated Inspector（Work Session） |
+| Teacher leaf / no-Companion | **删除，不继承** |
+| Teacher Returned→Completion | generic SyncDelegate Returned→Completion |
+| Student↔Teacher multiple Q/A | caller↔Inspector multiple sync calls in one ReuseScope |
+| QA.md | 删除；hot knowledge 留 transcript |
+| StudentCompile / SKILL | 删除；cold knowledge → Casebook（opt-in） |
+| `(owner SessionId, role)` | `(OwnerReuseScopeId, role)` |
+| owner Session retire → synthesis | graceful ReuseScope close → CaseFinalize once |
+| one-shot vs dedicated | non-reusable vs reusable Inspector knowledge lifetime |
+| Student learning state machine | 删除 |
 
 ---
 
@@ -4058,14 +4780,14 @@ Case publication
 成功后的完整知识循环应该只有：
 
 ```text
-当前 Session：
+当前 ReuseScope：
 
 Reasoner
   Meditator
       ↓ asks
 
 Evidence specialist
-  Dedicated Inspector
+  Reusable dedicated Inspector（Work Session）
       ↓ investigates
 
 Repository / runtime evidence
@@ -4080,21 +4802,22 @@ Meditator synthesizes
 User result
 ```
 
-Session 结束：
+ReuseScope graceful close（Casebook enabled）：
 
 ```text
-Owner final knowledge
-+
-Inspector Q/A
-+
-captured evidence
+Inspector Q/A + captured observations
+= evidence base
+
+optional owner terminal
+= low-trust organizational hint
       ↓
-Bookkeeper once
+Bookkeeper CaseFinalize once
+（one provider transaction; edit-qa may repeat inside）
       ↓
 Canonical Inspector Case
 ```
 
-下一 Session：
+下一 ReuseScope：
 
 ```text
 New Inspector
@@ -4103,10 +4826,12 @@ Casebook index
       ↓
 fetch relevant Case
       ↓
-freshness replay
+freshness replay / CaseRefresh if needed
       ↓
 reuse / investigate further
 ```
+
+Casebook disabled 时：循环在 hot transcript reuse 处结束，没有 cold publication。
 
 ---
 
@@ -4116,14 +4841,20 @@ reuse / investigate further
 Meditator
 负责：
   思考
+  （含 Student epistemic style；无 Student workflow protocol）
 
 Inspector
 负责：
   证据
 
+ReuseScope
+负责：
+  定义 dedicated Session 可兼容复用的最大语义生命周期
+
 Dedicated Session
 负责：
-  当前 Session 内的长期上下文复用
+  当前 ReuseScope 内的长期上下文复用
+  Dedicated Inspector = Work + Attached
 
 PrefixEpoch
 负责：
@@ -4131,15 +4862,16 @@ PrefixEpoch
 
 Case Draft
 负责：
-  当前 dedicated Inspector 生命周期的 best-effort capture
+  当前 reusable Inspector 生命周期的 best-effort capture
 
 Bookkeeper
 负责：
-  owner 退出时一次性知识压缩
+  CaseRefresh（旧 Case）
+  CaseFinalize（ReuseScope graceful close，一次性）
 
 Casebook
 负责：
-  跨 Session reusable knowledge cache
+  跨 ReuseScope reusable knowledge cache（repository opt-in）
 
 Observation replay
 负责：
@@ -4172,25 +4904,36 @@ Teacher alias 到 Inspector
 保留 QA 作为 hidden backup
 保留 SKILL 作为 compatibility artifact
 Meditator 继续 read/glob/grep
+只改 Meditator 工具矩阵、不合并 Student epistemic style
 每次 inspector() 创建新 Session
-允许同 owner 并发 sync delegate
+允许同 ReuseScope 并发 sync delegate
+按 family root / repository / worktree 做 sync gate
 Inspector 正文直接当 return
 return 后不等待 completion
+把 Dedicated Inspector 做成 Teacher-style leaf / no-Companion
+把 return 做成 InspectorNormal / InspectorDelegatePhase 业务阶段
+模型每轮选择 fast/deep dedicated Agent
 每轮 Inspector answer archive Case
-每轮增量 Bookkeeper
+每轮增量 Bookkeeper provider transaction
 定时 Case flush
 按 token/context size 提前 compile
 Case Draft 写 Journal
 Case Draft 用于 recovery
 Case Draft 用于业务 branch
 owner idle 被当最终退出
-一次 Assistant completion 被当 Session exit
+一次 Assistant completion 被当 ReuseScope exit
+把 owner Session retire/dispose 直接等同 ReuseScope 终结
+unexpected SessionDeleted 仍强制 reconstruction synthesis
+把 owner terminal 当 evidence base
 Casebook failure 改变 owner terminal
 Case 自动注入 Meditator trusted prompt
 Casebook 成为 correctness proof
 Casebook 成为 PromptAuthority
 为 Casebook 再建第二 persistence system
 为了 storage migration 继续实现 Student QA
+写死“系统 Agent 总数 = 20”（忽略 Casebook Bookkeeper pair）
+新造 KnowledgeId / Learner / Compiler / Synthesizer Agent
+假装 CaseRefresh prompt 原封不动可承担 CaseFinalize
 ```
 
 ---
@@ -4226,11 +4969,11 @@ SKILL
 ```text
 Meditator
 +
-Dedicated Inspector
+Reusable dedicated Inspector（Work Session）
 +
 Inspector transcript
 +
-Exit-time Casebook synthesis
+Graceful ReuseScope-close Casebook CaseFinalize
 ```
 
 前者需要：
@@ -4248,16 +4991,20 @@ Exit-time Casebook synthesis
 后者只需要两个已经有独立价值的通用 primitive：
 
 ```text
-Dedicated synchronous specialist Session
+Dedicated synchronous specialist Session bound by ReuseScope
 +
-Inspector Casebook
+Inspector Casebook（repository opt-in）
 ```
 
 因此最终原则应写成：
 
 > **Reasoning lives in Meditator; evidence lives in Inspector.**
 
-> **Hot knowledge lives in the dedicated Inspector session; cold reusable knowledge is synthesized once, when its owner retires.**
+> **Hot knowledge lives in the dedicated Inspector session; cold reusable knowledge is synthesized once, when its OwnerReuseScope gracefully closes.**
+
+> **Dedicated ownership is not “physical Session forever”; it is a semantically compatible ReuseScope.**
+
+> **Reuse Teacher’s call algebra, not Teacher’s leaf/no-Companion topology.**
 
 > **Learning is no longer a special Agent program. It is ordinary reasoning plus persistent evidence reuse.**
 
