@@ -308,6 +308,7 @@
     <Compile Include="Infrastructure/OpenCode/Tools/BashHoneypotTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/SyncDelegateTools.fs"/>
     <Compile Include="Infrastructure/JsToolsFs.fs"/>
+    <Compile Include="Infrastructure/CasebookCapture.fs"/>
     <Compile Include="Infrastructure/JsToolsBindings.fs"/>
     <Compile Include="Infrastructure/JsToolsTransactionStore.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/JsToolWorkflow.fs"/>
