@@ -30,25 +30,16 @@ import { ScenarioRuntime } from '../support/scenario-runtime.js';
 import { awaitCausalObservation, observeCausalProgress, runStaticGate, setupScenario, teardownScenario, getSessionId } from '../support/index.js';
 import { WATCHDOG_TIMEOUT_MS, ENFORCER_POLL_SLICE_MS } from '../support/time-budget.js';
 import { bindLaneSession } from '../support/lane.mjs';
+import { journalEventLines } from '../support/journal-observer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
 function runtimeFacts(workDir, factName) {
-  const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
-  const runtimeDir = path.join(
-    path.isAbsolute(common) ? common : path.resolve(workDir, common),
-    'wanxiangshu-next',
-    'runtimes',
-  );
-  if (!fs.existsSync(runtimeDir)) return [];
-
-  return fs
-    .readdirSync(runtimeDir)
-    .filter((name) => name.endsWith('.ndjson'))
-    .flatMap((name) => fs.readFileSync(path.join(runtimeDir, name), 'utf8').split('\n'))
-    .filter((line) => line.trim() !== '')
-    .map((line) => JSON.parse(line))
-    .filter((fact) => JSON.stringify(fact).includes(factName));
+  return journalEventLines(workDir)
+    .map((line) => {
+      try { return JSON.parse(line); } catch { return null; }
+    })
+    .filter((fact) => fact && JSON.stringify(fact).includes(factName));
 }
 
 function bloggerRequests(provider, bloggerId) {

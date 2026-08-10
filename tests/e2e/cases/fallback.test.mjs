@@ -11,27 +11,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { journalEventLines } from '../support/journal-observer.js';
 
 import { runCanary } from '../support/scenario-driver.mjs';
 import { runStaticGate } from '../support/index.js';
 
 function runtimeFacts(workDir, factName) {
-  const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], {
-    encoding: 'utf8',
-  }).trim();
-  const runtimeDir = path.join(
-    path.isAbsolute(common) ? common : path.resolve(workDir, common),
-    'wanxiangshu-next',
-    'runtimes',
-  );
-  if (!fs.existsSync(runtimeDir)) return [];
-
-  return fs.readdirSync(runtimeDir)
-    .filter((name) => name.endsWith('.ndjson'))
-    .flatMap((name) => fs.readFileSync(path.join(runtimeDir, name), 'utf8').split('\n'))
-    .filter((line) => line.trim() !== '')
-    .map((line) => JSON.parse(line))
-    .filter((fact) => JSON.stringify(fact).includes(factName));
+  return journalEventLines(workDir)
+    .map((line) => {
+      try { return JSON.parse(line); } catch { return null; }
+    })
+    .filter((fact) => fact && JSON.stringify(fact).includes(factName));
 }
 
 function fieldValues(value, fieldName, values = []) {

@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { awaitCausalObservation, runStaticGate } from '../support/index.js';
 import { runCanary } from '../support/scenario-driver.mjs';
 import { FORK_COMPLETION_WINDOW_MS } from '../support/time-budget.js';
+import { journalEventLines } from '../support/journal-observer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const WAKE_PROMPT = 'The first join was interrupted; start a fresh join and keep waiting for the same child.';
@@ -184,25 +185,7 @@ async function assertJoinTrajectory(scenario, ctx) {
 }
 
 function journalLines(workDir) {
-  const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], {
-    encoding: 'utf8',
-  }).trim();
-  const directory = path.join(
-    path.isAbsolute(common) ? common : path.resolve(workDir, common),
-    'wanxiangshu-next',
-    'runtimes',
-  );
-  if (!fs.existsSync(directory)) return [];
-  return fs
-    .readdirSync(directory)
-    .filter((file) => file.endsWith('.ndjson'))
-    .flatMap((file) =>
-      fs
-        .readFileSync(path.join(directory, file), 'utf8')
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => JSON.parse(line)),
-    );
+  return journalEventLines(workDir);
 }
 
 function factPayloads(lines, caseName) {

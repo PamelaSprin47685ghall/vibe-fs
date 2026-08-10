@@ -16,28 +16,10 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate } from '../support/index.js';
 import { runCanary } from '../support/scenario-driver.mjs';
-import { readJournal } from '../support/journal-observer.js';
+import { readJournal, journalEventLines } from '../support/journal-observer.js';
 
 function journalLines(workDir) {
-  const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], {
-    encoding: 'utf8',
-  }).trim();
-  const dir = path.join(
-    path.isAbsolute(common) ? common : path.resolve(workDir, common),
-    'wanxiangshu-next',
-    'runtimes',
-  );
-  if (!fs.existsSync(dir)) return [];
-  return fs
-    .readdirSync(dir)
-    .filter((file) => file.endsWith('.ndjson'))
-    .flatMap((file) =>
-      fs
-        .readFileSync(path.join(dir, file), 'utf8')
-        .split('\n')
-        .filter((line) => line.trim() !== '')
-        .map((line) => JSON.parse(line)),
-    );
+  return journalEventLines(workDir);
 }
 
 function factPayloads(lines, caseName) {

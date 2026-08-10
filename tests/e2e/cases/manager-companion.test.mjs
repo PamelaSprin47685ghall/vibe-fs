@@ -75,20 +75,13 @@ try {
   // Blogger parks after blog tool cycle — may never go session.idle while parked.
   // Journal BlogEntryCommitted is the completion signal for the first cycle.
   const workDir = scenario.host.workDir;
-  const { execFileSync } = await import('node:child_process');
-  const { join } = await import('node:path');
-  const { existsSync, readdirSync, readFileSync } = await import('node:fs');
-  const runtimeFacts = (factName) => {
-    const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
-    const runtimeDir = join(common.startsWith('/') ? common : join(workDir, common), 'wanxiangshu-next', 'runtimes');
-    if (!existsSync(runtimeDir)) return [];
-    return readdirSync(runtimeDir)
-      .filter((name) => name.endsWith('.ndjson'))
-      .flatMap((name) => readFileSync(join(runtimeDir, name), 'utf8').split('\n'))
-      .filter((line) => line.trim() !== '')
-      .map((line) => JSON.parse(line))
-      .filter((fact) => JSON.stringify(fact).includes(factName));
-  };
+  const { journalEventLines } = await import('../support/journal-observer.js');
+  const runtimeFacts = (factName) =>
+    journalEventLines(workDir)
+      .map((line) => {
+        try { return JSON.parse(line); } catch { return null; }
+      })
+      .filter((fact) => fact && JSON.stringify(fact).includes(factName));
   const blogEntries = await awaitCausalObservation({
     scenario,
     id: 'manager-blog-entry',

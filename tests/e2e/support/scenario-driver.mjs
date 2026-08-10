@@ -204,7 +204,7 @@ export async function awaitFactBarrier(scenario, step) {
   let observed = readJournal(scenario.host.workDir, name, renewOn);
   while (!cmp(observed.named) && Date.now() < deadline) {
     const remaining = Math.max(1, deadline - Date.now());
-    // Journal watch wakes on *.ndjson change; ≤FACT_WAKE_GUARD_MS wall guard is fallback only.
+    // Journal watch wakes on refs/wanxiang/store tip change; ≤FACT_WAKE_GUARD_MS wall guard is fallback only.
     await wakeOnJournal(scenario.host.workDir, Math.min(remaining, FACT_WAKE_GUARD_MS));
 
     const next = readJournal(scenario.host.workDir, name, renewOn);
@@ -742,14 +742,9 @@ export async function runCanary(scriptName, { customs } = {}) {
       }
     }
     if (process.env.SCENARIO_DEBUG_FACTS === '1' && scenario?.host?.workDir) {
-      const common = execFileSync('git', ['-C', scenario.host.workDir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
-      const runtimeDir = path.join(path.isAbsolute(common) ? common : path.resolve(scenario.host.workDir, common), 'wanxiangshu-next', 'runtimes');
-      if (fs.existsSync(runtimeDir)) {
-        for (const file of fs.readdirSync(runtimeDir).filter(name => name.endsWith('.ndjson'))) {
-          console.error(`[scenario-facts] ${file}`);
-          console.error(fs.readFileSync(path.join(runtimeDir, file), 'utf8'));
-        }
-      }
+      const { journalFactTail, storeTip } = await import('./journal-observer.js');
+      console.error(`[scenario-facts] tip=${storeTip(scenario.host.workDir)}`);
+      console.error(journalFactTail(scenario.host.workDir, 40).join('\n'));
     }
     if (scenario) {
       try { await teardownScenario(scenario, { keepOnFailure: true }); } catch {}

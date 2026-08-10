@@ -16,43 +16,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { journalEventLines } from '../support/journal-observer.js';
 
 import { runCanary } from '../support/scenario-driver.mjs';
 import { runStaticGate } from '../support/index.js';
 
 function runtimeFacts(workDir, factName) {
-  const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], {
-    encoding: 'utf8',
-  }).trim();
-  const runtimeDir = path.join(
-    path.isAbsolute(common) ? common : path.resolve(workDir, common),
-    'wanxiangshu-next',
-    'runtimes',
-  );
-  if (!fs.existsSync(runtimeDir)) return [];
-
-  return fs.readdirSync(runtimeDir)
-    .filter((name) => name.endsWith('.ndjson'))
-    .flatMap((name) => fs.readFileSync(path.join(runtimeDir, name), 'utf8').split('\n'))
-    .filter((line) => line.trim() !== '')
-    .map((line) => JSON.parse(line))
-    .filter((fact) => JSON.stringify(fact).includes(factName));
-}
-
-async function runtimeDirOf(workDir) {
-  const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], {
-    encoding: 'utf8',
-  }).trim();
-  return path.join(
-    path.isAbsolute(common) ? common : path.resolve(workDir, common),
-    'wanxiangshu-next',
-    'runtimes',
-  );
+  return journalEventLines(workDir)
+    .map((line) => {
+      try { return JSON.parse(line); } catch { return null; }
+    })
+    .filter((fact) => fact && JSON.stringify(fact).includes(factName));
 }
 
 async function oracle(scenario, ctx) {
-  const runtimeDir = await runtimeDirOf(scenario.host.workDir);
-
   // The coder subagent must have completed (HandleCompleted), never a MISSING_FINAL_REPORT
   // failure. Read the journal's HandleCompleted facts and assert the manager's join saw the
   // coder as completed, not failed.
@@ -62,11 +39,7 @@ async function oracle(scenario, ctx) {
   // The completed coder's join blob must NOT carry a MISSING_FINAL_REPORT failure code, and
   // the manager's own transcript must show the coder's valid report text (proof the empty
   // terminal was repaired and continued, not concluded).
-  const allFactText = fs
-    .readdirSync(runtimeDir)
-    .filter((name) => name.endsWith('.ndjson'))
-    .map((name) => fs.readFileSync(path.join(runtimeDir, name), 'utf8'))
-    .join('\n');
+  const allFactText = journalEventLines(scenario.host.workDir).join('\n');
 
   assert.doesNotMatch(allFactText, /MISSING_FINAL_REPORT/,
     `the coder subagent must never be concluded as MISSING_FINAL_REPORT; facts:\n${allFactText.slice(0, 2000)}`);

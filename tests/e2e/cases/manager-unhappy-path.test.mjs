@@ -15,7 +15,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { runStaticGate } from '../support/index.js';
 import { runCanary } from '../support/scenario-driver.mjs';
-import { readJournal, watchJournal } from '../support/journal-observer.js';
+import { readJournal, watchJournal, journalEventLines } from '../support/journal-observer.js';
 import { WAIT_FACT_WINDOW_MS } from '../support/time-budget.js';
 
 const ROOT_PROMPT = 'Run the full unhappy path in one turn.';
@@ -31,19 +31,7 @@ const pollSlice = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Every journal line of the scenario run, in file order (per-stream seq preserved). */
 function journalLines(workDir) {
-  const common = execFileSync('git', ['-C', workDir, 'rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim();
-  const dir = path.join(path.isAbsolute(common) ? common : path.resolve(workDir, common), 'wanxiangshu-next', 'runtimes');
-  if (!fs.existsSync(dir)) return [];
-  return fs
-    .readdirSync(dir)
-    .filter((file) => file.endsWith('.ndjson'))
-    .flatMap((file) =>
-      fs
-        .readFileSync(path.join(dir, file), 'utf8')
-        .split('\n')
-        .filter((line) => line.trim() !== '')
-        .map((line) => JSON.parse(line)),
-    );
+  return journalEventLines(workDir);
 }
 
 /** The payload of the named fact case wherever it nests inside the envelope. */

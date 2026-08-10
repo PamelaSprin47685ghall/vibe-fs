@@ -28,7 +28,7 @@ export function storeTip(workDir) {
 }
 
 /** Canonical event JSON texts under refs/wanxiang/store (events/**/*.jsonl). */
-const journalEventTexts = (workDir) => {
+export const journalEventLines = (workDir) => {
   const tip = storeTip(workDir);
   if (!tip) return [];
   let listing = '';
@@ -54,6 +54,8 @@ const journalEventTexts = (workDir) => {
     })
     .filter((text) => text.trim() !== '');
 };
+
+const journalEventTexts = journalEventLines;
 
 const factLabelFromEvent = (text) => {
   try {
