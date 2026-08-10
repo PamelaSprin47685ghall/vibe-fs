@@ -24,7 +24,13 @@ export const FORBIDDEN_TOKENS = [
   'StudentTeacherJs',
 ]
 
-/** Literal per-role js-* tool names — only the generator may produce them, at runtime. */
+/**
+ * Literal per-role js-* tool names — only the generator may produce them, at
+ * runtime. The Host permission matrix (Tools/StaticTools.fs knownToolNames) is
+ * the one legitimate static enumeration: the schema layer must name every tool
+ * to emit concrete allow/deny pairs. Everywhere else a literal js-* role name
+ * means a handwritten variant was introduced — fail closed.
+ */
 export const HANDWRITTEN_ROLE_TOOL_TOKENS = [
   'js-coder',
   'js-inspector',
@@ -34,6 +40,9 @@ export const HANDWRITTEN_ROLE_TOOL_TOKENS = [
   'js-meditator',
 ]
 
+/** Files where the static enumeration is legitimate (permission matrix only). */
+const PERMISSION_MATRIX_FILES = ['src/Wanxiangshu/Tools/StaticTools.fs']
+
 const norm = (path) => path.replace(/\\/g, '/')
 
 export const scanEntries = (entries) => {
@@ -42,12 +51,15 @@ export const scanEntries = (entries) => {
     const lines = text.split('\n')
     const check = (i, token, kind) =>
       violations.push({ file, line: i + 1, token, kind, text: lines[i].trim() })
+    const skipHandwritten = PERMISSION_MATRIX_FILES.includes(norm(file))
     for (let i = 0; i < lines.length; i++) {
       for (const token of FORBIDDEN_TOKENS) {
         if (lines[i].includes(token)) check(i, token, 'forbidden')
       }
-      for (const token of HANDWRITTEN_ROLE_TOOL_TOKENS) {
-        if (lines[i].includes(token)) check(i, token, 'handwritten-role-tool')
+      if (!skipHandwritten) {
+        for (const token of HANDWRITTEN_ROLE_TOOL_TOKENS) {
+          if (lines[i].includes(token)) check(i, token, 'handwritten-role-tool')
+        }
       }
     }
   }

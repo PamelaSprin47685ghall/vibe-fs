@@ -58,6 +58,23 @@ module StaticTools =
         | ToolPermission.Return -> "return"
         | ToolPermission.Finality -> "suicide"
 
+    /// JS-001: the generated js-ROLE tool name for a role.
+    let jsToolName (role: Role) : string =
+        "js-" + (string role).ToLowerInvariant()
+
+    /// JS-001: a role whose capability set includes any filesystem permission
+    /// gets its js-* tool allowed in the permission matrix.
+    let private hasFsCapability (role: Role) : bool =
+        let fsPermissions =
+            set
+                [ ToolPermission.Read
+                  ToolPermission.Write
+                  ToolPermission.Edit
+                  ToolPermission.Glob
+                  ToolPermission.Grep ]
+
+        Set.intersect (Roles.permissions role) fsPermissions |> Set.isEmpty |> not
+
     /// Single source: Kernel.Roles.permissions → OpenCode agent permission object.
     /// Emits explicit allow/deny for the full known tool name set so host schema
     /// filters and contract tests see concrete denies (not only "*").
@@ -82,7 +99,17 @@ module StaticTools =
           "verdict"
           "blog"
           "return"
-          "suicide" ]
+          "suicide"
+          "js-manager"
+          "js-orchestrator"
+          "js-coder"
+          "js-inspector"
+          "js-browser"
+          "js-meditator"
+          "js-reviewer"
+          "js-devops"
+          "js-executor"
+          "js-blogger" ]
 
     /// PROMPT-012: an explicit complete allow/deny map for PromptInput.tools.
     let requestToolMap (allowed: Set<ToolPermission>) : Map<string, bool> =
@@ -114,6 +141,17 @@ module StaticTools =
                   // DevOps may inspect and delegate edits, never write/edit directly.
                   | "write", Role.DevOps
                   | "edit", Role.DevOps -> yield name, box "deny"
+                  // JS-001: the generated js-* tool is allowed iff this role has
+                  // a filesystem capability and the name is this role's own.
+                  | name, _ when name.StartsWith "js-" ->
+                      yield
+                          name,
+                          box (
+                              if name = jsToolName role && hasFsCapability role then
+                                  "allow"
+                              else
+                                  "deny"
+                          )
                   | _ -> yield name, box (if Set.contains name allowed then "allow" else "deny") ]
 
         createObj pairs

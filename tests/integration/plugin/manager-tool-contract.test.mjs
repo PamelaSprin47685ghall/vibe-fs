@@ -80,6 +80,11 @@ const EXPECTED_ARGUMENTS = {
   'fork-pty': { agent: 'required', prompt: 'optional', signal: 'optional' },
   inspector: { prompt: 'optional', prompts: 'optional' },
   join: {},
+  'js-browser': { program: 'required' },
+  'js-coder': { program: 'required' },
+  'js-devops': { program: 'required' },
+  'js-inspector': { program: 'required' },
+  'js-reviewer': { program: 'required' },
   list: {},
   mv: { source: 'required', destination: 'required' },
   rm: { path: 'required' },
@@ -165,6 +170,16 @@ const KNOWN_TOOL_KEYS = [
   'blog',
   'return',
   'suicide',
+  'js-manager',
+  'js-orchestrator',
+  'js-coder',
+  'js-inspector',
+  'js-browser',
+  'js-meditator',
+  'js-reviewer',
+  'js-devops',
+  'js-executor',
+  'js-blogger',
 ]
 
 /** AGENT-006/011/013/014/015: the allowed tools per role. Everything else denies. */
@@ -180,6 +195,15 @@ const ALLOWED_TOOLS = {
   // ENFORCER-010: Blogger's tool set is exactly { blog }.
   blogger: ['blog'],
   executor: [],
+  // JS-001: the generated js-ROLE tool — allowed iff the role has a
+  // filesystem capability (Coder/Inspector/DevOps/Browser/Reviewer).
+  'js-tools': {
+    coder: ['js-coder'],
+    inspector: ['js-inspector'],
+    devops: ['js-devops'],
+    browser: ['js-browser'],
+    reviewer: ['js-reviewer'],
+  },
 }
 
 /**
@@ -198,11 +222,19 @@ const ALLOWED_TOOLS = {
  * `external_directory` is Host meta-permission, not a role tool: Host defaults it to
  * ask; every managed agent overrides to allow so project-external paths do not prompt.
  */
+// JS-001: a role allows exactly its own generated js-* tool, and only when
+// its capability set holds a filesystem permission.
+const JS_TOOL_ROLES = ['coder', 'inspector', 'devops', 'browser', 'reviewer']
+const jsToolAllowed = (role, key) =>
+  key.startsWith('js-') && key === `js-${role}` && JS_TOOL_ROLES.includes(role)
+
 const expectedPermission = (role) =>
   Object.fromEntries(
     KNOWN_TOOL_KEYS.map((key) => [
       key,
-      key === 'external_directory' || ALLOWED_TOOLS[role].includes(key) ? 'allow' : 'deny',
+      key === 'external_directory' || ALLOWED_TOOLS[role].includes(key) || jsToolAllowed(role, key)
+        ? 'allow'
+        : 'deny',
     ]),
   )
 
@@ -466,7 +498,11 @@ test('AGENT_004_006_010_config_gains_a_prompt_and_the_whole_permission_matrix', 
     const allowedCount = ROLE_NAMES.map((role) => [
       role,
       KNOWN_TOOL_KEYS.filter(
-        (key) => key !== '*' && key !== 'external_directory' && permissions[`fast-${role}`][key] === 'allow',
+        (key) =>
+          key !== '*' &&
+          key !== 'external_directory' &&
+          !key.startsWith('js-') && // js-* is one capability-projected surface, not a ToolPermission
+          permissions[`fast-${role}`][key] === 'allow',
       ).length,
     ])
     const facadeCount = ROLE_NAMES.map((role) => [

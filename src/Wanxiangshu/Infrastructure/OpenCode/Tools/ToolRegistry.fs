@@ -2,6 +2,8 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Collections.Generic
+open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
@@ -36,6 +38,23 @@ module ToolRegistry =
         | "coder" -> fun r -> r = Role.DevOps
         | "blog" -> fun r -> r = Role.Blogger && BlogTool.hasLiveCycle parkedHost sessionId
         | "return" -> fun r -> r = Role.Inspector || r = Role.Coder
+        // JS-001: the js-* gate — the invoked name must be this role's own
+        // generated name AND the role must actually hold a filesystem
+        // capability (four-layer exactness, forged names fail closed).
+        | name when name.StartsWith "js-" ->
+            let roleName = name.Substring 3
+
+            let fsPermissions =
+                set
+                    [ ToolPermission.Read
+                      ToolPermission.Write
+                      ToolPermission.Edit
+                      ToolPermission.Glob
+                      ToolPermission.Grep ]
+
+            fun r ->
+                (string r).ToLowerInvariant() = roleName
+                && not (Set.isEmpty (Set.intersect (Roles.permissions r) fsPermissions))
         | _ -> fun _ -> false
 
     let create
@@ -100,7 +119,15 @@ module ToolRegistry =
               // parkedHost + CurrentRequest gate request-scoped execute (InFlight).
               yield BlogTool.spec factory runtime parkedHost
               // SyncDelegate return: Inspector/Coder only.
-              yield SyncDelegateTools.returnSpec factory syncDelegateRuntime ]
+              yield SyncDelegateTools.returnSpec factory syncDelegateRuntime
+              // JS-001/JS-073: the capability-projected js-* tools. The surface
+              // is generated from the role matrix (AGENT-007: profile capability
+              // set == Roles.permissions), so a role without filesystem
+              // capability gets no js-* spec at all.
+              for role in RoleDefinitions.all |> List.map (fun d -> d.Role) do
+                  match JsToolGenerator.generate (string role) (Roles.permissions role) with
+                  | Some surface -> yield JsToolSpec.create factory surface (defaultArg workspaceDirectory "") None
+                  | None -> () ]
 
         // Role-gated tools: agent permission schema and this execute gate agree on
         // CanonicalRole. blog is request-scoped on top of Role=Blogger: no live
