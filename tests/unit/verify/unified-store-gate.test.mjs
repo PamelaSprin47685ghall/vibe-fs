@@ -1,29 +1,37 @@
 /**
- * Unified-store Phase 1 gate: fixtures RED + production GREEN (empty git-bypass allowlist).
+ * Unified-store gate: Phase 1–3 fixtures RED + P4U2 clean-break RED + production GREEN
+ * (empty git-bypass / dual-write allowlists).
  */
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
+  DUAL_WRITE_ALLOWLIST,
   GIT_BYPASS_ALLOWLIST,
   NON_STORE_SCHEMA_VERSION_SITES,
   SCANNER_IDS,
   collectProductionEntries,
+  scanDualWrite,
   scanFeatureRef,
   scanFiles,
   scanGitBypass,
+  scanNoMigrator,
   scanSchemaVersionInStoreContext,
+  scanStudentQaRevival,
   scanText,
 } from '../../../scripts/checks/unified-store-gate.mjs'
 
 const readFixture = (name) =>
   readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8')
 
-test('scanner ids cover the three Phase 1 rules', () => {
+test('scanner ids cover Phase 1–3 and P4U2 clean-break rules', () => {
   assert.deepEqual([...SCANNER_IDS], [
     'feature-ref',
     'schema-version-in-store-context',
     'git-bypass',
+    'student-qa-revival',
+    'no-migrator',
+    'dual-write',
   ])
 })
 
@@ -55,6 +63,61 @@ test('fixture unified-store-git-bypass.fs is RED for git-bypass', () => {
   assert.match(hits[0].text, /FileName\s*=\s*"git"/)
   assert.equal(scanFeatureRef(source, 'Domain/FeatureGit.fs').length, 0)
   assert.equal(scanSchemaVersionInStoreContext(source).length, 0)
+})
+
+test('fixture unified-store-student-qa-revival.fs is RED for student-qa-revival', () => {
+  const source = readFixture('unified-store-student-qa-revival.fs')
+  const hits = scanStudentQaRevival(source, 'src/Wanxiangshu/Infrastructure/OpenCode/Host/StudentQaStore.fs')
+  assert.ok(hits.length >= 1, 'expected student-qa-revival violation')
+  assert.ok(hits.every((h) => h.id === 'student-qa-revival'))
+  assert.ok(hits.some((h) => /StudentQaStore/.test(h.text)))
+  assert.ok(hits.some((h) => /QA\.md/.test(h.text)))
+})
+
+test('fixture unified-store-no-migrator.mjs is RED for no-migrator', () => {
+  const source = readFixture('unified-store-no-migrator.mjs')
+  const hits = scanNoMigrator(source, 'tests/integration/persist/migration.test.mjs')
+  assert.ok(hits.length >= 1, 'expected no-migrator violation')
+  assert.ok(hits.every((h) => h.id === 'no-migrator'))
+  assert.ok(
+    hits.some((h) => /LegacyProjection|LegacyMigrator|wanxiangshu-next/i.test(h.text + h.label)),
+    'expected LegacyProjection / LegacyMigrator / wanxiangshu-next signal',
+  )
+})
+
+test('synthetic LegacyProjection≡NewProjection claim is RED for no-migrator', () => {
+  const source = 'assert.deepEqual(LegacyProjection, NewProjection) // LegacyProjection == NewProjection'
+  const hits = scanNoMigrator(source, 'tests/integration/persist/migration.test.mjs')
+  assert.ok(hits.some((h) => /LegacyProjection/.test(h.label) || /LegacyProjection/.test(h.text)))
+})
+
+test('fixture unified-store-dual-write.fs is RED for dual-write', () => {
+  const source = readFixture('unified-store-dual-write.fs')
+  const hits = scanDualWrite(source, 'src/Wanxiangshu/Application/DualWriteBridge.fs')
+  assert.ok(hits.length >= 1, 'expected dual-write violation')
+  assert.equal(hits[0].id, 'dual-write')
+})
+
+test('Journal-only or EventStore-only modules are not dual-write', () => {
+  const journalOnly = [
+    'module RuntimePath',
+    'let root = joinPath common "wanxiangshu-next"',
+    'let file = sprintf "%s.ndjson" runtimeId',
+    'type AgentJournal(writer: JournalWriter) =',
+    '    member _.AppendAgent fact = writer.Append fact',
+  ].join('\n')
+  assert.equal(scanDualWrite(journalOnly, 'src/Wanxiangshu/Journal/AgentJournal.fs').length, 0)
+
+  const eventStoreOnly = [
+    'module EventStore',
+    'let append (store: IEventStore) candidate =',
+    '    store.Append candidate.NewEvents',
+    'let create store = EventStore.create store',
+  ].join('\n')
+  assert.equal(
+    scanDualWrite(eventStoreOnly, 'src/Wanxiangshu/Infrastructure/Persist/EventStore.fs').length,
+    0,
+  )
 })
 
 test('schemaVersion without store context is not flagged (host/authored allow)', () => {
@@ -122,6 +185,23 @@ test('git-bypass allowlist is empty; only Persist/Git ownership may invoke git',
   assert.equal(scanGitBypass(source, 'src/Wanxiangshu/Infrastructure/Persist/GitRawStore.fs').length, 0)
   assert.ok(scanGitBypass(source, 'src/Wanxiangshu/Domain/Sneaky.fs').length >= 1)
   assert.ok(scanGitBypass(source, 'src/Wanxiangshu/Journal/RuntimePath.fs').length >= 1)
+})
+
+test('dual-write allowlist is empty (no parked bridges)', () => {
+  assert.deepEqual([...DUAL_WRITE_ALLOWLIST], [])
+})
+
+test('e2e journal observers that only read wanxiangshu-next are not no-migrator', () => {
+  const observer = [
+    "const dir = path.join(common, 'wanxiangshu-next', 'runtimes')",
+    "const text = fs.readFileSync(path.join(dir, runtimeId + '.ndjson'), 'utf8')",
+    'assert.ok(text.includes("LifeOpened"))',
+  ].join('\n')
+  assert.equal(
+    scanNoMigrator(observer, 'tests/e2e/cases/reviewer-verdict.test.mjs').length,
+    0,
+    'live Journal observation is not a legacy migrator',
+  )
 })
 
 test('production scan is GREEN under gate rules (empty git-bypass allowlist)', () => {

@@ -77,6 +77,7 @@
     <Compile Include="Infrastructure/OpenCode/Tools/ManagedAgent.fs"/>
     <Compile Include="Journal/FactCodec.fs"/>
     <Compile Include="Journal/Envelope.fs"/>
+    <Compile Include="Journal/EventStoreJournalCodec.fs"/>
     <Compile Include="Journal/CompanionProjection.fs"/>
     <Compile Include="Journal/XTraceProjection.fs"/>
     <Compile Include="Journal/ManagerLifecycleProjection.fs"/>

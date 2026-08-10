@@ -46,6 +46,29 @@ const streamState = (projection, stream) => {
   return entry[1]
 }
 
+test('AuthoritativeEventTypes_isKnown_includes_JournalEnvelope_and_Job_types', () => {
+  assert.equal(Fold.AuthoritativeEventTypes_isKnown('JournalEnvelope'), true)
+  assert.equal(Fold.AuthoritativeEventTypes_isKnown('JobRequested'), true)
+  assert.equal(Fold.AuthoritativeEventTypes_isKnown('JobAccepted'), true)
+  assert.equal(Fold.AuthoritativeEventTypes_isKnown('JobRejected'), true)
+  assert.equal(Fold.AuthoritativeEventTypes_isKnown('JobConflictResolved'), true)
+  assert.equal(Fold.AuthoritativeEventTypes_isKnown('TotallyUnknownEventType'), false)
+})
+
+test('fold_JournalEnvelope_validates', () => {
+  const journal = envelope({
+    id: 'dddddddddddddddddddddddddddddddddddddddd',
+    stream: 'journal/main',
+    eventType: 'JournalEnvelope',
+    payload: { kind: 'entry' },
+  })
+  const projection = mustOk(Fold.EventStoreFold_fold(toList([journal])))
+  assert.deepEqual(foldOrderIds(projection), ['dddddddddddddddddddddddddddddddddddddddd'])
+  assert.equal(listItems(projection.Conflicts).length, 0)
+  const state = streamState(projection, 'journal/main')
+  assert.equal(caseOf(state), 'Unique')
+})
+
 test('fold_unknown_authoritative_event_type_fail_closed', () => {
   const unknown = envelope({
     id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',

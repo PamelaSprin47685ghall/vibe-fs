@@ -5,11 +5,17 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Kernel.Identity
 
 /// Wave C seed vocabulary until domain folds migrate (§5.2 additive).
+/// Includes JournalEnvelope (W1-vocab) alongside Job* types.
 /// Unknown authoritative types fail closed via StorageInvalid.UnknownEventType.
 [<RequireQualifiedAccess>]
 module AuthoritativeEventTypes =
     let private builtins =
-        set [ "JobRequested"; "JobAccepted"; "JobRejected"; "JobConflictResolved" ]
+        set
+            [ "JobRequested"
+              "JobAccepted"
+              "JobRejected"
+              "JobConflictResolved"
+              "JournalEnvelope" ]
 
     let isKnown (eventType: string) : bool = builtins.Contains eventType
 
