@@ -1,39 +1,72 @@
-# Journal — 目标实现
+# Persist — 目标实现
 
 ## Implements
 
-行为合同见 `what/persist.md`；本文件只描述 append、blob、fold 和 durable effect 算法。
+行为合同见 `what/persist.md`；本文件只描述 Git raw append、payload、merge/converge、AgentJournal adapter 与 durable effect 算法。
 
 ## Ownership
 
-Journal、blob 与 projection 边界见 `shape/persist.md`。
+Store 边界与所有权见 `shape/persist.md`。
 
 ---
 
-## PERSIST-007：Blob
+## 核心端口
 
-超过阈值的正文存 blob；NDJSON 只存 digest/reference。  
-顺序：先写 blob，再 append event。
-
-`BlobRef` 与 `BlobDigest` 是核心领域引用类型，被 `BlogFrame.TextRef`（how/companion.md COMPANION-005）与 `PrefixSnapshot.FrozenRecordPrefixRef`（shape/companion.md COMPANION-009）等复用。唯一定义在 `Identity.fs`：
-
-```fsharp
-type BlobRef = private BlobRef of string      // 相对 blob 存储根的持久路径
-type BlobDigest = private BlobDigest of string // 完整 SHA-256 十六进制，对规范序列化字节计算
-
-type BlobWriteReceipt =
-    { BlobRef: BlobRef
-      BlobDigest: BlobDigest }
+```text
+IEventStore
+  OpenSnapshot / Refresh → StoreSnapshot
+  Append(base, events) → StoreSnapshot
+  Publish(AppendCandidate) → StoreSnapshot
+  Merge(snapshots) → StoreSnapshot
+  Converge(remote) → StoreSnapshot   // 经 GitGateway 绑定
 ```
 
-性质（存档侧，`RuntimePath` 下 blob 目录）：
+`StoreSnapshot` 只冻结 `RootOid`（`refs/wanxiang/store` 指向的 root tree），不背全量 EventId 集合。  
+`AppendCandidate` = base snapshot + new events + Persist 侧 payload blobs（GitObjectId × bytes）。
 
-1. 内容寻址：同一规范字节 → 同一 `BlobRef`；写 blob 是幂等的（同 digest 复用既有 payload）。
-2. `BlobDigest` 对写入 blob 的 UTF-8 内容字节计算；读取时按同一字节重算，失配 → fail closed，不得按路径猜测对齐。
-3. 顺序：先落磁盘并取得 receipt，成功后才 append 引用该 blob 的 journal envelope。Blob 写失败时没有可引用的 receipt；Journal append 若为 `CommitUnknown`，按 PERSIST-003 fail closed，不能重试原命令。
-4. 载荷不可变；全文重写以新 `BlobRef` 呈现，旧 blob 由回收策略清理，不原地涂改。
+生产装配：
 
-不得把 digest 当随机身份；`BlobRef` 的路径由完整 digest 确定，身份永远是内容本身。
+```text
+ProcessGitRawStore(commonDir)
+  → EventStore.create / createWithRetries(+Converge)
+  → WorkspaceEventStore.acquire（process-local refcount）
+  → IJournalEventStoreBoot / EventStoreJournalWriter
+  → AgentJournal.createFromEventStore | createFromProjection
+```
+
+Git 传输唯一入口：`GitGateway`（Fetch/Pull/Push/ConvergeStore）。  
+`HookDispatcher`：`reference-transaction` / `pre-push` shim + recursion guard（`WANXIANG_GIT_SYNC_ACTIVE`）；不得覆盖用户已有 hook；converge 协议注入，hook 自身不 fetch/merge。
+
+Dumb remote 只懂 objects / refs / CAS / auth；不得跑 Domain reducer。
+
+---
+
+## PERSIST-007：PayloadRef / Git raw blob
+
+大正文不进 envelope inline（超过阈值或不适合 inline 时）：
+
+```text
+payload bytes → IGitRawStore.WriteBlob → GitObjectId
+             → Domain PayloadRef（opaque）
+             → envelope.payload_refs
+```
+
+Committed root 的 `payloads/` **恰好等于**全部 committed events 的 `payload_refs` 并集（closure）：dangling ref → `StorageInvalid`；未引用 payload 不得进入 committed root。
+
+顺序：先写 payload objects 并校验 closure，再 `Publish`/`Append` 引用它们的 events。Payload 写失败 → 无可用 receipt；CAS 未见证 EventId → 不得假装已提交（PERSIST-003）。
+
+### AgentJournal 适配映射
+
+`EventStoreBlobWriter` 对既有 `BlobRef` 调用方保持：
+
+```fsharp
+// BlobRef 路径形态仍为 blobs/<handle>
+// <handle> = Git blob OID hex（与 PayloadRef / Persist oid 同文）
+// BlobDigest = SHA-256(UTF-8 content)，用于完整性，不是 Git OID
+```
+
+成功路径**不得**创建磁盘 `blobs/` 目录；body 只在 Git ODB。  
+`BlobRef` / `BlobDigest` 定义仍在 `Identity.fs`；Persist 映射 OID，Domain 不直接操作 `GitObjectId`。
 
 ---
 
@@ -54,11 +87,6 @@ Requested / Claimed
 
 崩溃后：Requested 未 Accepted → **结局未知**。先执行表中 Reconcile；仅当物理证据证明效果不存在且该效果的合同允许幂等重试时才重试。Prompt 例外地保持 Pending，按 PROMPT-011 检索 `PromptKey`，不得自动重发。Accepted → 该领域合同已确认物理完成；重复 Accepted 幂等；不得把 Accepted 折回 Requested。
 
-QA 不是 Journal durable effect；它自身是权威文件。更新算法固定为：fatal UTF-8 read → 计算尾部去重后的
-完整新 bytes → 在同目录创建 `0600` 临时文件 → write/fsync/close → rename → fsync directory。rename 前
-失败删除临时文件并保留旧 QA；rename 结局不确定时重新读取完整 QA，只在字节等于预期时接受，否则
-fail closed。日志只记路径摘要、字节数、operation/result/error。
-
 ### Session 创建例外
 
 Host 在 `session.create` 返回前不分配 child SessionId → 不引入 `SessionCreateRequested`。  
@@ -66,7 +94,34 @@ accepted 证据 = 链接事实：`HandleLinked` / `CompanionBloggerLinked`。
 
 ---
 
+## Append / Merge / Converge 算法要点
+
+1. **Canonicalize**：`EventEnvelope.normalize`（parents / payload_refs 去重排序）→ canonical JSON+LF bytes。  
+2. **Materialize**：EventId 分片写入 `events/`；payload 写入 `payloads/`；构造候选 root。  
+3. **CAS**：`CompareAndSwapRef(refs/wanxiang/store, expected, new)`；Absent 用 zero-oid expected。  
+4. **K-way Merge**：`Merge` = set union + identity dedupe（structural tree merge；Spec oracle 仅测试）。禁止 wall_clock LWW。  
+5. **Converge(remote)**：经 GitGateway 双向同步 store objects+ref → merge → 校验 fold + payload closure → 发布；禁止单向 `PullStore`/`PushStore` API。  
+6. **Fold**：按 `parents` 做 deterministic topological fold；StorageInvalid vs DomainConflict 分类见 PERSIST-003。
+
+---
+
+## AgentJournal 适配表面（Strategy A）
+
+`AgentJournal` **保留**为应用侧 API；耐久底层是 EventStore：
+
+| 组件 | 职责 |
+|------|------|
+| `EventStoreJournalCodec` | Journal envelope ↔ `EventEnvelope`（固定 journal event_type） |
+| `EventStoreJournalWriter` | `IJournalWriter`；成功路径无 `.ndjson` / 无目录 `blobs/` |
+| `WorkspaceEventStore` | common-dir → `ProcessGitRawStore` + `IEventStore` |
+| `IJournalEventStoreBoot` | `ResumeOrCreate` 不点名 `IEventStore` token，避免 dual-write 同文件桥 |
+
+同一生产模块不得同时写 EventStore **与** Journal NDJSON 路径（`unified-store-gate` `dual-write`）。  
+已删除：生产 `Boot.fs`、NDJSON `JournalWriter`、目录 `BlobWriter`、`AgentJournal.createFromBoot` / directory `create`。
+
+---
+
 ## 上下文恢复 fold 实现落点（不变量见 what/persist.md PERSIST-010）
 
 拒绝条件（不变量）权威定义见 `what/persist.md` PERSIST-010——不满足任一条拒绝 envelope，fail closed。  
-本处只留实现落点：恢复 fold 逐 fact 校验的代码在 `Journal/Fold.fs` 的恢复事实分支；物理 envelope 形状见 PERSIST-001/002。
+本处只留实现落点：恢复 fold 逐 fact 校验在 `Journal/Fold.fs` 的恢复事实分支；物理 event 形状见 PERSIST-001/002；Journal 行经 codec 进入 EventStore。

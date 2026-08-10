@@ -3634,6 +3634,31 @@ const durableJournal = (() => {
   }
 })()
 
+
+/** Strip `blobs/<oid>` → Git OID hex used as InMemoryGitRawStore.objects key. */
+const gitOidFromBlobRef = (blobRef) => {
+  const relative =
+    typeof blobRef === 'string'
+      ? blobRef
+      : blobRef?.fields?.[0] ??
+        (() => {
+          throw new Error('blobRef must be a BlobRef DU or blobs/<oid> string')
+        })()
+  const prefix = 'blobs/'
+  if (!relative.startsWith(prefix) || relative.length <= prefix.length || relative.includes('/', prefix.length)) {
+    throw new Error(`invalid EventStore blob ref: ${relative}`)
+  }
+  return relative.slice(prefix.length)
+}
+
+const rawStoreOf = (journal) => {
+  const raw = durableJournal.blobWriter(journal)?.raw
+  if (raw == null || !(raw.objects instanceof Map)) {
+    throw new Error('journal BlobWriter has no mutable InMemoryGitRawStore.objects Map')
+  }
+  return raw
+}
+
 export const agentJournal = {
   create: ({ directory, runtime = 'rt_1', pid = 4242, startedAt = '2026-01-01T00:00:00Z' } = {}) => {
     const pair = registerEventStore(directory, freshEventStorePair())
@@ -3646,7 +3671,7 @@ export const agentJournal = {
     )
     const result = resultOf(AgentJournalCreate.createFromEventStore(writer, initEnvelope))
     return result.ok
-      ? { ok: true, journal: result.value, dispose: () => result.value.Dispose() }
+      ? { ok: true, journal: result.value, raw: pair.raw, dispose: () => result.value.Dispose() }
       : result
   },
   /**
@@ -3683,6 +3708,43 @@ export const agentJournal = {
   /** Blob write receipt: { BlobRef, BlobDigest } after Ok. */
   writeBlob: (content, journal) => resultOf(AgentJournalCreate.writeBlob(content, journal)),
   readBlob: (journal, ref) => resultOf(durableJournal.blobWriter(journal).Read(ref)),
+  /**
+   * Test-only: delete a blob from the journal's InMemoryGitRawStore so
+   * BlobWriter.Read fails closed (EventStore bodies are not RuntimePath files).
+   */
+  deleteBlob: (journal, blobRef) => {
+    const raw = rawStoreOf(journal)
+    const oid = gitOidFromBlobRef(blobRef)
+    if (!raw.objects.delete(oid)) {
+      throw new Error(`deleteBlob: oid ${oid} not present in raw store`)
+    }
+  },
+  /**
+   * Test-only: overwrite blob bytes under the same Git OID so reads succeed
+   * with tampered content (digest mismatch / corrupt JSON paths).
+   */
+  replaceBlobContent: (journal, blobRef, content) => {
+    const raw = rawStoreOf(journal)
+    const oid = gitOidFromBlobRef(blobRef)
+    if (!raw.objects.has(oid)) {
+      throw new Error(`replaceBlobContent: oid ${oid} not present in raw store`)
+    }
+    const bytes =
+      typeof content === 'string'
+        ? new TextEncoder().encode(content)
+        : content instanceof Uint8Array
+          ? content
+          : (() => {
+              throw new Error('replaceBlobContent: content must be string or Uint8Array')
+            })()
+    const prior = raw.objects.get(oid)
+    raw.objects.set(
+      oid,
+      prior?.constructor
+        ? new prior.constructor(/* Blob */ 0, [bytes])
+        : { tag: 0, fields: [bytes] },
+    )
+  },
   persistedEnvelopes: (durable) => {
     const writer = durableJournal.writer(durable)
     const blobWriter = durableJournal.blobWriter(durable)

@@ -41,4 +41,4 @@ module MagicTodoProcessReview =
 
     /// ensureReview obligation predicate (protocol §15):
     /// Accepted ∧ ¬TodoReviewConcluded → Rk must be ensure-able from any reentry site.
-    let obligationPending (accepted: bool) (concluded: bool) : bool = accepted && not concluded
+    let needsEnsureReview (accepted: bool) (concluded: bool) : bool = accepted && not concluded

@@ -18,6 +18,7 @@ import {
   agentJournal,
   agentFact,
   sessionId,
+  stream,
   toList,
   listItems,
   caseOf,
@@ -39,7 +40,6 @@ const {
   AgentJournalModule_snapshot,
   AgentJournal__WriteBlob_Z721C83C5,
 } = await import('../../../dist/Journal/AgentJournal.js')
-const { StreamId } = await import('../../../dist/Journal/Envelope.js')
 const {
   handleContinuation,
   tryRefreshMainContextFromJournal,
@@ -52,7 +52,8 @@ const {
 
 const MAIN = 'ses-main'
 const BLOG = 'ses-blog'
-const streamSession = (sid) => new StreamId(1, sessionId(sid))
+const streamSession = (sid) =>
+  stream.session(typeof sid === 'string' ? sessionId(sid) : sid)
 const sha256Hex = (input) => createHash('sha256').update(input, 'utf8').digest('hex')
 
 const seedHarness = (journal, { material = 0 } = {}) => {

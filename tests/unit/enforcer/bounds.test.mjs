@@ -24,6 +24,7 @@ import {
   agentJournal,
   agentFact,
   sessionId,
+  stream,
   toList,
   caseOf,
   bloggerRequestContext,
@@ -39,13 +40,12 @@ import {
 runtimeResources.installFromPackage()
 
 const { AgentJournalModule_appendAgent } = await import('../../../dist/Journal/AgentJournal.js')
-const { StreamId } = await import('../../../dist/Journal/Envelope.js')
 const { handleContinuation } = await import('../../../dist/Session/EnforcerHost.js')
 
 const MAIN = 'ses-main'
 const BLOG = 'ses-blog'
 const streamSession = (sid) =>
-  new StreamId(1, typeof sid === 'string' ? sessionId(sid) : sid)
+  stream.session(typeof sid === 'string' ? sessionId(sid) : sid)
 const sha256Hex = (input) => createHash('sha256').update(input, 'utf8').digest('hex')
 const digestForToml = (toml) => sha256Hex(toml)
 

@@ -27,7 +27,7 @@ export function storeTip(workDir) {
   }
 }
 
-/** Canonical event JSON texts under refs/wanxiang/store (events/**/*.jsonl). */
+/** Canonical event JSON texts under refs/wanxiang/store (events/ shard jsonl blobs). */
 export const journalEventLines = (workDir) => {
   const tip = storeTip(workDir);
   if (!tip) return [];

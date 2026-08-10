@@ -7,13 +7,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
-import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import {
   agentJournal,
   agentFact,
   sessionId,
+  stream,
   toList,
   listItems,
   caseOf,
@@ -32,7 +33,6 @@ const {
   AgentJournalModule_appendAgent,
   AgentJournalModule_snapshot,
 } = await import('../../../dist/Journal/AgentJournal.js')
-const { StreamId } = await import('../../../dist/Journal/Envelope.js')
 const {
   handleContinuation,
   lastAssistantStep,
@@ -41,7 +41,8 @@ const {
 
 const MAIN = 'ses-main'
 const BLOG = 'ses-blog'
-const streamSession = (sid) => new StreamId(1, sessionId(sid))
+const streamSession = (sid) =>
+  stream.session(typeof sid === 'string' ? sessionId(sid) : sid)
 const sha256Hex = (input) => createHash('sha256').update(input, 'utf8').digest('hex')
 
 const withHarness = async (fn, { link = true, material = 0 } = {}) => {
@@ -425,7 +426,7 @@ test('ENFORCER_load_effective_frames_resolves_committed_frame', async () => {
 
 test('ENFORCER_load_effective_frames_missing_blob_fails_closed', async () => {
   await withHarness(
-    async ({ journal, scope, dir, run, assistantStep, mainSession }) => {
+    async ({ journal, scope, run, assistantStep, mainSession }) => {
       parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
       const original = scope.ParkTransform.bind(scope)
       scope.ParkTransform = () => Promise.resolve(false)
@@ -439,7 +440,7 @@ test('ENFORCER_load_effective_frames_missing_blob_fails_closed', async () => {
         scope.ParkTransform = original
       }
       const frame = listItems(mainSession().Blog.Frames)[0]
-      rmSync(join(dir, frame.TextRef.fields[0]), { force: true })
+      agentJournal.deleteBlob(journal, frame.TextRef)
       const result = loadEffectiveFrames(journal, sessionId(MAIN))
       assert.equal(result.tag, 1)
       assert.equal(caseOf(result.fields[0]), 'MissingFrameBlob')
@@ -450,7 +451,7 @@ test('ENFORCER_load_effective_frames_missing_blob_fails_closed', async () => {
 
 test('ENFORCER_load_effective_frames_digest_mismatch_fails_closed', async () => {
   await withHarness(
-    async ({ journal, scope, dir, run, assistantStep, mainSession }) => {
+    async ({ journal, scope, run, assistantStep, mainSession }) => {
       parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
       const original = scope.ParkTransform.bind(scope)
       scope.ParkTransform = () => Promise.resolve(false)
@@ -464,7 +465,7 @@ test('ENFORCER_load_effective_frames_digest_mismatch_fails_closed', async () => 
         scope.ParkTransform = original
       }
       const frame = listItems(mainSession().Blog.Frames)[0]
-      writeFileSync(join(dir, frame.TextRef.fields[0]), 'tampered body')
+      agentJournal.replaceBlobContent(journal, frame.TextRef, 'tampered body')
       const result = loadEffectiveFrames(journal, sessionId(MAIN))
       assert.equal(result.tag, 1)
       assert.equal(caseOf(result.fields[0]), 'DigestMismatch')
@@ -475,7 +476,7 @@ test('ENFORCER_load_effective_frames_digest_mismatch_fails_closed', async () => 
 
 test('ENFORCER_rebuild_falls_back_to_raw_when_frame_blob_lost', async () => {
   await withHarness(
-    async ({ journal, scope, dir, run, assistantStep, mainSession, fatals }) => {
+    async ({ journal, scope, run, assistantStep, mainSession, fatals }) => {
       parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
       const original = scope.ParkTransform.bind(scope)
       scope.ParkTransform = () => Promise.resolve(false)
@@ -488,10 +489,10 @@ test('ENFORCER_rebuild_falls_back_to_raw_when_frame_blob_lost', async () => {
       } finally {
         scope.ParkTransform = original
       }
-      // Corrupt the frame blob: any rebuild from context must fail closed and
+      // Corrupt the frame blob in IGitRawStore: rebuild fails closed and
       // the continuation must fall back to the raw transcript (never []).
       const frame = listItems(mainSession().Blog.Frames)[0]
-      writeFileSync(join(dir, frame.TextRef.fields[0]), 'tampered')
+      agentJournal.replaceBlobContent(journal, frame.TextRef, 'tampered')
       const out = await run(
         assistantStep('asst-f4', [
           { type: 'tool', tool: 'blog', callID: 'c-f4', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'frame body four' } } },

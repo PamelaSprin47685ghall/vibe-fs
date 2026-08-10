@@ -695,10 +695,15 @@ Per §0 / Phase 0 table / **Amendment G3.5-A**: Student QA is **retired / do-not
 - [x] Phase 3 GitGateway + HookDispatcher + Dumb Server proof（`GitGateway.fs` / `HookDispatcher.fs` / `GitSubject.fs` / `ProcessGitRawStore.fs`；`EventStore.Converge` → gateway；`unified-store-gate` `GIT_BYPASS_ALLOWLIST` cleared；`tests/integration/persist/dumb-server.test.mjs` 7/7：object upload/fetch、two-client merge、lease rejection+retry）
 - [x] Phase 4 Clean-break policy / order / ownership map / doNotBuild（**docs/policy only**；supersedes frozen §Phase4 migrator / LegacyProjection via Amendment G3.5-A + Phase 4 Active notes below；**no** code cutover yet）
 - [x] Phase 5 Cutover（正常 runtime 仅 EventStore；删除 Journal/Blob NDJSON writers；旧 StudentQa file backend 不打开；**Strategy A `AgentJournal` surface retained** via EventStore adapter）
-- [ ] Phase 6 现有 Domain 改用统一 Store（仅仍存活 domain；Application/Session 改写到 `IEventStore`）
-- [ ] Phase 7 重写 Proposed Storage Sections（perm-inspector/rulebook/strength）
+- [x] Phase 6 现有 Domain 改用统一 Store（**Strategy A DONE**：Wave-1 vocab→proof + Phase 5 NDJSON/Boot delete；`AgentJournal` retained as EventStore adapter；App/Session may keep calling `AgentJournal`；further optional direct `IEventStore` call-sites are non-blocking；**无** migrator）
+- [x] Phase 7 重写 Proposed Storage Sections（perm-inspector/rulebook/strength + js-capability audit；EventStore-only；G4P7*）
+
+### Phase 7 — DONE（G4P7PermInspector / Rulebook / Strength / JsAudit；2026-08-10）
+
+Proposed storage sections rewritten to EventStore-only (`refs/wanxiang/store` / `payload_refs` / no feature-owned refs/LWW/private journals). js-capability durable prepare/crash recovery → EventStore; js-student/js-teacher annotated as Universal G3 rebase debt only.
+
 - [ ] Phase 8 Full Proof（`spec`/`architecture`/`dsl-ownership`/`unified-store-gate` + build + unit/integration/e2e + dumb-server + `npm run check`；**无** legacy migrator suite for Student QA）
-- [ ] Formal docs 重写（`docs/{why,what,shape,how,proof}/persist.md`）
+- [x] Formal docs 重写（`docs/{why,what,shape,how,proof}/persist.md` — EventStore world；G4PersistDocs；spec gate green）
 
 ### Phase 3 — DONE（G4U8–G4U12；2026-08-10）
 
@@ -711,7 +716,7 @@ Per §0 / Phase 0 table / **Amendment G3.5-A**: Student QA is **retired / do-not
 
 ### Phase 4 — DONE（G4U14–G4U16；2026-08-10）
 
-**Status：** clean-break docs/policy + gates + leave-unread proof **DONE**. Code cutover / domain rewrite remain Phase 6 then Phase 5（unchecked）.
+**Status：** clean-break docs/policy + gates + leave-unread proof **DONE**. Phase 5 + Phase 6 Wave-1 later closed under Strategy A（see below）.
 
 验收：
 - Active notes：clean-break meaning / chicken-egg order Phase4→Phase6→Phase5 / ownership map / doNotBuild（G4U14）
@@ -720,7 +725,7 @@ Per §0 / Phase 0 table / **Amendment G3.5-A**: Student QA is **retired / do-not
 
 ### Phase 4 — Active notes（P4U1+P4U4+P4U5；docs/policy DONE）
 
-**Status：** docs/policy **DONE**. Code cutover / domain rewrite remain Phase 5 / Phase 6（unchecked）.
+**Status：** docs/policy **DONE**. Phase 5 NDJSON cutover + Phase 6 Strategy A Wave-1 later marked **DONE**（ownership map amended below）.
 
 #### Clean-break meaning（supersedes frozen §Phase4 migrator text）
 
@@ -735,38 +740,38 @@ Phase 4 ≠ LegacyProjection ≡ NewProjection suite
 Phase 4 ≠ dual-write bridge
 
 Phase 4 (docs/policy) = lock clean-break cutover semantics + chicken-egg order + ownership lanes + doNotBuild
-Phase 5 (later) = delete Journal/Blob production writers after consumers are gone
-Phase 6 (before Phase 5) = rewrite surviving Application/Session domains onto IEventStore
+Phase 5 = delete Journal/Blob NDJSON production writers（Boot / dir-blob）；Strategy A keeps `AgentJournal` as EventStore adapter
+Phase 6 = Wave-1 EventStore-backed journal adapter（vocab→proof）；App/Session may keep calling `AgentJournal`；optional direct `IEventStore` call-sites non-blocking
 ```
 
 Old Journal / Blob / Student QA / feature-owned on-disk history: leave-unread or discard; runtime never opens them; no format-preserving translation into EventStore.
 
 #### Locked recommended order（chicken-egg）
 
-Frozen numbering stays 4 / 5 / 6, but **execution order is locked**:
+Frozen numbering stays 4 / 5 / 6, but **execution order is locked**（historical plan; Wave-1 + Phase 5 now **DONE** under Strategy A）:
 
 ```text
 1. Phase 4 — ratchets / docs / policy（THIS section；DONE）
-2. Phase 6 — domain rewrite onto IEventStore（Application/Session stop calling AgentJournal）
-3. Phase 5 — cutover delete Journal/Blob writers（Writer / Boot / NDJSON / blobs production paths）
+2. Phase 6 Wave-1 — EventStore-backed `AgentJournal` adapter（vocab→proof；App/Session may keep calling AgentJournal）
+3. Phase 5 — cutover delete NDJSON/Boot/dir-blob writers（substrate only；AgentJournal adapter retained）
 ```
 
-**Forbid:** deleting `JournalWriter` / `Boot` / Journal substrate while Application or Session still call `AgentJournal`.
+**Forbid:** deleting NDJSON / `Boot` / dir-blob substrate while live durability still depends on those writers（resolved by Wave-1 adapter + Phase 5 delete）.
 
-**Forbid:** Phase 5 cutover before Phase 6 consumer rewrite is complete.
+**Forbid:** inventing migrators / dual-write / legacy NDJSON readers（Amendment G3.5-A）.
 
-Rationale: Journal deletion is blocked until every live consumer is rewritten; otherwise clean-break removes the only durability path mid-flight.
+Rationale（Strategy A truth）: durability substrate is `IEventStore`; `AgentJournal` is the retained adapter surface; App/Session need not stop calling `AgentJournal`. Further optional direct `IEventStore` call-sites are non-blocking.
 
-#### Phase 6 ownership map（disjoint lanes）
+#### Phase 6 ownership map（disjoint lanes；Strategy A）
 
 | Lane | Owns | Does NOT own | Notes |
 |---|---|---|---|
-| **Journal substrate** | `src/Wanxiangshu/Journal/*`（`AgentJournal` / `Writer` / `Boot` / folds / RuntimePath NDJSON+Blob） | EventStore semantics; proposal docs | Live today; **deletion blocked** until App+Session consumers rewritten |
-| **App + Session consumers** | `src/Wanxiangshu/Application/**` + `src/Wanxiangshu/Session/**` call sites that read/append via `AgentJournal` | Persist Git primitives; Journal on-disk format | Phase 6 rewrite target → `IEventStore` |
+| **Journal adapter surface** | `AgentJournal` + folds / writer ports；EventStore-backed via `EventStoreJournalWriter` / `createFromEventStore` / `createFromProjection` | NDJSON/Boot on-disk format（deleted Phase 5）；Persist Git primitives | **Retained** as adapter over `IEventStore`；App/Session may keep calling it |
+| **App + Session consumers** | `src/Wanxiangshu/Application/**` + `src/Wanxiangshu/Session/**` call sites that read/append via `AgentJournal` | Persist Git primitives; deleted NDJSON substrate | Strategy A: **may keep calling `AgentJournal`**；optional direct `IEventStore` call-sites are **non-blocking** |
 | **Persist owners** | `Infrastructure/Persist/*` + `Infrastructure/Git/*`（`IEventStore` / GitRawStore / GitGateway / HookDispatcher） | Domain event vocabulary; Application when-to-append policy | Sole durable substrate after cutover |
 | **Proposal docs** | `changes/active/storage.md` Active work；`changes/proposed/{perm-inspector,rulebook,strength,entry}.md` storage sections | Production code | Phase 4/7 docs only; no migrator obligation |
 
-**Journal deletion rule:** substrate lane may be removed only after App+Session consumer lane no longer references `AgentJournal` / Journal writers.
+**Substrate deletion rule（DONE）：** NDJSON / Boot / dir-blob writers deleted in Phase 5 after Wave-1 adapter proof；`AgentJournal` itself is **not** deleted — it remains the adapter surface.
 
 #### doNotBuild（explicit；Active work）
 
@@ -782,9 +787,13 @@ doNotBuild:
 
 Any PR introducing the above is out of scope for G4 Active and must be rejected under Amendment G3.5-A.
 
-### Phase 6 Wave-1 — IN PROGRESS（Strategy A：EventStore-backed journal adapter；无 dual-write）
+### Phase 6 — DONE（Strategy A；Wave-1 vocab→proof + Phase 5 NDJSON delete）
 
-**Policy：** Keep `AgentJournal` surface; swap durability substrate to `IEventStore`. Amendment G3.5-A forbids dual-write / migrators / legacy NDJSON readers. Chicken-egg order remains Phase6 Wave-1 → Phase5 delete NDJSON writers.
+**Status：** Phase 6 **DONE** under Strategy A. Wave-1 swapped durability to `IEventStore` while retaining `AgentJournal` as the adapter surface; Phase 5 deleted NDJSON/Boot/dir-blob writers. App/Session may keep calling `AgentJournal`. Further optional direct `IEventStore` call-sites are non-blocking. No migrators / dual-write / legacy readers（Amendment G3.5-A）.
+
+### Phase 6 Wave-1 — DONE（Strategy A：EventStore-backed journal adapter；无 dual-write）
+
+**Policy：** Keep `AgentJournal` surface; swap durability substrate to `IEventStore`. Amendment G3.5-A forbids dual-write / migrators / legacy NDJSON readers. Chicken-egg order was Phase6 Wave-1 → Phase5 delete NDJSON writers（both **DONE**）.
 
 | Unit | Status | Notes |
 |---|---|---|
@@ -793,7 +802,7 @@ Any PR introducing the above is out of scope for G4 Active and must be rejected 
 | W1-writer | DONE（G4U20） | `EventStoreJournalWriter` + `createFromEventStore`; success path no `.ndjson` / no `blobs/` dir |
 | W1-boot | DONE（G4U21） | `loadJournalEnvelopes` + `resumeOrCreate` + `createFromProjection`; boot tests 4/4; gate OK |
 | W1-host | DONE（G4U22） | `WorkspaceEventStore` + `IJournalEventStoreBoot` + SharedAgentJournal factory + PluginHost；leave-unread host tests 2/2；dual-write clean |
-| W1-proof | DONE（unlocked Phase 5） | host leave-unread green；Phase 5 NDJSON substrate deletion unblocked |
+| W1-proof | DONE（unlocked Phase 5） | host leave-unread green；Phase 5 NDJSON substrate deletion completed |
 
 **dual-write seam：** `EventStoreJournalWriter` may name `IEventStore` but not `AgentJournal`; `AgentJournal` may not name `IEventStore`; composition root must not co-locate both token classes in one `.fs` file（`unified-store-gate` `scanDualWrite`）.
 

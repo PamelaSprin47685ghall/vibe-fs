@@ -1,37 +1,82 @@
-# Journal — 可观察行为
+# Persist — 可观察行为
 
 条款前缀：`PERSIST-`。  
-路径与权限边界见 `shape/persist.md`。  
-Blob、Durable Effect、上下文 fold 见 `how/persist.md`。
+边界与所有权见 `shape/persist.md`。  
+CAS / Git raw / adapter 算法见 `how/persist.md`。
 
-## PERSIST-001：Envelope
+统一 durable substrate 是 EventStore：事实 = event；修改 = append；查询 = projection；大正文 = Git raw payload；原子发布 = `refs/wanxiang/store` CAS。
 
-每个 journal envelope 必须含：schema version、event ID、stream ID。  
-序列化时间戳必须 UTC offset 归一化——否则同一事实跨时区字节不同，指纹与重放失效。
+## PERSIST-001：EventEnvelope
 
-## PERSIST-002：Append 原子性
+每个 durable event 必须是版本无关的 `EventEnvelope`，至少含：
 
-Append 只有：`Committed` | `CommitUnknown`。  
-不存在「部分写入」。
+```text
+event_id
+stream_id
+event_type
+parents          // 直接前驱 EventId 集合；可空 = stream 根
+payload          // canonical JSON 对象
+payload_refs     // opaque PayloadRef 集合；可空
+```
 
-## PERSIST-003：CommitUnknown
+禁止 envelope / store 携带 `schemaVersion` / `storageVersion` / `journalVersion` / `formatVersion` / `generationVersion`。  
+同一 `event_type` 的 payload shape（字段名、含义、必填性）一经 committed 即冻结；新语义必须新 `event_type`（additive vocabulary）。
 
-出现 CommitUnknown → runtime 进入 fail-closed reconcile，需显式恢复。  
-不得用「再请求一次模型」假装写入成功。
+Canonical JSON 是 identity 协议：UTF-8、无 BOM、恰好一个 LF 结尾；object key 按 Unicode codepoint 升序；`parents` / `payload_refs` 先去重再按 canonical 文本序排序。同 `event_id` + 不同 canonical bytes → identity collision，fail closed。
 
-## PERSIST-004：尾部损坏
+## PERSIST-002：Append / Publish 原子性
 
-只允许截断恢复**最后一条**不完整 envelope。  
-中间损坏 → 拒绝启动（不跳过后续行）。
+`Append` / `Publish` 以 canonical ref 的 CAS 为唯一提交原语：
 
-## PERSIST-005：旧 Schema
+```text
+CAS(refs/wanxiang/store, expected = Absent | R0, new = R1)
+```
 
-Pre-0.5.0 journal 不猜测迁移。启动见旧 schema → 直接失败。
+成功 → 新 `StoreSnapshot`（Committed）。  
+不存在「部分写入」的权威历史：one event = one immutable Git blob；半条 NDJSON 不得进入 canonical root。
+
+CAS 冲突 → 重新观察 root → 若 EventId 已在 store 中则视为已 Committed，否则基于新 snapshot 重建并 bounded retry。  
+禁止独立 `CreateRef` / 第二套首次 bootstrap 协议。
+
+## PERSIST-003：提交结局与 fail-closed
+
+提交结局的 durable witness 是 canonical root（是否已包含该 `event_id`），不得用「再请求一次模型」或内存猜测代替。
+
+以下必须 fail closed，进入显式恢复 / 人工处置，不得跳过坏 event 继续 fold：
+
+- `StorageInvalid`（坏 JSON、非 canonical、identity collision、缺 parent / 成环、payload 缺失或 hash 失配、unknown authoritative `event_type`、必填字段错误）
+- Append/Publish CAS retry 耗尽且 EventId 仍不在 store
+
+`DomainConflict`（合法并发 fork）**不是** `StorageInvalid`：history 保留 competing heads，由 projection 表达冲突态，经以全部 heads 为 `parents` 的 resolution event 收敛。
+
+## PERSIST-004：损坏与拒绝加载
+
+权威 store 中任一 event 无法通过 canonical / identity / causal / payload closure 校验 → 拒绝以该 snapshot 构建投影或启动依赖它的 runtime 路径。  
+禁止「跳过中间坏对象继续」；禁止把 DomainConflict 升级为全局 corruption。
+
+旧 RuntimePath NDJSON / 目录 blob **不是**权威历史：不得为截断半行而打开它们（见 PERSIST-005 leave-unread）。
+
+## PERSIST-005：无 schema 版本；leave-unread clean-break
+
+Store **不**维护 schema / store / migration generation。  
+旧 Journal NDJSON、RuntimePath `blobs/`、Student QA 私有文件、feature-owned ref：
+
+```text
+不要求可读
+不要求可迁
+不进入新 active domain projection
+不作为 EventStore ongoing vocabulary
+不要求 LegacyProjection ≡ NewProjection
+runtime 永不打开（leave-unread）；允许丢弃或原地留存
+```
+
+禁止 dual-write、legacy reader / importer、fallback-to-old-store shim。
 
 ## PERSIST-008：Projection 查询
 
 Projection 查询不得扫描完整历史。  
-必须 O(1) 积分状态回答当前 epoch、frames、coverage、XTrace 锚点等。
+必须 O(1) 积分状态回答当前 epoch、frames、coverage、XTrace 锚点、effect 窗口等。  
+Projection 不是第二真相源：禁止先改投影再补 event。
 
 ## PERSIST-010：上下文恢复 fold
 
@@ -68,21 +113,11 @@ ContextReanchored
 
 禁止引入：`PrefixProbeRolledBack`、`OverflowDetected`、`ContextNearLimit`、`SquashReason` 等——失败不分类（CTX-005），容量不观察（CTX-001）。  
 失败的 X probe 不产生事实（CTX-010）。  
-Projection 只从 Journal fold 派生 Y 有效 frames，不读物理 Y transcript 当历史源。
+Projection 只从 committed events fold 派生 Y 有效 frames，不读物理 Y transcript 当历史源。
 
-## PERSIST-011：Student QA 权威文件
+## PERSIST-011：（空缺）Student QA 权威文件 — G3 已删除
 
-每个 Student Logical Run 恰有一个私有 `QA.md`；存在期间它是学习知识的唯一权威状态。Journal、Host
-metadata、共享表和日志只能保存 Session/attempt/路径摘要等控制身份，禁止保存问题、回答、推测阶段、
-置信度、知识分支或 QA 正文。
-
-QA 是 UTF-8 自然语言字节流，只按真实发生顺序包含：用户原始请求、Student 问题、Teacher return。
-框架只插入防粘连换行；不得添加标题、角色标签、分隔线、JSON/TOML 字段或旁路 Journal。完整尾部字节
-等于待追加项时幂等去重；无法证明重复时宁可保留。
-
-每次更新必须原子且 durable：旧完整文件或新完整文件，不得出现半段 UTF-8。用户请求先于 Student
-provider effect；Student 问题先于 Teacher send；Teacher return 先于交付 Student。UTF-8 损坏、读取失败
-或原子提交不确定均 fail closed，保留原文件，不跳过坏字节。
-
-最终 return 与明确取消删除 QA 及空任务目录；删除失败不宣称完成。插件重启只按 Session/LogicalRun
-确定路径，不解析正文；任务终态无法证明时保留，不自动删除。
+**编号永久空缺（retired / absent）。**  
+`StudentQaStore` / 私有 `QA.md` filesystem backend 与 Student QA 知识权威文件合同已删除（G3 clean-break）。  
+不得迁入 EventStore，不得发明后继 QA event vocabulary，不得 dual-write / legacy reader。  
+证明义务见 `scripts/checks/student-teacher-absence.mjs` 与 `unified-store-gate` 的 `student-qa-revival` / `no-migrator` 扫描。

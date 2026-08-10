@@ -2,7 +2,8 @@
 
 > 本文件位于 `changes/proposed/` 时只是已批准变更的 Proposal 原文，不是当前产品规范。
 > 实施时，目标语义必须分别进入 `docs/{why,what,shape,how,proof}`；本文件不定义正式 Clause ID。
-> 本次 rebase 以当前仓库已经落地的 Satellite、PromptAuthority、Projection Algebra、XTrace、Companion、Fallback 与结构化程序边界为基线。
+> 本次 rebase 以当前仓库已经落地的 Universal SessionOwnership（ExecutionClass × Ownership）、EventStore/`payload_refs`、PromptAuthority、Projection Algebra、XTrace、Companion、Fallback 与结构化程序边界为基线。
+> **Storage / Ownership 收口（相对旧稿强制）**：`FrameBundleRef` / `PredictorSnapshotRef` / candidate material 一律改为 EventStore envelope 的 opaque `PayloadRef`（`payload_refs`）；删除 Journal NDJSON 文件与 `RuntimePath` blob/`blobs/<sha256>` 假定；禁止再向 `SatelliteKind` 塞 `Replica`——Strength Replica 归 Universal `InternalLeaf × Attached(..., StrengthReplica)`；全文不再以 Student/Teacher 为产品边界。
 
 ## 一、这次 rebase 的结论
 
@@ -23,7 +24,7 @@
 | 新增 `fast-replica/deep-replica` Agent / Replica 特殊身份 | 删除。Replica 复用当前角色的 `fast-ROLE`，不新增 Agent、不新增 CanonicalRole                              |
 | Replica 自己一套 Agent→Role 例外映射                        | 删除。所有 attempt 仍只走 `AttemptExecutionProfile` 单一构造链                                       |
 | `ExecutionSurface = StrengthReadOnlySurface`        | 删除。工具面用当前 `ProviderRequestKind × CanonicalRole → ToolCapabilitySet` 表达                  |
-| 另造 Satellite 生命周期/关联框架                              | 删除。只扩展现有 `SatelliteKind`，物理生命周期归 `SatelliteRuntime`                                     |
+| 另造 Satellite 生命周期/关联框架                              | 删除。不向 `SatelliteKind` 塞 `Replica`；归 Universal `SessionExecutionClass × SessionOwnership` / `AttachmentKind.StrengthReplica` |
 | Replica 自有 Companion                                | 删除。Replica 是叶子 Satellite，不递归拥有 Companion                                                |
 | 自造 `SemanticEventCursor` / 全局语义事件体系                 | 删除。跨 Session 语义使用 `ProviderSemanticProjection`；持久语义顺序复用 `XTraceCursor`                  |
 | 先完成 Projection DSL 大迁移才能做 Strength                  | 删除。Projection Algebra 已经落地；Strength 只增自己需要的 intent                                      |
@@ -34,11 +35,12 @@
 这次 rebase 的核心不是“把旧类名换成新类名”，而是让 Strength 成为当前架构上的一个薄功能：
 
 ```text
-现有 Work Session / SatelliteRuntime
+现有 Work Session / Universal Attached ownership
 + 现有 PromptAuthority / AttemptExecutionProfile
 + 现有 request-specific ToolCapabilitySet
 + 现有 Projection Algebra
 + 现有 XTrace / Companion durable semantic history
++ 统一 EventStore（Strength events + payload_refs）
 + 一个 Strength-specific pure policy + workflow
 ```
 
@@ -166,10 +168,12 @@ StrengthFallback
 Strength 只能向它们增加一个合法 case：
 
 ```text
-SatelliteKind.Replica
+AttachmentKind.StrengthReplica
+  （InternalLeaf × Attached；不是 SatelliteKind case）
 ProviderRequestKind.StrengthReplica
 ProjectionIntent 的 Strength intent
-Strength durable facts / projection
+Strength EventStore events / projection
+  （大 material 仅经 envelope payload_refs）
 ```
 
 所有公共不变量继续由原 owner 证明。
@@ -214,7 +218,7 @@ source=sidecar
 
 Replica 也不接收“你正在帮另一个模型预读”之类提示。
 
-但 Journal / diagnostics 必须保留：
+但 EventStore events / diagnostics 必须保留：
 
 ```text
 DecisionId
@@ -250,48 +254,49 @@ failure reason
 
 Strength 的实现必须建立在以下已经存在的结构上。
 
-## 1. Satellite 已经统一
+## 1. Session ownership 已归 Universal（禁止再扩 SatelliteKind）
 
-当前结构已经是：
+当前正式模型已经是正交二维（HOST-008 / Universal）：
 
 ```fsharp
-type SatelliteKind =
-    | Companion
-    | Teacher
+type SessionExecutionClass =
+    | Work
+    | InternalLeaf
 
-type ManagedSessionKind =
-    | WorkSession
-    | SatelliteSession of ownerSessionId: SessionId * kind: SatelliteKind
+type SessionOwnership =
+    | Root
+    | Attached of ownerSessionId: SessionId * attachment: AttachmentKind
+
+type AttachmentKind =
+    | Companion
+    | SyncInspector
+    | SyncCoder
+    | Bookkeeper of transactionId: string
+    // Strength 只增加下一 case；不回退到 SatelliteKind.Replica
+    | StrengthReplica
 ```
 
-并由 `Session/SatelliteRuntime.fs` 统一负责：
+`SatelliteKind` 现仅保留 Companion leaf 投影兼容面；**不得**再塞 `Replica` / `Teacher` / SyncDelegate。Dedicated SyncInspector/SyncCoder 是 Work+Attached；Companion/Bookkeeper/StrengthReplica 是 InternalLeaf+Attached。
+
+Strength Replica 的分类固定为：
 
 ```text
-single-flight ensure
-journal-proven recovery
-Host child replacement
-link-before-first-prompt
-abort / retire
+SessionExecutionClass.InternalLeaf
+× SessionOwnership.Attached(ownerWorkSessionId, AttachmentKind.StrengthReplica)
 ```
 
-所以 Strength 只增加：
-
-```fsharp
-| Replica
-```
-
-不创建 `StrengthSatelliteRuntime`。
+物理 ensure / abort / retire 归现有 Attached/leaf runtime 路径（可有 `StrengthRuntime` 做 decision-local batch 收集），**不**创建 `StrengthSatelliteRuntime`，**不**扩展 `SatelliteRuntime` 的 kind switch 充当第二套 ownership。
 
 第一版仍保持：
 
 ```text
-每个 WorkSession 至多一个 active Replica Satellite
-Replica 是 leaf
-Replica 不能再拥有 Companion / Teacher / Replica
+每个 owner Work Session 至多一个 active StrengthReplica attachment
+StrengthReplica 是 InternalLeaf：无 Companion、无 SyncDelegate 子会话、无嵌套 StrengthReplica
 owner 删除/取消 → 级联停止 Replica
+短生命周期：按 StrengthDecision 使用，完成后 retire；不跨 decision 复用 transcript
 ```
 
-当前 `SessionAssociation` 可以最小增加 `ReplicaSessionId` 与 `tryReplicaOf`。不要为了 Strength 顺手把整个 association record 重写成泛型图结构；如果未来出现第四、第五种 satellite，再单独做结构泛化。
+关联投影可以最小增加 `StrengthReplicaSessionId` / `tryStrengthReplicaOf`（按 owner × AttachmentKind 索引）。不要为了 Strength 把 Universal ownership 记录重写成泛型图；也不要复活 Student/Teacher 身份来解释 leaf。
 
 ## 2. 不新增 Replica Agent
 
@@ -362,7 +367,7 @@ RequestKind
 ProjectionChoice
 ```
 
-而 `StudentLearn / StudentCompile` 已证明：同一个 CanonicalRole 可以因为真实请求语义不同而拥有不同的 provider-visible 工具集。
+而现有 request-specific 路径（例如 SyncInspector / Bookkeeper / StrengthReplica）已证明：同一个 CanonicalRole 可以因为真实请求语义不同而拥有不同的 provider-visible 工具集。Student/Teacher 产品面已由 Universal clean break 删除，不得再作为 Strength 权限样板。
 
 Strength 应直接增加：
 
@@ -442,7 +447,7 @@ Strength promotion 后的工具调用/结果必须最终进入这个 durable sem
 ```text
 X      主 Work Session
 Y_X    X 的 Companion Satellite
-Z_D    某次 Strength Decision 的 Replica Satellite
+Z_D    某次 Strength Decision 的 StrengthReplica（InternalLeaf+Attached）
 D      StrengthDecisionId
 ```
 
@@ -450,7 +455,7 @@ D      StrengthDecisionId
 
 ```text
 eligible primary attempt
-→ Ensure Replica satellite
+→ Ensure StrengthReplica attachment
 → 运行最多 K 个 provider request
 → 得到 0..K 个完整只读 batch
 → candidate 已物化或决定 K0
@@ -528,7 +533,7 @@ read evidence
 只有同时满足以下条件才进入预测：
 
 ```text
-session = WorkSession
+session = Work + Root（普通主工作会话）
 request kind = WorkMain
 role ∈ { Coder, Inspector, DevOps, Meditator }
 selected tier = Deep
@@ -537,11 +542,10 @@ current effective agent = selected deep agent
 不是 InteractionRepair
 不是 PrefixProbe attempt
 不是 Reviewer / finality verification
-不是 Student / Teacher
-不是任何 Satellite
+不是任何 Attached / InternalLeaf session（含 Companion、SyncDelegate、Bookkeeper、StrengthReplica）
 没有 owner cancellation / abort
 可以唯一绑定 TargetProviderRun
-journal 可用且健康
+EventStore 可用且健康（唯一 dynamic durability；非 Journal NDJSON / RuntimePath blob）
 Replica fast peer 可解析
 成本模型可用
 ```
@@ -554,7 +558,7 @@ K0
 
 Browser 第一版不纳入。它的高价值调查往往涉及网络工具，而网络不是第一版 Strength 的可投机副作用边界。
 
-Manager / Orchestrator 没有这种普通只读工作面；Reviewer 的因果 seal 不允许被投机内容干扰；Student/Teacher 有自己的 request-specific protocol；全部排除。
+Manager / Orchestrator 没有这种普通只读工作面；Reviewer 的因果 seal 不允许被投机内容干扰。Student/Teacher 已删除，不再出现在 eligible 否定清单里——它们不是“排除项”，而是不存在的产品面。
 
 ---
 
@@ -653,12 +657,13 @@ Replica 的 provider-visible message base
 这个 intent 只对：
 
 ```text
-SatelliteKind.Replica
+AttachmentKind.StrengthReplica
+  （InternalLeaf × Attached）
 +
 ProviderRequestKind.StrengthReplica
 ```
 
-合法；其它组合 fail closed。
+合法；其它组合 fail closed。不得用旧 `SatelliteKind.Replica` 作为合法判别。
 
 它与普通 Work Session 的：
 
@@ -784,7 +789,7 @@ type StrengthRequestBatch =
 type StrengthFrameBundle =
     { DecisionId: StrengthDecisionId
       Batches: NonEmptyList<StrengthRequestBatch>
-      SemanticDigest: BlobDigest
+      SemanticDigest: ContentDigest  // 内容摘要；不是 RuntimePath BlobDigest / blobs/<sha256>
       ByteLength: int64 }
 ```
 
@@ -826,22 +831,36 @@ StrengthCandidatePrepared
     OwnerSessionId
     DecisionId
     TargetProviderRun
-    ReplicaSessionId
+    StrengthReplicaSessionId
     Budget
     AnchorDigest
-    FrameBundleRef
     FrameBundleDigest
     FrameByteLength
-    PredictorSnapshotRef / digest
+    // 大 material 不进 inline journal/blob path：
+    // EventEnvelope.PayloadRefs : PayloadRef list
+    //   - frame bundle payload（原 FrameBundleRef）
+    //   - predictor snapshot payload（原 PredictorSnapshotRef；可选）
+    // Domain 只见 opaque PayloadRef；Persist 映射到 Git OID / payloads/ tree
 ```
 
-Fact 表示：
+Event 表示：
 
-> “这些候选 bytes 已经被准备好，并被绑定给这个明确的 TargetProviderRun。”
+> “这些候选 bytes 已经作为 EventStore payload 准备好，并被绑定给这个明确的 TargetProviderRun。”
 
 它不表示 provider 已经消费。
 
-Candidate 成功落 durable 后，`StrengthSpeculate` 才声明 `InsertStrengthFrames` intent。
+**禁止**再引入：
+
+```text
+FrameBundleRef / PredictorSnapshotRef 作为独立 storage 类型
+RuntimePath → .../runtimes/<RuntimeId>.ndjson
+RuntimePath → .../blobs/<sha256>
+feature-owned Strength blob directory
+```
+
+Candidate material 与 predictor snapshot 一律经统一 EventStore：`append StrengthCandidatePrepared` 时把大正文写入 raw payload，并在 envelope `payload_refs` 中引用；小字段可留在 canonical JSON payload 内（此时对应 refs 可为空集规则仍服从 Storage §7.1）。
+
+Candidate 成功 commit 到 EventStore 后，`StrengthSpeculate` 才声明 `InsertStrengthFrames` intent。
 
 如果普通 Replica 失败发生在此之前：
 
@@ -857,14 +876,14 @@ fail open → 不插入 → main 正常请求
 不能猜“没写进去”然后继续 main
 ```
 
-因为 journal 可能实际已写，而 provider input 没有 Candidate；之后若仅凭 TargetProviderRun output 自动 promotion，就会把模型从未见过的 frame 变成历史。
+因为 EventStore 可能实际已 commit，而 provider input 没有 Candidate；之后若仅凭 TargetProviderRun output 自动 promotion，就会把模型从未见过的 frame 变成历史。
 
 正确流程：
 
 ```text
 append outcome unknown
-→ 重读 durable projection
-→ candidate 明确存在：注入同一 bundle 后继续
+→ 重读 EventStore Strength projection（按索引，不扫 NDJSON 文件）
+→ candidate 明确存在：注入同一 bundle（同一 PayloadRef 集合 / digest）后继续
 → candidate 明确不存在：按 K0 继续
 → 仍无法证明：阻止当前 provider attempt 外发 / fail closed
 ```
@@ -895,6 +914,7 @@ StrengthCandidatePromoted
     DecisionId
     ConsumingProviderRun
     FrameBundleDigest
+    // 可再次列出同一 frame bundle PayloadRef；禁止另写 RuntimePath blob 副本
 ```
 
 如果 run 在产生可用 provider output 前 Failed/Aborted：
@@ -1286,21 +1306,28 @@ Strength 在普通 Coder/Inspector/DevOps/Meditator 的工具结果里即使恰�
 
 ---
 
-# 二十、Student / Teacher / Companion 边界
+# 二十、Universal ownership / Companion 边界
 
 ## Student / Teacher
 
-全部 K0。
+**不存在。** Universal clean break 已删除 Student/Teacher 产品面与 request kind。Strength 不得：
 
-它们已经有 request-specific tool protocol；Strength 不插入第三套隐藏教育控制流。
+```text
+以 Student/Teacher 作为 eligible 排除样板
+复用 Teacher-style SatelliteKind 分类解释 Replica
+引入任何教育控制流 / QA / SKILL 依赖
+```
 
 ## Replica 自身
 
-Replica 是 Satellite leaf：
+Strength Replica 是 Universal InternalLeaf attachment：
 
 ```text
+ExecutionClass = InternalLeaf
+Ownership = Attached(owner, StrengthReplica)
 无 Companion
-无 Teacher
+无 SyncDelegate 子会话
+无嵌套 StrengthReplica
 无 fork/list/join
 无 fallback deep peer
 ```
@@ -1342,27 +1369,39 @@ Strength 自己不得向模型显示 provenance 标签。
 
 ---
 
-# 二十二、持久事实：只记录发生过的事
+# 二十二、持久事实：只记录发生过的事（EventStore only）
 
-建议新增独立 Strength fact family，而不是塞进 Companion / Fallback。
+建议新增独立 Strength **EventStore event family**，而不是塞进 Companion / Fallback，也不是私有 Journal/Blob store。
 
-核心 facts：
+### Storage 收口（相对旧稿）
+
+| 旧假定 | 裁决 |
+|---|---|
+| `FrameBundleRef` | 删除类型名；改为 `EventEnvelope.PayloadRefs` 中的 opaque `PayloadRef` |
+| `PredictorSnapshotRef` | 同上（可选 snapshot payload） |
+| Journal NDJSON (`RuntimePath` `*.ndjson`) | 删除；Strength 不写、不读该 substrate |
+| `RuntimePath` `blobs/<sha256>` | 删除；大 material → EventStore `payloads/` via `payload_refs` |
+| feature-owned Strength store / ref | 禁止 |
+
+核心 events：
 
 ```fsharp
 StrengthDecisionObserved
     // 可选；仅当需要 durable predictor/control audit 时
 
 StrengthCandidatePrepared
-    // Replica bundle 已 durable，绑定 target run
+    // Replica bundle 已 commit 到 EventStore，绑定 target run
+    // payload_refs ⊇ { frameBundlePayload, predictorSnapshotPayload? }
 
 StrengthCandidatePromoted
     // target run 已产生消费证据
+    // 可引用同一 frame bundle PayloadRef；禁止复制第二份 RuntimePath blob
 
 StrengthFramesTraced
     // promoted bundle 已被 XTrace 捕获到明确 cursor range
 ```
 
-可选诊断事实：
+可选诊断事件：
 
 ```fsharp
 StrengthCandidateAbandoned
@@ -1391,13 +1430,13 @@ Projection 至少索引：
 
 ```text
 OwnerSessionId → current/open candidate by TargetProviderRun
-DecisionId → prepared metadata
+DecisionId → prepared metadata + PayloadRef set + digests
 DecisionId → promotion evidence
 DecisionId → XTrace range
 TargetProviderRun → DecisionId
 ```
 
-业务热路径不得每次扫描 Journal。
+业务热路径不得每次扫描 event 全集或任何遗留 NDJSON 文件；只读 Strength projection / 索引。Committed `payload_refs` 必须落在 EventStore root `payloads/` closure 内（dangling → StorageInvalid）。
 
 ---
 
@@ -1405,7 +1444,7 @@ TargetProviderRun → DecisionId
 
 ## A. Replica 创建前 crash
 
-无 durable Strength effect。
+无 durable Strength EventStore effect。
 
 ```text
 restart → 正常 K0 / 重新决策
@@ -1493,7 +1532,7 @@ Strength 不伪造“用户消息中断”一类原因。
 
 必须有 canary 证明：
 
-1. **Nested session safety**：一个 Work transform 等待另一个 Satellite session 的 provider/tool loop 不死锁 Host。
+1. **Nested session safety**：一个 Work transform 等待 StrengthReplica（InternalLeaf+Attached）session 的 provider/tool loop 不死锁 Host。
 2. **Budget stop**：Replica 达 K 后可以在下一 transform/reconcile 物理阻止 K+1 请求。
 3. **Target binding**：当前 transform 可以唯一绑定将要消费输入的 `ProviderRunIdentity`；无唯一答案时 K0。
 4. **Tool schema**：StrengthReplica provider-visible schema 恰好是 `{read,glob,grep}`（provider 要求 noop 的合法例外单独登记）。
@@ -1506,7 +1545,7 @@ Strength 不伪造“用户消息中断”一类原因。
 11. **Promotion durability**：消费后 crash/restart，下一 request 仍看到等价 Promoted history。
 12. **Pair invariant**：Strength tool-result anchors 之后仍存在 PairProgrammingThought marker。
 13. **Review invariant**：ReviewSeal 仍覆盖最终 provider bytes；Reviewer 路径 Strength 永远 K0。
-14. **Satellite leaf**：Replica 不创建 Companion/Teacher，也不进入普通 fork/list/join surface。
+14. **InternalLeaf attachment**：StrengthReplica 不创建 Companion / SyncDelegate / 嵌套 StrengthReplica，也不进入普通 fork/list/join surface；分类不得回退为 `SatelliteKind.Replica`。
 15. **Upgrade canary**：Host / OpenCode 版本变化后，上述行为重新跑；任一关键项失败 → Strength 自动禁用。
 
 ---
@@ -1543,17 +1582,19 @@ Promoted inserted before target assistant
 semantic digest stable across replica/owner call IDs
 ```
 
-## Journal / Fold tests
+## EventStore / Fold tests
 
 ```text
-Prepared idempotent same digest
+Prepared idempotent same digest + same payload_refs
 Prepared same Decision different digest rejected
+Prepared material only via payload_refs（无 RuntimePath blob / NDJSON side write）
 Promoted without Prepared rejected
 Promoted wrong TargetProviderRun rejected
 Promoted twice idempotent
 Traced before Promoted rejected
 XTrace range monotonic
-restart snapshot equals live projection
+restart snapshot equals live EventStore projection
+payload_refs ⊆ committed payloads/ closure
 ```
 
 ## Integration tests
@@ -1593,9 +1634,9 @@ K2 does not activate before minimum evidence floor
 只落：
 
 ```text
-SatelliteKind.Replica
+AttachmentKind.StrengthReplica（InternalLeaf × Attached）
 StrengthReplica request kind + permissions
-Strength facts/projection
+Strength EventStore events/projection + payload_refs
 Projection intents
 replay/candidate wiring skeleton
 all feature decisions forced K0
@@ -1704,20 +1745,21 @@ Domain/
       semantic batch / digest / deterministic wire identity
   StrengthProjection.fs
       durable view types / pure decisions
+  StrengthEvents.fs
+      StrengthCandidatePrepared/Promoted/... vocabulary；PayloadRef fields only
   ProjectionAlgebra.fs
       + UseStrengthMirror / InsertStrengthFrames
   PrefixCandidate.fs
       + ProviderRequestKind.StrengthReplica semantics
   PromptAuthority.fs
       + request-specific readonly capability mapping
+  SessionOwnership / AttachmentKind
+      + StrengthReplica（Universal owner；非 SatelliteKind）
 
-Journal/
-  StrengthProjection.fs
-  Fold.fs
-  FactCodec.fs
-  ProjectionState.fs
-  SessionAssociation.fs
-      + SatelliteKind.Replica / ReplicaSessionId / accessors
+Infrastructure/Persist/（或 EventStore adapter 面）
+  Strength event codec / fold / indexed projection
+  payload_refs ↔ raw payloads mapping
+  禁止 Journal NDJSON writer、禁止 RuntimePath blob path
 
 Application/
   Strength/
@@ -1730,8 +1772,8 @@ Application/
 Session/
   StrengthRuntime.fs
       decision-local physical ownership / batch collection only
-  SatelliteRuntime.fs
-      复用；只扩 kind switch
+  Attached/leaf runtime
+      复用 Universal ownership；不扩 SatelliteKind.Replica
 
 Infrastructure/OpenCode/Host/
   Strength host adapter / canary glue
@@ -1742,14 +1784,14 @@ Infrastructure/OpenCode/Host/
 模块职责必须保持：
 
 ```text
-Domain      不访问 Host、不写 Journal
+Domain      不访问 Host、不写 EventStore/Git OID
 Application 结构化 workflow + typed ports
-Session     single-flight / physical Replica resource
-Journal     facts / fold / indexed projection
+Session     single-flight / physical StrengthReplica resource
+Persist     EventStore events / payload_refs / fold / indexed projection
 Infrastructure 只做 Host adapter / codec
 ```
 
-不要创建一个 1000 行 `StrengthTransform.fs` 同时做预测、session、权限、投影、journal、恢复。
+不要创建一个 1000 行 `StrengthTransform.fs` 同时做预测、session、权限、投影、EventStore、恢复。
 
 ---
 
@@ -1758,8 +1800,8 @@ Infrastructure 只做 Host adapter / codec
 ## 1. 先接身份与空行为
 
 ```text
-SatelliteKind.Replica
-SessionAssociation
+AttachmentKind.StrengthReplica
+Universal ownership association / accessors
 ProviderRequestKind.StrengthReplica
 ToolCapabilitySet
 AttemptExecutionProfile integration
@@ -1780,7 +1822,7 @@ InsertStrengthFrames
 
 ## 3. Replica runtime + dry run
 
-复用 SatelliteRuntime，跑真实 fast same-role request，但不注入 main。
+复用 Universal Attached/leaf runtime（StrengthRuntime），跑真实 fast same-role request，但不注入 main。
 
 ## 4. Candidate durability
 
@@ -1926,7 +1968,7 @@ request-specific readonly tools
 ```text
 1. Strength disabled → 普通 Work Session provider-visible bytes 与控制流无变化。
 
-2. Replica 是 Satellite leaf；没有 Companion / Teacher / Replica 子卫星。
+2. StrengthReplica = InternalLeaf × Attached(StrengthReplica)；无 Companion / SyncDelegate / 嵌套 StrengthReplica；禁止 SatelliteKind.Replica。
 
 3. 没有 Replica Role，没有 fast-replica/deep-replica Agent。
 
@@ -1950,7 +1992,7 @@ request-specific readonly tools
 
 13. Replica 失败不推进 owner FallbackCursor，也不触发 owner InteractionRepair。
 
-14. Review/Finality/Student/Teacher/Satellite 路径第一版永远 K0。
+14. Review/Finality/Attached/InternalLeaf 路径第一版永远 K0（含 Companion、SyncDelegate、Bookkeeper、StrengthReplica 自身）。Student/Teacher 已删除，不在词汇表中。
 
 15. PairProgrammingThought 仍覆盖 Strength 新增的 tool-result anchor；ReviewSeal 仍最后。
 
@@ -1960,9 +2002,11 @@ request-specific readonly tools
 
 18. control assignment restart-stable，且不由 predictor score 选择。
 
-19. 所有 lifecycle 状态从事实与 projection 推导；没有 Stage/Phase/NextAction 程序计数器。
+19. 所有 lifecycle 状态从 EventStore 事实与 projection 推导；没有 Stage/Phase/NextAction 程序计数器。
 
 20. Host 版本 canary 任一关键边界失败 → 新 Strength decision 自动 K0；旧 Promoted history 仍可恢复。
+
+21. Strength 大 material 只经 EventStore payload_refs；无 Journal NDJSON、无 RuntimePath blob、无 FrameBundleRef/PredictorSnapshotRef 独立存储类型。
 ```
 
 ---
@@ -1985,7 +2029,7 @@ Candidate → consumption proof → Promotion
 
 ## 架构正确
 
-Strength 只扩当前 Satellite / PromptAuthority / Projection / XTrace owner，不产生第二套身份、权限、projection、fallback 或 lifecycle runtime。
+Strength 只扩当前 Universal ownership（AttachmentKind.StrengthReplica）/ PromptAuthority / Projection / XTrace / EventStore owner，不产生第二套身份、权限、projection、fallback、lifecycle runtime 或 feature-owned storage。
 
 ## 经济正确
 
@@ -2060,6 +2104,6 @@ execution
 
 Strength 仍然值得做，但今天正确的形状已经不是“给旧系统外挂一个 Replica 子系统”，而是：
 
-> **在当前 Work Session 的 provider request 临界点，用现有 SatelliteRuntime 启一个同角色 fast leaf session，通过现有 AttemptExecutionProfile 把它约束成只读；它最多提前执行两个真实 provider request。其输出先是仅绑定当前 TargetProviderRun 的 Candidate，只有主 run 产生消费证据后才 Promotion，并在下一次早期 projection 中进入 XTrace/Companion 的 durable semantic history。预测器只用 shadow/control primary 行为训练，普通失败 K0，durable 因果不确定则 fail closed。**
+> **在当前 Work Session 的 provider request 临界点，按 Universal ownership 启一个 `InternalLeaf × Attached(StrengthReplica)` 同角色 fast leaf session，通过现有 AttemptExecutionProfile 把它约束成只读；它最多提前执行两个真实 provider request。其输出先作为 EventStore `StrengthCandidatePrepared`（frame/predictor material 仅经 `payload_refs`）绑定当前 TargetProviderRun；只有主 run 产生消费证据后才 Promotion，并在下一次早期 projection 中进入 XTrace/Companion 的 durable semantic history。预测器只用 shadow/control primary 行为训练，普通失败 K0，durable 因果不确定则 fail closed。不使用 Journal NDJSON / RuntimePath blob，不使用 `SatelliteKind.Replica`，不依赖 Student/Teacher。**
 
 这保留了旧提案真正有价值的第一性原理，同时删除了所有已经被当前 repo 基础设施取代、或会重新制造第二套 owner 的实现包袱。

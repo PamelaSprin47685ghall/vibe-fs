@@ -10,13 +10,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import {
   agentJournal,
   agentFact,
   sessionId,
+  stream,
   toList,
   listItems,
   caseOf,
@@ -40,7 +41,6 @@ const {
   AgentJournalModule_snapshot,
   AgentJournal__WriteBlob_Z721C83C5,
 } = await import('../../../dist/Journal/AgentJournal.js')
-const { StreamId } = await import('../../../dist/Journal/Envelope.js')
 const {
   handleContinuation,
   tryRefreshMainContextFromJournal,
@@ -49,7 +49,8 @@ const {
 
 const MAIN = 'ses-main'
 const BLOG = 'ses-blog'
-const streamSession = (sid) => new StreamId(1, sessionId(sid))
+const streamSession = (sid) =>
+  stream.session(typeof sid === 'string' ? sessionId(sid) : sid)
 const sha256Hex = (input) => createHash('sha256').update(input, 'utf8').digest('hex')
 
 const withHarness = async (fn, { material = 0 } = {}) => {
@@ -309,20 +310,20 @@ test('ENFORCER_reload_derives_delta_digest_from_context_digest_when_toml_empty',
 })
 
 test('ENFORCER_reload_unreadable_blob_returns_none', async () => {
-  await withHarness(async ({ journal, scope, dir }) => {
+  await withHarness(async ({ journal, scope }) => {
     const openReq = materializeOpen(journal, { requestId: 'req-gone', json: mainJson() })
-    const blobPath = join(dir, openReq.ContextRef.fields[0])
-    rmSync(blobPath, { force: true })
+    // EventStore BlobRef is blobs/<gitOid> in IGitRawStore — not a RuntimePath file.
+    agentJournal.deleteBlob(journal, openReq.ContextRef)
     const reloaded = resolveCycleContext(scope, journal, sessionId(MAIN), sessionId(BLOG))
     assert.equal(reloaded, undefined)
   })
 })
 
 test('ENFORCER_reload_corrupt_json_returns_none', async () => {
-  await withHarness(async ({ journal, scope, dir }) => {
+  await withHarness(async ({ journal, scope }) => {
     const openReq = materializeOpen(journal, { requestId: 'req-badjson', json: mainJson() })
     // Unterminated JSON → JSON.parse throws → decoder returns None (fail closed).
-    writeFileSync(join(dir, openReq.ContextRef.fields[0]), '{"kind": "main", "toml": ')
+    agentJournal.replaceBlobContent(journal, openReq.ContextRef, '{"kind": "main", "toml": ')
     const reloaded = resolveCycleContext(scope, journal, sessionId(MAIN), sessionId(BLOG))
     assert.equal(reloaded, undefined)
   })

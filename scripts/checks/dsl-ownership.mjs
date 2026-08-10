@@ -229,9 +229,13 @@ export const FORBIDDEN = [
 //                                       1:1 to ChildRecoveryResult after effects
 //   ManagedAgent.fs:ManagedAgentParseError  Infrastructure boundary; one-way
 //                                       from AgentNameRejection (ManagedAgent.fs:66)
+//   MagicTodo.fs:ProcessReviewVerdict   pure Decision façade; 1:1 ofGuard map
+//                                       from ReviewGuardVerdict (Fact.fs)
 export const DUP_CASES_EXEMPT = new Set([
   'ChildRecovery.fs:ChildResolution',
   'ManagedAgent.fs:ManagedAgentParseError',
+  // 1:1 Decision façade over ReviewGuardVerdict via ProcessReviewVerdict.ofGuard
+  'MagicTodo.fs:ProcessReviewVerdict',
 ])
 
 export const GATE_NAMES = FORBIDDEN.map((item) => item.gate)

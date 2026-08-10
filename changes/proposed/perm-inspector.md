@@ -1,4 +1,4 @@
-# Inspector Casebook — 持久复用、增量刷新与 Git Raw 同步
+# Inspector Casebook — 持久复用、增量刷新与 EventStore 耐久
 
 ## 摘要
 
@@ -20,16 +20,15 @@ Question
 4. `fetch` 不直接信任旧答案，而是先针对**当前 worktree**重放 observations；
 5. 未检测到 observation 变化时直接复用旧 A；no-delta 只是 freshness hint，**不构成正确性证明**；
 6. 检测到 observation 变化时，启动一个私有 Bookkeeper Agent，根据 Q/A 与 evidence diff 修订 Q/A；
-7. Bookkeeper 成功且 evidence 再次稳定 → 更新 snapshot 并返回新 A；失败 → 保留旧 Case，返回旧 A（允许过时——这是预期产品语义）；
-8. Casebook 不进入任何 worktree，不制造 branch commit，不产生产品意义上的版本历史；
-9. Casebook 使用 Git object database + 一个 custom tree ref 作为 repository-global 当前状态；
-10. linked worktree 共享同一个 Casebook；
-11. 与普通 Git remote 的同步统一采用 dumb-remote 模式：
-    `fetch → merge → CAS-push`；
-12. replica merge 只使用简单的 `revision + wall_clock` LWW，同值任取；
-13. timestamp/revision 只解决 replica 收敛；observation replay 只是 freshness hint——任何机制都**不证明答案正确**；
-14. Casebook 使用有限 LRU，长期无人使用的条目自动淘汰；
-15. 本功能完全 opt-in：只有 repository 中存在指定 marker directory 时才启用；不存在时工具、Prompt 注入、Bookkeeper 和同步行为全部静默消失。
+7. Bookkeeper 成功且 evidence 再次稳定 → 更新 Case 并返回新 A；失败 → 保留旧 Case，返回旧 A（允许过时——这是预期产品语义）；
+8. Casebook **不拥有**独立 durable store：Case 事实以 EventStore events 表达；Q/A/snapshot 等大正文经 `PayloadRef` 进入统一 payloads；
+9. 物理耐久与同步统一落在 Persist 的 `refs/wanxiang/store` + `IEventStore` / `GitGateway`；Casebook 不制造 feature ref、branch commit 或产品版本历史；
+10. linked worktree 通过 Git common-dir 共享同一个统一 EventStore；
+11. remote 同步属于 Persist/GitGateway 的 dumb-remote `ConvergeStore`，**不是** Casebook 自有 sync/hook/refspec；
+12. replica 收敛 = EventStore **集合并（set union）**；同 Case 合法并发 fork 由投影表达为 `DomainConflict`，经后续 resolution / refresh / evict events 收敛——**禁止** `(revision, wall_clock)` LWW；
+13. observation replay 只是 freshness hint；任何 merge 标量或 EventStore 物理顺序都**不证明答案正确**；
+14. Casebook 使用有限 LRU：淘汰通过 append `InspectorCaseEvicted` 表达，长期无人使用的条目退出 live projection；
+15. 本功能完全 opt-in：只有 repository 中存在指定 marker directory 时才启用；不存在时工具、Prompt 注入、Bookkeeper 和 archive 行为全部静默消失（store sync 仍由 Persist 拥有，与 Casebook marker 无关）。
 
 Compatibility：**Compatible**。未启用 Casebook 的 repository 行为必须保持不变。
 
@@ -47,17 +46,20 @@ Casebook 是 hopefully useful 的 best-effort semantic cache，不是证明系�
 
 ```text
 - Inspector 不修改 subject worktree；
-- Casebook 动态数据不污染 git status / Orchestrator Clean Gate；
-- Case publication 原子，不出现 Q/A/snapshot 撕裂状态；
-- Git canonical ref 更新使用 CAS；
-- remote push 使用 lease，不 blind force；
+- Case 动态数据不污染 git status / Orchestrator Clean Gate
+  （只经统一 EventStore / refs/wanxiang/store，不写 worktree 动态文件）；
+- Case publication 原子：一次 InspectorCaseCaptured / InspectorCaseRefreshed
+  append 绑定完整 Q/A/snapshot/observations PayloadRef 集合，不出现撕裂状态；
+- 物理 store CAS / k-way merge / remote converge 由 Persist + GitGateway 拥有，
+  Casebook 不得自实现 feature CAS / lease push / hook；
 - Bookkeeper 只能通过 edit-qa 修改 staged Q/A；
 - Casebook 内容不逃逸 Synthetic TOML data containment；
-- 同一 Inspector PrefixEpoch 的 Casebook index 字节稳定；
+- 同一 Inspector PrefixEpoch 的 Casebook index 字节稳定
+  （冻结 CasebookProjection snapshot，不是 feature pin ref）；
 - Casebook mutation 不主动制造 PrefixEpoch；
 - ToolResultBound 始终生效；
 - 路径不得逃逸 repository / .git 安全边界；
-- 有界 retry，不建立第二运行时或无限同步循环。
+- 有界 retry，不建立第二运行时或 Casebook 专属无限同步循环。
 ```
 
 ## 0.2 明确不保证
@@ -71,16 +73,17 @@ Casebook 是 hopefully useful 的 best-effort semantic cache，不是证明系�
 - snapshot 是否足以发现所有会影响旧答案的 repository 变化；
 - 没检测到 observation delta 是否意味着旧答案仍然正确；
 - Bookkeeper 是否成功把旧答案刷新到当前 repository 的最佳答案；
-- 两个并发 replica 中 LWW winner 是否语义上“更正确”。
+- EventStore 上并存的同 Case DomainConflict heads 哪一个“更正确”
+  （物理层只做 union；业务正确性不由 merge 证明）。
 ```
 
 因此：
 
 ```text
 observation replay = freshness hint
-revision / wall_clock = replica ordering
+EventStore union / DomainConflict = replica / concurrency accounting
 Bookkeeper = opportunistic maintenance
-A.md = reusable best-effort knowledge
+A = reusable best-effort knowledge（via PayloadRef）
 ```
 
 任何上述机制都不得被提升为 correctness proof。
@@ -98,7 +101,7 @@ repository-scoped
 + evidence-backed
 + freshness-hinted
 + self-maintaining
-+ remotely synchronizable
++ remotely synchronizable（via unified Persist/GitGateway）
 ```
 
 的知识缓存。
@@ -125,8 +128,10 @@ Answer 是否直接复用，由 observations 在当前 worktree 上的 best-effo
 框架保证的只是机制方向，不是答案质量：
 
 ```text
-revision / wall_clock
-    = replica conflict resolution
+EventStore set-union
++ CasebookProjection fold
++ DomainConflict（同 Case 合法并发 fork）
+    = durable history / concurrency accounting
 
 observation replay
     = freshness hint
@@ -141,6 +146,8 @@ no detected change
 ```
 
 旧 A 可以因为 capture 缺口、未识别命令、未观察区域、并发变化、Bookkeeper 失败等原因过时——这是允许的产品行为。
+
+**SUPERSEDED（不得再作为当前设计）：** 以 `revision` / `wall_clock` 作为 replica conflict resolution 或 merge scalar。
 
 ---
 
@@ -165,7 +172,7 @@ Fetched answers are best-effort cached knowledge and may be stale or
 imperfect. Use them freely, then continue investigating whenever useful.
 ```
 
-后台真实成本（Git read、observation replay、Bookkeeper provider call、CAS、remote sync）由 runtime 承担，Inspector 不可见，也不得据其优化调用。
+后台真实成本（EventStore read、observation replay、Bookkeeper provider call、IEventStore.Append、Persist ConvergeStore）由 runtime 承担，Inspector 不可见，也不得据其优化调用。
 
 `fetch` 仍是阻塞工具，但“阻塞”是执行语义，不是决策成本信号。
 
@@ -200,7 +207,7 @@ session_id -- full question
 
 ---
 
-## 2.2 不引入 commit history
+## 2.2 不引入 commit history / feature Git history
 
 Casebook 不创建：
 
@@ -211,53 +218,56 @@ Casebook branch
 tag
 merge commit
 历史版本链
+feature-owned storage ref
 ```
 
-Git 只被用作：
+Git raw object database 只作为 **Persist/EventStore 的物理底层**：
 
 ```text
 content-addressed blob/tree store
-+ atomic ref CAS
-+ remote object transport
++ atomic refs/wanxiang/store CAS（Persist 拥有）
++ remote object transport（GitGateway 拥有）
 ```
+
+Casebook 领域层只看见 events / projections / opaque `PayloadRef`，不得操作 Git OID / root OID / feature ref。
 
 ---
 
-## 2.3 不保证历史 Q/A 可追溯
+## 2.3 不保证历史 Q/A 可追溯为产品 API
 
-`Q.md` 和 `A.md` 是**当前 canonical 文档**。
+`Q` / `A` 是 **CasebookProjection 中的当前 canonical 文档**（bytes 经 PayloadRef 耐久）。
 
-旧 Git objects 在 ref 更新后可以变成 unreachable，并最终被 Git GC。
-
-产品层不存在：
+EventStore 保留 append-only event history；产品层不存在：
 
 ```text
-previous revision
+previous revision（作为用户 API）
 history()
 rollback()
 show old answer
 ```
 
-`revision` 只是 merge scalar，不是用户可查询的版本历史。
+**SUPERSEDED：** 把 `revision` 当作 merge scalar 或用户可查询版本号。
+
+淘汰通过 `InspectorCaseEvicted` 表达；被 Evict 的 Case 退出 live projection，但不得靠“静默缺席”假装删除事实。
 
 ---
 
-## 2.4 不用 timestamp 判断 freshness
+## 2.4 不用 timestamp 判断 freshness 或 merge winner
 
-即使某个 remote case：
+即使某个 remote Case 相关 event 更“新”，或投影中存在更新的 Accessed/Refreshed：
 
 ```text
-revision = 999999
-wall_clock = tomorrow
+也不得因此跳过 evidence replay
+也不得用 wall_clock / revision 决定答案正确性或 LWW winner
 ```
 
-也不得因此跳过 evidence replay。
+freshness 只来自当前 worktree 上的 observation replay。
 
 ---
 
 ## 2.5 不改变 subject worktree
 
-Inspector、Bookkeeper、Casebook synchronization 都不得：
+Inspector、Bookkeeper、以及 Persist 对 store 的同步都不得：
 
 ```text
 write subject source files
@@ -269,7 +279,7 @@ rebase
 改变 branch
 ```
 
-Casebook 的动态内容不进入 worktree，因此不得使 Clean Gate 变 dirty。
+Case 动态内容不进入 worktree，因此不得使 Clean Gate 变 dirty。
 
 ---
 
@@ -307,7 +317,7 @@ directory exists?
 .wanxiang/casebook/
 ```
 
-不存在，则 Casebook 功能必须整体静默消失。
+不存在，则 **Casebook 产品表面**必须整体静默消失。
 
 具体包括：
 
@@ -317,55 +327,75 @@ Inspector system prompt 中没有 Casebook index
 不创建 Bookkeeper
 不要求 Bookkeeper Agent 配置存在
 不采集 Casebook observations
-不创建/更新 Casebook canonical ref
-不主动 fetch/push Casebook ref
-Git hook 即使残留也必须立即 no-op
+不 archive / 不 append InspectorCase* events
 ```
 
-已有：
+**不**包括（这些不属于 Casebook 所有权）：
 
 ```text
-refs/wanxiang/inspector-casebook
+关闭 refs/wanxiang/store
+卸载 Persist/GitGateway hooks
+删除统一 EventStore 对象
+Casebook 自有 custom refspec / feature sync（本 Change 根本不拥有它们）
 ```
 
-可以保留，不要求删除。
+Feature disable **只关闭 Casebook surface**。统一 store 的 sync/converge 继续由 Persist 拥有，与 Casebook marker 无关。
 
-重新创建 marker 后可以重新使用。
+**SUPERSEDED：** 保留或清理 `refs/wanxiang/inspector-casebook` 作为 Casebook authority；本 Change 不得再以该 ref 为当前设计。
+
+重新创建 marker 后，新的 Case 事实从当前 EventStore 上的 InspectorCase* events / CasebookProjection 继续工作（clean break：不要求迁移任何旧 feature-store 布局）。
 
 ---
 
-# 4. Git 物理模型
+# 4. EventStore 物理模型 / 共享 store
 
-## 4.1 Canonical local ref
+> **REPLACE** 原 “§4 Git 物理模型 / `refs/wanxiang/inspector-casebook`”。
+> Casebook **不得**拥有 feature canonical ref。
 
-每个 Git repository 只有一份 canonical Casebook：
+## 4.1 统一 canonical store
+
+每个 Git repository 只有一份动态 durable substrate：
 
 ```text
-refs/wanxiang/inspector-casebook
+refs/wanxiang/store
 ```
 
-该 ref：
+由 Persist 拥有，直接指向 EventStore root tree（events/ + payloads/），而不是 commit。
+
+Casebook 的 durable 事实只能是：
 
 ```text
-直接指向 tree object
+InspectorCaseCaptured
+InspectorCaseRefreshed
+InspectorCaseAccessed
+InspectorCaseEvicted
 ```
 
-而不是 commit。
-
-因此：
+经 `IEventStore.Append` 进入该 store。大正文经 envelope `payload_refs`（Domain 侧 opaque `PayloadRef`）。
 
 ```text
-refs/wanxiang/inspector-casebook
+refs/wanxiang/store
         │
         ▼
-     root tree
+   EventStore root
+        ├── events/     # InspectorCase* 与其它 domain events 共存
+        └── payloads/   # Q/A/snapshot/observation materials
+```
+
+**禁止（当前设计）：**
+
+```text
+refs/wanxiang/inspector-casebook
+Casebook-owned remote-tracking refs
+Casebook-owned pin refs
+Casebook-owned refspec / lease push / feature hook
 ```
 
 ---
 
 ## 4.2 linked worktree 共享
 
-Casebook 的 repository identity 取 Git common directory。
+store / CasebookProjection 的 repository identity 取 Git common directory。
 
 不同 linked worktree：
 
@@ -379,16 +409,16 @@ repo-worktree-b/
 
 ```text
 Git common object database
-refs/wanxiang/inspector-casebook
+refs/wanxiang/store
 ```
 
-不得为每个 worktree 创建不同 Casebook copy。
+不得为每个 worktree 创建不同 Casebook copy 或不同 feature store。
 
 因此：
 
 ```text
 worktree A ─┐
-worktree B ─┼──► one canonical Casebook ref
+worktree B ─┼──► one unified EventStore
 worktree C ─┘
 ```
 
@@ -396,9 +426,9 @@ worktree C ─┘
 
 ---
 
-## 4.3 没有 canonical ref
+## 4.3 没有 Case events
 
-marker 存在但 canonical ref 不存在表示：
+marker 存在但 CasebookProjection 当前没有 retained Case 表示：
 
 ```text
 Casebook enabled
@@ -407,43 +437,48 @@ Casebook currently empty
 
 不是错误。
 
-第一条可永久化 Case 创建时 CAS-create ref。
+第一条可永久化 Case 通过 append `InspectorCaseCaptured` 创建；物理上由 Persist 对 `refs/wanxiang/store` 做 Absent→present 或普通 CAS（Casebook 不实现私有 CreateRef）。
 
 ---
 
-# 5. Root tree 格式
+# 5. 逻辑 Case materials（event payloads，非 feature tree authority）
 
-推荐逻辑布局：
+> **REPLACE** 原 “§5 Root tree 格式 / cases/<session>/… 作为 Casebook authority”。
+> 任何 Git tree 布局若存在，只属于 Persist EventStore 物理编码，**不是** Casebook 产品树权威。
+
+逻辑 Case 至少包含：
 
 ```text
-<root-tree>/
-  cases/
-    <encoded-session-id>/
-      Q.md
-      A.md
-      meta.toml
-      snapshot/
-        observations.toml
-        files/
-          <repository-relative-path...>
+session_id
+Q bytes
+A bytes
+replayable observations
+evidence snapshot materials
 ```
 
-不建立 root manifest。
+耐久方式：
+
+```text
+append InspectorCaseCaptured | InspectorCaseRefreshed
+→ payload / payload_refs 承载 Q、A、observations、snapshot
+→ CasebookProjection fold → CurrentCases
+```
+
+不建立 Casebook-owned root manifest，不把 `cases/<id>/meta.toml` 树当作第二真相源。
 
 ---
 
-## 5.1 Session path
+## 5.1 Session identity / 路径安全
 
-模型不得提供 Case 路径。
+模型不得提供 Case 存储路径。
 
-路径只能从真实 Inspector SessionId 确定性编码：
+逻辑身份只能从真实 Inspector SessionId 确定性得到：
 
 ```text
-encode(SessionId)
-→ one safe Git tree path segment
+SessionId → Case stream / business key
 ```
 
-必须拒绝：
+Evidence 路径必须拒绝：
 
 ```text
 /
@@ -453,31 +488,31 @@ path traversal
 平台相关歧义
 ```
 
-`Q.md` / `A.md` / `meta.toml` / `snapshot` 均为框架固定名字。
+产品文档仍可用 `Q` / `A` 指称 canonical question/answer bytes；它们是逻辑文档名，不是 feature Git path authority。
 
 ---
 
 # 6. Case 内容
 
-## 6.1 Q.md
+## 6.1 Q（逻辑 Q.md）
 
 新 Inspector Case 创建时：
 
 ```text
-Q.md = Inspector invocation 的完整 initial prompt
+Q = Inspector invocation 的完整 initial prompt
 ```
 
 不摘要。
 
 不做 ToolResultBound truncation。
 
-Bookkeeper 后续**允许修改 Q.md**。
+Bookkeeper 后续**允许修改 Q**。
 
 因此长期语义是：
 
 ```text
-Q.md
-= current canonical question
+Q
+= current canonical question（CasebookProjection）
 
 initially initialized from original Inspector prompt
 ```
@@ -487,19 +522,19 @@ initially initialized from original Inspector prompt
 Casebook 不保留一个额外：
 
 ```text
-OriginalQ.md
+OriginalQ
 ```
 
-也不保留旧 Q history。
+也不提供产品层旧 Q history API。耐久历史上的旧 Q bytes 若仍被旧 event 的 PayloadRef 引用，那是 EventStore 物理可达性，不是产品 rollback API。
 
 ---
 
-## 6.2 A.md
+## 6.2 A（逻辑 A.md）
 
 新 Case 创建时：
 
 ```text
-A.md
+A
 = Inspector tool 实际返回给 caller 的 ToolResult body
 ```
 
@@ -512,24 +547,26 @@ A.md
 
 但
 
-A.md == caller 真正拿到的 bounded answer
+A == caller 真正拿到的 bounded answer
 ```
 
 不存在：
 
 ```text
-A.full.md
-A.raw.md
+A.full
+A.raw
 hidden untruncated answer
 ```
 
+大正文经 `PayloadRef` 进入 EventStore payloads；Domain 不得直接写 Git OID。
+
 ---
 
-## 6.3 Bookkeeper 更新后的 A.md
+## 6.3 Bookkeeper 更新后的 A
 
 Bookkeeper 修改 A 后，最终 candidate A 仍必须满足同一个 ToolResultBound。
 
-Casebook 中保存的 A：
+CasebookProjection 中保存的 A：
 
 ```text
 就是 fetch 最终能够返回的 bounded bytes
@@ -539,7 +576,7 @@ Casebook 中保存的 A：
 
 ```text
 fetch(id)
-→ stored A.md
+→ projected A（PayloadRef）
 ```
 
 不需要另一套 Casebook 专属截断规则。
@@ -548,17 +585,20 @@ fetch(id)
 
 ---
 
-# 7. meta.toml
+# 7. Case metadata（无 revision / wall_clock）
 
-每个 Case：
+> **REPLACE** 原 `meta.toml` 中的 `revision` / `wall_clock` merge schema。
 
-```toml
-revision = 42
-wall_clock = "2026-08-08T03:58:12.123Z"
-last_access = "2026-08-08T04:00:01.001Z"
+Casebook **不**再持久化：
+
+```text
+revision
+wall_clock
 ```
 
-只有这三个 merge/cache 字段。
+作为 Case 字段或 merge scalar。
+
+投影可派生的 cache 字段只有与 LRU 相关的 **last_access**（见 §7.3），来自 event fold，不是独立可 LWW 的文档权威。
 
 不得增加：
 
@@ -576,161 +616,119 @@ semantic score
 
 ---
 
-## 7.1 revision
+## 7.1 SUPERSEDED — revision
 
-新 Case：
+**SUPERSEDED：** 以 `revision = max(...) + 1` 表达 refresh / 竞争胜负。
 
-```text
-revision = 1
-```
-
-每当 Q/A/snapshot/observations 这个**逻辑 Case 内容整体**发生一次 refresh publication：
-
-```text
-revision =
-    max(all observed competing revisions) + 1
-```
-
-仅 LRU touch：
-
-```text
-revision 不变
-```
-
-Replica merge：
-
-```text
-revision 不变
-```
-
-revision 不得因：
-
-```text
-fetch remote
-CAS retry
-push retry
-LRU merge
-```
-
-虚增。
-
-revision 达到整数表示上界时不得 wrap；该 Case 直接淘汰（evict），具体实现不得回绕为 0。
+当前设计：内容更新 = append `InspectorCaseRefreshed`（或初次 `InspectorCaseCaptured`）。并发同 Case heads = EventStore union + `DomainConflict`，经后续 resolution/refresh/evict 收敛。
 
 ---
 
-## 7.2 wall_clock
+## 7.2 SUPERSEDED — wall_clock
 
-`wall_clock` 是产生该 content revision 时的 wall-clock timestamp。
+**SUPERSEDED：** 以 `wall_clock` 作为 revision 并列的 merge tie-breaker。
 
-只在 revision 内容更新时改变。
-
-比较只作为 revision 相同情况下的 tie-breaker。
-
-系统时钟漂移不会影响 correctness。
+当前设计：禁止 wall_clock LWW。时钟只可出现在诊断；不得进入 Case merge schema。
 
 ---
 
-## 7.3 last_access
+## 7.3 last_access via InspectorCaseAccessed
 
-以下成功事件更新：
+以下成功路径 append（或等价地让投影视作 access）`InspectorCaseAccessed`：
 
 ```text
-新 Case publication
-成功 fetch(session_id)
+新 Case Captured 成功
+成功 fetch(session_id)（含 no-delta touch 与 refresh 成功后的访问）
 ```
 
-不要求更新时间单调可信。
+`CasebookProjection.last_access(session_id)` 由 Accessed（以及 Captured/Refreshed 作为首次/刷新访问）fold 得出，只服务 LRU。
 
-它只服务 LRU。
+不要求 wall-clock 单调可信。时钟漂移最多影响 cache retention，不影响 answer validity。
 
-时钟漂移最多影响 cache retention，不影响 answer validity。
+仅 LRU touch：**只** append `InspectorCaseAccessed`，不得伪造 Refreshed，不得引入 revision++。
 
 ---
 
-# 8. Replica merge
+# 8. Replica merge — SUPERSEDED LWW；EventStore union + DomainConflict
 
-设本地和 remote 都存在同一个 `session_id`。
+> **REPLACE** 原 `(revision, wall_clock)` LWW。
 
-内容 winner 使用：
+## 8.0 SUPERSEDED callout
 
-```text
-(revision, wall_clock)
-```
-
-lexicographic max。
-
-规则：
+**SUPERSEDED（不得实现）：**
 
 ```text
-revision 大 → 赢
-
-revision 相同
-wall_clock 大 → 赢
-
-revision 和 wall_clock 都相同
-→ 任取一个
+(revision, wall_clock) lexicographic max
+canonical content-tree OID tie-break as Casebook merge
+last_access 写入 meta.toml 再独立 max merge
+missing != tombstone 且 prune 不留 deletion record
 ```
 
-为了让同一输入的纯 merge 实现稳定，最后一种“任取”建议机械地使用：
+以及任何 Casebook-owned：
 
 ```text
-canonical content-tree OID lexicographic max
+compareAndSwapCasebookRoot
+fetchRemoteCasebook
+pushRemoteCasebook*
+pinCasebookRoot
 ```
-
-这不是第三个业务 timestamp，也不进入 `meta.toml`。
-
-只是 deterministic arbitrary choice。
 
 ---
 
-## 8.1 原子 Case winner
+## 8.1 EventStore union
 
-winner 必须整体选择：
+本地与 remote 的 Case 事实进入同一个 append-only event set。
 
-```text
-Q.md
-A.md
-snapshot/
-revision
-wall_clock
-```
+Persist k-way merge **只做集合并 + identity dedupe**，不解释 Case 业务胜负。
 
-禁止：
-
-```text
-local Q
-+ remote A
-+ local snapshot
-```
-
-或任意字段级 semantic merge。
+`CasebookProjection` 对 union 后的 InspectorCase* events 做 deterministic fold，得到 retained Cases。
 
 ---
 
-## 8.2 last_access 独立 merge
+## 8.2 同 Case DomainConflict
 
-无论 content winner 来自哪边：
+同一 `session_id` 上出现互斥的并发 Captured/Refreshed heads 时：
 
 ```text
-merged.last_access =
-    max(local.last_access, remote.last_access)
+物理层：合法 fork，history 全保留（非 StorageInvalid）
+投影层：DomainConflict { heads; reason }
 ```
 
-因此另一 replica 更新 A 不会把本地刚访问过的热门 Case 变成冷数据。
+禁止字段级拼装：
+
+```text
+local Q + remote A + local snapshot
+```
+
+Resolution 必须经后续 event（例如新的 `InspectorCaseRefreshed` / 领域 `*Resolved` / 或 Evicted）显式声明 parents 覆盖 competing heads；不得用 LWW “悄悄选一个”。
 
 ---
 
-## 8.3 不使用 tombstone
+## 8.3 last_access 派生，不是独立 merge 文档
 
-Case missing 不表示删除事实。
+`last_access` 由 Accessed/Captured/Refreshed fold 派生。
+
+另一 replica 刷新 A 不会“擦掉”本机刚发生的 Accessed——因为 Accessed events 在 union 后仍然存在；投影取最新 access 语义服务 LRU。
+
+---
+
+## 8.4 Evicted tombstone events
+
+Case 从 live projection 消失必须通过：
 
 ```text
-missing != tombstone
+append InspectorCaseEvicted
 ```
 
-merge 先 union 所有合法 Case，再执行同一个 deterministic LRU prune。
+表达。
 
-LRU 淘汰不创建 deletion record。
+```text
+missing projection entry
+≠
+“从未存在” 或 “远程删除未声明”
+```
+
+LRU prune **创建** Evicted tombstone event，而不是静默从 feature tree 删路径。
 
 ---
 
@@ -751,7 +749,7 @@ provider token window
 ```text
 case count
 UTF-8 bytes
-Git object payload bytes
+payload / stored bytes（经 EventStore）
 rendered index bytes
 ```
 
@@ -772,25 +770,25 @@ CasebookIndexMaxUtf8Bytes
 淘汰顺序：
 
 ```text
-last_access ascending
+projected last_access ascending
 then session_id lexical
 ```
 
-即最久未访问优先删除。
+即最久未访问优先 Evict。
 
 ---
 
 ## 9.2 Prune timing
 
-以下操作之后统一运行同一个纯 prune：
+以下操作之后统一运行同一个纯 prune 决策，并对需要淘汰的 Case append `InspectorCaseEvicted`：
 
 ```text
-local Case publication
-remote/local merge
-LRU touch merge
+local Case Captured / Refreshed publication
+EventStore converge 后投影刷新
+InspectorCaseAccessed touch 后如越界
 ```
 
-相同 Case 集合 + 相同 metadata 必须生成相同 retained Case 集。
+相同 event 集合必须生成相同 retained Case 集（fold 确定性）。
 
 ---
 
@@ -804,7 +802,7 @@ stored-byte bound
 完整 Q index entry bound
 ```
 
-则 Inspector 原调用正常返回，但该 Session **不进入 Casebook**。
+则 Inspector 原调用正常返回，但该 Session **不 append Captured**（不进入 CasebookProjection）。
 
 不得为了缓存而截断：
 
@@ -825,7 +823,7 @@ observation evidence
 Inspector system 中注入当前 retained Case 的：
 
 ```text
-session_id -- full Q.md
+session_id -- full Q
 ```
 
 Q 不摘要、不 embeddings、不关键词化。
@@ -877,10 +875,10 @@ Casebook 变化不得主动制造 PrefixEpoch。
 新增 Case
 → switch PrefixEpoch
 
-LRU touch
+LRU touch（Accessed）
 → switch PrefixEpoch
 
-remote sync
+Persist converge / remote sync
 → switch PrefixEpoch
 
 Bookkeeper refresh
@@ -900,12 +898,15 @@ CasebookIndexSnapshot
 逻辑内容至少包括：
 
 ```text
-Casebook root OID
 ordered session_id
 Q bytes
-case subtree OID
 rendered index bytes
+足以在 epoch 内服务 fetch 的冻结 Case materials
+  （Q/A/observations/snapshot PayloadRef 或已解析 bytes）
 ```
+
+**不得**把 Casebook feature root OID / `refs/wanxiang/store` OID 当作 Casebook 产品权威字段写进 index contract。
+允许实现为了诊断记录一次投影采样时的 store snapshot 身份，但它不是 Casebook authority，也不得引入 feature pin ref。
 
 同一 PrefixEpoch 内永久不变。
 
@@ -921,7 +922,7 @@ rendered index bytes
 
 选择完成。
 
-不得在 seal 后重新读取 Casebook 并替换 Q list。
+不得在 seal 后重新读取 CasebookProjection 并替换 Q list。
 
 对于 prefix probe/promote：
 
@@ -933,7 +934,7 @@ probe candidate materialize
 → promoted epoch 继承同一个 snapshot
 ```
 
-禁止 probe 成功后再重新 sample Casebook。
+禁止 probe 成功后再重新 sample CasebookProjection。
 
 对于 compaction reanchor：
 
@@ -945,34 +946,31 @@ reanchor
 
 ---
 
-# 12. Epoch pin
+# 12. Epoch freeze（无 feature pin refs）
 
-LRU 或其它 worktree 可能在当前 Inspector epoch 活跃期间把某个已展示 Case 从 canonical root 淘汰。
+> **REPLACE** 原 `refs/wanxiang/pins/<host-session-id>/<epoch-id>`。
+
+LRU（`InspectorCaseEvicted`）或其它 replica 可能在当前 Inspector epoch 活跃期间把某个已展示 Case 从 **live** CasebookProjection 淘汰。
 
 因此 index 不能只保存 session id。
 
-当前 epoch 必须让其 index root 在物理上保持可读。
-
-推荐使用 local-only pin：
+当前 epoch 必须冻结其 index 所展示 Case 的 materials，使 epoch 内 `fetch` 仍可读。
 
 ```text
-refs/wanxiang/pins/<host-session-id>/<epoch-id>
+冻结 = process/session 持有的 CasebookIndexSnapshot materials
+     + 对应 PayloadRef 所指向的已 committed EventStore payloads
 ```
 
-指向该 epoch 建 index 时的 root tree。
-
-该 ref：
+**SUPERSEDED / 禁止（当前设计）：**
 
 ```text
-永不 push
-永不 fetch
-不进入 Casebook merge
-不进入 Inspector index
+refs/wanxiang/pins/...
+pinCasebookRoot
+Casebook-owned pin ref push/fetch
+把 pin 纳入 Casebook merge
 ```
 
-Epoch retire / Session dispose 后删除。
-
-这样 Git GC 不会在活跃 epoch 中清除已展示 Case 的对象。
+已 committed 的 EventStore payloads 随 `refs/wanxiang/store` history 可达；Casebook **不得**为了 epoch 安全性再发明第二套 feature pin/GC 协议。Epoch retire / Session dispose 后释放进程内冻结 snapshot 即可。
 
 ---
 
@@ -1004,12 +1002,13 @@ feature disabled 时不存在空壳 tool。
 
 调用时：
 
-1. 首选 canonical current root 中同 `session_id` Case；
-2. 若 canonical 已因 LRU 不存在，但当前 Inspector epoch 的 frozen index 中存在该 ID，则可从 epoch pin 的 Case subtree 恢复；
+1. 首选当前 `CasebookProjection` 中同 `session_id` 的 retained Case；
+2. 若 live projection 已因 Evicted 不存在，但当前 Inspector epoch 的 **frozen CasebookIndexSnapshot** 中存在该 ID，则从冻结 materials 恢复；
 3. 两者都没有则返回 typed tool failure：
    `CASE_NOT_FOUND`。
 
 不得从 Session transcript 猜旧答案。
+不得查 feature pin refs（本 Change 不存在它们）。
 
 ---
 
@@ -1018,9 +1017,9 @@ feature disabled 时不存在空壳 tool。
 `fetch` 只在无法提供答案时失败：
 
 ```text
-session_id 不存在
-Case 损坏到无法读取
-A.md 缺失
+session_id 不存在（projection 与 epoch freeze 皆无）
+Case materials 损坏到无法读取
+A 缺失
 ```
 
 只要存在可读取的 A：
@@ -1029,7 +1028,7 @@ A.md 缺失
 prefer answer over failure
 ```
 
-refresh 失败、remote 失败、publication 失败都不构成 fetch 失败（§22.3、§29.1、§36）。
+refresh 失败、Persist remote 失败、publication 失败都不构成 fetch 失败（§22.3、§29.1；sync 失败语义属 Persist）。
 
 ---
 
@@ -1195,7 +1194,7 @@ bash -c ...
 
 # 19. Repository containment
 
-Casebook 是可以推送远端的 repository artifact。
+Casebook 的 durable Case materials 会进入统一 EventStore，并随 `refs/wanxiang/store` 由 Persist/GitGateway 同步。
 
 因此 evidence 永久化必须满足：
 
@@ -1229,7 +1228,7 @@ submodule / 外部 repository 内容
 
 理由：
 
-Casebook 会和 remote 同步，不能把 `.gitignore` 或 repository boundary 变成秘密旁路。
+Case materials 会进入统一 store 并可能随 Persist sync 到达 remote，不能把 `.gitignore` 或 repository boundary 变成秘密旁路。
 
 这是单文件证据策略，不是 Case 资格门槛。
 
@@ -1243,7 +1242,7 @@ Git-tracked 文件即使当前存在 unstaged/staged 修改，仍可以进入 sn
 
 因此启用 Casebook 即表示接受：
 
-> Inspector 对 tracked working-tree 内容形成的 evidence snapshot 可能通过隐藏 Casebook ref 同步到 `origin`，即使该内容尚未通过普通 branch commit 发布。
+> Inspector 对 tracked working-tree 内容形成的 evidence snapshot 可能作为 EventStore payload 进入 `refs/wanxiang/store`，并经 Persist/GitGateway 同步到 remote（例如 `origin`），即使该内容尚未通过普通 branch commit 发布。
 
 这一点必须在正式用户文档中明确说明。
 
@@ -1292,7 +1291,7 @@ all fetched Case captured observations
 → flattened observation set
 ```
 
-Git blob/tree 内容寻址负责物理 dedupe。
+EventStore payload 内容寻址（Persist 管理的 Git raw blobs）负责物理 dedupe。
 
 ---
 
@@ -1356,10 +1355,9 @@ lookup Case
 ```text
 no detected delta
 → 不启动 Bookkeeper
-→ touch last_access
-→ local CAS publication（best-effort）
-→ best-effort remote sync
-→ return exact A.md
+→ append InspectorCaseAccessed（best-effort）
+→ Persist 可随后 ConvergeStore（Casebook 不拥有 sync）
+→ return exact A（PayloadRef 指向的 bounded bytes）
 ```
 
 这是最便宜的 hot path。no-delta 不构成“答案仍然正确”的证明，只是 good enough cache hit。
@@ -1381,17 +1379,14 @@ detected delta
 若当前 worktree 在 Bookkeeper 运行期间未继续漂移：
 
 ```text
-publish:
-  Q
-  A
-  refreshed snapshot
-  refreshed observations
-  revision + 1
-  new wall_clock
-  last_access = now
-
+append InspectorCaseRefreshed:
+  Q / A / refreshed snapshot / refreshed observations
+  （大正文经 PayloadRef；小字段可 inline）
+→ CasebookProjection 消费新 event
 → return new A
 ```
+
+不得使用 `revision + 1` / `wall_clock` 作为 merge 或 freshness 标量。
 
 ---
 
@@ -1400,12 +1395,12 @@ publish:
 Bookkeeper 失败、subject 持续漂移、publication 失败时：
 
 ```text
-不 publish 撕裂 candidate
-Case 保持不变
-return 当前 stored A
+不 append 撕裂 candidate
+CasebookProjection 保持旧 Case
+return 当前 projected A
 ```
 
-旧 A 可能过时——这是允许的产品行为（见 §29.1、§30、§36.1）。
+旧 A 可能过时——这是允许的产品行为（见 §29.1、§30；remote/local publication 失败语义见 Persist/EventStore，Casebook 不拥有独立 sync 状态机）。
 
 ---
 
@@ -1768,391 +1763,209 @@ CasebookRefreshMaxAttempts = 3
 
 ---
 
-# 31. Publication 原子性
+# 31. Publication 原子性（EventStore append）
+
+> **REPLACE** 原 Casebook tree CAS / `update-ref refs/wanxiang/inspector-casebook`。
 
 逻辑 Case：
 
 ```text
 Q
 A
-meta
 snapshot
 observations
 ```
 
-必须一次 publication 原子切换。
+必须作为**一次** `InspectorCaseCaptured` 或 `InspectorCaseRefreshed` append 原子切换进 live projection（同一 event 的 payload / `payload_refs` 闭包完整）。
 
-利用 Git：
+物理步骤由 Persist 拥有：
 
 ```text
-write new blobs
-→ build new case subtree
-→ build new root tree
-→ update-ref CAS
+canonicalize event + write payload blobs
+→ build store root candidate
+→ CAS refs/wanxiang/store via IEventStore
 ```
 
-在最后 CAS 之前，新 Case 对读者不可见。
+在 Append 成功之前，新 Case 对 CasebookProjection 读者不可见。
 
 ---
 
-## 31.1 本地 CAS
+## 31.1 本地 append
 
 使用：
 
 ```text
-update-ref
-  refs/wanxiang/inspector-casebook
-  <new-root>
-  <observed-old-root>
+IEventStore.Append(InspectorCaseCaptured | InspectorCaseRefreshed | …)
 ```
 
-只有 current ref 仍等于 observed root 才提交。
+Casebook Application **不得**直接调用 feature `update-ref`，也不得暴露：
+
+```text
+compareAndSwapCasebookRoot   # do not use
+```
 
 ---
 
-## 31.2 CAS conflict
+## 31.2 Append / CAS conflict
 
-root CAS 因其它 worktree/plugin instance 更新失败时：
+store CAS 因其它 worktree/process 更新失败时：
 
 ```text
-read latest root
-→ merge candidate mutation
-→ retry CAS
+Persist 重读最新 StoreSnapshot
+→ k-way merge / retry append（bounded）
 ```
 
-重试必须有限。
-
-如果同一 `session_id` 被并发修改，并且 competing Case 的 `(revision, wall_clock)` 已胜出，则当前 fetch 不能直接假装自己的 candidate 已永久化。
-
-必须：
+若同一 `session_id` 出现合法并发 heads：
 
 ```text
-重新读取 winner
+投影：DomainConflict
+当前 fetch 不得假装自己的 candidate 已是唯一 winner
+→ 重新读取投影
 → 对当前 worktree 重新 freshness check
-→ 必要时生成 revision = winner.revision + 1 的新 refresh
+→ 必要时以 competing heads 为 parents append 新的 Refreshed / Resolved
 ```
 
 若持续竞争超过有限预算：
 
 ```text
-fetch fail
+fetch 返回当前可读 A；或在完全无法读 A 时失败
 ```
+
+不得用 revision/wall_clock LWW “强行宣布胜利”。
 
 ---
 
-# 32. Remote
+# 32–40. Remote / refs / dumb sync / hooks / bootstrap / cleanup — SUPERSEDED
 
-v1 唯一 remote policy：
+> **REPLACE** 原 §§32–40 整段 Casebook-owned remote/refspec/hook/bootstrap 设计。
+> 统一由 Persist + `GitGateway` 拥有。Casebook **必须不**拥有 sync / hooks / refspecs。
 
-```text
-若 origin 存在
-→ origin 是 Casebook sync remote
+## 32. SUPERSEDED — Casebook Remote policy
 
-若 origin 不存在
-→ local-only Casebook
-```
+**SUPERSEDED：** “若 origin 存在则 origin 是 Casebook sync remote” 以及任何 Casebook-owned remote 选择。
 
-不自动推断 upstream branch remote。
-
-不支持多 remote CRDT。
-
-未来若需要其它 remote，另行设计。
+当前：Case 事件随统一 EventStore 复制范围走 Persist 策略。Casebook 不选择 remote，不实现 `fetchRemoteCasebook` / `pushRemoteCasebook*`。
 
 ---
 
-# 33. Remote refs
+## 33. SUPERSEDED — Casebook Remote refs
 
-Remote canonical：
+**SUPERSEDED / 禁止作为当前设计：**
 
 ```text
 refs/wanxiang/inspector-casebook
-```
-
-Local remote-tracking copy：
-
-```text
 refs/wanxiang/remotes/origin/inspector-casebook
+Casebook custom fetch refspec
 ```
 
-配置普通 fetch refspec，使无显式 branch/refspec 的：
+当前唯一动态 store ref：
 
 ```text
-git fetch
-git fetch origin
-git pull
+refs/wanxiang/store
 ```
 
-可以顺便 transport 该 custom ref。
+其 remote-tracking / refspec / lease-push 由 Persist/GitGateway 定义，不是本 Change 的端口。
 
 ---
 
-# 34. Dumb-remote sync
+## 34. SUPERSEDED — Casebook dumb-remote sync 算法
 
-禁止 server-side merge protocol。
-
-禁止要求：
+**SUPERSEDED：** Casebook 自己的
 
 ```text
-pre-receive
-proc-receive
-post-receive
-自建 Git server
+fetch remote Casebook ref → merge → local CAS → CAS-push
 ```
 
-所有 remote 都按 dumb replica 处理。
-
-统一算法：
-
-```text
-fetch remote Casebook ref
-→ merge(local canonical, fetched remote)
-→ local CAS
-→ CAS-push merged root
-```
+当前：Application 需要跨 replica 可见性时调用 Persist 的 converge 能力（经 `GitGateway`），语义是 EventStore union，不是 Casebook LWW tree merge。
 
 ---
 
-# 35. Remote CAS-push
+## 35. SUPERSEDED — Casebook Remote CAS-push / lease
 
-Tree ref replacement 采用 explicit lease：
+**SUPERSEDED：** Casebook `--force-with-lease` 推 feature ref。
 
-```text
-observed remote = R0
-merged local    = M
-
-push M
-only if remote ref still == R0
-```
-
-语义等价于：
-
-```text
---force-with-lease=<casebook-ref>:<R0>
-```
-
-同时只 push Casebook exact ref。
-
-不得使用：
-
-```text
-blind --force
-```
+Lease / CAS-push 若存在，只针对 `refs/wanxiang/store`，由 Persist/GitGateway 实现。Casebook 不得 blind force，也不得拥有自己的 lease API。
 
 ---
 
-## 35.1 Lease rejection
+## 36. Local correctness 与 remote availability 分离（保留产品语义）
 
-若 push lease rejected：
+### 36.1 Local publication failure
 
-```text
-fetch new remote R1
-→ merge(local, R1)
-→ CAS local
-→ push with expect R1
-```
-
-有限 retry。
-
-达到 retry budget：
+若当前 `fetch(session_id)` 需要刷新 Case，而本地 `IEventStore.Append(InspectorCaseRefreshed)` 无法完成：
 
 ```text
-remote sync deferred/failed
-```
-
-但已经成功 publication 的 local Case 仍然有效。
-
----
-
-# 36. Local correctness 与 remote availability 分离
-
-## 36.1 Local publication failure
-
-若当前 `fetch(session_id)` 需要刷新 Case，而本地 Git CAS publication 无法完成：
-
-```text
-Case 保持不变
+CasebookProjection 保持不变
 fetch 返回当前 stored A
 ```
 
-本地 canonical state 未推进，下次 fetch 会重试 refresh；答案可用性优先于刷新成功。
+答案可用性优先于刷新成功。
+
+### 36.2 Remote / converge failure
+
+offline / DNS / auth / lease contention / converge budget 用尽时：
+
+```text
+不得让本地已 append 成功的 Answer 失效
+fetch 可以正常返回本地 projected A
+sync/converge 留到 Persist 后续入口
+```
+
+Remote 是 EventStore replica 通道，不是 Casebook authority。
+Casebook **不**保存 `PendingSync` / `NeedsPush` 第二状态机（见 §54）。
 
 ---
 
-## 36.2 Remote failure
+## 37–38. SUPERSEDED — Casebook reference-transaction hook / ownership
 
-以下情况：
-
-```text
-offline
-DNS failure
-auth failure
-remote custom ref rejected
-lease contention budget exhausted
-```
-
-不得让本地已发布的 Answer 失效。
-
-行为：
+**SUPERSEDED / 禁止作为当前设计：**
 
 ```text
-local Casebook 保留
-fetch 可以正常返回本地 A
-remote sync 留到以后
+Casebook 监听 refs/wanxiang/remotes/origin/inspector-casebook
+WANXIANG_CASEBOOK_HOOK_ACTIVE
+Casebook 安装/维护 reference-transaction shim
+“hook acceleration disabled” 作为 Casebook 合法状态
 ```
 
-Remote 是 replica，不是 authority。
+若仓库存在 Persist/GitGateway 的统一 hook dispatcher，那是 storage Change 的职责。Casebook 正确性不得依赖任何 hook；feature disable 也不得去卸载 Persist hooks。
 
 ---
 
-# 37. 普通 git fetch 集成
-
-Git 没有专门的 pre/post-fetch product hook。
-
-使用：
-
-```text
-reference-transaction
-```
-
-作为 fetch-side accelerator。
-
-Hook 只关心：
-
-```text
-state = committed
-且
-ref =
-refs/wanxiang/remotes/origin/inspector-casebook
-```
-
-其它 ref update 立即忽略。
-
----
-
-## 37.1 Hook 工作
-
-tracking ref 更新后：
-
-```text
-merge tracking remote into local canonical
-→ local CAS
-→ best-effort CAS-push merged root
-```
-
-这样普通：
-
-```text
-git fetch
-```
-
-也趋向完成双向 convergence。
-
----
-
-## 37.2 Hook recursion
-
-Hook 内部 Casebook `update-ref` 会再次触发 `reference-transaction`。
-
-必须有确定性 recursion guard，例如：
-
-```text
-WANXIANG_CASEBOOK_HOOK_ACTIVE=1
-```
-
-内部 ref update 检测到 guard 后立即 no-op。
-
-不得靠：
-
-```text
-“应该不会递归”
-```
-
-作为假设。
-
----
-
-# 38. Hook ownership
-
-不得覆盖用户已有的非万象术：
-
-```text
-.git/hooks/reference-transaction
-```
-
-行为：
-
-```text
-hook absent
-→ 可安装万象术 shim
-
-hook 已是万象术拥有
-→ 可幂等维护
-
-hook 是用户/其它系统拥有
-→ 不覆盖、不 rename、不 patch
-→ 记录非敏感诊断
-→ fetch hook acceleration disabled
-```
-
-Casebook correctness 不得依赖 hook 存在。
-
----
-
-## 38.1 Hook unavailable fallback
-
-即使 hook 不能安装：
-
-```text
-fetch(session_id)
-Inspector epoch bootstrap
-local Case publication
-```
-
-仍应主动 merge 已存在的 remote-tracking Casebook state。
-
-因此 hook 只减少同步延迟，不是 correctness dependency。
-
----
-
-# 39. Bootstrap
+## 39. SUPERSEDED — Casebook Bootstrap（feature refspec / hook / casebook-only fetch）
 
 Casebook marker 首次被发现时：
 
-1. 初始化 Casebook runtime；
-2. 若 `origin` 存在，幂等确保 custom fetch refspec；
-3. 尝试安全安装/确认 reference-transaction shim；
-4. 若 local tracking ref 尚不存在，可进行一次 casebook-only best-effort bootstrap fetch；
-5. fetch 失败不阻止 Inspector；
-6. 不创建空 Casebook commit；
-7. 在没有 Case 时 canonical ref 可以继续 absent。
+```text
+初始化 Casebook domain/runtime surface
+不安装 Casebook custom refspec
+不安装 Casebook hook
+不做 casebook-only bootstrap fetch
+不创建空 Casebook commit / feature ref
+```
+
+若需要与 remote 对齐，走统一 EventStore converge（Persist），失败不阻止 Inspector。
 
 ---
 
-# 40. Feature disable cleanup
+## 40. Feature disable cleanup
 
 marker 消失后：
 
 ```text
 provider surface 立即关闭
+不 archive / 不暴露 fetch / 不要求 Bookkeeper
 ```
 
-可以幂等移除万象术自己添加的：
+**不得**借机删除或改写：
 
 ```text
-remote.origin.fetch exact refspec
-reference-transaction hook shim（仅当可证明为万象术拥有）
-```
-
-不得删除：
-
-```text
+refs/wanxiang/store
+Persist/GitGateway hooks
 用户 hook
-canonical local Casebook ref
-remote Casebook ref
-Git objects
+EventStore objects
 ```
 
-残留 Wanxiang hook 即使尚未清理也必须先检测 marker 并 no-op。
+残留若有人错误实现过的 Casebook hook：**不是**本 Change 当前设计；若代码路径仍存在，必须在无 marker 时 no-op，且不得被文档描述为应维护的产品能力。
 
 ---
 
@@ -2169,11 +1982,8 @@ else:
     A = exact bounded Inspector ToolResult
     snapshot = captured evidence snapshot
     observations = flattened replayable observations
-    meta.revision = 1
-    meta.wall_clock = now
-    meta.last_access = now
-    local CAS publish（best-effort）
-    best-effort remote sync
+    append InspectorCaseCaptured（PayloadRef 承载大正文；best-effort）
+    （Persist 可随后 ConvergeStore；Casebook 不拥有 sync）
     return same A
 ```
 
@@ -2181,11 +1991,13 @@ capture 有缺口不阻止归档：能捕获多少就保存多少。
 
 Casebook publication 不得改变原 Inspector caller 已应获得的 Answer bytes。
 
+**SUPERSEDED：** `meta.revision = 1` / `meta.wall_clock = now` 作为 publication schema。
+
 ---
 
 # 42. Publication failure on initial archive
 
-第一次 Inspector 已经成功完成，但 archive write 失败时：
+第一次 Inspector 已经成功完成，但 `InspectorCaseCaptured` append 失败时：
 
 ```text
 Inspector 原 tool call 仍应返回其正常 A
@@ -2207,9 +2019,17 @@ fetch refresh publication failure
 
 ---
 
-# 43. Casebook 与 Journal
+# 43. Casebook 与 Journal / EventStore authority
 
-Casebook 当前 tree ref 自身就是 Casebook authority。
+> **REPLACE** “Casebook tree ref 自身就是 Casebook authority”。
+
+**EventStore 是 Case durable facts 的唯一 authority**：
+
+```text
+InspectorCase* events
++ PayloadRef materials
+→ CasebookProjection
+```
 
 不得把完整：
 
@@ -2221,31 +2041,29 @@ observation result
 Bookkeeper patch
 ```
 
-复制进 Journal 作为第二份 truth。
+复制进 Journal / NDJSON / 私有旁路文件作为第二份 truth。
 
-Journal/日志如需诊断，只保存：
+Journal 或诊断日志如需记录，只保存：
 
 ```text
 session id
-root/tree/blob OID
-revision
+EventId / opaque PayloadRef
 byte count
 observation count
 result/error code
 duration
 ```
 
-不得记录大段 Case 内容。
+不得记录大段 Case 内容。Journal **must not hold Case bodies**。
 
 ---
 
 # 44. Casebook 与 Worktree Clean Gate
 
-动态 Casebook 内容只能进入：
+动态 Case 内容只能进入：
 
 ```text
-Git object database
-refs/wanxiang/*
+统一 EventStore（refs/wanxiang/store + object database）
 ```
 
 不得生成：
@@ -2258,7 +2076,7 @@ refs/wanxiang/*
 
 `.wanxiang/casebook/.keep` 是静态 opt-in marker，正常由 repository commit 管理。
 
-因此 Casebook refresh/sync 不应出现在：
+因此 Case refresh / Persist sync 不应出现在：
 
 ```text
 git status
@@ -2276,7 +2094,7 @@ Inspector 模型本身仍只有只读调查能力。
 
 ```text
 写 source workspace
-直接写 Casebook
+直接写 EventStore / 直接 append
 直接 edit Q/A
 调用 update-ref
 调用 git push
@@ -2284,7 +2102,7 @@ Inspector 模型本身仍只有只读调查能力。
 
 `fetch` 是一个受 runtime 控制的知识读取/刷新工具。
 
-Bookkeeper 对 Q/A 的修改发生在 Casebook staged documents 中，不授予 Inspector filesystem write 权限。
+Bookkeeper 对 Q/A 的修改发生在 staged documents 中，不授予 Inspector filesystem write 权限。
 
 因此“Inspector 对 subject repository 只读”保持成立。
 
@@ -2301,16 +2119,15 @@ freeze old Case
 → Bookkeeper
 → final staged Q/A
 → final current evidence verification
-→ build refreshed snapshot
-→ build new tree
-→ CAS publication
+→ build refreshed materials
+→ append InspectorCaseRefreshed（原子 publication）
 → return A
 ```
 
 禁止：
 
 ```text
-先换 snapshot
+先换 snapshot / 先 append 不完整 event
 再跑 Bookkeeper
 ```
 
@@ -2326,18 +2143,23 @@ new snapshot + old A
 
 # 47. Corruption / invalid Case
 
-Case parser 必须验证：
+Case / event 消费必须验证：
 
 ```text
-safe session path
-Q.md readable
-A.md readable and within ToolResult contract
-meta.toml schema valid
-revision valid positive integer
-timestamps parseable
+safe session identity
+Q readable
+A readable and within ToolResult contract
 observations schema valid
 snapshot path containment valid
-Git objects存在且类型正确
+PayloadRef 可达且属于 committed store closure
+```
+
+**不再验证**（已删除的 schema）：
+
+```text
+revision valid positive integer
+wall_clock / timestamps parseable as merge fields
+meta.toml LWW schema
 ```
 
 无效 Case：
@@ -2347,23 +2169,23 @@ Git objects存在且类型正确
 不得被 fetch 返回
 ```
 
-Casebook 是 cache，因此可以在后续 deterministic prune/repair 中淘汰坏 Case。
+坏 event 若属 Persist `StorageInvalid`（坏 JSON / 缺 parent / unknown authoritative type 等）→ **fail closed via Persist**，不得“跳过坏 event 继续猜”。
 
-不得从自然语言 Q/A 猜缺失 metadata。
+Casebook 是 cache：业务上非法但物理合法的 Case materials 可在后续 deterministic prune 中 `InspectorCaseEvicted`；不得从自然语言 Q/A 猜缺失 metadata。
 
 ---
 
 # 48. Remote malformed data
 
-Remote Casebook 含非法 Case 时：
+Remote 经 Persist converge 并入的 event set 中若含非法/损坏 Case payload：
 
 ```text
-非法 Case 不得覆盖本地合法 Case
+非法 Case 不得进入 CasebookProjection 覆盖本地合法 Case
+StorageInvalid → Persist fail closed
+DomainConflict → 投影表达冲突，等待 resolution event
 ```
 
-Merge validator 必须先验证 candidate。
-
-不得因为 remote revision 更大就绕过 schema/evidence validation。
+**SUPERSEDED：** “不得因为 remote revision 更大就绕过 validation”——本 Change 已无 revision merge。
 
 ---
 
@@ -2417,7 +2239,7 @@ Command/Reply interpreter
 Step AST
 ```
 
-`revision` 是真实 replica data，不是程序计数器。
+**SUPERSEDED：** “`revision` 是真实 replica data”——replica data 是 EventStore events，不是 revision 计数器。
 
 `PrefixEpoch` 是已有领域事实，不新增 CasebookGeneration 类伪阶段。
 
@@ -2427,9 +2249,9 @@ Step AST
 
 ## 51.1 不同 Case
 
-不同 `session_id` 可以并发准备 blobs/trees。
+不同 `session_id` 可以并发准备 payload / append candidates。
 
-最终 root mutation 经 Git CAS 收敛。
+最终 store mutation 经 Persist `IEventStore` CAS / merge 收敛。
 
 ---
 
@@ -2443,7 +2265,7 @@ Step AST
 
 建议 single-flight `fetch` refresh，避免同时启动两个 Bookkeeper。
 
-该 single-flight 是进程内物理所有权，不写入 meta/Journal。
+该 single-flight 是进程内物理所有权，不写入 Case metadata / Journal。
 
 ---
 
@@ -2453,27 +2275,22 @@ Step AST
 
 因为各自针对不同 current worktree validation。
 
-两边可能产生：
+两边可能各自 append `InspectorCaseRefreshed`。
+
+Replica 层：
 
 ```text
-revision = N+1
+EventStore union
+→ CasebookProjection
+→ 若互斥 heads：DomainConflict
+→ 后续 Refreshed/Resolved/Evicted 收敛
 ```
 
-不同 candidate。
-
-Replica merge：
-
-```text
-revision
-→ wall_clock
-→ deterministic arbitrary OID tie
-```
-
-最终只保存一个 canonical current Case。
+**SUPERSEDED：** `revision → wall_clock → OID` LWW 选唯一 canonical Case。
 
 另一个 worktree 下一次使用时再次 replay observations；若不适合其 tree，会再次 refresh。
 
-这是预期 eventual behavior，不建立 multi-version Case。
+这是预期 eventual behavior，不建立产品 multi-version Case API。
 
 ---
 
@@ -2482,40 +2299,30 @@ revision
 只要：
 
 ```text
-两 replica 后续能互相 fetch
+两 replica 后续能经 Persist/GitGateway 互相 converge
 且没有无限新的 mutation
 ```
 
 重复执行：
 
 ```text
-union
-LWW merge
-last_access max
-deterministic prune
-CAS-push
+EventStore set-union
+CasebookProjection fold
+InspectorCaseEvicted prune（bounded）
+store CAS / converge
 ```
 
-应 eventually 收敛到相同 root tree。
+应 eventually 收敛到相同 event set（进而相同 live projection，冲突经 resolution 消失）。
 
-不要求 vector clock、HLC、CRDT conflict set。
+不要求 vector clock、HLC、CRDT conflict set，也**禁止** LWW。
 
 ---
 
-# 53. timestamp 同值
+# 53. SUPERSEDED — timestamp 同值 LWW
 
-若两个并发更新产生：
+**SUPERSEDED：** “same revision + same wall_clock → 任取一个 / OID tie-break”。
 
-```text
-same revision
-same wall_clock
-```
-
-无需进一步业务语义。
-
-任取一个即可。
-
-实现只需选择稳定的 arbitrary winner，以避免同一 merge 输入产生随机 root。
+当前：并发 heads 保留在 history 中，由投影标为 `DomainConflict` 或由 domain 定义的 order-independent fold 消化；不得为了 merge 漂亮而把 wall_clock 塞进产品 schema。
 
 不得因此增加：
 
@@ -2526,7 +2333,7 @@ vector clock
 UUID timestamp
 ```
 
-到产品 schema。
+到 Casebook 产品 schema。
 
 ---
 
@@ -2541,23 +2348,22 @@ RemoteDirty
 SyncGeneration
 ```
 
-下一次合法同步入口直接从：
+下一次合法同步入口直接从 Persist 物理状态：
 
 ```text
-local canonical ref
-remote tracking ref
-remote observed ref
+local refs/wanxiang/store
+GitGateway observed remote store
 ```
 
 重新计算该做什么。
 
-物理状态就是事实。
+物理状态就是事实；Casebook 不拥有 sync 状态机。
 
 ---
 
 # 55. Git reflog / history
 
-Casebook canonical ref 不主动创建 reflog。
+统一 store ref 不主动为 Casebook 创建 reflog。
 
 不要求：
 
@@ -2565,21 +2371,21 @@ Casebook canonical ref 不主动创建 reflog。
 --create-reflog
 ```
 
-产品不提供历史恢复。
+产品不提供 Case history 恢复 API。
 
-Git 因自身配置临时留下 unreachable object 或 reflog，不改变产品语义。
+Git 因自身配置临时留下 unreachable object 或 reflog，不改变产品语义。Event history 来自 events，不是 Git commit graph。
 
 ---
 
-# 56. Git GC
+# 56. Git GC / 可达性
 
-当前 canonical ref 保证当前 Casebook tree reachable。
+`refs/wanxiang/store` 保证 committed EventStore root（含 payload closure）reachable。
 
-活跃 Inspector epoch pin 保证其 frozen index root reachable。
+Casebook **不**维护 feature pin refs；epoch freeze 依赖已 committed payloads + 进程内 snapshot。
 
-未被 canonical/pin 引用的旧 Case objects 可以由正常 Git GC 回收。
+未被任何 committed store root 引用的 orphan blobs 可由正常 Git GC / Persist 规则回收。
 
-不得自己实现第二套 object GC。
+不得自己实现第二套 Casebook object GC，也不得用 pin ref 阻止 Persist GC 协议。
 
 ---
 
@@ -2588,14 +2394,14 @@ Git 因自身配置临时留下 unreachable object 或 reflog，不改变产品�
 实施该 Change 时，应建立一个独立正式主题，例如：
 
 ```text
-docs/why/inspector-casebook.md
-docs/what/inspector-casebook.md
-docs/shape/inspector-casebook.md
-docs/how/inspector-casebook.md
-docs/proof/inspector-casebook.md
+docs/why/casebook.md
+docs/what/casebook.md
+docs/shape/casebook.md
+docs/how/casebook.md
+docs/proof/casebook.md
 ```
 
-Change 文件本身不定义正式 Clause ID。
+Change 文件本身不定义正式 Clause ID。主题名 “casebook” 指产品能力，不暗示 feature Git ref，也不得写回 `refs/wanxiang/inspector-casebook`。
 
 ---
 
@@ -2604,11 +2410,12 @@ Change 文件本身不定义正式 Clause ID。
 需要正式化：
 
 ```text
-Casebook best-effort freshness vs replica convergence 分离
-Casebook raw Git ref 不进入 worktree
-PrefixEpoch Casebook index freeze
+Casebook best-effort freshness vs EventStore replica convergence 分离
+Case 动态数据只经 refs/wanxiang/store，不进入 worktree
+PrefixEpoch CasebookIndexSnapshot freeze（无 feature pin）
 Casebook 不制造新 epoch
 不建立第二运行时
+Casebook 不拥有 sync/hooks/refspecs
 ```
 
 ---
@@ -2673,9 +2480,13 @@ fetch/edit-qa 自定义 tool text result（如适用）
 需要明确：
 
 ```text
-Casebook 不属于 Journal
-Casebook custom Git ref 是自己的 authority
-Journal/log 不复制 Q/A/snapshot
+Case durable authority = unified EventStore（IEventStore）
+InspectorCaseCaptured / Refreshed / Accessed / Evicted
+CasebookProjection fold
+大正文 = PayloadRef → store payloads/
+Journal / 诊断不得复制 Case bodies
+物理 CAS / converge / dumb remote = Persist + GitGateway
+禁止 Casebook feature ref / LWW / pin / Casebook hook
 ```
 
 ---
@@ -2685,7 +2496,7 @@ Journal/log 不复制 Q/A/snapshot
 需要 proof 确认：
 
 ```text
-Casebook refresh/sync 不产生 worktree dirty
+Case refresh / Persist sync 不产生 worktree dirty
 Clean Gate 行为不变
 ```
 
@@ -2698,28 +2509,27 @@ Clean Gate 行为不变
 纯类型与算法：
 
 ```text
-CaseRevision
-CaseMetadata
+Case（逻辑 Q/A/observations/snapshot refs）
 Observation
 ObservationIdentity
 ObservationReplayResult
-CaseMerge
-CasebookMerge
-LruPrune
+CasebookProjection
+LruPrune（基于 projected last_access）
+DomainConflict 表达（同 Case heads）
 ```
 
 纯函数：
 
 ```text
-compareCase
-mergeCase
-mergeCasebooks
+foldCasebookProjection
 prune
 classifyReplay
 normalizeObservations
 ```
 
-不得 Git I/O。
+不得 Git I/O，不得出现 `GitObjectId` / feature ref API。
+
+**SUPERSEDED domain 类型：** `CaseRevision`、LWW `compareCase` / `mergeCasebooks` 作为 storage merge。
 
 ---
 
@@ -2728,14 +2538,15 @@ normalizeObservations
 结构化 workflow：
 
 ```text
-archiveInspectorResult
+archiveInspectorResult   → Append Captured
 fetchCase
-refreshCase
-publishCase
-syncCasebook
+refreshCase              → Append Refreshed
+touchCaseAccess          → Append Accessed
+evictCases               → Append Evicted
 ```
 
 直接使用 CE / Task / match。
+需要跨 replica 时组合 Persist converge（经 GitGateway），**不**实现 Casebook syncCasebook 端口。
 
 ---
 
@@ -2744,16 +2555,21 @@ syncCasebook
 仅实现能力：
 
 ```text
-Git object read/write
-tree materialization
-update-ref CAS
-fetch custom ref
-push with explicit lease
-reference-transaction shim
+IEventStore / StoreSnapshot（Persist）
+GitGateway（Persist 组合；非 Casebook 拥有）
 filesystem evidence reads
 Host tool observation adapter
 SyntheticToml renderer
-wall clock
+```
+
+**禁止 Casebook Infrastructure 再实现：**
+
+```text
+feature tree materialization as authority
+update-ref Casebook ref
+fetch/push Casebook ref
+reference-transaction Casebook shim
+wall clock LWW
 ```
 
 ---
@@ -2763,37 +2579,45 @@ wall clock
 物理 ownership：
 
 ```text
-Inspector epoch pin
+Inspector epoch CasebookIndexSnapshot freeze（进程内）
 same-worktree fetch single-flight
 Bookkeeper child lifetime
-hook recursion guard
 ```
 
-不得把这些镜像成长期领域状态机。
+不得把这些镜像成长期领域状态机，不得创建 Casebook pin refs / Casebook hook recursion guard。
 
 ---
 
 # 59. 推荐主要端口
 
-概念上保持具名 capability，不建立 generic Git Command bus：
+概念上保持具名 capability；**不**建立 Casebook generic Git Command bus。
 
 ```text
-readCasebookRoot
-readCase
-writeCaseTree
-compareAndSwapCasebookRoot
+# EventStore / projection
+IEventStore.Append
+IEventStore 读取 StoreSnapshot / 投影输入
+fold CasebookProjection
 
-fetchRemoteCasebook
-pushRemoteCasebookWithLease
-
+# Observation
 captureReadObservation
 replayObservation
 
+# Bookkeeper
 startBookkeeper
 awaitBookkeeperIdle
+```
 
+Persist 组合根可使用 `GitGateway`，但那不是 Casebook 端口。
+
+**Do not use / SUPERSEDED Casebook ports：**
+
+```text
+compareAndSwapCasebookRoot
+fetchRemoteCasebook
+pushRemoteCasebookWithLease
 pinCasebookRoot
 releaseCasebookPin
+readCasebookRoot   # as feature-ref authority
 ```
 
 ---
@@ -2808,8 +2632,8 @@ marker absent
 → ToolRegistry execute fetch 也拒绝
 → 无 Casebook index
 → 无 Bookkeeper config requirement
-→ 无 archive
-→ hook no-op
+→ 无 archive / 无 InspectorCase* append
+→ Casebook surface 全关
 ```
 
 双门都必须测：
@@ -2821,16 +2645,18 @@ execution registry
 
 不能只隐藏 schema。
 
+**SUPERSEDED proof：** “Casebook hook no-op”——Casebook 当前设计不拥有 hook；Persist hooks 与 marker 无关。
+
 ---
 
 # 61. 测试与 proof：Q/A
 
 必须证明：
 
-1. 新 Case Q.md 逐字等于完整 Inspector initial prompt；
+1. 新 Case Q 逐字等于完整 Inspector initial prompt；
 2. Q 不经过摘要；
-3. A.md 逐字等于实际 Inspector ToolResult body；
-4. oversized Inspector answer 先走现有 ToolResultBound，再写 A；
+3. A 逐字等于实际 Inspector ToolResult body；
+4. oversized Inspector answer 先走现有 ToolResultBound，再作为 Captured payload；
 5. Bookkeeper 可以改 Q；
 6. Bookkeeper 可以改 A；
 7. Bookkeeper 可以连续多次 edit-qa；
@@ -2861,7 +2687,7 @@ grep multi result
 ```text
 capture 不完整（如 executor 命令无法识别）
 → original Inspector 成功
-→ Case 照常归档
+→ Case 照常 Captured
 → 缺失的 observation 只是未来少一次变化检测机会
 ```
 
@@ -2896,7 +2722,7 @@ bash -c ...
 
 ```text
 该命令的 observation 被跳过
-Case 仍归档
+Case 仍 Captured
 ```
 
 ---
@@ -2917,7 +2743,7 @@ symlink escape
 submodule/external repo
 ```
 
-批准范围内 evidence 永久化；范围外（untracked/ignored/external/.git）证据跳过，Case 仍归档。
+批准范围内 evidence 永久化（EventStore payload）；范围外（untracked/ignored/external/.git）证据跳过，Case 仍 Captured。
 
 ---
 
@@ -2931,6 +2757,7 @@ current worktree identical
 fetch
 → Bookkeeper zero launches
 → A exact
+→ InspectorCaseAccessed appended（best-effort）
 ```
 
 ## changed read
@@ -2938,7 +2765,7 @@ fetch
 ```text
 file bytes changed
 → 启动 Bookkeeper refresh（一次 refresh flight）
-→ 成功返回新 A；失败返回旧 A
+→ 成功：InspectorCaseRefreshed + 返回新 A；失败返回旧 A
 ```
 
 ## changed glob
@@ -2964,7 +2791,7 @@ matching line set changes
 ```text
 changed evidence + Bookkeeper 失败
 → 返回旧 A
-→ Case/snapshot 不推进
+→ 不 append Refreshed；snapshot 不推进
 ```
 
 ---
@@ -2984,8 +2811,8 @@ idle wait fail
 期望：
 
 ```text
-old root OID unchanged
-old snapshot unchanged
+无新的 InspectorCaseRefreshed
+old projected Case unchanged
 fetch 返回旧 A（内容可能过时，这是预期语义）
 ```
 
@@ -3005,7 +2832,7 @@ replay change A
 
 ```text
 candidate discarded
-snapshot A 不提交
+不 append 基于 A 的 Refreshed
 重新 refresh
 ```
 
@@ -3017,18 +2844,18 @@ snapshot A 不提交
 
 ---
 
-# 68. 测试与 proof：Atomic publication
+# 68. 测试与 proof：Atomic publication（EventStore append）
 
 在以下每一点故障注入：
 
 ```text
-blob write
-subtree build
-root tree build
-CAS
+payload blob write
+event canonicalize
+store root build
+IEventStore CAS
 ```
 
-Casebook reader只能看见：
+CasebookProjection 只能看见：
 
 ```text
 old complete Case
@@ -3045,110 +2872,68 @@ new A + old snapshot
 
 ---
 
-# 69. 测试与 proof：Local multi-worktree CAS
+# 69. 测试与 proof：Local multi-worktree CAS（store）
 
 模拟：
 
 ```text
-A observes T0
-B observes T0
+A observes store S0
+B observes store S0
 
-A publishes T1
-B CAS T0→T2 fails
-B reloads T1
-B merges candidate
-B publishes T3
+A appends Captured/Refreshed → S1
+B CAS S0→S2 fails
+B reloads S1
+B merges / retries
+B publishes S3
 ```
 
-最终 root 同时包含双方不冲突 Case。
+最终 event set 同时包含双方不冲突 Case events。
 
 ---
 
-# 70. 测试与 proof：same-case conflict
+# 70. 测试与 proof：same-case conflict（DomainConflict，非 LWW）
 
-两个 worktree：
+两个 worktree 对同一 Case 同时 refresh，各自 append `InspectorCaseRefreshed`。
 
-```text
-revision 10
-```
-
-同时 refresh：
+必须：
 
 ```text
-A → (11, t1)
-B → (11, t2)
+EventStore union 保留双方 events
+CasebookProjection 表达 DomainConflict 或等价确定性冲突态
+不得用 (revision, wall_clock) 选 winner
 ```
 
-必须选：
+后续 resolution / 新的 Refreshed（parents ⊇ competing heads）后投影离开冲突态。
 
-```text
-max((11,t1),(11,t2))
-```
-
-相同 timestamp 再按 arbitrary deterministic content OID 收敛。
+**SUPERSEDED proof：** `max((11,t1),(11,t2))` LWW。
 
 ---
 
-# 71. 测试与 proof：Remote sync
+# 71. 测试与 proof：Remote sync — SUPERSEDED Casebook remote；改测 Persist converge
 
-覆盖：
+**SUPERSEDED 作为 Casebook 拥有的测试面：** custom Casebook ref / lease / `remote rejects tree custom ref`。
+
+当前应证明（依赖或对接 storage Change）：
 
 ```text
-remote absent ref
-remote same ref
-remote newer case
-local newer case
-双方不同 cases
-双方同 case conflict
-lease rejected once
-lease repeatedly rejected until budget
-network failure
-auth failure
-remote rejects tree custom ref
+Case events 经 refs/wanxiang/store converge 可见
+network/auth/lease failure 不回滚已成功 local Append
+Casebook 无 fetchRemoteCasebook / pushRemoteCasebook 端口
 ```
-
-Remote failure 不得回滚已成功 local publication。
 
 ---
 
-# 72. 测试与 proof：ordinary git fetch integration
+# 72–73. SUPERSEDED — ordinary git fetch Casebook hook / existing hook ownership
 
-证明：
-
-```text
-remote tracking Casebook ref 更新
-→ reference-transaction committed hook sees exact ref
-→ local merge
-```
-
-并证明：
+**SUPERSEDED proofs：**
 
 ```text
-普通 branch/tag ref update
-→ Casebook hook no-op
+remote tracking Casebook ref → Casebook reference-transaction hook
+WANXIANG_CASEBOOK_HOOK recursion guard
+Casebook bootstrap 不覆盖用户 hook
 ```
 
-以及 recursion guard。
-
----
-
-# 73. 测试与 proof：existing hook
-
-准备用户自定义：
-
-```text
-.git/hooks/reference-transaction
-```
-
-Feature bootstrap：
-
-```text
-不得覆盖
-不得 rename
-不得修改 bytes
-```
-
-Casebook 仍可通过非 hook 路径工作。
+当前：Casebook 不拥有这些；Persist/GitGateway hook 证明属于 storage Change。本 Change 只需证明 Casebook 正确性不依赖 hook。
 
 ---
 
@@ -3160,10 +2945,10 @@ Casebook 仍可通过非 hook 路径工作。
 request 1 index = I0
 
 后台：
-新增 Case
-fetch Case
-LRU touch
-remote merge
+Captured 新 Case
+fetch Case / Accessed
+LRU Evicted
+Persist converge
 
 request 2 index 必须仍逐字 = I0
 ```
@@ -3192,16 +2977,18 @@ promotion 后重新 sample 得 I2
 
 ---
 
-# 76. 测试与 proof：Epoch pin
+# 76. 测试与 proof：Epoch freeze（无 pin refs）
 
 ```text
 epoch index 包含 Case X
-→ canonical LRU 淘汰 X
-→ Git GC 可运行
-→ active epoch fetch(X) 仍可从 pin 读取
+→ live projection LRU append InspectorCaseEvicted(X)
+→ Git GC / Persist GC 按 store 规则运行
+→ active epoch fetch(X) 仍可从 CasebookIndexSnapshot 冻结 materials 读取
 ```
 
-Epoch retire 后 pin 必须清理。
+**SUPERSEDED：** `refs/wanxiang/pins/...` / `pinCasebookRoot` 证明。
+
+Epoch retire 后释放进程内 freeze；不得残留 feature pin ref。
 
 ---
 
@@ -3223,7 +3010,7 @@ A 的 captured evidence
 + B direct evidence
 ```
 
-之后删除/淘汰 A：
+之后 Evict A：
 
 ```text
 fetch(B)
@@ -3231,7 +3018,7 @@ fetch(B)
 
 仍可独立 freshness replay。
 
-不得要求 A 仍存在。
+不得要求 A 仍存在于 live projection。
 
 ---
 
@@ -3240,19 +3027,19 @@ fetch(B)
 验证：
 
 ```text
-successful fetch updates last_access
-content revision 不变
+successful fetch → InspectorCaseAccessed
+不 append 伪造 Refreshed
 
-Bookkeeper refresh
-revision +1
-wall_clock changes
-last_access updates
+Bookkeeper refresh → InspectorCaseRefreshed
+Accessed 语义更新 last_access
 
-merge
-last_access = max
+prune → InspectorCaseEvicted tombstone
+projection 不再 retained
 ```
 
-同 ties 必须 deterministic。
+**SUPERSEDED：** `content revision 不变` / `revision +1` / `wall_clock changes` / `merge last_access = max` meta schema。
+
+同 ties 必须 deterministic（fold 纯函数）。
 
 ---
 
@@ -3261,11 +3048,10 @@ last_access = max
 执行：
 
 ```text
-Inspector archival
-fetch refresh
-LRU touch
-remote merge
-remote push
+Inspector archival（Captured）
+fetch refresh（Refreshed）
+LRU touch（Accessed） / Evicted
+Persist converge（若测集成）
 ```
 
 前后：
@@ -3274,7 +3060,7 @@ remote push
 git status porcelain
 ```
 
-subject worktree 状态必须完全不因 Casebook 动态数据改变。
+subject worktree 状态必须完全不因 Case 动态数据改变。
 
 ---
 
@@ -3292,13 +3078,13 @@ Host business facts
 不得出现不必要的完整：
 
 ```text
-Q.md
-A.md
+Q
+A
 snapshot
 Bookkeeper patch
 ```
 
-Casebook Git objects 是这些数据的唯一新永久化面。
+**EventStore（`refs/wanxiang/store` events + payloads）是这些数据的唯一新永久化面。**
 
 ---
 
@@ -3308,43 +3094,44 @@ Casebook Git objects 是这些数据的唯一新永久化面。
 
 1. feature disabled repository 的 Inspector 行为与当前完全兼容；
 2. marker 启用后 Inspector 有 conditional `fetch`；
-3. Inspector Case 完成后可形成 Q/A/evidence Case（capture best-effort）；
+3. Inspector Case 完成后可 append `InspectorCaseCaptured`（capture best-effort）；
 4. Q 初始完整，不摘要；
 5. A 与实际 bounded ToolResult 一致；
 6. read/glob/grep observation 可重放；
-7. 未识别的 executor 命令只跳过其 observation，Case 仍归档；
-8. external/untracked/ignored/.git 证据不永久化，Case 仍归档；
-9. unchanged evidence 不启动 Bookkeeper；
-10. changed evidence 触发 best-effort refresh；refresh 失败返回旧 A；
+7. 未识别的 executor 命令只跳过其 observation，Case 仍 Captured；
+8. external/untracked/ignored/.git 证据不永久化，Case 仍 Captured；
+9. unchanged evidence 不启动 Bookkeeper；touch = `InspectorCaseAccessed`；
+10. changed evidence 触发 best-effort refresh；成功 = `InspectorCaseRefreshed`；失败返回旧 A；
 11. Bookkeeper 只有 `edit-qa`；
 12. Bookkeeper 可修改 Q 和/或 A；零 edit idle 合法；
 13. Bookkeeper failure 不推进 snapshot，fetch 返回旧 A；
 14. Bookkeeper idle 后重新验证 subject stability（有界重试）；
-15. Q/A/snapshot publication 为一个 Git-tree CAS；
-16. Casebook canonical state 是 custom tree ref，不创建 commit；
-17. 所有 worktree 共享同一 canonical ref；
-18. 动态 Casebook 内容不污染 worktree；
-19. full-Q Inspector index 同 PrefixEpoch 字节稳定；
+15. Q/A/snapshot publication = 一次 EventStore append（Captured/Refreshed）原子；
+16. Case durable authority = unified EventStore / `refs/wanxiang/store`，不创建 Casebook commit / feature ref；
+17. 所有 worktree 共享同一 EventStore（common-dir）；
+18. 动态 Case 内容不污染 worktree；
+19. full-Q Inspector index 同 PrefixEpoch 字节稳定（冻结 CasebookProjection snapshot）；
 20. Casebook mutation 不主动切 PrefixEpoch；
-21. epoch pin 防止活跃 index Case 被 LRU/GC 破坏；
+21. epoch freeze（无 feature pin refs）防止活跃 index Case 在 Evict 后不可读；
 22. `fetch` 使用 current worktree 做 freshness replay；
 23. fetched Case evidence 被 flatten，不形成递归 dependency runtime；
-24. replica content merge 只用 `(revision, wall_clock)`；
-25. timestamp/revision 与 no-delta 都不构成正确性证明；
-26. last_access 独立 max；
-27. deterministic LRU 有界；
-28. remote 统一采用 dumb `fetch → merge → CAS-push`；
-29. remote push 必须 explicit lease，不 blind force；
-30. lease/network failure 不破坏 local Case；
-31. reference-transaction hook 只是同步 accelerator；
-32. 不覆盖现有用户 Git hook；
-33. 没有 server-side hook requirement；
-34. 没有 Casebook commit/version/history API；
-35. 没有第二运行时、Stage/Phase/Sync state machine；
-36. Inspector prompt 明确 fetch 免费（§1.3）；
+24. replica 收敛只用 EventStore union + projection；**禁止** `(revision, wall_clock)` LWW；
+25. observation no-delta 与任何物理标量都不构成正确性证明；
+26. last_access 由 Accessed/Captured/Refreshed 投影派生；
+27. deterministic LRU 有界；淘汰 = `InspectorCaseEvicted`；
+28. remote 同步属 Persist/GitGateway，Casebook 不拥有 refspec/hook/lease API；
+29. Persist converge / lease failure 不破坏 local 已 Append 的 Case；
+30. Casebook 正确性不依赖 Git hook；
+31. 不覆盖用户 Git hook（Casebook 也不安装自己的 hook）；
+32. 没有 server-side hook requirement（dumb remote 属 Persist）；
+33. 没有 Casebook commit/version/history API；
+34. 没有第二运行时、Stage/Phase/Casebook Sync state machine；
+35. Inspector prompt 明确 fetch 免费（§1.3）；
+36. Journal 不持有 Case bodies；
 37. why/what/shape/how/proof 与实现、proof tests 全部闭环；
 38. spec/lint/architecture/DSL/static gates 与相关 unit/integration/e2e 全绿；
-39. 新增静态门均有受控反例证明能够判红。
+39. 新增静态门均有受控反例证明能够判红；
+40. 端口面不包含 SUPERSEDED Casebook Git ports（§59）。
 
 ---
 
@@ -3372,41 +3159,41 @@ agent
 host/execution
 projection/context
 synthetic-toml
-persist
+persist（EventStore vocabulary + CasebookProjection）
 orchestrator proof
 glossary/navigation
 ```
 
-先把所有权和硬边界写完整。
+先把所有权和硬边界写完整：**Casebook 无 feature store**。
 
 ### Step 2 — 纯 Domain
 
 实现并测：
 
 ```text
-metadata parse/render
-case validation
-observation identity / dedupe
-LWW merge
-last_access merge
-LRU prune
+Case / observation identity / dedupe
+CasebookProjection fold
+DomainConflict 表达
+LRU prune → Evicted 决策（纯）
+freshness classification
 ```
 
 无 Git/Host I/O。
+**不要**实现 LWW merge / revision / wall_clock。
 
-### Step 3 — Git raw store
+### Step 3 — EventStore + GitGateway（非 feature store）
 
-实现：
+对接统一 Persist：
 
 ```text
-tree read
-blob/tree build
-local CAS
-pin refs
-root validation
+IEventStore.Append / StoreSnapshot
+PayloadRef materials
+refs/wanxiang/store CAS（Persist）
+GitGateway converge 组合（非 Casebook 拥有）
 ```
 
-先证明多 worktree local correctness，不碰 remote。
+先证明多 worktree local append/converge correctness。
+**SUPERSEDED Step：** Casebook tree read / pin refs / feature root validation。
 
 ### Step 4 — Observation capture/replay
 
@@ -3433,7 +3220,7 @@ Q
 A
 observations
 snapshot
-local Case publication
+append InspectorCaseCaptured
 ```
 
 保证 archive failure 不影响原 Inspector Answer。
@@ -3443,10 +3230,10 @@ local Case publication
 先实现：
 
 ```text
-lookup
+lookup（projection + epoch freeze）
 replay unchanged
 return A
-last_access touch
+append InspectorCaseAccessed
 ```
 
 证明不启动 Bookkeeper。
@@ -3461,6 +3248,7 @@ ephemeral lifecycle
 system TOML
 edit-qa
 changed-evidence refresh
+append InspectorCaseRefreshed
 post-idle stability verify
 ```
 
@@ -3470,52 +3258,36 @@ post-idle stability verify
 
 ```text
 full Q list
-epoch freeze
+epoch freeze CasebookIndexSnapshot
 candidate epoch sampling
-pin root
 ```
 
-避免先污染 provider prefix 再补 seal 证明。
+避免先污染 provider prefix 再补 seal 证明。无 pin refs。
 
-### Step 9 — Remote
+### Step 9 — Persist remote converge（非 Casebook remote）
 
-实现：
+**不**实现 Casebook custom refspec / lease push。
 
-```text
-origin custom refspec
-fetch tracking ref
-pure merge
-lease push
-bounded retry
-```
+验证 Case events 随 `refs/wanxiang/store` 经 GitGateway converge；remote failure 保持 local Append success。
 
-Remote failure全部保持 local success。
+### Step 10 — 无 Casebook hook step
 
-### Step 10 — Git fetch accelerator
+**SUPERSEDED：** “Git fetch accelerator / reference-transaction Casebook shim”。
 
-最后加：
-
-```text
-reference-transaction shim
-ownership detection
-recursion guard
-feature-disabled no-op
-```
-
-Hook 不是核心 correctness 路径，因此必须最后接入。
+若 Persist 已有统一 hook dispatcher，Casebook 不单独接入；只证明 Casebook 不依赖 hook。
 
 ### Step 11 — Crash/concurrency/e2e
 
 完成：
 
 ```text
-CAS races
+IEventStore CAS races
+DomainConflict same-case
 Bookkeeper drift
-GC/pin
-LRU
-remote contention
-hook conflict
+LRU Evicted
+epoch freeze without pins
 feature off compatibility
+Persist converge failure isolation
 ```
 
 之后再申请 Reviewer。
@@ -3530,15 +3302,18 @@ feature off compatibility
 1. Casebook 是 best-effort semantic cache，不是第二个产品数据库，
    也不是证明系统；允许旧答案过时或不准确。
 
-2. Git ref 解决“当前缓存状态放哪里”；
+2. 统一 EventStore（refs/wanxiang/store + IEventStore/GitGateway）
+   解决“Case 事实与 materials 放哪里 / 如何同步”；
    observation replay 提供 freshness hint，不证明答案正确。
 
-3. revision / wall_clock 只解决 replica 谁赢，
+3. 禁止 revision / wall_clock LWW；replica 只做 EventStore union，
+   同 Case 冲突由 DomainConflict + 后续 events 收敛——
    永远不解决答案对不对。
 
 4. Inspector 仍然只读 subject repository；
    Bookkeeper 只能编辑 staged Q/A。
 
 5. 如果 Casebook marker 不存在，
-   整个能力应当像从未实现过一样消失。
+   Casebook 产品表面应当像从未实现过一样消失
+   （Persist store sync 不受 Casebook marker 左右）。
 ```

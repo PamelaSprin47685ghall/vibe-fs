@@ -11,9 +11,11 @@ js-reviewer
 js-devops
 js-browser
 js-meditator
-js-student
-js-teacher
+js-student   ← Universal G3 rebase debt only（见下）
+js-teacher   ← Universal G3 rebase debt only（见下）
 ```
+
+**Universal G3 rebase debt（不得复活生产）：** 文中残留的 `js-student` / `js-teacher`、StudentLearn / StudentCompile / Teacher 专属表面与迁移项，一律视为尚未从原文 scrub 干净的 **Universal G3 Clean Break rebase debt**。G3 已删除 Student / Teacher / QA / SKILL 生产；激活本 Change 时不得再实现、不得再迁回、不得再以兼容别名复活这些角色。实施输入只认当时仍存活的 Agent catalog + `AttemptExecutionProfile.ToolCapabilitySet`。
 
 真正的 primitive 是：
 
@@ -307,16 +309,17 @@ Role 和 RequestKind 已经在 profile 构造阶段完成解释。
 
 输入已经是 canonical profile，输出只是 projection。
 
-这对 Student 尤其重要：
+这对 **按 RequestKind 分叉的同一 CanonicalRole** 尤其重要（原文 Student 示例已是 Universal G3 rebase debt，勿复活生产）：
 
 ```text
-StudentLearn
-StudentCompile
+# historical illustration only — StudentLearn / StudentCompile deleted in G3
+RequestKindA
+RequestKindB
 ```
 
-虽然 CanonicalRole 都是 Student，但能力完全不同。
+虽然 CanonicalRole 相同，但能力可以完全不同。
 
-Generator 不能再次发明 Student 状态判断。
+Generator 不能再次发明该 Role 的内部状态判断；只读 AttemptExecutionProfile。
 
 ---
 
@@ -479,8 +482,7 @@ js-reviewer
 js-devops
 js-browser
 js-meditator
-js-student
-js-teacher
+# js-student / js-teacher — Universal G3 rebase debt only；勿复活生产
 ```
 
 Tier 永远不进入工具名。
@@ -1518,6 +1520,8 @@ INVALID_RETURN_VALUE
 
 # 28. JS Return ≠ Student/Teacher `return` Tool
 
+> **Universal G3 rebase debt 对照。** Student / Teacher 专用 `return` 已随 G3 删除；本节只冻结：`Js.run()` return 从不承担任何已删角色终态语义。勿复活 Student/Teacher 生产。
+
 必须明确区分：
 
 ```text
@@ -1529,18 +1533,18 @@ Js.run() return
 它不会：
 
 ```text
-结束 Student
+结束已删角色会话
 回答 teacher
 构造 RunCompletion
 ```
 
-现有 Student / Teacher 专用：
+历史 Student / Teacher 专用：
 
 ```text
 return
 ```
 
-工具保持完全独立的 workflow 语义。
+工具曾保持完全独立的 workflow 语义；现已不在生产面。
 
 两者只有英语单词相同，没有领域关系。
 
@@ -2368,6 +2372,8 @@ js-reviewer
 
 ## StudentLearn
 
+> **Universal G3 rebase debt。** 不复活 Student 生产；本节仅保留原文投影示例，激活时删除/忽略。
+
 filesystem primitive capability 为空。
 
 因此：
@@ -2388,6 +2394,8 @@ teacher
 ---
 
 ## StudentCompile
+
+> **Universal G3 rebase debt。** 不复活 Student 生产；本节仅保留原文投影示例，激活时删除/忽略。不得实现 `js-student` 生产路径。
 
 filesystem capabilities：
 
@@ -2418,6 +2426,8 @@ return
 
 ## Teacher
 
+> **Universal G3 rebase debt。** 不复活 Teacher 生产；本节仅保留原文投影示例，激活时删除/忽略。不得实现 `js-teacher` 生产路径。
+
 不在 Generator 中硬编码。
 
 由 Teacher 当前 AttemptExecutionProfile 实际 filesystem capabilities 投影。
@@ -2438,6 +2448,8 @@ return
 ---
 
 # 49. Student AGENT-022
+
+> **Universal G3 rebase debt。** AGENT-022 / Student artifact boundary 随 Student 删除；不复活生产。以下原文约束仅作历史对照。
 
 `js-student` 不能因为 program 可以调用多次：
 
@@ -2834,6 +2846,8 @@ js-* tool call
 JsTransaction
 ```
 
+**Durability：** prepare / committed / rolled-back / recovery-required 等动态持久状态 **只** 进入统一 EventStore（facts + owned payloads）。禁止 `js-transaction.db`、`transaction-v2.json`、special feature ref、或任何 feature-owned durable store。
+
 程序执行期间：
 
 ```text
@@ -2948,7 +2962,7 @@ replacement-character 修复
 以 binary Buffer 继续
 ```
 
-Student 现有合同本身也要求目标 SKILL 为 UTF-8 并在不可解码时 fail closed；新工具必须保持相同姿态。
+（历史 Student SKILL 合同已是 Universal G3 rebase debt。）新工具对目标文件仍保持：UTF-8 且不可解码时 fail closed。
 
 ---
 
@@ -3107,35 +3121,42 @@ transaction B: b then a
 
 # 62. Prepare Phase
 
-所有 replacement 先进入 transaction-private durable staging。
+所有 replacement 先进入 **EventStore 上的 durable prepare facts / payloads**。
+workspace 文件系统在 `Prepared` 被 EventStore 证明之前不得被修改。
 
-概念：
+> **Durable prepare 与 crash-recovery 的唯一 substrate 是统一 EventStore。**
+> 内存 staging / 进程内 scratch 可以存在，但**不得**充当崩溃恢复权威。
+
+禁止为 JS transaction 自建任何 feature-owned durability：
 
 ```text
-transaction/
-  manifest
-  originals/
-  replacements/
+js-transaction.db
+transaction-v2.json
+special feature ref / sidecar journal
+feature-owned sqlite / blob / ndjson store
+transaction/ 目录式 manifest 作为 durability authority
+```
+
+逻辑视图（不是磁盘布局合同；权威在 EventStore）：
+
+```text
+JsTransactionPrepared  (EventStore fact)
+  transaction id
+  canonical targets[]
+  preimage kind/digest per target
+  replacement digest / EventStore payload ref per target
+  transaction state = Prepared
 ```
 
 每个 replacement：
 
 ```text
-write full bytes
-→ fsync
+materialize full bytes as EventStore-owned payload
+→ append Prepared fact（同一统一 EventStore）
+→ Prepared 对 recovery 可证明 durable
 ```
 
-manifest 至少包含：
-
-```text
-transaction id
-canonical target
-preimage kind/digest
-replacement digest
-transaction state
-```
-
-manifest durable 后进入：
+Prepared fact durable 后进入：
 
 ```text
 Prepared
@@ -3179,13 +3200,12 @@ Prepared
 正常 commit：
 
 ```text
-Prepared
+Prepared（EventStore fact 已 durable）
 → final snapshot validation
-→ apply mutations in canonical order
-→ durable directory sync
-→ mark Committed
+→ apply mutations in canonical order（workspace filesystem effect）
+→ append Committed fact to EventStore
 → only now expose successful tool result
-→ cleanup
+→ cleanup ephemeral scratch only（不得留下 feature-owned durable store）
 ```
 
 Create：
@@ -3201,6 +3221,8 @@ Original → Replacement
 ```
 
 每一步都必须有 compare-before-effect 保护。
+
+Committed / 终态只以 **EventStore facts** 为准；目录 fsync 或临时文件布局不是 durability contract。
 
 ---
 
@@ -3238,13 +3260,14 @@ Replacement → Missing
 TRANSACTION_RECOVERY_REQUIRED
 ```
 
-并保留 durable evidence。
+并在 **同一 EventStore** 保留 durable evidence（recovery blocker fact + 既有 Prepared/payload refs）。
+禁止另写 `js-transaction.db` / feature sidecar 充当 evidence store。
 
 ---
 
 # 66. Crash Recovery
 
-最小 transaction state：
+最小 transaction state（全部为 EventStore durable facts，不是程序计数器）：
 
 ```text
 Prepared
@@ -3254,13 +3277,20 @@ RolledBack
 
 不要把程序计数器固化成几十个领域状态。
 
-启动恢复读取：
+启动恢复只读取：
 
 ```text
-manifest
-original digest
-replacement digest
-current filesystem state
+EventStore transaction facts（Prepared / Committed / RolledBack / RecoveryRequired）
+EventStore-owned preimage / replacement payload digests
+current workspace filesystem state
+```
+
+禁止：
+
+```text
+打开 js-transaction.db
+扫描 transaction/ manifest 目录作为权威
+读任何 feature-owned journal / blob / json 旁路
 ```
 
 每个 target 分类：
@@ -3281,13 +3311,14 @@ Unknown
 ```text
 unfinished transaction
 → rollback toward original preimages
+→ 终态仍 append 到 EventStore
 ```
 
 无法证明安全恢复：
 
 ```text
 fail closed
-retain manifest
+retain EventStore evidence
 report recovery blocker
 ```
 
@@ -3568,9 +3599,10 @@ profile
 → hook rewrites visible builtin filesystem descriptions
 ```
 
-Student：
+Student（**Universal G3 rebase debt；勿复活生产**）：
 
 ```text
+# historical illustration only
 StudentLearn profile
 → no JS surface
 → no Prefer js-* hook
@@ -3580,7 +3612,7 @@ StudentCompile profile
 → hook Prefer js-student on still-visible filesystem builtins
 ```
 
-切换 Compile 前必须先生成完整新 surface，再随整套 permission 原子安装。
+激活后不以 Student 切换路径验收；通用规则仍是：切换 RequestKind / profile 前必须先生成完整新 surface，再随整套 permission 原子安装。
 
 ---
 
@@ -3898,18 +3930,27 @@ resource budgets
 ---
 
 ```text
-Infrastructure filesystem adapter
+Infrastructure filesystem adapter + EventStore ports
 ```
 
 拥有：
 
 ```text
 snapshot
-staging
-durable prepare
-commit
+ephemeral / in-memory staging（非 durability authority）
+EventStore durable prepare facts + payloads
+commit（workspace effect + EventStore Committed fact）
 rollback
-recovery
+crash recovery from EventStore only
+```
+
+禁止另建：
+
+```text
+js-transaction.db
+transaction-v2.json
+special feature ref
+feature-owned durable store
 ```
 
 Domain 不做 Host I/O。
@@ -3968,13 +4009,13 @@ JS-008  rewrite()
 JS-009  write()
 JS-010  JSON-compatible return
 JS-011  Sandbox capability boundary
-JS-012  Transaction staging
+JS-012  Transaction staging（ephemeral OK；durable = EventStore only）
 JS-013  Multi-file all-or-nothing commit
 JS-014  Conflict detection
-JS-015  Rollback/recovery
+JS-015  Rollback/recovery（EventStore facts only；forbid js-transaction.db / feature store）
 JS-016  Synthetic TOML result
 JS-017  Builtin tools remain (no alias takeover)
-JS-018  Student request/path projection
+JS-018  Student request/path projection（Universal G3 rebase debt；勿复活生产）
 ```
 
 并更新：
@@ -4351,9 +4392,10 @@ fast-inspector == deep-inspector JS surface
 fast-reviewer == deep-reviewer JS surface
 ```
 
-Student：
+Student（**Universal G3 rebase debt；勿复活生产 / 非 Active 验收**）：
 
 ```text
+# historical illustration only
 StudentLearn
 → no js-student
 
@@ -4361,7 +4403,7 @@ StudentCompile
 → exact generated js-student
 ```
 
-旧 Learn Attempt 伪造 Compile JS call：
+旧 Learn Attempt 伪造 Compile JS call（历史对照）：
 
 ```text
 fail closed
@@ -4530,31 +4572,39 @@ do not overwrite
 ```text
 Prepared + zero applied
 Prepared + subset applied
-Prepared + all applied but not marked
+Prepared + all applied but not marked Committed in EventStore
 ```
 
 恢复必须根据：
 
 ```text
-manifest
-preimage digest
-replacement digest
-current bytes
+EventStore transaction facts
+EventStore payload digests（preimage / replacement）
+current workspace bytes
 ```
 
 确定结果。
+
+禁止测试依赖：
+
+```text
+js-transaction.db
+transaction/ manifest 目录
+任何 feature-owned sidecar
+```
 
 未确认成功的 incomplete transaction 默认：
 
 ```text
 rollback toward original
+→ 终态 append 到 EventStore
 ```
 
 Unknown：
 
 ```text
 fail closed
-retain evidence
+retain EventStore evidence
 ```
 
 ---
@@ -4833,6 +4883,8 @@ class Js extends JsProgram {
 
 # 102. E2E Canary — Student
 
+> **Universal G3 rebase debt。** 不作为 Active 实施/验收项；不得为复活 Student 而保留此 canary。
+
 StudentCompile program：
 
 ```text
@@ -4904,16 +4956,16 @@ builtin description 无复制整份 JS SDK 长文
 10. sandbox runner
 11. anchor/FileView implementation
 12. glob binding
-13. rewrite/write staging
-14. transaction engine
+13. rewrite/write staging（ephemeral；durability 不在此步）
+14. transaction engine（durable prepare/commit/recovery → EventStore only）
 15. return serializer
 16. Synthetic TOML bridge
-17. Agent surface migration
-18. StudentCompile migration
+17. Agent surface migration（仅存活 Agent catalog；不含 Student/Teacher）
+18. ~~StudentCompile migration~~ — Universal G3 rebase debt；不得复活生产
 19. BuiltinToolDescriptionHook (deprecated + Prefer js-ROLE)
 20. keep builtin read/edit/write/glob/grep/patch executable with original schemas
 21. unit tests
-22. transaction/recovery tests
+22. transaction/recovery tests（EventStore facts；禁 js-transaction.db）
 23. sandbox tests
 24. e2e
 25. proof
@@ -4952,10 +5004,11 @@ PTY
 network
 delegation
 verdict
-return(Student/Teacher)
 ```
 
 继续保持独立工具。
+
+`return(Student/Teacher)` 是 Universal G3 rebase debt — 已删生产面；不得复活。
 
 未来如要纳入，只能通过新增正式 capability fragment。
 
@@ -5065,10 +5118,10 @@ Generator 自动为合法 Agent surface 投影。
 * multi-file transaction；
 * all preflight before mutation；
 * snapshot conflict fail closed；
-* durable prepare；
+* durable prepare **仅经统一 EventStore**（禁止 `js-transaction.db` / feature-owned store / manifest 目录权威）；
 * all-or-nothing normal outcome；
 * rollback；
-* crash recovery；
+* crash recovery **仅从 EventStore facts/payloads 重建**；
 * success result 只在 commit 完成后暴露。
 
 ## Security
@@ -5080,6 +5133,8 @@ Generator 自动为合法 Agent surface 投影。
 * runtime gate 不依赖模型遵守 base class。
 
 ## Student
+
+> **Universal G3 rebase debt — 不得复活生产。** 下列条目不作为 Active 验收；激活时从 Remaining work 删除。
 
 * StudentLearn 无 JS surface；
 * StudentCompile exact projected surface；
@@ -5114,9 +5169,9 @@ Generator 自动为合法 Agent surface 投影。
 * multi-file transaction；
 * conflict；
 * rollback；
-* crash recovery；
+* crash recovery（EventStore only）；
 * sandbox；
-* Student；
+* Student（G3 rebase debt — 非验收复活项）；
 * e2e；
 * spec/lint/coverage 全绿。
 

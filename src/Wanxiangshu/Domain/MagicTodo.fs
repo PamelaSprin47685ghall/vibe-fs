@@ -5,7 +5,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 
-/// Magic Todo Checkpoint Protocol — pure algebra (changes/proposed/magic-todo.md).
+/// Magic Todo Checkpoint Protocol — pure algebra (see Magic Todo change proposal).
 ///
 /// Speculative / unwired: not yet hooked into tool.execute.before/after or Manager
 /// lifecycle. Keep illegal states unrepresentable; recovery reads durable facts, not
@@ -126,6 +126,8 @@ module MagicTodo =
 
     // ── Rejection taxonomy (fail closed; no Prepared/Accepted) ─────────────
 
+    /// DSL-class: Decision — fail-closed refusal taxonomy for TodoWrite admission
+    /// and settle (no Prepared/Accepted durable states live here).
     [<RequireQualifiedAccess>]
     type MagicTodoReject =
         | MissingKind

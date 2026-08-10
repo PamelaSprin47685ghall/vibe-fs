@@ -2,6 +2,31 @@
 
 ## 目录即身份、双全文规则、Observation 原子历史与 Main 分级投递
 
+## Storage stance（与 Unified Storage 对齐）
+
+```text
+Authored source（repository Git content，本 Change 不迁出）:
+    resources/enforcer/*/enforcer.md
+    resources/enforcer/*/main.md
+    resources/prompts/blogger-system.md
+
+Runtime durable history（唯一 substrate = unified EventStore）:
+    Observation events
+    Tip delivery events
+    Coverage advances carried by those events
+    → fold / projection only
+```
+
+禁止 Rulebook 私有：
+
+```text
+journal NDJSON / feature journal encoding
+RuntimePath / private blob store / blob format
+coverage.state.json / delivery-history.json / tips.jsonl
+observations.ndjson / 任何 filesystem durable list
+feature-owned Git ref / dual-write / fallback old store
+```
+
 ---
 
 # 0. Executive Decision
@@ -37,6 +62,7 @@ resources/enforcer/
 120 rule directories
 240 authored Markdown files
 0 authored metadata files
+0 Rulebook-owned runtime stores
 ```
 
 每个目录名就是唯一 canonical tip identity。
@@ -128,15 +154,103 @@ Observation
 
 ```text
 共同产生
-共同持久化
-共同投影
+共同以 EventStore event 持久化
+共同由 EventStore projection 投影
 共同 squash
-共同恢复
+共同从 EventStore fold 恢复
 ```
 
 永不分离。
 
-当前 `BlogEntryCommitted` 本身已经把 `TextRef/TextDigest` 与 `TipRuleId/FieldNameAtCommit` 放在同一个原子事实里，因此这不是凭空制造的新关联，而是把已有 durable 因果关系贯彻到 projection 层。
+当前 `BlogEntryCommitted` 本身已经把 work-log payload 与 tip identity 放在同一个原子事实里。本 Change 把这条因果关系贯彻为 **unified EventStore** 上的 Observation vocabulary + Projection，而不是再维护 Journal fold 旁路或独立 tip list。
+
+---
+
+# 1A. Runtime Durability：Observation / Delivery / Coverage → EventStore
+
+## Authored vs runtime
+
+| Plane | Owner | Substrate |
+|---|---|---|
+| Rule texts (`enforcer.md` / `main.md`) | Repository source | `resources/enforcer/*` Git files |
+| Blogger base prompt | Repository source | `resources/prompts/blogger-system.md` |
+| Historic Observations | Runtime | Unified EventStore events → projections |
+| Main tip delivery history | Runtime | Unified EventStore events → projections |
+| Blog / Record / Prefix coverage | Runtime | Carried by Observation events; projected, never a private file |
+
+`resources/enforcer/*` **始终是仓库 authored SSOT**。本 Change 不把它搬进 EventStore，也不为 Rulebook 另造 runtime catalog store。
+
+## Event vocabulary（概念名可按 Domain 调整，语义不可）
+
+```text
+BlogObservationCommitted
+    // atomic: work-log payload_refs + TipName + optional evidence
+    //          + coverage advance cursor(s) + cycle / provider identity
+
+BlogObservationsSquashed
+    // replace oldest K observations with one squashed observation
+    // tip + work log + coverage effects move together
+
+TipGuidanceDelivered
+    // MainSession + TipName + TipPresentation(Full|IdentityOnly)
+    // + exact MarkerText bytes / placement (HOST-013 replay)
+
+PairProgrammingGuidelineAnchored
+    // existing HOST surface; may carry typed TipName/TipPresentation
+    // instead of MarkerText-only inference
+```
+
+大正文（work log、evidence、frozen MarkerText body）走 EventStore **payload_refs**（统一 Git raw payload），不是 Rulebook 私有 blob path。
+
+## Projection（derived，不是第二真相）
+
+```text
+ObservationProjection
+    Observations[]          // paired work log + tip
+    Coverage                // RecordCoverage / PrefixCoverage fields
+                            // folded from Observation events only
+
+TipDeliveryProjection
+    DeliveredFullTips       // by MainSession
+    LastPresentation        // Full | IdentityOnly
+    ExactMarkerBytes        // for byte-identical replay
+```
+
+规则：
+
+```text
+append durable EventStore event
+→ commit 成功
+→ projection consume
+```
+
+禁止：
+
+```text
+先改 ObservationProjection / TipDeliveryProjection / Coverage 内存结构
+再补 event
+
+或：
+把 coverage / delivery / tip list 写到独立 JSON / NDJSON / filesystem list
+再假装那是 durable history
+```
+
+## 明确删除的 Rulebook-owned durability
+
+不得实现或保留：
+
+```text
+AgentJournal NDJSON encoding dedicated to Rulebook
+private BlobStore / RuntimePath blobs/<sha> owned by Enforcer
+coverage.state / coverage.json
+delivery-history.json / delivered-tips.json
+recent-tips.jsonl
+observations.ndjson
+enforcer-history/ worktree directories
+feature-owned refs/wanxiang/enforcer-*
+```
+
+旧 Journal/Blob 上的 Observation 历史遵循 Unified Storage **clean break**：不要求读旧档、不要求 LegacyProjection ≡ NewProjection、不写 migrator。新世界只认 EventStore。
 
 ---
 
@@ -388,7 +502,7 @@ Main delivery 的触发来源仍然必须是：
 
 ---
 
-# 7. 删除独立 RecentTips 语义
+# 7. 删除独立 RecentTips 语义；统一 ObservationProjection（EventStore fold）
 
 本 Proposal 下不再需要：
 
@@ -397,9 +511,9 @@ BlogProjection.Frames
 EnforcementProjection.RecentTips
 ```
 
-作为两个彼此独立、生命周期不同的历史。
+作为两个彼此独立、生命周期不同、且可能落在 Journal 旁路上的历史。
 
-推荐目标是一个统一：
+推荐目标是一个由 **统一 EventStore** fold 出来的：
 
 ```text
 ObservationProjection
@@ -412,6 +526,9 @@ ObservationProjection
     FrameEpochId
     Observations
     Coverage
+        // RecordCoverage / PrefixCoverage（或等价字段）
+        // 仅由 Observation 相关 events 推进
+        // 禁止独立 coverage durable list / state file
 ```
 
 其中每条：
@@ -419,10 +536,10 @@ ObservationProjection
 ```text
 ObservationRecord
     Kind = Entry | Squash
-    TextRef
-    TextDigest
+    WorkLogPayloadRef      // EventStore payload_refs，非私有 BlobRef path
+    WorkLogDigest
     TipName
-    EvidenceRef?
+    EvidencePayloadRef?
     CycleIdentity
 ```
 
@@ -436,6 +553,18 @@ tips 不被 squash
 ```
 
 这种状态。
+
+Coverage 不是第三份 durable list：它是 Observation events 的投影字段。不得再出现：
+
+```text
+frames.ndjson
++
+tips.json
++
+coverage.state
+```
+
+三套平行 filesystem 历史。
 
 ---
 
@@ -669,7 +798,17 @@ auto-injected tool-call/tool-result pair
 TipIdentity
 ```
 
-Main 侧收到 tip 时，按 durable delivery history 决定 payload。
+Main 侧收到 tip 时，按 **EventStore tip-delivery projection**（由 delivery events fold）决定 payload。
+
+禁止用：
+
+```text
+delivered-tips.json
+process-local HashSet
+私有 journal tip ledger
+```
+
+作为 first/repeat 判定 substrate。
 
 ## 第一次出现
 
@@ -699,6 +838,8 @@ resources/enforcer/primitive-obsession/main.md FULL CONTENT
 如何验证
 什么时候算完成
 ```
+
+`main.md` 正文本身仍从 **repository authored source** 读取；投递事实与 exact MarkerText 则写入 EventStore。
 
 ---
 
@@ -737,14 +878,18 @@ First occurrence → full main.md
 Repeated occurrence → identity only
 ```
 
+判定依据只能是 EventStore 上已 commit 的 delivery history projection，而不是内存集合。
+
 ---
 
-# 16. “第一次”必须由 Durable Facts 判定
+# 16. “第一次”必须由 EventStore Durable Facts 判定
 
 绝对不能用：
 
 ```text
 process-local HashSet
+in-memory delivered set
+filesystem tip ledger
 ```
 
 判断 main.md 是否已发过。
@@ -758,17 +903,17 @@ crash
 retry
 ```
 
-以后会忘记。
+以后会忘记或分叉。
 
-必须从 durable auto-injected history 得出：
+必须从 **unified EventStore** 上的 tip-delivery / auto-injected events fold 得出：
 
 ```text
 HasFullTipBeenDelivered(MainSession, TipName)
 ```
 
-当前 `PairProgrammingGuidelineAnchored` 已经持久化精确 `MarkerText` 和 placement。
+当前 `PairProgrammingGuidelineAnchored` 已经持久化精确 `MarkerText` 和 placement；在 EventStore 世界中它（或其后继 event）仍是唯一 durable delivery truth。
 
-Rulebook v2 推荐进一步让 durable fact typed 地携带：
+Rulebook v2 推荐进一步让 EventStore event typed 地携带：
 
 ```text
 TipName?
@@ -788,11 +933,11 @@ TipPresentation =
 
 这不是 authored metadata。
 
-这是 runtime durable business fact。
+这是 runtime EventStore business fact → TipDeliveryProjection。
 
 ---
 
-# 17. Historical Auto-injected Bytes 必须冻结
+# 17. Historical Auto-injected Bytes 必须冻结（EventStore replay）
 
 假设第一次：
 
@@ -801,7 +946,7 @@ TipPresentation =
 primitive-obsession/main.md = version A
 ```
 
-Main 已经收到 version A。
+Main 已经收到 version A，且对应 delivery event + payload_refs 已在 EventStore commit。
 
 后来 repository 更新：
 
@@ -811,11 +956,13 @@ main.md = version B
 
 restart 后不得把历史 pair 改成 B。
 
-历史 pair 必须继续 replay 当时实际送出的 A。
+历史 pair 必须继续从 EventStore **byte-identical replay** 当时实际送出的 A。
 
 当前 HOST-013 本来就定义 `MarkerText` 为 provider 当时实际看到的精确正文，并持久化后原样恢复。
 
-这个性质应继续保留。
+这个性质应继续保留，且 substrate 是 EventStore（含 payload_refs），不是私有 journal/blob 文件旁路。
+
+Authored `resources/enforcer/*/main.md` 可以演进；已投递的历史 bytes 不随 authored 文件改写而改写。
 
 ---
 
@@ -997,7 +1144,7 @@ done criteria
 
 ---
 
-# 23. Catalog 旧字段的最终迁移
+# 23. Catalog 旧字段的最终迁移（authored only；无 runtime 私有 store 迁移）
 
 现有：
 
@@ -1010,7 +1157,7 @@ nudge
 catalogOrdinal
 ```
 
-迁移为：
+迁移为 **repository authored content**：
 
 ```text
 field
@@ -1040,21 +1187,30 @@ catalogOrdinal
 TipName
 ```
 
-如果 durable migration 需要兼容旧事件，则在 legacy decoder 中使用：
+Authored migration 只触及：
 
 ```text
-FieldNameAtCommit
+resources/enforcer/catalog.json → resources/enforcer/*/enforcer.md + main.md
 ```
 
-完成映射。
+这是仓库 source rewrite，不是读旧 runtime Journal/Blob。
+
+若仍有旧事件名（例如 `BlogEntryCommitted` / `FieldNameAtCommit`）需要在 EventStore vocabulary 演进中解码：
+
+```text
+只允许在 EventStore legacy event decoder / projection adapter 内映射
+```
 
 禁止因此再创建：
 
 ```text
 legacy-rule-map.json
+rulebook-migrator
+private journal importer
+LegacyProjection ≡ NewProjection suite for old Rulebook disk files
 ```
 
-作为永久第二 SSOT。
+作为永久第二 SSOT 或兼容面。Unified Storage clean break：旧 Rulebook runtime 盘可不读。
 
 ---
 
@@ -1133,7 +1289,7 @@ count == 120
 
 ---
 
-# 26. 资源目录必须只有运行时 Rulebook
+# 26. 资源目录必须只有 authored Rulebook（repository source）
 
 推荐：
 
@@ -1141,7 +1297,9 @@ count == 120
 resources/enforcer/
 ```
 
-下面只出现 120 个 rule folders。
+下面只出现 120 个 rule folders（authored Markdown）。
+
+这是 **repository source**，不是 EventStore，也不是 runtime durable history。
 
 不要塞：
 
@@ -1151,6 +1309,9 @@ authoring-guide
 schema.json
 manifest.json
 examples/
+observations/
+delivery-history/
+coverage/
 ```
 
 写作规范属于：
@@ -1160,6 +1321,8 @@ docs/
 ```
 
 本 Proposal 的 Appendix A 可以最终迁移到正式 authoring documentation。
+
+Observation / delivery / coverage 的 durable history 只存在于 unified EventStore，绝不作为 `resources/enforcer/` 下的 filesystem list。
 
 ---
 
@@ -1259,7 +1422,7 @@ tip identity only
 
 ---
 
-# 29. 推荐目标领域模型
+# 29. 推荐目标领域模型（EventStore events + projections）
 
 概念示例：
 
@@ -1269,41 +1432,50 @@ type TipName = private TipName of string
 type EnforcerRule =
     {
         Name: TipName
-        EnforcerText: string
-        MainText: string
+        EnforcerText: string   // loaded from resources/enforcer/<name>/enforcer.md
+        MainText: string       // loaded from resources/enforcer/<name>/main.md
     }
+
+type TipPresentation =
+    | Full
+    | IdentityOnly
+    | None
 
 type Observation =
     {
         Kind: Entry | Squash
-        WorkLogRef: BlobRef
-        WorkLogDigest: BlobDigest
+        WorkLogPayloadRef: PayloadRef     // EventStore payload_refs
+        WorkLogDigest: ContentDigest
         Tip: TipName
-        EvidenceRef: BlobRef option
+        EvidencePayloadRef: PayloadRef option
         Cycle: ProviderRunIdentity
     }
 ```
 
+Authored `EnforcerRule` 文本来自 repository；`Observation` / delivery / coverage **从不**写入 `resources/enforcer/*`。
+
+## Events（统一 EventStore vocabulary）
+
 正常提交：
 
 ```text
-ObservationCommitted
+BlogObservationCommitted
 ```
 
 必须原子包含：
 
 ```text
-work log
-coverage
+work log payload_refs
+coverage advance
 tip
-evidence
-provider identity
+evidence payload_refs?
+provider / cycle identity
 ```
 
 Squash：
 
 ```text
-ObservationsSquashed
+BlogObservationsSquashed
 ```
 
 必须表达：
@@ -1314,6 +1486,40 @@ with one new Squashed Observation
 ```
 
 不能只改 work-log projection。
+
+Main delivery：
+
+```text
+TipGuidanceDelivered
+    MainSession
+    TipName
+    TipPresentation
+    MarkerTextPayloadRef / exact bytes
+    Placement
+```
+
+（或扩展既有 `PairProgrammingGuidelineAnchored` 等价 event；不得另建 filesystem delivery list。）
+
+## Projections（fold only）
+
+```text
+ObservationProjection
+    Observations
+    Coverage
+
+TipDeliveryProjection
+    HasFullTipBeenDelivered(MainSession, TipName)
+    Exact historical MarkerText bytes
+```
+
+禁止：
+
+```text
+Rulebook private journal encoding
+Rulebook private blob format / RuntimePath blob writer
+filesystem durable lists for observations / tips / coverage / deliveries
+dual-write EventStore + old Journal/Blob
+```
 
 ---
 
@@ -1409,7 +1615,7 @@ enum = sorted directory names
 
 ---
 
-## Slice E — Observation Domain
+## Slice E — Observation Domain on EventStore
 
 把：
 
@@ -1417,15 +1623,20 @@ enum = sorted directory names
 Blog frame projection
 +
 independent tip projection
+(+ Journal/Blob substrate assumptions)
 ```
 
 收敛成：
 
 ```text
-paired Observation projection
+BlogObservationCommitted / BlogObservationsSquashed
+→ EventStore
+→ paired ObservationProjection (incl. Coverage)
 ```
 
 normal commit 原子不变量保持。
+
+禁止实现 Rulebook 私有 journal/blob/coverage file。
 
 ---
 
@@ -1449,6 +1660,8 @@ delta LAST
 
 每个 historic observation 内部 tip + work log 并置。
 
+投影输入只能是 EventStore fold 结果。
+
 ---
 
 ## Slice G — Squash
@@ -1459,7 +1672,7 @@ delta LAST
 Observation[] → Squashed Observation
 ```
 
-work log 和 tip 一起替换。
+作为 `BlogObservationsSquashed` event；work log 和 tip 一起替换。
 
 删除：
 
@@ -1483,6 +1696,8 @@ rule.Nudge
 rule.MainText
 ```
 
+（从 authored `resources/enforcer/<tip>/main.md` 加载）
+
 并提供：
 
 ```text
@@ -1493,19 +1708,30 @@ TipName
 
 ---
 
-## Slice I — Full/Identity Delivery
+## Slice I — Full/Identity Delivery（EventStore）
 
-实现 durable：
+实现：
 
 ```text
 first occurrence
 → Full main.md
+→ TipGuidanceDelivered(Full) on EventStore
 
 repeat
 → TipName only
+→ TipGuidanceDelivered(IdentityOnly) on EventStore
 ```
 
-同时保留 exact MarkerText replay。
+`HasFullTipBeenDelivered` 只读 TipDeliveryProjection。
+
+同时保留 exact MarkerText EventStore replay。
+
+禁止：
+
+```text
+delivery-history.json
+process-local first-seen set as durability
+```
 
 ---
 
@@ -1520,22 +1746,24 @@ identity-only tip
 
 ---
 
-## Slice K — Delete `catalog.json`
+## Slice K — Delete `catalog.json`（authored cutover）
 
 只有：
 
 ```text
 loader
 schema
-runtime
+runtime EventStore observation/delivery/coverage path
 tests
 docs
 main delivery
 blogger prompt
-journal replay
+EventStore fold / replay proofs
 ```
 
-全部完成后才能删除。
+全部完成后才能删除 authored `catalog.json`。
+
+不得以“还要读旧 journal”为由拖延；旧 runtime 盘不在兼容边界内。
 
 ---
 
@@ -1548,6 +1776,7 @@ journal replay
 [ ] 恰好 240 markdown files
 [ ] catalog.json 不存在
 [ ] 无 authored metadata
+[ ] resources/enforcer/* 仍是 repository authored SSOT
 
 [ ] directory name 是唯一 TipName
 [ ] blog enum = folder names
@@ -1555,21 +1784,26 @@ journal replay
 [ ] Blogger system 始终包含 120 篇 enforcer.md 全文
 [ ] effective prompt deterministic
 
-[ ] normal history = paired observations
+[ ] normal history = paired observations from EventStore projection
 [ ] work log 与 tip 一一对应
 [ ] projection 中相邻/并置
 
-[ ] squash 同时 squash work log 和 tip
+[ ] Coverage 是 Observation event fold 字段，不是私有 coverage file
+[ ] squash 同时 squash work log 和 tip（BlogObservationsSquashed）
 [ ] 不再存在独立 RecentTips 生命周期
 
 [ ] new normal observation 可以向 Main 投 tip
 [ ] Main 第一次收到 tip → full main.md
 [ ] 后续同 tip → identity only
-
-[ ] delivery decision durable/restart-safe
-[ ] old auto-injected MarkerText byte-identical replay
+[ ] delivery decision = EventStore TipDeliveryProjection（restart-safe）
+[ ] old auto-injected MarkerText byte-identical EventStore replay
 
 [ ] identity-only 永不成为 dangling semantic reference
+
+[ ] 无 Rulebook private journal encoding
+[ ] 无 Rulebook private blob / RuntimePath durable list
+[ ] 无 delivery-history.json / tips.jsonl / observations.ndjson
+[ ] 无 dual-write / fallback old Journal/Blob for Rulebook runtime
 
 [ ] 不恢复 score/throttle/fuzzy matching
 [ ] 不建立 fake-user enforcement overlay
@@ -1588,9 +1822,9 @@ Main work
 Blogger sees:
     full base system
     +
-    all 120 enforcer.md
+    all 120 enforcer.md          // authored resources/enforcer/*
     +
-    historic observations:
+    historic observations:       // EventStore ObservationProjection
         [work log + tip]
         [work log + tip]
         ...
@@ -1605,7 +1839,8 @@ exactly one blog:
 
     ↓
 
-atomic Observation commit
+atomic BlogObservationCommitted on EventStore
+（coverage advance included）
 
     ↓
     ├── future Blogger:
@@ -1614,8 +1849,10 @@ atomic Observation commit
     └── Main:
            first occurrence:
                TipName + full main.md
+               + TipGuidanceDelivered(Full) event
            repeated occurrence:
                TipName only
+               + TipGuidanceDelivered(IdentityOnly) event
 ```
 
 Squash：
@@ -1625,7 +1862,7 @@ Squash：
 [log B + tip B]
 [log C + tip C]
 
-↓ squash as one semantic operation
+↓ BlogObservationsSquashed as one EventStore semantic operation
 
 [squashed log + squashed tip]
 ```
@@ -1636,6 +1873,8 @@ Squash：
 squashed logs
 +
 old independent tip history
++
+filesystem tip/coverage lists
 ```
 
 ---
@@ -1648,7 +1887,7 @@ Rulebook v2 的最终目标不是：
 
 而是建立一个完整闭环：
 
-> Blogger 始终拥有全部工程判断知识；每一次工程判断与当时的 work log 永久属于同一个 observation；历史压缩同时压缩二者；同一 tip 第一次向 Main 出现时给出完整处置手册，之后只用稳定 identity 低成本唤醒；所有 identity、恢复与 replay 都由 durable facts 和目录名证明，而不是靠第二份 metadata 或内存猜测。
+> Authored `resources/enforcer/*` 始终是仓库规则正文 SSOT；Blogger 始终拥有全部工程判断知识；每一次工程判断与当时的 work log 永久属于同一个 Observation EventStore event；Coverage 与 Tip delivery history 同样只存在于统一 EventStore events/projections；历史压缩同时压缩 work log 与 tip；同一 tip 第一次向 Main 出现时给出完整处置手册，之后只用稳定 identity 低成本唤醒；所有 identity、恢复与 replay 都由 EventStore durable facts 和目录名证明，而不是靠第二份 metadata、私有 journal/blob、filesystem durable list 或内存猜测。
 
 ---
 
@@ -2775,7 +3014,7 @@ TipName
 full main.md
 ```
 
-并 durable 记录 exact bytes。
+并在 EventStore 上 durable 记录 exact MarkerText / delivery bytes（payload_refs），不是私有 delivery JSON。
 
 ---
 
@@ -2794,6 +3033,8 @@ primitive-obsession
 不重复 main.md 全文
 ```
 
+判定必须来自 EventStore TipDeliveryProjection。
+
 同时新的 auto-injected pair identity 仍按 HOST placement 规则生成。
 
 ---
@@ -2810,6 +3051,8 @@ primitive-obsession
 
 除非当前 provider knowledge 已不再含 full semantic content，且正式 compaction contract 明确要求 re-materialize。
 
+证明路径：只 replay EventStore；不得读旧 Journal NDJSON / 私有 tip ledger 作为真相。
+
 ---
 
 # A47. Content Change Policy
@@ -2822,7 +3065,7 @@ add better example
 improve wrong-fix explanation
 ```
 
-可修改同一个 Markdown。
+可修改同一个 authored Markdown。
 
 但：
 
@@ -2859,12 +3102,22 @@ tip identity migration
 必须考虑：
 
 ```text
-journal history
-main delivery history
+EventStore observation history
+EventStore main delivery history
 blog enum
-historic observations
-replay
+historic ObservationProjection
+EventStore replay
+authored resources/enforcer/<old> → <new>
 ```
+
+禁止为 rename 另建：
+
+```text
+legacy-rule-map.json
+filesystem alias list
+```
+
+作为第二 SSOT。
 
 ---
 
@@ -2892,6 +3145,7 @@ main token budget
 rule references valid
 effective system contains all 120 exactly once
 tip enum matches names
+no Rulebook private journal/blob/coverage/delivery filesystem stores in proposed runtime paths
 ```
 
 ---
@@ -2911,37 +3165,45 @@ tip enum matches names
 [ ] verification 有针对性
 [ ] authority 不越界
 [ ] paired history eval 能使用它
-[ ] Main first-full / repeat-name 行为能使用它
+[ ] Main first-full / repeat-name 行为能使用它（EventStore delivery projection）
 ```
 
 120 条全部满足，才算完成 240 篇 Rulebook。
 
 ---
 
-# Appendix B — 最终不可违反的 12 条 Invariants
+# Appendix B — 最终不可违反的 Invariants
 
 ```text
 1. FolderName is TipIdentity.
 
 2. No authored metadata besides folder names.
 
-3. Every rule has exactly enforcer.md + main.md.
+3. Every rule has exactly enforcer.md + main.md under resources/enforcer/<name>/.
 
-4. Blogger always sees all 120 enforcer.md in full.
+4. Authored resources/enforcer/* remains repository source SSOT for rule texts.
 
-5. Every normal work-log observation has exactly one TipIdentity.
+5. Blogger always sees all 120 enforcer.md in full.
 
-6. WorkLog and Tip are one durable Observation.
+6. Every normal work-log observation has exactly one TipIdentity.
 
-7. Blogger historical WorkLog and Tip are one-to-one and co-located.
+7. WorkLog and Tip are one durable Observation EventStore event.
 
-8. Squash acts on Observations; it can never squash logs while retaining independent tips.
+8. Blogger historical WorkLog and Tip are one-to-one and co-located in ObservationProjection.
 
-9. Main receives full main.md on the first occurrence of a tip.
+9. Coverage is projected from Observation events only; never a private coverage file or filesystem durable list.
 
-10. Repeated occurrences send only TipIdentity, subject to the invariant that the full semantics remain recoverable in the current provider context.
+10. Squash acts on Observations via EventStore squash events; it can never squash logs while retaining independent tips.
 
-11. Historical auto-injected bytes replay exactly as originally sent.
+11. Main tip delivery history is EventStore events → TipDeliveryProjection only.
 
-12. No score vector, numeric severity, throttle, fuzzy matching, shadow metadata, or fake-user enforcement overlay returns through this redesign.
+12. Main receives full main.md on the first occurrence of a tip; exact delivered bytes are EventStore-durable.
+
+13. Repeated occurrences send only TipIdentity, subject to the invariant that the full semantics remain recoverable in the current provider context.
+
+14. Historical auto-injected bytes replay exactly as originally sent from EventStore (incl. payload_refs).
+
+15. No Rulebook-owned journal encoding, private blob store, RuntimePath durable list, delivery-history.json, tips.jsonl, observations.ndjson, feature-owned ref, dual-write, or fallback old Journal/Blob.
+
+16. No score vector, numeric severity, throttle, fuzzy matching, shadow metadata, or fake-user enforcement overlay returns through this redesign.
 ```

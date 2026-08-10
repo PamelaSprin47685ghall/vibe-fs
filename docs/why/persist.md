@@ -1,19 +1,23 @@
-# Journal — 理由
+# Persist — 理由
 
-先写盘后改内存：内存会看见无证据的未来。只截断最后一条不完整 envelope；中间损坏必须拒绝加载，因为事件前后相扣，缺中间则后续建立在错基上。
+动态 durable 状态只允许有一个解释权：统一 EventStore。否则每个 feature 会再发明一份 journal / blob 目录 / 私有 ref / 合并协议，崩溃恢复与多进程合并立刻变成产品分叉。
 
-O(1) projection：完整扫描把「查询」变成「重放成本」，恢复路径不可控。Requested→Accepted 把外部副作用做成可审计意图，而不是「内存里好像做过了」。
+Git raw ODB 是物理介质，不是第二真相：事实是 event；大正文是 content-addressed blob；原子发布是 `refs/wanxiang/store` 的 CAS。历史来自 event DAG，不来自 commit / branch / tag。
 
-上下文事实 fold 的原子性（尤其 BlogEntry 与 ContextReanchored）防止「只改一半投影」的撕裂世界。
+Clean-break：旧 NDJSON journal、RuntimePath `blobs/`、Student QA 私有文件与其它 feature-owned store **不要求可读、不迁、不双写**。runtime 永不打开它们（leave-unread）。AgentJournal 只是 EventStore 上的适配表面，不是平行存储。
 
 ## 备选与被拒
 
-**写序：先改内存再补盘 vs 先落盘后改内存。** 拒内存优先：内存会看见无证据的未来，崩溃后重放与内存分歧也进不了恢复路径。先 append journal、确认成功后才替权威状态（本体契约）。
+**多存储 vs 单一 durable substrate。** 拒 feature 自有 journal/blob/ref：同一仓库多进程与 dumb remote 无法共享一套 merge/CAS，恢复路径按 feature 分裂（PERSIST-005/006）。
 
-**坏行恢复：截断 vs 跳过。** 拒跳过：事件前后相扣，缺中间则后续事实建在错基上；宁可少恢复一步不多恢复矛盾态。只截最后一条不完整 envelope（PERSIST-004）。
+**先改内存再补盘 vs append 成功后才改权威态。** 拒内存优先：内存会看见无证据的未来；崩溃后重放与内存分歧进不了恢复路径。必须 `Append`/`Publish` 见证成功后再 fold 投影（PERSIST-002/003）。
 
-**查询：O(1) 投影 vs 全历史扫描。** 拒全扫：把「查询」变成「重放成本」。投影走积分状态，恢复路径可控（PERSIST-008）。
+**schemaVersion / store-v2 vs 无存储版本 + additive event vocabulary。** 拒 envelope/store 版本链：版本不是领域事实，会逼出永久 migration mode。已 committed 的 `event_type` 语义冻结；新语义用新类型（PERSIST-001/005）。
 
-**副作用：Requested→Accepted vs 内存「好像做了」。** 拒内存记账：外部副作用必须可在崩溃后核对（worktree/publish/prompt 均是）。两相契约把意图变可审计事实；Requested-only 表示结局未知，不表示未发生，恢复必须按效果身份核对，Prompt 不自动重发（PERSIST-009）。
+**全历史扫描 vs O(1) projection。** 拒全扫：把「查询」变成「重放成本」。投影是积分状态；恢复路径可控（PERSIST-008）。
 
-**BlobRef 身份：内容寻址 vs 自增 id。** 拒自增 id：重放/恢复会重排或漂，同变化产生不同 ref。内容寻址使同字节→同 `BlobRef`，写幂等、digest 可验（PERSIST-007）。
+**副作用：Requested→Accepted vs 内存「好像做了」。** 拒内存记账：外部副作用必须可在崩溃后按效果身份核对。Requested-only 表示结局未知，不表示未发生；Accepted 不得折回（PERSIST-009）。
+
+**内容寻址 payload vs 自增 id / 目录 blob。** 拒自增与第二套 RuntimePath blob：重放会漂身份。Git object id 即物理 identity；Domain 只见 opaque `PayloadRef`（PERSIST-007）。
+
+**Student QA 私有权威文件 vs 统一 store / 退休。** G3 已删除该域；不得迁入 EventStore，不得发明后继 QA vocabulary（PERSIST-011 空缺）。

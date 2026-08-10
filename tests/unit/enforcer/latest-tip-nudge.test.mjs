@@ -27,13 +27,12 @@ import {
 runtimeResources.installFromPackage()
 
 const { AgentJournalModule_appendAgent } = await import('../../../dist/Journal/AgentJournal.js')
-const { StreamId } = await import('../../../dist/Journal/Envelope.js')
 const { latestTipNudge } = await import('../../../dist/Session/EnforcerHost.js')
 const { tryInject } = await import('../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js')
 
 const main = sessionId('ses-nudge-main')
 const blogger = sessionId('ses-nudge-blogger')
-const journalStream = (id) => new StreamId(1, id)
+const journalStream = (id) => stream.session(id)
 
 const append = (journal, id, value, run) => {
   const result = AgentJournalModule_appendAgent(journalStream(id), run, value, journal)
