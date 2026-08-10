@@ -31,12 +31,12 @@ import "wanxiangshu"
 `private: true` 商业软件，不从公共 npm 默认源分发。从 tarball 或私有 registry 安装：
 
 ```bash
-npm install ./wanxiangshu-0.5.4.tgz
+npm install ./wanxiangshu-0.6.0.tgz
 # 或
 npm install wanxiangshu --registry <your-private-registry>
 ```
 
-版本以 `package.json` 的 `version` 为准（当前 **0.5.4**）。
+版本以 `package.json` 的 `version` 为准（当前 **0.6.0**）。
 
 ### OpenCode 配置
 
@@ -58,7 +58,7 @@ npm install wanxiangshu --registry <your-private-registry>
 ### 快速开始
 
 ```bash
-npm install ./wanxiangshu-0.5.4.tgz
+npm install ./wanxiangshu-0.6.0.tgz
 # 在 OpenCode 注册插件后启动会话
 # Orchestrator / Manager 发起任务；子角色按工具面分工
 ```
@@ -104,6 +104,7 @@ Executor、Blogger 等由编排路径调用，不作为单独“安装角色”�
 
 - 0.5.3 无运行时协议变更：布局、资源打包与仓库整理为主，公开行为与 wire 语义与 0.5.2 产品合同一致。
 - 0.5.4：DSL 全面主导化与门禁收紧（控制流/测试 harness）；journal/wire 协议与 0.5.3 兼容。
+- 0.6.0：Causal CE / Finality / HOST-013 / Student–Teacher / Projection Algebra 收口；文档治理与 canary 可信度；相对 0.5.4 兼容方向见 CHANGELOG。
 - 升级：安装新版本 → 确认 Node ≥ 20 与 Host peer → 重启 OpenCode。
 - 破坏性变更见 CHANGELOG；跳版本时按条目顺序阅读。
 

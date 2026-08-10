@@ -2,15 +2,20 @@
 
 ## Unreleased
 
-- 文档变更工作流改为单文件生命周期：当前规范保留在 `docs/{why,what,shape,how,proof}`；已批准变更在 `changes/{proposed,active,completed}` 间移动，不再创建平行 Proposal 与 Status 文件。
-- 条款 ID（`ARCH-`/`PROMPT-`/…）保留且唯一归属一层；`scripts/checks/spec.mjs` 扫描正式层；导航见 `docs/README.md`。
-- 工程入口（`AGENTS.md`、根 README、VERIFY-004 退化清单）改指向新路径；无运行时协议变更。
-- `PENDING.md` 收口为 COMPLETED/HISTORICAL：Join v2 / sub-session 复用 / Blogger InteractionRepair / Enforcer tip v2 / Coder TDD / HOST-013 marker 均有正式条款与自动化证据；删除未勾选假待办。
-- `AGENTS.md`：修正 `architecture` 文件数 226、`gate:dsl-ownership` 契约为 `--threshold=0`（删除陈旧 322）。
-- Enforcer / Blogger-as-Enforcer rebase 文档收口：`how`/`shape`/`proof` 对齐 tip-v2 基线（PartOrdinal-first 多调用 tip、物理所有权轴取代 Runtime cell 的 DU 叙事、`§13` 证明清单）。变更生命周期见 `changes/completed/enforcer.md`；未恢复 wire/runtime score 路径，生产本就 tip-v2。新增 `bounds.test.mjs` 永久回归锁定归并 size/count 越界 fail-closed（>32 calls / text >512 KiB / evidence >128 KiB）。
-- 新增 `tests/unit/enforcer/bounds.test.mjs` 永久回归，锁定 EnforcerHost 归并 size/count fail-closed 边界：合并 tool call >32（`MaxMergedToolCalls=32`）、合并 text >512 KiB（`MaxBlogTextBytes=512KiB`）、合并 evidence >128 KiB（`MaxEvidenceBytes=128KiB`）均触发 `enforcer-cycle-failed` fatal；无生产逻辑变更。
+## 0.6.0
+
+- Causal CE / 时序所有权：可观察因果等待、Wait Graph、waitFact 续期归因；Reconciler 去业务轮询；Join interrupt / user-wake 收口；Diagnostic Bridge。
+- Manager Finality / lifecycle：`FinalityTool`、terminal frontier、sibling steering / durable revision；PERFECT 后的收口与 rest-in-peace 路径。
+- HOST-013：guideline pair 永久 append-only；prefix-cache 不变量；idle-derived continuation 资格门控（SessionQuiescenceGate）。
+- Student–Teacher CE collapse：Teacher 侧单一 CE await 链；durable evidence；相关单元/回归收口。
+- Projection Algebra / Glory：attempt-local PrefixProbe 与 plain-X 前缀投影迁入投影 DSL；idle / revise / MISSING_FINAL_REPORT 观察路径加固。
+- Coder 工具面：`bash-honeypot` 禁未授权 shell；严禁 Coder 跑测试；PTY prompt 补齐换行。
 - EXEC-028：同步 one-shot `inspector`/`coder` 返回统一为 entry-local LWR 注释（`includeOpening=false`）+ 末条 TurnFormalText，禁字段式 `work_record`；与 Join 共用 COMPANION-003 物化器。Opening 在 send 前从原始 assignment 捕获以便物化；`Completed` 无法物化非空 LWR 时 fail-closed 返回工具级 `error=`，不 soft-omit。
 - LWR 段标题在 materialize 中为纯文本（`Opening task` / `Work log` / …）；`# ` 仅由 `SyntheticToml.comment` 在 wire 注入，消除 join/oneshot/finality 上的 `# # Work log`。
+- Enforcer / Blogger-as-Enforcer rebase 文档收口：`how`/`shape`/`proof` 对齐 tip-v2 基线（PartOrdinal-first 多调用 tip、物理所有权轴、`§13` 证明清单）。`bounds.test.mjs` 永久回归锁定归并 size/count 越界 fail-closed（>32 calls / text >512 KiB / evidence >128 KiB）；未恢复 wire/runtime score 路径。
+- 文档治理：变更单文件生命周期 `changes/{proposed,active,completed}`；条款 ID 唯一归属正式层；`PENDING.md` 收口为 COMPLETED/HISTORICAL；`AGENTS.md` 修正 architecture 文件数与 `gate:dsl-ownership --threshold=0`。
+- Canary unbend：纠正迎合错误生产的声明扭曲；e2e 事件驱动等待取代固定 poll slice。
+- journal / 公开 wire 合同相对 0.5.4 兼容方向：控制流、投影与 Host 不变量收紧；破坏性细节见上列条目与 `docs/`。
 
 ## 0.5.4
 
