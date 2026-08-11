@@ -96,10 +96,10 @@ Strength
 | **G5** JS Capability-Projected Tools | **DONE** | `changes/completed/js-capability-projected-tools.md` Final outcome；C-3 按用户裁决 |
 | **G6** perm-inspector + Casebook | **DONE** | CasebookLifecycle session wiring + mechanical Bookkeeper + Index；`changes/completed/universal.md` + `changes/completed/perm-inspector.md` |
 | **G7** Rulebook | **DONE（runtime）** | `changes/completed/rulebook.md`；folder SSOT（无 catalog.json）；Full/Identity `TipGuidanceDelivered`；squash co-move；blogger compose enforcer。**Residual（非 runtime 阻塞，记在 Final outcome）：** constitution 120 rewrite、docs plane enforcer、Observation EventStore vocabulary 全量 rename、compaction identity integrity、INVENTORY.md |
-| **G8** Strength | **PARTIAL** | K0 splice 类型已在树（`AttachmentKind.StrengthReplica`、StrengthPolicy、`ProviderRequestKind.StrengthReplica` 等，见 `c1348308` 区间）。**Change 仍 `changes/active/strength.md`，交并行 owner；NOT playbook-closed。禁止扩 Strength feature 当 G8 DONE** |
-| **G9** Global Convergence | **PARTIAL** | 既有 ratchet：`student-teacher-absence`（含禁止 `SatelliteKind.Replica`）、`unified-store-gate`、`js-surface-gate`、`g4r-*`。本快照增量：`session-ownership-ratchet`（AttachmentKind 必含 Companion/SyncInspector/SyncCoder/Bookkeeper/StrengthReplica）。capability-isomorphism 等仍可后续加硬 |
+| **G8** Strength | **PARTIAL→merged** | `wanxiangshu-strength` 已 merge：Strength docs + Frame/Events/Projection + ProjectionAlgebra `UseStrengthMirror`/`InsertStrengthFrames` + unit 21。Change 仍 `changes/active/strength.md`（K1/K2/shadow 未 claim DONE） |
+| **G9** Global Convergence | **PARTIAL** | ratchets：`student-teacher-absence`（含 `SatelliteKind.Replica`）、`session-ownership-ratchet`、`enforcer-rulebook-gate`、`unified-store-gate`、`js-surface-gate`、`g4r-*`。`npm run check` + Long Stroke GREEN（journal 372） |
 
-**当前主线位置：** G0–G6 **DONE**；G7 runtime **DONE**（constitution/docs residual）；G8 **PARTIAL**（active/strength，并行 owner）；G9 **PARTIAL**（ratchet 增补中）。entry 本身保持 `proposed/` Playbook，不迁 completed。
+**当前主线位置：** G0–G7 runtime **DONE**；G8 **PARTIAL**（strength active，algebra 已可测）；G9 **PARTIAL**（gates 绿，capability-isomorphism 静态闸可选未做）。entry 保持 `proposed/`。
 
 ## 0.2 自 Playbook 落地以来关键 commit（`31d456ec` 之后）
 
