@@ -1765,8 +1765,8 @@ Tests
 - [x] Wave 0：删除 `EnforcerNudge/Throttle`、清 `sessionDeadRefusal`、建 `kolmogorov-size` ratchet
 - [x] Wave 1：拆 `JsTools.fs`、`ProjectionAlgebra.fs`、`tests/unit/support/domain.mjs`
 - [x] Wave 2：拆 `PluginRuntimeScope.fs`（四 owner）、`Journal/Fold.fs`（8 family 模块）、`EnforcerHost.fs`（五 owner）
-- [ ] Wave 3：收 `HostForkRuntime`、`SyncDelegateRuntime`、`ManagerNarrativeTransform`、`Codec/Projection`、`JsToolsFs.fs`、`SpikePlugin.fs`
-- [ ] Wave 4/5：重审 `Fact.fs` 等 + 再扫全部 >300 行文件
+- [x] Wave 3：收 `HostForkRuntime`（→HostForkJoin）、`SyncDelegateRuntime`（→CallStore/Wait/Workflow）、`ManagerNarrativeTransform`（→Codec 收敛）、`Codec/Projection`（→Decode/Capture/MessageEdit）、`JsToolsFs`（→四 adapter）、`SpikePlugin`（→六 wiring 模块）
+- [x] Wave 4/5：重审 `Fact.fs` 等——10 个单世界 vocabulary/代数/适配器写入 kolmogorov-size 例外（带 owner/reason）；协调器长尾（EnforcerHost 905/HostSignalBootstrap/BloggerCoordinator/Reconciler 等）保持 ratchet 压力待后续二级拆分
 
 ### Completion criteria
 

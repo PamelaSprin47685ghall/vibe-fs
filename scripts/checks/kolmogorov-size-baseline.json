@@ -291,5 +291,46 @@
     "tests/unit/verify/session-ownership-ratchet.test.mjs": 259,
     "tests/unit/verify/unified-store-gate.test.mjs": 231
   },
-  "_exceptions": {}
+  "_exceptions": {
+    "src/Wanxiangshu/Kernel/Fact.fs": {
+      "owner": "durable fact vocabulary",
+      "reason": "single serialized algebra; physical size does not mix lifecycle/effect ownership (Wave 4 verdict, proposal ch. 6)"
+    },
+    "src/Wanxiangshu/Kernel/Identity.fs": {
+      "owner": "durable identity vocabulary",
+      "reason": "single serialized algebra of identity types; no lifecycle/effect ownership mixed"
+    },
+    "src/Wanxiangshu/Domain/MagicTodo.fs": {
+      "owner": "magic-todo domain algebra",
+      "reason": "one cohesive algebra (id derivation + canonical wire + status machine)"
+    },
+    "src/Wanxiangshu/Domain/SyntheticToml.fs": {
+      "owner": "synthetic TOML generator",
+      "reason": "single declarative generator; one reason to change (wire format)"
+    },
+    "src/Wanxiangshu/Domain/JsDescription.fs": {
+      "owner": "js-ROLE canonical description generator",
+      "reason": "JsCanonicalDescription is one cohesive generator (proposal ch. 7 kept it whole)"
+    },
+    "src/Wanxiangshu/Domain/PromptAuthority.fs": {
+      "owner": "prompt authority protocol algebra",
+      "reason": "high protocol sensitivity; single authority ledger algebra (proposal P2)"
+    },
+    "src/Wanxiangshu/Application/Reconciliation/XTraceCapture.fs": {
+      "owner": "semantic trace capture algebra",
+      "reason": "one capture algebra (stable + positional insertion); single reason to change"
+    },
+    "src/Wanxiangshu/Infrastructure/Persist/GitRawStore.fs": {
+      "owner": "git raw store adapter",
+      "reason": "single external-failure-law adapter (git storage boundary)"
+    },
+    "src/Wanxiangshu/Infrastructure/OpenCode/Host/OpenCodePort.fs": {
+      "owner": "OpenCode host port adapter",
+      "reason": "single host boundary adapter (OpenCode API surface)"
+    },
+    "src/Wanxiangshu/Infrastructure/OpenCode/Host/ManagerNarrativeTransform.fs": {
+      "owner": "manager narrative rewrite decision",
+      "reason": "typed-evidence to rewrite-decision transform; raw parsing converged into Codec (Wave 3)"
+    }
+  }
 }
