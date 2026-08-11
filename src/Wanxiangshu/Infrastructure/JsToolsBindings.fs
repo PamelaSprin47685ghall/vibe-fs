@@ -74,14 +74,14 @@ module JsToolsBindings =
                             match resolveInside root path with
                             | Error failure -> failureObj failure
                             | Ok full ->
-                                match JsToolsFs.readUtf8Classified full with
+                                match JsUtf8Fs.readUtf8Classified full with
                                 | Ok text ->
                                     createObj
                                         [ "ok" ==> true; "path" ==> path; "text" ==> text; "byteCount" ==> text.Length ]
                                 | Error failure -> failureObj failure
                         "glob"
                         ==> fun (pattern: string) ->
-                            match JsToolsFs.glob root pattern 256 with
+                            match JsGlobFs.glob root pattern 256 with
                             | Ok listing ->
                                 createObj
                                     [ "ok" ==> true
@@ -103,7 +103,7 @@ module JsToolsBindings =
                                 | AnchorSpec.Exact text when System.String.IsNullOrEmpty text ->
                                     failureObj JsFailure.AnchorEmptyContent
                                 | _ ->
-                                    match JsToolsFs.grep root spec globPattern 500 with
+                                    match JsAnchorFs.grep root spec globPattern 500 with
                                     | Error failure -> failureObj failure
                                     | Ok listing ->
                                         let matches =
@@ -126,7 +126,7 @@ module JsToolsBindings =
                             match resolveInside root path with
                             | Error failure -> failureObj failure
                             | Ok full ->
-                                match JsToolsFs.readUtf8Classified full with
+                                match JsUtf8Fs.readUtf8Classified full with
                                 | Error failure -> failureObj failure
                                 | Ok current ->
                                     staging.Add(JsStagedMutation.Rewrite(path, current, replacement))

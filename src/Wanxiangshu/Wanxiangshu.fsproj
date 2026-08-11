@@ -364,7 +364,10 @@
     <Compile Include="Infrastructure/OpenCode/Tools/FileMutationTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/BashHoneypotTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/SyncDelegateTools.fs"/>
-    <Compile Include="Infrastructure/JsToolsFs.fs"/>
+    <Compile Include="Infrastructure/JsUtf8Fs.fs"/>
+    <Compile Include="Infrastructure/JsGlobFs.fs"/>
+    <Compile Include="Infrastructure/JsAnchorFs.fs"/>
+    <Compile Include="Infrastructure/JsMutationFs.fs"/>
     <Compile Include="Infrastructure/CasebookCapture.fs"/>
     <Compile Include="Infrastructure/CasebookStore.fs"/>
     <Compile Include="Infrastructure/CasebookReplay.fs"/>

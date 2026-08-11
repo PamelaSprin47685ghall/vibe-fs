@@ -9,7 +9,7 @@ open Wanxiangshu.Domain
 module CasebookReplay =
 
     let private readHash (root: string) (path: string) : string option =
-        match JsToolsFs.readUtf8Classified (JsToolsFs.resolveToolPath root path) with
+        match JsUtf8Fs.readUtf8Classified (JsMutationFs.resolveToolPath root path) with
         | Ok text -> Some(CasebookCapture.contentHash text)
         | Error _ -> None
 
@@ -20,11 +20,11 @@ module CasebookReplay =
         | Observation.FileRead(path, _) ->
             readHash root path |> Option.map (fun hash -> Observation.FileRead(path, hash))
         | Observation.GlobResult(pattern, _) ->
-            match JsToolsFs.glob root pattern 256 with
+            match JsGlobFs.glob root pattern 256 with
             | Ok listing -> Some(Observation.GlobResult(pattern, listing.Paths))
             | Error _ -> None
         | Observation.GrepResult(pattern, _) ->
-            match JsToolsFs.grep root (AnchorSpec.Regex pattern) "**/*" 256 with
+            match JsAnchorFs.grep root (AnchorSpec.Regex pattern) "**/*" 256 with
             | Ok listing ->
                 let matches = listing.Matches |> List.map (fun hit -> hit.Path, hit.Line, hit.Text)
 

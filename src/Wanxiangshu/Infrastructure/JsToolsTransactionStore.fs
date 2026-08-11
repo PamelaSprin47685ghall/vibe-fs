@@ -151,4 +151,4 @@ module JsToolsTransactionStore =
     let recover (root: string) (pending: JsTransactionPrepared list) : unit =
         for prepared in pending do
             for mutation in prepared.Mutations do
-                JsToolsFs.undoIfMatches root mutation.Path mutation.NewText mutation.OriginalText
+                JsMutationFs.undoIfMatches root mutation.Path mutation.NewText mutation.OriginalText

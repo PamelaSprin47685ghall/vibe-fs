@@ -12,13 +12,19 @@ import { join } from 'node:path'
 
 import {
   readUtf8Classified as readUtf8,
+} from '../../../dist/Infrastructure/JsUtf8Fs.js'
+import {
+  glob as glob,
+} from '../../../dist/Infrastructure/JsGlobFs.js'
+import {
   findAnchor as findAnchor,
   requireUnique as requireUnique,
-  glob as glob,
   grep as grep,
+} from '../../../dist/Infrastructure/JsAnchorFs.js'
+import {
   commitPlan as commitPlan,
   rollbackPlan as rollbackPlan,
-} from '../../../dist/Infrastructure/JsToolsFs.js'
+} from '../../../dist/Infrastructure/JsMutationFs.js'
 import { AnchorSpec } from '../../../dist/Domain/JsAnchor.js'
 import { JsFailureModule_code as failureCode } from '../../../dist/Domain/JsFailure.js'
 import { listItems, resultOf, toList } from '../support/domain.mjs'

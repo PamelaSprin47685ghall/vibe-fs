@@ -167,10 +167,10 @@ module JsToolWorkflow =
                     let mutations = staging |> Seq.toList
 
                     let exists (path: string) : bool =
-                        JsToolsFs.existsPath (JsToolsFs.resolveToolPath root path)
+                        JsMutationFs.existsPath (JsMutationFs.resolveToolPath root path)
 
                     let readCurrent (path: string) : string option =
-                        match JsToolsFs.readUtf8Classified (JsToolsFs.resolveToolPath root path) with
+                        match JsUtf8Fs.readUtf8Classified (JsMutationFs.resolveToolPath root path) with
                         | Ok text -> Some text
                         | Error _ -> None
 
@@ -189,7 +189,7 @@ module JsToolWorkflow =
                         match persistence with
                         | None ->
                             // ephemeral path (tests / no store available)
-                            match JsToolsFs.commitPlan root (JsTransaction.commitPlan mutations) with
+                            match JsMutationFs.commitPlan root (JsTransaction.commitPlan mutations) with
                             | Error failure -> return Failed failure
                             | Ok() ->
                                 let written =
@@ -219,7 +219,7 @@ module JsToolWorkflow =
                             | Error _ -> return Failed JsFailure.TransactionPrepareFailed
                             | Ok preparedEventId ->
                                 // 4. commit: all-or-nothing
-                                match JsToolsFs.commitPlan root (JsTransaction.commitPlan mutations) with
+                                match JsMutationFs.commitPlan root (JsTransaction.commitPlan mutations) with
                                 | Error failure -> return Failed failure
                                 | Ok() ->
                                     // 5. the commit fact (JS-012): its absence after
