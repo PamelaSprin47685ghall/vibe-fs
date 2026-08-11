@@ -137,6 +137,7 @@ const [
   ReviewSealModule,
   SessionSnapshotPortModule,
   MagicTodoLocalityModule,
+  MagicTodoMembraneModule,
   ToolHostCodecModule,
   MagicTodoHostCodecModule,
   CompletionMailboxModule,
@@ -236,6 +237,7 @@ const [
   prod('Application/Reconciliation/ReviewSeal'),
   prod('Infrastructure/OpenCode/Host/SessionSnapshotPort'),
   prod('Application/Reconciliation/MagicTodoLocality'),
+  prod('Application/Reconciliation/MagicTodoMembrane'),
   prod('Infrastructure/OpenCode/Codec/ToolHostCodec'),
   prod('Infrastructure/OpenCode/Codec/MagicTodoHostCodec'),
   prod('Session/CompletionMailbox'),
@@ -725,8 +727,9 @@ export const fact = (caseName, payload) => asFact(agentFact(caseName, payload))
 const buildManagerLifecycleFact = unionCase(FactModule.ManagerLifecycleFact, 'ManagerLifecycleFact')
 
 /** Build a ManagerLifecycleFact by case name (GLORY-010). */
+export const managerLifecycle = (caseName, payload) => buildManagerLifecycleFact(caseName, [payload])
 export const managerLifecycleFact = (caseName, payload) =>
-  buildFact('ManagerLifecycle', [buildManagerLifecycleFact(caseName, [payload])])
+  buildFact('ManagerLifecycle', [managerLifecycle(caseName, payload)])
 
 /** Canonical opaque-wire top-level fact for typed MagicTodoFact codec bytes. */
 export const magicTodoFactEnvelope = (payload) => buildFact('MagicTodo', [payload])
@@ -3693,6 +3696,18 @@ export const magicTodoLocality = (() => {
   }
 })()
 
+export const magicTodoMembrane = (() => {
+  const m = bind(MagicTodoMembraneModule, 'MagicTodoMembrane', ['prepare', 'accept'])
+
+  return {
+    prepare: (journal, sessionIdValue, locality, inputCanonical, inputDigest, rawInputs) =>
+      resultOf(m.prepare(journal, sessionIdValue, locality, inputCanonical, inputDigest, toList(rawInputs))),
+    accept: (journal, bridge, physicalEvidence, inputDigest, outputDigest) =>
+      resultOf(m.accept(journal, bridge, physicalEvidence, inputDigest, outputDigest)),
+    PreparedBridge: MagicTodoMembraneModule.PreparedBridge,
+  }
+})()
+
 export const reviewSeal = (() => {
   const bindableRun = member(ReviewSealModule, 'ReviewSeal', 'bindableRun')
   const projectMessages = member(SessionSnapshotPortModule, 'SessionSnapshotPort', 'projectMessages')
@@ -3770,6 +3785,8 @@ const AgentJournalCreate = bind(AgentJournalModule, 'AgentJournal', [
   'createFromEventStore',
   'createFromProjection',
   'appendAgent',
+  'appendMagicTodo',
+  'appendManagerLifecycle',
   'snapshot',
   'revision',
   'snapshotWithRevision',
@@ -3858,6 +3875,10 @@ export const agentJournal = {
   },
   appendAgent: (streamId, providerRun, agentFactValue, journal) =>
     resultOf(AgentJournalCreate.appendAgent(streamId, providerRun, agentFactValue, journal)),
+  appendMagicTodo: (streamId, providerRun, magicTodoFactValue, journal) =>
+    resultOf(AgentJournalCreate.appendMagicTodo(streamId, providerRun, magicTodoFactValue, journal)),
+  appendManagerLifecycle: (streamId, lifecycleFactValue, journal) =>
+    resultOf(AgentJournalCreate.appendManagerLifecycle(streamId, lifecycleFactValue, journal)),
   snapshot: (journal) => AgentJournalCreate.snapshot(journal),
   /** Module-level revision (AgentJournal.revision). */
   revision: (journal) => AgentJournalCreate.revision(journal),
