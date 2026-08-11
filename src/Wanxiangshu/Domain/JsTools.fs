@@ -177,8 +177,14 @@ module JsCanonicalDescription =
         + "the Host as one transaction."
 
     /// Proposal §16 canonical file() body (description uses HOST_READ).
-    let fileAlgorithm (readSourceLine: string) =
+    /// `raiseFailure` closes over `code` and `reason`.
+    let fileAlgorithm (readSourceLine: string) (raiseFailure: string) =
         "  async file(path, matches = []) {\n"
+        + "    const fail = (code, reason) => {\n"
+        + "      "
+        + raiseFailure
+        + "\n"
+        + "    };\n"
         + "    "
         + readSourceLine
         + "\n"
@@ -190,10 +196,25 @@ module JsCanonicalDescription =
 
     let cursor = 0;
 
+    const preview = pattern => {
+      if (typeof pattern === "string") {
+        return pattern.length > 80
+          ? JSON.stringify(pattern.slice(0, 80)) + "…"
+          : JSON.stringify(pattern);
+      }
+
+      if (pattern instanceof RegExp) {
+        const shown = "/" + pattern.source + "/";
+        return shown.length > 80 ? shown.slice(0, 80) + "…" : shown;
+      }
+
+      return String(pattern);
+    };
+
     const findNext = pattern => {
       if (typeof pattern === "string") {
         if (pattern.length === 0)
-          throw new Error("String anchor patterns must be non-empty.");
+          fail("EMPTY_ANCHOR_CONTENT", "string anchor patterns must be non-empty");
 
         const start = source.indexOf(pattern, cursor);
 
@@ -214,7 +235,13 @@ module JsCanonicalDescription =
             pattern.flags.replace(/[gy]/g, "") + "g"
           )].join("");
 
-        const regexp = new RegExp(pattern.source, flags);
+        let regexp;
+        try {
+          regexp = new RegExp(pattern.source, flags);
+        } catch {
+          fail("INVALID_ANCHOR_PATTERN", "anchor RegExp is invalid");
+        }
+
         regexp.lastIndex = cursor;
 
         const match = regexp.exec(source);
@@ -228,34 +255,38 @@ module JsCanonicalDescription =
         };
       }
 
-      throw new Error(
-        "Anchor pattern must be a string or RegExp."
-      );
+      fail("INVALID_ANCHOR_PATTERN", "anchor pattern must be a string or RegExp");
     };
 
+    let declaration = 0;
+
     for (const [begin, end, pattern] of matches) {
+      declaration += 1;
+
       if (!begin || !end)
-        throw new Error("Anchor names must be non-empty.");
+        fail("EMPTY_ANCHOR_CONTENT", `anchor ${declaration}: names must be non-empty`);
 
       if (
         begin === "^" || begin === "$" ||
         end === "^" || end === "$"
       )
-        throw new Error("^ and $ are reserved anchors.");
+        fail("INVALID_ANCHOR_PATTERN", `anchor ${declaration}: ^ and $ are reserved`);
 
       if (begin === end)
-        throw new Error(
-          "Begin and end anchor names must differ."
+        fail(
+          "INVALID_ANCHOR_PATTERN",
+          `anchor ${declaration}: begin and end names must differ`
         );
 
       if (anchors.has(begin) || anchors.has(end))
-        throw new Error("Anchor names must be unique.");
+        fail("INVALID_ANCHOR_PATTERN", `anchor ${declaration}: names must be unique`);
 
       const match = findNext(pattern);
 
       if (!match)
-        throw new Error(
-          "Anchor pattern was not found in declaration order."
+        fail(
+          "ANCHOR_NOT_FOUND",
+          `anchor ${declaration} not found in ${path} (forward from cursor ${cursor}); pattern: ${preview(pattern)}`
         );
 
       anchors.set(begin, match.start);
@@ -264,11 +295,18 @@ module JsCanonicalDescription =
       cursor = match.end;
     }
 
-    const offset = name => {
-      if (!anchors.has(name))
-        throw new Error(`Unknown anchor: ${name}`);
+    const clip = n => Math.min(Math.max(0, n), source.length);
 
-      return anchors.get(name);
+    const offset = name => {
+      if (anchors.has(name))
+        return anchors.get(name);
+
+      const shifted = /^(.*)([+-]\d+)$/.exec(name);
+
+      if (!shifted || shifted[1].length === 0)
+        fail("ANCHOR_NOT_FOUND", `unknown anchor: ${name}`);
+
+      return clip(offset(shifted[1]) + Number(shifted[2]));
     };
 
     return Object.freeze({
@@ -277,9 +315,7 @@ module JsCanonicalDescription =
         const end = offset(to);
 
         if (start > end)
-          throw new Error(
-            `Invalid slice: ${from} is after ${to}`
-          );
+          fail("INVALID_ANCHOR_PATTERN", `invalid slice: ${from} is after ${to}`);
 
         return source.slice(start, end);
       },
@@ -303,7 +339,9 @@ module JsCanonicalDescription =
     let publicBaseClass (capabilities: Set<JsCapability>) : string =
         let methods =
             [ if has capabilities JsCapability.Read then
-                  fileAlgorithm "const source = await HOST_READ_IMMUTABLE_UTF8_SNAPSHOT(path);"
+                  fileAlgorithm
+                      "const source = await HOST_READ_IMMUTABLE_UTF8_SNAPSHOT(path);"
+                      "throw new Error(reason);"
               if has capabilities JsCapability.Glob then
                   globStub
               if has capabilities JsCapability.Grep then
@@ -316,20 +354,36 @@ module JsCanonicalDescription =
 
         String.concat "\n\n" ("class JsProgram {" :: methods @ [ "}" ])
 
+    let rethrowHost =
+        "if (result && result.ok === false) {\n"
+        + "      const err = new Error(result.reason || result.code);\n"
+        + "      err.__jsFailure = { code: result.code, reason: result.reason || result.code };\n"
+        + "      throw err;\n"
+        + "    }"
+
     let runtimeBaseClass (capabilities: Set<JsCapability>) : string =
         let methods =
             [ "  constructor(api) { this._api = api; }"
               if has capabilities JsCapability.Read then
                   fileAlgorithm
-                      "const snapshot = this._api.js.read(path);\n    if (snapshot && snapshot.ok === false) throw new Error(snapshot.reason || snapshot.code);\n    const source = snapshot.text;"
+                      "const snapshot = this._api.js.read(path);\n    if (snapshot && snapshot.ok === false) fail(snapshot.code || \"FILE_READ_FAILED\", snapshot.reason || snapshot.code || \"file read failed\");\n    const source = snapshot.text;"
+                      "const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"
               if has capabilities JsCapability.Glob then
-                  "  async glob(pattern) {\n    const result = this._api.js.glob(pattern);\n    if (result && result.ok === false) throw new Error(result.reason || result.code);\n    return { paths: result.paths, truncated: result.truncated === true };\n  }"
+                  "  async glob(pattern) {\n    const result = this._api.js.glob(pattern);\n    "
+                  + rethrowHost
+                  + "\n    return { paths: result.paths, truncated: result.truncated === true };\n  }"
               if has capabilities JsCapability.Grep then
-                  "  async grep(needle, pattern = \"**/*\") {\n    const result = this._api.js.grep(needle, pattern);\n    if (result && result.ok === false) throw new Error(result.reason || result.code);\n    return { matches: result.matches, truncated: result.truncated === true };\n  }"
+                  "  async grep(needle, pattern = \"**/*\") {\n    const result = this._api.js.grep(needle, pattern);\n    "
+                  + rethrowHost
+                  + "\n    return { matches: result.matches, truncated: result.truncated === true };\n  }"
               if has capabilities JsCapability.Edit then
-                  "  rewrite(path, newText) {\n    const result = this._api.js.edit(path, newText);\n    if (result && result.ok === false) throw new Error(result.reason || result.code);\n  }"
+                  "  rewrite(path, newText) {\n    const result = this._api.js.edit(path, newText);\n    "
+                  + rethrowHost
+                  + "\n  }"
               if has capabilities JsCapability.Write then
-                  "  write(path, newText) {\n    const result = this._api.js.write(path, newText);\n    if (result && result.ok === false) throw new Error(result.reason || result.code);\n  }"
+                  "  write(path, newText) {\n    const result = this._api.js.write(path, newText);\n    "
+                  + rethrowHost
+                  + "\n  }"
               runStub ]
 
         String.concat "\n\n" ("class JsProgram {" :: methods @ [ "}" ])
@@ -420,11 +474,19 @@ module JsCanonicalDescription =
         + "Reverse slices fail. FileView is immutable: rewrite() does not change a previously\n"
         + "returned view.\n"
         + "\n"
+        + "from/to may be a declared name, ^, $, or a temporary shift name+N / name-N\n"
+        + "(example: h1+200, h1-40, $+0). Shifts are not stored. If the full string is a\n"
+        + "declared name, that exact name wins. Otherwise the last [+-]digits is the delta;\n"
+        + "the base name is resolved recursively. The resulting caret is clipped to\n"
+        + "[0, file_len] inclusive, so $+N and ^-N stay at EOF / start.\n"
+        + "\n"
         + "Recommended workflow:\n"
-        + "1. Declare the minimal begin/end anchor set needed to locate edits.\n"
+        + "1. Declare the minimal begin/end anchors needed to locate spans (read or edit).\n"
         + "2. Let Host resolve those positions.\n"
-        + "3. Build the complete resulting file from text(...) slices plus new content.\n"
-        + "4. Use indexOf / replaceAll only when anchor-and-splice is genuinely inconvenient.\n"
+        + "3. Read with text(from, to). Adjacent headers make a body slice:\n"
+        + "   text(\"h1end\", \"h2\"). A window around a hit is text(\"h1\", \"h1+200\").\n"
+        + "4. For edits, build the complete file from text(...) slices plus new content.\n"
+        + "5. Use indexOf / replaceAll only when anchor-and-splice is genuinely inconvenient.\n"
         + "\n"
         + "Prefer:\n"
         + "  f.text(\"^\", \"begin\") + \"newString\" + f.text(\"end\", \"$\")"
@@ -489,6 +551,22 @@ module JsCanonicalDescription =
     let examples: JsExample list =
         [ { Requires = set [ JsCapability.Read ]
             Source = JsFragmentRegistry.read.CanonicalExample }
+          { Requires = set [ JsCapability.Read ]
+            Source =
+              "class Js extends JsProgram {\n"
+              + "  async run() {\n"
+              + "    const doc = await this.file(\"docs/what/js-tools.md\", [\n"
+              + "      [\"h1\", \"h1end\", \"## JS-016\"],\n"
+              + "      [\"h2\", \"h2end\", \"## JS-017\"],\n"
+              + "      [\"h3\", \"h3end\", \"## JS-019\"],\n"
+              + "    ]);\n"
+              + "    return {\n"
+              + "      resultShape: doc.text(\"h1\", \"h2\"),\n"
+              + "      aroundH1: doc.text(\"h1\", \"h1+200\"),\n"
+              + "      failures: doc.text(\"h3\", \"$\"),\n"
+              + "    };\n"
+              + "  }\n"
+              + "}" }
           { Requires = set [ JsCapability.Glob ]
             Source = JsFragmentRegistry.glob.CanonicalExample }
           { Requires = set [ JsCapability.Grep ]
@@ -749,7 +827,7 @@ module JsToolGenerator =
 [<RequireQualifiedAccess>]
 type JsFailure =
     | InvalidProgram
-    | ProgramFailed
+    | ProgramFailed of string
     | ProgramTimeout
     | ProgramResourceLimit
     | PermissionDenied of string
@@ -760,7 +838,7 @@ type JsFailure =
     | InvalidUtf8 of string
     | AnchorEmptyContent
     | AnchorInvalidPattern
-    | AnchorNotFound of int
+    | AnchorNotFound of string
     | AnchorNotUnique
     | AnchorCrossFile
     | DuplicateMutationTarget of string
@@ -779,7 +857,7 @@ module JsFailure =
     let code (failure: JsFailure) : string =
         match failure with
         | JsFailure.InvalidProgram -> "INVALID_PROGRAM"
-        | JsFailure.ProgramFailed -> "PROGRAM_FAILED"
+        | JsFailure.ProgramFailed _ -> "PROGRAM_FAILED"
         | JsFailure.ProgramTimeout -> "PROGRAM_TIMEOUT"
         | JsFailure.ProgramResourceLimit -> "PROGRAM_RESOURCE_LIMIT"
         | JsFailure.PermissionDenied _ -> "PERMISSION_DENIED"
@@ -807,7 +885,11 @@ module JsFailure =
     let reason (failure: JsFailure) : string =
         match failure with
         | JsFailure.InvalidProgram -> "program source is invalid JavaScript"
-        | JsFailure.ProgramFailed -> "program threw; see program error payload"
+        | JsFailure.ProgramFailed message ->
+            if System.String.IsNullOrEmpty message then
+                "program threw"
+            else
+                "program threw: " + message
         | JsFailure.ProgramTimeout -> "program exceeded its deadline"
         | JsFailure.ProgramResourceLimit -> "program exceeded a resource bound"
         | JsFailure.PermissionDenied capability -> "capability not present in this attempt: " + capability
@@ -818,7 +900,11 @@ module JsFailure =
         | JsFailure.InvalidUtf8 path -> "file is not strict UTF-8: " + path
         | JsFailure.AnchorEmptyContent -> "anchor content is empty"
         | JsFailure.AnchorInvalidPattern -> "anchor RegExp is invalid"
-        | JsFailure.AnchorNotFound index -> "anchor did not match at declaration " + string index
+        | JsFailure.AnchorNotFound detail ->
+            if System.String.IsNullOrEmpty detail then
+                "anchor did not match"
+            else
+                detail
         | JsFailure.AnchorNotUnique -> "anchor matches multiple locations and no occurrence was declared"
         | JsFailure.AnchorCrossFile -> "anchor declaration crosses files"
         | JsFailure.DuplicateMutationTarget path -> "the same path was mutated twice in one program: " + path
@@ -838,6 +924,48 @@ module JsFailure =
         + "\", reason: \""
         + reason failure
         + "\" }"
+
+    /// Map a structured sandbox sentinel `{ code, reason }` to a typed failure.
+    /// Classification uses the code field, never exception-message sniffing (JS-019).
+    let ofWire (code: string) (reason: string) : JsFailure =
+        let text =
+            if System.String.IsNullOrEmpty reason then
+                code
+            else
+                reason
+
+        let after (prefix: string) =
+            if text.StartsWith prefix then
+                text.Substring(prefix.Length)
+            else
+                text
+
+        match code with
+        | "INVALID_PROGRAM" -> JsFailure.InvalidProgram
+        | "PROGRAM_FAILED" -> JsFailure.ProgramFailed text
+        | "PROGRAM_TIMEOUT" -> JsFailure.ProgramTimeout
+        | "PROGRAM_RESOURCE_LIMIT" -> JsFailure.ProgramResourceLimit
+        | "PERMISSION_DENIED" -> JsFailure.PermissionDenied(after "capability not present in this attempt: ")
+        | "PATH_DENIED" -> JsFailure.PathDenied(after "path outside capability boundary: ")
+        | "FILE_NOT_FOUND" -> JsFailure.FileNotFound(after "target file does not exist: ")
+        | "FILE_ALREADY_EXISTS" -> JsFailure.FileAlreadyExists(after "target file already exists: ")
+        | "FILE_READ_FAILED" -> JsFailure.FileReadFailed(after "file read failed: ")
+        | "INVALID_UTF8" -> JsFailure.InvalidUtf8(after "file is not strict UTF-8: ")
+        | "EMPTY_ANCHOR_CONTENT" -> JsFailure.AnchorEmptyContent
+        | "INVALID_ANCHOR_PATTERN" -> JsFailure.AnchorInvalidPattern
+        | "ANCHOR_NOT_FOUND" -> JsFailure.AnchorNotFound text
+        | "ANCHOR_NOT_UNIQUE" -> JsFailure.AnchorNotUnique
+        | "ANCHOR_CROSS_FILE" -> JsFailure.AnchorCrossFile
+        | "DUPLICATE_MUTATION_TARGET" -> JsFailure.DuplicateMutationTarget(after "the same path was mutated twice in one program: ")
+        | "RESULT_TOO_LARGE" -> JsFailure.ResultTooLarge None
+        | "INVALID_RETURN_VALUE" -> JsFailure.InvalidReturnValue
+        | "FILE_CHANGED" -> JsFailure.FileChanged(after "target changed since the read snapshot; no implicit retry: ")
+        | "TRANSACTION_PREPARE_FAILED" -> JsFailure.TransactionPrepareFailed
+        | "TRANSACTION_COMMIT_FAILED" -> JsFailure.TransactionCommitFailed
+        | "TRANSACTION_ROLLBACK_FAILED" -> JsFailure.TransactionRollbackFailed
+        | "TRANSACTION_RECOVERY_REQUIRED" -> JsFailure.TransactionRecoveryRequired
+        | "UNKNOWN_MEMBER" -> JsFailure.UnknownMember
+        | _ -> JsFailure.ProgramFailed text
 
 /// JS-006: ordered anchor declarations — string or RegExp, with an optional
 /// 1-based occurrence selector; duplicate textual occurrence resolves in

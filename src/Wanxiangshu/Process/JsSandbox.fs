@@ -17,9 +17,13 @@ module JsSandbox =
     [<Import("runInContext", "node:vm")>]
     let private runInContext (code: string) (context: obj) (options: obj) : obj = jsNative
 
+    [<Emit("JSON.parse($0)")>]
+    let private parseJson (text: string) : obj = jsNative
+
     /// Sentinel payloads the wrapper returns instead of the program result;
     /// recognized by prefix, never by exception-message sniffing (JS-019).
     let private failedPrefix = "{\"__jsProgramFailed\":"
+    let private hostFailedPrefix = "{\"__jsHostFailed\":"
     let private invalidReturnPrefix = "{\"__jsInvalidReturn\":"
 
     /// Wrap base class + model source into an async IIFE that evaluates to a
@@ -39,7 +43,11 @@ module JsSandbox =
         + "      return (...args) => {\n"
         + "        if (Date.now() > "
         + string deadlineEpochMs
-        + ") throw new Error('__PROGRAM_TIMEOUT__');\n"
+        + ") {\n"
+        + "          const err = new Error('program exceeded its deadline');\n"
+        + "          err.__jsFailure = { code: 'PROGRAM_TIMEOUT', reason: 'program exceeded its deadline' };\n"
+        + "          throw err;\n"
+        + "        }\n"
         + "        return value(...args);\n"
         + "      };\n"
         + "    }\n"
@@ -50,7 +58,16 @@ module JsSandbox =
         + "const __api = __wrap(api);\n"
         + "let __result;\n"
         + "try { __result = await new Js(__api).run(); }\n"
-        + "catch (__e) { return JSON.stringify({ __jsProgramFailed: true, message: String((__e && __e.message) || __e) }); }\n"
+        + "catch (__e) {\n"
+        + "  if (__e && __e.__jsFailure && typeof __e.__jsFailure.code === 'string') {\n"
+        + "    return JSON.stringify({\n"
+        + "      __jsHostFailed: true,\n"
+        + "      code: __e.__jsFailure.code,\n"
+        + "      reason: String(__e.__jsFailure.reason || __e.__jsFailure.code)\n"
+        + "    });\n"
+        + "  }\n"
+        + "  return JSON.stringify({ __jsProgramFailed: true, message: String((__e && __e.message) || __e) });\n"
+        + "}\n"
         + "try { return JSON.stringify(__result); }\n"
         + "catch (__e2) { return JSON.stringify({ __jsInvalidReturn: true }); }\n"
         + "})()"
@@ -66,7 +83,21 @@ module JsSandbox =
         elif message.Contains "timed out" then
             JsFailure.ProgramTimeout
         else
-            JsFailure.ProgramFailed
+            JsFailure.ProgramFailed message
+
+    let private decodeHostFailed (json: string) : JsFailure =
+        try
+            let payload = parseJson json
+            JsFailure.ofWire (string payload?code) (string payload?reason)
+        with _ ->
+            JsFailure.ProgramFailed "program threw"
+
+    let private decodeProgramFailed (json: string) : JsFailure =
+        try
+            let payload = parseJson json
+            JsFailure.ProgramFailed(string payload?message)
+        with _ ->
+            JsFailure.ProgramFailed "program threw"
 
     /// Execute the wrapped program in a fresh vm context.
     ///
@@ -88,8 +119,10 @@ module JsSandbox =
 
                 let! json = promise :?> Task<string>
 
-                if json.StartsWith failedPrefix then
-                    return Error JsFailure.ProgramFailed
+                if json.StartsWith hostFailedPrefix then
+                    return Error(decodeHostFailed json)
+                elif json.StartsWith failedPrefix then
+                    return Error(decodeProgramFailed json)
                 elif json.StartsWith invalidReturnPrefix then
                     return Error JsFailure.InvalidReturnValue
                 elif json.Length > outputBoundBytes then

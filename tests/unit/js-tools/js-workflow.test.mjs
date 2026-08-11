@@ -114,6 +114,10 @@ test('JS085_workflow_file_missing_fails_the_program', async () => {
 }`
     const { outcome } = await runWorkflow(dir, program)
     assert.equal(caseName(outcome), 'Failed')
+    const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
+    const failed = parseToml(render(outcome))
+    assert.equal(failed.code, 'FILE_NOT_FOUND')
+    assert.equal(failed.reason.includes('missing.txt'), true)
   } finally {
     cleanup()
   }
@@ -196,6 +200,7 @@ test('JS016_result_renders_stable_toml_shapes', async () => {
     const failed = parseToml(failedToml)
     assert.equal(failed.code, 'PROGRAM_FAILED')
     assert.equal(typeof failed.reason, 'string')
+    assert.equal(failed.reason.includes('boom'), true)
     assert.equal(failed.data, undefined)
     assert.equal(failed.fs, undefined)
   } finally {
@@ -275,6 +280,59 @@ test('JS010_mixed_object_array_is_invalid', async () => {
     assert.equal(caseName(outcome), 'Failed')
     const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
     assert.equal(parseToml(render(outcome)).code, 'INVALID_RETURN_VALUE')
+  } finally {
+    cleanup()
+  }
+})
+
+test('JS006_019_missing_anchor_is_typed_and_names_the_pattern', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
+    const surface = generate('Coder', coderCaps)
+    const program = `class Js extends JsProgram {
+  async run() {
+    await this.file('a.txt', [['begin', 'end', '## JS-007 FileView.text()']]);
+    return { ok: true };
+  }
+}`
+    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+    const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
+    const failed = parseToml(render(outcome))
+    assert.equal(failed.code, 'ANCHOR_NOT_FOUND')
+    assert.equal(failed.reason.includes('anchor 1'), true)
+    assert.equal(failed.reason.includes('a.txt'), true)
+    assert.equal(failed.reason.includes('## JS-007 FileView.text()'), true)
+  } finally {
+    cleanup()
+  }
+})
+
+test('JS005_offset_anchor_clips_to_closed_file_range', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
+    const surface = generate('Coder', coderCaps)
+    const program = `class Js extends JsProgram {
+  async run() {
+    const file = await this.file('a.txt', [['h', 'hend', 'hello']]);
+    return {
+      window: file.text('h', 'h+6'),
+      before: file.text('hend-5', 'hend'),
+      clippedEnd: file.text('h', 'h+1000'),
+      clippedStart: file.text('^-1000', 'h'),
+      eof: file.text('$+100', '$+200').length,
+    };
+  }
+}`
+    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+    const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
+    const doc = parseToml(render(outcome))
+    assert.equal(doc.data.window, 'hello ')
+    assert.equal(doc.data.before, 'hello')
+    assert.equal(doc.data.clippedEnd, 'hello world')
+    assert.equal(doc.data.clippedStart, '')
+    assert.equal(doc.data.eof, 0)
   } finally {
     cleanup()
   }

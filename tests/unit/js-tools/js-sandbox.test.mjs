@@ -73,9 +73,7 @@ test('JS054_1_async_deadline_proxy_aborts_api_calls_after_deadline', async () =>
   const api = { js: { read: async () => ({ text: 'x' }) } }
   const result = await runWrapped(wrapProgram(BASE, program, past), api)
   assert.equal(result.ok, false)
-  // The proxy error surfaces as PROGRAM_FAILED through the wrapper catch;
-  // the vm timeout path is the PROGRAM_TIMEOUT classification.
-  assert.equal(failureCode(result.error), 'PROGRAM_FAILED')
+  assert.equal(failureCode(result.error), 'PROGRAM_TIMEOUT')
 })
 
 test('JS019_invalid_javascript_is_invalid_program', async () => {

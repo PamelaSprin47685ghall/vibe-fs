@@ -22,11 +22,11 @@ Clause 前缀 `JS-`。本页只冻结 observable semantics，不规定内部模�
 
 ## JS-005 file() / FileView
 
-`file(path, matches = [])` 读取本事务 immutable UTF-8 快照，按声明顺序解析 begin/end anchors，返回不可变 FileView。`text(from, to)`（默认 `^`/`$`）切出原文 substring。后续 rewrite 不影响已取得的视图。strict UTF-8：非法 UTF-8 拒绝，不以替换字符静默清洗。
+`file(path, matches = [])` 读取本事务 immutable UTF-8 快照，按声明顺序解析 begin/end anchors，返回不可变 FileView。`text(from, to)`（默认 `^`/`$`）切出原文 substring。锚点可用于只读切片，不必 `rewrite`。`from`/`to` 可以是已声明名、`^`、`$`，或临时位移 `name+N` / `name-N`（例：`h1+200`）。位移不入库；全名已声明则用声明；否则取最后一个 `[+-]digits` 为 delta，基名递归解析。结果 caret clip 到闭区间 `[0, file_len]`，故 `$+N` / `^-N` 停在 EOF / 文件首。后续 rewrite 不影响已取得的视图。strict UTF-8：非法 UTF-8 拒绝，不以替换字符静默清洗。
 
 ## JS-006 Ordered string/RegExp anchors
 
-`matches` 为 `Array<[begin, end, pattern]>`，按**声明顺序**从 cursor 向前匹配；匹配后 `cursor = match.end`。pattern 为非空字符串或 RegExp（忽略调用方 g/y/`lastIndex`）。`^` / `$` 为文件绝对首/尾，禁止自定义同名。零宽 RegExp 合法。拒绝：空名字、保留名、重复名、begin==end、空字符串 pattern、按序找不到。
+`matches` 为 `Array<[begin, end, pattern]>`，按**声明顺序**从 cursor 向前匹配；匹配后 `cursor = match.end`。pattern 为非空字符串或 RegExp（忽略调用方 g/y/`lastIndex`）。`^` / `$` 为文件绝对首/尾，禁止自定义同名。零宽 RegExp 合法。拒绝：空名字、保留名、重复名、begin==end、空字符串 pattern、按序找不到。按序找不到的失败码为 `ANCHOR_NOT_FOUND`，`reason` 含 1-based 声明序号、path、从 cursor 起搜，以及 pattern 预览。
 
 ## JS-007 glob()
 
@@ -80,7 +80,7 @@ normal 失败路径回滚全部 staged 效果。crash 恢复只从 EventStore fa
 
 两份文档，无 `status` discriminator，无 `result` / `written` / `created`：
 
-- **失败**：instruction 恰好 `# failed`；根级 `code` / `reason`（JS-019）。无 `[data]`，无 `[fs]`。
+- **失败**：instruction 恰好 `# failed`；根级 `code` / `reason`（JS-019）。无 `[data]`，无 `[fs]`。`PROGRAM_FAILED` 的 `reason` 含 throw 的 message；Host 可预见失败（`FILE_NOT_FOUND` / `ANCHOR_NOT_FOUND` 等）不得压成 `PROGRAM_FAILED`。
 - **成功**：instruction 恰好 `# ok`；程序值进入 `data`（对象 → `[data]`；原始值/原始值数组 → `data = …`；对象数组 → `[[data]]`）；有磁盘效果时文末 `[fs]`，`rewritten` / `created` 为非空路径数组。空提交不出现 `[fs]`；`[fs]` 不含空数组或空字符串。顶层 `null` 无 data 体。
 
 程序键活在 `[data]` 内，与 Host `[fs]`、失败根级 `code` 不合体。值编码（省略对象 `null` 字段、整数/浮点、quoted key、裸字段先于表）由 `SyntheticToml` 决定，见 `how/synthetic-toml.md`。
@@ -95,4 +95,4 @@ normal 失败路径回滚全部 staged 效果。crash 恢复只从 EventStore fa
 
 ## JS-019 Failure algebra
 
-失败以稳定失败码表达（proposal §77.1：`INVALID_PROGRAM` / `PROGRAM_FAILED` / `PROGRAM_TIMEOUT` / `PERMISSION_DENIED` / `PATH_DENIED` / `FILE_NOT_FOUND` / `FILE_ALREADY_EXISTS` / `INVALID_UTF8` / `ANCHOR_NOT_FOUND` / `ANCHOR_NOT_UNIQUE` / `DUPLICATE_MUTATION_TARGET` / `RESULT_TOO_LARGE` / `INVALID_RETURN_VALUE` / `FILE_CHANGED` / `TRANSACTION_*` / `UNKNOWN_MEMBER`），LLM-visible errors 可读且稳定；不把程序可预见失败伪装成异常，不从 exception message 反推业务错误种类。LLM-visible 失败文档形状见 JS-016；失败码集合不因渲染改动而增减。
+失败以稳定失败码表达（proposal §77.1：`INVALID_PROGRAM` / `PROGRAM_FAILED` / `PROGRAM_TIMEOUT` / `PERMISSION_DENIED` / `PATH_DENIED` / `FILE_NOT_FOUND` / `FILE_ALREADY_EXISTS` / `INVALID_UTF8` / `ANCHOR_NOT_FOUND` / `ANCHOR_NOT_UNIQUE` / `DUPLICATE_MUTATION_TARGET` / `RESULT_TOO_LARGE` / `INVALID_RETURN_VALUE` / `FILE_CHANGED` / `TRANSACTION_*` / `UNKNOWN_MEMBER`），LLM-visible errors 可读且稳定；不把程序可预见失败伪装成异常，不从 exception message 反推业务错误种类。生成面把 Host `{ ok: false, code, reason }` 与锚点声明失败经结构化 sentinel（`__jsFailure`）交给沙箱，工具结果使用该 `code`，不是一律 `PROGRAM_FAILED`。未带 sentinel 的 throw 才是 `PROGRAM_FAILED`，且 `reason` 含 message。LLM-visible 失败文档形状见 JS-016；失败码集合不因渲染改动而增减。

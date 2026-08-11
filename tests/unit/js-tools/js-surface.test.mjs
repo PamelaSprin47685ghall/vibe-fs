@@ -100,6 +100,11 @@ test('JS004_four_layer_exactness_coder', () => {
     assert.equal(layer.inExamples, true, `${member} in examples`)
     assert.equal(layer.binding, BINDING_BY_MEMBER[member], `${member} binding`)
   }
+  assert.equal(result.Description.includes('HOST_READ_IMMUTABLE_UTF8_SNAPSHOT'), true)
+  assert.equal(result.Description.includes('h1+200'), true)
+  assert.equal(result.Description.includes('text("h1", "h2")'), true)
+  assert.equal(result.Description.includes('_api'), false)
+  assert.equal(result.Description.includes('__jsFailure'), false)
 })
 
 test('JS004_absent_capability_is_absent_in_all_four_layers', () => {

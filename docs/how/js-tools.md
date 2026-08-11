@@ -43,7 +43,8 @@ profile.ToolCapabilitySet
 - 精确字符串锚点：literal 查找。
 - RegExp 锚点：按 RegExp 语义匹配；`^` / `$` = 文件绝对首/尾（非行锚）。
 - 零宽 RegExp：位置有效，可表达插入点。
-- 5 类拒绝（`ANCHOR_*`）：不唯一且未指定序 / 不匹配 / 正则非法 / 跨文件混用 / 空锚点。
+- 5 类拒绝（`ANCHOR_*`）：不唯一且未指定序 / 不匹配 / 正则非法 / 跨文件混用 / 空锚点。按序找不到：`ANCHOR_NOT_FOUND`，reason 含声明序号、path、cursor、pattern 预览。
+- `text(from, to)` 位移名：`name+N` / `name-N`。全名已在 Map 则用声明；否则最后一个 `[+-]digits` 为 delta，基名递归解析。caret clip 到 `[0, file_len]`（含 EOF）。位移是临时 caret，不写入 Map。
 
 ## glob（JS-007）
 
@@ -71,7 +72,7 @@ JS-007 glob(pattern) 选文件（文件上限宽于返回给模型的 glob 上�
 
 ## FileView
 
-`file(path, matches = [])` 读取时快照不可变视图并按序解析 anchors。read 路径：strict UTF-8 校验 → 快照缓存 → FileView.text(from, to)。同一 program 内 mutation 不改变先前取得的 FileView（快照隔离）。
+`file(path, matches = [])` 读取时快照不可变视图并按序解析 anchors。read 路径：strict UTF-8 校验 → 快照缓存 → FileView.text(from, to)。N 个锚点可只用于阅读：一次 `file()` 钉多节标题，再用 `text("h1end", "h2")` 或 `text("h1", "h1+200")` 取窗。同一 program 内 mutation 不改变先前取得的 FileView（快照隔离）。
 
 ## Transaction
 
@@ -110,3 +111,5 @@ sandbox JSON string
 ## Failure algebra
 
 程序可预见失败 = 稳定失败码返回（proposal §77.1：`FILE_NOT_FOUND` / `FILE_ALREADY_EXISTS` / `FILE_CHANGED` / `INVALID_UTF8` / `ANCHOR_*` / `PERMISSION_DENIED` / `PATH_DENIED` / `PROGRAM_*` / `TRANSACTION_*` / `DUPLICATE_MUTATION_TARGET` / `RESULT_TOO_LARGE` / `INVALID_RETURN_VALUE`）。异常只留给程序无法继续的事故（进程崩溃、Host 故障）；不从 exception message 反推业务错误种类。
+
+运行时 throw 若带 `__jsFailure = { code, reason }`，沙箱 sentinel `__jsHostFailed` 按 code 还原 JsFailure；普通 throw 走 `__jsProgramFailed` + message，渲染为 `PROGRAM_FAILED` 且 reason 含该 message。异步 deadline proxy 使用 `PROGRAM_TIMEOUT` sentinel，不靠嗅探 `'__PROGRAM_TIMEOUT__'` 字符串。

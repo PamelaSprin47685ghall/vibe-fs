@@ -28,4 +28,8 @@
 
 **结果：JSON stringify 进 TOML 字符串字段 vs 值树进 SyntheticToml。** 拒前者：`status` / `result = "{...}"` / 逗号拼接 `written` 是两套语法叠信封；空字符串噪声；路径含逗号不可消歧。`run()` 的 JSON 兼容值仍是沙箱边界；LLM 看见的是 ARCH-010 文档。Host 事实与程序值分表，不用 `status` discriminator（JS-016）。
 
+**可预见失败压成 `PROGRAM_FAILED` 且丢掉 throw message vs 结构化 sentinel。** 拒前者：`file()` 找不到锚点、目标缺失必须是 `ANCHOR_NOT_FOUND` / `FILE_NOT_FOUND`；普通 throw 的 `reason` 必须含 message。分类看 `__jsFailure.code`，不嗅探 exception 文本（JS-019）。
+
+**锚点只能切声明 span vs `name±N` 临时 caret。** 拒只能声明：读一窗正文时不该再钉一个假 pattern。位移 clip 到闭区间 `[0, file_len]`，EOF 与 `$` 对齐（JS-005）。
+
 **数组 `null` / 异构对象数组放行 vs commit 前 `INVALID_RETURN_VALUE`。** 拒放行：TOML 不能诚实表示 `null` 元素，对象与原始值混列也无法用一种 array 记法。对象字段 `null` 省略；顶层 `null` 无 data 体（JS-010）。

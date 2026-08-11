@@ -477,7 +477,7 @@ module JsToolsFs =
                     if start >= 0 then
                         Ok(start, start + needle.Length)
                     else
-                        Error(JsFailure.AnchorNotFound occurrence)
+                        Error(JsFailure.AnchorNotFound("anchor did not match at occurrence " + string occurrence))
             | AnchorSpec.Regex pattern ->
                 if System.String.IsNullOrEmpty pattern then
                     Error JsFailure.AnchorEmptyContent
@@ -489,7 +489,7 @@ module JsToolsFs =
                         if matchFound m then
                             Ok(matchStart m, matchEnd m)
                         else
-                            Error(JsFailure.AnchorNotFound occurrence)
+                            Error(JsFailure.AnchorNotFound("anchor did not match at occurrence " + string occurrence))
                     with _ ->
                         Error JsFailure.AnchorInvalidPattern
 

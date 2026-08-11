@@ -32,13 +32,13 @@ const failureOf = (name, payload) => {
 test('JS019_failure_codes_are_stable_and_unique', () => {
   const cases = [
     [failureOf('InvalidProgram'), 'INVALID_PROGRAM'],
-    [failureOf('ProgramFailed'), 'PROGRAM_FAILED'],
+    [failureOf('ProgramFailed', ''), 'PROGRAM_FAILED'],
     [failureOf('ProgramTimeout'), 'PROGRAM_TIMEOUT'],
     [failureOf('ProgramResourceLimit'), 'PROGRAM_RESOURCE_LIMIT'],
     [failureOf('FileNotFound', 'a'), 'FILE_NOT_FOUND'],
     [failureOf('FileAlreadyExists', 'a'), 'FILE_ALREADY_EXISTS'],
     [failureOf('InvalidUtf8', 'a'), 'INVALID_UTF8'],
-    [failureOf('AnchorNotFound', 0), 'ANCHOR_NOT_FOUND'],
+    [failureOf('AnchorNotFound', 'missing'), 'ANCHOR_NOT_FOUND'],
     [failureOf('AnchorNotUnique'), 'ANCHOR_NOT_UNIQUE'],
     [failureOf('DuplicateMutationTarget', 'a'), 'DUPLICATE_MUTATION_TARGET'],
     [failureOf('ResultTooLarge', undefined), 'RESULT_TOO_LARGE'],
