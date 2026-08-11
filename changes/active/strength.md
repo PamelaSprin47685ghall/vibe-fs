@@ -2119,15 +2119,20 @@ Strength 仍然值得做，但今天正确的形状已经不是“给旧系统�
 - 在正式 `why/what/shape/how/proof` 中定义 Strength 的只读投机价值、eligible/K、Candidate→Promotion→XTrace 语义、Universal ownership、PromptAuthority、Projection Algebra、EventStore `payload_refs`、recovery/control/canary 边界。
 - 既有 agent/host/prompt/projection/companion/context/fallback/review/persist/execution 条款保持 owner；Strength 只增加合法 case 与交叉引用，不建立第二套 runtime/storage/fallback/projection authority。
 
+## 2026-08-11 machine progress
+
+- decision-local StrengthReplica 的 K1/K2 request-budget 与停止语义已有永久 unit proof，并进入唯一 Long Stroke real-Host/mock-LLM dry-run：K2 request #1 可含并行 readonly batch 且按一个 request 计数；request #2 能消费完整 call/result batch；request #3 在物理 provider 外发前停止。
+- OpenCode 1.18.14 completed tool batch 按 native completed `type=tool` part 编码/回放；readonly provider schema / execution gate 继续固定为 `read/glob/grep`。
+- 该证明只关闭 Host/request-budget 机制义务，不构成 Proposal Completion：§32 仍要求 shadow/control 可识别经济证据、稳定 eligible cohort 的 K1 正净收益、质量指标无不可接受退化，且 K2 独立通过。
+- 标准 build/unit/integration/e2e/package 机器面已绿；仓库总 `check` 仍被本 Change 外、未获 ownership 的 proposed Change 三个悬空条款引用阻断，因此不得据此关闭 Strength。
+
 ## Remaining work
 
 1. 对齐正式 docs 与 glossary/navigation，消除旧 Phase-0/Student-Teacher/feature-owned storage 语义漂移。
-2. 完成纯 Domain：eligibility/control/value policy、semantic frame/digest/wire identity、Strength events/projection、Projection intents 与冲突规则。
-3. 完成 EventStore codec/fold/index 与 payload material durability；实现 Prepared/Promoted/Traced 幂等、冲突与 wrong-target 约束。
-4. 完成 decision-local StrengthReplica runtime、same-role fast profile、readonly schema+execution gate、K1/K2 request budget 与停止语义。
-5. 完成 StrengthSpeculate/Promotion/Replay/XTrace/Companion wiring、CommitUnknown resolve、cancellation/recovery/fuse。
-6. 建立 proposal 要求的 domain/projection/persist/integration/statistical/Host canary 永久 proof；通过仓库标准 build/test/spec/lint 门禁。
-7. 清理 Phase-0 stub、旧 Strength 残留与无价值临时脚手架；关闭 Change 并记录 Final outcome。
+2. 补齐 §31 最终不变量尚缺的正式 Clause / mechanical proof，特别是 crash/restart/compaction/promotion closure 与 no-reflection 交叉证明。
+3. 完成 shadow/control statistical proof 与显式成本评估：证明至少一个稳定 eligible cohort 的 K1 正净收益，并保持 deterministic control holdout。
+4. 完成 treatment-vs-control quality proof：任务成功率、review/finality、fallback/repair、用户可见错误、tail latency、provider input bytes；K2 独立验收，不能继承 K1。
+5. 清理 Phase-0 stub、旧 Strength 残留与无价值临时脚手架；待标准仓库检查全绿后关闭 Change 并记录 Final outcome。
 
 ## Completion criteria
 

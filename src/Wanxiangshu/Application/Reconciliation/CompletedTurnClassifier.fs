@@ -119,15 +119,18 @@ module CompletedTurnClassifier =
             | None -> box ReconcileProgram.TurnUnknown
 
     /// ARCH-011: named for the typed occasion (unfinished interaction), not for any
-    /// character feature of the repair payload. `_parts` is deliberately ignored: a
-    /// `TurnInProgress`/`TurnNeedsContinuation` outcome already carries the decision.
+    /// character feature of the repair payload. A normal `finish=tool-calls` turn is
+    /// still owned by the Host provider/tool loop; its concrete tool/activity part is
+    /// proof that continuation is already in flight and must never be pre-empted by a
+    /// synthetic InteractionRepair. Only an in-progress turn with no such Host work,
+    /// or an explicit NeedsContinuation, earns repair.
     /// Accepts `obj` because classifyOutcome may return SnapshotObservation.
-    let needsInteractionRepair (role: Role option) (classified: obj) (_parts: MessagePart array) =
+    let needsInteractionRepair (role: Role option) (classified: obj) (parts: MessagePart array) =
         supportsInteractionRepair role
         && (match classified with
             | :? ReconcileProgram.TurnOutcome as outcome ->
                 match outcome with
-                | ReconcileProgram.TurnInProgress
+                | ReconcileProgram.TurnInProgress -> not (hasToolCallPart parts)
                 | ReconcileProgram.TurnNeedsContinuation _ -> true
                 | ReconcileProgram.TurnCompleted
                 | ReconcileProgram.TurnAborted _

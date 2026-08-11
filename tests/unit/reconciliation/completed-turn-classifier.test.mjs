@@ -186,6 +186,7 @@ test('RECON_classify_no_finish_is_unknown_even_with_parts', async () => {
 
 test('RECON_needs_interactionRepair_role_by_outcome_table', () => {
   const inProgress = classifyOutcome(false, 'tool-calls', undefined, [])
+  const inProgressWithRealTool = classifyOutcome(false, 'tool-calls', undefined, [toolCall('c-live', 'write', '{}')])
   const needsMore = classifyOutcome(false, 'length', undefined, [])
   const completed = classifyOutcome(false, 'stop', undefined, [text('ok')])
   const aborted = classifyOutcome(false, 'aborted', undefined, [])
@@ -193,7 +194,12 @@ test('RECON_needs_interactionRepair_role_by_outcome_table', () => {
   const unknown = classifyOutcome(false, undefined, undefined, [])
 
   for (const role of ['Manager', 'Orchestrator', 'Coder', 'Reviewer', 'Inspector', 'DevOps', 'Browser', 'Meditator']) {
-    assert.equal(needsInteractionRepair(roles.of(role), inProgress, []), true, `${role} InProgress`)
+    assert.equal(needsInteractionRepair(roles.of(role), inProgress, []), true, `${role} InProgress without a real tool part repairs`)
+    assert.equal(
+      needsInteractionRepair(roles.of(role), inProgressWithRealTool, [toolCall('c-live', 'write', '{}')]),
+      false,
+      `${role} normal tool-call continuation must stay on the Host provider/tool lane`,
+    )
     assert.equal(needsInteractionRepair(roles.of(role), needsMore, []), true, `${role} NeedsContinuation`)
     for (const [label, outcome] of [['Completed', completed], ['Aborted', aborted], ['Failed', failed], ['Unknown', unknown]]) {
       assert.equal(needsInteractionRepair(roles.of(role), outcome, []), false, `${role} ${label} never repairs`)

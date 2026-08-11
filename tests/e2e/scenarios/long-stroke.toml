@@ -47,7 +47,7 @@
 #   - FinalityBlessed waitFact: widen via renewOn; journal noise without renew can trip silence
 #   - ConflictDetected / Published: rebase+barrier lag; timeouts mirror orch-unhappy (60–90s caps)
 #   - AgentOwnerRoot WorkActivated is migration-written on first suicide (FinalityTool
-#     ensureMigrationLife), NOT at fork — never waitFact WorkActivated before mgr-finish
+#     ensureMigrationLife), NOT at fork — never waitFact WorkActivated before manager-idle suicide
 #   - interrupt requires holdChildC1UntilLabor; without hold, drain completes child and skips user_message
 #   - REVISE→PERFECT needs bindFinalityReviseThenPerfect retire/activate (same OpeningAssignment)
 #   - blogger pad undersize → unmatched companion requests (fail closed)
@@ -61,14 +61,14 @@ description = "G4R-3 The Long Stroke: orchestrator shell, one OpenCode world thr
 pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fallback, REVISE→FinalityRejected→Blessed→LifeCompleted, gitConflictProof→ConflictDetected→Published (no restart)."
 
 # Event ceilings (fail-closed on dead loops; primary over silence watchdog):
-#   maxJournalEvents — EventStore envelope count; full Host lifetime converges to 515. The flow
-#                      snapshot may print 512 before three already-in-flight durable commits land.
-#   maxSseEvents     — OpenCode SSE excluding server.heartbeat; transport-level count calibrated at
-#                      2537 across three consecutive green runs (including the real Host title loops).
+#   maxJournalEvents — EventStore envelope count; the unique causal flow snapshots at 511 and
+#                      teardown may land three already-in-flight durable commits, so 514 is the
+#                      full Host lifetime ceiling.
+#   maxSseEvents     — OpenCode SSE excluding server.heartbeat; K2 + real Host title loops calibrate
+#                      the legal transport lifetime to an observed upper bound of 2549.
 #                      Both are fail-closed runaway ceilings, not wall-clock budgets.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
-# Headroom kept after canary wrapper noise; Manager does not advertise todowrite yet.
-setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["native-todo-title", "native-todo", "strength-canary-title", "strength-canary-replica", "strength-canary-owner", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run" }, maxJournalEvents = 515, maxSseEvents = 2537, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", ".wanxiang/casebook/.keep" = "" } } }
+setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["native-todo-title", "native-todo", "strength-canary-title", "strength-canary-replica", "strength-canary-owner", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 514, maxSseEvents = 2549, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", ".wanxiang/casebook/.keep" = "" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 
@@ -85,22 +85,23 @@ must = [
   "coder.0",
   "coder.1",
   "continue.0",
+  "manager-idle.0",
+  "manager-idle.1",
   "manager-finality-revise.0",
-  "mgr-finish.0",
-  "mgr-bless.0",
   "manager-finality-reviewer.0",
   "conflict-resume.0",
   "coder-resolve.0",
   "barrier-reviewer.0",
   # orch.2 = join harvest text after Published (orch-unhappy Stroke 6). EXEC-016
-  # orch-join-guard remains declared optional for the outstanding-Manager race.
   "orch.2",
 ]
 
 flow = [
-  # STRENGTH-011 real Host dry-run canary: one nested readonly Replica request,
-  # no K+1 delivery and no Prepared/Candidate intervention into the owner.
+  # STRENGTH-003/011 real Host K2 dry-run canary: two nested readonly Replica
+  # requests, request #1 replays as a complete batch into #2, and request #3 is
+  # physically blocked before provider delivery. Dry-run never prepares/injects Candidate bytes.
   { assertDeliveries = { id = "strength-canary-replica.0", eq = 1 } },
+  { assertDeliveries = { id = "strength-canary-replica.1", eq = 1 } },
   { assertDeliveries = { id = "strength-canary-owner.0", eq = 1 } },
   { assertDeliveries = { id = "g2-inspector-q1.0", eq = 1 } },
   { assertDeliveries = { id = "g2-inspector-q2.0", eq = 1 } },
@@ -125,9 +126,8 @@ flow = [
   # Manager: fork → join; join stays in flight while child held.
   # Host evidence (StaticTools.knownToolNames + Manager permission matrix) does not
   # advertise builtin todowrite on Manager provider tools — requiring tools=["todowrite"]
-  # here fails toolsGate and lets optional manager-repair steal the "#" opening prefix,
-  # which stalled wait=manager.0 with no MOCK-FATAL. A/E/G/H assert uses wire evidence.
-  # WorkActivated for AgentOwnerRoot arrives later (first suicide migration) — see mgr-finish.
+  # here fails toolsGate. A/E/G/H assert uses wire evidence.
+  # WorkActivated for AgentOwnerRoot arrives later (first suicide migration) — see manager-idle.
   # All Manager prompts MUST use session="child" (bindChild); default session is Orchestrator.
   { wait = "manager.0" },
   { wait = "manager.1" },
@@ -140,33 +140,30 @@ flow = [
   { wait = "mgr-labor.1" },
   { wait = "mgr-labor.2" },
 
-  # Sole provider-error (fallback.toml): fault never waits as expectation.
-  { prompt = { agent = "fast-manager", text = "Provider round for long-stroke fallback." }, session = "child" },
+  # Normal Manager idle continuation owns the next same-lane action. Delivery #1
+  # receives the sole provider-error fault; the Host fallback continuation then
+  # completes, and delivery #2 of the same step performs the first legal suicide.
+  # No external Manager prompt races the Host continuation.
+  { wait = "manager-idle.0" },
   { awaitTerminal = true, requireAssistantTerminal = true, requireIdleAfterActivity = true, session = "child" },
   { wait = "continue" },
   { waitFact = { name = "FallbackCursorAdvanced", eq = 1 } },
-
-  # First legal suicide → AgentOwnerRoot migration Life (WorkActivated) → Host finality REVISE
-  # After FinalityRejected Host may idle-nudge (manager-guard) instead of mgr-finish.1 text;
-  # repair continues via a fresh MARK-REPAIR HumanRoot (manager-unhappy shape).
-  { prompt = { agent = "fast-manager", text = "Continue the long stroke: seek a legal ending for publish_proof.txt after fallback." }, session = "child" },
-  { wait = "mgr-finish.0" },
+  { wait = "manager-idle.0" },
   { waitFact = { name = "WorkActivated", eq = 1 } },
   { wait = "manager-finality-revise.0" },
   { wait = "manager-finality-revise.1" },
   { waitFact = { name = "FinalityRejected", gte = 1 } },
 
-  # Repair → dual PERFECT → Blessed → last_words / LifeCompleted
-  { prompt = { agent = "fast-manager", text = "MARK-REPAIR: ensure publish_proof.txt is exact, then seek a blessed ending." }, session = "child" },
-  { wait = "mgr-bless.0" },
+  # Same physical ManagerIdle turn repairs, then seeks dual-PERFECT blessing.
+  { wait = "manager-idle.1" },
   { wait = "coder-fix.0" },
-  { wait = "mgr-bless.1" },
-  { wait = "mgr-bless.2" },
+  { wait = "manager-idle.2" },
+  { wait = "manager-idle.3" },
   { wait = "manager-finality-reviewer.0", timeoutMs = 30000 },
   { wait = "manager-finality-reviewer.1", timeoutMs = 30000 },
   { waitFact = { name = "FinalityBlessed", gte = 1, renewOn = ["ReviewVerdictRecorded", "ConfirmedReviewWitness", "FinalityReviewerEnlisted", "BlogObservationCommitted"] }, timeoutMs = 180000 },
-  { wait = "mgr-bless.3", timeoutMs = 30000 },
-  { wait = "mgr-bless.4", timeoutMs = 30000 },
+  { wait = "manager-idle.4", timeoutMs = 30000 },
+  { wait = "manager-idle.5", timeoutMs = 30000 },
   { waitFact = { name = "LifeCompleted", gte = 1 } },
   { waitFact = { name = "CandidateReady", eq = 1 }, timeoutMs = 60000 },
 
@@ -230,7 +227,11 @@ tools = ["glob", "grep", "read"]
 forbiddenTools = ["bash-honeypot", "edit", "fetch", "inspector", "js-coder", "mv", "rm", "write"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "read", args = { filePath = "README.md" } }
+  respond = { type = "tool-calls", calls = [{ tool = "read", args = { filePath = "README.md" } }, { tool = "read", args = { filePath = "AGENTS.md" } }] }
+
+  [[turn.step]]
+  runtimeStep = 1
+  respond = { type = "tool-call", tool = "read", args = { filePath = ".wanxiang/casebook/.keep" } }
 
 [[turn]]
 id = "strength-canary-owner"
@@ -392,16 +393,6 @@ tools = ["fork", "join", "list", "suicide"]
   [[turn.step]]
   respond = { type = "text", text = "Join harvested after user_message wake; continue." }
 
-# Faulted delivery — not in must / wait= (fallback.toml).
-[[turn]]
-id = "provider-fail"
-lane = "fast-manager"
-user = "Provider round for long-stroke fallback."
-tools = ["fork", "join", "list", "suicide"]
-
-  [[turn.step]]
-  respond = { type = "text", text = "unreachable: the first delivery is refused" }
-
 [[turn]]
 id = "continue"
 internal = true
@@ -415,33 +406,19 @@ turn = "continue"
 step = 0
 reason = "prefix-probe"
 
-# After fallback: first legal suicide → REVISE (text ends this turn).
+# GLORY-029 normal Manager idle continuation. The first physical occasion is
+# refused by the sole provider-error fault; fallback then causes a second
+# physical occasion. Both are the same declared step and therefore share one
+# delivery counter. The successful second occasion owns the rest of the Manager
+# tool loop, so no same-lane external prompt races it.
 [[turn]]
-id = "mgr-finish"
-lane = "fast-manager"
-user = "Continue the long stroke: seek a legal ending for publish_proof.txt after fallback."
+id = "manager-idle"
+internal = true
+user = ["# You are doing well.", "# You have plenty of time.", "# You can continue.", "# When nothing useful remains, call suicide."]
 tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "suicide", args = { last_words = "first ending" } }
-
-  # Optional: same-turn text after REVISE; Host often idle-nudges instead (manager-guard).
-  [[turn.step]]
-  optional = true
-  respond = { type = "text", text = "First ending rejected after REVISE; repairing." }
-
-# Fallback continuation + Host rebuild can rewrite the Manager prefix before first legal suicide.
-[[epoch]]
-turn = "mgr-finish"
-step = 0
-reason = "prefix-probe"
-
-# Fresh HumanRoot after REVISE: repair coder + Host dual-PERFECT blessing + last_words.
-[[turn]]
-id = "mgr-bless"
-lane = "fast-manager"
-user = "MARK-REPAIR: ensure publish_proof.txt is exact, then seek a blessed ending."
-tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Ensure publish_proof.txt contains exactly: Published by long-stroke canary" } }
@@ -457,6 +434,11 @@ tools = ["fork", "join", "list", "suicide"]
 
   [[turn.step]]
   respond = { type = "text", text = "Manager rest in peace." }
+
+[[epoch]]
+turn = "manager-idle"
+step = 0
+reason = "prefix-probe"
 
 [[turn]]
 id = "coder"
@@ -522,68 +504,6 @@ tools = ["verdict"]
 
   [[turn.step]]
   respond = { type = "text", text = "Manager finality reviewer confirmed." }
-
-[[turn]]
-id = "manager-guard"
-internal = true
-optional = true
-user = ["# You are doing well.", "# You have plenty of time.", "# You can continue.", "# When nothing useful remains, call suicide."]
-tools = ["fork", "join", "list", "suicide"]
-
-  [[turn.step]]
-  respond = { type = "text", text = "Manager continues." }
-
-[[turn]]
-id = "mgr-join-guard"
-internal = true
-optional = true
-user = ["# Background work is still outstanding.", "# Call join to collect completed results before finishing."]
-tools = ["fork", "join", "list", "suicide"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "join", args = {} }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Manager joined." }
-
-# EXEC-016 twin on Orchestrator while ManagerJob is still outstanding (orch-restart-publish).
-# Long Stroke adversity keeps the Manager alive long enough that this path is the shell
-# completion (join blocks until Published; step 1 is the clean shutdown text).
-[[turn]]
-id = "orch-join-guard"
-internal = true
-optional = true
-user = ["# Background work is still outstanding.", "# Call join to collect completed results before finishing."]
-tools = ["fork-manager", "join"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "join" }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Long stroke publish completed after conflict resume." }
-
-[[turn]]
-id = "manager-repair"
-internal = true
-optional = true
-user = "#"
-tools = ["fork", "join", "list", "suicide"]
-
-  [[turn.step]]
-  respond = { type = "text", text = "Manager continues after repair." }
-
-[[turn]]
-id = "reviewer-repair"
-internal = true
-optional = true
-user = ["# Your previous response did not submit a verdict.", "# Continue the review and submit PERFECT or REVISE with the verdict tool."]
-tools = ["verdict"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Repaired Reviewer submitted the tool verdict." }
 
 # ORCH-007 conflict resume — same Manager session; do NOT restart original task.
 [[turn]]
@@ -1100,7 +1020,7 @@ reason = "frame-commit"
 
 # Sole physical fault: one settled non-retryable provider-error (no AABB here).
 [[fault]]
-turn = "provider-fail"
+turn = "manager-idle"
 step = 0
 delivery = "provider-error"
 status = 400

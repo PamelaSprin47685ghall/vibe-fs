@@ -23,9 +23,19 @@ export function sendSSE(res, chunks) {
 }
 
 export function buildToolCallChunks(id, name, argsStr, promptTokens) {
+  return buildToolCallsChunks(id, [{ name, argsStr }], promptTokens);
+}
+
+export function buildToolCallsChunks(id, calls, promptTokens) {
+  const toolCalls = calls.map((call, index) => ({
+    index,
+    id: calls.length === 1 ? id : `${id}_${index + 1}`,
+    type: 'function',
+    function: { name: call.name, arguments: call.argsStr },
+  }));
   return [
     { id, object: 'chat.completion.chunk', created: 1, model: 'mock', choices: [{ index: 0, delta: { role: 'assistant', content: null }, finish_reason: null }] },
-    { id, object: 'chat.completion.chunk', created: 1, model: 'mock', choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id, type: 'function', function: { name, arguments: argsStr } }] }, finish_reason: null }] },
+    { id, object: 'chat.completion.chunk', created: 1, model: 'mock', choices: [{ index: 0, delta: { tool_calls: toolCalls }, finish_reason: null }] },
     { id, object: 'chat.completion.chunk', created: 1, model: 'mock', choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }], usage: { prompt_tokens: promptTokens, completion_tokens: 100, total_tokens: promptTokens + 100 } },
   ];
 }

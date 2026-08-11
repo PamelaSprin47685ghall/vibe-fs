@@ -82,6 +82,14 @@ module StrengthSettings =
         | Some value -> String.Equals(value, HostCanaryFingerprint, StringComparison.Ordinal)
         | None -> false
 
+    /// Host-canary only. DryRun never publishes Prepared or changes primary bytes,
+    /// so K2 can be exercised independently of treatment/economic activation.
+    /// Missing or malformed input stays on the established K1 canary path.
+    let dryRunBudget () : StrengthBudget =
+        match env "WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET" |> Option.bind StrengthBudget.parse with
+        | Some StrengthBudget.K2 -> StrengthBudget.K2
+        | _ -> StrengthBudget.K1
+
     let load () : StrengthRolloutConfig =
         let k1Margin =
             nonNegativeFloat "WANXIANGSHU_STRENGTH_K1_MARGIN" |> Option.defaultValue 0.0

@@ -19,6 +19,8 @@ import {
   agentJournal,
   commitHash,
   managerJobId,
+  mapEntries,
+  physicalUser,
   resultOf,
   reviewBarrierId,
   sessionId,
@@ -87,7 +89,9 @@ const fakeSessions = (behaviour = {}) => {
     },
     SendPrompt: async (...args) => {
       calls.push(['SendPrompt', ...args])
-      return { tag: 0, fields: [] }
+      behaviour.onSendPrompt?.(...args)
+      if (behaviour.sendPromptError) return { tag: 4, fields: [behaviour.sendPromptError] }
+      return { tag: 1, fields: [physicalUser('msg_fake_prompt')] }
     },
     SendPromptAsync: async (...args) => {
       calls.push(['SendPromptAsync', ...args])
@@ -366,6 +370,38 @@ test('HOST_terminateChildren_tears_down_manager_and_reviewer_children', async ()
   live.cleanup()
 })
 
+test('HOST_reverify_durably_opens_barrier_before_first_reviewer_prompt', async () => {
+  let live
+  let barrierVisibleAtSend = false
+  live = liveOrchestrator({
+    sessionBehaviour: {
+      onSendPrompt: (reviewerId) => {
+        const reviewerKey = reviewerId?.fields?.[0] ?? reviewerId
+        const projection = mapEntries(agentJournal.snapshot(live.journal).AgentProjections.Sessions)
+          .find(([sid]) => (sid?.fields?.[0] ?? sid) === reviewerKey)?.[1]
+        barrierVisibleAtSend = projection?.ReviewGuard != null
+      },
+      sendPromptError: 'stop-after-order-probe',
+    },
+  })
+  const worktree = gitDir('rv-order')
+  try {
+    const result = resultOf(
+      await live.host.managerPort.Reverify(
+        managerJobId('hostfw-order'),
+        sessionId('ses_mgr_order'),
+        worktreePath(worktree),
+        reviewBarrierId('bar_order'),
+      ),
+    )
+    assert.equal(result.ok, false, 'probe intentionally fails the transport after observing send order')
+    assert.equal(barrierVisibleAtSend, true, 'reviewer provider lane must not start before ReviewBarrierStarted is durable')
+  } finally {
+    live.cleanup()
+    rmSync(worktree, { recursive: true, force: true })
+  }
+})
+
 test('HOST_reverify_forks_a_deep_reviewer_and_fails_closed_without_a_journal', async () => {
   const live = liveOrchestrator({ journal: false })
   const worktree = gitDir('rvf')
@@ -379,10 +415,11 @@ test('HOST_reverify_forks_a_deep_reviewer_and_fails_closed_without_a_journal', a
       ),
     )
     assert.equal(result.ok, false)
-    assert.match(result.error, /Cannot create reviewer.*No journal/, 'reverify without a journal fails closed')
+    assert.match(result.error, /Cannot open review barrier.*AgentJournal/, 'reverify without a journal fails closed before lane start')
 
     const created = live.sessions.calls.filter(([name]) => name === 'CreateChildSession')
-    assert.ok(created.length >= 1, 'a reviewer child session was forked')
+    assert.ok(created.length >= 1, 'a reviewer child session was prepared')
+    assert.equal(live.sessions.calls.filter(([name]) => name === 'SendPrompt').length, 0, 'no reviewer prompt is sent before a durable barrier exists')
     assert.equal(live.host.runtime.children.has('hostfw14-reviewer-bar_14'), true)
   } finally {
     live.cleanup()

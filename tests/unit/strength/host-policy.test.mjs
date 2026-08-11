@@ -33,6 +33,18 @@ test('STRENGTH_011_dry_run_is_an_explicit_non_default_host_canary_mode', () => {
   })
 })
 
+test('STRENGTH_011_dry_run_budget_defaults_to_k1_and_requires_explicit_k2_canary_opt_in', () => {
+  withEnv('WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET', undefined, () => {
+    assert.equal(caseOf(Settings.dryRunBudget()), 'K1')
+  })
+  withEnv('WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET', 'K2', () => {
+    assert.equal(caseOf(Settings.dryRunBudget()), 'K2')
+  })
+  withEnv('WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET', 'garbage', () => {
+    assert.equal(caseOf(Settings.dryRunBudget()), 'K1', 'malformed canary budget fails safe to K1')
+  })
+})
+
 test('STRENGTH_011_default_settings_are_shadow_k0_with_economic_holdout_and_no_k2_enablement', () => {
   // Default Host settings: Shadow, no cost template, canary unhealthy, 10%
   // control holdout kept. This is not a live Host canary and does not enable K2.

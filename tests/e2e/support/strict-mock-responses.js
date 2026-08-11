@@ -1,4 +1,4 @@
-import { buildToolCallChunks, buildTextChunks, sendJSON } from './strict-mock-sse.js';
+import { buildToolCallChunks, buildToolCallsChunks, buildTextChunks, sendJSON } from './strict-mock-sse.js';
 import { decorateLegacyArgs } from './strict-mock-decorate.js';
 
 const MOCK_MODEL = 'mock';
@@ -43,7 +43,7 @@ async function respondStream(res, chunks, exp) {
   res.end();
 }
 
-function toolCallChunks(id, exp, parsed, strict, promptTokens, state) {
+function toolArgs(exp, parsed, strict, state) {
   const args = typeof exp.respond.args === 'function'
     ? exp.respond.args(parsed)
     : { ...exp.respond.args };
@@ -52,7 +52,11 @@ function toolCallChunks(id, exp, parsed, strict, promptTokens, state) {
     if (rewritten && typeof rewritten === 'object') Object.assign(args, rewritten);
   }
   if (!strict) decorateLegacyArgs(args);
+  return args;
+}
 
+function toolCallChunks(id, exp, parsed, strict, promptTokens, state) {
+  const args = toolArgs(exp, parsed, strict, state);
   const argsText = exp.respond.malformedArgs
     ? '{malformed_json_arguments:'
     : JSON.stringify(args);
@@ -63,6 +67,14 @@ function toolCallChunks(id, exp, parsed, strict, promptTokens, state) {
   if (exp.respond.fragmentArgs) return fragmentedToolCallChunks(id, exp, argsText, promptTokens);
   if (exp.respond.duplicateToolCallId) return duplicateToolCallChunks(id, exp, argsText, promptTokens);
   return buildToolCallChunks(id, exp.respond.tool, argsText, promptTokens);
+}
+
+function multiToolCallChunks(id, exp, parsed, strict, promptTokens, state) {
+  const calls = (exp.respond.calls ?? []).map((call) => {
+    const callExp = { ...exp, respond: { ...exp.respond, ...call, type: 'tool-call' } };
+    return { name: call.tool, argsStr: JSON.stringify(toolArgs(callExp, parsed, strict, state)) };
+  });
+  return buildToolCallsChunks(id, calls, promptTokens);
 }
 
 function fragmentedToolCallChunks(id, exp, argsText, promptTokens) {
@@ -157,6 +169,8 @@ export async function respond(state, res, exp, parsed) {
 
   const chunks = exp.respond.type === 'tool-call'
     ? toolCallChunks(id, exp, parsed, state.strict, promptTokens, state)
+    : exp.respond.type === 'tool-calls'
+      ? multiToolCallChunks(id, exp, parsed, state.strict, promptTokens, state)
     : exp.respond.emptyAssistant
       ? buildTextChunks(id, '', promptTokens)
       : exp.respond.reasoningOnly

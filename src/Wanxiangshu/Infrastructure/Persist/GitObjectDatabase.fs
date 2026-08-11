@@ -84,10 +84,28 @@ module GitObjectDatabase =
 
     /// Write via temp + rename, the way Git writes a loose object: a reader either sees the
     /// complete object or no file at all, never a truncated prefix.
+    ///
+    /// Git maintenance is an external writer to the same ODB and may remove an
+    /// empty `objects/xx` directory between our existence check and open(2). The
+    /// object is content-addressed, so one bounded retry is deterministic: if a
+    /// competing writer already installed `file`, the desired effect exists;
+    /// otherwise recreate the prefix directory and retry with a fresh sibling.
     let private writeBytesAtomic (file: string) (bytes: byte[]) =
-        let temp = tempSibling file
-        writeFileSyncBinary temp (asBuffer bytes)
-        renameSync temp file
+        let directory = file.Substring(0, file.LastIndexOf '/')
+
+        let rec write remaining =
+            ensureDirectory directory
+            let temp = tempSibling file
+
+            try
+                writeFileSyncBinary temp (asBuffer bytes)
+                renameSync temp file
+            with error ->
+                if existsSync file then ()
+                elif remaining > 0 then write (remaining - 1)
+                else raise error
+
+        write 1
 
     /// `sha1` of the framed object bytes — the oid Git itself would assign.
     let private sha1Hex (framed: byte[]) : string =

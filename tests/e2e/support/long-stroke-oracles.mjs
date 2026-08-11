@@ -390,6 +390,32 @@ export async function oracleLongStroke(scenario, _ctx) {
     1,
     'long-stroke: orch-shell requires exactly one ManagerJobCreated',
   );
+  assert.equal(
+    scenario.provider.matchCount('manager-idle.0'),
+    2,
+    'long-stroke determinism: ManagerIdle step 0 must have exactly two physical deliveries (fault then suicide)',
+  );
+  for (const id of ['manager-idle.1', 'manager-idle.2', 'manager-idle.3', 'manager-idle.4', 'manager-idle.5']) {
+    assert.equal(
+      scenario.provider.matchCount(id),
+      1,
+      `long-stroke determinism: ${id} must be delivered exactly once on the same Manager lane`,
+    );
+  }
+
+  const managerIdleClaims = factPayloads(workDir, 'PluginPromptClaimed')
+    .filter((payload) => payload?.ContinuationKind === 'ManagerIdleEncouragement');
+  const terminalPromptKeys = new Set([
+    ...factPayloads(workDir, 'PluginPromptPhysicalAccepted'),
+    ...factPayloads(workDir, 'PluginPromptAbandoned'),
+  ].map((payload) => payload?.PromptKey?.[1]).filter(Boolean));
+  for (const claim of managerIdleClaims) {
+    const key = claim?.PromptKey?.[1];
+    assert.ok(
+      key && terminalPromptKeys.has(key),
+      `long-stroke determinism: ManagerIdle PromptKey ${key ?? '<missing>'} must not remain unresolved after transport`,
+    );
+  }
 }
 
 /** waitFact presets mirroring long-stroke.toml flow barriers. */
@@ -418,7 +444,7 @@ export const ADVERSITY_CHECKLIST = Object.freeze([
   {
     id: 'provider-transient-failure',
     covered: true,
-    injection: '[[fault]] provider-error on provider-fail (sole fault row)',
+    injection: '[[fault]] provider-error on manager-idle.0 delivery #1 (sole fault row)',
     oracle: 'assertProviderTransientFailure',
   },
   {

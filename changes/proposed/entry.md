@@ -27,7 +27,7 @@ Proposal 相互覆盖时如何落地
 
 Unified Storage / Session / Casebook 等 cutover 是 **clean break**：旧 Journal / Blob / feature-owned store 上的历史数据可以丢弃或留在原地不再读取；新世界只认最终 EventStore 语义。禁止为“迁旧数据”“双向兼容”“旧档可读性”投入工期。
 
-**进度快照最后同步：** 2026-08-11 下班（§0.1 是 observational living status，不覆盖后文 Product Exit Gate。G0/G1/G3/G3.5/G4 DONE；G5 DONE-with-amendment（C-3 user裁决）；G2/G6/G7/G8/G9 PARTIAL。见 §0.5 交接。）
+**进度快照最后同步：** 2026-08-11 收口（§0.1 是 observational living status，不覆盖后文 Product Exit Gate。G0/G1/G3/G3.5/G4 DONE；G5 DONE-with-amendment（C-3 user裁决）；G2/G6/G7/G8/G9 PARTIAL。见 §0.5 交接。）
 
 > **Living status：** §0.1 Gate 总览是观察快照，不是对历史 Gate 正文的覆盖权。后文 G2 Exit、G6-E/F/G、G7 Exit、G8、G9 等 Product Exit Gate 仍是验收基线。
 
@@ -35,7 +35,7 @@ Unified Storage / Session / Casebook 等 cutover 是 **clean break**：旧 Journ
 
 ```text
 Active:
-  changes/active/strength.md       — G8 PARTIAL：K0 policy/transform unit proofs in tests/unit/strength/*；非 live Host canary；**不** claim K1/K2/shadow DONE；Change 仍 active，交并行 owner 续做；勿 playbook-close
+  changes/active/strength.md       — G8 PARTIAL：K1/K2 request-budget / readonly Host 机制已有 unit + 唯一 Long Stroke real-Host/mock-LLM proof；K2 恰好允许 request #2、request #3 外发前停止。Proposal 自身的 economic/quality/control completion criteria 仍未满足；Change 保持 active，勿 playbook-close
 
 Completed（本 Playbook 相关）:
   changes/completed/causal-ce-observability.md
@@ -47,7 +47,7 @@ Completed（本 Playbook 相关）:
   changes/completed/rulebook.md                         — G7 PARTIAL（mechanical A37/A38 production 120 GREEN after authoring；HUMAN_ONLY remaining；not Exit）
 
 Proposed（Playbook 本身 + 独立 Lane）:
-  changes/proposed/entry.md        — 本文件；Integration Playbook，不是产品 Change；不迁 completed
+  changes/proposed/entry.md        — 本文件；Integration Playbook。按 2026-08-11 用户裁决：只有全部 Product Exit Gate 真正满足后才迁 `completed/`；当前仍未完成，保持 proposed
   changes/proposed/magic-todo.md   — 不在本 Playbook Gate 序列内；保持 proposed；不入 G0–G9 gates
 ```
 
@@ -96,10 +96,10 @@ Strength
 | **G5** JS Capability-Projected Tools | **DONE-with-amendment** | `changes/completed/js-capability-projected-tools.md` Final outcome；Amendment C-3 (2026-08-10 user裁决): builtin `read`/`edit`/`write`/`glob`/`grep`/`patch` retained, coexists with js-ROLE; legacy-absent clause superseded. |
 | **G6** perm-inspector + Casebook | **PARTIAL** | Observational APIs（**not** Exit）：`BookkeeperRuntime.setSessionPort` / `runTransaction` / `isAttached` / `tryTxId`；`EditQaTool.execute`（document `Q.md`\|`A.md`, unique `old_text`）；`BookkeeperStaging.begin`/`read`/`replace`/`take`/`abort`。`AttachmentKind.Bookkeeper` `txId` lives in `BookkeeperRuntime`, not child options。digest synthesizer **gone** from `CasebookBookkeeper`。`SpikePlugin` calls `BookkeeperRuntime.setSessionPort` at `createHost`；`tryFinalizeInspector` is `Task`。`G6HostPathE2E` landed（**not** Exit）：`HostSignalBootstrap` SessionDeleted awaits `tryFinalizeInspector` Task before CancelSession；`SpikePlugin` passes `CasebookLifecycle.tryFinalizeInspector` (`Task`) and `BookkeeperRuntime.setSessionPort`。`tests/unit/casebook/g6-inspector-tool-finalize-fetch.test.mjs` is inspector-tool → SyncDelegate → lifecycle → Bookkeeper → fetch，**not** live Host LLM / `tool.execute.before` Long Stroke。G2 `promptModel` not removed。live Host LLM / Host e2e Remaining。 |
 | **G7** Rulebook | **PARTIAL** | Observation events DONE。mechanical A37/A38 on production 120 **GREEN** after authoring wave（root-cause + who owns）。**not** G7 Exit。`HUMAN_ONLY_RUBRIC_ITEMS` remain paired-history 120 / A39 pair review / A40 tournament。Machine evidence（**not** human Exit）：`tests/unit/enforcer/paired-history-eval.test.mjs`（catalog+history identity, **not** true-repeat oracle）；`scripts/checks/enforcer-cross-family-collision.mjs`（lexical A40, **not** human tournament）。 |
-| **G8** Strength | **PARTIAL** | Change 仍 `changes/active/strength.md`（并行 owner）。Policy/transform **unit** proofs only（not live Host canaries, not K1/K2 DONE）：`tests/unit/strength/{host-canary-k0,host-policy,replica-transform,projection-algebra}.test.mjs` — `StrengthPolicy.decideFromFacts` / eligibility / budgetOf；`StrengthSettings.load` / `HostCanaryFingerprint` / `hostCanaryHealthy`；`StrengthReplicaTransform.apply`；`StrengthReplicaTools.exactReadonlyHostToolMap`；`StrengthFrame.isAllowedTool`；`StrengthReplicaAssociationHints`；`SatelliteKind.Companion` only；`PromptAuthority.systemPromptIdFor` / `toolCapabilitiesFor(..., StrengthReplica)`。G7 未 full Exit；G8 仍 active PARTIAL。 |
+| **G8** Strength | **PARTIAL** | Change 仍 `changes/active/strength.md`。K1/K2 request-budget 与 readonly Host 机制已同时有 unit + 唯一 Long Stroke real-Host/mock-LLM proof：K2 replica request #1 可含并行 readonly batch 且按一个 request 计数；request #2 可消费完整 batch；request #3 在物理 provider 外发前被 budget 停止。真实 title loops 保留。此证明只关闭机制义务；Strength Completion criteria 仍要求 shadow/control 可识别经济证据、稳定 eligible cohort 的 K1 正净收益、质量指标无不可接受退化，且 K2 独立通过，因此 G8 仍 active PARTIAL。 |
 | **G9** Global Convergence | **PARTIAL** | smoke-check only, not full release-close。Cite: `scripts/checks/session-ownership-ratchet.mjs` + `session-ownership-matrix.json` + `tests/unit/verify/session-ownership-ratchet.test.mjs`（wired in `scripts/check.mjs`）。Closed kinds: Companion, SyncInspector, SyncCoder, Bookkeeper, hidden Reviewer, StrengthReplica, fork agent, Executor child。Bookkeeper `evidencePath` moved to `src/Wanxiangshu/Infrastructure/BookkeeperRuntime.fs` after G6 landed that runtime（was `SessionOwnership.fs`）。Symbol/storage/capability ratchets remain separate。 |
 
-**当前主线位置：** G0/G1/G3/G3.5/G4 DONE；G5 DONE-with-amendment（C-3）；G2/G6/G7/G8/G9 PARTIAL。entry 保持 `proposed/`。§0.1 为观察快照，不覆盖后文 Exit Gate。
+**当前主线位置：** G0/G1/G3/G3.5/G4 DONE；G5 DONE-with-amendment（C-3）；G2/G6/G7/G8/G9 PARTIAL。entry 因 Product Exit 尚未全满足而保持 `proposed/`；全部 Gate 真正收口后按用户裁决迁 `completed/`。§0.1 为观察快照，不覆盖后文 Exit Gate。
 
 ## 0.2 自 Playbook 落地以来关键 commit（`31d456ec` 之后）
 
@@ -126,12 +126,12 @@ ac41ef8f  session abort diagnostic
 |---|---|
 | 静态 ratchet：`student-teacher-absence`（含 `SatelliteKind.Replica` 禁止）+ `session-ownership-ratchet` + `unified-store-gate` + `g4r-*` | **GREEN** |
 | `enforcer-rulebook-gate --require-headings --strict` + `capability-isomorphism-gate` + `session-ownership-ratchet` | **PARTIAL**（G7: mechanical A37/A38 production 120 GREEN; HUMAN_ONLY not claimed。G9: ownership ratchet smoke-check, not release-close） |
-| `npm run check`（lint + build + unit + integration） | **BLOCKED（非本 Lane）**：`scripts/check.mjs` 只剩 `changes/proposed/fission.md:2269-2271` 的三个悬空 AGENT 条款引用；本班按 ownership 裁决未改 fission。其余 build / unit / integration 已独立 GREEN。 |
-| unit | **2300 / 2300 PASS** |
-| `npm run test:e2e` Long Stroke | **GREEN**（59 steps；真实 title loops 保留；full Host lifetime ceiling `journal=515` / `SSE=2537`；A/E/G/H + Strength dry-run + G2/G6 全链通过；多连稳定） |
+| `npm run check`（lint + build + unit + integration） | **BLOCKED（非本 Lane）**：`scripts/check.mjs` 只剩 `changes/proposed/blockedForNow/fission.md` 的三个悬空条款引用；本班按 ownership 裁决未改 fission。其余 build / unit / integration 已独立 GREEN。 |
+| unit | **2308 / 2308 PASS** |
+| `npm run test:e2e` Long Stroke | **GREEN**（58 steps；真实 title loops 与正常 ManagerIdle loops 全保留并 mock；full Host lifetime ceiling `journal=514` / `SSE=2549`；A/E/G/H + Strength K2 dry-run + G2/G6 + adversity spine 全链通过；最终因果脚本 20 连稳定） |
 | Storage G4 / JS G5 | **DONE / DONE-with-amendment(C-3)** |
 | Universal+perm-inspector G6 / Rulebook G7 | **PARTIAL / PARTIAL** — G6 digest gone；BookkeeperRuntime+edit-qa landed；唯一 Long Stroke 已真实走本机 OpenCode + mock LLM 的 Inspector Q1→Q3 reuse → owner recursive delete → Bookkeeper CaseFinalize → later Coder cold `fetch`，但这仍是 mock-Host 证明，不覆盖原 Gate 的全部 Exit；G7 mechanical A37/A38 production 120 GREEN; HUMAN_ONLY remaining |
-| 已知 residual | G2 PREFIX LAW 已同时有 unit 与唯一 Long Stroke live Host mock 证明，但不得据此把原 G2 Exit 改 DONE。G6 同理已有 live Host mock finalize/fetch 证明，仍非全部 Exit。Strength dry-run 已有真实 nested Replica + K1 Host proof，K2 / active strength Change 仍由并行 owner 收口。G7 HUMAN_ONLY（paired-history 120 / A39 / A40）。G9 release-close 仍开着。magic-todo A/E/G/H real Host canary GREEN，但 Change 仍 proposed。 |
+| 已知 residual | G2 PREFIX LAW 已同时有 unit 与唯一 Long Stroke live Host mock 证明，但不得据此把原 G2 Exit 改 DONE。G6 同理已有 live Host mock finalize/fetch 证明，仍非全部 Exit。Strength K1/K2 Host request-budget 机制已证明，但 economic/quality/control Completion criteria 未满足，Change 仍 active。G7 HUMAN_ONLY（paired-history 120 / A39 / A40）。G9 release-close 仍开着。magic-todo A/E/G/H real Host canary GREEN，但 Change 仍 proposed。 |
 
 ## 0.4 合法中间状态（现在）— **G0/G1/G3/G3.5/G4 DONE; G5 DONE-with-amendment; G2/G6/G7/G8/G9 PARTIAL**
 
@@ -146,10 +146,10 @@ ac41ef8f  session abort diagnostic
 ◐ G2：runtime reuse + PREFIX LAW unit green；唯一 Long Stroke 又以真实本机 OpenCode 验证同一 Inspector child 的 Q1→Q2→Q3 provider-wire append-only prefix；G2 Exit 仍未全满足
 ◐ G6：digest gone；BookkeeperRuntime+edit-qa landed；唯一 Long Stroke 已走真实 Host 的 recursive `session.deleted` → CaseFinalize → Bookkeeper → later Coder cold fetch；digest deletion / mock-Host proof ≠ 全部 synthesis Exit
 ◐ G7：Observation events DONE；mechanical A37/A38 production 120 GREEN after authoring（root-cause + who owns）；HUMAN_ONLY remaining；identity/lexical machine evidence ≠ human Exit
-◐ Strength：unit + 唯一 Long Stroke dry-run nested Replica / K1 GREEN；K2 未证明；Change 仍 active/strength.md（并行 owner；G8 PARTIAL）
+◐ Strength：unit + 唯一 Long Stroke dry-run nested Replica / K1/K2 request-budget 机制 GREEN；K2 request #2 可执行、#3 外发前停止。economic/quality/control Completion criteria 仍开着；Change 保持 active/strength.md（G8 PARTIAL）
 ◐ G9：`session-ownership-ratchet.mjs` smoke-check（kinds closed；Bookkeeper evidencePath now `src/Wanxiangshu/Infrastructure/BookkeeperRuntime.fs`）；symbol/storage/capability ratchets 另轨；非 full release close
 ○ magic-todo — 独立 Lane；保持 proposed；不入主 Gate
-○ entry — Playbook；保持 proposed；不迁 completed
+○ entry — Playbook；当前因 G2/G6/G7/G8/G9 Product Exit 未全满足而保持 proposed；全部 Gate 真正完成后按用户裁决迁 completed
 ```
 
 ---
@@ -161,24 +161,24 @@ ac41ef8f  session abort diagnostic
 **用户当场裁决（下一班必须遵守）：**
 
 1. Long Stroke = **mock LLM + 本机已安装的 OpenCode**，不是付费真模型。G2/G6/G8 的 Host 证明走这一条，**禁止**另开第二条 e2e。
-2. **不准提升超时**（含 `WATCHDOG` / wall / waitFact 预算）。事件 ceiling **不是 timeout**：它只用于 fail-closed 捕获 runaway，应该按当前合法完整 Host lifetime 精确校准；不要为了压计数删 title loop 或其它正常 Host 流量。当前校准为 `maxJournalEvents=515`、`maxSseEvents=2537`，真实 title mocks 保留。
+2. **不准提升超时**（含 `WATCHDOG` / wall / waitFact 预算）。事件 ceiling **不是 timeout**：它只用于 fail-closed 捕获 runaway，应该按当前合法完整 Host lifetime 精确校准；不要为了压计数删 title loop 或其它正常 Host 流量。当前唯一因果脚本校准为 `maxJournalEvents=514`、`maxSseEvents=2549`，真实 title mocks 与正常 ManagerIdle continuation 均保留。
 
 **本班已落地（机器，仍非原 Exit）：**
 
 - G2 unit PREFIX LAW：`tests/unit/session/g2-inspector-provider-wire-prefix.test.mjs`（fake `ISessionHostPort`）。
 - G6：digest synthesizer 已删；`BookkeeperRuntime` + `edit-qa` + `BookkeeperStaging`；`SpikePlugin.setSessionPort`；SessionDeleted await `tryFinalizeInspector`；unit `tests/unit/casebook/g6-inspector-tool-finalize-fetch.test.mjs`。
 - G7：mechanical A37/A38 生产 120 GREEN；HUMAN_ONLY 仍是 paired-history 120 / A39 / A40 tournament。
-- G8/G9：Strength dry-run 的真实 nested Replica / K1 已在唯一 Long Stroke 证明；K2 未证明；ownership ratchet 仍只是 G9 smoke，非 release-close。
-- Long Stroke 已从“接线”推进到 **GREEN**：Strength Replica mirror / K1、G2 PREFIX LAW、G6 recursive delete + Bookkeeper finalize + persisted cold fetch、Magic Todo A/E/G/H，以及原 adversity spine 全部在同一 OpenCode lifetime 通过。
-- 修复过的关键 Host 边界：Replica transform 原数组 in-place；Fable `return ()` fall-through；OpenCode completed tool-part 的 K1 batch；`session.deleted.info.parentID` 级联顺序；Coder/Inspector canonical `fetch` capability；真实 `HostToolArguments`；Canary H 的 durable `SessionId + ToolCallId + HostToolPartId → ProviderRun + XTrace range` 映射。
+- G8/G9：Strength dry-run 的真实 nested Replica / K1/K2 request-budget 机制已在唯一 Long Stroke 证明；K2 request #1 的并行 readonly batch 只计一个 request，request #2 能消费完整 batch，request #3 在物理 provider 外发前停止。Strength 的 economic/quality/control Completion criteria 仍未满足；ownership ratchet 仍只是 G9 smoke，非 release-close。
+- Long Stroke 已从“接线”推进到 **因果唯一路径 GREEN**：Strength Replica mirror / K1/K2、G2 PREFIX LAW、G6 recursive delete + Bookkeeper finalize + persisted cold fetch、Magic Todo A/E/G/H，以及原 adversity spine 全部在同一 OpenCode lifetime 通过。Manager 正常 idle continuation 被完整 mock：`manager-idle.0` 恰好两次物理 delivery（第一次 provider-error fault，第二次 suicide），其后 `.1`–`.5` 各一次；不再用 optional race turn 接住并发分叉。
+- 修复过的关键 Host 边界：Replica transform 原数组 in-place；Fable `return ()` fall-through；OpenCode completed tool-part 的 K1/K2 batch；Reviewer first prompt 改为 durable barrier 之后发送；正常 `tool-calls` 不再误触 InteractionRepair；Git loose-object prefix-dir TOCTOU 采用 content-addressed bounded retry；`session.deleted.info.parentID` 级联顺序；Coder/Inspector canonical `fetch` capability；真实 `HostToolArguments`；Canary H 的 durable `SessionId + ToolCallId + HostToolPartId → ProviderRun + XTrace range` 映射。
 - 临时 `strength-replica-bind-snapshot` 诊断已删除；F# production 已通过 Fantomas。
-- 验证：`npm run build` GREEN；`npm test` **2300/2300**；`npm run test:integration` 全绿（harness **273/273**）；`npm run test:package` GREEN；`npm pack --dry-run` GREEN；Long Stroke 在 `515/2537` ceiling 下 5 连 GREEN。`npm run check` 唯一已知 blocker 是未获批 `changes/proposed/fission.md:2269-2271` 的三个悬空 AGENT 条款引用，本班未触碰。
+- 验证：`npm run build` GREEN；`npm test` **2308/2308**；`npm run test:integration` 全绿（harness **273/273**）；`npm run test:e2e` GREEN（58 steps，`511/514` journal flow snapshot，SSE 常态 `2531–2532/2549`）；`npm run test:package` GREEN；`npm pack --dry-run` GREEN；最终因果脚本在撤销临时 arbitration 实验后 20 连 GREEN，并在最终 `514/2549` ceiling 下再 20 连 GREEN。`npm run check` 唯一已知 blocker 是未获 ownership 的 `changes/proposed/blockedForNow/fission.md` 三个悬空条款引用，本班未触碰。
 
 **下一班第一件事：**
 
-1. 不要重做 Long Stroke 已绿的 G2/G6/Strength Host 修复；先确认本交接 commit 后工作区干净。
-2. `npm run check` 若仍红，预期只会命中 `changes/proposed/fission.md:2269-2271` 的三个悬空 AGENT 条款引用；只有取得该 Change ownership 后才修。
-3. G7 120 true-repeat / A39 / A40 仍须人工；Strength K2 与 G9 release-close 仍开着。
+1. 不要重做 Long Stroke 已绿的 G2/G6/Strength K2 Host 机制；先确认本交接 commit 后工作区干净。
+2. `npm run check` 若仍红，预期只会命中未获 ownership 的 `changes/proposed/blockedForNow/fission.md` 三个悬空条款引用；只有取得该 Change ownership 后才修。
+3. G7 120 true-repeat / A39 / A40 仍须人工；Strength 剩余的是 economic/quality/control completion，而不是 K2 request-budget 机制；G9 release-close 仍开着。
 
 **不要再做的事：** 用 unit/fake port 宣布 Exit；删 Gate 正文或把 viewer 折叠标记写回文件；把 digest/scripted Bookkeeper 写成 semantic synthesis。
 
@@ -2500,8 +2500,8 @@ CURRENT（2026-08-11；§0.1 observational）
 ├─ Completed files: Causal CE + Orchestrator + Storage(G4) + JS(G5 C-3)
 │            + Universal + perm-inspector（G2/G6 PARTIAL；G3 DONE）
 │            + rulebook（G7 PARTIAL；mechanical A37/A38 production 120 GREEN；HUMAN_ONLY Remaining）
-├─ Active: strength.md（G8 PARTIAL；并行 owner；勿 playbook-close）
-├─ Proposed: entry.md（本 Playbook；不迁 completed）
+├─ Active: strength.md（G8 PARTIAL；K1/K2 Host 机制已证明；economic/quality/control 尚未收口）
+├─ Proposed: entry.md（本 Playbook；Product Exit 未全满足；全部 Gate 完成后按用户裁决迁 completed）
 └─ Proposed: magic-todo（Playbook 外；不入 gates）
         │
         ▼
@@ -2535,7 +2535,7 @@ CURRENT（2026-08-11；§0.1 observational）
         │
         ▼
 [9] Strength                                 ◐ PARTIAL（active/strength）
-    K1/K2 / holdout — 并行 owner；unit policy/transform proofs only；G7 未 full Exit，G8 仍非 full DONE
+    K1/K2 request-budget / readonly Host 机制已有 unit + 唯一 Long Stroke proof；shadow/control economic + quality holdout 尚未完成，G8 仍非 full DONE
         │
         ▼
 [10] Full ratchet + release                  ◐ PARTIAL（G9）
@@ -2546,7 +2546,7 @@ CURRENT（2026-08-11；§0.1 observational）
 
 # 33. Definition of Done
 
-> **2026-08-11 living status（observational）：** Product Exit Gates in this section remain the acceptance baseline. G0/G1/G3/G3.5/G4 DONE；G5 DONE-with-amendment（C-3 user裁决）。G2/G6/G7/G8/G9 PARTIAL。G6 digest gone; BookkeeperRuntime+edit-qa landed; `G6HostPathE2E` landed (inspector-tool path unit, not live Host LLM / tool.execute.before Long Stroke); no user amendment authority as Exit. G7 mechanical A37/A38 production 120 GREEN is not G7 Exit; HUMAN_ONLY (paired-history 120 / A39 / A40) remain; identity/lexical machine evidence is not human tournament. The checklist below is the *product* convergence DoD — **not** all-green.
+> **2026-08-11 living status（observational）：** Product Exit Gates in this section remain the acceptance baseline. G0/G1/G3/G3.5/G4 DONE；G5 DONE-with-amendment（C-3 user裁决）。G2/G6/G7/G8/G9 PARTIAL。G6 已有唯一 Long Stroke live Host mock finalize/fetch proof，但不覆盖原 Gate 全部 Exit。G7 mechanical A37/A38 production 120 GREEN is not G7 Exit; HUMAN_ONLY (paired-history 120 / A39 / A40) remain; identity/lexical machine evidence is not human tournament. G8 K1/K2 request-budget / readonly Host mechanism is now proven in the sole Long Stroke, but Strength economic/quality/control completion criteria remain open. The checklist below is the *product* convergence DoD — **not** all-green.
 
 只有以下全部成立，才能认为这一批 Proposal 真正“收敛”，而不是“分别实现过”：
 

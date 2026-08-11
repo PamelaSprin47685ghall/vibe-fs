@@ -194,6 +194,58 @@ test('STRENGTH_003_K2_allows_request_2_then_aborts_before_request_3', async () =
   assert.deepEqual(host.aborted, ['replica-k2'])
 })
 
+test('STRENGTH_003_K2_counts_parallel_OpenCode_tool_parts_as_one_request_then_stops_before_request_3', async () => {
+  const runtime = registered('replica-host-k2', StrengthBudget.K2)
+  const host = sessions()
+  const output = {
+    messages: [
+      {
+        info: { id: 'u1', role: 'user', sessionID: 'replica-host-k2' },
+        parts: [{ id: 'p-u1', type: 'text', text: 'Continue.' }],
+      },
+      {
+        info: {
+          id: 'a1', role: 'assistant', sessionID: 'replica-host-k2', parentID: 'u1',
+          finish: 'tool-calls', time: { created: 1, completed: 2 },
+        },
+        parts: [
+          {
+            id: 'p-tool-1', type: 'tool', tool: 'read', callID: 'c1',
+            state: { status: 'completed', input: { filePath: 'README.md' }, output: 'alpha' },
+          },
+          {
+            id: 'p-tool-2', type: 'tool', tool: 'grep', callID: 'c2',
+            state: { status: 'completed', input: { pattern: 'Strength' }, output: 'README.md:1:Strength' },
+          },
+        ],
+      },
+      {
+        info: {
+          id: 'a2', role: 'assistant', sessionID: 'replica-host-k2', parentID: 'u1',
+          finish: 'tool-calls', time: { created: 3, completed: 4 },
+        },
+        parts: [{
+          id: 'p-tool-3', type: 'tool', tool: 'glob', callID: 'c3',
+          state: { status: 'completed', input: { pattern: '**/*.md' }, output: 'README.md' },
+        }],
+      },
+      {
+        info: { id: 'a3', role: 'assistant', sessionID: 'replica-host-k2', parentID: 'u1', time: { created: 5 } },
+        parts: [],
+      },
+    ],
+  }
+
+  const retired = await Transform.StrengthReplicaTransform_apply(H, runtime, host.port, output)
+  assert.equal(caseOf(retired), 'Retired')
+  assert.equal(retired.fields[0], 'provider-request-budget-reached')
+  const batches = listItems(retired.fields[1])
+  assert.equal(batches.length, 2, 'two provider messages spend K2 even though request #1 has two tools')
+  assert.deepEqual(listItems(batches[0].Exchanges).map((exchange) => exchange.ToolName), ['read', 'grep'])
+  assert.equal(listItems(batches[1].Exchanges)[0].ToolName, 'glob')
+  assert.deepEqual(host.aborted, ['replica-host-k2'])
+})
+
 test('STRENGTH_003_005_transform_discards_incomplete_and_invalid_batches_then_stops_the_replica', async () => {
   // Discard-on-error at the transform program. Not a live Host provider-failure canary.
   // K2 so one complete illegal batch is below requestLimit and hits tryBuild,

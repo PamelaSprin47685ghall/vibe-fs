@@ -331,7 +331,7 @@ module StrengthSpeculate =
                                                                 owner,
                                                                 id,
                                                                 target,
-                                                                StrengthBudget.K1,
+                                                                StrengthSettings.dryRunBudget (),
                                                                 agent,
                                                                 replicaMirror,
                                                                 anchorDigest

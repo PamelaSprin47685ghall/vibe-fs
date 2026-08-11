@@ -167,7 +167,7 @@ module StrengthReplicaTransform =
                                         currentWire.Messages
                                         ordered
 
-                                match Projection.tryApplyRenderedMessages sessionIdText sha256 rendered with
+                                match Projection.tryApplyStrengthRenderedMessages sessionIdText sha256 rendered with
                                 | Error error ->
                                     runtime.Retire replicaSessionId |> ignore
                                     let! _ = sessions.AbortSession replicaSessionId

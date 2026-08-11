@@ -70,11 +70,18 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     ///
     /// The session comes from the runtime's own child map, not from the fork result:
     /// only the Host can issue a session id, and ORCH-006 requires the real one.
-    let forkChild (agentId: string) (role: Role) (agent: string) (worktree: WorktreePath) (prompt: string) =
+    let forkChild
+        (agentId: string)
+        (role: Role)
+        (agent: string)
+        (worktree: WorktreePath)
+        (prompt: string)
+        (deferSend: bool)
+        =
         task {
             worktrees.[agentId] <- WorktreePath.value worktree
 
-            match! runtime.Fork(agentId, role, agent, prompt, None) with
+            match! runtime.Fork(agentId, role, agent, prompt, None, deferSend = deferSend) with
             | Error error -> return Error error
             | Ok _ ->
                 match runtime.TryChildSession agentId with
@@ -164,7 +171,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     // ── ManagerPort ─────────────────────────────────────────────────────────
 
     let startManager (start: ManagerStart) : Task<Result<SessionId, string>> =
-        forkChild (managerAgentId start.JobId) Role.Manager start.ManagerAgent start.Worktree start.Prompt
+        forkChild (managerAgentId start.JobId) Role.Manager start.ManagerAgent start.Worktree start.Prompt false
 
     /// Await the Manager, then stage its work into a candidate commit.
     ///
@@ -332,8 +339,13 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         OrchestratorHostReview.reverify
             deps.Journal
             (fun _ path prompt ->
-                forkChild reviewerAgentId Role.Reviewer OrchestratorHostReview.DeepReviewerAgent path prompt)
-            (fun _ -> awaitChild reviewerAgentId)
+                forkChild reviewerAgentId Role.Reviewer OrchestratorHostReview.DeepReviewerAgent path prompt true)
+            (fun _ ->
+                task {
+                    match! runtime.SendDeferredFirstPrompt reviewerAgentId with
+                    | Error error -> return Error error
+                    | Ok() -> return! awaitChild reviewerAgentId
+                })
             jobId
             managerSessionId
             worktree
