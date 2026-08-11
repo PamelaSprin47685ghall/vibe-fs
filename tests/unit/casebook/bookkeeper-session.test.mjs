@@ -26,15 +26,17 @@ import { gitCommonDir } from '../../../dist/Journal/RuntimePath.js'
 import { GitRawStore_createInMemory as createRaw } from '../../../dist/Infrastructure/Persist/GitRawStore.js'
 import { EventStore_create as createStore } from '../../../dist/Infrastructure/Persist/EventStore.js'
 import { idValue, resultOf, sessionId, toList } from '../support/domain.mjs'
+import {
+  BookkeeperRuntime_setSessionPort as setSessionPort,
+  BookkeeperRuntime_resetSessionPort as resetSessionPort,
+  BookkeeperRuntime_txIdFor as txIdFor,
+} from '../../../dist/Infrastructure/BookkeeperRuntime.js'
 
 const { HostToolArguments_$ctor_4E60E31B: makeArgs, HostToolContext } = await import(
   '../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js'
 )
 const { execute } = await import('../../../dist/Infrastructure/OpenCode/Tools/EditQaTool.js')
 const { read } = await import('../../../dist/Infrastructure/BookkeeperStaging.js')
-const { setSessionPort, resetSessionPort, txIdFor } = await import(
-  '../../../dist/Infrastructure/BookkeeperRuntime.js'
-)
 const { TerminalOutcome } = await import('../../../dist/Infrastructure/OpenCode/Host/Events.js')
 const { AgentRunResult } = await import('../../../dist/Kernel/Outcome.js')
 const { Role } = await import('../../../dist/Kernel/Roles.js')

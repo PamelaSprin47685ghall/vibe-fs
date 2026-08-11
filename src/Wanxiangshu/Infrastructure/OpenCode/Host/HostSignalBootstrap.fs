@@ -300,31 +300,34 @@ module HostSignalBootstrap =
                     // CancelSession clears inspector drafts; fire-and-forget would race.
                     // Unexpected delete of a non-owner / incomplete draft never finalizes
                     // (tryFinalize is no-op without Q+A; CancelSession cleans drafts).
-                    // Fable Task = Promise: GetResult is the last expression so the Host
-                    // event hook can await; let! is the real sequencing.
-                    task {
-                        match scope.SyncDelegateRuntime with
-                        | Some runtime ->
-                            match runtime.TryFind(sessionId, SyncDelegateRole.Inspector) with
-                            | Some inspectorId ->
-                                match workspaceDirectory with
-                                | Some root ->
-                                    let! _ = finalizeInspector root (SessionId.value inspectorId)
-                                    ()
+                    // onSignal is HostSignal -> unit (HostSignalRouter), so we cannot
+                    // return the inner Task. Fable Task = Promise: emit the Promise as
+                    // the last expression so the Host event hook can await a thenable.
+                    let finished =
+                        task {
+                            match scope.SyncDelegateRuntime with
+                            | Some runtime ->
+                                match runtime.TryFind(sessionId, SyncDelegateRole.Inspector) with
+                                | Some inspectorId ->
+                                    match workspaceDirectory with
+                                    | Some root ->
+                                        let! _ = finalizeInspector root (SessionId.value inspectorId)
+                                        ()
+                                    | None -> ()
                                 | None -> ()
+
+                                runtime.CancelSession sessionId
                             | None -> ()
 
-                            runtime.CancelSession sessionId
-                        | None -> ()
+                            // Residual draft if the deleted id itself held Inspector Q/A.
+                            cleanupInspectorDraft (SessionId.value sessionId)
 
-                        // Residual draft if the deleted id itself held Inspector Q/A.
-                        cleanupInspectorDraft (SessionId.value sessionId)
+                            scope.Quiescence.DropSession sessionId
+                            scope.DisposeSession(SessionId.value sessionId)
+                            reconciler.Signal signal
+                        }
 
-                        scope.Quiescence.DropSession sessionId
-                        scope.DisposeSession(SessionId.value sessionId)
-                        reconciler.Signal signal
-                    }
-                    |> fun t -> t.GetAwaiter().GetResult()
+                    (emitJsExpr finished "$0": unit)
 
             // LOOP-002/006: edge sensor shares the same event subscription, aborts via
             // the session port, and leaves AABB to OrdinaryTurnWorkflow on TurnAborted.

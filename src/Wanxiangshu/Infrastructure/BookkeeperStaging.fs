@@ -7,9 +7,7 @@ open System.Collections.Generic
 /// edit-qa is the only mutation path; there is no filesystem path.
 module BookkeeperStaging =
 
-    type private Slot =
-        { mutable Q: string
-          mutable A: string }
+    type private Slot = { Q: string; A: string }
 
     let private gate = obj ()
     let private slots = Dictionary<string, Slot>()
@@ -58,7 +56,7 @@ module BookkeeperStaging =
                 match uniqueReplace source oldText newText with
                 | Error err -> Error err
                 | Ok next ->
-                    if isQ then slot.Q <- next else slot.A <- next
+                    slots.[txId] <- if isQ then { slot with Q = next } else { slot with A = next }
                     Ok())
 
     let take (txId: string) : Result<string * string, string> =

@@ -307,6 +307,7 @@ type StrengthReplicaRuntime
                                                 PromptDispatcher.AwaitMode.Detached
                                                 None
                                                 StrengthReplicaTools.exactReadonlyHostToolMap
+                                                None
                                         with
                                         | Error error -> complete (StrengthReplicaTerminal.Failed error) state
                                         | Ok _ -> ()

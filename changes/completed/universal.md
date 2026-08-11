@@ -5094,7 +5094,7 @@ Evidence:
 
 ## Blockers
 
-G2 仍 PARTIAL（PREFIX LAW unit canary cited, not Exit）。G6 仍 PARTIAL（digest gone；BookkeeperRuntime+edit-qa landed；HostSignalBootstrap await + inspector-tool path still in flight (`G6HostPathE2E`)；Host e2e Remaining）。G3 为 DONE。
+G2 仍 PARTIAL（PREFIX LAW unit canary cited, not Exit）。G6 仍 PARTIAL（digest gone；BookkeeperRuntime+edit-qa landed；`G6HostPathE2E` landed but **not** live Host LLM / `tool.execute.before` Long Stroke；digest deletion ≠ synthesis Exit）。G3 为 DONE。
 
 ## Final outcome
 
@@ -5114,7 +5114,7 @@ Living status is observational. Product Exit Gates in the Playbook remain the ac
 
 **G2 PARTIAL:** PREFIX LAW **unit** canary exists, still PARTIAL vs live Host. Runtime reuse canary green (`tests/unit/session/sync-delegate-runtime.test.mjs` :: `G2_inspector_Q1_Q2_Q3_same_session_serial_reuse`). Inspector PREFIX LAW unit canary cited, **not** live Host Exit: `tests/unit/session/g2-inspector-provider-wire-prefix.test.mjs` :: `G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix` (reused-child SendPrompt → OpenAI body → `wireOf`/`sealHolds` + Domain `isAppendOnlyPrefix`). optional `SyncDelegateRuntime` `promptModel` is G2 PREFIX LAW ModelId bind (`ChatParamsHook` leaves `Model=None`); G6 Casebook/`SpikePlugin` hooks must not remove it. Do not claim G2 Exit.
 
-**G6 PARTIAL:** observational APIs (**not** Exit): `BookkeeperRuntime.setSessionPort` / `runTransaction` / `isAttached` / `tryTxId`; `EditQaTool.execute` (document `Q.md`|`A.md`, unique `old_text`); `BookkeeperStaging.begin`/`read`/`replace`/`take`/`abort`. `AttachmentKind.Bookkeeper` `txId` lives in `BookkeeperRuntime`, not child options. Digest synthesizer is **gone** from `CasebookBookkeeper`. `SpikePlugin` calls `BookkeeperRuntime.setSessionPort` at `createHost`; `tryFinalizeInspector` is `Task`. HostSignalBootstrap await + inspector-tool path still in flight (`G6HostPathE2E`). G2 `promptModel` not removed. Host e2e Remaining. Host-path unit (`tests/unit/casebook/g6-host-reuse-finalize.test.mjs`) is **not** full tool→PromptDispatcher→TurnCompleted→Casebook→fetch e2e.
+**G6 PARTIAL:** observational APIs (**not** Exit): `BookkeeperRuntime.setSessionPort` / `runTransaction` / `isAttached` / `tryTxId`; `EditQaTool.execute` (document `Q.md`|`A.md`, unique `old_text`); `BookkeeperStaging.begin`/`read`/`replace`/`take`/`abort`. `AttachmentKind.Bookkeeper` `txId` lives in `BookkeeperRuntime`, not child options. Digest synthesizer is **gone** from `CasebookBookkeeper`. `SpikePlugin` passes `CasebookLifecycle.tryFinalizeInspector` (`Task`) and `BookkeeperRuntime.setSessionPort`. `HostSignalBootstrap` SessionDeleted awaits `tryFinalizeInspector` Task before CancelSession. `tests/unit/casebook/g6-inspector-tool-finalize-fetch.test.mjs` is inspector-tool → SyncDelegate → lifecycle → Bookkeeper → fetch, **not** live Host LLM / `tool.execute.before` Long Stroke. G2 `promptModel` not removed. live Host LLM Remaining.
 
 Deferred — G6-E/F/G Remaining (keep; not DONE):
 - **LLM Bookkeeper** (InternalLeaf + Attached, `edit-qa` synthesis) still open — `BookkeeperRuntime` / `EditQaTool` / `BookkeeperStaging` cited observationally; digest synthesizer gone from `CasebookBookkeeper`; not Host e2e / not Exit.

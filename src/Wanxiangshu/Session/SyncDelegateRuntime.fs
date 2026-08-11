@@ -256,7 +256,7 @@ type SyncDelegateRuntime
                     PromptDispatcher.AwaitMode.Detached
                     None
                     tools
-                    ?model = boundPromptModel
+                    boundPromptModel
         }
 
     let sendIdleNudge (permit: QuiescencePermit option) (call: SyncDelegateCall) =
@@ -276,7 +276,7 @@ type SyncDelegateRuntime
                         PromptDispatcher.AwaitMode.Detached
                         None
                         (toolMap (canonicalRole call.Role))
-                        ?model = boundPromptModel
+                        boundPromptModel
         }
 
     member _.Attached = attached

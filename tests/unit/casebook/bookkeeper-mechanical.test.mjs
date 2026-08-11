@@ -19,10 +19,10 @@ import {
   CANONICAL_Q,
   scriptedBookkeeperPort,
 } from './bookkeeper-session.test.mjs'
-
-const { setSessionPort, resetSessionPort } = await import(
-  '../../../dist/Infrastructure/BookkeeperRuntime.js'
-)
+import {
+  BookkeeperRuntime_setSessionPort as setSessionPort,
+  BookkeeperRuntime_resetSessionPort as resetSessionPort,
+} from '../../../dist/Infrastructure/BookkeeperRuntime.js'
 
 const obsIndex = (name) => Object.create(Observation.prototype).cases().indexOf(name)
 const fileRead = (path, h) => new Observation(obsIndex('FileRead'), [path, h])

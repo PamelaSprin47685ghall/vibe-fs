@@ -4,10 +4,12 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Kernel.Outcome
 open Wanxiangshu.OpenCode
 
 [<RequireQualifiedAccess>]
@@ -68,7 +70,7 @@ module BookkeeperRuntime =
 
     let private systemPrompt () =
         try
-            PackageResources.readText("prompts/bookkeeper-system.md").Trim()
+            PromptResources.loadBookkeeperSystem ()
         with _ ->
             "Maintain staged Q/A via edit-qa only. Idle is allowed when evidence does not change the answer."
 
@@ -228,11 +230,11 @@ module BookkeeperRuntime =
 
                     let sendError =
                         match sent with
-                        | SendOutcome.Retryable reason -> Some reason
-                        | SendOutcome.Fatal reason -> Some reason
-                        | SendOutcome.AcceptanceUnknown reason -> Some reason
-                        | SendOutcome.AdmittedWithReceipt _
-                        | SendOutcome.AdmittedWithPhysicalMessage _ -> None
+                        | Retryable reason -> Some reason
+                        | Fatal reason -> Some reason
+                        | AcceptanceUnknown reason -> Some reason
+                        | AdmittedWithReceipt _
+                        | AdmittedWithPhysicalMessage _ -> None
 
                     let disposeSub () =
                         subscription |> Option.iter (fun active -> active.Dispose())

@@ -2,6 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { listItems, resultOf } from '../support/domain.mjs'
+import {
+  BookkeeperRuntime_bindSession as bindSession,
+  BookkeeperRuntime_resetSessionPort as resetSessionPort,
+} from '../../../dist/Infrastructure/BookkeeperRuntime.js'
 
 const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,
@@ -15,10 +19,6 @@ const {
   take,
   abort,
 } = await import('../../../dist/Infrastructure/BookkeeperStaging.js')
-const {
-  bindSession,
-  resetSessionPort,
-} = await import('../../../dist/Infrastructure/BookkeeperRuntime.js')
 
 const factory = ToolHostCodec_factory({
   tool: {

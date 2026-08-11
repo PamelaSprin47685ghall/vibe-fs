@@ -51,6 +51,11 @@ import {
   roles,
   sessionId,
 } from '../support/domain.mjs'
+import {
+  BookkeeperRuntime_setSessionPort as setSessionPort,
+  BookkeeperRuntime_resetSessionPort as resetSessionPort,
+  BookkeeperRuntime_txIdFor as txIdFor,
+} from '../../../dist/Infrastructure/BookkeeperRuntime.js'
 
 const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,
@@ -61,9 +66,6 @@ const { spec: inspectorSpec } = await import('../../../dist/Infrastructure/OpenC
 const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
 const { execute } = await import('../../../dist/Infrastructure/OpenCode/Tools/EditQaTool.js')
 const { read } = await import('../../../dist/Infrastructure/BookkeeperStaging.js')
-const { setSessionPort, resetSessionPort, txIdFor } = await import(
-  '../../../dist/Infrastructure/BookkeeperRuntime.js'
-)
 const { TerminalOutcome } = await import('../../../dist/Infrastructure/OpenCode/Host/Events.js')
 const { AgentRunResult } = await import('../../../dist/Kernel/Outcome.js')
 const { Role } = await import('../../../dist/Kernel/Roles.js')
@@ -142,7 +144,7 @@ const scriptedBookkeeperPort = () => {
   let seq = 0
 
   const port = {
-    CreateChildSession: (parentId, options) => {
+    CreateChildSession: async (parentId, options) => {
       seq += 1
       const child = sessionId(`bk-child-${seq}`)
       createCalls.push({

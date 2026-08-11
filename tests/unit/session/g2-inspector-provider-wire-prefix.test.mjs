@@ -1,7 +1,6 @@
 // G2 Inspector canary: PREFIX LAW on a reused Inspector child.
 //
-// changes/completed/cache.md:
-//   same PrefixEpoch: ProviderWire(n) is an exact prefix of ProviderWire(n+1)
+// same PrefixEpoch: ProviderWire(n) is an exact prefix of ProviderWire(n+1)
 // Authority: Domain ProviderProjection.isAppendOnlyPrefix (via
 // tests/e2e/support/provider-wire.js wireOf / sealHolds — not a second prefix helper).
 //
@@ -317,9 +316,12 @@ test('G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix', async () => {
     assert.equal(wireQ1.ModelId, INSPECTOR_MODEL_ID)
     assert.equal(wireQ1.ModelId, wireQ2.ModelId, 'wire.ModelId must be identical on reused Inspector Q1→Q2')
     assert.equal(wireQ2.ModelId, wireQ3.ModelId, 'wire.ModelId must be identical on reused Inspector Q2→Q3')
-    assert.equal(modelIdOf(prompts[0]), INSPECTOR_MODEL_ID)
-    assert.equal(modelIdOf(prompts[0]), modelIdOf(prompts[1]))
-    assert.equal(modelIdOf(prompts[1]), modelIdOf(prompts[2]))
+    assert.equal(captures[0].modelId, INSPECTOR_MODEL_ID)
+    assert.equal(captures[0].modelId, captures[1].modelId)
+    assert.equal(captures[1].modelId, captures[2].modelId)
+    assert.equal(wireQ1.ModelId, captures[0].modelId)
+    assert.equal(wireQ2.ModelId, captures[1].modelId)
+    assert.equal(wireQ3.ModelId, captures[2].modelId)
 
     const msgCount = (wire) => listItems(wire.Messages).length
     assert.ok(msgCount(wireQ1) >= 1, 'Q1 wire must include the Inspector user prompt')

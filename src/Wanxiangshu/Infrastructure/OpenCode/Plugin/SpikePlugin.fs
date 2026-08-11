@@ -103,9 +103,7 @@ module SpikePlugin =
                         scope
                         input
                         workspaceDirectory
-                        (Some(fun root inspectorId ->
-                            CasebookLifecycle.tryFinalizeInspector root inspectorId |> ignore
-                            Ok()))
+                        (Some CasebookLifecycle.tryFinalizeInspector)
                         (Some CasebookLifecycle.cleanupInspector)
 
                 match journal with

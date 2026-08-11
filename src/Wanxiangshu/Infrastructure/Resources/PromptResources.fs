@@ -19,6 +19,9 @@ module PromptResources =
     let private loadPrompt (fileName: string) : string =
         PackageResources.readText(sprintf "prompts/%s" fileName).Trim()
 
+    /// InternalLeaf Bookkeeper is not a Role; keep it off PromptCatalog.
+    let loadBookkeeperSystem () : string = loadPrompt "bookkeeper-system.md"
+
     let load () : PromptCatalog =
         { ManagerSystemPrompt = loadPrompt "manager-system.md"
           CoderSystemPrompt = loadPrompt "coder-system.md"

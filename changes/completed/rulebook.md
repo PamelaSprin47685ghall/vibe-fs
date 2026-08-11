@@ -3327,9 +3327,9 @@ G7 仍 PARTIAL：mechanical A37/A38 production 120 GREEN after authoring（root-
 | **Drop bridge fields** | **DONE** | `ScoreWhen` / `Nudge` / `Family` 已删；序用 `LexicalOrder`（非 priority / CatalogOrdinal） |
 | **Observation vocabulary（events）** | **DONE** | Physical EventStore vocabulary is `BlogObservationCommitted` / `BlogObservationsSquashed`；codec dual-decodes legacy tags。Domain `ObservationProjection` / `RulebookObservation` 命名仍在。 |
 | **Docs plane rewrite** | **DONE** | `docs/{what,how,shape,why,proof}/enforcer.md` enforcer 平面按 folder SSOT + dual-consumer 重写 |
-| **Authoring gates（expanded `--strict`）** | **Remaining** | `enforcer-rulebook-gate.mjs --require-headings --strict` encodes mechanical A37+A38；production 120 **fails** until authoring wave。HUMAN_ONLY / A37–A50 **未**证明。 |
+| **Authoring gates（expanded `--strict`）** | **GREEN（mechanical A37/A38）** | production 120 mechanical A37/A38 GREEN after authoring（root-cause + who owns）。**not** G7 Exit。HUMAN_ONLY remaining。 |
 | **Compaction identity integrity** | **DONE** | 见 Runtime delivered §5（TipDelivery / re-Full） |
-| **A37–A50 semantic / paired-history / tournament** | **Remaining** | semantic rubric、paired-history eval、cross-family tournament **未**证明。structural `--strict` 子集不得升格为 full G7 Exit。 |
+| **HUMAN_ONLY / A39 / A40** | **Remaining** | `HUMAN_ONLY_RUBRIC_ITEMS` = paired-history 120 / A39 pair review / A40 tournament。`paired-history-eval.test.mjs` = catalog+history identity, **not** true-repeat oracle。`enforcer-cross-family-collision.mjs` = lexical A40, **not** human tournament。mechanical GREEN 不得升格为 full G7 Exit。 |
 
 ### Residual honesty
 

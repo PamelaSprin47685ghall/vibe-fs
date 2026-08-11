@@ -56,10 +56,10 @@ import {
   CANONICAL_Q,
   scriptedBookkeeperPort,
 } from './bookkeeper-session.test.mjs'
-
-const { setSessionPort, resetSessionPort } = await import(
-  '../../../dist/Infrastructure/BookkeeperRuntime.js'
-)
+import {
+  BookkeeperRuntime_setSessionPort as setSessionPort,
+  BookkeeperRuntime_resetSessionPort as resetSessionPort,
+} from '../../../dist/Infrastructure/BookkeeperRuntime.js'
 
 
 const SYNC_RETURN_COMPLETION = 'Sync delegate answer returned to caller.'

@@ -75,7 +75,7 @@ const writeEvidence = (fx, kinds, evidenceFor) => {
     const rel = kinds[kind].evidencePath
     if (typeof rel !== 'string' || rel.length === 0) continue
     const token = evidenceFor[kind] ?? relatedEvidenceToken(kind)
-    fx.write(rel, `// fixture for ${kind}\n${token}\n`)
+    fx.write(rel, `${token}\n`)
   }
 }
 

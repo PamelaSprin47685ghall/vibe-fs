@@ -184,7 +184,7 @@ module PromptDispatcherSend =
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             (tools: Map<string, bool>)
-            (?model: OpencodeModel)
+            (model: OpencodeModel option)
             : Task<Result<PromptKey, string>> =
             this.SendAgentOwnerRootCore port sessionId text agent directory awaitMode onAccepted (Some tools) model
 
