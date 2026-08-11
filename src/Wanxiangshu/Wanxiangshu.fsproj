@@ -137,6 +137,16 @@
     <Compile Include="Journal/PromptAuthorityLedger.fs"/>
     <Compile Include="Journal/Writer.fs"/>
     <Compile Include="Journal/ProjectionState.fs"/>
+    <Compile Include="Journal/FoldRejection.fs"/>
+    <Compile Include="Journal/ProjectionUpdate.fs"/>
+    <Compile Include="Journal/PromptFactFold.fs"/>
+    <Compile Include="Journal/FallbackFactFold.fs"/>
+    <Compile Include="Journal/ReviewFactFold.fs"/>
+    <Compile Include="Journal/ExecutionFactFold.fs"/>
+    <Compile Include="Journal/OrchestratorFactFold.fs"/>
+    <Compile Include="Journal/CompanionFactFold.fs"/>
+    <Compile Include="Journal/ContextFactFold.fs"/>
+    <Compile Include="Journal/HostFactFold.fs"/>
     <Compile Include="Journal/Fold.fs"/>
     <Compile Include="Journal/JournalEventStoreBoot.fs"/>
     <Compile Include="Journal/EventStoreJournalWriter.fs"/>
