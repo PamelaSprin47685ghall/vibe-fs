@@ -75,9 +75,11 @@ test('STRENGTH_003_004_replica_initial_transform_replaces_bootstrap_with_frozen_
   const runtime = registered('replica-initial', StrengthBudget.K1)
   const host = sessions()
   const output = rawOutput('replica-initial', [message('user', [text('Continue.')])])
+  const hostMessagesBinding = output.messages
 
   const outcome = await Transform.StrengthReplicaTransform_apply(H, runtime, host.port, output)
   assert.equal(caseOf(outcome), 'Ready')
+  assert.equal(output.messages, hostMessagesBinding, 'Host keeps its original messages array binding after the hook')
   assert.equal(listItems(outcome.fields[0]).length, 0)
   assert.deepEqual(host.aborted, [])
 
@@ -107,6 +109,60 @@ test('STRENGTH_003_K1_aborts_before_provider_request_2_after_one_complete_batch'
   // transform on the same child cannot re-admit a provider request.
   const again = await Transform.StrengthReplicaTransform_apply(H, runtime, host.port, output)
   assert.equal(caseOf(again), 'NotReplica')
+})
+
+test('STRENGTH_003_K1_counts_OpenCode_completed_tool_part_as_one_real_request', async () => {
+  const runtime = registered('replica-host-k1', StrengthBudget.K1)
+  const host = sessions()
+  const output = {
+    messages: [
+      {
+        info: { id: 'u1', role: 'user', sessionID: 'replica-host-k1' },
+        parts: [{ id: 'p-u1', type: 'text', text: 'Continue.' }],
+      },
+      {
+        info: {
+          id: 'a1',
+          role: 'assistant',
+          sessionID: 'replica-host-k1',
+          parentID: 'u1',
+          finish: 'tool-calls',
+          time: { created: 1, completed: 2 },
+        },
+        parts: [{
+          id: 'p-tool-1',
+          type: 'tool',
+          tool: 'read',
+          callID: 'c1',
+          state: {
+            status: 'completed',
+            input: { filePath: 'README.md' },
+            output: 'alpha',
+          },
+        }],
+      },
+      {
+        info: {
+          id: 'a2',
+          role: 'assistant',
+          sessionID: 'replica-host-k1',
+          parentID: 'u1',
+          time: { created: 3 },
+        },
+        parts: [],
+      },
+    ],
+  }
+
+  const outcome = await Transform.StrengthReplicaTransform_apply(H, runtime, host.port, output)
+  assert.equal(caseOf(outcome), 'Retired')
+  assert.equal(outcome.fields[0], 'provider-request-budget-reached')
+  assert.equal(listItems(outcome.fields[1]).length, 1)
+  const [exchange] = listItems(outcome.fields[1].head.Exchanges)
+  assert.equal(exchange.ToolName, 'read')
+  assert.equal(exchange.CanonicalArguments, '{"filePath":"README.md"}')
+  assert.equal(exchange.CanonicalResult, 'alpha')
+  assert.deepEqual(host.aborted, ['replica-host-k1'])
 })
 
 test('STRENGTH_003_K2_allows_request_2_then_aborts_before_request_3', async () => {

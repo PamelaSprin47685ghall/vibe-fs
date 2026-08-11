@@ -11,8 +11,8 @@ module HostSignalAdapter =
     let sessionIdOf =
         function
         | SessionIdle sessionId
-        | SessionDeleted sessionId
         | AttemptAborted sessionId -> sessionId
+        | SessionDeleted(sessionId, _) -> sessionId
         | ProviderRetry retry -> retry.SessionId
         | ProviderFailure(sessionId, _) -> sessionId
 

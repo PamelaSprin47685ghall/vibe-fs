@@ -405,7 +405,7 @@ module Reconciler =
             | SessionIdle sessionId -> this.Kick(sessionId, ReconcileProgram.ReconcileWake.RetryWake)
             | ProviderFailure(sessionId, _) -> this.Kick(sessionId, ReconcileProgram.ReconcileWake.FailureWake)
             | ProviderRetry retry -> this.Kick(retry.SessionId, ReconcileProgram.ReconcileWake.RetryWake)
-            | SessionDeleted sessionId -> this.ClearSession(sessionId)
+            | SessionDeleted(sessionId, _) -> this.ClearSession(sessionId)
             // HOST-002/004: an operator abort is a typed wake, not a failure.
             // AbortWake holds no idle rights (quiescence was already revoked via
             // RevokeCurrentAttempt), and decideStep refuses to Publish Unknown /

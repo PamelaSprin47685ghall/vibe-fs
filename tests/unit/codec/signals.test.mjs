@@ -30,7 +30,11 @@ const retryRaw = (sessionID, attempt = '2', message = 'rate limited') => ({
   sessionID,
   properties: { status: { type: 'retry', attempt, message } },
 })
-const deletedRaw = (sessionID) => ({ type: 'session.deleted', sessionID })
+const deletedRaw = (sessionID, parentID) => ({
+  type: 'session.deleted',
+  sessionID,
+  properties: parentID ? { info: { id: sessionID, parentID } } : { info: { id: sessionID } },
+})
 const errorRaw = (sessionID, name = 'TimeoutError', message = 'slow') => ({
   type: 'session.error',
   sessionID,
@@ -53,7 +57,10 @@ test('MISC_signals_try_adapt_idle_retry_deleted_and_failure', () => {
   const owned = () => true
   assert.equal(caseOf(tryAdapt(owned, idleRaw('s1'))), 'SessionIdle')
   assert.equal(caseOf(tryAdapt(owned, retryRaw('s1', '3', 'backoff'))), 'ProviderRetry')
-  assert.equal(caseOf(tryAdapt(owned, deletedRaw('s1'))), 'SessionDeleted')
+  const deleted = tryAdapt(owned, deletedRaw('s1', 'owner-1'))
+  assert.equal(caseOf(deleted), 'SessionDeleted')
+  assert.equal(deleted.fields[0].fields[0], 's1')
+  assert.equal(deleted.fields[1].fields[0], 'owner-1', 'session.deleted must preserve Host info.parentID')
   assert.equal(caseOf(tryAdapt(owned, errorRaw('s1', 'OverloadedError', 'busy'))), 'ProviderFailure')
 
   // Wrapped payload / event shapes unwrap too.

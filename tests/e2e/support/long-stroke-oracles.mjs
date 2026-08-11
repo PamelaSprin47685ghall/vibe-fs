@@ -546,9 +546,14 @@ export function assertG2InspectorPrefixLaw(scenario) {
   const q1 = requests.filter((body) => lastUserText(body).includes(G2_Q1) && requestTools(body).includes('return'));
   const q2 = requests.filter((body) => lastUserText(body).includes(G2_Q2) && requestTools(body).includes('return'));
   const q3 = requests.filter((body) => lastUserText(body).includes(G2_Q3) && requestTools(body).includes('return'));
-  assert.equal(q1.length, 1, `G2: expected one Inspector Q1 provider request, got ${q1.length}`);
-  assert.equal(q2.length, 1, `G2: expected one Inspector Q2 provider request, got ${q2.length}`);
-  assert.equal(q3.length, 1, `G2: expected one Inspector Q3 provider request, got ${q3.length}`);
+  // Each Inspector question begins with the SyncDelegate SendPrompt wire pinned by
+  // g2-inspector-qN.0. A real Host then performs a second provider request after
+  // the `return` tool result so the child loop can settle. PREFIX LAW compares the
+  // question-entry wires; the scenario's assertDeliveries owns duplicate-entry
+  // detection instead of mistaking the legal tool-loop continuation for a resend.
+  assert.ok(q1.length >= 1, 'G2: Inspector Q1 provider request missing');
+  assert.ok(q2.length >= 1, 'G2: Inspector Q2 provider request missing');
+  assert.ok(q3.length >= 1, 'G2: Inspector Q3 provider request missing');
 
   const sessionId = q1[0].sessionID;
   assert.ok(typeof sessionId === 'string' && sessionId.length > 0, 'G2: Inspector Q1 missing sessionID');

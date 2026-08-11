@@ -67,6 +67,10 @@ type SyncDelegateRuntime
     let callsByOwnerScope = Dictionary<string, SyncDelegateCall>()
     let callsByDelegate = Dictionary<string, SyncDelegateCall>()
     let pendingCompletionTexts = Dictionary<string, PendingSyncCompletionText>()
+    // Host recursively emits attached-child SessionDeleted before the owner
+    // SessionDeleted that closes the ReuseScope. Keep only the retired Inspector
+    // id here; live reuse ownership remains in AttachedSessionRuntime.
+    let deletedInspectorsByOwnerScope = Dictionary<string, SessionId>()
     let inFlightScopes = HashSet<string>()
     let recoveryBudget = AgentPairCursor.DefaultAutoRecoveryBudget
     let directory = workspaceDirectory
@@ -283,10 +287,70 @@ type SyncDelegateRuntime
 
     member _.TryFind(ownerSessionId: SessionId, role: SyncDelegateRole) = attached.TryFind(ownerSessionId, role)
 
+    member _.TryFindForScopeClose(ownerSessionId: SessionId, role: SyncDelegateRole) =
+        match attached.TryFind(ownerSessionId, role) with
+        | Some sessionId -> Some sessionId
+        | None when role = SyncDelegateRole.Inspector ->
+            let ownerScope = ReuseScope.ofSession ownerSessionId
+
+            lock gate (fun () ->
+                match deletedInspectorsByOwnerScope.TryGetValue(scopeKey ownerScope) with
+                | true, sessionId -> Some sessionId
+                | false, _ -> None)
+        | None -> None
+
+    member _.StageDeletedInspector(ownerSessionId: SessionId, inspectorSessionId: SessionId) : bool =
+        match attached.TryFind(ownerSessionId, SyncDelegateRole.Inspector) with
+        | Some bound when bound = inspectorSessionId ->
+            match tryCallByDelegate inspectorSessionId with
+            | Some call ->
+                clearPendingText inspectorSessionId
+                removeCall call
+                failCall call "Sync delegate Inspector session was deleted"
+                releaseFlight call.OwnerScope
+            | None -> clearPendingText inspectorSessionId
+
+            attached.Remove(ownerSessionId, SyncDelegateRole.Inspector) |> ignore
+
+            let ownerScope = ReuseScope.ofSession ownerSessionId
+
+            let replaced =
+                lock gate (fun () ->
+                    let key = scopeKey ownerScope
+
+                    let previous =
+                        match deletedInspectorsByOwnerScope.TryGetValue key with
+                        | true, sessionId -> Some sessionId
+                        | false, _ -> None
+
+                    deletedInspectorsByOwnerScope.[key] <- inspectorSessionId
+                    previous)
+
+            replaced
+            |> Option.filter (fun previous -> previous <> inspectorSessionId)
+            |> Option.iter (fun previous -> cleanupInspectorDraft (sessionKey previous))
+
+            true
+        | _ -> false
+
     member _.Invoke(ownerSessionKey: string, role: SyncDelegateRole, message: string) : Task<Result<string, string>> =
         task {
             let owner = SessionId.create ownerSessionKey
             let ownerScope = ReuseScope.ofSession owner
+
+            if role = SyncDelegateRole.Inspector then
+                let staleDeletedInspector =
+                    lock gate (fun () ->
+                        let key = scopeKey ownerScope
+
+                        match deletedInspectorsByOwnerScope.TryGetValue key with
+                        | true, sessionId ->
+                            deletedInspectorsByOwnerScope.Remove key |> ignore
+                            Some sessionId
+                        | false, _ -> None)
+
+                staleDeletedInspector
+                |> Option.iter (fun sessionId -> cleanupInspectorDraft (sessionKey sessionId))
 
             match resolveOwnerTier owner with
             | None -> return Error "sync delegate rejected: owner tier unknown"
@@ -457,6 +521,16 @@ type SyncDelegateRuntime
         // Capture inspector draft holders before bindings are torn down.
         let inspectorOwned = attached.TryFind(sessionId, SyncDelegateRole.Inspector)
 
+        let stagedInspectorOwned =
+            lock gate (fun () ->
+                let key = scopeKey asOwnerScope
+
+                match deletedInspectorsByOwnerScope.TryGetValue key with
+                | true, inspectorId ->
+                    deletedInspectorsByOwnerScope.Remove key |> ignore
+                    Some inspectorId
+                | false, _ -> None)
+
         let inspectorAsDelegate =
             match call with
             | Some c when c.Role = SyncDelegateRole.Inspector -> Some c.Delegate
@@ -476,6 +550,7 @@ type SyncDelegateRuntime
             attached.Remove(sessionId, role) |> ignore
 
         inspectorOwned |> Option.iter (fun id -> cleanupInspectorDraft (sessionKey id))
+        stagedInspectorOwned |> Option.iter (fun id -> cleanupInspectorDraft (sessionKey id))
 
         inspectorAsDelegate
         |> Option.iter (fun id -> cleanupInspectorDraft (sessionKey id))
@@ -491,6 +566,11 @@ type SyncDelegateRuntime
             callsByOwnerScope.Clear()
             callsByDelegate.Clear()
             pendingCompletionTexts.Clear()
+
+            for inspectorId in deletedInspectorsByOwnerScope.Values |> Seq.toList do
+                cleanupInspectorDraft (sessionKey inspectorId)
+
+            deletedInspectorsByOwnerScope.Clear()
             inFlightScopes.Clear()
             attached.Clear())
 

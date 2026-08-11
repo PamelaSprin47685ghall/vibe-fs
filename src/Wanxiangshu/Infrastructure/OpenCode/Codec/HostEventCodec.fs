@@ -119,7 +119,17 @@ module HostEventCodec =
                         | _ -> None
             | "session.deleted" ->
                 match tryReadSessionId raw with
-                | Some sessionId -> Some(SessionDeleted sessionId)
+                | Some sessionId ->
+                    let properties = raw?properties
+                    let info = if isNull properties then null else properties?info
+
+                    let parentSessionId =
+                        if isNull info || isNull info?parentID then
+                            None
+                        else
+                            Some(SessionId.create (unbox<string> info?parentID))
+
+                    Some(SessionDeleted(sessionId, parentSessionId))
                 | _ -> None
             | "session.error" ->
                 match tryReadSessionId raw with

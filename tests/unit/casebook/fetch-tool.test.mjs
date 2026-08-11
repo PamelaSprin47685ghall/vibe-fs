@@ -25,6 +25,9 @@ import {
   BookkeeperRuntime_setSessionPort as setSessionPort,
   BookkeeperRuntime_resetSessionPort as resetSessionPort,
 } from '../../../dist/Infrastructure/BookkeeperRuntime.js'
+import {
+  HostToolArguments_$ctor_4E60E31B as hostArgs,
+} from '../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js'
 
 const obsIndex = (name) => Object.create(Observation.prototype).cases().indexOf(name)
 const fileRead = (path, h) => new Observation(obsIndex('FileRead'), [path, h])
@@ -58,7 +61,7 @@ test('CASE004_fetch_fresh_and_stale_paths', async () => {
     assert.equal(tool.Name, 'fetch')
 
     // no-delta → fresh with exact A
-    const fresh = await tool.Execute({ session_id: 's1' }, { sessionID: 'ses', agent: 'fast-inspector' })
+    const fresh = await tool.Execute(hostArgs({ session_id: 's1' }), { sessionID: 'ses', agent: 'fast-inspector' })
     assert.equal(fresh.includes('status = "fresh"'), true)
     assert.equal(fresh.includes('A1'), true)
 
@@ -66,7 +69,7 @@ test('CASE004_fetch_fresh_and_stale_paths', async () => {
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
     const { port, createCalls, editQaCalls } = scriptedBookkeeperPort()
     setSessionPort(port)
-    const afterChange = await tool.Execute({ session_id: 's1' }, { sessionID: 'ses', agent: 'fast-inspector' })
+    const afterChange = await tool.Execute(hostArgs({ session_id: 's1' }), { sessionID: 'ses', agent: 'fast-inspector' })
     assert.equal(afterChange.includes('status = "fresh"'), true, `edit-qa refresh should re-stabilize: ${afterChange}`)
     assert.equal(afterChange.includes(CANONICAL_A), true, afterChange)
     assert.equal(afterChange.includes('evidence:'), false)
@@ -74,11 +77,11 @@ test('CASE004_fetch_fresh_and_stale_paths', async () => {
     assert.equal(editQaCalls.length >= 2, true)
 
     // second fetch on stable worktree still fresh
-    const again = await tool.Execute({ session_id: 's1' }, { sessionID: 'ses', agent: 'fast-inspector' })
+    const again = await tool.Execute(hostArgs({ session_id: 's1' }), { sessionID: 'ses', agent: 'fast-inspector' })
     assert.equal(again.includes('status = "fresh"'), true)
 
     // unknown session → no-case
-    const missing = await tool.Execute({ session_id: 'nope' }, { sessionID: 'ses', agent: 'fast-inspector' })
+    const missing = await tool.Execute(hostArgs({ session_id: 'nope' }), { sessionID: 'ses', agent: 'fast-inspector' })
     assert.equal(missing.includes('status = "no-case"'), true)
   } finally {
     resetSessionPort()
@@ -98,7 +101,7 @@ test('CASE009_fetch_never_writes_the_subject', async () => {
     const codec = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
     const factory = codec.ToolHostCodec_factory({ tool: { schema: { string: () => ({ type: 'string' }) } } })
     const tool = spec(factory, dir, store, raw)
-    await tool.Execute({ session_id: 's1' }, { sessionID: 'ses', agent: 'fast-inspector' })
+    await tool.Execute(hostArgs({ session_id: 's1' }), { sessionID: 'ses', agent: 'fast-inspector' })
     // worktree untouched — no new files, content unchanged
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'hello')
   } finally {
@@ -122,15 +125,15 @@ test('CASE011_fetch_single_flight_serializes_same_session', async () => {
     // two concurrent fetches for the same session_id — both must succeed and
     // agree; the single-flight gate must not corrupt either result
     const [a, b] = await Promise.all([
-      tool.Execute({ session_id: 's1' }, { sessionID: 'ses', agent: 'fast-inspector' }),
-      tool.Execute({ session_id: 's1' }, { sessionID: 'ses', agent: 'fast-inspector' }),
+      tool.Execute(hostArgs({ session_id: 's1' }), { sessionID: 'ses', agent: 'fast-inspector' }),
+      tool.Execute(hostArgs({ session_id: 's1' }), { sessionID: 'ses', agent: 'fast-inspector' }),
     ])
     assert.equal(a.includes('status = "fresh"'), true)
     assert.equal(a.includes('a = "A"'), true)
     assert.equal(b, a, 'single-flight callers must observe the same result bytes')
 
     // after completion the gate is clear — a later fetch still works
-    const later = await tool.Execute({ session_id: 's1' }, { sessionID: 'ses', agent: 'fast-inspector' })
+    const later = await tool.Execute(hostArgs({ session_id: 's1' }), { sessionID: 'ses', agent: 'fast-inspector' })
     assert.equal(later.includes('status = "fresh"'), true)
   } finally {
     cleanup()

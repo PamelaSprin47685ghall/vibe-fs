@@ -31,11 +31,13 @@
 // to call a hook.
 
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
 import { withPlugin, withPluginClient } from './plugin-fixture.mjs'
 
 const SESSION = 'ses_hook_probe'
+const SPIKE_PLUGIN_SOURCE = new URL('../../../src/Wanxiangshu/Infrastructure/OpenCode/Plugin/SpikePlugin.fs', import.meta.url)
 
 /** AGENT-002/003: the Host-final `opencode.json` names every managed agent. */
 const ROLES = [
@@ -195,6 +197,25 @@ export const assertMagicTodoHookShape = (hooks) => {
     assert.equal(hooks[name].length, 2, `${name} must be positional (input, output)`)
   }
 }
+
+test('STRENGTH_004_replica_transform_route_is_structurally_exclusive', () => {
+  const source = readFileSync(SPIKE_PLUGIN_SOURCE, 'utf8')
+  const normalStart = source.indexOf('let normalTransform')
+  assert.notEqual(normalStart, -1, 'ordinary Work transform must be a separate task, not fall through a Replica branch')
+
+  const transformStart = source.indexOf('let transform', normalStart + 1)
+  const transformEnd = source.indexOf('let chatParams', transformStart)
+  assert.ok(transformStart > normalStart && transformEnd > transformStart, 'Replica route must follow normalTransform')
+
+  const route = source.slice(transformStart, transformEnd)
+  assert.match(route, /\| Some runtime ->[\s\S]*StrengthReplicaRuntime|\| Some runtime ->[\s\S]*runtime\.HandleTransform/)
+  assert.match(route, /\| None ->\s*do! normalTransform/)
+  assert.equal(
+    (route.match(/XWire\.applyTransform/g) ?? []).length,
+    1,
+    'Replica route must own exactly one XWire request-plan write',
+  )
+})
 
 const toolContext = (sessionID, messageID = 'msg_tool_probe') => ({
   sessionID,

@@ -23,6 +23,9 @@ import {
   SyncDelegateRuntime__Return_Z65460A0C as returnAnswer,
   SyncDelegateRuntime__HandleTurn_Z7791586C as handleTurn,
   SyncDelegateRuntime__CancelSession_Z31B28506 as cancelSession,
+  SyncDelegateRuntime__StageDeletedInspector_59B1A0C0 as stageDeletedInspector,
+  SyncDelegateRuntime__TryFind_636E3F87 as tryFind,
+  SyncDelegateRuntime__TryFindForScopeClose_636E3F87 as tryFindForScopeClose,
   SyncDelegateRuntime__Dispose as disposeRuntime,
 } from '../../../dist/Session/SyncDelegateRuntime.js'
 import {
@@ -293,6 +296,44 @@ test('G2_inspector_Q1_Q2_Q3_same_session_serial_reuse', async () => {
     )
     assert.equal(new Set(answers).size, 3)
     assert.equal(createCalls.length, 1)
+  })
+})
+
+test('G6_deleted_inspector_child_retires_live_binding_but_survives_for_owner_scope_close', async () => {
+  await withHarness(async ({ runtime, prompts, createCalls }) => {
+    const owner = 'ses_owner_g6_cascade'
+    const inspectorRole = roles.of('Inspector')
+    const first = invoke(runtime, owner, SyncDelegateRole.Inspector, 'Q1 before owner cascade')
+    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'Inspector Q1 did not send')
+    const deletedChild = createCalls[0].child
+
+    await settlePendingInvoke(runtime, deletedChild, inspectorRole, 'A1', 'asst_g6_q1')
+    assert.equal(resultOf(await first).ok, true)
+    assert.equal(idValue.session(tryFind(runtime, sessionId(owner), SyncDelegateRole.Inspector)), deletedChild)
+
+    assert.equal(
+      stageDeletedInspector(runtime, sessionId(owner), sessionId(deletedChild)),
+      true,
+      'child SessionDeleted must stage the attached Inspector for owner scope close',
+    )
+    assert.equal(tryFind(runtime, sessionId(owner), SyncDelegateRole.Inspector), undefined, 'dead child is not reusable')
+    assert.equal(
+      idValue.session(tryFindForScopeClose(runtime, sessionId(owner), SyncDelegateRole.Inspector)),
+      deletedChild,
+      'owner SessionDeleted can still resolve the retired Inspector for CaseFinalize',
+    )
+
+    const second = invoke(runtime, owner, SyncDelegateRole.Inspector, 'Q2 after unexpected child delete')
+    await waitFor(() => prompts.length === 2 && createCalls.length === 2, 'continued owner did not replace dead Inspector')
+    assert.notEqual(createCalls[1].child, deletedChild)
+    assert.equal(
+      tryFindForScopeClose(runtime, sessionId(owner), SyncDelegateRole.Inspector)?.fields[0],
+      createCalls[1].child,
+      'continued owner must discard the staged child and use the replacement binding',
+    )
+
+    cancelSession(runtime, sessionId(owner))
+    assert.equal(resultOf(await second).ok, false)
   })
 })
 

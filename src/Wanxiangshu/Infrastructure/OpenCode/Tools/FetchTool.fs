@@ -1,8 +1,6 @@
 namespace Wanxiangshu.Infrastructure
 
 open System.Threading.Tasks
-open Fable.Core
-open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.OpenCode
@@ -14,9 +12,6 @@ open Wanxiangshu.OpenCode
 /// marked stale with a refresh intent. Fetch is cheap and never writes the
 /// subject worktree.
 module FetchTool =
-
-    [<Fable.Core.Emit("$0 === undefined || $0 === null")>]
-    let private isUndefined (value: obj) : bool = jsNative
 
     /// CASE-011: same-worktree fetch single-flight — concurrent fetches for the
     /// same session_id share one in-flight Task; a second caller awaits the
@@ -95,10 +90,7 @@ module FetchTool =
           Execute =
             fun args _ ->
                 task {
-                    // dynamic access, consistent with JsToolSpec: plain args
-                    // objects (tests) and HostToolArguments both work
-                    let sessionRaw = args?session_id
-                    let sessionId = if isUndefined sessionRaw then "" else string sessionRaw
+                    let sessionId = args.Text "session_id"
 
                     if System.String.IsNullOrWhiteSpace sessionId then
                         return ToolHostCodec.tomlObject [ "error", tString "missing session_id" ]

@@ -30,7 +30,6 @@ import {
   ADVERSITY_ORACLES,
   ADVERSITY_CHECKLIST,
   G2_INSPECTOR_CANARY_PROMPT,
-  G6_FETCH_CANARY_PROMPT,
   G6_CANONICAL_A,
   assertG2InspectorPrefixLaw,
   assertG6BookkeeperFinalize,
@@ -77,7 +76,7 @@ const STRENGTH_HOST_CANARY_PROMPT =
   'STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica path.';
 
 const runPreFlowPrompt = async (scenario, lane, prompt, agent) => {
-  const created = await scenario.client.createSession({});
+  const created = await scenario.client.createSession({ title: `${lane} canary` });
   const sessionID = getSessionId(created);
   assert.ok(sessionID, `${lane} session creation failed: ${JSON.stringify(created)}`);
   if (!scenario.sessionIds.includes(sessionID)) scenario.sessionIds.push(sessionID);
@@ -117,7 +116,7 @@ const preFlowNativeTodoCanary = async (scenario) => {
   );
 
   scenario.provider._state.rewriteToolArgs = (entry, args) => {
-    if (entry?.turnId === 'g6-fetch' && args?.session_id === '$inspector') {
+    if (entry?.turnId === 'coder' && args?.session_id === '$inspector') {
       const inspectorId = extractInspectorIdFromOwnerRequests(scenario.provider.requests);
       assert.ok(inspectorId, 'G6 fetch rewrite needs inspector_id from InspectorTool result');
       return { session_id: inspectorId };
@@ -125,7 +124,7 @@ const preFlowNativeTodoCanary = async (scenario) => {
     return undefined;
   };
 
-  const inspectorOwner = await scenario.client.createSession({ agent: 'deep-coder' });
+  const inspectorOwner = await scenario.client.createSession({ agent: 'fast-coder', title: 'G2 Inspector Prefix Canary' });
   const inspectorOwnerId = getSessionId(inspectorOwner);
   assert.ok(inspectorOwnerId, `g2-inspector-owner session creation failed: ${JSON.stringify(inspectorOwner)}`);
   if (!scenario.sessionIds.includes(inspectorOwnerId)) scenario.sessionIds.push(inspectorOwnerId);
@@ -133,26 +132,28 @@ const preFlowNativeTodoCanary = async (scenario) => {
 
   const inspectorTurn = scenario.turn.start(inspectorOwnerId);
   const inspectorPrompt = await scenario.client.request('POST', `/session/${inspectorOwnerId}/prompt_async`, {
-    body: { parts: [{ type: 'text', text: G2_INSPECTOR_CANARY_PROMPT }], agent: 'deep-coder' },
+    body: { parts: [{ type: 'text', text: G2_INSPECTOR_CANARY_PROMPT }], agent: 'fast-coder' },
   });
   assert.ok(inspectorPrompt.ok, `g2 inspector prompt failed: ${JSON.stringify(inspectorPrompt.data)}`);
   await inspectorTurn.awaitTerminal();
 
   const g2 = assertG2InspectorPrefixLaw(scenario);
+  scenario.g6InspectorSessionId = g2.inspectorSessionId;
 
   const deleted = await scenario.client.deleteSession(inspectorOwnerId);
   assert.ok(deleted.ok, `G6 owner session.deleted failed: ${JSON.stringify(deleted.data)}`);
   await waitCaptured(scenario);
   assertG6BookkeeperFinalize(scenario);
+};
 
-  await runPreFlowPrompt(scenario, 'g6-fetch-owner', G6_FETCH_CANARY_PROMPT, 'fast-coder');
+const assertG6ColdFetch = async (scenario) => {
   const fetchResults = (scenario.provider.requests ?? [])
     .flatMap((request) => request?.messages ?? [])
     .filter((message) => message?.role === 'tool' || message?.role === 'toolResult')
     .map((message) => String(message?.content ?? ''));
   assert.ok(
     fetchResults.some((text) => text.includes('fresh') && text.includes(G6_CANONICAL_A)),
-    `G6 fetch must return fresh canonical A; inspector=${g2.inspectorSessionId} results=${JSON.stringify(fetchResults).slice(0, 800)}`,
+    `G6 fetch must return fresh canonical A from the later Coder session; inspector=${scenario.g6InspectorSessionId ?? 'unknown'} results=${JSON.stringify(fetchResults).slice(0, 800)}`,
   );
 };
 
@@ -184,6 +185,7 @@ const code = await runCanary('long-stroke', {
   preFlow: preFlowNativeTodoCanary,
   customs: {
     ...CUSTOMS,
+    assertG6ColdFetch,
     assertHostCanariesAEGH,
   },
 });

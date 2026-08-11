@@ -41,6 +41,8 @@ type ToolPermission =
     | Verdict
     | Blog
     | Return
+    /// CASE-009: conditional Casebook read surface for Coder/Inspector.
+    | Fetch
     /// GLORY-036: the Manager's own end-of-life tool (`suicide`).
     | Finality
     /// Coder-only honeypot: visible as `bash-honeypot`, never a real shell.
@@ -67,13 +69,15 @@ module Roles =
                   ToolPermission.Move
                   ToolPermission.Remove
                   ToolPermission.BashHoneypot
-                  ToolPermission.Inspector ]
+                  ToolPermission.Inspector
+                  ToolPermission.Fetch ]
         | Role.Inspector ->
             set
                 [ ToolPermission.Read
                   ToolPermission.Glob
                   ToolPermission.Grep
-                  ToolPermission.Exec ]
+                  ToolPermission.Exec
+                  ToolPermission.Fetch ]
         | Role.Browser ->
             set
                 [ ToolPermission.Read

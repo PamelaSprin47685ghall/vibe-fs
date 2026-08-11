@@ -286,7 +286,7 @@ module HostSignalBootstrap =
                     |> Option.iter (fun runtime -> runtime.CancelOwner sessionId |> ignore)
 
                     reconciler.Signal signal
-                | SessionDeleted sessionId ->
+                | SessionDeleted(sessionId, parentSessionIdOpt) ->
                     scope.LoopSensor.DropSession sessionId
 
                     // STRENGTH-004/011: owner deletion cancels the decision-local
@@ -296,31 +296,37 @@ module HostSignalBootstrap =
                     scope.StrengthReplicaRuntime
                     |> Option.iter (fun runtime -> runtime.CancelOwner sessionId |> ignore)
 
-                    // Graceful owner teardown: await CaseFinalize before CancelSession.
-                    // CancelSession clears inspector drafts; fire-and-forget would race.
-                    // Unexpected delete of a non-owner / incomplete draft never finalizes
-                    // (tryFinalize is no-op without Q+A; CancelSession cleans drafts).
-                    // onSignal is HostSignal -> unit (HostSignalRouter), so we cannot
-                    // return the inner Task. Fable Task = Promise: emit the Promise as
-                    // the last expression so the Host event hook can await a thenable.
+                    // OpenCode recursively emits child SessionDeleted before the owner
+                    // SessionDeleted. An attached Inspector child must retire its live
+                    // binding without clearing the Casebook draft; the later owner
+                    // event is the graceful ReuseScope-close signal that finalizes it.
+                    // A continued owner Invoke consumes the staged child as unexpected
+                    // deletion and cleans its draft instead of reusing the dead child.
                     let finished =
                         task {
-                            match scope.SyncDelegateRuntime with
-                            | Some runtime ->
-                                match runtime.TryFind(sessionId, SyncDelegateRole.Inspector) with
-                                | Some inspectorId ->
-                                    match workspaceDirectory with
-                                    | Some root ->
-                                        let! _ = finalizeInspector root (SessionId.value inspectorId)
-                                        ()
+                            let stagedInspector =
+                                match scope.SyncDelegateRuntime, parentSessionIdOpt with
+                                | Some runtime, Some parentSessionId ->
+                                    runtime.StageDeletedInspector(parentSessionId, sessionId)
+                                | _ -> false
+
+                            if not stagedInspector then
+                                match scope.SyncDelegateRuntime with
+                                | Some runtime ->
+                                    match runtime.TryFindForScopeClose(sessionId, SyncDelegateRole.Inspector) with
+                                    | Some inspectorId ->
+                                        match workspaceDirectory with
+                                        | Some root ->
+                                            let! _ = finalizeInspector root (SessionId.value inspectorId)
+                                            ()
+                                        | None -> ()
                                     | None -> ()
+
+                                    runtime.CancelSession sessionId
                                 | None -> ()
 
-                                runtime.CancelSession sessionId
-                            | None -> ()
-
-                            // Residual draft if the deleted id itself held Inspector Q/A.
-                            cleanupInspectorDraft (SessionId.value sessionId)
+                                // Residual draft if the deleted id itself held Inspector Q/A.
+                                cleanupInspectorDraft (SessionId.value sessionId)
 
                             scope.Quiescence.DropSession sessionId
                             scope.DisposeSession(SessionId.value sessionId)

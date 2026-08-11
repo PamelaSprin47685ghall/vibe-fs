@@ -20,6 +20,64 @@ type StrengthReplicaTransformOutcome =
 [<RequireQualifiedAccess>]
 module StrengthReplicaTransform =
 
+    let private providerResultsByCallId (rawMessage: obj) =
+        Projection.decodeMessageView [ rawMessage ]
+        |> fun view -> view.Messages
+        |> List.collect (fun message -> message.Parts)
+        |> List.choose (function
+            | ProviderProjection.WireToolResult(callId, result) -> Some(ToolCallId.value callId, result)
+            | _ -> None)
+        |> Map.ofList
+
+    let private collectHostCompleteBatches (rawMessages: obj list) : StrengthRequestBatch list =
+        let rec loop remaining requestOrdinal collected =
+            match remaining with
+            | [] -> List.rev collected
+            | rawMessage :: tail ->
+                match SessionSnapshotPort.projectMessage rawMessage with
+                | Some message when String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase) ->
+                    let toolParts = message.ToolParts |> Array.toList
+
+                    if List.isEmpty toolParts then
+                        List.rev collected
+                    elif
+                        toolParts
+                        |> List.exists (fun part ->
+                            match part.State with
+                            | SnapshotToolPartState.Pending -> true
+                            | _ -> false)
+                    then
+                        List.rev collected
+                    else
+                        let results = providerResultsByCallId rawMessage
+
+                        if Map.count results <> List.length toolParts then
+                            List.rev collected
+                        else
+                            let exchanges =
+                                toolParts
+                                |> List.choose (fun part ->
+                                    Map.tryFind (ToolCallId.value part.ToolCallId) results
+                                    |> Option.map (fun result ->
+                                        { ToolName = part.ToolName.Trim().ToLowerInvariant()
+                                          CanonicalArguments = part.InputCanonical
+                                          CanonicalResult = result }))
+
+                            if List.length exchanges <> List.length toolParts then
+                                List.rev collected
+                            else
+                                let nextOrdinal = requestOrdinal + 1
+
+                                loop
+                                    tail
+                                    nextOrdinal
+                                    ({ RequestOrdinal = nextOrdinal
+                                       Exchanges = exchanges }
+                                     :: collected)
+                | _ -> loop tail requestOrdinal collected
+
+        loop rawMessages 0 []
+
     let private snapshotOf wire =
         { CurrentProjection = ProviderProjection.toSemantic wire
           CommittedPrefix = None
@@ -44,7 +102,14 @@ module StrengthReplicaTransform =
                 | Some binding ->
                     let rawMessages = Projection.messagesFromTransformOutput output
                     let currentWire = Projection.decodeMessageView rawMessages
-                    let batches = StrengthBatchCollector.collectCompleteBatches currentWire.Messages
+                    let hostBatches = collectHostCompleteBatches rawMessages
+
+                    let batches =
+                        if List.isEmpty hostBatches then
+                            StrengthBatchCollector.collectCompleteBatches currentWire.Messages
+                        else
+                            hostBatches
+
                     let completed = List.length batches
 
                     if completed >= StrengthBudget.requestLimit binding.Budget then
@@ -108,6 +173,6 @@ module StrengthReplicaTransform =
                                     let! _ = sessions.AbortSession replicaSessionId
                                     return StrengthReplicaTransformOutcome.Retired(error, batches)
                                 | Ok replacement ->
-                                    output?messages <- List.toArray replacement
+                                    HostMessageProjection.replaceMessagesInPlace output replacement
                                     return StrengthReplicaTransformOutcome.Ready batches
         }

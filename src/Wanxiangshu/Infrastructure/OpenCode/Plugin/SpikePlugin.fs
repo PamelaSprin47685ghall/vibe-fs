@@ -211,37 +211,12 @@ module SpikePlugin =
                     )
                 | _ -> ()
 
-                let transform inObj outObj : Task<unit> =
+                let normalTransform
+                    (projectionSessionIdOpt: string option)
+                    (inObj: obj)
+                    (outObj: obj)
+                    : Task<unit> =
                     task {
-                        let projectionSessionIdOpt = projectionSessionIdFromMessages outObj
-
-                        projectionSessionIdOpt |> Option.iter wired.RegisterOwned
-
-                        let strengthReplica =
-                            match projectionSessionIdOpt, scope.StrengthReplicaRuntime with
-                            | Some sessionId, Some runtime when runtime.IsReplica(SessionId.create sessionId) ->
-                                Some runtime
-                            | _ -> None
-
-                        match strengthReplica with
-                        | Some runtime ->
-                            // STRENGTH-004/009: Replica uses exactly one request-plan
-                            // writer plus its mirror/K gate. XTrace, Manager narrative,
-                            // Companion, Enforcer, Pair and Review are owner-only.
-                            do! XWire.applyTransform snapshotOpt journal scope outObj
-                            let! handled = runtime.HandleTransform outObj
-
-                            if not handled then
-                                raise (
-                                    InvalidOperationException "StrengthReplica transform lost its live decision binding"
-                                )
-
-                            let currentMessages = unbox<obj array> outObj?messages |> Array.toList
-                            let sanitized = HostMessageProjection.sanitizeMessages currentMessages
-                            HostMessageProjection.replaceMessagesInPlace outObj sanitized
-                            return ()
-                        | None -> ()
-
                         // HOST-004：新 provider request 开始构建 → 旧 idle permit
                         // 立即失效。必须在该 transform 的最早同步位置（任何 let!
                         // 之前）调用，不得等 request 已运行才标 Running。
@@ -705,6 +680,38 @@ module SpikePlugin =
 
                         do! sealTask
                         ()
+                    }
+
+                let transform (inObj: obj) (outObj: obj) : Task<unit> =
+                    task {
+                        let projectionSessionIdOpt = projectionSessionIdFromMessages outObj
+
+                        projectionSessionIdOpt |> Option.iter wired.RegisterOwned
+
+                        let strengthReplica =
+                            match projectionSessionIdOpt, scope.StrengthReplicaRuntime with
+                            | Some sessionId, Some runtime when runtime.IsReplica(SessionId.create sessionId) ->
+                                Some runtime
+                            | _ -> None
+
+                        match strengthReplica with
+                        | Some runtime ->
+                            // STRENGTH-004/009: Replica uses exactly one request-plan
+                            // writer plus its mirror/K gate. XTrace, Manager narrative,
+                            // Companion, Enforcer, Pair and Review are owner-only.
+                            do! XWire.applyTransform snapshotOpt journal scope outObj
+                            let! handled = runtime.HandleTransform outObj
+
+                            if not handled then
+                                raise (
+                                    InvalidOperationException "StrengthReplica transform lost its live decision binding"
+                                )
+
+                            let currentMessages = unbox<obj array> outObj?messages |> Array.toList
+                            let sanitized = HostMessageProjection.sanitizeMessages currentMessages
+                            HostMessageProjection.replaceMessagesInPlace outObj sanitized
+                        | None ->
+                            do! normalTransform projectionSessionIdOpt inObj outObj
                     }
 
                 let chatParams = ChatParamsHook.create journal

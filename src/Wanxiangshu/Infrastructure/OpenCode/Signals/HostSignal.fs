@@ -25,7 +25,7 @@ type HostSignal =
     | SessionIdle of SessionId
     | ProviderRetry of RetrySignal
     | ProviderFailure of sessionId: SessionId * reason: string
-    | SessionDeleted of SessionId
+    | SessionDeleted of sessionId: SessionId * parentSessionId: SessionId option
     /// HOST-002/004: operator abort (MessageAbortedError / AbortError) is a
     /// typed signal that revokes the current attempt's idle-derived continuation
     /// capability. It is NOT ProviderFailure (it never advances fallback); it

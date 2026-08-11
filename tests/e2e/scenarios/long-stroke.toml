@@ -67,7 +67,7 @@ pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fal
 #                      not a DU-algebra equality. Journal is the exact semantic pin.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
 # Headroom kept after canary wrapper noise; Manager does not advertise todowrite yet.
-setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["native-todo-title", "native-todo", "strength-canary-title", "strength-canary-replica", "strength-canary-owner", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g6-bookkeeper-title", "g6-bookkeeper-finalize", "g6-fetch-title", "g6-fetch"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run" }, maxJournalEvents = 480, maxSseEvents = 2100, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", ".wanxiang/casebook/.keep" = "" } } }
+setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["native-todo", "strength-canary-replica", "strength-canary-owner", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run" }, maxJournalEvents = 480, maxSseEvents = 2100, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", ".wanxiang/casebook/.keep" = "" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 
@@ -77,12 +77,12 @@ must = [
   "g2-inspector-q2.0",
   "g2-inspector-q3.0",
   "g6-bookkeeper-finalize.0",
-  "g6-fetch.0",
   "orch.0",
   "manager.0",
   "manager.1",
   "mgr-labor.0",
   "coder.0",
+  "coder.1",
   "continue.0",
   "manager-finality-revise.0",
   "mgr-finish.0",
@@ -105,7 +105,6 @@ flow = [
   { assertDeliveries = { id = "g2-inspector-q2.0", eq = 1 } },
   { assertDeliveries = { id = "g2-inspector-q3.0", eq = 1 } },
   { assertDeliveries = { id = "g6-bookkeeper-finalize.0", eq = 1 } },
-  { assertDeliveries = { id = "g6-fetch.0", eq = 1 } },
   { assertFacts = { name = "StrengthCandidatePrepared", eq = 0 } },
   { assertFacts = { name = "InspectorCaseCaptured", gte = 1 } },
 
@@ -185,19 +184,12 @@ flow = [
   { wait = "orch.2", timeoutMs = 60000 },
   { awaitTerminal = true, requireAssistantTerminal = false },
   { custom = "oracleLongStroke" },
+  { assertDeliveries = { id = "coder.1", eq = 1 } },
+  { custom = "assertG6ColdFetch" },
   # Phase 0 real-host A/E/G/H — wire tools + wrapper artifacts (or precise V2 unavailability).
   { custom = "assertHostCanariesAEGH" },
   { expectSatisfied = true },
 ]
-
-[[turn]]
-id = "native-todo-title"
-lane = "native-todo-canary"
-kind = "title"
-user = "NATIVE_TODO_CANARY: exercise the default build session todowrite hook."
-
-  [[turn.step]]
-  respond = { type = "title", text = "Native Todo Canary" }
 
 [[turn]]
 id = "native-todo"
@@ -212,20 +204,11 @@ tools = ["todowrite"]
   respond = { type = "text", text = "Native todowrite canary completed." }
 
 [[turn]]
-id = "strength-canary-title"
-lane = "strength-canary-owner"
-kind = "title"
-user = "STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica path."
-
-  [[turn.step]]
-  respond = { type = "title", text = "Strength Host Canary" }
-
-[[turn]]
 id = "strength-canary-replica"
 internal = true
 user = "STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica path."
 tools = ["glob", "grep", "read"]
-forbiddenTools = ["bash-honeypot", "edit", "inspector", "js-coder", "mv", "rm", "write"]
+forbiddenTools = ["bash-honeypot", "edit", "fetch", "inspector", "js-coder", "mv", "rm", "write"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "read", args = { filePath = "README.md" } }
@@ -237,15 +220,6 @@ user = "STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica 
 
   [[turn.step]]
   respond = { type = "text", text = "Strength dry-run canary owner completed." }
-
-[[turn]]
-id = "g2-inspector-title"
-lane = "g2-inspector-owner"
-kind = "title"
-user = "G2_INSPECTOR_PREFIX_CANARY: reuse one inspector for Q1, Q2, then Q3."
-
-  [[turn.step]]
-  respond = { type = "title", text = "G2 Inspector Prefix Canary" }
 
 [[turn]]
 id = "g2-inspector-owner"
@@ -322,7 +296,7 @@ user = "CaseFinalize"
 [[turn]]
 id = "g6-bookkeeper-finalize"
 internal = true
-user = "CaseFinalize"
+user = "# # System Prompt: Casebook Bookkeeper"
 tools = ["edit-qa"]
 forbiddenTools = ["inspector", "write", "edit", "bash-honeypot"]
 
@@ -334,27 +308,6 @@ forbiddenTools = ["inspector", "write", "edit", "bash-honeypot"]
 
   [[turn.step]]
   respond = { type = "text", text = "Bookkeeper CaseFinalize idle." }
-
-[[turn]]
-id = "g6-fetch-title"
-lane = "g6-fetch-owner"
-kind = "title"
-user = "G6_CASEBOOK_FETCH_CANARY: fetch the finalized Inspector case."
-
-  [[turn.step]]
-  respond = { type = "title", text = "G6 Casebook Fetch Canary" }
-
-[[turn]]
-id = "g6-fetch"
-lane = "g6-fetch-owner"
-user = "G6_CASEBOOK_FETCH_CANARY: fetch the finalized Inspector case."
-tools = ["fetch"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "fetch", args = { session_id = "$inspector" } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "G6 fetch canary completed." }
 
 [[turn]]
 id = "title"
@@ -488,6 +441,12 @@ tools = ["write"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "write", args = { filePath = "publish_proof.txt", content = "Published by long-stroke canary\n" } }
+
+  # G6 cold fetch rides the first later Coder child instead of spawning a
+  # dedicated proof-only root/Companion/title session. It is still a new Host
+  # session after CaseFinalize and therefore proves the same persisted read path.
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fetch", args = { session_id = "$inspector" } }
 
   [[turn.step]]
   respond = { type = "text", text = "Coder finished." }

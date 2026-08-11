@@ -56,6 +56,7 @@ module StaticTools =
         | ToolPermission.Verdict -> "verdict"
         | ToolPermission.Blog -> "blog"
         | ToolPermission.Return -> "return"
+        | ToolPermission.Fetch -> "fetch"
         | ToolPermission.Finality -> "suicide"
 
     /// JS-001: the generated js-ROLE tool name for a role.
@@ -99,6 +100,7 @@ module StaticTools =
           "verdict"
           "blog"
           "return"
+          "fetch"
           "suicide"
           "js-manager"
           "js-orchestrator"
