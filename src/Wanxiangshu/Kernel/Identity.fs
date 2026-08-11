@@ -101,6 +101,10 @@ module Identity =
     /// make that check expressible but meaningless.
     type ToolCallId = private ToolCallId of string
 
+    /// One persisted Host ToolPart. Distinct from the provider-facing call id:
+    /// the former identifies the Host object, the latter identifies one invocation.
+    type HostToolPartId = private HostToolPartId of string
+
     /// A Host transcript message address (HOST-013).
     ///
     /// The raw message's `info.id` / `id` — the same address Session snapshot
@@ -307,6 +311,10 @@ module Identity =
     module ToolCallId =
         let create (value: string) = ToolCallId value
         let value (ToolCallId v) = v
+
+    module HostToolPartId =
+        let create (value: string) = HostToolPartId value
+        let value (HostToolPartId v) = v
 
     module TranscriptMessageAddress =
         let create (value: string) = TranscriptMessageAddress value

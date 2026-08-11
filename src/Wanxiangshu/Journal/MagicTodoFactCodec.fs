@@ -6,11 +6,10 @@ open Wanxiangshu.Domain.MagicTodo
 open Wanxiangshu.Domain.MagicTodoFacts
 open Wanxiangshu.Kernel.Identity
 
-/// Speculative Thoth codec for `MagicTodoFact`.
+/// Canonical tagged codec for `Fact.MagicTodo` payload bytes.
 ///
-/// Parallel to `FactCodec` — not yet merged into AgentFact encode/decode.
-/// When wired: nest under AgentFact or keep a sibling journal stream with the
-/// same envelope. Until then this is the ready-made wire contract.
+/// `FactCodec` owns the outer journal union; this module owns only the typed
+/// Magic Todo payload and fails closed on any unknown or malformed inner case.
 module MagicTodoFactCodec =
 
     let private cursorEncoder (c: XTraceCursor) =
@@ -102,6 +101,7 @@ module MagicTodoFactCodec =
                       "BaseTodoDigest", Encode.string (BlobDigest.value p.BaseTodoDigest)
                       "ProposedTodoRef", Encode.string (BlobRef.value p.ProposedTodoRef)
                       "ProposedTodoDigest", Encode.string (BlobDigest.value p.ProposedTodoDigest)
+                      "ProviderInputDigest", Encode.string p.ProviderInputDigest
                       "ReviewFrontier", cursorEncoder p.ReviewFrontier
                       "SemanticVersion", Encode.string p.SemanticVersion ]
             | MagicTodoFact.TodoWriteAccepted p ->
@@ -110,7 +110,7 @@ module MagicTodoFactCodec =
                       "ManagerLifeId", Encode.string (ManagerLifeId.value p.ManagerLifeId)
                       "TodoWriteId", todoWriteIdEncoder p.TodoWriteId
                       "ToolCallId", Encode.string (ToolCallId.value p.ToolCallId)
-                      "PreparedFactRef", Encode.string p.PreparedFactRef
+                      "PreparedFactRef", Encode.string (EventId.value p.PreparedFactRef)
                       "InputDigest", Encode.string p.InputDigest
                       "OutputDigest", Encode.string p.OutputDigest
                       "PhysicalSuccessEvidence", physicalEvidenceEncoder p.PhysicalSuccessEvidence
@@ -136,6 +136,8 @@ module MagicTodoFactCodec =
                       "Verdict", verdictEncoder p.Verdict
                       "WorkRecordRef", Encode.string (BlobRef.value p.WorkRecordRef)
                       "WorkRecordDigest", Encode.string (BlobDigest.value p.WorkRecordDigest)
+                      "SettledTodoRef", Encode.string (BlobRef.value p.SettledTodoRef)
+                      "SettledTodoDigest", Encode.string (BlobDigest.value p.SettledTodoDigest)
                       "ReviewerRecordFrontier", cursorEncoder p.ReviewerRecordFrontier
                       "ProviderRunId", Encode.string (ProviderRunIdentity.value p.ProviderRunId)
                       "ToolCallId", Encode.string (ToolCallId.value p.ToolCallId) ]
@@ -214,6 +216,7 @@ module MagicTodoFactCodec =
                           ProposedTodoRef = BlobRef.create (get.Required.Field "ProposedTodoRef" Decode.string)
                           ProposedTodoDigest =
                             BlobDigest.create (get.Required.Field "ProposedTodoDigest" Decode.string)
+                          ProviderInputDigest = get.Required.Field "ProviderInputDigest" Decode.string
                           ReviewFrontier = get.Required.Field "ReviewFrontier" cursorDecoder
                           SemanticVersion = get.Required.Field "SemanticVersion" Decode.string }
                 | "TodoWriteAccepted" ->
@@ -221,7 +224,8 @@ module MagicTodoFactCodec =
                         { ManagerLifeId = ManagerLifeId.create (get.Required.Field "ManagerLifeId" Decode.string)
                           TodoWriteId = get.Required.Field "TodoWriteId" todoWriteIdDecoder
                           ToolCallId = ToolCallId.create (get.Required.Field "ToolCallId" Decode.string)
-                          PreparedFactRef = get.Required.Field "PreparedFactRef" Decode.string
+                          PreparedFactRef =
+                            EventId.create (get.Required.Field "PreparedFactRef" Decode.string)
                           InputDigest = get.Required.Field "InputDigest" Decode.string
                           OutputDigest = get.Required.Field "OutputDigest" Decode.string
                           PhysicalSuccessEvidence =
@@ -246,6 +250,8 @@ module MagicTodoFactCodec =
                           Verdict = get.Required.Field "Verdict" verdictDecoder
                           WorkRecordRef = BlobRef.create (get.Required.Field "WorkRecordRef" Decode.string)
                           WorkRecordDigest = BlobDigest.create (get.Required.Field "WorkRecordDigest" Decode.string)
+                          SettledTodoRef = BlobRef.create (get.Required.Field "SettledTodoRef" Decode.string)
+                          SettledTodoDigest = BlobDigest.create (get.Required.Field "SettledTodoDigest" Decode.string)
                           ReviewerRecordFrontier = get.Required.Field "ReviewerRecordFrontier" cursorDecoder
                           ProviderRunId = ProviderRunIdentity.create (get.Required.Field "ProviderRunId" Decode.string)
                           ToolCallId = ToolCallId.create (get.Required.Field "ToolCallId" Decode.string) }
@@ -294,6 +300,9 @@ module MagicTodoFactCodec =
                             |> Option.map ProviderRunIdentity.create }
                 | other -> failwith ("unknown MagicTodoFact case: " + other))
 
-        match Decode.fromString decoder json with
-        | Ok fact -> Ok fact
-        | Error err -> Error err
+        try
+            match Decode.fromString decoder json with
+            | Ok fact -> Ok fact
+            | Error err -> Error err
+        with error ->
+            Error error.Message

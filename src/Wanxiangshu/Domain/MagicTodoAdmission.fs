@@ -51,27 +51,27 @@ module MagicTodoAdmission =
         (localized: LocalizedToolCall)
         (rawInputs: MagicTodoInputItem list)
         : AdmissionOutcome =
-        match mayProceedPastLag1 with
+        match MagicTodo.admitTodowriteBatch localized.TodowriteCallIdsInMessage with
         | Error e -> AdmissionOutcome.Rejected e
         | Ok() ->
-            match MagicTodo.admitTodowriteBatch localized.TodowriteCallIdsInMessage with
-            | Error e -> AdmissionOutcome.Rejected e
-            | Ok() ->
-                let writeId = MagicTodo.todoWriteId sha256 lifeId localized.ToolCallId
+            let writeId = MagicTodo.todoWriteId sha256 lifeId localized.ToolCallId
 
-                match existingPrepared with
-                | Some existing when TodoWriteId.value existing.TodoWriteId = TodoWriteId.value writeId ->
-                    let observed =
-                        { ManagerLifeId = lifeId
-                          ProviderInputDigest = localized.ProviderInputDigest
-                          BaseTodoDigest = MagicTodo.listDigest sha256 settledCurrent
-                          ToolPartOrdinal = localized.ToolPartOrdinal }
+            match existingPrepared with
+            | Some existing when TodoWriteId.value existing.TodoWriteId = TodoWriteId.value writeId ->
+                let observed =
+                    { ManagerLifeId = lifeId
+                      ProviderInputDigest = localized.ProviderInputDigest
+                      BaseTodoDigest = MagicTodo.listDigest sha256 settledCurrent
+                      ToolPartOrdinal = localized.ToolPartOrdinal }
 
-                    match MagicTodo.checkPreparedReplay existing.Identity observed with
-                    | Error e -> AdmissionOutcome.Rejected e
-                    | Ok() -> AdmissionOutcome.IdempotentReplay writeId
-                | Some _ -> AdmissionOutcome.Rejected(MagicTodoReject.IdentityCorruption "TodoWriteId")
-                | None ->
+                match MagicTodo.checkPreparedReplay existing.Identity observed with
+                | Error e -> AdmissionOutcome.Rejected e
+                | Ok() -> AdmissionOutcome.IdempotentReplay writeId
+            | Some _ -> AdmissionOutcome.Rejected(MagicTodoReject.IdentityCorruption "TodoWriteId")
+            | None ->
+                match mayProceedPastLag1 with
+                | Error e -> AdmissionOutcome.Rejected e
+                | Ok() ->
                     match MagicTodo.normalizeProposed sha256 lifeId localized.ToolCallId settledCurrent rawInputs with
                     | Error e -> AdmissionOutcome.Rejected e
                     | Ok proposed ->

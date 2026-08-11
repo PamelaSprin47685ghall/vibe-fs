@@ -190,34 +190,8 @@ module MagicTodoSurface =
 
     // ── Canonical list wire (tool result / blob body) ──────────────────────
 
-    /// Minimal JSON string escape (Fable-safe; no System.Text.Json).
-    let private jsonString (value: string) : string =
-        let sb = StringBuilder(value.Length + 8)
-        sb.Append('"') |> ignore
-
-        for c in value do
-            match c with
-            | '"' -> sb.Append("\\\"") |> ignore
-            | '\\' -> sb.Append("\\\\") |> ignore
-            | '\n' -> sb.Append("\\n") |> ignore
-            | '\r' -> sb.Append("\\r") |> ignore
-            | '\t' -> sb.Append("\\t") |> ignore
-            | _ when int c < 0x20 -> sb.Append(sprintf "\\u%04x" (int c)) |> ignore
-            | _ -> sb.Append(c) |> ignore
-
-        sb.Append('"') |> ignore
-        sb.ToString()
-
-    let renderItemWire (item: MagicTodoItem) : string =
-        sprintf
-            """{"id":%s,"content":%s,"status":%s,"priority":%s}"""
-            (jsonString (TodoItemId.value item.Id))
-            (jsonString item.Content)
-            (jsonString (TodoStatus.wire item.Status))
-            (jsonString item.Priority)
-
     let renderListWire (items: MagicTodoList) : string =
-        items |> List.map renderItemWire |> String.concat ",\n" |> sprintf "[\n%s\n]"
+        MagicTodo.canonicalListWire items
     // ── Enriched tool result (§22) — byte-stable renderer ──────────────────
 
     type PreviousReviewView =

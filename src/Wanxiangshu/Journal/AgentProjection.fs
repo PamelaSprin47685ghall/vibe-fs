@@ -65,6 +65,8 @@ type AgentProjectionSet =
         /// three handle facts (link / complete / retire), and retired records stay
         /// — the tombstone is permanent (EXEC-009).
         HandleByChildSession: Map<SessionId, HandleRecord>
+        /// Canonical per-Life Magic Todo checkpoint projection.
+        MagicTodo: MagicTodoProjection.MagicTodoProjectionState
     }
 
 /// Composition of bounded session projections. Fact routing lives in Fold.fs.
@@ -90,7 +92,8 @@ module AgentProjection =
         { Sessions = Map.empty
           Associations = SessionAssociationProjection.empty
           Orchestrator = OrchestratorProjection.empty
-          HandleByChildSession = Map.empty }
+          HandleByChildSession = Map.empty
+          MagicTodo = MagicTodoProjection.empty }
 
     let tryFind (sessionId: SessionId) (projection: AgentProjectionSet) =
         Map.tryFind sessionId projection.Sessions

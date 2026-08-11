@@ -40,6 +40,16 @@ module XTraceCapture =
         | SemanticToolResult result -> "tool_result", None, result
         | SemanticMedia(mediaType, _digest) -> "media_omitted", None, (mediaType |> Option.defaultValue "")
 
+    type private TraceSourcePart =
+        { Part: SemanticPart
+          ToolCallId: ToolCallId option
+          HostToolPartId: HostToolPartId option }
+
+    type private TraceSourceMessage =
+        { Role: string
+          ProviderRun: ProviderRunIdentity option
+          Parts: TraceSourcePart list }
+
     let private xTraceOf (journal: AgentJournal) (sessionId: SessionId) =
         AgentJournal.snapshot journal
         |> fun projection -> AgentProjection.tryFind sessionId projection.AgentProjections
@@ -296,10 +306,18 @@ module XTraceCapture =
     /// caller can refresh the in-memory Companion mirror — otherwise the chunker
     /// keeps mapping against the stale trace captured at construction and re-reads
     /// the projection head every round.
-    let captureProjection
+    let private semanticPartFromWire (part: WirePart) : SemanticPart =
+        match part with
+        | WireText text -> SemanticText text
+        | WireReasoning text -> SemanticReasoning text
+        | WireToolCall(_, name, args) -> SemanticToolCall(name, args)
+        | WireToolResult(_, result) -> SemanticToolResult result
+        | WireMedia(mediaType, digest) -> SemanticMedia(mediaType, digest)
+
+    let private captureSources
         (journal: AgentJournal option)
         (sessionId: SessionId)
-        (projection: ProviderSemanticProjection)
+        (messages: TraceSourceMessage list)
         : XTraceProjectionState option =
         match journal with
         | None -> None
@@ -313,10 +331,10 @@ module XTraceCapture =
             // DSL-MUTABLE: algorithm-scratch — monotone projection cursor advanced by the fold
             let mutable cursor = XTraceProjection.headSequence existing
 
-            projection.Messages
+            messages
             |> List.iteri (fun turnIndex message ->
                 message.Parts
-                |> List.iteri (fun partIndex part ->
+                |> List.iteri (fun partIndex source ->
                     // g:N isolates Host renumbering after ContextReanchored (HOST-006).
                     // PrefixRebase does not grow ReanchoredRuns, so ordinary epoch
                     // promotion keeps the same generation and stays idempotent.
@@ -324,7 +342,7 @@ module XTraceCapture =
 
                     if not (Set.contains provenance recorded) then
                         cursor <- cursor + 1L
-                        let kind, toolName, body = partShape part
+                        let kind, toolName, body = partShape source.Part
 
                         match durable.WriteBlob body with
                         | Error error ->
@@ -344,7 +362,51 @@ module XTraceCapture =
                                    TextRef = blob.BlobRef
                                    TextDigest = blob.BlobDigest
                                    Provenance = provenance
-                                   ProviderRun = None |}
-                            |> appendFact durable sessionId None))
+                                   ProviderRun = message.ProviderRun
+                                   ToolCallId = source.ToolCallId
+                                   HostToolPartId = source.HostToolPartId |}
+                            |> appendFact durable sessionId message.ProviderRun))
 
             Some(xTraceOf durable sessionId)
+
+    let captureProjection
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (projection: ProviderSemanticProjection)
+        : XTraceProjectionState option =
+        projection.Messages
+        |> List.map (fun message ->
+            { Role = message.Role
+              ProviderRun = None
+              Parts =
+                message.Parts
+                |> List.map (fun part ->
+                    { Part = part
+                      ToolCallId = None
+                      HostToolPartId = None }) })
+        |> captureSources journal sessionId
+
+    /// Capture an already-decoded transform view with the assistant message and
+    /// Host ToolPart identities that localize a V1 tool invocation.
+    let captureMessageView
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (messages: Projection.CapturedWireMessage list)
+        : XTraceProjectionState option =
+        messages
+        |> List.map (fun message ->
+            { Role = message.Role
+              ProviderRun = message.ProviderRun
+              Parts =
+                message.Parts
+                |> List.map (fun captured ->
+                    let toolCallId =
+                        match captured.WirePart with
+                        | WireToolCall(callId, _, _)
+                        | WireToolResult(callId, _) -> Some callId
+                        | _ -> None
+
+                    { Part = semanticPartFromWire captured.WirePart
+                      ToolCallId = toolCallId
+                      HostToolPartId = captured.HostToolPartId }) })
+        |> captureSources journal sessionId

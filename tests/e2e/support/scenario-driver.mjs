@@ -756,7 +756,7 @@ function reportFlowDistribution(name, timings, totalMs) {
   );
 }
 
-export async function runCanary(scriptName, { customs } = {}) {
+export async function runCanary(scriptName, { customs, preFlow } = {}) {
   const doc = loadScenario(scriptName);
   let scenario;
   const ctx = { customs: customs || {} };
@@ -778,6 +778,11 @@ export async function runCanary(scriptName, { customs } = {}) {
     attachEventCeilings(scenario, eventCeilings);
 
     scenario.provider.attachScenario(new ScenarioRuntime(doc));
+
+    if (Array.isArray(doc.setup?.preFlowTurns) && doc.setup.preFlowTurns.length > 0 && !preFlow) {
+      throw new Error('scenario declares preFlowTurns but no preFlow handler was supplied');
+    }
+    if (preFlow) await preFlow(scenario, ctx);
 
     const agent = doc.session?.agent || doc.prompt?.agent;
     if (agent || doc.session) {

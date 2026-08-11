@@ -17,6 +17,19 @@ open Wanxiangshu.Kernel.Identity
 ///
 /// The reconcile layer constructs the typed identity at the point where the role
 /// is known. This is the Host-raw boundary the migration allows an adapter at.
+[<RequireQualifiedAccess>]
+type SnapshotToolPartState =
+    | Pending
+    | Completed of outputCanonical: string
+    | Failed of errorCanonical: string
+
+type SessionToolPart =
+    { HostToolPartId: HostToolPartId
+      ToolCallId: ToolCallId
+      ToolName: string
+      InputCanonical: string
+      State: SnapshotToolPartState }
+
 type SessionMessage =
     {
         Id: string
@@ -46,6 +59,7 @@ type SessionMessage =
         /// matched to a physical message after a restart.
         PromptKey: string option
         Parts: MessagePart array
+        ToolParts: SessionToolPart array
     }
 
 type ISessionSnapshotPort =
@@ -71,6 +85,91 @@ module SessionSnapshotPort =
         else
             try
                 HostMessageCodec.decodeParts (unbox<obj array> raw?parts)
+            with _ ->
+                [||]
+
+    let private canonicalValue (value: obj) =
+        if isNull value then "null" else CanonicalJson.canonicalJson value
+
+    let private toolPartsOf (raw: obj) : SessionToolPart array =
+        if isNull raw || isNull raw?parts then
+            [||]
+        else
+            try
+                unbox<obj array> raw?parts
+                |> Array.choose (fun part ->
+                    if isNull part then
+                        None
+                    else
+                        let kind =
+                            readString part?``type``
+                            |> Option.defaultValue ""
+                            |> fun value -> value.ToLowerInvariant()
+
+                        let isTool =
+                            kind = "tool"
+                            || kind = "tool-call"
+                            || kind = "tool_call"
+                            || kind.StartsWith "tool-"
+
+                        if not isTool then
+                            None
+                        else
+                            let state = if isNull part?state then null else part?state
+
+                            let callId =
+                                readString part?toolCallId
+                                |> Option.orElse (readString part?callID)
+                                |> Option.orElse (readString part?callId)
+
+                            let toolName =
+                                readString part?tool |> Option.orElse (readString part?name)
+
+                            let hostToolPartId = readString part?id
+
+                            match hostToolPartId, callId, toolName with
+                            | Some partId, Some call, Some name ->
+                                let input =
+                                    if not (isNull state) && not (isNull state?input) then
+                                        state?input
+                                    elif not (isNull part?input) then
+                                        part?input
+                                    elif not (isNull part?args) then
+                                        part?args
+                                    else
+                                        part?arguments
+
+                                let stateValue =
+                                    readString (if isNull state then null else state?status)
+                                    |> Option.map (fun value -> value.ToLowerInvariant())
+                                    |> Option.defaultValue "pending"
+
+                                let toolState =
+                                    match stateValue with
+                                    | "completed" ->
+                                        let output =
+                                            if isNull state then null
+                                            elif not (isNull state?output) then state?output
+                                            else state?result
+
+                                        SnapshotToolPartState.Completed(canonicalValue output)
+                                    | "error" ->
+                                        let error =
+                                            if isNull state then null
+                                            elif not (isNull state?error) then state?error
+                                            elif not (isNull state?errorText) then state?errorText
+                                            else state?output
+
+                                        SnapshotToolPartState.Failed(canonicalValue error)
+                                    | _ -> SnapshotToolPartState.Pending
+
+                                Some
+                                    { HostToolPartId = HostToolPartId.create partId
+                                      ToolCallId = ToolCallId.create call
+                                      ToolName = name
+                                      InputCanonical = canonicalValue input
+                                      State = toolState }
+                            | _ -> None)
             with _ ->
                 [||]
 
@@ -211,10 +310,56 @@ module SessionSnapshotPort =
                       Completed = completedOf info raw
                       IsCompaction = isCompactionOf info raw
                       PromptKey = promptKeyOf info raw
-                      Parts = partsOf raw }
+                      Parts = partsOf raw
+                      ToolParts = toolPartsOf raw }
 
     let projectMessages (rawMessages: obj array) =
         rawMessages |> Array.toList |> List.choose projectMessage
+
+    type ToolCallLocation =
+        { ProviderRun: ProviderRunIdentity
+          HostToolPartId: HostToolPartId
+          ToolCallId: ToolCallId
+          ToolName: string
+          InputCanonical: string
+          State: SnapshotToolPartState }
+
+    [<RequireQualifiedAccess>]
+    type ToolCallLocationError =
+        | Missing of toolCallId: ToolCallId
+        | Ambiguous of toolCallId: ToolCallId
+
+    /// Resolve one tool callback through the Host's persisted assistant message.
+    /// `callID` alone is not a ProviderRun binding; the enclosing assistant
+    /// message and persisted ToolPart are the only admissible evidence.
+    let locateToolCall
+        (toolCallId: ToolCallId)
+        (messages: SessionMessage list)
+        : Result<ToolCallLocation, ToolCallLocationError> =
+        let candidates =
+            messages
+            |> List.collect (fun message ->
+                if message.Role <> "assistant" then
+                    []
+                else
+                    message.ToolParts
+                    |> Array.toList
+                    |> List.choose (fun part ->
+                        if part.ToolCallId = toolCallId then
+                            Some
+                                { ProviderRun = ProviderRunIdentity.create message.Id
+                                  HostToolPartId = part.HostToolPartId
+                                  ToolCallId = part.ToolCallId
+                                  ToolName = part.ToolName
+                                  InputCanonical = part.InputCanonical
+                                  State = part.State }
+                        else
+                            None))
+
+        match candidates with
+        | [ location ] -> Ok location
+        | [] -> Error(ToolCallLocationError.Missing toolCallId)
+        | _ -> Error(ToolCallLocationError.Ambiguous toolCallId)
 
     [<Emit("Array.isArray($0)")>]
     let private isJsArray (value: obj) : bool = jsNative

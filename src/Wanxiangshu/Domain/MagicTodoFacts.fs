@@ -4,11 +4,11 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Domain.MagicTodo
 
-/// Magic Todo durable fact algebra (protocol §16).
+/// Magic Todo durable fact algebra (TODO-004/006/012).
 ///
-/// Speculative / unwired: parallel family ready to plug into `Fact.AgentFact` /
-/// Fold. Not yet dispatched from Journal.Boot. Illegal intermediate Stages are
-/// deliberately absent — pending review is derived from Accepted ∧ ¬Concluded.
+/// Canonical codec bytes enter the top-level journal `Fact.MagicTodo` boundary;
+/// Boot decodes and folds them into the one MagicTodo projection. Illegal
+/// intermediate stages are absent: pending review is Accepted ∧ ¬Concluded.
 module MagicTodoFacts =
 
     /// Physical success evidence for TodoWriteAccepted (protocol §15 / §16.2).
@@ -32,6 +32,8 @@ module MagicTodoFacts =
             BaseTodoDigest: BlobDigest
             ProposedTodoRef: BlobRef
             ProposedTodoDigest: BlobDigest
+            /// Digest of the tagged provider arguments before normalization.
+            ProviderInputDigest: string
             /// Exclusive frontier immediately before this tool-call in the Life.
             ReviewFrontier: XTraceCursor
             SemanticVersion: string
@@ -43,8 +45,8 @@ module MagicTodoFacts =
             ManagerLifeId: ManagerLifeId
             TodoWriteId: TodoWriteId
             ToolCallId: ToolCallId
-            /// Journal line / envelope identity of the matching Prepared (opaque ref).
-            PreparedFactRef: string
+            /// Journal envelope identity of the matching Prepared.
+            PreparedFactRef: EventId
             InputDigest: string
             OutputDigest: string
             PhysicalSuccessEvidence: PhysicalSuccessEvidence
@@ -76,6 +78,8 @@ module MagicTodoFacts =
           Verdict: ProcessReviewVerdict
           WorkRecordRef: BlobRef
           WorkRecordDigest: BlobDigest
+          SettledTodoRef: BlobRef
+          SettledTodoDigest: BlobDigest
           ReviewerRecordFrontier: XTraceCursor
           ProviderRunId: ProviderRunIdentity
           ToolCallId: ToolCallId }
@@ -113,8 +117,8 @@ module MagicTodoFacts =
         | Probe of probeId: string
         | TodoCheckpoint of triggerTodoWriteId: TodoWriteId * coveredBeforeTodoWriteId: TodoWriteId option
 
-    /// Speculative PrefixRebaseCommitted payload with EvidenceKind.
-    /// When wired, replaces / extends ContextFactCases.PrefixRebaseCommitted.
+    /// Todo-aware PrefixRebaseCommitted payload with EvidenceKind.
+    /// Fold routes it into the existing PrefixEpochProjection SSOT.
     type PrefixRebaseCommittedV2 =
         {
             SessionId: SessionId

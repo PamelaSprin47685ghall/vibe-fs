@@ -11,6 +11,7 @@ open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Host
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Session
 open Wanxiangshu.Tools
 
 [<RequireQualifiedAccess>]
@@ -295,6 +296,9 @@ type StrengthReplicaRuntime
                                   TargetProviderRun = targetProviderRun
                                   CanonicalRole = managed.Role
                                   Budget = budget
+                                  MaxFrameBytes = frameByteLimit
+                                  SemanticDigest = mirrorSemanticDigest
+                                  MirrorMessages = frozenMirror
                                   ToolCapabilitySet = capabilities }
 
                             match liveRegistry.Register binding with
@@ -313,9 +317,8 @@ type StrengthReplicaRuntime
                                 if not collectorClaimed then
                                     liveRegistry.Retire replica |> ignore
                                     do! abortReplica state
-                                    return Error "StrengthReplica collector state collided after live registration"
-                                else
-                                    registerReplica owner replica fastAgent
+                                    raise (InvalidOperationException "StrengthReplica collector state collided after live registration")
+                                registerReplica owner replica fastAgent
 
                                 let tools = StrengthReplicaTools.exactReadonlyHostToolMap
 
@@ -323,7 +326,8 @@ type StrengthReplicaRuntime
                                     // Mechanism-neutral bootstrap text. The Replica transform
                                     // replaces this physical child history with FrozenMirror
                                     // before the provider sees request #1.
-                                    match!
+                                    let!
+                                        dispatchResult =
                                         dispatcher.SendAgentOwnerRootWithTools
                                             sessions
                                             replica
@@ -333,16 +337,31 @@ type StrengthReplicaRuntime
                                             PromptDispatcher.AwaitMode.Detached
                                             None
                                             tools
-                                    with
+
+                                    match dispatchResult with
                                     | Error error ->
                                         complete (StrengthReplicaTerminal.Failed error) state
+                                        do! abortReplica state
                                     | Ok _ -> ()
 
                                     let deadline = timer.Delay latencyMs
                                     let completionTask = state.Completion.Task
-                                    let! winner = Task.WhenAny([| completionTask :> Task; deadline.Delay :> Task |])
 
-                                    if Object.ReferenceEquals(winner, completionTask :> Task) then
+                                    let completedFirst: Task<bool> =
+                                        task {
+                                            let! _ = completionTask
+                                            return true
+                                        }
+
+                                    let deadlineFirst: Task<bool> =
+                                        task {
+                                            do! deadline.Delay
+                                            return false
+                                        }
+
+                                    let! completionWon = emitJsExpr (completedFirst, deadlineFirst) "Promise.race([$0, $1])": Task<bool>
+
+                                    if completionWon then
                                         deadline.Cancel()
                                     else
                                         complete StrengthReplicaTerminal.TimedOut state

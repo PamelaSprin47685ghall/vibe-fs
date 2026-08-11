@@ -162,6 +162,7 @@ test('VERIFY_005_the_journal_publishes_boot_append_and_snapshot', async () => {
     'AgentJournalModule_createFromEventStore',
     'AgentJournalModule_createFromProjection',
     'AgentJournalModule_appendAgent',
+    'AgentJournalModule_appendMagicTodo',
     'AgentJournalModule_snapshot',
     'AgentJournalModule_revision',
     'AgentJournalModule_snapshotWithRevision',

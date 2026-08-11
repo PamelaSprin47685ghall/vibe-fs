@@ -474,7 +474,9 @@ module Fact =
                TextRef: BlobRef
                TextDigest: BlobDigest
                Provenance: string
-               ProviderRun: ProviderRunIdentity option |}
+               ProviderRun: ProviderRunIdentity option
+               ToolCallId: ToolCallId option
+               HostToolPartId: HostToolPartId option |}
 
         /// COMPANION-003: the Session's terminal output, captured verbatim at
         /// reconcile. Idempotent and never overwritten. The body goes to a blob.
@@ -922,3 +924,5 @@ module Fact =
         | Runtime of RuntimeFact
         | Agent of AgentFact
         | ManagerLifecycle of ManagerLifecycleFact
+        /// Typed Magic Todo facts cross this earlier Kernel boundary as canonical codec bytes.
+        | MagicTodo of payload: string

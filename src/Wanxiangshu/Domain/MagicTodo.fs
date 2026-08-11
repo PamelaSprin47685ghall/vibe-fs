@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Domain
 
 open System
+open System.Text
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
@@ -182,18 +183,40 @@ module MagicTodo =
             sha256 (String.concat "|" [ ManagerLifeId.value lifeId; "dedicated-todo-reviewer" ])
         )
 
-    /// Canonical list digest for BaseTodoDigest / ProposedTodoDigest / identity checks.
-    let listDigest (sha256: string -> string) (items: MagicTodoList) : string =
+    let private jsonString (value: string) =
+        let builder = StringBuilder(value.Length + 8)
+        builder.Append('"') |> ignore
+
+        for character in value do
+            match character with
+            | '"' -> builder.Append("\\\"") |> ignore
+            | '\\' -> builder.Append("\\\\") |> ignore
+            | '\n' -> builder.Append("\\n") |> ignore
+            | '\r' -> builder.Append("\\r") |> ignore
+            | '\t' -> builder.Append("\\t") |> ignore
+            | _ when int character < 0x20 -> builder.Append(sprintf "\\u%04x" (int character)) |> ignore
+            | _ -> builder.Append(character) |> ignore
+
+        builder.Append('"') |> ignore
+        builder.ToString()
+
+    /// Canonical durable body for BaseTodo / ProposedTodo / SettledCurrent blobs.
+    /// Its SHA-256 is therefore the one digest carried by the corresponding fact.
+    let canonicalListWire (items: MagicTodoList) : string =
         items
         |> List.map (fun item ->
-            String.concat
-                "\u001f"
-                [ TodoItemId.value item.Id
-                  item.Content
-                  TodoStatus.wire item.Status
-                  item.Priority ])
-        |> String.concat "\u001e"
-        |> fun body -> sha256 (body + "|magic-todo-list")
+            sprintf
+                """{"id":%s,"content":%s,"status":%s,"priority":%s}"""
+                (jsonString (TodoItemId.value item.Id))
+                (jsonString item.Content)
+                (jsonString (TodoStatus.wire item.Status))
+                (jsonString item.Priority))
+        |> String.concat ","
+        |> sprintf "[%s]"
+
+    /// Canonical list digest for BaseTodoDigest / ProposedTodoDigest / identity checks.
+    let listDigest (sha256: string -> string) (items: MagicTodoList) : string =
+        canonicalListWire items |> sha256
 
     // ── Completed gate (§8.1) ──────────────────────────────────────────────
 

@@ -15,15 +15,18 @@ open Wanxiangshu.Kernel.Identity
 module MagicTodoProjection =
 
     type CheckpointRecord =
-        { TodoWriteId: TodoWriteId
+        { ManagerSessionId: SessionId
+          TodoWriteId: TodoWriteId
           ToolCallId: ToolCallId
           ToolPartOrdinal: int
           BaseTodoDigest: BlobDigest
           ProposedTodoDigest: BlobDigest
           BaseTodoRef: BlobRef
           ProposedTodoRef: BlobRef
+          ProviderInputDigest: string
           ReviewFrontier: XTraceCursor
-          PreparedFactRef: string option
+          SemanticVersion: string
+          PreparedFactRef: EventId
           InputDigest: string option
           OutputDigest: string option
           Accepted: bool
@@ -38,17 +41,14 @@ module MagicTodoProjection =
     type LifeMagicTodoState =
         {
             LifeId: ManagerLifeId
-            /// Settled current (Ck for the next prepare). Empty for a normal new Life.
-            SettledCurrent: MagicTodoList
-            /// Optimistic working proposal after latest Accepted, if any (Pk).
-            /// Canonical settlement still waits for Concluded of that checkpoint.
-            WorkingProposal: MagicTodoList option
+            /// Settled current (Ck for the next prepare). None means normal new Life.
+            SettledCurrentRef: (BlobRef * BlobDigest) option
             /// Accepted chain in order (lag-1 desired cutoff source).
             AcceptedOrder: TodoWriteId list
             Checkpoints: Map<string, CheckpointRecord>
             Dedicated: DedicatedReviewerState option
-            /// Blob list bodies live in the blob store; projection keeps digests/refs.
-            LegacySeedAdopted: bool
+            /// Blob list bodies live in the blob store; projection keeps their locator and ids.
+            LegacySeed: (BlobRef * BlobDigest * TodoItemId list) option
         }
 
     type MagicTodoProjectionState =
@@ -58,11 +58,12 @@ module MagicTodoProjection =
     type MagicTodoFoldRejection =
         | LifeMismatch of expected: string * actual: string
         | PreparedMissingForAccept of todoWriteId: string
+        | OutstandingReviewBeforePrepare of pendingTodoWriteId: string
         | IdentityCorruption of field: string
-        | DuplicateConcluded of todoWriteId: string
         | AssignmentWithoutAccepted of todoWriteId: string
         | ConcludedWithoutAccepted of todoWriteId: string
         | LegacySeedAfterCheckpoint
+        | DedicatedMissingForAssign
         | DedicatedMissingForReplace
 
     let empty: MagicTodoProjectionState = { ByLife = Map.empty }
@@ -73,12 +74,11 @@ module MagicTodoProjection =
 
     let emptyLife (lifeId: ManagerLifeId) : LifeMagicTodoState =
         { LifeId = lifeId
-          SettledCurrent = []
-          WorkingProposal = None
+          SettledCurrentRef = None
           AcceptedOrder = []
           Checkpoints = Map.empty
           Dedicated = None
-          LegacySeedAdopted = false }
+          LegacySeed = None }
 
     let tryLife (lifeId: ManagerLifeId) (state: MagicTodoProjectionState) : LifeMagicTodoState option =
         Map.tryFind (lifeKey lifeId) state.ByLife
@@ -125,23 +125,16 @@ module MagicTodoProjection =
     let desiredLag1 (life: LifeMagicTodoState) : TodoWriteId option =
         MagicTodo.desiredLag1Cutoff life.AcceptedOrder
 
-    /// Apply settlement when consuming a Concluded review: updates SettledCurrent.
-    let private applySettlement
+    let materializeSettledCurrent
         (decodeList: BlobRef -> BlobDigest -> MagicTodoList)
         (life: LifeMagicTodoState)
-        (cp: CheckpointRecord)
-        (concluded: TodoReviewConcluded)
-        : LifeMagicTodoState =
-        let baseList = decodeList cp.BaseTodoRef cp.BaseTodoDigest
-        let proposed = decodeList cp.ProposedTodoRef cp.ProposedTodoDigest
-        let settled = MagicTodo.settle baseList proposed concluded.Verdict
-
-        { life with
-            SettledCurrent = settled
-            // Working proposal cleared once settled; next Accepted sets a new one.
-            WorkingProposal = None }
+        : MagicTodoList =
+        match life.SettledCurrentRef with
+        | Some (blobRef, digest) -> decodeList blobRef digest
+        | None -> []
 
     let foldPrepared
+        (preparedFactRef: EventId)
         (payload: TodoWritePrepared)
         (state: MagicTodoProjectionState)
         : Result<MagicTodoProjectionState, MagicTodoFoldRejection> =
@@ -149,42 +142,59 @@ module MagicTodoProjection =
         let key = writeKey payload.TodoWriteId
 
         match Map.tryFind key life.Checkpoints with
-        | Some existing when existing.Accepted || existing.Concluded.IsSome ->
-            // Identity corruption if Prepared fields disagree with frozen record.
-            if existing.BaseTodoDigest <> payload.BaseTodoDigest then
+        | Some existing ->
+            if existing.ManagerSessionId <> payload.ManagerSessionId then
+                Error(MagicTodoFoldRejection.IdentityCorruption "ManagerSessionId")
+            elif existing.ToolCallId <> payload.ToolCallId then
+                Error(MagicTodoFoldRejection.IdentityCorruption "ToolCallId")
+            elif existing.ProviderInputDigest <> payload.ProviderInputDigest then
+                Error(MagicTodoFoldRejection.IdentityCorruption "ProviderInputDigest")
+            elif existing.BaseTodoDigest <> payload.BaseTodoDigest then
                 Error(MagicTodoFoldRejection.IdentityCorruption "BaseTodoDigest")
             elif existing.ProposedTodoDigest <> payload.ProposedTodoDigest then
                 Error(MagicTodoFoldRejection.IdentityCorruption "ProposedTodoDigest")
+            elif existing.BaseTodoRef <> payload.BaseTodoRef then
+                Error(MagicTodoFoldRejection.IdentityCorruption "BaseTodoRef")
+            elif existing.ProposedTodoRef <> payload.ProposedTodoRef then
+                Error(MagicTodoFoldRejection.IdentityCorruption "ProposedTodoRef")
             elif existing.ToolPartOrdinal <> payload.ToolPartOrdinal then
                 Error(MagicTodoFoldRejection.IdentityCorruption "ToolPartOrdinal")
+            elif existing.ReviewFrontier <> payload.ReviewFrontier then
+                Error(MagicTodoFoldRejection.IdentityCorruption "ReviewFrontier")
+            elif existing.SemanticVersion <> payload.SemanticVersion then
+                Error(MagicTodoFoldRejection.IdentityCorruption "SemanticVersion")
             else
                 Ok state
-        | Some _ ->
-            // Idempotent replay of same Prepared.
-            Ok state
         | None ->
-            let cp =
-                { TodoWriteId = payload.TodoWriteId
-                  ToolCallId = payload.ToolCallId
-                  ToolPartOrdinal = payload.ToolPartOrdinal
-                  BaseTodoDigest = payload.BaseTodoDigest
-                  ProposedTodoDigest = payload.ProposedTodoDigest
-                  BaseTodoRef = payload.BaseTodoRef
-                  ProposedTodoRef = payload.ProposedTodoRef
-                  ReviewFrontier = payload.ReviewFrontier
-                  PreparedFactRef = None
-                  InputDigest = None
-                  OutputDigest = None
-                  Accepted = false
-                  Assignment = None
-                  Concluded = None }
+            match pendingReviewObligation life with
+            | Some pending ->
+                Error(MagicTodoFoldRejection.OutstandingReviewBeforePrepare(TodoWriteId.value pending.TodoWriteId))
+            | None ->
+                let cp =
+                    { ManagerSessionId = payload.ManagerSessionId
+                      TodoWriteId = payload.TodoWriteId
+                      ToolCallId = payload.ToolCallId
+                      ToolPartOrdinal = payload.ToolPartOrdinal
+                      BaseTodoDigest = payload.BaseTodoDigest
+                      ProposedTodoDigest = payload.ProposedTodoDigest
+                      BaseTodoRef = payload.BaseTodoRef
+                      ProposedTodoRef = payload.ProposedTodoRef
+                      ProviderInputDigest = payload.ProviderInputDigest
+                      ReviewFrontier = payload.ReviewFrontier
+                      SemanticVersion = payload.SemanticVersion
+                      PreparedFactRef = preparedFactRef
+                      InputDigest = None
+                      OutputDigest = None
+                      Accepted = false
+                      Assignment = None
+                      Concluded = None }
 
-            Ok(
-                putLife
-                    { life with
-                        Checkpoints = Map.add key cp life.Checkpoints }
-                    state
-            )
+                Ok(
+                    putLife
+                        { life with
+                            Checkpoints = Map.add key cp life.Checkpoints }
+                        state
+                )
 
     let foldAccepted
         (payload: TodoWriteAccepted)
@@ -195,29 +205,25 @@ module MagicTodoProjection =
 
         match Map.tryFind key life.Checkpoints with
         | None -> Error(MagicTodoFoldRejection.PreparedMissingForAccept key)
+        | Some cp when cp.PreparedFactRef <> payload.PreparedFactRef ->
+            Error(MagicTodoFoldRejection.IdentityCorruption "PreparedFactRef")
+        | Some cp when cp.ToolCallId <> payload.ToolCallId ->
+            Error(MagicTodoFoldRejection.IdentityCorruption "ToolCallId")
+        | Some cp when cp.ProviderInputDigest <> payload.InputDigest ->
+            Error(MagicTodoFoldRejection.IdentityCorruption "InputDigest")
+        | Some cp when cp.SemanticVersion <> payload.SemanticVersion ->
+            Error(MagicTodoFoldRejection.IdentityCorruption "SemanticVersion")
         | Some cp when cp.Accepted ->
-            // Idempotent; live/recovery digests must converge.
             match cp.InputDigest, cp.OutputDigest with
-            | Some i, Some o when i = payload.InputDigest && o = payload.OutputDigest -> Ok state
+            | Some inputDigest, Some outputDigest
+                when inputDigest = payload.InputDigest && outputDigest = payload.OutputDigest ->
+                Ok state
             | Some _, Some _ -> Error(MagicTodoFoldRejection.IdentityCorruption "AcceptedDigest")
-            | _ ->
-                let cp =
-                    { cp with
-                        PreparedFactRef = Some payload.PreparedFactRef
-                        InputDigest = Some payload.InputDigest
-                        OutputDigest = Some payload.OutputDigest }
-
-                Ok(
-                    putLife
-                        { life with
-                            Checkpoints = Map.add key cp life.Checkpoints }
-                        state
-                )
+            | _ -> Error(MagicTodoFoldRejection.IdentityCorruption "AcceptedState")
         | Some cp ->
             let cp =
                 { cp with
                     Accepted = true
-                    PreparedFactRef = Some payload.PreparedFactRef
                     InputDigest = Some payload.InputDigest
                     OutputDigest = Some payload.OutputDigest }
 
@@ -235,16 +241,6 @@ module MagicTodoProjection =
                     state
             )
 
-    /// Overlay WorkingProposal after Accepted (blob decode stays at the call site).
-    let withWorkingProposal (lifeId: ManagerLifeId) (proposed: MagicTodoList) (state: MagicTodoProjectionState) =
-        match tryLife lifeId state with
-        | None -> state
-        | Some life ->
-            putLife
-                { life with
-                    WorkingProposal = Some proposed }
-                state
-
     let foldAssigned
         (payload: TodoProcessReviewAssigned)
         (state: MagicTodoProjectionState)
@@ -256,19 +252,25 @@ module MagicTodoProjection =
         | None
         | Some { Accepted = false } -> Error(MagicTodoFoldRejection.AssignmentWithoutAccepted key)
         | Some cp ->
-            match cp.Assignment with
-            | Some existing when existing.TodoReviewId = payload.TodoReviewId -> Ok state
-            | Some _ -> Error(MagicTodoFoldRejection.IdentityCorruption "TodoReviewId")
-            | None ->
-                Ok(
-                    putLife
-                        { life with
-                            Checkpoints = Map.add key { cp with Assignment = Some payload } life.Checkpoints }
-                        state
-                )
+            match life.Dedicated with
+            | None -> Error MagicTodoFoldRejection.DedicatedMissingForAssign
+            | Some dedicated
+                when dedicated.DedicatedReviewerId <> payload.DedicatedReviewerId
+                     || dedicated.ReviewerSessionId <> payload.ReviewerSessionId ->
+                Error(MagicTodoFoldRejection.IdentityCorruption "DedicatedReviewer")
+            | Some _ ->
+                match cp.Assignment with
+                | Some existing when existing = payload -> Ok state
+                | Some _ -> Error(MagicTodoFoldRejection.IdentityCorruption "TodoProcessReviewAssigned")
+                | None ->
+                    Ok(
+                        putLife
+                            { life with
+                                Checkpoints = Map.add key { cp with Assignment = Some payload } life.Checkpoints }
+                            state
+                    )
 
     let foldConcluded
-        (decodeList: BlobRef -> BlobDigest -> MagicTodoList)
         (payload: TodoReviewConcluded)
         (state: MagicTodoProjectionState)
         : Result<MagicTodoProjectionState, MagicTodoFoldRejection> =
@@ -278,17 +280,29 @@ module MagicTodoProjection =
         match Map.tryFind key life.Checkpoints with
         | None
         | Some { Accepted = false } -> Error(MagicTodoFoldRejection.ConcludedWithoutAccepted key)
-        | Some { Concluded = Some _ } -> Error(MagicTodoFoldRejection.DuplicateConcluded key)
+        | Some { Concluded = Some existing } ->
+            if existing = payload then
+                Ok state
+            else
+                Error(MagicTodoFoldRejection.IdentityCorruption "TodoReviewConcluded")
         | Some cp ->
-            let cp = { cp with Concluded = Some payload }
+            match cp.Assignment with
+            | None -> Error(MagicTodoFoldRejection.AssignmentWithoutAccepted key)
+            | Some assignment ->
+                if assignment.TodoReviewId <> payload.TodoReviewId
+                   || assignment.DedicatedReviewerId <> payload.DedicatedReviewerId
+                   || assignment.ReviewerSessionId <> payload.ReviewerSessionId then
+                    Error(MagicTodoFoldRejection.IdentityCorruption "TodoReviewAssignment")
+                else
+                    let cp = { cp with Concluded = Some payload }
 
-            let life =
-                { life with
-                    Checkpoints = Map.add key cp life.Checkpoints }
-            // Settlement applies when Concluded becomes durable — next prepare
-            // reads SettledCurrent as C(k+1). Suicide drain uses the same path.
-            let life = applySettlement decodeList life cp payload
-            Ok(putLife life state)
+                    Ok(
+                        putLife
+                            { life with
+                                Checkpoints = Map.add key cp life.Checkpoints
+                                SettledCurrentRef = Some(payload.SettledTodoRef, payload.SettledTodoDigest) }
+                            state
+                    )
 
     let foldDedicatedEnlisted (payload: DedicatedTodoReviewerEnlisted) (state: MagicTodoProjectionState) =
         let life, state = ensureLife payload.ManagerLifeId state
@@ -335,40 +349,42 @@ module MagicTodoProjection =
             )
 
     let foldLegacySeed
-        (decodeList: BlobRef -> BlobDigest -> MagicTodoList)
         (payload: LegacyTodoSeedAdopted)
         (state: MagicTodoProjectionState)
         : Result<MagicTodoProjectionState, MagicTodoFoldRejection> =
         let life, state = ensureLife payload.ManagerLifeId state
 
-        if life.LegacySeedAdopted then
+        match life.LegacySeed with
+        | Some(seedRef, seedDigest, seedItemIds)
+            when seedRef = payload.SeedTodoRef
+                 && seedDigest = payload.SeedTodoDigest
+                 && seedItemIds = payload.SeedItemIds ->
             Ok state
-        elif not (List.isEmpty life.AcceptedOrder) then
+        | Some _ -> Error(MagicTodoFoldRejection.IdentityCorruption "LegacyTodoSeed")
+        | None when not (Map.isEmpty life.Checkpoints) ->
             Error MagicTodoFoldRejection.LegacySeedAfterCheckpoint
-        else
-            let seeded = decodeList payload.SeedTodoRef payload.SeedTodoDigest
-
+        | None ->
             Ok(
                 putLife
                     { life with
-                        SettledCurrent = seeded
-                        LegacySeedAdopted = true }
+                        SettledCurrentRef = Some(payload.SeedTodoRef, payload.SeedTodoDigest)
+                        LegacySeed = Some(payload.SeedTodoRef, payload.SeedTodoDigest, payload.SeedItemIds) }
                     state
             )
 
     /// Dispatch one Magic Todo fact. PrefixRebaseCommittedV2 is owned by
     /// PrefixEpochProjection once wired — ignored here (no todo-list effect).
     let fold
-        (decodeList: BlobRef -> BlobDigest -> MagicTodoList)
+        (envelopeEventId: EventId)
         (state: MagicTodoProjectionState)
         (fact: MagicTodoFact)
         : Result<MagicTodoProjectionState, MagicTodoFoldRejection> =
         match fact with
-        | MagicTodoFact.TodoWritePrepared payload -> foldPrepared payload state
+        | MagicTodoFact.TodoWritePrepared payload -> foldPrepared envelopeEventId payload state
         | MagicTodoFact.TodoWriteAccepted payload -> foldAccepted payload state
         | MagicTodoFact.TodoProcessReviewAssigned payload -> foldAssigned payload state
-        | MagicTodoFact.TodoReviewConcluded payload -> foldConcluded decodeList payload state
+        | MagicTodoFact.TodoReviewConcluded payload -> foldConcluded payload state
         | MagicTodoFact.DedicatedTodoReviewerEnlisted payload -> foldDedicatedEnlisted payload state
         | MagicTodoFact.DedicatedTodoReviewerReplaced payload -> foldDedicatedReplaced payload state
-        | MagicTodoFact.LegacyTodoSeedAdopted payload -> foldLegacySeed decodeList payload state
+        | MagicTodoFact.LegacyTodoSeedAdopted payload -> foldLegacySeed payload state
         | MagicTodoFact.PrefixRebaseCommittedV2 _ -> Ok state

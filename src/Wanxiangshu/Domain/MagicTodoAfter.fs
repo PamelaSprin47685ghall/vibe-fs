@@ -35,7 +35,7 @@ module MagicTodoAfter =
         (expectedInputDigest: string)
         (observedInputDigest: string)
         (outputDigest: string)
-        (preparedFactRef: string)
+        (preparedFactRef: EventId)
         (dedicatedExists: bool)
         (concludedExists: bool)
         (previous: PreviousReviewView option)
