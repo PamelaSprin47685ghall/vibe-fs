@@ -59,6 +59,7 @@ module HostSignalBootstrap =
         task {
             let finalizeInspector =
                 defaultArg tryFinalizeInspector (fun _ _ -> Task.FromResult(Ok()))
+
             let cleanupInspectorDraft = defaultArg cleanupInspector (fun _ -> ())
 
             let snapshot =

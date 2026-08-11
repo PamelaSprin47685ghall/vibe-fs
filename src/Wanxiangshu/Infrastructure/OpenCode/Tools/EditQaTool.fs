@@ -43,15 +43,12 @@ module EditQaTool =
                 | None -> BookkeeperRuntime.txIdFor context.SessionId
 
             if String.IsNullOrWhiteSpace txId then
-                return ToolHostCodec.tomlObject [ "error", tString "edit-qa: no Bookkeeper transaction for this session" ]
+                return
+                    ToolHostCodec.tomlObject [ "error", tString "edit-qa: no Bookkeeper transaction for this session" ]
             else
                 match BookkeeperStaging.replace txId document oldText newText with
                 | Error err -> return ToolHostCodec.tomlObject [ "error", tString err ]
-                | Ok() ->
-                    return
-                        ToolHostCodec.tomlObject
-                            [ "status", tString "replaced"
-                              "document", tString document ]
+                | Ok() -> return ToolHostCodec.tomlObject [ "status", tString "replaced"; "document", tString document ]
         }
 
     let spec (factory: HostToolFactory) : ToolSpec =

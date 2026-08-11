@@ -127,20 +127,6 @@ module XWire =
                 match snapshotResult with
                 | Error reason -> raise (InvalidOperationException reason)
                 | Ok messages ->
-                    let bindingDiagnostic =
-                        messages
-                        |> List.map (fun message ->
-                            sprintf
-                                "%s:%b:%b"
-                                message.Role
-                                message.Completed
-                                (message.ParentId = Some(PhysicalUserMessageId.value physical)))
-                        |> String.concat ","
-
-                    Diagnostic.emit
-                        "strength-replica-bind-snapshot"
-                        [ "session_id", SessionId.value sessionId; "result", bindingDiagnostic ]
-
                     match ReviewSeal.bindableRun (PhysicalUserMessageId.value physical) messages with
                     | Error rejection ->
                         raise (InvalidOperationException(sprintf "StrengthReplica run binding failed: %A" rejection))

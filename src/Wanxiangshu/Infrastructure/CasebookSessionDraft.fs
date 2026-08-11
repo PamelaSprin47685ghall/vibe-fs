@@ -25,8 +25,7 @@ module CasebookDraftStore =
             match drafts.TryGetValue sessionId with
             | true, draft ->
                 match List.rev draft.Turns with
-                | last :: earlier ->
-                    drafts.[sessionId] <- { Turns = List.rev ({ last with A = Some a } :: earlier) }
+                | last :: earlier -> drafts.[sessionId] <- { Turns = List.rev ({ last with A = Some a } :: earlier) }
                 | [] -> drafts.[sessionId] <- { Turns = [ { Q = ""; A = Some a } ] }
             | false, _ -> drafts.[sessionId] <- { Turns = [ { Q = ""; A = Some a } ] })
 

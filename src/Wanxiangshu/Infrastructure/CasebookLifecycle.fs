@@ -67,6 +67,7 @@ module CasebookLifecycle =
                             let commonDir = RuntimePath.gitCommonDir workspaceRoot
                             let raw, store = WorkspaceEventStore.acquire commonDir
                             let observations = collector.Drain inspectorSessionId
+
                             let lastQ =
                                 draft.Turns
                                 |> List.tryLast

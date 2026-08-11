@@ -550,7 +550,9 @@ type SyncDelegateRuntime
             attached.Remove(sessionId, role) |> ignore
 
         inspectorOwned |> Option.iter (fun id -> cleanupInspectorDraft (sessionKey id))
-        stagedInspectorOwned |> Option.iter (fun id -> cleanupInspectorDraft (sessionKey id))
+
+        stagedInspectorOwned
+        |> Option.iter (fun id -> cleanupInspectorDraft (sessionKey id))
 
         inspectorAsDelegate
         |> Option.iter (fun id -> cleanupInspectorDraft (sessionKey id))

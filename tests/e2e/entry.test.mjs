@@ -35,7 +35,7 @@ import {
   assertG6BookkeeperFinalize,
   extractInspectorIdFromOwnerRequests,
 } from './support/long-stroke-oracles.mjs';
-import { countFactCase, readJournal } from './support/journal-observer.js';
+import { countFactCase, factPayloads, readJournal } from './support/journal-observer.js';
 import { WAIT_FACT_WINDOW_MS } from './support/time-budget.js';
 import {
   getOpencodeSpawnCount,
@@ -76,7 +76,7 @@ const STRENGTH_HOST_CANARY_PROMPT =
   'STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica path.';
 
 const runPreFlowPrompt = async (scenario, lane, prompt, agent) => {
-  const created = await scenario.client.createSession({ title: `${lane} canary` });
+  const created = await scenario.client.createSession({});
   const sessionID = getSessionId(created);
   assert.ok(sessionID, `${lane} session creation failed: ${JSON.stringify(created)}`);
   if (!scenario.sessionIds.includes(sessionID)) scenario.sessionIds.push(sessionID);
@@ -124,7 +124,7 @@ const preFlowNativeTodoCanary = async (scenario) => {
     return undefined;
   };
 
-  const inspectorOwner = await scenario.client.createSession({ agent: 'fast-coder', title: 'G2 Inspector Prefix Canary' });
+  const inspectorOwner = await scenario.client.createSession({ agent: 'fast-coder' });
   const inspectorOwnerId = getSessionId(inspectorOwner);
   assert.ok(inspectorOwnerId, `g2-inspector-owner session creation failed: ${JSON.stringify(inspectorOwner)}`);
   if (!scenario.sessionIds.includes(inspectorOwnerId)) scenario.sessionIds.push(inspectorOwnerId);
@@ -172,7 +172,10 @@ const assertHostCanariesAEGH = async (scenario, ctx) => {
   const managerProviderWire = collectManagerProviderToolEvidence(scenario, {
     childSessionId: ctx?.childId ?? null,
   });
-  const result = assertMagicTodoHostCanariesAEGH(dir, { managerProviderWire });
+  const result = assertMagicTodoHostCanariesAEGH(dir, {
+    managerProviderWire,
+    xTraceParts: factPayloads(scenario.host.workDir, 'XTracePartAppended'),
+  });
   assert.equal(result.ok, true, 'HOST_CANARY A/E/G/H must pass');
   console.log(
     `[host-canary] A/E/G/H ok session=${result.canaries.H.sessionID} call=${result.canaries.H.callID} ` +

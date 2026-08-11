@@ -20,6 +20,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { buildCarrierEvidence } from '../../e2e/support/magic-todo-host-canary-plugin.mjs'
 import {
   applyToolDefinitionHook,
   createMagicTodoContractHooks,
@@ -35,6 +36,70 @@ import {
 
 const SESSION = 'ses_magic_todo_canary'
 const CALL = 'call_magic_todo_1'
+
+// ── Canary H — durable call → provider-run/XTrace carrier ───────────────────
+
+test('MAGIC_TODO_CANARY_H_journal_xtrace_uniquely_completes_host_carrier', () => {
+  const locate = {
+    sessionID: SESSION,
+    callID: CALL,
+    matchCount: 1,
+    unique: true,
+    match: {
+      messageID: 'msg_provider_run_1',
+      partID: 'prt_tool_1',
+      ordinal: 3,
+      toolOrdinal: 0,
+      assistant: { id: 'msg_provider_run_1' },
+      part: { id: 'prt_tool_1', sessionID: SESSION, messageID: 'msg_provider_run_1', type: 'tool', callID: CALL },
+    },
+  }
+  const carrier = buildCarrierEvidence(locate, [
+    {
+      SessionId: ['SessionId', SESSION],
+      ToolCallId: ['ToolCallId', CALL],
+      HostToolPartId: ['HostToolPartId', 'prt_tool_1'],
+      ProviderRun: ['ProviderRunIdentity', 'msg_provider_run_1'],
+      CursorSequence: '7',
+      Kind: 'tool_result',
+    },
+  ])
+
+  assert.equal(carrier.journalMappingAvailable, true)
+  assert.equal(carrier.journalProviderRun, 'msg_provider_run_1')
+  assert.deepEqual(carrier.journalXTraceRange, { start: 7, endExclusive: 8 })
+  assert.equal(carrier.carrierMappingComplete, true)
+})
+
+test('MAGIC_TODO_CANARY_H_journal_mapping_fails_closed_on_host_part_mismatch', () => {
+  const locate = {
+    sessionID: SESSION,
+    callID: CALL,
+    matchCount: 1,
+    unique: true,
+    match: {
+      messageID: 'msg_provider_run_1',
+      partID: 'prt_tool_1',
+      ordinal: 3,
+      toolOrdinal: 0,
+      assistant: { id: 'msg_provider_run_1' },
+      part: { id: 'prt_tool_1', sessionID: SESSION, messageID: 'msg_provider_run_1', type: 'tool', callID: CALL },
+    },
+  }
+  const carrier = buildCarrierEvidence(locate, [
+    {
+      SessionId: ['SessionId', SESSION],
+      ToolCallId: ['ToolCallId', CALL],
+      HostToolPartId: ['HostToolPartId', 'prt_other'],
+      ProviderRun: ['ProviderRunIdentity', 'msg_provider_run_1'],
+      CursorSequence: '7',
+      Kind: 'tool_result',
+    },
+  ])
+
+  assert.equal(carrier.journalMappingAvailable, false)
+  assert.equal(carrier.carrierMappingComplete, false)
+})
 
 // ── Canary B — definition schema ────────────────────────────────────────────
 

@@ -111,7 +111,9 @@ module BookkeeperRuntime =
                     "evidence"
                     [ SyntheticToml.field "kind" (SyntheticToml.renderString "glob")
                       SyntheticToml.field "pattern" (SyntheticToml.renderString pattern)
-                      SyntheticToml.field "paths" (SyntheticToml.renderString (paths |> List.sort |> String.concat "\n")) ]
+                      SyntheticToml.field
+                          "paths"
+                          (SyntheticToml.renderString (paths |> List.sort |> String.concat "\n")) ]
             | Observation.GrepResult(pattern, matches) ->
                 let flat =
                     matches
@@ -160,7 +162,7 @@ module BookkeeperRuntime =
           Agent = Some "fast-inspector"
           Directory = None }
 
-    let private promptOptions : OpenCodePromptOptions =
+    let private promptOptions: OpenCodePromptOptions =
         { Model = None
           Agent = Some "fast-inspector"
           Directory = None
@@ -193,8 +195,7 @@ module BookkeeperRuntime =
                 let txId = Guid.NewGuid().ToString("N")
                 BookkeeperStaging.beginTransaction txId q a
 
-                let! created =
-                    sessions.CreateChildSession(SessionId.create ownerSessionId, childOptions txId)
+                let! created = sessions.CreateChildSession(SessionId.create ownerSessionId, childOptions txId)
 
                 match created with
                 | Error err ->

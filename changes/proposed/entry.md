@@ -126,12 +126,12 @@ ac41ef8f  session abort diagnostic
 |---|---|
 | 静态 ratchet：`student-teacher-absence`（含 `SatelliteKind.Replica` 禁止）+ `session-ownership-ratchet` + `unified-store-gate` + `g4r-*` | **GREEN** |
 | `enforcer-rulebook-gate --require-headings --strict` + `capability-isomorphism-gate` + `session-ownership-ratchet` | **PARTIAL**（G7: mechanical A37/A38 production 120 GREEN; HUMAN_ONLY not claimed。G9: ownership ratchet smoke-check, not release-close） |
-| `npm run check`（lint + build + unit + integration） | **GREEN** |
-| enforcer / strength / verify unit | **256 PASS** |
-| `npm run test:e2e` Long Stroke | **GREEN**（48 steps；journal ceiling 372；三连稳定） |
+| `npm run check`（lint + build + unit + integration） | **BLOCKED（非本 Lane）**：`scripts/check.mjs` 只剩 `changes/proposed/fission.md:2269-2271` 的三个悬空 AGENT 条款引用；本班按 ownership 裁决未改 fission。其余 build / unit / integration 已独立 GREEN。 |
+| unit | **2300 / 2300 PASS** |
+| `npm run test:e2e` Long Stroke | **GREEN**（59 steps；真实 title loops 保留；full Host lifetime ceiling `journal=515` / `SSE=2537`；A/E/G/H + Strength dry-run + G2/G6 全链通过；多连稳定） |
 | Storage G4 / JS G5 | **DONE / DONE-with-amendment(C-3)** |
-| Universal+perm-inspector G6 / Rulebook G7 | **PARTIAL / PARTIAL** — G6 digest gone；BookkeeperRuntime+edit-qa landed；`G6HostPathE2E` landed but **not** live Host LLM / `tool.execute.before` Long Stroke；G7 mechanical A37/A38 production 120 GREEN; HUMAN_ONLY remaining |
-| 已知 residual | G2 PREFIX LAW unit canary ≠ live Host Exit；Long Stroke G2/G6 mock preFlow **已接线**于 `1ee448d3`（`entry.test.mjs` + `long-stroke.toml` + `long-stroke-oracles.mjs`），**本下班点未重跑** `npm run test:e2e`，不得把接线写成 Exit。G6 unit `G6HostPathE2E` ≠ live Host。G7 HUMAN_ONLY（paired-history 120 / A39 / A40）。G8 live Host / K1/K2。G9 smoke-check only。magic-todo 仍 proposed。 |
+| Universal+perm-inspector G6 / Rulebook G7 | **PARTIAL / PARTIAL** — G6 digest gone；BookkeeperRuntime+edit-qa landed；唯一 Long Stroke 已真实走本机 OpenCode + mock LLM 的 Inspector Q1→Q3 reuse → owner recursive delete → Bookkeeper CaseFinalize → later Coder cold `fetch`，但这仍是 mock-Host 证明，不覆盖原 Gate 的全部 Exit；G7 mechanical A37/A38 production 120 GREEN; HUMAN_ONLY remaining |
+| 已知 residual | G2 PREFIX LAW 已同时有 unit 与唯一 Long Stroke live Host mock 证明，但不得据此把原 G2 Exit 改 DONE。G6 同理已有 live Host mock finalize/fetch 证明，仍非全部 Exit。Strength dry-run 已有真实 nested Replica + K1 Host proof，K2 / active strength Change 仍由并行 owner 收口。G7 HUMAN_ONLY（paired-history 120 / A39 / A40）。G9 release-close 仍开着。magic-todo A/E/G/H real Host canary GREEN，但 Change 仍 proposed。 |
 
 ## 0.4 合法中间状态（现在）— **G0/G1/G3/G3.5/G4 DONE; G5 DONE-with-amendment; G2/G6/G7/G8/G9 PARTIAL**
 
@@ -143,10 +143,10 @@ ac41ef8f  session abort diagnostic
 ✓ 无 legacy NDJSON writer / 无 dual-write / 无 migrator
 ✓ Storage completed（G4）
 ✓ JS capability-projected tools（G5 DONE-with-amendment C-3 user裁决）
-◐ G2：runtime reuse canary green；PREFIX LAW unit canary cited (`g2-inspector-provider-wire-prefix.test.mjs`)；G2 Exit 未满足
-◐ G6：digest gone；BookkeeperRuntime+edit-qa landed；`G6HostPathE2E` landed（inspector-tool → SyncDelegate → lifecycle → Bookkeeper → fetch unit）；**not** live Host LLM / `tool.execute.before` Long Stroke；digest deletion ≠ synthesis Exit
+◐ G2：runtime reuse + PREFIX LAW unit green；唯一 Long Stroke 又以真实本机 OpenCode 验证同一 Inspector child 的 Q1→Q2→Q3 provider-wire append-only prefix；G2 Exit 仍未全满足
+◐ G6：digest gone；BookkeeperRuntime+edit-qa landed；唯一 Long Stroke 已走真实 Host 的 recursive `session.deleted` → CaseFinalize → Bookkeeper → later Coder cold fetch；digest deletion / mock-Host proof ≠ 全部 synthesis Exit
 ◐ G7：Observation events DONE；mechanical A37/A38 production 120 GREEN after authoring（root-cause + who owns）；HUMAN_ONLY remaining；identity/lexical machine evidence ≠ human Exit
-◐ Strength：K0 policy/transform unit proofs in tests/unit/strength/*；非 live Host canary；Change 仍 active/strength.md（并行 owner；G8 PARTIAL；非 K1/K2 DONE）
+◐ Strength：unit + 唯一 Long Stroke dry-run nested Replica / K1 GREEN；K2 未证明；Change 仍 active/strength.md（并行 owner；G8 PARTIAL）
 ◐ G9：`session-ownership-ratchet.mjs` smoke-check（kinds closed；Bookkeeper evidencePath now `src/Wanxiangshu/Infrastructure/BookkeeperRuntime.fs`）；symbol/storage/capability ratchets 另轨；非 full release close
 ○ magic-todo — 独立 Lane；保持 proposed；不入主 Gate
 ○ entry — Playbook；保持 proposed；不迁 completed
@@ -161,21 +161,24 @@ ac41ef8f  session abort diagnostic
 **用户当场裁决（下一班必须遵守）：**
 
 1. Long Stroke = **mock LLM + 本机已安装的 OpenCode**，不是付费真模型。G2/G6/G8 的 Host 证明走这一条，**禁止**另开第二条 e2e。
-2. **不准提升超时**（含 `WATCHDOG` / wall / waitFact 预算）。`1ee448d3` 已把 `maxJournalEvents` 372→480、`maxSseEvents`→2100；那是事件天花板不是 wall timeout。e2e 若红，先缩 scenario / 修 mock，**禁止**用加超时换绿。
+2. **不准提升超时**（含 `WATCHDOG` / wall / waitFact 预算）。事件 ceiling **不是 timeout**：它只用于 fail-closed 捕获 runaway，应该按当前合法完整 Host lifetime 精确校准；不要为了压计数删 title loop 或其它正常 Host 流量。当前校准为 `maxJournalEvents=515`、`maxSseEvents=2537`，真实 title mocks 保留。
 
 **本班已落地（机器，仍非原 Exit）：**
 
 - G2 unit PREFIX LAW：`tests/unit/session/g2-inspector-provider-wire-prefix.test.mjs`（fake `ISessionHostPort`）。
 - G6：digest synthesizer 已删；`BookkeeperRuntime` + `edit-qa` + `BookkeeperStaging`；`SpikePlugin.setSessionPort`；SessionDeleted await `tryFinalizeInspector`；unit `tests/unit/casebook/g6-inspector-tool-finalize-fetch.test.mjs`。
 - G7：mechanical A37/A38 生产 120 GREEN；HUMAN_ONLY 仍是 paired-history 120 / A39 / A40 tournament。
-- G8/G9：K0 unit / ownership ratchet smoke；非 K1、非 `check:release`。
-- Long Stroke **接线**（`1ee448d3`）：`preFlowNativeTodoCanary` 在 native-todo + strength 之后加了 deep-coder Inspector owner → Q1–Q3 child mock → `assertG2InspectorPrefixLaw` → `deleteSession` → `InspectorCaseCaptured` → `assertG6BookkeeperFinalize` → fast-coder `fetch`。toml `preFlowTurns` 含 `g2-inspector-*` / `g6-bookkeeper-*` / `g6-fetch*`；工程文件含 `.wanxiang/casebook/.keep`。
+- G8/G9：Strength dry-run 的真实 nested Replica / K1 已在唯一 Long Stroke 证明；K2 未证明；ownership ratchet 仍只是 G9 smoke，非 release-close。
+- Long Stroke 已从“接线”推进到 **GREEN**：Strength Replica mirror / K1、G2 PREFIX LAW、G6 recursive delete + Bookkeeper finalize + persisted cold fetch、Magic Todo A/E/G/H，以及原 adversity spine 全部在同一 OpenCode lifetime 通过。
+- 修复过的关键 Host 边界：Replica transform 原数组 in-place；Fable `return ()` fall-through；OpenCode completed tool-part 的 K1 batch；`session.deleted.info.parentID` 级联顺序；Coder/Inspector canonical `fetch` capability；真实 `HostToolArguments`；Canary H 的 durable `SessionId + ToolCallId + HostToolPartId → ProviderRun + XTrace range` 映射。
+- 临时 `strength-replica-bind-snapshot` 诊断已删除；F# production 已通过 Fantomas。
+- 验证：`npm run build` GREEN；`npm test` **2300/2300**；`npm run test:integration` 全绿（harness **273/273**）；`npm run test:package` GREEN；`npm pack --dry-run` GREEN；Long Stroke 在 `515/2537` ceiling 下 5 连 GREEN。`npm run check` 唯一已知 blocker 是未获批 `changes/proposed/fission.md:2269-2271` 的三个悬空 AGENT 条款引用，本班未触碰。
 
 **下一班第一件事：**
 
-1. 不提高超时，跑 `npm run test:e2e`（唯一 Long Stroke）。绿了也只是 mock-Host 证据，不得把 §0.1 改成 G2/G6 DONE。
-2. 若红：修 mock lane / Inspector return 双等待 / Bookkeeper `edit-qa` 回合，不要加 watchdog。
-3. G7 120 true-repeat / A39 / A40 仍须人工；G8 K1、G9 release-close 仍开着。
+1. 不要重做 Long Stroke 已绿的 G2/G6/Strength Host 修复；先确认本交接 commit 后工作区干净。
+2. `npm run check` 若仍红，预期只会命中 `changes/proposed/fission.md:2269-2271` 的三个悬空 AGENT 条款引用；只有取得该 Change ownership 后才修。
+3. G7 120 true-repeat / A39 / A40 仍须人工；Strength K2 与 G9 release-close 仍开着。
 
 **不要再做的事：** 用 unit/fake port 宣布 Exit；删 Gate 正文或把 viewer 折叠标记写回文件；把 digest/scripted Bookkeeper 写成 semantic synthesis。
 

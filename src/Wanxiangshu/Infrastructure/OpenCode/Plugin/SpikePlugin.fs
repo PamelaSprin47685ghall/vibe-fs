@@ -211,11 +211,7 @@ module SpikePlugin =
                     )
                 | _ -> ()
 
-                let normalTransform
-                    (projectionSessionIdOpt: string option)
-                    (inObj: obj)
-                    (outObj: obj)
-                    : Task<unit> =
+                let normalTransform (projectionSessionIdOpt: string option) (inObj: obj) (outObj: obj) : Task<unit> =
                     task {
                         // HOST-004：新 provider request 开始构建 → 旧 idle permit
                         // 立即失效。必须在该 transform 的最早同步位置（任何 let!
@@ -710,8 +706,7 @@ module SpikePlugin =
                             let currentMessages = unbox<obj array> outObj?messages |> Array.toList
                             let sanitized = HostMessageProjection.sanitizeMessages currentMessages
                             HostMessageProjection.replaceMessagesInPlace outObj sanitized
-                        | None ->
-                            do! normalTransform projectionSessionIdOpt inObj outObj
+                        | None -> do! normalTransform projectionSessionIdOpt inObj outObj
                     }
 
                 let chatParams = ChatParamsHook.create journal

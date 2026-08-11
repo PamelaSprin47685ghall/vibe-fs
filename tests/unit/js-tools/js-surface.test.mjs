@@ -25,7 +25,7 @@ const surface = (role, permissionNames) => generate(role, caps(...permsOf(permis
 const memberNames = (s) => listItems(s.Members).map((fragment) => fragment.MemberName)
 
 const PERMISSION_NAMES = [
-  'Fork', 'Join', 'List', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move',
+  'Fork', 'Join', 'List', 'Read', 'Write', 'Edit', 'Fetch', 'Glob', 'Grep', 'Move',
   'Remove', 'Inspector', 'Coder', 'Exec', 'Pty', 'Network', 'Verdict', 'Blog',
   'Return', 'Finality', 'BashHoneypot',
 ]

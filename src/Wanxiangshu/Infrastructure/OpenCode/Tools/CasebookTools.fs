@@ -22,7 +22,6 @@ module CasebookTools =
                 let raw, store =
                     WorkspaceEventStore.acquire (RuntimePath.gitCommonDir workspaceRoot)
 
-                [ FetchTool.spec factory workspaceRoot store raw
-                  EditQaTool.spec factory ]
+                [ FetchTool.spec factory workspaceRoot store raw; EditQaTool.spec factory ]
             with _ ->
                 []

@@ -144,13 +144,42 @@ const argsAreV1Compatibility = (args) =>
   && args.todos.length > 0
   && args.todos.every((row) => row && typeof row === 'object' && !rowHasV2Identity(row));
 
+const taggedValue = (value) =>
+  Array.isArray(value) && value.length >= 2 ? value.at(-1) : value;
+
+const journalCarrierFor = (locate, xTraceParts) => {
+  const partID = locate?.match?.partID ?? null;
+  const matches = (Array.isArray(xTraceParts) ? xTraceParts : []).filter((payload) => {
+    if (!payload || typeof payload !== 'object') return false;
+    if (taggedValue(payload.SessionId) !== locate?.sessionID) return false;
+    if (taggedValue(payload.ToolCallId) !== locate?.callID) return false;
+    if (partID && taggedValue(payload.HostToolPartId) !== partID) return false;
+    return true;
+  });
+  if (matches.length !== 1) return { available: false, matchCount: matches.length };
+
+  const payload = matches[0];
+  const providerRun = taggedValue(payload.ProviderRun);
+  const cursor = Number(taggedValue(payload.CursorSequence));
+  if (typeof providerRun !== 'string' || providerRun.length === 0 || !Number.isSafeInteger(cursor)) {
+    return { available: false, matchCount: 1 };
+  }
+  return {
+    available: true,
+    matchCount: 1,
+    providerRun,
+    xTraceRange: { start: cursor, endExclusive: cursor + 1 },
+    hostToolPartID: taggedValue(payload.HostToolPartId) ?? null,
+  };
+};
+
 /**
  * Carrier evidence for Canary H.
  * HOST-011: ProviderRunIdentity := assistant messageID; ToolCallId := callID.
- * HOST-011 defines the assistant message ID as ProviderRunIdentity. Direct Host
- * ToolPart has no XTrace field; without a journal mapping, that missing range blocks.
+ * Direct Host ToolPart has no XTrace field, so the durable XTrace fact completes
+ * the carrier by SessionId + ToolCallId + HostToolPartId.
  */
-export const buildCarrierEvidence = (locate) => {
+export const buildCarrierEvidence = (locate, xTraceParts = []) => {
   const match = locate?.match ?? null;
   const part = match?.part ?? null;
   const toolPartKeys = part && typeof part === 'object' ? Object.keys(part) : [];
@@ -174,10 +203,10 @@ export const buildCarrierEvidence = (locate) => {
 
   const directHostLacksProviderRunField = toolPartProviderRunID == null;
   const directHostLacksXTraceField = toolPartXTrace == null;
-  // Phase 0: no production journal callID→XTrace mapping is wired for todowrite.
-  const journalMappingAvailable = false;
-  const journalProviderRun = null;
-  const journalXTraceRange = null;
+  const journal = journalCarrierFor(locate, xTraceParts);
+  const journalMappingAvailable = journal.available === true;
+  const journalProviderRun = journalMappingAvailable ? journal.providerRun : null;
+  const journalXTraceRange = journalMappingAvailable ? journal.xTraceRange : null;
 
   const unique = locate?.unique === true && locate?.matchCount === 1;
   const hasOrdinals =
@@ -188,10 +217,15 @@ export const buildCarrierEvidence = (locate) => {
 
   const providerRun = journalProviderRun ?? toolPartProviderRunID ?? providerRunFromMessageID;
   const xTraceRange = journalXTraceRange ?? toolPartXTrace;
+  const providerRunConsistent =
+    journalProviderRun == null
+    || providerRunFromMessageID == null
+    || journalProviderRun === providerRunFromMessageID;
   const carrierMappingComplete =
     unique
     && hasAssistant
     && hasOrdinals
+    && providerRunConsistent
     && typeof providerRun === 'string'
     && providerRun.length > 0
     && xTraceRange != null;
@@ -210,16 +244,18 @@ export const buildCarrierEvidence = (locate) => {
     toolPartXTrace,
     toolPartKeys,
     journalMappingAvailable,
+    journalMappingMatchCount: journal.matchCount ?? 0,
     journalProviderRun,
     journalXTraceRange,
     providerRun,
     xTraceRange,
     directHostLacksProviderRunField,
     directHostLacksXTraceField,
+    providerRunConsistent,
     carrierMappingComplete,
-    note:
-      'Direct Host ToolPart has no providerRunID/XTrace. Without a journal callID→provider-run/XTrace '
-      + 'mapping, Host Canary H blocks the membrane.',
+    note: carrierMappingComplete
+      ? 'Direct Host identity is completed by the durable XTrace call/part carrier.'
+      : 'Direct Host ToolPart has no providerRunID/XTrace; durable XTrace mapping is missing, ambiguous, or inconsistent.',
   };
 };
 
@@ -391,7 +427,7 @@ const extractToolNamesFromRequest = (request) => {
  * that is NOT the documented V2-unavailable Host path.
  *
  * @param {string} dir
- * @param {{ managerProviderWire?: ReturnType<typeof collectManagerProviderToolEvidence> | null }} [opts]
+ * @param {{ managerProviderWire?: ReturnType<typeof collectManagerProviderToolEvidence> | null, xTraceParts?: object[] }} [opts]
  */
 export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
   const managerProviderWire = opts.managerProviderWire ?? null;
@@ -528,7 +564,7 @@ export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
   if (!match?.messageID || !Number.isInteger(match.ordinal) || !Number.isInteger(match.toolOrdinal)) {
     throw new Error('HOST_CANARY_H: unique match must carry messageID + part/tool ordinals');
   }
-  const carrier = locateH.carrier ?? buildCarrierEvidence(locateH);
+  const carrier = buildCarrierEvidence(locateH, opts.xTraceParts ?? []);
   if (!carrier.carrierMappingComplete) {
     throw new Error(
       `HOST_CANARY_H_BLOCKED: sessionID+callID lacks provider-run/XTrace range mapping: ${JSON.stringify(carrier)}`,

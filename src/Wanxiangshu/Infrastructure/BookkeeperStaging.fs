@@ -56,7 +56,12 @@ module BookkeeperStaging =
                 match uniqueReplace source oldText newText with
                 | Error err -> Error err
                 | Ok next ->
-                    slots.[txId] <- if isQ then { slot with Q = next } else { slot with A = next }
+                    slots.[txId] <-
+                        if isQ then
+                            { slot with Q = next }
+                        else
+                            { slot with A = next }
+
                     Ok())
 
     let take (txId: string) : Result<string * string, string> =

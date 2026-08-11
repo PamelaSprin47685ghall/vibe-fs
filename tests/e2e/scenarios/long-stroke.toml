@@ -61,13 +61,14 @@ description = "G4R-3 The Long Stroke: orchestrator shell, one OpenCode world thr
 pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fallback, REVISE→FinalityRejected→Blessed→LifeCompleted, gitConflictProof→ConflictDetected→Published (no restart)."
 
 # Event ceilings (fail-closed on dead loops; primary over silence watchdog):
-#   maxJournalEvents — EventStore envelope count = exact theoretical trigger count (372; TipGuidanceDelivered path)
-#   maxSseEvents     — OpenCode SSE excluding server.heartbeat; transport-noisy so this
-#                      is the measured max fail-closed bound (1716–1724 across green runs),
-#                      not a DU-algebra equality. Journal is the exact semantic pin.
+#   maxJournalEvents — EventStore envelope count; full Host lifetime converges to 515. The flow
+#                      snapshot may print 512 before three already-in-flight durable commits land.
+#   maxSseEvents     — OpenCode SSE excluding server.heartbeat; transport-level count calibrated at
+#                      2537 across three consecutive green runs (including the real Host title loops).
+#                      Both are fail-closed runaway ceilings, not wall-clock budgets.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
 # Headroom kept after canary wrapper noise; Manager does not advertise todowrite yet.
-setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["native-todo", "strength-canary-replica", "strength-canary-owner", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run" }, maxJournalEvents = 480, maxSseEvents = 2100, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", ".wanxiang/casebook/.keep" = "" } } }
+setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["native-todo-title", "native-todo", "strength-canary-title", "strength-canary-replica", "strength-canary-owner", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run" }, maxJournalEvents = 515, maxSseEvents = 2537, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", ".wanxiang/casebook/.keep" = "" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 
@@ -192,6 +193,15 @@ flow = [
 ]
 
 [[turn]]
+id = "native-todo-title"
+lane = "native-todo-canary"
+kind = "title"
+user = "NATIVE_TODO_CANARY: exercise the default build session todowrite hook."
+
+  [[turn.step]]
+  respond = { type = "title", text = "Native Todo Canary" }
+
+[[turn]]
 id = "native-todo"
 lane = "native-todo-canary"
 user = "NATIVE_TODO_CANARY: exercise the default build session todowrite hook."
@@ -202,6 +212,15 @@ tools = ["todowrite"]
 
   [[turn.step]]
   respond = { type = "text", text = "Native todowrite canary completed." }
+
+[[turn]]
+id = "strength-canary-title"
+lane = "strength-canary-owner"
+kind = "title"
+user = "STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica path."
+
+  [[turn.step]]
+  respond = { type = "title", text = "Strength Host Canary" }
 
 [[turn]]
 id = "strength-canary-replica"
@@ -220,6 +239,15 @@ user = "STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica 
 
   [[turn.step]]
   respond = { type = "text", text = "Strength dry-run canary owner completed." }
+
+[[turn]]
+id = "g2-inspector-title"
+lane = "g2-inspector-owner"
+kind = "title"
+user = "G2_INSPECTOR_PREFIX_CANARY: reuse one inspector for Q1, Q2, then Q3."
+
+  [[turn.step]]
+  respond = { type = "title", text = "G2 Inspector Prefix Canary" }
 
 [[turn]]
 id = "g2-inspector-owner"

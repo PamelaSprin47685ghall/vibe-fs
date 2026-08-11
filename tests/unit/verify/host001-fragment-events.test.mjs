@@ -48,7 +48,18 @@ test('HOST_001_only_coarse_session_lifecycle_signals_cross_the_boundary', () => 
     properties: { sessionID: SESSION },
   })
   assert.equal(caseOf(deleted), 'SessionDeleted')
-  assert.equal(idValue.session(payloadOf(deleted)), SESSION)
+  const deletedSignal = payloadOf(deleted)
+  assert.equal(idValue.session(deletedSignal[0]), SESSION)
+  assert.equal(deletedSignal[1], undefined, 'missing Host parentID must remain None')
+
+  const deletedChild = hostSignals.tryDecode({
+    type: 'session.deleted',
+    properties: { sessionID: SESSION, info: { parentID: 'ses_parent' } },
+  })
+  assert.equal(caseOf(deletedChild), 'SessionDeleted')
+  const deletedChildSignal = payloadOf(deletedChild)
+  assert.equal(idValue.session(deletedChildSignal[0]), SESSION)
+  assert.equal(idValue.session(deletedChildSignal[1]), 'ses_parent')
 
   const error = hostSignals.tryDecode({
     type: 'session.error',

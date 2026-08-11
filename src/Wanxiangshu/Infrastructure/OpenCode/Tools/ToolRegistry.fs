@@ -191,8 +191,7 @@ module ToolRegistry =
                         else
                             return
                                 ToolHostCodec.tomlObject
-                                    [ "error",
-                                      tString (sprintf "Tool '%s' is not permitted for Bookkeeper" spec.Name) ]
+                                    [ "error", tString (sprintf "Tool '%s' is not permitted for Bookkeeper" spec.Name) ]
                     elif spec.Name = "edit-qa" then
                         return
                             ToolHostCodec.tomlObject

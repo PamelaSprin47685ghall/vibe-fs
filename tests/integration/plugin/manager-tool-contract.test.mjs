@@ -169,6 +169,7 @@ const KNOWN_TOOL_KEYS = [
   'verdict',
   'blog',
   'return',
+  'fetch',
   'suicide',
   'js-manager',
   'js-orchestrator',
@@ -186,8 +187,8 @@ const KNOWN_TOOL_KEYS = [
 const ALLOWED_TOOLS = {
   orchestrator: ['fork-manager', 'join'],
   manager: ['fork', 'join', 'list', 'suicide'],
-  coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspector', 'mv', 'rm', 'bash-honeypot'],
-  inspector: ['read', 'glob', 'grep', 'executor'],
+  coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspector', 'fetch', 'mv', 'rm', 'bash-honeypot'],
+  inspector: ['read', 'glob', 'grep', 'executor', 'fetch'],
   devops: ['fork-pty', 'join', 'list', 'read', 'glob', 'grep', 'inspector', 'coder', 'executor'],
   browser: ['read', 'glob', 'grep', 'network'],
   meditator: ['inspector'],

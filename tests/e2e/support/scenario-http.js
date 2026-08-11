@@ -74,13 +74,11 @@ export class HttpClient {
   async createSession(opts = { model: { id: 'test-model', providerID: 'test' } }) {
     const model = opts.model || { id: 'test-model', providerID: 'test' };
     const agent = opts.agent;
-    const title = opts.title;
     const body = { model };
     if (agent) body.agent = agent;
-    if (title) body.title = title;
-    const res = await this.request('POST', '/session', { body });
+    const res = await this.request('POST', '/api/session', { body });
     if (res.ok && this.onSessionCreated) {
-      const sid = res.data?.data?.data?.id || res.data?.data?.id || res.data?.id;
+      const sid = res.data?.data?.data?.id || res.data?.data?.id;
       if (sid) this.onSessionCreated(sid);
     }
     return res;
@@ -122,5 +120,5 @@ export class HttpClient {
 }
 
 export function getSessionId(sess) {
-  return sess?.data?.data?.data?.id || sess?.data?.data?.id || sess?.data?.id;
+  return sess?.data?.data?.data?.id || sess?.data?.data?.id;
 }
