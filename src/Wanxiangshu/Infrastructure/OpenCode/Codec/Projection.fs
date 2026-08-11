@@ -247,6 +247,93 @@ module Projection =
 
         head :: List.skip dropLeading rawMessages
 
+    let private canonicalValue (canonical: string) : obj =
+        try
+            emitJsExpr canonical "JSON.parse($0)"
+        with _ ->
+            box canonical
+
+    let private encodeWirePart (part: WirePart) : Result<obj, string> =
+        match part with
+        | WireText text -> Ok(createObj [ "type", box "text"; "text", box text ])
+        | WireReasoning text -> Ok(createObj [ "type", box "reasoning"; "text", box text ])
+        | WireToolCall(callId, name, argsCanonical) ->
+            Ok(
+                createObj
+                    [ "type", box "tool-call"
+                      "callID", box (ToolCallId.value callId)
+                      "tool", box name
+                      "args", canonicalValue argsCanonical ]
+            )
+        | WireToolResult(callId, resultCanonical) ->
+            Ok(
+                createObj
+                    [ "type", box "tool-result"
+                      "callID", box (ToolCallId.value callId)
+                      "result", canonicalValue resultCanonical ]
+            )
+        | WireMedia _ ->
+            // VERIFY-007: semantic/media digests are one-way. Reconstructing media
+            // bytes from a digest would invent provider-visible content, so a
+            // Strength mirror containing media is ineligible rather than lossy.
+            Error "wire media cannot be reconstructed from semantic digest"
+
+    /// STRENGTH-009 / PROJ-004: write a fully rendered DSL message view back to
+    /// Host objects. This is intentionally an adapter, not business assembly.
+    /// Missing Host ids are derived from wire bytes + ordinal and are Host-only;
+    /// the generated identity never enters ProviderSemanticProjection.
+    let tryApplyRenderedMessages
+        (sessionId: string)
+        (sha256: string -> string)
+        (rendered: Wanxiangshu.Domain.RenderedMessages)
+        : Result<obj list, string> =
+        let rec encodeParts remaining acc =
+            match remaining with
+            | [] -> Ok(List.rev acc)
+            | part :: tail ->
+                match encodeWirePart part with
+                | Error error -> Error error
+                | Ok encoded -> encodeParts tail (encoded :: acc)
+
+        let triples =
+            List.zip3 rendered.Messages rendered.HostMessageIds rendered.HostIsPhysical
+            |> List.mapi (fun index triple -> index, triple)
+
+        let rec encodeMessages remaining acc =
+            match remaining with
+            | [] -> Ok(List.rev acc)
+            | (index, (message, hostId, _)) :: tail ->
+                match encodeParts message.Parts [] with
+                | Error error -> Error error
+                | Ok parts ->
+                    let id =
+                        hostId
+                        |> Option.defaultWith (fun () ->
+                            let single =
+                                { ProviderId = None
+                                  ModelId = None
+                                  Variant = None
+                                  Tools = []
+                                  System = []
+                                  Messages = [ message ] }
+
+                            sha256 (sprintf "%d\u001f%s" index (ProviderProjection.renderWire single)))
+
+                    let raw =
+                        createObj
+                            [ "info",
+                              box (
+                                  createObj
+                                      [ "id", box id
+                                        "sessionID", box sessionId
+                                        "role", box message.Role ]
+                              )
+                              "parts", box (List.toArray parts) ]
+
+                    encodeMessages tail (raw :: acc)
+
+        encodeMessages triples []
+
     /// PROJ-004: apply a rendered prefix to the Host message view — the one write-back
     /// adapter for the projection DSL's prefix stage. Business modules declare intents
     /// (PROJ-005) and never assemble messages themselves; this function turns the

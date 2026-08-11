@@ -21,7 +21,11 @@ module AuthoritativeEventTypes =
               "InspectorCaseCaptured"
               "InspectorCaseRefreshed"
               "InspectorCaseAccessed"
-              "InspectorCaseEvicted" ]
+              "InspectorCaseEvicted"
+              StrengthEventTypes.CandidatePrepared
+              StrengthEventTypes.CandidatePromoted
+              StrengthEventTypes.FramesTraced
+              StrengthEventTypes.CandidateAbandoned ]
 
     let isKnown (eventType: string) : bool = builtins.Contains eventType
 

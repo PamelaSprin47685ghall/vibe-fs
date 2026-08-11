@@ -61,6 +61,7 @@
     <Compile Include="Domain/StrengthCostModel.fs"/>
     <Compile Include="Domain/StrengthPolicy.fs"/>
     <Compile Include="Domain/StrengthFrame.fs"/>
+    <Compile Include="Domain/StrengthBatchCollector.fs"/>
     <Compile Include="Domain/ToolResultBound.fs"/>
     <Compile Include="Domain/RuntimeNudge.fs"/>
     <Compile Include="Session/LoopDetector.fs"/>
@@ -86,6 +87,8 @@
     <Compile Include="Domain/EventStore.fs"/>
     <Compile Include="Domain/StrengthEvents.fs"/>
     <Compile Include="Domain/StrengthProjection.fs"/>
+    <Compile Include="Domain/StrengthCommit.fs"/>
+    <Compile Include="Domain/StrengthPromotion.fs"/>
     <Compile Include="Domain/JsTools.fs"/>
     <Compile Include="Domain/Casebook.fs"/>
     <Compile Include="Infrastructure/Persist/StoreTypes.fs"/>
@@ -94,6 +97,7 @@
     <Compile Include="Infrastructure/Persist/EventStoreMerge.fs"/>
     <Compile Include="Infrastructure/Persist/EventStoreFold.fs"/>
     <Compile Include="Infrastructure/Persist/EventStore.fs"/>
+    <Compile Include="Infrastructure/Persist/StrengthStore.fs"/>
     <Compile Include="Infrastructure/Persist/GitObjectDatabase.fs"/>
     <Compile Include="Infrastructure/Persist/ProcessGitRawStore.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ManagedAgent.fs"/>
@@ -201,6 +205,7 @@
     <Compile Include="Infrastructure/OpenCode/Signals/HostSignalAdapter.fs"/>
     <Compile Include="Infrastructure/OpenCode/Signals/HostSignalSubscribe.fs"/>
     <Compile Include="Application/Reconciliation/ReconciledTurn.fs"/>
+    <Compile Include="Application/Strength/StrengthTurnEvidence.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SessionSnapshotPort.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/OpenCodePort.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Sessions.fs"/>
