@@ -77,11 +77,14 @@ export class HttpClient {
     const title = opts.title;
     const body = { model };
     if (agent) body.agent = agent;
-    if (title) body.title = title;
     const res = await this.request('POST', '/api/session', { body });
-    if (res.ok && this.onSessionCreated) {
+    if (res.ok) {
       const sid = res.data?.data?.data?.id || res.data?.data?.id;
-      if (sid) this.onSessionCreated(sid);
+      if (sid && this.onSessionCreated) this.onSessionCreated(sid);
+      if (sid && title) {
+        const renamed = await this.request('POST', `/api/session/${sid}/rename`, { body: { title } });
+        if (!renamed.ok) return renamed;
+      }
     }
     return res;
   }
