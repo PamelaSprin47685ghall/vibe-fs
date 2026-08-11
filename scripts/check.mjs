@@ -42,7 +42,8 @@ for (const script of checks) {
     )
   }
   // Kolmogorov file-size ratchet: grandfathered files must not grow; new or
-  // previously-small files must stay <= 200 lines. Warnings only, never fail.
+  // previously-small files must stay <= 200 lines. Advisory parts (function
+  // size, tiny files) never fail.
   if (script.endsWith('kolmogorov-size.mjs')) {
     args.push(`--baseline=${join(root, 'checks/kolmogorov-size-baseline.json')}`)
   }
