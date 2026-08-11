@@ -108,6 +108,59 @@ module XWire =
                     blob.BlobDigest
                     (ProjectionRenderer.cutoffDigest HostDigest.sha256Hex snapshot)
 
+    let private applyStrengthReplicaPlan
+        (snapshotPort: ISessionSnapshotPort)
+        (durable: AgentJournal)
+        (scope: PluginRuntimeScope)
+        (sessionId: SessionId)
+        (binding: StrengthReplicaBinding)
+        (output: obj)
+        : Task<unit> =
+        task {
+            let rawMessages = Projection.messagesFromTransformOutput output
+
+            match Projection.lastUserMessageId rawMessages with
+            | None ->
+                raise (InvalidOperationException "StrengthReplica request has no physical user message")
+            | Some physical ->
+                let! snapshotResult = snapshotPort.GetMessages sessionId
+
+                match snapshotResult with
+                | Error reason -> raise (InvalidOperationException reason)
+                | Ok messages ->
+                    match ReviewSeal.bindableRun (PhysicalUserMessageId.value physical) messages with
+                    | Error rejection ->
+                        raise (InvalidOperationException(sprintf "StrengthReplica run binding failed: %A" rejection))
+                    | Ok assistant ->
+                        let providerRun = ProviderRunIdentity.create assistant.Id
+                        let projections = AgentJournal.snapshot durable
+
+                        match PromptAuthorityLedger.activeProfile sessionId projections.AgentProjections with
+                        | None -> raise (InvalidOperationException "StrengthReplica has no active Authority Root")
+                        | Some authority when authority.CanonicalRole <> binding.CanonicalRole ->
+                            raise (InvalidOperationException "StrengthReplica Authority Root role changed after binding")
+                        | Some authority ->
+                            let plan =
+                                AttemptPlanner.plan
+                                    authority
+                                    AgentPairCursor.initial
+                                    physical
+                                    providerRun
+                                    (PromptAuthority.PromptOrigin.AuthorityRoot
+                                        PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
+                                    ProviderRequestKind.StrengthReplica
+                                    false
+                                    (fun () -> Error NoCandidateReason.NoCoverage)
+
+                            if plan.Profile.ToolCapabilitySet <> binding.ToolCapabilitySet then
+                                raise (
+                                    InvalidOperationException
+                                        "StrengthReplica PromptAuthority capabilities disagree with live execution gate"
+                                )
+
+                            scope.RecordAttemptPlan sessionId providerRun plan
+        }
+
     let applyTransform
         (snapshot: ISessionSnapshotPort option)
         (journal: AgentJournal option)
@@ -117,7 +170,14 @@ module XWire =
         task {
             match journal, sessionIdOfOutput output with
             | Some durable, Some sessionId when not (isCompanionSession durable sessionId) ->
-                match scope.TryRecoveryArming sessionId with
+                match scope.StrengthRuntime.TryFindByReplica sessionId, snapshot with
+                | Some binding, Some snapshotPort ->
+                    do! applyStrengthReplicaPlan snapshotPort durable scope sessionId binding output
+                    return ()
+                | Some _, None ->
+                    raise (InvalidOperationException "StrengthReplica cannot plan without the public session snapshot")
+                | None, _ ->
+                    match scope.TryRecoveryArming sessionId with
                 | None -> return ()
                 | Some arming ->
                     let rawMessages = Projection.messagesFromTransformOutput output
