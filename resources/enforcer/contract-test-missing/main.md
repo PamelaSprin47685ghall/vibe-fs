@@ -1,7 +1,7 @@
 # contract-test-missing — Main
 
 ## What To Do Now
-Add a contract-level test through the changed boundary and assert the exact representation, identity, ordering, and failure behavior the consumer relies on.
+Add a contract-level test through the changed boundary and assert the exact representation, identity, ordering, and failure behavior the consumer relies on. The inter-system boundary is who owns the observable agreement; each side’s unit tests are not who owns compatibility between them.
 
 ## Why This Matters
 Unit tests prove local intent. A contract test proves compatibility between independent truths. Serialization details, process framing, provider IDs, transaction outcomes, and language conversions are often absent from the domain model yet decisive in production.

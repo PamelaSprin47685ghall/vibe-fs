@@ -1,7 +1,7 @@
 # compatibility-cruft — Enforcer
 
 ## Definition
-Compatibility cruft is a second representation, alias, adapter, or execution path preserved without a concrete external contract that still requires it.
+Compatibility cruft is a second representation, alias, adapter, or execution path preserved without a concrete external contract that still requires it. The root-cause is that a second path is retained without a named consumer and end condition, so fear of breakage becomes permanent dual architecture.
 
 ## Governing Principle
 Compatibility is not free kindness; it is a promise to support two histories at once. Every retained surface multiplies states the system must understand, test, document, migrate, and eventually remove. Without an identified consumer and retirement condition, “just in case” compatibility converts uncertainty into permanent architecture.

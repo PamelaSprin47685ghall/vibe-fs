@@ -1,7 +1,7 @@
 # contract-test-missing — Enforcer
 
 ## Definition
-A contract test is missing when a boundary owned by another runtime, process, language, store, provider, or plugin changes without a proof of the observable agreement at that boundary.
+A contract test is missing when a boundary owned by another runtime, process, language, store, provider, or plugin changes without a proof of the observable agreement at that boundary. The root-cause is that each side is proven self-consistent while the intersection of emit and accept is untested, so independent implementations can silently disagree.
 
 ## Governing Principle
 A boundary is where independent implementations meet. Internal tests can prove each side is self-consistent while both sides disagree about bytes, ordering, identity, defaults, failure, or lifetime. The contract is therefore not the code on either side; it is the intersection of what one emits and the other accepts.

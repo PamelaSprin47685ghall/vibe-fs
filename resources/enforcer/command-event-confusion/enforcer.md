@@ -1,7 +1,7 @@
 # command-event-confusion — Enforcer
 
 ## Definition
-Command/event confusion occurs when a request to change the world is stored as though the change already happened, or when a recorded fact is later subjected again to present-day permission or business rules.
+Command/event confusion occurs when a request to change the world is stored as though the change already happened, or when a recorded fact is later subjected again to present-day permission or business rules. The root-cause is that one record is asked to be both rejectable intention and irrevocable occurrence, so authorization and history share a shape they cannot both own.
 
 ## Governing Principle
 Intention and fact have opposite epistemic status. A command says “please make this true” and may be refused; an event says “this became true” and may not be vetoed by a later interpretation. Conflating them corrupts either authorization or history: commands gain undeserved certainty, while events become revocable opinions.

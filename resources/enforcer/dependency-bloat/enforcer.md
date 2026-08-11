@@ -1,7 +1,7 @@
 # dependency-bloat — Enforcer
 
 ## Definition
-Dependency bloat occurs when a new library, plugin, service, or framework imports more lifecycle, compatibility, security, and upgrade obligations than the problem requires.
+Dependency bloat occurs when a new library, plugin, service, or framework imports more lifecycle, compatibility, security, and upgrade obligations than the problem requires. The root-cause is that the project borrowed an ecosystem to avoid owning a capability the platform or a small local implementation already covers.
 
 ## Governing Principle
 A dependency is borrowed code plus borrowed future. Its visible API is only the first cost; the project also inherits release cadence, transitive graph, vulnerabilities, platform assumptions, configuration, and eventual migration. The correct comparison is therefore not “lines avoided today” but “essential complexity removed over the dependency’s lifetime.”

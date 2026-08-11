@@ -340,6 +340,9 @@
     <Compile Include="Infrastructure/CasebookReplay.fs"/>
     <Compile Include="Infrastructure/ObservationCollector.fs"/>
     <Compile Include="Infrastructure/CasebookSessionDraft.fs"/>
+    <Compile Include="Infrastructure/BookkeeperStaging.fs"/>
+    <Compile Include="Infrastructure/BookkeeperRuntime.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Tools/EditQaTool.fs"/>
     <Compile Include="Infrastructure/CasebookWorkflow.fs"/>
     <Compile Include="Infrastructure/CasebookIndex.fs"/>
     <Compile Include="Infrastructure/JsToolsBindings.fs"/>

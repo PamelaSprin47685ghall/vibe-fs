@@ -4,7 +4,7 @@
 A schema is unversioned when a durable or cross-version representation can change meaning without carrying an explicit identity for the language in which its bytes were written.
 
 ## Governing Principle
-Persistence creates communication across time. Old code is a producer and future code is a consumer separated by deployments rather than machines. Without schema version, the consumer must infer which grammar and semantics produced the data, turning compatibility into guesswork. Versioning makes historical interpretation a dispatch on evidence instead of a heuristic on shape.
+Persistence creates communication across time. Old code is a producer and future code is a consumer separated by deployments rather than machines. The root-cause is durable bytes without language identity. Without schema version, the consumer must infer which grammar and semantics produced the data, turning compatibility into guesswork. Versioning makes historical interpretation a dispatch on evidence instead of a heuristic on shape.
 
 ## Trigger When
 Trigger when persisted events, files, wire messages, caches with cross-version lifetime, or other durable contracts evolve without an explicit version and deterministic compatibility/migration rule.

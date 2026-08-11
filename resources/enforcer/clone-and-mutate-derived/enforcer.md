@@ -1,7 +1,7 @@
 # clone-and-mutate-derived — Enforcer
 
 ## Definition
-Clone-and-mutate derives a domain value by copying a mutable prototype and patching selected fields, so the new value’s meaning is defined by what happened not to be changed.
+Clone-and-mutate derives a domain value by copying a mutable prototype and patching selected fields, so the new value’s meaning is defined by what happened not to be changed. The root-cause is that derivation is defined by omitted patches on a mutable prototype, so future source fields silently inherit into a value nobody constructed.
 
 ## Governing Principle
 A value should state its own truth. Prototype cloning instead defines truth negatively: every inherited field is accepted by omission. As objects evolve, newly added fields silently propagate into old derivation code, turning structural reuse into semantic inheritance. The derived value then depends on the prototype’s entire future shape, not only on the facts its constructor intended to preserve.

@@ -1,7 +1,7 @@
 # translator-layer-bloat — Enforcer
 
 ## Definition
-A translator layer is bloated when a broker, coordinator, manager, adapter, governor, or mediator exists chiefly to forward calls and rename values without owning a semantic transformation or invariant.
+A translator layer is bloated when a broker, coordinator, manager, adapter, governor, or mediator exists chiefly to forward calls and rename values without owning a semantic transformation or invariant. The root-cause is that a hop exists without owning a change in knowledge, representation, authority, or lifecycle, so indirection adds distance without information hiding.
 
 ## Governing Principle
 A layer earns existence by changing the terms under which reasoning is valid: translating protocols, enforcing authorization, normalizing representation, batching, isolating failure, or owning policy. Pure forwarding adds another place to search and another vocabulary to learn while preserving the same knowledge on both sides. Indirection without information hiding is distance, not abstraction.

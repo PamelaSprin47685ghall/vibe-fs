@@ -1,7 +1,7 @@
 # resource-not-scoped — Main
 
 ## What To Do Now
-Wrap acquisition and disposal in one lexical/structured lifetime and make ownership transfer explicit where a resource legitimately escapes.
+Wrap acquisition and disposal in one lexical/structured lifetime and make ownership transfer explicit where a resource legitimately escapes. The structured owning scope is who owns acquire-and-release as one obligation; later manual close calls on known branches are not who owns lifetime.
 
 ## Why This Matters
 Manual cleanup makes lifetime a property of every control path. As code evolves, one new early return or cancellation path can leak a resource whose acquisition looked locally correct. Scoping reduces many path obligations to one structural guarantee.

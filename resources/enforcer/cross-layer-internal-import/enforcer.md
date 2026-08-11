@@ -1,7 +1,7 @@
 # cross-layer-internal-import — Enforcer
 
 ## Definition
-A cross-layer internal import occurs when one layer depends on implementation members that another layer has not declared as part of its public contract.
+A cross-layer internal import occurs when one layer depends on implementation members that another layer has not declared as part of its public contract. The root-cause is that a consumer treats another layer's private representation as if it were a supported contract.
 
 ## Governing Principle
 Encapsulation is a promise about what may change independently. An internal import silently cancels that promise: private structure becomes a de facto API without review, versioning, or ownership. The dependency graph then understates the real architecture because source visibility, not declared design, determines who may know what.

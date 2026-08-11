@@ -1,7 +1,7 @@
 # primitive-obsession — Main
 
 ## What To Do Now
-Introduce a distinct domain type at the boundary and migrate callers so values with the same primitive representation but different meanings are no longer interchangeable.
+Introduce a distinct domain type at the boundary and migrate callers so values with the same primitive representation but different meanings are no longer interchangeable. The named domain type at the boundary is who owns the identity invariant that values with the same primitive representation but different meanings are not interchangeable.
 
 ## Why This Matters
 A primitive tells the compiler how bits are stored, not what they mean. When semantic categories collapse into one representation, the compiler cannot help with one of the most valuable classes of mistakes: a valid-looking value supplied to the wrong concept.

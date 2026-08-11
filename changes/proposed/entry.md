@@ -27,31 +27,31 @@ Proposal 相互覆盖时如何落地
 
 Unified Storage / Session / Casebook 等 cutover 是 **clean break**：旧 Journal / Blob / feature-owned store 上的历史数据可以丢弃或留在原地不再读取；新世界只认最终 EventStore 语义。禁止为“迁旧数据”“双向兼容”“旧档可读性”投入工期。
 
-**进度快照最后同步：** 2026-08-11（§0.1 为 Gate 状态权威；正文历史章节若与 §0.1 冲突，以 §0.1 为准。G0/G1/G2/G3/G3.5/G4/G7 DONE；G5/G6 DONE-with-amendment；G8/G9 PARTIAL）
+**进度快照最后同步：** 2026-08-11（§0.1 是 observational living status，不覆盖后文 Product Exit Gate。G0/G1/G3/G3.5/G4 DONE；G5 DONE-with-amendment（C-3 user裁决）；G2/G6/G7/G8/G9 PARTIAL）
 
-> **权威声明：** §0.1 Gate 总览是 living status 唯一权威。后文 G4/G5/G6 等章节标题里若仍残留 “IN PROGRESS / BLOCKED / NOT STARTED”，那是施工手册原文，不覆盖 §0.1。
+> **Living status：** §0.1 Gate 总览是观察快照，不是对历史 Gate 正文的覆盖权。后文 G2 Exit、G6-E/F/G、G7 Exit、G8、G9 等 Product Exit Gate 仍是验收基线。
 
 当前 Change 分布：
 
 ```text
 Active:
-  changes/active/strength.md       — G8 PARTIAL：K0 splice（AttachmentKind.StrengthReplica 等）已在树；Change 仍 active，交并行 owner 续做；勿 playbook-close
+  changes/active/strength.md       — G8 PARTIAL：K0 policy/transform unit proofs in tests/unit/strength/*；非 live Host canary；**不** claim K1/K2/shadow DONE；Change 仍 active，交并行 owner 续做；勿 playbook-close
 
 Completed（本 Playbook 相关）:
   changes/completed/causal-ce-observability.md
   changes/completed/orchestrator-e2e-timeout.md
   changes/completed/storage.md                          — G4 DONE
-  changes/completed/js-capability-projected-tools.md    — G5 DONE-with-amendment(C-3)
-  changes/completed/universal.md                        — G2 DONE (Q1/Q2/Q3) + G3 DONE + G6 synthesis+Host-path
-  changes/completed/perm-inspector.md                   — G6 DONE-with-amendment (deterministic Bookkeeper synthesizer)
-  changes/completed/rulebook.md                         — G7 DONE（--strict rubric 120/120 + Observation event vocabulary）
+  changes/completed/js-capability-projected-tools.md    — G5 DONE-with-amendment(C-3 user裁决)
+  changes/completed/universal.md                        — G2 PARTIAL（runtime reuse canary green；PREFIX LAW unit canary cited, not Exit）+ G3 DONE + G6 PARTIAL
+  changes/completed/perm-inspector.md                   — G6 PARTIAL（BookkeeperRuntime/EditQaTool/BookkeeperStaging cited; digest synthesizer gone; Host e2e / LLM Bookkeeper open）
+  changes/completed/rulebook.md                         — G7 PARTIAL（Observation events DONE；production 120 fails expanded `--strict`；A37–A50 / HUMAN_ONLY 未证）
 
 Proposed（Playbook 本身 + 独立 Lane）:
   changes/proposed/entry.md        — 本文件；Integration Playbook，不是产品 Change；不迁 completed
   changes/proposed/magic-todo.md   — 不在本 Playbook Gate 序列内；保持 proposed；不入 G0–G9 gates
 ```
 
-已解决的历史 anomaly：`storage` / `universal` / `perm-inspector` / `rulebook` 文件在 `changes/completed/`。Gate 状态以 §0.1 为准；Strength 仍 active。
+已解决的历史 anomaly：`storage` / `universal` / `perm-inspector` / `rulebook` 文件在 `changes/completed/`。文件迁 completed 不等于 Product Exit Gate 已满足；Strength 仍 active。
 
 这些 Change 不能按照“每个 Proposal 自己从 Phase 0 一路做到完成”的方式独立实施。
 
@@ -89,17 +89,17 @@ Strength
 |---|---|---|
 | **G0** Governance + Baseline | **DONE** | Storage path 唯一化；baseline 已建 |
 | **G1** Causal CE + Orchestrator canaries | **DONE** | `changes/completed/causal-ce-observability.md` + `orchestrator-e2e-timeout.md`；release **0.6.0** |
-| **G2** Universal Runtime Foundation | **DONE** | Q1/Q2/Q3 same Inspector SessionId + same agent + serial + return→TurnCompleted + owner cancel：`tests/unit/session/sync-delegate-runtime.test.mjs` (`G2_inspector_Q1_Q2_Q3_same_session_serial_reuse`, `G2_inspector_cancel_owner_fails_pending_invoke_no_extra_child`). |
+| **G2** Universal Runtime Foundation | **PARTIAL** | runtime reuse canary only：`tests/unit/session/sync-delegate-runtime.test.mjs` (`G2_inspector_Q1_Q2_Q3_same_session_serial_reuse`, `G2_inspector_cancel_owner_fails_pending_invoke_no_extra_child`)。Inspector PREFIX LAW unit canary（**not** Exit）：`tests/unit/session/g2-inspector-provider-wire-prefix.test.mjs` :: `G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix`（reused-child `SendPrompt` → OpenAI body from dispatcher text + Return answers → `tests/e2e/support/provider-wire.js` `wireOf`/`sealHolds` + Domain `isAppendOnlyPrefix`）。optional `SyncDelegateRuntime` `promptModel`（after G6 `onInspector*` hooks）is G2 PREFIX LAW ModelId bind：`ChatParamsHook` leaves `Model=None` so Inspector Q1–Q3 `SendPrompt` must carry the same `OpencodeModel`；G6 must not treat `promptModel` as theirs to remove。G2 Exit 仍未满足。 |
 | **G3** Universal Clean Break | **DONE** | Student/Teacher/QA/SKILL 删除；Meditator → Inspector only；`student-teacher-absence` ratchet green |
 | **G3.5** Storage cutover scope 修订 | **DONE** | Amendment G3.5-A；Student QA retired；no migrator / dual-write |
 | **G4** Unified Storage | **DONE** | `changes/completed/storage.md` Final outcome；G4R（`changes/completed/test.md`）；`unified-store-gate` |
 | **G5** JS Capability-Projected Tools | **DONE-with-amendment** | `changes/completed/js-capability-projected-tools.md` Final outcome；Amendment C-3 (2026-08-10 user裁决): builtin `read`/`edit`/`write`/`glob`/`grep`/`patch` retained, coexists with js-ROLE; legacy-absent clause superseded. |
-| **G6** perm-inspector + Casebook | **DONE-with-amendment** | One `QaSynthesize` provider transaction on CaseRefresh (edit-qa + stability verify → `InspectorCaseRefreshed`) and on ReuseScope close (exactly one CaseFinalize). Host-path Q1/Q2/Q3 → finalize → cold fetch: `tests/unit/casebook/g6-host-reuse-finalize.test.mjs`. Amendment: synthesizer is deterministic evidence-digest (not a live LLM InternalLeaf session). |
-| **G7** Rulebook | **DONE** | (a) `enforcer-rulebook-gate --require-headings --strict` 120/120 GREEN. Wired in `scripts/check.mjs`. (b) Physical EventStore vocabulary is `BlogObservationCommitted` / `BlogObservationsSquashed`; codec dual-decodes legacy tags. |
-| **G8** Strength | **PARTIAL** | Change 仍 `changes/active/strength.md`（并行 owner）。K0 splice / algebra 可测；**不** claim K1/K2/shadow DONE。G7 full gate is now green; G8 remains active PARTIAL. |
-| **G9** Global Convergence | **PARTIAL** | ratchets include `enforcer-rulebook-gate --require-headings --strict` and expanded `session-ownership-ratchet`. Still smoke-check, not full release-close. |
+| **G6** perm-inspector + Casebook | **PARTIAL** | Observational APIs（**not** Exit）：`BookkeeperRuntime.setSessionPort` / `runTransaction` / `isAttached` / `tryTxId`；`EditQaTool.execute`（document `Q.md`\|`A.md`, unique `old_text`）；`BookkeeperStaging.begin`/`read`/`replace`/`take`/`abort`。`AttachmentKind.Bookkeeper` `txId` lives in `BookkeeperRuntime`, not child options。digest synthesizer **gone** from `CasebookBookkeeper`。`SpikePlugin` calls `BookkeeperRuntime.setSessionPort` at `createHost`；`tryFinalizeInspector` is `Task`；`HostSignalBootstrap` remains sync so `SpikePlugin` fire-and-forgets after starting the Task（`tryTake` is sync-before-await）。G2 `promptModel` not removed。Host e2e / LLM Bookkeeper **still open**。Host-path unit（`tests/unit/casebook/g6-host-reuse-finalize.test.mjs`）**不是** full tool→PromptDispatcher→TurnCompleted→Casebook→fetch e2e。 |
+| **G7** Rulebook | **PARTIAL** | Observation events DONE（`BlogObservationCommitted` / `BlogObservationsSquashed`；legacy dual-decode）。`scripts/checks/enforcer-rulebook-gate.mjs --require-headings --strict`（=`--require-rubric`）encodes mechanical A37+A38 (`NEW_RUBRIC_CODES`); production 120 **fails** `--strict` until authoring wave。`HUMAN_ONLY_RUBRIC_ITEMS`（paired-history 120 / A39 pair review / A40 tournament）this gate does **not** claim。A37–A50 semantic / paired-history / tournament **未**证明。 |
+| **G8** Strength | **PARTIAL** | Change 仍 `changes/active/strength.md`（并行 owner）。Policy/transform **unit** proofs only（not live Host canaries, not K1/K2 DONE）：`tests/unit/strength/{host-canary-k0,host-policy,replica-transform,projection-algebra}.test.mjs` — `StrengthPolicy.decideFromFacts` / eligibility / budgetOf；`StrengthSettings.load` / `HostCanaryFingerprint` / `hostCanaryHealthy`；`StrengthReplicaTransform.apply`；`StrengthReplicaTools.exactReadonlyHostToolMap`；`StrengthFrame.isAllowedTool`；`StrengthReplicaAssociationHints`；`SatelliteKind.Companion` only；`PromptAuthority.systemPromptIdFor` / `toolCapabilitiesFor(..., StrengthReplica)`。G7 未 full Exit；G8 仍 active PARTIAL。 |
+| **G9** Global Convergence | **PARTIAL** | smoke-check only, not full release-close。Cite: `scripts/checks/session-ownership-ratchet.mjs` + `session-ownership-matrix.json` + `tests/unit/verify/session-ownership-ratchet.test.mjs`（wired in `scripts/check.mjs`）。Closed kinds: Companion, SyncInspector, SyncCoder, Bookkeeper, hidden Reviewer, StrengthReplica, fork agent, Executor child。Bookkeeper `evidencePath` moved to `src/Wanxiangshu/Infrastructure/BookkeeperRuntime.fs` after G6 landed that runtime（was `SessionOwnership.fs`）。Symbol/storage/capability ratchets remain separate。 |
 
-**当前主线位置：** G0/G1/G2/G3/G3.5/G4/G7 DONE；G5/G6 DONE-with-amendment；G8/G9 PARTIAL。entry 保持 `proposed/`；§0.1 为权威。
+**当前主线位置：** G0/G1/G3/G3.5/G4 DONE；G5 DONE-with-amendment（C-3）；G2/G6/G7/G8/G9 PARTIAL。entry 保持 `proposed/`。§0.1 为观察快照，不覆盖后文 Exit Gate。
 
 ## 0.2 自 Playbook 落地以来关键 commit（`31d456ec` 之后）
 
@@ -125,15 +125,15 @@ ac41ef8f  session abort diagnostic
 | 证明切片 | 状态 |
 |---|---|
 | 静态 ratchet：`student-teacher-absence`（含 `SatelliteKind.Replica` 禁止）+ `session-ownership-ratchet` + `unified-store-gate` + `g4r-*` | **GREEN** |
-| `enforcer-rulebook-gate --require-headings --strict` + `capability-isomorphism-gate` | **GREEN**（G7 rubric + G9 静态闸） |
+| `enforcer-rulebook-gate --require-headings --strict` + `capability-isomorphism-gate` + `session-ownership-ratchet` | **PARTIAL**（G7: production 120 fails expanded `--strict` until authoring; HUMAN_ONLY items not claimed。G9: ownership ratchet smoke-check, not release-close） |
 | `npm run check`（lint + build + unit + integration） | **GREEN** |
 | enforcer / strength / verify unit | **256 PASS** |
 | `npm run test:e2e` Long Stroke | **GREEN**（48 steps；journal ceiling 372；三连稳定） |
 | Storage G4 / JS G5 | **DONE / DONE-with-amendment(C-3)** |
-| Universal+perm-inspector G6 / Rulebook G7 | **DONE-with-amendment / DONE** — G6 synthesizer + Host-path e2e; G7 `--strict` 120/120 + Observation event names |
-| 已知 residual | G6 非 live LLM Bookkeeper session；G8 PARTIAL；G9 PARTIAL smoke-check only；magic-todo 仍 proposed。 |
+| Universal+perm-inspector G6 / Rulebook G7 | **PARTIAL / PARTIAL** — G6 BookkeeperRuntime/EditQaTool cited, digest synthesizer gone, Host e2e/LLM Bookkeeper open；G7 Observation events DONE；expanded `--strict` mechanical A37+A38 未过 production 120；A37–A50 / HUMAN_ONLY 未证 |
+| 已知 residual | G2 Exit（PREFIX LAW unit ≠ Host Exit）；G6 LLM Bookkeeper / edit-qa / CaseFinalize / Host e2e；G7 production 120 `--strict` + A37–A50 / HUMAN_ONLY；G8 live Host / K1/K2；G9 PARTIAL smoke-check only；magic-todo 仍 proposed。 |
 
-## 0.4 合法中间状态（现在）— **G0–G4/G7 DONE; G5/G6 DONE-with-amendment; G8/G9 PARTIAL**
+## 0.4 合法中间状态（现在）— **G0/G1/G3/G3.5/G4 DONE; G5 DONE-with-amendment; G2/G6/G7/G8/G9 PARTIAL**
 
 ```text
 ✓ Causal waits 可解释；orchestrator canaries 无历史 timeout
@@ -142,11 +142,12 @@ ac41ef8f  session abort diagnostic
 ✓ Runtime durability = EventStore（Strategy A：AgentJournal 作 adapter surface）
 ✓ 无 legacy NDJSON writer / 无 dual-write / 无 migrator
 ✓ Storage completed（G4）
-✓ JS capability-projected tools（G5 DONE-with-amendment C-3）
-✓ Casebook synthesizer transaction + Host-path Q1/Q2/Q3 finalize/fetch（G6 DONE-with-amendment: deterministic Bookkeeper, not live LLM）
-✓ Rulebook G7：`--require-headings --strict` 120/120；physical events `BlogObservationCommitted` / `BlogObservationsSquashed`（legacy tags dual-decode）
-◐ Strength：K0 splice 类型在树；Change 仍 active/strength.md（并行 owner；G8 PARTIAL；非 full DONE）
-◐ G9：既有 ratchets + capability-isomorphism-gate + enforcer-rulebook `--require-headings --strict`；ratchet 仍为 smoke，非 full release close
+✓ JS capability-projected tools（G5 DONE-with-amendment C-3 user裁决）
+◐ G2：runtime reuse canary green；PREFIX LAW unit canary cited (`g2-inspector-provider-wire-prefix.test.mjs`)；G2 Exit 未满足
+◐ G6：BookkeeperRuntime/EditQaTool/BookkeeperStaging cited；digest synthesizer gone；Host e2e / LLM Bookkeeper open；Host-path unit ≠ full tool→PromptDispatcher→TurnCompleted→Casebook→fetch e2e
+◐ G7：Observation events DONE；expanded `--strict` mechanical A37+A38 未过 production 120；HUMAN_ONLY / A37–A50 semantic/paired-history/tournament 未证
+◐ Strength：K0 policy/transform unit proofs in tests/unit/strength/*；非 live Host canary；Change 仍 active/strength.md（并行 owner；G8 PARTIAL；非 K1/K2 DONE）
+◐ G9：`session-ownership-ratchet.mjs` smoke-check（kinds closed；Bookkeeper evidencePath now `src/Wanxiangshu/Infrastructure/BookkeeperRuntime.fs`）；symbol/storage/capability ratchets 另轨；非 full release close
 ○ magic-todo — 独立 Lane；保持 proposed；不入主 Gate
 ○ entry — Playbook；保持 proposed；不迁 completed
 ```
@@ -557,13 +558,13 @@ npm run check:release
 
 也绿。
 
-**没有这一 Gate，不进入 Universal。** — **已满足**（Universal 已 Active 且 G2/G3 完成）。
+**没有这一 Gate，不进入 Universal。** — **已满足**（Universal 已 Active；G3 DONE；G2 PARTIAL）。
 
 ---
 
-# 7. G2 — Universal Runtime Foundation — **DONE**
+# 7. G2 — Universal Runtime Foundation — **PARTIAL**
 
-> **状态：DONE**（2026-08-10）。`changes/active/universal.md` Active work G2 exit 已勾选；证据：`SyncDelegateRuntime`、dual-await、`inspector-oneshot` Q1/Q2 reuse e2e、`devops-mechanical-repair-loop`。
+> **Living status：PARTIAL**（2026-08-11 observational）。runtime reuse canary green；PREFIX LAW unit canary cited (`tests/unit/session/g2-inspector-provider-wire-prefix.test.mjs` :: `G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix`)；optional `promptModel` is G2 ModelId bind (`ChatParamsHook` `Model=None`)，**not** a G6-owned field to remove；**not** G2 Exit。下文 G2 Exit Gate 仍是验收基线。
 
 ~~现在才启动 `changes/proposed/universal.md` 并 move 到 active。~~ 已启动并冻结原文于：
 
@@ -754,7 +755,7 @@ owner cascade works
 causal frontier works
 ```
 
-通过后才能删 Student。 — **G2 Exit 已满足**（2026-08-10）。
+通过后才能删 Student。 — **G2 Exit 未满足**（observational 2026-08-11）：runtime reuse canary green；PREFIX LAW unit canary cited, not Host/Exit proof。
 
 ---
 
@@ -967,9 +968,9 @@ Student QA 是已退休 domain。
 
 ---
 
-# 11. G4 — Unified Storage — **DONE**（§0.1 权威）
+# 11. G4 — Unified Storage — **DONE**
 
-> **状态：DONE**（见 §0.1 / `changes/completed/storage.md`）。下文保留施工手册原文；若与 §0.1 冲突，以 §0.1 为准。
+> **状态：DONE**（见 `changes/completed/storage.md`）。下文是施工手册原文 / Product Exit Gate；living status 不覆盖其验收基线。
 
 现在进入最大的基础设施 Change。
 
@@ -1179,9 +1180,9 @@ runtime 只认 EventStore
 
 ---
 
-# 12. G5 — JS Capability-Projected Tools — **DONE**（§0.1 权威）
+# 12. G5 — JS Capability-Projected Tools — **DONE-with-amendment**
 
-> **状态：DONE**（见 §0.1 / `changes/completed/js-capability-projected-tools.md`）。下文保留施工手册原文；若与 §0.1 冲突，以 §0.1 为准。
+> **状态：DONE-with-amendment**（见 `changes/completed/js-capability-projected-tools.md`）。Amendment C-3 (2026-08-10 user裁决): builtin `read`/`edit`/`write`/`glob`/`grep`/`patch` retained, coexists with js-ROLE; legacy-absent clause superseded。下文是施工手册原文 / Product Exit Gate。
 
 到这里 Agent 世界已经稳定：
 
@@ -1381,9 +1382,9 @@ Casebook observation capture
 
 ---
 
-# 14. G6 — perm-inspector + Universal Casebook Completion — **DONE**（§0.1 权威）
+# 14. G6 — perm-inspector + Universal Casebook Completion — **PARTIAL**
 
-> **状态：DONE**（见 §0.1 / `changes/completed/universal.md` + `changes/completed/perm-inspector.md`：CasebookLifecycle + mechanical Bookkeeper + Index）。下文保留施工手册原文；若与 §0.1 冲突，以 §0.1 为准。
+> **Living status：PARTIAL**（2026-08-11 observational）。`BookkeeperRuntime` / `EditQaTool.execute` / `BookkeeperStaging` cited；digest synthesizer gone from `CasebookBookkeeper`；`SpikePlugin` calls `setSessionPort` at `createHost`；`tryFinalizeInspector` is `Task`；`HostSignalBootstrap` remains sync（fire-and-forget after starting the Task；`tryTake` sync-before-await）。G2 `promptModel` not removed。无 user amendment 把 runtime surface 当作 G6 Exit。Host e2e / LLM Bookkeeper still open。Host-path unit 不是 full tool→PromptDispatcher→TurnCompleted→Casebook→fetch e2e。下文 G6-E/F/G Product Exit Gate 仍是验收基线。
 
 现在才正式启动 `perm-inspector`。
 
@@ -1670,7 +1671,9 @@ perm-inspector → completed
 
 ---
 
-# 22. G7 — Rulebook
+# 22. G7 — Rulebook — **PARTIAL**
+
+> **Living status：PARTIAL**（2026-08-11 observational）。Observation events DONE。`enforcer-rulebook-gate.mjs --require-headings --strict` encodes mechanical A37+A38; production 120 fails `--strict` until authoring wave。HUMAN_ONLY_RUBRIC_ITEMS / A37–A50 semantic / paired-history / tournament 未证。下文 G7 Exit Gate 仍是验收基线。
 
 Rulebook 放在这里，而不是更早。
 
@@ -2056,12 +2059,12 @@ Orchestrator timeout   ✓ completed
 
 ---
 
-## Lane B — Universal Runtime — **G2/G3/G6 DONE**
+## Lane B — Universal Runtime — **G2 PARTIAL / G3 DONE / G6 PARTIAL**
 
 ```text
-ReuseScope / SessionOwnership / SyncDelegate   ✓ DONE
+ReuseScope / SessionOwnership / SyncDelegate   ◐ PARTIAL（runtime reuse canary green；PREFIX LAW unit canary cited, not Exit）
 Student/Teacher clean break                     ✓ DONE
-Casebook / CaseFinalize                         ✓ DONE（universal + perm-inspector completed）
+Casebook / CaseFinalize                         ◐ PARTIAL（BookkeeperRuntime/EditQaTool cited；digest synthesizer gone；Host e2e / LLM Bookkeeper open）
 ```
 
 ---
@@ -2084,9 +2087,9 @@ G4 Exit（§43+§48，G3.5-A 修订）→ changes/completed/  ✓ DONE（2026-08
 ```text
 Universal destructive delete          ✓ DONE
 Storage cutover                       ✓ DONE（G4 completed）
-JS legacy tool removal                ✓ DONE（G5 completed）
-Casebook observation integration      ✓ DONE（G6）
-Rulebook                              ✓ DONE（G7 residual closed；见 completed/rulebook Final outcome）
+JS legacy tool removal                ✓ DONE-with-amendment（G5 C-3）
+Casebook observation integration      ◐ PARTIAL（G6：digest ≠ Bookkeeper；非 full Host e2e）
+Rulebook                              ◐ PARTIAL（G7：Observation events DONE；production 120 fails expanded `--strict`；A37–A50 / HUMAN_ONLY 未证）
 Strength promotion                    ◐ PARTIAL（K0 splice in tree；active/strength 并行 owner）
 G9 ratchets                           ◐ PARTIAL（session-ownership + headings + capability-isomorphism 已接线；非 full close）
 ```
@@ -2464,11 +2467,11 @@ Strength
 把整个过程压缩成一张执行图：
 
 ```text
-CURRENT（2026-08-11；§0.1 权威）
+CURRENT（2026-08-11；§0.1 observational）
 │
-├─ Completed: Causal CE + Orchestrator + Storage(G4) + JS(G5)
-│            + Universal + perm-inspector（G6 Casebook）
-│            + rulebook（G7 residual closed；Final outcome）
+├─ Completed files: Causal CE + Orchestrator + Storage(G4) + JS(G5 C-3)
+│            + Universal + perm-inspector（G2/G6 PARTIAL；G3 DONE）
+│            + rulebook（G7 PARTIAL；Observation events DONE；`--strict` production 120 Remaining）
 ├─ Active: strength.md（G8 PARTIAL；并行 owner；勿 playbook-close）
 ├─ Proposed: entry.md（本 Playbook；不迁 completed）
 └─ Proposed: magic-todo（Playbook 外；不入 gates）
@@ -2480,8 +2483,8 @@ CURRENT（2026-08-11；§0.1 权威）
 [2] Orchestrator canaries green              ✓ DONE
         │
         ▼
-[3] Universal Session Architecture           ✓ DONE
-    ReuseScope / SessionOwnership / SyncDelegate
+[3] Universal Session Architecture           ◐ PARTIAL
+    ReuseScope / SessionOwnership / SyncDelegate；runtime reuse canary green；PREFIX LAW unit canary cited, not Exit
         │
         ▼
 [4] Delete Student / Teacher / QA / SKILL    ✓ DONE
@@ -2495,16 +2498,16 @@ CURRENT（2026-08-11；§0.1 权威）
 [6] Capability-Projected JS Tools            ✓ DONE-with-amendment(C-3)
         │
         ▼
-[7] Inspector Casebook                       ✓ DONE-with-amendment
-    QaSynthesize transaction + Host-path Q1–Q3 finalize/fetch; deterministic synthesizer (not live LLM)
+[7] Inspector Casebook                       ◐ PARTIAL
+    BookkeeperRuntime/EditQaTool cited；digest synthesizer gone；Host e2e / LLM Bookkeeper open；Host-path unit ≠ full e2e
         │
         ▼
-[8] Rulebook                                 ✓ DONE
-    --require-headings --strict 120/120; BlogObservationCommitted / BlogObservationsSquashed
+[8] Rulebook                                 ◐ PARTIAL
+    Observation events DONE；expanded `--strict` mechanical A37+A38 未过 production 120；A37–A50 / HUMAN_ONLY 未证
         │
         ▼
 [9] Strength                                 ◐ PARTIAL（active/strength）
-    K1/K2 / holdout — 并行 owner；G7 已 full green，G8 仍非 full DONE
+    K1/K2 / holdout — 并行 owner；unit policy/transform proofs only；G7 未 full Exit，G8 仍非 full DONE
         │
         ▼
 [10] Full ratchet + release                  ◐ PARTIAL（G9）
@@ -2515,7 +2518,7 @@ CURRENT（2026-08-11；§0.1 权威）
 
 # 33. Definition of Done
 
-> **2026-08-11 closeout:** §0.1 is authoritative. G0–G4/G7 DONE; G5/G6 DONE-with-amendment (G5 C-3 supersedes `legacy five tool implementation = absent`; G6 Bookkeeper is a deterministic evidence-digest synthesizer, not a live LLM InternalLeaf). G8/G9 remain PARTIAL. The checklist below is the *product* convergence DoD — G8 Strength + G9 full ratchet are still open, so this list is **not** all-green.
+> **2026-08-11 living status（observational）：** Product Exit Gates in this section remain the acceptance baseline. G0/G1/G3/G3.5/G4 DONE；G5 DONE-with-amendment（C-3 user裁决）。G2/G6/G7/G8/G9 PARTIAL。G6 BookkeeperRuntime/EditQaTool/BookkeeperStaging are observational cites, not Exit; digest synthesizer is gone from CasebookBookkeeper and has no user amendment authority. G7 expanded `--strict` is not A37–A50 Exit; production 120 currently fails `--strict`. The checklist below is the *product* convergence DoD — **not** all-green.
 
 只有以下全部成立，才能认为这一批 Proposal 真正“收敛”，而不是“分别实现过”：
 
@@ -2539,8 +2542,8 @@ no dual write / fallback old store
 
 File capability = exact generated projection
 legacy five tool implementation = absent
-    // SUPERSEDED by Amendment C-3 (2026-08-10): builtin read/edit/write/glob/grep/patch
-    // retained; coexistence is the Exit. See §0.1 G5 DONE-with-amendment.
+    // SUPERSEDED by Amendment C-3 (2026-08-10 user裁决): builtin read/edit/write/glob/grep/patch
+    // retained; coexistence is the Exit. G5 DONE-with-amendment.
 
 Reusable Inspector:
     hot transcript reuse

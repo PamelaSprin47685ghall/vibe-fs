@@ -1,7 +1,7 @@
 # canary-skipped — Main
 
 ## What To Do Now
-Write the external assumption down precisely and test it against the real Host or provider with the smallest safe canary that can prove it false.
+Write the external assumption down precisely and test it against the real Host or provider with the smallest safe canary that can prove it false. The real Host or provider is who owns the undocumented empirical behavior; a narrow live canary is who owns the proof that the assumption still holds.
 
 ## Why This Matters
 Mocks prove what we told them to do. A canary proves what the other system actually does. If the behavior is undocumented, the gap between those two statements is the entire risk. Internal tests can be perfectly green while resting on a false premise about framing, ordering, identity, or lifecycle.

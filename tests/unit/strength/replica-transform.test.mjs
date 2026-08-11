@@ -102,6 +102,11 @@ test('STRENGTH_003_K1_aborts_before_provider_request_2_after_one_complete_batch'
   assert.equal(listItems(outcome.fields[1]).length, 1)
   assert.deepEqual(host.aborted, ['replica-k1'])
   assert.equal(Runtime.StrengthRuntime__TryFindByReplica_Z31B28506(runtime, session('replica-k1')), undefined)
+
+  // Transform-level K+1 stop, not the live Host nested-session canary: a later
+  // transform on the same child cannot re-admit a provider request.
+  const again = await Transform.StrengthReplicaTransform_apply(H, runtime, host.port, output)
+  assert.equal(caseOf(again), 'NotReplica')
 })
 
 test('STRENGTH_003_K2_allows_request_2_then_aborts_before_request_3', async () => {
@@ -131,4 +136,33 @@ test('STRENGTH_003_K2_allows_request_2_then_aborts_before_request_3', async () =
   assert.equal(retired.fields[0], 'provider-request-budget-reached')
   assert.equal(listItems(retired.fields[1]).length, 2)
   assert.deepEqual(host.aborted, ['replica-k2'])
+})
+
+test('STRENGTH_003_005_transform_discards_incomplete_and_invalid_batches_then_stops_the_replica', async () => {
+  // Discard-on-error at the transform program. Not a live Host provider-failure canary.
+  // K2 so one complete illegal batch is below requestLimit and hits tryBuild,
+  // not the K1 budget-reached shortcut.
+  const runtime = registered('replica-discard', StrengthBudget.K2)
+  const host = sessions()
+  const incomplete = rawOutput('replica-discard', [
+    message('user', [text('Continue.')]),
+    message('assistant', [call('c1', 'read', '{"filePath":"a"}')]),
+  ])
+
+  const ready = await Transform.StrengthReplicaTransform_apply(H, runtime, host.port, incomplete)
+  assert.equal(caseOf(ready), 'Ready')
+  assert.equal(listItems(ready.fields[0]).length, 0)
+  assert.deepEqual(host.aborted, [])
+
+  const forgedWrite = rawOutput('replica-discard', [
+    message('user', [text('Continue.')]),
+    message('assistant', [call('w1', 'write', '{"filePath":"a","content":"no"}')]),
+    message('tool', [result('w1', 'ok')]),
+  ])
+  const retired = await Transform.StrengthReplicaTransform_apply(H, runtime, host.port, forgedWrite)
+  assert.equal(caseOf(retired), 'Retired')
+  assert.match(retired.fields[0], /invalid-replica-frame/)
+  assert.equal(listItems(retired.fields[1]).length, 1)
+  assert.deepEqual(host.aborted, ['replica-discard'])
+  assert.equal(Runtime.StrengthRuntime__TryFindByReplica_Z31B28506(runtime, session('replica-discard')), undefined)
 })

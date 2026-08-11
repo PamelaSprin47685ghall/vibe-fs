@@ -1,7 +1,7 @@
 # null-ambiguity — Main
 
 ## What To Do Now
-Replace ambiguous null/optional results with explicit alternatives for every absence reason that changes caller behavior.
+Replace ambiguous null/optional results with explicit alternatives for every absence reason that changes caller behavior. The producer that still knows why the value is absent is who owns the distinction; do not ask downstream to reconstruct it from flags or status.
 
 ## Why This Matters
 Once distinct outcomes are collapsed into "no value," information is irreversibly lost. Downstream layers compensate with flags, status inspection, retries, or prose parsing, creating a web of heuristics around a distinction the producer already knew and failed to preserve.

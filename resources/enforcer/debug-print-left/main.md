@@ -1,7 +1,7 @@
 # debug-print-left — Main
 
 ## What To Do Now
-Remove temporary prints, dumps, traces, breakpoints, and investigation-only instrumentation from production paths. Promote only signals that have a durable operational purpose.
+Remove temporary prints, dumps, traces, breakpoints, and investigation-only instrumentation from production paths. Promote only signals that have a durable operational purpose. Operations is who owns production diagnostics; the original investigator is not who owns leftover prints after the question is settled.
 
 ## Why This Matters
 Debug output is optimized for the investigator who already knows the question. Production diagnostics must be optimized for unknown future incidents, stable tooling, privacy, and bounded noise. Treating one as the other leaves an accidental interface that nobody owns.

@@ -1,7 +1,7 @@
 # weakened-test-to-pass — Main
 
 ## What To Do Now
-Restore the behavioral expectation unless a separate authoritative decision changed the contract; then fix the implementation until it satisfies the preserved test.
+Restore the behavioral expectation unless a separate authoritative decision changed the contract; then fix the implementation until it satisfies the preserved test. Change the test only if who owns the contract authorized a new promise.
 
 ## Why This Matters
 A test exists to make some implementations unacceptable. Weakening it solely because the current code fails removes exactly the pressure that gives verification value. The suite becomes a description of whatever the code already does rather than a constraint on what it is allowed to do.

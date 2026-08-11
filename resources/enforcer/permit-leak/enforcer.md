@@ -1,7 +1,7 @@
 # permit-leak — Enforcer
 
 ## Definition
-A permit leaks when a semaphore slot, lock token, lease, gate entry, or capacity right can outlive the operation that acquired it because some exit path fails to release it.
+A permit leaks when a semaphore slot, lock token, lease, gate entry, or capacity right can outlive the operation that acquired it because some exit path fails to release it. The root-cause is that permit lifetime is accounted in control-flow paths instead of a scoped construct, so any unhandled exit can violate acquire/release conservation.
 
 ## Governing Principle
 A permit is a linear resource: acquisition creates exactly one obligation to release. Any control flow with more than one exit threatens that conservation law unless lifetime is encoded structurally. Manual acquire/release pairs are therefore fragile not because developers forget often, but because exceptions, cancellation, and early returns continuously create new paths that must all preserve the same accounting identity.

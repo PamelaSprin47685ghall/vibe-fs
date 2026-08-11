@@ -1,7 +1,7 @@
 # cross-layer-internal-import — Main
 
 ## What To Do Now
-Remove the internal import. Either expose the required fact through the provider’s deliberate public contract or relocate the behavior to the layer that already owns the necessary knowledge.
+Remove the internal import. Either expose the required fact through the provider’s deliberate public contract or relocate the behavior to the layer that already owns the necessary knowledge. The providing layer is who owns internal members; the consumer may depend only on the published contract.
 
 ## Why This Matters
 Internal imports create obligations no architecture document records. A provider appears free to refactor but is not; a consumer appears dependent only on an interface but actually knows storage layout, helper structure, or lifecycle detail. This is coupling without an honest contract.

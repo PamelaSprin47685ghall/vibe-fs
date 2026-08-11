@@ -1,7 +1,7 @@
 # tool-error-ignored — Main
 
 ## What To Do Now
-Resolve the failed tool operation or replace the missing evidence with an explicit alternative before continuing any conclusion that depended on it.
+Resolve the failed tool operation or replace the missing evidence with an explicit alternative before continuing any conclusion that depended on it. The failed tool’s intended proof obligation is who owns whether later conclusions may proceed; a red signal cannot be inherited as success.
 
 ## Why This Matters
 A tool failure is not merely an inconvenience; it changes what is known. Ignoring it causes later steps to inherit a premise that was never established, so a polished final result can rest on a silent hole in the evidence chain.

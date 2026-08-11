@@ -1,7 +1,7 @@
 # program-counter-state — Main
 
 ## What To Do Now
-Remove fields whose primary purpose is to remember execution position. Express sequencing with local continuations/structured control flow and persist only states the domain genuinely recognizes.
+Remove fields whose primary purpose is to remember execution position. Express sequencing with local continuations/structured control flow and persist only states the domain genuinely recognizes. Structured control flow of the in-flight operation is who owns sequencing; durable domain facts are who owns the persistence invariant that stored state describes the world, not the instruction pointer.
 
 ## Why This Matters
 Persisted program counters freeze an implementation strategy into the data model. Refactoring the control flow then becomes a data migration, while concurrency and recovery must interpret partially executed code as if it were business state.

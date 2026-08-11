@@ -1,7 +1,7 @@
 # dirty-hack — Main
 
 ## What To Do Now
-Remove the workaround and repair the model, ownership, or boundary whose mismatch made the workaround appear necessary.
+Remove the workaround and repair the model, ownership, or boundary whose mismatch made the workaround appear necessary. The violated invariant’s owner is who owns the repair; the bypass site is not who owns the real specification.
 
 ## Why This Matters
 A hack is expensive not because it is ugly but because it creates an undocumented exception to the system’s explanatory model. Future code must remember both the rule and the place where the rule is false. Enough such exceptions turn architecture into folklore.

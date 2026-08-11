@@ -1,7 +1,7 @@
 # impure-core — Enforcer
 
 ## Definition
-A core is impure when business decisions reach outward for time, randomness, storage, network, environment, or mutable global state instead of receiving the facts they need as explicit inputs.
+A core is impure when business decisions reach outward for time, randomness, storage, network, environment, or mutable global state instead of receiving the facts they need as explicit inputs. The root-cause is that policy fetches undeclared external facts inside the decision, so the signature understates the true inputs and identical calls are not identical results.
 
 ## Governing Principle
 A policy function is easiest to trust when its result is a mathematical consequence of visible inputs. Hidden effects enlarge the input set without enlarging the signature: the same call can mean different things tomorrow, on another machine, or after another test. Replay, audit, and local reasoning then fail for the same reason—the function has dependencies it refuses to name.

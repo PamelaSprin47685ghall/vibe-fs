@@ -3411,7 +3411,7 @@ Observation capture 从最终执行层接（G5 后 = builtin read/glob/grep Host
 - [x] Host mechanical Bookkeeper：`CasebookBookkeeper.refreshStale` — needsRefresh → fetch → replayAll → refreshCase(same Q/A, replayed obs)；无 LLM / 无 edit-qa
 - [x] FetchTool stale branch：single-flight 内尝试 mechanical refresh once，再 re-fetch；成功且 Fresh → 返回 fresh A；否则仍 stale + refresh:required（不把 maintenance 变成 fetch error）
 - [x] unit：`tests/unit/casebook/bookkeeper-mechanical.test.mjs` + fetch stale→mechanical path
-- [ ] **Remaining（诚实）**：LLM Bookkeeper Agent 会话（InternalLeaf + Attached；`edit-qa` 合成修订 Q/A + CaseFinalize synthesis prompt）— 未实现；当前 CaseRefresh 仅为 observation 机械推进，不合成新答案
+- [ ] **Remaining（诚实）**：LLM Bookkeeper / Host e2e still open。Observational APIs（**not** Exit）：`BookkeeperRuntime.setSessionPort` / `runTransaction` / `isAttached` / `tryTxId`；`EditQaTool.execute`（`Q.md`\|`A.md`, unique `old_text`）；`BookkeeperStaging.begin`/`read`/`replace`/`take`/`abort`。`txId` in `BookkeeperRuntime` not child options。digest synthesizer **gone** from `CasebookBookkeeper`。`SpikePlugin` calls `BookkeeperRuntime.setSessionPort` at `createHost`；`tryFinalizeInspector` is `Task`；`HostSignalBootstrap` remains sync so `SpikePlugin` fire-and-forgets after starting the Task（`tryTake` is sync-before-await）。G2 `promptModel` not removed。
 
 ### G6-F — CaseFinalize（Universal 核心）— DONE（workflow + lifecycle；semantic synthesis deferred）
 - [x] `finalizeCase`：exactly-one guard（同 scope 二次 finalize 拒绝；unexpected SessionDeleted 不 reconstruct）
@@ -3432,41 +3432,29 @@ G6 mechanical Casebook surface（Domain / Capture / Store / Replay / Fetch+singl
 
 ## Blockers
 
-无。LLM Bookkeeper / full CaseFinalize synthesis 为后续增量，非本 Exit 阻塞。
+G6 仍 PARTIAL。`BookkeeperRuntime` / `EditQaTool` / `BookkeeperStaging` 是 observational surface，不是 Exit。LLM Bookkeeper / CaseFinalize synthesis / full Host e2e 是 Product Exit Remaining，不得降格为后续增量。digest synthesizer 已从 `CasebookBookkeeper` 移除，无 user amendment authority。
 
 ## Final outcome
 
-**G6 Inspector Casebook（perm-inspector）已收口**（2026-08-11，mechanical Bookkeeper + lifecycle session wiring）：
+**G6 Inspector Casebook（perm-inspector）mechanical surface**（2026-08-11 observational PARTIAL；G6-E/F/G Remaining 仍开放）：
 
 1. **Domain / Store / Capture / Replay**：CASE-001..012 正式文档 + 纯 Domain projection；统一 EventStore 事件（Captured/Refreshed/Accessed/Evicted）；marker opt-in；typed observation capture + executor 阅读容错；freshness = exact normalized observation equality（hint，非 proof）。
-2. **Lifecycle session wiring**：`CasebookLifecycle` — notePrompt / noteAnswer / tryFinalizeInspector / cleanupInspector / touchAccess；SpikePlugin + SyncDelegateRuntime + HostSignalBootstrap 钩子；graceful finalize once；unexpected delete = cleanup only（零 EventStore 写）。
+2. **Lifecycle session wiring**：`CasebookLifecycle` — notePrompt / noteAnswer / tryFinalizeInspector / cleanupInspector / touchAccess；`SpikePlugin` calls `BookkeeperRuntime.setSessionPort` at `createHost`；`tryFinalizeInspector` is `Task`；`HostSignalBootstrap` remains sync（fire-and-forget after starting the Task；`tryTake` sync-before-await）；G2 `promptModel` not removed；graceful finalize once；unexpected delete = cleanup only（零 EventStore 写）。
 3. **Fetch hot path**：`FetchTool` fresh/stale/no-case；CASE-011 single-flight；fresh → Accessed；process-local `CasebookIndex` epoch snapshot。
 4. **Minimal Bookkeeper（无 LLM）**：`CasebookBookkeeper.refreshStale` 在 stale 时用同一 Q/A + 重放 observations 发布 Refreshed；FetchTool stale 分支尝试一次后 re-fetch；maintenance failure ≠ fetch failure。
 5. **Proofs**：`tests/unit/casebook/*` **36 PASS**（含 `bookkeeper-mechanical`、`lifecycle-wiring`、`fetch-tool`、`universal-loop`、index/store/domain/capture）。
-6. **诚实 Remaining**：LLM Bookkeeper Agent（edit-qa / CaseRefresh 合成 / CaseFinalize 多轮 synthesis）与 full Host Meditator e2e **未**实现；当前 cold path 为 draft 原文 Captured + observation 机械刷新。
+6. **诚实 Remaining**：`BookkeeperRuntime` / `EditQaTool` / `BookkeeperStaging` cited observationally；digest synthesizer gone；LLM Bookkeeper / CaseFinalize 多轮 synthesis / full Host Meditator e2e **仍开放**。
 
-**Gate 移交**：与 `universal.md` 同窗 completed；Playbook G6 Exit 的 mechanical Casebook 目标达成。后续 LLM Bookkeeper 可作为独立增量，不回滚本 Change。
+**Gate 移交**：与 `universal.md` 同窗 completed **不等于** G6 Exit。`BookkeeperRuntime`/`EditQaTool` surface ≠ G6 Exit；digest synthesizer gone；G6-E/F/G Remaining 仍开放。
 
 ## Amendment (2026-08-11 strict audit)
 
-**Status correction — Gate reclassified to PARTIAL per `changes/proposed/entry.md` §0.1 (living-status authority).** The frozen body and `Final outcome` above are retained verbatim; this section is the only honesty amendment and does not rewrite history.
+Living status is observational. Product Exit Gates (G6-E/F/G) remain the acceptance baseline. This section does not override Gate text. Mechanical digest has **no** user amendment authority and is **not** Bookkeeper / `edit-qa` / synthesis. Host-path unit is **not** full tool→PromptDispatcher→TurnCompleted→Casebook→fetch e2e.
 
-Deferred — G6-E/F/G (not DONE, mechanical only):
-- **LLM Bookkeeper** (InternalLeaf + Attached, `edit-qa` synthesis) deferred — current is mechanical `CasebookBookkeeper.refreshStale` only (same Q/A + replayed observations, no LLM synthesis).
-- **edit-qa synthesis** deferred — no Bookkeeper Agent provider session that revises Q/A.
+The Remaining bullets under G6-E/F/G above stay open:
+- **LLM Bookkeeper** (InternalLeaf + Attached, `edit-qa` synthesis) still open — `BookkeeperRuntime` / `EditQaTool` / `BookkeeperStaging` cited observationally; digest synthesizer gone from `CasebookBookkeeper`; not Host e2e / not Exit.
+- **edit-qa synthesis** still open — `EditQaTool.execute` (document `Q.md`|`A.md`, unique `old_text`) is surface, not Host e2e proof.
 - **Single provider transaction synthesis (CaseFinalize)** deferred — ReuseScope-close multi-turn Q/A → one canonical Q/A via exactly-one Bookkeeper provider transaction not evidenced; current finalize is draft Q/A direct `Captured`.
 - **Evidence stability verify after synthesis** deferred (freeze → Bookkeeper → replay/verify → publish not exercised with LLM candidate).
 - **Real Host Meditator→reusable Inspector→scope-close→CaseFinalize→cold fetch e2e** deferred — only helper/unit evidenced (`tests/unit/casebook/universal-loop.test.mjs`, `tests/unit/casebook/*` 36 PASS); no full Host e2e with LLM Bookkeeper.
-
-Mechanical surface remains as described in the frozen body; full semantic Casebook remains PARTIAL. `entry.md` §0.1 is authoritative.
-
-## Amendment (2026-08-11 implementation closeout)
-
-Supersedes the honesty-only amendment above for living status. Frozen body retained.
-
-**G2:** Q1/Q2/Q3 same Inspector SessionId + serial reuse + owner cancel evidenced in `tests/unit/session/sync-delegate-runtime.test.mjs`.
-
-**G6:** `CasebookBookkeeper` now runs a `QaSynthesize` transaction (edit-qa + evidence-stability verify → `InspectorCaseRefreshed`). `CasebookLifecycle.tryFinalizeInspector` performs exactly one CaseFinalize synthesis then `finalizeCase`. Host-path reuse Q1–Q3 → scope-close → fetch: `tests/unit/casebook/g6-host-reuse-finalize.test.mjs`. Remaining amendment: synthesizer is deterministic evidence-digest, not a live LLM InternalLeaf Bookkeeper session.
-
-**G7 (this file if rulebook):** `enforcer-rulebook-gate --require-headings --strict` 120/120 GREEN and wired in `scripts/check.mjs`. Physical EventStore vocabulary is `BlogObservationCommitted` / `BlogObservationsSquashed`; codec dual-decodes legacy tags.
 

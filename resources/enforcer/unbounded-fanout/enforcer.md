@@ -4,7 +4,7 @@
 Fan-out is unbounded when work creation follows input size without a finite concurrency limit, allowing tasks, requests, processes, agents, or file operations to demand resources faster than the system can service them.
 
 ## Governing Principle
-Concurrency converts a collection into simultaneous claims on finite resources. Without a bound, input cardinality becomes resource policy by accident: a larger list means more sockets, memory, file descriptors, processes, or remote pressure with no independent ceiling. Bounded concurrency separates two quantities that must not be confused—the amount of work that exists and the amount of work allowed to be active now.
+Concurrency converts a collection into simultaneous claims on finite resources. The root-cause is treating input cardinality as concurrency policy. Without a bound, a larger list means more sockets, memory, file descriptors, processes, or remote pressure with no independent ceiling. Bounded concurrency separates two quantities that must not be confused—the amount of work that exists and the amount of work allowed to be active now.
 
 ## Trigger When
 Trigger when code spawns or starts one concurrent operation per item with no semaphore, worker pool, bounded map, queue capacity, or inherently small fixed upper bound.

@@ -4,7 +4,7 @@
 A decision is unrecorded when a material architecture, compatibility, operational, or tradeoff choice changes what future engineers are allowed to assume but its rationale and rejected alternatives exist only in the moment of discussion.
 
 ## Governing Principle
-Code preserves what was chosen; it rarely preserves why alternatives were rejected. Without rationale, future maintainers encounter only the surviving shape and may rationally “simplify” it back toward a discarded design because the constraints that ruled that design out are invisible. A decision record carries the counterfactual knowledge implementation cannot express by itself.
+Code preserves what was chosen; it rarely preserves why alternatives were rejected. The root-cause is that rejected alternatives live only in conversation. Without rationale, future maintainers encounter only the surviving shape and may rationally “simplify” it back toward a discarded design because the constraints that ruled that design out are invisible. A decision record carries the counterfactual knowledge implementation cannot express by itself.
 
 ## Trigger When
 Trigger when a consequential design choice, compatibility boundary, operational compromise, or rejected alternative will influence future changes and no durable record states the reason.

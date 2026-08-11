@@ -1,7 +1,7 @@
 # coverage-theater — Main
 
 ## What To Do Now
-Replace metric-only tests with behavioral assertions that distinguish the intended result from realistic wrong results.
+Replace metric-only tests with behavioral assertions that distinguish the intended result from realistic wrong results. A falsifiable caller-visible proposition is who owns verification; coverage counts are not who owns the claim that behavior is correct.
 
 ## Why This Matters
 A coverage report answers “did execution pass here?” It cannot answer “was what happened here correct?” Chasing the metric encourages tests that touch branches without specifying their meaning, producing numerical confidence detached from defect-detection power.

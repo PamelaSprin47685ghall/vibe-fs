@@ -1,7 +1,7 @@
 # recovery-by-filesystem-state — Main
 
 ## What To Do Now
-Replace lifecycle inference from file/directory residue with explicit durable events or records whose schema states the recovery fact directly.
+Replace lifecycle inference from file/directory residue with explicit durable events or records whose schema states the recovery fact directly. The durable lifecycle record is who owns recovery truth; incidental files and directories are not who owns workflow progress.
 
 ## Why This Matters
 Incidental artifacts are ambiguous because they can exist before or after the business milestone they seem to imply. Crashes preserve arbitrary prefixes of execution, so existence is not equivalent to completion unless the protocol deliberately makes it so.

@@ -1,7 +1,7 @@
 # release-ladder-skipped — Main
 
 ## What To Do Now
-Run the applicable verification rungs in order: pure behavior, contract boundaries, replay/recovery, then real-environment canary or release checks where relevant.
+Run the applicable verification rungs in order: pure behavior, contract boundaries, replay/recovery, then real-environment canary or release checks where relevant. Each applicable narrower rung is who owns its class of uncertainty; a later integration or canary is not who owns the skipped local proof.
 
 ## Why This Matters
 A broad test mixes many causes. When it fails, diagnosis is expensive; when it passes, the specific local invariant may still have escaped exercise. Narrow proofs establish small truths first, so later stages test only what cannot be proven below.

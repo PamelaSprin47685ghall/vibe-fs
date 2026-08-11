@@ -43,36 +43,45 @@ module FetchTool =
               "a", ToolHostCodec.TString answer
               "refresh", ToolHostCodec.TString "required" ]
 
-    let private runFetch (workspaceRoot: string) (store: IEventStore) (raw: IGitRawStore) (sessionId: string) : string =
-        match CasebookWorkflow.fetchCase store raw 256 sessionId with
-        | Error err ->
-            ToolHostCodec.tomlObject [ "error", ToolHostCodec.TString(sprintf "casebook fetch failed: %s" err) ]
-        | Ok None ->
-            ToolHostCodec.tomlObject
-                [ "status", ToolHostCodec.TString "no-case"
-                  "session_id", ToolHostCodec.TString sessionId ]
-        | Ok(Some case) ->
-            let replayed = CasebookReplay.replayAll workspaceRoot case.Observations
+    let private runFetch
+        (workspaceRoot: string)
+        (store: IEventStore)
+        (raw: IGitRawStore)
+        (sessionId: string)
+        : System.Threading.Tasks.Task<string> =
+        task {
+            match CasebookWorkflow.fetchCase store raw 256 sessionId with
+            | Error err ->
+                return
+                    ToolHostCodec.tomlObject [ "error", ToolHostCodec.TString(sprintf "casebook fetch failed: %s" err) ]
+            | Ok None ->
+                return
+                    ToolHostCodec.tomlObject
+                        [ "status", ToolHostCodec.TString "no-case"
+                          "session_id", ToolHostCodec.TString sessionId ]
+            | Ok(Some case) ->
+                let replayed = CasebookReplay.replayAll workspaceRoot case.Observations
 
-            match CasebookWorkflow.checkFreshness case replayed with
-            | ReplayResult.Fresh -> emitFresh workspaceRoot sessionId case.A
-            | ReplayResult.Stale ->
-                // CASE-006: Host Bookkeeper synthesis once (edit-qa transaction
-                // + stability verify). Maintenance failure keeps the old Case
-                // and still returns stale — never a fetch error.
-                match CasebookBookkeeper.refreshStale store raw workspaceRoot sessionId with
-                | Ok true ->
-                    match CasebookWorkflow.fetchCase store raw 256 sessionId with
-                    | Error _ -> emitStale sessionId case.A
-                    | Ok None -> emitStale sessionId case.A
-                    | Ok(Some updated) ->
-                        let again = CasebookReplay.replayAll workspaceRoot updated.Observations
+                match CasebookWorkflow.checkFreshness case replayed with
+                | ReplayResult.Fresh -> return emitFresh workspaceRoot sessionId case.A
+                | ReplayResult.Stale ->
+                    // CASE-006: one Bookkeeper child session (edit-qa against staged
+                    // Q/A + stability verify). Maintenance failure keeps the old Case
+                    // and still returns stale — never a fetch error.
+                    match! CasebookBookkeeper.refreshStale store raw workspaceRoot sessionId with
+                    | Ok true ->
+                        match CasebookWorkflow.fetchCase store raw 256 sessionId with
+                        | Error _ -> return emitStale sessionId case.A
+                        | Ok None -> return emitStale sessionId case.A
+                        | Ok(Some updated) ->
+                            let again = CasebookReplay.replayAll workspaceRoot updated.Observations
 
-                        match CasebookWorkflow.checkFreshness updated again with
-                        | ReplayResult.Fresh -> emitFresh workspaceRoot sessionId updated.A
-                        | ReplayResult.Stale -> emitStale sessionId updated.A
-                | Ok false
-                | Error _ -> emitStale sessionId case.A
+                            match CasebookWorkflow.checkFreshness updated again with
+                            | ReplayResult.Fresh -> return emitFresh workspaceRoot sessionId updated.A
+                            | ReplayResult.Stale -> return emitStale sessionId updated.A
+                    | Ok false
+                    | Error _ -> return emitStale sessionId case.A
+        }
 
     let spec (factory: HostToolFactory) (workspaceRoot: string) (store: IEventStore) (raw: IGitRawStore) : ToolSpec =
         let tString = ToolHostCodec.TString
@@ -105,7 +114,7 @@ module FetchTool =
                                     let work =
                                         task {
                                             try
-                                                return runFetch workspaceRoot store raw sessionId
+                                                return! runFetch workspaceRoot store raw sessionId
                                             finally
                                                 lock fetchGate (fun () -> fetchInFlight.Remove sessionId |> ignore)
                                         }

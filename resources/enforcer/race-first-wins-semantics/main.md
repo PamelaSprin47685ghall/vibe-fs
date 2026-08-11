@@ -1,7 +1,7 @@
 # race-first-wins-semantics — Main
 
 ## What To Do Now
-Remove scheduler order from the business decision. Gather the information the rule actually needs and apply a deterministic merge, or explicitly define first-writer semantics if timing truly belongs to the domain.
+Remove scheduler order from the business decision. Gather the information the rule actually needs and apply a deterministic merge, or explicitly define first-writer semantics if timing truly belongs to the domain. The documented merge law, or an explicit first-writer protocol, is who owns the outcome; the scheduler is not who owns business truth.
 
 ## Why This Matters
 “Whichever finishes first” makes load and latency part of the product model without admitting it. Replays, tests, and retries can then produce different answers from the same logical inputs because execution timing—not data—decides truth.

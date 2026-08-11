@@ -1,7 +1,7 @@
 # catch-all-swallows-future — Main
 
 ## What To Do Now
-Replace the generic fallback with explicit exhaustive cases wherever the domain is closed and new variants deserve deliberate semantics.
+Replace the generic fallback with explicit exhaustive cases wherever the domain is closed and new variants deserve deliberate semantics. The closed domain type is who owns exhaustiveness; each new variant is who owns its own semantics, not a leftover default arm.
 
 ## Why This Matters
 A wildcard trades a present convenience for a future blind spot. Without it, extending a finite type produces a map of every place whose assumptions must be reconsidered. With it, the compiler stays silent and old behavior is silently inherited by a case nobody had in mind when the branch was written.

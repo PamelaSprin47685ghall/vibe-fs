@@ -1,7 +1,7 @@
 # comment-theater — Main
 
 ## What To Do Now
-Remove comments that merely translate unclear code and rewrite the code so its names, types, and structure carry the intended meaning directly.
+Remove comments that merely translate unclear code and rewrite the code so its names, types, and structure carry the intended meaning directly. Names, types, and control structure are who owns executable meaning; comments are not who owns facts the compiler could enforce.
 
 ## Why This Matters
 A compensating comment creates two representations of one fact, but only one is mechanically checked. As code changes, the prose can remain plausible while becoming false. Worse, readers learn to depend on the explanation rather than demand a structure that makes the rule obvious.

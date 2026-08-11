@@ -1,7 +1,7 @@
 # boundary-collapse — Main
 
 ## What To Do Now
-Re-establish an explicit interface between the contexts and reduce what crosses it to the smallest set of facts required by the consumer.
+Re-establish an explicit interface between the contexts and reduce what crosses it to the smallest set of facts required by the consumer. Each context is who owns its private model and lifecycle; only an explicit translator at the declared crossing may copy contracted facts.
 
 ## Why This Matters
 Architecture is a theory of permitted knowledge. When one context can depend on another’s internals, private implementation choices become public obligations by accident. The cost appears later as synchronized migrations, defensive adapters, and changes that cannot be reasoned about locally.

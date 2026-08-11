@@ -168,13 +168,32 @@ module ToolRegistry =
                             strength.TryFindByReplica(SessionId.create ctx.SessionId) |> Option.isSome
                         | _ -> false
 
+                    let isBookkeeper =
+                        not (String.IsNullOrWhiteSpace ctx.SessionId)
+                        && BookkeeperRuntime.isAttached ctx.SessionId
+
                     if isStrengthReplica then
                         // STRENGTH-004: Host-native read/glob/grep are the entire
                         // replica tool surface. Every plugin-registered tool is
                         // therefore a forged/hidden path and fails closed here.
+                        // StrengthReplica still denies edit-qa.
                         return
                             ToolHostCodec.tomlObject
                                 [ "error", tString (sprintf "Tool '%s' is not permitted for StrengthReplica" spec.Name) ]
+                    elif isBookkeeper then
+                        // Inverted StrengthReplica special-case: Bookkeeper may
+                        // run edit-qa only. No Role.Bookkeeper.
+                        if spec.Name = "edit-qa" then
+                            return! original args ctx
+                        else
+                            return
+                                ToolHostCodec.tomlObject
+                                    [ "error",
+                                      tString (sprintf "Tool '%s' is not permitted for Bookkeeper" spec.Name) ]
+                    elif spec.Name = "edit-qa" then
+                        return
+                            ToolHostCodec.tomlObject
+                                [ "error", tString "Tool 'edit-qa' is only permitted for Bookkeeper attachment" ]
                     else
                         match runtime.RoleFor ctx with
                         | Some role when allowed role -> return! original args ctx

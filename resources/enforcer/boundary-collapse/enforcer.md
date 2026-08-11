@@ -1,7 +1,7 @@
 # boundary-collapse — Enforcer
 
 ## Definition
-A boundary has collapsed when two contexts that own different invariants can directly reach into one another’s representation, state, or lifecycle.
+A boundary has collapsed when two contexts that own different invariants can directly reach into one another’s representation, state, or lifecycle. The root-cause is that two contexts which own different invariants can reach each other’s representation or lifecycle, so private facts become accidental public obligations.
 
 ## Governing Principle
 A boundary exists to make one side ignorant of facts it has no right to depend on. Once internals cross freely, each context acquires accidental knowledge of the other’s timing, storage, and representation. The system may still be split into files, but its change graph has become one object: any local revision can invalidate remote assumptions no interface records.

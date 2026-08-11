@@ -1,7 +1,7 @@
 # duplicated-control-flow — Enforcer
 
 ## Definition
-Control flow is duplicated when the same workflow, validation order, retry protocol, or state transition is independently re-expressed in more than one owner.
+Control flow is duplicated when the same workflow, validation order, retry protocol, or state transition is independently re-expressed in more than one owner. The root-cause is that one protocol has several independent implementations and therefore several authorities over ordering and failure.
 
 ## Governing Principle
 Duplication matters when it duplicates knowledge, not text. A workflow encodes temporal knowledge: which step precedes which, what failure cancels what, which result permits continuation. Copying that sequence creates two authorities over one protocol. They can remain textually similar while becoming semantically different one edit at a time.

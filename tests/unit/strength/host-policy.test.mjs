@@ -33,6 +33,22 @@ test('STRENGTH_011_dry_run_is_an_explicit_non_default_host_canary_mode', () => {
   })
 })
 
+test('STRENGTH_011_default_settings_are_shadow_k0_with_economic_holdout_and_no_k2_enablement', () => {
+  // Default Host settings: Shadow, no cost template, canary unhealthy, 10%
+  // control holdout kept. This is not a live Host canary and does not enable K2.
+  withEnv('WANXIANGSHU_STRENGTH_MODE', undefined, () => {
+    withCanary(undefined, () => {
+      const settings = Settings.load()
+      assert.equal(caseOf(settings.Mode), 'Shadow')
+      assert.equal(settings.Costs, undefined)
+      assert.equal(Settings.hostCanaryHealthy(), false)
+      assert.equal(settings.ControlRateBasisPoints, 1000)
+      assert.equal(settings.Policy.K2MinimumEvidence, 50)
+      assert.ok(settings.Policy.K2Margin > settings.Policy.K1Margin)
+    })
+  })
+})
+
 test('STRENGTH_011_host_canary_is_bound_to_the_pinned_OpenCode_and_plugin_contract', () => {
   const expected = `opencode-ai@${packageJson.devDependencies['opencode-ai']}|@opencode-ai/plugin@${packageJson.peerDependencies['@opencode-ai/plugin']}|strength-host-canary-v1`
   assert.equal(Settings.HostCanaryFingerprint, expected)

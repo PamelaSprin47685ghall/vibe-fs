@@ -1,7 +1,7 @@
 # guessed-not-verified — Main
 
 ## What To Do Now
-Identify the factual premise that the current decision relies on and verify it against the source that actually owns that fact.
+Identify the factual premise that the current decision relies on and verify it against the source that actually owns that fact. The authoritative source of the claim is who owns the premise; memory, naming convention, and confirmatory snippets are not.
 
 ## Why This Matters
 A guessed premise contaminates every downstream conclusion while often remaining invisible because the reasoning itself looks coherent. The cost of checking early is usually tiny compared with repairing a design built on an API, file, lifecycle, or failure model that never existed.

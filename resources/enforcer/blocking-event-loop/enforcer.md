@@ -1,7 +1,7 @@
 # blocking-event-loop — Enforcer
 
 ## Definition
-An event loop is blocked when one task retains the loop while waiting on work whose completion does not require the loop’s exclusive attention.
+An event loop is blocked when one task retains the loop while waiting on work whose completion does not require the loop’s exclusive attention. The root-cause is that a task keeps exclusive hold of the shared event-loop thread while waiting on work that does not need that exclusivity, turning one local stall into global head-of-line blocking.
 
 ## Governing Principle
 An event loop buys concurrency by making a strict bargain: each callback may borrow the thread briefly, never own it while the world is slow. Blocking I/O, sleeps, synchronous process waits, and long CPU loops break that bargain. One local wait becomes global head-of-line blocking because unrelated progress shares the same executor.

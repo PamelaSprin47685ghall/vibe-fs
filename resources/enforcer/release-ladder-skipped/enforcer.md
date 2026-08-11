@@ -1,7 +1,7 @@
 # release-ladder-skipped — Enforcer
 
 ## Definition
-The release ladder is skipped when verification jumps to a broad or expensive stage without first clearing the lower-level proofs that isolate simpler classes of failure.
+The release ladder is skipped when verification jumps to a broad or expensive stage without first clearing the lower-level proofs that isolate simpler classes of failure. The root-cause is that a broader stage is counted as proof while a cheaper applicable rung that isolates a narrower class of failure was never cleared.
 
 ## Governing Principle
 Verification levels form an information hierarchy. Pure tests prove local logic cheaply; contract tests prove boundaries; replay tests prove history; canaries prove real hosts. A high-level success cannot substitute cleanly for lower proofs because failure there has many possible causes, while success may not exercise the specific property a lower rung targets. The ladder orders evidence from narrow causality to broad realism.

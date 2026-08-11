@@ -201,6 +201,10 @@ test('EXEC_026_sync_delegate_reuses_session_after_full_completion', async () => 
   })
 })
 
+// ProviderWire(Q1) prefix-of Q2 prefix-of Q3 (ARCH-004) is proved in
+// tests/unit/session/g2-inspector-provider-wire-prefix.test.mjs
+// (`G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix`). This harness's
+// fake SendPrompt records text/agent only and does not prove ProviderWire.
 test('G2_inspector_Q1_Q2_Q3_same_session_serial_reuse', async () => {
   await withHarness(async ({ runtime, prompts, createCalls }) => {
     const owner = 'ses_owner_g2'

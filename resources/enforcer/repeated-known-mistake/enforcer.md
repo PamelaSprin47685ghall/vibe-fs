@@ -1,7 +1,7 @@
 # repeated-known-mistake — Enforcer
 
 ## Definition
-A known mistake is repeated when current work reenacts a failed approach or violates a constraint that the repository has already recorded as a lesson, invariant, or prior decision.
+A known mistake is repeated when current work reenacts a failed approach or violates a constraint that the repository has already recorded as a lesson, invariant, or prior decision. The root-cause is that still-authoritative recorded knowledge is not consulted, so the project pays again for a failure it already documented.
 
 ## Governing Principle
 Recording knowledge is valuable only if future decisions can inherit it. Repeating a documented mistake means the project has storage but no retrieval: experience exists as text yet does not constrain action. Engineering maturity therefore requires not merely writing lessons but consulting the knowledge nearest to the problem before paying to rediscover the same failure.

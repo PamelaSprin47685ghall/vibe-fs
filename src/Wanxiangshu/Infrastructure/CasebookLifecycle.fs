@@ -1,12 +1,13 @@
 namespace Wanxiangshu.Infrastructure
 
+open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Journal
 open Wanxiangshu.OpenCode
 
-/// CASE-003/010: process-local Casebook session wiring — draft Q/A, observation
-/// drain, graceful finalize vs unexpected cleanup. Publication goes only through
-/// WorkspaceEventStore (unified store); never AgentJournal.
+/// CASE-003/010: process-local Casebook session wiring — draft Q/A turns,
+/// observation drain, graceful finalize vs unexpected cleanup. Publication
+/// goes only through WorkspaceEventStore (unified store); never AgentJournal.
 module CasebookLifecycle =
 
     /// Process-local singleton the plugin feeds; lifecycle drains it.
@@ -28,11 +29,11 @@ module CasebookLifecycle =
     let isEnabled () : bool =
         lock stateGate (fun () -> enabledWorkspace.IsSome)
 
-    /// Invoke: record Q for the inspector session id.
+    /// Invoke: record Q for the inspector session id (appends a turn).
     let notePrompt (inspectorSessionId: string) (q: string) : unit =
         CasebookDraftStore.setQ inspectorSessionId q
 
-    /// Return: record A for the inspector session id.
+    /// Return: record A for the inspector session id (fills the current turn).
     let noteAnswer (inspectorSessionId: string) (a: string) : unit =
         CasebookDraftStore.setA inspectorSessionId a
 
@@ -42,49 +43,66 @@ module CasebookLifecycle =
         collector.Drain inspectorSessionId |> ignore
 
     /// Graceful owner scope close: if draft has Q+A, drain observations, run
-    /// exactly one CaseFinalize provider transaction (`QaSynthesize`), then
-    /// finalizeCase once. Unexpected cleanup never synthesizes.
-    /// Best-effort Result — missing draft/A is Ok no-op; store/synthesizer
-    /// failures surface as Error.
-    let tryFinalizeInspector (workspaceRoot: string) (inspectorSessionId: string) : Result<unit, string> =
-        if not (CasebookFeature.isEnabled workspaceRoot) then
-            cleanupInspector inspectorSessionId
-            Ok()
-        else
-            match CasebookDraftStore.tryTake inspectorSessionId with
-            | None ->
-                collector.Drain inspectorSessionId |> ignore
-                Ok()
-            | Some draft ->
-                match draft.A with
+    /// exactly one CaseFinalize child session with the full turn transcript,
+    /// then finalizeCase once. Unexpected cleanup never runs Bookkeeper.
+    let tryFinalizeInspector (workspaceRoot: string) (inspectorSessionId: string) : Task<Result<unit, string>> =
+        task {
+            if not (CasebookFeature.isEnabled workspaceRoot) then
+                cleanupInspector inspectorSessionId
+                return Ok()
+            else
+                match CasebookDraftStore.tryTake inspectorSessionId with
                 | None ->
                     collector.Drain inspectorSessionId |> ignore
-                    Ok()
-                | Some a ->
-                    try
-                        let commonDir = RuntimePath.gitCommonDir workspaceRoot
-                        let raw, store = WorkspaceEventStore.acquire commonDir
-                        let observations = collector.Drain inspectorSessionId
+                    return Ok()
+                | Some draft ->
+                    let lastAnswer = draft.Turns |> List.rev |> List.tryPick (fun turn -> turn.A)
 
-                        match CasebookBookkeeper.synthesize draft.Q a observations with
-                        | Error err -> Error err
-                        | Ok(q', a') ->
-                            let case: Case =
-                                { SessionId = inspectorSessionId
-                                  Q = q'
-                                  A = a'
-                                  Observations = observations
-                                  LastAccessOrder = 0L }
-
-                            match CasebookWorkflow.finalizeCase store raw case with
-                            | Ok() ->
-                                CasebookIndex.invalidate ()
-                                CasebookIndex.refresh store raw 256 |> ignore
-                                Ok()
-                            | Error err -> Error err
-                    with ex ->
+                    match lastAnswer with
+                    | None ->
                         collector.Drain inspectorSessionId |> ignore
-                        Error ex.Message
+                        return Ok()
+                    | Some a ->
+                        try
+                            let commonDir = RuntimePath.gitCommonDir workspaceRoot
+                            let raw, store = WorkspaceEventStore.acquire commonDir
+                            let observations = collector.Drain inspectorSessionId
+                            let lastQ =
+                                draft.Turns
+                                |> List.tryLast
+                                |> Option.map (fun turn -> turn.Q)
+                                |> Option.defaultValue ""
+
+                            let transcript = CasebookDraftStore.transcript draft.Turns
+
+                            match!
+                                BookkeeperRuntime.runTransaction
+                                    BookkeeperRequest.CaseFinalize
+                                    inspectorSessionId
+                                    lastQ
+                                    a
+                                    observations
+                                    (Some transcript)
+                            with
+                            | Error err -> return Error err
+                            | Ok(q', a') ->
+                                let case: Case =
+                                    { SessionId = inspectorSessionId
+                                      Q = q'
+                                      A = a'
+                                      Observations = observations
+                                      LastAccessOrder = 0L }
+
+                                match CasebookWorkflow.finalizeCase store raw case with
+                                | Ok() ->
+                                    CasebookIndex.invalidate ()
+                                    CasebookIndex.refresh store raw 256 |> ignore
+                                    return Ok()
+                                | Error err -> return Error err
+                        with ex ->
+                            collector.Drain inspectorSessionId |> ignore
+                            return Error ex.Message
+        }
 
     /// Fresh fetch side-effect: append InspectorCaseAccessed (ignore errors).
     let touchAccess (workspaceRoot: string) (sessionId: string) : unit =

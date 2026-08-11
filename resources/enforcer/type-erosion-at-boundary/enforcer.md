@@ -4,7 +4,7 @@
 Type erosion occurs when dynamic, unchecked, reflective, or unboxed representations cross the adapter boundary and continue circulating inside code that should reason in domain types.
 
 ## Governing Principle
-A boundary is where uncertainty should be spent. External data may arrive weakly typed, but once admitted inward the system should have paid the cost of parsing and validation and gained stronger propositions in return. Allowing `any`, unchecked casts, or reflective lookup to persist means every downstream use reopens the same uncertainty and can fail far from the point where evidence was available.
+A boundary is where uncertainty should be spent. External data may arrive weakly typed, but once admitted inward the system should have paid the cost of parsing and validation and gained stronger propositions in return. The root-cause is spending that uncertainty after the adapter instead of at it: allowing `any`, unchecked casts, or reflective lookup to persist means every downstream use reopens the same uncertainty and can fail far from the point where evidence was available.
 
 ## Trigger When
 Trigger when `any`, reflection, dynamic property access, unboxing, unchecked casts, or generic maps escape protocol/adapters into domain/application logic.

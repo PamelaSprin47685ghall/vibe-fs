@@ -1,7 +1,7 @@
 # missing-regression-test — Main
 
 ## What To Do Now
-Capture the reported defect as a behavioral test that fails against the old mechanism and passes only after the repair.
+Capture the reported defect as a behavioral test that fails against the old mechanism and passes only after the repair. The behavioral boundary that exhibited the bug is who owns the regression: the suite must remember the failure, not only the patched implementation.
 
 ## Why This Matters
 A fix changes code; a regression test changes institutional memory. The test turns a one-time debugging discovery into a permanent constraint on future implementations, preventing the same failure from becoming expensive knowledge twice.

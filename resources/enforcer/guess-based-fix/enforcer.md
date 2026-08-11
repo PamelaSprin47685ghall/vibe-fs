@@ -1,7 +1,7 @@
 # guess-based-fix — Enforcer
 
 ## Definition
-A guess-based fix changes variables until a symptom disappears without establishing a causal mechanism that explains both the failure and the repair.
+A guess-based fix changes variables until a symptom disappears without establishing a causal mechanism that explains both the failure and the repair. The root-cause is that a passing configuration is treated as a causal explanation, so the patch is selected by symptom disappearance rather than by a falsified-and-confirmed mechanism.
 
 ## Governing Principle
 Correlation after a patch is not a proof of cause. Complex systems contain many interventions that can perturb timing, ordering, cache state, or error visibility enough to hide a symptom temporarily. A repair becomes engineering knowledge only when it identifies the violated invariant and predicts why the observed change restores it.

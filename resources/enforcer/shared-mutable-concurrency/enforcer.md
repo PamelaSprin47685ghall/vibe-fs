@@ -1,10 +1,10 @@
 # shared-mutable-concurrency — Enforcer
 
 ## Definition
-Shared mutable concurrency coordinates workers by letting several execution contexts directly mutate the same state and relying on locks or timing discipline to keep those mutations coherent.
+Shared mutable concurrency coordinates workers by letting several execution contexts directly mutate the same state and relying on locks or timing discipline to keep those mutations coherent. The root-cause is that write authority is shared, so correctness is reconstructed from lock choreography instead of from a single owner of change.
 
 ## Governing Principle
-The hard part of concurrency is not parallel execution; it is shared authority over change. A lock protects moments, not meaning: readers must still determine which fields belong to one invariant, which lock protects them, and which lock order avoids deadlock. Single ownership reverses the problem. One actor/writer owns mutation; others exchange messages or immutable values, so serialization follows authority rather than being reconstructed from lock choreography.
+The hard part of concurrency is not parallel execution; it is shared authority over change. A lock protects moments, not meaning: readers must still determine which fields belong to one invariant, which lock protects them, and which lock order avoids deadlock. Single ownership reverses the problem. One actor or writer owns mutation; others exchange messages or immutable values, so serialization follows authority rather than being reconstructed from locks.
 
 ## Trigger When
 Trigger when concurrent workers read and mutate shared domain state under ad hoc locks, especially when multiple locks or compound invariants are involved.
@@ -16,10 +16,13 @@ Trigger when concurrent workers read and mutate shared domain state under ad hoc
 - Sharing is limited to immutable values or copy-on-write snapshots.
 
 ## Distinguish From
-in-place-mutation is the general mutation smell. lost-update is one concrete conflict. race-first-wins-semantics concerns timing choosing business truth. This rule is shared write authority itself. Tie-break: fire here when several workers may write the same state; fire in-place-mutation when mutation is sequential; fire lost-update for a specific overwrite conflict; fire race-first-wins-semantics when first completion, not shared mutation, chooses the result.
+`in-place-mutation` is the general mutation smell. `lost-update` is one concrete overwrite conflict. `race-first-wins-semantics` concerns timing choosing business truth. This rule is shared write authority itself. Tie-break: if several workers may write the same state, this rule owns the case.
 
 ## Decision Procedure
-Identify the state’s semantic owner. If several workers can independently mutate it, ask whether ownership can be centralized and communication expressed as commands/messages or immutable snapshots.
+1. Identify the state’s semantic owner.
+2. Ask whether several workers can independently mutate it.
+3. If yes, centralize ownership.
+4. Express communication as commands, messages, or immutable snapshots across that boundary.
 
 ## Examples
 - positive: request handlers each lock a shared domain object and mutate several fields that together form one invariant.

@@ -1,7 +1,7 @@
 # unrecorded-decision — Main
 
 ## What To Do Now
-Create or update the project’s durable decision record with the context, chosen path, credible alternatives, rationale, and consequences.
+Create or update the project’s durable decision record with the context, chosen path, credible alternatives, rationale, and consequences. Write it where the architecture is decided: who owns the choice owns the durable rationale.
 
 ## Why This Matters
 Code shows the equilibrium after a decision but not the forces that produced it. When those forces are forgotten, future refactors can resurrect previously rejected designs and pay the same analysis cost again.

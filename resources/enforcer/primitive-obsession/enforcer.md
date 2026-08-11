@@ -1,7 +1,7 @@
 # primitive-obsession — Enforcer
 
 ## Definition
-Primitive obsession exists when distinct domain concepts cross a meaningful boundary as the same undifferentiated string, number, or boolean, allowing substitutions the domain itself forbids.
+Primitive obsession exists when distinct domain concepts cross a meaningful boundary as the same undifferentiated string, number, or boolean, allowing substitutions the domain itself forbids. The root-cause is that a primitive representation is asked to carry distinct domain identities across a boundary, so substitutions the domain forbids still type-check.
 
 ## Governing Principle
 A primitive preserves representation while erasing identity. `string` can carry an account ID, order ID, path, digest, capability, or currency code, so the type system sees all substitutions as legitimate even when the domain sees category errors. A named type restores the missing proposition: this value is not merely text; it belongs to this concept and may cross only where that concept is accepted.

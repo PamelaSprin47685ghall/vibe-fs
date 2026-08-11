@@ -1,7 +1,7 @@
 # unversioned-schema — Main
 
 ## What To Do Now
-Add an explicit schema version to the durable contract and define deterministic read, migration, and rejection behavior for every supported version.
+Add an explicit schema version to the durable contract and define deterministic read, migration, and rejection behavior for every supported version. Repair at persistence: who owns the durable contract owns schema identity and migration.
 
 ## Why This Matters
 Persisted data outlives the code that wrote it. Without a version, future readers must infer historical meaning from field shape, making compatibility dependent on coincidence and heuristics precisely when the original writer is gone.

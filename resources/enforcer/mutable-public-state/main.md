@@ -1,7 +1,7 @@
 # mutable-public-state — Main
 
 ## What To Do Now
-Remove public write access to invariant-bearing fields and expose domain operations that produce valid next state instead.
+Remove public write access to invariant-bearing fields and expose domain operations that produce valid next state instead. The named transition that preserves the object's rules is who owns every authoritative write; callers observe, they do not assign.
 
 ## Why This Matters
 Public mutation distributes authority without distributing complete knowledge. Each caller can create a state the object itself would never choose, then every downstream consumer must defend against those possibilities. Encapsulation pays the reasoning cost once at the transition boundary.

@@ -1,27 +1,38 @@
 #!/usr/bin/env node
 /**
- * Session-ownership ratchet (entry Playbook G9 / HOST-008).
+ * Session-ownership ratchet (entry Playbook G9 / HOST-008 / §24.4).
  *
- * Fail-closed: `src/Wanxiangshu/Kernel/SessionOwnership.fs` must declare the
- * long-lived AttachmentKind surface tokens. StrengthReplica is Universal
- * ownership only — never a SatelliteKind case (see student-teacher-absence).
+ * This script is the §24.4 questionnaire, not full G9. Symbol ratchet,
+ * storage ratchet, and capability-isomorphism ratchet already exist as
+ * separate gates. A green run here is still a smoke check — do not claim
+ * release-close.
  *
- * Hardened (Contract 4): beyond token presence, verify full lifecycle coverage
- * across dedicated Session surfaces:
- *   - hidden Reviewer session, fork-agent, Executor child
- *   - Handle / Companion ownership
- *   - cancel / retire / reconcile / crash signals
- * Scans Session plus Infrastructure/OpenCode/Host (plus Application)
- * and fails closed if any lifecycle signal is absent.
+ * Fail-closed:
+ *   1. `src/Wanxiangshu/Kernel/SessionOwnership.fs` must declare the
+ *      long-lived AttachmentKind surface tokens (Companion, SyncInspector,
+ *      SyncCoder, Bookkeeper, StrengthReplica). StrengthReplica is Universal
+ *      ownership only — never a SatelliteKind case.
+ *   2. Every managed session kind in the §24.4 matrix must answer:
+ *      owner, reusable, cancel, retire, handle, companion, crashReconcile,
+ *      evidencePath. Missing kind, empty field, missing evidence file, or
+ *      evidence file without the related token → exit 1.
+ *
+ * Bookkeeper live session runtime is owned by G6. evidencePath points at
+ * src/Wanxiangshu/Infrastructure/BookkeeperRuntime.fs (bindSession /
+ * AttachmentKind.Bookkeeper txId). SessionOwnership.fs remains the
+ * AttachmentKind surface ratchet. This questionnaire is still not full G9.
  *
  * Usage: node scripts/checks/session-ownership-ratchet.mjs
  */
 
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
+
 export const SESSION_OWNERSHIP_REL = 'src/Wanxiangshu/Kernel/SessionOwnership.fs'
+export const SESSION_OWNERSHIP_MATRIX_REL = 'scripts/checks/session-ownership-matrix.json'
 
 /** Required AttachmentKind / ownership tokens that must appear in SessionOwnership.fs. */
 export const REQUIRED_ATTACHMENT_TOKENS = Object.freeze([
@@ -33,31 +44,51 @@ export const REQUIRED_ATTACHMENT_TOKENS = Object.freeze([
 ])
 
 /**
- * Required lifecycle signals that must appear across the broader Session/Host
- * corpus. Covers hidden Reviewer, fork-agent, Executor, Handle, Companion,
- * cancel, retire, reconcile/crash signals per Contract 4.
- *
- * Lowercase entries are matched case-insensitively (e.g. fork matches Fork,
- * cancel matches Cancel). Capitalized entries are case-sensitive type signals.
+ * Playbook §24.4 managed session kinds. Closed set: matrix must answer each
+ * exactly; extra kinds fail closed so undocumented kinds cannot sneak in.
  */
-export const REQUIRED_LIFECYCLE_TOKENS = Object.freeze([
-  'Reviewer',
-  'fork',
-  'Executor',
-  'Handle',
+export const REQUIRED_KINDS = Object.freeze([
   'Companion',
-  'cancel',
-  'retire',
-  'reconcile',
-  'crash',
+  'SyncInspector',
+  'SyncCoder',
+  'Bookkeeper',
+  'hidden Reviewer',
+  'StrengthReplica',
+  'fork agent',
+  'Executor child',
 ])
 
-/** Directories whose .fs corpus must collectively contain every lifecycle token. */
-export const LIFECYCLE_SCAN_DIRS = Object.freeze([
-  'src/Wanxiangshu/Session',
-  'src/Wanxiangshu/Infrastructure/OpenCode/Host',
-  'src/Wanxiangshu/Application',
+/** Structured questionnaire fields. Every value must be a non-empty string. */
+export const MATRIX_FIELDS = Object.freeze([
+  'owner',
+  'reusable',
+  'cancel',
+  'retire',
+  'handle',
+  'companion',
+  'crashReconcile',
+  'evidencePath',
 ])
+
+const SPECIAL_PLEADING_RE = /this one is special/i
+
+/**
+ * Token that evidencePath must contain. Kind ids with spaces map onto the
+ * type/signal the production file actually spells.
+ * @param {string} kind
+ */
+export const relatedEvidenceToken = (kind) => {
+  switch (kind) {
+    case 'hidden Reviewer':
+      return 'Reviewer'
+    case 'fork agent':
+      return 'Fork'
+    case 'Executor child':
+      return 'Executor'
+    default:
+      return kind
+  }
+}
 
 /**
  * @param {string} text
@@ -84,97 +115,200 @@ export const scanSessionOwnership = (text) => {
   return { ok: missing.length === 0, missing }
 }
 
-/**
- * Lifecycle token check — lowercase tokens are case-insensitive, capitalized are
- * case-sensitive (exact type/signal name).
- * @param {string} text aggregated corpus text
- * @param {readonly string[]} [required]
- * @returns {string[]} missing tokens
- */
-export const missingLifecycleTokens = (text, required = REQUIRED_LIFECYCLE_TOKENS) => {
-  const missing = []
-  for (const token of required) {
-    const isLower = token === token.toLowerCase()
-    const found = isLower ? new RegExp(token, 'i').test(text) : text.includes(token)
-    if (!found) missing.push(token)
-  }
-  return missing
-}
+const posix = (p) => p.replaceAll('\\', '/')
+
+const isNonEmptyString = (value) => typeof value === 'string' && value.trim().length > 0
+
+const failure = (code, message, extra = {}) => ({ code, message, ...extra })
 
 /**
- * @param {string} text aggregated lifecycle corpus
- * @returns {{ ok: boolean, missing: string[] }}
+ * Parse and validate a matrix document (already-parsed JSON object).
+ * `readFile` / `exists` are injectable so tests can use a fixture root.
+ *
+ * @param {unknown} matrix
+ * @param {{ repoRoot?: string, existsSync?: (p: string) => boolean, readFileSync?: (p: string, enc: string) => string }} [opts]
+ * @returns {{ ok: boolean, failures: object[] }}
  */
-export const scanLifecycle = (text) => {
-  const missing = missingLifecycleTokens(text)
-  return { ok: missing.length === 0, missing }
-}
+export const scanMatrix = (matrix, opts = {}) => {
+  const repoRoot = opts.repoRoot ?? process.cwd()
+  const exists = opts.existsSync ?? existsSync
+  const read = opts.readFileSync ?? readFileSync
+  const failures = []
 
-/**
- * Walk a directory recursively and return absolute paths of .fs files.
- * @param {string} dirAbs
- * @returns {string[]}
- */
-const walkFs = (dirAbs) => {
-  const out = []
-  let entries
-  try {
-    entries = readdirSync(dirAbs, { withFileTypes: true })
-  } catch {
-    return out
+  if (matrix === null || typeof matrix !== 'object' || Array.isArray(matrix)) {
+    return { ok: false, failures: [failure('invalid-matrix', 'matrix must be a JSON object')] }
   }
-  for (const ent of entries) {
-    const full = join(dirAbs, ent.name)
-    if (ent.isDirectory()) {
-      out.push(...walkFs(full))
-    } else if (ent.isFile() && ent.name.endsWith('.fs')) {
-      out.push(full)
+
+  const kinds = matrix.kinds
+  if (kinds === null || typeof kinds !== 'object' || Array.isArray(kinds)) {
+    return { ok: false, failures: [failure('invalid-matrix', "matrix missing object field 'kinds'")] }
+  }
+
+  for (const kind of REQUIRED_KINDS) {
+    if (!Object.prototype.hasOwnProperty.call(kinds, kind)) {
+      failures.push(failure('missing-kind', `missing kind '${kind}'`, { kind }))
     }
   }
-  return out
-}
 
-/**
- * Collect aggregated text of every .fs file under LIFECYCLE_SCAN_DIRS.
- * @param {string} [repoRoot] defaults to process.cwd()
- * @returns {{ text: string, files: string[], dirsScanned: string[] }}
- */
-export const collectLifecycleCorpus = (repoRoot = process.cwd()) => {
-  const files = []
-  const dirsScanned = []
-  for (const rel of LIFECYCLE_SCAN_DIRS) {
-    const abs = resolve(repoRoot, rel)
-    dirsScanned.push(rel)
-    const found = walkFs(abs)
-    files.push(...found)
+  for (const kind of Object.keys(kinds)) {
+    if (!REQUIRED_KINDS.includes(kind)) {
+      failures.push(failure('unexpected-kind', `unexpected kind '${kind}'`, { kind }))
+    }
   }
-  let text = ''
-  for (const f of files) {
+
+  for (const kind of REQUIRED_KINDS) {
+    if (!Object.prototype.hasOwnProperty.call(kinds, kind)) continue
+    const row = kinds[kind]
+    if (row === null || typeof row !== 'object' || Array.isArray(row)) {
+      failures.push(failure('invalid-matrix', `kind '${kind}' must be an object`, { kind }))
+      continue
+    }
+
+    for (const field of MATRIX_FIELDS) {
+      const value = row[field]
+      if (!isNonEmptyString(value)) {
+        failures.push(
+          failure('empty-field', `kind '${kind}' empty field '${field}'`, { kind, field }),
+        )
+        continue
+      }
+      if (SPECIAL_PLEADING_RE.test(value)) {
+        failures.push(
+          failure(
+            'special-pleading',
+            `kind '${kind}' field '${field}' answers "this one is special"`,
+            { kind, field },
+          ),
+        )
+      }
+    }
+
+    const evidencePath = row.evidencePath
+    if (!isNonEmptyString(evidencePath)) continue
+
+    const normalized = posix(evidencePath.trim())
+    if (normalized.includes('..') || isAbsolute(evidencePath) || !normalized.startsWith('src/')) {
+      failures.push(
+        failure(
+          'evidence-not-src',
+          `kind '${kind}' evidencePath must be a repo-relative src/ file: ${evidencePath}`,
+          { kind, field: 'evidencePath' },
+        ),
+      )
+      continue
+    }
+
+    const abs = resolve(repoRoot, normalized.split('/').join(sep))
+    const rel = posix(relative(repoRoot, abs))
+    if (rel.startsWith('..')) {
+      failures.push(
+        failure(
+          'evidence-not-src',
+          `kind '${kind}' evidencePath escapes repo root: ${evidencePath}`,
+          { kind, field: 'evidencePath' },
+        ),
+      )
+      continue
+    }
+
+    if (!exists(abs)) {
+      failures.push(
+        failure(
+          'missing-evidence-file',
+          `kind '${kind}' evidencePath file missing: ${normalized}`,
+          { kind, field: 'evidencePath', evidencePath: normalized },
+        ),
+      )
+      continue
+    }
+
+    let text = ''
     try {
-      text += '\n' + readFileSync(f, 'utf8')
+      text = read(abs, 'utf8')
     } catch {
-      // unreadable file — fail closed upstream via missing tokens, but keep scanning
+      failures.push(
+        failure(
+          'missing-evidence-file',
+          `kind '${kind}' evidencePath unreadable: ${normalized}`,
+          { kind, field: 'evidencePath', evidencePath: normalized },
+        ),
+      )
+      continue
+    }
+
+    const token = relatedEvidenceToken(kind)
+    if (!text.includes(token)) {
+      failures.push(
+        failure(
+          'missing-evidence-token',
+          `kind '${kind}' evidencePath '${normalized}' lacks related token '${token}'`,
+          { kind, field: 'evidencePath', token, evidencePath: normalized },
+        ),
+      )
     }
   }
-  return { text, files, dirsScanned }
+
+  return { ok: failures.length === 0, failures }
 }
 
 /**
- * Combined scan: SessionOwnership attachment + lifecycle corpus.
- * @param {string} ownershipText
- * @param {string} lifecycleText
- * @returns {{ ok: boolean, attachment: { ok: boolean, missing: string[] }, lifecycle: { ok: boolean, missing: string[] } }}
+ * @param {string} [absPath]
+ * @returns {{ ok: boolean, matrix?: object, error?: string }}
  */
-export const scanAll = (ownershipText, lifecycleText) => {
-  const attachment = scanSessionOwnership(ownershipText)
-  const lifecycle = scanLifecycle(lifecycleText)
-  return { ok: attachment.ok && lifecycle.ok, attachment, lifecycle }
+export const loadMatrixFile = (absPath = resolve(process.cwd(), SESSION_OWNERSHIP_MATRIX_REL)) => {
+  if (!existsSync(absPath)) {
+    return { ok: false, error: `matrix file missing: ${absPath}` }
+  }
+  let raw
+  try {
+    raw = readFileSync(absPath, 'utf8')
+  } catch (err) {
+    return { ok: false, error: `matrix file unreadable: ${absPath} (${err.message})` }
+  }
+  try {
+    return { ok: true, matrix: JSON.parse(raw) }
+  } catch (err) {
+    return { ok: false, error: `matrix JSON invalid: ${absPath} (${err.message})` }
+  }
+}
+
+/**
+ * Combined scan: AttachmentKind surface + §24.4 matrix.
+ * @param {string} [repoRoot]
+ * @returns {{ ok: boolean, attachment: { ok: boolean, missing: string[] }, matrix: { ok: boolean, failures: object[] }, matrixPath: string }}
+ */
+export const scanRepo = (repoRoot = process.cwd()) => {
+  const ownershipAbs = resolve(repoRoot, SESSION_OWNERSHIP_REL)
+  const matrixAbs = resolve(repoRoot, SESSION_OWNERSHIP_MATRIX_REL)
+  let attachment
+  if (!existsSync(ownershipAbs)) {
+    attachment = { ok: false, missing: [`<file missing: ${SESSION_OWNERSHIP_REL}>`] }
+  } else {
+    attachment = scanSessionOwnership(readFileSync(ownershipAbs, 'utf8'))
+  }
+
+  const loaded = loadMatrixFile(matrixAbs)
+  const matrix = loaded.ok
+    ? scanMatrix(loaded.matrix, { repoRoot })
+    : { ok: false, failures: [failure('missing-matrix', loaded.error)] }
+
+  return {
+    ok: attachment.ok && matrix.ok,
+    attachment,
+    matrix,
+    matrixPath: posix(relative(repoRoot, matrixAbs)) || SESSION_OWNERSHIP_MATRIX_REL,
+  }
+}
+
+const defaultMatrixPath = () => {
+  const fromCwd = resolve(process.cwd(), SESSION_OWNERSHIP_MATRIX_REL)
+  if (existsSync(fromCwd)) return fromCwd
+  return join(SCRIPT_DIR, 'session-ownership-matrix.json')
 }
 
 const runCli = () => {
   let hasError = false
 
-  // --- 1) AttachmentKind surface (SessionOwnership.fs) ---
   if (!existsSync(SESSION_OWNERSHIP_REL)) {
     console.error(
       `session-ownership-ratchet: required file '${SESSION_OWNERSHIP_REL}' does not exist`,
@@ -195,62 +329,21 @@ const runCli = () => {
     }
   }
 
-  // --- 2) Lifecycle coverage (Session + Host + Application) ---
-  const { text: lifecycleText, files, dirsScanned } = collectLifecycleCorpus(process.cwd())
-
-  if (files.length === 0) {
+  const matrixAbs = defaultMatrixPath()
+  const loaded = loadMatrixFile(matrixAbs)
+  if (!loaded.ok) {
     hasError = true
-    console.error(
-      `session-ownership-ratchet: lifecycle scan found no .fs files under: ${dirsScanned.join(', ')} — fail closed (missing lifecycle coverage)`,
-    )
+    console.error(`session-ownership-ratchet: ${loaded.error}`)
   } else {
-    const lifecycle = scanLifecycle(lifecycleText)
-    if (!lifecycle.ok) {
+    const matrix = scanMatrix(loaded.matrix, { repoRoot: process.cwd() })
+    if (!matrix.ok) {
       hasError = true
       console.error(
-        `session-ownership-ratchet: ${lifecycle.missing.length} required lifecycle signal(s) missing from corpus (${files.length} .fs files across ${dirsScanned.join(', ')})\n`,
+        `session-ownership-ratchet: ${matrix.failures.length} §24.4 matrix failure(s) in ${SESSION_OWNERSHIP_MATRIX_REL}\n`,
       )
-      for (const token of lifecycle.missing) {
-        let hint = ''
-        switch (token) {
-          case 'Reviewer':
-            hint = ' — hidden Reviewer session surface absent (e.g. Reviewer/ReviewerWorkflow/HostReviewGuard)'
-            break
-          case 'fork':
-            hint = ' — fork-agent surface absent (e.g. fork, HostForkRuntime, HostForkAgent)'
-            break
-          case 'Executor':
-            hint = ' — Executor child surface absent'
-            break
-          case 'Handle':
-            hint = ' — Handle ownership surface absent (e.g. HandleController, HandleProjection)'
-            break
-          case 'Companion':
-            hint = ' — Companion lifecycle absent'
-            break
-          case 'cancel':
-            hint = ' — cancel/retire lifecycle signal absent (cancel, abort, CancelAgent)'
-            break
-          case 'retire':
-            hint = ' — retire tombstone signal absent (retire, Retired, HandleRetired)'
-            break
-          case 'reconcile':
-            hint = ' — reconcile signal absent (reconcile, Reconciler, TurnReconcile)'
-            break
-          case 'crash':
-            hint = ' — crash-recovery signal absent (crash, BloggerCrashRecovery, SessionRecoveryWorkflow)'
-            break
-          default:
-            break
-        }
-        console.error(`  missing lifecycle token '${token}'${hint}`)
+      for (const item of matrix.failures) {
+        console.error(`  ${item.code}: ${item.message}`)
       }
-      console.error(
-        `\n  Scanned ${files.length} files under: ${dirsScanned.join(', ')}`,
-      )
-      console.error(
-        `  Each token in [${REQUIRED_LIFECYCLE_TOKENS.join(', ')}] must appear at least once in the combined corpus.`,
-      )
     }
   }
 
@@ -258,12 +351,14 @@ const runCli = () => {
     process.exit(1)
   }
 
-  const { files: okFiles } = collectLifecycleCorpus(process.cwd())
   console.log(
     `session-ownership-ratchet: OK — ${SESSION_OWNERSHIP_REL} has AttachmentKind tokens: ${REQUIRED_ATTACHMENT_TOKENS.join(', ')}`,
   )
   console.log(
-    `session-ownership-ratchet: OK — lifecycle tokens present [${REQUIRED_LIFECYCLE_TOKENS.join(', ')}] across ${okFiles.length} .fs files in ${LIFECYCLE_SCAN_DIRS.join(', ')}`,
+    `session-ownership-ratchet: OK — §24.4 questionnaire answered for [${REQUIRED_KINDS.join(', ')}] via ${SESSION_OWNERSHIP_MATRIX_REL}`,
+  )
+  console.log(
+    'session-ownership-ratchet: note — this is the §24.4 smoke questionnaire, not full G9 release-close (symbol/storage/capability ratchets are separate).',
   )
   process.exit(0)
 }

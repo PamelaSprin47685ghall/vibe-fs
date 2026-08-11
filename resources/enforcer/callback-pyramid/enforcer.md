@@ -1,7 +1,7 @@
 # callback-pyramid — Enforcer
 
 ## Definition
-A callback pyramid exists when the lexical nesting of continuations becomes the primary representation of sequencing, so resource lifetime and failure propagation are encoded by indentation rather than structure.
+A callback pyramid exists when the lexical nesting of continuations becomes the primary representation of sequencing, so resource lifetime and failure propagation are encoded by indentation rather than structure. The root-cause is that nested continuations make indentation the representation of sequence, so resource lifetime, cancellation, and failure have no single visible scope.
 
 ## Governing Principle
 Control flow should preserve the operation’s causal order in a form a reader can scan linearly. Deep callback nesting fractures that order into suspended fragments. Every new branch inherits hidden questions—who owns cancellation, which scope releases the resource, where an exception travels, whether later work still runs. The problem is not aesthetic depth; it is loss of a single visible lifetime.

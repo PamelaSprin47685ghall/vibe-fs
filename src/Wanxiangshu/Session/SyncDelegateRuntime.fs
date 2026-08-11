@@ -57,7 +57,11 @@ type SyncDelegateRuntime
         /// Casebook draft hooks (wired from SpikePlugin → CasebookLifecycle; compile-order seam).
         ?onInspectorPrompt: string -> string -> unit,
         ?onInspectorAnswer: string -> string -> unit,
-        ?onInspectorCleanup: string -> unit
+        ?onInspectorCleanup: string -> unit,
+        /// G2 PREFIX LAW: bind the same ModelId on every Inspector/Coder child
+        /// SendPrompt. ChatParamsHook leaves Model=None; Host agent config is not
+        /// visible here, so the caller supplies the bound OpencodeModel.
+        ?promptModel: OpencodeModel
     ) =
     let gate = obj ()
     let callsByOwnerScope = Dictionary<string, SyncDelegateCall>()
@@ -69,6 +73,7 @@ type SyncDelegateRuntime
     let noteInspectorPrompt = defaultArg onInspectorPrompt (fun _ _ -> ())
     let noteInspectorAnswer = defaultArg onInspectorAnswer (fun _ _ -> ())
     let cleanupInspectorDraft = defaultArg onInspectorCleanup (fun _ -> ())
+    let boundPromptModel = promptModel
 
     let sessionKey (sessionId: SessionId) = SessionId.value sessionId
 
@@ -251,6 +256,7 @@ type SyncDelegateRuntime
                     PromptDispatcher.AwaitMode.Detached
                     None
                     tools
+                    ?model = boundPromptModel
         }
 
     let sendIdleNudge (permit: QuiescencePermit option) (call: SyncDelegateCall) =
@@ -270,6 +276,7 @@ type SyncDelegateRuntime
                         PromptDispatcher.AwaitMode.Detached
                         None
                         (toolMap (canonicalRole call.Role))
+                        ?model = boundPromptModel
         }
 
     member _.Attached = attached

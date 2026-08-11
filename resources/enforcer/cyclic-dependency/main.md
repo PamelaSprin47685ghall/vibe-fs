@@ -1,7 +1,7 @@
 # cyclic-dependency — Main
 
 ## What To Do Now
-Break the smallest semantic cycle by extracting the shared fact, protocol, or policy into an owner both sides may depend on without depending on each other.
+Break the smallest semantic cycle by extracting the shared fact, protocol, or policy into an owner both sides may depend on without depending on each other. That extracted concept is who owns the shared fact; neither cyclic peer is who owns the foundation the other needs.
 
 ## Why This Matters
 Cycles destroy locality. To understand A you must understand B, but to understand B you must already understand A. Construction inherits the same paradox through lazy initialization, mutable registries, or runtime lookups. The code can execute, yet no component has an independent definition.

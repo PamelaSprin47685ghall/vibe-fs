@@ -1,7 +1,7 @@
 # test-implementation-coupled — Main
 
 ## What To Do Now
-Rewrite the test around supported inputs, observable outputs, durable state, and contractual external interactions; remove assertions on private decomposition.
+Rewrite the test around supported inputs, observable outputs, durable state, and contractual external interactions; remove assertions on private decomposition. The supported public contract is who owns the testable invariant; private decomposition is not a promise the suite may freeze.
 
 ## Why This Matters
 A good test permits internal evolution while forbidding behavioral regression. Implementation-coupled tests do the reverse: they punish refactoring and reward imitation of the old algorithm even when a simpler equivalent design exists.

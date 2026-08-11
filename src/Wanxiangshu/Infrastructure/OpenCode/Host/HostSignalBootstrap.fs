@@ -51,12 +51,14 @@ module HostSignalBootstrap =
         /// Workspace root for graceful Casebook finalize (SpikePlugin → CasebookLifecycle).
         (workspaceDirectory: string option)
         /// Owner-scope graceful close: finalize inspector draft once (root → inspectorSessionId).
-        (tryFinalizeInspector: (string -> string -> Result<unit, string>) option)
+        /// Returns a Task so SessionDeleted can await CaseFinalize before CancelSession.
+        (tryFinalizeInspector: (string -> string -> Task<Result<unit, string>>) option)
         /// Unexpected / residual draft cleanup (inspectorSessionId).
         (cleanupInspector: (string -> unit) option)
         : Task<WiredSignals> =
         task {
-            let finalizeInspector = defaultArg tryFinalizeInspector (fun _ _ -> Ok())
+            let finalizeInspector =
+                defaultArg tryFinalizeInspector (fun _ _ -> Task.FromResult(Ok()))
             let cleanupInspectorDraft = defaultArg cleanupInspector (fun _ -> ())
 
             let snapshot =
@@ -294,26 +296,35 @@ module HostSignalBootstrap =
                     scope.StrengthReplicaRuntime
                     |> Option.iter (fun runtime -> runtime.CancelOwner sessionId |> ignore)
 
-                    // Graceful owner teardown: finalize bound Inspector draft once before cancel.
+                    // Graceful owner teardown: await CaseFinalize before CancelSession.
+                    // CancelSession clears inspector drafts; fire-and-forget would race.
                     // Unexpected delete of a non-owner / incomplete draft never finalizes
                     // (tryFinalize is no-op without Q+A; CancelSession cleans drafts).
-                    match scope.SyncDelegateRuntime with
-                    | Some runtime ->
-                        match runtime.TryFind(sessionId, SyncDelegateRole.Inspector) with
-                        | Some inspectorId ->
-                            workspaceDirectory
-                            |> Option.iter (fun root -> finalizeInspector root (SessionId.value inspectorId) |> ignore)
+                    // Fable Task = Promise: GetResult is the last expression so the Host
+                    // event hook can await; let! is the real sequencing.
+                    task {
+                        match scope.SyncDelegateRuntime with
+                        | Some runtime ->
+                            match runtime.TryFind(sessionId, SyncDelegateRole.Inspector) with
+                            | Some inspectorId ->
+                                match workspaceDirectory with
+                                | Some root ->
+                                    let! _ = finalizeInspector root (SessionId.value inspectorId)
+                                    ()
+                                | None -> ()
+                            | None -> ()
+
+                            runtime.CancelSession sessionId
                         | None -> ()
 
-                        runtime.CancelSession sessionId
-                    | None -> ()
+                        // Residual draft if the deleted id itself held Inspector Q/A.
+                        cleanupInspectorDraft (SessionId.value sessionId)
 
-                    // Residual draft if the deleted id itself held Inspector Q/A.
-                    cleanupInspectorDraft (SessionId.value sessionId)
-
-                    scope.Quiescence.DropSession sessionId
-                    scope.DisposeSession(SessionId.value sessionId)
-                    reconciler.Signal signal
+                        scope.Quiescence.DropSession sessionId
+                        scope.DisposeSession(SessionId.value sessionId)
+                        reconciler.Signal signal
+                    }
+                    |> fun t -> t.GetAwaiter().GetResult()
 
             // LOOP-002/006: edge sensor shares the same event subscription, aborts via
             // the session port, and leaves AABB to OrdinaryTurnWorkflow on TurnAborted.

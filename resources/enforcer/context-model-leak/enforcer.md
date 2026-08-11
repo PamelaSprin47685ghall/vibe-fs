@@ -1,7 +1,7 @@
 # context-model-leak — Enforcer
 
 ## Definition
-A context model leaks when one data type is reused across domains that assign its fields different meanings, invariants, lifetimes, or authority.
+A context model leaks when one data type is reused across domains that assign its fields different meanings, invariants, lifetimes, or authority. The root-cause is that one type is reused across contexts that assign its fields different meanings, so a field added for one question becomes apparently meaningful everywhere.
 
 ## Governing Principle
 Sameness of shape is not sameness of concept. A user in authentication, an account in billing, and a participant in a session may share an identifier and display name while answering entirely different questions. Reusing one model makes those contexts share more knowledge than the domain does, so a field added for one purpose silently becomes visible—and apparently meaningful—everywhere.

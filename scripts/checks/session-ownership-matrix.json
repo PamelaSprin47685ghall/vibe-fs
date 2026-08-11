@@ -1,0 +1,86 @@
+{
+  "comment": "Playbook §24.4 questionnaire for every managed session kind. This matrix is the G9 session-ownership smoke check, not full release-close (symbol / storage / capability ratchets are separate).",
+  "kinds": {
+    "Companion": {
+      "owner": "Owning Work session (CompanionHost.primaryId / SatelliteSpec ownerSessionId). InternalLeaf + Attached(Companion).",
+      "reusable": "Yes. SatelliteRuntime.Ensure reuses the journal RestoredSessionId child when exactly one Host child matches agent+title (HOST-015). No journal link never adopts a sibling; always create.",
+      "cancel": "Owner cascade: SatelliteRuntime AbortSession on link failure and on Retire; owner delete/cancel tears down the leaf. Not a public Handle cancel.",
+      "retire": "SatelliteRuntime.Retire: AbortSession the lease then spec.Close (durable unlink) and Invalidate the in-flight Ensure.",
+      "handle": "No. Companion is not a public Handle and does not enter Handle/list/join.",
+      "companion": "No. InternalLeaf must not hold a Companion (COMPANION-002 CompanionWouldRecurse).",
+      "crashReconcile": "SessionRecoveryWorkflow.defaultRecoverBlogger via BloggerCrashRecovery.reconcile. SatelliteRuntime.Ensure reuses the journal-linked child, Replacement if Host proves it gone, fail closed on query/conflict.",
+      "evidencePath": "src/Wanxiangshu/Session/SatelliteRuntime.fs"
+    },
+    "SyncInspector": {
+      "owner": "Owning Work session (ownerSessionId). DedicatedDelegateKey = (OwnerReuseScopeId, Inspector). Work + Attached(SyncInspector).",
+      "reusable": "Yes. At most one live dedicated Session per (scope, Inspector). AttachedSessionRuntime.GetOrCreate reuses a still-usable binding.",
+      "cancel": "Owner session cancel (SyncDelegateRuntime DiagnosticWait CancelledBy owner-session + SessionLifetime). Owner abort fails in-flight Returned/Completion.",
+      "retire": "AttachedSessionRuntime.Remove / RemoveByDelegateSession plus owner cascade abort/retire. Not a public Handle consume.",
+      "handle": "No. Dedicated SyncInspector does not enter public Handle/list/join.",
+      "companion": "MAY. Work+Attached may hold its own Companion (Work capability path). Not InternalLeaf.",
+      "crashReconcile": "Rebind via AttachedSessionRuntime when the Host child is still usable; otherwise create a replacement Work child. Durable association + HOST-015 fail-closed recovery. Returned→Completion is call algebra, not a second ownership map.",
+      "evidencePath": "src/Wanxiangshu/Kernel/SyncDelegate.fs"
+    },
+    "SyncCoder": {
+      "owner": "Owning Work session (ownerSessionId). DedicatedDelegateKey = (OwnerReuseScopeId, Coder). Work + Attached(SyncCoder).",
+      "reusable": "Yes. At most one live dedicated Session per (scope, Coder). AttachedSessionRuntime.GetOrCreate reuses a still-usable binding.",
+      "cancel": "Owner session cancel (SyncDelegateRuntime DiagnosticWait CancelledBy owner-session + SessionLifetime). Owner abort fails in-flight Returned/Completion.",
+      "retire": "AttachedSessionRuntime.Remove / RemoveByDelegateSession plus owner cascade abort/retire. Not a public Handle consume.",
+      "handle": "No. Dedicated SyncCoder does not enter public Handle/list/join.",
+      "companion": "MAY. Work+Attached may hold its own Companion (Work capability path). Not InternalLeaf.",
+      "crashReconcile": "Rebind via AttachedSessionRuntime when the Host child is still usable; otherwise create a replacement Work child. Durable association + HOST-015 fail-closed recovery. Returned→Completion is call algebra, not a second ownership map.",
+      "evidencePath": "src/Wanxiangshu/Kernel/SyncDelegate.fs"
+    },
+    "Bookkeeper": {
+      "owner": "Owning Work session (ownerSessionId). InternalLeaf + Attached(Bookkeeper of transactionId). BookkeeperRuntime.bindSession records sessionId→txId with AttachmentKind.Bookkeeper txId.",
+      "reusable": "No across transactions. One CreateChildSession per Guid txId; bound to that transactionId and must not mix with Companion or Sync* identity.",
+      "cancel": "BookkeeperRuntime.retire: AbortSession the CreateChildSession child then unbindSession. Invoked on SendPrompt failure, timeout, or terminal Failed/Aborted. Not an in-process digest cancel and not a public Handle cancel.",
+      "retire": "BookkeeperRuntime.retire after BookkeeperStaging.take (success) or abort: AbortSession then unbindSession. Transaction-local CreateChildSession leaf, not in-process digest and not a public Handle consume.",
+      "handle": "No. Bookkeeper must not enter public Handle/list/join.",
+      "companion": "No. InternalLeaf does not hold a Companion.",
+      "crashReconcile": "Process-local live map is not durable lifecycle authority. After crash do not reuse the child; next CaseRefresh/CaseFinalize creates a new InternalLeaf via CreateChildSession with a new txId. Not in-process digest. This questionnaire is still not full G9 release-close.",
+      "evidencePath": "src/Wanxiangshu/Infrastructure/BookkeeperRuntime.fs",
+      "notes": "G6 landed BookkeeperRuntime.fs: one CreateChildSession per transaction, edit-qa against process-local staging, then AbortSession. OpenCodeChildOptions stays {Title, Agent, Directory}. CasebookBookkeeper synthesizer/digest is gone; refreshStale calls runTransaction CaseRefresh. AttachmentKind.Bookkeeper remains declared on SessionOwnership.fs."
+    },
+    "hidden Reviewer": {
+      "owner": "Host-owned Finality workflow. HostForkRuntime is constructed with HandleOwnership.HostOwnedHidden (FinalityHostPort); the Reviewer is not owned by the Manager list/join surface.",
+      "reusable": "Ungraduated historical Reviewers are reused (GLORY-045). A request's new Reviewer is created once; crash re-entry must reuse the same ReviewerSessionId (FinalityReviewCohort). Retired/abandoned handles never re-fork under the same agent id.",
+      "cancel": "Owning HostForkRuntime.CancelAgent aborts the Host child. HostOwnedHidden keeps the Reviewer out of Manager list/join/guard cancel.",
+      "retire": "HandleController HandleRetired / HandleAbandoned on the hidden handle. HostForkRuntime.IsRetiredHandle blocks reuse of that agent id.",
+      "handle": "Yes, HostOwnedHidden. The handle exists for EXEC-009 identity but never enters Manager list/join/guard or parent RestoreHandles.",
+      "companion": "MAY. Role.Reviewer is Work, so CompanionTransform may attach a Blogger leaf when the session is not a satellite. The Reviewer handle itself stays HostOwnedHidden.",
+      "crashReconcile": "FinalityReviewCohort crash re-entry reuses the enlisted ReviewerSessionId (AdoptChild). HostForkRestart RestoreHandles skips HostOwnedHidden so the Reviewer is not resurrected inside the parent Manager runtime.",
+      "evidencePath": "src/Wanxiangshu/Infrastructure/OpenCode/Tools/FinalityHostPort.fs"
+    },
+    "StrengthReplica": {
+      "owner": "Owning Work session (StrengthReplicaBinding.OwnerSessionId). InternalLeaf + Attached(StrengthReplica). At most one active replica per owner.",
+      "reusable": "No. Decision-local leaf; must not reuse transcript across Strength decisions (STRENGTH-004/014).",
+      "cancel": "StrengthReplicaRuntime abortReplica (AbortSession). Dispose completes in-flight as Cancelled. Owner session deletion / attempt abort cascades.",
+      "retire": "StrengthRuntime.Retire removes owner and replica indexes atomically on terminal (removeState after complete).",
+      "handle": "No. Not a public Handle and not a SatelliteKind case.",
+      "companion": "No. No Companion, SyncDelegate, or nested Attached (STRENGTH-004/014).",
+      "crashReconcile": "Process-local StrengthRuntime is not durable lifecycle authority. After crash do not reuse a replica transcript; a new decision creates a new child. Durable causality lives in Strength EventStore facts.",
+      "evidencePath": "src/Wanxiangshu/Session/StrengthRuntime.fs"
+    },
+    "fork agent": {
+      "owner": "Parent Work session (HandleLinked.ParentSessionId / HostForkRuntime parentId).",
+      "reusable": "No new fork under a retired or abandoned handle (IsRetiredHandle). Restart restores the same handle id and ChildSessionId (EXEC-009). Not a SyncDelegate reuse scope.",
+      "cancel": "Parent HostForkRuntime.CancelAgent: mailbox cancel plus AbortSession of the Host child.",
+      "retire": "HandleController is the single writer: HandleCompleted then HandleRetired, or HandleAbandoned.",
+      "handle": "Yes. DurableParentHandle; the agent handle id is the runtime agent id (HandleController.agentHandle).",
+      "companion": "MAY. A Work fork child is not a satellite, so CompanionTransform may attach a Blogger leaf.",
+      "crashReconcile": "HostForkRestart RestoreHandles → ChildRecoveryWorkflow; SessionRecoveryWorkflow.RestoreHandles. HostOwnedHidden handles are excluded from parent restore. Fail closed on missing proof.",
+      "evidencePath": "src/Wanxiangshu/Session/HostForkRuntime.fs"
+    },
+    "Executor child": {
+      "owner": "Calling session via HostForkRuntime (Executor tool parent). Map/reduce workers are forked with Role.Executor through ExecutorSummarizeRuntime.asExecutorRuntime.",
+      "reusable": "No. Agent ids are content-addressed per spool chunk (exec- + digest); one-shot map/reduce workers.",
+      "cancel": "IExecutorRuntime.CancelAgent → HostForkRuntime.CancelAgent. Cancels one owned map/reduce agent without tearing down the runtime.",
+      "retire": "JoinWithPermit / AwaitAgentWithPermit completion then Handle retire on the fork path; cancel retires or abandons that agent handle.",
+      "handle": "Yes. Private Executor mailbox handles on HostForkRuntime. Never Manager Join — only permit-gated JoinWithPermit / AwaitAgentWithPermit.",
+      "companion": "No. Executor is an internal Role (AGENT-008); not a Work+Companion path.",
+      "crashReconcile": "FamilyRecoveryPermit required before join. FamilyBlocked fail closed; FamilyWaiting retries inside awaitAgent timeout. HostForkRestart restores DurableParentHandle children on the same fork path.",
+      "evidencePath": "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ExecutorSummarizeRuntime.fs"
+    }
+  }
+}

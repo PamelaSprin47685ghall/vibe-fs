@@ -4,7 +4,7 @@
 A lesson is unrecorded when debugging, operations, integration, or recovery reveals a reusable fact about the system and that fact disappears with the people or session that discovered it.
 
 ## Governing Principle
-Experience becomes engineering capital only after it is externalized. An incident may reveal a provider quirk, ordering constraint, failed hypothesis, diagnostic shortcut, or recovery law that source code alone does not make obvious. If that knowledge remains conversational, the organization has learned biologically but not structurally; turnover or context loss resets the system’s effective memory.
+Experience becomes engineering capital only after it is externalized. An incident may reveal a provider quirk, ordering constraint, failed hypothesis, diagnostic shortcut, or recovery law that source code alone does not make obvious. The root-cause is experience remaining conversational: the organization has learned biologically but not structurally, so turnover or context loss resets the system’s effective memory.
 
 ## Trigger When
 Trigger when an investigation produces a fact or method likely to reduce future search space and no maintained runbook, rule, test, decision record, or project knowledge artifact captures it.

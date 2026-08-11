@@ -1,7 +1,7 @@
 # recovery-by-filesystem-state — Enforcer
 
 ## Definition
-Recovery by filesystem state infers workflow progress from incidental files, directories, temp names, or working-tree shape instead of from durable lifecycle facts explicitly written for recovery.
+Recovery by filesystem state infers workflow progress from incidental files, directories, temp names, or working-tree shape instead of from durable lifecycle facts explicitly written for recovery. The root-cause is that incidental path presence is treated as lifecycle authority, so accidents of execution order become the recovery protocol.
 
 ## Governing Principle
 Filesystem residue records implementation side effects, not necessarily business commitments. A temp file may survive a crash before completion; a directory may exist because creation preceded validation; cleanup may lag success. Inferring lifecycle from shape promotes accidents of execution order into protocol states and makes refactoring filenames/layout equivalent to changing recovery semantics.

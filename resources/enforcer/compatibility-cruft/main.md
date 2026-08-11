@@ -1,7 +1,7 @@
 # compatibility-cruft — Main
 
 ## What To Do Now
-Delete compatibility machinery that has no named external obligation. If a real migration exists, write down its consumer, overlap period, and removal condition.
+Delete compatibility machinery that has no named external obligation. If a real migration exists, write down its consumer, overlap period, and removal condition. A named external consumer with a bounded overlap is who owns a second path; unspecified fear is not who owns a duplicate interface.
 
 ## Why This Matters
 Every compatibility path creates a second answer to “what is the system?” The cost is not the adapter’s line count; it is the enlarged semantic universe. Bugs can occur only on one path, tests must cover both, and future changes must decide whether to evolve or preserve each historical form.

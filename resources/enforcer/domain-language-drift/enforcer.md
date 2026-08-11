@@ -1,7 +1,7 @@
 # domain-language-drift — Enforcer
 
 ## Definition
-Domain language drifts when one concept accumulates several names or one name is stretched across several concepts, so vocabulary no longer preserves identity.
+Domain language drifts when one concept accumulates several names or one name is stretched across several concepts, so vocabulary no longer preserves identity. The root-cause is that vocabulary inside one context stopped being a one-to-one map from term to concept.
 
 ## Governing Principle
 Names are the join keys between code, tests, documentation, and human discussion. When vocabulary drifts, those representations can no longer be joined reliably: two engineers may agree on words while disagreeing on concepts, or disagree on words while describing the same fact. The resulting ambiguity is not cosmetic; it destroys the possibility of local reasoning because every term requires contextual disambiguation.

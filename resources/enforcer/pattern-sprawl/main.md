@@ -1,7 +1,7 @@
 # pattern-sprawl — Main
 
 ## What To Do Now
-Collapse pattern scaffolding into the language feature that directly represents its semantic job: closed cases, pattern matching, first-class functions, modules, or immutable constructors.
+Collapse pattern scaffolding into the language feature that directly represents its semantic job: closed cases, pattern matching, first-class functions, modules, or immutable constructors. The host language's native form for the same law (closed data, match, functions, modules) is who owns the abstraction invariant that remaining indirection still buys a capability the language lacks.
 
 ## Why This Matters
 Indirection is useful when it buys a capability the language lacks. Once that capability is native, the same indirection becomes translation overhead: readers must map factories back to choices, strategies back to functions, visitors back to case analysis.

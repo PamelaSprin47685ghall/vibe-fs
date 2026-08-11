@@ -11,9 +11,9 @@ open Wanxiangshu.OpenCode
 /// token pair (AgentJournal + IEventStore in one file is forbidden).
 module CasebookTools =
 
-    /// Marker + EventStore availability → the fetch tool, or none.
-    /// Acquire failure degrades the surface (no fetch) instead of failing the
-    /// plugin — the schema gate and the execution gate stay in agreement.
+    /// Marker + EventStore availability → fetch + edit-qa, or none.
+    /// Acquire failure degrades the surface instead of failing the plugin —
+    /// the schema gate and the execution gate stay in agreement.
     let buildSpecs (factory: HostToolFactory) (workspaceRoot: string) : ToolSpec list =
         if not (CasebookFeature.isEnabled workspaceRoot) then
             []
@@ -22,6 +22,7 @@ module CasebookTools =
                 let raw, store =
                     WorkspaceEventStore.acquire (RuntimePath.gitCommonDir workspaceRoot)
 
-                [ FetchTool.spec factory workspaceRoot store raw ]
+                [ FetchTool.spec factory workspaceRoot store raw
+                  EditQaTool.spec factory ]
             with _ ->
                 []

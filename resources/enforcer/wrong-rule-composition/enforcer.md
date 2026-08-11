@@ -4,7 +4,7 @@
 Rule composition is wrong when dependent checks continue after a prerequisite has failed and emit consequences that no longer have meaning, or when independent checks stop at the first failure and hide other simultaneously valid errors.
 
 ## Governing Principle
-Composition semantics follow logical dependence. If rule B assumes A established a fact, `A ∧ B` is sequential: failure of A removes the premise that gives B meaning. Independent validations are different: each proposition can be evaluated on the same input, so short-circuiting destroys useful information without improving correctness. One generic “validation pipeline” cannot choose these semantics by syntax alone; the dependency graph determines the algebra.
+Composition semantics follow logical dependence. If rule B assumes A established a fact, `A ∧ B` is sequential: failure of A removes the premise that gives B meaning. Independent validations are different: each proposition can be evaluated on the same input, so short-circuiting destroys useful information without improving correctness. The root-cause is applying one evaluation law regardless of logical dependence. One generic “validation pipeline” cannot choose these semantics by syntax alone; the dependency graph determines the algebra.
 
 ## Trigger When
 Trigger when downstream dependent rules run after prerequisite failure, producing nonsense/cascading errors, or independent validations stop early despite callers needing the complete error set.

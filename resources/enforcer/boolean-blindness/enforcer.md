@@ -1,7 +1,7 @@
 # boolean-blindness — Enforcer
 
 ## Definition
-Boolean blindness appears when `true` and `false` are asked to carry domain distinctions whose names disappear at the call site or whose combinations include impossible worlds.
+Boolean blindness appears when `true` and `false` are asked to carry domain distinctions whose names disappear at the call site or whose combinations include impossible worlds. The root-cause is that true/false (or a product of flags) is asked to carry named domain modes, erasing vocabulary at the call site and making illegal combinations constructable.
 
 ## Governing Principle
 A type is a set of states the program permits. Replacing a domain distinction with a boolean enlarges or obscures that set while erasing vocabulary. Two independent flags already admit four combinations; three admit eight. If the domain has only three meaningful states, the remaining five are not flexibility—they are fabricated universes the rest of the program must defensively reject.

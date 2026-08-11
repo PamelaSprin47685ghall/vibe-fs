@@ -1,7 +1,7 @@
 # dirty-hack — Enforcer
 
 ## Definition
-A dirty hack is a local exception added to make an observed path work while leaving the governing model or invariant known to be wrong.
+A dirty hack is a local exception added to make an observed path work while leaving the governing model or invariant known to be wrong. The root-cause is that a known-false model is kept alive by a local exception instead of being repaired at its owner.
 
 ## Governing Principle
 Every special case is a claim about reality. If the exception has no domain meaning and exists only because the current abstraction cannot express the truth, the codebase acquires two models: the official one and the workaround that knows where it fails. Repeating this process does not stabilize the system; it distributes the real specification across escape hatches.

@@ -1,7 +1,7 @@
 # retry-not-idempotent — Enforcer
 
 ## Definition
-A retryable operation is non-idempotent when repeating the same logical request can create additional externally visible effects rather than converge to the same result.
+A retryable operation is non-idempotent when repeating the same logical request can create additional externally visible effects rather than converge to the same result. The root-cause is that physical retries lack a stable logical identity that collapses them into one effect, so transport duplication leaks into business history.
 
 ## Governing Principle
 Retries are temporal duplication. Networks and processes make retries inevitable whenever acknowledgements can be lost, so safe retry requires a stable logical identity that lets many physical attempts denote one operation. Without that identity, transport unreliability leaks into business semantics as duplicate charges, writes, prompts, publications, or resource creation.

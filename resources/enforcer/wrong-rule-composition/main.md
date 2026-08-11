@@ -1,7 +1,7 @@
 # wrong-rule-composition — Main
 
 ## What To Do Now
-Classify rules by dependence, then use sequential short-circuit composition for prerequisite chains and accumulating composition for independent validations.
+Classify rules by dependence, then use sequential short-circuit composition for prerequisite chains and accumulating composition for independent validations. Choose the combinator at the premise: who owns each rule’s required fact owns whether it short-circuits or accumulates.
 
 ## Why This Matters
 Error behavior is part of policy. Running a rule after its premise failed manufactures misleading errors; stopping after one independent failure withholds other facts the same input already proves. The right composition preserves the logical structure of the domain rather than imposing one control-flow habit everywhere.

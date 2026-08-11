@@ -1,7 +1,7 @@
 # race-first-wins-semantics — Enforcer
 
 ## Definition
-Race-first-wins semantics arise when scheduler timing or whichever concurrent operation finishes first determines a business result even though the competing operations carry different information.
+Race-first-wins semantics arise when scheduler timing or whichever concurrent operation finishes first determines a business result even though the competing operations carry different information. The root-cause is that scheduler arrival order is treated as domain meaning, so identical logical inputs can yield different business results under different timing.
 
 ## Governing Principle
 Scheduling order is usually an accident of load, network, and runtime, not a domain fact. If “first completion” chooses truth, identical logical inputs can produce different outcomes under different timing. The system has then delegated business semantics to the scheduler. Determinism requires either an explicit first-writer rule with stable identity or a merge function over the complete relevant information.

@@ -1,7 +1,7 @@
 # coverage-theater — Enforcer
 
 ## Definition
-Coverage theater occurs when execution metrics are treated as evidence of correctness even though the tests assert little or nothing that distinguishes correct behavior from plausible defects.
+Coverage theater occurs when execution metrics are treated as evidence of correctness even though the tests assert little or nothing that distinguishes correct behavior from plausible defects. The root-cause is that reachability metrics are treated as proof of correctness, so tests can stay green under defects that never violate an assertion.
 
 ## Governing Principle
 Coverage measures reachability, not truth. A line can execute under a test that would remain green if its result were inverted, its identity corrupted, or its error swallowed. Verification begins only where a test states a proposition capable of being false. The value of an assertion is therefore not that it exists, but that a realistic defect would violate it.

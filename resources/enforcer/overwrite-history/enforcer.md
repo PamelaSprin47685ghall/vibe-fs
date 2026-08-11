@@ -1,7 +1,7 @@
 # overwrite-history — Enforcer
 
 ## Definition
-History is overwritten when previously committed facts are edited or deleted to represent correction instead of preserving the original fact and appending the correcting fact.
+History is overwritten when previously committed facts are edited or deleted to represent correction instead of preserving the original fact and appending the correcting fact. The root-cause is that correction is implemented as mutation of a committed fact, destroying the original event and the later change as distinct history.
 
 ## Governing Principle
 A fact may later become superseded without ceasing to have happened. Historical systems derive trust from that distinction. Rewriting old records destroys evidence of both the original belief and the later correction, collapsing two events into one timeless value. Audit, replay, causality, and learning all lose the transition that actually occurred.

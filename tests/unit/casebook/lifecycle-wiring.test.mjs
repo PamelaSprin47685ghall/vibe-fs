@@ -29,6 +29,16 @@ import { loadEvents, project } from '../../../dist/Infrastructure/CasebookStore.
 import { acquire } from '../../../dist/Infrastructure/OpenCode/Host/WorkspaceEventStore.js'
 import { gitCommonDir } from '../../../dist/Journal/RuntimePath.js'
 import { caseOf, listItems, mapEntries, resultOf } from '../support/domain.mjs'
+import {
+  CANONICAL_A,
+  CANONICAL_Q,
+  scriptedBookkeeperPort,
+} from './bookkeeper-session.test.mjs'
+
+const { setSessionPort, resetSessionPort } = await import(
+  '../../../dist/Infrastructure/BookkeeperRuntime.js'
+)
+
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-'))
@@ -43,17 +53,19 @@ const envelopeTypes = (raw, store) => {
   return listItems(events.value).map((e) => caseOf(e))
 }
 
-test('lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once', () => {
+test('lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once', async () => {
   const { dir, cleanup } = sandbox()
   try {
     setEnabled(dir)
+    const { port } = scriptedBookkeeperPort()
+    setSessionPort(port)
     const sessionId = 'insp-finalize-1'
     notePrompt(sessionId, 'What owns PromptAuthority?')
     collect(collector, sessionId, 'read', { path: 'a.txt' }, 'hello')
     const rawA = 'PromptAuthority is owned by the Host.'
     noteAnswer(sessionId, rawA)
 
-    const first = resultOf(tryFinalizeInspector(dir, sessionId))
+    const first = resultOf(await tryFinalizeInspector(dir, sessionId))
     assert.equal(first.ok, true, `first finalize ok, got ${JSON.stringify(first.error)}`)
 
     const common = gitCommonDir(dir)
@@ -61,9 +73,11 @@ test('lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once', () => {
     const fetched = resultOf(fetchCase(store, raw, 10, sessionId))
     assert.equal(fetched.ok, true)
     assert.equal(fetched.value !== undefined && fetched.value !== null, true, 'case present after finalize')
-    assert.equal(fetched.value.Q, 'What owns PromptAuthority?')
+    assert.equal(fetched.value.Q, CANONICAL_Q)
+    assert.notEqual(fetched.value.Q, 'What owns PromptAuthority?')
     assert.notEqual(fetched.value.A, rawA, 'finalize synthesizes A (not raw noteAnswer)')
-    assert.equal(fetched.value.A.startsWith(rawA), true)
+    assert.equal(fetched.value.A, CANONICAL_A)
+    assert.equal(fetched.value.A.includes('evidence:'), false)
     assert.equal(listItems(fetched.value.Observations).length, 1)
 
     const publishedA = fetched.value.A
@@ -71,19 +85,20 @@ test('lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once', () => {
     // Re-seed and finalize again — finalizeCase refuses the second publication.
     notePrompt(sessionId, 'Q2')
     noteAnswer(sessionId, 'A2')
-    const second = resultOf(tryFinalizeInspector(dir, sessionId))
+    const second = resultOf(await tryFinalizeInspector(dir, sessionId))
     assert.equal(second.ok, false, 'second finalize must be refused')
     assert.equal(String(second.error).includes('already finalized'), true)
 
     const still = resultOf(fetchCase(store, raw, 10, sessionId))
     assert.equal(still.value.A, publishedA, 'original synthesized case retained')
   } finally {
+    resetSessionPort()
     setEnabled(undefined)
     cleanup()
   }
 })
 
-test('lifecycle_cleanupInspector_never_writes_eventstore', () => {
+test('lifecycle_cleanupInspector_never_writes_eventstore', async () => {
   const { dir, cleanup } = sandbox()
   try {
     setEnabled(dir)
@@ -106,7 +121,7 @@ test('lifecycle_cleanupInspector_never_writes_eventstore', () => {
     assert.equal(fetched.value === undefined || fetched.value === null, true, 'no case after cleanup')
 
     // A later finalize after cleanup alone (no re-seed) is a no-op Ok.
-    const after = resultOf(tryFinalizeInspector(dir, sessionId))
+    const after = resultOf(await tryFinalizeInspector(dir, sessionId))
     assert.equal(after.ok, true)
     assert.equal(envelopeTypes(raw, store).length, 0)
   } finally {
@@ -115,13 +130,13 @@ test('lifecycle_cleanupInspector_never_writes_eventstore', () => {
   }
 })
 
-test('lifecycle_missing_answer_is_noop_finalize', () => {
+test('lifecycle_missing_answer_is_noop_finalize', async () => {
   const { dir, cleanup } = sandbox()
   try {
     setEnabled(dir)
     const sessionId = 'insp-no-a'
     notePrompt(sessionId, 'Q only')
-    const r = resultOf(tryFinalizeInspector(dir, sessionId))
+    const r = resultOf(await tryFinalizeInspector(dir, sessionId))
     assert.equal(r.ok, true)
 
     const common = gitCommonDir(dir)
@@ -133,14 +148,16 @@ test('lifecycle_missing_answer_is_noop_finalize', () => {
   }
 })
 
-test('lifecycle_touchAccess_and_touchCaseAccess_append_accessed', () => {
+test('lifecycle_touchAccess_and_touchCaseAccess_append_accessed', async () => {
   const { dir, cleanup } = sandbox()
   try {
     setEnabled(dir)
+    const { port } = scriptedBookkeeperPort()
+    setSessionPort(port)
     const sessionId = 'insp-access-1'
     notePrompt(sessionId, 'Q')
     noteAnswer(sessionId, 'A')
-    assert.equal(resultOf(tryFinalizeInspector(dir, sessionId)).ok, true)
+    assert.equal(resultOf(await tryFinalizeInspector(dir, sessionId)).ok, true)
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)
@@ -159,12 +176,13 @@ test('lifecycle_touchAccess_and_touchCaseAccess_append_accessed', () => {
     const cases = project(10, resultOf(loadEvents(raw, store.OpenSnapshot())).value)
     assert.equal(mapEntries(cases).some(([k]) => k === sessionId), true)
   } finally {
+    resetSessionPort()
     setEnabled(undefined)
     cleanup()
   }
 })
 
-test('lifecycle_disabled_marker_skips_publication', () => {
+test('lifecycle_disabled_marker_skips_publication', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-off-'))
   try {
     execFileSync('git', ['init', '--quiet', dir])
@@ -173,7 +191,7 @@ test('lifecycle_disabled_marker_skips_publication', () => {
     const sessionId = 'insp-off'
     notePrompt(sessionId, 'Q')
     noteAnswer(sessionId, 'A')
-    const r = resultOf(tryFinalizeInspector(dir, sessionId))
+    const r = resultOf(await tryFinalizeInspector(dir, sessionId))
     assert.equal(r.ok, true)
 
     const common = gitCommonDir(dir)

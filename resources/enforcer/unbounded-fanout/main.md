@@ -1,7 +1,7 @@
 # unbounded-fanout — Main
 
 ## What To Do Now
-Introduce a bounded map, worker pool, semaphore, or queue that caps active work independently of input size and propagates cancellation through the whole fan-out.
+Introduce a bounded map, worker pool, semaphore, or queue that caps active work independently of input size and propagates cancellation through the whole fan-out. Repair at the scheduler: who owns the finite resource owns the active-work ceiling.
 
 ## Why This Matters
 Parallel work competes for finite resources. If every input can become active immediately, a perfectly valid large input can turn into resource exhaustion, provider overload, or self-inflicted denial of service. A bound makes capacity a deliberate invariant rather than an emergent property of workload size.

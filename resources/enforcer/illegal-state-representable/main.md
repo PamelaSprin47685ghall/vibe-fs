@@ -1,7 +1,7 @@
 # illegal-state-representable — Main
 
 ## What To Do Now
-Replace the field/flag product with explicit domain states so only legitimate combinations can be constructed.
+Replace the field/flag product with explicit domain states so only legitimate combinations can be constructed. The constructing type—sum of valid cases or closed constructor—is who owns the state-space invariant that representable values equal legitimate domain states; downstream guards are not.
 
 ## Why This Matters
 Every illegal value admitted by a type becomes a proof obligation for all code that reads it. Guards multiply because the model keeps re-asking whether the value is real. A stronger type pays that proof once, at construction, and lets the rest of the program reason under a smaller truthful state space.

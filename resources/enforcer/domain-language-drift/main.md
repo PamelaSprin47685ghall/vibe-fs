@@ -1,7 +1,7 @@
 # domain-language-drift — Main
 
 ## What To Do Now
-Choose the canonical domain term for each concept within the owning context and rename code, tests, events, and docs until that vocabulary is consistent.
+Choose the canonical domain term for each concept within the owning context and rename code, tests, events, and docs until that vocabulary is consistent. The bounded context is who owns each concept’s canonical term; adapters are who owns translation only at a genuine border.
 
 ## Why This Matters
 A stable vocabulary compresses reasoning: once a term is learned, every occurrence recalls the same concept. Drift reverses that compression. Readers must repeatedly ask which synonym or meaning is active, and cross-team discussion loses the guarantee that identical words denote identical things.

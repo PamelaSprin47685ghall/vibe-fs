@@ -1,7 +1,7 @@
 # ignored-tdd — Enforcer
 
 ## Definition
-TDD is ignored when production behavior is changed before a failing behavioral test establishes what must become true.
+TDD is ignored when production behavior is changed before a failing behavioral test establishes what must become true. The root-cause is that implementation precedes an independent failing specification, so the test is written under the influence of code that already exists and cannot accuse the old behavior.
 
 ## Governing Principle
 Red-first is not ceremony; it separates specification from implementation influence. A test written after the code is already green is vulnerable to describing what was built rather than what was required. Seeing the test fail for the right reason proves two things at once: the requirement was absent before the change, and the test is capable of detecting that absence.

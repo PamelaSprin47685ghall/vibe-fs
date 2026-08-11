@@ -1,7 +1,7 @@
 # missing-regression-test — Enforcer
 
 ## Definition
-A regression test is missing when a defect is corrected without preserving an executable example that fails under the old behavior and passes under the repaired behavior.
+A regression test is missing when a defect is corrected without preserving an executable example that fails under the old behavior and passes under the repaired behavior. The root-cause is that the defect's reachable failure is repaired in implementation without becoming executable memory, so future refactors may recreate the same region of state space unnoticed.
 
 ## Governing Principle
 A bug report is new knowledge about the system's reachable state space. Fixing the implementation removes the symptom; a regression test preserves the knowledge that this region of state space is dangerous. Without it, the team pays for the discovery once and then permits future refactors to forget it completely.
@@ -13,9 +13,10 @@ Trigger when a concrete defect is fixed and no test reproduces the original fail
 - An existing test already fails on the buggy behavior and was the evidence that drove the repair.
 - The change is a pure refactor with no observed defect and no new reachable failure.
 - The incident was an operational misconfiguration outside the product's behavioral contract.
+- The repair is a documentation-only correction with no reachable product behavior to reproduce.
 
 ## Distinguish From
-ignored-tdd concerns going red first for all behavior changes. failure-path-untested concerns failure branches never exercised. Tie-break: if a known defect was fixed without an executable memory of that defect, this rule; if new behavior was written without going red first, ignored-tdd; if a failure branch has never been covered, failure-path-untested.
+`ignored-tdd` concerns going red first for all behavior changes. `failure-path-untested` concerns failure branches never exercised. Tie-break: if a known defect was fixed without an executable memory of that defect, this rule; if new behavior was written without going red first, `ignored-tdd`; if a failure branch has never been covered, `failure-path-untested`.
 
 ## Decision Procedure
 Reproduce the bug in the smallest behavioral test before or alongside the fix. Confirm the old implementation fails for the reported reason, then require the corrected implementation to pass.

@@ -1,7 +1,7 @@
 # illegal-state-representable — Enforcer
 
 ## Definition
-An illegal state is representable when the program’s data type admits combinations of fields or flags that the domain says can never legitimately exist.
+An illegal state is representable when the program’s data type admits combinations of fields or flags that the domain says can never legitimately exist. The root-cause is that a product of fields or flags admits combinations the domain forbids, so every consumer inherits a proof obligation the constructor refused to take.
 
 ## Governing Principle
 A type is not merely storage; it is a theorem about possibility. Every constructible value is a state the rest of the program must be prepared to handle. If nullable fields and flags admit contradictory combinations, the type has enlarged reality and pushed the burden of disproving those invented worlds into every consumer. Correctness then depends on repeated runtime discipline instead of construction.

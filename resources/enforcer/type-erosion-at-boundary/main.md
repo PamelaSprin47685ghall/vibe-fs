@@ -1,7 +1,7 @@
 # type-erosion-at-boundary — Main
 
 ## What To Do Now
-Contain dynamic decoding and unchecked operations inside the adapter, then expose a validated domain type to every inward caller.
+Contain dynamic decoding and unchecked operations inside the adapter, then expose a validated domain type to every inward caller. Repair at ingress: who owns the adapter owns the typed construction.
 
 ## Why This Matters
 Weak representations move uncertainty rather than remove it. If a cast or dynamic field access survives past ingress, downstream code repeatedly asks questions the boundary could have settled once, and failures occur after provenance has been lost.

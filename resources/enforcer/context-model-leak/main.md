@@ -1,7 +1,7 @@
 # context-model-leak — Main
 
 ## What To Do Now
-Split the shared model into context-owned types and define explicit translations for the small set of facts that legitimately cross boundaries.
+Split the shared model into context-owned types and define explicit translations for the small set of facts that legitimately cross boundaries. Each bounded context is who owns the model its questions require; a structurally similar master type is not who owns every context’s meaning.
 
 ## Why This Matters
 A universal model creates semantic coupling disguised as reuse. Changes become contagious because every context can see fields introduced for every other context. Optional fields accumulate to represent “not meaningful here,” and authorization or lifecycle rules blur because the type no longer tells which interpretation is active.

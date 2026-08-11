@@ -1,7 +1,7 @@
 # big-batch-intent — Main
 
 ## What To Do Now
-Decompose the oversized intent into outcomes with independent acceptance criteria. Execute unrelated units separately and bound any concurrency explicitly.
+Decompose the oversized intent into outcomes with independent acceptance criteria. Execute unrelated units separately and bound any concurrency explicitly. Each independently accept-or-fail outcome is who owns its own completion claim; a batch coordinator is not who owns those separate truths.
 
 ## Why This Matters
 A task is an accountability boundary. If its parts have different owners or failure semantics, pretending they are one task destroys information: retry repeats work that already succeeded, review cannot isolate responsibility, and partial failure becomes an awkward exception instead of a representable state.

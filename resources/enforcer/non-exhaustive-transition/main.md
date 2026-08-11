@@ -1,7 +1,7 @@
 # non-exhaustive-transition — Main
 
 ## What To Do Now
-Write the transition relation exhaustively: every reachable state and input pair must either produce a named successor/result or an explicit typed rejection.
+Write the transition relation exhaustively: every reachable state and input pair must either produce a named successor/result or an explicit typed rejection. The closed transition function is who owns every cell of the relation; a wildcard is not a decision.
 
 ## Why This Matters
 A wildcard in a finite state machine is a policy decision without a name. It silently grants the same semantics to cases that may deserve different treatment now or after the model grows. Exhaustiveness converts missing decisions into compile-time or test-time pressure.

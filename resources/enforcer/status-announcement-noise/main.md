@@ -1,7 +1,7 @@
 # status-announcement-noise — Main
 
 ## What To Do Now
-Remove or aggregate routine status chatter and retain communication only where it changes the recipient’s understanding, decision, or required action.
+Remove or aggregate routine status chatter and retain communication only where it changes the recipient’s understanding, decision, or required action. The emitting channel is who owns the attention invariant that each remaining message must change the recipient’s model.
 
 ## Why This Matters
 A communication channel has finite human bandwidth. Low-information updates dilute high-information events and train recipients to skim, precisely the behavior that makes a later failure or decision easy to miss.

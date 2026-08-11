@@ -1,7 +1,7 @@
 # cyclic-dependency — Enforcer
 
 ## Definition
-A dependency cycle exists when components require one another’s definitions, initialization, or services to become meaningful, so there is no direction in which the system can be understood or constructed.
+A dependency cycle exists when components require one another’s definitions, initialization, or services to become meaningful, so there is no direction in which the system can be understood or constructed. The root-cause is that the fact both sides need has no independent owner, so each module must be defined in terms of the other.
 
 ## Governing Principle
 A dependency edge is an arrow of knowledge: A → B means A is defined partly in terms of B. A cycle therefore says each participant must already exist for the other to be defined. Runtimes may break the physical loop with lazy initialization or service locators, but the conceptual loop remains and appears later as ordering constraints, partial states, and tests that need the whole graph.

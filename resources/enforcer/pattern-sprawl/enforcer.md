@@ -1,7 +1,7 @@
 # pattern-sprawl — Enforcer
 
 ## Definition
-Pattern sprawl occurs when factories, visitors, strategy classes, interface hierarchies, builders, or other pattern machinery simulate distinctions the language can express more directly with closed data and first-class functions.
+Pattern sprawl occurs when factories, visitors, strategy classes, interface hierarchies, builders, or other pattern machinery simulate distinctions the language can express more directly with closed data and first-class functions. The root-cause is that pattern machinery continues to simulate a language capability that is now native, so ceremony remains after the original limitation has disappeared.
 
 ## Governing Principle
 A design pattern is historically a compensation mechanism: it encodes a missing language capability as a convention of objects and indirection. When the language already has sum types, exhaustive matching, closures, modules, and immutable values, keeping the simulation preserves ceremony after the original limitation has disappeared. Abstraction should collapse when the host language can state the same law directly.

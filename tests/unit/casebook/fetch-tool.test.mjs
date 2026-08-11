@@ -17,6 +17,14 @@ import { Observation } from '../../../dist/Domain/Casebook.js'
 import { GitRawStore_createInMemory as createRaw } from '../../../dist/Infrastructure/Persist/GitRawStore.js'
 import { EventStore_create as createStore } from '../../../dist/Infrastructure/Persist/EventStore.js'
 import { toList, resultOf } from '../support/domain.mjs'
+import {
+  CANONICAL_A,
+  scriptedBookkeeperPort,
+} from './bookkeeper-session.test.mjs'
+
+const { setSessionPort, resetSessionPort } = await import(
+  '../../../dist/Infrastructure/BookkeeperRuntime.js'
+)
 
 const obsIndex = (name) => Object.create(Observation.prototype).cases().indexOf(name)
 const fileRead = (path, h) => new Observation(obsIndex('FileRead'), [path, h])
@@ -54,11 +62,16 @@ test('CASE004_fetch_fresh_and_stale_paths', async () => {
     assert.equal(fresh.includes('status = "fresh"'), true)
     assert.equal(fresh.includes('A1'), true)
 
-    // content changed → Bookkeeper synthesizes + advances obs → fresh
+    // content changed → Bookkeeper child + edit-qa revises A, then fresh
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
+    const { port, createCalls, editQaCalls } = scriptedBookkeeperPort()
+    setSessionPort(port)
     const afterChange = await tool.Execute({ session_id: 's1' }, { sessionID: 'ses', agent: 'fast-inspector' })
-    assert.equal(afterChange.includes('status = "fresh"'), true, `synthesis refresh should re-stabilize: ${afterChange}`)
-    assert.equal(afterChange.includes('A1'), true, 'original A body still present in synthesized answer')
+    assert.equal(afterChange.includes('status = "fresh"'), true, `edit-qa refresh should re-stabilize: ${afterChange}`)
+    assert.equal(afterChange.includes(CANONICAL_A), true, afterChange)
+    assert.equal(afterChange.includes('evidence:'), false)
+    assert.equal(createCalls.length, 1, 'exactly one Bookkeeper child on stale fetch')
+    assert.equal(editQaCalls.length >= 2, true)
 
     // second fetch on stable worktree still fresh
     const again = await tool.Execute({ session_id: 's1' }, { sessionID: 'ses', agent: 'fast-inspector' })
@@ -68,6 +81,7 @@ test('CASE004_fetch_fresh_and_stale_paths', async () => {
     const missing = await tool.Execute({ session_id: 'nope' }, { sessionID: 'ses', agent: 'fast-inspector' })
     assert.equal(missing.includes('status = "no-case"'), true)
   } finally {
+    resetSessionPort()
     cleanup()
   }
 })

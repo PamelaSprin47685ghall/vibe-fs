@@ -1,7 +1,7 @@
 # time-dependent-test — Main
 
 ## What To Do Now
-Inject a controllable clock or explicit instant/time zone into the scenario and replace real waits with deterministic clock advancement or causal synchronization.
+Inject a controllable clock or explicit instant/time zone into the scenario and replace real waits with deterministic clock advancement or causal synchronization. The test fixture is who owns the temporal facts; the host clock must not supply the premises of the verdict.
 
 ## Why This Matters
 A test that depends on the current clock has moving premises. It may cross midnight, DST, timeout thresholds, or scheduling delays differently on every machine. Failures then mix domain defects with facts about when and where CI happened to run.

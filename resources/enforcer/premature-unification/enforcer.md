@@ -1,7 +1,7 @@
 # premature-unification — Enforcer
 
 ## Definition
-Unification is premature when similar-looking code or data with different invariants, lifecycles, or reasons to change is forced behind one abstraction before it represents one piece of knowledge.
+Unification is premature when similar-looking code or data with different invariants, lifecycles, or reasons to change is forced behind one abstraction before it represents one piece of knowledge. The root-cause is that similar shape is treated as shared knowledge, coupling independent owners behind one abstraction before they must evolve together.
 
 ## Governing Principle
 DRY applies to knowledge, not appearance. Two structures may be textually identical today because independent domains happen to share a shape. Unifying them creates a new claim: they must evolve together. If that claim is false, every future divergence fights the abstraction through flags, optional fields, hooks, or special cases until the "reuse" costs more than the duplication it removed.

@@ -1,7 +1,7 @@
 # command-event-confusion — Main
 
 ## What To Do Now
-Separate the request from the fact it may produce. Validate the command against current state and policy; only after success append an event describing what actually occurred.
+Separate the request from the fact it may produce. Validate the command against current state and policy; only after success append an event describing what actually occurred. Current policy is who owns whether a command may succeed; the event log is who owns what already happened and must not re-ask permission on replay.
 
 ## Why This Matters
 History must remain replayable under tomorrow’s code. If replay asks today’s authorization rules whether yesterday was allowed, the past changes whenever policy changes. Conversely, storing an unvalidated intention as an event grants history to something that may never have become true.

@@ -1,7 +1,7 @@
 # false-gate — Main
 
 ## What To Do Now
-Add a self-test or known-bad fixture that demonstrates the gate turns red for the exact property it claims to enforce. The gate’s subject discovery, matching, and exit wiring are who own the claim that green means the property held; a command that cannot turn red is not.
+Add a self-test or known-bad fixture that demonstrates the gate turns red for the exact property it claims to enforce. The gate’s subject discovery, matching, and exit wiring are who owns the claim that green means the property held; a command that cannot turn red is not.
 
 ## Why This Matters
 Green has meaning only as the negation of a possible red. A gate that cannot observe violations is not neutral; it is a confidence amplifier disconnected from reality. Teams then optimize for passing a ritual rather than preserving the invariant.

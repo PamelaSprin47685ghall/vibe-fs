@@ -1,7 +1,7 @@
 # order-dependent-test — Enforcer
 
 ## Definition
-A test is order-dependent when its verdict depends on which other tests ran before it rather than solely on its own explicit setup and inputs.
+A test is order-dependent when its verdict depends on which other tests ran before it rather than solely on its own explicit setup and inputs. The root-cause is that suite history supplies invisible premises, so a case's proposition is not local and the verdict changes when neighbors or order change.
 
 ## Governing Principle
 A test case should be a proposition with local premises. Shared residue adds invisible premises supplied by suite history, so the proposition changes when ordering changes. The suite then stops being a set of independent proofs and becomes one giant stateful scenario whose correctness cannot be localized.

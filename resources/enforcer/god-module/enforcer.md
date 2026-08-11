@@ -1,7 +1,7 @@
 # god-module — Enforcer
 
 ## Definition
-A god module owns several unrelated policies, effects, resources, or domains because colocating them is convenient, not because one invariant requires their joint ownership.
+A god module owns several unrelated policies, effects, resources, or domains because colocating them is convenient, not because one invariant requires their joint ownership. The root-cause is that convenience colocation puts several independent sovereignties under one module, so unrelated invariants, lifecycles, and effect laws share a single change surface.
 
 ## Governing Principle
 Size is a symptom; mixed reasons to change are the disease. A module becomes “god-like” when it sits above multiple independent truths and therefore must know how they interact. Every new responsibility increases the Cartesian product of contexts visible inside it, until local changes require understanding storage, network, policy, lifecycle, and presentation at once.

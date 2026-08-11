@@ -118,6 +118,7 @@ module PromptDispatcherSend =
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             (tools: Map<string, bool> option)
+            (model: OpencodeModel option)
             : Task<Result<PromptKey, string>> =
             task {
                 let payloadDigest = HostDigest.sha256Hex text
@@ -149,7 +150,7 @@ module PromptDispatcherSend =
                         use _listener = this.SubscribeNoOp port sessionId
 
                         let options =
-                            { Model = None
+                            { Model = model
                               Agent = Some agent
                               Directory = directory
                               Metadata = Some(this.Metadata key (PromptDispatcher.originLabel origin) None)
@@ -172,7 +173,7 @@ module PromptDispatcherSend =
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             : Task<Result<PromptKey, string>> =
-            this.SendAgentOwnerRootCore port sessionId text agent directory awaitMode onAccepted None
+            this.SendAgentOwnerRootCore port sessionId text agent directory awaitMode onAccepted None None
 
         member this.SendAgentOwnerRootWithTools
             (port: ISessionHostPort)
@@ -183,8 +184,9 @@ module PromptDispatcherSend =
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             (tools: Map<string, bool>)
+            (?model: OpencodeModel)
             : Task<Result<PromptKey, string>> =
-            this.SendAgentOwnerRootCore port sessionId text agent directory awaitMode onAccepted (Some tools)
+            this.SendAgentOwnerRootCore port sessionId text agent directory awaitMode onAccepted (Some tools) model
 
         /// PROMPT-003: a continuation of an existing Logical Run.
         ///

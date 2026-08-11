@@ -1,7 +1,7 @@
 # abbreviation-anxiety — Enforcer
 
 ## Definition
-An abbreviation is harmful when understanding the name requires a private decoding step that the domain itself does not require. The defect is not shortness; it is hidden vocabulary.
+An abbreviation is harmful when understanding the name requires a private decoding step that the domain itself does not require. The defect is not shortness; it is hidden vocabulary. The root-cause is that a locally invented abbreviation installs a private decoding vocabulary the domain never required, so every reader must expand the token before they can reason.
 
 ## Governing Principle
 A name is an address into the reader’s existing model. Good names reuse domain language so recognition is immediate. Private acronyms allocate a second language beside the first, forcing every reader to pay translation cost on every encounter. That tax compounds: the shorter the token, the more context must be reconstructed around it.

@@ -1,7 +1,7 @@
 # premature-unification — Main
 
 ## What To Do Now
-Separate concepts that were unified by appearance rather than shared invariant. Let each owner evolve independently until common knowledge—not merely common shape—becomes undeniable.
+Separate concepts that were unified by appearance rather than shared invariant. Let each owner evolve independently until common knowledge—not merely common shape—becomes undeniable. Each concept's owner (lifecycle and reason to change) is who owns the DRY invariant that a shared abstraction corresponds to shared knowledge, not coincidental shape.
 
 ## Why This Matters
 A premature abstraction converts coincidental similarity into a coupling contract. The first real divergence then appears as "exceptions" to the abstraction, and the code begins accumulating flags and optional hooks to preserve a unity the domain never had.

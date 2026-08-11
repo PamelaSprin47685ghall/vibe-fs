@@ -1,7 +1,7 @@
 # blind-edit — Main
 
 ## What To Do Now
-Stop changing the visible symptom. Read the owner, the contract around it, and the caller/data path until you can state a causal explanation for the defect.
+Stop changing the visible symptom. Read the owner, the contract around it, and the caller/data path until you can state a causal explanation for the defect. The contract at the first violated invariant is who owns the fix; downstream renderers and guards are not.
 
 ## Why This Matters
 The cheapest edit is not the fewest changed lines; it is the edit that restores the violated invariant without creating a second story elsewhere. Without ownership, every patch is a wager that the chosen file happens to be the source rather than merely a witness.

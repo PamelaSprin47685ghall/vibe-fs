@@ -1,7 +1,7 @@
 # callback-pyramid — Main
 
 ## What To Do Now
-Flatten the continuation tree into structured asynchronous control with one explicit lifetime for resources, cancellation, and errors.
+Flatten the continuation tree into structured asynchronous control with one explicit lifetime for resources, cancellation, and errors. The top-level structured async operation is who owns sequence, cleanup, cancellation, and error propagation, not the inner closures of a callback pyramid.
 
 ## Why This Matters
 Nested callbacks turn time into topology. A reader must infer execution order from lexical depth, then separately reconstruct which closure owns each failure and cleanup action. That representation scales poorly because every extra branch multiplies paths without improving the domain model.

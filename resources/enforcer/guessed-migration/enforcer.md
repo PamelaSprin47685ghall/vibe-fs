@@ -1,7 +1,7 @@
 # guessed-migration — Enforcer
 
 ## Definition
-A migration is guessed when old durable data is heuristically reinterpreted as a newer schema without an explicit, versioned rule that says what the old bytes meant and how they become the new meaning.
+A migration is guessed when old durable data is heuristically reinterpreted as a newer schema without an explicit, versioned rule that says what the old bytes meant and how they become the new meaning. The root-cause is that present shape is treated as evidence of past language, so recovery invents a version the bytes never recorded and upgrades under fabricated certainty.
 
 ## Governing Principle
 Persistence turns representation into history. Once bytes survive code versions, their meaning cannot be recovered safely from today’s shape alone. Heuristics such as “if field X exists, this was probably v2” convert ambiguity into fabricated certainty. A migration must be a function from a known old language to a known new language, not an act of archaeological optimism.

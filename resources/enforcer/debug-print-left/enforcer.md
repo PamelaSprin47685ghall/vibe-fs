@@ -1,7 +1,7 @@
 # debug-print-left — Enforcer
 
 ## Definition
-A debug artifact is left behind when temporary output or instrumentation created to answer one local question remains on a production path after that question is settled.
+A debug artifact is left behind when temporary output or instrumentation created to answer one local question remains on a production path after that question is settled. The root-cause is that investigation output was never retired or promoted to a diagnostic with an operational owner.
 
 ## Governing Principle
 Diagnostics are an interface to future operators. Temporary prints have no such contract: their vocabulary, volume, sensitivity, and lifetime were chosen for one investigation. Leaving them in production turns private investigative context into permanent observable behavior without deciding whether anyone should rely on it.

@@ -1,7 +1,7 @@
 # clone-and-mutate-derived — Main
 
 ## What To Do Now
-Replace clone-then-patch construction with an explicit immutable constructor or record copy whose preserved fields are intentionally part of the same value semantics.
+Replace clone-then-patch construction with an explicit immutable constructor or record copy whose preserved fields are intentionally part of the same value semantics. The constructor of the derived value is who owns which facts are preserved; a prototype’s current shape is not who owns that relation.
 
 ## Why This Matters
 Clone-and-mutate makes future fields opt in to propagation automatically. A field added next month can flow into derived values nobody reviewed, because omission means inheritance. That is the opposite of a stable constructor, where new information must be deliberately supplied or deliberately defaulted.

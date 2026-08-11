@@ -4,7 +4,7 @@
 Boundary parsing is weak when untrusted or cross-language data enters the system without being normalized into a strong internal model, forcing deeper layers to rediscover its shape and validity repeatedly.
 
 ## Governing Principle
-Ingress is the moment of maximum evidence and minimum trust. The raw payload, protocol context, schema version, and validation errors are all still available there. Delaying interpretation moves ambiguity inward while discarding provenance, so every consumer performs partial parsing under less information. A strong boundary turns an uncertain external proposition into a validated internal fact exactly once.
+Ingress is the moment of maximum evidence and minimum trust. The raw payload, protocol context, schema version, and validation errors are all still available there. The root-cause is delaying interpretation past the moment of maximum evidence. That move sends ambiguity inward while discarding provenance, so every consumer performs partial parsing under less information. A strong boundary turns an uncertain external proposition into a validated internal fact exactly once.
 
 ## Trigger When
 Trigger when dictionaries, loosely typed JSON, optional-field bags, raw strings, or cross-language payloads circulate beyond their adapter and downstream code repeatedly checks fields, formats, or variants.

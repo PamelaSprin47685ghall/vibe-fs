@@ -1,7 +1,7 @@
 # repeat-until-pass — Main
 
 ## What To Do Now
-Treat the first unexplained inconsistent verdict as a defect. Reproduce and remove the hidden source of nondeterminism before accepting any later green run.
+Treat the first unexplained inconsistent verdict as a defect. Reproduce and remove the hidden source of nondeterminism before accepting any later green run. The first unexplained inconsistent verdict is who owns the defect; a later lucky green is not who owns the correctness claim.
 
 ## Why This Matters
 Rerunning until success converts verification into selection bias. The suite no longer answers “is the system correct?” but “did we eventually observe a favorable schedule/environment?” That destroys the epistemic value of both red and green.

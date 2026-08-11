@@ -1,7 +1,7 @@
 # null-ambiguity — Enforcer
 
 ## Definition
-Null ambiguity exists when `null`, missing, empty, or optional presence is used to represent several semantically different outcomes.
+Null ambiguity exists when `null`, missing, empty, or optional presence is used to represent several semantically different outcomes. The root-cause is that distinct absence reasons that require different caller actions are collapsed into one empty representation, destroying the proposition at the boundary.
 
 ## Governing Principle
 Absence is not a domain; it is a missing proposition. "Not found," "not authorized," "not loaded," "failed," and "not applicable" may all lack a value, but they differ in cause and required response. Collapsing them to one empty representation destroys information at the boundary and forces downstream code to reconstruct meaning from context it no longer has.
@@ -13,9 +13,10 @@ Trigger when callers must infer why a value is absent from surrounding flags, er
 - There is genuinely one semantic notion of optionality and callers need no further distinction to behave correctly.
 - Absence is already a named result case, not a bare null.
 - The optional wraps a value whose missingness has one meaning at that boundary.
+- Absence is a transport encoding that adapters immediately expand into named domain cases before any caller sees it.
 
 ## Distinguish From
-illegal-state-representable concerns invalid combinations. expected-failure-as-exception hides named failures in exceptions. Tie-break: if distinct outcomes are collapsed into one absence value, this rule; if a product of fields can be contradictory, illegal-state-representable; if named failures are thrown instead of returned, expected-failure-as-exception.
+`illegal-state-representable` concerns invalid combinations. `expected-failure-as-exception` hides named failures in exceptions. Tie-break: if distinct outcomes are collapsed into one absence value, this rule; if a product of fields can be contradictory, `illegal-state-representable`; if named failures are thrown instead of returned, `expected-failure-as-exception`.
 
 ## Decision Procedure
 List every reason the value may be absent and every caller action those reasons require. If actions differ, encode the reasons as distinct result cases.

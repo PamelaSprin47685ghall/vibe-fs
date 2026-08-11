@@ -1,7 +1,7 @@
 # test-implementation-coupled — Enforcer
 
 ## Definition
-A test is implementation-coupled when its verdict depends on private structure, helper calls, incidental ordering, internal fields, or algorithm choices that are not part of the supported behavior.
+A test is implementation-coupled when its verdict depends on private structure, helper calls, incidental ordering, internal fields, or algorithm choices that are not part of the supported behavior. The root-cause is that the test freezes private choreography instead of a caller-visible promise, becoming a second implementation rather than an independent specification.
 
 ## Governing Principle
 A test should constrain what must remain true while leaving implementations free to change what the contract does not promise. Assertions on private structure invert that relation: refactoring correct code becomes expensive while behaviorally wrong code can still pass if it preserves the expected choreography. The test has become a second implementation rather than an independent specification.

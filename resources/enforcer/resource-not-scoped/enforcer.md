@@ -1,7 +1,7 @@
 # resource-not-scoped — Enforcer
 
 ## Definition
-A resource is not scoped when acquisition and release are separate responsibilities that control flow may accidentally separate, allowing files, processes, streams, sessions, subscriptions, worktrees, or handles to outlive their owner.
+A resource is not scoped when acquisition and release are separate responsibilities that control flow may accidentally separate, allowing files, processes, streams, sessions, subscriptions, worktrees, or handles to outlive their owner. The root-cause is that acquire and release are separate path obligations rather than one structured lifetime, so any new exit can abandon the resource.
 
 ## Governing Principle
 Resources are temporal values: their correctness includes when they exist and when they cease to exist. An acquire call creates an obligation whose lifetime should be visible in the same structure. If cleanup is an unrelated later action, every new return, exception, cancellation, and branch becomes another proof obligation. Lexical scoping turns lifetime from convention into syntax.

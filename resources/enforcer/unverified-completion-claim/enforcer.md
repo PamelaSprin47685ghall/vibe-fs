@@ -4,7 +4,7 @@
 A completion claim is unverified when work is declared done before the relevant behavior, build, check, reproduction, or external observation has established that the promised result actually holds.
 
 ## Governing Principle
-“Done” is not a statement about effort; it is a statement about evidence. Editing creates a candidate solution. Verification turns that candidate into a justified claim by confronting it with an independent condition capable of failure. Without that step, completion collapses intention and reality into one assertion: because the change was made, the desired outcome is assumed.
+“Done” is not a statement about effort; it is a statement about evidence. Editing creates a candidate solution. Verification turns that candidate into a justified claim by confronting it with an independent condition capable of failure. The root-cause is equating effort with evidence. Without that step, completion collapses intention and reality into one assertion: because the change was made, the desired outcome is assumed.
 
 ## Trigger When
 Trigger when implementation is reported complete without running the tests, checks, build, reproduction, or observable verification appropriate to the changed contract.

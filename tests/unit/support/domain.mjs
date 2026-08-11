@@ -2955,6 +2955,7 @@ export const providerProjection = {
   semanticallyEqual: (a, b) => ProviderProj.semanticallyEqual(a, b),
   // OpenCode/Projection: Host-assembled message view (1.18.10 `tool-<tool>`
   // parts live on assistant messages; see HOST-012 tool-part test).
+  decodeRequest: (requestObj) => ProjectionModule.decodeRequest(requestObj),
   decodeMessageView: (rawMessages) => ProjectionModule.decodeMessageView(rawMessages),
   decodeCapturedMessageView: (rawMessages) => listItems(ProjectionModule.decodeCapturedMessageView(toList(rawMessages))),
   wireMessageView: (capturedMessages) => ProjectionModule.wireMessageView(toList(capturedMessages)),

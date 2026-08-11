@@ -1,7 +1,7 @@
 # optimistic-retry-assumption — Enforcer
 
 ## Definition
-An optimistic retry assumption exists when an external effect with unknown outcome is repeated without an identity or protocol that makes repetition safe.
+An optimistic retry assumption exists when an external effect with unknown outcome is repeated without an identity or protocol that makes repetition safe. The root-cause is that timeout is treated as failure-before-effect, so a possibly committed external action is repeated without identity that would collapse the two histories into one.
 
 ## Governing Principle
 Timeout means "knowledge is missing," not "the effect did not happen." The remote system may have committed just before the response was lost. Retrying under that uncertainty creates two possible histories—one effect or two—unless stable identity collapses them or an at-most-once protocol can query/resolve the original attempt.
@@ -13,9 +13,10 @@ Trigger when network/process/tool calls that may create irreversible side effect
 - The operation is proven idempotent, uniquely keyed, read-only, or covered by a protocol that can determine the original outcome before any repeat.
 - Failure is known to have occurred before the effect (validation rejected, connection never established).
 - The caller records unknown and requires explicit human/protocol resolution rather than automatic retry.
+- The retry is an internal pure computation with no external effect and therefore no second history to collapse.
 
 ## Distinguish From
-retry-not-idempotent concerns repeatability of a known retryable operation. partial-write-assumption invents storage states. Tie-break: if the issue is epistemic uncertainty after an external effect may already have happened, this rule; if retries of an operation already deemed retryable are not idempotent, retry-not-idempotent; if recovery invents unobservable storage states, partial-write-assumption.
+`retry-not-idempotent` concerns repeatability of a known retryable operation. `partial-write-assumption` invents storage states. Tie-break: if the issue is epistemic uncertainty after an external effect may already have happened, this rule; if retries of an operation already deemed retryable are not idempotent, `retry-not-idempotent`; if recovery invents unobservable storage states, `partial-write-assumption`.
 
 ## Decision Procedure
 Classify outcomes as known success, known failure-before-effect, or unknown. Only the unknown case needs a recovery protocol; never silently reinterpret it as failure.

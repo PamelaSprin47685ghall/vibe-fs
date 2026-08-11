@@ -1,7 +1,7 @@
 # guessed-not-verified — Enforcer
 
 ## Definition
-A claim is guessed when material behavior, API shape, file content, Host semantics, or failure cause is asserted from expectation rather than inspected from its authoritative source.
+A claim is guessed when material behavior, API shape, file content, Host semantics, or failure cause is asserted from expectation rather than inspected from its authoritative source. The root-cause is that an unverified premise is admitted as fact, so later deductions inherit false certainty from expectation, memory, or naming convention rather than from the authority that owns the claim.
 
 ## Governing Principle
 Engineering reasoning is conditional: if premise P is false, every flawless deduction from P is still wrong. Material premises therefore deserve stronger evidence in proportion to the cost of acting on them. Source code, actual files, direct experiments, and documented contracts outrank naming conventions, memory, and what a tool “usually” does.

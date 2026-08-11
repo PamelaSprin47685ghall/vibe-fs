@@ -1,7 +1,7 @@
 # time-source-in-logic — Enforcer
 
 ## Definition
-Time is hidden in logic when domain policy reads the current clock internally instead of receiving the relevant instant or clock as an explicit dependency.
+Time is hidden in logic when domain policy reads the current clock internally instead of receiving the relevant instant or clock as an explicit dependency. The root-cause is that ambient time is an undeclared policy input, so identical visible arguments are not identical decisions and replay from recorded data is impossible.
 
 ## Governing Principle
 The present moment is an input, not a universal constant. A decision that calls `now()` internally changes meaning between two otherwise identical invocations, making replay and causal explanation impossible from visible data alone. Moving the clock to the boundary restores referential clarity: the shell observes time; the policy reasons about a supplied temporal fact.

@@ -1,7 +1,7 @@
 # premature-optimization — Enforcer
 
 ## Definition
-Optimization is premature when complexity is introduced to improve performance before measurement or an explicit resource constraint establishes that the simpler design is insufficient.
+Optimization is premature when complexity is introduced to improve performance before measurement or an explicit resource constraint establishes that the simpler design is insufficient. The root-cause is that complexity is purchased for performance before a measured bottleneck or stated budget proves the simple design insufficient.
 
 ## Governing Principle
 Optimization trades one resource for another. Often it spends readability, determinism, memory model simplicity, or architectural freedom to buy latency or throughput. Without evidence that the purchased resource is scarce, the trade has no denominator and cannot be evaluated. The system pays certain complexity for hypothetical performance.

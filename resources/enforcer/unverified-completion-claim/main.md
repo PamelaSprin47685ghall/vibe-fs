@@ -1,7 +1,7 @@
 # unverified-completion-claim — Main
 
 ## What To Do Now
-Run the verification that corresponds to the promises changed by the work and report the observed outcomes before declaring completion.
+Run the verification that corresponds to the promises changed by the work and report the observed outcomes before declaring completion. Do not announce done until who owns the claim also owns evidence that could have failed.
 
 ## Why This Matters
 A diff is a hypothesis about the desired system. Tests, builds, reproductions, and canaries are attempts to falsify that hypothesis. Skipping them turns implementation confidence into evidence and makes the completion statement stronger than what is actually known.

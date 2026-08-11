@@ -1,7 +1,7 @@
 # duplicated-truth — Enforcer
 
 ## Definition
-Truth is duplicated when the same fact has more than one representation that may be independently written and each is treated as authoritative.
+Truth is duplicated when the same fact has more than one representation that may be independently written and each is treated as authoritative. The root-cause is that one present fact has more than one writable authority.
 
 ## Governing Principle
 A fact can have many projections but only one authority. Once two writable representations claim equal status, disagreement becomes a legal system state and every read must answer a new question: which copy wins? Synchronization code cannot eliminate this problem; it merely defines increasingly elaborate rituals for repairing the contradiction after the model allowed it.

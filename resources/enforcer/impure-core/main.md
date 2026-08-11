@@ -1,7 +1,7 @@
 # impure-core — Main
 
 ## What To Do Now
-Move external observation and side effects to the shell. Pass time, random choices, loaded data, and other required facts explicitly into pure decision functions.
+Move external observation and side effects to the shell. Pass time, random choices, loaded data, and other required facts explicitly into pure decision functions. The shell/adapter is who owns observation and enactment; the core is who owns policy as a function of explicit inputs.
 
 ## Why This Matters
 Hidden dependencies make behavior contingent on an environment the signature does not reveal. Tests need mocks, replay changes with the clock, and auditing cannot reconstruct why a decision occurred. Purity is not aesthetic restraint; it is preservation of causal evidence.

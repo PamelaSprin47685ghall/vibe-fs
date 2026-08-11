@@ -1,7 +1,7 @@
 # random-source-in-logic — Main
 
 ## What To Do Now
-Inject randomness as an explicit source/seed or generate the choice at the shell and pass the chosen value into pure domain logic.
+Inject randomness as an explicit source/seed or generate the choice at the shell and pass the chosen value into pure domain logic. The shell or recorded event is who owns entropy provenance; domain policy is not who owns ambient randomness.
 
 ## Why This Matters
 Hidden randomness breaks the equivalence between “same inputs” and “same decision.” That undermines deterministic tests, incident replay, event rebuilding, and explanations of why one branch was chosen over another.

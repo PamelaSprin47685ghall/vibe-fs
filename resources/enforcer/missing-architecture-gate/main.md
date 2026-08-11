@@ -1,7 +1,7 @@
 # missing-architecture-gate — Main
 
 ## What To Do Now
-Encode the architecture rule as a deterministic repository check and add it to the standard verification entry point.
+Encode the architecture rule as a deterministic repository check and add it to the standard verification entry point. The command CI actually runs is who owns the architecture invariant: forbidden edges must be unmergeable, not merely unwelcome in review.
 
 ## Why This Matters
 A boundary enforced only in review survives exactly until a rushed change, unfamiliar contributor, or innocently convenient import crosses it. The violation is usually cheap locally and expensive globally, so relying on memory places the cost signal at the wrong time.

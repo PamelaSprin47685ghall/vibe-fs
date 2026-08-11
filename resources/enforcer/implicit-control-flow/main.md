@@ -1,7 +1,7 @@
 # implicit-control-flow — Main
 
 ## What To Do Now
-Move correctness-critical ordering into explicit structured control flow, with named phases or direct sequencing where the dependency is real.
+Move correctness-critical ordering into explicit structured control flow, with named phases or direct sequencing where the dependency is real. The sequencer that names the required phases is who owns happens-before; registration order, import side effects, and hook folklore are not.
 
 ## Why This Matters
 Invisible order is an undeclared protocol. It survives only while every participant remembers when hooks run, imports fire, or callbacks were registered. Refactors that preserve all local functions can still break the global behavior because the causal relation lived nowhere explicit.

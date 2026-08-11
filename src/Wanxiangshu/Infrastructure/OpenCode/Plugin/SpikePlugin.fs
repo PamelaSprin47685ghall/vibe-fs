@@ -51,6 +51,7 @@ module SpikePlugin =
             match PluginHost.createHost input portOpt (Some familyParent) with
             | Error err -> return raise (InvalidOperationException err)
             | Ok(eventPort, sessionPort, snapshotOpt, terminalKey, sharedTerminalPort) ->
+                BookkeeperRuntime.setSessionPort sessionPort
                 scope.AttachSharedTerminal(terminalKey, sharedTerminalPort)
                 scope.AttachSatelliteRuntime(SatelliteRuntime sessionPort)
 
@@ -102,7 +103,9 @@ module SpikePlugin =
                         scope
                         input
                         workspaceDirectory
-                        (Some CasebookLifecycle.tryFinalizeInspector)
+                        (Some(fun root inspectorId ->
+                            CasebookLifecycle.tryFinalizeInspector root inspectorId |> ignore
+                            Ok()))
                         (Some CasebookLifecycle.cleanupInspector)
 
                 match journal with

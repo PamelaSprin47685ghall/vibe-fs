@@ -1,7 +1,7 @@
 # retry-not-idempotent — Main
 
 ## What To Do Now
-Give the logical operation a stable identity that survives physical retries, or make the operation explicitly non-retryable when repeated effects cannot be collapsed safely.
+Give the logical operation a stable identity that survives physical retries, or make the operation explicitly non-retryable when repeated effects cannot be collapsed safely. The stable idempotency identity at the effect boundary is who owns collapsing retries into one intent; the retry loop is not who owns uniqueness.
 
 ## Why This Matters
 A retry is not a second business intention; it is a second transport attempt to realize the first intention. If the receiver cannot recognize that equivalence, network uncertainty leaks into the domain as duplicated facts. The defect therefore is not “too many retries” but absence of an identity relation between attempts.

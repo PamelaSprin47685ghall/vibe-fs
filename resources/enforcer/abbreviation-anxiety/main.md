@@ -1,7 +1,7 @@
 # abbreviation-anxiety — Main
 
 ## What To Do Now
-Replace locally invented or ambiguous abbreviations with the domain term they compress. Do not optimize identifier length before optimizing recognition.
+Replace locally invented or ambiguous abbreviations with the domain term they compress. Do not optimize identifier length before optimizing recognition. The public identifier surface of the owning module is who owns the naming invariant that identifiers are domain terms, not private ciphers.
 
 ## Why This Matters
 Code is read by reconstructing concepts from names. An abbreviation inserts an unnecessary inverse function into that process: token → guessed expansion → domain concept. The machine pays nothing for this compression; only readers pay. Repetition turns a tiny local saving into a permanent tax on maintenance.

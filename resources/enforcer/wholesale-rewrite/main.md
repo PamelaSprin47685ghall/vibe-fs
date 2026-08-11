@@ -1,7 +1,7 @@
 # wholesale-rewrite — Main
 
 ## What To Do Now
-Reduce the change to the smallest structurally correct transformation that satisfies the new contract while preserving known-good code and verified behavior outside that boundary.
+Reduce the change to the smallest structurally correct transformation that satisfies the new contract while preserving known-good code and verified behavior outside that boundary. Limit blast radius: who owns the invalidated invariants owns the rewrite surface.
 
 ## Why This Matters
 A rewrite expands uncertainty faster than it expands value. Every replaced line reopens assumptions that previous production history may already have settled, so the verification burden grows from “prove this new behavior” toward “re-prove the subsystem.”

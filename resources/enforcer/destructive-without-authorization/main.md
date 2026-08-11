@@ -1,7 +1,7 @@
 # destructive-without-authorization — Main
 
 ## What To Do Now
-Establish explicit authorization for the destructive operation and independently verify the concrete target immediately before executing it.
+Establish explicit authorization for the destructive operation and independently verify the concrete target immediately before executing it. The authorizing principal is who owns the class of destruction; the live identity check is who owns proof of the exact target.
 
 ## Why This Matters
 Deletion removes evidence and options. The expected cost of a mistaken destructive action is therefore dominated by rare catastrophic cases, not by average convenience. Safety comes from refusing to compress “may delete” and “this is the thing to delete” into one assumption.

@@ -1,7 +1,7 @@
 # program-counter-state — Enforcer
 
 ## Definition
-Program-counter state appears when fields such as stage, phase, next action, current step, lease, generation, or owner primarily encode where execution should resume rather than a durable real-world fact.
+Program-counter state appears when fields such as stage, phase, next action, current step, lease, generation, or owner primarily encode where execution should resume rather than a durable real-world fact. The root-cause is that interpreter position is persisted or shared as if it were a domain fact, freezing implementation sequencing into authoritative state.
 
 ## Governing Principle
 Control state and domain state answer different questions. Domain state describes the world; a program counter describes the interpreter's current location. Persisting or sharing the latter turns transient implementation sequencing into business data, making restarts and concurrent observers reason about internal continuations that should have remained local to structured control flow.

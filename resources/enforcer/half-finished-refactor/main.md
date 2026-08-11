@@ -1,7 +1,7 @@
 # half-finished-refactor — Main
 
 ## What To Do Now
-Choose the post-refactor owner, migrate every repository-owned caller to it, and remove obsolete adapters, aliases, flags, and duplicate implementations.
+Choose the post-refactor owner, migrate every repository-owned caller to it, and remove obsolete adapters, aliases, flags, and duplicate implementations. The intended post-refactor owner is who owns all repository-controlled callers; transitional adapters, aliases, and flags are not owners and must not remain the dispatch.
 
 ## Why This Matters
 A half migration preserves the cost of the old model while adding the cost of the new one. Every future change must answer which path to update, which representation is canonical, and whether divergence is intentional. The refactor has increased entropy instead of reducing it.

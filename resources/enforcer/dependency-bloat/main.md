@@ -1,7 +1,7 @@
 # dependency-bloat — Main
 
 ## What To Do Now
-Remove or avoid the dependency unless it eliminates complexity the project would otherwise have to own materially and permanently.
+Remove or avoid the dependency unless it eliminates complexity the project would otherwise have to own materially and permanently. The repository is who owns a small local capability; a library is who owns only complexity that would be irresponsible to reimplement.
 
 ## Why This Matters
 A package can delete twenty local lines while adding thousands of indirect assumptions. The source diff hides that asymmetry. Every dependency expands the set of external decisions that can force your project to change, so adoption should purchase real leverage, not merely syntactic convenience.

@@ -1,7 +1,7 @@
 # commented-out-code — Enforcer
 
 ## Definition
-Commented-out implementation is dead code kept inside the living source as an informal archive.
+Commented-out implementation is dead code kept inside the living source as an informal archive. The root-cause is that former implementation is warehoused in comments, so present-tense source and historical residue share one visual channel.
 
 ## Governing Principle
 Source should describe the program that exists. Version control already describes programs that used to exist. Mixing those temporal roles forces every reader to classify code before understanding it: executable truth and historical residue occupy the same visual channel. The repository then stops being a precise statement of the current system.

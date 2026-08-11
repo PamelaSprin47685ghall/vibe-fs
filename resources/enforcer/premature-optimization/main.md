@@ -1,7 +1,7 @@
 # premature-optimization — Main
 
 ## What To Do Now
-Return to the simplest correct design unless a measured bottleneck or explicit resource budget justifies the added complexity.
+Return to the simplest correct design unless a measured bottleneck or explicit resource budget justifies the added complexity. The measured constraint (SLO, profile, hard budget) is who owns the performance invariant that every nontrivial optimization points to the scarcity it satisfies.
 
 ## Why This Matters
 Speculative optimization hardens assumptions about where cost lives. Those assumptions often outlive the workload that inspired them, while the complexity they introduced remains real in every test, refactor, and failure path.

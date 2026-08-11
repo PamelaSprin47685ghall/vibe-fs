@@ -1,7 +1,7 @@
 # missing-invariant-documentation — Main
 
 ## What To Do Now
-Write the hidden correctness rule as a precise invariant at the contract that owns it, then encode a type, test, or gate wherever practical.
+Write the hidden correctness rule as a precise invariant at the contract that owns it, then encode a type, test, or gate wherever practical. The owning contract is who owns the invariant: one falsifiable sentence there, not scattered comments near symptoms.
 
 ## Why This Matters
 Undocumented invariants survive only inside people who have already paid the cost to discover them. When those people leave or context fades, later changes can violate the rule while appearing locally reasonable. The defect is not lack of prose; it is failure to preserve necessary knowledge.

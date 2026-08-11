@@ -4,7 +4,7 @@
 A test is weakened to pass when assertions, cases, fixtures, or expected outcomes are removed or relaxed primarily because the implementation fails them, without an independently justified change to the contract.
 
 ## Governing Principle
-A failing test is evidence of disagreement between implementation and specification. There are only two legitimate resolutions: the implementation is wrong, or the specification has intentionally changed. Weakening the test merely because red is inconvenient erases the witness instead of settling the disagreement. It converts verification from an adversary of defects into a servant of the current implementation.
+A failing test is evidence of disagreement between implementation and specification. There are only two legitimate resolutions: the implementation is wrong, or the specification has intentionally changed. The root-cause is resolving spec/impl disagreement by silencing the witness. Weakening the test merely because red is inconvenient erases evidence instead of settling the disagreement. It converts verification from an adversary of defects into a servant of the current implementation.
 
 ## Trigger When
 Trigger when meaningful expectations are loosened, edge cases deleted, assertions generalized, or fixtures simplified chiefly to make an otherwise failing implementation green.

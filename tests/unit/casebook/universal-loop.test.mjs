@@ -32,6 +32,16 @@ import { gitCommonDir } from '../../../dist/Journal/RuntimePath.js'
 import { GitRawStore_createInMemory as createRaw } from '../../../dist/Infrastructure/Persist/GitRawStore.js'
 import { EventStore_create as createStore } from '../../../dist/Infrastructure/Persist/EventStore.js'
 import { toList, resultOf, listItems } from '../support/domain.mjs'
+import {
+  CANONICAL_A,
+  CANONICAL_Q,
+  scriptedBookkeeperPort,
+} from './bookkeeper-session.test.mjs'
+
+const { setSessionPort, resetSessionPort } = await import(
+  '../../../dist/Infrastructure/BookkeeperRuntime.js'
+)
+
 
 const obsIndex = (n) => Object.create(Observation.prototype).cases().indexOf(n)
 const fileRead = (p, h) => new Observation(obsIndex('FileRead'), [p, h])
@@ -62,13 +72,15 @@ test('G6_G_universal_loop_archive_finalize_fetch', async () => {
   }
 })
 
-test('G6_G_lifecycle_note_finalize_fetch_and_cleanup', () => {
+test('G6_G_lifecycle_note_finalize_fetch_and_cleanup', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-universal-life-'))
   try {
     execFileSync('git', ['init', '--quiet', dir])
     mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     setEnabled(dir)
+    const { port, createCalls, editQaCalls } = scriptedBookkeeperPort()
+    setSessionPort(port)
 
     const sessionId = 'reuse-insp-1'
     notePrompt(sessionId, 'Who owns PromptAuthority?')
@@ -76,16 +88,20 @@ test('G6_G_lifecycle_note_finalize_fetch_and_cleanup', () => {
     const rawA = 'Host owns PromptAuthority.'
     noteAnswer(sessionId, rawA)
 
-    const fin = resultOf(tryFinalizeInspector(dir, sessionId))
+    const fin = resultOf(await tryFinalizeInspector(dir, sessionId))
     assert.equal(fin.ok, true, `finalize ok: ${JSON.stringify(fin.error)}`)
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)
     const fetched = resultOf(fetch(store, raw, 10, sessionId))
     assert.equal(fetched.ok, true)
-    assert.equal(fetched.value.Q, 'Who owns PromptAuthority?')
-    assert.notEqual(fetched.value.A, rawA, 'finalize synthesizes A')
-    assert.equal(fetched.value.A.startsWith(rawA), true)
+    assert.equal(fetched.value.Q, CANONICAL_Q)
+    assert.notEqual(fetched.value.Q, 'Who owns PromptAuthority?')
+    assert.notEqual(fetched.value.A, rawA, 'finalize synthesizes A via edit-qa')
+    assert.equal(fetched.value.A, CANONICAL_A)
+    assert.equal(fetched.value.A.includes('evidence:'), false)
+    assert.equal(createCalls.length, 1, 'exactly one Bookkeeper child on finalize')
+    assert.equal(editQaCalls.length >= 2, true)
     assert.equal(listItems(fetched.value.Observations).length, 1)
 
     const publishedA = fetched.value.A
@@ -97,14 +113,16 @@ test('G6_G_lifecycle_note_finalize_fetch_and_cleanup', () => {
 
     // worktree drift → Bookkeeper synthesizes again and advances obs
     writeFileSync(join(dir, 'a.txt'), 'drift', 'utf8')
-    const mech = resultOf(refreshStale(store, raw, dir, sessionId))
+    const mech = resultOf(await refreshStale(store, raw, dir, sessionId))
     assert.equal(mech.ok, true)
     assert.equal(mech.value, true)
     const after = resultOf(fetch(store, raw, 10, sessionId))
-    assert.notEqual(after.value.A, publishedA, 'refresh revises A again')
-    assert.equal(after.value.A.startsWith(publishedA), true)
+    assert.equal(after.value.Q, CANONICAL_Q)
+    assert.equal(after.value.A.includes('evidence:'), false)
+    assert.equal(createCalls.length, 2, 'one Bookkeeper child per finalize and refresh')
     assert.equal(listItems(after.value.Observations)[0].fields[1], contentHash('drift'))
   } finally {
+    resetSessionPort()
     setEnabled(undefined)
     rmSync(dir, { recursive: true, force: true })
   }

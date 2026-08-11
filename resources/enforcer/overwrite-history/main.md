@@ -1,7 +1,7 @@
 # overwrite-history — Main
 
 ## What To Do Now
-Stop editing committed historical facts. Append a correction, compensation, revocation, or superseding event that preserves both what happened and how understanding changed.
+Stop editing committed historical facts. Append a correction, compensation, revocation, or superseding event that preserves both what happened and how understanding changed. The append-only historical log (events/journal/audit) is who owns the history invariant that committed facts remain queryable as recorded and corrections appear as new facts.
 
 ## Why This Matters
 An overwrite gives the present power to forge the past. Even when the new value is "more correct," the system loses when and why the correction occurred, which decisions were made under the earlier fact, and whether replay would reproduce the same historical trajectory.

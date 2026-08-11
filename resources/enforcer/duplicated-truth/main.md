@@ -1,7 +1,7 @@
 # duplicated-truth — Main
 
 ## What To Do Now
-Declare one canonical writable representation for the fact and turn every other copy into a deterministic projection, cache, or view of that source.
+Declare one canonical writable representation for the fact and turn every other copy into a deterministic projection, cache, or view of that source. The declared source is who owns the fact; caches and views are not who owns writes.
 
 ## Why This Matters
 When two places can both define the same fact, inconsistency is no longer a bug in synchronization—it is a state the architecture permits. Every repair mechanism then needs precedence rules, timestamps, reconciliation, or manual judgment because the model refused to answer where truth lives.

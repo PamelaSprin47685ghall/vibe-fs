@@ -5094,11 +5094,11 @@ Evidence:
 
 ## Blockers
 
-无。
+G2 仍 PARTIAL（PREFIX LAW unit canary cited, not Exit）。G6 仍 PARTIAL（BookkeeperRuntime/EditQaTool cited；digest synthesizer gone；LLM Bookkeeper / Host e2e / CaseFinalize Remaining）。G3 为 DONE。
 
 ## Final outcome
 
-**G2–G6 Universal（Dedicated Inspector Learning Collapse 的 runtime + Casebook 集成）已收口**（2026-08-11）：
+**G2–G6 Universal（Dedicated Inspector Learning Collapse 的 runtime + Casebook 集成）**（2026-08-11 observational：G3 DONE；G2/G6 PARTIAL）：
 
 1. **G2 Runtime Foundation**：ReuseScope / SessionOwnership（Work|InternalLeaf × Root|Attached）/ SyncDelegateRuntime / CausalAwait dual-await / dedicated Inspector+Coder；Teacher CE 代数保留、leaf 特例不保留。
 2. **G3 Clean Break**：Student/Teacher/QA/SKILL 删除；Meditator = pure reasoner + Inspector；catalog 20 baseline；static ratchet fail-closed。
@@ -5106,28 +5106,20 @@ Evidence:
 4. **G6 Casebook（与 perm-inspector 同窗）**：lifecycle finalize/cleanup 接线；Fetch single-flight + Index；**minimal mechanical Bookkeeper**（同 Q/A + replayed obs → Refreshed）；unit 36 PASS。
 5. **产品边界诚实**：Dedicated Inspector = baseline；Casebook = opt-in cold cache；observation replay ≠ correctness proof；LLM Bookkeeper synthesis 明确 Remaining，不假装 CaseFinalize 已做语义编译。
 
-**Gate 移交**：Universal + perm-inspector → `changes/completed/`。Playbook 后续 G7 Rulebook / G8 Strength 等按 entry 继续；**勿**在未交付 LLM Bookkeeper 前声称 multi-turn semantic CaseFinalize 已完成。
+**Gate 移交**：Universal + perm-inspector → `changes/completed/` **不等于** G2/G6 Exit。G2 PREFIX LAW unit canary cited, not Exit；**勿**把 `BookkeeperRuntime`/`EditQaTool` surface 当成 G6 Exit；digest synthesizer 已从 `CasebookBookkeeper` 移除，**勿**把任何 digest 当成 synthesis，**勿**在未交付 LLM Bookkeeper 前声称 multi-turn semantic CaseFinalize 已完成。
 
 ## Amendment (2026-08-11 strict audit)
 
-**Status correction — Gate reclassified to PARTIAL per `changes/proposed/entry.md` §0.1 (living-status authority).** The frozen body and `Final outcome` above are retained verbatim; this section is the only honesty amendment and does not rewrite history.
+Living status is observational. Product Exit Gates in the Playbook remain the acceptance baseline. This section does not override Gate text. `BookkeeperRuntime`/`EditQaTool` surface has **no** user amendment authority as G6 Exit. Digest synthesizer is gone from `CasebookBookkeeper`.
 
-Deferred — G6-E/F/G (not DONE, mechanical only):
-- **LLM Bookkeeper** (InternalLeaf + Attached, `edit-qa` synthesis) deferred — current is mechanical `CasebookBookkeeper.refreshStale` only (same Q/A + replayed observations, no LLM synthesis).
-- **edit-qa synthesis** deferred — no Bookkeeper Agent provider session that revises Q/A.
+**G2 PARTIAL:** runtime reuse canary green (`tests/unit/session/sync-delegate-runtime.test.mjs` :: `G2_inspector_Q1_Q2_Q3_same_session_serial_reuse`). Inspector PREFIX LAW **unit** canary cited, **not** Exit: `tests/unit/session/g2-inspector-provider-wire-prefix.test.mjs` :: `G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix` (reused-child SendPrompt → OpenAI body → `wireOf`/`sealHolds` + Domain `isAppendOnlyPrefix`). optional `SyncDelegateRuntime` `promptModel` is G2 PREFIX LAW ModelId bind (`ChatParamsHook` leaves `Model=None`); G6 Casebook/`SpikePlugin` hooks must not remove it. Do not claim G2 Exit.
+
+**G6 PARTIAL:** observational APIs (**not** Exit): `BookkeeperRuntime.setSessionPort` / `runTransaction` / `isAttached` / `tryTxId`; `EditQaTool.execute` (document `Q.md`|`A.md`, unique `old_text`); `BookkeeperStaging.begin`/`read`/`replace`/`take`/`abort`. `AttachmentKind.Bookkeeper` `txId` lives in `BookkeeperRuntime`, not child options. Digest synthesizer is **gone** from `CasebookBookkeeper`. `SpikePlugin` calls `BookkeeperRuntime.setSessionPort` at `createHost`; `tryFinalizeInspector` is `Task`; `HostSignalBootstrap` remains sync so `SpikePlugin` fire-and-forgets after starting the Task (`tryTake` is sync-before-await). G2 `promptModel` not removed. Host e2e / LLM Bookkeeper **still open**. Host-path unit (`tests/unit/casebook/g6-host-reuse-finalize.test.mjs`) is **not** full tool→PromptDispatcher→TurnCompleted→Casebook→fetch e2e.
+
+Deferred — G6-E/F/G Remaining (keep; not DONE):
+- **LLM Bookkeeper** (InternalLeaf + Attached, `edit-qa` synthesis) still open — `BookkeeperRuntime` / `EditQaTool` / `BookkeeperStaging` cited observationally; digest synthesizer gone from `CasebookBookkeeper`; not Host e2e / not Exit.
+- **edit-qa synthesis** still open — `EditQaTool.execute` (document `Q.md`|`A.md`, unique `old_text`) is surface, not Host e2e proof.
 - **Single provider transaction synthesis (CaseFinalize)** deferred — ReuseScope-close multi-turn Q/A → one canonical Q/A via exactly-one Bookkeeper provider transaction not evidenced; current finalize is draft Q/A direct `Captured`.
 - **Evidence stability verify after synthesis** deferred (freeze → Bookkeeper → replay/verify → publish not exercised with LLM candidate).
 - **Real Host Meditator→reusable Inspector→scope-close→CaseFinalize→cold fetch e2e** deferred — only helper/unit evidenced (`tests/unit/casebook/universal-loop.test.mjs`, `tests/unit/casebook/*` 36 PASS); no full Host e2e with LLM Bookkeeper.
-
-Mechanical surface remains as described in the frozen body; full semantic Casebook remains PARTIAL. `entry.md` §0.1 is authoritative.
-
-## Amendment (2026-08-11 implementation closeout)
-
-Supersedes the honesty-only amendment above for living status. Frozen body retained.
-
-**G2:** Q1/Q2/Q3 same Inspector SessionId + serial reuse + owner cancel evidenced in `tests/unit/session/sync-delegate-runtime.test.mjs`.
-
-**G6:** `CasebookBookkeeper` now runs a `QaSynthesize` transaction (edit-qa + evidence-stability verify → `InspectorCaseRefreshed`). `CasebookLifecycle.tryFinalizeInspector` performs exactly one CaseFinalize synthesis then `finalizeCase`. Host-path reuse Q1–Q3 → scope-close → fetch: `tests/unit/casebook/g6-host-reuse-finalize.test.mjs`. Remaining amendment: synthesizer is deterministic evidence-digest, not a live LLM InternalLeaf Bookkeeper session.
-
-**G7 (this file if rulebook):** `enforcer-rulebook-gate --require-headings --strict` 120/120 GREEN and wired in `scripts/check.mjs`. Physical EventStore vocabulary is `BlogObservationCommitted` / `BlogObservationsSquashed`; codec dual-decodes legacy tags.
 

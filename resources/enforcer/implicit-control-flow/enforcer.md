@@ -1,7 +1,7 @@
 # implicit-control-flow — Enforcer
 
 ## Definition
-Control flow is implicit when essential ordering is determined by registration, hidden callbacks, lifecycle hooks, global initialization, or framework convention rather than visible program structure.
+Control flow is implicit when essential ordering is determined by registration, hidden callbacks, lifecycle hooks, global initialization, or framework convention rather than visible program structure. The root-cause is that happens-before is left as ambient lifecycle knowledge—registration, hooks, import side effects—so the causal protocol exists only in folklore and not in program structure.
 
 ## Governing Principle
 Correctness that depends on order should make order a first-class fact. Hidden sequencing turns causality into ambient knowledge: readers see components but not the temporal relation that makes them correct. The system then behaves like a distributed protocol without an explicit protocol—events may be locally valid yet globally wrong because nobody owns the happens-before relation.

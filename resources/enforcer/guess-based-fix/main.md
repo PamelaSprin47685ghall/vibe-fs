@@ -1,7 +1,7 @@
 # guess-based-fix — Main
 
 ## What To Do Now
-Reproduce the failure, form a falsifiable causal hypothesis, and keep only the change whose mechanism explains the observed defect.
+Reproduce the failure, form a falsifiable causal hypothesis, and keep only the change whose mechanism explains the observed defect. The violated invariant is who owns the repair; a newly green suite is not.
 
 ## Why This Matters
 A speculative patch can make a symptom vanish by changing timing or incidental state while leaving the underlying defect intact. Without causality, the team learns only that one configuration happened to pass once; it cannot predict adjacent cases or know what future refactors must preserve.

@@ -1,7 +1,7 @@
 # blob-after-event — Enforcer
 
 ## Definition
-A reference event is invalidly ordered when it becomes durable before the content it names is itself durably retrievable.
+A reference event is invalidly ordered when it becomes durable before the content it names is itself durably retrievable. The root-cause is that a durable event is appended before its named blob is itself durably retrievable, so replay can observe a committed reference to missing content.
 
 ## Governing Principle
 A durable event is a promise to every future replay: “this fact existed.” If the event points to a blob that can still disappear, the log has recorded a world that never became reconstructible. Referential integrity is therefore temporal, not merely structural: the referent must become durable before the reference may become history.

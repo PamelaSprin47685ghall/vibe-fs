@@ -1,7 +1,7 @@
 # random-source-in-logic — Enforcer
 
 ## Definition
-Randomness is hidden in logic when a domain decision draws entropy internally, making the decision depend on an input absent from its signature and difficult to replay.
+Randomness is hidden in logic when a domain decision draws entropy internally, making the decision depend on an input absent from its signature and difficult to replay. The root-cause is that entropy is sampled inside policy instead of being an explicit input, so replay cannot reconstruct the decision from visible data.
 
 ## Governing Principle
 Randomness is still input. A function that samples it internally only conceals the input channel, so identical visible state can lead to different events with no reproducible explanation. For simulations, allocation, games, sampling, and tie-breaking, replayability requires preserving either the generated choice or the seed/source from which the choice is deterministically derived.

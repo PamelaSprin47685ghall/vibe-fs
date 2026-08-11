@@ -1,7 +1,7 @@
 # behavioral-boundary-untested — Main
 
 ## What To Do Now
-Add a behavioral test that enters through the same public surface production callers use and asserts the outcome they are promised.
+Add a behavioral test that enters through the same public surface production callers use and asserts the outcome they are promised. The module’s supported public entry point is who owns the caller-visible promise and therefore who owns the test that must cross that boundary.
 
 ## Why This Matters
 Implementation tests establish facts about today’s decomposition. They do not establish that the system exposes the intended behavior. The distance between helper and boundary contains wiring, normalization, authorization, defaults, effect sequencing, and serialization—the exact places where integration defects hide.

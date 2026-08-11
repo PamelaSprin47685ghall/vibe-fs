@@ -1,7 +1,7 @@
 # partial-write-assumption — Main
 
 ## What To Do Now
-Replace speculative partial-write recovery with the exact outcome model promised by the storage/effect boundary.
+Replace speculative partial-write recovery with the exact outcome model promised by the storage/effect boundary. The storage/effect boundary that defines atomicity is who owns the recovery invariant that the handled outcome set equals the contract's observable outcomes.
 
 ## Why This Matters
 Recovery code is only as sound as its failure model. Invented intermediate states make the application more complex while weakening correctness because subsequent actions—truncate, retry, compensate—may be based on a state that never actually existed.

@@ -1,7 +1,7 @@
 # time-source-in-logic — Main
 
 ## What To Do Now
-Move system-clock reads to the shell and pass an explicit instant or clock value into the domain decision that needs temporal context.
+Move system-clock reads to the shell and pass an explicit instant or clock value into the domain decision that needs temporal context. The shell/adapter is who owns clock observation; domain policy owns only interpretation of a supplied instant.
 
 ## Why This Matters
 Hidden time makes identical visible inputs non-identical in reality. That breaks deterministic tests, event replay, incident reconstruction, and explanations of why a deadline or eligibility decision differed between runs.

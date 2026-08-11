@@ -1,7 +1,7 @@
 # rule-spaghetti — Enforcer
 
 ## Definition
-Rule spaghetti exists when a business rule is encoded primarily as nested branches, mutable flags, early exits, and temporary state, so its meaning can be recovered only by mentally executing the program.
+Rule spaghetti exists when a business rule is encoded primarily as nested branches, mutable flags, early exits, and temporary state, so its meaning can be recovered only by mentally executing the program. The root-cause is that the policy exists only as nested control flow, so meaning can be recovered only by simulating the program rather than reading named propositions.
 
 ## Governing Principle
 Policy is a relation between facts and conclusions. Control flow is merely one possible interpreter of that relation. When the interpreter becomes the only specification, readers must simulate paths to discover the rule, and small changes alter both meaning and execution topology at once. A rule is better represented when its propositions are named directly and composition exposes the logic without requiring a private program counter in the reader’s head.

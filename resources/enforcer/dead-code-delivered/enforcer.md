@@ -1,7 +1,7 @@
 # dead-code-delivered — Enforcer
 
 ## Definition
-Delivered dead code is production code with no reachable role in the current system: unused, superseded, unreferenced, or impossible to execute.
+Delivered dead code is production code with no reachable role in the current system: unused, superseded, unreferenced, or impossible to execute. The root-cause is that the working tree still presents abandoned paths as live system, while history already owns the archive.
 
 ## Governing Principle
 Version control is the archive; the working tree is the proposition “this is the system.” Dead code weakens that proposition by preserving alternatives that no longer participate in behavior. Readers must still reason about them, tools still index them, and future maintainers cannot tell whether the path is intentionally dormant or merely forgotten.

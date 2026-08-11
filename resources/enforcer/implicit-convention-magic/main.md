@@ -1,7 +1,7 @@
 # implicit-convention-magic — Main
 
 ## What To Do Now
-Replace correctness-critical discovery conventions with explicit typed registration or a build-time contract that makes participation visible and checkable.
+Replace correctness-critical discovery conventions with explicit typed registration or a build-time contract that makes participation visible and checkable. The typed registration or mechanical completeness gate is who owns participation; filename, path, annotation, and discovery order are not.
 
 ## Why This Matters
 Convention saves syntax by spending memory. The more correctness depends on hidden names, paths, and annotations, the more the codebase requires folklore to assemble. Failures become omissions rather than type errors: nothing happens because some invisible ritual was missed.

@@ -1,7 +1,7 @@
 # missing-architecture-gate — Enforcer
 
 ## Definition
-An architecture gate is missing when a critical dependency or ownership rule exists only as human convention even though the repository can check the rule mechanically.
+An architecture gate is missing when a critical dependency or ownership rule exists only as human convention even though the repository can check the rule mechanically. The root-cause is that a known, mechanically decidable graph or ownership invariant has no failing predicate in the check pipeline, so preservation depends on future attention rather than mechanism.
 
 ## Governing Principle
 An invariant without enforcement is a request to future attention. Architecture is especially vulnerable because violations are locally convenient: importing one internal module often makes a task easier while invisibly degrading the global graph. A static gate moves the burden from memory to mechanism, making the forbidden state expensive at the moment it is introduced rather than during a later redesign.
@@ -13,9 +13,10 @@ Trigger when forbidden imports, layering, ownership boundaries, generated-file r
 - The principle is inherently semantic and cannot be recognized mechanically without unacceptable false positives.
 - The remark is a one-off review comment about a specific import, not a standing architecture rule.
 - The build already rejects the forbidden edge via an existing layer, import, or ownership check.
+- The remark is a style preference with no architectural consequence if crossed.
 
 ## Distinguish From
-missing-invariant-documentation lacks a durable statement of the rule. false-gate has a check that does not actually fail. Tie-break: if the invariant is known and mechanically decidable but left to discipline, this rule; if the wording is missing, missing-invariant-documentation; if a check exists but is ineffective, false-gate.
+`missing-invariant-documentation` lacks a durable statement of the rule. `false-gate` has a check that does not actually fail. Tie-break: if the invariant is known and mechanically decidable but left to discipline, this rule; if the wording is missing, `missing-invariant-documentation`; if a check exists but is ineffective, `false-gate`.
 
 ## Decision Procedure
 Express the boundary as a decidable predicate over repository structure. If a cheap deterministic check can recognize violation, make that check part of the standard gate.

@@ -1,7 +1,7 @@
 # blind-edit — Enforcer
 
 ## Definition
-A blind edit changes a representation before establishing which contract owns the behavior and which path turns that representation into an observable result.
+A blind edit changes a representation before establishing which contract owns the behavior and which path turns that representation into an observable result. The root-cause is that mutation starts at the loudest symptom before the owning contract and causal path are mapped, so the patch changes a witness rather than the violated invariant.
 
 ## Governing Principle
 Source code is evidence of a system, not the system itself. A line acquires meaning from the invariants above it and the callers below it. Editing the first plausible location confuses textual proximity with causal ownership. Such fixes often remove a symptom while preserving—or worsening—the mechanism that produced it.

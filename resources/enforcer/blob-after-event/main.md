@@ -1,7 +1,7 @@
 # blob-after-event — Main
 
 ## What To Do Now
-Write the blob to its durable store, verify the store’s success condition, then append the event or manifest entry that references it.
+Write the blob to its durable store, verify the store’s success condition, then append the event or manifest entry that references it. The publisher of the history record is who owns the ordering invariant that the blob must be durable before the reference becomes history.
 
 ## Why This Matters
 A history that names missing content is not merely incomplete; it is self-contradictory. Replay trusts committed events as facts. Once such a reference is admitted, every recovery path must either lie about the past or invent exceptional repair semantics for a state that correct ordering could have made impossible.

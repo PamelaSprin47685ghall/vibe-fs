@@ -1,7 +1,7 @@
 # cancellation-not-propagated — Enforcer
 
 ## Definition
-Cancellation is broken when an operation acknowledges that its owner no longer wants the result but leaves owned child work running beyond that decision.
+Cancellation is broken when an operation acknowledges that its owner no longer wants the result but leaves owned child work running beyond that decision. The root-cause is that cancellation is treated as an outer return rather than a statement about ownership, so owned child effects keep running after the principal has ceased.
 
 ## Governing Principle
 Cancellation is a statement about ownership, not a cosmetic early return. If a parent may abandon its result while children continue consuming sockets, processes, permits, or money, the runtime lifetime has escaped the logical lifetime. The system then contains work with no remaining principal—effects whose owner has ceased to exist.

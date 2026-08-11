@@ -1,7 +1,7 @@
 # facade-hides-mess — Main
 
 ## What To Do Now
-Remove the facade as the supposed cure and repair the ownership, dependency, and state boundaries it currently conceals. Reintroduce a narrow facade only if a genuine subsystem contract remains useful afterward. The owners and dependency edges beneath the wrapper are who own the architecture; a forwarding facade is not.
+Remove the facade as the supposed cure and repair the ownership, dependency, and state boundaries it currently conceals. Reintroduce a narrow facade only if a genuine subsystem contract remains useful afterward. The owners and dependency edges beneath the wrapper are who owns the architecture; a forwarding facade is not.
 
 ## Why This Matters
 A facade can reduce caller knowledge only when the hidden system has a coherent internal model. Over disorder, it reduces visibility without reducing coupling. That makes the architecture harder to diagnose while leaving every underlying reason for change intact.

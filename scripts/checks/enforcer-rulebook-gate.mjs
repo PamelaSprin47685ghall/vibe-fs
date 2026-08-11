@@ -11,10 +11,17 @@
  *       enforcer.md → ## Definition / ## Trigger When / ## Nudge
  *       main.md     → ## What To Do Now / ## Verification / ## Done When
  *   - optional structural rubric (`requireRubric` / `--strict` / `--require-rubric`):
- *       enforcer.md → Do Not Trigger When ≥3 bullets; Distinguish From ≥2 sibling names;
+ *       Mechanical A37 (enforcer.md) + A38 (main.md) items encoded below.
+ *       This gate does NOT claim human-only work: paired-history 120,
+ *       A39 pair review, A40 tournament.
+ *       enforcer.md → Do Not Trigger When ≥3 bullets; Distinguish From ≥2 sibling names
+ *                     plus tie-break language; root-cause present; no remediation drift;
+ *                     Trigger When semantic; Definition nonempty and not title-only;
  *                     Examples positive / near-miss / counterexample markers
  *       main.md     → Common Wrong Fixes ≥3 items; Decision Branches ≥2;
- *                     Verification mentions invariant/不变量; Done When present
+ *                     Verification mentions invariant/不变量; Done When present;
+ *                     owner/root language; authority not exceeded; no reclassification;
+ *                     scope 不扩张
  *
  * Usage:
  *   node scripts/checks/enforcer-rulebook-gate.mjs
@@ -59,6 +66,30 @@ export const MAIN_REQUIRED_HEADINGS = Object.freeze([
   'What To Do Now',
   'Verification',
   'Done When',
+])
+
+/**
+ * Remaining A37/A38-adjacent work this gate explicitly does not claim.
+ * Paired-history coverage of all 120, A39 pair review, and A40 cross-family
+ * tournament stay human-only (plus non-mechanical A37/A38 prose quality).
+ */
+export const HUMAN_ONLY_RUBRIC_ITEMS = Object.freeze([
+  'paired-history 120',
+  'A39 pair review',
+  'A40 tournament',
+])
+
+/** Mechanical A37/A38 violation codes added beyond the original count-marker subset. */
+export const NEW_RUBRIC_CODES = Object.freeze([
+  'rubric-distinguish-tie-break',
+  'rubric-root-cause',
+  'rubric-remediation-drift',
+  'rubric-trigger-semantic',
+  'rubric-definition',
+  'rubric-owner-root',
+  'rubric-authority-overreach',
+  'rubric-reclassification',
+  'rubric-scope-expansion',
 ])
 
 /**
@@ -188,9 +219,67 @@ const hasNearMissExampleMarker = (text) =>
 const hasCounterexampleMarker = (text) =>
   /counter[-\s]?example|反例/i.test(text)
 
+const TIE_BREAK_RE = /tie-break|决胜|区分规则|若相似/i
+const ROOT_CAUSE_RE = /root-cause|根因|root cause/i
+const OWNER_ROOT_RE = /修的是\s*owner|root-cause\s+owner|who owns/i
+const SCOPE_EXPANSION_RE = /rewrite(?:s|ing)?(?:\s+\w+){0,4}\s+the\s+system|unrelated modules?|重写(?:整个)?系统|无关(?:的)?模块/i
+const AUTHORITY_OVERREACH_RE =
+  /(?:change|edit|rewrite|modify|update|alter|修改|改写).{0,48}(?:rulebook|architecture|playbook)\s+gates?|(?:rulebook|architecture|playbook)\s+gates?.{0,48}(?:change|edit|rewrite|modify|update|alter|修改|改写)/i
+
+const BEHAVIORAL_TRIGGER_RE =
+  /when|trigger|fire|fail|behavio(?:u)?r|mutat|edit|claim|before|after|\bif\b|because|unless|owner|contract|invariant|cause|observ|violat|should|must|begin|appear|若|当|行为|触发|失败|编辑|不变/i
+
+const GLOBISH_RE =
+  /`[^`]*`|\*\*\/\S+|\*+\.[A-Za-z0-9*?]+|\b[\w./-]+\.[A-Za-z0-9]{1,8}\b|\.[A-Za-z][A-Za-z0-9]{0,7}\b/g
+
+const FILE_VOCAB_RE =
+  /\b(?:files?|filenames?|extensions?|globs?|paths?|dirs?|directories|matching|patterns?)\b/gi
+
 /**
- * Structural rubric for `enforcer.md` (Appendix A37 subset).
+ * Drop filename / extension / glob tokens so Trigger When can be judged as prose.
+ * @param {string} text
+ */
+const stripGlobish = (text) =>
+  String(text)
+    .replace(GLOBISH_RE, ' ')
+    .replace(FILE_VOCAB_RE, ' ')
+    .replace(/^[ \t]*(?:[-*+]|\d+[.)])[ \t]+/gm, ' ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+/**
+ * True when Trigger When is semantic (behavioral language, not glob lists only).
+ * @param {string} section
+ */
+const isTriggerSemantic = (section) => {
+  const text = String(section ?? '').trim()
+  if (!text) return false
+  const core = stripGlobish(text)
+  return core.length > 0 && BEHAVIORAL_TRIGGER_RE.test(core)
+}
+
+const normalizeProse = (s) =>
+  String(s)
+    .replace(/[`*_>#]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+
+/**
+ * Strip negated spans so "do not rewrite the system" does not look like overreach.
+ * @param {string} text
+ */
+const stripNegatedSpans = (text) =>
+  String(text).replace(
+    /(?:\bdo(?:es)?\s+not\b|\bdon't\b|\bnever\b|禁止|不得|不要)[^.!\n]{0,200}/gi,
+    ' ',
+  )
+
+/**
+ * Mechanical A37 checks for `enforcer.md`.
  * Independent of constitution heading presence.
+ * Does not claim paired-history 120, A39 pair review, or A40 tournament.
  * @param {string} text
  * @returns {{ code: string, path?: string, detail?: string }[]}
  */
@@ -198,6 +287,34 @@ export const checkEnforcerRubric = (text) => {
   /** @type {{ code: string, path?: string, detail?: string }[]} */
   const out = []
   const body = String(text ?? '')
+
+  const definition = extractSection(body, 'Definition')
+  const defNorm = normalizeProse(definition)
+  if (!defNorm) {
+    out.push({
+      code: 'rubric-definition',
+      detail: 'Definition section must be nonempty',
+    })
+  } else {
+    const titleLine = (body.match(/^#\s+(.+)$/m) || [])[1] ?? ''
+    const titleNorm = normalizeProse(titleLine)
+    const nameNorm = normalizeProse(titleLine.split(/\s+[—–-]\s+/)[0] ?? '')
+    if (defNorm === titleNorm || (nameNorm && defNorm === nameNorm)) {
+      out.push({
+        code: 'rubric-definition',
+        detail: 'Definition must not be identical to the title only',
+      })
+    }
+  }
+
+  const trigger = extractSection(body, 'Trigger When')
+  if (!isTriggerSemantic(trigger)) {
+    out.push({
+      code: 'rubric-trigger-semantic',
+      detail:
+        'Trigger When must be semantic behavioral language, not only filename/extension glob lists',
+    })
+  }
 
   const dnt = extractSection(body, 'Do Not Trigger When')
   const dntCount = countListItems(dnt)
@@ -214,6 +331,27 @@ export const checkEnforcerRubric = (text) => {
     out.push({
       code: 'rubric-distinguish-siblings',
       detail: `Distinguish From must mention ≥2 sibling-like kebab names or resources/enforcer/ refs (found ${siblings.size})`,
+    })
+  }
+  if (!TIE_BREAK_RE.test(distinguish)) {
+    out.push({
+      code: 'rubric-distinguish-tie-break',
+      detail: 'Distinguish From must contain tie-break language (tie-break / 决胜 / 区分规则 / 若相似)',
+    })
+  }
+
+  if (!ROOT_CAUSE_RE.test(body)) {
+    out.push({
+      code: 'rubric-root-cause',
+      detail: 'enforcer.md must contain root-cause language (root-cause / 根因 / Root cause)',
+    })
+  }
+
+  if (hasHeading(body, 'What To Do Now') || hasHeading(body, 'Common Wrong Fixes')) {
+    out.push({
+      code: 'rubric-remediation-drift',
+      detail:
+        "enforcer.md must not contain remediation headings '## What To Do Now' or '## Common Wrong Fixes'",
     })
   }
 
@@ -253,7 +391,8 @@ const countDecisionBranches = (text) => {
 }
 
 /**
- * Structural rubric for `main.md` (Appendix A38 subset).
+ * Mechanical A38 checks for `main.md`.
+ * Does not claim paired-history 120, A39 pair review, or A40 tournament.
  * @param {string} text
  * @returns {{ code: string, path?: string, detail?: string }[]}
  */
@@ -261,6 +400,7 @@ export const checkMainRubric = (text) => {
   /** @type {{ code: string, path?: string, detail?: string }[]} */
   const out = []
   const body = String(text ?? '')
+  const actionable = stripNegatedSpans(body)
 
   const wrongFixes = extractSection(body, 'Common Wrong Fixes')
   const wrongCount = countListItems(wrongFixes)
@@ -292,6 +432,34 @@ export const checkMainRubric = (text) => {
     out.push({
       code: 'rubric-done-when',
       detail: "missing required heading '## Done When'",
+    })
+  }
+
+  if (!OWNER_ROOT_RE.test(body)) {
+    out.push({
+      code: 'rubric-owner-root',
+      detail: 'main.md must contain owner/root language (修的是 owner / root-cause owner / who owns)',
+    })
+  }
+
+  if (AUTHORITY_OVERREACH_RE.test(actionable)) {
+    out.push({
+      code: 'rubric-authority-overreach',
+      detail: 'main.md must not tell the model to change Rulebook / architecture / Playbook gates',
+    })
+  }
+
+  if (hasHeading(body, 'Definition') || hasHeading(body, 'Detection')) {
+    out.push({
+      code: 'rubric-reclassification',
+      detail: 'main.md must not re-do Detection / Definition (classification stays in enforcer.md)',
+    })
+  }
+
+  if (SCOPE_EXPANSION_RE.test(actionable)) {
+    out.push({
+      code: 'rubric-scope-expansion',
+      detail: 'main.md must not expand scope (rewrite the system / unrelated modules)',
     })
   }
 

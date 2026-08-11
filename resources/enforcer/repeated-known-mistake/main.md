@@ -1,7 +1,7 @@
 # repeated-known-mistake — Main
 
 ## What To Do Now
-Read the existing lesson or decision before proceeding, verify its premises still hold, and change the current approach accordingly.
+Read the existing lesson or decision before proceeding, verify its premises still hold, and change the current approach accordingly. The still-authoritative recorded lesson or decision is who owns the constraint; current convenience is not who owns permission to repeat the failed path.
 
 ## Why This Matters
 A documented failure is prepaid reasoning. Ignoring it spends the same debugging cost again and teaches contributors that repository knowledge is ornamental rather than operational. Over time that destroys incentives to record lessons at all.

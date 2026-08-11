@@ -1,7 +1,7 @@
 # phase-flag-accumulation — Main
 
 ## What To Do Now
-Replace interacting lifecycle flags with a smaller explicit state model or structured control flow whose valid phases and transitions are named.
+Replace interacting lifecycle flags with a smaller explicit state model or structured control flow whose valid phases and transitions are named. The named lifecycle type (or the local control scope that owns phase) is who owns the state-space invariant that representable phases equal the valid lifecycle, not the boolean product.
 
 ## Why This Matters
 Flags scale as combinations, while real lifecycles usually scale as a sequence or small graph. The gap becomes illegal states and conditional logic whose purpose is to rule out worlds the representation should never have admitted.

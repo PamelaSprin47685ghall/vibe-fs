@@ -1,7 +1,7 @@
 # commented-out-code — Main
 
 ## What To Do Now
-Delete the commented implementation. Recover it from version control if it ever becomes relevant again.
+Delete the commented implementation. Recover it from version control if it ever becomes relevant again. Version control is who owns retired implementation; the working tree is who owns only the present program and durable non-obvious knowledge.
 
 ## Why This Matters
 A source file is valuable because readers can treat its visible structure as present tense. Commented code breaks that compact: it looks operational, carries stale names and assumptions, and competes for attention even though the compiler cannot verify it. The result is uncertainty without capability.

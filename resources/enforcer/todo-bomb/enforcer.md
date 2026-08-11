@@ -1,7 +1,7 @@
 # todo-bomb — Enforcer
 
 ## Definition
-A TODO becomes a correctness bomb when required behavior is replaced by a placeholder, unimplemented branch, panic, or note whose future completion is necessary for the shipped path to be sound.
+A TODO becomes a correctness bomb when required behavior is replaced by a placeholder, unimplemented branch, panic, or note whose future completion is necessary for the shipped path to be sound. The root-cause is that a known hole on a reachable shipped path is converted into a deferred promise, so the current contract already depends on work that has not been done.
 
 ## Governing Principle
 A TODO is not deferred work unless the current system remains complete without it. When correctness depends on the future task, the comment converts a known defect into an undocumented time bomb: execution may reach a state the implementation already knows it cannot honor. A system should either implement its contract or explicitly refuse the unsupported case at the boundary.

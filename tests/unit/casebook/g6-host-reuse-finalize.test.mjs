@@ -51,6 +51,16 @@ import {
   roles,
   sessionId,
 } from '../support/domain.mjs'
+import {
+  CANONICAL_A,
+  CANONICAL_Q,
+  scriptedBookkeeperPort,
+} from './bookkeeper-session.test.mjs'
+
+const { setSessionPort, resetSessionPort } = await import(
+  '../../../dist/Infrastructure/BookkeeperRuntime.js'
+)
+
 
 const SYNC_RETURN_COMPLETION = 'Sync delegate answer returned to caller.'
 
@@ -150,6 +160,7 @@ const withHarness = async (fn) => {
       prompts,
     })
   } finally {
+    resetSessionPort()
     setEnabled(undefined)
     disposeRuntime(runtime)
     opened.dispose()
@@ -192,10 +203,13 @@ test('G6_G_host_reusable_inspector_one_finalize_then_cold_fetch', async () => {
 
     collect(collector, delegateId, 'read', { path: 'a.txt' }, 'hello')
 
-    // ReuseScope close: exactly one CaseFinalize. Synthesis text is G6QaSynthesizer's
-    // contract; this Host test only requires one successful publish + fetch.
-    const first = resultOf(tryFinalizeInspector(dir, delegateId))
+    // ReuseScope close: exactly one CaseFinalize child (separate Bookkeeper port).
+    const bookkeeper = scriptedBookkeeperPort()
+    setSessionPort(bookkeeper.port)
+    const first = resultOf(await tryFinalizeInspector(dir, delegateId))
     assert.equal(first.ok, true, `exactly one finalize ok: ${JSON.stringify(first.error)}`)
+    assert.equal(bookkeeper.createCalls.length, 1, 'exactly one Bookkeeper CreateChildSession')
+    assert.equal(bookkeeper.editQaCalls.length >= 2, true, 'edit-qa invoked')
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)
@@ -203,6 +217,9 @@ test('G6_G_host_reusable_inspector_one_finalize_then_cold_fetch', async () => {
     assert.equal(published.ok, true)
     assert.equal(published.value !== undefined && published.value !== null, true, 'Case exists after ReuseScope close')
     assert.equal(published.value.SessionId, delegateId)
+    assert.equal(published.value.Q, CANONICAL_Q)
+    assert.equal(published.value.A, CANONICAL_A)
+    assert.equal(published.value.A.includes('evidence:'), false)
     assert.equal(listItems(published.value.Observations).length, 1)
 
     cleanupInspector(delegateId)
@@ -215,7 +232,7 @@ test('G6_G_host_reusable_inspector_one_finalize_then_cold_fetch', async () => {
 
     notePrompt(delegateId, 'second finalize must not publish')
     noteAnswer(delegateId, 'should be refused')
-    const second = resultOf(tryFinalizeInspector(dir, delegateId))
+    const second = resultOf(await tryFinalizeInspector(dir, delegateId))
     assert.equal(second.ok, false, 'finalize twice is refused')
     assert.equal(String(second.error).includes('already finalized'), true)
 

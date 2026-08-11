@@ -1,7 +1,7 @@
 # implicit-convention-magic — Enforcer
 
 ## Definition
-Convention becomes magic when correctness depends on names, paths, annotations, reflection, discovery order, or placement that the call site cannot see and the type system does not check.
+Convention becomes magic when correctness depends on names, paths, annotations, reflection, discovery order, or placement that the call site cannot see and the type system does not check. The root-cause is that participation and configuration are encoded as ambient names, paths, or annotations, so the type system never sees the contract and omission becomes a silent runtime change.
 
 ## Governing Principle
 A hidden convention is an API whose syntax is absence. The programmer “calls” it by putting a file in the right folder or choosing the right string, and failure appears only at runtime when the invisible agreement is broken. Such mechanisms trade explicit local information for global ambient rules; each new convention enlarges the amount of architecture that must live in memory rather than code.

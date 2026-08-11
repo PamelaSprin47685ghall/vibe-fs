@@ -1,7 +1,7 @@
 # behavioral-boundary-untested — Enforcer
 
 ## Definition
-A behavior is unverified when tests exercise the machinery beneath a public contract but never cross the contract itself. Correct helpers do not imply a correct boundary.
+A behavior is unverified when tests exercise the machinery beneath a public contract but never cross the contract itself. Correct helpers do not imply a correct boundary. The root-cause is that helper coverage is treated as proof of the public theorem, so wiring, defaults, and identity at the supported entry can fail while tests stay green.
 
 ## Governing Principle
 A module is known only by what can be observed through its supported surface. Private functions are lemmas; the public entry point is the theorem. A proof that checks only lemmas can coexist with a broken theorem because wiring, translation, defaults, identity, and effect ordering live precisely at the boundary the test avoided.

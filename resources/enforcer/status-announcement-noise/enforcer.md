@@ -1,7 +1,7 @@
 # status-announcement-noise — Enforcer
 
 ## Definition
-Status announcement noise is communication that repeatedly reports routine motion without adding a decision, changed fact, failure, uncertainty, or action the recipient can use.
+Status announcement noise is communication that repeatedly reports routine motion without adding a decision, changed fact, failure, uncertainty, or action the recipient can use. The root-cause is that routine motion is treated as if it were a state change, spending the same interruption budget as decisions and failures without updating the recipient’s model.
 
 ## Governing Principle
 Attention is a finite channel. Messages that carry no new state consume the same interruption budget as messages that matter, reducing the signal-to-noise ratio until important information becomes easier to miss. Progress communication earns its place when it changes the receiver’s model of the work, not merely when another internal step happened.

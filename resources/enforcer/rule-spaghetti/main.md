@@ -1,7 +1,7 @@
 # rule-spaghetti — Main
 
 ## What To Do Now
-Rewrite the policy as named predicates, explicit cases, and small composition rules so a reader can recover the business statement without simulating control flow.
+Rewrite the policy as named predicates, explicit cases, and small composition rules so a reader can recover the business statement without simulating control flow. Named predicates and their composition are who owns the business rule; nested branches and mutable flags are not who owns the policy statement.
 
 ## Why This Matters
 Nested imperative code makes policy accidental to execution. The same business sentence becomes scattered across branches, assignments, and returns, so changing one clause requires understanding every path that happens to carry it. Declarative structure shortens the proof: the source states which propositions hold and how they combine.

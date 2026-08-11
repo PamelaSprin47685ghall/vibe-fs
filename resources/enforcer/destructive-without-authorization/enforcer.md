@@ -1,7 +1,7 @@
 # destructive-without-authorization — Enforcer
 
 ## Definition
-A destructive action is unauthorized when it can irreversibly remove or overwrite state without both explicit authority for the action and verified identity of the target.
+A destructive action is unauthorized when it can irreversibly remove or overwrite state without both explicit authority for the action and verified identity of the target. The root-cause is that irreversibility is treated as an ordinary step whose authority and exact target can be inferred.
 
 ## Governing Principle
 Irreversibility changes the proof burden. For additive or inspectable actions, a mistake can often be corrected later; deletion collapses possible futures. Therefore “I probably know what this is” is not sufficient evidence. Safe destruction requires two independent facts: someone entitled to decide has authorized the class of action, and the concrete object about to be destroyed is the intended object.

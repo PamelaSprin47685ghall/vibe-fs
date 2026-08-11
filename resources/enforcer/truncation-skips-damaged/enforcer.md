@@ -1,7 +1,7 @@
 # truncation-skips-damaged — Enforcer
 
 ## Definition
-Recovery skips damage when it encounters corruption inside durable history, discards or bypasses the damaged region, and continues applying later records as though the missing prefix still had a defined meaning.
+Recovery skips damage when it encounters corruption inside durable history, discards or bypasses the damaged region, and continues applying later records as though the missing prefix still had a defined meaning. The root-cause is that later records are replayed after their committed prefix has been broken, manufacturing continuity across a causal gap that no longer has a defined starting state.
 
 ## Governing Principle
 An ordered log gives later facts meaning relative to the prefix before them. Interior corruption removes part of that premise, so subsequent replay no longer has a trustworthy starting state. A final incomplete record is different: if the storage contract permits torn tail writes, truncating only that uncommitted suffix preserves a complete committed prefix. Interior damage breaks the chain of derivation itself.

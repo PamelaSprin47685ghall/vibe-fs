@@ -1,7 +1,7 @@
 # optimistic-retry-assumption — Main
 
 ## What To Do Now
-Treat an unknown external outcome as its own state. Resolve it through idempotency identity, status lookup, deduplication, or an explicit at-most-once protocol before repeating the effect.
+Treat an unknown external outcome as its own state. Resolve it through idempotency identity, status lookup, deduplication, or an explicit at-most-once protocol before repeating the effect. The recovery protocol that can prove whether the original attempt committed is who owns retry after uncertainty.
 
 ## Why This Matters
 A timeout removes knowledge, not history. If the remote side committed before the response vanished, an unqualified retry can duplicate charges, prompts, publications, resource creation, or writes while both attempts appear individually successful.

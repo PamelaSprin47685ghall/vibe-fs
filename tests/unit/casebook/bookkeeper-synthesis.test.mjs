@@ -1,6 +1,3 @@
-// tests/unit/casebook/bookkeeper-synthesis.test.mjs — G6-E/F:
-// Bookkeeper QaSynthesize transaction (once per refresh/finalize; Error keeps old Case).
-
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { execFileSync } from 'node:child_process'
@@ -10,12 +7,7 @@ import { join } from 'node:path'
 
 import { CasebookWorkflow_archiveInspectorResult as archive } from '../../../dist/Infrastructure/CasebookWorkflow.js'
 import { CasebookWorkflow_fetchCase as fetchCase } from '../../../dist/Infrastructure/CasebookWorkflow.js'
-import {
-  defaultSynthesize,
-  refreshStale,
-  resetSynthesizer,
-  setSynthesizer,
-} from '../../../dist/Infrastructure/CasebookBookkeeper.js'
+import { refreshStale } from '../../../dist/Infrastructure/CasebookBookkeeper.js'
 import {
   collector,
   cleanupInspector,
@@ -34,17 +26,44 @@ import { acquire } from '../../../dist/Infrastructure/OpenCode/Host/WorkspaceEve
 import { gitCommonDir } from '../../../dist/Journal/RuntimePath.js'
 import { GitRawStore_createInMemory as createRaw } from '../../../dist/Infrastructure/Persist/GitRawStore.js'
 import { EventStore_create as createStore } from '../../../dist/Infrastructure/Persist/EventStore.js'
-import { caseOf, errorResult, listItems, resultOf, toList } from '../support/domain.mjs'
+import { caseOf, listItems, resultOf, sessionId, toList } from '../support/domain.mjs'
+import {
+  CANONICAL_A,
+  CANONICAL_Q,
+  scriptedBookkeeperPort,
+} from './bookkeeper-session.test.mjs'
 
+const { setSessionPort, resetSessionPort } = await import(
+  '../../../dist/Infrastructure/BookkeeperRuntime.js'
+)
 const obsIndex = (name) => Object.create(Observation.prototype).cases().indexOf(name)
 const fileRead = (path, h) => new Observation(obsIndex('FileRead'), [path, h])
 
 const FAIL_A = 'A-must-fail-synthesis'
-const COUNT_Q = 'Q-count-synth-once'
 const CLEANUP_Q = 'Q-cleanup-never-synth'
 
-test('CASE006_injected_synthesizer_error_keeps_old_case', () => {
+const failingPort = () => {
+  const createCalls = []
+  let seq = 0
+  return {
+    createCalls,
+    port: {
+      CreateChildSession: async (parentId) => {
+        seq += 1
+        const child = sessionId(`bk-fail-${seq}`)
+        createCalls.push(parentId)
+        return { tag: 0, fields: [child] }
+      },
+      AbortSession: async () => ({ tag: 0, fields: [] }),
+      SubscribeTerminal: () => ({ Dispose: () => {} }),
+      SendPrompt: async () => ({ tag: 4, fields: ['injected synth failure'] }),
+    },
+  }
+}
+
+test('CASE006_injected_synthesizer_error_keeps_old_case', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-err-'))
+  const { port } = failingPort()
   try {
     const raw = createRaw()
     const store = createStore(raw)
@@ -59,14 +78,9 @@ test('CASE006_injected_synthesizer_error_keeps_old_case', () => {
     assert.equal(resultOf(archive(store, raw, caseRec)).ok, true)
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
 
-    // Sentinel A so a parallel file's default path is not poisoned.
-    setSynthesizer((q, a, obs) => {
-      if (a === FAIL_A) return errorResult('injected synth failure')
-      return defaultSynthesize(q, a, obs)
-    })
-
-    const refreshed = resultOf(refreshStale(store, raw, dir, 's-err-1'))
-    assert.equal(refreshed.ok, false, 'synthesizer Error must not publish')
+    setSessionPort(port)
+    const refreshed = resultOf(await refreshStale(store, raw, dir, 's-err-1'))
+    assert.equal(refreshed.ok, false, 'transaction Error must not publish')
     assert.equal(String(refreshed.error).includes('injected synth failure'), true)
 
     const fetched = resultOf(fetchCase(store, raw, 10, 's-err-1'))
@@ -79,20 +93,21 @@ test('CASE006_injected_synthesizer_error_keeps_old_case', () => {
     assert.equal(kinds.includes('CaseCaptured'), true)
     assert.equal(kinds.includes('CaseRefreshed'), false)
   } finally {
-    resetSynthesizer()
+    resetSessionPort()
     rmSync(dir, { recursive: true, force: true })
   }
 })
 
-test('CASE006_synthesizer_runs_once_per_stale_refresh', () => {
+test('CASE006_synthesizer_runs_once_per_stale_refresh', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-once-'))
+  const { port, createCalls, editQaCalls } = scriptedBookkeeperPort()
   try {
     const raw = createRaw()
     const store = createStore(raw)
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     const caseRec = {
       SessionId: 's-once',
-      Q: COUNT_Q,
+      Q: 'Q-count-synth-once',
       A: 'A once',
       Observations: toList([fileRead('a.txt', hash('hello'))]),
       LastAccessOrder: 0,
@@ -100,89 +115,89 @@ test('CASE006_synthesizer_runs_once_per_stale_refresh', () => {
     assert.equal(resultOf(archive(store, raw, caseRec)).ok, true)
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
 
-    let calls = 0
-    setSynthesizer((q, a, obs) => {
-      if (q === COUNT_Q) calls += 1
-      return defaultSynthesize(q, a, obs)
-    })
-
-    const refreshed = resultOf(refreshStale(store, raw, dir, 's-once'))
+    setSessionPort(port)
+    const refreshed = resultOf(await refreshStale(store, raw, dir, 's-once'))
     assert.equal(refreshed.ok, true)
     assert.equal(refreshed.value, true)
-    assert.equal(calls, 1, 'exactly one provider transaction')
+    assert.equal(createCalls.length, 1, 'exactly one child session per refresh')
+    assert.equal(editQaCalls.length >= 2, true, 'edit-qa invoked')
   } finally {
-    resetSynthesizer()
+    resetSessionPort()
     rmSync(dir, { recursive: true, force: true })
   }
 })
 
-test('CASE010_finalize_uses_synthesizer_not_raw_noteAnswer', () => {
+test('CASE010_finalize_uses_synthesizer_not_raw_noteAnswer', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-fin-'))
+  const { port, createCalls, editQaCalls } = scriptedBookkeeperPort()
   try {
     execFileSync('git', ['init', '--quiet', dir])
     mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
     setEnabled(dir)
+    setSessionPort(port)
 
-    const sessionId = 'insp-synth-fin'
+    const sessionIdKey = 'insp-synth-fin'
     const rawA = 'PromptAuthority is owned by the Host.'
-    notePrompt(sessionId, 'What owns PromptAuthority?')
-    collect(collector, sessionId, 'read', { path: 'a.txt' }, 'hello')
-    noteAnswer(sessionId, rawA)
+    notePrompt(sessionIdKey, 'What owns PromptAuthority?')
+    collect(collector, sessionIdKey, 'read', { path: 'a.txt' }, 'hello')
+    noteAnswer(sessionIdKey, rawA)
 
-    const first = resultOf(tryFinalizeInspector(dir, sessionId))
+    const first = resultOf(await tryFinalizeInspector(dir, sessionIdKey))
     assert.equal(first.ok, true, `first finalize ok, got ${JSON.stringify(first.error)}`)
+    assert.equal(createCalls.length, 1)
+    assert.equal(editQaCalls.length >= 2, true)
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)
-    const fetched = resultOf(fetchCase(store, raw, 10, sessionId))
+    const fetched = resultOf(fetchCase(store, raw, 10, sessionIdKey))
     assert.equal(fetched.ok, true)
-    assert.equal(fetched.value.Q, 'What owns PromptAuthority?')
+    assert.equal(fetched.value.Q, CANONICAL_Q)
+    assert.notEqual(fetched.value.Q, 'What owns PromptAuthority?')
     assert.notEqual(fetched.value.A, rawA, 'fetched A is synthesized, not raw noteAnswer')
-    assert.equal(fetched.value.A.startsWith(rawA), true)
+    assert.equal(fetched.value.A, CANONICAL_A)
+    assert.equal(fetched.value.A.includes('evidence:'), false)
     assert.equal(listItems(fetched.value.Observations).length, 1)
 
     const publishedA = fetched.value.A
-    notePrompt(sessionId, 'Q2')
-    noteAnswer(sessionId, 'A2')
-    const second = resultOf(tryFinalizeInspector(dir, sessionId))
+    notePrompt(sessionIdKey, 'Q2')
+    noteAnswer(sessionIdKey, 'A2')
+    const second = resultOf(await tryFinalizeInspector(dir, sessionIdKey))
     assert.equal(second.ok, false, 'second finalize must be refused')
     assert.equal(String(second.error).includes('already finalized'), true)
 
-    const still = resultOf(fetchCase(store, raw, 10, sessionId))
+    const still = resultOf(fetchCase(store, raw, 10, sessionIdKey))
     assert.equal(still.value.A, publishedA, 'original synthesized case retained')
   } finally {
+    resetSessionPort()
     setEnabled(undefined)
     rmSync(dir, { recursive: true, force: true })
   }
 })
 
-test('CASE010_cleanup_never_synthesizes', () => {
+test('CASE010_cleanup_never_synthesizes', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-cleanup-'))
+  const { port, createCalls, editQaCalls } = scriptedBookkeeperPort()
   try {
     execFileSync('git', ['init', '--quiet', dir])
     mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
     setEnabled(dir)
+    setSessionPort(port)
 
-    let calls = 0
-    setSynthesizer((q, a, obs) => {
-      if (q === CLEANUP_Q) calls += 1
-      return defaultSynthesize(q, a, obs)
-    })
+    const sessionIdKey = 'insp-cleanup-synth'
+    notePrompt(sessionIdKey, CLEANUP_Q)
+    collect(collector, sessionIdKey, 'read', { path: 'b.txt' }, 'body')
+    noteAnswer(sessionIdKey, 'A cleanup')
+    cleanupInspector(sessionIdKey)
 
-    const sessionId = 'insp-cleanup-synth'
-    notePrompt(sessionId, CLEANUP_Q)
-    collect(collector, sessionId, 'read', { path: 'b.txt' }, 'body')
-    noteAnswer(sessionId, 'A cleanup')
-    cleanupInspector(sessionId)
-
-    assert.equal(calls, 0, 'unexpected cleanup must not run QaSynthesize')
+    assert.equal(createCalls.length, 0, 'unexpected cleanup must not CreateChildSession')
+    assert.equal(editQaCalls.length, 0, 'unexpected cleanup must not run edit-qa')
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)
-    const fetched = resultOf(fetchCase(store, raw, 10, sessionId))
+    const fetched = resultOf(fetchCase(store, raw, 10, sessionIdKey))
     assert.equal(fetched.value === undefined || fetched.value === null, true)
   } finally {
-    resetSynthesizer()
+    resetSessionPort()
     setEnabled(undefined)
     rmSync(dir, { recursive: true, force: true })
   }

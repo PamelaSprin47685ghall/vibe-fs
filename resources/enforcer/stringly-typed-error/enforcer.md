@@ -1,7 +1,7 @@
 # stringly-typed-error — Enforcer
 
 ## Definition
-An error is stringly typed when program behavior depends on parsing, matching, or recognizing human-readable error prose rather than a stable closed error value.
+An error is stringly typed when program behavior depends on parsing, matching, or recognizing human-readable error prose rather than a stable closed error value. The root-cause is that human-readable wording is used as machine identity, so control flow is coupled to editorial phrasing that was never a protocol.
 
 ## Governing Principle
 Presentation text and control information have different audiences and different stability requirements. Prose evolves for clarity, localization, and diagnostics; control values must remain unambiguous under those changes. Parsing text couples machine semantics to editorial wording, turning punctuation and phrasing into undocumented protocol fields.

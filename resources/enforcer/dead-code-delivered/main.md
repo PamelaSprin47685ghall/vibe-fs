@@ -1,7 +1,7 @@
 # dead-code-delivered — Main
 
 ## What To Do Now
-Delete production code that has no current caller, activation path, or contractual role.
+Delete production code that has no current caller, activation path, or contractual role. Version control is who owns history; the working tree is who owns only paths with a present role.
 
 ## Why This Matters
 Dead code has zero runtime value but nonzero reasoning cost. It creates false alternatives in the reader’s model and makes searches, refactors, security review, and ownership analysis less trustworthy. Keeping it “for later” transfers uncertainty to every future maintainer.

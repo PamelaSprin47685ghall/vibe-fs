@@ -1,7 +1,7 @@
 # weak-boundary-parsing — Main
 
 ## What To Do Now
-Parse and validate external data once at ingress, then expose a normalized strong internal type instead of passing raw payload shape deeper into the system.
+Parse and validate external data once at ingress, then expose a normalized strong internal type instead of passing raw payload shape deeper into the system. Repair at the adapter: who owns ingress owns the conversion from payload to domain type.
 
 ## Why This Matters
 Repeated parsing means repeated uncertainty. Each downstream layer knows less about provenance yet must reconstruct the same distinctions, so validation drifts and malformed states travel farther before failing. A boundary should exchange ambiguity for guarantees.

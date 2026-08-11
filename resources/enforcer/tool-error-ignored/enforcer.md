@@ -1,7 +1,7 @@
 # tool-error-ignored — Enforcer
 
 ## Definition
-A tool error is ignored when an operation reports that evidence gathering or mutation failed, yet subsequent reasoning proceeds as though the intended observation or change had succeeded.
+A tool error is ignored when an operation reports that evidence gathering or mutation failed, yet subsequent reasoning proceeds as though the intended observation or change had succeeded. The root-cause is that a failed observation is treated as an established premise, converting “unknown” into unearned certainty.
 
 ## Governing Principle
 A failed tool call creates an epistemic gap. The desired fact was not established, so any conclusion that depends on it has lost a premise. Continuing can be legitimate only if the error is explicitly classified and an independent source supplies equivalent evidence. Otherwise the workflow silently converts “unknown” into “probably fine.”

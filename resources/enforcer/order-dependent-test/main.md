@@ -1,7 +1,7 @@
 # order-dependent-test — Main
 
 ## What To Do Now
-Make the test create every premise it needs and clean up every resource/state it owns within the test's own lifecycle.
+Make the test create every premise it needs and clean up every resource/state it owns within the test's own lifecycle. The test case's own setup and teardown is who owns the isolation invariant that a verdict depends only on that case's explicit premises.
 
 ## Why This Matters
 Suite order is not a business input. When a test depends on residue from another case, a hidden global state machine emerges and failures shift location as the runner parallelizes or reorders work. Isolation restores the meaning of a test as an independently reproducible claim.

@@ -1,7 +1,7 @@
 # duplicated-control-flow — Main
 
 ## What To Do Now
-Move the genuinely shared workflow or transition protocol to one owner and make every caller invoke that canonical behavior.
+Move the genuinely shared workflow or transition protocol to one owner and make every caller invoke that canonical behavior. That canonical module is who owns the shared protocol; callers are not who owns a private copy of the same sequence.
 
 ## Why This Matters
 Copied control flow duplicates time-sensitive knowledge: ordering, short-circuit rules, retry boundaries, and cleanup. Drift rarely appears as a dramatic fork; one branch gets a new condition, another misses it, and the system quietly acquires multiple definitions of the same process.

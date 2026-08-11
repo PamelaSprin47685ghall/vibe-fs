@@ -1,13 +1,16 @@
 // Structural enforcer-rulebook-gate (folder SSOT) + optional constitution headings.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   ENFORCER_REQUIRED_HEADINGS,
   EXPECTED_RULE_COUNT,
+  HUMAN_ONLY_RUBRIC_ITEMS,
   MAIN_REQUIRED_HEADINGS,
+  NEW_RUBRIC_CODES,
   checkEnforcerRubric,
   checkMainRubric,
   hasHeading,
@@ -218,6 +221,12 @@ test('enforcer_rulebook_documents_heading_constants', () => {
 
 const ENFORCER_RUBRIC_OK = `# sample-tip — Enforcer
 
+## Definition
+A sample-tip is editing a representation before the root-cause owner is known.
+
+## Trigger When
+Fire when implementation changes begin before locating the owner and tracing the causal path.
+
 ## Do Not Trigger When
 - skip local-only change
 - skip when evidence is missing
@@ -225,6 +234,7 @@ const ENFORCER_RUBRIC_OK = `# sample-tip — Enforcer
 
 ## Distinguish From
 \`blind-edit\` vs resources/enforcer/guessed-not-verified: different causal stage.
+Tie-break: if mutation starts without an ownership map, this rule owns the case.
 
 ## Examples
 - positive / 正例: mutation before locating the owner
@@ -233,6 +243,9 @@ const ENFORCER_RUBRIC_OK = `# sample-tip — Enforcer
 `
 
 const MAIN_RUBRIC_OK = `# sample-tip — Main
+
+## What To Do Now
+Repair only at the root-cause owner; who owns the violated invariant is the legal edit site.
 
 ## Decision Branches
 If the value is internal-only, wrap at the module boundary.
@@ -267,13 +280,19 @@ test('enforcer_rulebook_checkEnforcerRubric_reports_structural_gaps', () => {
 test('enforcer_rulebook_checkEnforcerRubric_accepts_chinese_example_markers', () => {
   const text = `# t
 
+## Definition
+精确说明该反模式的根因：在未定位 owner 前就开始改代码。
+
+## Trigger When
+当实现改动在定位 owner 之前就开始时触发。
+
 ## Do Not Trigger When
 - a
 - b
 - c
 
 ## Distinguish From
-See foo-bar and baz-qux.
+See foo-bar and baz-qux. 若相似, foo-bar 更早。
 
 ## Examples
 正例 one. 近邻 two. 反例 three.
@@ -325,4 +344,126 @@ test('enforcer_rulebook_requireRubric_true_enforces_structural_rubric', () => {
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+})
+
+const replaceSection = (src, heading, body) =>
+  src.replace(new RegExp(`## ${heading}\\n[\\s\\S]*?(?=\\n## |$)`), `## ${heading}\n${body}\n`)
+
+const codesOf = (hits) => hits.map((v) => v.code)
+
+test('enforcer_rulebook_checkEnforcerRubric_tie_break_required', () => {
+  const text = replaceSection(
+    ENFORCER_RUBRIC_OK,
+    'Distinguish From',
+    '`blind-edit` vs resources/enforcer/guessed-not-verified: different causal stage.',
+  )
+  const codes = codesOf(checkEnforcerRubric(text))
+  assert.ok(codes.includes('rubric-distinguish-tie-break'), codes.join(','))
+  assert.equal(codes.includes('rubric-distinguish-siblings'), false)
+})
+
+test('enforcer_rulebook_checkEnforcerRubric_root_cause_required', () => {
+  const text = ENFORCER_RUBRIC_OK.replace(/root-cause/g, 'causal')
+  const codes = codesOf(checkEnforcerRubric(text))
+  assert.ok(codes.includes('rubric-root-cause'), codes.join(','))
+})
+
+test('enforcer_rulebook_checkEnforcerRubric_remediation_drift', () => {
+  const withNow = `${ENFORCER_RUBRIC_OK}\n## What To Do Now\nFix it in the owner.\n`
+  assert.ok(codesOf(checkEnforcerRubric(withNow)).includes('rubric-remediation-drift'))
+  const withFixes = `${ENFORCER_RUBRIC_OK}\n## Common Wrong Fixes\n- add a flag\n`
+  assert.ok(codesOf(checkEnforcerRubric(withFixes)).includes('rubric-remediation-drift'))
+})
+
+test('enforcer_rulebook_checkEnforcerRubric_trigger_must_be_semantic', () => {
+  const globOnly = replaceSection(
+    ENFORCER_RUBRIC_OK,
+    'Trigger When',
+    '- `*.js`\n- `*.ts`\n- `**/*.mjs`\n',
+  )
+  assert.ok(codesOf(checkEnforcerRubric(globOnly)).includes('rubric-trigger-semantic'))
+
+  const empty = replaceSection(ENFORCER_RUBRIC_OK, 'Trigger When', '   \n')
+  assert.ok(codesOf(checkEnforcerRubric(empty)).includes('rubric-trigger-semantic'))
+})
+
+test('enforcer_rulebook_checkEnforcerRubric_definition_nonempty_not_title', () => {
+  const empty = replaceSection(ENFORCER_RUBRIC_OK, 'Definition', '   \n')
+  assert.ok(codesOf(checkEnforcerRubric(empty)).includes('rubric-definition'))
+
+  const titleOnly = replaceSection(ENFORCER_RUBRIC_OK, 'Definition', 'sample-tip — Enforcer\n')
+  assert.ok(codesOf(checkEnforcerRubric(titleOnly)).includes('rubric-definition'))
+
+  const nameOnly = replaceSection(ENFORCER_RUBRIC_OK, 'Definition', 'sample-tip\n')
+  assert.ok(codesOf(checkEnforcerRubric(nameOnly)).includes('rubric-definition'))
+})
+
+test('enforcer_rulebook_checkMainRubric_owner_root_required', () => {
+  const text = MAIN_RUBRIC_OK.replace('root-cause owner; who owns', 'the current file; repair')
+  const codes = codesOf(checkMainRubric(text))
+  assert.ok(codes.includes('rubric-owner-root'), codes.join(','))
+})
+
+test('enforcer_rulebook_checkMainRubric_authority_not_exceeded', () => {
+  const overreach = `${MAIN_RUBRIC_OK}\nChange the Rulebook gates to allow this exception.\n`
+  assert.ok(codesOf(checkMainRubric(overreach)).includes('rubric-authority-overreach'))
+
+  const playbook = `${MAIN_RUBRIC_OK}\nEdit Playbook gates before shipping.\n`
+  assert.ok(codesOf(checkMainRubric(playbook)).includes('rubric-authority-overreach'))
+
+  const negated = `${MAIN_RUBRIC_OK}\nDo not change Rulebook gates or architecture gates.\n`
+  assert.deepEqual(
+    checkMainRubric(negated).filter((v) => v.code === 'rubric-authority-overreach'),
+    [],
+  )
+})
+
+test('enforcer_rulebook_checkMainRubric_no_reclassification', () => {
+  const text = `${MAIN_RUBRIC_OK}\n## Definition\nRe-state the anti-pattern here.\n`
+  assert.ok(codesOf(checkMainRubric(text)).includes('rubric-reclassification'))
+
+  const detection = `${MAIN_RUBRIC_OK}\n## Detection\nDecide again whether this rule fires.\n`
+  assert.ok(codesOf(checkMainRubric(detection)).includes('rubric-reclassification'))
+})
+
+test('enforcer_rulebook_checkMainRubric_scope_not_expanded', () => {
+  const rewrite = `${MAIN_RUBRIC_OK}\nNext, rewrite the system around this tip.\n`
+  assert.ok(codesOf(checkMainRubric(rewrite)).includes('rubric-scope-expansion'))
+
+  const unrelated = `${MAIN_RUBRIC_OK}\nAlso clean unrelated modules while you are here.\n`
+  assert.ok(codesOf(checkMainRubric(unrelated)).includes('rubric-scope-expansion'))
+
+  const negated = `${MAIN_RUBRIC_OK}\nDo not rewrite the system or touch unrelated modules.\n`
+  assert.deepEqual(
+    checkMainRubric(negated).filter((v) => v.code === 'rubric-scope-expansion'),
+    [],
+  )
+})
+
+test('enforcer_rulebook_documents_human_only_items_not_subset', () => {
+  assert.deepEqual([...HUMAN_ONLY_RUBRIC_ITEMS], [
+    'paired-history 120',
+    'A39 pair review',
+    'A40 tournament',
+  ])
+  assert.deepEqual([...NEW_RUBRIC_CODES], [
+    'rubric-distinguish-tie-break',
+    'rubric-root-cause',
+    'rubric-remediation-drift',
+    'rubric-trigger-semantic',
+    'rubric-definition',
+    'rubric-owner-root',
+    'rubric-authority-overreach',
+    'rubric-reclassification',
+    'rubric-scope-expansion',
+  ])
+  const gateSrc = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '../../../scripts/checks/enforcer-rulebook-gate.mjs'),
+    'utf8',
+  )
+  assert.equal(gateSrc.includes('A37 subset'), false)
+  assert.equal(gateSrc.includes('A38 subset'), false)
+  assert.ok(gateSrc.includes('paired-history 120'))
+  assert.ok(gateSrc.includes('A39 pair review'))
+  assert.ok(gateSrc.includes('A40 tournament'))
 })

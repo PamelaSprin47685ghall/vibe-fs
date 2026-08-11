@@ -141,6 +141,24 @@ test('STRENGTH_008_009_multiple_promoted_absolute_anchors_are_registration_order
   ))
 })
 
+test('STRENGTH_009_012_policy_promoted_frames_leave_later_pair_anchor_messages_in_place', () => {
+  // Not the live Host PairProgrammingThought canary. Unit-level: Strength
+  // splice is BeforeMessageIndex and does not drop messages after the target.
+  const base = toList([
+    message('user', [textPart('u1')]),
+    message('assistant', [textPart('target-assistant')]),
+    message('user', [textPart('pair-anchor-stand-in')]),
+  ])
+  const promoted = P.ProjectionIntentModule_strengthPromoted(
+    session('owner'), decision('d1'), run('target-1'), 1, false, bundle,
+  )
+  const rendered = P.ProjectionRenderer_renderMessagesWithHostIds(H, snapshot, base, toList([promoted]))
+  const roles = listItems(rendered.Messages).map((item) => item.Role)
+  const last = listItems(rendered.Messages).at(-1)
+  assert.deepEqual(roles, ['user', 'assistant', 'tool', 'assistant', 'user'])
+  assert.equal(last.Parts.head.fields[0], 'pair-anchor-stand-in')
+})
+
 test('STRENGTH_009_replica_mirror_replaces_base_then_local_batches_append', () => {
   const mirrorMessages = toList([message('user', [textPart('mirror-base')])])
   const mirror = P.ProjectionIntentModule_useStrengthMirror(decision('d1'), run('target'), 'sem-a', mirrorMessages)

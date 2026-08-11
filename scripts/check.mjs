@@ -17,6 +17,7 @@ const checks = [
   join(root, 'checks/student-teacher-absence.mjs'),
   join(root, 'checks/session-ownership-ratchet.mjs'),
   join(root, 'checks/enforcer-rulebook-gate.mjs'),
+  join(root, 'checks/enforcer-cross-family-collision.mjs'),
   join(root, 'checks/js-surface-gate.mjs'),
   join(root, 'checks/capability-isomorphism-gate.mjs'),
   join(root, 'checks/unified-store-gate.mjs'),

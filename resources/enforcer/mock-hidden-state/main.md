@@ -1,7 +1,7 @@
 # mock-hidden-state — Main
 
 ## What To Do Now
-Remove invisible cursors and call-count logic from the mock. Derive each response from the visible request and any protocol state the real provider actually exposes.
+Remove invisible cursors and call-count logic from the mock. Derive each response from the visible request and any protocol state the real provider actually exposes. The visible request plus that explicit protocol state is who owns the mock's answer, never call order or a hidden phase flag.
 
 ## Why This Matters
 A stateful fixture can make tests pass only because they issue calls in the expected sequence. The production contract may contain no such sequence guarantee, so the test suite becomes coupled to its own choreography rather than to observable provider semantics.

@@ -1,7 +1,7 @@
 # comment-theater — Enforcer
 
 ## Definition
-Comment theater appears when prose repeats syntax, apologizes for design, or carries intent that the executable structure itself ought to make evident.
+Comment theater appears when prose repeats syntax, apologizes for design, or carries intent that the executable structure itself ought to make evident. The root-cause is that prose is asked to carry meaning the executable structure could own, so intent lives in an unchecked channel beside the checked one.
 
 ## Governing Principle
 Comments and code age under different authorities: the compiler constrains one and ignores the other. Therefore every fact expressible in types, names, control structure, or tests is safer there than in prose. A comment earns its existence only when it records knowledge the program cannot naturally encode—why a constraint exists, which external fact forces it, or what tempting alternative is deliberately forbidden.

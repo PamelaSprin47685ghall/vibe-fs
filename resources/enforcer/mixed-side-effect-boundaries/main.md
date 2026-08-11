@@ -1,7 +1,7 @@
 # mixed-side-effect-boundaries — Main
 
 ## What To Do Now
-Separate unrelated effects behind narrow ports and move business decisions into a pure core. Keep one thin shell to sequence already-decided external operations.
+Separate unrelated effects behind narrow ports and move business decisions into a pure core. Keep one thin shell to sequence already-decided external operations. Each distinct effect contract is who owns that world's failure and lifetime; the pure core is who owns policy.
 
 ## Why This Matters
 A database transaction, subprocess, network request, and UI update obey different notions of failure and completion. Putting them in one policy body makes every rule depend on every external lifecycle, inflating both test setup and mental state space.

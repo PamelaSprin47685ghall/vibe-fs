@@ -1,7 +1,7 @@
 # big-batch-intent — Enforcer
 
 ## Definition
-A batch is too large when one instruction contains several outcomes whose correctness, ownership, or failure can be judged independently.
+A batch is too large when one instruction contains several outcomes whose correctness, ownership, or failure can be judged independently. The root-cause is that several independently judgeable outcomes are fused into one instruction, so the unit of execution outgrows the unit of truth and mixed success has no honest state.
 
 ## Governing Principle
 An operation should have one coherent success condition. When unrelated intents are bundled, the unit of execution becomes larger than the unit of truth: one part can succeed while another fails, yet the batch offers no honest state for that mixed result. Reviewability, retry, concurrency, and rollback all become ambiguous because the system no longer knows what the atomic promise is.

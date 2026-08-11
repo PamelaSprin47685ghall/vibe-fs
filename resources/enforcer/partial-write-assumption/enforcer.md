@@ -1,7 +1,7 @@
 # partial-write-assumption — Enforcer
 
 ## Definition
-A partial-write assumption exists when recovery invents an intermediate commit state that the storage/effect contract does not expose, then writes logic to handle that imagined state.
+A partial-write assumption exists when recovery invents an intermediate commit state that the storage/effect contract does not expose, then writes logic to handle that imagined state. The root-cause is that recovery invents failure states the storage/effect contract cannot produce, then acts on those imagined states as if they were evidence.
 
 ## Governing Principle
 Failure models must come from the boundary that owns atomicity. If storage defines outcomes as committed, not committed, or unknown, application code cannot gain correctness by imagining "half committed" states unsupported by that contract. Extra states enlarge recovery logic without adding evidence; they often lead to destructive repair of data that was actually valid.

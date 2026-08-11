@@ -1,7 +1,7 @@
 # catch-all-swallows-future — Enforcer
 
 ## Definition
-A catch-all is dangerous when it converts an open-ended future domain into a closed present assumption without forcing that assumption to be revisited.
+A catch-all is dangerous when it converts an open-ended future domain into a closed present assumption without forcing that assumption to be revisited. The root-cause is that a wildcard treats unknown future cases as equivalent to today’s remainder, so new variants inherit semantics nobody chose.
 
 ## Governing Principle
 Exhaustiveness is a maintenance alarm. In a finite domain, a new case should create compile-time or test-time pressure at every place whose meaning may change. A wildcard silences that pressure by asserting, usually accidentally, that all unknown futures are semantically equivalent. The branch does not merely handle today’s remainder; it grants itself authority over tomorrow’s cases.

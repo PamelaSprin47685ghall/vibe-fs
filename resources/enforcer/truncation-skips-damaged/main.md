@@ -1,7 +1,7 @@
 # truncation-skips-damaged — Main
 
 ## What To Do Now
-Fail recovery on interior corruption. Permit truncation only when the storage contract proves the damaged bytes are an incomplete final record beyond a verified committed prefix.
+Fail recovery on interior corruption. Permit truncation only when the storage contract proves the damaged bytes are an incomplete final record beyond a verified committed prefix. The verified committed prefix is who owns later replay meaning; recovery cannot skip interior damage and keep interpreting the suffix.
 
 ## Why This Matters
 Later events are interpreted against state produced by earlier events. Skipping a damaged interior segment destroys that state while pretending the later stream remains meaningful, producing a reconstruction with no valid historical derivation.

@@ -1,7 +1,7 @@
 # property-test-missing — Enforcer
 
 ## Definition
-A property test is missing when code implements a general law over a large input space but verification consists only of a few hand-picked examples.
+A property test is missing when code implements a general law over a large input space but verification consists only of a few hand-picked examples. The root-cause is that a known universal law is evidenced only by curated anecdotes, so the quantifier over the input space remains untested.
 
 ## Governing Principle
 Examples prove points; laws describe spaces. For parsers, serializers, normalization, folds, merges, and state machines, correctness often has algebraic form: round trips preserve values, normalization is idempotent, merges are associative/commutative under stated conditions, transitions preserve invariants. Testing only examples leaves most of the law’s quantifier unchecked.

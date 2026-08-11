@@ -1,7 +1,7 @@
 # half-finished-refactor — Enforcer
 
 ## Definition
-A refactor is half-finished when old and new ownership models coexist after the change, forcing adapters, duplicate paths, or conventions to decide which world a caller belongs to.
+A refactor is half-finished when old and new ownership models coexist after the change, forcing adapters, duplicate paths, or conventions to decide which world a caller belongs to. The root-cause is that the ownership transfer stopped while both models still run, so adapters and conventions remain the real dispatch and neither side is authoritative.
 
 ## Governing Principle
 A refactor changes the representation of knowledge without intending to change behavior. During migration two representations may temporarily coexist, but that state is not architecture—it is scaffolding. If delivered without a bounded migration contract, the temporary duality becomes permanent and future changes must maintain both stories.

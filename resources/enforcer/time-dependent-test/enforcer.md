@@ -1,7 +1,7 @@
 # time-dependent-test — Enforcer
 
 ## Definition
-A test is time-dependent when its verdict depends on the real clock, elapsed wall time, time zone, or scheduler timing rather than on explicit temporal facts under test control.
+A test is time-dependent when its verdict depends on the real clock, elapsed wall time, time zone, or scheduler timing rather than on explicit temporal facts under test control. The root-cause is that the host clock is an undeclared input to the verdict, so premises move while the scenario is supposed to be fixed.
 
 ## Governing Principle
 Time is an input even when an API hides it. Real clocks make test premises move while the test is running: midnight, DST, machine load, and scheduling alter the scenario without changing source. Deterministic temporal tests freeze the relevant instant or advance a controlled clock, separating domain rules about time from accidents of when the suite happened to execute.

@@ -1,7 +1,7 @@
 # property-test-missing — Main
 
 ## What To Do Now
-Express the general invariant as a property and test it over generated inputs with useful shrinking and explicit validity constraints.
+Express the general invariant as a property and test it over generated inputs with useful shrinking and explicit validity constraints. The algebraic law over the generated space is who owns the correctness claim; a handful of fixtures is not who owns that quantifier.
 
 ## Why This Matters
 A few examples can establish familiarity but not a universal law. When the code claims behavior over a combinatorial space, property testing lets the machine search for the smallest counterexample to the actual invariant rather than to cases humans happened to foresee.

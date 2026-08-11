@@ -1,7 +1,7 @@
 # permit-leak — Main
 
 ## What To Do Now
-Move permit acquisition into a scoped construct that guarantees exactly one release on success, error, cancellation, and early return.
+Move permit acquisition into a scoped construct that guarantees exactly one release on success, error, cancellation, and early return. The scoped acquire/release construct (using/defer/finally/bracket) is who owns the conservation invariant that every acquisition has exactly one release on every exit.
 
 ## Why This Matters
 A leaked permit is capacity that disappears without evidence. Enough leaks convert bounded concurrency into eventual deadlock or starvation, often far from the operation that failed to release. The root problem is lifetime accounting hidden in control flow.

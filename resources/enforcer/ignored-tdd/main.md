@@ -1,7 +1,7 @@
 # ignored-tdd — Main
 
 ## What To Do Now
-Write the behavioral test first, run it red for the intended reason, then make the smallest production change that turns that same test green.
+Write the behavioral test first, run it red for the intended reason, then make the smallest production change that turns that same test green. The public behavioral requirement is who owns the change order: it must fail against the old code for the intended reason before production edits begin. The implementation is not who specifies.
 
 ## Why This Matters
 A post-hoc test can be perfectly aligned with an accidental implementation because the implementation has already shaped what the author thinks to assert. Red-first creates a counterfactual baseline: this requirement is demonstrably not met before the code changes.

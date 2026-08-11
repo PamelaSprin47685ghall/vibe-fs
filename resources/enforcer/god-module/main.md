@@ -1,7 +1,7 @@
 # god-module — Main
 
 ## What To Do Now
-Split the module along independent invariants, lifecycles, and side-effect boundaries. Keep together only behavior that must change together for one domain reason.
+Split the module along independent invariants, lifecycles, and side-effect boundaries. Keep together only behavior that must change together for one domain reason. Each independent invariant, lifecycle, or side-effect boundary is who owns that sovereignty; the convenience module that merely colocated them is not.
 
 ## Why This Matters
 A god module destroys locality by making unrelated concepts mutually visible. Its apparent convenience at call sites is paid back as a growing internal state space: every policy can now branch on every resource and every lifecycle phase unless discipline prevents it.

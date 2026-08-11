@@ -1,7 +1,7 @@
 # todo-bomb — Main
 
 ## What To Do Now
-Complete the correctness-critical behavior or explicitly remove that case from the supported contract before delivery.
+Complete the correctness-critical behavior or explicitly remove that case from the supported contract before delivery. The shipped contract is who owns required behavior; a TODO cannot fulfill that ownership.
 
 ## Why This Matters
 A reachable TODO is a known hole hidden behind future tense. The code already knows a valid path can arrive somewhere it cannot honor, yet shifts the cost to whichever user or maintainer encounters it first.

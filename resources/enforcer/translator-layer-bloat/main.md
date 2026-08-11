@@ -1,7 +1,7 @@
 # translator-layer-bloat — Main
 
 ## What To Do Now
-Delete forwarding-only layers and connect callers to the real owning contract. Retain an intermediate layer only where it enforces a distinct invariant or translation.
+Delete forwarding-only layers and connect callers to the real owning contract. Retain an intermediate layer only where it enforces a distinct invariant or translation. The real contract is who owns the hop; a forwarding layer that owns no invariant should not exist.
 
 ## Why This Matters
 Every layer creates a cognitive toll: another file, name, stack frame, test double, and place where ownership might live. That toll is repaid only when crossing the layer changes what callers are allowed to know or assume.

@@ -1,7 +1,7 @@
 # canary-skipped — Enforcer
 
 ## Definition
-A canary is skipped when correctness depends on behavior owned by a real Host, provider, runtime, or deployment environment, yet verification stops at mocks or documentation.
+A canary is skipped when correctness depends on behavior owned by a real Host, provider, runtime, or deployment environment, yet verification stops at mocks or documentation. The root-cause is that an empirical Host/provider premise is treated as proven by mocks or comments, so release can rest on behavior only the real environment can settle.
 
 ## Governing Principle
 Undocumented external behavior is an empirical premise. No amount of internal proof can derive it, because the proposition is not owned by the code under test. When correctness depends on ordering, framing, identity, timing, or lifecycle supplied by another system, the final proof obligation must cross that system’s actual boundary.

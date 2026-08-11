@@ -1,7 +1,7 @@
 # unrecorded-lesson — Main
 
 ## What To Do Now
-Capture the reusable discovery in the project artifact future engineers will naturally consult: a regression test, runbook, rule, decision note, contract documentation, or maintained troubleshooting guide.
+Capture the reusable discovery in the project artifact future engineers will naturally consult: a regression test, runbook, rule, decision note, contract documentation, or maintained troubleshooting guide. Record it at the affected concept: who owns that concept owns the durable lesson.
 
 ## Why This Matters
 Debugging cost compounds when discoveries are not retained. The next incident starts with the same false hypotheses, repeated probes, and provider surprises because the system’s durable memory did not improve when its humans did.

@@ -1,7 +1,7 @@
 # boolean-blindness — Main
 
 ## What To Do Now
-Replace boolean parameters and flag clusters that stand for named domain choices with explicit cases or distinct types.
+Replace boolean parameters and flag clusters that stand for named domain choices with explicit cases or distinct types. The type that models the domain choice is who owns the state-space invariant that representable cases equal the legal named alternatives.
 
 ## Why This Matters
 A call such as `open(true, false)` is information-poor even when the implementation is correct. The meaning lives outside the expression, in memory or comments. Worse, flag combinations create states that may have no counterpart in reality. Every downstream branch then pays to rediscover the distinction the type erased.

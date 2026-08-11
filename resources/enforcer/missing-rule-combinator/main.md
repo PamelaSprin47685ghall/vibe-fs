@@ -1,7 +1,7 @@
 # missing-rule-combinator — Main
 
 ## What To Do Now
-Extract the shared rule signature and define the smallest combinators for its real semantics: sequential short-circuit, independent error accumulation, mapping, or conjunction.
+Extract the shared rule signature and define the smallest combinators for its real semantics: sequential short-circuit, independent error accumulation, mapping, or conjunction. That shared signature is who owns composition: one vocabulary for how failures combine, not a nested `if err return` at every call site.
 
 ## Why This Matters
 Handwritten rule chains duplicate not just syntax but policy about how failures compose. Once that policy has one algebraic owner, readers can reason at the level of rules rather than temporary variables and nested conditionals.

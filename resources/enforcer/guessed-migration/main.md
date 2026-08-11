@@ -1,7 +1,7 @@
 # guessed-migration — Main
 
 ## What To Do Now
-Replace heuristic legacy detection with explicit schema versions and deterministic migrations from each supported historical version.
+Replace heuristic legacy detection with explicit schema versions and deterministic migrations from each supported historical version. Durable schema identity is who owns migration: only a recorded version may authorize a deterministic transform; shape resemblance is not an owner.
 
 ## Why This Matters
 Durable data is a conversation with past code. If the past did not record which language it was speaking, present code cannot safely infer meaning from resemblance. Silent guessing can produce valid-looking state whose provenance is false—the most dangerous kind of corruption because recovery appears successful.

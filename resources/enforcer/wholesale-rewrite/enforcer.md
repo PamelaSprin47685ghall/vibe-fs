@@ -4,7 +4,7 @@
 A wholesale rewrite replaces a broad region of known-working structure when the required change can be established through a smaller transformation that preserves verified behavior and local knowledge.
 
 ## Governing Principle
-Existing code contains more information than its visible design: bug fixes, operational constraints, edge cases, and compatibility facts accumulated through history. A rewrite discards that information wholesale and asks tests to rediscover every relevant constraint at once. Precision is therefore an epistemic strategy: preserve what is already proven and invalidate only the smallest assumptions the new requirement makes false.
+Existing code contains more information than its visible design: bug fixes, operational constraints, edge cases, and compatibility facts accumulated through history. The root-cause is discarding proven structure for a smaller semantic delta. A rewrite throws away that information wholesale and asks tests to rediscover every relevant constraint at once. Precision is therefore an epistemic strategy: preserve what is already proven and invalidate only the smallest assumptions the new requirement makes false.
 
 ## Trigger When
 Trigger when large delete-and-recreate, generated replacement, or broad rearchitecture is chosen for a task whose acceptance criteria affect a materially smaller surface.

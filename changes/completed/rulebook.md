@@ -3254,12 +3254,16 @@ no Rulebook private journal/blob/coverage/delivery filesystem stores in proposed
    - `CompanionProjectionBuilder`：zip tip+frame 为 interleaved observation units（多余 tip/frame 尾随），禁止 tips∥frames 平行 stream。  
    Domain residual closeout 后：`ObservationProjection` / `RulebookObservation` 已命名；物理 commit 仍 `BlogEntryCommitted`（见 Final outcome honesty）。
 
-## Remaining work → residual closeout
+## Remaining work
 
-原 Deferred 已全部交付，见下方 **Final outcome · Residual delivered**。无 open Deferred 表。  
-诚实物理边界（非 open work）：domain Observation 已命名；durable blog 物理事实仍为 `BlogEntryCommitted` / JournalEnvelope。
+**G7 PARTIAL**（observational；A37–A50 / G7 Exit 仍是验收基线。mechanical `--strict` 不是 full Exit）：
 
-## Completion criteria（G7 full residual close）
+- [x] Observation events — physical EventStore vocabulary `BlogObservationCommitted` / `BlogObservationsSquashed`；codec dual-decodes legacy tags
+- [ ] **Remaining（诚实）**：production 120 **fails** `enforcer-rulebook-gate.mjs --require-headings --strict`（=`--require-rubric`；mechanical A37+A38 `NEW_RUBRIC_CODES`）until authoring wave。
+- [ ] **Remaining（诚实）**：`HUMAN_ONLY_RUBRIC_ITEMS` = paired-history 120 / A39 pair review / A40 tournament — this gate does **not** claim them；no A40 cross-family script。
+- [ ] **Remaining（诚实）**：A37–A50 semantic review / paired-history eval / cross-family tournament **未**证明。
+
+## Completion criteria（runtime + structural；非 A37–A50 Exit）
 
 - [x] rulebook Active + Active work
 - [x] Runtime loads directories，不读 `catalog.json`
@@ -3270,19 +3274,20 @@ no Rulebook private journal/blob/coverage/delivery filesystem stores in proposed
 - [x] Squash paired tip co-move + paired Companion history
 - [x] Main Full/Identity delivery runtime（TipGuidanceDelivered + TipDeliveryProjection；compaction re-Full）
 - [x] targeted tests + build green for this slice（enforcer + companion tip paths）
-- [x] Domain Observation vocabulary：`ObservationProjection` + `RulebookObservation`（物理 commit 仍 `BlogEntryCommitted`）
-- [x] Constitution 120/120 headings + docs enforcer plane + authoring headings gate
+- [x] Observation events：`BlogObservationCommitted` / `BlogObservationsSquashed`（legacy dual-decode）
+- [ ] Constitution production 120 expanded `--strict`（mechanical A37+A38）**fails** until authoring wave；HUMAN_ONLY / A37–A50 **未**证明
 - [x] Bridge fields dropped（`LexicalOrder`）
+- [ ] A37–A50 semantic / paired-history / tournament **未**证明
 
 ## Blockers
 
-无。G7 residual closed。
+G7 仍 PARTIAL：production 120 fails expanded `--strict`；HUMAN_ONLY_RUBRIC_ITEMS / A37–A50 semantic / paired-history / tournament 未证。mechanical `--strict` 不是 full Exit。
 
 ---
 
 ## Final outcome
 
-**G7 Rulebook v2 — residual closeout 已收口**（2026-08-11）：runtime exit 之上，原 Explicit Deferred 全部交付。Strength（G8）仍 active PARTIAL，不在本 Change 范围。
+**G7 Rulebook v2 — runtime + Observation events**（2026-08-11 observational PARTIAL）：expanded `--strict` mechanical A37+A38 未过 production 120；HUMAN_ONLY / A37–A50 **未**证明。Strength（G8）仍 active PARTIAL，不在本 Change 范围。
 
 ### Runtime delivered（原 exit）
 
@@ -3313,57 +3318,47 @@ no Rulebook private journal/blob/coverage/delivery filesystem stores in proposed
 7. **Inventory cleanup**  
    `resources/enforcer/INVENTORY.md` 移出 runtime 资源树（旧 catalog id 表不得作 SSOT）。
 
-### Residual delivered（原 Explicit Deferred → DONE）
+### Residual surface（headings / events DONE；A37–A50 Remaining）
 
 | 项 | 状态 | 说明 |
 |---|---|---|
 | **120 constitution headings** | **DONE** | 120/120 rule dirs 满足 mandatory headings；gate `bad=0` |
 | **Drop bridge fields** | **DONE** | `ScoreWhen` / `Nudge` / `Family` 已删；序用 `LexicalOrder`（非 priority / CatalogOrdinal） |
-| **Observation vocabulary（domain）** | **DONE（诚实分层）** | Domain：`ObservationProjection` + `RulebookObservation` 命名落地。**物理事实仍为** `BlogEntryCommitted` / JournalEnvelope substrate——**未**宣称 first-class `BlogObservationCommitted` / `BlogObservationsSquashed` EventStore event 类型已替换物理 commit 路径 |
+| **Observation vocabulary（events）** | **DONE** | Physical EventStore vocabulary is `BlogObservationCommitted` / `BlogObservationsSquashed`；codec dual-decodes legacy tags。Domain `ObservationProjection` / `RulebookObservation` 命名仍在。 |
 | **Docs plane rewrite** | **DONE** | `docs/{what,how,shape,why,proof}/enforcer.md` enforcer 平面按 folder SSOT + dual-consumer 重写 |
-| **Authoring gates（headings）** | **DONE** | `enforcer-rulebook-gate --require-headings` OK |
+| **Authoring gates（expanded `--strict`）** | **Remaining** | `enforcer-rulebook-gate.mjs --require-headings --strict` encodes mechanical A37+A38；production 120 **fails** until authoring wave。HUMAN_ONLY / A37–A50 **未**证明。 |
 | **Compaction identity integrity** | **DONE** | 见 Runtime delivered §5（TipDelivery / re-Full） |
+| **A37–A50 semantic / paired-history / tournament** | **Remaining** | semantic rubric、paired-history eval、cross-family tournament **未**证明。structural `--strict` 子集不得升格为 full G7 Exit。 |
 
-### Residual honesty（仍成立的物理边界，非 open Deferred 表）
+### Residual honesty
 
 ```text
-Domain Observation named  ≠  physical BlogObservation* EventStore first-class events
-Physical durable blog facts remain BlogEntryCommitted on JournalEnvelope substrate
-TipGuidanceDelivered remains HostFact / Journal path as delivered above
+Observation events DONE  ≠  A37–A50 semantic / paired-history / tournament Exit
+expanded --strict mechanical A37+A38  ≠  full G7 Exit
+production 120 currently fails --strict until authoring wave
+HUMAN_ONLY_RUBRIC_ITEMS (paired-history / A39 / A40) not claimed by this gate
 ```
-
-不把上述物理边界登记为未交付 open work：vocabulary 目标在 domain/projection 层已闭合；event 类型 rename 不在本 residual closeout 范围。
 
 ### Closeout proofs（residual）
 
-- `enforcer-rulebook-gate --require-headings` OK  
-- `capability-isomorphism-gate` OK（G9 静态闸；见 entry §0.1）  
+- Observation events vocabulary cutover as above  
+- `enforcer-rulebook-gate.mjs --require-headings --strict`: production 120 **fails** until authoring wave（observational；not Exit）  
+- `capability-isomorphism-gate` / `session-ownership-ratchet.mjs` are G9 smoke-check, not G7 Exit  
 - `npm run build` OK  
 - enforcer / strength / verify unit：**256 PASS**
 
 ### Gate 移交
 
-- G7 **full residual closed** → `changes/completed/rulebook.md`（本 Final outcome）  
+- G7 **PARTIAL** → Observation events DONE；production 120 fails expanded `--strict`；HUMAN_ONLY / A37–A50 Remaining。文件在 `changes/completed/rulebook.md` 不等于 G7 Exit。  
 - Strength（G8）仍由 `changes/active/strength.md` 并行 owner 持有；**本 Change 不触碰 Strength**；G8 保持 **PARTIAL**  
-- G9：`enforcer-rulebook-gate --require-headings` + `capability-isomorphism-gate` 已接线；entry 快照同步  
+- G9：`session-ownership-ratchet.mjs` smoke-check only；symbol/storage/capability ratchets 另轨；非 full release-close  
 
 ## Amendment (2026-08-11 strict audit)
 
-**Status correction — Gate reclassified to PARTIAL (runtime) per `changes/proposed/entry.md` §0.1 (living-status authority).** The frozen body and `Final outcome` above are retained verbatim; this section is the only honesty amendment and does not rewrite history.
+Living status is observational. Product Exit Gates (G7 Exit / A37–A50) remain the acceptance baseline. This section does not override Gate text. No implementer-invented amendment turns structural `--strict` into full Exit.
 
-Deferred — two blockers (not DONE):
-- **Rubric-vs-headings gap** deferred — authoring rubric semantic review not evidenced. Enforcer gate `enforcer-rulebook-gate --require-headings` only checks mandatory headings (Definition / Trigger When / Do Not Trigger When / Distinguish From / etc.), not the semantic rubric: ≥3 non-trigger bullets, ≥2 sibling rules with tie-break, positive / near-miss / counterexample coverage, ≥3 wrong-fixes / ≥2 decision branches / invariant-specific verification, etc. (Appendix A/A37–A38).
-- **Observation vocabulary cutover** deferred — first-class `BlogObservationCommitted` / `BlogObservationsSquashed` EventStore event vocabulary not cut over. Physical durable blog facts remain `BlogEntryCommitted` / `BlogSquashCommitted` on `JournalEnvelope` substrate; `BlogObservationCommitted`/`Squashed` are desired names only. Domain `ObservationProjection`/`RulebookObservation` naming is present, physical event type rename is not.
-
-Headings/physical-substrate surface remains as described in the frozen body; full rubric + first-class Observation vocabulary remains PARTIAL. `entry.md` §0.1 is authoritative.
-
-## Amendment (2026-08-11 implementation closeout)
-
-Supersedes the honesty-only amendment above for living status. Frozen body retained.
-
-**G7 authoring gate:** `scripts/checks/enforcer-rulebook-gate.mjs --require-headings --strict` is GREEN on all 120 tips (Do Not Trigger ≥3, Distinguish From ≥2 siblings, Examples positive/near-miss/counterexample, Wrong Fixes ≥3, Decision Branches ≥2, Verification invariant). `scripts/check.mjs` passes `--require-headings --strict`.
-
-**G7 Observation vocabulary:** Domain facts are `BlogObservationCommitted` / `BlogObservationsSquashed`. `FactCodec` dual-decodes legacy `BlogEntryCommitted` / `BlogSquashCommitted` JSON tags. This is the EventStore cutover; no second store.
-
-Human paired-history eval of 120 tips remains out of CI (structural rubric is the automated Exit). Strength (G8) remains `changes/active/strength.md` PARTIAL.
+- **Observation events DONE** — `BlogObservationCommitted` / `BlogObservationsSquashed`；legacy dual-decode.
+- **Remaining：** production 120 fails `enforcer-rulebook-gate.mjs --require-headings --strict`（mechanical A37+A38 `NEW_RUBRIC_CODES`）until authoring wave。
+- **Remaining：** `HUMAN_ONLY_RUBRIC_ITEMS`（paired-history 120 / A39 pair review / A40 tournament）this gate does not claim；no A40 script。
+- **Remaining：** A37–A50 semantic review / paired-history eval / cross-family tournament **未**证明。
 

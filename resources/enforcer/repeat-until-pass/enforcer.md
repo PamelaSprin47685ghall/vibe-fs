@@ -1,7 +1,7 @@
 # repeat-until-pass — Enforcer
 
 ## Definition
-Repeat-until-pass treats a lucky successful run as verification after identical or equivalent runs have already failed nondeterministically.
+Repeat-until-pass treats a lucky successful run as verification after identical or equivalent runs have already failed nondeterministically. The root-cause is that a favorable sample is selected from mixed verdicts, so nondeterminism is treated as noise rather than as a defect in the experiment.
 
 ## Governing Principle
 A repeated experiment does not become more true because one sample is favorable. If the relevant inputs are unchanged yet verdicts differ, the unresolved fact is nondeterminism. Selecting the green sample is statistical cherry-picking: it discards evidence precisely because that evidence is inconvenient. Correct verification removes the hidden variable, not the red observations.

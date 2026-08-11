@@ -1,7 +1,7 @@
 # phase-flag-accumulation — Enforcer
 
 ## Definition
-Phase flags accumulate when lifecycle behavior is patched by adding booleans or counters whose combinations implicitly encode a state machine no type or transition table names.
+Phase flags accumulate when lifecycle behavior is patched by adding booleans or counters whose combinations implicitly encode a state machine no type or transition table names. The root-cause is that lifecycle is patched as a product of flags, so the representable combinations exceed the valid phases and transitions stay unnamed.
 
 ## Governing Principle
 Each independent flag multiplies possible worlds. When flags actually describe one lifecycle, the product type invents combinations the process can never legitimately enter and hides which transitions connect the valid ones. The resulting system is a state machine expressed as arithmetic over bits, so correctness requires readers to reconstruct states from combinations and control history.
