@@ -208,6 +208,7 @@ module ProjectionIntent =
               Anchor = StrengthFrameAnchor.Append }
 
 /// PROJ-006：同锚意图冲突。fail-closed——禁止依赖注册顺序隐式选边。
+/// DSL-class: Decision — planner refusal taxonomy for conflicting ProjectionIntent sets.
 [<RequireQualifiedAccess>]
 type ProjectionConflict =
     /// 前缀锚同时被两个互斥意图选择（Keep vs Activate，或载荷不等的两次 Activate）。

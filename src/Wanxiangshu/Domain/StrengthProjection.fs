@@ -16,6 +16,7 @@ type StrengthProjection =
     { ByDecision: Map<string, StrengthCandidateView>
       ByTargetRun: Map<string, StrengthDecisionId> }
 
+/// DSL-class: Decision — Strength candidate fold refusals (Prepared/Promoted/Trace/Abandon).
 [<RequireQualifiedAccess>]
 type StrengthProjectionError =
     | PreparedConflict of decisionId: StrengthDecisionId
