@@ -6,6 +6,7 @@ import { FsOracle, HttpClient } from './scenario-http.js';
 import { initGitWorkspace } from './process-host-utils.js';
 import { resolvePluginPath } from './scenario-paths.js';
 import { ReceiptAcceptanceGate, receiptAcceptanceGatePluginPath } from './receipt-acceptance-gate.mjs';
+import { magicTodoHostCanaryPluginPath } from './magic-todo-host-canary-plugin.mjs';
 import { StrictMockProvider } from './strict-mock-provider.js';
 import { createScenarioTurn } from './scenario-turn.js';
 import { Watchdog } from './watchdog.js';
@@ -53,6 +54,7 @@ export class Scenario {
     this.fs = ctx.fs;
     this.scenarioDir = ctx.scenarioDir;
     this.acceptanceGate = ctx.acceptanceGate ?? null;
+    this.magicTodoHostCanaryDirectory = ctx.magicTodoHostCanaryDirectory ?? null;
     this.sessionIds = [];
     this.sessionCreatedDiagnostics = [];
     this.turn = createScenarioTurn(this);
@@ -124,9 +126,24 @@ export async function setupScenarioParallel(opts, tmpDir) {
   const acceptanceGateDirectory = opts.acceptanceGate ? path.join(scenarioDir, 'receipt-acceptance-gate') : null;
   if (acceptanceGateDirectory) fs.mkdirSync(acceptanceGateDirectory, { recursive: true });
   const acceptanceGate = acceptanceGateDirectory ? new ReceiptAcceptanceGate(acceptanceGateDirectory) : null;
+  // Opt-in real-host Magic Todo canaries A/E/G/H (Phase 0). Mutually exclusive with
+  // receipt acceptance gate: both wrap the sole production plugin path.
+  const magicTodoHostCanaryDirectory = opts.magicTodoHostCanary
+    ? path.join(scenarioDir, 'magic-todo-host-canary')
+    : null;
+  if (magicTodoHostCanaryDirectory) fs.mkdirSync(magicTodoHostCanaryDirectory, { recursive: true });
+  if (acceptanceGateDirectory && magicTodoHostCanaryDirectory) {
+    throw new Error('setup cannot enable both acceptanceGate and magicTodoHostCanary wrappers');
+  }
   const pluginPaths = productionPluginPath === null
     ? []
-    : [acceptanceGateDirectory ? receiptAcceptanceGatePluginPath : productionPluginPath];
+    : [
+        acceptanceGateDirectory
+          ? receiptAcceptanceGatePluginPath
+          : magicTodoHostCanaryDirectory
+            ? magicTodoHostCanaryPluginPath
+            : productionPluginPath,
+      ];
 
   try {
     const t0 = Date.now();
@@ -165,6 +182,10 @@ export async function setupScenarioParallel(opts, tmpDir) {
           WANXIANGSHU_E2E_ACCEPTANCE_GATE_PLUGIN: productionPluginPath,
           WANXIANGSHU_E2E_ACCEPTANCE_GATE_CONFIG: JSON.stringify(opts.acceptanceGate),
         } : {}),
+        ...(magicTodoHostCanaryDirectory ? {
+          WANXIANGSHU_E2E_MAGIC_TODO_HOST_CANARY_DIR: magicTodoHostCanaryDirectory,
+          WANXIANGSHU_E2E_MAGIC_TODO_HOST_CANARY_PLUGIN: productionPluginPath,
+        } : {}),
         ...(opts.extraEnv || {}),
       },
     });
@@ -190,6 +211,7 @@ export async function setupScenarioParallel(opts, tmpDir) {
       fs: new FsOracle(host.workDir),
       scenarioDir,
       acceptanceGate,
+      magicTodoHostCanaryDirectory,
     });
     events.onEvent((e) => {
       if (e.type === 'session.created' && e.sessionAgent && e.sessionID) {

@@ -65,7 +65,9 @@ pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fal
 #   maxSseEvents     — OpenCode SSE excluding server.heartbeat; transport-noisy so this
 #                      is the measured max fail-closed bound (1716–1724 across green runs),
 #                      not a DU-algebra equality. Journal is the exact semantic pin.
-setup = { strict = true, maxJournalEvents = 372, maxSseEvents = 1730, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n" } } }
+# magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
+# Headroom kept after canary wrapper noise; Manager does not advertise todowrite yet.
+setup = { strict = true, magicTodoHostCanary = true, maxJournalEvents = 400, maxSseEvents = 1900, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 
@@ -102,7 +104,11 @@ flow = [
   { waitFact = { name = "ManagerJobCreated", eq = 1 } },
   { bindChild = { agent = "fast-manager", bind = ["fast-manager"] } },
 
-  # Manager fork + join tool-calls delivered; join stays in flight while child held.
+  # Manager: fork → join; join stays in flight while child held.
+  # Host evidence (StaticTools.knownToolNames + Manager permission matrix) does not
+  # advertise builtin todowrite on Manager provider tools — requiring tools=["todowrite"]
+  # here fails toolsGate and lets optional manager-repair steal the "#" opening prefix,
+  # which stalled wait=manager.0 with no MOCK-FATAL. A/E/G/H assert uses wire evidence.
   # WorkActivated for AgentOwnerRoot arrives later (first suicide migration) — see mgr-finish.
   # All Manager prompts MUST use session="child" (bindChild); default session is Orchestrator.
   { wait = "manager.0" },
@@ -161,6 +167,8 @@ flow = [
   { wait = "orch.2", timeoutMs = 60000 },
   { awaitTerminal = true, requireAssistantTerminal = false },
   { custom = "oracleLongStroke" },
+  # Phase 0 real-host A/E/G/H — wire tools + wrapper artifacts (or precise V2 unavailability).
+  { custom = "assertHostCanariesAEGH" },
   { expectSatisfied = true },
 ]
 
@@ -191,6 +199,7 @@ tools = ["fork-manager", "join"]
 
 # AgentOwnerRoot Manager (opening is "#" + orch fork prompt). Fork + join; join
 # stays blocked while holdChild keeps coder incomplete for user_message wake.
+# tools MUST match the real Manager provider surface (no todowrite — see flow note).
 [[turn]]
 id = "manager"
 lane = "fast-manager"
