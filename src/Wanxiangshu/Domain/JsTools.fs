@@ -11,33 +11,31 @@ type JsCapability =
     | Write
     | Edit
     | Glob
-    | Grep
 
 module JsCapability =
 
     /// The only ToolPermission → JsCapability mapping. Non-filesystem
     /// permissions produce no js-* member (JS-004 four-layer exactness).
+    /// Grep is not a js-* primitive: builtin grep visibility stays on
+    /// ToolPermission.Grep; the SDK teaches grep as Read+Glob+RegExp.
     let ofToolPermission (permission: ToolPermission) : JsCapability option =
         match permission with
         | ToolPermission.Read -> Some JsCapability.Read
         | ToolPermission.Write -> Some JsCapability.Write
         | ToolPermission.Edit -> Some JsCapability.Edit
         | ToolPermission.Glob -> Some JsCapability.Glob
-        | ToolPermission.Grep -> Some JsCapability.Grep
         | _ -> None
 
     let ofToolCapabilities (capabilities: Set<ToolPermission>) : Set<JsCapability> =
         capabilities |> Set.toList |> List.choose ofToolPermission |> Set.ofList
 
-    /// Fixed canonical member order for generated surfaces (JS-002
-    /// deterministic generation: Read, Glob, Grep, Edit, Write).
+    /// Fixed canonical member order (JS-002/§46): file, glob, rewrite, write.
     let order (capability: JsCapability) : int =
         match capability with
         | JsCapability.Read -> 0
         | JsCapability.Glob -> 1
-        | JsCapability.Grep -> 2
-        | JsCapability.Edit -> 3
-        | JsCapability.Write -> 4
+        | JsCapability.Edit -> 2
+        | JsCapability.Write -> 3
 
 /// One capability's complete SDK projection: the single source for member
 /// name, description, canonical example, and runtime binding key. The four
@@ -45,6 +43,8 @@ module JsCapability =
 type JsCapabilityFragment =
     { Capability: JsCapability
       MemberName: string
+      /// LLM-visible method signature in the public base class (JS-002).
+      Signature: string
       Description: string
       CanonicalExample: string
       RuntimeBindingKey: string }
@@ -55,53 +55,568 @@ module JsFragmentRegistry =
     let read: JsCapabilityFragment =
         { Capability = JsCapability.Read
           MemberName = "file"
+          Signature = "async file(path, matches = [])"
           Description =
-            "file(path) — read a strict-UTF-8 file into an immutable FileView. "
-            + "Returns { path, text, byteCount }; refuses non-UTF-8 as FILE_NOT_UTF8."
-          CanonicalExample = "const view = api.file('src/main.fs'); view.text"
+            "file(path, matches = []) — read a strict-UTF-8 immutable snapshot and "
+            + "optionally resolve ordered begin/end anchors. Returns FileView with text(from, to)."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    const file = await this.file(\"README.md\");\n"
+            + "    return file.text();\n"
+            + "  }\n"
+            + "}"
           RuntimeBindingKey = "js.read" }
 
     let glob: JsCapabilityFragment =
         { Capability = JsCapability.Glob
           MemberName = "glob"
+          Signature = "async glob(pattern)"
           Description =
             "glob(pattern) — bounded, deterministically ordered path enumeration. "
-            + "Returns { paths: string[] }; capability-invisible paths never appear."
-          CanonicalExample = "const paths = api.glob('src/**/*.fs').paths"
+            + "Returns canonical paths. Does not grant Read on those paths."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    return await this.glob(\"src/**/*.fs\");\n"
+            + "  }\n"
+            + "}"
           RuntimeBindingKey = "js.glob" }
-
-    let grep: JsCapabilityFragment =
-        { Capability = JsCapability.Grep
-          MemberName = "grep"
-          Description =
-            "grep(regexp, pattern) — search files with a RegExp (Read + Glob derived). "
-            + "Returns { matches: [{ path, index, text }] }."
-          CanonicalExample = "const hits = api.grep(/TODO/, 'src/**/*.fs').matches"
-          RuntimeBindingKey = "js.grep" }
 
     let rewrite: JsCapabilityFragment =
         { Capability = JsCapability.Edit
           MemberName = "rewrite"
+          Signature = "rewrite(path, newText)"
           Description =
-            "rewrite(path, { find, replace, occurrence }) — rewrite an existing file via "
-            + "ordered string/RegExp anchors. Staged; commits with the program (all-or-nothing)."
-          CanonicalExample = "api.rewrite('src/main.fs', { find: 'old', replace: 'new' })"
+            "rewrite(path, newText) — stage replacement of an existing UTF-8 file. "
+            + "Missing target is FILE_NOT_FOUND. Commits with the program (all-or-nothing)."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    const file = await this.file(\"src/foo.js\", [\n"
+            + "      [\"begin\", \"end\", \"oldString\"],\n"
+            + "    ]);\n"
+            + "    this.rewrite(\n"
+            + "      \"src/foo.js\",\n"
+            + "      file.text(\"^\", \"begin\")\n"
+            + "        + \"newString\"\n"
+            + "        + file.text(\"end\", \"$\")\n"
+            + "    );\n"
+            + "  }\n"
+            + "}"
           RuntimeBindingKey = "js.edit" }
 
     let write: JsCapabilityFragment =
         { Capability = JsCapability.Write
           MemberName = "write"
+          Signature = "write(path, newText)"
           Description =
-            "write(path, text) — create a missing file with strict-UTF-8 text. "
-            + "Staged; commits with the program. Fails FILE_EXISTS when the target exists."
-          CanonicalExample = "api.write('src/new.fs', 'module New')"
+            "write(path, newText) — stage creation of a missing UTF-8 file. "
+            + "Existing target is FILE_ALREADY_EXISTS. Commits with the program."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    this.write(\n"
+            + "      \"generated/version.txt\",\n"
+            + "      \"1.2.3\\n\"\n"
+            + "    );\n"
+            + "    return { created: \"generated/version.txt\" };\n"
+            + "  }\n"
+            + "}"
           RuntimeBindingKey = "js.write" }
 
-    /// Fixed canonical fragment list; surface order follows JsCapability.order.
-    let all: JsCapabilityFragment list = [ read; glob; grep; rewrite; write ]
+    /// Member fragments only. Grep is a derived example (Read+Glob), not a member.
+    let all: JsCapabilityFragment list = [ read; glob; rewrite; write ]
 
     let byCapability: Map<JsCapability, JsCapabilityFragment> =
         all |> List.map (fun fragment -> fragment.Capability, fragment) |> Map.ofList
+
+/// Canonical example with capability requirements (proposal §44).
+type JsExample =
+    { Requires: Set<JsCapability>
+      Source: string }
+
+/// Proposal §12/§16/§31–§47: LLM-visible description is header + exact public
+/// base class + capability rules + filtered examples + footer. Runtime proxy
+/// class stays out of the description.
+module JsCanonicalDescription =
+
+    let header =
+        "This is the programmable filesystem tool for the current agent.\n"
+        + "\n"
+        + "The base class below is generated from the capabilities actually available in\n"
+        + "this request. If a method is present, you may use it. If a method is absent,\n"
+        + "that capability is not available.\n"
+        + "\n"
+        + "Define exactly one class named Js that extends JsProgram and implement\n"
+        + "async run()."
+
+    let footer =
+        "Use the generated API directly. Do not reimplement Host filesystem,\n"
+        + "permission, anchor, snapshot, or transaction logic.\n"
+        + "\n"
+        + "Anchors locate. JavaScript transforms. Mutations are staged and committed by\n"
+        + "the Host as one transaction."
+
+    /// Proposal §16 canonical file() body (description uses HOST_READ).
+    let fileAlgorithm (readSourceLine: string) =
+        "  async file(path, matches = []) {\n"
+        + "    "
+        + readSourceLine
+        + "\n"
+        + """
+    const anchors = new Map([
+      ["^", 0],
+      ["$", source.length],
+    ]);
+
+    let cursor = 0;
+
+    const findNext = pattern => {
+      if (typeof pattern === "string") {
+        if (pattern.length === 0)
+          throw new Error("String anchor patterns must be non-empty.");
+
+        const start = source.indexOf(pattern, cursor);
+
+        if (start < 0)
+          return null;
+
+        return {
+          start,
+          end: start + pattern.length,
+        };
+      }
+
+      if (pattern instanceof RegExp) {
+        // Anchor matching defines its own forward-search semantics.
+        // Caller g/y state and lastIndex are ignored.
+        const flags =
+          [...new Set(
+            pattern.flags.replace(/[gy]/g, "") + "g"
+          )].join("");
+
+        const regexp = new RegExp(pattern.source, flags);
+        regexp.lastIndex = cursor;
+
+        const match = regexp.exec(source);
+
+        if (!match)
+          return null;
+
+        return {
+          start: match.index,
+          end: match.index + match[0].length,
+        };
+      }
+
+      throw new Error(
+        "Anchor pattern must be a string or RegExp."
+      );
+    };
+
+    for (const [begin, end, pattern] of matches) {
+      if (!begin || !end)
+        throw new Error("Anchor names must be non-empty.");
+
+      if (
+        begin === "^" || begin === "$" ||
+        end === "^" || end === "$"
+      )
+        throw new Error("^ and $ are reserved anchors.");
+
+      if (begin === end)
+        throw new Error(
+          "Begin and end anchor names must differ."
+        );
+
+      if (anchors.has(begin) || anchors.has(end))
+        throw new Error("Anchor names must be unique.");
+
+      const match = findNext(pattern);
+
+      if (!match)
+        throw new Error(
+          "Anchor pattern was not found in declaration order."
+        );
+
+      anchors.set(begin, match.start);
+      anchors.set(end, match.end);
+
+      cursor = match.end;
+    }
+
+    const offset = name => {
+      if (!anchors.has(name))
+        throw new Error(`Unknown anchor: ${name}`);
+
+      return anchors.get(name);
+    };
+
+    return Object.freeze({
+      text(from = "^", to = "$") {
+        const start = offset(from);
+        const end = offset(to);
+
+        if (start > end)
+          throw new Error(
+            `Invalid slice: ${from} is after ${to}`
+          );
+
+        return source.slice(start, end);
+      },
+    });
+  }"""
+
+    let globStub = "  async glob(pattern) {\n    // Host capability\n  }"
+
+    let rewriteStub = "  rewrite(path, newText) {\n    // Host capability\n  }"
+
+    let writeStub = "  write(path, newText) {\n    // Host capability\n  }"
+
+    let runStub =
+        "  async run() {\n    throw new Error(\"Js.run() must be implemented.\");\n  }"
+
+    let has (capabilities: Set<JsCapability>) (capability: JsCapability) =
+        Set.contains capability capabilities
+
+    let publicBaseClass (capabilities: Set<JsCapability>) : string =
+        let methods =
+            [ if has capabilities JsCapability.Read then
+                  fileAlgorithm "const source = await HOST_READ_IMMUTABLE_UTF8_SNAPSHOT(path);"
+              if has capabilities JsCapability.Glob then
+                  globStub
+              if has capabilities JsCapability.Edit then
+                  rewriteStub
+              if has capabilities JsCapability.Write then
+                  writeStub
+              runStub ]
+
+        String.concat "\n\n" ("class JsProgram {" :: methods @ [ "}" ])
+
+    let runtimeBaseClass (capabilities: Set<JsCapability>) : string =
+        let methods =
+            [ "  constructor(api) { this._api = api; }"
+              if has capabilities JsCapability.Read then
+                  fileAlgorithm
+                      "const snapshot = this._api.js.read(path);\n    if (snapshot && snapshot.ok === false) throw new Error(snapshot.reason || snapshot.code);\n    const source = snapshot.text;"
+              if has capabilities JsCapability.Glob then
+                  "  async glob(pattern) {\n    const result = this._api.js.glob(pattern);\n    if (result && result.ok === false) throw new Error(result.reason || result.code);\n    return result.paths;\n  }"
+              if has capabilities JsCapability.Edit then
+                  "  rewrite(path, newText) {\n    const result = this._api.js.edit(path, newText);\n    if (result && result.ok === false) throw new Error(result.reason || result.code);\n  }"
+              if has capabilities JsCapability.Write then
+                  "  write(path, newText) {\n    const result = this._api.js.write(path, newText);\n    if (result && result.ok === false) throw new Error(result.reason || result.code);\n  }"
+              runStub ]
+
+        String.concat "\n\n" ("class JsProgram {" :: methods @ [ "}" ])
+
+    let contract (toolName: string) (capabilities: Set<JsCapability>) =
+        let verbs =
+            List.concat
+                [ if has capabilities JsCapability.Read then [ "read" ] else []
+                  if has capabilities JsCapability.Read && has capabilities JsCapability.Glob then
+                      [ "search" ]
+                  else
+                      []
+                  if has capabilities JsCapability.Edit then
+                      [ "transform"; "rewrite" ]
+                  else
+                      []
+                  if has capabilities JsCapability.Write then [ "create" ] else [] ]
+            |> String.concat ", "
+
+        let parallelLine =
+            if has capabilities JsCapability.Edit || has capabilities JsCapability.Write then
+                "3. Parallel "
+                + toolName
+                + " calls are absolutely safe for same-file and cross-file edits."
+            else
+                "3. Parallel "
+                + toolName
+                + " calls are absolutely safe for same-file and cross-file reads."
+
+        "Prefer "
+        + toolName
+        + " for all filesystem work.\n"
+        + "\n"
+        + "Do not use the legacy tools read/edit/write/glob/grep/patch for new work when "
+        + toolName
+        + " is available.\n"
+        + toolName
+        + " is the capability-projected JavaScript filesystem SDK for this\n"
+        + "request. It can "
+        + verbs
+        + " files in one transactional program — including large parallel batches.\n"
+        + "\n"
+        + "Strongly recommended:\n"
+        + "1. Call "
+        + toolName
+        + " instead of read/edit/write/glob/grep/patch whenever possible.\n"
+        + "2. Write complex JavaScript in one "
+        + toolName
+        + " program rather than many legacy RPCs.\n"
+        + parallelLine
+        + "\n"
+        + "\n"
+        + "Call tools in parallel whenever needed. Parallel reads, parallel edits, same-file\n"
+        + "and cross-file calls are all absolutely safe. The Host serializes one assistant\n"
+        + "message's tool calls in deterministic order; each call is its own transaction.\n"
+        + "\n"
+        + "Write complex JavaScript in one program. The Host commits the whole program as one\n"
+        + "all-or-nothing transaction."
+
+    let readRules =
+        "file(path, matches = []) reads this transaction's immutable UTF-8 snapshot,\n"
+        + "optionally resolves ordered anchors, and returns an immutable FileView.\n"
+        + "\n"
+        + "matches is Array<[beginAnchor, endAnchor, pattern]> where pattern is a non-empty\n"
+        + "string or a RegExp. Anchors are position names, not the matched text.\n"
+        + "Every FileView has built-in anchors ^ (file start) and $ (file end). Do not\n"
+        + "declare ^ or $ as custom names.\n"
+        + "\n"
+        + "Ordered matching: each pattern is searched from the current cursor; after a match,\n"
+        + "cursor = match.end. Duplicate source text does not need to be globally unique.\n"
+        + "Caller RegExp g/y flags and lastIndex are ignored; matching uses its own forward\n"
+        + "search. Zero-width RegExp is allowed (begin offset may equal end offset); begin\n"
+        + "and end names must still differ.\n"
+        + "\n"
+        + "Anchor declaration refusals: empty names; reserved ^/$; duplicate names; begin == end\n"
+        + "in one declaration; empty string pattern. Pattern not found in declaration order fails.\n"
+        + "\n"
+        + "file.text(from, to) — default text(from = \"^\", to = \"$\") — returns the exact original\n"
+        + "substring between two resolved anchors. String pattern content must be non-empty.\n"
+        + "Reverse slices fail. FileView is immutable: rewrite() does not change a previously\n"
+        + "returned view.\n"
+        + "\n"
+        + "Recommended workflow:\n"
+        + "1. Declare the minimal begin/end anchor set needed to locate edits.\n"
+        + "2. Let Host resolve those positions.\n"
+        + "3. Build the complete resulting file from text(...) slices plus new content.\n"
+        + "4. Use indexOf / replaceAll only when anchor-and-splice is genuinely inconvenient.\n"
+        + "\n"
+        + "Prefer:\n"
+        + "  f.text(\"^\", \"begin\") + \"newString\" + f.text(\"end\", \"$\")"
+
+    let globRules =
+        "glob(pattern) returns the deterministically sorted canonical paths inside the\n"
+        + "current path boundary. It does not grant Read. A profile with Glob and without\n"
+        + "Read can enumerate paths but cannot call file()."
+
+    let editRules =
+        "rewrite(path, newText) stages replacement of an existing UTF-8 file. The target\n"
+        + "must exist in the transaction snapshot or the call fails FILE_NOT_FOUND.\n"
+        + "newText must be a string. The call does not write immediately; it adds a\n"
+        + "StagedRewrite to this program's WriteSet. You do not have to file(path) first."
+
+    let writeRules =
+        "write(path, newText) stages creation of a missing UTF-8 file. If the target\n"
+        + "exists: FILE_ALREADY_EXISTS. Edit and Write are distinct capabilities."
+
+    let mutationRules =
+        "A program may mutate each canonical path exactly once. A second rewrite/write\n"
+        + "on the same path is DUPLICATE_MUTATION_TARGET. Multi-phase edits belong in\n"
+        + "JavaScript variables, then one rewrite/write.\n"
+        + "\n"
+        + "The generated class has no commit, rollback, snapshot, or transaction methods.\n"
+        + "run() returning normally → Host preflight → prepare → commit. run() throwing or\n"
+        + "any file()/glob() failure discards every staged mutation.\n"
+        + "\n"
+        + "run() must return a JSON-compatible value: null, boolean, finite number, string,\n"
+        + "array, or plain object (recursive). undefined, BigInt, NaN, Infinity, function,\n"
+        + "symbol, cyclic or exotic objects fail as INVALID_RETURN_VALUE before commit."
+
+    let rules (capabilities: Set<JsCapability>) : string =
+        let blocks =
+            [ if has capabilities JsCapability.Read then
+                  readRules
+              if has capabilities JsCapability.Glob then
+                  globRules
+              if has capabilities JsCapability.Edit then
+                  editRules
+              if has capabilities JsCapability.Write then
+                  writeRules
+              if has capabilities JsCapability.Edit || has capabilities JsCapability.Write then
+                  mutationRules ]
+
+        String.concat "\n\n" blocks
+
+    let examples: JsExample list =
+        [ { Requires = set [ JsCapability.Read ]
+            Source = JsFragmentRegistry.read.CanonicalExample }
+          { Requires = set [ JsCapability.Glob ]
+            Source = JsFragmentRegistry.glob.CanonicalExample }
+          { Requires = set [ JsCapability.Read; JsCapability.Glob ]
+            Source =
+              "class Js extends JsProgram {\n"
+              + "  async run() {\n"
+              + "    const paths = await this.glob(\"src/**/*.js\");\n"
+              + "    const hits = [];\n"
+              + "    for (const path of paths) {\n"
+              + "      const file = await this.file(path);\n"
+              + "      const text = file.text();\n"
+              + "      for (const match of text.matchAll(/TODO:.+/g)) {\n"
+              + "        hits.push({ path, index: match.index, text: match[0] });\n"
+              + "      }\n"
+              + "    }\n"
+              + "    return hits;\n"
+              + "  }\n"
+              + "}" }
+          { Requires = set [ JsCapability.Read; JsCapability.Edit ]
+            Source = JsFragmentRegistry.rewrite.CanonicalExample }
+          { Requires = set [ JsCapability.Read; JsCapability.Edit ]
+            Source =
+              "class Js extends JsProgram {\n"
+              + "  async run() {\n"
+              + "    const file = await this.file(\"src/foo.js\", [\n"
+              + "      [\"begin\", \"end\", /const\\s+version\\s*=\\s*\"[^\"]*\";/],\n"
+              + "    ]);\n"
+              + "    this.rewrite(\n"
+              + "      \"src/foo.js\",\n"
+              + "      file.text(\"^\", \"begin\")\n"
+              + "        + 'const version = \"2.0\";'\n"
+              + "        + file.text(\"end\", \"$\")\n"
+              + "    );\n"
+              + "  }\n"
+              + "}" }
+          { Requires = set [ JsCapability.Read; JsCapability.Edit ]
+            Source =
+              "class Js extends JsProgram {\n"
+              + "  async run() {\n"
+              + "    const file = await this.file(\"src/foo.js\", [\n"
+              + "      [\"at\", \"afterAt\", /(?=function foo)/],\n"
+              + "    ]);\n"
+              + "    this.rewrite(\n"
+              + "      \"src/foo.js\",\n"
+              + "      file.text(\"^\", \"at\")\n"
+              + "        + \"// inserted\\n\"\n"
+              + "        + file.text(\"at\", \"$\")\n"
+              + "    );\n"
+              + "  }\n"
+              + "}" }
+          { Requires = set [ JsCapability.Read; JsCapability.Edit ]
+            Source =
+              "class Js extends JsProgram {\n"
+              + "  async run() {\n"
+              + "    const file = await this.file(\"src/foo.js\", [\n"
+              + "      [\"begin\", \"end\", \"const obsolete = true;\\n\"],\n"
+              + "    ]);\n"
+              + "    this.rewrite(\n"
+              + "      \"src/foo.js\",\n"
+              + "      file.text(\"^\", \"begin\") + file.text(\"end\", \"$\")\n"
+              + "    );\n"
+              + "  }\n"
+              + "}" }
+          { Requires = set [ JsCapability.Read; JsCapability.Edit ]
+            Source =
+              "class Js extends JsProgram {\n"
+              + "  async run() {\n"
+              + "    const file = await this.file(\"src/foo.js\", [\n"
+              + "      [\"a\", \"b\", \"first block\"],\n"
+              + "      [\"c\", \"d\", \"second block\"],\n"
+              + "    ]);\n"
+              + "    this.rewrite(\n"
+              + "      \"src/foo.js\",\n"
+              + "      file.text(\"^\", \"a\")\n"
+              + "        + file.text(\"c\", \"d\")\n"
+              + "        + file.text(\"b\", \"c\")\n"
+              + "        + file.text(\"a\", \"b\")\n"
+              + "        + file.text(\"d\", \"$\")\n"
+              + "    );\n"
+              + "  }\n"
+              + "}" }
+          { Requires = set [ JsCapability.Read; JsCapability.Edit ]
+            Source =
+              "class Js extends JsProgram {\n"
+              + "  async run() {\n"
+              + "    const file = await this.file(\"src/foo.js\", [\n"
+              + "      [\"a\", \"b\", \"const item = createItem();\"],\n"
+              + "    ]);\n"
+              + "    this.rewrite(\n"
+              + "      \"src/foo.js\",\n"
+              + "      file.text(\"^\", \"a\")\n"
+              + "        + file.text(\"a\", \"b\")\n"
+              + "        + \"\\n\"\n"
+              + "        + file.text(\"a\", \"b\")\n"
+              + "        + file.text(\"b\", \"$\")\n"
+              + "    );\n"
+              + "  }\n"
+              + "}" }
+          { Requires = set [ JsCapability.Read; JsCapability.Edit ]
+            Source =
+              "class Js extends JsProgram {\n"
+              + "  async run() {\n"
+              + "    const file = await this.file(\"src/foo.js\", [\n"
+              + "      [\"a\", \"b\", \"oldA\"],\n"
+              + "      [\"c\", \"d\", \"oldB\"],\n"
+              + "    ]);\n"
+              + "    this.rewrite(\n"
+              + "      \"src/foo.js\",\n"
+              + "      file.text(\"^\", \"a\")\n"
+              + "        + \"newA\"\n"
+              + "        + file.text(\"b\", \"c\")\n"
+              + "        + \"newB\"\n"
+              + "        + file.text(\"d\", \"$\")\n"
+              + "    );\n"
+              + "  }\n"
+              + "}" }
+          { Requires = set [ JsCapability.Write ]
+            Source = JsFragmentRegistry.write.CanonicalExample }
+          { Requires = set [ JsCapability.Read; JsCapability.Edit ]
+            Source =
+              "class Js extends JsProgram {\n"
+              + "  async run() {\n"
+              + "    const implementation = await this.file(\"src/foo.js\", [\n"
+              + "      [\"a\", \"b\", \"oldValue\"],\n"
+              + "    ]);\n"
+              + "    const test = await this.file(\"tests/foo.test.js\", [\n"
+              + "      [\"a\", \"b\", '\"oldValue\"'],\n"
+              + "    ]);\n"
+              + "    this.rewrite(\n"
+              + "      \"src/foo.js\",\n"
+              + "      implementation.text(\"^\", \"a\") + \"newValue\" + implementation.text(\"b\", \"$\")\n"
+              + "    );\n"
+              + "    this.rewrite(\n"
+              + "      \"tests/foo.test.js\",\n"
+              + "      test.text(\"^\", \"a\") + '\"newValue\"' + test.text(\"b\", \"$\")\n"
+              + "    );\n"
+              + "    return { changed: [\"src/foo.js\", \"tests/foo.test.js\"] };\n"
+              + "  }\n"
+              + "}" }
+          { Requires = set [ JsCapability.Read; JsCapability.Glob; JsCapability.Edit ]
+            Source =
+              "class Js extends JsProgram {\n"
+              + "  async run() {\n"
+              + "    const paths = await this.glob(\"src/**/*.js\");\n"
+              + "    const changed = [];\n"
+              + "    for (const path of paths) {\n"
+              + "      const file = await this.file(path);\n"
+              + "      const oldText = file.text();\n"
+              + "      if (!/\\boldApi\\b/.test(oldText)) continue;\n"
+              + "      this.rewrite(path, oldText.replaceAll(\"oldApi\", \"newApi\"));\n"
+              + "      changed.push(path);\n"
+              + "    }\n"
+              + "    return { changed };\n"
+              + "  }\n"
+              + "}" } ]
+
+    let filteredExamples (capabilities: Set<JsCapability>) : JsExample list =
+        examples
+        |> List.filter (fun example -> Set.isSubset example.Requires capabilities)
+
+    let render (toolName: string) (capabilities: Set<JsCapability>) : string =
+        let exampleBlocks =
+            filteredExamples capabilities
+            |> List.map (fun example -> "```js\n" + example.Source + "\n```")
+            |> String.concat "\n\n"
+
+        String.concat
+            "\n\n"
+            [ header
+              contract toolName capabilities
+              "```js\n" + publicBaseClass capabilities + "\n```"
+              rules capabilities
+              "Examples:\n\n" + exampleBlocks
+              footer ]
 
 /// The generated js-ROLE surface for one Attempt profile. Deterministic:
 /// same capabilities → same bytes (JS-002; fast/deep identical).
@@ -126,36 +641,22 @@ module JsToolGenerator =
         capabilities
         |> Set.toList
         |> List.sortBy JsCapability.order
-        |> List.map (fun capability -> Map.find capability JsFragmentRegistry.byCapability)
+        |> List.choose (fun capability -> Map.tryFind capability JsFragmentRegistry.byCapability)
 
     let toolNameFor (roleName: string) : string = "js-" + roleName.ToLowerInvariant()
 
-    let renderBaseClass (members: JsCapabilityFragment list) : string =
-        let memberLines =
-            members
-            |> List.map (fun fragment ->
-                $"    {fragment.MemberName}(...args) {{ return this._api.{fragment.RuntimeBindingKey}(...args); }}")
+    let renderBaseClass (capabilities: Set<JsCapability>) : string =
+        JsCanonicalDescription.runtimeBaseClass capabilities
 
-        String.concat
-            "\n"
-            ("class JsProgram {" :: "  constructor(api) { this._api = api; }" :: memberLines
-             @ [ "}" ])
+    let renderPublicBaseClass (capabilities: Set<JsCapability>) : string =
+        JsCanonicalDescription.publicBaseClass capabilities
 
-    let renderDescription (roleName: string) (members: JsCapabilityFragment list) : string =
-        let methodList =
-            members |> List.map (fun fragment -> fragment.MemberName) |> String.concat ", "
+    let renderDescription (roleName: string) (capabilities: Set<JsCapability>) : string =
+        JsCanonicalDescription.render (toolNameFor roleName) capabilities
 
-        "Capability-projected JavaScript SDK for "
-        + roleName
-        + ". "
-        + "Program filesystem work as one all-or-nothing JS program; parallel calls are safe. "
-        + "Available methods: "
-        + methodList
-        + ". "
-        + "Prefer this tool over builtin read/edit/write/glob/grep."
-
-    let renderExamples (members: JsCapabilityFragment list) : string list =
-        members |> List.map (fun fragment -> fragment.CanonicalExample)
+    let renderExamples (capabilities: Set<JsCapability>) : string list =
+        JsCanonicalDescription.filteredExamples capabilities
+        |> List.map (fun example -> example.Source)
 
     /// Deterministic projection: an Attempt profile with no filesystem
     /// capability gets no js-* surface at all (JS-001/004).
@@ -172,9 +673,9 @@ module JsToolGenerator =
                   RoleName = roleName
                   Capabilities = jsCapabilities
                   Members = members
-                  Description = renderDescription roleName members
-                  BaseClassSource = renderBaseClass members
-                  Examples = renderExamples members
+                  Description = renderDescription roleName jsCapabilities
+                  BaseClassSource = renderBaseClass jsCapabilities
+                  Examples = renderExamples jsCapabilities
                   RuntimeBindings =
                     members
                     |> List.map (fun fragment -> fragment.MemberName, fragment.RuntimeBindingKey)

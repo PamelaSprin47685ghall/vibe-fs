@@ -28,10 +28,9 @@ const GOOD_JS_TOOLS = `
 module JsFragmentRegistry =
     let read: JsCapabilityFragment = Unchecked.defaultof<_>
     let glob: JsCapabilityFragment = Unchecked.defaultof<_>
-    let grep: JsCapabilityFragment = Unchecked.defaultof<_>
     let rewrite: JsCapabilityFragment = Unchecked.defaultof<_>
     let write: JsCapabilityFragment = Unchecked.defaultof<_>
-    let all: JsCapabilityFragment list = [ read; glob; grep; rewrite; write ]
+    let all: JsCapabilityFragment list = [ read; glob; rewrite; write ]
 `
 
 const GOOD_SURFACE_TEST = `
@@ -50,7 +49,7 @@ type Role =
 `
 
 test('capability_iso_documents_required_tokens', () => {
-  assert.deepEqual([...REQUIRED_FRAGMENT_CAPS], ['read', 'glob', 'grep', 'rewrite', 'write'])
+  assert.deepEqual([...REQUIRED_FRAGMENT_CAPS], ['read', 'glob', 'rewrite', 'write'])
   assert.deepEqual([...REQUIRED_SURFACE_TEST_TOKENS], ['JS004', 'layersOf', 'memberBinding'])
   assert.deepEqual([...FORBIDDEN_ROLE_TOKENS], ['Student', 'Teacher'])
 })
@@ -68,7 +67,7 @@ test('capability_iso_tool_registry_requires_generator', () => {
   assert.ok(handwritten.some((v) => v.code === 'handwritten-js-tool-spec'))
 })
 
-test('capability_iso_js_fragment_registry_requires_five_caps', () => {
+test('capability_iso_js_fragment_registry_requires_member_caps', () => {
   assert.equal(scanJsFragmentRegistry(GOOD_JS_TOOLS).length, 0)
 
   const noModule = scanJsFragmentRegistry('module Other\nlet read: int = 1\n')
@@ -78,9 +77,8 @@ test('capability_iso_js_fragment_registry_requires_five_caps', () => {
 module JsFragmentRegistry =
     let read: JsCapabilityFragment = Unchecked.defaultof<_>
     let glob: JsCapabilityFragment = Unchecked.defaultof<_>
-    let grep: JsCapabilityFragment = Unchecked.defaultof<_>
     let rewrite: JsCapabilityFragment = Unchecked.defaultof<_>
-    let all: JsCapabilityFragment list = [ read; glob; grep; rewrite ]
+    let all: JsCapabilityFragment list = [ read; glob; rewrite ]
 `)
   assert.ok(missingWrite.some((v) => v.code === 'missing-fragment-cap'))
   assert.ok(missingWrite.some((v) => v.detail?.includes('write')))

@@ -74,14 +74,15 @@ module JsToolSpec =
         (workspaceRoot: string)
         (persistence: (IEventStore * IGitRawStore) option)
         : ToolSpec =
-        let readProgram (args: obj) : string option =
-            // args["program"] — the model's `class Js extends JsProgram { ... }`
-            let raw = args?program
-            if isUndefined raw then None else Some(string raw)
+        let readProgram (args: HostToolArguments) : string option = args.OptionalText "program"
 
         { Name = surface.ToolName
           Description = surface.Description
-          Arguments = [ "program", ToolHostCodec.stringSchema factory ]
+          Arguments =
+            [ "program",
+              ToolHostCodec.stringSchemaDescribed
+                  "Exactly one class named Js that extends the generated JsProgram in this tool description and implements async run()."
+                  factory ]
           Execute =
             fun args _ ->
                 task {

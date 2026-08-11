@@ -159,37 +159,17 @@ module JsToolsBindings =
 
                                     createObj [ "ok" ==> true; "matches" ==> (List.toArray flattened) ]
                         "edit"
-                        ==> fun (path: string) (args: obj) ->
-                            let find = args?find
-                            let replace = string (args?replace)
-
-                            let occurrence =
-                                let raw = args?occurrence
-                                if isUndefined raw then 0 else int raw
+                        ==> fun (path: string) (newText: obj) ->
+                            let replacement = string newText
 
                             match resolveInside root path with
                             | Error failure -> failureObj failure
                             | Ok full ->
-                                match anchorOf find with
+                                match JsToolsFs.readUtf8Classified full with
                                 | Error failure -> failureObj failure
-                                | Ok spec ->
-                                    match JsToolsFs.readUtf8Classified full with
-                                    | Error failure -> failureObj failure
-                                    | Ok current ->
-                                        let locate =
-                                            if occurrence > 0 then
-                                                JsToolsFs.findAnchor current spec occurrence
-                                            else
-                                                JsToolsFs.requireUnique current spec
-
-                                        match locate with
-                                        | Error failure -> failureObj failure
-                                        | Ok(startPos, endPos) ->
-                                            let newText =
-                                                current.Substring(0, startPos) + replace + current.Substring(endPos)
-
-                                            staging.Add(JsStagedMutation.Rewrite(path, current, newText))
-                                            createObj [ "ok" ==> true ]
+                                | Ok current ->
+                                    staging.Add(JsStagedMutation.Rewrite(path, current, replacement))
+                                    createObj [ "ok" ==> true ]
                         "write"
                         ==> fun (path: string) (text: string) ->
                             match resolveInside root path with

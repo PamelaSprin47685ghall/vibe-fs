@@ -27,9 +27,10 @@ resolve Attempt
 profile.ToolCapabilitySet
 → 过滤出文件系统相关 capabilities（Read/Write/Edit/Glob/Grep）
 → Capability Fragment Registry 逐能力取 member fragment
-→ 拼接 base class（class Js extends JsProgram { file/glob/... }）
-→ 拼接 description（只列存在的方法）
-→ 拼接 canonical examples（只含存在的方法）
+→ 拼接 runtime 代理基类（沙箱用；含 `_api`；file() 语义与公开算法等价）
+→ 拼接公开 JsProgram（Read 时嵌入 §16 file() 全文；Glob/Edit/Write 为 Host stub；始终有 run()）
+→ 拼接 description = header + 模型合同（Prefer js-ROLE / 并行 / 复杂 program）+ 公开基类 + 仅当前能力的规则 + Requires ⊆ capabilities 的 §31–§43 examples + footer
+→ Grep 不是 member；Read+Glob 时加入 grep-style example（glob + file + RegExp）
 → 生成 runtime capability bindings（存在的方法 ↔ 实际执行器）
 → 生成 BuiltinToolDescriptionHook 文案（引用 js-ROLE 名称）
 ```
@@ -46,7 +47,7 @@ profile.ToolCapabilitySet
 
 ## FileView
 
-`file(path)` 读取时快照不可变视图。read 路径：strict UTF-8 校验 → 快照缓存 → 返回。同一 program 内 mutation 不改变先前取得的 FileView（快照隔离）。
+`file(path, matches = [])` 读取时快照不可变视图并按序解析 anchors。read 路径：strict UTF-8 校验 → 快照缓存 → FileView.text(from, to)。同一 program 内 mutation 不改变先前取得的 FileView（快照隔离）。
 
 ## Transaction
 

@@ -48,6 +48,7 @@ const {
   ToolHostCodec_register: register,
   ToolHostCodec_registry: registry,
   ToolHostCodec_stringSchema: stringSchema,
+  ToolHostCodec_stringSchemaDescribed: stringSchemaDescribed,
   ToolHostCodec_tomlObject: tomlObject,
   ToolHostCodec_tomlObjectWithInstructions: tomlObjectWithInstructions,
   ToolHostCodec_tomlTable: tomlTable,
@@ -101,7 +102,11 @@ test('CODEC_schema_dsl_builds_each_shape', () => {
   const toolModule = {
     tool: {
       schema: {
-        string: () => ({ schema: 'string', optional: () => ({ schema: 'string-optional' }) }),
+        string: () => ({
+          schema: 'string',
+          describe: (description) => ({ schema: 'string-described', description }),
+          optional: () => ({ schema: 'string-optional' }),
+        }),
         number: () => ({ schema: 'number', optional: () => ({ schema: 'number-optional' }) }),
         enum: (values) => ({
           describe: (description) => ({
@@ -121,6 +126,10 @@ test('CODEC_schema_dsl_builds_each_shape', () => {
   const unwrap = (hostSchema) => hostSchema.fields[0]
 
   assert.equal(unwrap(stringSchema(factory)).schema, 'string')
+  assert.deepEqual(unwrap(stringSchemaDescribed('program source', factory)), {
+    schema: 'string-described',
+    description: 'program source',
+  })
   assert.equal(unwrap(numberSchema(factory)).schema, 'number')
 
   const described = unwrap(enumSchemaDescribed(toList(['a', 'b']), 'pick one', factory))

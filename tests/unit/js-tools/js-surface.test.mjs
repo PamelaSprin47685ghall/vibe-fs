@@ -27,15 +27,15 @@ const memberNames = (s) => listItems(s.Members).map((fragment) => fragment.Membe
 const PERMISSION_NAMES = [
   'Fork', 'Join', 'List', 'Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move',
   'Remove', 'Inspector', 'Coder', 'Exec', 'Pty', 'Network', 'Verdict', 'Blog',
-  'Return', 'Finality', 'BashHoneypot',
+  'Return', 'Finality', 'BashHoneypot', 'Fetch',
 ]
 const toolPermissionByName = Object.fromEntries(PERMISSION_NAMES.map((n) => [n, ToolPermission[n]]))
 const permsOf = (names) => names.map((n) => toolPermissionByName[n])
 const fsPermissionsOf = (role) =>
-  roles.permissions(roles.of(role)).filter((n) => ['Read', 'Write', 'Edit', 'Glob', 'Grep'].includes(n))
+  roles.permissions(roles.of(role)).filter((n) => ['Read', 'Write', 'Edit', 'Glob'].includes(n))
 
-const MEMBER_BY_PERMISSION = { Read: 'file', Glob: 'glob', Grep: 'grep', Edit: 'rewrite', Write: 'write' }
-const BINDING_BY_MEMBER = { file: 'js.read', glob: 'js.glob', grep: 'js.grep', rewrite: 'js.edit', write: 'js.write' }
+const MEMBER_BY_PERMISSION = { Read: 'file', Glob: 'glob', Edit: 'rewrite', Write: 'write' }
+const BINDING_BY_MEMBER = { file: 'js.read', glob: 'js.glob', rewrite: 'js.edit', write: 'js.write' }
 
 // The four layers a capability must light up: member, description, example,
 // runtime binding, base class. A member missing from any layer is exactly a
@@ -86,14 +86,14 @@ test('JS002_generation_is_deterministic_and_names_js_role', () => {
   assert.equal(a.Description, b.Description)
   assert.equal(a.BaseClassSource, b.BaseClassSource)
   assert.deepEqual(a.Examples, b.Examples)
-  assert.equal(a.Capabilities.size, 5)
+  assert.equal(a.Capabilities.size, 4)
 })
 
 test('JS004_four_layer_exactness_coder', () => {
   const result = surface('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
   assert.equal(isSome(result), true)
   const layers = layersOf(result)
-  assert.deepEqual(Object.keys(layers).sort(), ['file', 'glob', 'grep', 'rewrite', 'write'])
+  assert.deepEqual(Object.keys(layers).sort(), ['file', 'glob', 'rewrite', 'write'])
   for (const [member, layer] of Object.entries(layers)) {
     assert.equal(layer.inBaseClass, true, `${member} in base class`)
     assert.equal(layer.inDescription, true, `${member} in description`)
@@ -105,15 +105,12 @@ test('JS004_four_layer_exactness_coder', () => {
 test('JS004_absent_capability_is_absent_in_all_four_layers', () => {
   const result = surface('Inspector', ['Read', 'Glob', 'Grep']) // no Edit / Write
   assert.equal(isSome(result), true)
-  assert.deepEqual(memberNames(result), ['file', 'glob', 'grep'])
-  // description lists only present members; the builtin-name substring
-  // 'read/edit/write/glob/grep' appears in the recommendation line, so assert
-  // on the Available-methods clause instead.
-  assert.equal(result.Description.includes('Available methods: file, glob, grep'), true)
-  assert.equal(result.Description.includes('Available methods: file, glob, grep, rewrite, write'), false)
+  assert.deepEqual(memberNames(result), ['file', 'glob'])
+  assert.equal(result.Description.includes('rewrite(path'), false)
+  assert.equal(result.Description.includes('write(path'), false)
   assert.equal(result.BaseClassSource.includes('js.edit'), false)
   assert.equal(result.BaseClassSource.includes('js.write'), false)
-  assert.equal(listItems(result.Examples).length, 3)
+  assert.equal(listItems(result.Examples).some((example) => example.includes('this.rewrite')), false)
 })
 
 test('JS001_generated_name_gate_rejects_forged_names', () => {
@@ -140,14 +137,14 @@ test('JS002_same_capabilities_same_surface_across_roles', () => {
   const a = generate('Coder', caps(ToolPermission.Read))
   const b = generate('Reviewer', caps(ToolPermission.Read))
   assert.equal(a.BaseClassSource, b.BaseClassSource)
-  assert.equal(a.Description.includes('Coder'), true)
-  assert.equal(b.Description.includes('Reviewer'), true)
   assert.equal(a.ToolName, 'js-coder')
   assert.equal(b.ToolName, 'js-reviewer')
+  assert.equal(a.Description.includes('js-coder'), true)
+  assert.equal(b.Description.includes('js-reviewer'), true)
 })
 
 test('JS001_non_fs_permissions_never_produce_members', () => {
-  for (const name of PERMISSION_NAMES.filter((n) => !['Read', 'Write', 'Edit', 'Glob', 'Grep'].includes(n))) {
+  for (const name of PERMISSION_NAMES.filter((n) => !['Read', 'Write', 'Edit', 'Glob'].includes(n))) {
     const result = generate('Coder', caps(toolPermissionByName[name]))
     assert.equal(isNone(result), true, `${name} alone must not generate a surface`)
   }
@@ -160,6 +157,31 @@ test('JS004_fast_deep_profiles_generate_identical_surfaces', () => {
   const deep = generate('Coder', caps(ToolPermission.Read, ToolPermission.Glob))
   assert.equal(fast.BaseClassSource, deep.BaseClassSource)
   assert.equal(fast.Description, deep.Description)
+})
+
+test('JS002_description_embeds_spec_base_class_rules_and_examples', () => {
+  const coder = surface('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
+  for (const token of [
+    'class JsProgram',
+    'class Js extends JsProgram',
+    'HOST_READ_IMMUTABLE_UTF8_SNAPSHOT',
+    'text(from = "^", to = "$")',
+    'ordered',
+    'begin',
+    'end',
+    'complete resulting file',
+    'oldString',
+    'Anchors locate',
+    'Define exactly one class named Js',
+  ]) {
+    assert.equal(coder.Description.includes(token), true, `coder description missing: ${token}`)
+  }
+  assert.equal(coder.Description.includes('_api'), false)
+  assert.equal(coder.Description.includes('js.read'), false)
+  const inspector = surface('Inspector', ['Read', 'Glob', 'Grep'])
+  assert.equal(inspector.Description.includes('HOST_READ_IMMUTABLE_UTF8_SNAPSHOT'), true)
+  assert.equal(inspector.Description.includes('matchAll'), true)
+  assert.equal(inspector.Description.includes('this.rewrite'), false)
 })
 
 test('JS004_lying_generator_counterexample_is_rejected', () => {

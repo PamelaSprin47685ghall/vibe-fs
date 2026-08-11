@@ -95,6 +95,9 @@ module ToolHostCodec =
     [<Emit("$0.schema.string()")>]
     let private rawStringSchema (tool: obj) : obj = jsNative
 
+    [<Emit("$0.schema.string().describe($1)")>]
+    let private rawStringSchemaDescribed (tool: obj) (description: string) : obj = jsNative
+
     [<Emit("$0.schema.number()")>]
     let private rawNumberSchema (tool: obj) : obj = jsNative
 
@@ -207,6 +210,10 @@ module ToolHostCodec =
     let factory (toolModule: obj) = HostToolFactory(toolModule?tool)
 
     let stringSchema (HostToolFactory factory) = HostSchema(rawStringSchema factory)
+
+    let stringSchemaDescribed description (HostToolFactory factory) =
+        HostSchema(rawStringSchemaDescribed factory description)
+
     let numberSchema (HostToolFactory factory) = HostSchema(rawNumberSchema factory)
 
     let enumSchema values (HostToolFactory factory) =
