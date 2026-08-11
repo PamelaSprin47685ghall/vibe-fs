@@ -473,18 +473,21 @@ test('ENFORCER_stopPhysicalRun_argument_order_is_messages_then_fallback', () => 
   // Call sites must pass (rawMessages, fallback, reason), not swapped.
   const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
   const host = readFileSync(join(root, 'src/Wanxiangshu/Session/EnforcerHost.fs'), 'utf8')
+  const continuation = readFileSync(join(root, 'src/Wanxiangshu/Session/EnforcerContinuation.fs'), 'utf8')
 
   assert.match(
     host,
-    /let private stopPhysicalRun \(messages: obj list\) \(fallback: obj list\) \(reason: string\)/,
+    /let private stopPhysicalRun\s*\(messages: obj list\)\s*\(fallback: obj list\)\s*\(reason: string\)/,
     'definition order is messages, fallback, reason',
   )
-  // All production call sites: first arg is rawMessages (or same on both sides).
+  // The only remaining direct call site is the ctx.Stop injection in mkCtx
+  // (first arg rawMessages on both sides); continuation branches go through
+  // ctx.Stop and must not re-call stopPhysicalRun directly.
   const calls = [...host.matchAll(/stopPhysicalRun\s+(\w+)\s+(\w+)\s+/g)].map((m) => [
     m[1],
     m[2],
   ])
-  assert.ok(calls.length >= 3, `expected call sites, got ${calls.length}`)
+  assert.ok(calls.length >= 1, `expected injection call site, got ${calls.length}`)
   for (const [first, second] of calls) {
     assert.equal(
       first,
@@ -492,6 +495,11 @@ test('ENFORCER_stopPhysicalRun_argument_order_is_messages_then_fallback', () => 
       `stopPhysicalRun first arg must be rawMessages, got ${first} ${second}`,
     )
   }
+  assert.doesNotMatch(
+    continuation,
+    /stopPhysicalRun\s+\w+\s+\w+\s+/,
+    'continuation branches must use ctx.Stop, never stopPhysicalRun directly',
+  )
 })
 
 test('EXEC_012_the_output_threshold_is_tripled_and_saturates_instead_of_overflowing', () => {

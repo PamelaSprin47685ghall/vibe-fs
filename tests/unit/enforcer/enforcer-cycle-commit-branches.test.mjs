@@ -43,9 +43,11 @@ const {
 const {
   handleContinuation,
   tryRefreshMainContextFromJournal,
+} = await import('../../../dist/Session/EnforcerHost.js')
+const {
   CycleDisposition_$reflection,
   ContinuationOutcome_$reflection,
-} = await import('../../../dist/Session/EnforcerHost.js')
+} = await import('../../../dist/Session/EnforcerContinuation.js')
 const {
   CycleCommitOutcome_$reflection,
 } = await import('../../../dist/Session/EnforcerCycleCommit.js')

@@ -107,10 +107,11 @@
     "src/Wanxiangshu/Session/BloggerCoordinator.fs": 403,
     "src/Wanxiangshu/Session/CompanionHost.fs": 271,
     "src/Wanxiangshu/Session/CompletionMailbox.fs": 256,
+    "src/Wanxiangshu/Session/EnforcerContinuation.fs": 673,
     "src/Wanxiangshu/Session/EnforcerCycleCommit.fs": 243,
     "src/Wanxiangshu/Session/EnforcerCycleDecode.fs": 212,
     "src/Wanxiangshu/Session/EnforcerFrameRecovery.fs": 394,
-    "src/Wanxiangshu/Session/EnforcerHost.fs": 905,
+    "src/Wanxiangshu/Session/EnforcerHost.fs": 314,
     "src/Wanxiangshu/Session/EnforcerRepair.fs": 202,
     "src/Wanxiangshu/Session/ForkRuntime.fs": 300,
     "src/Wanxiangshu/Session/HandleCompletionCodec.fs": 305,
@@ -195,10 +196,10 @@
     "tests/unit/domain/loop-sensor.test.mjs": 431,
     "tests/unit/domain/magic-todo-projection.test.mjs": 263,
     "tests/unit/domain/reconcile-program.test.mjs": 248,
-    "tests/unit/enforcer/blogger-convergence-gaps.test.mjs": 321,
+    "tests/unit/enforcer/blogger-convergence-gaps.test.mjs": 327,
     "tests/unit/enforcer/blogger-crash-recovery.test.mjs": 338,
     "tests/unit/enforcer/bounds.test.mjs": 208,
-    "tests/unit/enforcer/enforcer-cycle-commit-branches.test.mjs": 716,
+    "tests/unit/enforcer/enforcer-cycle-commit-branches.test.mjs": 718,
     "tests/unit/enforcer/enforcer-cycle-protocol.test.mjs": 1122,
     "tests/unit/enforcer/enforcer-open-reload.test.mjs": 476,
     "tests/unit/enforcer/enforcer-predicate-branches.test.mjs": 514,
@@ -209,7 +210,7 @@
     "tests/unit/execution/executor-summarize.test.mjs": 300,
     "tests/unit/execution/fork-child-payload.test.mjs": 292,
     "tests/unit/execution/handle-abandoned.test.mjs": 227,
-    "tests/unit/execution/handle.test.mjs": 714,
+    "tests/unit/execution/handle.test.mjs": 722,
     "tests/unit/execution/join-abort-clean-break.test.mjs": 482,
     "tests/unit/execution/join-completion-property.test.mjs": 264,
     "tests/unit/execution/join-completion.test.mjs": 201,
@@ -291,46 +292,5 @@
     "tests/unit/verify/session-ownership-ratchet.test.mjs": 259,
     "tests/unit/verify/unified-store-gate.test.mjs": 231
   },
-  "_exceptions": {
-    "src/Wanxiangshu/Kernel/Fact.fs": {
-      "owner": "durable fact vocabulary",
-      "reason": "single serialized algebra; physical size does not mix lifecycle/effect ownership (Wave 4 verdict, proposal ch. 6)"
-    },
-    "src/Wanxiangshu/Kernel/Identity.fs": {
-      "owner": "durable identity vocabulary",
-      "reason": "single serialized algebra of identity types; no lifecycle/effect ownership mixed"
-    },
-    "src/Wanxiangshu/Domain/MagicTodo.fs": {
-      "owner": "magic-todo domain algebra",
-      "reason": "one cohesive algebra (id derivation + canonical wire + status machine)"
-    },
-    "src/Wanxiangshu/Domain/SyntheticToml.fs": {
-      "owner": "synthetic TOML generator",
-      "reason": "single declarative generator; one reason to change (wire format)"
-    },
-    "src/Wanxiangshu/Domain/JsDescription.fs": {
-      "owner": "js-ROLE canonical description generator",
-      "reason": "JsCanonicalDescription is one cohesive generator (proposal ch. 7 kept it whole)"
-    },
-    "src/Wanxiangshu/Domain/PromptAuthority.fs": {
-      "owner": "prompt authority protocol algebra",
-      "reason": "high protocol sensitivity; single authority ledger algebra (proposal P2)"
-    },
-    "src/Wanxiangshu/Application/Reconciliation/XTraceCapture.fs": {
-      "owner": "semantic trace capture algebra",
-      "reason": "one capture algebra (stable + positional insertion); single reason to change"
-    },
-    "src/Wanxiangshu/Infrastructure/Persist/GitRawStore.fs": {
-      "owner": "git raw store adapter",
-      "reason": "single external-failure-law adapter (git storage boundary)"
-    },
-    "src/Wanxiangshu/Infrastructure/OpenCode/Host/OpenCodePort.fs": {
-      "owner": "OpenCode host port adapter",
-      "reason": "single host boundary adapter (OpenCode API surface)"
-    },
-    "src/Wanxiangshu/Infrastructure/OpenCode/Host/ManagerNarrativeTransform.fs": {
-      "owner": "manager narrative rewrite decision",
-      "reason": "typed-evidence to rewrite-decision transform; raw parsing converged into Codec (Wave 3)"
-    }
-  }
+  "_exceptions": {}
 }

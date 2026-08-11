@@ -29,7 +29,7 @@ const interpreterSrc = readFileSync(
   'utf8',
 )
 const enforcerSrc = readFileSync(
-  join(ROOT, 'src/Wanxiangshu/Session/EnforcerHost.fs'),
+  join(ROOT, 'src/Wanxiangshu/Session/EnforcerContinuation.fs'),
   'utf8',
 )
 const repairSrc = readFileSync(

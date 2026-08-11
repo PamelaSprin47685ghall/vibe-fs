@@ -150,10 +150,14 @@ test('C0_commit_uses_live_InFlight_only_not_open_heal', () => {
   // is not in the list). Commit must peek InFlight only — healing open here
   // rebinds a new RequestId onto an old provider run (stale-cycle race).
   // Durable open reload stays for rebuild / crash recovery, not cycle commit.
-  const host = prodText('src/Wanxiangshu/Session/EnforcerHost.fs')
+  const host = prodText('src/Wanxiangshu/Session/EnforcerContinuation.fs')
   const recovery = prodText('src/Wanxiangshu/Session/EnforcerFrameRecovery.fs')
   assert.match(host, /tryLiveCycleContext/, 'commit authority is live InFlight peek')
-  assert.match(host, /let liveCtx = EnforcerFrameRecovery\.tryLiveCycleContext/, 'completed-blog arm peeks live only')
+  assert.match(
+    host,
+    /let liveCtx =\s*EnforcerFrameRecovery\.tryLiveCycleContext/,
+    'completed-blog arm peeks live only',
+  )
   assert.match(host, /resolveCycleContext/, 'rebuild/empty-calls still resolve typed context')
   assert.match(recovery, /tryReloadRequestContext/, 'durable open materialization must reload full typed context')
   assert.equal(
@@ -198,7 +202,7 @@ test('C0_no_BloggerNeedsReset_full_X_replay', () => {
 })
 
 test('C0_first_request_does_not_extract_raw_user_toml', () => {
-  const host = prodText('src/Wanxiangshu/Session/EnforcerHost.fs')
+  const host = prodText('src/Wanxiangshu/Session/EnforcerContinuation.fs')
   const extractsRawToml =
     /Extract the TOML from the raw messages/.test(host) ||
     /last user[\s\S]{0,80}toml/i.test(host) ||
@@ -237,7 +241,7 @@ test('C0_squash_constructs_typed_BloggerRequestContext_Squash_in_production', ()
 // ── commit / park ───────────────────────────────────────────────────────────
 
 test('C0_park_only_after_KnownCommitted', () => {
-  const host = prodText('src/Wanxiangshu/Session/EnforcerHost.fs')
+  const host = prodText('src/Wanxiangshu/Session/EnforcerContinuation.fs')
   assert.match(host, /ParkTransform/,
     'probe: ParkTransform must exist to assert the KnownCommitted gate')
   // P1-3: not-committed paths are CycleDisposition arms (Working/InjectRepair/
@@ -276,8 +280,10 @@ test('C0_commit_drains_via_tryRefresh_before_park', () => {
   // One external wake may need many ≤200 KiB cycles. After BlogObservationCommitted the
   // continuation must re-chunk from durable coverage (tryRefresh) and continue
   // without waiting for a new main-session wake. Stale PendingOffer is not enough.
-  const host = prodText('src/Wanxiangshu/Session/EnforcerHost.fs')
-  const refresh = host.lastIndexOf('tryRefreshMainContextFromJournal', host.indexOf('ParkTransform'))
+  const host = prodText('src/Wanxiangshu/Session/EnforcerContinuation.fs')
+  // EnforcerHost injects the re-chunk through ctx.RefreshMainContext; the
+  // commit branch must use it before parking.
+  const refresh = host.lastIndexOf('RefreshMainContext', host.indexOf('ParkTransform'))
   const park = host.indexOf('ParkTransform')
   assert.ok(refresh >= 0 && park > refresh,
     'post-commit path must tryRefresh (catch-up drain) before ParkTransform')
@@ -289,7 +295,7 @@ test('C0_commit_drains_via_tryRefresh_before_park', () => {
   // Stale PendingOffer must not be preferred over re-chunk.
   assert.match(
     host,
-    /TryTakePendingOffer key \|> ignore[\s\S]{0,400}tryRefreshMainContextFromJournal/,
+    /TryTakePendingOffer key \|> ignore[\s\S]{0,400}RefreshMainContext/,
     'PendingOffer is discarded; next window always re-chunks from coverage',
   )
 })

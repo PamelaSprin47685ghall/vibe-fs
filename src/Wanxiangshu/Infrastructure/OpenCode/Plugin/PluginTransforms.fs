@@ -344,7 +344,7 @@ module PluginTransforms =
                                     (durable: AgentJournal)
                                     (sid: SessionId)
                                     (rawMessages: obj list)
-                                    : EnforcerHost.RecoveryStageProbe =
+                                    : EnforcerContinuation.RecoveryStageProbe =
                                     fun ctx ->
                                         let terminalRun =
                                             match EnforcerCycleDecode.lastAssistantStep rawMessages with
@@ -367,7 +367,7 @@ module PluginTransforms =
                                         bloggerMessages
 
                                 match outcome with
-                                | EnforcerHost.ContinuationOutcome.ProjectMessages messages ->
+                                | EnforcerContinuation.ContinuationOutcome.ProjectMessages messages ->
                                     let projected =
                                         if List.isEmpty messages then
                                             Diagnostic.emit
@@ -380,7 +380,7 @@ module PluginTransforms =
                                             messages
 
                                     HostMessageProjection.replaceMessagesInPlace outObj projected
-                                | EnforcerHost.ContinuationOutcome.StopPhysicalRun(messages, reason) ->
+                                | EnforcerContinuation.ContinuationOutcome.StopPhysicalRun(messages, reason) ->
                                     let projected = if List.isEmpty messages then bloggerMessages else messages
 
                                     HostMessageProjection.replaceMessagesInPlace outObj projected

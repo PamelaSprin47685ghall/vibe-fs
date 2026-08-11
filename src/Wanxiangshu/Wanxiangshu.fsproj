@@ -281,6 +281,7 @@
     <Compile Include="Session/EnforcerCycleCommit.fs"/>
     <Compile Include="Session/EnforcerFrameRecovery.fs"/>
     <Compile Include="Session/EnforcerRepair.fs"/>
+    <Compile Include="Session/EnforcerContinuation.fs"/>
     <Compile Include="Session/EnforcerHost.fs"/>
     <Compile Include="Session/CompanionHostBlogger.fs"/>
     <Compile Include="Session/CompanionJournalPort.fs"/>
