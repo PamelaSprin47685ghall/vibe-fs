@@ -504,3 +504,303 @@ export const withPluginClient = async (client, body) => {
 }
 
 export const withPlugin = async (body) => withPluginClient({}, body)
+
+// ── Magic Todo Phase 0 Host V1 contract helpers (test-only) ──────────────────
+//
+// Mirror the OpenCode V1 tool-hook call shape used by:
+//   packages/opencode/src/tool/registry.ts  (tool.definition)
+//   packages/opencode/src/session/tools.ts  (execute.before → execute → after)
+//   packages/opencode/src/tool/tool.ts      (original parameters decoder)
+//   packages/opencode/src/tool/todo.ts      (V1 todowrite Parameters)
+//
+// These helpers do not import production membrane code. They only freeze the
+// Host call contract that membrane implementations must satisfy.
+
+import { Schema, Result } from 'effect'
+
+/** V1 Todo.Info — content/status/priority only (no id/kind). */
+export const V1_TODO_INFO = Schema.Struct({
+  content: Schema.String,
+  status: Schema.String,
+  priority: Schema.String,
+})
+
+/** Original V1 todowrite parameters decoder (Host Tool.define wraps this). */
+export const V1_TODOWRITE_PARAMETERS = Schema.Struct({
+  todos: Schema.mutable(Schema.Array(V1_TODO_INFO)),
+})
+
+const decodeV1TodoWriteUnknown = Schema.decodeUnknownResult(V1_TODOWRITE_PARAMETERS)
+
+/**
+ * Run the original V1 todowrite decoder the way Host `Tool.define` does after
+ * `tool.execute.before` returns. Returns `{ ok, value?, error? }`.
+ */
+export const decodeV1TodoWriteArgs = (args) => {
+  const result = decodeV1TodoWriteUnknown(args)
+  if (Result.isSuccess(result)) return { ok: true, value: result.success }
+  return { ok: false, error: result.failure }
+}
+
+/**
+ * Host `tool.definition` registry wrap (registry.ts):
+ * builds `{ description, parameters, jsonSchema }`, triggers the hook with
+ * positional `(input, output)`, then applies the ternary that drops jsonSchema
+ * when only `parameters` identity changed.
+ */
+export const applyToolDefinitionHook = async (hook, tool) => {
+  const output = {
+    description: tool.description,
+    parameters: tool.parameters,
+    jsonSchema: tool.jsonSchema,
+  }
+  if (typeof hook === 'function') {
+    await hook({ toolID: tool.id }, output)
+  }
+  const jsonSchema =
+    output.parameters === tool.parameters || output.jsonSchema !== tool.jsonSchema
+      ? output.jsonSchema
+      : undefined
+  return {
+    id: tool.id,
+    description: output.description,
+    parameters: output.parameters,
+    jsonSchema,
+    // Host keeps the original execute wrapper — definition never replaces it.
+    execute: tool.execute,
+    originalParameters: tool.parameters,
+  }
+}
+
+/**
+ * Host V1 execute path (session/tools.ts):
+ *   before(input, { args })  — mutates local args in place
+ *   item.execute(args, ctx)  — original decoder+body; throw skips after
+ *   after(input, output)     — only on success
+ *
+ * Returns observations needed by canaries A-precondition / B / C / F.
+ */
+export const runHostV1ToolExecutePath = async ({
+  toolID,
+  sessionID,
+  callID,
+  args,
+  before,
+  after,
+  execute,
+  decode = decodeV1TodoWriteArgs,
+}) => {
+  const beforeInput = { tool: toolID, sessionID, callID }
+  const beforeOutput = { args }
+  const argsIdentityBefore = args
+  const argsSnapshotBefore = structuredClone(args)
+
+  if (typeof before === 'function') {
+    await before(beforeInput, beforeOutput)
+  }
+
+  // Host never rebinds the local `args` binding from `output.args = …`.
+  // Only in-place field mutation on the original object reaches execute.
+  const executorArgs = args
+  const replacedArgsObject = beforeOutput.args !== argsIdentityBefore
+  const decodeResult = decode(executorArgs)
+
+  const observation = {
+    argsIdentityUnchanged: executorArgs === argsIdentityBefore,
+    replacedArgsObject,
+    argsSnapshotBefore,
+    argsAfterBefore: structuredClone(executorArgs),
+    beforeOutputArgs: beforeOutput.args,
+    decode: decodeResult,
+    executorSawArgs: executorArgs,
+    afterRan: false,
+    afterOutput: undefined,
+    executeThrew: false,
+    executeError: undefined,
+    executeResult: undefined,
+  }
+
+  if (!decodeResult.ok) {
+    observation.executeThrew = true
+    observation.executeError = decodeResult.error
+    return observation
+  }
+
+  try {
+    const result = await execute(decodeResult.value, {
+      sessionID,
+      callID,
+      abort: new AbortController().signal,
+    })
+    observation.executeResult = result
+    const afterOutput = {
+      title: result?.title ?? '',
+      output: result?.output ?? '',
+      metadata: result?.metadata,
+    }
+    if (typeof after === 'function') {
+      await after(
+        { tool: toolID, sessionID, callID, args: executorArgs },
+        afterOutput,
+      )
+      observation.afterRan = true
+      observation.afterOutput = afterOutput
+    }
+  } catch (error) {
+    observation.executeThrew = true
+    observation.executeError = error
+    // Host: after is only reached after item.execute succeeds.
+  }
+
+  return observation
+}
+
+/** Strip V2-only identity fields so the original V1 decoder receives compatibility rows. */
+export const stripV2TodoIdentityFields = (args) => {
+  if (!args || typeof args !== 'object' || !Array.isArray(args.todos)) return args
+  args.todos = args.todos.map((todo) => {
+    if (!todo || typeof todo !== 'object') return todo
+    const { id: _id, kind: _kind, ...v1 } = todo
+    return v1
+  })
+  return args
+}
+
+/** Baseline V1 todowrite tool record as registry seeds definition output. */
+export const v1TodoWriteToolSeed = (overrides = {}) => ({
+  id: 'todowrite',
+  description:
+    'Create and maintain a structured task list for the current coding session.',
+  parameters: V1_TODOWRITE_PARAMETERS,
+  jsonSchema: {
+    type: 'object',
+    properties: {
+      todos: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            content: { type: 'string' },
+            status: { type: 'string' },
+            priority: { type: 'string' },
+          },
+          required: ['content', 'status', 'priority'],
+        },
+      },
+    },
+    required: ['todos'],
+  },
+  execute: async (params) => ({
+    title: `${params.todos.filter((t) => t.status !== 'completed').length} todos`,
+    output: JSON.stringify(params.todos, null, 2),
+    metadata: { todos: params.todos },
+  }),
+  ...overrides,
+})
+
+/**
+ * Positional Host trigger double — Effect.promise(() => fn(input, output)).
+ * Used to prove registration call shape for definition / before / after.
+ */
+export const hostTrigger = async (fn, input, output) => {
+  if (typeof fn !== 'function') return output
+  await fn(input, output)
+  return output
+}
+
+/** Sample V2 provider wire args (id/kind/reviewing) before membrane stripping. */
+export const sampleV2TodoWriteArgs = () => ({
+  todos: [
+    {
+      content: 'implement membrane',
+      status: 'reviewing',
+      priority: 'high',
+      id: 'todo_existing_1',
+      kind: 'existing',
+    },
+    {
+      content: 'write canaries',
+      status: 'pending',
+      priority: 'medium',
+      id: 'todo_new_1',
+      kind: 'new',
+    },
+  ],
+})
+
+/** V2 advertisement surfaces the membrane will install via tool.definition. */
+export const sampleV2TodoWriteAdvertisement = () => ({
+  description:
+    'Magic Todo V2: tagged id/kind rows and reviewing status. Host sink remains V1.',
+  parameters: {
+    type: 'object',
+    properties: {
+      todos: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            content: { type: 'string' },
+            status: {
+              type: 'string',
+              enum: ['pending', 'in_progress', 'reviewing', 'completed', 'cancelled'],
+            },
+            priority: { type: 'string', enum: ['high', 'medium', 'low'] },
+            id: { type: 'string' },
+            kind: { type: 'string', enum: ['existing', 'new'] },
+          },
+          required: ['content', 'status', 'priority', 'id', 'kind'],
+        },
+      },
+    },
+    required: ['todos'],
+  },
+  jsonSchema: {
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    type: 'object',
+    properties: {
+      todos: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            content: { type: 'string' },
+            status: {
+              type: 'string',
+              enum: ['pending', 'in_progress', 'reviewing', 'completed', 'cancelled'],
+            },
+            priority: { type: 'string', enum: ['high', 'medium', 'low'] },
+            id: { type: 'string' },
+            kind: { type: 'string', enum: ['existing', 'new'] },
+          },
+          required: ['content', 'status', 'priority', 'id', 'kind'],
+        },
+      },
+    },
+    required: ['todos'],
+  },
+})
+
+/**
+ * Fixture-level membrane hook set used only by unit canaries.
+ * Not wired into production SpikePlugin.
+ */
+export const createMagicTodoContractHooks = () => {
+  const advertisement = sampleV2TodoWriteAdvertisement()
+  return {
+    'tool.definition': async (input, output) => {
+      if (input.toolID !== 'todowrite') return
+      output.description = advertisement.description
+      output.parameters = advertisement.parameters
+      output.jsonSchema = advertisement.jsonSchema
+    },
+    'tool.execute.before': async (input, output) => {
+      if (input.tool !== 'todowrite') return
+      // Host only honors in-place mutation of the original args object.
+      stripV2TodoIdentityFields(output.args)
+    },
+    'tool.execute.after': async (_input, _output) => {
+      // Observation-only in Phase 0 unit canaries.
+    },
+  }
+}
