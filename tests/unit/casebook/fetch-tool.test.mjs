@@ -87,3 +87,34 @@ test('CASE009_fetch_never_writes_the_subject', async () => {
     cleanup()
   }
 })
+
+test('CASE011_fetch_single_flight_serializes_same_session', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const raw = createRaw()
+    const store = createStore(raw)
+    writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
+    const caseRec = { SessionId: 's1', Q: 'Q', A: 'A', Observations: toList([fileRead('a.txt', hash('hello'))]), LastAccessOrder: 0 }
+    resultOf(archive(store, raw, caseRec))
+    const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/FetchTool.js')
+    const codec = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
+    const factory = codec.ToolHostCodec_factory({ tool: { schema: { string: () => ({ type: 'string' }) } } })
+    const tool = spec(factory, dir, store, raw)
+
+    // two concurrent fetches for the same session_id — both must succeed and
+    // agree; the single-flight gate must not corrupt either result
+    const [a, b] = await Promise.all([
+      tool.Execute({ session_id: 's1' }, { sessionID: 'ses', agent: 'fast-inspector' }),
+      tool.Execute({ session_id: 's1' }, { sessionID: 'ses', agent: 'fast-inspector' }),
+    ])
+    assert.equal(a.includes('status = "fresh"'), true)
+    assert.equal(a.includes('a = "A"'), true)
+    assert.equal(b, a, 'single-flight callers must observe the same result bytes')
+
+    // after completion the gate is clear — a later fetch still works
+    const later = await tool.Execute({ session_id: 's1' }, { sessionID: 'ses', agent: 'fast-inspector' })
+    assert.equal(later.includes('status = "fresh"'), true)
+  } finally {
+    cleanup()
+  }
+})
