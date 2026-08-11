@@ -454,7 +454,16 @@ module ProjectionPlanner =
 
             match merge insertions [] with
             | Error conflict -> Error conflict
-            | Ok merged -> Ok(Some(ProjectionIntent.InsertStrengthFrames { Items = merged }))
+            | Ok merged ->
+                let canonical =
+                    merged
+                    |> List.sortBy (fun insertion ->
+                        match insertion.Anchor with
+                        | StrengthFrameAnchor.BeforeMessageIndex index ->
+                            0, index, StrengthDecisionId.value insertion.DecisionId
+                        | StrengthFrameAnchor.Append -> 1, 0, StrengthDecisionId.value insertion.DecisionId)
+
+                Ok(Some(ProjectionIntent.InsertStrengthFrames { Items = canonical }))
 
     let private reduceGroup (items: ProjectionIntent list) : Result<ProjectionIntent option, ProjectionConflict> =
         match items with
@@ -787,11 +796,25 @@ module ProjectionRenderer =
         (intent: StrengthFramesIntent)
         (acc: RenderedMessages)
         : RenderedMessages =
-        // Apply insertions in listed order. Append anchors extend the growing tail;
-        // BeforeMessageIndex anchors are absolute indices into the pre-insertion base
-        // only when a single promoted insertion is present — multiple BeforeIndex
-        // items apply sequentially against the evolving message list.
-        (acc, intent.Items)
+        let before, append =
+            intent.Items
+            |> List.partition (fun insertion ->
+                match insertion.Anchor with
+                | StrengthFrameAnchor.BeforeMessageIndex _ -> true
+                | StrengthFrameAnchor.Append -> false)
+
+        let beforeInApplicationOrder =
+            before
+            |> List.sortByDescending (fun insertion ->
+                match insertion.Anchor with
+                | StrengthFrameAnchor.BeforeMessageIndex index -> index, StrengthDecisionId.value insertion.DecisionId
+                | StrengthFrameAnchor.Append -> -1, "")
+
+        let appendInApplicationOrder =
+            append
+            |> List.sortBy (fun insertion -> StrengthDecisionId.value insertion.DecisionId)
+
+        (acc, beforeInApplicationOrder @ appendInApplicationOrder)
         ||> List.fold (fun state insertion ->
             let msgs, ids, phys = expandStrengthBundle sha256 insertion
 

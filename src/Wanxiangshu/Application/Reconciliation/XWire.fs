@@ -183,6 +183,7 @@ module XWire =
                         raise (
                             InvalidOperationException "StrengthReplica cannot plan without the public session snapshot"
                         )
+
                 | None ->
                     let rawMessages = Projection.messagesFromTransformOutput output
                     let physical = Projection.lastUserMessageId rawMessages

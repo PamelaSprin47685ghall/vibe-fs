@@ -103,6 +103,44 @@ test('STRENGTH_005_009_candidate_renders_concurrent_calls_then_results_with_stab
   ))
 })
 
+test('STRENGTH_008_009_multiple_promoted_absolute_anchors_are_registration_order_independent', () => {
+  const base = toList([
+    message('user', [textPart('u1')]),
+    message('assistant', [textPart('target-1')]),
+    message('user', [textPart('u2')]),
+    message('assistant', [textPart('target-2')]),
+  ])
+  const first = P.ProjectionIntentModule_strengthPromoted(
+    session('owner'), decision('d1'), run('target-1'), 1, false, bundle,
+  )
+  const second = P.ProjectionIntentModule_strengthPromoted(
+    session('owner'), decision('d2'), run('target-2'), 3, false, bundle,
+  )
+
+  const forward = P.ProjectionRenderer_renderMessagesWithHostIds(H, snapshot, base, toList([first, second]))
+  const reverse = P.ProjectionRenderer_renderMessagesWithHostIds(H, snapshot, base, toList([second, first]))
+  const forwardMessages = listItems(forward.Messages)
+  const forwardIds = listItems(forward.HostMessageIds)
+
+  assert.deepEqual(forwardMessages.map((item) => item.Role), [
+    'user', 'assistant', 'tool', 'assistant', 'user', 'assistant', 'tool', 'assistant',
+  ])
+  assert.equal(
+    forwardIds[1],
+    Frame.StrengthFrame_hostMessageId(H, session('owner'), decision('d1'), 1, 'call', bundle.Digest),
+  )
+  assert.equal(
+    forwardIds[5],
+    Frame.StrengthFrame_hostMessageId(H, session('owner'), decision('d2'), 1, 'call', bundle.Digest),
+  )
+  assert.deepEqual(listItems(reverse.HostMessageIds), forwardIds)
+  assert.equal(Provider.renderWire(
+    { ProviderId: undefined, ModelId: undefined, Variant: undefined, Tools: toList([]), System: toList([]), Messages: forward.Messages },
+  ), Provider.renderWire(
+    { ProviderId: undefined, ModelId: undefined, Variant: undefined, Tools: toList([]), System: toList([]), Messages: reverse.Messages },
+  ))
+})
+
 test('STRENGTH_009_replica_mirror_replaces_base_then_local_batches_append', () => {
   const mirrorMessages = toList([message('user', [textPart('mirror-base')])])
   const mirror = P.ProjectionIntentModule_useStrengthMirror(decision('d1'), run('target'), 'sem-a', mirrorMessages)
