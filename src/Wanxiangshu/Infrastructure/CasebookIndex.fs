@@ -13,8 +13,9 @@ module CasebookIndex =
           SessionIds: string list }
 
     let private gate = obj ()
-    // DSL-MUTABLE: process-local frozen index
+    // DSL-MUTABLE: resource
     let mutable private frozen: Snapshot option = None
+    // DSL-MUTABLE: resource
     let mutable private dirty = true
 
     let tryGet () : Snapshot option = lock gate (fun () -> frozen)

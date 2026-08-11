@@ -13,6 +13,7 @@ module CasebookLifecycle =
     let collector = ObservationCollector()
 
     let private stateGate = obj ()
+    // DSL-MUTABLE: resource
     let mutable private enabledWorkspace: string option = None
 
     /// Marker-gated enablement for the shared collector path. `None` or a root
