@@ -294,3 +294,143 @@ Start 组（ordinal 升序）
    - 若不存在 reasoning 文本，补充最小非空占位 text part（`{ type: "text", text: "..." }`）。
 2. 任何 `user` 消息：若无非空 text part / content，补充非空 text part（`{ type: "text", text: "#" }`）。
 3. 经 `HostMessageProjection.sanitizeMessages` 处理后的消息就地写回 `outObj.messages`，确保 ReviewSeal 与上游 Provider 获得相同且合法的数据。
+
+---
+
+## Magic Todo V1 membrane 程序（归属 HOST-017..025）
+
+语义合同只引用 `what/todo.md`（TODO-*）；本节只写 Host hook 收敛算法。禁止改 OpenCode core、禁止同名 plugin tool 覆盖 builtin `todowrite`。
+
+### 0. 注册与 V2 门禁（HOST-024 / TODO-004）
+
+```text
+plugin start
+→ 注册 tool.definition / tool.execute.before / tool.execute.after（仅 todowrite）
+→ MagicTodo Manager Attempt 构造时：
+     runner 无 proven definition+before+after path
+     → fail closed（不得 SessionTodo.update 裸写）
+```
+
+V2 hook parity 解除前必须重跑 HOST-019..025 canary（见 `proof/host.md`）。
+
+### 1. definition（HOST-018 / TODO-002）
+
+同一触发内**同时**写：
+
+```text
+parameters
+jsonSchema
+description
+```
+
+description 覆盖 Manager 可见纪律（TODO-002/003/004/006/013）；禁止 TODO-013 隐藏编排词。只改一处 → 视为 HostContractUnsupported，不得上线 membrane。
+
+### 2. before（HOST-019/020/025 / TODO-004/006/007）
+
+输入：`{ tool, sessionID, callID }` + `{ args }`。executor 只读**原地** `args` 字段；禁止 `output.args = newArgs` 重绑。
+
+```text
+1. sessionID+callID → 完整 SDK snapshot 唯一定位
+   ToolPart / assistant / provider run / ordinal / XTrace range
+   （不能唯一 → fail closed；HOST-025）
+2. admitSingleCheckpoint（TODO-004：
+   同 message 多不同 ToolCallId → 全部拒绝；
+   同 ToolCallId replay → 校验 digest，不新开）
+3. await ConsumableReview(k-1) 若存在未消费义务（TODO-006）
+4. decodeTaggedTodos + allocateNewIds + validate（TODO-002/003）
+5. append TodoWritePrepared（冻结 BaseTodo / Proposed / ReviewFrontier）
+6. installEphemeralBridge(sessionID, callID, payload)   // HOST-021
+7. 原地 mutate args.todos → V1 {content,status,priority}
+   剥离 kind/id；reviewing 按 HOST-023 sink 策略投影
+8. return（不启动 reviewer；不写 Accepted）
+```
+
+**Alias 不变量（HOST-019）**：步骤 7 不得改写 pre-before 已持久化的 `ToolPart.input`。实现前 canary 必须绿；红则停止 membrane。
+
+### 3. Ephemeral bridge（HOST-021 / TODO-012）
+
+```js
+const MagicTodoBridge = Symbol("wanxiangshu.magic-todo.bridge")
+const bridges = new Map() // key = sessionID + ":" + callID
+```
+
+before：`bridges.set(key, carrier)`，carrier 上 non-enumerable Symbol 挂 settledOld / proposal / preview / previousReview / compatibilityProjection。  
+after 成功或 tool/turn failure cleanup：`bridges.delete(key)`。  
+崩溃恢复**忽略** Map；只从 Journal Prepared + physical evidence 重建。bridge 不得表示 checkpoint / review obligation。
+
+### 4. after（HOST-021/022 / TODO-005/006/007/008/009）
+
+仅 live path：原 executor 成功返回后进入。execute throw → after 不保证运行（canary F 冻结行为；协议不依赖）。
+
+```text
+1. bridge = bridges.get(key) 或 rebuild(Prepared, physical)
+2. prove physical success（HOST-022）：
+     live AfterSuccess  ∨  recovery completed ToolPart
+     且 TodoWriteId+input digest+output digest 与 Prepared 对齐
+3. ensure TodoWriteAccepted（幂等）
+4. ensure DedicatedTodoReviewer（TODO-008/010 retention）
+5. ensureReview(Tk)：
+     若尚无 TodoReviewConcluded ≡ ConsumableReview（TODO-006）
+     → ensure TodoProcessReviewAssigned + 提交/续跑
+     （不必“已跑完 reviewer”才算 after 成功）
+6. desired lag-1 cutoff 由 Accepted 链纯推导（TODO-009；此处不 commit PrefixEpoch）
+7. 富化 output.output：
+     上次 ConsumableReview 的 ProcessReviewLWR
+     + settled current
+     + REVISE merge preview（若适用）
+     + PERFECT 时 preview 不生效提示（TODO-005/013）
+8. bridges.delete(key)；return
+```
+
+禁止：先 reviewer 后 Accepted；把 Host TodoTable==Pk 当 Accepted。  
+富化字节必须进入本次模型可见结果且下一 provider history 同字节（canary E）。
+
+### 5. physical-success 双路径（HOST-022 / TODO-004）
+
+| 路径 | 条件 | 动作 |
+|------|------|------|
+| live | executor 成功 ∧ after 运行 | ensure Accepted |
+| recovery | SDK snapshot 中该 call ToolPart.status=completed | restart/ensure Accepted |
+| 失败 | Prepared 但 tool failed/absent/digest mismatch | 不 Accepted；下次 before 以 Journal canonical 覆盖 sink |
+
+两路径收敛同一 identity digests。canary G 冻结 after vs ToolPart completed 的真实 Host 顺序，但协议不把单一顺序当公理。
+
+### 6. reviewing sink 与 reconciliation（HOST-023 / TODO-003/005/007）
+
+**第五态决策（启动 canary D/I 一次冻结）**：
+
+```text
+if consumers tolerate status="reviewing"
+  → sink passthrough
+else
+  → sink "in_progress"（仅 compatibility）
+canonical status 永远不变（TODO-003）
+```
+
+**Reconciliation 触发**（幂等，无 checkpoint）：
+
+```text
+REVISE 被 TodoWrite/suicide 消费
+AND canonical := settle(Ck,Pk,REVISE) 已变
+→ project Host TodoTable := settled current
+→ 不 append TodoWrite*；不 ensureReview
+```
+
+随后合法 T(k+1) Accepted 时原 executor 再写成新 Pk。禁止留下否决 Pk；禁止 sink→canonical 反推（TODO-011）。
+
+### 7. call localization 辅助（HOST-025）
+
+所有 before/after 定位经：
+
+```text
+snapshot = SDK full session messages
+parts = filter tool parts where callID matches
+assert |parts| = 1
+derive assistant message / provider run / ordinal / XTrace range
+```
+
+0 或 ≥2 → fail closed。不读 HOST-011 之外的伪造字段（如不存在的 `userMessageID`）。
+
+### 8. 与 HOST-013 / transform 的相对顺序
+
+membrane 挂在 tool hooks，**不**插入 messages.transform 链。Manager-only guideline 片段（TODO-013）在 projection/prompt 层叠加，与 HOST-013 pair replay 正交：HOST-013 仍按 Work session 通用规则注入；Magic 文案不得写入 `PairProgrammingGuidelineText`。

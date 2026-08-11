@@ -39,14 +39,15 @@ Opening 永不送 Y 压缩；Terminal 不复经 transform。
 LWR **硬禁止** raw tool call/result 与 call/result linkage。  
 父 LWR 是 child 输入 context，**不**作 child Seed / Opening 复制。
 
-两种 coverage 禁止混用：
+两种 coverage 禁止混用（义务与 Magic Todo lag-1 共用，见 TODO-008/009；本条仍是 LWR/Y 分型所有者）：
 
 ```text
 RecordCoverage   // XTrace 游标；LWR gap 起点；可落在 turn 中间
 PrefixCoverage   // 完整 Host turn 边界；prefix replacement 证明
 ```
 
-X prefix probe 只能用 CoverableRecordPrefix（Opening + 可证明完整 turn 的 Y prefix），不能用 RawGap。
+X prefix probe **与** TodoCheckpoint lag-1 rebase 都只能用 CoverableRecordPrefix（Opening + 可证明完整 turn 的 Y prefix），不能用 RawGap。  
+`EvidenceKind=TodoCheckpoint` 进入既有 `ActivePrefixEpoch` / `PrefixRebaseCommitted`（COMPANION-009 / TODO-009），不另造 coverage 或 LWR 投影（TODO-008、TODO-012）。
 
 `includeOpening`：父→子 true；子→父 false；同 Session frozen prefix true。
 
@@ -69,7 +70,8 @@ canonical digest 用 Semantic projection，禁止反向解析 TOML。
 
 Blogger busy：不打断、不排队、**不推进** RecordCoverage；失败/空/XML-only 不推进。  
 仅 `BlogEntryCommitted` 原子推进 frame 可见性与 RecordCoverage（PERSIST-010）。  
-Host compaction 只作废 PrefixCoverage 映射，不得清零 RecordCoverage/Frames。
+Host compaction 只作废 PrefixCoverage 映射，不得清零 RecordCoverage/Frames。  
+`PrefixRebaseCommitted`（含 `EvidenceKind=TodoCheckpoint`，TODO-009）切换 ActivePrefixEpoch / PrefixCoverage 证明边界，**不**推进 RecordCoverage，也不得把 LWR RawGap 写进 prefix Y bundle（TODO-008/009）。
 
 ## COMPANION-010：低信任注入
 

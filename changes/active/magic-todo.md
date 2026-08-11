@@ -5271,3 +5271,17 @@ tool.execute.after(todowrite)
 
 OpenCode 宿主给 Todo Checkpoint Protocol 准备好了 **V1 钩子三件套 + todowrite sink + task resume/background + 临时 messages 改写**；没有准备好 **id/reviewing 状态机、迟滞 review journal、Y-complete review 投影、TodoCheckpoint 级前缀 rebase、以及终末 2N/suicide drain**。  
 可在 V1 overlay 验证时钟与 membrane；完整协议仍需 Host 增量，不能只靠 Manager prompt。
+
+## Active work
+
+> 本节仅记录实施闭环，不定义当前产品语义；正式规则以 `docs/` Clause 为准。
+
+### Remaining work
+
+- 将冻结协议拆入 `docs/{why,what,shape,how,proof}` 的稳定 Clause。
+- 证明并实现 Host canary、domain、journal/recovery、review、membrane、prefix rebase、Finality、migration 与 Manager atomic cutover。
+- 建立 unhappy-path、property、integration、static governance proof，并完成 release gate。
+
+### Completion criteria
+
+`§47 Release Gate` 的 37 项均有正式 Clause、实现与自动化 proof；完整 release check 通过。

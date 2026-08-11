@@ -14,4 +14,15 @@ X probe 失败不写事实：未提交的候选从未成为世界的一部分，
 
 **失败语义：不分类 vs 按错误文字分叉。** 拒文字分叉：换 provider 即整体失效，且制造永不执行分支。只看 snapshot `Outcome`（CTX-005）。
 
-**squash 依据：内容/比例触发 vs 仅失败槽。** 拒比例：压缩点由失败堆栈决定，不看 token/配额（CTX-004）。<br>**上界：200 KiB 合同 vs 窗口估算。** 拒估算：合同只约束单次 delta 渲染字节，不比较、不触发、不动态调参（CTX-003）。
+**squash 依据：内容/比例触发 vs 仅失败槽。** 拒比例：压缩点由失败堆栈决定，不看 token/配额（CTX-004）。  
+**上界：200 KiB 合同 vs 窗口估算。** 拒估算：合同只约束单次 delta 渲染字节，不比较、不触发、不动态调参（CTX-003）。
+
+## ActivePrefixEpoch 与 TodoCheckpoint（理由）
+
+**一条 PrefixEpoch SSOT vs todo-only 平行 epoch。** 拒第二真相源：若 todo 事实说已 rebase 而 `ActivePrefixEpoch` 未变，崩溃恢复与 seal 绑定会分叉。TodoCheckpoint 只是既有 `PrefixRebaseCommitted` 的 `EvidenceKind`，进入同一 ActivePrefixEpoch（CTX-015；义务见 TODO-009；禁平行 owner 见 TODO-012）。
+
+**desired cutoff ≠ committed epoch。** 拒 Accepted 后立刻写 committed、拒 `NeedRebase`/`Requested` Stage：Accepted 链只导出下一轮 policy；epoch 证明在下一 provider attempt seal/绑定前原子提交。provider 成败不是 commit 条件，失败不得回滚已 seal epoch（CTX-015；TODO-009、TODO-012）。
+
+**PrefixCoverage-only Y vs RecordCoverage/LWR。** 拒用 LWR RawGap 冒充可替换前缀：过程评审要看 frontier 上的完整证据（可含 gap）；Manager lag-1 前缀只许 proven complete-turn Y。二者不得互推（CTX-015；coverage TODO-008；rebase TODO-009）。
+
+**Opening floor = WorkRecordStart，不是 Activation。** 拒把 Opening 保护绑回 `WorkActivated`/planning floor：删除两阶段后仍须 byte-stable Opening；Blogger/Y 的结构性起点是 Opening exclusive end（CTX-016；TODO-001）。

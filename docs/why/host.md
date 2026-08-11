@@ -81,3 +81,26 @@ Transform input 为空对象是 Host 能力现实；绑定必须用「已创建�
   Companion/Bookkeeper = InternalLeaf+Attached。复用 Teacher 的 Returned→Completion 调用代数，不复用其
   leaf/no-Companion Session 分类。G2 过渡期 Teacher 仍可作为 transitional InternalLeaf 存在（非长期
   AttachmentKind）。HOST-015 物理扁平与恢复 fail-closed 不变：逻辑可嵌套 Attached，物理一律挂 family root。
+
+### 16. Magic Todo membrane：三钩子 overlay vs 改 Host core / 同名覆盖
+- **被拒方案**：修改 OpenCode 源码，或 plugin `tool` 同名覆盖 builtin `todowrite`。前者违反 compatibility 策略；后者丢掉 Host store / UI 事件契约，并把 canonical 与 sink 再次揉成一体。
+- **被拒方案**：V1 有 membrane、V2 runner 暂时裸奔 `SessionTodo.update`。协议缺口会被静默绕过。
+- **选择方案**：V1 仅挂 `tool.definition` + `tool.execute.before` + `tool.execute.after`；原 executor 降为 compatibility sink；Magic Todo 语义由 Journal / TODO-* 拥有（TODO-007）。V2 在等价 hook canary 证明前 Attempt fail closed（TODO-004、HOST-024）。
+
+### 17. before 原地 mutation vs 重绑 args / after 回写历史
+- **被拒方案**：`output.args = newArgs` 重绑定——Host 本地 `args` 引用不变，executor 仍见旧对象。
+- **被拒方案**：alias canary 失败后靠 after「改回」durable `ToolPart.input`——历史/prefix 身份已在不受控别名上被污染，不可补救。
+- **选择方案**：before **原地**改 args 字段达 V1 compatibility 投影；上线前必须证明 mutation 不污染 pre-before durable ToolPart input（HOST-019）。fail → 禁止上线 membrane，不得绕。
+
+### 18. before→after 传递：偶然同对象 vs Symbol/Map 短桥
+- **被拒方案**：依赖 before/after 共享同一 hook output 对象身份；Host 未合同保证深克隆/异常路径行为。
+- **被拒方案**：把 bridge 当 Prepared/Accepted/review obligation。execute 抛错时 after 可不跑；崩溃后 bridge 消失。
+- **选择方案**：process-local `Symbol` + `Map(sessionID:callID → carrier)` 短桥（HOST-021）；durable 只进 Journal（TODO-012）。after 成功或 failure cleanup 删 entry；恢复忽略 bridge。
+
+### 19. Accepted physical success：只信 after 顺序 vs live/recovery 双路径
+- **被拒方案**：把「after 运行时 ToolPart 已 durable completed」当唯一公理。顺序未证且实现易误绑。
+- **选择方案**：live（原 executor 成功进入 after）与 recovery（完整 SDK snapshot 中 completed ToolPart）双路径，收敛同一 TodoWriteId + input/output digest（HOST-022；义务语义 TODO-006/012）。Host TodoTable 乐观写成 Pk ≠ Accepted。
+
+### 20. reviewing 与 sink reconciliation
+- **被拒方案**：改 canonical status 迁就 UI；或 REVISE settlement 后永久留下否决的 Pk 在 Host TodoTable；或把 sink repair 写成新 checkpoint/review。
+- **选择方案**：先 canary 第五态消费者；能容忍则 passthrough `reviewing`，否则仅 sink 降为 `in_progress`（HOST-023）。canonical 仍 `reviewing`（TODO-003）。REVISE 被消费且 settlement 改变后幂等 reconcile 到 settled current（TODO-007）；repair 不产生 checkpoint/review。

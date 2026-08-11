@@ -80,7 +80,8 @@ Projection 不是第二真相源：禁止先改投影再补 event。
 
 ## PERSIST-010：上下文恢复 fold
 
-恢复 fold 对以下事实的不变量**不满足任一条 → 拒绝 envelope，fail closed**：
+恢复 fold 对以下事实的不变量**不满足任一条 → 拒绝 envelope，fail closed**。  
+本条是 fold 不变量所有者；Magic Todo 的 cadence / desired cutoff / settlement 语义只交叉引用 TODO-*，不在此复制。
 
 ```text
 OpeningPromptCaptured
@@ -103,12 +104,27 @@ BlogSquashCommitted
   不改变 IngestCursor / CoverableTurnCutoff / RecordCoverage
 
 PrefixRebaseCommitted
-  Epoch +1；attempt 含相同 ProbeId；Completed + terminal valid
-  candidate cutoff digest 再验证
+  Epoch +1；candidate cutoff digest 再验证；Y bundle 必须 PrefixCoverage-complete-turn
+  EvidenceKind = Probe | TodoCheckpoint（单一 ActivePrefixEpoch 合同，TODO-009 / COMPANION-009）
+  · Probe：attempt 含相同 ProbeId；Completed + terminal valid（既有 probe 不变量不削弱）
+  · TodoCheckpoint：TriggerTodoWriteId 等字段齐备（CTX-015）；commit 在 attempt seal 前
+    不要求 provider Completed；不因后续 Failed/Aborted 删除或回滚本事实
+  禁止：缺字段旁路；用 RecordCoverage / RawGap 证明 replacement（TODO-008/009）；平行 todo-only epoch（TODO-009/012）
 
 ContextReanchored
   Epoch +1；同一 ObservedCompactionMessageId 只接受一次
   Snapshot→None；PrefixCoverage 归零；RecordCoverage 与 Frames 保留
+```
+
+**Durable Todo 事实（合法 vocabulary，不削弱上表 probe/coverage 不变量）**：  
+Magic Todo 域的 Journal facts（如 `TodoWriteAccepted`、`TodoReviewConcluded`、settlement 相关事实等，权威语义 TODO-001..014）经同一 EventStore 提交时，fold **必须**接受其已 committed 的 additive `event_type`，并派生 canonical Todo 投影（TODO-007）。  
+它们：
+
+```text
+不推进 RecordCoverage / PrefixCoverage
+不单独切换 PrefixEpoch（epoch 仍只经 PrefixRebaseCommitted / ContextReanchored）
+不把 Host TodoTable 当作 canonical 恢复源（TODO-007）
+不得发明 PrefixProbeRolledBack 或「provider 失败回滚 epoch」类事实
 ```
 
 禁止引入：`PrefixProbeRolledBack`、`OverflowDetected`、`ContextNearLimit`、`SquashReason` 等——失败不分类（CTX-005），容量不观察（CTX-001）。  

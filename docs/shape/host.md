@@ -194,3 +194,85 @@ idle-derived continuation（missing-final-report、interaction-repair、ManagerI
 |------|----------|----------|
 | `assistant` | 无 `tool_calls` / tool part，且 text part / content 为空 | 提取 reasoning/thinking 文本填充为 text part；无 reasoning 则填充 `"..."` |
 | `user` | text part / content 为空 | 填充 `"#"` text part |
+
+## Magic Todo V1 membrane 所有权边界（归属 HOST-017..025）
+
+可观察总行为与 canary 合同见 `what/host.md` HOST-017（及 HOST-018..025）；本节只定实现层所有权与挂载边界，不重复定义条款。
+
+### 分层所有权
+
+```text
+OpenCode Host
+  = transport / builtin todowrite executor / TodoTable UI sink
+  = V1 hook 挂载面（definition / before / after）
+
+Wanxiangshu Domain + Journal
+  = Magic Todo protocol owner（TODO-001..014）
+  = canonical list、checkpoint、review obligation、settlement、rebase evidence
+```
+
+禁止 Host core 修改；禁止 plugin 同名 tool 覆盖 builtin `todowrite`（会夺取 executor 与 store 契约）。Membrane 只叠加钩子，把原 executor **降级**为 compatibility sink（TODO-007）。
+
+### Hook 面与身份半边（扩展 HOST-011）
+
+| 面 | 可见身份 | 可变合同 |
+|----|----------|----------|
+| `tool.definition` | tool 名 / schema | 同时写 `parameters`+`jsonSchema`+`description`；V2 广告唯一 owner（TODO-002） |
+| `tool.execute.before` | `sessionID`+`callID` only | 原地 mutation `args` 字段；async 可等待 ConsumableReview（TODO-006） |
+| `tool.execute.after` | `sessionID`+`callID` only | 改写模型可见 `output`；ensure Accepted（HOST-022） |
+| executor `ToolContext` | message id + call id | 跑原 V1 decoder；只见 compatibility 投影 |
+
+before/after **不得**猜配 messageID。定位 ToolPart/assistant/run/ordinal/XTrace range 必须经完整 SDK snapshot 唯一成立（HOST-025）；否则 fail closed，不得上线。
+
+### 非别名边界（HOST-019）
+
+```text
+durable ToolPart.input  （pre-before 历史）
+        ≠
+before 本地 args 对象   （可原地改为 V1 sink 形状）
+        →
+executor 观察的 args
+```
+
+三槽不得因共享引用塌缩。mutation 污染 historical input → membrane 禁止上线；不得 after 回写补救。
+
+### Ephemeral bridge 边界（HOST-021 载体）
+
+```js
+// 形状示意，非第二真相源
+Symbol("wanxiangshu.magic-todo.bridge")
+Map<`${sessionID}:${callID}`, carrier>
+```
+
+| 允许 | 禁止 |
+|------|------|
+| process-local before→after 短传：settledOld / proposal / preview / previousReview | 表示 Prepared/Accepted/checkpoint/review obligation/settlement |
+| after 成功或 tool/turn failure cleanup 删除 entry | 跨进程、写 Journal、crash recovery 读取 |
+| carrier 上 non-enumerable Symbol 字段 | 依赖 before/after hook output 偶然同对象身份 |
+
+Durable 只在 AgentJournal（TODO-012）。bridge 丢失 ⇒ 从 Prepared + physical evidence 重建，不从 Host TodoTable 反推。
+
+### Compatibility sink 边界（HOST-023）
+
+```text
+Host TodoTable     = optimistic compatibility projection（无 stable id）
+MagicTodoProjection = canonical semantic truth（TODO-007）
+```
+
+- `reviewing`：canary 决定 passthrough 或 sink→`in_progress`；canonical 不变（TODO-003）。
+- REVISE 消费后 settlement 改变 ⇒ 幂等 reconcile sink 到 settled current；**不**产生 checkpoint/review（TODO-005/007）。
+- sink 永不拥有 recovery 权；后续新 Life 不得把同 session TodoTable 再当 canonical seed（TODO-011）。
+
+### V2 runner 边界（HOST-024）
+
+```text
+MagicTodo Manager Attempt
+  → 仅允许已证明 definition+before+after 的 path
+  → V2 local settle 无 hook parity ⇒ construction fail closed（TODO-004）
+```
+
+不得静默裸 `SessionTodo.update`。解除限制前必须重跑 HOST-019..025 全套 canary。
+
+### 与 HOST-013 的交界
+
+HOST-013 pair-programming 仍是 **Work session 通用** marker，不专属 Manager。Manager-only 持续 todowrite 文案是 TODO-013 表面片段，在 role=Manager 且 `todowrite` provider-visible 时叠加；禁止把 Magic Todo 正文并入全局 `PairProgrammingGuidelineText`。

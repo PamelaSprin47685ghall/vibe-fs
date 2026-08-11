@@ -46,6 +46,7 @@ const PREFIX_OWNER = {
   SURFACE: 'what/glory.md',
   JS: 'what/js-tools.md',
   CASE: 'what/casebook.md',
+  TODO: 'what/todo.md',
 }
 
 /** Prefixes allowed to split definitions across listed files; individual IDs remain unique. */
@@ -84,6 +85,7 @@ const PREFIX_SPLIT_OWNERS = {
   SURFACE: ['what/glory.md'],
   JS: ['what/js-tools.md', 'shape/js-tools.md', 'how/js-tools.md', 'proof/js-tools.md', 'why/js-tools.md'],
   CASE: ['what/casebook.md', 'shape/casebook.md', 'how/casebook.md', 'proof/casebook.md', 'why/casebook.md'],
+  TODO: ['what/todo.md', 'shape/todo.md', 'how/todo.md', 'proof/todo.md', 'why/todo.md'],
 }
 
 const PREFIXES = Object.keys(PREFIX_OWNER)
