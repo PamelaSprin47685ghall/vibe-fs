@@ -88,9 +88,64 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     // STRENGTH-014: decision-local replica ownership/capability registry. Durable
     // causality remains in EventStore; this is only live physical-session state.
     let strengthRuntime = StrengthRuntime()
+    // PROMPT-002/AGENT-003: Host-final managed inventory is captured from the
+    // config gate so Strength can prove same-role fast/deep model bindings differ.
+    let mutable managedAgentInventory: ManagedAgentConfig.ManagedAgentInventory option = None
+    // STRENGTH-004: physical coordinator is attached after Host ports are wired.
+    // The Session StrengthRuntime above remains the sole live ownership/capability registry.
+    let mutable strengthReplicaRuntime: StrengthReplicaRuntime option = None
+    // STRENGTH-010: bounded process-local predictor cache. Losing it on restart
+    // only lowers evidence back toward K0; it is never lifecycle authority.
+    let mutable strengthPredictorState = StrengthPredictor.empty
+    let strengthRecentPrimary = Dictionary<string, StrengthPrimarySymbol list>()
+    let strengthPendingFirst = Dictionary<string, ProviderRunIdentity * StrengthFeatureKey>()
+    let strengthPendingSecond = Dictionary<string, StrengthFeatureKey>()
 
     member _.Journal = journal
     member _.StrengthRuntime = strengthRuntime
+    member _.RecordManagedAgentInventory(inventory: ManagedAgentConfig.ManagedAgentInventory) =
+        managedAgentInventory <- Some inventory
+    member _.ManagedAgentInventory = managedAgentInventory
+    member _.AttachStrengthReplicaRuntime(runtime: StrengthReplicaRuntime) = strengthReplicaRuntime <- Some runtime
+    member _.StrengthReplicaRuntime = strengthReplicaRuntime
+
+    member _.StrengthFeature(sessionId: SessionId, role: Role, visibleBytes: int) =
+        let key = SessionId.value sessionId
+        let recent =
+            match strengthRecentPrimary.TryGetValue key with
+            | true, values -> values
+            | false, _ -> []
+        StrengthPredictor.feature role recent visibleBytes
+
+    member _.StrengthPrediction(feature: StrengthFeatureKey) =
+        StrengthPredictor.predict feature strengthPredictorState
+
+    member _.ArmStrengthCounterfactual(sessionId: SessionId, targetRun: ProviderRunIdentity, feature: StrengthFeatureKey) =
+        let key = SessionId.value sessionId
+        if not (strengthPendingFirst.ContainsKey key) && not (strengthPendingSecond.ContainsKey key) then
+            strengthPendingFirst.[key] <- (targetRun, feature)
+
+    member _.ObserveStrengthPrimary(sessionId: SessionId, providerRun: ProviderRunIdentity, symbol: StrengthPrimarySymbol) =
+        let key = SessionId.value sessionId
+
+        match strengthPendingFirst.TryGetValue key with
+        | true, (targetRun, feature) when targetRun = providerRun ->
+            strengthPendingFirst.Remove key |> ignore
+            let next, firstReadonly = StrengthPredictor.observeFirst feature symbol strengthPredictorState
+            strengthPredictorState <- next
+            if firstReadonly then strengthPendingSecond.[key] <- feature
+        | _ ->
+            match strengthPendingSecond.TryGetValue key with
+            | true, feature ->
+                strengthPendingSecond.Remove key |> ignore
+                strengthPredictorState <- StrengthPredictor.observeSecond feature symbol strengthPredictorState
+            | false, _ -> ()
+
+        let recent =
+            match strengthRecentPrimary.TryGetValue key with
+            | true, values -> symbol :: values |> List.truncate 3
+            | false, _ -> [ symbol ]
+        strengthRecentPrimary.[key] <- recent
 
     member _.AttachSatelliteRuntime(runtime: SatelliteRuntime) = satelliteRuntime <- Some runtime
 
@@ -428,6 +483,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             this.Companions.Clear()
             syncDelegateRuntime |> Option.iter (fun sd -> sd.Dispose())
             syncDelegateRuntime <- None
+            strengthReplicaRuntime |> Option.iter (fun runtime -> runtime.Dispose())
+            strengthReplicaRuntime <- None
             SharedAgentJournal.release journal
             SharedTerminalBus.release sharedTerminalKey sharedTerminalPort
             sharedTerminalKey <- None

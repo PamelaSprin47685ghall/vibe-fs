@@ -67,7 +67,7 @@ pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fal
 #                      not a DU-algebra equality. Journal is the exact semantic pin.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
 # Headroom kept after canary wrapper noise; Manager does not advertise todowrite yet.
-setup = { strict = true, magicTodoHostCanary = true, maxJournalEvents = 400, maxSseEvents = 1900, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n" } } }
+setup = { strict = true, magicTodoHostCanary = true, maxJournalEvents = 372, maxSseEvents = 1730, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 

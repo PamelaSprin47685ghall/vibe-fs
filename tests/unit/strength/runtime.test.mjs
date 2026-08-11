@@ -20,6 +20,9 @@ const binding = (owner, replica, decision, role = Role.Coder, budget = StrengthB
     Id.ProviderRunIdentityModule_create(`run-${decision}`),
     role,
     budget,
+    65536,
+    `sem-${decision}`,
+    undefined,
     Authority.toolCapabilitiesFor(role, ProviderRequestKind.StrengthReplica),
   )
 

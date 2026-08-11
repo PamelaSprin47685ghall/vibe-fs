@@ -28,6 +28,27 @@ module StrengthTurnEvidence =
         | 1 -> StrengthProviderOutputEvidence.TransportOnly
         | _ -> StrengthProviderOutputEvidence.NoOutput
 
+    let primarySymbol (parts: MessagePart array) : StrengthPrimarySymbol =
+        let calls =
+            parts
+            |> Array.choose (function
+                | MessagePart.ToolCall(_, name, _) -> Some name
+                | _ -> None)
+            |> Array.toList
+
+        match calls with
+        | _ :: _ when calls |> List.forall (fun name -> name = "read" || name = "glob" || name = "grep") ->
+            StrengthPrimarySymbol.ReadonlyBatch
+        | _ :: _ -> StrengthPrimarySymbol.MutatingOrExecuting
+        | [] when
+            parts
+            |> Array.exists (function
+                | MessagePart.Text text
+                | MessagePart.Reasoning text -> not (String.IsNullOrWhiteSpace text)
+                | _ -> false) ->
+            StrengthPrimarySymbol.TextOnly
+        | [] -> StrengthPrimarySymbol.Other
+
     let promotionDecision
         (targetProviderRun: Wanxiangshu.Kernel.Identity.ProviderRunIdentity)
         (turn: ReconciledTurn)

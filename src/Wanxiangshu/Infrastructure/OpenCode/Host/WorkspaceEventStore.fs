@@ -47,6 +47,18 @@ module WorkspaceEventStore =
 
                 raw, store)
 
+    /// Borrow the already-owned process-local store without changing ownership.
+    /// Strength uses this only after AgentJournal boot has acquired the workspace;
+    /// `None` means durability is unavailable and new speculation must stay K0.
+    let tryCurrent (commonDir: string) : (IGitRawStore * IEventStore) option =
+        if String.IsNullOrWhiteSpace commonDir then
+            None
+        else
+            lock gate (fun () ->
+                match shared.TryGetValue commonDir with
+                | true, entry -> Some(entry.Raw, entry.Store)
+                | false, _ -> None)
+
     /// Drop one refcount for `commonDir`. No-op when unknown.
     let release (commonDir: string) =
         if String.IsNullOrWhiteSpace commonDir then

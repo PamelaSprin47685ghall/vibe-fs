@@ -348,3 +348,83 @@ module XTraceCapture =
                             |> appendFact durable sessionId None))
 
             Some(xTraceOf durable sessionId)
+
+    /// STRENGTH-008: whether this XTrace can accept a historical insertion
+    /// without positional provenance drift. Empty traces are eligible; once a
+    /// runtime has captured parts, every provenance must be Host-message based.
+    /// Legacy `g:N/turn:M/part:P` traces remain readable but force Strength K0.
+    let supportsStableInsertion (journal: AgentJournal option) (sessionId: SessionId) : bool =
+        match journal with
+        | None -> false
+        | Some durable ->
+            let existing = xTraceOf durable sessionId
+
+            existing.Parts
+            |> List.forall (fun part -> part.Provenance.Contains("/msg:", StringComparison.Ordinal))
+
+    /// HOST runtime capture with stable Host-message identity. Existing physical
+    /// messages keep their Host id when Strength frames are inserted before the
+    /// target assistant, so already-captured history is skipped while the new
+    /// Strength frames and not-yet-captured target output append in causal order.
+    ///
+    /// The legacy `captureProjection` above is intentionally kept for historical
+    /// sessions/tests; mixing both provenance schemes in one non-empty trace is
+    /// rejected rather than silently duplicating history.
+    let captureProjectionStable
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (messageIds: string list)
+        (projection: ProviderSemanticProjection)
+        : Result<XTraceProjectionState option, string> =
+        match journal with
+        | None -> Ok None
+        | Some durable ->
+            let existing = xTraceOf durable sessionId
+
+            if not (supportsStableInsertion journal sessionId) then
+                Error "legacy positional XTrace cannot accept stable historical insertion"
+            elif List.length messageIds <> List.length projection.Messages then
+                Error "stable XTrace message identity cardinality does not match semantic projection"
+            elif messageIds |> List.exists String.IsNullOrWhiteSpace then
+                Error "stable XTrace requires a non-empty Host id for every semantic message"
+            elif (messageIds |> Set.ofList |> Set.count) <> List.length messageIds then
+                Error "stable XTrace requires unique Host message ids"
+            else
+                let generation = captureGeneration durable sessionId
+                let recorded = existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
+                let mutable cursor = XTraceProjection.headSequence existing
+                let mutable failure: string option = None
+
+                List.zip messageIds projection.Messages
+                |> List.iteri (fun turnIndex (messageId, message) ->
+                    if Option.isNone failure then
+                        message.Parts
+                        |> List.iteri (fun partIndex part ->
+                            if Option.isNone failure then
+                                let provenance =
+                                    sprintf "g:%d/msg:%s/part:%d" generation messageId partIndex
+
+                                if not (Set.contains provenance recorded) then
+                                    cursor <- cursor + 1L
+                                    let kind, toolName, body = partShape part
+
+                                    match durable.WriteBlob body with
+                                    | Error error -> failure <- Some(sprintf "XTrace part blob write failed: %s" error)
+                                    | Ok blob ->
+                                        CompanionFact.XTracePartAppended
+                                            {| SessionId = sessionId
+                                               CursorSequence = cursor
+                                               Role = message.Role
+                                               Turn = turnIndex
+                                               PartIndex = partIndex
+                                               Kind = kind
+                                               ToolName = toolName
+                                               TextRef = blob.BlobRef
+                                               TextDigest = blob.BlobDigest
+                                               Provenance = provenance
+                                               ProviderRun = None |}
+                                        |> appendFact durable sessionId None))
+
+                match failure with
+                | Some error -> Error error
+                | None -> Ok(Some(xTraceOf durable sessionId))

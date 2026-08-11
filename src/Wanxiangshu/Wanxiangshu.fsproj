@@ -60,6 +60,8 @@
     <Compile Include="Domain/StrengthBudget.fs"/>
     <Compile Include="Domain/StrengthCostModel.fs"/>
     <Compile Include="Domain/StrengthPolicy.fs"/>
+    <Compile Include="Domain/StrengthPredictor.fs"/>
+    <Compile Include="Domain/StrengthRollout.fs"/>
     <Compile Include="Domain/StrengthFrame.fs"/>
     <Compile Include="Domain/StrengthBatchCollector.fs"/>
     <Compile Include="Domain/ToolResultBound.fs"/>
@@ -208,13 +210,15 @@
     <Compile Include="Infrastructure/OpenCode/Signals/HostSignalSubscribe.fs"/>
     <Compile Include="Application/Reconciliation/ReconciledTurn.fs"/>
     <Compile Include="Application/Strength/StrengthTurnEvidence.fs"/>
+    <Compile Include="Application/Strength/StrengthLifecycle.fs"/>
+    <Compile Include="Application/Strength/StrengthTraceRecovery.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SessionSnapshotPort.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/OpenCodePort.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Sessions.fs"/>
-    <Compile Include="Application/Strength/StrengthReplicaTransform.fs"/>
     <Compile Include="Session/SatelliteRuntime.fs"/>
     <Compile Include="Application/Prompting/PromptDispatcher.fs"/>
     <Compile Include="Application/Prompting/PromptDispatcherSend.fs"/>
+    <Compile Include="Application/Strength/StrengthReplicaTransform.fs"/>
     <Compile Include="Application/Strength/StrengthReplicaRuntime.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/PromptIngressCodec.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostSessionContext.fs"/>
@@ -343,6 +347,8 @@
     <Compile Include="Infrastructure/OpenCode/Tools/FetchTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/CasebookTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginHost.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/StrengthSettings.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/StrengthSpeculate.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/ManagerConfig.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/ChatParamsHook.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginHostInterop.fs"/>

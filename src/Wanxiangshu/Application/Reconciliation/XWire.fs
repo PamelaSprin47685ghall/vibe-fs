@@ -170,16 +170,19 @@ module XWire =
         task {
             match journal, sessionIdOfOutput output with
             | Some durable, Some sessionId when not (isCompanionSession durable sessionId) ->
-                match scope.StrengthRuntime.TryFindByReplica sessionId, snapshot with
-                | Some binding, Some snapshotPort ->
-                    do! applyStrengthReplicaPlan snapshotPort durable scope sessionId binding output
-                    return ()
-                | Some _, None ->
-                    raise (InvalidOperationException "StrengthReplica cannot plan without the public session snapshot")
-                | None, _ ->
-                    match scope.TryRecoveryArming sessionId with
-                | None -> return ()
-                | Some arming ->
+                let replicaBinding = scope.StrengthRuntime.TryFindByReplica sessionId
+
+                match replicaBinding with
+                | Some binding ->
+                    match snapshot with
+                    | Some snapshotPort ->
+                        do! applyStrengthReplicaPlan snapshotPort durable scope sessionId binding output
+                        return ()
+                    | None ->
+                        raise (InvalidOperationException "StrengthReplica cannot plan without the public session snapshot")
+                | None when scope.TryRecoveryArming sessionId |> Option.isNone -> return ()
+                | None ->
+                    let arming = scope.TryRecoveryArming sessionId |> Option.get
                     let rawMessages = Projection.messagesFromTransformOutput output
                     let physical = Projection.lastUserMessageId rawMessages
 
