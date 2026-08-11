@@ -44,7 +44,7 @@ Completed（本 Playbook 相关）:
   changes/completed/js-capability-projected-tools.md    — G5 DONE-with-amendment(C-3 user裁决)
   changes/completed/universal.md                        — G2 PARTIAL（runtime reuse canary green；PREFIX LAW unit canary cited, not Exit）+ G3 DONE + G6 PARTIAL
   changes/completed/perm-inspector.md                   — G6 PARTIAL（BookkeeperRuntime/EditQaTool/BookkeeperStaging cited; digest synthesizer gone; Host e2e / LLM Bookkeeper open）
-  changes/completed/rulebook.md                         — G7 PARTIAL（Observation events DONE；production 120 fails expanded `--strict`；A37–A50 / HUMAN_ONLY 未证）
+  changes/completed/rulebook.md                         — G7 PARTIAL（mechanical A37/A38 production 120 GREEN after authoring；HUMAN_ONLY remaining；not Exit）
 
 Proposed（Playbook 本身 + 独立 Lane）:
   changes/proposed/entry.md        — 本文件；Integration Playbook，不是产品 Change；不迁 completed
@@ -94,8 +94,8 @@ Strength
 | **G3.5** Storage cutover scope 修订 | **DONE** | Amendment G3.5-A；Student QA retired；no migrator / dual-write |
 | **G4** Unified Storage | **DONE** | `changes/completed/storage.md` Final outcome；G4R（`changes/completed/test.md`）；`unified-store-gate` |
 | **G5** JS Capability-Projected Tools | **DONE-with-amendment** | `changes/completed/js-capability-projected-tools.md` Final outcome；Amendment C-3 (2026-08-10 user裁决): builtin `read`/`edit`/`write`/`glob`/`grep`/`patch` retained, coexists with js-ROLE; legacy-absent clause superseded. |
-| **G6** perm-inspector + Casebook | **PARTIAL** | Observational APIs（**not** Exit）：`BookkeeperRuntime.setSessionPort` / `runTransaction` / `isAttached` / `tryTxId`；`EditQaTool.execute`（document `Q.md`\|`A.md`, unique `old_text`）；`BookkeeperStaging.begin`/`read`/`replace`/`take`/`abort`。`AttachmentKind.Bookkeeper` `txId` lives in `BookkeeperRuntime`, not child options。digest synthesizer **gone** from `CasebookBookkeeper`。`SpikePlugin` calls `BookkeeperRuntime.setSessionPort` at `createHost`；`tryFinalizeInspector` is `Task`；`HostSignalBootstrap` remains sync so `SpikePlugin` fire-and-forgets after starting the Task（`tryTake` is sync-before-await）。G2 `promptModel` not removed。Host e2e / LLM Bookkeeper **still open**。Host-path unit（`tests/unit/casebook/g6-host-reuse-finalize.test.mjs`）**不是** full tool→PromptDispatcher→TurnCompleted→Casebook→fetch e2e。 |
-| **G7** Rulebook | **PARTIAL** | Observation events DONE（`BlogObservationCommitted` / `BlogObservationsSquashed`；legacy dual-decode）。`scripts/checks/enforcer-rulebook-gate.mjs --require-headings --strict`（=`--require-rubric`）encodes mechanical A37+A38 (`NEW_RUBRIC_CODES`); production 120 **fails** `--strict` until authoring wave。`HUMAN_ONLY_RUBRIC_ITEMS`（paired-history 120 / A39 pair review / A40 tournament）this gate does **not** claim。A37–A50 semantic / paired-history / tournament **未**证明。 |
+| **G6** perm-inspector + Casebook | **PARTIAL** | Observational APIs（**not** Exit）：`BookkeeperRuntime.setSessionPort` / `runTransaction` / `isAttached` / `tryTxId`；`EditQaTool.execute`（document `Q.md`\|`A.md`, unique `old_text`）；`BookkeeperStaging.begin`/`read`/`replace`/`take`/`abort`。`AttachmentKind.Bookkeeper` `txId` lives in `BookkeeperRuntime`, not child options。digest synthesizer **gone** from `CasebookBookkeeper`。`SpikePlugin` calls `BookkeeperRuntime.setSessionPort` at `createHost`；`tryFinalizeInspector` is `Task`。HostSignalBootstrap await + inspector-tool path still in flight (`G6HostPathE2E`)。G2 `promptModel` not removed。Host e2e Remaining。Host-path unit（`tests/unit/casebook/g6-host-reuse-finalize.test.mjs`）**不是** full tool→PromptDispatcher→TurnCompleted→Casebook→fetch e2e。 |
+| **G7** Rulebook | **PARTIAL** | Observation events DONE。mechanical A37/A38 on production 120 **GREEN** after authoring wave（root-cause + who owns）。**not** G7 Exit。`HUMAN_ONLY_RUBRIC_ITEMS` remain paired-history 120 / A39 pair review / A40 tournament。Machine evidence（**not** human Exit）：`tests/unit/enforcer/paired-history-eval.test.mjs`（catalog+history identity, **not** true-repeat oracle）；`scripts/checks/enforcer-cross-family-collision.mjs`（lexical A40, **not** human tournament）。 |
 | **G8** Strength | **PARTIAL** | Change 仍 `changes/active/strength.md`（并行 owner）。Policy/transform **unit** proofs only（not live Host canaries, not K1/K2 DONE）：`tests/unit/strength/{host-canary-k0,host-policy,replica-transform,projection-algebra}.test.mjs` — `StrengthPolicy.decideFromFacts` / eligibility / budgetOf；`StrengthSettings.load` / `HostCanaryFingerprint` / `hostCanaryHealthy`；`StrengthReplicaTransform.apply`；`StrengthReplicaTools.exactReadonlyHostToolMap`；`StrengthFrame.isAllowedTool`；`StrengthReplicaAssociationHints`；`SatelliteKind.Companion` only；`PromptAuthority.systemPromptIdFor` / `toolCapabilitiesFor(..., StrengthReplica)`。G7 未 full Exit；G8 仍 active PARTIAL。 |
 | **G9** Global Convergence | **PARTIAL** | smoke-check only, not full release-close。Cite: `scripts/checks/session-ownership-ratchet.mjs` + `session-ownership-matrix.json` + `tests/unit/verify/session-ownership-ratchet.test.mjs`（wired in `scripts/check.mjs`）。Closed kinds: Companion, SyncInspector, SyncCoder, Bookkeeper, hidden Reviewer, StrengthReplica, fork agent, Executor child。Bookkeeper `evidencePath` moved to `src/Wanxiangshu/Infrastructure/BookkeeperRuntime.fs` after G6 landed that runtime（was `SessionOwnership.fs`）。Symbol/storage/capability ratchets remain separate。 |
 
@@ -125,13 +125,13 @@ ac41ef8f  session abort diagnostic
 | 证明切片 | 状态 |
 |---|---|
 | 静态 ratchet：`student-teacher-absence`（含 `SatelliteKind.Replica` 禁止）+ `session-ownership-ratchet` + `unified-store-gate` + `g4r-*` | **GREEN** |
-| `enforcer-rulebook-gate --require-headings --strict` + `capability-isomorphism-gate` + `session-ownership-ratchet` | **PARTIAL**（G7: production 120 fails expanded `--strict` until authoring; HUMAN_ONLY items not claimed。G9: ownership ratchet smoke-check, not release-close） |
+| `enforcer-rulebook-gate --require-headings --strict` + `capability-isomorphism-gate` + `session-ownership-ratchet` | **PARTIAL**（G7: mechanical A37/A38 production 120 GREEN; HUMAN_ONLY not claimed。G9: ownership ratchet smoke-check, not release-close） |
 | `npm run check`（lint + build + unit + integration） | **GREEN** |
 | enforcer / strength / verify unit | **256 PASS** |
 | `npm run test:e2e` Long Stroke | **GREEN**（48 steps；journal ceiling 372；三连稳定） |
 | Storage G4 / JS G5 | **DONE / DONE-with-amendment(C-3)** |
-| Universal+perm-inspector G6 / Rulebook G7 | **PARTIAL / PARTIAL** — G6 BookkeeperRuntime/EditQaTool cited, digest synthesizer gone, Host e2e/LLM Bookkeeper open；G7 Observation events DONE；expanded `--strict` mechanical A37+A38 未过 production 120；A37–A50 / HUMAN_ONLY 未证 |
-| 已知 residual | G2 Exit（PREFIX LAW unit ≠ Host Exit）；G6 LLM Bookkeeper / edit-qa / CaseFinalize / Host e2e；G7 production 120 `--strict` + A37–A50 / HUMAN_ONLY；G8 live Host / K1/K2；G9 PARTIAL smoke-check only；magic-todo 仍 proposed。 |
+| Universal+perm-inspector G6 / Rulebook G7 | **PARTIAL / PARTIAL** — G6 BookkeeperRuntime+edit-qa landed, digest gone, HostSignalBootstrap await + inspector-tool path in flight (`G6HostPathE2E`)；G7 mechanical A37/A38 production 120 GREEN; HUMAN_ONLY remaining |
+| 已知 residual | G2 PREFIX LAW unit canary ≠ live Host Exit；G6 HostSignalBootstrap await + inspector-tool path (`G6HostPathE2E`) / CaseFinalize / Host e2e；G7 HUMAN_ONLY（paired-history 120 / A39 / A40；identity/lexical machine evidence ≠ human tournament）；G8 live Host / K1/K2；G9 PARTIAL smoke-check only；magic-todo 仍 proposed。 |
 
 ## 0.4 合法中间状态（现在）— **G0/G1/G3/G3.5/G4 DONE; G5 DONE-with-amendment; G2/G6/G7/G8/G9 PARTIAL**
 
@@ -144,8 +144,8 @@ ac41ef8f  session abort diagnostic
 ✓ Storage completed（G4）
 ✓ JS capability-projected tools（G5 DONE-with-amendment C-3 user裁决）
 ◐ G2：runtime reuse canary green；PREFIX LAW unit canary cited (`g2-inspector-provider-wire-prefix.test.mjs`)；G2 Exit 未满足
-◐ G6：BookkeeperRuntime/EditQaTool/BookkeeperStaging cited；digest synthesizer gone；Host e2e / LLM Bookkeeper open；Host-path unit ≠ full tool→PromptDispatcher→TurnCompleted→Casebook→fetch e2e
-◐ G7：Observation events DONE；expanded `--strict` mechanical A37+A38 未过 production 120；HUMAN_ONLY / A37–A50 semantic/paired-history/tournament 未证
+◐ G6：digest gone；BookkeeperRuntime+edit-qa landed；HostSignalBootstrap await + inspector-tool path still in flight (`G6HostPathE2E`)；Host e2e Remaining
+◐ G7：Observation events DONE；mechanical A37/A38 production 120 GREEN after authoring（root-cause + who owns）；HUMAN_ONLY remaining；identity/lexical machine evidence ≠ human Exit
 ◐ Strength：K0 policy/transform unit proofs in tests/unit/strength/*；非 live Host canary；Change 仍 active/strength.md（并行 owner；G8 PARTIAL；非 K1/K2 DONE）
 ◐ G9：`session-ownership-ratchet.mjs` smoke-check（kinds closed；Bookkeeper evidencePath now `src/Wanxiangshu/Infrastructure/BookkeeperRuntime.fs`）；symbol/storage/capability ratchets 另轨；非 full release close
 ○ magic-todo — 独立 Lane；保持 proposed；不入主 Gate
@@ -1384,7 +1384,7 @@ Casebook observation capture
 
 # 14. G6 — perm-inspector + Universal Casebook Completion — **PARTIAL**
 
-> **Living status：PARTIAL**（2026-08-11 observational）。`BookkeeperRuntime` / `EditQaTool.execute` / `BookkeeperStaging` cited；digest synthesizer gone from `CasebookBookkeeper`；`SpikePlugin` calls `setSessionPort` at `createHost`；`tryFinalizeInspector` is `Task`；`HostSignalBootstrap` remains sync（fire-and-forget after starting the Task；`tryTake` sync-before-await）。G2 `promptModel` not removed。无 user amendment 把 runtime surface 当作 G6 Exit。Host e2e / LLM Bookkeeper still open。Host-path unit 不是 full tool→PromptDispatcher→TurnCompleted→Casebook→fetch e2e。下文 G6-E/F/G Product Exit Gate 仍是验收基线。
+> **Living status：PARTIAL**（2026-08-11 observational）。`BookkeeperRuntime` / `EditQaTool.execute` / `BookkeeperStaging` cited；digest synthesizer gone from `CasebookBookkeeper`；`SpikePlugin` calls `setSessionPort` at `createHost`；`tryFinalizeInspector` is `Task`。HostSignalBootstrap await + inspector-tool path still in flight (`G6HostPathE2E`)。G2 `promptModel` not removed。无 user amendment 把 runtime surface 当作 G6 Exit。Host e2e Remaining。Host-path unit 不是 full tool→PromptDispatcher→TurnCompleted→Casebook→fetch e2e。下文 G6-E/F/G Product Exit Gate 仍是验收基线。
 
 现在才正式启动 `perm-inspector`。
 
@@ -1673,7 +1673,7 @@ perm-inspector → completed
 
 # 22. G7 — Rulebook — **PARTIAL**
 
-> **Living status：PARTIAL**（2026-08-11 observational）。Observation events DONE。`enforcer-rulebook-gate.mjs --require-headings --strict` encodes mechanical A37+A38; production 120 fails `--strict` until authoring wave。HUMAN_ONLY_RUBRIC_ITEMS / A37–A50 semantic / paired-history / tournament 未证。下文 G7 Exit Gate 仍是验收基线。
+> **Living status：PARTIAL**（2026-08-11 observational）。Observation events DONE。mechanical A37/A38 on production 120 **GREEN** after authoring wave（root-cause + who owns）。**not** G7 Exit。`HUMAN_ONLY_RUBRIC_ITEMS` remain paired-history 120 / A39 pair review / A40 tournament。Machine evidence：`tests/unit/enforcer/paired-history-eval.test.mjs`（catalog+history identity, **not** true-repeat oracle）；`scripts/checks/enforcer-cross-family-collision.mjs`（lexical A40, **not** human tournament）。下文 G7 Exit Gate 仍是验收基线。
 
 Rulebook 放在这里，而不是更早。
 
@@ -2089,7 +2089,7 @@ Universal destructive delete          ✓ DONE
 Storage cutover                       ✓ DONE（G4 completed）
 JS legacy tool removal                ✓ DONE-with-amendment（G5 C-3）
 Casebook observation integration      ◐ PARTIAL（G6：digest ≠ Bookkeeper；非 full Host e2e）
-Rulebook                              ◐ PARTIAL（G7：Observation events DONE；production 120 fails expanded `--strict`；A37–A50 / HUMAN_ONLY 未证）
+Rulebook                              ◐ PARTIAL（G7：mechanical A37/A38 production 120 GREEN；HUMAN_ONLY remaining；not Exit）
 Strength promotion                    ◐ PARTIAL（K0 splice in tree；active/strength 并行 owner）
 G9 ratchets                           ◐ PARTIAL（session-ownership + headings + capability-isomorphism 已接线；非 full close）
 ```
@@ -2471,7 +2471,7 @@ CURRENT（2026-08-11；§0.1 observational）
 │
 ├─ Completed files: Causal CE + Orchestrator + Storage(G4) + JS(G5 C-3)
 │            + Universal + perm-inspector（G2/G6 PARTIAL；G3 DONE）
-│            + rulebook（G7 PARTIAL；Observation events DONE；`--strict` production 120 Remaining）
+│            + rulebook（G7 PARTIAL；mechanical A37/A38 production 120 GREEN；HUMAN_ONLY Remaining）
 ├─ Active: strength.md（G8 PARTIAL；并行 owner；勿 playbook-close）
 ├─ Proposed: entry.md（本 Playbook；不迁 completed）
 └─ Proposed: magic-todo（Playbook 外；不入 gates）
@@ -2503,7 +2503,7 @@ CURRENT（2026-08-11；§0.1 observational）
         │
         ▼
 [8] Rulebook                                 ◐ PARTIAL
-    Observation events DONE；expanded `--strict` mechanical A37+A38 未过 production 120；A37–A50 / HUMAN_ONLY 未证
+    Observation events DONE；mechanical A37/A38 production 120 GREEN；HUMAN_ONLY remaining；identity/lexical machine evidence ≠ human Exit
         │
         ▼
 [9] Strength                                 ◐ PARTIAL（active/strength）
@@ -2518,7 +2518,7 @@ CURRENT（2026-08-11；§0.1 observational）
 
 # 33. Definition of Done
 
-> **2026-08-11 living status（observational）：** Product Exit Gates in this section remain the acceptance baseline. G0/G1/G3/G3.5/G4 DONE；G5 DONE-with-amendment（C-3 user裁决）。G2/G6/G7/G8/G9 PARTIAL。G6 BookkeeperRuntime/EditQaTool/BookkeeperStaging are observational cites, not Exit; digest synthesizer is gone from CasebookBookkeeper and has no user amendment authority. G7 expanded `--strict` is not A37–A50 Exit; production 120 currently fails `--strict`. The checklist below is the *product* convergence DoD — **not** all-green.
+> **2026-08-11 living status（observational）：** Product Exit Gates in this section remain the acceptance baseline. G0/G1/G3/G3.5/G4 DONE；G5 DONE-with-amendment（C-3 user裁决）。G2/G6/G7/G8/G9 PARTIAL。G6 digest gone; BookkeeperRuntime+edit-qa landed; HostSignalBootstrap await + inspector-tool path still in flight (`G6HostPathE2E`); no user amendment authority as Exit. G7 mechanical A37/A38 production 120 GREEN is not G7 Exit; HUMAN_ONLY (paired-history 120 / A39 / A40) remain; identity/lexical machine evidence is not human tournament. The checklist below is the *product* convergence DoD — **not** all-green.
 
 只有以下全部成立，才能认为这一批 Proposal 真正“收敛”，而不是“分别实现过”：
 

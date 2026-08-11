@@ -3256,12 +3256,13 @@ no Rulebook private journal/blob/coverage/delivery filesystem stores in proposed
 
 ## Remaining work
 
-**G7 PARTIAL**（observational；A37–A50 / G7 Exit 仍是验收基线。mechanical `--strict` 不是 full Exit）：
+**G7 PARTIAL**（observational；G7 Exit / HUMAN_ONLY 仍是验收基线。mechanical A37/A38 GREEN **不是** full Exit）：
 
 - [x] Observation events — physical EventStore vocabulary `BlogObservationCommitted` / `BlogObservationsSquashed`；codec dual-decodes legacy tags
-- [ ] **Remaining（诚实）**：production 120 **fails** `enforcer-rulebook-gate.mjs --require-headings --strict`（=`--require-rubric`；mechanical A37+A38 `NEW_RUBRIC_CODES`）until authoring wave。
-- [ ] **Remaining（诚实）**：`HUMAN_ONLY_RUBRIC_ITEMS` = paired-history 120 / A39 pair review / A40 tournament — this gate does **not** claim them；no A40 cross-family script。
-- [ ] **Remaining（诚实）**：A37–A50 semantic review / paired-history eval / cross-family tournament **未**证明。
+- [x] mechanical A37/A38 on production 120 **GREEN** after authoring wave（root-cause + who owns）— `enforcer-rulebook-gate.mjs --require-headings --strict`
+- [ ] **Remaining（诚实）**：`HUMAN_ONLY_RUBRIC_ITEMS` = paired-history 120 / A39 pair review / A40 tournament — this gate does **not** claim them。
+- [ ] **Remaining（诚实）**：`tests/unit/enforcer/paired-history-eval.test.mjs` is catalog+history identity, **not** true-repeat oracle。
+- [ ] **Remaining（诚实）**：`scripts/checks/enforcer-cross-family-collision.mjs` is lexical A40, **not** human tournament。
 
 ## Completion criteria（runtime + structural；非 A37–A50 Exit）
 
@@ -3275,19 +3276,19 @@ no Rulebook private journal/blob/coverage/delivery filesystem stores in proposed
 - [x] Main Full/Identity delivery runtime（TipGuidanceDelivered + TipDeliveryProjection；compaction re-Full）
 - [x] targeted tests + build green for this slice（enforcer + companion tip paths）
 - [x] Observation events：`BlogObservationCommitted` / `BlogObservationsSquashed`（legacy dual-decode）
-- [ ] Constitution production 120 expanded `--strict`（mechanical A37+A38）**fails** until authoring wave；HUMAN_ONLY / A37–A50 **未**证明
+- [x] Constitution production 120 expanded `--strict` mechanical A37/A38 **GREEN** after authoring wave（root-cause + who owns）— **not** G7 Exit
 - [x] Bridge fields dropped（`LexicalOrder`）
-- [ ] A37–A50 semantic / paired-history / tournament **未**证明
+- [ ] HUMAN_ONLY remaining：paired-history 120 / A39 pair review / A40 tournament；identity/lexical machine evidence ≠ human Exit
 
 ## Blockers
 
-G7 仍 PARTIAL：production 120 fails expanded `--strict`；HUMAN_ONLY_RUBRIC_ITEMS / A37–A50 semantic / paired-history / tournament 未证。mechanical `--strict` 不是 full Exit。
+G7 仍 PARTIAL：mechanical A37/A38 production 120 GREEN after authoring（root-cause + who owns）；HUMAN_ONLY_RUBRIC_ITEMS remaining；identity/lexical machine evidence ≠ human tournament。mechanical GREEN 不是 full Exit。
 
 ---
 
 ## Final outcome
 
-**G7 Rulebook v2 — runtime + Observation events**（2026-08-11 observational PARTIAL）：expanded `--strict` mechanical A37+A38 未过 production 120；HUMAN_ONLY / A37–A50 **未**证明。Strength（G8）仍 active PARTIAL，不在本 Change 范围。
+**G7 Rulebook v2 — runtime + Observation events + mechanical A37/A38 production 120 GREEN**（2026-08-11 observational PARTIAL）：**not** G7 Exit。HUMAN_ONLY remaining；`paired-history-eval.test.mjs` is catalog+history identity not true-repeat oracle；`enforcer-cross-family-collision.mjs` is lexical A40 not human tournament。Strength（G8）仍 active PARTIAL，不在本 Change 范围。
 
 ### Runtime delivered（原 exit）
 
@@ -3333,23 +3334,26 @@ G7 仍 PARTIAL：production 120 fails expanded `--strict`；HUMAN_ONLY_RUBRIC_IT
 ### Residual honesty
 
 ```text
-Observation events DONE  ≠  A37–A50 semantic / paired-history / tournament Exit
-expanded --strict mechanical A37+A38  ≠  full G7 Exit
-production 120 currently fails --strict until authoring wave
+Observation events DONE  ≠  G7 Exit
+mechanical A37/A38 production 120 GREEN  ≠  full G7 Exit
 HUMAN_ONLY_RUBRIC_ITEMS (paired-history / A39 / A40) not claimed by this gate
+paired-history-eval.test.mjs = catalog+history identity, NOT true-repeat oracle
+enforcer-cross-family-collision.mjs = lexical A40, NOT human tournament
 ```
 
 ### Closeout proofs（residual）
 
 - Observation events vocabulary cutover as above  
-- `enforcer-rulebook-gate.mjs --require-headings --strict`: production 120 **fails** until authoring wave（observational；not Exit）  
+- `enforcer-rulebook-gate.mjs --require-headings --strict`: mechanical A37/A38 production 120 **GREEN** after authoring（observational；not Exit）  
+- `tests/unit/enforcer/paired-history-eval.test.mjs`: catalog+history identity, **not** true-repeat oracle  
+- `scripts/checks/enforcer-cross-family-collision.mjs`: lexical A40, **not** human tournament  
 - `capability-isomorphism-gate` / `session-ownership-ratchet.mjs` are G9 smoke-check, not G7 Exit  
 - `npm run build` OK  
 - enforcer / strength / verify unit：**256 PASS**
 
 ### Gate 移交
 
-- G7 **PARTIAL** → Observation events DONE；production 120 fails expanded `--strict`；HUMAN_ONLY / A37–A50 Remaining。文件在 `changes/completed/rulebook.md` 不等于 G7 Exit。  
+- G7 **PARTIAL** → Observation events DONE；mechanical A37/A38 production 120 GREEN；HUMAN_ONLY Remaining。文件在 `changes/completed/rulebook.md` 不等于 G7 Exit。  
 - Strength（G8）仍由 `changes/active/strength.md` 并行 owner 持有；**本 Change 不触碰 Strength**；G8 保持 **PARTIAL**  
 - G9：`session-ownership-ratchet.mjs` smoke-check only；symbol/storage/capability ratchets 另轨；非 full release-close  
 
@@ -3358,7 +3362,8 @@ HUMAN_ONLY_RUBRIC_ITEMS (paired-history / A39 / A40) not claimed by this gate
 Living status is observational. Product Exit Gates (G7 Exit / A37–A50) remain the acceptance baseline. This section does not override Gate text. No implementer-invented amendment turns structural `--strict` into full Exit.
 
 - **Observation events DONE** — `BlogObservationCommitted` / `BlogObservationsSquashed`；legacy dual-decode.
-- **Remaining：** production 120 fails `enforcer-rulebook-gate.mjs --require-headings --strict`（mechanical A37+A38 `NEW_RUBRIC_CODES`）until authoring wave。
-- **Remaining：** `HUMAN_ONLY_RUBRIC_ITEMS`（paired-history 120 / A39 pair review / A40 tournament）this gate does not claim；no A40 script。
-- **Remaining：** A37–A50 semantic review / paired-history eval / cross-family tournament **未**证明。
+- **mechanical A37/A38 production 120 GREEN** after authoring wave（root-cause + who owns）— **not** G7 Exit.
+- **Remaining：** `HUMAN_ONLY_RUBRIC_ITEMS`（paired-history 120 / A39 pair review / A40 tournament）this gate does not claim.
+- **Remaining：** `tests/unit/enforcer/paired-history-eval.test.mjs` is catalog+history identity, **not** true-repeat oracle.
+- **Remaining：** `scripts/checks/enforcer-cross-family-collision.mjs` is lexical A40, **not** human tournament.
 

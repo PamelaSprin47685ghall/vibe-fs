@@ -3411,7 +3411,7 @@ Observation capture 从最终执行层接（G5 后 = builtin read/glob/grep Host
 - [x] Host mechanical Bookkeeper：`CasebookBookkeeper.refreshStale` — needsRefresh → fetch → replayAll → refreshCase(same Q/A, replayed obs)；无 LLM / 无 edit-qa
 - [x] FetchTool stale branch：single-flight 内尝试 mechanical refresh once，再 re-fetch；成功且 Fresh → 返回 fresh A；否则仍 stale + refresh:required（不把 maintenance 变成 fetch error）
 - [x] unit：`tests/unit/casebook/bookkeeper-mechanical.test.mjs` + fetch stale→mechanical path
-- [ ] **Remaining（诚实）**：LLM Bookkeeper / Host e2e still open。Observational APIs（**not** Exit）：`BookkeeperRuntime.setSessionPort` / `runTransaction` / `isAttached` / `tryTxId`；`EditQaTool.execute`（`Q.md`\|`A.md`, unique `old_text`）；`BookkeeperStaging.begin`/`read`/`replace`/`take`/`abort`。`txId` in `BookkeeperRuntime` not child options。digest synthesizer **gone** from `CasebookBookkeeper`。`SpikePlugin` calls `BookkeeperRuntime.setSessionPort` at `createHost`；`tryFinalizeInspector` is `Task`；`HostSignalBootstrap` remains sync so `SpikePlugin` fire-and-forgets after starting the Task（`tryTake` is sync-before-await）。G2 `promptModel` not removed。
+- [ ] **Remaining（诚实）**：LLM Bookkeeper / Host e2e still open。Observational APIs（**not** Exit）：`BookkeeperRuntime.setSessionPort` / `runTransaction` / `isAttached` / `tryTxId`；`EditQaTool.execute`（`Q.md`\|`A.md`, unique `old_text`）；`BookkeeperStaging.begin`/`read`/`replace`/`take`/`abort`。`txId` in `BookkeeperRuntime` not child options。digest gone；BookkeeperRuntime+edit-qa landed。`SpikePlugin` calls `BookkeeperRuntime.setSessionPort` at `createHost`；`tryFinalizeInspector` is `Task`。HostSignalBootstrap await + inspector-tool path still in flight (`G6HostPathE2E`)。G2 `promptModel` not removed。
 
 ### G6-F — CaseFinalize（Universal 核心）— DONE（workflow + lifecycle；semantic synthesis deferred）
 - [x] `finalizeCase`：exactly-one guard（同 scope 二次 finalize 拒绝；unexpected SessionDeleted 不 reconstruct）
@@ -3432,14 +3432,14 @@ G6 mechanical Casebook surface（Domain / Capture / Store / Replay / Fetch+singl
 
 ## Blockers
 
-G6 仍 PARTIAL。`BookkeeperRuntime` / `EditQaTool` / `BookkeeperStaging` 是 observational surface，不是 Exit。LLM Bookkeeper / CaseFinalize synthesis / full Host e2e 是 Product Exit Remaining，不得降格为后续增量。digest synthesizer 已从 `CasebookBookkeeper` 移除，无 user amendment authority。
+G6 仍 PARTIAL。digest gone；BookkeeperRuntime+edit-qa landed。HostSignalBootstrap await + inspector-tool path still in flight (`G6HostPathE2E`)。CaseFinalize synthesis / full Host e2e 是 Product Exit Remaining，不得降格为后续增量。无 user amendment authority。
 
 ## Final outcome
 
 **G6 Inspector Casebook（perm-inspector）mechanical surface**（2026-08-11 observational PARTIAL；G6-E/F/G Remaining 仍开放）：
 
 1. **Domain / Store / Capture / Replay**：CASE-001..012 正式文档 + 纯 Domain projection；统一 EventStore 事件（Captured/Refreshed/Accessed/Evicted）；marker opt-in；typed observation capture + executor 阅读容错；freshness = exact normalized observation equality（hint，非 proof）。
-2. **Lifecycle session wiring**：`CasebookLifecycle` — notePrompt / noteAnswer / tryFinalizeInspector / cleanupInspector / touchAccess；`SpikePlugin` calls `BookkeeperRuntime.setSessionPort` at `createHost`；`tryFinalizeInspector` is `Task`；`HostSignalBootstrap` remains sync（fire-and-forget after starting the Task；`tryTake` sync-before-await）；G2 `promptModel` not removed；graceful finalize once；unexpected delete = cleanup only（零 EventStore 写）。
+2. **Lifecycle session wiring**：`CasebookLifecycle` — notePrompt / noteAnswer / tryFinalizeInspector / cleanupInspector / touchAccess；`SpikePlugin` calls `BookkeeperRuntime.setSessionPort` at `createHost`；`tryFinalizeInspector` is `Task`；HostSignalBootstrap await + inspector-tool path still in flight (`G6HostPathE2E`)；G2 `promptModel` not removed；graceful finalize once；unexpected delete = cleanup only（零 EventStore 写）。
 3. **Fetch hot path**：`FetchTool` fresh/stale/no-case；CASE-011 single-flight；fresh → Accessed；process-local `CasebookIndex` epoch snapshot。
 4. **Minimal Bookkeeper（无 LLM）**：`CasebookBookkeeper.refreshStale` 在 stale 时用同一 Q/A + 重放 observations 发布 Refreshed；FetchTool stale 分支尝试一次后 re-fetch；maintenance failure ≠ fetch failure。
 5. **Proofs**：`tests/unit/casebook/*` **36 PASS**（含 `bookkeeper-mechanical`、`lifecycle-wiring`、`fetch-tool`、`universal-loop`、index/store/domain/capture）。
