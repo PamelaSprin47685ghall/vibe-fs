@@ -1,15 +1,22 @@
 # translator-layer-bloat — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Delete pass-through wrappers. Call the real owner directly, or move a genuine policy into the layer so it earns its name.
 
-## Why
+## Repair Strategy
+Trace call chains. Collapse identity forwards. Keep only layers that change type, trust, lifetime, or transaction boundaries.
 
-Translator, broker, governor, coordinator, manager, adapter, or mediator layers merely forward calls without enforcing a real boundary or transformation.
+## Decision Branches
+If a layer exists for future growth with no present invariant, remove it until the invariant appears. If generated stubs forward, generate thinner bindings.
 
-## What to do
+## Wrong Fixes
+Manager of managers that only delegate. Renaming a forwarder instead of deleting it. Adding logging-only wrappers as "architecture".
 
-A forwarding layer adds ceremony without a concept. Remove it or give it a genuine invariant and ownership boundary.
+## Verification
+Call graphs show fewer hops; remaining layers have stated invariants tested at that boundary.
 
-## Reference
+## Done When
+No load-bearing name exists solely to forward; surviving layers own a real boundary.
 
-Family L, enforcement-l05, ordinal 115.
+## Scope and Authority
+Structural layering in application code.

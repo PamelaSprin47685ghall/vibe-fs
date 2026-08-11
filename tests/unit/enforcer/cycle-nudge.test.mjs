@@ -39,7 +39,7 @@ test('ENFORCER_025_canonical_tip_is_first_by_part_ordinal', () => {
   assert.deepEqual(forward.tip, {
     ruleId: ruleA.ruleId,
     fieldName: ruleA.fieldName,
-    catalogOrdinal: ruleA.catalogOrdinal,
+    lexicalOrder: ruleA.lexicalOrder,
   })
   assert.equal(forward.multiCall, true)
 

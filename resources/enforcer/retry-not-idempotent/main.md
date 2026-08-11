@@ -1,15 +1,22 @@
 # retry-not-idempotent — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Give the effect a stable idempotency key or natural identity. Make handlers safe under at-least-once delivery. Prove double execution does not double-apply.
 
-## Why
+## Repair Strategy
+Introduce dedupe keys, upsert semantics, or outbox with unique constraints. Separate "accept command" from "apply effect" when needed.
 
-A retryable operation can duplicate writes, prompts, publications, charges, processes, or resource creation.
+## Decision Branches
+If the effect cannot be made idempotent, remove automatic retry and require explicit operator replay with safeguards. If only parts are safe, retry only the safe segment.
 
-## What to do
+## Wrong Fixes
+Blind HTTP retries on POST that creates records. Re-sending prompts that charge tokens without dedupe. Catch-and-retry around multi-step side effects.
 
-A retryable effect is not idempotent. Add a stable identity and prove repeated execution is safe.
+## Verification
+Execute the path twice with the same identity; observable side effects remain single-applied.
 
-## Reference
+## Done When
+Retry policy only wraps idempotent effects, or identity-based dedupe is proven.
 
-Family E, enforcement-e10, ordinal 50.
+## Scope and Authority
+Effects under retry/at-least-once delivery. Not pure CPU recomputation.

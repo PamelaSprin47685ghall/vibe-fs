@@ -1,15 +1,22 @@
 # weak-boundary-parsing — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Parse and validate at the edge into domain types. Downstream code accepts only those types. Reject invalid payloads before business logic.
 
-## Why
+## Repair Strategy
+Introduce schema validation at ingress. Replace `dict`/`JsonElement` plumbing with typed models. Centralize codecs.
 
-Untrusted or cross-language data remains weakly typed after entering the system, forcing downstream code to repeatedly infer its shape.
+## Decision Branches
+If multiple ingress points share a shape, share one codec. If partial payloads are allowed, model optionality explicitly in the type.
 
-## What to do
+## Wrong Fixes
+Passing raw JSON through many layers. Re-validating differently in each feature. Trusting query strings as ints without parse.
 
-Boundary data was not normalized early enough. Parse and validate it once into a strong internal type.
+## Verification
+Invalid payloads fail at the boundary; domain functions never see raw untrusted shapes.
 
-## Reference
+## Done When
+Ingress is normalized once; internal code is strongly typed against the result.
 
-Family A, enforcement-a08, ordinal 8.
+## Scope and Authority
+Untrusted and cross-language ingress boundaries.

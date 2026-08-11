@@ -15,10 +15,23 @@ type ObservationUnit =
         FrameBody: string option
     }
 
+/// Named work-log Observation: tip identity paired with an optional frame digest.
+///
+/// Domain name for the rulebook BlogObservation* residual. Physical substrate remains
+/// Journal `BlogEntryCommitted` (frame + tip half) and `BlogSquashCommitted` (Observation
+/// squash: frames and tips co-truncate). Not a second projection store and not a new
+/// EventStore event family — pair Enforcement RecentTips with Blog frames at the boundary.
+type WorkLogObservation =
+    { TipName: string
+      CycleId: string
+      FrameDigest: string option }
+
 /// Pure tip↔frame pairing for Observation history (rulebook §2).
 ///
 /// Not a second projection store: call sites fold RecentTips with coverable frames
-/// through `pairTipsAndFrames`. Message-layer rendering stays in CompanionProjectionBuilder.
+/// through `pairTipsAndFrames` / `ofTipsAndFrames`. Message-layer rendering stays in
+/// CompanionProjectionBuilder. Journal `ObservationProjection.observationsOf` is the
+/// session-facing zip over Enforcement + Blog.
 [<RequireQualifiedAccess>]
 module RulebookObservation =
 
@@ -57,3 +70,38 @@ module RulebookObservation =
             | [], [] -> List.rev acc
 
         loop tips frames []
+
+    /// Zip tip identities (TipName × CycleId) with frame digests into WorkLogObservations.
+    ///
+    /// Front-zip oldest → newest. Leftover tips keep `FrameDigest = None`. Leftover
+    /// frames are dropped: a WorkLogObservation is tip-anchored (cycle identity required).
+    /// Prefer this when projecting Enforcement RecentTips against Blog frame digests.
+    let ofTipsAndFrames (tips: (string * string) list) (frameDigests: string list) : WorkLogObservation list =
+        let rec loop tipRest digestRest acc =
+            match tipRest, digestRest with
+            | (name, cycle) :: ts, d :: ds ->
+                loop
+                    ts
+                    ds
+                    ({ TipName = name
+                       CycleId = cycle
+                       FrameDigest = Some d }
+                     :: acc)
+            | (name, cycle) :: ts, [] ->
+                loop
+                    ts
+                    []
+                    ({ TipName = name
+                       CycleId = cycle
+                       FrameDigest = None }
+                     :: acc)
+            | [], _ -> List.rev acc
+
+        loop tips frameDigests []
+
+    /// Lift `ObservationUnit` list that already carries tip names into WorkLogObservation
+    /// when a cycle id is supplied per tip index (unpaired frames skipped).
+    let workLogFromUnits (tipCycles: (string * string) list) (units: ObservationUnit list) : WorkLogObservation list =
+        let digests = units |> List.choose (fun u -> u.FrameDigest)
+
+        ofTipsAndFrames tipCycles digests

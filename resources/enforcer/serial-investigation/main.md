@@ -1,15 +1,22 @@
 # serial-investigation — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Batch independent reads and searches in one turn. Synthesize after all evidence arrives. Only chain steps that need prior outputs.
 
-## Why
+## Repair Strategy
+List the unknown questions. Mark dependency edges. Parallelize the independent set. Keep a short serial tail for dependent refinement.
 
-Independent searches, file reads, source inspections, or diagnostics are performed one by one despite having no dependency.
+## Decision Branches
+If the first hit may eliminate the rest, a cheap serial probe is fine—then parallelize the remainder. If tools rate-limit, bound concurrency rather than going fully serial by habit.
 
-## What to do
+## Wrong Fixes
+Reading one file per turn out of habit. Waiting for irrelevant context before starting independent searches. Serializing purely to narrate progress.
 
-Independent investigation is unnecessarily serial. Run the reads and searches concurrently, then synthesize the evidence.
+## Verification
+Independent lookups were issued together; wall time reflects overlap, not a chain of waits.
 
-## Reference
+## Done When
+Investigation plan shows concurrent independent reads; only true dependencies remain serial.
 
-Family I, enforcement-i04, ordinal 84.
+## Scope and Authority
+Research and diagnostics workflow. Not user-visible product request handling (see serial-when-parallel).

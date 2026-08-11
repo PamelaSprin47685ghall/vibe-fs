@@ -1,15 +1,22 @@
 # type-erosion-at-boundary — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Keep dynamic decoding inside the adapter. Validate once and expose a typed domain contract. Ban `any`/unchecked casts in domain modules.
 
-## Why
+## Repair Strategy
+Find casts and dynamic access inward of adapters. Move parsing out. Introduce DTOs and mappers that fail at the edge.
 
-`any`, unchecked casts, reflection, dynamic property access, or unboxing escape the designated adapter boundary and enter domain logic.
+## Decision Branches
+If a language boundary forces reflection, wrap it in one module with a typed façade and tests. If legacy forces gradual typing, stop the bleed with a firewall package.
 
-## What to do
+## Wrong Fixes
+Passing `obj` through domain services. Catch-and-cast everywhere. Using reflection to reach private domain state from plugins without a protocol.
 
-Type information is being discarded beyond the adapter boundary. Contain dynamic decoding and expose a typed contract.
+## Verification
+Domain projects compile/lint without `any` escapes; adapter tests cover invalid payloads failing before domain entry.
 
-## Reference
+## Done When
+Dynamic typing stops at adapters; domain code consumes validated types only.
 
-Family A, enforcement-a09, ordinal 9.
+## Scope and Authority
+Trust and type boundaries between adapters and domain.

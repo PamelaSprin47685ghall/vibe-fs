@@ -1,15 +1,22 @@
 # spike-not-cleaned — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Rebuild the production path with explicit types, boundaries, error contracts, and tests. Delete spike shortcuts, hard-coded credentials, and throwaway structure.
 
-## Why
+## Repair Strategy
+List every known spike compromise. Either fix each before promote or keep the spike out of the release path. Prefer a clean reimplementation over polishing the experiment in place when structure is wrong.
 
-Experimental code or a proof of concept is promoted without replacing shortcuts, hard-coded assumptions, and missing contracts.
+## Decision Branches
+If time forces a phased harden, gate the spike and track each compromise as required work—do not call it done.
 
-## What to do
+## Wrong Fixes
+Renaming spike folders and shipping. Adding one test and declaring production-ready. Leaving TODOs on critical paths (see todo-bomb).
 
-A spike is being shipped as production design. Rebuild it around explicit contracts and remove experimental shortcuts.
+## Verification
+Production entry points use contracted code; spike artifacts are removed or quarantined; acceptance tests pass on the hardened path.
 
-## Reference
+## Done When
+Promoted code meets production contracts; experimental shortcuts are gone from the live path.
 
-Family K, enforcement-k08, ordinal 108.
+## Scope and Authority
+Promotion of experiments into production. Not exploratory branches that stay isolated.

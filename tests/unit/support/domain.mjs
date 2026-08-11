@@ -5054,20 +5054,15 @@ export const enforcerCatalog = (() => {
       name,
       ruleId,
       fieldName,
-      family = 'X',
-      scoreWhen = 'score when',
-      nudge = 'nudge text',
-      enforcerText,
-      mainText,
-      catalogOrdinal = 1,
+      enforcerText = 'enforcer body',
+      mainText = 'main body',
+      lexicalOrder = 1,
     } = {}) => {
       const tip = name ?? fieldName ?? ruleId ?? 'sample-field'
       const id = ruleId ?? tip
       const field = fieldName ?? tip
-      const enf = enforcerText ?? scoreWhen
-      const main = mainText ?? nudge
-      // Fable record ctor order: Name, EnforcerText, MainText, RuleId, FieldName, Family, ScoreWhen, Nudge, CatalogOrdinal
-      return new Rule(tip, enf, main, id, field, family, scoreWhen, nudge, catalogOrdinal)
+      // Fable record ctor order: Name, EnforcerText, MainText, RuleId, FieldName, LexicalOrder
+      return new Rule(tip, enforcerText, mainText, id, field, lexicalOrder)
     },
     /**
      * Result over schemaVersion + rules list.
@@ -5109,7 +5104,7 @@ export const enforcer = (() => {
     return {
       ruleId: tip.RuleId,
       fieldName: tip.FieldName,
-      catalogOrdinal: tip.CatalogOrdinal,
+      lexicalOrder: tip.LexicalOrder,
     }
   }
 
@@ -5133,7 +5128,7 @@ export const enforcer = (() => {
       return {
         ruleId: rule.RuleId,
         fieldName: rule.FieldName,
-        catalogOrdinal: rule.CatalogOrdinal,
+        lexicalOrder: rule.LexicalOrder,
       }
     },
 
@@ -5193,7 +5188,7 @@ export const enforcer = (() => {
       const tip = {
         ruleId: merged.CanonicalTip.RuleId,
         fieldName: merged.CanonicalTip.FieldName,
-        catalogOrdinal: merged.CanonicalTip.CatalogOrdinal,
+        lexicalOrder: merged.CanonicalTip.LexicalOrder,
       }
       return {
         mergedText: merged.MergedText,

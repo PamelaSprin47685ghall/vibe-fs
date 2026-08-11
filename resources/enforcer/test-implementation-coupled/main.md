@@ -1,15 +1,22 @@
 # test-implementation-coupled — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Rewrite assertions against observable outputs, state transitions, and public APIs. Drop spies on private helpers unless the interaction is the contract.
 
-## Why
+## Repair Strategy
+For each assertion, ask what user-visible or API-visible fact it protects. Replace internal white-box checks with black-box outcomes.
 
-A test asserts private structure, call counts, helper layout, internal fields, or incidental algorithm choices instead of observable behavior.
+## Decision Branches
+If only internals are testable, the design may lack a seam—introduce a pure function or port rather than testing privates.
 
-## What to do
+## Wrong Fixes
+Expecting exact call order into private methods. Snapshotting full private object graphs. Failing tests after a pure rename of helpers.
 
-A test is coupled to implementation details. Assert the public behavior and durable contract instead.
+## Verification
+Refactor internals without changing behavior; tests stay green. Break the public contract; tests go red.
 
-## Reference
+## Done When
+Tests encode durable behavior; incidental structure can change freely.
 
-Family G, enforcement-g03, ordinal 63.
+## Scope and Authority
+Unit and collaboration tests. Not characterization tests explicitly marked as temporary during a rewrite.

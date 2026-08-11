@@ -1,15 +1,22 @@
 # shared-mutable-concurrency — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Give each unit owned state, or route updates through one writer/actor/channel. Remove ad hoc lock webs around shared mutable graphs.
 
-## Why
+## Repair Strategy
+Identify shared mutable locations. Choose ownership, CSP/actor, or STM/single writer. Move invariants next to the owner.
 
-Concurrent workers coordinate by mutating shared state protected by ad hoc locks rather than owning state or exchanging messages.
+## Decision Branches
+If performance requires shared structures, use proven concurrent types with clear invariants and tests—not hand-rolled lock ordering.
 
-## What to do
+## Wrong Fixes
+Sprinkling mutexes until races become rare. Cloning entire graphs on every read without an ownership story. Documenting "do not call concurrently" on a hot shared API.
 
-Concurrent workers share mutable state. Prefer ownership, message passing, or a single serialized writer.
+## Verification
+Stress concurrent paths; invariants hold without lock-order deadlocks. Design review shows a single mutation owner or message protocol.
 
-## Reference
+## Done When
+Concurrent coordination uses ownership or messages; ad hoc shared mutation is gone from the hot path.
 
-Family F, enforcement-f03, ordinal 53.
+## Scope and Authority
+Multi-worker mutable coordination. Not single-threaded pure pipelines.

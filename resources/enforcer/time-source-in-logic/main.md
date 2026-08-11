@@ -1,15 +1,22 @@
 # time-source-in-logic — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Pass `now` or a clock port into domain functions. Keep `UtcNow` at the edge. Persist decision time with the fact when audit matters.
 
-## Why
+## Repair Strategy
+Find ambient clock reads in domain code. Thread explicit instants. Update callers and tests to supply time.
 
-Domain logic reads the current clock internally instead of receiving an explicit time value or clock port.
+## Decision Branches
+If multiple reads during one decision must match, take one instant at the boundary and reuse it. If monotonic deadlines differ from wall time, name both ports.
 
-## What to do
+## Wrong Fixes
+Calling DateTime.UtcNow deep in pure folds. Seeding "random" from the clock inside domain services. Tests that cannot freeze expiration logic.
 
-Time is an implicit dependency. Inject the relevant instant or clock so behavior is deterministic and testable.
+## Verification
+Same inputs and same provided time yield identical decisions; expiration tests advance a fake clock.
 
-## Reference
+## Done When
+Domain logic receives time explicitly; no hidden ambient clock remains in policy code.
 
-Family D, enforcement-d05, ordinal 35.
+## Scope and Authority
+Domain and pure application decisions. Edge adapters may read OS time.

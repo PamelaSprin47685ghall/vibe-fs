@@ -1,15 +1,22 @@
 # rule-spaghetti — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Extract the rule into named predicates, decision tables, pattern matches, or combinators. Eliminate temporary boolean piles and mutation that exist only to thread control.
 
-## Why
+## Repair Strategy
+Write the rule in one paragraph of prose, then mirror that structure in code. Prefer exhaustive matches and early domain results over flag accumulation.
 
-A rule set is expressed through nested conditionals, temporary flags, mutation, and early exits such that the reader must simulate execution to recover the rule.
+## Decision Branches
+If performance forces a special path, keep the declarative form as source of truth and derive the optimized path with tests proving equivalence.
 
-## What to do
+## Wrong Fixes
+Adding more flags to an already opaque chain. Commenting the intended rule above unreformed spaghetti. Extracting methods that still mutate shared control state.
 
-The business rule is buried in control flow. Rewrite it so the rule can be read directly from the code.
+## Verification
+A reader can state the rule from the code structure without stepping through. Table-driven cases match the prose rule.
 
-## Reference
+## Done When
+The rule is directly readable; simulation of nested control is no longer required to understand outcomes.
 
-Family B, enforcement-b02, ordinal 12.
+## Scope and Authority
+Business and validation rules. Not every low-level loop.

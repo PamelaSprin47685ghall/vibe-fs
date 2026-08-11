@@ -1,15 +1,22 @@
 # unrecorded-decision — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Write a short decision record: context, decision, alternatives rejected, consequences. Link it from the change notes.
 
-## Why
+## Repair Strategy
+Identify decisions only present in chat or memory. Capture them in the project decision plane before moving on.
 
-A material architecture choice, rejected alternative, compatibility decision, or operational tradeoff is made without a durable decision record.
+## Decision Branches
+If superseding an old decision, mark the old record and point to the new one. If reversible experiment, record the exit criteria.
 
-## What to do
+## Wrong Fixes
+Merging a foundational choice with no rationale. Re-litigating the same decision every month because nothing was written. Capturing only the outcome without rejected alternatives.
 
-A material decision lacks a durable record. Document the choice, rationale, rejected alternatives, and consequences.
+## Verification
+A newcomer can find why the choice was made and what was rejected without asking the original author.
 
-## Reference
+## Done When
+Material decisions have durable records with rationale and alternatives.
 
-Family K, enforcement-k03, ordinal 103.
+## Scope and Authority
+Architecture and operational decisions with lasting blast radius.

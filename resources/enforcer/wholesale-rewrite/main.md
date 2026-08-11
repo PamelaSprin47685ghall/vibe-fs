@@ -1,15 +1,22 @@
 # wholesale-rewrite — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Prefer the smallest edit that fixes the defect or lands the feature. Preserve known-good structure, names, and adjacent behavior.
 
-## Why
+## Repair Strategy
+Revert sprawling rewrite hunks. Re-apply a minimal patch. Use structure-aware edits over regenerate-everything flows.
 
-A broad rewrite, generated replacement, or large delete-and-recreate operation is chosen instead of a precise change preserving known-good structure.
+## Decision Branches
+If local structure blocks a safe fix, extract a seam first—still smaller than a full rewrite. If rewrite is justified, get explicit scope and characterization tests first.
 
-## What to do
+## Wrong Fixes
+Regenerating whole files for a one-line fix. Delete-and-recreate to avoid reading code. Formatting-only churn mixed with behavior changes at file scale.
 
-A wholesale rewrite is replacing a targeted repair. Make the smallest structurally correct change.
+## Verification
+Diff is reviewable and tied to acceptance; unrelated behavior remains intact under tests.
 
-## Reference
+## Done When
+The change is the smallest structurally correct patch; no unjustified wholesale rewrite remains.
 
-Family I, enforcement-i05, ordinal 85.
+## Scope and Authority
+Edits to existing known-good codebases.

@@ -1,15 +1,22 @@
 # time-dependent-test — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Inject a fake clock or fixed instants. Drive time explicitly in the arrange phase. Remove wall-clock sleeps from assertions.
 
-## Why
+## Repair Strategy
+Replace Date.now/new Date with a port. In tests, advance time manually to trigger timeouts and expirations.
 
-A test depends on real current time, wall-clock delays, time zones, or timing luck.
+## Decision Branches
+If timezone behavior matters, fix a zone and instant rather than using the machine local zone.
 
-## What to do
+## Wrong Fixes
+asserting `Date.now()` within a fuzzy window as the main proof. sleep then assert. Tests that fail around midnight or DST.
 
-A test depends on real time. Inject time and make the scenario deterministic.
+## Verification
+Tests pass with the system clock set arbitrarily; time-sensitive branches flip by advancing the fake clock only.
 
-## Reference
+## Done When
+Time in tests is injected and deterministic; wall-clock luck is gone.
 
-Family G, enforcement-g07, ordinal 67.
+## Scope and Authority
+Automated tests. Production time injection is time-source-in-logic.

@@ -1,15 +1,22 @@
 # resource-not-scoped — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Wrap acquisition and disposal in one scope (bracket, use, defer, try/finally, owning type). Ensure failure paths dispose. Prefer ownership types over manual close calls scattered across functions.
 
-## Why
+## Repair Strategy
+Identify every resource open site. Attach a single owner. Add cleanup on cancel and exception. For subprocesses and worktrees, register teardown with the parent session.
 
-Files, processes, streams, sessions, subscriptions, worktrees, or handles are not tied to a deterministic lifetime.
+## Decision Branches
+If lifetime spans requests, make the session object the owner and document end conditions. If a pool is required, bound it and define eviction.
 
-## What to do
+## Wrong Fixes
+Opening handles in helpers and hoping callers close them. Catch blocks that return without dispose. Leaking worktrees after agent exit.
 
-A resource lacks scoped ownership. Make acquisition and disposal part of one structured lifetime.
+## Verification
+Fault-inject mid-lifetime; resources are released. Process/fd counts return to baseline after the scope ends.
 
-## Reference
+## Done When
+Every acquired resource has a clear owner and deterministic disposal on all exits.
 
-Family F, enforcement-f07, ordinal 57.
+## Scope and Authority
+I/O and process resources. Not pure value lifetimes.

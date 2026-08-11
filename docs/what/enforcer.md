@@ -1,17 +1,23 @@
 # Blogger / Enforcer — 可观察行为
 
 条款前缀：`ENFORCER-`。  
-Cycle 写入口与恢复证据边界见 `shape/enforcer.md`。
-归并、nudge、continuation、compaction 接线见 `how/enforcer.md`。  
-规则实例 SSOT：`resources/enforcer/<TipName>/{enforcer.md,main.md}`（目录名 = TipName = provider tip enum；无 `catalog.json`）。
+Cycle 写入口与恢复证据边界见 `shape/enforcer.md`。  
+归并、nudge、continuation、compaction、Full/Identity 与 Observation 接线见 `how/enforcer.md`。  
+规则实例 SSOT：`resources/enforcer/<TipName>/{enforcer.md,main.md}`（目录名 = TipName = provider tip enum = durable RuleId；**无** `catalog.json`，也无并行元数据清单）。
 
 ## ENFORCER-001：目标
 
-Blogger 以 `blog` 工具提交稠密工作日志；tip 绑定目录 TipName；cycle 原子提交 coverage。
+Blogger 以 `blog` 工具提交稠密工作日志；`tip` 绑定目录 TipName；一次有效 cycle 原子提交 Blog frame 与 RecordCoverage。  
+同一 tip 目录对双消费者各交付一份正文：
+
+- **Blogger（Y）**：装载 `enforcer.md` 全文进 effective system（与 `blogger-system.md` 合成），约束 tip 选择与检测边界。
+- **Main（X）**：经 `TipGuidanceDelivered` 投影，按 Full / IdentityOnly 交付 `main.md`（见 ENFORCER-071 与 how 交付算法），不改写 Main Authority。
 
 ## ENFORCER-002：非目标
 
-不把 Blogger 做成通用评分引擎；不恢复 score-vector 控制流；不在 transform 里预测压缩。
+不把 Blogger 做成通用评分引擎；不恢复 score-vector 控制流；不在 transform 里预测压缩。  
+不把 `catalog.json`、代码内 fallback catalog 或 dist 双副本当作规则 SSOT。  
+不向 Main 注入工程 fake-user message 作为 tip 第二 Authority。
 
 ## ENFORCER-003：Blogger Cycle
 
@@ -19,7 +25,8 @@ Blogger 以 `blog` 工具提交稠密工作日志；tip 绑定目录 TipName；c
 
 ## ENFORCER-004：Blogger Cycle 结果
 
-结果携带 canonical text、tip→RuleId、可选 evidence；无效 cycle 不进 frames。
+结果携带 canonical text、tip→RuleId（= TipName）、可选 evidence；无效 cycle 不进 frames。  
+提交成功时同时派生 Enforcement 半边：该 cycle 的 tip 进入有界 RecentTips（Observation 历史的 tip 侧）。
 
 ## ENFORCER-010：Blogger 工具权限
 
@@ -31,11 +38,11 @@ Blogger 工具权限仅 `blog`。
 
 ## ENFORCER-020：逻辑 schema
 
-必填：`text`、`tip`（catalog field 枚举）。可选：`evidence`。
+必填：`text`、`tip`（目录 TipName 枚举）。可选：`evidence`。
 
 ## ENFORCER-021：tip 枚举身份
 
-`tip` 的合法值 = catalog 的 `field` 枚举；映射到 RuleId。
+`tip` 的合法值 = 已加载 rulebook 的目录 TipName 枚举；映射到 RuleId，且 RuleId = FieldName = TipName（folder cutover 后无第二身份前缀）。
 
 ## ENFORCER-022：Required / Optional 语义
 
@@ -43,15 +50,16 @@ Blogger 工具权限仅 `blog`。
 
 ## ENFORCER-023：缺 tip / 未知 tip 失败
 
-缺 tip 或 tip 不在 catalog → 该调用失败，不得默认 tip。
+缺 tip 或 tip 不在目录 enum → 该调用失败，不得默认 tip，不得 fuzzy / 拼写修复。
 
 ## ENFORCER-024：字段识别
 
-只认合同字段名；未知字段不得静默充当 tip/text。
+只认合同字段名；未知字段不得静默充当 tip/text。  
+额外 numeric property 不得复活 score path。
 
 ## ENFORCER-025：多调用时 tip 选择
 
-多 `blog` 归并时 tip 选择规则确定（实现见 how 归并）；不得随机取。
+多 `blog` 归并时 tip 选择规则确定（实现见 how 归并）；不得随机取，不得按 lexical ordinal 二级排序。
 
 ## ENFORCER-026：Transport 与 Semantic Schema 分离
 
@@ -59,7 +67,8 @@ Blogger 工具权限仅 `blog`。
 
 ## ENFORCER-030：统一 System Prompt
 
-fast/deep blogger 共用 authoritative system（见资源文件）；工具合同在 system 中固定「恰好调用一次 blog」。
+fast/deep blogger 共用 authoritative system（`resources/prompts/blogger-system.md`），并与 folder SSOT 各 tip 的 **enforcer.md** 全文合成 effective system；工具合同在 system 中固定「恰好调用一次 blog」。  
+`main.md` **不**进入 Blogger system——它只服务 Main Full/Identity 交付。
 
 ## ENFORCER-040：工具立即返回
 
@@ -81,6 +90,34 @@ fast/deep blogger 共用 authoritative system（见资源文件）；工具合�
 
 成功提交把当前逻辑请求的 `BloggerToolRecovery` 恢复为 `NoRecovery`；不得保留会污染下一请求的 Nudge/AABB 证据，也不得另造 repair 计数器。
 
+## ENFORCER-070：Observation 历史（RecentTips + frames）
+
+每次已提交 cycle 恰好记录一个 tip 到有界 RecentTips（上限 8，oldest → newest）。  
+Observation 是 tip 与 Blog frame 的**配对**视图（domain `ObservationUnit` / `pairTipsAndFrames`）：优先 tipᵢ↔frameᵢ 前向 zip，剩余侧 unpaired 追加——禁止 tip∥frame 两路平行流当权威历史。  
+`BlogSquashCommitted` 在折叠最老 `count` 个 frame 的同时 **co-truncate** 最老 tip（Observation squash / tip co-move）；squash frame 本身不新增 tip。  
+RecentTips 覆盖 normal / squash / restart / recovery / compaction 后重建路径（同一 projection 输入 Companion 重建）。
+
+## ENFORCER-071：双消费者 tip 呈现
+
+### Blogger 侧（低信任 previous tip）
+
+work record 以低信任 `previous_enforcer_tip` 块呈现（role=assistant、`[[do_not_exec]]`）；不得伪装 parent instruction。  
+与 historic_frame 组成配对 Observation unit 后，再接物理 delta（normal）或 squash instruction（squash）。
+
+### Main 侧（Full / Identity main.md）
+
+Main 自动 tip 半边经 `resolveTipGuidance`：
+
+| 条件 | Presentation | 正文 |
+|------|--------------|------|
+| 本 Main session 尚未 Full 交付过该 TipName | `TipPresentation.Full` | name header + **main.md** 全文 |
+| 已 Full 交付过 | `TipPresentation.IdentityOnly` | 紧凑 `tip: <name>` 身份 |
+
+决策只读 `TipDeliveryProjection`（fold `HostFact.TipGuidanceDelivered`），不读进程内存私账。  
+`ContextReanchored`（HOST-006）清空 `FullDeliveredTips`，重锚后必须再发 Full main.md，禁止 IdentityOnly 搁浅。  
+IdentityOnly 不写入 Full 集合（audit-only）。  
+不得向 Main 注入工程 fake-user 作为 tip Authority；Main 语义仍由正式域独有。
+
 ## ENFORCER-072：ScoreVector 删除与版本化 clean break
 
 ScoreVector 删除与版本化 clean break。
@@ -89,10 +126,9 @@ ScoreVector 删除与版本化 clean break。
 
 旧评分条款废止，不得作为运行时分支。
 
-## ENFORCER-071：work record 呈现 previous_enforcer_tip
+## ENFORCER-170：规则 folder SSOT
 
-work record 以低信任 `previous_enforcer_tip` 块呈现；不得伪装 parent instruction。
-
-## ENFORCER-170：规则 catalog
-
-规则 catalog：schemaVersion + rules；`id`/`field` 发布后稳定；校验非空、唯一、ordinal 连续 1..N。
+规则实例唯一真相：`resources/enforcer/<TipName>/` 下恰好 `enforcer.md` + `main.md`（UTF-8；无第三文件作 SSOT）。  
+装载后 Domain 校验：schemaVersion=1；至少一条；Name/RuleId/FieldName 唯一且三者相等；lexical ordinal 连续 `1..N`；EnforcerText/MainText（及装载派生字段）非空。  
+启动 fail fast；**禁止**代码内 fallback catalog、dist 双副本、并行 `catalog.json` 元数据第二真相。  
+发布后 TipName（= field = id）稳定；改名是显式迁移，不是静默别名。

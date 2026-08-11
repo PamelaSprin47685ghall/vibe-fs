@@ -1,8 +1,7 @@
 namespace Wanxiangshu.Domain
 
 /// Rulebook folder SSOT: directory basename = TipName = provider field = durable RuleId.
-/// Bridge fields (ScoreWhen/Nudge/Family/CatalogOrdinal) keep existing consumers compiling
-/// until Observation EventStore vocabulary lands; they are derived at load, not authored JSON.
+/// Rule payload is full enforcer.md + main.md texts; LexicalOrder is folder order 1..N.
 type EnforcerRule =
     {
         /// Directory basename = TipIdentity = provider enum value.
@@ -15,14 +14,8 @@ type EnforcerRule =
         RuleId: string
         /// Provider-facing tip enum value; = Name.
         FieldName: string
-        /// Optional authoring family tag parsed from stub header; not a second identity.
-        Family: string
-        /// Detection seed (enforcer ScoreWhen section or full enforcer body).
-        ScoreWhen: string
-        /// Main guidance seed (Nudge / What to do / main body excerpt).
-        Nudge: string
         /// Lexical folder order index 1..N (deterministic enum/prompt order only).
-        CatalogOrdinal: int
+        LexicalOrder: int
     }
 
 /// ENFORCER-004 / 021: tip identity after rulebook resolve.
@@ -30,14 +23,14 @@ type EnforcerRule =
 type EnforcerTip =
     { RuleId: string
       FieldName: string
-      CatalogOrdinal: int }
+      LexicalOrder: int }
 
 module EnforcerTip =
 
     let ofRule (rule: EnforcerRule) : EnforcerTip =
         { RuleId = rule.RuleId
           FieldName = rule.FieldName
-          CatalogOrdinal = rule.CatalogOrdinal }
+          LexicalOrder = rule.LexicalOrder }
 
 module EnforcerCatalog =
 
@@ -49,7 +42,7 @@ module EnforcerCatalog =
         |> List.choose (fun (k, group) -> if List.length group > 1 then Some k else None)
 
     /// schemaVersion kept for test/facade compatibility (folder loader always passes 1).
-    /// non-empty rules, unique Name/RuleId/FieldName, ordinals 1..N, non-empty texts.
+    /// non-empty rules, unique Name/RuleId/FieldName, order 1..N, non-empty texts.
     let validate (schemaVersion: int) (rules: EnforcerRule list) : Result<EnforcerRule list, string> =
         let n = List.length rules
 
@@ -69,12 +62,12 @@ module EnforcerCatalog =
             elif not (List.isEmpty fieldDupes) then
                 Error(sprintf "enforcer catalog duplicate field: %s" (String.concat ", " fieldDupes))
             else
-                let ordered = rules |> List.sortBy (fun r -> r.CatalogOrdinal)
-                let ordinals = ordered |> List.map (fun r -> r.CatalogOrdinal)
+                let ordered = rules |> List.sortBy (fun r -> r.LexicalOrder)
+                let orders = ordered |> List.map (fun r -> r.LexicalOrder)
                 let expected = [ 1..n ]
 
-                if ordinals <> expected then
-                    Error(sprintf "enforcer catalog catalogOrdinal must be contiguous 1..%d" n)
+                if orders <> expected then
+                    Error(sprintf "enforcer catalog lexicalOrder must be contiguous 1..%d" n)
                 else
                     match
                         ordered
@@ -82,9 +75,6 @@ module EnforcerCatalog =
                             not (isNonEmpty r.Name)
                             || not (isNonEmpty r.RuleId)
                             || not (isNonEmpty r.FieldName)
-                            || not (isNonEmpty r.Family)
-                            || not (isNonEmpty r.ScoreWhen)
-                            || not (isNonEmpty r.Nudge)
                             || not (isNonEmpty r.EnforcerText)
                             || not (isNonEmpty r.MainText)
                             || r.Name <> r.RuleId
@@ -94,7 +84,7 @@ module EnforcerCatalog =
                         Error(
                             sprintf
                                 "enforcer catalog empty text or identity mismatch on rule ordinal %d"
-                                bad.CatalogOrdinal
+                                bad.LexicalOrder
                         )
                     | None -> Ok ordered
 
@@ -110,8 +100,8 @@ module EnforcerCatalog =
             else
                 rules |> List.tryFind (fun r -> r.FieldName = trimmed || r.Name = trimmed)
 
-    /// Provider enum values: TipName list in lexical (CatalogOrdinal) order.
+    /// Provider enum values: TipName list in lexical (LexicalOrder) order.
     let fieldNames (rules: EnforcerRule list) : string list =
         rules
-        |> List.sortBy (fun r -> r.CatalogOrdinal)
+        |> List.sortBy (fun r -> r.LexicalOrder)
         |> List.map (fun r -> r.FieldName)
