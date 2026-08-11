@@ -89,7 +89,10 @@ module SessionSnapshotPort =
                 [||]
 
     let private canonicalValue (value: obj) =
-        if isNull value then "null" else CanonicalJson.canonicalJson value
+        if isNull value then
+            "null"
+        else
+            CanonicalJson.canonicalJson value
 
     let private toolPartsOf (raw: obj) : SessionToolPart array =
         if isNull raw || isNull raw?parts then
@@ -122,8 +125,7 @@ module SessionSnapshotPort =
                                 |> Option.orElse (readString part?callID)
                                 |> Option.orElse (readString part?callId)
 
-                            let toolName =
-                                readString part?tool |> Option.orElse (readString part?name)
+                            let toolName = readString part?tool |> Option.orElse (readString part?name)
 
                             let hostToolPartId = readString part?id
 

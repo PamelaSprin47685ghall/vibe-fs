@@ -193,8 +193,7 @@ module Projection =
             let hostToolPartId =
                 match wirePart with
                 | WireToolCall _
-                | WireToolResult _ ->
-                    firstString rawPart [ "id" ] |> Option.map HostToolPartId.create
+                | WireToolResult _ -> firstString rawPart [ "id" ] |> Option.map HostToolPartId.create
                 | _ -> None
 
             { WirePart = wirePart
@@ -386,12 +385,7 @@ module Projection =
                     let raw =
                         createObj
                             [ "info",
-                              box (
-                                  createObj
-                                      [ "id", box id
-                                        "sessionID", box sessionId
-                                        "role", box message.Role ]
-                              )
+                              box (createObj [ "id", box id; "sessionID", box sessionId; "role", box message.Role ])
                               "parts", box (List.toArray parts) ]
 
                     encodeMessages tail (raw :: acc)

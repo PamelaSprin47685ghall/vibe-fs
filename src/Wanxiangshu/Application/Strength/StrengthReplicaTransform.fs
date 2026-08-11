@@ -60,9 +60,7 @@ module StrengthReplicaTransform =
                         let localFrame =
                             match batches with
                             | [] -> Ok None
-                            | _ ->
-                                StrengthFrame.tryBuild sha256 binding.MaxFrameBytes batches
-                                |> Result.map Some
+                            | _ -> StrengthFrame.tryBuild sha256 binding.MaxFrameBytes batches |> Result.map Some
 
                         match localFrame with
                         | Error error ->
@@ -90,7 +88,9 @@ module StrengthReplicaTransform =
                             | Error conflict ->
                                 runtime.Retire replicaSessionId |> ignore
                                 let! _ = sessions.AbortSession replicaSessionId
-                                return StrengthReplicaTransformOutcome.Retired(sprintf "projection-conflict:%A" conflict)
+
+                                return
+                                    StrengthReplicaTransformOutcome.Retired(sprintf "projection-conflict:%A" conflict)
                             | Ok ordered ->
                                 let rendered =
                                     ProjectionRenderer.renderMessagesWithHostIds

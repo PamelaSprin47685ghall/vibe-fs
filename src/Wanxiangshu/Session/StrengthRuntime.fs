@@ -86,7 +86,8 @@ type StrengthRuntime() =
             | false, _ -> None)
 
     member this.TryCapabilities(replicaSessionId: SessionId) : Set<ToolPermission> option =
-        this.TryFindByReplica replicaSessionId |> Option.map (fun binding -> binding.ToolCapabilitySet)
+        this.TryFindByReplica replicaSessionId
+        |> Option.map (fun binding -> binding.ToolCapabilitySet)
 
     member _.Retire(replicaSessionId: SessionId) : StrengthReplicaBinding option =
         lock gate (fun () ->

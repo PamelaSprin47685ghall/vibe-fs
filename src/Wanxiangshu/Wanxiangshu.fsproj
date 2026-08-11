@@ -218,7 +218,7 @@
     <Compile Include="Session/SatelliteRuntime.fs"/>
     <Compile Include="Application/Prompting/PromptDispatcher.fs"/>
     <Compile Include="Application/Prompting/PromptDispatcherSend.fs"/>
-    <Compile Include="Application/Strength/StrengthReplicaRuntime.fs"/>
+    <Compile Include="Session/Strength/StrengthReplicaRuntime.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/PromptIngressCodec.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostSessionContext.fs"/>
     <Compile Include="Application/Reconciliation/CompletedTurnClassifier.fs"/>

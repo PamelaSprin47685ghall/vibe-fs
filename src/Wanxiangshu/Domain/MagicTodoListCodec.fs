@@ -22,8 +22,7 @@ module MagicTodoListCodec =
               Status = get.Required.Field "status" Decode.string |> decodeStatus
               Priority = get.Required.Field "priority" Decode.string })
 
-    let encode (items: MagicTodoList) : string =
-        MagicTodo.canonicalListWire items
+    let encode (items: MagicTodoList) : string = MagicTodo.canonicalListWire items
 
     let tryDecode (json: string) : Result<MagicTodoList, string> =
         try

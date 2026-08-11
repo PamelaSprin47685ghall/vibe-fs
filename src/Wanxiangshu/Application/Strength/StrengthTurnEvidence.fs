@@ -15,7 +15,8 @@ module StrengthTurnEvidence =
             | MessagePart.Text text
             | MessagePart.Reasoning text when not (String.IsNullOrWhiteSpace text) -> 2
             | MessagePart.ToolCall(callId, name, _) when
-                not (String.IsNullOrWhiteSpace callId) || not (String.IsNullOrWhiteSpace name) ->
+                not (String.IsNullOrWhiteSpace callId) || not (String.IsNullOrWhiteSpace name)
+                ->
                 2
             | MessagePart.ToolResult _
             | MessagePart.Activity _ -> 1

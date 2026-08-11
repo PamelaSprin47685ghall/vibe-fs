@@ -31,6 +31,7 @@ type StrengthReplicaOutcome =
       Batches: StrengthRequestBatch list
       Terminal: StrengthReplicaTerminal }
 
+/// DSL-state-combination: physical
 type private StrengthReplicaDecisionState =
     { Owner: SessionId
       Replica: SessionId
@@ -41,7 +42,9 @@ type private StrengthReplicaDecisionState =
       FrozenMirror: WireMessage list
       MirrorSemanticDigest: string
       Completion: TaskCompletionSource<StrengthReplicaOutcome>
+      // DSL-MUTABLE: resource — provider-request progress cursor
       mutable RequestsAdmitted: int
+      // DSL-MUTABLE: resource — completed replica batches buffer
       mutable Batches: StrengthRequestBatch list }
 
 /// STRENGTH-003/004/009/011: decision-local InternalLeaf runtime.
@@ -127,7 +130,9 @@ type StrengthReplicaRuntime
                 match StrengthFrame.tryBuild HostDigest.sha256Hex frameByteLimit batches with
                 | Error error -> Error(sprintf "Replica local frame invalid: %A" error)
                 | Ok bundle ->
-                    Ok [ mirror; ProjectionIntent.strengthReplicaLocal state.Owner state.DecisionId bundle ]
+                    Ok
+                        [ mirror
+                          ProjectionIntent.strengthReplicaLocal state.Owner state.DecisionId bundle ]
 
         match intentsResult with
         | Error error -> Error error
@@ -151,19 +156,25 @@ type StrengthReplicaRuntime
 
         let oldCount = List.length state.Batches
 
-        if List.length collected < oldCount || (List.truncate oldCount collected <> state.Batches) then
+        if
+            List.length collected < oldCount
+            || (List.truncate oldCount collected <> state.Batches)
+        then
             Error "Replica completed-batch history changed across transforms"
         else
             state.Batches <- collected
             Ok()
 
-    member _.IsReplica(sessionId: SessionId) = liveRegistry.TryFindByReplica sessionId |> Option.isSome
+    member _.IsReplica(sessionId: SessionId) =
+        liveRegistry.TryFindByReplica sessionId |> Option.isSome
 
     member _.TryOwner(sessionId: SessionId) =
-        liveRegistry.TryFindByReplica sessionId |> Option.map (fun binding -> binding.OwnerSessionId)
+        liveRegistry.TryFindByReplica sessionId
+        |> Option.map (fun binding -> binding.OwnerSessionId)
 
     member _.TryDecision(sessionId: SessionId) =
-        liveRegistry.TryFindByReplica sessionId |> Option.map (fun binding -> binding.DecisionId)
+        liveRegistry.TryFindByReplica sessionId
+        |> Option.map (fun binding -> binding.DecisionId)
 
     /// Called at the very beginning of `chat.messages.transform` for a Replica.
     /// It harvests the previous request's complete batch, then physically stops
@@ -244,8 +255,7 @@ type StrengthReplicaRuntime
             fastAgent: string,
             frozenMirror: WireMessage list,
             mirrorSemanticDigest: string
-        )
-        : Task<Result<StrengthReplicaOutcome, string>> =
+        ) : Task<Result<StrengthReplicaOutcome, string>> =
         task {
             if StrengthBudget.requestLimit budget = 0 then
                 return Error "StrengthReplica cannot start with K0"
@@ -317,7 +327,12 @@ type StrengthReplicaRuntime
                                 if not collectorClaimed then
                                     liveRegistry.Retire replica |> ignore
                                     do! abortReplica state
-                                    raise (InvalidOperationException "StrengthReplica collector state collided after live registration")
+
+                                    raise (
+                                        InvalidOperationException
+                                            "StrengthReplica collector state collided after live registration"
+                                    )
+
                                 registerReplica owner replica fastAgent
 
                                 let tools = StrengthReplicaTools.exactReadonlyHostToolMap
@@ -326,8 +341,7 @@ type StrengthReplicaRuntime
                                     // Mechanism-neutral bootstrap text. The Replica transform
                                     // replaces this physical child history with FrozenMirror
                                     // before the provider sees request #1.
-                                    let!
-                                        dispatchResult =
+                                    let! dispatchResult =
                                         dispatcher.SendAgentOwnerRootWithTools
                                             sessions
                                             replica
@@ -359,7 +373,8 @@ type StrengthReplicaRuntime
                                             return false
                                         }
 
-                                    let! completionWon = emitJsExpr (completedFirst, deadlineFirst) "Promise.race([$0, $1])": Task<bool>
+                                    let! completionWon =
+                                        emitJsExpr (completedFirst, deadlineFirst) "Promise.race([$0, $1])": Task<bool>
 
                                     if completionWon then
                                         deadline.Cancel()
@@ -384,8 +399,7 @@ type StrengthReplicaRuntime
         for state in states do
             complete StrengthReplicaTerminal.Cancelled state
 
-        lock gate (fun () ->
-            byReplica.Clear())
+        lock gate (fun () -> byReplica.Clear())
 
         liveRegistry.Clear()
 

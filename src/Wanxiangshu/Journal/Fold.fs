@@ -1082,7 +1082,9 @@ module Fold =
                           SyntheticMessageId = rebase.SyntheticMessageId })
                     projection.AgentProjections
                 |> prefixOutcome "PrefixRebaseCommittedV2" projection.AgentProjections
-                |> Result.map (fun agents -> { projection with AgentProjections = agents })
+                |> Result.map (fun agents ->
+                    { projection with
+                        AgentProjections = agents })
             | Ok fact ->
                 MagicTodoProjection.fold envelope.EventId projection.AgentProjections.MagicTodo fact
                 |> Result.mapError (fun rejection ->

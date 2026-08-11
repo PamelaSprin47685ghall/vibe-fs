@@ -31,7 +31,13 @@ module MagicTodoHostCodec =
                 Error(sprintf "todowrite.%s must be a string" field)
 
     let private decodeRow (row: obj) : Result<MagicTodoSurface.RawTodoFields, string> =
-        match optionalText row "kind", optionalText row "id", optionalText row "content", optionalText row "status", optionalText row "priority" with
+        match
+            optionalText row "kind",
+            optionalText row "id",
+            optionalText row "content",
+            optionalText row "status",
+            optionalText row "priority"
+        with
         | Ok kind, Ok id, Ok content, Ok status, Ok priority ->
             Ok
                 { Kind = kind
@@ -63,11 +69,9 @@ module MagicTodoHostCodec =
 
             decode (Array.toList rows) []
 
-    let canonicalInput (args: obj) : string =
-        CanonicalJson.canonicalJson args
+    let canonicalInput (args: obj) : string = CanonicalJson.canonicalJson args
 
-    let canonicalInputDigest (sha256: string -> string) (args: obj) : string =
-        canonicalInput args |> sha256
+    let canonicalInputDigest (sha256: string -> string) (args: obj) : string = canonicalInput args |> sha256
 
     let replaceCompatibilityArgs (output: obj) (rows: MagicTodoSurface.CompatibilityTodoRow list) =
         let todos =
@@ -81,8 +85,7 @@ module MagicTodoHostCodec =
 
         output?args <- createObj [ "todos", box todos ]
 
-    let replaceEnrichedResult (output: obj) (text: string) =
-        output?output <- box text
+    let replaceEnrichedResult (output: obj) (text: string) = output?output <- box text
 
     let applyDefinition (output: obj) =
         output?description <- box MagicTodoSurface.TodoWriteDefinitionDescription

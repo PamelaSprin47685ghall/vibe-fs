@@ -156,8 +156,7 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
         (providerRun: ProviderRunIdentity option)
         (fact: AgentFact)
         : Result<ProjectionSet, JournalAppendFailure> =
-        this.AppendEnvelope stream providerRun (Fact.Agent fact)
-        |> Result.map fst
+        this.AppendEnvelope stream providerRun (Fact.Agent fact) |> Result.map fst
 
     /// Append a Magic Todo fact and return its durable envelope identity.
     ///
@@ -182,8 +181,7 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
         (stream: StreamId)
         (fact: ManagerLifecycleFact)
         : Result<ProjectionSet, JournalAppendFailure> =
-        this.AppendEnvelope stream None (Fact.ManagerLifecycle fact)
-        |> Result.map fst
+        this.AppendEnvelope stream None (Fact.ManagerLifecycle fact) |> Result.map fst
 
     member private _.AppendEnvelope
         (stream: StreamId)

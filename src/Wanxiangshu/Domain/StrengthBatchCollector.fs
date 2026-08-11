@@ -33,13 +33,17 @@ module StrengthBatchCollector =
             | _ -> None)
 
     let collectCompleteBatches (messages: ProviderProjection.WireMessage list) : StrengthRequestBatch list =
+        // DSL-MUTABLE: resource — scanning cursor over wire messages
         let all = List.toArray messages
         let collected = ResizeArray<StrengthRequestBatch>()
+        // DSL-MUTABLE: resource
         let mutable index = 0
+        // DSL-MUTABLE: resource
         let mutable requestOrdinal = 0
-        let mutable stopped = false
+        // DSL-MUTABLE: resource
+        let mutable stopped = 0
 
-        while index < all.Length && not stopped do
+        while index < all.Length && stopped = 0 do
             let message = all.[index]
 
             if String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase) then
@@ -49,38 +53,41 @@ module StrengthBatchCollector =
                 if List.isEmpty calls then
                     // A text/reasoning-only provider completion terminates the
                     // speculative loop; there can be no later batch in this decision.
-                    stopped <- true
+                    stopped <- 1
                 else
                     let callIds = calls |> List.map (fun call -> ToolCallId.value call.Id) |> Set.ofList
                     let results = System.Collections.Generic.Dictionary<string, string>()
-                    let mutable duplicateOrForeign = false
+                    // DSL-MUTABLE: resource
+                    let mutable duplicateOrForeign = 0
+                    // DSL-MUTABLE: resource
                     let mutable cursor = index + 1
-                    let mutable boundary = false
+                    // DSL-MUTABLE: resource
+                    let mutable atBoundary = 0
 
-                    while cursor < all.Length && not boundary do
+                    while cursor < all.Length && atBoundary = 0 do
                         let next = all.[cursor]
 
                         if
                             String.Equals(next.Role, "assistant", StringComparison.OrdinalIgnoreCase)
                             || String.Equals(next.Role, "user", StringComparison.OrdinalIgnoreCase)
                         then
-                            boundary <- true
+                            atBoundary <- 1
                         else
                             for callId, result in resultParts next do
                                 let key = ToolCallId.value callId
 
                                 if not (Set.contains key callIds) || results.ContainsKey key then
-                                    duplicateOrForeign <- true
+                                    duplicateOrForeign <- 1
                                 else
                                     results.[key] <- result
 
                             cursor <- cursor + 1
 
-                    if duplicateOrForeign || results.Count <> calls.Length then
+                    if duplicateOrForeign <> 0 || results.Count <> calls.Length then
                         // Preserve earlier complete batches, but never jump over an
                         // incomplete request: that would relabel provider request N+1
                         // as N and corrupt K accounting.
-                        stopped <- true
+                        stopped <- 1
                     else
                         let exchanges =
                             calls
@@ -93,7 +100,7 @@ module StrengthBatchCollector =
                             { RequestOrdinal = requestOrdinal
                               Exchanges = exchanges }
 
-                    index <- if boundary then cursor else max cursor (index + 1)
+                    index <- if atBoundary <> 0 then cursor else max cursor (index + 1)
             else
                 index <- index + 1
 

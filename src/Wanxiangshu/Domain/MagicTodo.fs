@@ -215,8 +215,7 @@ module MagicTodo =
         |> sprintf "[%s]"
 
     /// Canonical list digest for BaseTodoDigest / ProposedTodoDigest / identity checks.
-    let listDigest (sha256: string -> string) (items: MagicTodoList) : string =
-        canonicalListWire items |> sha256
+    let listDigest (sha256: string -> string) (items: MagicTodoList) : string = canonicalListWire items |> sha256
 
     // ── Completed gate (§8.1) ──────────────────────────────────────────────
 

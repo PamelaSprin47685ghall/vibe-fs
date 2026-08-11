@@ -38,7 +38,8 @@ module StrengthStore =
         |> sha256
         |> EventId.create
 
-    let private streamIdFor decisionId = EventStreamId.create ("strength/" + decisionText decisionId)
+    let private streamIdFor decisionId =
+        EventStreamId.create ("strength/" + decisionText decisionId)
 
     let private parentsFor sha256 event =
         let decisionId = decisionOf event
@@ -98,10 +99,7 @@ module StrengthStore =
         |> Encode.toString 0
         |> Encoding.UTF8.GetBytes
 
-    let decodeFrameBundlePayload
-        (sha256: string -> string)
-        (content: byte[])
-        : Result<StrengthFrameBundle, string> =
+    let decodeFrameBundlePayload (sha256: string -> string) (content: byte[]) : Result<StrengthFrameBundle, string> =
         let exchangeDecoder =
             Decode.object (fun get ->
                 { ToolName = get.Required.Field "tool_name" Decode.string
@@ -215,8 +213,7 @@ module StrengthStore =
     let private decodeAbandoned payload : Result<StrengthEvent, string> =
         let decoder =
             Decode.object (fun get ->
-                get.Required.Field "decision_id" Decode.string,
-                get.Required.Field "target_provider_run" Decode.string)
+                get.Required.Field "decision_id" Decode.string, get.Required.Field "target_provider_run" Decode.string)
 
         Decode.fromValue "$" decoder payload
         |> Result.map (fun (decision, target) ->
@@ -314,7 +311,10 @@ module StrengthStore =
             | Ok genericProjection when not (List.isEmpty genericProjection.Conflicts) ->
                 Error(sprintf "strength stream conflict: %A" genericProjection.Conflicts)
             | Ok genericProjection ->
-                let byId = envelopes |> List.map (fun envelope -> EventId.value envelope.EventId, envelope) |> Map.ofList
+                let byId =
+                    envelopes
+                    |> List.map (fun envelope -> EventId.value envelope.EventId, envelope)
+                    |> Map.ofList
 
                 let rec decode remaining acc =
                     match remaining with
@@ -339,6 +339,11 @@ module StrengthStore =
 
     /// Small facades keep callers on the durable adapter rather than reaching
     /// through to a separately rebuilt in-memory registry.
-    let isPromoted decisionId projection = StrengthProjection.isPromoted decisionId projection
-    let tryTraceRange decisionId projection = StrengthProjection.tryTraceRange decisionId projection
-    let tryDecisionForTarget targetRun projection = StrengthProjection.tryDecisionForTarget targetRun projection
+    let isPromoted decisionId projection =
+        StrengthProjection.isPromoted decisionId projection
+
+    let tryTraceRange decisionId projection =
+        StrengthProjection.tryTraceRange decisionId projection
+
+    let tryDecisionForTarget targetRun projection =
+        StrengthProjection.tryDecisionForTarget targetRun projection

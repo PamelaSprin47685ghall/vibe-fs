@@ -62,11 +62,7 @@ module MagicTodoLocality =
                 match matches with
                 | [] ->
                     Error(
-                        LocalityRejection.XTraceMissing(
-                            located.ProviderRun,
-                            located.ToolCallId,
-                            located.HostToolPartId
-                        )
+                        LocalityRejection.XTraceMissing(located.ProviderRun, located.ToolCallId, located.HostToolPartId)
                     )
                 | [ part ] ->
                     let toolPartOrdinal =
