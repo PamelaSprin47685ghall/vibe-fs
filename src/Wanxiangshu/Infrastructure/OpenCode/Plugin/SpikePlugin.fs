@@ -218,7 +218,8 @@ module SpikePlugin =
 
                         let strengthReplica =
                             match projectionSessionIdOpt, scope.StrengthReplicaRuntime with
-                            | Some sessionId, Some runtime when runtime.IsReplica(SessionId.create sessionId) -> Some runtime
+                            | Some sessionId, Some runtime when runtime.IsReplica(SessionId.create sessionId) ->
+                                Some runtime
                             | _ -> None
 
                         match strengthReplica with
@@ -230,7 +231,9 @@ module SpikePlugin =
                             let! handled = runtime.HandleTransform outObj
 
                             if not handled then
-                                raise (InvalidOperationException "StrengthReplica transform lost its live decision binding")
+                                raise (
+                                    InvalidOperationException "StrengthReplica transform lost its live decision binding"
+                                )
 
                             let currentMessages = unbox<obj array> outObj?messages |> Array.toList
                             let sanitized = HostMessageProjection.sanitizeMessages currentMessages
@@ -255,18 +258,16 @@ module SpikePlugin =
                         | Some sessionId, Some durability ->
                             let owner = SessionId.create sessionId
                             let rawMessages = unbox<obj array> outObj?messages |> Array.toList
+
                             let coveredThroughSequence =
                                 journal
                                 |> Option.bind (fun durable ->
-                                    AgentProjection.tryFind
-                                        owner
-                                        (AgentJournal.snapshot durable).AgentProjections
+                                    AgentProjection.tryFind owner (AgentJournal.snapshot durable).AgentProjections
                                     |> Option.bind (fun state -> state.Blog)
                                     |> Option.map (fun blog -> blog.Coverage.IngestedThroughSequence))
 
                             match durability.LoadProjection() with
-                            | Error error ->
-                                strengthFailClosed ("Strength replay projection failed: " + error)
+                            | Error error -> strengthFailClosed ("Strength replay projection failed: " + error)
                             | Ok strengthProjection ->
                                 match
                                     StrengthLifecycle.replayPlans
@@ -279,14 +280,14 @@ module SpikePlugin =
                                 | Error error -> strengthFailClosed error
                                 | Ok plans ->
                                     let plans =
-                                        plans
-                                        |> List.filter (StrengthLifecycle.needsRawReplay coveredThroughSequence)
+                                        plans |> List.filter (StrengthLifecycle.needsRawReplay coveredThroughSequence)
 
                                     match plans with
                                     | [] -> ()
                                     | _ ->
                                         strengthReplayPlans <- plans
                                         let wire = Projection.decodeMessageView rawMessages
+
                                         let snapshot =
                                             { CurrentProjection = ProviderProjection.toSemantic wire
                                               CommittedPrefix = None
@@ -308,8 +309,7 @@ module SpikePlugin =
                                                 rawMessages
                                                 rendered
                                         with
-                                        | Error error ->
-                                            strengthFailClosed ("Strength replay render failed: " + error)
+                                        | Error error -> strengthFailClosed ("Strength replay render failed: " + error)
                                         | Ok replayed -> HostMessageProjection.replaceMessagesInPlace outObj replayed
                         | _ -> ()
 
@@ -337,12 +337,18 @@ module SpikePlugin =
 
                             let stableMessageIds =
                                 let ids = rawMessages |> List.map Projection.hostMessageId
-                                if ids |> List.forall Option.isSome then Some(ids |> List.map Option.get) else None
+
+                                if ids |> List.forall Option.isSome then
+                                    Some(ids |> List.map Option.get)
+                                else
+                                    None
 
                             let traceState =
                                 match stableMessageIds with
                                 | Some ids when XTraceCapture.supportsStableInsertion journal sessionIdentity ->
-                                    match XTraceCapture.captureProjectionStable journal sessionIdentity ids semantic with
+                                    match
+                                        XTraceCapture.captureProjectionStable journal sessionIdentity ids semantic
+                                    with
                                     | Ok state -> state
                                     | Error error -> strengthFailClosed error
                                 | _ -> XTraceCapture.captureProjection journal sessionIdentity semantic
@@ -406,9 +412,12 @@ module SpikePlugin =
 
                                         let stableRange =
                                             if List.length byStableId = expectedCount && expectedCount > 0 then
-                                                let sequences = byStableId |> List.map (fun part -> part.Cursor.Sequence)
+                                                let sequences =
+                                                    byStableId |> List.map (fun part -> part.Cursor.Sequence)
+
                                                 let first = List.head sequences
                                                 let last = List.last sequences
+
                                                 let contiguous =
                                                     sequences
                                                     |> List.mapi (fun index value -> value = first + int64 index)

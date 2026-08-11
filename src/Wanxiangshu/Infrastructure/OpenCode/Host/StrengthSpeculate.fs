@@ -172,7 +172,9 @@ module StrengthSpeculate =
                                     | Ok durableStrength ->
                                         // Recovery is independent of rollout state: once Prepared is
                                         // durable, only its bound target may consume the same bytes.
-                                        match recoverPrepared durability owner target rawMessages durableStrength output with
+                                        match
+                                            recoverPrepared durability owner target rawMessages durableStrength output
+                                        with
                                         | Error error ->
                                             let reason = "Strength Prepared recovery failed closed: " + error
                                             scope.TripStrengthFuse reason
@@ -180,208 +182,216 @@ module StrengthSpeculate =
                                         | Ok true -> return ()
                                         | Ok false when settings.Mode = StrengthRolloutMode.Off -> return ()
                                         | Ok false ->
-                                                let currentPlan = scope.TryAttemptPlan owner target
-                                                let requestKind, effectiveAgent, hasPrefixProbe =
-                                                    match currentPlan with
-                                                    | Some plan ->
-                                                        plan.Profile.RequestKind,
-                                                        plan.Profile.EffectiveAgent,
-                                                        AttemptPlanner.probeOf plan |> Option.isSome
-                                                    | None ->
-                                                        ProviderRequestKind.WorkMain,
-                                                        FallbackEvidence.effectiveAgent owner projections authority,
-                                                        false
+                                            let currentPlan = scope.TryAttemptPlan owner target
 
-                                                let fast = fastBinding inventory authority.CanonicalRole
-                                                let fastAgent = fast |> Option.map (fun (name, _, _) -> name)
-                                                let modelsDistinct =
-                                                    fast
-                                                    |> Option.exists (fun (_, fastModel, deepModel) ->
-                                                        not (
-                                                            String.Equals(
-                                                                fastModel,
-                                                                deepModel,
-                                                                StringComparison.Ordinal
-                                                            )
-                                                        ))
+                                            let requestKind, effectiveAgent, hasPrefixProbe =
+                                                match currentPlan with
+                                                | Some plan ->
+                                                    plan.Profile.RequestKind,
+                                                    plan.Profile.EffectiveAgent,
+                                                    AttemptPlanner.probeOf plan |> Option.isSome
+                                                | None ->
+                                                    ProviderRequestKind.WorkMain,
+                                                    FallbackEvidence.effectiveAgent owner projections authority,
+                                                    false
 
-                                                let costsAvailable = settings.Costs.IsSome
-                                                let stableCaptureEligible =
-                                                    XTraceCapture.supportsStableInsertion (Some durable) owner
-                                                    && (rawMessages
-                                                        |> List.forall (Projection.hostMessageId >> Option.isSome))
+                                            let fast = fastBinding inventory authority.CanonicalRole
+                                            let fastAgent = fast |> Option.map (fun (name, _, _) -> name)
 
-                                                let opportunity =
-                                                    { IsRootWork =
-                                                        rootWork owner projections.AgentProjections.Associations
-                                                      RequestKind = requestKind
-                                                      CanonicalRole = authority.CanonicalRole
-                                                      SelectedTier = authority.SelectedTier
-                                                      SelectedAgent = authority.SelectedAgent
-                                                      EffectiveAgent = effectiveAgent
-                                                      IsFallbackRetry =
-                                                        not (
-                                                            String.Equals(
-                                                                authority.SelectedAgent,
-                                                                effectiveAgent,
-                                                                StringComparison.Ordinal
-                                                            )
+                                            let modelsDistinct =
+                                                fast
+                                                |> Option.exists (fun (_, fastModel, deepModel) ->
+                                                    not (String.Equals(fastModel, deepModel, StringComparison.Ordinal)))
+
+                                            let costsAvailable = settings.Costs.IsSome
+
+                                            let stableCaptureEligible =
+                                                XTraceCapture.supportsStableInsertion (Some durable) owner
+                                                && (rawMessages
+                                                    |> List.forall (Projection.hostMessageId >> Option.isSome))
+
+                                            let opportunity =
+                                                { IsRootWork = rootWork owner projections.AgentProjections.Associations
+                                                  RequestKind = requestKind
+                                                  CanonicalRole = authority.CanonicalRole
+                                                  SelectedTier = authority.SelectedTier
+                                                  SelectedAgent = authority.SelectedAgent
+                                                  EffectiveAgent = effectiveAgent
+                                                  IsFallbackRetry =
+                                                    not (
+                                                        String.Equals(
+                                                            authority.SelectedAgent,
+                                                            effectiveAgent,
+                                                            StringComparison.Ordinal
                                                         )
-                                                      HasPrefixProbe = hasPrefixProbe
-                                                      IsReviewerOrFinality = authority.CanonicalRole = Role.Reviewer
-                                                      IsAttachedOrInternalLeaf =
-                                                        not (
-                                                            rootWork
-                                                                owner
-                                                                projections.AgentProjections.Associations
-                                                        )
-                                                      OwnerCancelled = false
-                                                      TargetProviderRunBound = true
-                                                      EventStoreHealthy = true
-                                                      HostCanaryHealthy =
-                                                        StrengthSettings.hostCanaryHealthy ()
-                                                        && stableCaptureEligible
-                                                        && scope.StrengthFuseReason.IsNone
-                                                      FastPeerAvailable = fastAgent.IsSome
-                                                      ModelBindingsDistinct = modelsDistinct
-                                                      CostModelAvailable = costsAvailable }
-
-                                                let wire = Projection.decodeMessageView rawMessages
-                                                let semantic = ProviderProjection.toSemantic wire
-                                                let semanticText = ProviderProjection.renderSemantic semantic
-                                                let anchorDigest = HostDigest.sha256Hex semanticText
-                                                let feature =
-                                                    scope.StrengthFeature(
-                                                        owner,
-                                                        authority.CanonicalRole,
-                                                        StrengthFrame.utf8ByteCount semanticText
                                                     )
-                                                let prediction = scope.StrengthPrediction feature
-                                                let estimate =
-                                                    settings.Costs
-                                                    |> Option.map (StrengthRollout.estimate prediction)
-                                                    |> Option.defaultValue zeroEstimate
-                                                let bucket =
-                                                    StrengthPolicy.controlBucket
-                                                        HostDigest.sha256Hex
-                                                        settings.PolicyVersion
-                                                        (AuthorityRootUserMessageId.value authority.AuthorityRootUserMessageId)
-                                                        (ProviderRunIdentity.value target)
-                                                let control =
-                                                    StrengthPolicy.isControlHoldout
-                                                        settings.ControlRateBasisPoints
-                                                        bucket
+                                                  HasPrefixProbe = hasPrefixProbe
+                                                  IsReviewerOrFinality = authority.CanonicalRole = Role.Reviewer
+                                                  IsAttachedOrInternalLeaf =
+                                                    not (rootWork owner projections.AgentProjections.Associations)
+                                                  OwnerCancelled = false
+                                                  TargetProviderRunBound = true
+                                                  EventStoreHealthy = true
+                                                  HostCanaryHealthy =
+                                                    StrengthSettings.hostCanaryHealthy ()
+                                                    && stableCaptureEligible
+                                                    && scope.StrengthFuseReason.IsNone
+                                                  FastPeerAvailable = fastAgent.IsSome
+                                                  ModelBindingsDistinct = modelsDistinct
+                                                  CostModelAvailable = costsAvailable }
 
-                                                match settings.Mode with
-                                                | StrengthRolloutMode.Shadow ->
-                                                    // Shadow never starts a Replica. It records only
-                                                    // clean primary counterfactual labels for a fully
-                                                    // eligible opportunity except economic activation.
-                                                    let observationOpportunity =
-                                                        { opportunity with
-                                                            CostModelAvailable = true
-                                                            HostCanaryHealthy = true }
+                                            let wire = Projection.decodeMessageView rawMessages
+                                            let semantic = ProviderProjection.toSemantic wire
+                                            let semanticText = ProviderProjection.renderSemantic semantic
+                                            let anchorDigest = HostDigest.sha256Hex semanticText
 
-                                                    match StrengthPolicy.eligibility observationOpportunity with
-                                                    | StrengthEligibility.Eligible ->
-                                                        scope.ArmStrengthCounterfactual(owner, target, feature)
-                                                    | StrengthEligibility.Ineligible _ -> ()
+                                            let feature =
+                                                scope.StrengthFeature(
+                                                    owner,
+                                                    authority.CanonicalRole,
+                                                    StrengthFrame.utf8ByteCount semanticText
+                                                )
 
+                                            let prediction = scope.StrengthPrediction feature
+
+                                            let estimate =
+                                                settings.Costs
+                                                |> Option.map (StrengthRollout.estimate prediction)
+                                                |> Option.defaultValue zeroEstimate
+
+                                            let bucket =
+                                                StrengthPolicy.controlBucket
+                                                    HostDigest.sha256Hex
+                                                    settings.PolicyVersion
+                                                    (AuthorityRootUserMessageId.value
+                                                        authority.AuthorityRootUserMessageId)
+                                                    (ProviderRunIdentity.value target)
+
+                                            let control =
+                                                StrengthPolicy.isControlHoldout settings.ControlRateBasisPoints bucket
+
+                                            match settings.Mode with
+                                            | StrengthRolloutMode.Shadow ->
+                                                // Shadow never starts a Replica. It records only
+                                                // clean primary counterfactual labels for a fully
+                                                // eligible opportunity except economic activation.
+                                                let observationOpportunity =
+                                                    { opportunity with
+                                                        CostModelAvailable = true
+                                                        HostCanaryHealthy = true }
+
+                                                match StrengthPolicy.eligibility observationOpportunity with
+                                                | StrengthEligibility.Eligible ->
+                                                    scope.ArmStrengthCounterfactual(owner, target, feature)
+                                                | StrengthEligibility.Ineligible _ -> ()
+
+                                                return ()
+                                            | StrengthRolloutMode.Off -> return ()
+                                            | StrengthRolloutMode.Treatment ->
+                                                let decision =
+                                                    StrengthPolicy.decideFromFacts
+                                                        opportunity
+                                                        control
+                                                        false
+                                                        prediction
+                                                        estimate
+                                                        settings.Policy
+
+                                                match decision with
+                                                | StrengthDecision.Skip _ -> return ()
+                                                | StrengthDecision.ControlHoldout ->
+                                                    scope.ArmStrengthCounterfactual(owner, target, feature)
                                                     return ()
-                                                | StrengthRolloutMode.Off -> return ()
-                                                | StrengthRolloutMode.Treatment ->
-                                                    let decision =
-                                                        StrengthPolicy.decideFromFacts
-                                                            opportunity
-                                                            control
-                                                            false
-                                                            prediction
-                                                            estimate
-                                                            settings.Policy
+                                                | StrengthDecision.Speculate(budget, _) ->
+                                                    match fastAgent with
+                                                    | None -> return ()
+                                                    | Some agent ->
+                                                        let id =
+                                                            decisionId
+                                                                settings.PolicyVersion
+                                                                owner
+                                                                authority.AuthorityRootUserMessageId
+                                                                target
 
-                                                    match decision with
-                                                    | StrengthDecision.Skip _ -> return ()
-                                                    | StrengthDecision.ControlHoldout ->
-                                                        scope.ArmStrengthCounterfactual(owner, target, feature)
-                                                        return ()
-                                                    | StrengthDecision.Speculate(budget, _) ->
-                                                        match fastAgent with
-                                                        | None -> return ()
-                                                        | Some agent ->
-                                                            let id =
-                                                                decisionId
-                                                                    settings.PolicyVersion
-                                                                    owner
-                                                                    authority.AuthorityRootUserMessageId
-                                                                    target
+                                                        let! outcome =
+                                                            runtime.StartDecision(
+                                                                owner,
+                                                                id,
+                                                                target,
+                                                                budget,
+                                                                agent,
+                                                                wire.Messages,
+                                                                anchorDigest
+                                                            )
 
-                                                            let! outcome =
-                                                                runtime.StartDecision(
-                                                                    owner,
-                                                                    id,
-                                                                    target,
-                                                                    budget,
-                                                                    agent,
-                                                                    wire.Messages,
-                                                                    anchorDigest
+                                                        match outcome with
+                                                        | Error _ -> return ()
+                                                        | Ok completed ->
+                                                            match completed.Terminal with
+                                                            | StrengthReplicaTerminal.InvalidFrame reason ->
+                                                                scope.TripStrengthFuse(
+                                                                    "Strength Replica invalid frame: " + reason
                                                                 )
 
-                                                            match outcome with
-                                                            | Error _ -> return ()
-                                                            | Ok completed ->
-                                                                match completed.Terminal with
-                                                                | StrengthReplicaTerminal.InvalidFrame reason ->
+                                                                return ()
+                                                            | _ when List.isEmpty completed.Batches -> return ()
+                                                            | _ ->
+                                                                match
+                                                                    StrengthFrame.tryBuild
+                                                                        HostDigest.sha256Hex
+                                                                        runtime.MaxFrameBytes
+                                                                        completed.Batches
+                                                                with
+                                                                | Error error ->
                                                                     scope.TripStrengthFuse(
-                                                                        "Strength Replica invalid frame: " + reason
+                                                                        sprintf
+                                                                            "Strength Replica bundle invalid: %A"
+                                                                            error
                                                                     )
+
                                                                     return ()
-                                                                | _ when List.isEmpty completed.Batches -> return ()
-                                                                | _ ->
+                                                                | Ok bundle ->
                                                                     match
-                                                                        StrengthFrame.tryBuild
-                                                                            HostDigest.sha256Hex
-                                                                            runtime.MaxFrameBytes
-                                                                            completed.Batches
+                                                                        durability.PublishPrepared
+                                                                            { OwnerSessionId = owner
+                                                                              DecisionId = id
+                                                                              TargetProviderRun = target
+                                                                              ReplicaSessionId =
+                                                                                completed.ReplicaSessionId
+                                                                              Budget = budget
+                                                                              AnchorDigest = anchorDigest
+                                                                              Bundle = bundle }
                                                                     with
-                                                                    | Error error ->
-                                                                        scope.TripStrengthFuse(
-                                                                            sprintf "Strength Replica bundle invalid: %A" error
-                                                                        )
+                                                                    | StrengthPreparedPublish.StorageInvalid error ->
+                                                                        let reason =
+                                                                            "Strength Prepared storage invalid: "
+                                                                            + error
+
+                                                                        scope.TripStrengthFuse reason
+                                                                        raise (InvalidOperationException reason)
+                                                                    | StrengthPreparedPublish.Rejected _ ->
+                                                                        // Definite pre-intervention publication failure:
+                                                                        // fail open to K0. No candidate bytes are visible.
                                                                         return ()
-                                                                    | Ok bundle ->
+                                                                    | StrengthPreparedPublish.Published ->
                                                                         match
-                                                                            durability.PublishPrepared
-                                                                                { OwnerSessionId = owner
-                                                                                  DecisionId = id
-                                                                                  TargetProviderRun = target
-                                                                                  ReplicaSessionId =
-                                                                                    completed.ReplicaSessionId
-                                                                                  Budget = budget
-                                                                                  AnchorDigest = anchorDigest
-                                                                                  Bundle = bundle }
+                                                                            renderCandidate
+                                                                                owner
+                                                                                target
+                                                                                id
+                                                                                bundle
+                                                                                output
                                                                         with
-                                                                        | StrengthPreparedPublish.StorageInvalid error ->
+                                                                        | Ok() -> return ()
+                                                                        | Error error ->
+                                                                            // Prepared is durable but target has not been
+                                                                            // allowed to leave this transform. Wrong/failed
+                                                                            // rendering is therefore fail closed.
                                                                             let reason =
-                                                                                "Strength Prepared storage invalid: " + error
+                                                                                "Strength Candidate render failed closed: "
+                                                                                + error
+
                                                                             scope.TripStrengthFuse reason
                                                                             raise (InvalidOperationException reason)
-                                                                        | StrengthPreparedPublish.Rejected _ ->
-                                                                            // Definite pre-intervention publication failure:
-                                                                            // fail open to K0. No candidate bytes are visible.
-                                                                            return ()
-                                                                        | StrengthPreparedPublish.Published ->
-                                                                            match
-                                                                                renderCandidate owner target id bundle output
-                                                                            with
-                                                                            | Ok() -> return ()
-                                                                            | Error error ->
-                                                                                // Prepared is durable but target has not been
-                                                                                // allowed to leave this transform. Wrong/failed
-                                                                                // rendering is therefore fail closed.
-                                                                                let reason =
-                                                                                    "Strength Candidate render failed closed: "
-                                                                                    + error
-                                                                                scope.TripStrengthFuse reason
-                                                                                raise (InvalidOperationException reason)
             | _ -> return ()
         }
