@@ -182,27 +182,24 @@ module HostForkAgent =
                     match retired, existing with
                     | Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
                     | _, Some childId ->
-                        match HostPendingRun.sessionDeadRefusal this.Journal childId with
-                        | Some refusal -> return Error refusal
-                        | None ->
-                            return!
-                                HostForkChildDispatch.sendToExistingChild
-                                    this.Gate
-                                    this.PendingRuns
-                                    this.Journal
-                                    this.ParentId
-                                    this.Sessions
-                                    this.ChildWorkRecordOf
-                                    this.Runtime
-                                    this.SendChildPrompt
-                                    this.SendBusyNudge
-                                    (fun child role -> this.RunStarted child role (this.DirectoryOf agentId))
-                                    agentId
-                                    childId
-                                    role
-                                    prompt
-                                    agentName
-                                    (if isFirstPrompt then Some enrichedPrompt else None)
+                        return!
+                            HostForkChildDispatch.sendToExistingChild
+                                this.Gate
+                                this.PendingRuns
+                                this.Journal
+                                this.ParentId
+                                this.Sessions
+                                this.ChildWorkRecordOf
+                                this.Runtime
+                                this.SendChildPrompt
+                                this.SendBusyNudge
+                                (fun child role -> this.RunStarted child role (this.DirectoryOf agentId))
+                                agentId
+                                childId
+                                role
+                                prompt
+                                agentName
+                                (if isFirstPrompt then Some enrichedPrompt else None)
                     | _, None ->
                         let! childResult =
                             this.Sessions.CreateChildSession(
@@ -309,78 +306,69 @@ module HostForkAgent =
                 | Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
                 | _, None -> return Error(sprintf "Unknown agent id: %s" agentId)
                 | _, Some childId ->
-                    match HostPendingRun.sessionDeadRefusal this.Journal childId with
-                    | Some refusal -> return Error refusal
-                    | None ->
-                        // The record carries the managed name this handle was forked
-                        // with. Rebuilding it from the role would silently downgrade a
-                        // deep-* agent to fast-* on reuse.
-                        let recordOpt =
-                            this.Runtime.List()
-                            |> fst
-                            |> List.tryFind (fun agent -> agent.AgentId = agentId)
+                    // The record carries the managed name this handle was forked
+                    // with. Rebuilding it from the role would silently downgrade a
+                    // deep-* agent to fast-* on reuse.
+                    let recordOpt =
+                        this.Runtime.List()
+                        |> fst
+                        |> List.tryFind (fun agent -> agent.AgentId = agentId)
 
-                        match recordOpt with
-                        | None -> return Error(sprintf "Unknown agent id: %s" agentId)
-                        | Some record when System.String.IsNullOrWhiteSpace record.Agent ->
-                            return Error(sprintf "Agent handle '%s' has no managed agent name" agentId)
-                        | Some record ->
-                            let role = record.Role
-                            let agentName = record.Agent
+                    match recordOpt with
+                    | None -> return Error(sprintf "Unknown agent id: %s" agentId)
+                    | Some record when System.String.IsNullOrWhiteSpace record.Agent ->
+                        return Error(sprintf "Agent handle '%s' has no managed agent name" agentId)
+                    | Some record ->
+                        let role = record.Role
+                        let agentName = record.Agent
 
-                            // Re-open a joined (Retired) handle before the new send so
-                            // the next completion has an Active cell to claim.
-                            match
-                                HandleController.link
+                        // Re-open a joined (Retired) handle before the new send so
+                        // the next completion has an Active cell to claim.
+                        match
+                            HandleController.link
+                                this.Journal
+                                this.ParentId
+                                agentId
+                                childId
+                                agentName
+                                role
+                                this.HandleOwnership
+                        with
+                        | Error linkError -> return Error linkError
+                        | Ok() ->
+                            // A reuse after join is a new work unit on the same
+                            // child session — same first-prompt envelope a brand-new
+                            // fork would receive (ARCH-010). Busy-nudge continues
+                            // still go through sendToExistingChild's active-run path
+                            // with the raw prompt when a run is already live.
+                            let activeRun =
+                                lock this.Gate (fun () ->
+                                    match this.PendingRuns.TryGetValue agentId with
+                                    | true, _ -> true
+                                    | false, _ -> false)
+
+                            let enriched =
+                                if activeRun then
+                                    None
+                                else
+                                    Some(ForkChildPayload.relay prompt (this.ParentWorkRecordOf this.ParentId) [] None)
+
+                            return!
+                                HostForkChildDispatch.sendToExistingChild
+                                    this.Gate
+                                    this.PendingRuns
                                     this.Journal
                                     this.ParentId
+                                    this.Sessions
+                                    this.ChildWorkRecordOf
+                                    this.Runtime
+                                    this.SendChildPrompt
+                                    this.SendBusyNudge
+                                    (fun child role -> this.RunStarted child role (this.DirectoryOf agentId))
                                     agentId
                                     childId
-                                    agentName
                                     role
-                                    this.HandleOwnership
-                            with
-                            | Error linkError -> return Error linkError
-                            | Ok() ->
-                                // A reuse after join is a new work unit on the same
-                                // child session — same first-prompt envelope a brand-new
-                                // fork would receive (ARCH-010). Busy-nudge continues
-                                // still go through sendToExistingChild's active-run path
-                                // with the raw prompt when a run is already live.
-                                let activeRun =
-                                    lock this.Gate (fun () ->
-                                        match this.PendingRuns.TryGetValue agentId with
-                                        | true, _ -> true
-                                        | false, _ -> false)
-
-                                let enriched =
-                                    if activeRun then
-                                        None
-                                    else
-                                        Some(
-                                            ForkChildPayload.relay
-                                                prompt
-                                                (this.ParentWorkRecordOf this.ParentId)
-                                                []
-                                                None
-                                        )
-
-                                return!
-                                    HostForkChildDispatch.sendToExistingChild
-                                        this.Gate
-                                        this.PendingRuns
-                                        this.Journal
-                                        this.ParentId
-                                        this.Sessions
-                                        this.ChildWorkRecordOf
-                                        this.Runtime
-                                        this.SendChildPrompt
-                                        this.SendBusyNudge
-                                        (fun child role -> this.RunStarted child role (this.DirectoryOf agentId))
-                                        agentId
-                                        childId
-                                        role
-                                        prompt
-                                        agentName
-                                        enriched
+                                    prompt
+                                    agentName
+                                    enriched
             }
