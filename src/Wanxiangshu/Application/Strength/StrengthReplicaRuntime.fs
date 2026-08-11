@@ -346,9 +346,22 @@ type StrengthReplicaRuntime
 
                                     let deadline = timer.Delay latencyMs
                                     let completionTask = state.Completion.Task
-                                    let! winner = Task.WhenAny([| completionTask :> Task; deadline.Delay :> Task |])
 
-                                    if Object.ReferenceEquals(winner, completionTask :> Task) then
+                                    let completedFirst: Task<bool> =
+                                        task {
+                                            let! _ = completionTask
+                                            return true
+                                        }
+
+                                    let deadlineFirst: Task<bool> =
+                                        task {
+                                            do! deadline.Delay
+                                            return false
+                                        }
+
+                                    let! completionWon = emitJsExpr (completedFirst, deadlineFirst) "Promise.race([$0, $1])": Task<bool>
+
+                                    if completionWon then
                                         deadline.Cancel()
                                     else
                                         complete StrengthReplicaTerminal.TimedOut state
