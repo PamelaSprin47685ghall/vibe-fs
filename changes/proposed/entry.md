@@ -124,10 +124,11 @@ ac41ef8f  session abort diagnostic
 
 | 证明切片 | 状态 |
 |---|---|
-| 静态 ratchet：`student-teacher-absence`（含 `SatelliteKind.Replica` 禁止）+ `session-ownership-ratchet` + `unified-store-gate` + `g4r-*` | 本快照目标 GREEN |
-| `npm run check`（全量；由 orchestrator 收口跑） | 以 orchestrator 结果为准 |
-| Storage G4 / JS G5 / Universal+perm-inspector G6 | **DONE**（均在 `changes/completed/`） |
-| 已知 residual | G7 constitution/docs plane；G8 Strength 全量（非 K0）；G9 capability-isomorphism 等可选硬门；magic-todo 仍 proposed |
+| 静态 ratchet：`student-teacher-absence`（含 `SatelliteKind.Replica` 禁止）+ `session-ownership-ratchet` + `unified-store-gate` + `g4r-*` | **GREEN** |
+| `npm run check`（lint + build + unit + integration） | **GREEN** |
+| `npm run test:e2e` Long Stroke | **GREEN**（48 steps；journal ceiling 372；三连稳定） |
+| Storage G4 / JS G5 / Universal+perm-inspector G6 / Rulebook G7 runtime | **DONE**（均在 `changes/completed/`） |
+| 已知 residual | G7 constitution 120 rewrite 等（Final outcome Deferred）；G8 Strength 全量（`active/strength.md` 并行 owner）；G9 capability-isomorphism 可选硬门；magic-todo 仍 proposed |
 
 ## 0.4 合法中间状态（现在）— **G0–G6 DONE；G7 runtime DONE；G8/G9 PARTIAL**
 
