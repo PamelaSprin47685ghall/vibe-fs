@@ -96,6 +96,8 @@ const [
   ProviderProj,
   XTraceModule,
   MagicTodoModule,
+  MagicTodoListCodecModule,
+  MagicTodoAdmissionModule,
   MagicTodoFactsModule,
   MagicTodoProjectionModule,
   MagicTodoFactCodecModule,
@@ -134,7 +136,9 @@ const [
   JoinDrainModule,
   ReviewSealModule,
   SessionSnapshotPortModule,
+  MagicTodoLocalityModule,
   ToolHostCodecModule,
+  MagicTodoHostCodecModule,
   CompletionMailboxModule,
   AgentCompletionModuleEarly,
   HostForkRunLifecycleModule,
@@ -191,6 +195,8 @@ const [
   prod('Domain/ProviderProjection'),
   prod('Domain/XTrace'),
   prod('Domain/MagicTodo'),
+  prod('Domain/MagicTodoListCodec'),
+  prod('Domain/MagicTodoAdmission'),
   prod('Domain/MagicTodoFacts'),
   prod('Journal/MagicTodoProjection'),
   prod('Journal/MagicTodoFactCodec'),
@@ -229,7 +235,9 @@ const [
   prod('Session/JoinDrain'),
   prod('Application/Reconciliation/ReviewSeal'),
   prod('Infrastructure/OpenCode/Host/SessionSnapshotPort'),
+  prod('Application/Reconciliation/MagicTodoLocality'),
   prod('Infrastructure/OpenCode/Codec/ToolHostCodec'),
+  prod('Infrastructure/OpenCode/Codec/MagicTodoHostCodec'),
   prod('Session/CompletionMailbox'),
   prod('Session/AgentCompletion'),
   prod('Session/HostForkRunLifecycle'),
@@ -536,6 +544,7 @@ const Ids = {
   transportReceipt: idModule('TransportReceipt'),
   providerRun: idModule('ProviderRunIdentity'),
   toolCall: idModule('ToolCallId'),
+  hostToolPart: idModule('HostToolPartId'),
   systemPrompt: idModule('SystemPromptId'),
   reviewBarrier: idModule('ReviewBarrierId'),
   gitTree: idModule('GitTreeHash'),
@@ -566,6 +575,7 @@ export const promptKey = (v) => Ids.promptKey.create(v)
 export const transportReceipt = (v) => Ids.transportReceipt.create(v)
 export const providerRun = (v) => Ids.providerRun.create(v)
 export const toolCallId = (v) => Ids.toolCall.create(v)
+export const hostToolPartId = (v) => Ids.hostToolPart.create(v)
 export const systemPromptId = (v) => Ids.systemPrompt.create(v)
 export const reviewBarrierId = (v) => Ids.reviewBarrier.create(v)
 export const gitTreeHash = (v) => Ids.gitTree.create(v)
@@ -1186,6 +1196,7 @@ export const syntheticToml = (() => {
  */
 export const magicTodo = (() => {
   const input = unionCase(MagicTodoModule.MagicTodoInputItem, 'MagicTodoInputItem')
+  const listCodec = bind(MagicTodoListCodecModule, 'MagicTodoListCodec', ['encode', 'tryDecode'])
   const m = bind(MagicTodoModule, 'MagicTodo', [
     'todoWriteId',
     'todoItemId',
@@ -1206,6 +1217,8 @@ export const magicTodo = (() => {
 
   return {
     ...m,
+    encodeList: (items) => listCodec.encode(toList(items)),
+    decodeList: (json) => resultOf(listCodec.tryDecode(json)),
     TodoStatus: MagicTodoModule.TodoStatus,
     MagicTodoInputItem: MagicTodoModule.MagicTodoInputItem,
     MagicTodoItem: MagicTodoModule.MagicTodoItem,
@@ -1220,6 +1233,40 @@ export const magicTodo = (() => {
     item: (id, content, status, priority) => new MagicTodoModule.MagicTodoItem(id, content, status, priority),
     perfect: MagicTodoModule.ProcessReviewVerdict.Perfect,
     revise: MagicTodoModule.ProcessReviewVerdict.Revise,
+  }
+})()
+
+export const magicTodoAdmission = (() => {
+  const m = bind(MagicTodoAdmissionModule, 'MagicTodoAdmission', ['admit'])
+
+  return {
+    admit: (sha256, life, settled, lagAdmission, existingPrepared, localized, inputs) =>
+      m.admit(sha256, life, toList(settled), lagAdmission, existingPrepared, localized, toList(inputs)),
+    LocalizedToolCall: MagicTodoAdmissionModule.LocalizedToolCall,
+    ExistingPrepared: MagicTodoAdmissionModule.ExistingPrepared,
+    PrepareSuccess: MagicTodoAdmissionModule.PrepareSuccess,
+    AdmissionOutcome: MagicTodoAdmissionModule.AdmissionOutcome,
+  }
+})()
+
+/** Magic Todo's raw Host argument and compatibility-output boundary. */
+export const magicTodoHost = (() => {
+  const m = bind(MagicTodoHostCodecModule, 'MagicTodoHostCodec', [
+    'tryDecodeV2',
+    'canonicalInput',
+    'canonicalInputDigest',
+    'replaceCompatibilityArgs',
+    'replaceEnrichedResult',
+    'applyDefinition',
+  ])
+
+  return {
+    decodeV2: (args) => resultOf(m.tryDecodeV2(args)),
+    canonicalInput: (args) => m.canonicalInput(args),
+    canonicalInputDigest: (sha256, args) => m.canonicalInputDigest(sha256, args),
+    replaceCompatibilityArgs: (output, rows) => m.replaceCompatibilityArgs(output, toList(rows)),
+    replaceEnrichedResult: (output, text) => m.replaceEnrichedResult(output, text),
+    applyDefinition: (output) => m.applyDefinition(output),
   }
 })()
 
@@ -1462,7 +1509,7 @@ export const bloggerDelta = (() => {
  * MessagePart → SemanticPart。Activity 是 transport bookkeeping，被丢弃。
  */
 export const xTraceCapture = (() => {
-  const m = bind(XTraceCaptureModule, 'XTraceCapture', ['semanticPart', 'captureProjection', 'captureOpening', 'lifecycleWorkRecord'])
+  const m = bind(XTraceCaptureModule, 'XTraceCapture', ['semanticPart', 'captureProjection', 'captureMessageView', 'captureOpening', 'lifecycleWorkRecord'])
   const semanticPart = unionCase(ProviderProj.SemanticPart, 'SemanticPart')
   const messagePart = unionCase(HostMessageCodecModule.MessagePart, 'MessagePart')
 
@@ -1508,6 +1555,11 @@ export const xTraceCapture = (() => {
      */
     captureProjection: (journal, sessionIdValue, semanticProjection) => {
       const result = m.captureProjection(journal, sessionIdValue, semanticProjection)
+      return isNone(result) ? undefined : result
+    },
+
+    captureMessageView: (journal, sessionIdValue, capturedMessages) => {
+      const result = m.captureMessageView(journal, sessionIdValue, toList(capturedMessages))
       return isNone(result) ? undefined : result
     },
 
@@ -2901,6 +2953,8 @@ export const providerProjection = {
   // OpenCode/Projection: Host-assembled message view (1.18.10 `tool-<tool>`
   // parts live on assistant messages; see HOST-012 tool-part test).
   decodeMessageView: (rawMessages) => ProjectionModule.decodeMessageView(rawMessages),
+  decodeCapturedMessageView: (rawMessages) => listItems(ProjectionModule.decodeCapturedMessageView(toList(rawMessages))),
+  wireMessageView: (capturedMessages) => ProjectionModule.wireMessageView(toList(capturedMessages)),
   // PROJ-004: the one write-back adapter of the projection DSL's prefix stage.
   applyRenderedPrefix: (rawMessages, rendered) =>
     listItems(ProjectionModule.applyRenderedPrefix(rawMessages, rendered)),
@@ -3621,6 +3675,24 @@ export const promptDispatcher = (() => {
  * HOST-010: transform → ProviderRunIdentity binding (ReviewSeal.bindableRun).
  * Messages are Host-raw objects projected via SessionSnapshotPort.projectMessages.
  */
+export const sessionSnapshot = (() => {
+  const m = bind(SessionSnapshotPortModule, 'SessionSnapshotPort', ['projectMessages', 'locateToolCall'])
+
+  return {
+    projectMessages: (rawMessages) => listItems(m.projectMessages(rawMessages)),
+    locateToolCall: (callId, messages) => resultOf(m.locateToolCall(callId, toList(messages))),
+  }
+})()
+
+export const magicTodoLocality = (() => {
+  const m = bind(MagicTodoLocalityModule, 'MagicTodoLocality', ['resolve'])
+
+  return {
+    resolve: (sessionIdValue, messages, projection, callId) =>
+      resultOf(m.resolve(sessionIdValue, toList(messages), projection, callId)),
+  }
+})()
+
 export const reviewSeal = (() => {
   const bindableRun = member(ReviewSealModule, 'ReviewSeal', 'bindableRun')
   const projectMessages = member(SessionSnapshotPortModule, 'SessionSnapshotPort', 'projectMessages')

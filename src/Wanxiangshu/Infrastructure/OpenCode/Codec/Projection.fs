@@ -20,6 +20,19 @@ open Wanxiangshu.Kernel.Identity
 /// grew a separate normaliser beside it (VERIFY-007).
 module Projection =
 
+    /// One decoded wire part plus the stable Host ToolPart address when present.
+    type CapturedWirePart =
+        { WirePart: WirePart
+          HostToolPartId: HostToolPartId option }
+
+    /// A decoded wire message retaining the assistant provider-run identity.
+    /// The normal wire projection deliberately omits source addresses; capture
+    /// needs them to bind a tool call to its durable XTrace range.
+    type CapturedWireMessage =
+        { Role: string
+          ProviderRun: ProviderRunIdentity option
+          Parts: CapturedWirePart list }
+
     let private readField (value: obj) (name: string) : obj =
         if isNull value then
             null
@@ -174,7 +187,20 @@ module Projection =
 
             | _ -> None
 
-    let decodeMessage (rawObj: obj) : WireMessage option =
+    let private capturePart (rawPart: obj) : CapturedWirePart option =
+        decodePart rawPart
+        |> Option.map (fun wirePart ->
+            let hostToolPartId =
+                match wirePart with
+                | WireToolCall _
+                | WireToolResult _ ->
+                    firstString rawPart [ "id" ] |> Option.map HostToolPartId.create
+                | _ -> None
+
+            { WirePart = wirePart
+              HostToolPartId = hostToolPartId })
+
+    let decodeCapturedMessage (rawObj: obj) : CapturedWireMessage option =
         if isNull rawObj then
             None
         else
@@ -186,12 +212,29 @@ module Projection =
                 |> Option.defaultValue ""
                 |> fun value -> value.ToLowerInvariant()
 
-            let parts = rawArray (readField rawObj "parts") |> List.choose decodePart
+            let parts = rawArray (readField rawObj "parts") |> List.choose capturePart
 
             if String.IsNullOrWhiteSpace role && List.isEmpty parts then
                 None
             else
-                Some { Role = role; Parts = parts }
+                let providerRun =
+                    if role = "assistant" then
+                        firstString rawObj [ "id" ]
+                        |> Option.orElse (firstString info [ "id" ])
+                        |> Option.map ProviderRunIdentity.create
+                    else
+                        None
+
+                Some
+                    { Role = role
+                      ProviderRun = providerRun
+                      Parts = parts }
+
+    let decodeMessage (rawObj: obj) : WireMessage option =
+        decodeCapturedMessage rawObj
+        |> Option.map (fun captured ->
+            { Role = captured.Role
+              Parts = captured.Parts |> List.map (fun part -> part.WirePart) })
 
     /// Decode a whole provider request.
     ///
@@ -227,6 +270,24 @@ module Projection =
           Tools = []
           System = []
           Messages = rawMessages |> List.choose decodeMessage }
+
+    /// Decode transform messages once while retaining source identities needed by
+    /// durable XTrace locality. The ordinary wire view remains a projection of
+    /// this same decoder, never a parallel parser.
+    let decodeCapturedMessageView (rawMessages: obj list) : CapturedWireMessage list =
+        rawMessages |> List.choose decodeCapturedMessage
+
+    let wireMessageView (captured: CapturedWireMessage list) : ProviderWireProjection =
+        { ProviderId = None
+          ModelId = None
+          Variant = None
+          Tools = []
+          System = []
+          Messages =
+            captured
+            |> List.map (fun message ->
+                { Role = message.Role
+                  Parts = message.Parts |> List.map (fun part -> part.WirePart) }) }
 
     let messagesFromTransformOutput (output: obj) : obj list =
         unbox<obj array> output?messages |> Array.toList

@@ -474,7 +474,9 @@ module Fact =
                TextRef: BlobRef
                TextDigest: BlobDigest
                Provenance: string
-               ProviderRun: ProviderRunIdentity option |}
+               ProviderRun: ProviderRunIdentity option
+               ToolCallId: ToolCallId option
+               HostToolPartId: HostToolPartId option |}
 
         /// COMPANION-003: the Session's terminal output, captured verbatim at
         /// reconcile. Idempotent and never overwritten. The body goes to a blob.

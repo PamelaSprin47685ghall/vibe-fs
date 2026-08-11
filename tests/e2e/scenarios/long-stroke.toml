@@ -67,7 +67,7 @@ pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fal
 #                      not a DU-algebra equality. Journal is the exact semantic pin.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
 # Headroom kept after canary wrapper noise; Manager does not advertise todowrite yet.
-setup = { strict = true, magicTodoHostCanary = true, maxJournalEvents = 400, maxSseEvents = 1900, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n" } } }
+setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["native-todo-title", "native-todo"], maxJournalEvents = 400, maxSseEvents = 1900, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 
@@ -171,6 +171,27 @@ flow = [
   { custom = "assertHostCanariesAEGH" },
   { expectSatisfied = true },
 ]
+
+[[turn]]
+id = "native-todo-title"
+lane = "native-todo-canary"
+kind = "title"
+user = "NATIVE_TODO_CANARY: exercise the default build session todowrite hook."
+
+  [[turn.step]]
+  respond = { type = "title", text = "Native Todo Canary" }
+
+[[turn]]
+id = "native-todo"
+lane = "native-todo-canary"
+user = "NATIVE_TODO_CANARY: exercise the default build session todowrite hook."
+tools = ["todowrite"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "todowrite", args = { todos = [{ kind = "new", content = "Probe native V1 todowrite hook", status = "pending", priority = "medium" }] } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Native todowrite canary completed." }
 
 [[turn]]
 id = "title"

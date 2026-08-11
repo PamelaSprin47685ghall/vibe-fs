@@ -41,6 +41,9 @@ and XTracePartRef =
         PartIndex: int
         Kind: string
         ToolName: string option
+        ProviderRun: ProviderRunIdentity option
+        ToolCallId: ToolCallId option
+        HostToolPartId: HostToolPartId option
         TextRef: BlobRef
         TextDigest: BlobDigest
     }
@@ -103,6 +106,9 @@ module XTraceProjection =
         (partIndex: int)
         (kind: string)
         (toolName: string option)
+        (providerRun: ProviderRunIdentity option)
+        (toolCallId: ToolCallId option)
+        (hostToolPartId: HostToolPartId option)
         (textRef: BlobRef)
         (textDigest: BlobDigest)
         (state: XTraceProjectionState)
@@ -123,6 +129,9 @@ module XTraceProjection =
                               PartIndex = partIndex
                               Kind = kind
                               ToolName = toolName
+                              ProviderRun = providerRun
+                              ToolCallId = toolCallId
+                              HostToolPartId = hostToolPartId
                               TextRef = textRef
                               TextDigest = textDigest } ] }
 

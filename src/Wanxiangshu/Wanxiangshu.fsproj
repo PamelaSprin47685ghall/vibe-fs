@@ -41,6 +41,7 @@
     <Compile Include="Domain/ProviderProjection.fs"/>
     <Compile Include="Domain/XTrace.fs"/>
     <Compile Include="Domain/MagicTodo.fs"/>
+    <Compile Include="Domain/MagicTodoListCodec.fs"/>
     <Compile Include="Domain/MagicTodoFacts.fs"/>
     <Compile Include="Domain/MagicTodoPrefixEpoch.fs"/>
     <Compile Include="Domain/MagicTodoSurface.fs"/>
@@ -204,6 +205,7 @@
     <Compile Include="Infrastructure/OpenCode/Codec/HostEventCodec.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/LoopEventCodec.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/HostMessageCodec.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Codec/MagicTodoHostCodec.fs"/>
     <Compile Include="Infrastructure/OpenCode/Signals/HostSignalAdapter.fs"/>
     <Compile Include="Infrastructure/OpenCode/Signals/HostSignalSubscribe.fs"/>
     <Compile Include="Application/Reconciliation/ReconciledTurn.fs"/>
@@ -221,6 +223,8 @@
     <Compile Include="Infrastructure/OpenCode/Host/HostSessionContext.fs"/>
     <Compile Include="Application/Reconciliation/CompletedTurnClassifier.fs"/>
     <Compile Include="Application/Reconciliation/XTraceCapture.fs"/>
+    <Compile Include="Application/Reconciliation/MagicTodoLocality.fs"/>
+    <Compile Include="Application/Reconciliation/MagicTodoMembrane.fs"/>
     <Compile Include="Application/Prompting/PromptIngress.fs"/>
     <Compile Include="Application/Prompting/ChildPromptAuthority.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SessionQuiescenceGate.fs"/>

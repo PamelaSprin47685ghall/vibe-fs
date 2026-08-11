@@ -411,7 +411,7 @@ const resolveReference = (entries, reference) => {
  * This is the one check that requires the static whole. It is also the one most
  * likely to be too strict; package K8 converts the real scenarios and will say.
  */
-export function reachableTurnIds(turns, entries, { flow, prompt } = {}) {
+export function reachableTurnIds(turns, entries, { flow, prompt, setup } = {}) {
   // Reached by a scenario prompt, or by a reachable step's tool-call prompt. Fixpoint,
   // not one pass, because forks chain: Manager → Coder → the Coder's own children.
   //
@@ -426,6 +426,9 @@ export function reachableTurnIds(turns, entries, { flow, prompt } = {}) {
   // That last one is why this is a per-TURN flag rather than a per-lane one.
   const scenarioPrompts = [prompt?.text, ...(flow ?? []).map((flowStep) => flowStep.prompt?.text)].filter(
     (text) => typeof text === 'string',
+  );
+  const preFlowTurnIds = new Set(
+    Array.isArray(setup?.preFlowTurns) ? setup.preFlowTurns.filter((id) => typeof id === 'string') : [],
   );
 
   // For a fragment declaration the scenario-visible part is the LAST fragment: the earlier
@@ -446,7 +449,9 @@ export function reachableTurnIds(turns, entries, { flow, prompt } = {}) {
   };
 
   const reachableTurns = new Set(
-    turns.filter((turn) => turn.internal === true || reachedBy(scenarioPrompts, turn)),
+    turns.filter(
+      (turn) => turn.internal === true || preFlowTurnIds.has(turn.id) || reachedBy(scenarioPrompts, turn),
+    ),
   );
 
   for (;;) {

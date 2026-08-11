@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { magicTodo, managerLifeId, toList, toolCallId } from '../support/domain.mjs'
+import { caseOf, errorResult, magicTodo, magicTodoAdmission, managerLifeId, toList, toolCallId } from '../support/domain.mjs'
 
 const sha256 = (value) => `digest:${value}`
 const values = (list) => Array.from(list)
@@ -32,6 +32,20 @@ test('TODO-002 allocates replay-stable identities only for tagged new items', ()
 
   assert.equal(magicTodo.todoItemIdValue(first.Id), magicTodo.todoItemIdValue(replay.Id))
   assert.notEqual(magicTodo.todoItemIdValue(first.Id), magicTodo.todoItemIdValue(next.Id))
+})
+
+test('TODO-012 round-trips canonical settled todo bodies and rejects unknown statuses', () => {
+  const item = magicTodo.item(magicTodo.todoItemIdCreate('persisted'), 'Persist checkpoint', reviewing, 'high')
+  const encoded = magicTodo.encodeList([item])
+  const decoded = magicTodo.decodeList(encoded)
+
+  assert.equal(encoded, '[{"id":"persisted","content":"Persist checkpoint","status":"reviewing","priority":"high"}]')
+  assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
+  assert.equal(values(decoded.value)[0].Content, 'Persist checkpoint')
+  assert.equal(values(decoded.value)[0].Status, reviewing)
+
+  const unknown = magicTodo.decodeList('[{"id":"persisted","content":"Persist checkpoint","status":"invented","priority":"high"}]')
+  assert.equal(unknown.ok, false)
 })
 
 test('TODO-003 rejects direct completed transitions and completed new items', () => {
@@ -88,6 +102,32 @@ test('TODO-004 rejects replay identity corruption', () => {
   const rejected = error(magicTodo.checkPreparedReplay(expected, changed))
   assert.equal(rejected.cases()[rejected.tag], 'IdentityCorruption')
   assert.equal(rejected.fields[0], 'ProviderInputDigest')
+})
+
+test('TODO-004 replays an identical prepared call even while its review is outstanding', () => {
+  const write = magicTodo.todoWriteId(sha256, life, firstCall)
+  const existing = new magicTodoAdmission.ExistingPrepared(
+    new magicTodo.PreparedIdentity(life, 'provider-input', magicTodo.listDigest(sha256, toList([])), 1),
+    write,
+  )
+  const localized = new magicTodoAdmission.LocalizedToolCall(
+    firstCall,
+    1,
+    toList([firstCall]),
+    { Sequence: 4n },
+    'provider-input',
+  )
+
+  const outcome = magicTodoAdmission.admit(
+    sha256,
+    life,
+    [],
+    errorResult(undefined),
+    existing,
+    localized,
+    [],
+  )
+  assert.equal(caseOf(outcome), 'IdempotentReplay')
 })
 
 test('TODO-014 blocks first unblessed suicide without an accepted checkpoint', () => {

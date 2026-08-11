@@ -147,8 +147,8 @@ const argsAreV1Compatibility = (args) =>
 /**
  * Carrier evidence for Canary H.
  * HOST-011: ProviderRunIdentity := assistant messageID; ToolCallId := callID.
- * Direct Host ToolPart has no providerRunID / XTrace fields; without a journal
- * mapping this absence is an explicit fail-closed carrier record (not invented).
+ * HOST-011 defines the assistant message ID as ProviderRunIdentity. Direct Host
+ * ToolPart has no XTrace field; without a journal mapping, that missing range blocks.
  */
 export const buildCarrierEvidence = (locate) => {
   const match = locate?.match ?? null;
@@ -167,7 +167,6 @@ export const buildCarrierEvidence = (locate) => {
     ?? part?.XTraceRange
     ?? null;
   const assistantMessageID = match?.assistant?.id ?? match?.messageID ?? null;
-  // HOST-011 run half lives on the assistant message identity, not a ToolPart field.
   const providerRunFromMessageID =
     typeof assistantMessageID === 'string' && assistantMessageID.length > 0
       ? assistantMessageID
@@ -187,16 +186,15 @@ export const buildCarrierEvidence = (locate) => {
     && Number.isInteger(match.toolOrdinal);
   const hasAssistant = typeof assistantMessageID === 'string' && assistantMessageID.length > 0;
 
-  // Unique ToolPart + assistant + ordinals is the localizable SDK surface.
-  // Missing direct ToolPart providerRun/XTrace without journal mapping is
-  // recorded as fail-closed carrier evidence (membrane must not invent them).
-  const carrierFailClosed =
+  const providerRun = journalProviderRun ?? toolPartProviderRunID ?? providerRunFromMessageID;
+  const xTraceRange = journalXTraceRange ?? toolPartXTrace;
+  const carrierMappingComplete =
     unique
     && hasAssistant
     && hasOrdinals
-    && directHostLacksProviderRunField
-    && directHostLacksXTraceField
-    && !journalMappingAvailable;
+    && typeof providerRun === 'string'
+    && providerRun.length > 0
+    && xTraceRange != null;
 
   return {
     sessionID: locate?.sessionID ?? null,
@@ -214,12 +212,14 @@ export const buildCarrierEvidence = (locate) => {
     journalMappingAvailable,
     journalProviderRun,
     journalXTraceRange,
+    providerRun,
+    xTraceRange,
     directHostLacksProviderRunField,
     directHostLacksXTraceField,
-    carrierFailClosed,
+    carrierMappingComplete,
     note:
-      'Direct Host ToolPart has no providerRunID/XTrace; HOST-011 run identity is assistant messageID. '
-      + 'No journal callID→XTrace mapping is available in Phase 0 — absence is fail-closed evidence.',
+      'Direct Host ToolPart has no providerRunID/XTrace. Without a journal callID→provider-run/XTrace '
+      + 'mapping, Host Canary H blocks the membrane.',
   };
 };
 
@@ -391,9 +391,19 @@ const extractToolNamesFromRequest = (request) => {
  * that is NOT the documented V2-unavailable Host path.
  *
  * @param {string} dir
- * @param {{ providerWire?: ReturnType<typeof collectManagerProviderToolEvidence> | null }} [opts]
+ * @param {{ managerProviderWire?: ReturnType<typeof collectManagerProviderToolEvidence> | null }} [opts]
  */
 export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
+  const managerProviderWire = opts.managerProviderWire ?? null;
+  if (!managerProviderWire || managerProviderWire.requestCount === 0) {
+    throw new Error('HOST_CANARY_MANAGER: missing Manager provider-wire evidence');
+  }
+  if (managerProviderWire.todowriteAdvertised) {
+    throw new Error(
+      `HOST_CANARY_MANAGER: todowrite unexpectedly advertised before the safe membrane: ${JSON.stringify(managerProviderWire)}`,
+    );
+  }
+
   const failures = listHostCanaryFailures(dir);
   if (failures.length > 0) {
     throw new Error(
@@ -405,28 +415,6 @@ export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
   const after = readHostCanaryArtifact(dir, 'after');
   const settled = readHostCanaryArtifact(dir, 'after-settled');
   const definition = readHostCanaryArtifact(dir, 'definition');
-  const providerWire = opts.providerWire ?? null;
-
-  // Precise Host path: Manager never received todowrite on the provider tool list.
-  // Do not hang waiting for manager.0 todowrite; surface the runtime unavailability.
-  if (!before && !after) {
-    if (providerWire && providerWire.todowriteAdvertised !== true) {
-      return {
-        ok: false,
-        reason: 'todowrite-not-advertised-on-manager',
-        message:
-          'HOST_CANARY: V2 todowrite cannot execute on this Host path — Manager provider '
-          + 'requests never advertised tool "todowrite" (StaticTools/Roles matrix excludes it). '
-          + `unionTools=${JSON.stringify(providerWire.unionTools)} `
-          + `managerSessions=${JSON.stringify(providerWire.managerSessionIds)} `
-          + `requestCount=${providerWire.requestCount}`,
-        providerWire,
-        definitionObserved: definition != null,
-        canaries: null,
-      };
-    }
-    throw new Error('HOST_CANARY_A/H: missing before.json (todowrite before never observed)');
-  }
 
   if (!before) throw new Error('HOST_CANARY_A/H: missing before.json (todowrite before never observed)');
   if (!after) throw new Error('HOST_CANARY_E/G/H: missing after.json (todowrite after never observed)');
@@ -541,22 +529,9 @@ export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
     throw new Error('HOST_CANARY_H: unique match must carry messageID + part/tool ordinals');
   }
   const carrier = locateH.carrier ?? buildCarrierEvidence(locateH);
-  if (!carrier.providerRunFromMessageID) {
-    throw new Error('HOST_CANARY_H: assistant messageID (HOST-011 ProviderRun) missing');
-  }
-  if (carrier.directHostLacksProviderRunField !== true || carrier.directHostLacksXTraceField !== true) {
+  if (!carrier.carrierMappingComplete) {
     throw new Error(
-      'HOST_CANARY_H: expected direct Host ToolPart to lack providerRunID/XTrace fields '
-        + `(providerRunID=${JSON.stringify(carrier.toolPartProviderRunID)}, xTrace=${JSON.stringify(carrier.toolPartXTrace)})`,
-    );
-  }
-  if (carrier.journalMappingAvailable === true) {
-    // If a mapping appears later, this branch must be rewritten to assert it — not invent.
-    throw new Error('HOST_CANARY_H: unexpected journal mapping flag without assertion rewrite');
-  }
-  if (carrier.carrierFailClosed !== true) {
-    throw new Error(
-      `HOST_CANARY_H: carrier fail-closed evidence incomplete: ${JSON.stringify(carrier)}`,
+      `HOST_CANARY_H_BLOCKED: sessionID+callID lacks provider-run/XTrace range mapping: ${JSON.stringify(carrier)}`,
     );
   }
 

@@ -776,6 +776,9 @@ module Fold =
                             payload.PartIndex
                             payload.Kind
                             payload.ToolName
+                            payload.ProviderRun
+                            payload.ToolCallId
+                            payload.HostToolPartId
                             payload.TextRef
                             payload.TextDigest
                             (Option.defaultValue XTraceProjection.empty session.XTrace)

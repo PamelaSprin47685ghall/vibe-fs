@@ -195,15 +195,16 @@ module SpikePlugin =
                         match projectionSessionIdOpt with
                         | Some sessionId ->
                             let rawMessages = unbox<obj array> outObj?messages |> Array.toList
+                            let capturedMessages = Projection.decodeCapturedMessageView rawMessages
 
                             let semantic =
-                                Projection.decodeMessageView rawMessages |> ProviderProjection.toSemantic
+                                Projection.wireMessageView capturedMessages |> ProviderProjection.toSemantic
 
                             // COMPANION-003/007: keep the XTrace in step with the
                             // provider-visible semantic projection BEFORE the
                             // Companion rewrite and X-wire run (see below).
                             let traceState =
-                                XTraceCapture.captureProjection journal (SessionId.create sessionId) semantic
+                                XTraceCapture.captureMessageView journal (SessionId.create sessionId) capturedMessages
 
                             traceState
                             |> Option.iter (fun updated ->

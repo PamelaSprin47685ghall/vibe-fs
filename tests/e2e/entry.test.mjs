@@ -22,6 +22,8 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { runCanary } from './support/scenario-driver.mjs';
+import { bindLaneSession } from './support/lane.mjs';
+import { getSessionId } from './support/scenario-http.js';
 import { runStaticGate } from './support/index.js';
 import {
   CUSTOMS,
@@ -61,13 +63,29 @@ if (!runStaticGate([fileURLToPath(import.meta.url)]).passed) {
   throw new Error('long-stroke entry static gate failed');
 }
 
+const NATIVE_TODO_CANARY_PROMPT =
+  'NATIVE_TODO_CANARY: exercise the default build session todowrite hook.';
+
+const preFlowNativeTodoCanary = async (scenario) => {
+  const created = await scenario.client.createSession({});
+  const sessionID = getSessionId(created);
+  assert.ok(sessionID, `native todo canary session creation failed: ${JSON.stringify(created)}`);
+  if (!scenario.sessionIds.includes(sessionID)) scenario.sessionIds.push(sessionID);
+  bindLaneSession(scenario.provider, sessionID, 'native-todo-canary');
+
+  const turn = scenario.turn.start(sessionID);
+  const response = await scenario.client.request('POST', `/session/${sessionID}/prompt_async`, {
+    body: { parts: [{ type: 'text', text: NATIVE_TODO_CANARY_PROMPT }] },
+  });
+  assert.ok(response.ok, `native todo canary prompt failed: ${JSON.stringify(response.data)}`);
+  await turn.awaitTerminal();
+};
+
 /**
  * Long-stroke custom that freezes real-host A/E/G/H from wrapper artifacts
  * after the adversity spine and before expectSatisfied / teardown.
  * Wired only via CUSTOMS so the sole entry remains the assertion owner.
- *
- * When Manager provider wire never advertises `todowrite`, the canary result is
- * the precise Host unavailability (not a hang on an unreachable manager.0 step).
+ * Manager non-advertisement is checked independently of native canary artifacts.
  */
 const assertHostCanariesAEGH = async (scenario, ctx) => {
   const dir = scenario.magicTodoHostCanaryDirectory;
@@ -75,33 +93,20 @@ const assertHostCanariesAEGH = async (scenario, ctx) => {
     dir,
     'HOST_CANARY: scenario.magicTodoHostCanaryDirectory missing — setup.magicTodoHostCanary must be true',
   );
-  const providerWire = collectManagerProviderToolEvidence(scenario, {
+  const managerProviderWire = collectManagerProviderToolEvidence(scenario, {
     childSessionId: ctx?.childId ?? null,
   });
-  const result = assertMagicTodoHostCanariesAEGH(dir, { providerWire });
-  if (result.ok !== true) {
-    assert.equal(
-      result.reason,
-      'todowrite-not-advertised-on-manager',
-      `HOST_CANARY unexpected failure: ${result.message ?? JSON.stringify(result)}`,
-    );
-    console.log(
-      `[host-canary] V2 todowrite unavailable on Manager provider wire — fail-closed canary: ` +
-        `${result.message}`,
-    );
-    // Contract: precise runtime failure is the canary result (not hang, not silent pass).
-    throw new Error(result.message);
-  }
+  const result = assertMagicTodoHostCanariesAEGH(dir, { managerProviderWire });
   assert.equal(result.ok, true, 'HOST_CANARY A/E/G/H must pass');
   console.log(
     `[host-canary] A/E/G/H ok session=${result.canaries.H.sessionID} call=${result.canaries.H.callID} ` +
-      `statusDuringAfter=${result.canaries.G.toolPartStatusDuringAfter} ` +
-      `carrierFailClosed=${result.canaries.H.carrier.carrierFailClosed}`,
+      `statusDuringAfter=${result.canaries.G.toolPartStatusDuringAfter}`,
   );
 };
 
 resetOpencodeSpawnCount();
 const code = await runCanary('long-stroke', {
+  preFlow: preFlowNativeTodoCanary,
   customs: {
     ...CUSTOMS,
     assertHostCanariesAEGH,
