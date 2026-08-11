@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as Projection from '../../../dist/Infrastructure/OpenCode/Codec/Projection.js'
+import * as WireDecode from '../../../dist/Infrastructure/OpenCode/Codec/ProviderWireDecode.js'
+import * as WireCapture from '../../../dist/Infrastructure/OpenCode/Codec/ProviderWireCapture.js'
+import * as MessageEdit from '../../../dist/Infrastructure/OpenCode/Codec/ProjectionMessageEdit.js'
 import * as Provider from '../../../dist/Domain/ProviderProjection.js'
 import * as Id from '../../../dist/Kernel/Identity.js'
 import { ofArray as toList, toArray as listItems } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
@@ -23,14 +25,14 @@ test('STRENGTH_009_rendered_message_adapter_roundtrips_wire_semantics_with_host_
     HostIsPhysical: toList([false, false]),
   }
 
-  const applied = resultOf(Projection.tryApplyRenderedMessages('replica-session', H, rendered))
+  const applied = resultOf(MessageEdit.tryApplyRenderedMessages('replica-session', H, rendered))
   assert.equal(applied.ok, true)
   const raw = listItems(applied.value)
   assert.equal(raw.length, 2)
   assert.equal(raw[0].info.sessionID, 'replica-session')
   assert.doesNotMatch(raw[0].info.id, /strength|replica|prefetch/i)
 
-  const decoded = Projection.decodeMessageView(applied.value)
+  const decoded = WireCapture.decodeMessageView(applied.value)
   assert.equal(Provider.renderWire(decoded), Provider.renderWire({
     ProviderId: undefined,
     ModelId: undefined,
@@ -55,7 +57,7 @@ test('STRENGTH_009_host_adapter_encodes_strength_tool_pairs_as_native_completed_
     HostIsPhysical: toList([false, false, false]),
   }
 
-  const applied = resultOf(Projection.tryApplyStrengthRenderedMessages('replica-session', H, rendered))
+  const applied = resultOf(MessageEdit.tryApplyStrengthRenderedMessages('replica-session', H, rendered))
   assert.equal(applied.ok, true)
   const raw = listItems(applied.value)
   assert.equal(raw.length, 2, 'one logical tool batch becomes one native completed Host message')
@@ -77,7 +79,7 @@ test('STRENGTH_009_media_mirror_fails_closed_instead_of_reconstructing_from_dige
     HostMessageIds: toList([undefined]),
     HostIsPhysical: toList([false]),
   }
-  const applied = resultOf(Projection.tryApplyRenderedMessages('replica-session', H, rendered))
+  const applied = resultOf(MessageEdit.tryApplyRenderedMessages('replica-session', H, rendered))
   assert.equal(applied.ok, false)
   assert.match(applied.error, /media cannot be reconstructed/i)
 })

@@ -17,7 +17,8 @@ open Wanxiangshu.Session
 module XWire =
 
     let private sessionIdOfOutput (output: obj) : SessionId option =
-        Projection.projectionSessionIdFromMessages output |> Option.map SessionId.create
+        ProviderWireDecode.projectionSessionIdFromMessages output
+        |> Option.map SessionId.create
 
     let private sessionProjection (journal: AgentJournal) (sessionId: SessionId) =
         AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
@@ -45,7 +46,8 @@ module XWire =
 
     let private requestStartCutoff (physical: PhysicalUserMessageId) (rawMessages: obj list) =
         rawMessages
-        |> List.tryFindIndex (fun raw -> Projection.hostMessageId raw = Some(PhysicalUserMessageId.value physical))
+        |> List.tryFindIndex (fun raw ->
+            ProviderWireDecode.hostMessageId raw = Some(PhysicalUserMessageId.value physical))
         |> Option.defaultWith (fun () ->
             raise (InvalidOperationException "X-wire cannot bind the physical user message to the transform snapshot"))
 
@@ -117,9 +119,9 @@ module XWire =
         (output: obj)
         : Task<unit> =
         task {
-            let rawMessages = Projection.messagesFromTransformOutput output
+            let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
 
-            match Projection.lastUserMessageId rawMessages with
+            match ProviderWireCapture.lastUserMessageId rawMessages with
             | None -> raise (InvalidOperationException "StrengthReplica request has no physical user message")
             | Some physical ->
                 let! snapshotResult = snapshotPort.GetMessages sessionId
@@ -185,8 +187,8 @@ module XWire =
                         )
 
                 | None ->
-                    let rawMessages = Projection.messagesFromTransformOutput output
-                    let physical = Projection.lastUserMessageId rawMessages
+                    let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
+                    let physical = ProviderWireCapture.lastUserMessageId rawMessages
 
                     match scope.TryRecoveryArming sessionId, physical, snapshot with
                     | None, _, _ -> return ()
@@ -216,7 +218,8 @@ module XWire =
                                 with
                                 | Some authority, Some fallback, Some state ->
                                     let current =
-                                        Projection.decodeMessageView rawMessages |> ProviderProjection.toSemantic
+                                        ProviderWireCapture.decodeMessageView rawMessages
+                                        |> ProviderProjection.toSemantic
 
                                     let cutoff = requestStartCutoff physical rawMessages
                                     let blog = state.Blog |> Option.defaultValue BlogProjection.empty
@@ -316,7 +319,7 @@ module XWire =
                                             // ReanchorAfterCompaction 是 wire no-op；prefix 写回仍用
                                             // applyRenderedPrefix（与既有 Host id 字节合同一致）。
                                             let rendered = ProjectionRenderer.renderPrefix ordered
-                                            Projection.applyRenderedPrefix rawMessages rendered
+                                            ProjectionMessageEdit.applyRenderedPrefix rawMessages rendered
 
                                     Wanxiangshu.Session.HostMessageProjection.replaceMessagesInPlace output transformed
 

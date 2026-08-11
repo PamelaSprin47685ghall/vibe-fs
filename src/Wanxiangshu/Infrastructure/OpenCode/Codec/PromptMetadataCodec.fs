@@ -10,7 +10,7 @@ open Wanxiangshu.Kernel.Identity
 /// anchor through which an unresolved claim can be reconciled after a crash.
 /// The other fields are diagnostic.
 ///
-/// Metadata is deliberately absent from `Projection.decodePart`, so none of this
+/// Metadata is deliberately absent from `ProviderWireDecode.decodePart`, so none of this
 /// enters either provider projection (COMPANION-012).
 module PromptMetadataCodec =
 

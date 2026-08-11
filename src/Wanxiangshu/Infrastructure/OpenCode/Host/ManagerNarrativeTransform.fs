@@ -46,7 +46,7 @@ module ManagerNarrativeTransform =
         rawMessages
         |> List.mapi (fun index raw -> index, raw)
         |> List.choose (fun (index, raw) ->
-            match Projection.decodeMessage raw, Projection.hostMessageId raw with
+            match ProviderWireCapture.decodeMessage raw, ProviderWireDecode.hostMessageId raw with
             | Some message, Some id when message.Role = "user" -> Some(index, id, raw)
             | _ -> None)
         |> List.tryLast
@@ -61,8 +61,9 @@ module ManagerNarrativeTransform =
             |> Option.map (fun part -> part.Cursor.Sequence)
 
     /// The `PromptKey` a Host message carries in its metadata (PROMPT-011).
-    /// Read via the Codec boundary (Projection.promptKeyOfMessage).
-    let private promptKeyOfMessage (raw: obj) = Projection.promptKeyOfMessage raw
+    /// Read via the Codec boundary (ProviderWireDecode.promptKeyOfMessage).
+    let private promptKeyOfMessage (raw: obj) =
+        ProviderWireDecode.promptKeyOfMessage raw
 
     let private isMessageFromCompletedLife (traceState: XTraceProjectionState option) (messageId: string) =
         match traceState with
@@ -89,7 +90,7 @@ module ManagerNarrativeTransform =
             rawMessages
             |> List.skip (messageIndex + 1)
             |> List.exists (fun raw ->
-                match Projection.decodeMessage raw with
+                match ProviderWireCapture.decodeMessage raw with
                 | Some message ->
                     message.Parts
                     |> List.exists (function
@@ -112,7 +113,7 @@ module ManagerNarrativeTransform =
             if index <> messageIndex then
                 raw
             else
-                let parts = Projection.rawPartsOf raw
+                let parts = ProviderWireDecode.rawPartsOf raw
 
                 let narrativeParts =
                     projection.Parts
@@ -126,7 +127,7 @@ module ManagerNarrativeTransform =
                 let nonText =
                     parts
                     |> List.filter (fun part ->
-                        match Projection.decodePart part with
+                        match ProviderWireDecode.decodePart part with
                         | Some(WireText _) -> false
                         | _ -> true)
                     |> List.toArray
@@ -180,7 +181,7 @@ module ManagerNarrativeTransform =
                 let openingId = PhysicalUserMessageId.value life.OpeningUserMessageId
 
                 rawMessages
-                |> List.tryFindIndex (fun raw -> Projection.hostMessageId raw = Some openingId)
+                |> List.tryFindIndex (fun raw -> ProviderWireDecode.hostMessageId raw = Some openingId)
                 |> Option.bind (fun messageIndex ->
                     let rawText =
                         match durable.Writer.BlobWriter.Read life.OpeningTextRef with
@@ -189,7 +190,7 @@ module ManagerNarrativeTransform =
                             // Blob unavailable: fall back to the current message
                             // text (best effort; a persisted rewrite would stack,
                             // so prefer the blob).
-                            match Projection.decodeMessage (List.item messageIndex rawMessages) with
+                            match ProviderWireCapture.decodeMessage (List.item messageIndex rawMessages) with
                             | Some message ->
                                 message.Parts
                                 |> List.choose (function
@@ -224,7 +225,7 @@ module ManagerNarrativeTransform =
                         // (Host 1.18 assembly), not in `parts`.
                         let isTitleRequest =
                             let fromContent =
-                                Projection.topLevelString raw "content"
+                                ProviderWireDecode.topLevelString raw "content"
                                 |> Option.exists (fun text ->
                                     text.StartsWith(
                                         "Generate a title for this conversation:",
@@ -232,7 +233,7 @@ module ManagerNarrativeTransform =
                                     ))
 
                             fromContent
-                            || (match Projection.decodeMessage raw with
+                            || (match ProviderWireCapture.decodeMessage raw with
                                 | Some message ->
                                     message.Parts
                                     |> List.exists (function
@@ -246,7 +247,7 @@ module ManagerNarrativeTransform =
 
                         // GLORY-012: not a title request, not a continuation, not
                         // a compaction replay.
-                        if isTitleRequest || Projection.isCompactionMarker raw then
+                        if isTitleRequest || ProviderWireDecode.isCompactionMarker raw then
                             None
                         elif
                             isAcceptedContinuation durable sid messageId
@@ -265,13 +266,15 @@ module ManagerNarrativeTransform =
                                 let openingId = PhysicalUserMessageId.value completedLife.OpeningUserMessageId
 
                                 rawMessages
-                                |> List.tryFindIndex (fun raw -> Projection.hostMessageId raw = Some openingId)
+                                |> List.tryFindIndex (fun raw -> ProviderWireDecode.hostMessageId raw = Some openingId)
                                 |> Option.bind (fun messageIndex ->
                                     let rawText =
                                         match durable.Writer.BlobWriter.Read completedLife.OpeningTextRef with
                                         | Ok text -> text
                                         | Error _ ->
-                                            match Projection.decodeMessage (List.item messageIndex rawMessages) with
+                                            match
+                                                ProviderWireCapture.decodeMessage (List.item messageIndex rawMessages)
+                                            with
                                             | Some message ->
                                                 message.Parts
                                                 |> List.choose (function
@@ -382,7 +385,7 @@ module ManagerNarrativeTransform =
                             else
                                 // The raw user text: the durable Opening (GLORY-013).
                                 let rawText =
-                                    match Projection.decodeMessage raw with
+                                    match ProviderWireCapture.decodeMessage raw with
                                     | Some message ->
                                         message.Parts
                                         |> List.choose (function
@@ -493,7 +496,7 @@ module ManagerNarrativeTransform =
                 let activationMessage =
                     rawMessages
                     |> List.tryFind (fun raw ->
-                        match Projection.decodeMessage raw with
+                        match ProviderWireCapture.decodeMessage raw with
                         | Some message when message.Role = "user" ->
                             message.Parts
                             |> List.exists (function

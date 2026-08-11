@@ -242,7 +242,7 @@ module SpikePlugin =
                                 match
                                     StrengthLifecycle.replayPlans
                                         owner
-                                        Projection.hostMessageId
+                                        ProviderWireDecode.hostMessageId
                                         rawMessages
                                         durability.LoadFrameBundle
                                         strengthProjection
@@ -256,7 +256,7 @@ module SpikePlugin =
                                     | [] -> ()
                                     | _ ->
                                         strengthReplayPlans <- plans
-                                        let wire = Projection.decodeMessageView rawMessages
+                                        let wire = ProviderWireCapture.decodeMessageView rawMessages
 
                                         let snapshot =
                                             { CurrentProjection = ProviderProjection.toSemantic wire
@@ -273,7 +273,7 @@ module SpikePlugin =
                                                 (StrengthLifecycle.replayIntents plans)
 
                                         match
-                                            Projection.tryApplyRenderedInsertionsPreservingBase
+                                            ProjectionMessageEdit.tryApplyRenderedInsertionsPreservingBase
                                                 sessionId
                                                 HostDigest.sha256Hex
                                                 rawMessages
@@ -295,10 +295,11 @@ module SpikePlugin =
                         match projectionSessionIdOpt with
                         | Some sessionId ->
                             let rawMessages = unbox<obj array> outObj?messages |> Array.toList
-                            let capturedMessages = Projection.decodeCapturedMessageView rawMessages
+                            let capturedMessages = ProviderWireCapture.decodeCapturedMessageView rawMessages
 
                             let semantic =
-                                Projection.wireMessageView capturedMessages |> ProviderProjection.toSemantic
+                                ProviderWireCapture.wireMessageView capturedMessages
+                                |> ProviderProjection.toSemantic
 
                             // COMPANION-003/007 + STRENGTH-008: new Host-runtime
                             // traces use stable Host-message identity so a promoted
@@ -307,7 +308,7 @@ module SpikePlugin =
                             let sessionIdentity = SessionId.create sessionId
 
                             let stableMessageIds =
-                                let ids = rawMessages |> List.map Projection.hostMessageId
+                                let ids = rawMessages |> List.map ProviderWireDecode.hostMessageId
 
                                 if ids |> List.forall Option.isSome then
                                     Some(ids |> List.map Option.get)
@@ -669,8 +670,8 @@ module SpikePlugin =
                                     snapshotOpt
                                     journal
                                     (SessionId.create projectionSessionId)
-                                    (Projection.decodeMessageView rawMessages)
-                                    (Projection.lastUserMessageId rawMessages)
+                                    (ProviderWireCapture.decodeMessageView rawMessages)
+                                    (ProviderWireCapture.lastUserMessageId rawMessages)
                                     wired.PendingReviewSeals
 
                         do! sealTask

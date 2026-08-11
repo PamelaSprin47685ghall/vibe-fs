@@ -9,17 +9,21 @@ import { caseOf, payloadOf, listItems, toList } from '../support/domain.mjs'
 
 const {
   decodePart,
-  decodeMessage,
-  decodeRequest,
-  decodeMessageView,
   messagesFromTransformOutput,
-  prependCompanionMemory,
-  applyRenderedPrefix,
   hostMessageId,
   projectionSessionIdFromMessages,
+} = await import('../../../dist/Infrastructure/OpenCode/Codec/ProviderWireDecode.js')
+const {
+  decodeMessage,
+  decodeMessageView,
+  decodeRequest,
   lastUserMessageId,
   formalText,
-} = await import('../../../dist/Infrastructure/OpenCode/Codec/Projection.js')
+} = await import('../../../dist/Infrastructure/OpenCode/Codec/ProviderWireCapture.js')
+const {
+  prependCompanionMemory,
+  applyRenderedPrefix,
+} = await import('../../../dist/Infrastructure/OpenCode/Codec/ProjectionMessageEdit.js')
 
 const { RenderedPrefix } = await import('../../../dist/Domain/ProjectionRenderer.js')
 const { PrefixActivation } = await import('../../../dist/Domain/ProjectionIntent.js')

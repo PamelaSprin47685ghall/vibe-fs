@@ -166,7 +166,8 @@ module CompanionTransform =
                     companion.TransformRaw rawMessages |> replaceMessagesInPlace rawOutObj
 
                     let projection =
-                        Projection.decodeMessageView rawMessages |> ProviderProjection.toSemantic
+                        ProviderWireCapture.decodeMessageView rawMessages
+                        |> ProviderProjection.toSemantic
 
                     // No child until there is a real X gap. Empty fixture transforms
                     // (HOST-009 positional hooks) must not require Host transport.

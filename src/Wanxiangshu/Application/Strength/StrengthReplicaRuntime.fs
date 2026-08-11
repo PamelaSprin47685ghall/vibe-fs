@@ -142,7 +142,7 @@ type StrengthReplicaRuntime
     /// transform already aborted the child, so K+1 cannot escape physically.
     member _.HandleTransform(output: obj) : Task<bool> =
         task {
-            match Projection.projectionSessionIdFromMessages output with
+            match ProviderWireDecode.projectionSessionIdFromMessages output with
             | None -> return false
             | Some sessionIdText ->
                 let replica = SessionId.create sessionIdText

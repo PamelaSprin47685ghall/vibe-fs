@@ -6,7 +6,8 @@ import * as Authority from '../../../dist/Domain/PromptAuthority.js'
 import * as Provider from '../../../dist/Domain/ProviderProjection.js'
 import { StrengthBudget } from '../../../dist/Domain/StrengthBudget.js'
 import { ProviderRequestKind } from '../../../dist/Domain/PrefixCandidate.js'
-import * as Projection from '../../../dist/Infrastructure/OpenCode/Codec/Projection.js'
+import * as WireCapture from '../../../dist/Infrastructure/OpenCode/Codec/ProviderWireCapture.js'
+import * as MessageEdit from '../../../dist/Infrastructure/OpenCode/Codec/ProjectionMessageEdit.js'
 import * as Id from '../../../dist/Kernel/Identity.js'
 import { Role } from '../../../dist/Kernel/Roles.js'
 import * as Runtime from '../../../dist/Session/StrengthRuntime.js'
@@ -34,7 +35,7 @@ const rawOutput = (replica, messages) => {
     HostMessageIds: toList(messages.map(() => undefined)),
     HostIsPhysical: toList(messages.map(() => false)),
   }
-  const applied = resultOf(Projection.tryApplyRenderedMessages(replica, H, rendered))
+  const applied = resultOf(MessageEdit.tryApplyRenderedMessages(replica, H, rendered))
   assert.equal(applied.ok, true)
   return { messages: listItems(applied.value) }
 }
@@ -83,7 +84,7 @@ test('STRENGTH_003_004_replica_initial_transform_replaces_bootstrap_with_frozen_
   assert.equal(listItems(outcome.fields[0]).length, 0)
   assert.deepEqual(host.aborted, [])
 
-  const decoded = Projection.decodeMessageView(toList(output.messages))
+  const decoded = WireCapture.decodeMessageView(toList(output.messages))
   const messages = listItems(decoded.Messages)
   assert.equal(messages.length, 1)
   assert.equal(messages[0].Parts.head.fields[0], 'owner mirror')

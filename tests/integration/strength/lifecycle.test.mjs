@@ -5,7 +5,9 @@ import * as Lifecycle from '../../../dist/Application/Strength/StrengthLifecycle
 import * as Durability from '../../../dist/Infrastructure/Persist/StrengthDurability.js'
 import * as PersistStore from '../../../dist/Infrastructure/Persist/EventStore.js'
 import * as Raw from '../../../dist/Infrastructure/Persist/GitRawStore.js'
-import * as ProjectionAdapter from '../../../dist/Infrastructure/OpenCode/Codec/Projection.js'
+import * as WireDecode from '../../../dist/Infrastructure/OpenCode/Codec/ProviderWireDecode.js'
+import * as WireCapture from '../../../dist/Infrastructure/OpenCode/Codec/ProviderWireCapture.js'
+import * as MessageEdit from '../../../dist/Infrastructure/OpenCode/Codec/ProjectionMessageEdit.js'
 import * as Events from '../../../dist/Domain/StrengthEvents.js'
 import * as Frame from '../../../dist/Domain/StrengthFrame.js'
 import * as ProjectionIntent from '../../../dist/Domain/ProjectionIntent.js'
@@ -47,7 +49,7 @@ const rawMessages = (sessionId, messages, ids) => {
     HostMessageIds: toList(ids),
     HostIsPhysical: toList(ids.map(() => false)),
   }
-  const applied = resultOf(ProjectionAdapter.tryApplyRenderedMessages(sessionId, HostDigest.sha256Hex, rendered))
+  const applied = resultOf(MessageEdit.tryApplyRenderedMessages(sessionId, HostDigest.sha256Hex, rendered))
   assert.equal(applied.ok, true)
   return listItems(applied.value)
 }
@@ -124,7 +126,7 @@ test('STRENGTH_INTEGRATION_Prepared_candidate_consumption_Promoted_restart_repla
   ]
   const rawBase = rawMessages('owner', baseWire, ['user-1', 'run-1', 'user-2'])
   const replayPlans = resultOf(
-    Lifecycle.StrengthLifecycle_replayPlans(owner, ProjectionAdapter.hostMessageId, toList(rawBase), restarted.LoadFrameBundle, projection),
+    Lifecycle.StrengthLifecycle_replayPlans(owner, WireDecode.hostMessageId, toList(rawBase), restarted.LoadFrameBundle, projection),
   )
   assert.equal(replayPlans.ok, true)
   const [plan] = listItems(replayPlans.value)
@@ -137,20 +139,20 @@ test('STRENGTH_INTEGRATION_Prepared_candidate_consumption_Promoted_restart_repla
     Lifecycle.StrengthLifecycle_replayIntents(replayPlans.value),
   )
   const written = resultOf(
-    ProjectionAdapter.tryApplyRenderedInsertionsPreservingBase('owner', HostDigest.sha256Hex, toList(rawBase), replayed),
+    MessageEdit.tryApplyRenderedInsertionsPreservingBase('owner', HostDigest.sha256Hex, toList(rawBase), replayed),
   )
   assert.equal(written.ok, true)
   const writtenRaw = listItems(written.value)
   assert.equal(writtenRaw[0], rawBase[0], 'existing Host rows stay object-identical')
   assert.equal(writtenRaw[3], rawBase[1], 'target assistant stays after replayed Strength frame')
-  assert.deepEqual(listItems(ProjectionAdapter.decodeMessageView(written.value).Messages).map((item) => item.Role), [
+  assert.deepEqual(listItems(WireCapture.decodeMessageView(written.value).Messages).map((item) => item.Role), [
     'user', 'assistant', 'tool', 'assistant', 'user',
   ])
 
   assert.equal(resultOf(restarted.Append(Events.StrengthEvents_traced(id, 20n, 24n))).ok, true)
   projection = resultOf(restarted.LoadProjection()).value
   const tracedPlans = resultOf(
-    Lifecycle.StrengthLifecycle_replayPlans(owner, ProjectionAdapter.hostMessageId, toList(rawBase), restarted.LoadFrameBundle, projection),
+    Lifecycle.StrengthLifecycle_replayPlans(owner, WireDecode.hostMessageId, toList(rawBase), restarted.LoadFrameBundle, projection),
   ).value
   const [traced] = listItems(tracedPlans)
   assert.equal(Lifecycle.StrengthLifecycle_needsRawReplay(22n, traced), true)

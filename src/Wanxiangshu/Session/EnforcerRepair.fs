@@ -144,7 +144,7 @@ module EnforcerRepair =
     /// Host `createObj` 只写回 id / source / requestKey 侧信道；id 规则保持
     /// `enforcer-repair-` + sha256(requestKey + "|" + RepairInstruction).Substring(0, 24)。
     let withRepairInstruction (rawMessages: obj list) (requestKey: string) : obj list =
-        let baseWire = rawMessages |> List.choose Projection.decodeMessage
+        let baseWire = rawMessages |> List.choose ProviderWireCapture.decodeMessage
 
         let emptyCurrent: ProviderProjection.ProviderSemanticProjection =
             { ProviderId = None

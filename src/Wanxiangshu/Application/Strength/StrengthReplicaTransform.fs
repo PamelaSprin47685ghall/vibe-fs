@@ -21,7 +21,7 @@ type StrengthReplicaTransformOutcome =
 module StrengthReplicaTransform =
 
     let private providerResultsByCallId (rawMessage: obj) =
-        Projection.decodeMessageView [ rawMessage ]
+        ProviderWireCapture.decodeMessageView [ rawMessage ]
         |> fun view -> view.Messages
         |> List.collect (fun message -> message.Parts)
         |> List.choose (function
@@ -92,7 +92,7 @@ module StrengthReplicaTransform =
         (output: obj)
         : Task<StrengthReplicaTransformOutcome> =
         task {
-            match Projection.projectionSessionIdFromMessages output with
+            match ProviderWireDecode.projectionSessionIdFromMessages output with
             | None -> return StrengthReplicaTransformOutcome.NotReplica
             | Some sessionIdText ->
                 let replicaSessionId = SessionId.create sessionIdText
@@ -100,8 +100,8 @@ module StrengthReplicaTransform =
                 match runtime.TryFindByReplica replicaSessionId with
                 | None -> return StrengthReplicaTransformOutcome.NotReplica
                 | Some binding ->
-                    let rawMessages = Projection.messagesFromTransformOutput output
-                    let currentWire = Projection.decodeMessageView rawMessages
+                    let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
+                    let currentWire = ProviderWireCapture.decodeMessageView rawMessages
                     let hostBatches = collectHostCompleteBatches rawMessages
 
                     let batches =
@@ -167,7 +167,9 @@ module StrengthReplicaTransform =
                                         currentWire.Messages
                                         ordered
 
-                                match Projection.tryApplyStrengthRenderedMessages sessionIdText sha256 rendered with
+                                match
+                                    ProjectionMessageEdit.tryApplyStrengthRenderedMessages sessionIdText sha256 rendered
+                                with
                                 | Error error ->
                                     runtime.Retire replicaSessionId |> ignore
                                     let! _ = sessions.AbortSession replicaSessionId

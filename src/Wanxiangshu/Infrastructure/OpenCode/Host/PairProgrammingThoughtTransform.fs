@@ -249,7 +249,7 @@ module PairProgrammingThoughtTransform =
             function
             | [] -> Ok(List.rev acc)
             | message :: rest ->
-                match Projection.hostMessageId message with
+                match ProviderWireDecode.hostMessageId message with
                 | None -> Error "transcript message without address (HOST-013)"
                 | Some id when Set.contains id seen -> Error(sprintf "duplicate transcript address %s (HOST-013)" id)
                 | Some id -> loop ((id, message) :: acc) (Set.add id seen) rest
@@ -375,7 +375,7 @@ module PairProgrammingThoughtTransform =
 
             match List.rev resultRun, List.rev callRun with
             | lastResult :: _, lastCall :: _ ->
-                match Projection.hostMessageId lastCall, Projection.hostMessageId lastResult with
+                match ProviderWireDecode.hostMessageId lastCall, ProviderWireDecode.hostMessageId lastResult with
                 | Some callId, Some resultId ->
                     Ok(
                         TranscriptGap.After(TranscriptMessageAddress.create callId),
@@ -383,13 +383,13 @@ module PairProgrammingThoughtTransform =
                     )
                 | _ -> Error "tool batch message without transcript address (HOST-013)"
             | _ when lastIsUser ->
-                match Projection.hostMessageId last with
+                match ProviderWireDecode.hostMessageId last with
                 | Some id ->
                     let address = TranscriptMessageAddress.create id
                     Ok(TranscriptGap.Before address, TranscriptGap.Before address)
                 | None -> Error "trailing user without transcript address (HOST-013)"
             | _ ->
-                match Projection.hostMessageId last with
+                match ProviderWireDecode.hostMessageId last with
                 | Some id ->
                     let address = TranscriptMessageAddress.create id
                     Ok(TranscriptGap.After address, TranscriptGap.After address)

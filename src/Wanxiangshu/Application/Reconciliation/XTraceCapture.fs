@@ -470,7 +470,7 @@ module XTraceCapture =
     let captureMessageView
         (journal: AgentJournal option)
         (sessionId: SessionId)
-        (messages: Projection.CapturedWireMessage list)
+        (messages: ProviderWireCapture.CapturedWireMessage list)
         : XTraceProjectionState option =
         messages
         |> List.map (fun message ->
@@ -512,7 +512,7 @@ module XTraceCapture =
         (journal: AgentJournal option)
         (sessionId: SessionId)
         (messageIds: string list)
-        (messages: Projection.CapturedWireMessage list)
+        (messages: ProviderWireCapture.CapturedWireMessage list)
         : Result<XTraceProjectionState option, string> =
         messages
         |> List.map (fun message ->

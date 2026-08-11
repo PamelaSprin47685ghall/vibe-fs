@@ -44,7 +44,7 @@ module PluginHostInterop =
     let pairedHook (fn: obj) : obj = jsNative
 
     let projectionSessionIdFromMessages (output: obj) =
-        Projection.projectionSessionIdFromMessages output
+        ProviderWireDecode.projectionSessionIdFromMessages output
 
     let toolHooks
         (toolModule: obj)

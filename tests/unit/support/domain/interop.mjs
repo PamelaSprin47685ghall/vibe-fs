@@ -81,7 +81,9 @@ export const [
   RecoverySlotModule,
   CompactionPolicyModule,
   DiagnosticModule,
-  ProjectionModule,
+  ProviderWireDecode,
+  ProviderWireCapture,
+  ProjectionMessageEdit,
   SyntheticTomlModule,
   ToolResultBoundModule,
   ForkChildPayloadModule,
@@ -183,7 +185,9 @@ export const [
   prod('Domain/RecoverySlot'),
   prod('Domain/HostCompactionPolicy'),
   prod('Infrastructure/OpenCode/Host/Diagnostic'),
-  prod('Infrastructure/OpenCode/Codec/Projection'),
+  prod('Infrastructure/OpenCode/Codec/ProviderWireDecode'),
+  prod('Infrastructure/OpenCode/Codec/ProviderWireCapture'),
+  prod('Infrastructure/OpenCode/Codec/ProjectionMessageEdit'),
   prod('Domain/SyntheticToml'),
   prod('Domain/ToolResultBound'),
   prod('Domain/ForkChildPayload'),
@@ -270,6 +274,14 @@ export const ProjectionAlgebraModule = {
   ...ProjectionIntentModule,
   ...ProjectionPlannerModule,
   ...ProjectionRendererModule,
+}
+
+// Codec/Projection split into three owner files (Wave 3). Tests keep one
+// aggregate handle so the Fable-module naming boundary stays in one place.
+export const ProjectionModule = {
+  ...ProviderWireDecode,
+  ...ProviderWireCapture,
+  ...ProjectionMessageEdit,
 }
 
 export const [NodeProcessWaitModule, NodeProcessHostModule, PtyTimingModule, FableTask, FableTypes] =

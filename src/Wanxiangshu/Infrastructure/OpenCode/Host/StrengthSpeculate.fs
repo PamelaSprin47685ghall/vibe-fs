@@ -61,8 +61,8 @@ module StrengthSpeculate =
         (bundle: StrengthFrameBundle)
         (output: obj)
         : Result<unit, string> =
-        let rawMessages = Projection.messagesFromTransformOutput output
-        let wire = Projection.decodeMessageView rawMessages
+        let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
+        let wire = ProviderWireCapture.decodeMessageView rawMessages
 
         let snapshot =
             { CurrentProjection = ProviderProjection.toSemantic wire
@@ -79,7 +79,7 @@ module StrengthSpeculate =
                 [ ProjectionIntent.strengthCandidate owner decision target target bundle ]
 
         match
-            Projection.tryApplyRenderedInsertionsPreservingBase
+            ProjectionMessageEdit.tryApplyRenderedInsertionsPreservingBase
                 (SessionId.value owner)
                 HostDigest.sha256Hex
                 rawMessages
@@ -108,7 +108,7 @@ module StrengthSpeculate =
             | Some view when view.Promoted || view.Abandoned -> Ok true
             | Some view ->
                 let anchorDigest =
-                    Projection.decodeMessageView rawMessages
+                    ProviderWireCapture.decodeMessageView rawMessages
                     |> ProviderProjection.toSemantic
                     |> ProviderProjection.renderSemantic
                     |> HostDigest.sha256Hex
@@ -135,7 +135,7 @@ module StrengthSpeculate =
                 scope.Strength.StrengthReplicaRuntime,
                 strengthDurability,
                 scope.Strength.ManagedAgentInventory,
-                Projection.projectionSessionIdFromMessages output
+                ProviderWireDecode.projectionSessionIdFromMessages output
             with
             | Some durable, Some snapshots, Some runtime, Some durability, Some inventory, Some sessionIdText ->
                 let owner = SessionId.create sessionIdText
@@ -143,9 +143,9 @@ module StrengthSpeculate =
                 if runtime.IsReplica owner then
                     return ()
                 else
-                    let rawMessages = Projection.messagesFromTransformOutput output
+                    let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
 
-                    match Projection.lastUserMessageId rawMessages with
+                    match ProviderWireCapture.lastUserMessageId rawMessages with
                     | None -> return ()
                     | Some physical ->
                         let! snapshotResult = snapshots.GetMessages owner
@@ -208,7 +208,7 @@ module StrengthSpeculate =
                                             let stableCaptureEligible =
                                                 XTraceCapture.supportsStableInsertion (Some durable) owner
                                                 && (rawMessages
-                                                    |> List.forall (Projection.hostMessageId >> Option.isSome))
+                                                    |> List.forall (ProviderWireDecode.hostMessageId >> Option.isSome))
 
                                             let opportunity =
                                                 { IsRootWork = rootWork owner projections.AgentProjections.Associations
@@ -240,7 +240,7 @@ module StrengthSpeculate =
                                                   ModelBindingsDistinct = modelsDistinct
                                                   CostModelAvailable = costsAvailable }
 
-                                            let wire = Projection.decodeMessageView rawMessages
+                                            let wire = ProviderWireCapture.decodeMessageView rawMessages
                                             let semantic = ProviderProjection.toSemantic wire
                                             let semanticText = ProviderProjection.renderSemantic semantic
                                             let anchorDigest = HostDigest.sha256Hex semanticText
