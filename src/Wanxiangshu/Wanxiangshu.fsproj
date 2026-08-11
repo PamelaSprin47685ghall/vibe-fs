@@ -59,6 +59,7 @@
     <Compile Include="Domain/HostReviewPrompt.fs"/>
     <Compile Include="Domain/StrengthBudget.fs"/>
     <Compile Include="Domain/StrengthCostModel.fs"/>
+    <Compile Include="Domain/StrengthPolicy.fs"/>
     <Compile Include="Domain/ToolResultBound.fs"/>
     <Compile Include="Domain/RuntimeNudge.fs"/>
     <Compile Include="Session/LoopDetector.fs"/>
@@ -81,6 +82,7 @@
     <Compile Include="Domain/PromptAuthorityRun.fs"/>
     <Compile Include="Domain/AttemptPlanner.fs"/>
     <Compile Include="Domain/EventStore.fs"/>
+    <Compile Include="Domain/StrengthEvents.fs"/>
     <Compile Include="Domain/JsTools.fs"/>
     <Compile Include="Domain/Casebook.fs"/>
     <Compile Include="Infrastructure/Persist/StoreTypes.fs"/>
@@ -316,13 +318,16 @@
     <Compile Include="Infrastructure/ObservationCollector.fs"/>
     <Compile Include="Infrastructure/CasebookSessionDraft.fs"/>
     <Compile Include="Infrastructure/CasebookWorkflow.fs"/>
+    <Compile Include="Infrastructure/CasebookIndex.fs"/>
     <Compile Include="Infrastructure/JsToolsBindings.fs"/>
     <Compile Include="Infrastructure/JsToolsTransactionStore.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/JsToolWorkflow.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/JsToolHost.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Tools/FetchTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ToolRegistry.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/WorkspaceEventStore.fs"/>
+    <Compile Include="Infrastructure/CasebookLifecycle.fs"/>
+    <Compile Include="Infrastructure/CasebookBookkeeper.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Tools/FetchTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/CasebookTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginHost.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/ManagerConfig.fs"/>

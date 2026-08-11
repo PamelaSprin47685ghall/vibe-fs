@@ -303,3 +303,31 @@ module SyncDelegateAssociationHints =
 
     let dedicatedOwnership (owner: SessionId) (role: SyncDelegateRole) : SessionOwnership =
         SessionOwnership.Attached(owner, SyncDelegate.delegateRoleToAttachment role)
+
+/// StrengthReplica classification (HOST-008 / Strength Phase 0).
+///
+/// StrengthReplica is Universal `InternalLeaf × Attached(_, StrengthReplica)`.
+/// It is NOT a `SatelliteKind` case and is NOT durable on `SessionAssociation` /
+/// FactCodec. Process-local owner→replica indexes live in host/runtime state.
+module StrengthReplicaAssociationHints =
+
+    let executionClass = SessionExecutionClass.InternalLeaf
+
+    let ownership (owner: SessionId) : SessionOwnership =
+        SessionOwnership.Attached(owner, AttachmentKind.StrengthReplica)
+
+    let isStrengthReplicaAttachment =
+        function
+        | AttachmentKind.StrengthReplica -> true
+        | AttachmentKind.Companion
+        | AttachmentKind.SyncInspector
+        | AttachmentKind.SyncCoder
+        | AttachmentKind.Bookkeeper _ -> false
+
+    /// Look up the active StrengthReplica session for an owner from a process-local
+    /// owner → replica map. Not a durable association fold.
+    let tryStrengthReplica
+        (ownerSessionId: SessionId)
+        (replicasByOwner: Map<SessionId, SessionId>)
+        : SessionId option =
+        Map.tryFind ownerSessionId replicasByOwner

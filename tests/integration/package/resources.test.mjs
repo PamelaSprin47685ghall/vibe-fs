@@ -23,9 +23,9 @@ const PROMPT_FILES = [
   'reviewer-system.md',
 ]
 
-test('PACKAGE_resources_all_prompts_and_catalog_present_after_install', () => {
+test('PACKAGE_resources_all_prompts_and_rulebook_present_after_install', () => {
   const promptsDir = path.join(repoRoot, 'resources', 'prompts')
-  const catalogPath = path.join(repoRoot, 'resources', 'enforcer', 'catalog.json')
+  const enforcerDir = path.join(repoRoot, 'resources', 'enforcer')
 
   assert.ok(fs.existsSync(promptsDir), 'resources/prompts must exist')
   for (const name of PROMPT_FILES) {
@@ -36,11 +36,24 @@ test('PACKAGE_resources_all_prompts_and_catalog_present_after_install', () => {
   }
   assert.equal(PROMPT_FILES.length, 10)
 
-  assert.ok(fs.existsSync(catalogPath), 'resources/enforcer/catalog.json must exist')
-  const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'))
-  assert.ok(catalog && typeof catalog === 'object', 'catalog.json must parse as object')
-  assert.ok(Array.isArray(catalog.rules), 'catalog.json must have rules array')
-  assert.ok(catalog.rules.length > 0, 'catalog.rules must be non-empty')
+  assert.ok(fs.existsSync(enforcerDir), 'resources/enforcer must exist')
+  assert.equal(
+    fs.existsSync(path.join(enforcerDir, 'catalog.json')),
+    false,
+    'catalog.json must not ship after rulebook folder cutover',
+  )
+  const dirs = fs
+    .readdirSync(enforcerDir, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+  assert.ok(dirs.length > 0, 'rulebook must contain at least one rule directory')
+  for (const name of dirs) {
+    assert.ok(
+      fs.existsSync(path.join(enforcerDir, name, 'enforcer.md')),
+      `missing enforcer.md for ${name}`,
+    )
+    assert.ok(fs.existsSync(path.join(enforcerDir, name, 'main.md')), `missing main.md for ${name}`)
+  }
 })
 
 test('PACKAGE_resources_fixed_relative_path_from_PackageResources_module', () => {
@@ -60,6 +73,6 @@ test('PACKAGE_resources_fixed_relative_path_from_PackageResources_module', () =>
     path.normalize(expected),
     'PackageResources ../../../resources must resolve to package resources/',
   )
-  assert.ok(fs.existsSync(path.join(fromModule, 'enforcer', 'catalog.json')))
+  assert.ok(fs.existsSync(path.join(fromModule, 'enforcer', 'primitive-obsession', 'enforcer.md')))
   assert.ok(fs.existsSync(path.join(fromModule, 'prompts', 'manager-system.md')))
 })

@@ -25,5 +25,13 @@ test('PACKAGE_install_layout_matches_manifest_and_main', () => {
   assert.ok(fs.existsSync(main), `main entry must exist: ${main}`)
   assert.ok(fs.existsSync(path.join(repoRoot, 'package.json')))
   assert.ok(fs.existsSync(path.join(repoRoot, 'dist', 'Infrastructure', 'OpenCode', 'Plugin', 'Plugin.js')))
-  assert.ok(fs.existsSync(path.join(repoRoot, 'resources', 'enforcer', 'catalog.json')))
+  assert.ok(
+    fs.existsSync(path.join(repoRoot, 'resources', 'enforcer', 'primitive-obsession', 'enforcer.md')),
+  )
+  assert.ok(fs.existsSync(path.join(repoRoot, 'resources', 'enforcer', 'primitive-obsession', 'main.md')))
+  assert.equal(
+    fs.existsSync(path.join(repoRoot, 'resources', 'enforcer', 'catalog.json')),
+    false,
+    'catalog.json must not ship after rulebook folder cutover',
+  )
 })

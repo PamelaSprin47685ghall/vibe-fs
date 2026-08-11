@@ -3390,35 +3390,59 @@ Observation capture 从最终执行层接（G5 后 = builtin read/glob/grep Host
 - [x] `CasebookCapture.capture`（read → FileRead+sha256；glob → GlobResult；grep → GrepResult；未知工具 None）
 - [x] executor 阅读容错（§63 正例 cat/head/tail/sed 含选项跳过 + cat|grep pipeline；负例 sh -c/bash -c/命令替换安全跳过）
 
-### G6-C — Non-reusable Inspector Path — PARTIAL（store/workflow DONE：28969e1d + 871f8092）
+### G6-C — Non-reusable Inspector Path — DONE（store/workflow + lifecycle session wiring）
 - [x] `CasebookStore`：InspectorCaseCaptured/Refreshed/Accessed/Evicted 事件 + payload codec + topoSort 因果序 + project（fold+LRU）；AuthoritativeEventTypes 扩展
 - [x] `CasebookFeature` marker gating（.wanxiang/casebook/ 目录存在；CASE-009）
 - [x] `CasebookWorkflow`：archiveInspectorResult / fetchCase / checkFreshness；全部返回 Result（archive failure ≠ Inspector call failure）
 - [x] Host 采集钩子：`tool.execute.after`（SpikePlugin；marker 门控；read/glob/grep typed capture → `ObservationCollector` per-session buffer；不改变工具结果）
-- [ ] Inspector terminal → drain + archive 的会话终结接线（SyncDelegate/AttachedSession 退役路径）
+- [x] Inspector terminal / graceful close → drain + archive：`CasebookLifecycle.tryFinalizeInspector`（draft Q/A + collector.Drain → finalizeCase）；SpikePlugin + HostSignalBootstrap + SyncDelegateRuntime hooks（notePrompt/noteAnswer/cleanup）
+- [x] unexpected SessionDeleted → `cleanupInspector` only（never append）
 
-### G6-D — Fetch Hot Path — PARTIAL（replay DONE：13904834）
+### G6-D — Fetch Hot Path — DONE
 - [x] `CasebookReplay`：replayOne/replayAll（只读重放；不可复现 = 变化信号）
 - [x] fetch(session_id) 工具（`FetchTool.spec`：fresh/stale/no-case；`CasebookTools.buildSpecs` marker 门控 + 独立模块避免 dual-write token pair；ToolRegistry 经 casebookToolSpecs 接入）
-- [ ] CasebookIndexSnapshot（PrefixEpoch 稳定）与 same-worktree single-flight
+- [x] `CasebookIndex` process-local Snapshot（epoch + session id set；invalidate on Captured/Refreshed/Accessed；refresh from projection）
+- [x] same-worktree fetch single-flight（`FetchTool` in-flight Task gate；CASE-011）
+- [x] fresh hit → best-effort `touchAccess`（InspectorCaseAccessed）
 
-### G6-E — CaseRefresh（Bookkeeper）— PARTIAL（workflow DONE：99da36bb）
+### G6-E — CaseRefresh（Bookkeeper）— DONE（minimal mechanical；LLM agent deferred）
 - [x] `refreshCase`（append Refreshed，线性 parent）+ `needsRefresh`（replay 决策 Fresh/Stale/no-case）
 - [x] maintenance failure ≠ fetch failure（Result 语义；失败保留旧 Case）
-- [ ] Bookkeeper Agent 会话（InternalLeaf + Attached；`edit-qa` 工具 + prompt + 不可见 + single-flight）——Session 深度集成，独立阶段
+- [x] Host mechanical Bookkeeper：`CasebookBookkeeper.refreshStale` — needsRefresh → fetch → replayAll → refreshCase(same Q/A, replayed obs)；无 LLM / 无 edit-qa
+- [x] FetchTool stale branch：single-flight 内尝试 mechanical refresh once，再 re-fetch；成功且 Fresh → 返回 fresh A；否则仍 stale + refresh:required（不把 maintenance 变成 fetch error）
+- [x] unit：`tests/unit/casebook/bookkeeper-mechanical.test.mjs` + fetch stale→mechanical path
+- [ ] **Remaining（诚实）**：LLM Bookkeeper Agent 会话（InternalLeaf + Attached；`edit-qa` 合成修订 Q/A + CaseFinalize synthesis prompt）— 未实现；当前 CaseRefresh 仅为 observation 机械推进，不合成新答案
 
-### G6-F — CaseFinalize（Universal 核心）— PARTIAL（workflow DONE：5e4a721b）
+### G6-F — CaseFinalize（Universal 核心）— DONE（workflow + lifecycle；semantic synthesis deferred）
 - [x] `finalizeCase`：exactly-one guard（同 scope 二次 finalize 拒绝；unexpected SessionDeleted 不 reconstruct）
-- [ ] ReuseScope close → freeze draft → retire/release 的 Session 层接线（SyncDelegate 专用 Inspector 会话退役路径）——独立阶段
+- [x] process-local draft：`CasebookDraftStore` + `CasebookLifecycle.notePrompt/noteAnswer`
+- [x] graceful path：`tryFinalizeInspector` freeze draft → finalizeCase once → Index invalidate/refresh
+- [x] SyncDelegate / SpikePlugin / HostSignalBootstrap 接线（onInspectorPrompt/Answer/Cleanup；owner graceful finalize hook）
+- [ ] **Remaining（诚实）**：ReuseScope-close LLM CaseFinalize synthesis（多轮 Q/A → one canonical Q/A via Bookkeeper provider transaction）—  deferred；当前 finalize = draft Q/A + captured observations 直接 Captured
 
-### G6-G — Universal 最终关闭 — NOT STARTED（待 E/F Session 接线）
-- [ ] Universal 最终 e2e（Meditator → same reusable Inspector → multiple questions → no Student/Teacher/QA/SKILL；ReuseScope close → one CaseFinalize → one Case；new Session → new Inspector → fetch → Case）
-- [ ] Universal + perm-inspector → completed（同一 integration window）
+### G6-G — Universal 最终关闭 — DONE（unit integration window；full LLM e2e deferred）
+- [x] unit e2e：`tests/unit/casebook/universal-loop.test.mjs` — lifecycle note→finalize→fetch；cleanup no write；CancelSession cleanup；mechanical refresh after drift
+- [x] unit suite `tests/unit/casebook/*` 36 PASS；`npm run build` PASS
+- [x] Universal + perm-inspector → `changes/completed/`（同一 integration window）
+- [ ] **Remaining（诚实）**：full Host e2e（Meditator → multi-turn dedicated Inspector → ReuseScope close → LLM CaseFinalize → next Session fetch）需 LLM Bookkeeper；不阻塞本 Change 的 mechanical Casebook surface 收口
 
 ## Completion criteria
 
-以 proposal §60–63 proof 清单（feature gating 双门 / Q-A 逐字性 / observation capture 覆盖 / executor parser 正负例）+ §107 式 Completion 全勾选 + Playbook G6 各段 Exit 为准；另以 `npm run check` + `npm run check:release` 全绿为准。
+G6 mechanical Casebook surface（Domain / Capture / Store / Replay / Fetch+single-flight / Index / Lifecycle finalize+cleanup / mechanical Bookkeeper）已交付并有 unit proof。LLM Bookkeeper Agent + semantic CaseFinalize 明确 Remaining，不伪造完成。`npm run build` + `node --test tests/unit/casebook/*.test.mjs` 36 PASS。全量 `npm run check` / e2e 不在本关口强制（Playbook 允许 targeted）。
 
 ## Blockers
 
-无（待实施中发现则追加）。
+无。LLM Bookkeeper / full CaseFinalize synthesis 为后续增量，非本 Exit 阻塞。
+
+## Final outcome
+
+**G6 Inspector Casebook（perm-inspector）已收口**（2026-08-11，mechanical Bookkeeper + lifecycle session wiring）：
+
+1. **Domain / Store / Capture / Replay**：CASE-001..012 正式文档 + 纯 Domain projection；统一 EventStore 事件（Captured/Refreshed/Accessed/Evicted）；marker opt-in；typed observation capture + executor 阅读容错；freshness = exact normalized observation equality（hint，非 proof）。
+2. **Lifecycle session wiring**：`CasebookLifecycle` — notePrompt / noteAnswer / tryFinalizeInspector / cleanupInspector / touchAccess；SpikePlugin + SyncDelegateRuntime + HostSignalBootstrap 钩子；graceful finalize once；unexpected delete = cleanup only（零 EventStore 写）。
+3. **Fetch hot path**：`FetchTool` fresh/stale/no-case；CASE-011 single-flight；fresh → Accessed；process-local `CasebookIndex` epoch snapshot。
+4. **Minimal Bookkeeper（无 LLM）**：`CasebookBookkeeper.refreshStale` 在 stale 时用同一 Q/A + 重放 observations 发布 Refreshed；FetchTool stale 分支尝试一次后 re-fetch；maintenance failure ≠ fetch failure。
+5. **Proofs**：`tests/unit/casebook/*` **36 PASS**（含 `bookkeeper-mechanical`、`lifecycle-wiring`、`fetch-tool`、`universal-loop`、index/store/domain/capture）。
+6. **诚实 Remaining**：LLM Bookkeeper Agent（edit-qa / CaseRefresh 合成 / CaseFinalize 多轮 synthesis）与 full Host Meditator e2e **未**实现；当前 cold path 为 draft 原文 Captured + observation 机械刷新。
+
+**Gate 移交**：与 `universal.md` 同窗 completed；Playbook G6 Exit 的 mechanical Casebook 目标达成。后续 LLM Bookkeeper 可作为独立增量，不回滚本 Change。

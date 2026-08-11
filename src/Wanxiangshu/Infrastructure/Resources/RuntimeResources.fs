@@ -14,8 +14,17 @@ module RuntimeResources =
     let mutable private installed: RuntimeResources option = None
 
     let load () : RuntimeResources =
-        { Prompts = PromptResources.load ()
-          EnforcerRules = EnforcerCatalogResource.load () }
+        let rules = EnforcerCatalogResource.load ()
+        let prompts = PromptResources.load ()
+        // Rulebook v2 Slice C: effective blogger system = base + all enforcer.md texts.
+        // Derived only — never written back to resources/.
+        let promptsWithRulebook =
+            { prompts with
+                BloggerSystemPrompt =
+                    EnforcerCatalogResource.composeBloggerSystemPrompt prompts.BloggerSystemPrompt rules }
+
+        { Prompts = promptsWithRulebook
+          EnforcerRules = rules }
 
     /// Single install site: plugin constructor before any consumer runs.
     let install (resources: RuntimeResources) : unit = installed <- Some resources

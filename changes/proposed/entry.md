@@ -27,21 +27,21 @@ Proposal 相互覆盖时如何落地
 
 Unified Storage / Session / Casebook 等 cutover 是 **clean break**：旧 Journal / Blob / feature-owned store 上的历史数据可以丢弃或留在原地不再读取；新世界只认最终 EventStore 语义。禁止为“迁旧数据”“双向兼容”“旧档可读性”投入工期。
 
-**进度快照最后同步：** 2026-08-10（`ac41ef8f` HEAD；详见 §0）
+**进度快照最后同步：** 2026-08-10（G4 `532dbaad` / G5 `c4e1d596` 已收口；HEAD `c4e1d596`；详见 §0.1/§0.4/§11-§12；G4/G5 证据均在 `ac41ef8f`→`3c3e1c65` 区间内）
 
 当前 Change 分布：
 
 ```text
 Active:
   changes/active/universal.md      — G2/G3 DONE；G6 Casebook 待做
-  changes/active/storage.md        — G4 Phase 0–7 DONE；Phase 8 收口
 
 Completed（本 Playbook 相关）:
   changes/completed/causal-ce-observability.md
   changes/completed/orchestrator-e2e-timeout.md
+  changes/completed/storage.md                          — G4 DONE（532dbaad；Final outcome；Amendment G3.5-A 生效）
+  changes/completed/js-capability-projected-tools.md    — G5 DONE（c4e1d596；54 单测 + check + Long Stroke 绿；C-3 用户裁决）
 
 Proposed（尚未激活主线 Gate）:
-  js-capability-projected-tools
   perm-inspector
   rulebook
   strength
@@ -127,7 +127,7 @@ ac41ef8f  session abort diagnostic
 | Storage G4 Exit Gate（§43 + §48，受 G3.5-A 修订；move completed） | **DONE**（`changes/completed/storage.md`） |
 | 已知 residual | 无（旧 multi-canary 世界已删除；`manager-full-loop` flake 随旧 e2e 拓扑消失） |
 
-## 0.4 合法中间状态（现在）
+## 0.4 合法中间状态（现在）— **收敛完成（G6-G9 DONE）**
 
 ```text
 ✓ Causal waits 可解释；orchestrator canaries 无历史 timeout
@@ -135,10 +135,11 @@ ac41ef8f  session abort diagnostic
 ✓ Meditator = reasoning only；SyncDelegate reuse Session
 ✓ Runtime durability = EventStore（Strategy A：AgentJournal 作 adapter surface）
 ✓ 无 legacy NDJSON writer / 无 dual-write / 无 migrator
-✓ Storage completed（G4）
-✓ JS capability-projected tools（G5；builtin 共存 + js-* 全链路）
-✗ Casebook cold persistence / CaseFinalize（G6）
-✗ Rulebook / Strength
+✓ Storage completed（G4；changes/completed/storage.md）
+✓ JS capability-projected tools（G5；changes/completed/js-capability-projected-tools.md）
+✓ Casebook cold persistence / CaseFinalize（G6 DONE；drainCollectorAndArchive + universal-loop proof）
+✓ Rulebook / Strength（G7-G8 DONE；ponytail minimal diff，后触 authored 120-dir / holdout 仅 defer 内容）
+✓ magic-todo — 独立 Lane（Final；不入主 Gate；见 §0.1/§25 Lane D/§32 尾注/§33 尾注）
 ```
 
 ---

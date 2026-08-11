@@ -87,7 +87,8 @@ module EnforcerHost =
     let private projectMessages (messages: obj list) (fallback: obj list) : ContinuationOutcome =
         ContinuationOutcome.ProjectMessages(ensureNonEmpty messages fallback)
 
-    /// Latest committed tip for the blogger's owner, resolved through the runtime catalog.
+    /// Latest committed tip for the blogger's owner, resolved through the runtime rulebook.
+    /// Prefer short Nudge seed; fall back to main.md body when Nudge bridge is empty.
     let latestTipNudge (journal: AgentJournal) (bloggerSessionId: SessionId) : string option =
         let projections = AgentJournal.snapshot journal
 
@@ -108,7 +109,14 @@ module EnforcerHost =
                 | None -> None
                 | Some tip ->
                     EnforcerCatalog.tryFindByField tip.FieldName (RuntimeResources.current().EnforcerRules)
-                    |> Option.map (fun rule -> rule.Nudge)
+                    |> Option.map (fun rule ->
+                        let nudge = if isNull rule.Nudge then "" else rule.Nudge.Trim()
+
+                        if nudge.Length > 0 then
+                            nudge
+                        else
+                            let main = if isNull rule.MainText then "" else rule.MainText.Trim()
+                            main)
 
     let private stopPhysicalRun (messages: obj list) (fallback: obj list) (reason: string) : ContinuationOutcome =
         ContinuationOutcome.StopPhysicalRun(ensureNonEmpty messages fallback, reason)

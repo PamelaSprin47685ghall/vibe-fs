@@ -5,7 +5,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import {
@@ -29,28 +29,29 @@ import {
 } from '../support/domain.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
-const catalogPath = join(ROOT, 'resources/enforcer/catalog.json')
+const rulebookRoot = join(ROOT, 'resources/enforcer')
 const bloggerSystemPath = join(ROOT, 'resources/prompts/blogger-system.md')
+
+const packageTipNames = () =>
+  readdirSync(rulebookRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort()
 
 // ── 1. catalog exactly 120 valid rules ──────────────────────────────────────
 
 test('ENFORCER_TIP_01_catalog_has_exactly_120_valid_rules', () => {
   assert.equal(enforcer.ruleCount, 120)
-  const packaged = JSON.parse(readFileSync(catalogPath, 'utf8'))
-  assert.equal(packaged.rules.length, 120)
+  assert.equal(packageTipNames().length, 120)
   assert.equal(enforcer.fieldNames().length, 120)
   assert.equal(new Set(enforcer.fieldNames()).size, 120)
 })
 
-// ── 2 / 16. tip.enum = catalog field set; package = runtime ─────────────────
+// ── 2 / 16. tip.enum = directory TipName set; package = runtime ─────────────
 
 test('ENFORCER_TIP_02_and_16_tip_enum_equals_catalog_fields_and_package', () => {
   const runtimeFields = enforcer.fieldNames()
-  const packaged = JSON.parse(readFileSync(catalogPath, 'utf8'))
-  const packageFields = packaged.rules
-    .slice()
-    .sort((a, b) => a.catalogOrdinal - b.catalogOrdinal)
-    .map((r) => r.field)
+  const packageFields = packageTipNames()
 
   assert.deepEqual(runtimeFields, packageFields)
   assert.equal(runtimeFields.length, 120)

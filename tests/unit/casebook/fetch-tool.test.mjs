@@ -54,11 +54,15 @@ test('CASE004_fetch_fresh_and_stale_paths', async () => {
     assert.equal(fresh.includes('status = "fresh"'), true)
     assert.equal(fresh.includes('A1'), true)
 
-    // content changed → stale with refresh intent
+    // content changed → mechanical Bookkeeper advances obs with same A → fresh
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
-    const stale = await tool.Execute({ session_id: 's1' }, { sessionID: 'ses', agent: 'fast-inspector' })
-    assert.equal(stale.includes('status = "stale"'), true)
-    assert.equal(stale.includes('refresh = "required"'), true)
+    const afterChange = await tool.Execute({ session_id: 's1' }, { sessionID: 'ses', agent: 'fast-inspector' })
+    assert.equal(afterChange.includes('status = "fresh"'), true, `mechanical refresh should re-stabilize: ${afterChange}`)
+    assert.equal(afterChange.includes('A1'), true, 'same A retained after obs-only refresh')
+
+    // second fetch on stable worktree still fresh
+    const again = await tool.Execute({ session_id: 's1' }, { sessionID: 'ses', agent: 'fast-inspector' })
+    assert.equal(again.includes('status = "fresh"'), true)
 
     // unknown session → no-case
     const missing = await tool.Execute({ session_id: 'nope' }, { sessionID: 'ses', agent: 'fast-inspector' })

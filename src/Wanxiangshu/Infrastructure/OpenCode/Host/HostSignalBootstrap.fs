@@ -46,8 +46,16 @@ module HostSignalBootstrap =
         (journal: AgentJournal option)
         (scope: PluginRuntimeScope)
         (input: obj)
+        /// Workspace root for graceful Casebook finalize (SpikePlugin → CasebookLifecycle).
+        (workspaceDirectory: string option)
+        /// Owner-scope graceful close: finalize inspector draft once (root → inspectorSessionId).
+        (tryFinalizeInspector: (string -> string -> Result<unit, string>) option)
+        /// Unexpected / residual draft cleanup (inspectorSessionId).
+        (cleanupInspector: (string -> unit) option)
         : Task<WiredSignals> =
         task {
+            let finalizeInspector = defaultArg tryFinalizeInspector (fun _ _ -> Ok())
+            let cleanupInspectorDraft = defaultArg cleanupInspector (fun _ -> ())
             let snapshot =
                 match snapshotOpt with
                 | Some port -> port
@@ -228,8 +236,23 @@ module HostSignalBootstrap =
                 | SessionDeleted sessionId ->
                     scope.LoopSensor.DropSession sessionId
 
-                    scope.SyncDelegateRuntime
-                    |> Option.iter (fun runtime -> runtime.CancelSession sessionId)
+                    // Graceful owner teardown: finalize bound Inspector draft once before cancel.
+                    // Unexpected delete of a non-owner / incomplete draft never finalizes
+                    // (tryFinalize is no-op without Q+A; CancelSession cleans drafts).
+                    match scope.SyncDelegateRuntime with
+                    | Some runtime ->
+                        match runtime.TryFind(sessionId, SyncDelegateRole.Inspector) with
+                        | Some inspectorId ->
+                            workspaceDirectory
+                            |> Option.iter (fun root ->
+                                finalizeInspector root (SessionId.value inspectorId) |> ignore)
+                        | None -> ()
+
+                        runtime.CancelSession sessionId
+                    | None -> ()
+
+                    // Residual draft if the deleted id itself held Inspector Q/A.
+                    cleanupInspectorDraft (SessionId.value sessionId)
 
                     scope.Quiescence.DropSession sessionId
                     scope.DisposeSession(SessionId.value sessionId)

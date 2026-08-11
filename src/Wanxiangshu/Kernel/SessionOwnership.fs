@@ -6,8 +6,9 @@ open Wanxiangshu.Kernel.Identity
 ///
 /// Long-lived association is no longer a single `SatelliteKind` axis. Dedicated
 /// SyncInspector/SyncCoder are Work+Attached (MAY hold a Companion); Companion /
-/// Bookkeeper are InternalLeaf+Attached. Teacher remains a G2 transitional
-/// InternalLeaf via legacy projection, not a long-term AttachmentKind member.
+/// Bookkeeper / StrengthReplica are InternalLeaf+Attached. StrengthReplica is
+/// NEVER a `SatelliteKind` case. Teacher remains a G2 transitional InternalLeaf
+/// via legacy projection, not a long-term AttachmentKind member.
 /// HOST-008: whether the session is ordinary work or an internal leaf.
 [<RequireQualifiedAccess>]
 type SessionExecutionClass =
@@ -21,6 +22,9 @@ type AttachmentKind =
     | SyncInspector
     | SyncCoder
     | Bookkeeper of transactionId: string
+    /// Strength Phase 0: short-lived InternalLeaf replica attachment.
+    /// Not `SatelliteKind.Replica` — Universal ownership only.
+    | StrengthReplica
 
 /// HOST-008: Root work vs Attached ownership under one ownerSessionId.
 [<RequireQualifiedAccess>]

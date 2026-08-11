@@ -131,3 +131,14 @@ module CasebookWorkflow =
         | Error err -> Error err
         | Ok(Some _) -> Error(sprintf "case already finalized for scope %s" case.SessionId)
         | Ok None -> archiveInspectorResult store raw case
+
+    /// CASE-007: append InspectorCaseAccessed with the current stream head as parent.
+    let touchCaseAccess (store: IEventStore) (raw: IGitRawStore) (sessionId: string) : Result<unit, string> =
+        match CasebookStore.loadEnvelopes raw (store.OpenSnapshot()) with
+        | Error err -> Error err
+        | Ok envelopes ->
+            let parents = CasebookStore.headOf envelopes |> Option.toList
+
+            match CasebookStore.appendAccessed store parents sessionId with
+            | Ok _ -> Ok()
+            | Error err -> Error err

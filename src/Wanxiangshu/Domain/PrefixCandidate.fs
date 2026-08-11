@@ -66,6 +66,8 @@ type ProviderRequestKind =
     | BloggerSquash
     /// FALLBACK-008's one repair for an unusable terminal.
     | InteractionRepair
+    /// Strength Replica request. Read-only tools only; never owner fallback evidence.
+    | StrengthReplica
 
 [<RequireQualifiedAccess>]
 module ProviderRequestKind =
@@ -76,6 +78,7 @@ module ProviderRequestKind =
         | ProviderRequestKind.BloggerMain -> "blogger-main"
         | ProviderRequestKind.BloggerSquash -> "blogger-squash"
         | ProviderRequestKind.InteractionRepair -> "interaction-repair"
+        | ProviderRequestKind.StrengthReplica -> "strength-replica"
 
     /// CTX-008 / FALLBACK-011: does a success on this kind clear the consecutive
     /// failure count.
@@ -83,21 +86,24 @@ module ProviderRequestKind =
     /// Only a business main request does. A squash is maintenance — it produced a
     /// better representation, not a completed unit of the Logical Run's work — and a
     /// repair is salvage of an attempt that already failed to produce a usable
-    /// terminal.
+    /// terminal. StrengthReplica is a different resource: never owner fallback evidence.
     let clearsFailureCountOnSuccess (kind: ProviderRequestKind) =
         match kind with
         | ProviderRequestKind.WorkMain
         | ProviderRequestKind.BloggerMain -> true
         | ProviderRequestKind.BloggerSquash
-        | ProviderRequestKind.InteractionRepair -> false
+        | ProviderRequestKind.InteractionRepair
+        | ProviderRequestKind.StrengthReplica -> false
 
     /// CTX-010: only the work session's main request substitutes a prefix.
     ///
     /// A Companion request has no prefix to probe — its history is the frame sequence
     /// — and a repair reuses whatever the attempt it repairs already sent.
+    /// StrengthReplica mirrors owner messages but never carries a prefix probe.
     let mayCarryProbe (kind: ProviderRequestKind) =
         match kind with
         | ProviderRequestKind.WorkMain -> true
         | ProviderRequestKind.BloggerMain
         | ProviderRequestKind.BloggerSquash
-        | ProviderRequestKind.InteractionRepair -> false
+        | ProviderRequestKind.InteractionRepair
+        | ProviderRequestKind.StrengthReplica -> false

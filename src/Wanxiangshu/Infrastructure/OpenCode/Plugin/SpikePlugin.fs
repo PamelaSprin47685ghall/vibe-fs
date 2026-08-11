@@ -72,7 +72,21 @@ module SpikePlugin =
                     SharedState.RootWorkspace <- workspaceDirectory
                     CausalWaitHub.setWorkspace workspaceDirectory
 
-                let! wired = HostSignalBootstrap.wire sessionPort eventPort snapshotOpt journal scope input
+                // CASE-003/010: CasebookLifecycle collector enablement (marker-gated).
+                // SpikePlugin only Collects / enables — store IO stays in Lifecycle.
+                CasebookLifecycle.setEnabled workspaceDirectory
+
+                let! wired =
+                    HostSignalBootstrap.wire
+                        sessionPort
+                        eventPort
+                        snapshotOpt
+                        journal
+                        scope
+                        input
+                        workspaceDirectory
+                        (Some CasebookLifecycle.tryFinalizeInspector)
+                        (Some CasebookLifecycle.cleanupInspector)
 
                 match journal with
                 | Some durable ->
@@ -107,7 +121,10 @@ module SpikePlugin =
                             SyncDelegateTier.fromDispatcher dispatcher,
                             registerDelegate,
                             scope.Quiescence,
-                            ?workspaceDirectory = workspaceDirectory
+                            ?workspaceDirectory = workspaceDirectory,
+                            ?onInspectorPrompt = Some CasebookLifecycle.notePrompt,
+                            ?onInspectorAnswer = Some CasebookLifecycle.noteAnswer,
+                            ?onInspectorCleanup = Some CasebookLifecycle.cleanupInspector
                         )
 
                     scope.AttachSyncDelegateRuntime syncDelegate
@@ -424,13 +441,13 @@ module SpikePlugin =
 
                 let chatParams = ChatParamsHook.create journal
 
-                // CASE-003: typed capture at the tool boundary — the collector
-                // instance and the marker flag are read by the tool.execute.after
-                // hook registered in the hooks object below.
-                let observationCollector = ObservationCollector()
+                // CASE-003: typed capture at the tool boundary — shared
+                // CasebookLifecycle.collector; marker flag gates the after-hook.
+                // Store IO stays out of SpikePlugin (unified-store dual-write gate).
+                let observationCollector = CasebookLifecycle.collector
 
                 let casebookEnabled =
-                    match PluginHost.workspaceDirectory input with
+                    match workspaceDirectory with
                     | Some ws -> CasebookFeature.isEnabled ws
                     | None -> false
 

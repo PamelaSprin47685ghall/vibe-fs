@@ -37,10 +37,17 @@ test('PACKAGE_contents_tarball_includes_manifest_dist_resources', () => {
     'README.md',
     'LICENSE',
     'dist/Infrastructure/OpenCode/Plugin/Plugin.js',
-    'resources/enforcer/catalog.json',
+    'resources/enforcer/primitive-obsession/enforcer.md',
+    'resources/enforcer/primitive-obsession/main.md',
   ]) {
     assert.ok(exists(required), `package must include ${required}`)
   }
+
+  assert.equal(
+    exists('resources/enforcer/catalog.json'),
+    false,
+    'catalog.json must not ship after rulebook folder cutover',
+  )
 
   for (const name of PROMPT_FILES) {
     assert.ok(exists(`resources/prompts/${name}`), `package must include resources/prompts/${name}`)

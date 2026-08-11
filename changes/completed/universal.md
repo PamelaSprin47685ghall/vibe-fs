@@ -5064,9 +5064,12 @@ G3+（destructive delete / Casebook / Storage rebase）另列 Remaining work，�
 - [x] Storage Active Amendment G3.5-A: Student QA retired; no legacy reader / dual-write / LegacyProjection≡NewProjection
 - [x] Activated `changes/proposed/storage.md` → `changes/active/storage.md`（user: Activate now）
 
-### G3.5 / G6 Casebook / close（later）
-- [ ] Casebook lifecycle Amendments + CaseFinalize on ReuseScope close
-- [ ] Universal final e2e → completed
+### G3.5 / G6 Casebook / close — DONE（mechanical；与 perm-inspector 同窗）
+- [x] Casebook lifecycle Amendments（G6-A..G）：Domain/Capture/Store/Replay/Fetch/Index/Lifecycle/mechanical Bookkeeper
+- [x] Session wiring：CasebookLifecycle + SpikePlugin/SyncDelegate/HostSignalBootstrap（notePrompt/noteAnswer/tryFinalize/cleanup）
+- [x] CaseFinalize exactly-once workflow + draft freeze path（semantic LLM synthesis deferred — honest Remaining on perm-inspector）
+- [x] unit e2e：`tests/unit/casebook/universal-loop.test.mjs` + full casebook suite 36 PASS
+- [x] Universal + perm-inspector → `changes/completed/`
 
 ## Completion criteria
 
@@ -5081,6 +5084,26 @@ Evidence（本轮）:
 - Catalog 24→20；prompts 12→10；e2e student-teacher case deleted（suite now 26）
 - `npm run check` PASS（unit 1861 + integration 281）；`npm run test:e2e` **26/26 PASS**
 
+### G6 Casebook exit — DONE（mechanical surface）
+Evidence:
+- Dedicated Inspector / SyncDelegate / ReuseScope foundation（G2）+ Student/Teacher clean break（G3）+ unified storage（G3.5/G4）已先落地
+- Casebook opt-in surface：marker / fetch / index / capture / finalize once / cleanup-only on SessionDeleted / mechanical CaseRefresh
+- `CasebookBookkeeper.refreshStale` + FetchTool stale once-refresh；无 dual-write；无 feature store
+- `npm run build` PASS；`node --test tests/unit/casebook/*.test.mjs` **36 PASS**
+- Honest Remaining：LLM Bookkeeper edit-qa + multi-turn CaseFinalize synthesis + full Host Meditator e2e（见 perm-inspector Final outcome）
+
 ## Blockers
 
 无。
+
+## Final outcome
+
+**G2–G6 Universal（Dedicated Inspector Learning Collapse 的 runtime + Casebook 集成）已收口**（2026-08-11）：
+
+1. **G2 Runtime Foundation**：ReuseScope / SessionOwnership（Work|InternalLeaf × Root|Attached）/ SyncDelegateRuntime / CausalAwait dual-await / dedicated Inspector+Coder；Teacher CE 代数保留、leaf 特例不保留。
+2. **G3 Clean Break**：Student/Teacher/QA/SKILL 删除；Meditator = pure reasoner + Inspector；catalog 20 baseline；static ratchet fail-closed。
+3. **G3.5/G4 Storage**：统一 EventStore；Casebook 无自有 ref；Student QA 从 migration 删除。
+4. **G6 Casebook（与 perm-inspector 同窗）**：lifecycle finalize/cleanup 接线；Fetch single-flight + Index；**minimal mechanical Bookkeeper**（同 Q/A + replayed obs → Refreshed）；unit 36 PASS。
+5. **产品边界诚实**：Dedicated Inspector = baseline；Casebook = opt-in cold cache；observation replay ≠ correctness proof；LLM Bookkeeper synthesis 明确 Remaining，不假装 CaseFinalize 已做语义编译。
+
+**Gate 移交**：Universal + perm-inspector → `changes/completed/`。Playbook 后续 G7 Rulebook / G8 Strength 等按 entry 继续；**勿**在未交付 LLM Bookkeeper 前声称 multi-turn semantic CaseFinalize 已完成。

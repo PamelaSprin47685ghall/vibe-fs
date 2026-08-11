@@ -26,6 +26,23 @@ module FetchTool =
     let private fetchInFlight =
         System.Collections.Generic.Dictionary<string, System.Threading.Tasks.Task<string>>()
 
+    /// Emit a fresh hit (best-effort access touch).
+    let private emitFresh (workspaceRoot: string) (sessionId: string) (answer: string) : string =
+        CasebookLifecycle.touchAccess workspaceRoot sessionId
+
+        ToolHostCodec.tomlObject
+            [ "status", ToolHostCodec.TString "fresh"
+              "session_id", ToolHostCodec.TString sessionId
+              "a", ToolHostCodec.TString answer ]
+
+    /// Stale path after mechanical Bookkeeper failed or still-stale post-refresh.
+    let private emitStale (sessionId: string) (answer: string) : string =
+        ToolHostCodec.tomlObject
+            [ "status", ToolHostCodec.TString "stale"
+              "session_id", ToolHostCodec.TString sessionId
+              "a", ToolHostCodec.TString answer
+              "refresh", ToolHostCodec.TString "required" ]
+
     let private runFetch
         (workspaceRoot: string)
         (store: IEventStore)
@@ -39,17 +56,24 @@ module FetchTool =
             let replayed = CasebookReplay.replayAll workspaceRoot case.Observations
 
             match CasebookWorkflow.checkFreshness case replayed with
-            | ReplayResult.Fresh ->
-                ToolHostCodec.tomlObject
-                    [ "status", ToolHostCodec.TString "fresh"
-                      "session_id", ToolHostCodec.TString sessionId
-                      "a", ToolHostCodec.TString case.A ]
+            | ReplayResult.Fresh -> emitFresh workspaceRoot sessionId case.A
             | ReplayResult.Stale ->
-                ToolHostCodec.tomlObject
-                    [ "status", ToolHostCodec.TString "stale"
-                      "session_id", ToolHostCodec.TString sessionId
-                      "a", ToolHostCodec.TString case.A
-                      "refresh", ToolHostCodec.TString "required" ]
+                // CASE-006 minimal: Host mechanical refresh once (same Q/A +
+                // replayed observations). No LLM edit-qa. Maintenance failure
+                // keeps the old Case and still returns stale — never a fetch error.
+                match CasebookBookkeeper.refreshStale store raw workspaceRoot sessionId with
+                | Ok true ->
+                    match CasebookWorkflow.fetchCase store raw 256 sessionId with
+                    | Error _ -> emitStale sessionId case.A
+                    | Ok None -> emitStale sessionId case.A
+                    | Ok(Some updated) ->
+                        let again = CasebookReplay.replayAll workspaceRoot updated.Observations
+
+                        match CasebookWorkflow.checkFreshness updated again with
+                        | ReplayResult.Fresh -> emitFresh workspaceRoot sessionId updated.A
+                        | ReplayResult.Stale -> emitStale sessionId updated.A
+                | Ok false
+                | Error _ -> emitStale sessionId case.A
 
     let spec (factory: HostToolFactory) (workspaceRoot: string) (store: IEventStore) (raw: IGitRawStore) : ToolSpec =
         let tString = ToolHostCodec.TString

@@ -11,7 +11,7 @@ open Wanxiangshu.Session
 
 /// docs/what/enforcer.md — the `blog` tool (ENFORCER-010/020/040/041/061 tip v2).
 ///
-/// Provider schema: required `text` + required `tip` (enum = catalog fields),
+/// Provider schema: required `text` + required `tip` (enum = rule directory names),
 /// optional `evidence`. No 120 numeric score fields (ENFORCER-020).
 /// Execute never suspends (ENFORCER-040). Runtime re-validates tip
 /// (ENFORCER-023) — schema alone is not trusted.
@@ -46,7 +46,7 @@ module BlogTool =
     let private enforcerRules () =
         RuntimeResources.current().EnforcerRules
 
-    /// ENFORCER-020/021: tip enum = catalog field names in ordinal order.
+    /// ENFORCER-020/021: tip enum = rule directory TipNames in lexical order.
     let tipFieldNames () : string list =
         EnforcerCatalog.fieldNames (enforcerRules ())
 
@@ -62,7 +62,7 @@ module BlogTool =
 
         let catalogDescription =
             sprintf
-                "Record one work-log entry with required tip (exactly one of %d catalog fields). Optional evidence."
+                "Record one work-log entry with required tip (exactly one of %d rulebook TipNames). Optional evidence."
                 ruleCount
 
         { Name = "blog"

@@ -53,7 +53,11 @@ type SyncDelegateRuntime
         resolveOwnerTier: SessionId -> AgentTier option,
         onDelegateReady: SessionId -> string -> unit,
         quiescence: SessionQuiescenceGate,
-        ?workspaceDirectory: string
+        ?workspaceDirectory: string,
+        /// Casebook draft hooks (wired from SpikePlugin → CasebookLifecycle; compile-order seam).
+        ?onInspectorPrompt: string -> string -> unit,
+        ?onInspectorAnswer: string -> string -> unit,
+        ?onInspectorCleanup: string -> unit
     ) =
     let gate = obj ()
     let callsByOwnerScope = Dictionary<string, SyncDelegateCall>()
@@ -62,6 +66,9 @@ type SyncDelegateRuntime
     let inFlightScopes = HashSet<string>()
     let recoveryBudget = AgentPairCursor.DefaultAutoRecoveryBudget
     let directory = workspaceDirectory
+    let noteInspectorPrompt = defaultArg onInspectorPrompt (fun _ _ -> ())
+    let noteInspectorAnswer = defaultArg onInspectorAnswer (fun _ _ -> ())
+    let cleanupInspectorDraft = defaultArg onInspectorCleanup (fun _ -> ())
 
     let sessionKey (sessionId: SessionId) = SessionId.value sessionId
 
@@ -312,6 +319,9 @@ type SyncDelegateRuntime
                                 releaseFlight ownerScope
                                 return Error error
                             | Ok _ ->
+                                if role = SyncDelegateRole.Inspector then
+                                    noteInspectorPrompt (sessionKey delegateSession) message
+
                                 let! returned =
                                     CausalAwait.awaitTask
                                         CausalWaitHub.observer
@@ -366,6 +376,9 @@ type SyncDelegateRuntime
 
                     AsyncSupport.trySetResult call.Returned (Ok { Answer = message; ToolRun = toolRun })
                     |> ignore
+
+                    if call.Role = SyncDelegateRole.Inspector then
+                        noteInspectorAnswer delegateSessionKey message
 
                     return Ok SyncDelegatePrompt.returnResult
         }
@@ -434,6 +447,14 @@ type SyncDelegateRuntime
             tryCallByOwnerScope asOwnerScope
             |> Option.orElseWith (fun () -> tryCallByDelegate sessionId)
 
+        // Capture inspector draft holders before bindings are torn down.
+        let inspectorOwned = attached.TryFind(sessionId, SyncDelegateRole.Inspector)
+
+        let inspectorAsDelegate =
+            match call with
+            | Some c when c.Role = SyncDelegateRole.Inspector -> Some c.Delegate
+            | _ -> None
+
         call
         |> Option.iter (fun scope ->
             clearPendingText scope.Delegate
@@ -446,6 +467,15 @@ type SyncDelegateRuntime
 
         for role in [ SyncDelegateRole.Inspector; SyncDelegateRole.Coder ] do
             attached.Remove(sessionId, role) |> ignore
+
+        inspectorOwned
+        |> Option.iter (fun id -> cleanupInspectorDraft (sessionKey id))
+
+        inspectorAsDelegate
+        |> Option.iter (fun id -> cleanupInspectorDraft (sessionKey id))
+
+        // Deleted id may itself hold an inspector draft (no owner binding left).
+        cleanupInspectorDraft (sessionKey sessionId)
 
     member _.Dispose() =
         lock gate (fun () ->

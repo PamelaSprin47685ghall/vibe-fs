@@ -1,6 +1,7 @@
 // tests/unit/Enforcer/catalog.test.mjs — ENFORCER-170/171/172, ENFORCER-190.
 //
-// The Rule Catalog is resources/enforcer/catalog.json (runtime data, ENFORCER-170).
+// The Rule Catalog is resources/enforcer/*/enforcer.md+main.md (folder SSOT).
+// TipName = directory basename = provider tip enum = durable RuleId.
 // ENFORCER-190 (pure tests) items 1, 15:
 //   1. Catalog load is stable.
 //   15. A catalog update does not change old NudgeAnchored bytes (the nudge text
@@ -24,6 +25,13 @@ test('ENFORCER_170_field_names_are_unique', () => {
   assert.equal(new Set(fields).size, 120)
 })
 
+test('ENFORCER_170_tip_name_equals_rule_id_and_field', () => {
+  for (const rule of enforcer.rules) {
+    assert.equal(rule.Name, rule.RuleId, `Name/RuleId mismatch for ${rule.Name}`)
+    assert.equal(rule.Name, rule.FieldName, `Name/FieldName mismatch for ${rule.Name}`)
+  }
+})
+
 test('ENFORCER_170_catalog_ordinals_are_contiguous_from_1', () => {
   const ordinals = enforcer.rules.map((r) => r.CatalogOrdinal).sort((a, b) => a - b)
   assert.deepEqual(ordinals, Array.from({ length: 120 }, (_, i) => i + 1))
@@ -38,6 +46,8 @@ test('ENFORCER_170_all_nudges_are_nonempty', () => {
 test('ENFORCER_170_all_descriptions_are_nonempty', () => {
   for (const rule of enforcer.rules) {
     assert.ok(rule.ScoreWhen.trim().length > 0, `rule ${rule.RuleId} has empty description`)
+    assert.ok(rule.EnforcerText.trim().length > 0, `rule ${rule.RuleId} has empty enforcer.md`)
+    assert.ok(rule.MainText.trim().length > 0, `rule ${rule.RuleId} has empty main.md`)
   }
 })
 
@@ -52,7 +62,7 @@ test('ENFORCER_170_all_twelve_families_present_with_ten_rules_each', () => {
 })
 
 test('ENFORCER_172_field_names_match_the_rfc_spelling', () => {
-  // Spot-check a few known field names from resources/enforcer/catalog.json.
+  // Spot-check a few known TipNames (directory basenames).
   const fields = new Set(enforcer.fieldNames())
   for (const expected of [
     'primitive-obsession',
@@ -78,10 +88,9 @@ test('ENFORCER_170_catalog_is_stable_and_not_corrupted', () => {
   assert.ok(l10.Nudge.length < 200, `ENF-L10 Nudge must be short, got ${l10.Nudge.length} chars`)
 
   // Field names are the contract surface (provider-visible args); their exact
-  // list is part of the catalog contract.
+  // list is part of the catalog contract. Order is lexical directory order.
   const fields = enforcer.rules.map((r) => r.FieldName)
   assert.equal(fields.length, new Set(fields).size)
-  // Spot-check the first and last fields stay stable.
-  assert.equal(fields[0], 'primitive-obsession')
-  assert.equal(fields[119], 'incidental-complexity-dominates')
+  assert.equal(fields[0], 'abbreviation-anxiety')
+  assert.equal(fields[119], 'wrong-rule-composition')
 })

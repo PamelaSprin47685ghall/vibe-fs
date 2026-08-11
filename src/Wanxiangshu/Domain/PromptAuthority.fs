@@ -485,9 +485,26 @@ module PromptAuthority =
     /// (AGENT-010) would stop being structurally guaranteed.
     let systemPromptIdFor (role: Role) : SystemPromptId = SystemPromptId.create (roleLabel role)
 
-    /// AGENT-007: tool capabilities are the role's permission set (AGENT-010).
-    let toolCapabilitiesFor (role: Role) (_requestKind: ProviderRequestKind) : Set<ToolPermission> =
-        Roles.permissions role
+    /// StrengthReplica provider-visible tools: Read / Glob / Grep only.
+    /// Intersected with the role matrix so ineligible roles stay empty.
+    let private strengthReplicaReadonly =
+        set [ ToolPermission.Read; ToolPermission.Glob; ToolPermission.Grep ]
+
+    /// AGENT-007: tool capabilities are the role's permission set (AGENT-010),
+    /// narrowed by request-specific kinds (StrengthReplica → readonly set).
+    let toolCapabilitiesFor (role: Role) (requestKind: ProviderRequestKind) : Set<ToolPermission> =
+        match requestKind with
+        | ProviderRequestKind.StrengthReplica ->
+            let rolePerms = Roles.permissions role
+
+            if Set.isEmpty (Set.intersect rolePerms strengthReplicaReadonly) then
+                Set.empty
+            else
+                strengthReplicaReadonly
+        | ProviderRequestKind.WorkMain
+        | ProviderRequestKind.BloggerMain
+        | ProviderRequestKind.BloggerSquash
+        | ProviderRequestKind.InteractionRepair -> Roles.permissions role
 
     /// The ONLY way to build an AttemptExecutionProfile (PROMPT-008).
     ///

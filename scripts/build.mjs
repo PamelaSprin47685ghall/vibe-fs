@@ -55,8 +55,21 @@ removeSources(dist)
 const entry = path.join(root, 'dist/Infrastructure/OpenCode/Plugin/Plugin.js')
 if (!fs.existsSync(entry)) fail(`missing entry: ${entry}`)
 
-const catalog = path.join(root, 'resources/enforcer/catalog.json')
-if (!fs.existsSync(catalog)) fail(`missing catalog: ${catalog}`)
+const enforcerRoot = path.join(root, 'resources/enforcer')
+if (!fs.existsSync(enforcerRoot)) fail(`missing rulebook root: ${enforcerRoot}`)
+const ruleDirs = fs
+  .readdirSync(enforcerRoot, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+if (ruleDirs.length < 1) fail(`enforcer rulebook has no rule directories under ${enforcerRoot}`)
+const catalogJson = path.join(enforcerRoot, 'catalog.json')
+if (fs.existsSync(catalogJson)) fail(`catalog.json must be removed after folder cutover: ${catalogJson}`)
+for (const name of ['primitive-obsession', ruleDirs[0]]) {
+  const enforcerMd = path.join(enforcerRoot, name, 'enforcer.md')
+  const mainMd = path.join(enforcerRoot, name, 'main.md')
+  if (!fs.existsSync(enforcerMd)) fail(`missing rulebook file: ${enforcerMd}`)
+  if (!fs.existsSync(mainMd)) fail(`missing rulebook file: ${mainMd}`)
+}
 
 const prompts = [
   'manager',

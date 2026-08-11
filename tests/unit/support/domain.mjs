@@ -5014,17 +5014,23 @@ export const promptResources = (() => {
   }
 })()
 
-/** Package enforcer catalog.json load + domain validation fail-fast. */
+/** Package enforcer rulebook folder load + domain validation fail-fast. */
 export const enforcerCatalogResource = (() => {
-  const api = bind(EnforcerCatalogResourceModule, 'EnforcerCatalogResource', ['load'])
+  const api = bind(EnforcerCatalogResourceModule, 'EnforcerCatalogResource', [
+    'load',
+    'composeBloggerSystemPrompt',
+  ])
   return {
     load: () => listItems(api.load()),
+    composeBloggerSystemPrompt: (basePrompt, rules) =>
+      api.composeBloggerSystemPrompt(basePrompt, toList(rules)),
   }
 })()
 
 /**
- * ENFORCER-170 pure catalog validation + EnforcerRule construction.
+ * ENFORCER-170 pure rulebook validation + EnforcerRule construction.
  * Domain never reads files; tests hand rules via `rule(...)`.
+ * TipName = Name = RuleId = FieldName after folder SSOT cutover.
  */
 export const enforcerCatalog = (() => {
   // ENFORCER-170: validate + field lookup only. `triples` was a facade ghost —
@@ -5039,15 +5045,26 @@ export const enforcerCatalog = (() => {
     throw new Error('Domain/EnforcerCatalog exports no EnforcerRule constructor')
   }
   return {
-    /** Construct one EnforcerRule record (Fable class). */
+    /** Construct one EnforcerRule record (Fable class; field order matches Domain). */
     rule: ({
-      ruleId = 'enforcement-x01',
-      fieldName = 'sample-field',
+      name,
+      ruleId,
+      fieldName,
       family = 'X',
       scoreWhen = 'score when',
       nudge = 'nudge text',
+      enforcerText,
+      mainText,
       catalogOrdinal = 1,
-    } = {}) => new Rule(ruleId, fieldName, family, scoreWhen, nudge, catalogOrdinal),
+    } = {}) => {
+      const tip = name ?? fieldName ?? ruleId ?? 'sample-field'
+      const id = ruleId ?? tip
+      const field = fieldName ?? tip
+      const enf = enforcerText ?? scoreWhen
+      const main = mainText ?? nudge
+      // Fable record ctor order: Name, EnforcerText, MainText, RuleId, FieldName, Family, ScoreWhen, Nudge, CatalogOrdinal
+      return new Rule(tip, enf, main, id, field, family, scoreWhen, nudge, catalogOrdinal)
+    },
     /**
      * Result over schemaVersion + rules list.
      * Ok value is a JS array of EnforcerRule (listItems on F# list).
@@ -5098,7 +5115,7 @@ export const enforcer = (() => {
     'missing required argument: tip'
 
   return {
-    /** Packaged catalog rules (resources/enforcer/catalog.json, ENFORCER-170). */
+    /** Packaged rulebook rules (resources/enforcer/*/ folders, ENFORCER-170). */
     rules: catalogRules,
     ruleCount: catalogRules.length,
     fieldNames: () => listItems(catalogDomain.fieldNames(toList(catalogRules))),
