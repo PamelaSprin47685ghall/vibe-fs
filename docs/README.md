@@ -2,8 +2,9 @@
 
 本页只提供路由和索引，不定义产品行为。文档治理规则见
 [`GOV-`](what/document-governance.md)，术语见[词汇表](what/glossary.md)
-（含 HOST-008 改写后的 `SessionExecutionClass` × `SessionOwnership` / `AttachmentKind`，以及
-`ReuseScope` / `OwnerReuseScopeId` / `SyncDelegate` / `SyncInspector` / `SyncCoder`）。
+（含 HOST-008 改写后的 `SessionExecutionClass` × `SessionOwnership` / `AttachmentKind`，
+`ReuseScope` / `OwnerReuseScopeId` / `SyncDelegate` / `SyncInspector` / `SyncCoder`，以及
+Magic Todo 导航词 `WorkRecordStart` / `ConsumableReview` / `MagicTodoProjection` 等 → TODO-001..014）。
 
 ## 体系与阅读顺序
 
@@ -35,6 +36,7 @@ what → shape → how → code/resources → proof
 | 条款前缀 / 主题 | 文档 |
 |---|---|
 | `GOV-` 文档治理 | [what](what/document-governance.md) · [shape](shape/document-governance.md) · [how](how/document-governance.md) · [proof](proof/document-governance.md) · [why](why/document-governance.md) |
+| `TODO-` Magic Todo | [what](what/todo.md) · [shape](shape/todo.md) · [how](how/todo.md) · [proof](proof/todo.md) · [why](why/todo.md)（TODO-001..014；语义仅 what） |
 | `ARCH-` 架构 | [what](what/architecture.md) · [shape](shape/architecture.md) · [how](how/architecture.md) · [proof](proof/architecture.md) · [why](why/architecture.md) |
 | `AGENT-` Agent | [what](what/agent.md) · [shape](shape/agent.md) · [how](how/agent.md) · [proof](proof/agent.md) · [why](why/agent.md) |
 | `PROMPT-` Prompt | [what](what/prompt.md) · [shape](shape/prompt.md) · [how](how/prompt.md) · [proof](proof/prompt.md) · [why](why/prompt.md) |

@@ -171,3 +171,137 @@ SyncDelegate 关联）与 HOST-008 的 `SessionOwnership` 证明。历史 `Stude
 在 `experimental.chat.messages.transform` 交付给上游 provider 之前，对所有历史消息执行 content 兜底保障：
 无 `tool_calls` 的 `assistant` 消息，若无 text part（例如仅包含 reasoning/thinking）或 text 为空，必须以其 reasoning/thinking 文本（或默认占位）填充 text part，禁止向上游发送空 content 的 assistant 消息；
 `user` 消息若无 text part 或 text 为空，同样填充非空 text 兜底，防止上游 API 报 `messages[i].content cannot be empty` 400 错误。
+
+## HOST-017：Magic Todo V1 membrane 总行为
+
+对 Magic-Todo-enabled Manager 的 `todowrite`，Host **不**改 OpenCode 本体、**不**用同名 plugin tool 覆盖 builtin executor。合法路径只有 V1 三钩子 overlay：
+
+```text
+tool.definition   → provider-visible V2 schema（TODO-002）
+tool.execute.before → admission + Prepared + 原地 compatibility 投影（TODO-004/007）
+tool.execute.after  → physical-success Accepted + ensureReview + 富化 result（TODO-006/012）
+```
+
+原 Host `todowrite` executor = **compatibility sink** only：写入 Host TodoTable / UI 事件，不拥有 canonical todo truth（TODO-007）。canonical / settlement / review cadence / Finality drain 语义见 `what/todo.md`（TODO-*），本文件只定 Host membrane 可观察合同与 canary。
+
+禁止：
+
+```text
+修改 Host core 以嵌入 Magic Todo
+静默走无 hook 的 V2 settle（HOST-024）
+靠 Host TodoTable 恢复 canonical
+把 bridge / 内存 Stage 当 checkpoint（TODO-012）
+```
+
+## HOST-018：tool.definition — V2 广告与 description 边界
+
+`tool.definition` 是 provider-visible V2 schema 的**唯一** Host 侧广告点，必须同时更新：
+
+```text
+parameters
+jsonSchema
+description
+```
+
+只改其中一处导致 definition 组装不一致 → fail closed（不得上线）。
+
+description 必须覆盖 Manager 可见纪律（与 TODO-002/003/004/006/013 一致）：`kind:"existing"|"new"`、id 规则、`reviewing`、completed 门禁、持续维护 list、lag-1 消费语义、同 message 多 `todowrite` 全拒。
+
+description **禁止**泄露隐藏编排（TODO-013）：dedicated reviewer、hidden agent/session、Finality cohort、barrier、witness、2N。Manager 只应看见过程 review 的 outcome/report 合同，不知编排身份。
+
+definition 改的是广告 schema，**不**自动替换原 executor decode schema；故 before 必须剥离 `kind`/`id` 后再交 sink（HOST-020）。
+
+## HOST-019：pre-before historical input 非别名（blocking canary）
+
+Host 顺序合同：
+
+```text
+provider args → ToolPart.input 持久化 → before → executor
+```
+
+before 原地 mutation **必须**到达 executor，且 **不得**改写已持久化的 pre-before `ToolPart.input`（历史/provider call 身份）。
+
+```text
+provider 发送 V2 tagged list
+before args.todos := V1 compatibility projection
+executor 看见 compatibility list
+durable ToolPart.input 仍为原始 V2 list
+```
+
+任一不成立 → **membrane 禁止上线**（HOST-019 FAIL）。禁止用 after「改回」历史 input 补救。本 canary 是 P0 blocker。
+
+## HOST-020：before — 原地 mutation + compatibility 投影
+
+before 输入形如 `{ tool, sessionID, callID }` + `{ args }`。executor 只观察**原地**字段 mutation；`output.args = …` 重绑定不改变本地 `args` 引用。
+
+可观察义务（语义交叉引用，不在此重复）：
+
+1. 身份定位：仅 `sessionID + callID` → 完整 SDK snapshot 唯一定位 ToolPart / assistant / provider run / ordinal / XTrace range；不能唯一 → fail closed（与 HOST-011 半边边界一致；HOST-025）。
+2. admission / replay：TODO-004（同 message 多不同 ToolCallId 全拒；同 ToolCallId replay 幂等且 digest 一致）。
+3. 消费上一 ConsumableReview 后校验 proposed：TODO-006/003/002。
+4. 校验通过即 durable `TodoWritePrepared`（尚非 checkpoint）。
+5. 安装 ephemeral bridge（HOST-021）。
+6. 原地把 args 投影为原 executor 可 decode 的 V1：`{content,status,priority}`；剥离 `kind`/`id`。
+
+`reviewing` 的 sink 字段策略见 HOST-023。before **不**启动 reviewer、**不**写 `TodoWriteAccepted`。
+
+## HOST-021：after — Accepted、ensureReview、富化 result
+
+after 仅在原 executor **物理成功返回**的 live path 进入（failure 路径不保证 after；协议不依赖 after-on-throw）。
+
+顺序合同：
+
+```text
+1. 取 bridge 或从 Prepared + physical evidence 重建
+2. ensure TodoWriteAccepted（幂等；live 或 recovery 双路径，HOST-022）
+3. ensure DedicatedTodoReviewer / ensureReview（义务 TODO-006/008/010；after 不必“已跑 reviewer”才算成功）
+4. desired lag-1 cutoff 可从 Accepted 链推导（提交 PrefixEpoch 不在 after；TODO-009）
+5. 富化模型可见 tool result：上次 ConsumableReview 的 ProcessReviewLWR、REVISE 时 merge preview、PERFECT 时 preview 不生效提示（TODO-005/006/013）
+6. cleanup bridge
+7. return
+```
+
+禁止：先启动 reviewer 再 Accepted；把 Host TodoTable 已变成 Pk 误当 Accepted。富化 result 必须进入本次模型可见输出且下一 provider history 同字节（canary E）。
+
+## HOST-022：physical-success 双路径 Accepted
+
+`TodoWriteAccepted` 的 physical success **不得**只绑「after 运行时 ToolPart 已 completed」单一顺序：
+
+| 路径 | 证明 |
+|------|------|
+| live | 原 executor 成功返回并进入 `tool.execute.after` |
+| recovery | 完整 SDK snapshot 中该 call 的 ToolPart 已 `completed` |
+
+两条路径必须收敛同一 `TodoWriteId + input digest + output digest`。仅当 `TodoWritePrepared` 存在且 live∨recovery 成立时，after/recovery 才可 ensure Accepted。Prepared + 失败/缺席/digest 不符 → 不 Accepted；即便 sink 乐观写成 Pk，下次 before 仍以 Journal canonical 覆盖 sink（TODO-007/012）。
+
+## HOST-023：reviewing sink 决策与 reconciliation
+
+Host TodoTable 无 stable id，字段近似 `content/status/priority/position` → **compatibility / optimistic working projection** only（TODO-007）。
+
+**reviewing 第五态（canary D/I）**：
+
+```text
+优先：canonical reviewing → sink status "reviewing"（TodoTable / todo.updated / API / TUI 全容忍）
+否则：canonical reviewing → sink "in_progress"（仅 compatibility 降级）
+```
+
+不得改 canonical status（TODO-003）。
+
+**reconciliation**：一旦 REVISE 被消费且 canonical settlement 改变（TODO-005/007），Host TodoTable 必须幂等投影到 settled current。随后合法 `T(k+1)` Accepted 时由原 executor 再覆盖为新 Pk。该项 repair：**不**产生 checkpoint、**不**触发 process review、**不**改 canonical。
+
+禁止：REVISE settlement 后永久留下否决的 Pk；把 sink repair 写成 checkpoint/review；用 Host TodoTable 反推后续新 Life 的 canonical seed（TODO-011）。
+
+## HOST-024：V2 runner fail-closed
+
+当前 Host V2 local settle **不**执行 V1 plugin tool hook membrane。生产 invariant：
+
+```text
+MagicTodo-enabled Manager Attempt
+→ 必须走已证明 definition+before+after 的 execution path
+```
+
+`runner=V2` 且无等价 hook contract → **Attempt construction fail closed**（TODO-004）。禁止静默退化裸 `SessionTodo.update`。未来 V2 hook parity 须先通过同一套 HOST-019..025 canary 再解除限制；不长期维护两套 Magic Todo 语义。
+
+## HOST-025：sessionID+callID 定位 canary（blocking）
+
+before/after 仅有 `sessionID + callID`（HOST-011）。上线前必须证明经完整 SDK snapshot 能**唯一**定位：原 ToolPart、assistant message、provider run、ToolPart ordinal、其 XTrace range。不能唯一证明 → fail closed，membrane 不得上线。禁止用 callID 到别处猜配 messageID。

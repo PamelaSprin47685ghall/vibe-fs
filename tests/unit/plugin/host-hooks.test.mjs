@@ -147,6 +147,55 @@ const HOOK_FIXTURES = {
   },
 }
 
+// ── Magic Todo Phase 0 — fixture-level Host hook shape (registration only) ──
+//
+// Production SpikePlugin does not yet register tool.definition / execute.before.
+// Canaries B/C/F live in magic-todo-host-canaries.test.mjs against isolated
+// Host-path helpers. These fixtures freeze the positional (input, output)
+// call shape the membrane must satisfy once registered, without wiring
+// production membrane code into initSpikePlugin.
+
+/** Host tool.definition output seed (registry.ts builds this object). */
+export const TOOL_DEFINITION_FIXTURE = {
+  input: { toolID: 'todowrite' },
+  output: {
+    description: 'seed-description',
+    parameters: { type: 'object', properties: {} },
+    jsonSchema: { type: 'object', properties: {} },
+  },
+}
+
+/** Host tool.execute.before output seed (session/tools.ts passes { args }). */
+export const TOOL_EXECUTE_BEFORE_FIXTURE = {
+  input: { tool: 'todowrite', sessionID: SESSION, callID: 'call_todo_before' },
+  output: {
+    args: {
+      todos: [
+        {
+          content: 'fixture',
+          status: 'pending',
+          priority: 'high',
+          id: 'todo_fix',
+          kind: 'new',
+        },
+      ],
+    },
+  },
+}
+
+/**
+ * Assert a candidate hooks object exposes the Magic Todo membrane entry points
+ * with Host positional arity. Used by canary registration preconditions; not
+ * part of HOST_009 completeness over production SpikePlugin (those hooks are
+ * not production-registered in Phase 0).
+ */
+export const assertMagicTodoHookShape = (hooks) => {
+  for (const name of ['tool.definition', 'tool.execute.before', 'tool.execute.after']) {
+    assert.equal(typeof hooks[name], 'function', `${name} must be a function`)
+    assert.equal(hooks[name].length, 2, `${name} must be positional (input, output)`)
+  }
+}
+
 const toolContext = (sessionID, messageID = 'msg_tool_probe') => ({
   sessionID,
   agent: 'fast-manager',

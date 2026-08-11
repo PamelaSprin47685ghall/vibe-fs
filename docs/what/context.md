@@ -68,12 +68,13 @@ Work Session 从不向主模型发送「请压缩历史」类请求。压缩只�
 恢复槽中替换 X 前缀时，**不**立即改 ActivePrefixEpoch。候选只进不可变 `AttemptExecutionProfile.ProjectionChoice`。
 
 ```text
-probe 成功 → 提升为 ActivePrefixEpoch（写 PrefixRebaseCommitted）
+probe 成功 → 提升为 ActivePrefixEpoch（写 PrefixRebaseCommitted，EvidenceKind=Probe）
 probe 失败 → 丢弃候选；后续非 probe 槽用旧 epoch
 ```
 
 禁止先提交再回滚；故无 PrefixProbeRolledBack 类事实。  
-`A′` 失败不禁止 `B′` 用等价候选重试。
+`A′` 失败不禁止 `B′` 用等价候选重试。  
+本条只描述失败驱动 probe 路径；TodoCheckpoint 路径见 CTX-015，二者共用同一 ActivePrefixEpoch，不另造 epoch SSOT。
 
 ## CTX-013：Blogger delta TOML
 
@@ -85,3 +86,75 @@ probe 失败 → 丢弃候选；后续非 probe 槽用旧 epoch
 ## CTX-014：诊断边界
 
 可观测诊断不得变成控制输入：不得用日志字段驱动 Fallback/probe/squash 分支。
+
+## CTX-015：ActivePrefixEpoch · TodoCheckpoint evidence
+
+既有 `ActivePrefixEpoch` / `PrefixRebaseCommitted` 是**唯一** prefix epoch SSOT。Magic Todo lag-1 rebase **必须**进入该合同，不得平行 todo-only epoch、不得 `NeedRebase`/`RebaseRequested` Stage（TODO-009、TODO-012）。
+
+```text
+EvidenceKind = Probe | TodoCheckpoint
+```
+
+TodoCheckpoint commit 与 probe 同等级字段，至少含：`EpochId`、`PrefixSnapshot`、`Cutoff`、`SealRoot`、`YBundleRef`/`YBundleDigest`、`ProviderPrefixDigest`；以及 `TriggerTodoWriteId`、`CoveredBeforeTodoWriteId`（option）。若保留命名包装，必须是本事实的等价投影，不得缺字段旁路。
+
+### desired cutoff（非事实）
+
+```text
+desiredCutoff(Tk) = Before(T(k-1) tool-call)   // T1 无 prior → 无 TodoCheckpoint 替换
+```
+
+仅由 **Accepted** checkpoint 链纯推导（cadence TODO-006；commit 语义 TODO-009）；**不**需要 durable Requested 事实；Accepted **本身不**提交 PrefixEpoch。
+
+### commit 时点
+
+```text
+下一真实 provider attempt seal / 绑定之前
+→ 若 desired 严于 ActivePrefixEpoch
+→ 物化 PrefixCoverage 可证明的 complete-turn Y prefix
+→ 原子 append PrefixRebaseCommitted（EvidenceKind=TodoCheckpoint）
+→ ActivePrefixEpoch 切换
+→ 该 attempt 与全部 retry 使用新 epoch
+```
+
+禁止：先发新 prefix 后补 committed；Accepted 后立刻 committed；provider 成功才 commit。  
+**provider 成败不回滚**已 seal 的 epoch；崩溃后 boot fold 按 Accepted 链重算 desired，并在下次 seal 前 commit。
+
+### coverage 分型（与 COMPANION-003 同构；coverage TODO-008；rebase 消费 TODO-009）
+
+| 世界 | coverage | 材料 | 用途 |
+|------|----------|------|------|
+| Process review / LWR | RecordCoverage | Y + canonical RawGap；frontier/request-range bounded | 评审证据（非 prefix 证明） |
+| Manager lag-1 rebase | PrefixCoverage | CoverableRecordPrefix / proven Y only | X→Y prefix replacement |
+
+禁止：LWR RawGap 进入 prefix replacement；用 RecordCoverage 推导可替换性；用 PrefixCoverage 填 LWR gap；session head LWR 冒充 bounded range；第二套 work-record / prefix renderer。
+
+投影形状（TodoCheckpoint 生效后）：
+
+```text
+Opening（永久 raw，byte-stable）
++ proven Y prefix through TodoRebaseCutoff
++ cutoff 之后 raw X（含上一 checkpoint call/result 整段）
+```
+
+非 Magic 路径（无 Accepted TodoCheckpoint 链）保持 CTX-010/012 既有行为不变。
+
+## CTX-016：WorkRecordStart Opening floor
+
+删除 planning/Activation 业务 floor 后，Opening 保护改由结构性 cursor（不是 Stage）：
+
+```text
+ManagerLife.WorkRecordStart
+  = Opening HumanRoot semantic range 的 exclusive end
+  （由 LifeOpened / XTrace Opening 纯推导）
+
+Blogger effectiveStart
+  = max(RecordCoverage, Life.WorkRecordStart)
+```
+
+```text
+Opening 永久 raw、byte-stable
+Opening 不交给 Y 改写，不随 TodoCheckpoint rebase 消失
+process-review LWR：includeOpening=false，不得再复制 Opening
+```
+
+禁止：Blogger 从 0/session head 起步吞掉 Opening；把 Opening floor 绑回 `WorkActivated`（TODO-001）。

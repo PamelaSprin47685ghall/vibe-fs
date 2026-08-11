@@ -142,3 +142,54 @@ at-most-one logical effect + fail-closed unknown outcome
 
 后继：SyncDelegate 首发与 `SyncDelegateIdleNudge`（PROMPT-003/005；HOST-008 / EXEC-026/028）；
 插件 user-shaped message 仍一律经 PROMPT-005，不得直接 `prompt_async`。
+
+## PROMPT-013：Magic Todo Manager 持续规划 guidance
+
+Manager 的 provider-visible 规划指引是 **HOST-013 通用结对编程 guideline 的加法片段**，不是全局替换：
+
+```text
+general pair-programming guideline（HOST-013）
++
+if CanonicalRole = Manager
+   AND todowrite is provider-visible
+then MagicTodoManagerGuideline
+```
+
+禁止把 Magic Todo 文案并入 `ProjectionConstants.PairProgrammingGuidelineText` 或对其它角色投影。
+
+`MagicTodoManagerGuideline` 冻结语义（全文 owner 见 TODO-013；协议本体见 TODO-001）：
+
+```text
+Keep the todo list continuously accurate with todowrite.
+Planning and execution are one continuous activity.
+Do not stop for a separate planning-only phase.
+Update todowrite when truthful decomposition / discovered work / progress changes.
+kind:"existing" reuses exact id; kind:"new" omits id.
+A todo must pass through reviewing before completed.
+Continue independent next-stage work while prior checkpoint is reviewed.
+Each accepted todowrite consumes the preceding checkpoint review and starts the next.
+Do not emit multiple todowrite calls in the same assistant message.
+```
+
+### 可见 / 禁止 surface（与 GLORY-030 窄例外对齐）
+
+Manager **允许**观察 Todo Checkpoint process-review 的：
+
+```text
+outcome（PERFECT / REVISE）
+concrete report（ProcessReviewLWR，经既有 Finality safety-seal）
+```
+
+Manager **禁止**在 system prompt、continuation、schema、固定错误、tool description/result 中出现：
+
+```text
+reviewer / reviewer agent name / reviewer session
+barrier / witness / 2N / finality cohort
+confirmation rounds / hidden task 编排
+```
+
+窄例外仅限 Magic Todo process protocol（TODO-013）；不放宽 Finality 内部机制或其它 review surface。  
+GLORY-030 / SURFACE-005 以本条 + TODO-013 为唯一允许的 PERFECT/REVISE/report 出口；其余 Manager 固定 surface 仍全面禁止。
+
+V2 `todowrite` schema / description owner 见 TODO-002；admission 与 V2 hook 门禁见 TODO-004。  
+不得经 Prompt 路径伪造 checkpoint、ConsumableReview 或 PrefixEpoch。

@@ -57,3 +57,42 @@ Work↔Companion 深度逻辑 1（InternalLeaf）；Dedicated SyncInspector/Sync
 | Teacher return | 文本只成为父 `teacher` 结果；固定 terminal 正常完成，无 abort/interrupted，Session 可继续 | HOST-014 |
 | Student final return | QA 删除先于最终 Assistant completion；message 成为最终回复 | HOST-014、EXEC-027 |
 | 非 Student 回归 | provider schema、hooks、Companion 行为字节/语义不变 | HOST-014 |
+
+## Magic Todo V1 membrane canaries（Phase 0 blocking）
+
+行为：`what/host.md` HOST-017..025。语义交叉：`what/todo.md` TODO-002/003/004/005/006/007/008/009/011/012/013。  
+**任一 blocking canary 未证明 → 禁止写 production membrane；禁止改 Host core 绕过。**
+
+| ID | 证明 | 期望 | 条款 | 级别 |
+|----|------|------|------|------|
+| A | before 原地 mutation 达 executor | durable pre-before `ToolPart.input` **仍为** provider V2 原字节；executor 见 V1 compatibility list | HOST-019 | **blocking** |
+| B | 同时替换 parameters + jsonSchema | provider 见 V2；原 executor 仍跑 V1 decoder | HOST-018 | blocking |
+| C | before 剥 kind/id | 原 decoder 接受 unknown 扩展字段剥离后的 V1 list | HOST-020 | blocking |
+| D | `status="reviewing"` 经 TodoTable → todo.updated → API → TUI | 全容忍 → passthrough；否则冻结 sink→`in_progress` | HOST-023、TODO-003 | blocking（策略冻结） |
+| E | after 改写 `output.output` | 本次模型可见 ∧ 下一 provider history **同字节** | HOST-021、TODO-005/013 | blocking |
+| F | execute throw | 记录 after 是否运行；协议不依赖其运行 | HOST-021 | 冻结观测 |
+| G | after 运行瞬间 | 冻结 ToolPart 是否已 durable completed；Accepted 仍走双路径 | HOST-022、TODO-004 | blocking（防误绑） |
+| H | 仅 sessionID+callID | 完整 SDK snapshot **唯一**定位 ToolPart / assistant / run / ordinal / XTrace range | HOST-025、HOST-011 | **blocking** |
+| I | 第五态消费者回归 | 承接 D；UI 不稳则强制 compatibility `in_progress` | HOST-023 | blocking if D flaky |
+| J | live Accepted | executor 成功→after → `TodoWriteAccepted` 与 Prepared digest 对齐 | HOST-022 | blocking |
+| K | recovery Accepted | 无 after 时 snapshot completed ToolPart → 同一 digests Accepted | HOST-022、TODO-012 | blocking |
+| L | Prepared+失败 | 不 Accepted；sink 乐观 Pk 不构成 checkpoint；下次 before Journal 覆盖 sink | HOST-022、TODO-007 | blocking |
+| M | REVISE 消费后 reconcile | Host TodoTable == settled current；**零**新 checkpoint/review facts | HOST-023、TODO-005/007 | blocking |
+| N | V2 runner | 无 hook parity 时 MagicTodo Manager Attempt **construction fail closed**；零裸 `SessionTodo.update` | HOST-024、TODO-004 | **blocking** |
+| O | 无 Host core / 同名覆盖 | builtin executor 仍为 sink；无 OpenCode 源码修改；无 plugin 同名 tool 夺权 | HOST-017 | 静态/集成 |
+| P | bridge 非真相 | crash 后忽略 Map；只从 Journal 恢复；failure cleanup 无残留 key | HOST-021、TODO-012 | blocking |
+| Q | description 面 | 含 tagged/reviewing/lag/multi-reject；**不含** reviewer/session/barrier/witness/2N | HOST-018、TODO-013 | 静态 |
+| R | multi-todowrite | 同 assistant message 两个不同 callID → 全部拒绝、无 winner | HOST-020、TODO-004 | blocking |
+
+代表落点（实现后）：`tests/unit/host/magic-todo-membrane-canary*.test.mjs`、integration plugin hook 契约、e2e Manager todowrite unhappy-path。未落地前以本表为 release gate 清单（对齐 `changes/active/magic-todo.md` §47 Host canary 门禁）。
+
+### 反例（必须红）
+
+```text
+before mutation 改写 historical ToolPart.input          → A 红 → 停
+after 回写“修复”被污染的历史 input                      → 仍停（不可补救）
+V2 settle 静默写 TodoTable                              → N 红
+REVISE settlement 后 sink 永久留否决 Pk                 → M 红
+bridge / Host TodoTable 当 canonical 恢复源             → P/L 红
+plugin tool 名 todowrite 覆盖 builtin                   → O 红
+```

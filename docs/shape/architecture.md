@@ -22,6 +22,31 @@ Session / Process   运行时 cell、fallback、review、PTY 所有权
 依赖方向：上层可依赖下层；Domain/Kernel 不得依赖 Session/OpenCode。  
 资源读取仅在 `Infrastructure/Resources/`。
 
+### Magic Todo 分层落点（交叉引用，不重定义 TODO-*）
+
+| 关注点 | 层 | 唯一 owner / 条款 |
+|--------|----|-------------------|
+| tagged V2 `todowrite` schema / codec / examples / result 形态 | Infrastructure（`tool.definition` 同源模块） | TODO-002 |
+| canonical todo 真值 `MagicTodoProjection` | Kernel / Domain 投影 | TODO-007；PROJ-009 |
+| Host TodoTable | Infrastructure compatibility sink | TODO-007；非 canonical |
+| process / Finality 工作记录 | 既有 canonical LWR machinery | TODO-008；TODO-012；COMPANION-003 |
+| Manager lag-1 prefix | 既有 `ActivePrefixEpoch` + `EvidenceKind=TodoCheckpoint` | TODO-009；ARCH-004 |
+| Opening floor（非 Activation） | Domain 结构性 cursor | TODO-001 |
+| Manager-only continuous guidance 片段 | Application / Prompt surface | TODO-001；TODO-013；PROMPT-013；HOST-013 加法 |
+| V2 runner 无等价 hook | Session / Process gate | TODO-004 fail-closed |
+
+禁止：
+
+```text
+第二套 LWR / TodoProcessReviewEvidenceProjection / Y-complete reviewer projection（TODO-008/012）
+平行 PrefixEpoch / todo-only rebase SSOT（TODO-009/012）
+把 Host TodoTable 或 bridge 提升为 Domain 真值（TODO-007）
+在 Domain 固化 TodoStage / ReviewStage / AwaitingReview 等程序计数器（TODO-012）
+经 Manager 固定 surface 泄漏 reviewer / session / barrier / witness / 2N（TODO-013；GLORY-030 窄例外）
+```
+
+`PrefixRebaseCommitted.EvidenceKind = TodoCheckpoint` 是 ARCH-004 既有冷边界的合法新 evidence，不是新的 epoch 状态机；desired cutoff 由 Accepted 链推导，committed epoch 仅在下一 provider attempt seal 前原子提交（TODO-009）。
+
 ## ARCH-009：有界并发
 
 业务层扇出**唯一**原语：

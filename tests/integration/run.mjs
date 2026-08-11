@@ -55,6 +55,11 @@ const nodeTestSteps = [
     files: [path.join(here, 'plugin/manager-tool-contract.test.mjs')],
   },
   {
+    // Phase 0 Host canaries D/I — reviewing sink strategy freeze (no Magic membrane).
+    label: 'plugin/magic-todo-sink-canary.test.mjs',
+    files: [path.join(here, 'plugin/magic-todo-sink-canary.test.mjs')],
+  },
+  {
     label: 'plugin/file-mutation-tools.test.mjs',
     files: [path.join(here, 'plugin/file-mutation-tools.test.mjs')],
   },

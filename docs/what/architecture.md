@@ -41,17 +41,28 @@ client.session.* / prompt_async / session.messages
 ## ARCH-004：前缀缓存保护
 
 平常回合：Y frames 可增长，X active prefix **字节不变**。  
-PrefixEpoch 只在下列**已发生事实**提交时切换（冷边界）：
+PrefixEpoch 只在下列**已发生事实**提交时切换（冷边界；单一 `ActivePrefixEpoch` SSOT，COMPANION-009）：
 
-1. X prefix probe 提升（CTX-012）  
-2. Host compaction 后重锚（HOST-006）
+1. X prefix probe 提升（CTX-012）— `PrefixRebaseCommitted`，`EvidenceKind=Probe`  
+2. Host compaction 后重锚（HOST-006）— `ContextReanchored`  
+3. TodoCheckpoint lag-1 rebase（TODO-009 / CTX-015）— 同一 `PrefixRebaseCommitted` 合同，`EvidenceKind=TodoCheckpoint`
 
-历史第三冷边界 `StudentLearn → StudentCompile`（AGENT-020 / PROMPT-012）：**G3 已删除（absent）**，
+第 3 项是既有冷边界的合法 **evidence**，不是新的 epoch 状态机或平行 SSOT（TODO-009、TODO-012）：
+
+```text
+desired cutoff     ← 仅 Accepted Todo 链推导；Accepted 本身不 commit epoch
+commit 时机        ← 下一 provider attempt seal / 绑定之前原子 append
+todowrite after    ← 不 commit；不强制等 Y materialize
+provider 结局      ← Failed/Aborted 不回滚已 seal epoch；成功也不是 commit 条件
+Y 材料             ← 仅 PrefixCoverage 可证明的 complete-turn prefix（禁止 RawGap）
+```
+
+历史 `StudentLearn → StudentCompile`（AGENT-020 / PROMPT-012）：**G3 已删除（absent）**，
 不得再作 PrefixEpoch 例外。后继 SyncDelegate 不引入 owner-prefix 冷切换（EXEC-026/028）。
 
 Y BlogSquash 只推进 `FrameEpoch`（COMPANION-006），不得改 `PrefixEpoch`。
 
-禁止：按 token / 窗口 / 占比主动切换 epoch；把 Y frames 塞进 X active prefix；用 runtimeId/timestamp 做 canonical equality。
+禁止：按 token / 窗口 / 占比主动切换 epoch；把 Y frames 塞进 X active prefix；用 runtimeId/timestamp 做 canonical equality；以 provider 成功当作 epoch commit 条件；先发 provider 再补 `PrefixRebaseCommitted`；seal 后因失败删除/回滚已提交 epoch。
 
 ## ARCH-005：恢复哲学
 
