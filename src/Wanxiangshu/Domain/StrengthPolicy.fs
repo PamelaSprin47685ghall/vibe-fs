@@ -88,8 +88,14 @@ module StrengthPolicy =
     /// by the caller; the policy consumes canonical hex so assignment remains
     /// restart-stable and contains no RNG/time source.
     let controlBucket (sha256: string -> string) (policyVersion: string) (authorityRoot: string) (targetRun: string) =
-        let digest = sha256 (String.concat "\u001f" [ authorityRoot; targetRun; policyVersion ])
-        let prefix = if String.IsNullOrEmpty digest then "0" else digest.Substring(0, min 16 digest.Length)
+        let digest =
+            sha256 (String.concat "\u001f" [ authorityRoot; targetRun; policyVersion ])
+
+        let prefix =
+            if String.IsNullOrEmpty digest then
+                "0"
+            else
+                digest.Substring(0, min 16 digest.Length)
 
         // The digest is already the uniformizing primitive. A small ordinal fold
         // avoids platform-specific integer parsing while preserving a stable

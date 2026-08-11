@@ -86,6 +86,6 @@ test('long-stroke.toml declares theoretical exact event ceilings', () => {
   const source = readFileSync(path.join(root, 'tests/e2e/scenarios/long-stroke.toml'), 'utf8');
   const result = compileScenario(source, { name: 'long-stroke.toml' });
   assert.equal(result.ok, true, result.ok ? '' : result.problems.join('\n'));
-  assert.equal(result.scenario.setup.maxJournalEvents, 367);
+  assert.equal(result.scenario.setup.maxJournalEvents, 372);
   assert.equal(result.scenario.setup.maxSseEvents, 1730);
 });

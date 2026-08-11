@@ -16,6 +16,7 @@ type StrengthProjection =
     { ByDecision: Map<string, StrengthCandidateView>
       ByTargetRun: Map<string, StrengthDecisionId> }
 
+/// DSL-class: Decision — Strength candidate fold refusals (Prepared/Promoted/Trace/Abandon).
 [<RequireQualifiedAccess>]
 type StrengthProjectionError =
     | PreparedConflict of decisionId: StrengthDecisionId
@@ -43,7 +44,8 @@ module StrengthProjection =
     let tryCandidate (decisionId: StrengthDecisionId) (projection: StrengthProjection) =
         Map.tryFind (decisionKey decisionId) projection.ByDecision
 
-    let hasPrepared decisionId projection = Option.isSome (tryCandidate decisionId projection)
+    let hasPrepared decisionId projection =
+        Option.isSome (tryCandidate decisionId projection)
 
     let isPromoted decisionId projection =
         tryCandidate decisionId projection |> Option.exists (fun view -> view.Promoted)
@@ -61,7 +63,10 @@ module StrengthProjection =
         && prepared.FrameDigest = promoted.FrameDigest
         && prepared.MaterialPayloads = promoted.MaterialPayloads
 
-    let apply (projection: StrengthProjection) (event: StrengthEvent) : Result<StrengthProjection, StrengthProjectionError> =
+    let apply
+        (projection: StrengthProjection)
+        (event: StrengthEvent)
+        : Result<StrengthProjection, StrengthProjectionError> =
         match event with
         | StrengthEvent.Prepared prepared ->
             let dkey = decisionKey prepared.DecisionId

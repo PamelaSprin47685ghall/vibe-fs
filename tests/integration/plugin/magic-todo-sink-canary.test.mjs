@@ -167,7 +167,12 @@ test('HOST_023_canary_D_reviewing_sink_table_event_api_model', () => {
   assert.match(groupSrc, /\/:sessionID\/todo|sessionID.*todo/s, 'HTTP route group exposes session todo')
 
   // Shipped SDK model (API-facing): status is string, docs list four statuses but type is open.
-  const sdkTypes = require.resolve('@opencode-ai/sdk/dist/gen/types.gen.d.ts')
+  // Prefer package file path — package "exports" no longer expose dist/gen/*.d.ts.
+  const sdkTypes = join(
+    dirname(fileURLToPath(import.meta.url)),
+    '../../../node_modules/@opencode-ai/sdk/dist/gen/types.gen.d.ts',
+  )
+  assert.equal(existsSync(sdkTypes), true, 'SDK types.gen.d.ts must exist on disk')
   const sdkSrc = readFileSync(sdkTypes, 'utf8')
   assert.match(sdkSrc, /export type Todo = \{[\s\S]*?status:\s*string;/m, 'SDK Todo.status is string')
   assert.match(sdkSrc, /export type EventTodoUpdated/, 'SDK exposes todo.updated')

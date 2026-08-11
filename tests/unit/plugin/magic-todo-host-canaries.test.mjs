@@ -46,10 +46,8 @@ test('MAGIC_TODO_CANARY_B_definition_replaces_description_parameters_jsonSchema_
   const defined = await applyToolDefinitionHook(hooks['tool.definition'], seed)
 
   assert.equal(defined.description, advertised.description, 'B: description must be replaced')
-  // sampleV2TodoWriteAdvertisement() may allocate a fresh structural schema
-  // each call; compare structure to the independent expected object, and
-  // identity only against the seed (full replacement), not false identity
-  // with the independently allocated expected.
+  // Structural replacement (deep equal); Host may rebuild schema objects without
+  // preserving advertisement object identity.
   assert.deepEqual(defined.parameters, advertised.parameters, 'B: parameters must be replaced')
   assert.deepEqual(defined.jsonSchema, advertised.jsonSchema, 'B: jsonSchema must be replaced')
   assert.notEqual(defined.parameters, seed.parameters, 'B: parameters identity must change')

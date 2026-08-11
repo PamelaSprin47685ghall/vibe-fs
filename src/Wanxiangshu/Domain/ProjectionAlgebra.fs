@@ -88,7 +88,9 @@ type StrengthFrameInsertion =
           Visibility: StrengthFrameVisibility
           Anchor: StrengthFrameAnchor }
 
-type StrengthFramesIntent = private { Items: StrengthFrameInsertion list }
+type StrengthFramesIntent =
+    private
+        { Items: StrengthFrameInsertion list }
 
 /// PROJ-002：一次 attempt 的只读投影快照——DSL 核心输入（PROJ-002）。
 ///
@@ -148,56 +150,57 @@ module ProjectionIntent =
 
     let useStrengthMirror
         (decisionId: StrengthDecisionId)
-        (targetProviderRun: ProviderRunIdentity)
+        (targetRun: ProviderRunIdentity)
         (semanticDigest: string)
         (messages: ProviderProjection.WireMessage list)
-        =
+        : ProjectionIntent =
         ProjectionIntent.UseStrengthMirror
             { DecisionId = decisionId
-              TargetProviderRun = targetProviderRun
+              TargetProviderRun = targetRun
               SemanticDigest = semanticDigest
               Messages = messages }
 
-    let private strengthFrames item = ProjectionIntent.InsertStrengthFrames { Items = [ item ] }
+    let private framesIntent (insertion: StrengthFrameInsertion) : ProjectionIntent =
+        ProjectionIntent.InsertStrengthFrames { Items = [ insertion ] }
 
     let strengthCandidate
-        (ownerSessionId: SessionId)
+        (ownerSession: SessionId)
         (decisionId: StrengthDecisionId)
-        (targetProviderRun: ProviderRunIdentity)
-        (currentProviderRun: ProviderRunIdentity)
+        (targetRun: ProviderRunIdentity)
+        (currentRun: ProviderRunIdentity)
         (bundle: StrengthFrameBundle)
-        =
-        strengthFrames
-            { OwnerSessionId = ownerSessionId
+        : ProjectionIntent =
+        framesIntent
+            { OwnerSessionId = ownerSession
               DecisionId = decisionId
               FrameDigest = bundle.Digest
               Bundle = bundle
-              Visibility = StrengthFrameVisibility.Candidate(targetProviderRun, currentProviderRun)
+              Visibility = StrengthFrameVisibility.Candidate(targetRun, currentRun)
               Anchor = StrengthFrameAnchor.Append }
 
     let strengthPromoted
-        (ownerSessionId: SessionId)
+        (ownerSession: SessionId)
         (decisionId: StrengthDecisionId)
-        (targetProviderRun: ProviderRunIdentity)
-        (beforeMessageIndex: int)
+        (targetRun: ProviderRunIdentity)
+        (beforeIndex: int)
         (isReplicaRequest: bool)
         (bundle: StrengthFrameBundle)
-        =
-        strengthFrames
-            { OwnerSessionId = ownerSessionId
+        : ProjectionIntent =
+        framesIntent
+            { OwnerSessionId = ownerSession
               DecisionId = decisionId
               FrameDigest = bundle.Digest
               Bundle = bundle
-              Visibility = StrengthFrameVisibility.Promoted(targetProviderRun, isReplicaRequest)
-              Anchor = StrengthFrameAnchor.BeforeMessageIndex beforeMessageIndex }
+              Visibility = StrengthFrameVisibility.Promoted(targetRun, isReplicaRequest)
+              Anchor = StrengthFrameAnchor.BeforeMessageIndex beforeIndex }
 
     let strengthReplicaLocal
-        (ownerSessionId: SessionId)
+        (ownerSession: SessionId)
         (decisionId: StrengthDecisionId)
         (bundle: StrengthFrameBundle)
-        =
-        strengthFrames
-            { OwnerSessionId = ownerSessionId
+        : ProjectionIntent =
+        framesIntent
+            { OwnerSessionId = ownerSession
               DecisionId = decisionId
               FrameDigest = bundle.Digest
               Bundle = bundle
@@ -205,6 +208,7 @@ module ProjectionIntent =
               Anchor = StrengthFrameAnchor.Append }
 
 /// PROJ-006：同锚意图冲突。fail-closed——禁止依赖注册顺序隐式选边。
+/// DSL-class: Decision — planner refusal taxonomy for conflicting ProjectionIntent sets.
 [<RequireQualifiedAccess>]
 type ProjectionConflict =
     /// 前缀锚同时被两个互斥意图选择（Keep vs Activate，或载荷不等的两次 Activate）。
@@ -255,8 +259,8 @@ module ProjectionConstants =
 [<RequireQualifiedAccess>]
 module ProjectionPlanner =
 
-    /// Canonical rank（how/projection.md）：base0, Blog1, Repair2, Strength3,
-    /// Suppress4, Challenge5, Reanchor6. Base choices are mutually exclusive.
+    /// Canonical rank（how/projection.md）：
+    /// keep/activate/mirror → blog → repair → strengthFrames → suppress → challenge → reanchor
     let private rank (intent: ProjectionIntent) : int =
         match intent with
         | ProjectionIntent.KeepPhysicalPrefix
@@ -288,23 +292,32 @@ module ProjectionPlanner =
                     | ProjectionIntent.ActivatePrefixEpoch _ -> true
                     | _ -> false)
 
-            let mirrors =
+            let hasMirror =
                 xs
-                |> List.choose (function
-                    | ProjectionIntent.UseStrengthMirror mirror -> Some mirror
-                    | _ -> None)
+                |> List.exists (function
+                    | ProjectionIntent.UseStrengthMirror _ -> true
+                    | _ -> false)
 
-            if (not (List.isEmpty mirrors) && (hasKeep || hasActivate)) || (hasKeep && hasActivate) then
+            // Mirror is mutually exclusive with normal Work base selection.
+            if hasMirror && (hasKeep || hasActivate) then
+                Error(ProjectionConflict.ConflictingPrefixSelection(first, second))
+            elif hasKeep && hasActivate then
                 Error(ProjectionConflict.ConflictingPrefixSelection(first, second))
             elif hasKeep then
                 Ok(Some ProjectionIntent.KeepPhysicalPrefix)
-            elif not (List.isEmpty mirrors) then
-                let head = List.head mirrors
-
-                if mirrors |> List.forall ((=) head) then
-                    Ok(Some(ProjectionIntent.UseStrengthMirror head))
-                else
-                    Error(ProjectionConflict.ConflictingPrefixSelection(first, second))
+            elif hasMirror then
+                match
+                    xs
+                    |> List.choose (function
+                        | ProjectionIntent.UseStrengthMirror m -> Some m
+                        | _ -> None)
+                with
+                | [] -> Ok(Some first)
+                | headMirror :: restMirrors ->
+                    if restMirrors |> List.forall ((=) headMirror) then
+                        Ok(Some(ProjectionIntent.UseStrengthMirror headMirror))
+                    else
+                        Error(ProjectionConflict.ConflictingPrefixSelection(first, second))
             else
                 match first with
                 | ProjectionIntent.ActivatePrefixEpoch activation ->
@@ -354,69 +367,6 @@ module ProjectionPlanner =
                 Error ProjectionConflict.ConflictingRepair
         | first :: _ -> Ok(Some first)
 
-    let private validateStrengthInsertion (item: StrengthFrameInsertion) : Result<unit, ProjectionConflict> =
-        if item.FrameDigest <> item.Bundle.Digest then
-            Error(ProjectionConflict.StrengthFrameDigestMismatch item.DecisionId)
-        else
-            match item.Visibility, item.Anchor with
-            | StrengthFrameVisibility.Candidate(target, current), StrengthFrameAnchor.Append when target = current -> Ok()
-            | StrengthFrameVisibility.Candidate _, StrengthFrameAnchor.Append ->
-                Error(ProjectionConflict.StrengthCandidateWrongTarget item.DecisionId)
-            | StrengthFrameVisibility.Candidate _, _ -> Error(ProjectionConflict.InvalidStrengthAnchor item.DecisionId)
-            | StrengthFrameVisibility.Promoted(_, true), _ ->
-                Error(ProjectionConflict.StrengthPromotedReplicaReflection item.DecisionId)
-            | StrengthFrameVisibility.Promoted(_, false), StrengthFrameAnchor.BeforeMessageIndex index when index >= 0 -> Ok()
-            | StrengthFrameVisibility.Promoted _, _ -> Error(ProjectionConflict.InvalidStrengthAnchor item.DecisionId)
-            | StrengthFrameVisibility.ReplicaLocal, StrengthFrameAnchor.Append -> Ok()
-            | StrengthFrameVisibility.ReplicaLocal, _ -> Error(ProjectionConflict.InvalidStrengthAnchor item.DecisionId)
-
-    let private strengthOrder (item: StrengthFrameInsertion) =
-        let decision = StrengthDecisionId.value item.DecisionId
-
-        match item.Anchor with
-        | StrengthFrameAnchor.BeforeMessageIndex index -> 0, index, decision
-        | StrengthFrameAnchor.Append -> 1, 0, decision
-
-    let private reduceStrengthFrames (items: ProjectionIntent list) : Result<ProjectionIntent option, ProjectionConflict> =
-        let insertions =
-            items
-            |> List.collect (function
-                | ProjectionIntent.InsertStrengthFrames strength -> strength.Items
-                | _ -> [])
-
-        let rec validate remaining =
-            match remaining with
-            | [] -> Ok()
-            | head :: tail ->
-                match validateStrengthInsertion head with
-                | Error conflict -> Error conflict
-                | Ok() -> validate tail
-
-        let rec dedupe groups acc =
-            match groups with
-            | [] -> Ok(List.rev acc)
-            | (_, group) :: tail ->
-                let head = List.head group
-
-                if group |> List.forall ((=) head) then
-                    dedupe tail (head :: acc)
-                else
-                    Error(ProjectionConflict.ConflictingStrengthFrames head.DecisionId)
-
-        match validate insertions with
-        | Error conflict -> Error conflict
-        | Ok() ->
-            let groups =
-                insertions
-                |> List.groupBy (fun item -> StrengthDecisionId.value item.DecisionId)
-                |> List.sortBy fst
-
-            match dedupe groups [] with
-            | Error conflict -> Error conflict
-            | Ok normalized ->
-                let ordered = normalized |> List.sortBy strengthOrder
-                Ok(Some(ProjectionIntent.InsertStrengthFrames { Items = ordered }))
-
     let private reduceChallenge (items: ProjectionIntent list) : Result<ProjectionIntent option, ProjectionConflict> =
         match items with
         | [] -> Ok None
@@ -439,6 +389,72 @@ module ProjectionPlanner =
         match items with
         | [] -> Ok None
         | first :: _ -> Ok(Some first)
+
+    let private validateStrengthInsertion
+        (insertion: StrengthFrameInsertion)
+        : Result<StrengthFrameInsertion, ProjectionConflict> =
+        if insertion.FrameDigest <> insertion.Bundle.Digest then
+            Error(ProjectionConflict.StrengthFrameDigestMismatch insertion.DecisionId)
+        else
+            match insertion.Visibility, insertion.Anchor with
+            | StrengthFrameVisibility.Candidate(target, current), StrengthFrameAnchor.Append ->
+                if target <> current then
+                    Error(ProjectionConflict.StrengthCandidateWrongTarget insertion.DecisionId)
+                else
+                    Ok insertion
+            | StrengthFrameVisibility.Candidate _, StrengthFrameAnchor.BeforeMessageIndex _ ->
+                Error(ProjectionConflict.InvalidStrengthAnchor insertion.DecisionId)
+            | StrengthFrameVisibility.Promoted(_, isReplicaRequest), StrengthFrameAnchor.BeforeMessageIndex _ ->
+                if isReplicaRequest then
+                    Error(ProjectionConflict.StrengthPromotedReplicaReflection insertion.DecisionId)
+                else
+                    Ok insertion
+            | StrengthFrameVisibility.Promoted _, StrengthFrameAnchor.Append ->
+                Error(ProjectionConflict.InvalidStrengthAnchor insertion.DecisionId)
+            | StrengthFrameVisibility.ReplicaLocal, StrengthFrameAnchor.Append -> Ok insertion
+            | StrengthFrameVisibility.ReplicaLocal, StrengthFrameAnchor.BeforeMessageIndex _ ->
+                Error(ProjectionConflict.InvalidStrengthAnchor insertion.DecisionId)
+
+    /// Merge InsertStrengthFrames: same DecisionId+digest is idempotent;
+    /// same DecisionId different digest/anchor → ConflictingStrengthFrames.
+    /// Visibility rules applied per insertion before merge.
+    let private reduceStrengthFrames
+        (items: ProjectionIntent list)
+        : Result<ProjectionIntent option, ProjectionConflict> =
+        let rec collect remaining acc =
+            match remaining with
+            | [] -> Ok(List.rev acc)
+            | ProjectionIntent.InsertStrengthFrames payload :: tail ->
+                let rec validateAll insertions validated =
+                    match insertions with
+                    | [] -> Ok(List.rev validated)
+                    | head :: rest ->
+                        match validateStrengthInsertion head with
+                        | Error conflict -> Error conflict
+                        | Ok ok -> validateAll rest (ok :: validated)
+
+                match validateAll payload.Items [] with
+                | Error conflict -> Error conflict
+                | Ok validated -> collect tail (validated @ acc)
+            | _ :: tail -> collect tail acc
+
+        match collect items [] with
+        | Error conflict -> Error conflict
+        | Ok [] -> Ok None
+        | Ok insertions ->
+            // Stable merge by DecisionId: identical material collapses; conflicts fail closed.
+            let rec merge remaining kept =
+                match remaining with
+                | [] -> Ok(List.rev kept)
+                | head :: tail ->
+                    match kept |> List.tryFind (fun existing -> existing.DecisionId = head.DecisionId) with
+                    | None -> merge tail (head :: kept)
+                    | Some existing when existing = head -> merge tail kept
+                    | Some _ -> Error(ProjectionConflict.ConflictingStrengthFrames head.DecisionId)
+
+            match merge insertions [] with
+            | Error conflict -> Error conflict
+            | Ok merged -> Ok(Some(ProjectionIntent.InsertStrengthFrames { Items = merged }))
 
     let private reduceGroup (items: ProjectionIntent list) : Result<ProjectionIntent option, ProjectionConflict> =
         match items with
@@ -511,18 +527,22 @@ module ProjectionRenderer =
     let private isPrefixIntent (intent: ProjectionIntent) =
         match intent with
         | ProjectionIntent.KeepPhysicalPrefix
-        | ProjectionIntent.ActivatePrefixEpoch _ -> true
+        | ProjectionIntent.ActivatePrefixEpoch _
+        | ProjectionIntent.UseStrengthMirror _ -> true
         | _ -> false
 
     /// PROJ-004：把已排序意图渲染成写回指令。
     ///
     /// Planner 保证至多一个前缀意图；多意图列表时只读取前缀槽。
+    /// UseStrengthMirror is a base selection for StrengthReplica but does not
+    /// produce a Host prefix-writeback instruction — Host keeps PhysicalPrefix.
     let renderPrefix (intents: ProjectionIntent list) : RenderedPrefix =
         match intents |> List.tryFind isPrefixIntent with
         | None
-        | Some ProjectionIntent.KeepPhysicalPrefix -> RenderedPrefix.PhysicalPrefix
+        | Some ProjectionIntent.KeepPhysicalPrefix
+        | Some(ProjectionIntent.UseStrengthMirror _) -> RenderedPrefix.PhysicalPrefix
         | Some(ProjectionIntent.ActivatePrefixEpoch activation) -> RenderedPrefix.SyntheticPrefix activation
-        | Some _ -> invalidOp "unreachable: prefix filter admits only Keep/Activate"
+        | Some _ -> invalidOp "unreachable: prefix filter admits only Keep/Activate/Mirror"
 
     /// wire 层视图：合成头部 + 保留尾部。
     ///
@@ -629,98 +649,6 @@ module ProjectionRenderer =
           HostMessageIds = acc.HostMessageIds @ [ None ]
           HostIsPhysical = acc.HostIsPhysical @ [ false ] }
 
-    let private applyStrengthMirror (mirror: StrengthMirrorIntent) : RenderedMessages =
-        { Messages = mirror.Messages
-          HostMessageIds = mirror.Messages |> List.map (fun _ -> None)
-          HostIsPhysical = mirror.Messages |> List.map (fun _ -> false) }
-
-    let private strengthMessageId
-        (sha256: string -> string)
-        (item: StrengthFrameInsertion)
-        (requestOrdinal: int)
-        (half: string)
-        =
-        String.concat
-            "\u001f"
-            [ SessionId.value item.OwnerSessionId
-              StrengthDecisionId.value item.DecisionId
-              string requestOrdinal
-              half
-              item.FrameDigest ]
-        |> sha256
-
-    let private renderStrengthInsertion
-        (sha256: string -> string)
-        (item: StrengthFrameInsertion)
-        : RenderedMessages =
-        let renderBatch (batch: StrengthRequestBatch) =
-            let pairs =
-                batch.Exchanges
-                |> List.mapi (fun index exchange ->
-                    let callId =
-                        StrengthFrame.wireToolCallId
-                            sha256
-                            item.OwnerSessionId
-                            item.DecisionId
-                            batch.RequestOrdinal
-                            (index + 1)
-                            item.FrameDigest
-                        |> ToolCallId.create
-
-                    ProviderProjection.WireToolCall(callId, exchange.ToolName, exchange.CanonicalArguments),
-                    ProviderProjection.WireToolResult(callId, exchange.CanonicalResult))
-
-            let calls: ProviderProjection.WireMessage =
-                { Role = "assistant"
-                  Parts = pairs |> List.map fst }
-
-            let results: ProviderProjection.WireMessage =
-                { Role = "tool"
-                  Parts = pairs |> List.map snd }
-
-            [ calls; results ],
-            [ Some(strengthMessageId sha256 item batch.RequestOrdinal "c")
-              Some(strengthMessageId sha256 item batch.RequestOrdinal "r") ],
-            [ false; false ]
-
-        let rendered = item.Bundle.Batches |> List.map renderBatch
-
-        { Messages = rendered |> List.collect (fun (messages, _, _) -> messages)
-          HostMessageIds = rendered |> List.collect (fun (_, ids, _) -> ids)
-          HostIsPhysical = rendered |> List.collect (fun (_, _, physical) -> physical) }
-
-    let private insertRenderedAt (index: int) (addition: RenderedMessages) (acc: RenderedMessages) =
-        if index < 0 || index > List.length acc.Messages then
-            invalidArg "index" "Strength frame anchor exceeds the current message view"
-
-        { Messages = List.take index acc.Messages @ addition.Messages @ List.skip index acc.Messages
-          HostMessageIds =
-            List.take index acc.HostMessageIds @ addition.HostMessageIds @ List.skip index acc.HostMessageIds
-          HostIsPhysical =
-            List.take index acc.HostIsPhysical @ addition.HostIsPhysical @ List.skip index acc.HostIsPhysical }
-
-    let private applyStrengthFrames
-        (sha256: string -> string)
-        (intent: StrengthFramesIntent)
-        (acc: RenderedMessages)
-        : RenderedMessages =
-        let folder (current, insertedBefore) (item: StrengthFrameInsertion) =
-            let addition = renderStrengthInsertion sha256 item
-
-            match item.Anchor with
-            | StrengthFrameAnchor.Append ->
-                ({ Messages = current.Messages @ addition.Messages
-                   HostMessageIds = current.HostMessageIds @ addition.HostMessageIds
-                   HostIsPhysical = current.HostIsPhysical @ addition.HostIsPhysical },
-                 insertedBefore)
-            | StrengthFrameAnchor.BeforeMessageIndex index ->
-                let actual = index + insertedBefore
-                insertRenderedAt actual addition current, insertedBefore + List.length addition.Messages
-
-        (acc, 0)
-        |> fun seed -> (seed, intent.Items) ||> List.fold folder
-        |> fst
-
     /// Activate 合成前缀：头部无代数 MessageId；尾部侧信道按 DropLeading 截齐。
     let private applyActivate (activation: PrefixActivation) (acc: RenderedMessages) : RenderedMessages =
         let rendered =
@@ -768,6 +696,105 @@ module ProjectionRenderer =
 
             loop zipped budget [] [] []
 
+    /// STRENGTH-009: replace base messages with frozen owner wire messages.
+    /// Host identity/physical channels reset — mirror bytes are not Host-owned.
+    let private applyStrengthMirror (mirror: StrengthMirrorIntent) (_acc: RenderedMessages) : RenderedMessages =
+        { Messages = mirror.Messages
+          HostMessageIds = mirror.Messages |> List.map (fun _ -> None)
+          HostIsPhysical = mirror.Messages |> List.map (fun _ -> false) }
+
+    /// Expand one StrengthFrameBundle into concurrent tool-call + tool-result message pairs.
+    /// Each batch → one assistant (all WireToolCall) then one tool (all WireToolResult).
+    let private expandStrengthBundle
+        (sha256: string -> string)
+        (insertion: StrengthFrameInsertion)
+        : ProviderProjection.WireMessage list * string option list * bool list =
+        let owner = insertion.OwnerSessionId
+        let decisionId = insertion.DecisionId
+        let digest = insertion.Bundle.Digest
+
+        let batchMessages =
+            insertion.Bundle.Batches
+            |> List.collect (fun batch ->
+                let callParts, resultParts =
+                    batch.Exchanges
+                    |> List.mapi (fun exchangeIndex exchange ->
+                        let exchangeOrdinal = exchangeIndex + 1
+
+                        let callIdText =
+                            StrengthFrame.wireToolCallId
+                                sha256
+                                owner
+                                decisionId
+                                batch.RequestOrdinal
+                                exchangeOrdinal
+                                digest
+
+                        let callId = ToolCallId.create callIdText
+
+                        let callPart =
+                            ProviderProjection.WireToolCall(callId, exchange.ToolName, exchange.CanonicalArguments)
+
+                        let resultPart = ProviderProjection.WireToolResult(callId, exchange.CanonicalResult)
+
+                        callPart, resultPart)
+                    |> List.unzip
+
+                let assistant: ProviderProjection.WireMessage =
+                    { Role = "assistant"
+                      Parts = callParts }
+
+                let tool: ProviderProjection.WireMessage = { Role = "tool"; Parts = resultParts }
+
+                [ assistant; tool ])
+
+        let ids = batchMessages |> List.map (fun _ -> None)
+        let physical = batchMessages |> List.map (fun _ -> false)
+        batchMessages, ids, physical
+
+    let private spliceBefore
+        (index: int)
+        (extraMsgs: ProviderProjection.WireMessage list)
+        (extraIds: string option list)
+        (extraPhys: bool list)
+        (acc: RenderedMessages)
+        : RenderedMessages =
+        let idx =
+            if index < 0 then
+                0
+            elif index > List.length acc.Messages then
+                List.length acc.Messages
+            else
+                index
+
+        let beforeMsgs, afterMsgs = List.splitAt idx acc.Messages
+        let beforeIds, afterIds = List.splitAt idx acc.HostMessageIds
+        let beforePhys, afterPhys = List.splitAt idx acc.HostIsPhysical
+
+        { Messages = beforeMsgs @ extraMsgs @ afterMsgs
+          HostMessageIds = beforeIds @ extraIds @ afterIds
+          HostIsPhysical = beforePhys @ extraPhys @ afterPhys }
+
+    let private applyStrengthFrames
+        (sha256: string -> string)
+        (intent: StrengthFramesIntent)
+        (acc: RenderedMessages)
+        : RenderedMessages =
+        // Apply insertions in listed order. Append anchors extend the growing tail;
+        // BeforeMessageIndex anchors are absolute indices into the pre-insertion base
+        // only when a single promoted insertion is present — multiple BeforeIndex
+        // items apply sequentially against the evolving message list.
+        (acc, intent.Items)
+        ||> List.fold (fun state insertion ->
+            let msgs, ids, phys = expandStrengthBundle sha256 insertion
+
+            match insertion.Anchor with
+            | StrengthFrameAnchor.Append ->
+                { Messages = state.Messages @ msgs
+                  HostMessageIds = state.HostMessageIds @ ids
+                  HostIsPhysical = state.HostIsPhysical @ phys }
+            | StrengthFrameAnchor.BeforeMessageIndex index -> spliceBefore index msgs ids phys state)
+
     let private applyOne
         (sha256: string -> string)
         (snapshot: ProjectionSnapshot)
@@ -777,10 +804,10 @@ module ProjectionRenderer =
         match intent with
         | ProjectionIntent.KeepPhysicalPrefix -> acc
         | ProjectionIntent.ActivatePrefixEpoch activation -> applyActivate activation acc
-        | ProjectionIntent.UseStrengthMirror mirror -> applyStrengthMirror mirror
+        | ProjectionIntent.UseStrengthMirror mirror -> applyStrengthMirror mirror acc
         | ProjectionIntent.InsertBlogFrames payload -> applyBlogFrames sha256 snapshot payload acc
         | ProjectionIntent.InsertRepair _ -> appendSynthetic "user" ProjectionConstants.RepairInstruction acc
-        | ProjectionIntent.InsertStrengthFrames strength -> applyStrengthFrames sha256 strength acc
+        | ProjectionIntent.InsertStrengthFrames payload -> applyStrengthFrames sha256 payload acc
         | ProjectionIntent.SuppressTransportOnly -> applySuppressWithIds snapshot acc
         | ProjectionIntent.AppendReviewChallenge _ ->
             // REVIEW-003 生产可见字节 = Prompt（`# Text\n`），与 tool-result / nudge / seal 一致。

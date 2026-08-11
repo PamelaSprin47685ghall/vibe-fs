@@ -100,10 +100,12 @@ module StrengthFrame =
             | [] -> Ok()
             | batch :: tail when batch.RequestOrdinal <> expected ->
                 Error(StrengthFrameError.InvalidRequestOrdinal(expected, batch.RequestOrdinal))
-            | batch :: _ when List.isEmpty batch.Exchanges ->
-                Error(StrengthFrameError.EmptyBatch batch.RequestOrdinal)
+            | batch :: _ when List.isEmpty batch.Exchanges -> Error(StrengthFrameError.EmptyBatch batch.RequestOrdinal)
             | batch :: tail ->
-                match batch.Exchanges |> List.tryFind (fun exchange -> not (isAllowedTool exchange.ToolName)) with
+                match
+                    batch.Exchanges
+                    |> List.tryFind (fun exchange -> not (isAllowedTool exchange.ToolName))
+                with
                 | Some invalid -> Error(StrengthFrameError.UnsupportedTool invalid.ToolName)
                 | None -> validateBatches (expected + 1) tail
 
