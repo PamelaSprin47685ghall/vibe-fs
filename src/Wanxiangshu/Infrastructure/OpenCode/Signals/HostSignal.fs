@@ -32,7 +32,3 @@ type HostSignal =
     /// only means the attempt is no longer eligible to mint/consume a
     /// QuiescencePermit for a missing-final-report / interaction repair.
     | AttemptAborted of SessionId
-
-type SessionSignalSource =
-    | LocalPluginEvent
-    | GlobalForeignDirectoryEvent

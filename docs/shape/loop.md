@@ -39,7 +39,7 @@ Host events 流
 
 ## LOOP-009：事件选型与 Host 能力
 
-优先订阅与粗信号同一条 transport（`events.listen` 或 `/global/event`，HOST-003）：
+通过本地 Plugin event hook（`hooks.event`，HOST-003）直接接入：
 
 ```text
 isLoopTextDelta   → LoopSensor.push

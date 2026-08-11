@@ -2,7 +2,7 @@
 
 ## HOST-003：Transport ≠ Domain
 
-Transport 可以是 plugin event 或 global SSE。  
+Transport 为 in-process plugin event（hooks.event）。  
 Domain 合同永远是 typed `HostSignal`。业务层不得观察原始 payload。
 
 ```fsharp

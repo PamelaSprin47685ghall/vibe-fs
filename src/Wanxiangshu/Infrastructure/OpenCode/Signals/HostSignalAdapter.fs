@@ -38,8 +38,7 @@ type HostSignalRouter
         // stays free of LoopSensor's Host dependency (compile order + ARCH-002
         // layering). Drop-session cleanup is the caller's job.
         ?onLoopEvent: obj -> unit
-    ) as this =
-    let sources = Dictionary<string, SessionSignalSource>()
+    ) =
 
     // Fail-closed: empty registry owns nothing.
     let isOwned (sessionId: SessionId) =
@@ -48,38 +47,17 @@ type HostSignalRouter
     member _.RegisterOwned(sessionId: SessionId) =
         ownedSessions.Add(SessionId.value sessionId) |> ignore
 
-    member _.RegisterSource(sessionId: SessionId, source: SessionSignalSource) =
-        let key = SessionId.value sessionId
-        ownedSessions.Add key |> ignore
-        sources.[key] <- source
-
     member _.UnregisterOwned(sessionId: SessionId) =
         let key = SessionId.value sessionId
         ownedSessions.Remove key |> ignore
-        sources.Remove key |> ignore
-
-    member private _.Forward(sourceToDrop: SessionSignalSource, signal: HostSignal) =
-        let sessionId = HostSignalAdapter.sessionIdOf signal
-
-        match sources.TryGetValue(SessionId.value sessionId) with
-        | true, source when source = sourceToDrop -> ()
-        | _ -> onSignal signal
 
     /// LOOP-009: text deltas first; coarse signals second; everything else drop.
-    member private _.ObserveRaw(sourceToDrop: SessionSignalSource, raw: obj) =
+    member _.Observe(raw: obj) =
         match onLoopEvent with
         | Some observe when LoopEventCodec.isLoopTextDelta raw -> observe raw
         | _ ->
             match HostSignalAdapter.tryAdapt isOwned raw with
-            | Some signal -> this.Forward(sourceToDrop, signal)
+            | Some signal -> onSignal signal
             | None -> ()
 
-    /// Plugin-local event hook path drops sessions registered as global-only.
-    member _.ObserveLocal(raw: obj) =
-        this.ObserveRaw(SessionSignalSource.GlobalForeignDirectoryEvent, raw)
-
-    /// Global SSE path drops sessions registered as local-only.
-    member _.ObserveGlobal(raw: obj) =
-        this.ObserveRaw(SessionSignalSource.LocalPluginEvent, raw)
-
-    member _.Observe(raw: obj) = this.ObserveLocal raw
+    member this.ObserveLocal(raw: obj) = this.Observe raw

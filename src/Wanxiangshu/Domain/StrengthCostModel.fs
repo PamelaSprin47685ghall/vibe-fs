@@ -33,4 +33,7 @@ module StrengthCostModel =
 
     let report (control: StrengthCostSample) (treatment: StrengthCostSample) : StrengthReport =
         let delta = expectedValue treatment - expectedValue control
-        { Control = control; Treatment = treatment; Delta = delta }
+
+        { Control = control
+          Treatment = treatment
+          Delta = delta }

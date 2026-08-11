@@ -248,11 +248,14 @@ module HostSignalBootstrap =
             let signalRouter =
                 HostSignalRouter(scope.OwnedSessions, onSignal, onLoopEvent = loopSensor.Observe)
 
-            let! subscriptionResult = HostSignalSubscribe.trySubscribe input signalRouter.ObserveGlobal None
+            let! subscriptionResult = HostSignalSubscribe.trySubscribe input signalRouter.Observe None
 
             let subscription: IDisposable option =
                 match subscriptionResult with
-                | Error err -> raise (InvalidOperationException err)
+                | Error err ->
+                    Diagnostic.fatal "signal-subscribe-failed" [ "result", err ]
+                    raise (InvalidOperationException err)
+
                 | Ok(sub, _source) ->
                     // TrackSubscription only needs IDisposable; Health stays on the
                     // subscription record for future recovery consumers.
@@ -267,10 +270,6 @@ module HostSignalBootstrap =
                 if not (String.IsNullOrWhiteSpace sessionId) then
                     scope.OwnedSessions.Add sessionId |> ignore
                     signalRouter.RegisterOwned(SessionId.create sessionId)
-
-            let registerSource (sessionId: string) (source: SessionSignalSource) =
-                if not (String.IsNullOrWhiteSpace sessionId) then
-                    signalRouter.RegisterSource(SessionId.create sessionId, source)
 
             let bindUserMessage (sessionId: string) (messageId: string) =
                 if
@@ -291,7 +290,6 @@ module HostSignalBootstrap =
                     reconciler.BindUserMessage(sid, physical, ?agentRole = agentRole)
                     scope.AbortedSessions.Remove sessionId |> ignore
                     registerOwned sessionId
-                    registerSource sessionId LocalPluginEvent
 
             let bindContinuationMessage (sessionId: string) (messageId: string) =
                 if
@@ -303,24 +301,9 @@ module HostSignalBootstrap =
                         PhysicalUserMessageId.create messageId
                     )
 
-            let workspaceDir =
-                if isNull input || isNull input?directory then
-                    None
-                else
-                    let d = unbox<string> input?directory
-                    if String.IsNullOrWhiteSpace d then None else Some d
-
             let bindActiveRun (sessionId: SessionId) (role: Role) (directory: string option) =
                 let key = SessionId.value sessionId
                 registerOwned key
-
-                // Child sessions in a different worktree directory are observed via
-                // global SSE only; local plugin events belong to that worktree's
-                // own plugin instance.
-                match directory, workspaceDir with
-                | Some childDir, Some root when childDir <> root -> registerSource key GlobalForeignDirectoryEvent
-                | Some _, None -> registerSource key GlobalForeignDirectoryEvent
-                | _ -> registerSource key LocalPluginEvent
 
                 // A host-registered run knows its physical opening message; the
                 // Authority Root is derived from it by PROMPT-002 promotion rather than
@@ -338,6 +321,7 @@ module HostSignalBootstrap =
                       ContinuationMessageIds = Set.empty
                       Role = Some role
                       Directory = directory }
+
 
             let onAuthorityRoot (mainSessionId: SessionId, root: AuthorityRootUserMessageId) =
                 match journal with

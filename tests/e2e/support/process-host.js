@@ -35,11 +35,11 @@ import {
 } from './process-host-checks.js';
 
 const BOOTSTRAP_SENTINEL = 'Warning: OPENCODE_SERVER_PASSWORD is not set';
-const PROJECT_EVENT_SENTINEL = 'OPENCODE-SIGNAL-SOURCE global.event';
 const READY_SENTINEL = 'opencode server listening on http://';
 const LISTEN_POLL_INTERVAL_MS = 50;
 const LISTEN_POLL_INITIAL_DELAY_MS = 100;
 const STDOUT_RING_MAX = 100;
+
 
 export class ProcessHost {
   constructor() {
@@ -149,14 +149,13 @@ export class ProcessHost {
     let deadline = Date.now() + timeoutMs;
     let projectEventsObserved = false;
     const observeProjectEvents = () => {
-      if (projectEventsObserved || !this._stdoutBuffer.some((line) => line.includes(PROJECT_EVENT_SENTINEL))) return;
+      if (projectEventsObserved) return;
       projectEventsObserved = true;
       deadline = Date.now() + timeoutMs;
       onProjectEvents?.();
     };
 
     while (Date.now() < deadline) {
-      observeProjectEvents();
       try {
         const res = await fetch(`${this._baseUrl}/path`, {
           method: 'GET',
@@ -165,10 +164,9 @@ export class ProcessHost {
         });
         if (res && res.status > 0) {
           observeProjectEvents();
-          if (onProjectEvents === undefined || projectEventsObserved) return;
+          return;
         }
       } catch (err) {}
-      observeProjectEvents();
       await new Promise((r) => setTimeout(r, READY_POLL_INTERVAL_MS));
     }
     throw new Error(
@@ -177,6 +175,7 @@ export class ProcessHost {
       `stderr tail:\n${this._stderrBuffer.slice(-20).join('\n')}`,
     );
   }
+
 
   async stop({ assert = true } = {}) {
     if (this._stopped) return;

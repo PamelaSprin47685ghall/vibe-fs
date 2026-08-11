@@ -45,3 +45,4 @@ Thumbs.db
 
 # Local deepwork state
 .slim/deepwork/
+.omo/

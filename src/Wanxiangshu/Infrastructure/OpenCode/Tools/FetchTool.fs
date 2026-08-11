@@ -20,7 +20,9 @@ module FetchTool =
 
     // ponytail: global lock, per-session lock if throughput matters
     let private fetchGate = obj ()
-    let private fetchInFlight = System.Collections.Generic.Dictionary<string, System.Threading.Tasks.Task<string>>()
+
+    let private fetchInFlight =
+        System.Collections.Generic.Dictionary<string, System.Threading.Tasks.Task<string>>()
 
     let spec (factory: HostToolFactory) (workspaceRoot: string) (store: IEventStore) (raw: IGitRawStore) : ToolSpec =
         let tString = ToolHostCodec.TString

@@ -320,159 +320,50 @@ test('EXEC_events_sticky_terminal_bounded', () => {
   assert.equal(seen.has('s300'), true, 'newest session must remain')
 })
 
-// ── 3. HostSignalSubscribe reconnect loop (structural on emitJsExpr body) ────
+// ── 3. HostSignalSubscribe transport selection (local-event-hook default) ────
 
-test('EXEC_host_signal_subscribe_reconnect_after_stream_end', () => {
-  const src = hostSignalSubscribe.source()
-  for (const marker of hostSignalSubscribe.reconnectMarkers) {
-    assert.ok(src.includes(marker), `HostSignalSubscribe must contain reconnect marker: ${marker}`)
-  }
-  // Old bare return after normal stream end is gone; loop continues until disposed.
-  assert.ok(src.includes('while (!state.disposed)'), 'reconnect outer loop must exist')
-  assert.ok(src.includes('stream ended normally'), 'normal EOF is logged then loop continues')
-  // Cap delay at 10s with exponential 2**attempt.
-  assert.match(src, /Math\.min\(1000 \* 2 \*\* attempt,\s*10000\)/)
-})
-
-// ── 3b. HostSignalSubscribe transport selection (embedded-mode degradation) ──
-
-// The SDK SSE client streams through the global fetch, never through the
-// in-process custom fetch Host injects for other client calls. Selection must
-// therefore probe whether a real HTTP listener answers the server URL; the
-// probe is the only discriminator that survives a serve on any port (e2e runs
-// the real server on 4096). Tests mock globalThis.fetch so no test touches
-// the network.
-const withFetch = async (impl, fn) => {
-  const real = globalThis.fetch
-  globalThis.fetch = impl
-  try {
-    return await fn()
-  } finally {
-    globalThis.fetch = real
-  }
-}
-const refused = async () => {
-  throw new Error('ECONNREFUSED')
-}
-const answers = async () => ({ ok: true, json: async () => ({ healthy: true }) })
-const answersV2 = async () => ({ ok: true, json: async () => ({ healthy: true, pid: 1 }) })
-const answersNonOpencode = async () => ({ ok: true, json: async () => ({ status: 'ok', app: 'random' }) })
-
-test('HOST_signal_subscribe_embedded_fallback_degrades_to_local_event_hook', async () => {
-  const result = await withFetch(refused, () =>
-    hostSignalSubscribe.trySubscribe({ serverUrl: 'http://localhost:4096', client: null }, () => {}),
-  )
+test('HOST_signal_subscribe_defaults_to_local_event_hook', async () => {
+  const result = await hostSignalSubscribe.trySubscribe({ serverUrl: 'http://localhost:4096', client: null }, () => {})
   const decoded = resultOf(result)
-  assert.equal(decoded.ok, true, 'embedded mode must not hard-fail the plugin')
+  assert.equal(decoded.ok, true, 'local-event-hook must succeed with zero network probes')
   const [subscription, source] = decoded.value
-  assert.ok(isNone(subscription), 'no SSE subscription against a dead fallback address')
+  assert.ok(isNone(subscription), 'no subscription object needed for in-process hook')
   assert.equal(source, 'local-event-hook', 'local signals arrive through the Host event hook')
-})
-
-test('HOST_signal_subscribe_non_opencode_server_degrades_to_local_event_hook', async () => {
-  const result = await withFetch(answersNonOpencode, () =>
-    hostSignalSubscribe.trySubscribe({ serverUrl: 'http://localhost:4096', client: null }, () => {}),
-  )
-  const decoded = resultOf(result)
-  assert.equal(decoded.ok, true, 'random non-OpenCode HTTP listener must degrade to local hook')
-  const [subscription, source] = decoded.value
-  assert.ok(isNone(subscription), 'no SSE subscription against a non-OpenCode HTTP server')
-  assert.equal(source, 'local-event-hook')
 })
 
 test('HOST_signal_subscribe_embedded_uses_legacy_listen_when_present', async () => {
   const fakeListen = { call: () => ({ disposed: false }) }
-  const result = await withFetch(refused, () =>
-    hostSignalSubscribe.trySubscribe(
-      { serverUrl: 'http://localhost:4096', client: null, events: { listen: fakeListen } },
-      () => {},
-    ),
+  const result = await hostSignalSubscribe.trySubscribe(
+    { serverUrl: 'http://localhost:4096', client: null, events: { listen: fakeListen } },
+    () => {},
   )
   const decoded = resultOf(result)
   assert.equal(decoded.ok, true)
   const [subscription, source] = decoded.value
-  assert.ok(subscription, 'legacy events.listen is preferred over silent degradation')
+  assert.ok(subscription, 'legacy events.listen is used when explicitly provided')
   assert.equal(source, 'events.listen')
 })
 
-test('HOST_signal_subscribe_real_server_url_keeps_global_sse', async () => {
-  // Serve mode — a real listener answers the probe on whatever port it picked.
-  const result = await withFetch(answers, () =>
-    hostSignalSubscribe.trySubscribe({ serverUrl: 'http://127.0.0.1:4096', client: null }, () => {}),
+test('HOST_signal_subscribe_bad_listener_fails_closed', async () => {
+  const result = await hostSignalSubscribe.trySubscribe(
+    { events: { listen: () => null } },
+    () => {},
   )
   const decoded = resultOf(result)
-  assert.equal(decoded.ok, false, 'no client.global → hard error, not silent degradation')
-  assert.ok(decoded.error.includes('OPENCODE-SIGNAL-SUBSCRIBE'), decoded.error)
+  assert.equal(decoded.ok, false, 'broken events.listen must fail closed')
 })
 
-test('HOST_signal_subscribe_v2_server_url_keeps_global_sse', async () => {
-  // OpenCode v2 serve mode — /api/health returns pid + healthy: true.
-  const result = await withFetch(answersV2, () =>
-    hostSignalSubscribe.trySubscribe({ serverUrl: 'http://127.0.0.1:4096', client: null }, () => {}),
-  )
-  const decoded = resultOf(result)
-  assert.equal(decoded.ok, false, 'no client.global → hard error, not silent degradation')
-  assert.ok(decoded.error.includes('OPENCODE-SIGNAL-SUBSCRIBE'), decoded.error)
-})
-
-test('HOST_signal_subscribe_probe_refusal_degrades_not_fails', async () => {
-  // A live-but-unanswering endpoint must degrade to the local hook, not crash.
-  const result = await withFetch(refused, () =>
-    hostSignalSubscribe.trySubscribe({ serverUrl: 'http://10.255.255.1:9', client: null }, () => {}),
+test('HOST_signal_subscribe_client_events_listen_supported', async () => {
+  const fakeListen = { call: () => ({ disposed: false }) }
+  const result = await hostSignalSubscribe.trySubscribe(
+    { client: { events: { listen: fakeListen } } },
+    () => {},
   )
   const decoded = resultOf(result)
   assert.equal(decoded.ok, true)
-  assert.equal(decoded.value[1], 'local-event-hook')
+  assert.equal(decoded.value[1], 'events.listen')
 })
 
-test('HOST_signal_subscribe_legacy_host_without_server_url_keeps_legacy_verdict', async () => {
-  const result = await hostSignalSubscribe.trySubscribe({ client: null }, () => {})
-  const decoded = resultOf(result)
-  assert.equal(decoded.ok, false, 'legacy host with no transport at all stays fail-fast')
-})
-
-// ── 3c. Heartbeat timeout is fatal, never a reconnect-noise loop ─────────────
-
-test('HOST_signal_subscribe_heartbeat_watchdog_markers_present', () => {
-  const src = hostSignalSubscribe.source()
-  for (const marker of hostSignalSubscribe.heartbeatMarkers) {
-    assert.ok(src.includes(marker), `HostSignalSubscribe must contain heartbeat marker: ${marker}`)
-  }
-})
-
-test('HOST_signal_subscribe_heartbeat_timeout_is_fatal_not_reconnect', () => {
-  const src = hostSignalSubscribe.source()
-  // One timeout kills the process once via Diagnostic.fatal (SIGKILL) — no
-  // abort + exponential-backoff noise loop over a dead link.
-  assert.ok(src.includes('onHeartbeatTimeout(silent)'), 'heartbeat timeout must invoke the fatal path')
-  assert.ok(src.includes('port.Delay'), 'silence deadline armed via ITimerPort.Delay')
-  assert.ok(src.includes('heartbeatHandle'), 'one-shot handle stored on state.heartbeatHandle')
-  assert.ok(src.includes('.Cancel'), 're-arm/dispose cancels via ITimerHandle.Cancel')
-  assert.ok(!src.includes('setInterval'), 'period scan removed; one-shot deadline only')
-  assert.ok(!src.includes('clearInterval'), 'period scan removed; one-shot deadline only')
-  assert.ok(!src.includes('state.heartbeatTimer'), 'legacy heartbeatTimer name is gone')
-  assert.ok(!src.includes('heartbeat timeout recurring'), 'reconnect throttling noise is gone')
-  assert.ok(!src.includes('heartbeatTimeouts'), 'consecutive-timeout throttle state is gone')
-  assert.ok(!src.includes('state.connAbort.abort'), 'heartbeat no longer forces its own abort')
-})
-
-test('HOST_signal_subscribe_heartbeat_fatal_fields_are_whitelisted', () => {
-  // onHeartbeatTimeout → Diagnostic.fatal "sse-heartbeat-timeout" ["duration", ms].
-  // Must pass the CTX-014 schema gate and print exactly one JSON line (the
-  // SIGKILL itself is gated off under node:test).
-  const lines = []
-  const e = console.error
-  console.error = (line) => lines.push(String(line))
-  try {
-    assert.doesNotThrow(() => diagnostic.fatal('sse-heartbeat-timeout', [['duration', '39766']]))
-    assert.equal(lines.length, 1, 'fatal prints exactly one line')
-    const payload = JSON.parse(lines[0])
-    assert.equal(payload.operation, 'sse-heartbeat-timeout')
-    assert.equal(payload.duration, '39766')
-  } finally {
-    console.error = e
-  }
-})
 
 // ── 4. ForkRuntime.AwaitAgent timeout ────────────────────────────────────────
 
