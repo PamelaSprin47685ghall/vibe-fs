@@ -17,13 +17,6 @@ const {
   HostForkRuntime__InstallRun_7AC6F164: installRun,
   HostForkRuntime__FailRun_1B5DABF9: failRun,
   HostForkRuntime__MarkReady_Z397E187E: markReady,
-  HostForkRuntime__CancelAgent_Z721C83C5: cancelAgent,
-  HostForkRuntime__Join_71136F3F: joinAny,
-  HostForkRuntime__JoinAvailable_Z2FFF68F8: joinAvailable,
-  HostForkRuntime__JoinWithPermit_22872FC4: joinWithPermit,
-  HostForkRuntime__JoinAvailableWithPermit_76145D53: joinAvailableWithPermit,
-  HostForkRuntime__AwaitAgent_3B406CA4: awaitAgent,
-  HostForkRuntime__AwaitAgentWithPermit_Z23B24401: awaitAgentWithPermit,
   HostForkRuntime__IsRetiredHandle_Z721C83C5: isRetiredHandle,
   HostForkRuntime__TryChildSession_Z721C83C5: tryChildSession,
   HostForkRuntime__AdoptChild_Z7BE1869F: adoptChild,
@@ -33,6 +26,15 @@ const {
   HostForkRuntime__get_IsCancelled: runtimeIsCancelled,
   HostForkRuntime__Cancel: cancelRuntime,
 } = await import('../../../dist/Session/HostForkRuntime.js')
+const {
+  join: joinAny,
+  joinAvailable,
+  joinWithPermit,
+  joinAvailableWithPermit,
+  awaitAgent,
+  awaitAgentWithPermit,
+  cancelAgent,
+} = await import('../../../dist/Session/HostForkJoin.js')
 const {
   ForkRuntime,
   ForkRuntime__Fork_374A2FD6: forkRun,
@@ -264,7 +266,7 @@ test('HFRT_join_single_times_out_when_no_completion_arrives', async () => {
   const liveCtx = live()
   installRun(liveCtx.runtime, 'ag9', sessionId('ses_c9'), Role.Coder)
 
-  const result = await joinAny(liveCtx.runtime, 30)
+  const result = await joinAny(liveCtx.runtime, [30])
   assert.equal(result.tag, 1)
   assert.equal(caseOf(result.fields[0]), 'TimedOut')
   liveCtx.cleanup()
@@ -274,7 +276,7 @@ test('HFRT_join_cancelled_runtime_returns_cancelled', async () => {
   const liveCtx = live()
   cancelRuntime(liveCtx.runtime)
   assert.equal(runtimeIsCancelled(liveCtx.runtime), true)
-  const result = await joinAny(liveCtx.runtime, 10)
+  const result = await joinAny(liveCtx.runtime, [10])
   assert.equal(result.tag, 1)
   assert.equal(caseOf(result.fields[0]), 'Cancelled')
   liveCtx.cleanup()
@@ -285,7 +287,7 @@ test('HFRT_join_cancelled_runtime_returns_cancelled', async () => {
 test('HFRT_join_with_permit_root_mismatch_is_not_found', async () => {
   const liveCtx = live()
   const permit = new FamilyRecoveryPermit(sessionId('ses_other'), 0n, stringSet([]))
-  const result = await joinWithPermit(liveCtx.runtime, permit)
+  const result = await joinWithPermit(liveCtx.runtime, permit, [])
   assert.equal(result.tag, 1)
   const err = result.fields[0]
   assert.equal(caseOf(err), 'NotFound')
@@ -297,7 +299,7 @@ test('HFRT_join_with_permit_stale_journal_sequence_is_not_found', async () => {
   const liveCtx = live()
   const current = JournalRevisionModule_value(AgentJournalModule_revision(liveCtx.journal))
   const permit = new FamilyRecoveryPermit(PARENT, current + 1000n, stringSet([]))
-  const result = await joinWithPermit(liveCtx.runtime, permit)
+  const result = await joinWithPermit(liveCtx.runtime, permit, [])
   const err = result.fields[0]
   assert.equal(caseOf(err), 'NotFound')
   assert.match(err.fields[0], new RegExp(`family recovery permit journalSequence stale: permit=${current + 1000n}`))
@@ -330,7 +332,7 @@ test('EXEC_023_permit_survives_family_growth_after_recovery_closed', async () =>
   ])
   assert.deepEqual(listItems(FamilyRecoveryPermitModule_missingFrom(grown, permit)), [])
 
-  const result = await joinWithPermit(liveCtx.runtime, permit, 10)
+  const result = await joinWithPermit(liveCtx.runtime, permit, [10])
   assert.equal(result.tag, 1)
   assert.equal(caseOf(result.fields[0]), 'NothingToJoin', 'growth must not revoke the permit')
   liveCtx.cleanup()
@@ -339,7 +341,7 @@ test('EXEC_023_permit_survives_family_growth_after_recovery_closed', async () =>
 test('HFRT_join_with_valid_permit_passes_validation', async () => {
   const liveCtx = live()
   const permit = validPermit(liveCtx.journal)
-  const result = await joinWithPermit(liveCtx.runtime, permit, 10)
+  const result = await joinWithPermit(liveCtx.runtime, permit, [10])
   assert.equal(result.tag, 1)
   assert.equal(caseOf(result.fields[0]), 'NothingToJoin', 'valid permit must reach the join body')
   liveCtx.cleanup()
@@ -349,7 +351,7 @@ test('HFRT_join_with_valid_permit_passes_validation', async () => {
 
 test('HFRT_await_agent_unknown_id_is_error', async () => {
   const liveCtx = live()
-  const result = await awaitAgent(liveCtx.runtime, 'ghost')
+  const result = await awaitAgent(liveCtx.runtime, 'ghost', [])
   assert.equal(result.tag, 1)
   assert.equal(result.fields[0], 'Unknown agent id: ghost')
   liveCtx.cleanup()
@@ -358,7 +360,7 @@ test('HFRT_await_agent_unknown_id_is_error', async () => {
 test('HFRT_await_agent_with_permit_validation_error_maps_to_not_found', async () => {
   const liveCtx = live()
   const permit = new FamilyRecoveryPermit(sessionId('ses_other'), 0n, stringSet([]))
-  const result = await awaitAgentWithPermit(liveCtx.runtime, permit, 'ag9')
+  const result = await awaitAgentWithPermit(liveCtx.runtime, permit, 'ag9', [])
   assert.equal(result.tag, 1)
   assert.equal(caseOf(result.fields[0]), 'NotFound')
   liveCtx.cleanup()

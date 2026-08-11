@@ -10,7 +10,7 @@ module Join =
 
     /// Single-result join (FamilyRecoveryPermit required).
     let joinAny (runtime: HostForkRuntime) (permit: FamilyRecoveryPermit) : Task<Result<RunCompletion, ForkError>> =
-        runtime.JoinWithPermit(permit)
+        HostForkJoin.joinWithPermit runtime permit None
 
     /// EXEC-018 batch join: maxCount + typed local interrupt (≠ runtime.Cancel).
     let joinAvailable
@@ -19,4 +19,4 @@ module Join =
         (maxCount: int)
         (interrupt: Task<JoinInterruptReason>)
         : Task<Result<JoinWaitOutcome<JoinItem>, ForkError>> =
-        runtime.JoinAvailableWithPermit(permit, maxCount, interrupt)
+        HostForkJoin.joinAvailableWithPermit runtime permit maxCount interrupt

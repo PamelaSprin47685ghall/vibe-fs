@@ -38,13 +38,14 @@ const link = (handle, child, targetAgent, role, current) => {
 
 test('EXEC_021_duplicate_join_is_fail_closed_before_waiting', () => {
   const runtime = readFileSync(join(ROOT, 'src/Wanxiangshu/Session/HostForkRuntime.fs'), 'utf8')
+  const joinHost = readFileSync(join(ROOT, 'src/Wanxiangshu/Session/HostForkJoin.fs'), 'utf8')
   const orchestrator = readFileSync(
     join(ROOT, 'src/Wanxiangshu/Infrastructure/OpenCode/Orchestration/Host.fs'),
     'utf8',
   )
   assert.match(runtime, /let mutable joinInFlight = false/)
-  assert.match(runtime, /ForkError\.JoinInProgress/)
-  assert.match(runtime, /finally[\s\S]*joinInFlight <- false/)
+  assert.match(joinHost, /ForkError\.JoinInProgress/)
+  assert.match(joinHost, /finally[\s\S]*ReleaseJoin\(\)/)
   assert.match(orchestrator, /let joinGate = obj \(\)/)
   assert.match(orchestrator, /JOIN_IN_PROGRESS/)
 })

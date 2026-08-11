@@ -225,7 +225,7 @@ export const RULES = [
   },
   {
     id: 'join-with-permit-closure-digest',
-    fileHint: 'HostForkRuntime.fs',
+    fileHint: 'HostForkJoin.fs',
     pattern: /closureDigest|permitDigest|RecoveryClosureProjection\.discover/,
     label: 'JoinWithPermit must re-check closureDigest via RecoveryClosureProjection.discover',
     positive: true,

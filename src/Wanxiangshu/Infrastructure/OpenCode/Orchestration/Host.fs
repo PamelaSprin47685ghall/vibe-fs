@@ -163,7 +163,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             with
             | Some source -> return! awaitPendingSource agentId source
             | None ->
-                match! runtime.AwaitAgent(agentId, ?timeoutMs = Some ExecutorSummarize.AwaitAgentTimeoutMs) with
+                match! HostForkJoin.awaitAgent runtime agentId (Some ExecutorSummarize.AwaitAgentTimeoutMs) with
                 | Error error -> return Error error
                 | Ok run -> return outcomeOf run
         }

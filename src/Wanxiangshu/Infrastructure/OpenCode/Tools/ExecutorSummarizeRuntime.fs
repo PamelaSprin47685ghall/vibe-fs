@@ -52,8 +52,8 @@ module ExecutorSummarizeRuntime =
                     | Error msg -> return Error(ForkError.NotFound msg)
                     | Ok permit ->
                         match timeoutMs with
-                        | Some ms -> return! runtime.JoinWithPermit(permit, timeoutMs = ms)
-                        | None -> return! runtime.JoinWithPermit(permit)
+                        | Some ms -> return! HostForkJoin.joinWithPermit runtime permit (Some ms)
+                        | None -> return! HostForkJoin.joinWithPermit runtime permit None
                 }
 
             member _.AwaitAgentWithPermit(agentId, timeoutMs) =
@@ -66,8 +66,8 @@ module ExecutorSummarizeRuntime =
                     | Error msg -> return Error(ForkError.NotFound msg)
                     | Ok permit ->
                         match timeoutMs with
-                        | Some ms -> return! runtime.AwaitAgentWithPermit(permit, agentId, timeoutMs = ms)
-                        | None -> return! runtime.AwaitAgentWithPermit(permit, agentId)
+                        | Some ms -> return! HostForkJoin.awaitAgentWithPermit runtime permit agentId (Some ms)
+                        | None -> return! HostForkJoin.awaitAgentWithPermit runtime permit agentId None
                 }
 
             member _.CurrentJournalRevision() = AgentJournal.revision journal
@@ -75,7 +75,8 @@ module ExecutorSummarizeRuntime =
             member _.AwaitJournalChangeFrom(fromRevision) =
                 AgentJournal.awaitChangeFrom fromRevision journal
 
-            member _.CancelAgent(agentId) = runtime.CancelAgent(agentId) }
+            member _.CancelAgent(agentId) =
+                HostForkJoin.cancelAgent runtime agentId }
 
     /// Pure ForkRuntime has no journal → cannot hold FamilyRecoveryPermit.
     /// Fail closed; do not mint a synthetic permit for mailbox-only join.

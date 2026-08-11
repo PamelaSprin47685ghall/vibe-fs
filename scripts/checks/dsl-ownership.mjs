@@ -123,6 +123,7 @@ export const HOST_BOUNDARY_OPEN_BASENAMES = new Set([
   'HostForkRestart.fs',
   'HostForkRunLifecycle.fs',
   'HostForkRuntime.fs',
+  'HostForkJoin.fs',
   'ParkedTransform.fs',
   'RecordWorkflow.fs',
   'RuntimePath.fs',
