@@ -279,6 +279,10 @@ module HostSignalBootstrap =
                 // reconciler. Never ProviderFailure — it does not advance fallback.
                 | AttemptAborted sessionId ->
                     scope.Quiescence.RevokeCurrentAttempt sessionId
+
+                    scope.StrengthReplicaRuntime
+                    |> Option.iter (fun runtime -> runtime.CancelOwner sessionId |> ignore)
+
                     reconciler.Signal signal
                 | SessionDeleted sessionId ->
                     scope.LoopSensor.DropSession sessionId

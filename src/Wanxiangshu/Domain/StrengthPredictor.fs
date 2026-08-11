@@ -75,7 +75,10 @@ module StrengthPredictor =
                 SecondObservations = current.SecondObservations + 1
                 ReadonlySecond =
                     current.ReadonlySecond
-                    + (if symbol = StrengthPrimarySymbol.ReadonlyBatch then 1 else 0) }
+                    + (if symbol = StrengthPrimarySymbol.ReadonlyBatch then
+                           1
+                       else
+                           0) }
 
         put key next state
 
@@ -83,12 +86,16 @@ module StrengthPredictor =
         let bucket = bucketOf key state
 
         let p1 =
-            if bucket.Opportunities <= 0 then 0.0
-            else float bucket.ReadonlyFirst / float bucket.Opportunities
+            if bucket.Opportunities <= 0 then
+                0.0
+            else
+                float bucket.ReadonlyFirst / float bucket.Opportunities
 
         let p2 =
-            if bucket.SecondObservations <= 0 then 0.0
-            else float bucket.ReadonlySecond / float bucket.SecondObservations
+            if bucket.SecondObservations <= 0 then
+                0.0
+            else
+                float bucket.ReadonlySecond / float bucket.SecondObservations
 
         { P1 = p1
           P2 = p2

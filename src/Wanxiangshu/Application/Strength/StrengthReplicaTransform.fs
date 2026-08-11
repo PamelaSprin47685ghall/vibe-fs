@@ -55,15 +55,18 @@ module StrengthReplicaTransform =
                         let localFrame =
                             match batches with
                             | [] -> Ok None
-                            | _ ->
-                                StrengthFrame.tryBuild sha256 binding.MaxFrameBytes batches
-                                |> Result.map Some
+                            | _ -> StrengthFrame.tryBuild sha256 binding.MaxFrameBytes batches |> Result.map Some
 
                         match localFrame with
                         | Error error ->
                             runtime.Retire replicaSessionId |> ignore
                             let! _ = sessions.AbortSession replicaSessionId
-                            return StrengthReplicaTransformOutcome.Retired(sprintf "invalid-replica-frame:%A" error, batches)
+
+                            return
+                                StrengthReplicaTransformOutcome.Retired(
+                                    sprintf "invalid-replica-frame:%A" error,
+                                    batches
+                                )
                         | Ok frame ->
                             let intents =
                                 [ yield
@@ -85,7 +88,12 @@ module StrengthReplicaTransform =
                             | Error conflict ->
                                 runtime.Retire replicaSessionId |> ignore
                                 let! _ = sessions.AbortSession replicaSessionId
-                                return StrengthReplicaTransformOutcome.Retired(sprintf "projection-conflict:%A" conflict, batches)
+
+                                return
+                                    StrengthReplicaTransformOutcome.Retired(
+                                        sprintf "projection-conflict:%A" conflict,
+                                        batches
+                                    )
                             | Ok ordered ->
                                 let rendered =
                                     ProjectionRenderer.renderMessagesWithHostIds

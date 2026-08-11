@@ -15,7 +15,8 @@ module StrengthTurnEvidence =
             | MessagePart.Text text
             | MessagePart.Reasoning text when not (String.IsNullOrWhiteSpace text) -> 2
             | MessagePart.ToolCall(callId, name, _) when
-                not (String.IsNullOrWhiteSpace callId) || not (String.IsNullOrWhiteSpace name) ->
+                not (String.IsNullOrWhiteSpace callId) || not (String.IsNullOrWhiteSpace name)
+                ->
                 2
             | MessagePart.ToolResult _
             | MessagePart.Activity _ -> 1
@@ -37,7 +38,10 @@ module StrengthTurnEvidence =
             |> Array.toList
 
         match calls with
-        | _ :: _ when calls |> List.forall (fun name -> name = "read" || name = "glob" || name = "grep") ->
+        | _ :: _ when
+            calls
+            |> List.forall (fun name -> name = "read" || name = "glob" || name = "grep")
+            ->
             StrengthPrimarySymbol.ReadonlyBatch
         | _ :: _ -> StrengthPrimarySymbol.MutatingOrExecuting
         | [] when
@@ -45,7 +49,8 @@ module StrengthTurnEvidence =
             |> Array.exists (function
                 | MessagePart.Text text
                 | MessagePart.Reasoning text -> not (String.IsNullOrWhiteSpace text)
-                | _ -> false) ->
+                | _ -> false)
+            ->
             StrengthPrimarySymbol.TextOnly
         | [] -> StrengthPrimarySymbol.Other
 

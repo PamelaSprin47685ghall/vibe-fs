@@ -356,13 +356,14 @@ module StrengthSpeculate =
                                                                     | Ok bundle ->
                                                                         match
                                                                             durability.PublishPrepared
-                                                                                owner
-                                                                                id
-                                                                                target
-                                                                                completed.ReplicaSessionId
-                                                                                budget
-                                                                                anchorDigest
-                                                                                bundle
+                                                                                { OwnerSessionId = owner
+                                                                                  DecisionId = id
+                                                                                  TargetProviderRun = target
+                                                                                  ReplicaSessionId =
+                                                                                    completed.ReplicaSessionId
+                                                                                  Budget = budget
+                                                                                  AnchorDigest = anchorDigest
+                                                                                  Bundle = bundle }
                                                                         with
                                                                         | StrengthPreparedPublish.StorageInvalid error ->
                                                                             let reason =

@@ -33,7 +33,10 @@ module StrengthSettings =
             | _ -> fallback
 
     let private mode () =
-        match env "WANXIANGSHU_STRENGTH_MODE" |> Option.map (fun value -> value.ToLowerInvariant()) with
+        match
+            env "WANXIANGSHU_STRENGTH_MODE"
+            |> Option.map (fun value -> value.ToLowerInvariant())
+        with
         | Some "off" -> StrengthRolloutMode.Off
         | Some "treatment" -> StrengthRolloutMode.Treatment
         | Some "shadow"
@@ -79,8 +82,12 @@ module StrengthSettings =
         | None -> false
 
     let load () : StrengthRolloutConfig =
-        let k1Margin = nonNegativeFloat "WANXIANGSHU_STRENGTH_K1_MARGIN" |> Option.defaultValue 0.0
-        let k2Margin = nonNegativeFloat "WANXIANGSHU_STRENGTH_K2_MARGIN" |> Option.defaultValue 0.25
+        let k1Margin =
+            nonNegativeFloat "WANXIANGSHU_STRENGTH_K1_MARGIN" |> Option.defaultValue 0.0
+
+        let k2Margin =
+            nonNegativeFloat "WANXIANGSHU_STRENGTH_K2_MARGIN" |> Option.defaultValue 0.25
+
         let safeK2Margin = max (k1Margin + 0.000001) k2Margin
 
         { Mode = mode ()

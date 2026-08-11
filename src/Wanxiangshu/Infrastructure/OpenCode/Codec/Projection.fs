@@ -325,12 +325,7 @@ module Projection =
                     let raw =
                         createObj
                             [ "info",
-                              box (
-                                  createObj
-                                      [ "id", box id
-                                        "sessionID", box sessionId
-                                        "role", box message.Role ]
-                              )
+                              box (createObj [ "id", box id; "sessionID", box sessionId; "role", box message.Role ])
                               "parts", box (List.toArray parts) ]
 
                     encodeMessages tail (raw :: acc)

@@ -57,7 +57,9 @@ module StrengthLifecycle =
             |> Map.toList
             |> List.map snd
             |> List.filter (fun view ->
-                view.Prepared.OwnerSessionId = ownerSessionId && view.Promoted && not view.Abandoned)
+                view.Prepared.OwnerSessionId = ownerSessionId
+                && view.Promoted
+                && not view.Abandoned)
             |> List.sortBy (fun view -> StrengthDecisionId.value view.Prepared.DecisionId)
 
         let rec loop (remaining: StrengthCandidateView list) (acc: StrengthReplayPlan list) =
@@ -111,6 +113,4 @@ module StrengthLifecycle =
                 plan.Bundle)
 
     let framePartCount (bundle: StrengthFrameBundle) =
-        bundle.Batches
-        |> List.sumBy (fun batch -> batch.Exchanges.Length * 2)
-
+        bundle.Batches |> List.sumBy (fun batch -> batch.Exchanges.Length * 2)

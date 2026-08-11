@@ -70,8 +70,7 @@ type StrengthReplicaRuntime
 
     let requestsFor terminal (state: StrengthReplicaDecisionState) =
         match terminal with
-        | StrengthReplicaTerminal.TextCompleted ->
-            max state.RequestsAdmitted (min 2 (List.length state.Batches + 1))
+        | StrengthReplicaTerminal.TextCompleted -> max state.RequestsAdmitted (min 2 (List.length state.Batches + 1))
         | _ -> state.RequestsAdmitted
 
     let outcome terminal (state: StrengthReplicaDecisionState) =
@@ -118,13 +117,16 @@ type StrengthReplicaRuntime
 
     member _.MaxFrameBytes = frameByteLimit
 
-    member _.IsReplica(sessionId: SessionId) = liveRegistry.TryFindByReplica sessionId |> Option.isSome
+    member _.IsReplica(sessionId: SessionId) =
+        liveRegistry.TryFindByReplica sessionId |> Option.isSome
 
     member _.TryOwner(sessionId: SessionId) =
-        liveRegistry.TryFindByReplica sessionId |> Option.map (fun binding -> binding.OwnerSessionId)
+        liveRegistry.TryFindByReplica sessionId
+        |> Option.map (fun binding -> binding.OwnerSessionId)
 
     member _.TryDecision(sessionId: SessionId) =
-        liveRegistry.TryFindByReplica sessionId |> Option.map (fun binding -> binding.DecisionId)
+        liveRegistry.TryFindByReplica sessionId
+        |> Option.map (fun binding -> binding.DecisionId)
 
     /// Called after the Replica request profile has been bound by XWire, but
     /// before any ordinary Work transform writer. A Retired outcome means the
@@ -139,8 +141,7 @@ type StrengthReplicaRuntime
                 match tryState replica with
                 | None -> return false
                 | Some state ->
-                    let! transformed =
-                        StrengthReplicaTransform.apply HostDigest.sha256Hex liveRegistry sessions output
+                    let! transformed = StrengthReplicaTransform.apply HostDigest.sha256Hex liveRegistry sessions output
 
                     match transformed with
                     | StrengthReplicaTransformOutcome.NotReplica -> return false
@@ -160,8 +161,10 @@ type StrengthReplicaRuntime
 
                         if reason = "provider-request-budget-reached" then
                             complete StrengthReplicaTerminal.BudgetReached state
-                        elif reason.StartsWith("invalid-replica-frame", StringComparison.Ordinal)
-                             || reason.StartsWith("projection-conflict", StringComparison.Ordinal) then
+                        elif
+                            reason.StartsWith("invalid-replica-frame", StringComparison.Ordinal)
+                            || reason.StartsWith("projection-conflict", StringComparison.Ordinal)
+                        then
                             complete (StrengthReplicaTerminal.InvalidFrame reason) state
                         else
                             complete (StrengthReplicaTerminal.Failed reason) state
@@ -205,8 +208,7 @@ type StrengthReplicaRuntime
             fastAgent: string,
             frozenMirror: WireMessage list,
             mirrorSemanticDigest: string
-        )
-        : Task<Result<StrengthReplicaOutcome, string>> =
+        ) : Task<Result<StrengthReplicaOutcome, string>> =
         task {
             if StrengthBudget.requestLimit budget = 0 then
                 return Error "StrengthReplica cannot start with K0"

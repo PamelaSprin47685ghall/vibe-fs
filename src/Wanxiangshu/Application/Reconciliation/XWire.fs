@@ -120,8 +120,7 @@ module XWire =
             let rawMessages = Projection.messagesFromTransformOutput output
 
             match Projection.lastUserMessageId rawMessages with
-            | None ->
-                raise (InvalidOperationException "StrengthReplica request has no physical user message")
+            | None -> raise (InvalidOperationException "StrengthReplica request has no physical user message")
             | Some physical ->
                 let! snapshotResult = snapshotPort.GetMessages sessionId
 
@@ -138,7 +137,9 @@ module XWire =
                         match PromptAuthorityLedger.activeProfile sessionId projections.AgentProjections with
                         | None -> raise (InvalidOperationException "StrengthReplica has no active Authority Root")
                         | Some authority when authority.CanonicalRole <> binding.CanonicalRole ->
-                            raise (InvalidOperationException "StrengthReplica Authority Root role changed after binding")
+                            raise (
+                                InvalidOperationException "StrengthReplica Authority Root role changed after binding"
+                            )
                         | Some authority ->
                             let plan =
                                 AttemptPlanner.plan
@@ -179,7 +180,9 @@ module XWire =
                         do! applyStrengthReplicaPlan snapshotPort durable scope sessionId binding output
                         return ()
                     | None ->
-                        raise (InvalidOperationException "StrengthReplica cannot plan without the public session snapshot")
+                        raise (
+                            InvalidOperationException "StrengthReplica cannot plan without the public session snapshot"
+                        )
                 | None when scope.TryRecoveryArming sessionId |> Option.isNone -> return ()
                 | None ->
                     let arming = scope.TryRecoveryArming sessionId |> Option.get

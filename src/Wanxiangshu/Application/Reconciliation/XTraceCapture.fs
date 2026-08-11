@@ -391,7 +391,10 @@ module XTraceCapture =
                 Error "stable XTrace requires unique Host message ids"
             else
                 let generation = captureGeneration durable sessionId
-                let recorded = existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
+
+                let recorded =
+                    existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
+
                 let mutable cursor = XTraceProjection.headSequence existing
                 let mutable failure: string option = None
 
@@ -401,15 +404,15 @@ module XTraceCapture =
                         message.Parts
                         |> List.iteri (fun partIndex part ->
                             if Option.isNone failure then
-                                let provenance =
-                                    sprintf "g:%d/msg:%s/part:%d" generation messageId partIndex
+                                let provenance = sprintf "g:%d/msg:%s/part:%d" generation messageId partIndex
 
                                 if not (Set.contains provenance recorded) then
                                     cursor <- cursor + 1L
                                     let kind, toolName, body = partShape part
 
                                     match durable.WriteBlob body with
-                                    | Error error -> failure <- Some(sprintf "XTrace part blob write failed: %s" error)
+                                    | Error error ->
+                                        failure <- Some(sprintf "XTrace part blob write failed: %s" error)
                                     | Ok blob ->
                                         CompanionFact.XTracePartAppended
                                             {| SessionId = sessionId

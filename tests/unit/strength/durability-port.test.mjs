@@ -34,15 +34,15 @@ test('STRENGTH_006_008_durability_port_publishes_payload_closure_and_reloads_the
   const durability = Durability.create(raw, store)
   const bundle = frame()
 
-  const published = durability.PublishPrepared(
-    session('owner'),
-    decision('d1'),
-    run('run-1'),
-    session('replica-1'),
-    StrengthBudget.K1,
-    'anchor-a',
-    bundle,
-  )
+  const published = durability.PublishPrepared({
+    OwnerSessionId: session('owner'),
+    DecisionId: decision('d1'),
+    TargetProviderRun: run('run-1'),
+    ReplicaSessionId: session('replica-1'),
+    Budget: StrengthBudget.K1,
+    AnchorDigest: 'anchor-a',
+    Bundle: bundle,
+  })
   assert.equal(caseOf(published), 'Published')
 
   let projection = resultOf(durability.LoadProjection())
@@ -76,9 +76,15 @@ test('STRENGTH_006_durability_port_rejects_conflicting_Prepared_identity', () =>
   const durability = Durability.create(raw, store)
   const first = frame()
 
-  assert.equal(caseOf(durability.PublishPrepared(
-    session('owner'), decision('d1'), run('run-1'), session('replica-1'), StrengthBudget.K1, 'anchor-a', first,
-  )), 'Published')
+  assert.equal(caseOf(durability.PublishPrepared({
+    OwnerSessionId: session('owner'),
+    DecisionId: decision('d1'),
+    TargetProviderRun: run('run-1'),
+    ReplicaSessionId: session('replica-1'),
+    Budget: StrengthBudget.K1,
+    AnchorDigest: 'anchor-a',
+    Bundle: first,
+  })), 'Published')
 
   const other = resultOf(Frame.StrengthFrame_tryBuild(
     HostDigest.sha256Hex,
@@ -86,8 +92,14 @@ test('STRENGTH_006_durability_port_rejects_conflicting_Prepared_identity', () =>
     toList([batch(1, [exchange('grep', '{"pattern":"x"}', 'a:1:x')])]),
   )).value
 
-  const conflict = durability.PublishPrepared(
-    session('owner'), decision('d1'), run('run-1'), session('replica-2'), StrengthBudget.K1, 'anchor-a', other,
-  )
+  const conflict = durability.PublishPrepared({
+    OwnerSessionId: session('owner'),
+    DecisionId: decision('d1'),
+    TargetProviderRun: run('run-1'),
+    ReplicaSessionId: session('replica-2'),
+    Budget: StrengthBudget.K1,
+    AnchorDigest: 'anchor-a',
+    Bundle: other,
+  })
   assert.equal(caseOf(conflict), 'StorageInvalid')
 })
