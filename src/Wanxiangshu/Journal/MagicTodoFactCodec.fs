@@ -224,8 +224,7 @@ module MagicTodoFactCodec =
                         { ManagerLifeId = ManagerLifeId.create (get.Required.Field "ManagerLifeId" Decode.string)
                           TodoWriteId = get.Required.Field "TodoWriteId" todoWriteIdDecoder
                           ToolCallId = ToolCallId.create (get.Required.Field "ToolCallId" Decode.string)
-                          PreparedFactRef =
-                            EventId.create (get.Required.Field "PreparedFactRef" Decode.string)
+                          PreparedFactRef = EventId.create (get.Required.Field "PreparedFactRef" Decode.string)
                           InputDigest = get.Required.Field "InputDigest" Decode.string
                           OutputDigest = get.Required.Field "OutputDigest" Decode.string
                           PhysicalSuccessEvidence =

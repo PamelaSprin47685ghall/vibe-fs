@@ -10,9 +10,9 @@ module ManagerConfig =
     /// - never create missing agents
     /// - never write or overwrite model bindings
     /// - reject legacy unprefixed / build / plan names
-    let configureManager (config: obj) : unit =
+    let configureManager (config: obj) : ManagedAgentConfig.ManagedAgentInventory =
         match ManagedAgentConfig.configureFromHostConfig config with
-        | Ok _ -> ()
+        | Ok inventory -> inventory
         | Error err ->
             // Fail closed at config time so Host surfaces the gate error.
             raise (System.InvalidOperationException err)

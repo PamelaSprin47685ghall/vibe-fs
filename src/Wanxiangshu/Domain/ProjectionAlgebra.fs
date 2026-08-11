@@ -713,9 +713,9 @@ module ProjectionRenderer =
         let decisionId = insertion.DecisionId
         let digest = insertion.Bundle.Digest
 
-        let batchMessages =
+        let renderedBatches =
             insertion.Bundle.Batches
-            |> List.collect (fun batch ->
+            |> List.map (fun batch ->
                 let callParts, resultParts =
                     batch.Exchanges
                     |> List.mapi (fun exchangeIndex exchange ->
@@ -746,9 +746,16 @@ module ProjectionRenderer =
 
                 let tool: ProviderProjection.WireMessage = { Role = "tool"; Parts = resultParts }
 
-                [ assistant; tool ])
+                let callMessageId =
+                    StrengthFrame.hostMessageId sha256 owner decisionId batch.RequestOrdinal "call" digest
 
-        let ids = batchMessages |> List.map (fun _ -> None)
+                let resultMessageId =
+                    StrengthFrame.hostMessageId sha256 owner decisionId batch.RequestOrdinal "result" digest
+
+                [ assistant; tool ], [ Some callMessageId; Some resultMessageId ])
+
+        let batchMessages = renderedBatches |> List.collect fst
+        let ids = renderedBatches |> List.collect snd
         let physical = batchMessages |> List.map (fun _ -> false)
         batchMessages, ids, physical
 

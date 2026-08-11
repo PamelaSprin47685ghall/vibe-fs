@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
@@ -9,8 +10,8 @@ open Wanxiangshu.Session
 [<RequireQualifiedAccess>]
 type StrengthReplicaTransformOutcome =
     | NotReplica
-    | Ready of completedBatches: int
-    | Retired of reason: string
+    | Ready of completedBatches: StrengthRequestBatch list
+    | Retired of reason: string * completedBatches: StrengthRequestBatch list
 
 /// STRENGTH-003/004/009/014: transform program for the InternalLeaf replica.
 /// It bypasses Work recovery/Companion writers, replaces the physical child
@@ -18,12 +19,6 @@ type StrengthReplicaTransformOutcome =
 /// completed prior batches. Reaching K aborts before the next provider request.
 [<RequireQualifiedAccess>]
 module StrengthReplicaTransform =
-
-    let private budgetLimit =
-        function
-        | StrengthBudget.K0 -> 0
-        | StrengthBudget.K1 -> 1
-        | StrengthBudget.K2 -> 2
 
     let private snapshotOf wire =
         { CurrentProjection = ProviderProjection.toSemantic wire
@@ -52,23 +47,26 @@ module StrengthReplicaTransform =
                     let batches = StrengthBatchCollector.collectCompleteBatches currentWire.Messages
                     let completed = List.length batches
 
-                    if completed >= budgetLimit binding.Budget then
+                    if completed >= StrengthBudget.requestLimit binding.Budget then
                         runtime.Retire replicaSessionId |> ignore
                         let! _ = sessions.AbortSession replicaSessionId
-                        return StrengthReplicaTransformOutcome.Retired "provider-request-budget-reached"
+                        return StrengthReplicaTransformOutcome.Retired("provider-request-budget-reached", batches)
                     else
                         let localFrame =
                             match batches with
                             | [] -> Ok None
-                            | _ ->
-                                StrengthFrame.tryBuild sha256 binding.MaxFrameBytes batches
-                                |> Result.map Some
+                            | _ -> StrengthFrame.tryBuild sha256 binding.MaxFrameBytes batches |> Result.map Some
 
                         match localFrame with
                         | Error error ->
                             runtime.Retire replicaSessionId |> ignore
                             let! _ = sessions.AbortSession replicaSessionId
-                            return StrengthReplicaTransformOutcome.Retired(sprintf "invalid-replica-frame:%A" error)
+
+                            return
+                                StrengthReplicaTransformOutcome.Retired(
+                                    sprintf "invalid-replica-frame:%A" error,
+                                    batches
+                                )
                         | Ok frame ->
                             let intents =
                                 [ yield
@@ -90,7 +88,12 @@ module StrengthReplicaTransform =
                             | Error conflict ->
                                 runtime.Retire replicaSessionId |> ignore
                                 let! _ = sessions.AbortSession replicaSessionId
-                                return StrengthReplicaTransformOutcome.Retired(sprintf "projection-conflict:%A" conflict)
+
+                                return
+                                    StrengthReplicaTransformOutcome.Retired(
+                                        sprintf "projection-conflict:%A" conflict,
+                                        batches
+                                    )
                             | Ok ordered ->
                                 let rendered =
                                     ProjectionRenderer.renderMessagesWithHostIds
@@ -103,8 +106,8 @@ module StrengthReplicaTransform =
                                 | Error error ->
                                     runtime.Retire replicaSessionId |> ignore
                                     let! _ = sessions.AbortSession replicaSessionId
-                                    return StrengthReplicaTransformOutcome.Retired error
+                                    return StrengthReplicaTransformOutcome.Retired(error, batches)
                                 | Ok replacement ->
-                                    HostMessageProjection.replaceMessagesInPlace output replacement
-                                    return StrengthReplicaTransformOutcome.Ready completed
+                                    output?messages <- List.toArray replacement
+                                    return StrengthReplicaTransformOutcome.Ready batches
         }

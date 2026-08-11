@@ -369,6 +369,85 @@ module XTraceCapture =
 
             Some(xTraceOf durable sessionId)
 
+    /// STRENGTH-008: whether this XTrace can accept a historical insertion
+    /// without positional provenance drift. Empty traces are eligible; once a
+    /// runtime has captured parts, every provenance must be Host-message based.
+    /// Legacy `g:N/turn:M/part:P` traces remain readable but force Strength K0.
+    let supportsStableInsertion (journal: AgentJournal option) (sessionId: SessionId) : bool =
+        match journal with
+        | None -> false
+        | Some durable ->
+            let existing = xTraceOf durable sessionId
+
+            existing.Parts
+            |> List.forall (fun part -> part.Provenance.Contains("/msg:", StringComparison.Ordinal))
+
+    let private captureSourcesStable
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (messageIds: string list)
+        (messages: TraceSourceMessage list)
+        : Result<XTraceProjectionState option, string> =
+        match journal with
+        | None -> Ok None
+        | Some durable ->
+            let existing = xTraceOf durable sessionId
+
+            if not (supportsStableInsertion journal sessionId) then
+                Error "legacy positional XTrace cannot accept stable historical insertion"
+            elif List.length messageIds <> List.length messages then
+                Error "stable XTrace message identity cardinality does not match semantic projection"
+            elif messageIds |> List.exists String.IsNullOrWhiteSpace then
+                Error "stable XTrace requires a non-empty Host id for every semantic message"
+            elif (messageIds |> Set.ofList |> Set.count) <> List.length messageIds then
+                Error "stable XTrace requires unique Host message ids"
+            else
+                let generation = captureGeneration durable sessionId
+
+                let recorded =
+                    existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
+
+                // DSL-MUTABLE: algorithm-scratch
+                let mutable cursor = XTraceProjection.headSequence existing
+                // DSL-MUTABLE: algorithm-scratch
+                let mutable failure: string option = None
+
+                List.zip messageIds messages
+                |> List.iteri (fun turnIndex (messageId, message) ->
+                    if Option.isNone failure then
+                        message.Parts
+                        |> List.iteri (fun partIndex source ->
+                            if Option.isNone failure then
+                                let provenance = sprintf "g:%d/msg:%s/part:%d" generation messageId partIndex
+
+                                if not (Set.contains provenance recorded) then
+                                    cursor <- cursor + 1L
+                                    let kind, toolName, body = partShape source.Part
+
+                                    match durable.WriteBlob body with
+                                    | Error error ->
+                                        failure <- Some(sprintf "XTrace part blob write failed: %s" error)
+                                    | Ok blob ->
+                                        CompanionFact.XTracePartAppended
+                                            {| SessionId = sessionId
+                                               CursorSequence = cursor
+                                               Role = message.Role
+                                               Turn = turnIndex
+                                               PartIndex = partIndex
+                                               Kind = kind
+                                               ToolName = toolName
+                                               TextRef = blob.BlobRef
+                                               TextDigest = blob.BlobDigest
+                                               Provenance = provenance
+                                               ProviderRun = message.ProviderRun
+                                               ToolCallId = source.ToolCallId
+                                               HostToolPartId = source.HostToolPartId |}
+                                        |> appendFact durable sessionId message.ProviderRun))
+
+                match failure with
+                | Some error -> Error error
+                | None -> Ok(Some(xTraceOf durable sessionId))
+
     let captureProjection
         (journal: AgentJournal option)
         (sessionId: SessionId)
@@ -410,3 +489,45 @@ module XTraceCapture =
                       ToolCallId = toolCallId
                       HostToolPartId = captured.HostToolPartId }) })
         |> captureSources journal sessionId
+
+    let captureProjectionStable
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (messageIds: string list)
+        (projection: ProviderSemanticProjection)
+        : Result<XTraceProjectionState option, string> =
+        projection.Messages
+        |> List.map (fun message ->
+            { Role = message.Role
+              ProviderRun = None
+              Parts =
+                message.Parts
+                |> List.map (fun part ->
+                    { Part = part
+                      ToolCallId = None
+                      HostToolPartId = None }) })
+        |> captureSourcesStable journal sessionId messageIds
+
+    let captureMessageViewStable
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (messageIds: string list)
+        (messages: Projection.CapturedWireMessage list)
+        : Result<XTraceProjectionState option, string> =
+        messages
+        |> List.map (fun message ->
+            { Role = message.Role
+              ProviderRun = message.ProviderRun
+              Parts =
+                message.Parts
+                |> List.map (fun captured ->
+                    let toolCallId =
+                        match captured.WirePart with
+                        | WireToolCall(callId, _, _)
+                        | WireToolResult(callId, _) -> Some callId
+                        | _ -> None
+
+                    { Part = semanticPartFromWire captured.WirePart
+                      ToolCallId = toolCallId
+                      HostToolPartId = captured.HostToolPartId }) })
+        |> captureSourcesStable journal sessionId messageIds

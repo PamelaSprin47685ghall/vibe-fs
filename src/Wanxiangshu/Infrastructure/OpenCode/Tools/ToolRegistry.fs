@@ -161,6 +161,7 @@ module ToolRegistry =
             fun args (ctx: HostToolContext) ->
                 task {
                     let allowed = rolePredicate spec.Name parkedHost ctx.SessionId
+
                     let isStrengthReplica =
                         match strengthRuntime with
                         | Some strength when not (String.IsNullOrWhiteSpace ctx.SessionId) ->
@@ -173,8 +174,7 @@ module ToolRegistry =
                         // therefore a forged/hidden path and fails closed here.
                         return
                             ToolHostCodec.tomlObject
-                                [ "error",
-                                  tString (sprintf "Tool '%s' is not permitted for StrengthReplica" spec.Name) ]
+                                [ "error", tString (sprintf "Tool '%s' is not permitted for StrengthReplica" spec.Name) ]
                     else
                         match runtime.RoleFor ctx with
                         | Some role when allowed role -> return! original args ctx
@@ -183,7 +183,8 @@ module ToolRegistry =
                         | None ->
                             match! runtime.EnsureRoleFor ctx with
                             | Some role when allowed role -> return! original args ctx
-                            | Some role when spec.Name = "blog" && role = Role.Blogger -> return! stopBlogNoLiveCycle ctx
+                            | Some role when spec.Name = "blog" && role = Role.Blogger ->
+                                return! stopBlogNoLiveCycle ctx
                             | Some role -> return denyRole role
                             | None ->
                                 // AGENT-007: an unresolved Role means an empty tool set.

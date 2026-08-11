@@ -130,7 +130,7 @@ module MagicTodoProjection =
         (life: LifeMagicTodoState)
         : MagicTodoList =
         match life.SettledCurrentRef with
-        | Some (blobRef, digest) -> decodeList blobRef digest
+        | Some(blobRef, digest) -> decodeList blobRef digest
         | None -> []
 
     let foldPrepared
@@ -215,8 +215,9 @@ module MagicTodoProjection =
             Error(MagicTodoFoldRejection.IdentityCorruption "SemanticVersion")
         | Some cp when cp.Accepted ->
             match cp.InputDigest, cp.OutputDigest with
-            | Some inputDigest, Some outputDigest
-                when inputDigest = payload.InputDigest && outputDigest = payload.OutputDigest ->
+            | Some inputDigest, Some outputDigest when
+                inputDigest = payload.InputDigest && outputDigest = payload.OutputDigest
+                ->
                 Ok state
             | Some _, Some _ -> Error(MagicTodoFoldRejection.IdentityCorruption "AcceptedDigest")
             | _ -> Error(MagicTodoFoldRejection.IdentityCorruption "AcceptedState")
@@ -254,9 +255,10 @@ module MagicTodoProjection =
         | Some cp ->
             match life.Dedicated with
             | None -> Error MagicTodoFoldRejection.DedicatedMissingForAssign
-            | Some dedicated
-                when dedicated.DedicatedReviewerId <> payload.DedicatedReviewerId
-                     || dedicated.ReviewerSessionId <> payload.ReviewerSessionId ->
+            | Some dedicated when
+                dedicated.DedicatedReviewerId <> payload.DedicatedReviewerId
+                || dedicated.ReviewerSessionId <> payload.ReviewerSessionId
+                ->
                 Error(MagicTodoFoldRejection.IdentityCorruption "DedicatedReviewer")
             | Some _ ->
                 match cp.Assignment with
@@ -289,9 +291,11 @@ module MagicTodoProjection =
             match cp.Assignment with
             | None -> Error(MagicTodoFoldRejection.AssignmentWithoutAccepted key)
             | Some assignment ->
-                if assignment.TodoReviewId <> payload.TodoReviewId
-                   || assignment.DedicatedReviewerId <> payload.DedicatedReviewerId
-                   || assignment.ReviewerSessionId <> payload.ReviewerSessionId then
+                if
+                    assignment.TodoReviewId <> payload.TodoReviewId
+                    || assignment.DedicatedReviewerId <> payload.DedicatedReviewerId
+                    || assignment.ReviewerSessionId <> payload.ReviewerSessionId
+                then
                     Error(MagicTodoFoldRejection.IdentityCorruption "TodoReviewAssignment")
                 else
                     let cp = { cp with Concluded = Some payload }
@@ -355,14 +359,14 @@ module MagicTodoProjection =
         let life, state = ensureLife payload.ManagerLifeId state
 
         match life.LegacySeed with
-        | Some(seedRef, seedDigest, seedItemIds)
-            when seedRef = payload.SeedTodoRef
-                 && seedDigest = payload.SeedTodoDigest
-                 && seedItemIds = payload.SeedItemIds ->
+        | Some(seedRef, seedDigest, seedItemIds) when
+            seedRef = payload.SeedTodoRef
+            && seedDigest = payload.SeedTodoDigest
+            && seedItemIds = payload.SeedItemIds
+            ->
             Ok state
         | Some _ -> Error(MagicTodoFoldRejection.IdentityCorruption "LegacyTodoSeed")
-        | None when not (Map.isEmpty life.Checkpoints) ->
-            Error MagicTodoFoldRejection.LegacySeedAfterCheckpoint
+        | None when not (Map.isEmpty life.Checkpoints) -> Error MagicTodoFoldRejection.LegacySeedAfterCheckpoint
         | None ->
             Ok(
                 putLife

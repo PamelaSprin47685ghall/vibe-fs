@@ -32,69 +32,61 @@ module StrengthBatchCollector =
             | ProviderProjection.WireToolResult(callId, result) -> Some(callId, result)
             | _ -> None)
 
-    let collectCompleteBatches (messages: ProviderProjection.WireMessage list) : StrengthRequestBatch list =
-        let all = List.toArray messages
-        let collected = ResizeArray<StrengthRequestBatch>()
-        let mutable index = 0
-        let mutable requestOrdinal = 0
-        let mutable stopped = false
+    let private isBoundary (message: ProviderProjection.WireMessage) =
+        String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)
+        || String.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase)
 
-        while index < all.Length && not stopped do
-            let message = all.[index]
+    let private collectResults (boundarySlice: ProviderProjection.WireMessage list) =
+        boundarySlice
+        |> List.collect resultParts
+        |> List.fold
+            (fun (valid, acc: Map<string, string>) (callId, result) ->
+                let key = ToolCallId.value callId
 
-            if String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase) then
-                requestOrdinal <- requestOrdinal + 1
-                let calls = callsOf message
-
-                if List.isEmpty calls then
-                    // A text/reasoning-only provider completion terminates the
-                    // speculative loop; there can be no later batch in this decision.
-                    stopped <- true
+                if not valid || Map.containsKey key acc then
+                    false, acc
                 else
-                    let callIds = calls |> List.map (fun call -> ToolCallId.value call.Id) |> Set.ofList
-                    let results = System.Collections.Generic.Dictionary<string, string>()
-                    let mutable duplicateOrForeign = false
-                    let mutable cursor = index + 1
-                    let mutable boundary = false
+                    true, Map.add key result acc)
+            (true, Map.empty)
 
-                    while cursor < all.Length && not boundary do
-                        let next = all.[cursor]
+    let collectCompleteBatches (messages: ProviderProjection.WireMessage list) : StrengthRequestBatch list =
+        let rec loop (remaining: ProviderProjection.WireMessage list) ordinal acc =
+            match remaining with
+            | [] -> List.rev acc
+            | message :: tail ->
+                if String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase) then
+                    let calls = callsOf message
 
-                        if
-                            String.Equals(next.Role, "assistant", StringComparison.OrdinalIgnoreCase)
-                            || String.Equals(next.Role, "user", StringComparison.OrdinalIgnoreCase)
-                        then
-                            boundary <- true
-                        else
-                            for callId, result in resultParts next do
-                                let key = ToolCallId.value callId
-
-                                if not (Set.contains key callIds) || results.ContainsKey key then
-                                    duplicateOrForeign <- true
-                                else
-                                    results.[key] <- result
-
-                            cursor <- cursor + 1
-
-                    if duplicateOrForeign || results.Count <> calls.Length then
-                        // Preserve earlier complete batches, but never jump over an
-                        // incomplete request: that would relabel provider request N+1
-                        // as N and corrupt K accounting.
-                        stopped <- true
+                    if List.isEmpty calls then
+                        List.rev acc
                     else
-                        let exchanges =
-                            calls
-                            |> List.map (fun call ->
-                                { ToolName = call.Name.Trim().ToLowerInvariant()
-                                  CanonicalArguments = call.Arguments
-                                  CanonicalResult = results.[ToolCallId.value call.Id] })
+                        let callIdSet = calls |> List.map (fun c -> ToolCallId.value c.Id) |> Set.ofList
+                        let toolMessages = tail |> List.takeWhile (not << isBoundary)
+                        let rest = tail |> List.skipWhile (not << isBoundary)
 
-                        collected.Add
-                            { RequestOrdinal = requestOrdinal
-                              Exchanges = exchanges }
+                        let noForeignCalls =
+                            toolMessages
+                            |> List.collect resultParts
+                            |> List.forall (fun (id, _) -> Set.contains (ToolCallId.value id) callIdSet)
 
-                    index <- if boundary then cursor else max cursor (index + 1)
-            else
-                index <- index + 1
+                        let noDuplicates, resultMap = collectResults toolMessages
 
-        collected |> Seq.toList
+                        if noForeignCalls && noDuplicates && Map.count resultMap = List.length calls then
+                            let exchanges =
+                                calls
+                                |> List.map (fun call ->
+                                    { ToolName = call.Name.Trim().ToLowerInvariant()
+                                      CanonicalArguments = call.Arguments
+                                      CanonicalResult = resultMap.[ToolCallId.value call.Id] })
+
+                            let batch =
+                                { RequestOrdinal = ordinal
+                                  Exchanges = exchanges }
+
+                            loop rest (ordinal + 1) (batch :: acc)
+                        else
+                            List.rev acc
+                else
+                    loop tail ordinal acc
+
+        loop messages 1 []

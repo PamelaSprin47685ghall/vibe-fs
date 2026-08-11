@@ -190,8 +190,7 @@ module MagicTodoSurface =
 
     // ── Canonical list wire (tool result / blob body) ──────────────────────
 
-    let renderListWire (items: MagicTodoList) : string =
-        MagicTodo.canonicalListWire items
+    let renderListWire (items: MagicTodoList) : string = MagicTodo.canonicalListWire items
     // ── Enriched tool result (§22) — byte-stable renderer ──────────────────
 
     type PreviousReviewView =

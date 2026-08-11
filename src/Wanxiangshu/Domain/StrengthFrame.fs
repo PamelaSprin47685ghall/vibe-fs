@@ -126,6 +126,27 @@ module StrengthFrame =
                           Digest = sha256 canonical
                           ByteLength = bytes }
 
+    /// Host-only synthetic message identity for one rendered half of a provider
+    /// request batch. This identity is stable across replay/restart and is used by
+    /// XTrace provenance to recover the exact Traced cursor range. It never enters
+    /// ProviderSemanticProjection or provider-visible content.
+    let hostMessageId
+        (sha256: string -> string)
+        (ownerSessionId: SessionId)
+        (decisionId: StrengthDecisionId)
+        (requestOrdinal: int)
+        (half: string)
+        (semanticDigest: string)
+        : string =
+        String.concat
+            "\u001f"
+            [ SessionId.value ownerSessionId
+              StrengthDecisionId.value decisionId
+              string requestOrdinal
+              half
+              semanticDigest ]
+        |> sha256
+
     /// Cross-session wire identity is derived only from frozen owner/decision and
     /// semantic coordinates. No mechanism/provenance label enters provider bytes.
     let wireToolCallId

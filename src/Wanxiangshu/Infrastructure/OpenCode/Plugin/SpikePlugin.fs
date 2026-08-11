@@ -12,6 +12,7 @@ open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Host
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Infrastructure
+open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
@@ -35,6 +36,10 @@ module SpikePlugin =
                 | Error err -> raise (InvalidOperationException err)
 
             let scope = new PluginRuntimeScope(journal)
+
+            let strengthFailClosed (reason: string) =
+                scope.TripStrengthFuse reason
+                raise (InvalidOperationException reason)
 
             PluginHost.restoreSessionParents journal scope.SessionParents
 
@@ -65,6 +70,17 @@ module SpikePlugin =
                 // instance starts before the manager worktree instances.
                 let workspaceDirectory = PluginHost.workspaceDirectory input
 
+                // STRENGTH-006..008: borrow the same unified EventStore already
+                // acquired by AgentJournal boot. Keep the handle in the composition
+                // root rather than PluginRuntimeScope so Journal and EventStore
+                // writers never become one dual-write owner.
+                let strengthDurability =
+                    match journal, workspaceDirectory with
+                    | Some _, Some workspace ->
+                        WorkspaceEventStore.tryCurrent (RuntimePath.gitCommonDir workspace)
+                        |> Option.map (fun (raw, store) -> StrengthDurability.create raw store)
+                    | _ -> None
+
                 // Causal wait bridge must stay on the root workspace so E2E
                 // diagnostics (host.workDir) can read active waits. Later worktree
                 // plugin boots must not redirect the process-local hub.
@@ -82,6 +98,7 @@ module SpikePlugin =
                         eventPort
                         snapshotOpt
                         journal
+                        strengthDurability
                         scope
                         input
                         workspaceDirectory
@@ -128,6 +145,29 @@ module SpikePlugin =
                         )
 
                     scope.AttachSyncDelegateRuntime syncDelegate
+
+                    let registerStrengthReplica (ownerId: SessionId) (replicaId: SessionId) (agent: string) =
+                        let ownerKey = SessionId.value ownerId
+                        let replicaKey = SessionId.value replicaId
+                        scope.SessionParents.[replicaKey] <- ownerKey
+                        wired.RegisterOwned ownerKey
+                        wired.RegisterOwned replicaKey
+
+                        match ManagedAgent.tryParse agent with
+                        | Some managed -> wired.BindActiveRun replicaId managed.Role workspaceDirectory
+                        | None -> ()
+
+                    let strengthReplicaRuntime =
+                        new StrengthReplicaRuntime(
+                            sessionPort,
+                            dispatcher,
+                            Wanxiangshu.Process.PtyTiming.nodeTimerPort (),
+                            scope.StrengthRuntime,
+                            registerStrengthReplica,
+                            ?workspaceDirectory = workspaceDirectory
+                        )
+
+                    scope.AttachStrengthReplicaRuntime strengthReplicaRuntime
                 | None -> ()
 
                 // GREEN-4: mandatory SessionRecoveryPorts. Real RestoreHandles/RecoverJobs.
@@ -176,12 +216,103 @@ module SpikePlugin =
 
                         projectionSessionIdOpt |> Option.iter wired.RegisterOwned
 
+                        let strengthReplica =
+                            match projectionSessionIdOpt, scope.StrengthReplicaRuntime with
+                            | Some sessionId, Some runtime when runtime.IsReplica(SessionId.create sessionId) ->
+                                Some runtime
+                            | _ -> None
+
+                        match strengthReplica with
+                        | Some runtime ->
+                            // STRENGTH-004/009: Replica uses exactly one request-plan
+                            // writer plus its mirror/K gate. XTrace, Manager narrative,
+                            // Companion, Enforcer, Pair and Review are owner-only.
+                            do! XWire.applyTransform snapshotOpt journal scope outObj
+                            let! handled = runtime.HandleTransform outObj
+
+                            if not handled then
+                                raise (
+                                    InvalidOperationException "StrengthReplica transform lost its live decision binding"
+                                )
+
+                            let currentMessages = unbox<obj array> outObj?messages |> Array.toList
+                            let sanitized = HostMessageProjection.sanitizeMessages currentMessages
+                            HostMessageProjection.replaceMessagesInPlace outObj sanitized
+                            return ()
+                        | None -> ()
+
                         // HOST-004：新 provider request 开始构建 → 旧 idle permit
                         // 立即失效。必须在该 transform 的最早同步位置（任何 let!
                         // 之前）调用，不得等 request 已运行才标 Running。
                         projectionSessionIdOpt
                         |> Option.iter (fun sessionId ->
                             scope.Quiescence.BeginProviderAttempt(SessionId.create sessionId))
+
+                        // DSL-MUTABLE: algorithm-scratch
+                        let mutable strengthReplayPlans: StrengthReplayPlan list = []
+
+                        // STRENGTH-008: replay durable Promoted frames before XTrace.
+                        // Candidate material is never read here. Existing Host rows
+                        // are preserved object-for-object; only algebra-owned
+                        // synthetic rows are inserted at the target assistant anchor.
+                        match projectionSessionIdOpt, strengthDurability with
+                        | Some sessionId, Some durability ->
+                            let owner = SessionId.create sessionId
+                            let rawMessages = unbox<obj array> outObj?messages |> Array.toList
+
+                            let coveredThroughSequence =
+                                journal
+                                |> Option.bind (fun durable ->
+                                    AgentProjection.tryFind owner (AgentJournal.snapshot durable).AgentProjections
+                                    |> Option.bind (fun state -> state.Blog)
+                                    |> Option.map (fun blog -> blog.Coverage.IngestedThroughSequence))
+
+                            match durability.LoadProjection() with
+                            | Error error -> strengthFailClosed ("Strength replay projection failed: " + error)
+                            | Ok strengthProjection ->
+                                match
+                                    StrengthLifecycle.replayPlans
+                                        owner
+                                        Projection.hostMessageId
+                                        rawMessages
+                                        durability.LoadFrameBundle
+                                        strengthProjection
+                                with
+                                | Error error -> strengthFailClosed error
+                                | Ok plans ->
+                                    let plans =
+                                        plans |> List.filter (StrengthLifecycle.needsRawReplay coveredThroughSequence)
+
+                                    match plans with
+                                    | [] -> ()
+                                    | _ ->
+                                        strengthReplayPlans <- plans
+                                        let wire = Projection.decodeMessageView rawMessages
+
+                                        let snapshot =
+                                            { CurrentProjection = ProviderProjection.toSemantic wire
+                                              CommittedPrefix = None
+                                              BlogFrames = []
+                                              TransportMessages = Set.empty
+                                              HostReanchor = None }
+
+                                        let rendered =
+                                            ProjectionRenderer.renderMessagesWithHostIds
+                                                HostDigest.sha256Hex
+                                                snapshot
+                                                wire.Messages
+                                                (StrengthLifecycle.replayIntents plans)
+
+                                        match
+                                            Projection.tryApplyRenderedInsertionsPreservingBase
+                                                sessionId
+                                                HostDigest.sha256Hex
+                                                rawMessages
+                                                rendered
+                                        with
+                                        | Error error -> strengthFailClosed ("Strength replay render failed: " + error)
+                                        | Ok replayed -> HostMessageProjection.replaceMessagesInPlace outObj replayed
+                        | _ -> ()
 
                         // COMPANION-003/007: keep the XTrace in step with the
                         // provider-visible semantic projection at the transform
@@ -200,11 +331,139 @@ module SpikePlugin =
                             let semantic =
                                 Projection.wireMessageView capturedMessages |> ProviderProjection.toSemantic
 
-                            // COMPANION-003/007: keep the XTrace in step with the
-                            // provider-visible semantic projection BEFORE the
-                            // Companion rewrite and X-wire run (see below).
+                            // COMPANION-003/007 + STRENGTH-008: new Host-runtime
+                            // traces use stable Host-message identity so a promoted
+                            // frame may be inserted before its not-yet-captured target
+                            // output without renumbering already-captured history.
+                            let sessionIdentity = SessionId.create sessionId
+
+                            let stableMessageIds =
+                                let ids = rawMessages |> List.map Projection.hostMessageId
+
+                                if ids |> List.forall Option.isSome then
+                                    Some(ids |> List.map Option.get)
+                                else
+                                    None
+
                             let traceState =
-                                XTraceCapture.captureMessageView journal (SessionId.create sessionId) capturedMessages
+                                match stableMessageIds with
+                                | Some ids when XTraceCapture.supportsStableInsertion journal sessionIdentity ->
+                                    match
+                                        XTraceCapture.captureMessageViewStable
+                                            journal
+                                            sessionIdentity
+                                            ids
+                                            capturedMessages
+                                    with
+                                    | Ok state -> state
+                                    | Error error -> strengthFailClosed error
+                                | _ -> XTraceCapture.captureMessageView journal sessionIdentity capturedMessages
+
+                            // STRENGTH-008: close Promoted -> Traced after capture.
+                            // Stable synthetic Host ids recover the exact range even
+                            // after a crash between XTrace append and this EventStore
+                            // append. Legacy positional traces fall back to a unique
+                            // canonical frame match; ambiguity is fail closed.
+                            match journal, strengthDurability, traceState with
+                            | Some durable, Some durability, Some updated ->
+                                let rec resolveObserved
+                                    (remaining: XTracePartRef list)
+                                    (acc: StrengthTraceObservedPart list)
+                                    =
+                                    match remaining with
+                                    | [] -> Ok(List.rev acc)
+                                    | part :: tail ->
+                                        match durable.Writer.BlobWriter.Read part.TextRef with
+                                        | Error error -> Error error
+                                        | Ok body ->
+                                            resolveObserved
+                                                tail
+                                                ({ CursorSequence = part.Cursor.Sequence
+                                                   Kind = part.Kind
+                                                   ToolName = part.ToolName
+                                                   Body = body }
+                                                 :: acc)
+
+                                for plan in strengthReplayPlans do
+                                    if plan.ExistingTraceRange.IsNone then
+                                        let expectedIds =
+                                            plan.Bundle.Batches
+                                            |> List.collect (fun batch ->
+                                                [ StrengthFrame.hostMessageId
+                                                      HostDigest.sha256Hex
+                                                      plan.Prepared.OwnerSessionId
+                                                      plan.Prepared.DecisionId
+                                                      batch.RequestOrdinal
+                                                      "call"
+                                                      plan.Bundle.Digest
+                                                  StrengthFrame.hostMessageId
+                                                      HostDigest.sha256Hex
+                                                      plan.Prepared.OwnerSessionId
+                                                      plan.Prepared.DecisionId
+                                                      batch.RequestOrdinal
+                                                      "result"
+                                                      plan.Bundle.Digest ])
+
+                                        let byStableId =
+                                            updated.Parts
+                                            |> List.filter (fun part ->
+                                                expectedIds
+                                                |> List.exists (fun id ->
+                                                    part.Provenance.Contains(
+                                                        "/msg:" + id + "/part:",
+                                                        StringComparison.Ordinal
+                                                    )))
+
+                                        let expectedCount = StrengthLifecycle.framePartCount plan.Bundle
+
+                                        let stableRange =
+                                            if List.length byStableId = expectedCount && expectedCount > 0 then
+                                                let sequences =
+                                                    byStableId |> List.map (fun part -> part.Cursor.Sequence)
+
+                                                let first = List.head sequences
+                                                let last = List.last sequences
+
+                                                let contiguous =
+                                                    sequences
+                                                    |> List.mapi (fun index value -> value = first + int64 index)
+                                                    |> List.forall id
+
+                                                if contiguous then
+                                                    Some
+                                                        { StartInclusive = first
+                                                          EndExclusive = last + 1L }
+                                                else
+                                                    None
+                                            else
+                                                None
+
+                                        let range =
+                                            match stableRange with
+                                            | Some value -> Ok(Some value)
+                                            | None ->
+                                                resolveObserved updated.Parts []
+                                                |> Result.bind (StrengthTraceRecovery.recoverRange plan.Bundle)
+
+                                        match range with
+                                        | Error error ->
+                                            strengthFailClosed ("Strength Traced recovery failed: " + error)
+                                        | Ok None ->
+                                            strengthFailClosed
+                                                "Strength Promoted frame is absent from XTrace after replay capture"
+                                        | Ok(Some traced) ->
+                                            match
+                                                durability.Append(
+                                                    StrengthEvents.traced
+                                                        plan.Prepared.DecisionId
+                                                        traced.StartInclusive
+                                                        traced.EndExclusive
+                                                )
+                                            with
+                                            | Ok() -> ()
+                                            | Error error ->
+                                                strengthFailClosed ("Strength Traced commit failed closed: " + error)
+                            | _ -> ()
 
                             traceState
                             |> Option.iter (fun updated ->
@@ -363,6 +622,11 @@ module SpikePlugin =
                             | None -> ()
                         | None -> ()
 
+                        // STRENGTH-009: freeze the post-Enforcer semantic view and
+                        // complete any eligible speculation before the Pair marker.
+                        // Prepared publication precedes Candidate visibility.
+                        do! StrengthSpeculate.tryApply snapshotOpt journal strengthDurability scope outObj
+
                         // HOST-013：永久 pair-programming auto-injected。
                         // XTrace 之后、ReviewSeal 之前。恢复 durable 历史 pair，
                         // 再在全局末尾追加本次 tool-call + tool-result。
@@ -495,7 +759,8 @@ module SpikePlugin =
                           // would report the symptom without the observation.
                           "config",
                           box (fun (config: obj) ->
-                              ManagerConfig.configureManager config
+                              let inventory = ManagerConfig.configureManager config
+                              scope.RecordManagedAgentInventory inventory
                               scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config))
                           // HOST-006: this hook cannot refuse a compaction — its output
                           // has no cancel field (`plugin/index.ts:305`) and

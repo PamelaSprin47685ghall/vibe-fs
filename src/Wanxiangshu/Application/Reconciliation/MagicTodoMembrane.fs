@@ -34,6 +34,7 @@ module MagicTodoMembrane =
           NeedsDedicatedEnlist: bool
           NeedsEnsureReview: bool }
 
+    /// DSL-class: Decision
     [<RequireQualifiedAccess>]
     type PrepareRejection =
         | NoOpenManagerLife
@@ -54,10 +55,7 @@ module MagicTodoMembrane =
         | Planner of AcceptReject
         | JournalAppend of reason: string
 
-    let private managerLife
-        (sessionId: SessionId)
-        (projection: ProjectionSet)
-        =
+    let private managerLife (sessionId: SessionId) (projection: ProjectionSet) =
         AgentProjection.tryFind sessionId projection.AgentProjections
         |> Option.bind (fun session -> session.ManagerLife)
         |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
@@ -72,9 +70,7 @@ module MagicTodoMembrane =
         | Error reason -> Error(PrepareRejection.BlobRead reason)
         | Ok body when HostDigest.sha256Hex body <> BlobDigest.value expectedDigest ->
             Error(PrepareRejection.BlobDigestMismatch label)
-        | Ok body ->
-            MagicTodoListCodec.tryDecode body
-            |> Result.mapError PrepareRejection.BlobDecode
+        | Ok body -> MagicTodoListCodec.tryDecode body |> Result.mapError PrepareRejection.BlobDecode
 
     let private writeList
         (journal: AgentJournal)
@@ -197,7 +193,9 @@ module MagicTodoMembrane =
                         match Map.tryFind (TodoWriteId.value replayWriteId) life.Checkpoints with
                         | None -> Error(PrepareRejection.ProjectionInconsistent "replayed Prepared is absent")
                         | Some checkpoint ->
-                            match readList journal "ProposedTodo" checkpoint.ProposedTodoRef checkpoint.ProposedTodoDigest with
+                            match
+                                readList journal "ProposedTodo" checkpoint.ProposedTodoRef checkpoint.ProposedTodoDigest
+                            with
                             | Error error -> Error error
                             | Ok proposal ->
                                 Ok(
@@ -212,7 +210,10 @@ module MagicTodoMembrane =
                                         checkpoint.OutputDigest
                                 )
                     | AdmissionOutcome.FreshPrepare preparedPlan ->
-                        match writeList journal "BaseTodo" preparedPlan.BaseTodo, writeList journal "ProposedTodo" preparedPlan.NormalizedProposed with
+                        match
+                            writeList journal "BaseTodo" preparedPlan.BaseTodo,
+                            writeList journal "ProposedTodo" preparedPlan.NormalizedProposed
+                        with
                         | Error error, _
                         | _, Error error -> Error error
                         | Ok baseBlob, Ok proposedBlob ->
@@ -280,7 +281,9 @@ module MagicTodoMembrane =
                 Map.tryFind (TodoWriteId.value bridge.Prepared.TodoWriteId) life.Checkpoints
 
             let dedicatedExists = life.Dedicated.IsSome
-            let concludedExists = checkpoint |> Option.bind (fun value -> value.Concluded) |> Option.isSome
+
+            let concludedExists =
+                checkpoint |> Option.bind (fun value -> value.Concluded) |> Option.isSome
 
             match
                 MagicTodoAfter.planAccept

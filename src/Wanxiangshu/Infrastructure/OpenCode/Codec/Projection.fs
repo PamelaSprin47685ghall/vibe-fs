@@ -193,8 +193,7 @@ module Projection =
             let hostToolPartId =
                 match wirePart with
                 | WireToolCall _
-                | WireToolResult _ ->
-                    firstString rawPart [ "id" ] |> Option.map HostToolPartId.create
+                | WireToolResult _ -> firstString rawPart [ "id" ] |> Option.map HostToolPartId.create
                 | _ -> None
 
             { WirePart = wirePart
@@ -386,17 +385,72 @@ module Projection =
                     let raw =
                         createObj
                             [ "info",
-                              box (
-                                  createObj
-                                      [ "id", box id
-                                        "sessionID", box sessionId
-                                        "role", box message.Role ]
-                              )
+                              box (createObj [ "id", box id; "sessionID", box sessionId; "role", box message.Role ])
                               "parts", box (List.toArray parts) ]
 
                     encodeMessages tail (raw :: acc)
 
         encodeMessages triples []
+
+    /// STRENGTH-006/009: insertion-only write-back for owner Work history.
+    /// Existing Host objects are reused byte/object-for-object; only renderer rows
+    /// that do not match the next raw semantic message may be synthesized, and
+    /// such rows must carry an explicit algebra-owned Host id. This prevents a
+    /// Strength insertion from silently re-identifying physical owner history.
+    let tryApplyRenderedInsertionsPreservingBase
+        (sessionId: string)
+        (sha256: string -> string)
+        (rawMessages: obj list)
+        (rendered: Wanxiangshu.Domain.RenderedMessages)
+        : Result<obj list, string> =
+        let decodeSingle raw =
+            match (decodeMessageView [ raw ]).Messages with
+            | [ message ] -> Ok message
+            | _ -> Error "raw Host message does not decode to exactly one wire message"
+
+        let rec decodeRaw remaining acc =
+            match remaining with
+            | [] -> Ok(List.rev acc)
+            | raw :: tail ->
+                match decodeSingle raw with
+                | Error error -> Error error
+                | Ok wire -> decodeRaw tail ((raw, wire) :: acc)
+
+        let encodeInserted (message: WireMessage) (hostId: string option) =
+            match hostId with
+            | None -> Error "insertion-only write-back requires an explicit synthetic Host message id"
+            | Some _ ->
+                let singleton: Wanxiangshu.Domain.RenderedMessages =
+                    { Messages = [ message ]
+                      HostMessageIds = [ hostId ]
+                      HostIsPhysical = [ false ] }
+
+                match tryApplyRenderedMessages sessionId sha256 singleton with
+                | Ok [ raw ] -> Ok raw
+                | Ok _ -> Error "single synthetic message encoded to an unexpected cardinality"
+                | Error error -> Error error
+
+        match decodeRaw rawMessages [] with
+        | Error error -> Error error
+        | Ok decodedRaw ->
+            let renderedRows =
+                List.zip3 rendered.Messages rendered.HostMessageIds rendered.HostIsPhysical
+
+            let rec merge rows raw acc =
+                match rows, raw with
+                | [], [] -> Ok(List.rev acc)
+                | [], _ :: _ -> Error "projection insertion dropped raw Host messages"
+                | (message, _, _) :: tail, (rawObj, rawWire) :: rawTail when message = rawWire ->
+                    merge tail rawTail (rawObj :: acc)
+                | (message, hostId, isPhysical) :: tail, rawRemaining ->
+                    if isPhysical then
+                        Error "projection insertion invented a physical Host message"
+                    else
+                        match encodeInserted message hostId with
+                        | Error error -> Error error
+                        | Ok inserted -> merge tail rawRemaining (inserted :: acc)
+
+            merge renderedRows decodedRaw []
 
     /// PROJ-004: apply a rendered prefix to the Host message view — the one write-back
     /// adapter for the projection DSL's prefix stage. Business modules declare intents

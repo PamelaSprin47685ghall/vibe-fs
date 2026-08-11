@@ -6,6 +6,7 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.SessionRecovery
+open Wanxiangshu.Host
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
@@ -44,6 +45,7 @@ module HostSignalBootstrap =
         (eventPort: IEventObservationPort)
         (snapshotOpt: ISessionSnapshotPort option)
         (journal: AgentJournal option)
+        (strengthDurability: StrengthDurabilityPort option)
         (scope: PluginRuntimeScope)
         (input: obj)
         /// Workspace root for graceful Casebook finalize (SpikePlugin → CasebookLifecycle).
@@ -83,57 +85,101 @@ module HostSignalBootstrap =
                 task {
                     let turn = context.Turn
 
-                    // RECOVERY-FAMILY: family recovery before business effects of a turn.
-                    let! recovery = scope.EnsureRecoveryDone turn.SessionId
+                    let strengthHandled =
+                        scope.StrengthReplicaRuntime
+                        |> Option.exists (fun runtime -> runtime.HandleTurn turn)
 
-                    match recovery with
-                    | FamilyRecovery.FamilyBlocked _ ->
-                        // Fail closed: definitive block → no business effects.
-                        ()
-                    | FamilyRecovery.FamilyWaiting _
-                    | FamilyRecovery.FamilyReady _ ->
-                        // Ready = permit-eligible; Waiting = incomplete (no permit) but not hard
-                        // block. Bounded-context workflows still observe the terminal.
-
-                        match turn.Outcome with
-                        | ReconcileProgram.TurnFailed _
-                        | ReconcileProgram.TurnAborted _ ->
-                            scope.ArmRecovery turn.SessionId
-
-                            // CTX-006 step 1 (Y half): a failed Blogger turn opens a one-shot
-                            // recovery opportunity on the Companion that owns it. Opportunity
-                            // = pending material waiter Task; material Offer consumes it once.
-                            for KeyValue(_, companion) in scope.Companions do
-                                match companion.BloggerSession with
-                                | Some bloggerId when bloggerId = turn.SessionId ->
-                                    companion.StartRecoveryOpportunity() |> ignore
-                                | _ -> ()
-                        | ReconcileProgram.TurnCompleted
-                        | ReconcileProgram.TurnNeedsContinuation _
-                        | ReconcileProgram.TurnInProgress -> ()
-
-
+                    if strengthHandled then
+                        // STRENGTH-004/011: Replica observations are leaf-local. They
+                        // only reconcile the request plan for cleanup; family recovery,
+                        // owner fallback, Companion, Review and ordinary TurnWorkflow
+                        // must never observe them.
                         XWire.reconcileAttempt journal scope turn
-                        TurnRuntimePreparation.prepare scope.DisposeExecutorRuntime turn
+                        return ()
+                    else
+                        // STRENGTH-010: only primary (non-Replica) turns feed the
+                        // counterfactual predictor. Pending shadow/control labels
+                        // are target-bound inside the scope.
+                        scope.ObserveStrengthPrimary(
+                            turn.SessionId,
+                            turn.ProviderRun,
+                            StrengthTurnEvidence.primarySymbol turn.Parts
+                        )
 
-                        // Sole Application turn entry (rabbit §6.5 / §18): Host no longer
-                        // multiplexes SyncDelegate / Reviewer / Manager handled-bools.
-                        do!
-                            TurnWorkflow.observe
-                                recoveryTimerPort
-                                Pty.abortParent
-                                sessionPort
-                                eventPort
-                                journal
-                                scope.SyncDelegateRuntime
-                                reviewerContinuationPort
-                                scope.NudgeSent
-                                scope.JoinGuardNudges
-                                scope.HasLivePty
-                                scope.AbortedSessions
-                                (Some scope.LoopSensor)
-                                scope.Quiescence
-                                context
+                        // STRENGTH-007: consumption proof closes before any later
+                        // continuation can be admitted. This writer is independent
+                        // of rollout/fuse state because a provider may already have
+                        // consumed a durable Candidate.
+                        match strengthDurability with
+                        | None -> ()
+                        | Some durability ->
+                            match durability.LoadProjection() with
+                            | Error error ->
+                                let reason = "Strength promotion projection failed: " + error
+                                scope.TripStrengthFuse reason
+                                raise (InvalidOperationException reason)
+                            | Ok projection ->
+                                match StrengthLifecycle.reconcileEvent projection turn with
+                                | None -> ()
+                                | Some event ->
+                                    match durability.Append event with
+                                    | Ok() -> ()
+                                    | Error error ->
+                                        let reason = "Strength promotion commit failed closed: " + error
+                                        scope.TripStrengthFuse reason
+                                        raise (InvalidOperationException reason)
+
+                        // RECOVERY-FAMILY: family recovery before business effects of a turn.
+                        let! recovery = scope.EnsureRecoveryDone turn.SessionId
+
+                        match recovery with
+                        | FamilyRecovery.FamilyBlocked _ ->
+                            // Fail closed: definitive block → no business effects.
+                            ()
+                        | FamilyRecovery.FamilyWaiting _
+                        | FamilyRecovery.FamilyReady _ ->
+                            // Ready = permit-eligible; Waiting = incomplete (no permit) but not hard
+                            // block. Bounded-context workflows still observe the terminal.
+
+                            match turn.Outcome with
+                            | ReconcileProgram.TurnFailed _
+                            | ReconcileProgram.TurnAborted _ ->
+                                scope.ArmRecovery turn.SessionId
+
+                                // CTX-006 step 1 (Y half): a failed Blogger turn opens a one-shot
+                                // recovery opportunity on the Companion that owns it. Opportunity
+                                // = pending material waiter Task; material Offer consumes it once.
+                                for KeyValue(_, companion) in scope.Companions do
+                                    match companion.BloggerSession with
+                                    | Some bloggerId when bloggerId = turn.SessionId ->
+                                        companion.StartRecoveryOpportunity() |> ignore
+                                    | _ -> ()
+                            | ReconcileProgram.TurnCompleted
+                            | ReconcileProgram.TurnNeedsContinuation _
+                            | ReconcileProgram.TurnInProgress -> ()
+
+
+                            XWire.reconcileAttempt journal scope turn
+                            TurnRuntimePreparation.prepare scope.DisposeExecutorRuntime turn
+
+                            // Sole Application turn entry (rabbit §6.5 / §18): Host no longer
+                            // multiplexes SyncDelegate / Reviewer / Manager handled-bools.
+                            do!
+                                TurnWorkflow.observe
+                                    recoveryTimerPort
+                                    Pty.abortParent
+                                    sessionPort
+                                    eventPort
+                                    journal
+                                    scope.SyncDelegateRuntime
+                                    reviewerContinuationPort
+                                    scope.NudgeSent
+                                    scope.JoinGuardNudges
+                                    scope.HasLivePty
+                                    scope.AbortedSessions
+                                    (Some scope.LoopSensor)
+                                    scope.Quiescence
+                                    context
                 }
 
             /// HOST-006 containment: observe every reconciled snapshot for compaction
@@ -236,6 +282,13 @@ module HostSignalBootstrap =
                     reconciler.Signal signal
                 | SessionDeleted sessionId ->
                     scope.LoopSensor.DropSession sessionId
+
+                    // STRENGTH-004/011: owner deletion cancels the decision-local
+                    // InternalLeaf immediately. CancelOwner completes the waiting
+                    // decision before its best-effort physical abort, so no deleted
+                    // owner can keep a Replica eligible for later collection.
+                    scope.StrengthReplicaRuntime
+                    |> Option.iter (fun runtime -> runtime.CancelOwner sessionId |> ignore)
 
                     // Graceful owner teardown: finalize bound Inspector draft once before cancel.
                     // Unexpected delete of a non-owner / incomplete draft never finalizes
