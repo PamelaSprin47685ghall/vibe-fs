@@ -17,7 +17,7 @@ const recoverySrc = readFileSync(
   'utf8',
 )
 const spikeSrc = readFileSync(
-  join(ROOT, 'src/Wanxiangshu/Infrastructure/OpenCode/Plugin/SpikePlugin.fs'),
+  join(ROOT, 'src/Wanxiangshu/Infrastructure/OpenCode/Plugin/PluginRecoveryWiring.fs'),
   'utf8',
 )
 const scopeSrc = readFileSync(

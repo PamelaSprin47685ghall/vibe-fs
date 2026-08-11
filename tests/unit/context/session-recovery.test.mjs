@@ -34,7 +34,8 @@ test('RECOVERY_FAMILY_constructor_does_not_start_fork_restore', () => {
 })
 
 test('RECOVERY_FAMILY_plugin_attaches_family_ports_not_local_gates', () => {
-  const spike = readFileSync(join(ROOT, 'src/Wanxiangshu/Infrastructure/OpenCode/Plugin/SpikePlugin.fs'), 'utf8')
+  // Family recovery ports are wired in PluginRecoveryWiring (Wave 3).
+  const spike = readFileSync(join(ROOT, 'src/Wanxiangshu/Infrastructure/OpenCode/Plugin/PluginRecoveryWiring.fs'), 'utf8')
   // Family recovery + attempt planning live in PluginRecoveryScope (Wave 2).
   const scope = readFileSync(
     join(ROOT, 'src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRecoveryScope.fs'),

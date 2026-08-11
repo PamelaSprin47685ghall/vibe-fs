@@ -199,12 +199,16 @@ export const assertMagicTodoHookShape = (hooks) => {
 }
 
 test('STRENGTH_004_replica_transform_route_is_structurally_exclusive', () => {
-  const source = readFileSync(SPIKE_PLUGIN_SOURCE, 'utf8')
+  // normalTransform + replica route live in PluginTransforms (Wave 3).
+  const source = readFileSync(
+    new URL('../../../src/Wanxiangshu/Infrastructure/OpenCode/Plugin/PluginTransforms.fs', import.meta.url),
+    'utf8',
+  )
   const normalStart = source.indexOf('let normalTransform')
   assert.notEqual(normalStart, -1, 'ordinary Work transform must be a separate task, not fall through a Replica branch')
 
   const transformStart = source.indexOf('let transform', normalStart + 1)
-  const transformEnd = source.indexOf('let chatParams', transformStart)
+  const transformEnd = source.indexOf('transform\n', transformStart)
   assert.ok(transformStart > normalStart && transformEnd > transformStart, 'Replica route must follow normalTransform')
 
   const route = source.slice(transformStart, transformEnd)
