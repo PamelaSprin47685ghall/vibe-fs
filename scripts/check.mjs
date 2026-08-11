@@ -16,6 +16,7 @@ const checks = [
   join(root, 'checks/causal-wait-boundary.mjs'),
   join(root, 'checks/student-teacher-absence.mjs'),
   join(root, 'checks/session-ownership-ratchet.mjs'),
+  join(root, 'checks/kolmogorov-size.mjs'),
   join(root, 'checks/enforcer-rulebook-gate.mjs'),
   join(root, 'checks/enforcer-cross-family-collision.mjs'),
   join(root, 'checks/js-surface-gate.mjs'),
@@ -38,6 +39,11 @@ for (const script of checks) {
       `--baseline=${join(root, 'checks/dsl-ownership-ratchet-baseline.json')}`,
       '--root=src/Wanxiangshu',
     )
+  }
+  // Kolmogorov file-size ratchet: grandfathered files must not grow; new or
+  // previously-small files must stay <= 200 lines. Warnings only, never fail.
+  if (script.endsWith('kolmogorov-size.mjs')) {
+    args.push(`--baseline=${join(root, 'checks/kolmogorov-size-baseline.json')}`)
   }
   // Constitution headings + structural rubric (Appendix A37/A38) across all 120 tips.
   if (script.endsWith('enforcer-rulebook-gate.mjs')) {
