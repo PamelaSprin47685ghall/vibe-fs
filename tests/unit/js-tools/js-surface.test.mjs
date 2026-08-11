@@ -27,7 +27,7 @@ const memberNames = (s) => listItems(s.Members).map((fragment) => fragment.Membe
 const PERMISSION_NAMES = [
   'Fork', 'Join', 'List', 'Read', 'Write', 'Edit', 'Fetch', 'Glob', 'Grep', 'Move',
   'Remove', 'Inspector', 'Coder', 'Exec', 'Pty', 'Network', 'Verdict', 'Blog',
-  'Return', 'Finality', 'BashHoneypot',
+  'Return', 'Finality', 'BashHoneypot', 'Fetch',
 ]
 const toolPermissionByName = Object.fromEntries(PERMISSION_NAMES.map((n) => [n, ToolPermission[n]]))
 const permsOf = (names) => names.map((n) => toolPermissionByName[n])
@@ -106,14 +106,11 @@ test('JS004_absent_capability_is_absent_in_all_four_layers', () => {
   const result = surface('Inspector', ['Read', 'Glob', 'Grep']) // no Edit / Write
   assert.equal(isSome(result), true)
   assert.deepEqual(memberNames(result), ['file', 'glob', 'grep'])
-  // description lists only present members; the builtin-name substring
-  // 'read/edit/write/glob/grep' appears in the recommendation line, so assert
-  // on the Available-methods clause instead.
-  assert.equal(result.Description.includes('Available methods: file, glob, grep'), true)
-  assert.equal(result.Description.includes('Available methods: file, glob, grep, rewrite, write'), false)
+  assert.equal(result.Description.includes('rewrite(path'), false)
+  assert.equal(result.Description.includes('write(path'), false)
   assert.equal(result.BaseClassSource.includes('js.edit'), false)
   assert.equal(result.BaseClassSource.includes('js.write'), false)
-  assert.equal(listItems(result.Examples).length, 3)
+  assert.equal(listItems(result.Examples).some((example) => example.includes('this.rewrite')), false)
 })
 
 test('JS001_generated_name_gate_rejects_forged_names', () => {
@@ -129,6 +126,7 @@ test('JS004_member_gate_binds_present_members_only', () => {
   const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
   assert.equal(memberBinding('Inspector', perms, 'file'), 'js.read')
   assert.equal(memberBinding('Inspector', perms, 'glob'), 'js.glob')
+  assert.equal(memberBinding('Inspector', perms, 'grep'), 'js.grep')
   assert.equal(memberBinding('Inspector', perms, 'rewrite'), undefined)
   assert.equal(memberBinding('Inspector', perms, 'write'), undefined)
   assert.equal(memberBinding('Meditator', caps(ToolPermission.Inspector), 'file'), undefined)
@@ -140,10 +138,10 @@ test('JS002_same_capabilities_same_surface_across_roles', () => {
   const a = generate('Coder', caps(ToolPermission.Read))
   const b = generate('Reviewer', caps(ToolPermission.Read))
   assert.equal(a.BaseClassSource, b.BaseClassSource)
-  assert.equal(a.Description.includes('Coder'), true)
-  assert.equal(b.Description.includes('Reviewer'), true)
   assert.equal(a.ToolName, 'js-coder')
   assert.equal(b.ToolName, 'js-reviewer')
+  assert.equal(a.Description.includes('js-coder'), true)
+  assert.equal(b.Description.includes('js-reviewer'), true)
 })
 
 test('JS001_non_fs_permissions_never_produce_members', () => {
@@ -160,6 +158,31 @@ test('JS004_fast_deep_profiles_generate_identical_surfaces', () => {
   const deep = generate('Coder', caps(ToolPermission.Read, ToolPermission.Glob))
   assert.equal(fast.BaseClassSource, deep.BaseClassSource)
   assert.equal(fast.Description, deep.Description)
+})
+
+test('JS002_description_embeds_spec_base_class_rules_and_examples', () => {
+  const coder = surface('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
+  for (const token of [
+    'class JsProgram',
+    'class Js extends JsProgram',
+    'HOST_READ_IMMUTABLE_UTF8_SNAPSHOT',
+    'text(from = "^", to = "$")',
+    'ordered',
+    'begin',
+    'end',
+    'complete resulting file',
+    'oldString',
+    'Anchors locate',
+    'Define exactly one class named Js',
+  ]) {
+    assert.equal(coder.Description.includes(token), true, `coder description missing: ${token}`)
+  }
+  assert.equal(coder.Description.includes('_api'), false)
+  assert.equal(coder.Description.includes('js.read'), false)
+  const inspector = surface('Inspector', ['Read', 'Glob', 'Grep'])
+  assert.equal(inspector.Description.includes('HOST_READ_IMMUTABLE_UTF8_SNAPSHOT'), true)
+  assert.equal(inspector.Description.includes('matchAll'), true)
+  assert.equal(inspector.Description.includes('this.rewrite'), false)
 })
 
 test('JS004_lying_generator_counterexample_is_rejected', () => {

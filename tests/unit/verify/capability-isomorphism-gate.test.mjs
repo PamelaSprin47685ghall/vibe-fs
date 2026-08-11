@@ -68,7 +68,7 @@ test('capability_iso_tool_registry_requires_generator', () => {
   assert.ok(handwritten.some((v) => v.code === 'handwritten-js-tool-spec'))
 })
 
-test('capability_iso_js_fragment_registry_requires_five_caps', () => {
+test('capability_iso_js_fragment_registry_requires_member_caps', () => {
   assert.equal(scanJsFragmentRegistry(GOOD_JS_TOOLS).length, 0)
 
   const noModule = scanJsFragmentRegistry('module Other\nlet read: int = 1\n')
@@ -78,9 +78,8 @@ test('capability_iso_js_fragment_registry_requires_five_caps', () => {
 module JsFragmentRegistry =
     let read: JsCapabilityFragment = Unchecked.defaultof<_>
     let glob: JsCapabilityFragment = Unchecked.defaultof<_>
-    let grep: JsCapabilityFragment = Unchecked.defaultof<_>
     let rewrite: JsCapabilityFragment = Unchecked.defaultof<_>
-    let all: JsCapabilityFragment list = [ read; glob; grep; rewrite ]
+    let all: JsCapabilityFragment list = [ read; glob; rewrite ]
 `)
   assert.ok(missingWrite.some((v) => v.code === 'missing-fragment-cap'))
   assert.ok(missingWrite.some((v) => v.detail?.includes('write')))

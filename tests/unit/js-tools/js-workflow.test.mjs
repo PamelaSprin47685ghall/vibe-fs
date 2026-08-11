@@ -48,9 +48,9 @@ test('JS085_workflow_reads_and_commits_rewrite', async () => {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    const view = await this.file('a.txt');
-    await this.rewrite('a.txt', { find: 'hello', replace: 'goodbye' });
-    return { before: view.text };
+    const view = await this.file('a.txt', [['begin', 'end', 'hello']]);
+    this.rewrite('a.txt', view.text('^', 'begin') + 'goodbye' + view.text('end', '$'));
+    return { before: view.text() };
   }
 }`
     const { outcome } = await runWorkflow(dir, program)
@@ -89,36 +89,31 @@ test('JS085_workflow_preflight_blocks_stale_rewrite_without_touching_disk', asyn
     writeFileSync(join(dir, 'a.txt'), 'current text', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    const r = await this.rewrite('a.txt', { find: 'stale', replace: 'x' });
-    return { rewriteOk: r.ok, code: r.code };
+    this.rewrite('missing.txt', 'x');
+    return { ok: true };
   }
 }`
     const { outcome } = await runWorkflow(dir, program)
-    // the binding surfaces ANCHOR_NOT_FOUND; the program chose to continue,
-    // so the workflow commits nothing and reports the program result
-    assert.equal(caseName(outcome), 'Succeeded')
-    assert.deepEqual(JSON.parse(outcome.fields[0]), { rewriteOk: false, code: 'ANCHOR_NOT_FOUND' })
-    assert.deepEqual(listItems(outcome.fields[1]), [])
+    assert.equal(caseName(outcome), 'Failed')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'current text')
   } finally {
     cleanup()
   }
 })
 
-test('JS085_workflow_file_missing_surfaces_as_object_not_throw', async () => {
+test('JS085_workflow_file_missing_fails_the_program', async () => {
   const { dir, cleanup } = sandbox()
   try {
     // a missing target is a typed result the program can inspect (JS-019:
     // foreseeable failures are not exceptions)
     const program = `class Js extends JsProgram {
   async run() {
-    const view = await this.file('missing.txt');
-    return { found: view.ok, code: view.code };
+    await this.file('missing.txt');
+    return { ok: true };
   }
 }`
     const { outcome } = await runWorkflow(dir, program)
-    assert.equal(caseName(outcome), 'Succeeded')
-    assert.deepEqual(JSON.parse(outcome.fields[0]), { found: false, code: 'FILE_NOT_FOUND' })
+    assert.equal(caseName(outcome), 'Failed')
   } finally {
     cleanup()
   }
@@ -149,7 +144,8 @@ test('JS012_workflow_with_store_persists_prepare_and_commit', async () => {
     const surface = generate('Coder', coderCaps)
     const program = `class Js extends JsProgram {
   async run() {
-    await this.rewrite('a.txt', { find: 'hello', replace: 'goodbye' });
+    const file = await this.file('a.txt', [['begin', 'end', 'hello']]);
+    this.rewrite('a.txt', file.text('^', 'begin') + 'goodbye' + file.text('end', '$'));
     return { done: true };
   }
 }`
@@ -175,7 +171,8 @@ test('JS016_result_renders_stable_toml_shapes', async () => {
     const surface = generate('Coder', coderCaps)
     const program = `class Js extends JsProgram {
   async run() {
-    await this.rewrite('a.txt', { find: 'hello', replace: 'goodbye' });
+    const file = await this.file('a.txt', [['begin', 'end', 'hello']]);
+    this.rewrite('a.txt', file.text('^', 'begin') + 'goodbye' + file.text('end', '$'));
     return { before: 'x' };
   }
 }`

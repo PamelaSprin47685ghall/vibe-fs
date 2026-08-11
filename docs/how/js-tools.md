@@ -26,10 +26,11 @@ resolve Attempt
 ```text
 profile.ToolCapabilitySet
 → 过滤出文件系统相关 capabilities（Read/Write/Edit/Glob/Grep）
-→ Capability Fragment Registry 逐能力取 member fragment
-→ 拼接 base class（class Js extends JsProgram { file/glob/... }）
-→ 拼接 description（只列存在的方法）
-→ 拼接 canonical examples（只含存在的方法）
+→ Capability Fragment Registry 逐能力取 member fragment（含 Grep → grep()）
+→ 拼接 runtime 代理基类（沙箱用；含 `_api`；file() 语义与公开算法等价）
+→ 拼接公开 JsProgram（Read 时嵌入 §16 file() 全文；Glob/Grep/Edit/Write 为 Host stub；始终有 run()）
+→ 拼接 description = header + 模型合同（Prefer js-ROLE / 并行 / 复杂 program）+ 公开基类 + 仅当前能力的规则 + Requires ⊆ capabilities 的 examples + footer
+→ Grep 是 member（JS-020）；Read+Glob 而无 Grep 时仍可含 glob+file+RegExp composition example
 → 生成 runtime capability bindings（存在的方法 ↔ 实际执行器）
 → 生成 BuiltinToolDescriptionHook 文案（引用 js-ROLE 名称）
 ```
@@ -44,9 +45,33 @@ profile.ToolCapabilitySet
 - 零宽 RegExp：位置有效，可表达插入点。
 - 5 类拒绝（`ANCHOR_*`）：不唯一且未指定序 / 不匹配 / 正则非法 / 跨文件混用 / 空锚点。
 
+## glob（JS-007）
+
+```text
+expand {a,b}
+→ compile gitignore/wildmatch（相对 capability 根；无 `/` 则加 `**/` 前缀）
+→ 载入根 `.gitignore` 与 `.git/info/exclude`
+→ walk：跳过 `.git` 与 symlink；目录命中 ignore 则剪枝；进入子目录时叠加该目录 `.gitignore`
+→ 只收集匹配的普通文件
+→ 稳定排序
+→ 截断到 maxEntries（绑定层 256）；truncated = 匹配或访问触顶
+```
+
+有界计数的是匹配文件，不是 DFS 前缀。`.git` 不得占用配额。
+
+## grep（JS-020）
+
+```text
+JS-007 glob(pattern) 选文件（文件上限宽于返回给模型的 glob 上限）
+→ 逐文件 strict UTF-8；失败则跳过
+→ needle：字面量或 RegExp，收集全部出现
+→ 每条命中 { path, line, column, text }（1-based）
+→ 截断到 maxMatches（绑定层 500）；truncated 可见
+```
+
 ## FileView
 
-`file(path)` 读取时快照不可变视图。read 路径：strict UTF-8 校验 → 快照缓存 → 返回。同一 program 内 mutation 不改变先前取得的 FileView（快照隔离）。
+`file(path, matches = [])` 读取时快照不可变视图并按序解析 anchors。read 路径：strict UTF-8 校验 → 快照缓存 → FileView.text(from, to)。同一 program 内 mutation 不改变先前取得的 FileView（快照隔离）。
 
 ## Transaction
 

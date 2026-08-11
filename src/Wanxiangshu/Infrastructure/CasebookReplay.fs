@@ -20,16 +20,15 @@ module CasebookReplay =
         | Observation.FileRead(path, _) ->
             readHash root path |> Option.map (fun hash -> Observation.FileRead(path, hash))
         | Observation.GlobResult(pattern, _) ->
-            match JsToolsFs.glob root pattern 256 16 with
-            | Ok paths -> Some(Observation.GlobResult(pattern, paths))
+            match JsToolsFs.glob root pattern 256 with
+            | Ok listing -> Some(Observation.GlobResult(pattern, listing.Paths))
             | Error _ -> None
         | Observation.GrepResult(pattern, _) ->
-            // best-effort: re-run the pattern over the same glob surface; exact
-            // match positions may differ, so only path+text sets are compared
-            // via the observation identity (which includes index) — for greps
-            // we keep the stored shape and just refresh the matches.
-            match JsToolsFs.glob root pattern 256 16 with
-            | Ok _ -> Some(Observation.GrepResult(pattern, []))
+            match JsToolsFs.grep root (AnchorSpec.Regex pattern) "**/*" 256 with
+            | Ok listing ->
+                let matches = listing.Matches |> List.map (fun hit -> hit.Path, hit.Line, hit.Text)
+
+                Some(Observation.GrepResult(pattern, matches))
             | Error _ -> None
 
     /// Replay the whole stored observation set. Missing any single

@@ -59,28 +59,37 @@ test('JS073_spec_executes_program_and_renders_result', async () => {
     const surface = generate('Coder', coderCaps)
     // Build the spec with the real Host tool factory, like ToolRegistry does.
     const codec = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
-    const toolModule = { tool: { schema: { string: () => ({ type: 'string' }) } } }
-    const factory = codec.ToolHostCodec_factory(toolModule)
+    const tool = (definition) => definition
+    tool.schema = {
+      string: () => ({
+        type: 'string',
+        describe: (description) => ({ type: 'string', description }),
+      }),
+    }
+    const factory = codec.ToolHostCodec_factory({ tool })
     const { JsToolSpec_create: create } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolHost.js')
     const spec = create(factory, surface, dir, undefined)
+    const registered = codec.ToolHostCodec_register(factory, spec)
 
     assert.equal(spec.Name, 'js-coder')
-    assert.equal(spec.Description.includes('file'), true)
+    assert.equal(spec.Description.includes('class JsProgram'), true)
+    assert.equal(spec.Description.includes('HOST_READ_IMMUTABLE_UTF8_SNAPSHOT'), true)
+    assert.equal(spec.Description.includes('_api'), false)
 
     const program = `class Js extends JsProgram {
   async run() {
-    const view = await this.file('a.txt');
-    await this.rewrite('a.txt', { find: 'hello', replace: 'goodbye' });
-    return { before: view.text };
+    const view = await this.file('a.txt', [['begin', 'end', 'hello']]);
+    this.rewrite('a.txt', view.text('^', 'begin') + 'goodbye' + view.text('end', '$'));
+    return { before: view.text() };
   }
 }`
-    const result = await spec.Execute({ program }, { sessionID: 'ses-test', agent: 'fast-coder' })
+    const result = await registered.execute({ program }, { sessionID: 'ses-test', agent: 'fast-coder' })
     assert.equal(result.includes('status = "ok"'), true)
     assert.equal(result.includes('before'), true)
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'goodbye world', 'committed via workflow')
-    // missing program argument → stable error
-    const missing = await spec.Execute({}, { sessionID: 'ses-test', agent: 'fast-coder' })
+    const missing = await registered.execute({}, { sessionID: 'ses-test', agent: 'fast-coder' })
     assert.equal(missing.includes('error'), true)
+    assert.equal(missing.includes("missing 'program' argument"), true)
   } finally {
     cleanup()
   }

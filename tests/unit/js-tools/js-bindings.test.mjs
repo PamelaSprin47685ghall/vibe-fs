@@ -73,6 +73,7 @@ test('JS007_bindings_glob_lists_matching_paths', () => {
     const result = api.js.glob('src/*.fs')
     assert.equal(result.ok, true)
     assert.deepEqual(result.paths, ['src/a.fs'])
+    assert.equal(result.truncated, false)
   } finally {
     cleanup()
   }
@@ -87,6 +88,8 @@ test('JS010_bindings_grep_returns_matches', () => {
     assert.equal(result.ok, true)
     assert.deepEqual(result.matches.map((m) => m.text), ['one', 'one'])
     assert.deepEqual(result.matches.map((m) => m.path), ['a.txt', 'a.txt'])
+    assert.deepEqual(result.matches.map((m) => m.line), [1, 1])
+    assert.equal(result.truncated, false)
   } finally {
     cleanup()
   }
@@ -98,21 +101,14 @@ test('JS008_012_bindings_rewrite_stages_without_touching_disk', () => {
     writeFileSync(join(dir, 'a.txt'), 'old text', 'utf8')
     const staging = []
     const api = createApi(dir, staging)
-    const result = api.js.edit('a.txt', { find: 'old', replace: 'new' })
+    const result = api.js.edit('a.txt', 'new text')
     assert.equal(result.ok, true)
     assert.equal(staging.length, 1)
-    // disk untouched — staging only (JS-012)
     const disk = api.js.read('a.txt')
     assert.equal(disk.text, 'old text')
-    // ambiguous anchor without occurrence → ANCHOR_NOT_UNIQUE
-    writeFileSync(join(dir, 'b.txt'), 'x x', 'utf8')
-    const dup = api.js.edit('b.txt', { find: 'x', replace: 'y' })
-    assert.equal(dup.ok, false)
-    assert.equal(dup.code, 'ANCHOR_NOT_UNIQUE')
-    // ordered occurrence resolves duplicates
-    const nth = api.js.edit('b.txt', { find: 'x', replace: 'y', occurrence: 2 })
-    assert.equal(nth.ok, true)
-    assert.equal(staging.length, 2)
+    const missing = api.js.edit('nope.txt', 'x')
+    assert.equal(missing.ok, false)
+    assert.equal(missing.code, 'FILE_NOT_FOUND')
   } finally {
     cleanup()
   }
@@ -144,9 +140,9 @@ test('JS011_sandbox_program_uses_bindings_end_to_end', async () => {
     const surface = generate('Coder', coderCaps)
     const program = `class Js extends JsProgram {
   async run() {
-    const view = await this.file('a.txt');
-    await this.rewrite('a.txt', { find: 'hello', replace: 'goodbye' });
-    return { before: view.text };
+    const view = await this.file('a.txt', [['begin', 'end', 'hello']]);
+    this.rewrite('a.txt', view.text('^', 'begin') + 'goodbye' + view.text('end', '$'));
+    return { before: view.text() };
   }
 }`
     const wrapped = wrapProgram(surface.BaseClassSource, program, Date.now() + 60_000)

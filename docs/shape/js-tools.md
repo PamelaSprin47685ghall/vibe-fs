@@ -6,7 +6,7 @@
 |---|---|---|
 | `AttemptExecutionProfile`（Domain） | 权限 authority：`ToolCapabilitySet: Set<ToolPermission>` | 生成逻辑、工具名、描述 |
 | `JsToolGenerator` | surface projection：从 profile 生成 js-ROLE（name/schema/description/base class/examples/runtime bindings） | 权限裁决；runtime 执行 |
-| Capability Fragment Registry | SDK member / description / canonical example / runtime binding 的单一事实源 | 权限决定；Host I/O |
+| Capability Fragment Registry | SDK member / description / canonical example / runtime binding 的单一事实源（Read/Glob/Grep/Edit/Write） | 权限决定；Host I/O |
 | BuiltinToolDescriptionHook | builtin 工具 description 的 `Prefer js-ROLE` 推荐文案 | builtin schema / executor |
 | Sandbox Runner | 任意 JS 进程执行：deadline / kill / reap / resource budgets | 业务语义、权限 |
 | JsTransaction | staged filesystem effect：preflight / prepare / commit / rollback / recovery | 模型 JS 执行 |
@@ -19,7 +19,7 @@ src/Wanxiangshu/Domain/JsTools/      primitive capability algebra、anchor rules
 src/Wanxiangshu/Application/         JsTool workflow、transaction orchestration
 src/Wanxiangshu/Infrastructure/OpenCode/Tools/   provider specs、GeneratedJsSurface adapter、ToolRegistry bridge、Synthetic TOML result bridge
 src/Wanxiangshu/Process/             sandbox runner、deadline、kill/reap、resource budgets
-Infrastructure filesystem adapter + EventStore ports   snapshot、ephemeral staging、EventStore durable prepare facts + payloads、commit、rollback、crash recovery
+Infrastructure filesystem adapter + EventStore ports   snapshot、gitignore glob / Host grep、ephemeral staging、EventStore durable prepare facts + payloads、commit、rollback、crash recovery
 ```
 
 Domain 不做 Host I/O。

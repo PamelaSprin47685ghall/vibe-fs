@@ -15,6 +15,7 @@ import {
   findAnchor as findAnchor,
   requireUnique as requireUnique,
   glob as glob,
+  grep as grep,
   commitPlan as commitPlan,
   rollbackPlan as rollbackPlan,
 } from '../../../dist/Infrastructure/JsToolsFs.js'
@@ -84,13 +85,69 @@ test('JS007_glob_bounded_deterministic_enumeration', () => {
     writeFileSync(join(dir, 'src', 'deep', 'c.fs'), 'c', 'utf8')
     writeFileSync(join(dir, 'readme.md'), 'r', 'utf8')
 
-    const all = listItems(unwrap(glob(dir, '**/*.fs', 100, 10)))
-    assert.deepEqual(all, ['src/a.fs', 'src/b.fs', 'src/deep/c.fs'])
-    const shallow = listItems(unwrap(glob(dir, 'src/*.fs', 100, 10)))
-    assert.deepEqual(shallow, ['src/a.fs', 'src/b.fs'])
-    // bounded: maxEntries caps results
-    const bounded = listItems(unwrap(glob(dir, '**/*.fs', 2, 10)))
-    assert.equal(bounded.length, 2)
+    const all = unwrap(glob(dir, '**/*.fs', 100))
+    assert.deepEqual(listItems(all.Paths), ['src/a.fs', 'src/b.fs', 'src/deep/c.fs'])
+    assert.equal(all.Truncated, false)
+    const nested = unwrap(glob(dir, '*.fs', 100))
+    assert.deepEqual(listItems(nested.Paths), ['src/a.fs', 'src/b.fs', 'src/deep/c.fs'])
+    const shallow = unwrap(glob(dir, 'src/*.fs', 100))
+    assert.deepEqual(listItems(shallow.Paths), ['src/a.fs', 'src/b.fs'])
+    const zeroStar = unwrap(glob(dir, 'src/**/*.fs', 100))
+    assert.deepEqual(listItems(zeroStar.Paths), ['src/a.fs', 'src/b.fs', 'src/deep/c.fs'])
+    const bounded = unwrap(glob(dir, '**/*.fs', 2))
+    assert.equal(listItems(bounded.Paths).length, 2)
+    assert.equal(bounded.Truncated, true)
+  } finally {
+    cleanup()
+  }
+})
+
+test('JS007_glob_gitignore_skips_git_and_ignored', () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    mkdirSync(join(dir, '.git', 'objects'), { recursive: true })
+    mkdirSync(join(dir, 'dist'))
+    mkdirSync(join(dir, 'src'))
+    writeFileSync(join(dir, '.git', 'HEAD'), 'ref', 'utf8')
+    writeFileSync(join(dir, 'dist', 'out.js'), 'x', 'utf8')
+    writeFileSync(join(dir, 'secret.txt'), 's', 'utf8')
+    writeFileSync(join(dir, 'src', 'keep.fs'), 'k', 'utf8')
+    writeFileSync(join(dir, 'readme.md'), 'r', 'utf8')
+    writeFileSync(join(dir, '.gitignore'), 'secret.txt\n/dist/\n', 'utf8')
+
+    const listing = unwrap(glob(dir, '**/*', 100))
+    const paths = listItems(listing.Paths)
+    assert.equal(paths.some((p) => p.startsWith('.git/') || p === '.git'), false)
+    assert.equal(paths.includes('secret.txt'), false)
+    assert.equal(paths.includes('dist/out.js'), false)
+    assert.equal(paths.includes('src/keep.fs'), true)
+    assert.equal(paths.includes('readme.md'), true)
+    assert.equal(paths.includes('.gitignore'), true)
+
+    const braces = unwrap(glob(dir, '**/*.{fs,md}', 100))
+    assert.deepEqual(listItems(braces.Paths), ['readme.md', 'src/keep.fs'])
+  } finally {
+    cleanup()
+  }
+})
+
+test('JS020_grep_returns_line_column_and_skips_ignored', () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    mkdirSync(join(dir, 'src'))
+    mkdirSync(join(dir, 'dist'))
+    writeFileSync(join(dir, 'src', 'a.fs'), 'alpha\nTODO: one\n', 'utf8')
+    writeFileSync(join(dir, 'dist', 'skip.js'), 'TODO: hidden\n', 'utf8')
+    writeFileSync(join(dir, '.gitignore'), '/dist/\n', 'utf8')
+
+    const listing = unwrap(grep(dir, regex('TODO:.+'), 'src/**/*.fs', 50))
+    const hits = listItems(listing.Matches)
+    assert.equal(hits.length, 1)
+    assert.equal(hits[0].Path, 'src/a.fs')
+    assert.equal(hits[0].Line, 2)
+    assert.equal(hits[0].Column, 1)
+    assert.equal(hits[0].Text, 'TODO: one')
+    assert.equal(listing.Truncated, false)
   } finally {
     cleanup()
   }

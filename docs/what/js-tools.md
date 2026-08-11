@@ -10,25 +10,37 @@ Clause 前缀 `JS-`。本页只冻结 observable semantics，不规定内部模�
 
 生成结果同时包含：工具名称、工具 schema、工具描述、`JsProgram` 基类、允许出现的成员函数、canonical examples、runtime capability bindings、BuiltinToolDescriptionHook 注入文案。确定性生成：同一 profile 必须得到同一 surface（fast/deep 相同）。
 
+工具 schema 恰好一个必填字段 `program: string`：其值为恰好一个 `class Js extends JsProgram` 且实现 `async run()` 的源码。provider-visible 工具描述必须内嵌当前 Attempt 的**公开** `JsProgram` 基类全文（header + 公开基类 + 仅存在的方法规则 + 仅存在的 examples + footer）。公开基类不含 Host 内部 `_api` / binding key；runtime 代理类只用于沙箱执行，不得充当模型文档。
+
 ## JS-003 Builtin coexistence + description hook
 
 内置文件系统工具（`read` / `edit` / `write` / `glob` / `grep` / `patch`，凡存在者）保留原 schema、原实现、原可执行性。不把它们变成 `js-*` alias，不改顶层 RPC schema。当 `js-ROLE` 可见时，BuiltinToolDescriptionHook 在内置工具 description 中标记 `DEPRECATED` + `Prefer js-ROLE` + 鼓吹复杂 JS program / 并行调用。钩子不形成 security scope，不改变 builtin 可执行性；钩子文案提到的 `js-ROLE` 必须同时 provider-visible。
 
 ## JS-004 Generated base-class exactness
 
-`JsProgram` 基类只包含当前真正可执行的成员。能力缺失的方法不出现于基类、description、canonical examples 任何一层。即使模型伪造底层调用，runtime gate 仍 fail closed。
+`JsProgram` 基类只包含当前真正可执行的成员。能力缺失的方法不出现于公开基类、description、canonical examples 任何一层。即使模型伪造底层调用，runtime gate 仍 fail closed。模型只对描述里的公开基类编程：看得到的方法可调用，看不到的方法不存在。
 
 ## JS-005 file() / FileView
 
-`file(path)` 返回不可变 FileView。FileView 持有读取时的内容快照，后续任何并发修改不影响已取得的视图。strict UTF-8：非法 UTF-8 拒绝为 `FILE_NOT_UTF8`，不以替换字符静默清洗。
+`file(path, matches = [])` 读取本事务 immutable UTF-8 快照，按声明顺序解析 begin/end anchors，返回不可变 FileView。`text(from, to)`（默认 `^`/`$`）切出原文 substring。后续 rewrite 不影响已取得的视图。strict UTF-8：非法 UTF-8 拒绝，不以替换字符静默清洗。
 
 ## JS-006 Ordered string/RegExp anchors
 
-`find()` / `replace()` 按**声明顺序**匹配：同一文本中多个匹配依序消歧（第 N 个匹配）。支持精确字符串锚点与 RegExp 锚点；`^` / `$` 按文本绝对位置（文件首/尾），非行首/行尾。零宽 RegExp 位置有效。锚点声明 5 类拒绝：不唯一且未指定序、不匹配、正则非法、跨文件混用、空锚点（见 how）。
+`matches` 为 `Array<[begin, end, pattern]>`，按**声明顺序**从 cursor 向前匹配；匹配后 `cursor = match.end`。pattern 为非空字符串或 RegExp（忽略调用方 g/y/`lastIndex`）。`^` / `$` 为文件绝对首/尾，禁止自定义同名。零宽 RegExp 合法。拒绝：空名字、保留名、重复名、begin==end、空字符串 pattern、按序找不到。
 
 ## JS-007 glob()
 
-有界确定性路径枚举：返回匹配路径的稳定排序；结果受当前 capability 边界约束（不可见的路径不出现）。不跟随符号链接逃逸 capability 根。
+gitignore / wildmatch 风格的有界确定性路径枚举。`pattern` 相对 capability 根：
+
+- `*` 不跨 `/`；`**` 匹配零段或多段目录；`?` 匹配一个非 `/` 字符；`[abc]` / `[a-z]` 为字符类；`{a,b}` 先展开为交替再匹配。
+- pattern 不含 `/` 时匹配任意深度（`*.md` 命中全树 `.md`）；含 `/` 或前导 `/` 时相对根锚定。
+- 永不进入 `.git`；应用根与子目录 `.gitignore` 以及 `.git/info/exclude`（若存在）；不跟随符号链接。
+- 有界打在**匹配条数**，不打在 DFS 枚举前缀。返回 `{ paths, truncated }`：`paths` 为稳定排序的 canonical 相对路径；截断时 `truncated = true`，不得把截断伪装成空匹配。
+- 不授予 Read。capability 边界外的路径不出现。
+
+## JS-020 grep()
+
+`ToolPermission.Grep` 投影为 `grep(needle, pattern = "**/*")`。needle 为非空字符串（字面量）或 RegExp（忽略调用方 g/y/`lastIndex`）。`pattern` 与 JS-007 同一套 gitignore 选文件。Host 在选中的严格 UTF-8 文件上搜索；不可读或非法 UTF-8 的文件跳过，不使整次调用失败。返回 `{ matches: [{ path, line, column, text }], truncated }`：`line` / `column` 为 1-based；`text` 为匹配子串；有界打在匹配条数；截断可见。不授予 `file()`。builtin `grep` RPC 仍独立存在（JS-003/017）。Read+Glob 而无 Grep 时，仍可用 `glob()+file()+RegExp` 组合，但那不是 Grep capability 的投影。
 
 ## JS-008 rewrite()
 
