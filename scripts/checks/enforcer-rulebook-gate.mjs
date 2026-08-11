@@ -7,10 +7,15 @@
  *   - exactly EXPECTED_RULE_COUNT kebab-case directories
  *   - each dir contains exactly enforcer.md + main.md (no third entry)
  *   - both files are nonempty UTF-8 text with at least one `#` title line
+ *   - optional constitution body headings (`requireHeadings` / `--require-headings`):
+ *       enforcer.md → ## Definition / ## Trigger When / ## Nudge
+ *       main.md     → ## What To Do Now / ## Verification / ## Done When
  *
- * Does NOT enforce constitution body headings (Appendix A) — structure only.
+ * Usage:
+ *   node scripts/checks/enforcer-rulebook-gate.mjs
+ *   node scripts/checks/enforcer-rulebook-gate.mjs --require-headings
  *
- * Usage: node scripts/checks/enforcer-rulebook-gate.mjs
+ * check.mjs enables --require-headings once all 120 tips carry constitution headings.
  */
 
 import {
@@ -19,7 +24,7 @@ import {
   readFileSync,
   statSync,
 } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const RULEBOOK_REL = 'resources/enforcer'
@@ -31,6 +36,77 @@ export const KEBAB_CASE_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 /** At least one markdown ATX title line (`# …`) with non-whitespace after `#`. */
 export const TITLE_LINE_RE = /^#\s+\S/m
+
+/**
+ * Constitution mandatory H2 headings (Appendix A). Checked only when
+ * `requireHeadings: true`. Default false so synthetic unit fixtures stay lean.
+ */
+export const ENFORCER_REQUIRED_HEADINGS = Object.freeze([
+  'Definition',
+  'Trigger When',
+  'Nudge',
+])
+
+export const MAIN_REQUIRED_HEADINGS = Object.freeze([
+  'What To Do Now',
+  'Verification',
+  'Done When',
+])
+
+/**
+ * True when `text` has an ATX `## <heading>` line (optional trailing whitespace).
+ * @param {string} text
+ * @param {string} heading
+ */
+export const hasHeading = (text, heading) => {
+  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`^##\\s+${escaped}\\s*$`, 'm').test(text)
+}
+
+/**
+ * @param {string} text
+ * @param {readonly string[]} headings
+ * @param {string} [fileRel]
+ * @returns {{ code: string, path?: string, detail?: string }[]}
+ */
+export const missingHeadings = (text, headings, fileRel) => {
+  /** @type {{ code: string, path?: string, detail?: string }[]} */
+  const out = []
+  for (const h of headings) {
+    if (!hasHeading(text, h)) {
+      out.push({
+        code: 'missing-heading',
+        path: fileRel,
+        detail: `missing required heading '## ${h}'`,
+      })
+    }
+  }
+  return out
+}
+
+/**
+ * Parse CLI flags for the gate.
+ * @param {string[]} argv
+ * @returns {{ requireHeadings: boolean }}
+ */
+export const parseCliArgs = (argv = process.argv.slice(2)) => {
+  let requireHeadings = false
+  for (const arg of argv) {
+    if (arg === '--require-headings') {
+      requireHeadings = true
+      continue
+    }
+    if (arg === '--no-require-headings') {
+      requireHeadings = false
+      continue
+    }
+    if (arg.startsWith('--require-headings=')) {
+      const v = arg.slice('--require-headings='.length).toLowerCase()
+      requireHeadings = v !== 'false' && v !== '0' && v !== 'off'
+    }
+  }
+  return { requireHeadings }
+}
 
 /**
  * @typedef {{
@@ -45,12 +121,15 @@ export const TITLE_LINE_RE = /^#\s+\S/m
  * @param {{
  *   expectedCount?: number,
  *   requireTitle?: boolean,
+ *   requireHeadings?: boolean,
  * }} [opts]
  * @returns {{ ok: boolean, count: number, violations: Violation[] }}
  */
 export const scanRulebook = (rootAbs, opts = {}) => {
   const expectedCount = opts.expectedCount ?? EXPECTED_RULE_COUNT
   const requireTitle = opts.requireTitle !== false
+  // Default false: unit fixtures are structural-only. CLI / check.mjs enable true.
+  const requireHeadings = opts.requireHeadings === true
   /** @type {Violation[]} */
   const violations = []
 
@@ -236,6 +315,18 @@ export const scanRulebook = (rootAbs, opts = {}) => {
           detail: 'file must contain a markdown # title line',
         })
       }
+
+      if (requireHeadings) {
+        const required =
+          req === 'enforcer.md'
+            ? ENFORCER_REQUIRED_HEADINGS
+            : req === 'main.md'
+              ? MAIN_REQUIRED_HEADINGS
+              : null
+        if (required) {
+          violations.push(...missingHeadings(text, required, fileRel))
+        }
+      }
     }
   }
 
@@ -263,10 +354,14 @@ const formatViolation = (v) => {
 }
 
 const runCli = () => {
-  const result = scanRepoRulebook()
+  const { requireHeadings } = parseCliArgs()
+  const result = scanRepoRulebook(process.cwd(), { requireHeadings })
   if (result.ok) {
+    const headingNote = requireHeadings
+      ? '; constitution headings enforced'
+      : '; constitution headings not required (pass --require-headings)'
     console.log(
-      `enforcer-rulebook-gate: OK — ${result.count} kebab-case rule dirs, each with enforcer.md + main.md (no catalog.json)`,
+      `enforcer-rulebook-gate: OK — ${result.count} kebab-case rule dirs, each with enforcer.md + main.md (no catalog.json)${headingNote}`,
     )
     process.exit(0)
   }

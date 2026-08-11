@@ -1,15 +1,22 @@
 # stringly-typed-error — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Introduce a closed error type or stable error code. Map to messages only at the presentation edge. Branch on the typed case, never on substrings.
 
-## Why
+## Repair Strategy
+Find `includes`/`match` on error messages. Replace with discriminated unions/enums. Stabilize the wire code if cross-process.
 
-Callers interpret error strings, localized text, message fragments, or regular expressions to determine program behavior.
+## Decision Branches
+If a third party only offers strings, parse once at the adapter into your typed error and never re-parse downstream.
 
-## What to do
+## Wrong Fixes
+Matching translated UI text. Adding more regexes for new locales. Documenting "error message must contain X" as the API.
 
-Program logic is parsing error prose. Replace the string contract with a closed typed error value.
+## Verification
+Change message copy without breaking logic. Tests assert on typed cases, not substrings.
 
-## Reference
+## Done When
+Control flow uses typed errors; message text is presentation-only.
 
-Family A, enforcement-a07, ordinal 7.
+## Scope and Authority
+In-process and API error contracts used for branching.

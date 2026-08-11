@@ -42,7 +42,7 @@ module EnforcerCycle =
                 // validateCycle 保证非空；此分支不可达。
                 { RuleId = ""
                   FieldName = ""
-                  CatalogOrdinal = 0 }
+                  LexicalOrder = 0 }
 
         let mergedEvidence =
             sorted

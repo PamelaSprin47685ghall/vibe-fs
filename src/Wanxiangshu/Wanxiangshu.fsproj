@@ -117,6 +117,7 @@
     <Compile Include="Journal/GuidelineProjection.fs"/>
     <Compile Include="Journal/TipDeliveryProjection.fs"/>
     <Compile Include="Journal/AgentProjection.fs"/>
+    <Compile Include="Journal/ObservationProjection.fs"/>
     <Compile Include="Journal/FinalityReviewCohort.fs"/>
     <Compile Include="Journal/RecoveryClosureProjection.fs"/>
     <Compile Include="Journal/PromptAuthorityLedger.fs"/>

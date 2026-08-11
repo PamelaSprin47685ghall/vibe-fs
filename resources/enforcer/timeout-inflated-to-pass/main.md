@@ -1,15 +1,22 @@
 # timeout-inflated-to-pass — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Revert the inflated timeout. Find the missing signal, deadlock, leak, or overload. Fix the cause; set timeouts from real budgets afterward.
 
-## Why
+## Repair Strategy
+Capture traces under the hang. Check for missing await signals, lock cycles, unbounded work, and leaked resources. Restore a tight timeout that fails closed.
 
-A timeout or retry budget is increased mainly to turn a failing test or hanging operation green.
+## Decision Branches
+If load genuinely needs more time, document the measurement and SLO—distinct from greenwashing a flake.
 
-## What to do
+## Wrong Fixes
+timeout: 60000 because 5000 failed. Triple retries with triple timeouts until CI is quiet. Disabling timeouts entirely.
 
-A larger timeout is masking the failure. Fix the missing causal signal or resource leak instead.
+## Verification
+With a correct fix, a reasonable timeout passes reliably; breaking the signal fails fast again.
 
-## Reference
+## Done When
+Timeouts reflect real budgets; hangs are fixed at the causal root.
 
-Family H, enforcement-h09, ordinal 79.
+## Scope and Authority
+Tests and operational timeouts adjusted to hide failures.

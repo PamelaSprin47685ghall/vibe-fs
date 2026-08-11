@@ -1,15 +1,22 @@
 # wrong-rule-composition — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Classify rules as dependent or independent. Use applicative/accumulating composition for independents and monadic/short-circuit for dependents.
 
-## Why
+## Repair Strategy
+Refactor validation pipelines. Stop reporting cascade noise after a missing prerequisite. Gather all field-level errors that do not depend on each other.
 
-Dependent rules collect meaningless downstream errors instead of short-circuiting, or independent rules stop early instead of returning the full error set.
+## Decision Branches
+If a UX needs partial dependent hints, compute them separately from hard gate composition. If performance requires fail-fast everywhere, document that product choice.
 
-## What to do
+## Wrong Fixes
+Always fail-fast on multi-field forms. Always accumulating after a null parent access that makes child errors nonsense. Mixing both randomly per call site.
 
-The rule composition strategy is wrong. Short-circuit dependent checks and accumulate independent failures.
+## Verification
+Dependent failure yields one root error without cascade junk; independent invalid fields all appear together.
 
-## Reference
+## Done When
+Composition matches dependency structure; error sets are meaningful and complete.
 
-Family B, enforcement-b04, ordinal 14.
+## Scope and Authority
+Validation and business rule pipelines.

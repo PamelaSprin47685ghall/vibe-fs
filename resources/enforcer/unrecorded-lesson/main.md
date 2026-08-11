@@ -1,15 +1,22 @@
 # unrecorded-lesson — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Write the lesson into the durable skill/runbook/tip plane while context is fresh. Include trigger, failure mode, and fix.
 
-## Why
+## Repair Strategy
+Summarize what burned time. Store it where the next agent will load it. Link from the work log.
 
-A reusable engineering lesson, debugging discovery, provider quirk, or recovery principle emerges but is not recorded durably.
+## Decision Branches
+If the lesson changes an existing tip, update that tip. If it is provider-specific, scope the record accordingly.
 
-## What to do
+## Wrong Fixes
+Leaving the lesson only in chat. Assuming you will remember next session. Recording a vague "be careful" without the concrete trigger.
 
-A reusable lesson emerged but was not recorded. Capture it with the skill-creator tool so it survives this session.
+## Verification
+The lesson is loadable from the repo/skills without the original session transcript.
 
-## Reference
+## Done When
+Reusable learning is durably recorded in the appropriate plane.
 
-Family K, enforcement-k01, ordinal 101.
+## Scope and Authority
+Session and incident learning with reuse value.

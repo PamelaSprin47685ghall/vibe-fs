@@ -1,15 +1,22 @@
 # status-announcement-noise — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Delete routine "starting/done/working on" chatter. Emit signals only when a decision is made, a phase completes with a result, or action is required.
 
-## Why
+## Repair Strategy
+Audit log and message sites. Keep error and decision lines. Collapse multi-line progress into one summary at boundaries. Prefer structured events over prose spam.
 
-Production output, code comments, logs, or agent messages repeatedly announce routine progress without conveying a decision, result, failure, or required action.
+## Decision Branches
+If operators need heartbeats, use a single metric or sparse heartbeat with timestamps—not paragraph status. If debugging, gate verbose traces behind a flag.
 
-## What to do
+## Wrong Fixes
+Logging every loop iteration as INFO. Agent turns that only narrate tool intent without results. Comments that restate the next line as "now we process".
 
-Status announcements are adding noise. Report only decisions, meaningful progress, failures, and actionable results.
+## Verification
+Output under normal load is scannable; each remaining line carries decision, result, failure, or action.
 
-## Reference
+## Done When
+Routine status spam is gone; remaining messages are actionable or decision-bearing.
 
-Family L, enforcement-l08, ordinal 118.
+## Scope and Authority
+Logs, agent messages, and user-visible operational output. Not required audit trails.

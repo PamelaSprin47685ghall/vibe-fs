@@ -15,59 +15,10 @@ module EnforcerCatalogResource =
 
     let private isKebab (name: string) = kebabNamePattern.IsMatch name
 
-    /// Extract markdown section body under `## <heading>` (case-insensitive heading match).
-    let private trySection (markdown: string) (heading: string) : string option =
-        if isNull markdown then
-            None
-        else
-            let lines = markdown.Replace("\r\n", "\n").Split('\n')
-            let target = heading.Trim().ToLowerInvariant()
-            // DSL-MUTABLE: algorithm-scratch — section scan state
-            let mutable collecting = false
-            let mutable acc: string list = []
-
-            for line in lines do
-                let trimmed = line.TrimStart()
-
-                if trimmed.StartsWith("## ") then
-                    let title = trimmed.Substring(3).Trim().ToLowerInvariant()
-
-                    if collecting then
-                        collecting <- false
-                    elif title = target then
-                        collecting <- true
-                        acc <- []
-                elif collecting then
-                    acc <- line :: acc
-
-            if List.isEmpty acc then
-                None
-            else
-                let body = acc |> List.rev |> String.concat "\n" |> (fun s -> s.Trim())
-
-                if body.Length = 0 then None else Some body
-
-    let private tryFamily (markdown: string) : string option =
-        if isNull markdown then
-            None
-        else
-            let m = Regex.Match(markdown, @"Family:\s*([A-Za-z0-9_-]+)")
-
-            if m.Success then Some(m.Groups.[1].Value.Trim()) else None
-
-    let private firstNonEmptyParagraph (markdown: string) : string =
-        markdown.Replace("\r\n", "\n").Split([| "\n\n" |], StringSplitOptions.None)
-        |> Array.map (fun p -> p.Trim())
-        |> Array.tryFind (fun p ->
-            p.Length > 0
-            && not (p.StartsWith("#"))
-            && not (p.StartsWith("Tip already selected")))
-        |> Option.defaultValue (markdown.Trim())
-
     /// Effective Blogger system prompt: base blogger-system.md + full enforcer.md set.
     /// Deterministic projection only — never written back to the repository.
     let composeBloggerSystemPrompt (basePrompt: string) (rules: EnforcerRule list) : string =
-        let ordered = rules |> List.sortBy (fun r -> r.CatalogOrdinal)
+        let ordered = rules |> List.sortBy (fun r -> r.LexicalOrder)
         let parts = ResizeArray<string>()
 
         let baseText = if isNull basePrompt then "" else basePrompt.TrimEnd()
@@ -122,26 +73,14 @@ module EnforcerCatalogResource =
                 if mainText.Length = 0 then
                     raise (InvalidOperationException(sprintf "main.md empty for rule %s" name))
 
-                let scoreWhen =
-                    trySection enforcerText "ScoreWhen" |> Option.defaultValue enforcerText
-
-                let nudge =
-                    trySection enforcerText "Nudge"
-                    |> Option.orElse (trySection mainText "What to do")
-                    |> Option.defaultValue (firstNonEmptyParagraph mainText)
-
-                let family = tryFamily enforcerText |> Option.defaultValue "rulebook"
-                let ordinal = index + 1
+                let order = index + 1
 
                 { Name = name
                   EnforcerText = enforcerText
                   MainText = mainText
                   RuleId = name
                   FieldName = name
-                  Family = family
-                  ScoreWhen = scoreWhen.Trim()
-                  Nudge = nudge.Trim()
-                  CatalogOrdinal = ordinal })
+                  LexicalOrder = order })
 
         match EnforcerCatalog.validate 1 rules with
         | Error err ->

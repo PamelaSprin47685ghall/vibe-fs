@@ -56,7 +56,7 @@ test('ENFORCER_021_valid_field_maps_exact_rule_id', () => {
     tip: {
       ruleId: rule.ruleId,
       fieldName: rule.fieldName,
-      catalogOrdinal: rule.catalogOrdinal,
+      lexicalOrder: rule.lexicalOrder,
     },
   })
 })

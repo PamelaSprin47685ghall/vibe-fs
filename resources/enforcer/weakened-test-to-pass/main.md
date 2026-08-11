@@ -1,15 +1,22 @@
 # weakened-test-to-pass — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Restore the strong assertion. Fix the product code. If the contract truly changed, update the spec and tests to the new stronger story—not a looser one that hides bugs.
 
-## Why
+## Repair Strategy
+Diff the test change. Reintroduce removed cases. Confirm the failure mode. Patch implementation until the original behavioral intent holds.
 
-Assertions, cases, fixtures, or expected outcomes are removed or weakened primarily to make a failing test pass.
+## Decision Branches
+If the old test was wrong, replace it with a correct strong test—not `assert true`. If flaky, fix determinism rather than deleting the check.
 
-## What to do
+## Wrong Fixes
+Deleting the only failing assertion. Broadening equality to "not null". Marking tests skipped to go green permanently.
 
-The test was weakened instead of fixing the defect. Restore the behavioral expectation and repair the implementation.
+## Verification
+Restored tests fail on the old bug and pass on the fix; suite strength is not reduced.
 
-## Reference
+## Done When
+Behavioral expectations remain strong; the defect is fixed in implementation.
 
-Family G, enforcement-g04, ordinal 64.
+## Scope and Authority
+Test changes responding to failures.

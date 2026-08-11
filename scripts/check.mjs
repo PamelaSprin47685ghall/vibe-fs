@@ -18,6 +18,7 @@ const checks = [
   join(root, 'checks/session-ownership-ratchet.mjs'),
   join(root, 'checks/enforcer-rulebook-gate.mjs'),
   join(root, 'checks/js-surface-gate.mjs'),
+  join(root, 'checks/capability-isomorphism-gate.mjs'),
   join(root, 'checks/unified-store-gate.mjs'),
   join(root, 'checks/g4r-freeze.mjs'),
   join(root, 'checks/g4r-ce-vocabulary.mjs'),
@@ -37,6 +38,9 @@ for (const script of checks) {
       '--root=src/Wanxiangshu',
     )
   }
+  // Constitution headings (Definition/Trigger When/Nudge + What To Do Now/Verification/Done When)
+  // are complete across all 120 tips — enable require-headings for the rulebook gate.
+  if (script.endsWith('enforcer-rulebook-gate.mjs')) args.push('--require-headings')
   const result = spawnSync(process.execPath, args, { stdio: 'inherit' })
   if (result.status !== 0) process.exit(result.status ?? 1)
 }

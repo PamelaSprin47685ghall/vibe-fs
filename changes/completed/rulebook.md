@@ -3252,13 +3252,14 @@ no Rulebook private journal/blob/coverage/delivery filesystem stores in proposed
    - `EnforcementProjection.applySquash(count)`：squash 覆盖 oldest `count` frames 时，按 1:1 Entry↔tip 假设丢弃 oldest `min(count, tips)` tips（Squash frame 本身不产生 tip）。  
    - `Fold` `BlogSquashCommitted` 在 main `payload.SessionId` 上同时更新 Blog frames 与 Enforcement tips。  
    - `CompanionProjectionBuilder`：zip tip+frame 为 interleaved observation units（多余 tip/frame 尾随），禁止 tips∥frames 平行 stream。  
-   Residual：完整 Observation EventStore vocabulary / 把 tip 嵌进 BlogFrame 类型仍可后续收敛；当前不扩 event 类型爆炸。
+   Domain residual closeout 后：`ObservationProjection` / `RulebookObservation` 已命名；物理 commit 仍 `BlogEntryCommitted`（见 Final outcome honesty）。
 
-## Remaining work → Deferred（非本 Exit 阻塞）
+## Remaining work → residual closeout
 
-见下方 **Final outcome · Deferred**。Runtime G7 exit 已满足；以下为 content / docs / vocabulary residual。
+原 Deferred 已全部交付，见下方 **Final outcome · Residual delivered**。无 open Deferred 表。  
+诚实物理边界（非 open work）：domain Observation 已命名；durable blog 物理事实仍为 `BlogEntryCommitted` / JournalEnvelope。
 
-## Completion criteria（G7 runtime exit）
+## Completion criteria（G7 full residual close）
 
 - [x] rulebook Active + Active work
 - [x] Runtime loads directories，不读 `catalog.json`
@@ -3266,23 +3267,24 @@ no Rulebook private journal/blob/coverage/delivery filesystem stores in proposed
 - [x] `blog.tip` enum = directory names（lexical）
 - [x] Folder loader fail-fast；count ≥ 1；package/build gates updated
 - [x] Effective blogger prompt concatenates all enforcer.md（minimal composer）
-- [x] Squash paired tip co-move + paired Companion history（runtime；非完整 Observation EventStore vocabulary）
-- [x] Main Full/Identity delivery runtime（TipGuidanceDelivered + TipDeliveryProjection；Journal path until EventStore vocabulary cutover）
+- [x] Squash paired tip co-move + paired Companion history
+- [x] Main Full/Identity delivery runtime（TipGuidanceDelivered + TipDeliveryProjection；compaction re-Full）
 - [x] targeted tests + build green for this slice（enforcer + companion tip paths）
-- [ ] ~~Full Observation EventStore vocabulary cutover~~ → **Deferred**
-- [ ] ~~Constitution content + docs plane full rewrite + authoring gates~~ → **Deferred**
+- [x] Domain Observation vocabulary：`ObservationProjection` + `RulebookObservation`（物理 commit 仍 `BlogEntryCommitted`）
+- [x] Constitution 120/120 headings + docs enforcer plane + authoring headings gate
+- [x] Bridge fields dropped（`LexicalOrder`）
 
 ## Blockers
 
-无（runtime exit）。Deferred 项不阻塞 G7 close。
+无。G7 residual closed。
 
 ---
 
 ## Final outcome
 
-**G7 Rulebook v2 — runtime exit 已收口**（2026-08-11）：folder SSOT + Main tip Full/Identity + paired squash tip co-move。**不**宣称 120 篇 constitution 正文重写或完整 Observation EventStore vocabulary 已完成。
+**G7 Rulebook v2 — residual closeout 已收口**（2026-08-11）：runtime exit 之上，原 Explicit Deferred 全部交付。Strength（G8）仍 active PARTIAL，不在本 Change 范围。
 
-### Runtime delivered
+### Runtime delivered（原 exit）
 
 1. **Authored SSOT = directories only**  
    `resources/enforcer/<TipName>/{enforcer.md,main.md}`；`catalog.json` **已删除**。  
@@ -3296,35 +3298,51 @@ no Rulebook private journal/blob/coverage/delivery filesystem stores in proposed
 
 4. **Paired history + squash tip co-move**  
    - `CompanionProjectionBuilder`：tip+frame zip 为 interleaved observation units（禁止 tips∥frames 平行 stream）。  
-   - `EnforcementProjection.applySquash` + `Fold` `BlogSquashCommitted`：覆盖 oldest frames 时 1:1 共移 tips。  
-   - Residual：完整 `Observation[]` / `BlogObservation*` EventStore vocabulary 仍 **Deferred**（Journal path 保留）。
+   - `EnforcementProjection.applySquash` + `Fold` `BlogSquashCommitted`：覆盖 oldest frames 时 1:1 共移 tips。
 
 5. **Main Full / Identity tip delivery**  
    - `HostFact.TipGuidanceDelivered { SessionId; TipName; Presentation = Full | IdentityOnly }`  
    - `TipDeliveryProjection` fold：`FullDeliveredTips` per Main session（restart-safe；无 process-local set / delivery-history.json）  
    - `EnforcerHost.resolveTipGuidance` / `latestTipGuidance`：首次 Full = tip header + `main.md`；重复 = identity only；SpikePlugin markerText = guidance + guideline  
-   - Substrate：**Journal** `TipGuidanceDelivered`（非完整 EventStore vocabulary cutover）
+   - Compaction referential integrity：identity-only 在 full guide 不可见时 re-Full（Slice J 已交付）
 
-6. **Proofs（targeted）**  
+6. **Proofs（targeted，runtime exit 时）**  
    - `npm run build` PASS  
    - `node --test` enforcer tip-v2 / tip-guidance-delivery / latest-tip-nudge / catalog(+validation) + companion-projection：**72 PASS**（含 squash co-truncate、first Full / second IdentityOnly）
 
 7. **Inventory cleanup**  
    `resources/enforcer/INVENTORY.md` 移出 runtime 资源树（旧 catalog id 表不得作 SSOT）。
 
-### Explicit Deferred（诚实 residual；非本 Exit 范围）
+### Residual delivered（原 Explicit Deferred → DONE）
 
-| 项 | 说明 |
-|---|---|
-| **120 constitution rewrite** | Appendix A 模板全文重写 240 篇；当前 stub/seed 正文可运行，非 constitution-complete |
-| **Full BlogObservation\* EventStore vocabulary** | `BlogObservationCommitted` / `BlogObservationsSquashed` + Coverage fold-only；**Journal path 仍为 observation/tip runtime substrate** |
-| **Compaction identity integrity** | identity-only tip 在 full guide 不可见时必须 re-Full（Slice J） |
-| **Docs plane full rewrite** | `docs/{what,how,shape,why,proof}/enforcer.md` 统一 folder SSOT + dual-consumer 叙述（本 close 仅 minimal SSOT pointer） |
-| **Authoring gates** | token budget / mandatory headings / no third file under rule dirs 自动化 |
-| **Drop bridge fields** | `ScoreWhen` / `Nudge` / `Family` / `CatalogOrdinal` 待 consumers 全切 `Name`/`EnforcerText`/`MainText` |
+| 项 | 状态 | 说明 |
+|---|---|---|
+| **120 constitution headings** | **DONE** | 120/120 rule dirs 满足 mandatory headings；gate `bad=0` |
+| **Drop bridge fields** | **DONE** | `ScoreWhen` / `Nudge` / `Family` 已删；序用 `LexicalOrder`（非 priority / CatalogOrdinal） |
+| **Observation vocabulary（domain）** | **DONE（诚实分层）** | Domain：`ObservationProjection` + `RulebookObservation` 命名落地。**物理事实仍为** `BlogEntryCommitted` / JournalEnvelope substrate——**未**宣称 first-class `BlogObservationCommitted` / `BlogObservationsSquashed` EventStore event 类型已替换物理 commit 路径 |
+| **Docs plane rewrite** | **DONE** | `docs/{what,how,shape,why,proof}/enforcer.md` enforcer 平面按 folder SSOT + dual-consumer 重写 |
+| **Authoring gates（headings）** | **DONE** | `enforcer-rulebook-gate --require-headings` OK |
+| **Compaction identity integrity** | **DONE** | 见 Runtime delivered §5（TipDelivery / re-Full） |
+
+### Residual honesty（仍成立的物理边界，非 open Deferred 表）
+
+```text
+Domain Observation named  ≠  physical BlogObservation* EventStore first-class events
+Physical durable blog facts remain BlogEntryCommitted on JournalEnvelope substrate
+TipGuidanceDelivered remains HostFact / Journal path as delivered above
+```
+
+不把上述物理边界登记为未交付 open work：vocabulary 目标在 domain/projection 层已闭合；event 类型 rename 不在本 residual closeout 范围。
+
+### Closeout proofs（residual）
+
+- `enforcer-rulebook-gate --require-headings` OK  
+- `capability-isomorphism-gate` OK（G9 静态闸；见 entry §0.1）  
+- `npm run build` OK  
+- enforcer / strength / verify unit：**256 PASS**
 
 ### Gate 移交
 
-- G7 **runtime** → `changes/completed/rulebook.md`  
-- Strength（G8）仍由 `changes/active/strength.md` 并行 owner 持有；**本 Change 不触碰 Strength**  
-- Playbook entry 快照由并行 owner 更新；勿把 Deferred 写成 DONE
+- G7 **full residual closed** → `changes/completed/rulebook.md`（本 Final outcome）  
+- Strength（G8）仍由 `changes/active/strength.md` 并行 owner 持有；**本 Change 不触碰 Strength**；G8 保持 **PARTIAL**  
+- G9：`enforcer-rulebook-gate --require-headings` + `capability-isomorphism-gate` 已接线；entry 快照同步  

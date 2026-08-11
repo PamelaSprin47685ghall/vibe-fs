@@ -1,15 +1,22 @@
 # stale-documentation — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Update the owning spec, schema, examples, and diagrams in the same change as the behavior. Delete or relocate obsolete statements.
 
-## Why
+## Repair Strategy
+Diff behavior against docs. Patch the authoritative plane first or together. Link the change notes to the doc update.
 
-Code or behavior changes while authoritative documentation, schemas, examples, or diagrams continue to describe the old contract.
+## Decision Branches
+If docs live in another package, land a coordinated change. If a doc is superseded, mark it and point to the new authority rather than leaving both live.
 
-## What to do
+## Wrong Fixes
+Shipping code first and promising a doc follow-up that never lands. Updating a blog but not the schema contract. Leaving examples that fail against the new API.
 
-The implementation and authoritative documentation disagree. Update the owning specification in the same change.
+## Verification
+Follow docs-only instructions against the new code; they work. No contradictory authoritative page remains.
 
-## Reference
+## Done When
+Authoritative documentation matches the shipped contract in the same delivery.
 
-Family K, enforcement-k05, ordinal 105.
+## Scope and Authority
+Owning specs, schemas, and official examples. Not every chat transcript.

@@ -4,7 +4,7 @@
 // TipName = directory basename = provider tip enum = durable RuleId.
 // ENFORCER-190 (pure tests) items 1, 15:
 //   1. Catalog load is stable.
-//   15. A catalog update does not change old NudgeAnchored bytes (the nudge text
+//   15. A catalog update does not change old tip main guidance bytes (main.md
 //       is fixed per rule; the catalog is append-only in spirit).
 
 import assert from 'node:assert/strict'
@@ -33,31 +33,23 @@ test('ENFORCER_170_tip_name_equals_rule_id_and_field', () => {
 })
 
 test('ENFORCER_170_catalog_ordinals_are_contiguous_from_1', () => {
-  const ordinals = enforcer.rules.map((r) => r.CatalogOrdinal).sort((a, b) => a - b)
-  assert.deepEqual(ordinals, Array.from({ length: 120 }, (_, i) => i + 1))
+  const orders = enforcer.rules.map((r) => r.LexicalOrder).sort((a, b) => a - b)
+  assert.deepEqual(orders, Array.from({ length: 120 }, (_, i) => i + 1))
 })
 
-test('ENFORCER_170_all_nudges_are_nonempty', () => {
+test('ENFORCER_170_all_main_and_enforcer_texts_are_nonempty', () => {
   for (const rule of enforcer.rules) {
-    assert.ok(rule.Nudge.trim().length > 0, `rule ${rule.RuleId} has empty nudge`)
-  }
-})
-
-test('ENFORCER_170_all_descriptions_are_nonempty', () => {
-  for (const rule of enforcer.rules) {
-    assert.ok(rule.ScoreWhen.trim().length > 0, `rule ${rule.RuleId} has empty description`)
     assert.ok(rule.EnforcerText.trim().length > 0, `rule ${rule.RuleId} has empty enforcer.md`)
     assert.ok(rule.MainText.trim().length > 0, `rule ${rule.RuleId} has empty main.md`)
   }
 })
 
-test('ENFORCER_170_all_twelve_families_present_with_ten_rules_each', () => {
-  const byFamily = {}
+test('ENFORCER_170_no_bridge_fields_on_rule', () => {
   for (const rule of enforcer.rules) {
-    byFamily[rule.Family] = (byFamily[rule.Family] ?? 0) + 1
-  }
-  for (const f of 'ABCDEFGHIJKL'.split('')) {
-    assert.equal(byFamily[f], 10, `family ${f} should have 10 rules, got ${byFamily[f]}`)
+    assert.equal(rule.ScoreWhen, undefined, `rule ${rule.RuleId} still has ScoreWhen`)
+    assert.equal(rule.Nudge, undefined, `rule ${rule.RuleId} still has Nudge`)
+    assert.equal(rule.Family, undefined, `rule ${rule.RuleId} still has Family`)
+    assert.equal(rule.CatalogOrdinal, undefined, `rule ${rule.RuleId} still has CatalogOrdinal`)
   }
 })
 
@@ -77,15 +69,14 @@ test('ENFORCER_172_field_names_match_the_rfc_spelling', () => {
 })
 
 test('ENFORCER_170_catalog_is_stable_and_not_corrupted', () => {
-  // Regression for the L10 corruption: an earlier extract once swallowed the entire
-  // implementation-order chapter into ENF-L10's Nudge (measured >8,000 chars).
-  // The last rule's Nudge must stay short and exact.
+  // Regression: last tip main guidance must stay short and domain-specific.
   const l10 = enforcer.rules.find((r) => r.FieldName === 'incidental-complexity-dominates')
-  assert.equal(
-    l10.Nudge,
-    'Incidental complexity is dominating the design. Remove ceremony until the essential domain concepts become the visible structure.',
+  assert.ok(l10, 'incidental-complexity-dominates must exist')
+  assert.ok(l10.MainText.trim().length > 0, 'main.md must be non-empty')
+  assert.ok(
+    l10.MainText.includes('Incidental complexity') || l10.EnforcerText.includes('Incidental complexity'),
+    'tip substance about incidental complexity must remain in md texts',
   )
-  assert.ok(l10.Nudge.length < 200, `ENF-L10 Nudge must be short, got ${l10.Nudge.length} chars`)
 
   // Field names are the contract surface (provider-visible args); their exact
   // list is part of the catalog contract. Order is lexical directory order.

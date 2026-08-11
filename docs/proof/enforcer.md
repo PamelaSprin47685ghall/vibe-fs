@@ -1,41 +1,42 @@
 # Enforcer / Blogger — 证明
 
 行为见 `what/enforcer.md`，所有权见 `shape/enforcer.md`，程序见 `how/enforcer.md`。  
-规则实例实现面：`resources/enforcer/<TipName>/{enforcer.md,main.md}`（目录名 = TipName；无 `catalog.json`）。  
+规则实例实现面：`resources/enforcer/<TipName>/{enforcer.md,main.md}`（目录名 = TipName；**无** `catalog.json`）。  
 本文件只列证明项与真实证据路径；不重新定义任何 `ENFORCER-*` Clause。
 
 > 提示：多调用 tip 选择按 **provider-visible `PartOrdinal` 最早**（`EnforcerCycle.fs` 的
-> `mergeCalls`）证明，不是按 lexical ordinal。`docs/how/enforcer.md` ENFORCER-025 已改为
-> PartOrdinal-first-only，`docs/shape/enforcer.md` 已改为物理所有权（`HasFlight` /
-> `HasParked` / `PendingOffer` / `DrainWindow`）。此前的 baseline gap（catalog-ordinal tip
-> 选择、纯 cell 转移）均已关闭；本证明按当前 FIXED 文档与实现引用。
+> `mergeCalls`）证明，不是按 lexical ordinal。`docs/how/enforcer.md` ENFORCER-025 为
+> PartOrdinal-first-only；`docs/shape/enforcer.md` 为物理所有权（`HasFlight` /
+> `HasParked` / `PendingOffer` / `DrainWindow`）+ TipDelivery / Observation 投影边界。
+> 此前的 baseline gap（catalog-ordinal tip 选择、纯 cell 转移、catalog.json SSOT）均已关闭。
 
-## 资源与启动（§13.1 Rulebook folders）
+## 资源与启动（folder SSOT / ENFORCER-170）
 
 | 证明 | 证据路径 |
 |------|----------|
 | 打包 rulebook 目录可加载；缺失 / 非法目录 / Domain 校验失败 → 启动 fail fast，无代码内 fallback | `tests/unit/enforcer/catalog-validation.test.mjs`；`tests/unit/enforcer/catalog.test.mjs`；`tests/integration/resources/enforcer-rulebook.test.mjs`；资源 `resources/enforcer/*/` |
-| 恰好 120 条规则；TipName/`field`/`id` 唯一；ordinal 连续 `1..N`（lexical） | `tests/unit/enforcer/catalog.test.mjs`（`ENFORCER_170_*`）；`tests/unit/enforcer/catalog-validation.test.mjs`（`ENFORCER_170_validate_*`） |
+| 恰好 N 条规则（当前 120）；TipName/`field`/`id` 唯一且三者相等；lexical ordinal 连续 `1..N` | `tests/unit/enforcer/catalog.test.mjs`（`ENFORCER_170_*`）；`tests/unit/enforcer/catalog-validation.test.mjs`（`ENFORCER_170_validate_*`） |
+| 每 tip 目录含非空 `enforcer.md` + `main.md`（EnforcerText/MainText）；无 catalog.json 作为装载输入 | `tests/unit/enforcer/catalog.test.mjs`；`src/Wanxiangshu/Infrastructure/Resources/EnforcerCatalogResource.fs` |
 | `package.json` files 含 `resources/` → pack 后仍可加载 | integration 资源 / package 套件覆盖加载失败路径 |
 
-## 领域与 codec / tip（§13.1）
+## 领域与 codec / tip（ENFORCER-020..024）
 
 | 证明 | 证据路径 |
 |------|----------|
 | missing / empty tip 失败 | `tests/unit/enforcer/codec.test.mjs`（`ENFORCER_023_missing_tip_fails`、`ENFORCER_023_empty_tip_fails`） |
 | unknown tip 失败；无 fuzzy / 拼写修复 | `tests/unit/enforcer/codec.test.mjs`（`ENFORCER_023_unknown_tip_fails`、`ENFORCER_024_fuzzy_or_misspelled_tip_is_not_mapped`） |
-| exact field → exact RuleId；trim 后查找 | `tests/unit/enforcer/codec.test.mjs`（`ENFORCER_021_*`） |
+| exact field → exact RuleId；trim 后查找；RuleId = FieldName = TipName | `tests/unit/enforcer/codec.test.mjs`（`ENFORCER_021_*`） |
 | text / evidence 保留为独立字段；不是 tip | `tests/unit/enforcer/codec.test.mjs`（`ENFORCER_022_*`、`ENFORCER_020_*`） |
 | 额外 numeric property 不复活 score path | `tests/unit/enforcer/codec.test.mjs`（`ENFORCER_024_extra_numeric_properties_are_ignored`） |
 | 无 score 路径：decode 面无 `Scores` / `parseScore` | `tests/unit/enforcer/tip-v2-contract.test.mjs`（`ENFORCER_TIP_03_04_facade_surface_has_tip_not_numeric_scores`） |
-| 120 field 与 tool enum 一致（runtime = package） | `tests/unit/enforcer/tip-v2-contract.test.mjs`（`ENFORCER_TIP_01`、`ENFORCER_TIP_02_and_16`） |
+| field 枚举与 tool enum 一致（runtime = package directory scan） | `tests/unit/enforcer/tip-v2-contract.test.mjs`（`ENFORCER_TIP_01`、`ENFORCER_TIP_02_and_16`） |
 
-## Cycle 与多调用归并（§13.2）
+## Cycle 与多调用归并（ENFORCER-025/042/043/061）
 
 | 证明 | 证据路径 |
 |------|----------|
 | text 按 `PartOrdinal` 稳定合并（`"\n\n"`） | `tests/unit/enforcer/cycle-nudge.test.mjs`（`ENFORCER_042_text_merges_in_part_ordinal_order`）；`src/Wanxiangshu/Domain/EnforcerCycle.fs`（`mergeCalls`） |
-| canonical tip = **PartOrdinal 最早**，不合并 / 不 max / 不按 catalog ordinal | `tests/unit/enforcer/cycle-nudge.test.mjs`（`ENFORCER_025_canonical_tip_is_first_by_part_ordinal`、`ENFORCER_025_multi_call_does_not_merge_or_max_tips`）；`tests/unit/enforcer/tip-v2-contract.test.mjs`（`ENFORCER_TIP_15_multi_call_canonical_tip_is_first_by_part_ordinal`） |
+| canonical tip = **PartOrdinal 最早**，不合并 / 不 max / 不按 lexical ordinal | `tests/unit/enforcer/cycle-nudge.test.mjs`（`ENFORCER_025_canonical_tip_is_first_by_part_ordinal`、`ENFORCER_025_multi_call_does_not_merge_or_max_tips`）；`tests/unit/enforcer/tip-v2-contract.test.mjs`（`ENFORCER_TIP_15_multi_call_canonical_tip_is_first_by_part_ordinal`） |
 | evidence 完全相同去重、`"; "` 拼接 | `tests/unit/enforcer/cycle-nudge.test.mjs`（`ENFORCER_042_evidence_dedupes_exact_duplicates`） |
 | multi-call 仍提交单 cycle 并标记 protocol violation（`MultiCall=true`） | `tests/unit/enforcer/cycle-nudge.test.mjs`（`ENFORCER_042_single_call_is_not_multi_call`）；`tests/unit/enforcer/identity-fail-closed.test.mjs`（`ENFORCER_042_multi_call_commits_single_cycle_with_protocol_violation`）；`src/Wanxiangshu/Session/EnforcerHost.fs`（`validateCycle`）→ `Diagnostic.emit "enforcer-protocol-violation"`（静默，HOST-007；字段白名单见 `tests/unit/context/ctx014.test.mjs` `CTX_014_enforcer_protocol_violation_fields_are_whitelisted`）；`EnforcerCycle.fs` |
 | 重复 ToolCallId / identity 不成立 → fail closed（`ENFORCER-043`） | `tests/unit/enforcer/identity-fail-closed.test.mjs`（`ENFORCER_043_duplicate_tool_call_ids_fails_closed`）；`src/Wanxiangshu/Session/EnforcerHost.fs`（`validateCycle`）→ `Diagnostic.fatal "enforcer-cycle-failed"` |
@@ -46,7 +47,7 @@
 | 合并 text >512 KiB UTF-8 → fail closed（`MaxBlogTextBytes`） | `tests/unit/enforcer/bounds.test.mjs`（`ENFORCER_042_merged_text_over_512KiB_fails_closed`）；`src/Wanxiangshu/Session/EnforcerHost.fs`（`validateCycle`，`MaxBlogTextBytes=512*1024`，strict `>`，UTF-8 `SyntheticToml.byteCount`）→ `Diagnostic.fatal "enforcer-cycle-failed"` |
 | 合并 evidence >128 KiB UTF-8 → fail closed（`MaxEvidenceBytes`） | `tests/unit/enforcer/bounds.test.mjs`（`ENFORCER_042_merged_evidence_over_128KiB_fails_closed`）；`src/Wanxiangshu/Session/EnforcerHost.fs`（`validateCycle`，`MaxEvidenceBytes=128*1024`，strict `>`，UTF-8 `SyntheticToml.byteCount`）→ `Diagnostic.fatal "enforcer-cycle-failed"` |
 
-## 原子提交 / 恢复（§13.3）
+## 原子提交 / 恢复（ENFORCER-045/152/153/154）
 
 | 证明 | 证据路径 |
 |------|----------|
@@ -57,18 +58,32 @@
 | CommitUnknown 不盲重试模型（delta digest 不匹配 fail closed） | `tests/unit/enforcer/enforcer-cycle-protocol.test.mjs`（`ENFORCER_delta_digest_mismatch_is_fatal`） |
 | 不存在 `EnforcementCycleCommitted` 独立事实 | `tests/unit/enforcer/blogger-convergence-gaps.test.mjs`（`C0_no_EnforcementCycleCommitted_fact`） |
 
-## RecentTips / 投影（§13.4）
+## Observation / RecentTips / 配对（ENFORCER-070/071 Y 侧）
 
 | 证明 | 证据路径 |
 |------|----------|
 | 每次已提交 cycle 记录恰好一个 tip | `tests/unit/enforcer/tip-v2-contract.test.mjs`（`ENFORCER_TIP_08_each_committed_cycle_records_exactly_one_tip`） |
 | 上限 8（`RecentTipLimit = 8`） | `tests/unit/enforcer/tip-v2-contract.test.mjs`（`ENFORCER_TIP_10_recent_tips_cap_at_8`）；`src/Wanxiangshu/Journal/EnforcementProjection.fs` |
 | oldest → newest 顺序 | `tests/unit/enforcer/tip-v2-contract.test.mjs`（`ENFORCER_TIP_11_recent_tips_order_oldest_to_newest`） |
-| squash 不清空 RecentTips | `tests/unit/enforcer/tip-v2-contract.test.mjs`（`ENFORCER_TIP_12_squash_does_not_clear_recent_tips`） |
+| squash **co-truncate** RecentTips（Observation tip co-move；非「清空」） | `tests/unit/enforcer/tip-v2-contract.test.mjs`（squash/observation co-move 用例；`EnforcementProjection.applySquash`）；`src/Wanxiangshu/Journal/Fold.fs`（`BlogSquashCommitted` 同 session 应用 tips） |
+| Companion 重建为 **配对** tip+frame units，不是 tips∥frames 平行流 | `tests/unit/enforcer/tip-v2-contract.test.mjs`（配对 observation 断言）；`src/Wanxiangshu/Domain/CompanionProjectionBuilder.fs`（`pairTipFrameUnits`）；`src/Wanxiangshu/Domain/RulebookObservation.fs`（`pairTipsAndFrames`） |
 | `previous_enforcer_tip` 为 `[[do_not_exec]]` 低信任历史，role=assistant | `tests/unit/enforcer/tip-v2-contract.test.mjs`（`ENFORCER_TIP_13_work_record_contains_previous_enforcer_tip_blocks`） |
 | prompt 反重复 + 严重例外，不复活 score 措辞 | `tests/unit/enforcer/tip-v2-contract.test.mjs`（`ENFORCER_TIP_14_prompt_has_anti_repeat_and_severe_exception`） |
 
-## 运行时所有权（§13.5）
+## Main Full / Identity（ENFORCER-071 X 侧 / TipGuidanceDelivered）
+
+| 证明 | 证据路径 |
+|------|----------|
+| 首次 resolve → `TipPresentation.Full`，正文含 main.md / tip header | `tests/unit/enforcer/tip-guidance-delivery.test.mjs`（Full 首次用例）；`src/Wanxiangshu/Session/EnforcerHost.fs`（`resolveTipGuidance`） |
+| 同 tip 再次 resolve → `IdentityOnly`（`tip: <name>`），不重复 Full 正文 | `tests/unit/enforcer/tip-guidance-delivery.test.mjs`（Identity 重复用例） |
+| Full 路径 append `TipGuidanceDelivered`；fold 进 `TipDeliveryProjection.FullDeliveredTips` | `tests/unit/enforcer/tip-guidance-delivery.test.mjs`；`src/Wanxiangshu/Journal/TipDeliveryProjection.fs`；`src/Wanxiangshu/Journal/Fold.fs`（`TipGuidanceDelivered`） |
+| IdentityOnly 不扩展 Full 集合（audit-only） | `TipDeliveryProjection.apply`（`IdentityOnly -> state`）；对应 tip-guidance 测试 |
+| Blogger satellite session id 经 association 解析到 owner Main tip | `tests/unit/enforcer/tip-guidance-delivery.test.mjs`（blogger id resolve） |
+| 无 tip / 无 association → None，不发明 guidance | `tests/unit/enforcer/tip-guidance-delivery.test.mjs` |
+| `ContextReanchored` 清空 FullDeliveredTips；其后 resolve 再发 Full main.md | `tests/unit/enforcer/tip-guidance-delivery.test.mjs`（reanchor 后再 Full）；`TipDeliveryProjection.applyReanchor`；`docs/what/persist.md` ContextReanchored 行 |
+| `latestTipGuidance` / `latestTipNudge` 同义（Full/Identity 文本，非旧 Nudge 字段） | `tests/unit/enforcer/tip-guidance-delivery.test.mjs`（`ENFORCER_TIP_DELIVERY_003_*`） |
+
+## 运行时所有权（ENFORCER-047/050）
 
 | 证明 | 证据路径 |
 |------|----------|
@@ -78,7 +93,7 @@
 | 生命周期权威 = 物理所有权，非 cell | `tests/unit/enforcer/blogger-convergence-gaps.test.mjs`（`C0_blogger_lifecycle_authority_is_physical_ownership`）；`tests/unit/enforcer/blogger-seal-reactivate.test.mjs`（`BLOGGER_RUNTIME_cell_has_no_sealed_mirror_durable_is_truth`） |
 | 无 `BloggerRuntimeState` / `BloggerRuntimeCell` 生产引用；seal / teardown 经物理 registry + drain | `tests/unit/enforcer/blogger-seal-reactivate.test.mjs`（`HANDLE_lifecycle_*`、`BLOGGER_RUNTIME_*`）；`tests/unit/enforcer/blogger-runtime.test.mjs`（`ENFORCER_047_session_delete_is_registry_removal_not_a_cell_state`）；`src/Wanxiangshu/Session/BloggerRuntimeState.fs`（仅 `DrainWindow` 等物理定义，无 State DU） |
 
-## Repair / fallback（§13.6）
+## Repair / fallback（ENFORCER-060..068）
 
 | 证明 | 证据路径 |
 |------|----------|
@@ -92,15 +107,19 @@
 
 | 证明 | 证据路径 |
 |------|----------|
-| `ScoreVector` 路径不得复活 | ENFORCER-072/073（已有）；`tests/unit/enforcer/tip-v2-contract.test.mjs`（`ENFORCER_TIP_03_04`） |
+| `ScoreVector` 路径不得复活 | ENFORCER-072/073；`tests/unit/enforcer/tip-v2-contract.test.mjs`（`ENFORCER_TIP_03_04`） |
 | throttle / nudge 模块为 compiled tombstone，零生产调用 | `tests/unit/enforcer/throttle.test.mjs`；`src/Wanxiangshu/Domain/EnforcerThrottle.fs` / `EnforcerNudge.fs`（`Removed = true`） |
+| `catalog.json` 不得作为规则 SSOT 或装载输入 | folder loader + catalog 测试仅扫目录；无 JSON catalog 装载路径 |
 
 ## 端到端
 
-Blogger 路径 canary：工具必须调用、busy skip 不推进 coverage、成功提交推进
-RecordCoverage。与 CTX/HOST 交叉：compaction 后 reanchor 不把 Host 摘要当 BlogFrame。
+Blogger 路径 canary：工具必须调用、busy skip 不推进 coverage、成功提交推进 RecordCoverage。  
+Main tip 路径 canary：首次 Full main.md、重复 Identity、compaction reanchor 后再 Full。  
+Observation 路径 canary：提交 tip 入 RecentTips；squash tip co-move；Companion 配对 unit。  
+与 CTX/HOST 交叉：compaction 后 reanchor 不把 Host 摘要当 BlogFrame；TipDelivery 与 Blog/Prefix 同原子清空 Full 集合。
 
 ## 发布面
 
-规则正文变更 = 数据变更 + 对应测试；不得只改文档不改 catalog。  
-`ScoreVector` 路径不得复活（ENFORCER-072/073）。
+规则正文变更 = 数据变更（`resources/enforcer/<TipName>/{enforcer.md,main.md}`）+ 对应测试；不得只改文档不改目录正文。  
+`ScoreVector` 路径不得复活（ENFORCER-072/073）。  
+不得重新引入 `catalog.json` 作为第二真相。

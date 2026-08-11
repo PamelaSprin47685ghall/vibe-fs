@@ -27,7 +27,7 @@ Proposal 相互覆盖时如何落地
 
 Unified Storage / Session / Casebook 等 cutover 是 **clean break**：旧 Journal / Blob / feature-owned store 上的历史数据可以丢弃或留在原地不再读取；新世界只认最终 EventStore 语义。禁止为“迁旧数据”“双向兼容”“旧档可读性”投入工期。
 
-**进度快照最后同步：** 2026-08-11（§0.1 为 Gate 状态权威；正文历史章节若与 §0.1 冲突，以 §0.1 为准。G0–G6 已收口；G7 runtime DONE / constitution residual；G8 PARTIAL K0；G9 PARTIAL ratchet）
+**进度快照最后同步：** 2026-08-11（§0.1 为 Gate 状态权威；正文历史章节若与 §0.1 冲突，以 §0.1 为准。G0–G7 已收口；G8 PARTIAL active strength；G9 PARTIAL ratchet + capability-isomorphism / headings gates）
 
 > **权威声明：** §0.1 Gate 总览是 living status 唯一权威。后文 G4/G5/G6 等章节标题里若仍残留 “IN PROGRESS / BLOCKED / NOT STARTED”，那是施工手册原文，不覆盖 §0.1。
 
@@ -44,7 +44,7 @@ Completed（本 Playbook 相关）:
   changes/completed/js-capability-projected-tools.md    — G5 DONE
   changes/completed/universal.md                        — G2/G3/G6 Casebook lifecycle 收口
   changes/completed/perm-inspector.md                   — G6 Casebook / mechanical Bookkeeper 收口
-  changes/completed/rulebook.md                         — G7 runtime DONE（constitution residual 记在 Final outcome）
+  changes/completed/rulebook.md                         — G7 DONE（runtime + residual closeout；见 Final outcome）
 
 Proposed（Playbook 本身 + 独立 Lane）:
   changes/proposed/entry.md        — 本文件；Integration Playbook，不是产品 Change；不迁 completed
@@ -95,11 +95,11 @@ Strength
 | **G4** Unified Storage | **DONE** | `changes/completed/storage.md` Final outcome；G4R（`changes/completed/test.md`）；`unified-store-gate` |
 | **G5** JS Capability-Projected Tools | **DONE** | `changes/completed/js-capability-projected-tools.md` Final outcome；C-3 按用户裁决 |
 | **G6** perm-inspector + Casebook | **DONE** | CasebookLifecycle session wiring + mechanical Bookkeeper + Index；`changes/completed/universal.md` + `changes/completed/perm-inspector.md` |
-| **G7** Rulebook | **DONE（runtime）** | `changes/completed/rulebook.md`；folder SSOT（无 catalog.json）；Full/Identity `TipGuidanceDelivered`；squash co-move；blogger compose enforcer。**Residual（非 runtime 阻塞，记在 Final outcome）：** constitution 120 rewrite、docs plane enforcer、Observation EventStore vocabulary 全量 rename、compaction identity integrity、INVENTORY.md |
-| **G8** Strength | **PARTIAL→merged** | `wanxiangshu-strength` 已 merge：Strength docs + Frame/Events/Projection + ProjectionAlgebra `UseStrengthMirror`/`InsertStrengthFrames` + unit 21。Change 仍 `changes/active/strength.md`（K1/K2/shadow 未 claim DONE） |
-| **G9** Global Convergence | **PARTIAL** | ratchets：`student-teacher-absence`（含 `SatelliteKind.Replica`）、`session-ownership-ratchet`、`enforcer-rulebook-gate`、`unified-store-gate`、`js-surface-gate`、`g4r-*`。`npm run check` + Long Stroke GREEN（journal 372） |
+| **G7** Rulebook | **DONE** | `changes/completed/rulebook.md` Final outcome residual closeout：folder SSOT；Full/Identity `TipGuidanceDelivered` + compaction re-Full；squash co-move；blogger compose；**120/120** mandatory headings（`bad=0`）；bridge fields dropped（`LexicalOrder`）；domain `ObservationProjection` + `RulebookObservation`（物理事实仍 `BlogEntryCommitted` / JournalEnvelope）；docs enforcer plane rewrite；`enforcer-rulebook-gate --require-headings` OK。无 open Deferred 表。 |
+| **G8** Strength | **PARTIAL** | Change 仍 `changes/active/strength.md`（并行 owner）。K0 splice / algebra 可测；**不** claim K1/K2/shadow DONE。G8 保持 active PARTIAL。 |
+| **G9** Global Convergence | **PARTIAL** | ratchets：`student-teacher-absence`（含 `SatelliteKind.Replica`）、`session-ownership-ratchet`、`enforcer-rulebook-gate`（含 `--require-headings`）、`capability-isomorphism-gate`、`unified-store-gate`、`js-surface-gate`、`g4r-*`。`npm run check` + Long Stroke GREEN（journal 372）。G9 整体仍 PARTIAL（非 full release close）。 |
 
-**当前主线位置：** G0–G7 runtime **DONE**；G8 **PARTIAL**（strength active，algebra 已可测）；G9 **PARTIAL**（gates 绿，capability-isomorphism 静态闸可选未做）。entry 保持 `proposed/`。
+**当前主线位置：** G0–G7 **DONE**（G7 residual closed）；G8 **PARTIAL**（strength active）；G9 **PARTIAL**（capability-isomorphism + headings gates 已接线，非 full convergence close）。entry 保持 `proposed/`。
 
 ## 0.2 自 Playbook 落地以来关键 commit（`31d456ec` 之后）
 
@@ -125,12 +125,14 @@ ac41ef8f  session abort diagnostic
 | 证明切片 | 状态 |
 |---|---|
 | 静态 ratchet：`student-teacher-absence`（含 `SatelliteKind.Replica` 禁止）+ `session-ownership-ratchet` + `unified-store-gate` + `g4r-*` | **GREEN** |
+| `enforcer-rulebook-gate --require-headings` + `capability-isomorphism-gate` | **GREEN**（G7 residual / G9 静态闸） |
 | `npm run check`（lint + build + unit + integration） | **GREEN** |
+| enforcer / strength / verify unit | **256 PASS** |
 | `npm run test:e2e` Long Stroke | **GREEN**（48 steps；journal ceiling 372；三连稳定） |
-| Storage G4 / JS G5 / Universal+perm-inspector G6 / Rulebook G7 runtime | **DONE**（均在 `changes/completed/`） |
-| 已知 residual | G7 constitution 120 rewrite 等（Final outcome Deferred）；G8 Strength 全量（`active/strength.md` 并行 owner）；G9 capability-isomorphism 可选硬门；magic-todo 仍 proposed |
+| Storage G4 / JS G5 / Universal+perm-inspector G6 / Rulebook G7 | **DONE**（均在 `changes/completed/`；G7 residual closeout 见 rulebook Final outcome） |
+| 已知 residual | G8 Strength 全量仍 active PARTIAL（`active/strength.md` 并行 owner）；G9 非 full release close；magic-todo 仍 proposed。**G7 无 open Deferred。** |
 
-## 0.4 合法中间状态（现在）— **G0–G6 DONE；G7 runtime DONE；G8/G9 PARTIAL**
+## 0.4 合法中间状态（现在）— **G0–G7 DONE；G8/G9 PARTIAL**
 
 ```text
 ✓ Causal waits 可解释；orchestrator canaries 无历史 timeout
@@ -141,10 +143,11 @@ ac41ef8f  session abort diagnostic
 ✓ Storage completed（G4）
 ✓ JS capability-projected tools（G5）
 ✓ Casebook lifecycle / mechanical Bookkeeper / Index（G6；universal + perm-inspector completed）
-✓ Rulebook runtime：folder SSOT、Full/Identity tip guidance、squash co-move（G7 runtime DONE）
-◐ Rulebook residual：constitution 120、docs enforcer、Observation vocabulary rename、INVENTORY（不挡 runtime DONE 叙述）
-◐ Strength：K0 splice 类型在树；Change 仍 active/strength.md（并行 owner；非 G8 full DONE）
-◐ G9：既有 + session-ownership ratchet；capability-isomorphism 等仍可加
+✓ Rulebook G7 full residual closed：folder SSOT、Full/Identity + compaction re-Full、squash co-move、
+  120/120 headings、bridge fields dropped、domain ObservationProjection/RulebookObservation、
+  docs enforcer plane、enforcer-rulebook --require-headings（物理 blog facts 仍 BlogEntryCommitted）
+◐ Strength：K0 splice 类型在树；Change 仍 active/strength.md（并行 owner；G8 PARTIAL；非 full DONE）
+◐ G9：既有 ratchets + capability-isomorphism-gate + enforcer-rulebook headings；非 full release close
 ○ magic-todo — 独立 Lane；保持 proposed；不入主 Gate
 ○ entry — Playbook；保持 proposed；不迁 completed
 ```
@@ -2084,9 +2087,9 @@ Universal destructive delete          ✓ DONE
 Storage cutover                       ✓ DONE（G4 completed）
 JS legacy tool removal                ✓ DONE（G5 completed）
 Casebook observation integration      ✓ DONE（G6）
-Rulebook runtime                      ✓ DONE（G7 runtime；constitution residual）
+Rulebook                              ✓ DONE（G7 residual closed；见 completed/rulebook Final outcome）
 Strength promotion                    ◐ PARTIAL（K0 splice in tree；active/strength 并行 owner）
-G9 ratchets                           ◐ PARTIAL（session-ownership + absence Replica 禁令已加）
+G9 ratchets                           ◐ PARTIAL（session-ownership + headings + capability-isomorphism 已接线；非 full close）
 ```
 
 每完成一个都先恢复：
@@ -2466,8 +2469,8 @@ CURRENT（2026-08-11；§0.1 权威）
 │
 ├─ Completed: Causal CE + Orchestrator + Storage(G4) + JS(G5)
 │            + Universal + perm-inspector（G6 Casebook）
-├─ Active: strength.md（G8 PARTIAL K0；并行 owner；勿 playbook-close）
-├─ Completed: rulebook（G7 runtime DONE；constitution residual 记在 Final outcome）
+│            + rulebook（G7 residual closed；Final outcome）
+├─ Active: strength.md（G8 PARTIAL；并行 owner；勿 playbook-close）
 ├─ Proposed: entry.md（本 Playbook；不迁 completed）
 └─ Proposed: magic-todo（Playbook 外；不入 gates）
         │
@@ -2497,16 +2500,16 @@ CURRENT（2026-08-11；§0.1 权威）
     CasebookLifecycle + Bookkeeper + Index
         │
         ▼
-[8] Rulebook                                 ✓ runtime DONE（G7）
-    residual: constitution 120 / docs plane / vocabulary
+[8] Rulebook                                 ✓ DONE（G7 residual closed）
+    120 headings / docs plane / domain Observation / headings gate
         │
         ▼
-[9] Strength                                 ◐ PARTIAL（K0 splice；active）
+[9] Strength                                 ◐ PARTIAL（active/strength）
     K1/K2 / holdout — 并行 owner
         │
         ▼
 [10] Full ratchet + release                  ◐ PARTIAL（G9）
-    session-ownership + SatelliteKind.Replica 禁令已加
+    session-ownership + headings + capability-isomorphism 已接线
 ```
 
 ---

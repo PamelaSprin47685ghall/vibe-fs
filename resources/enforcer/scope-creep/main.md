@@ -1,15 +1,22 @@
 # scope-creep — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Cut the diff back to the task contract. Park unrelated cleanup and redesigns as separate work with their own acceptance.
 
-## Why
+## Repair Strategy
+Re-read the task acceptance criteria. Revert or split out opportunistic edits. Keep only dependency-forced touch points.
 
-The implementation expands into unrelated behavior, cleanup, migration, or redesign not required by the current task or governing architecture.
+## Decision Branches
+If a blocker forces a small adjacent fix, keep it minimal and name it. If architecture work is truly required, renegotiate scope explicitly before continuing.
 
-## What to do
+## Wrong Fixes
+Drive-by renames across the repo. "While I am here" refactors that obscure the review. Mixing feature work with unrelated dependency upgrades.
 
-The change has expanded beyond its justified scope. Separate unrelated work and keep this delivery focused.
+## Verification
+Every changed file maps to the stated acceptance criteria or a forced compile/migration edge.
 
-## Reference
+## Done When
+The delivery matches the justified scope; unrelated work is split out or dropped.
 
-Family J, enforcement-j01, ordinal 91.
+## Scope and Authority
+Task and PR boundaries. Not multi-step planned migrations that are the task itself.

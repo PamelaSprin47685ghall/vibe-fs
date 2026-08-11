@@ -1,15 +1,22 @@
 # random-source-in-logic — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Thread an explicit Random/seed/entropy port into the decision function. Persist the seed with the decision when audit or replay matters.
 
-## Why
+## Repair Strategy
+Replace internal RNG calls with a passed-in source. For tests, use a fixed seed. For production audit trails, record the seed or drawn values beside the outcome.
 
-Domain logic generates randomness internally and cannot be replayed from explicit input.
+## Decision Branches
+If non-replayable entropy is required (security tokens), keep it at the edge and pass the drawn value inward as data. If Monte Carlo logic is intentional, make the source a first-class input.
 
-## What to do
+## Wrong Fixes
+Seeding from the clock inside domain code. Global mutable RNG. Testing only the happy seed and calling it deterministic.
 
-Randomness is hidden inside policy. Inject a seed or random source and preserve replayability.
+## Verification
+Same inputs plus same seed reproduce identical outputs across runs.
 
-## Reference
+## Done When
+Domain functions that need entropy take it explicitly; replay and tests no longer depend on hidden RNG state.
 
-Family D, enforcement-d06, ordinal 36.
+## Scope and Authority
+Pure and application domain decisions. Edge adapters may still call OS entropy.

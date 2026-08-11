@@ -1,15 +1,22 @@
 # todo-bomb — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Implement the missing behavior now, or refuse to ship the incomplete path (feature flag off, API not exposed, hard error at boundary with no false success).
 
-## Why
+## Repair Strategy
+Inventory TODO/FIXME/unimplemented on the change path. Close each that correctness depends on. Delete false success stubs.
 
-A TODO, FIXME, placeholder, unimplemented branch, or temporary panic defers work required for correctness.
+## Decision Branches
+If scope truly excludes the path, make it unreachable and document the out-of-scope edge—do not leave a soft TODO on a live branch.
 
-## What to do
+## Wrong Fixes
+throw new Error("TODO") on a production branch that can be hit. Returning empty success from unimplemented handlers. "Fix later" on security or durability paths.
 
-Required correctness has been deferred to a TODO. Finish the behavior or explicitly reject the incomplete change.
+## Verification
+No live path depends on placeholder behavior; tests cover the finished branch or prove it is unreachable.
 
-## Reference
+## Done When
+Required behavior is implemented or the incomplete change is not shippable.
 
-Family J, enforcement-j05, ordinal 95.
+## Scope and Authority
+Correctness-critical paths in delivered code.

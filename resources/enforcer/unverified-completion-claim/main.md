@@ -1,15 +1,22 @@
 # unverified-completion-claim — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Run the checks that prove the acceptance criteria. Report commands and outcomes. Only then claim completion.
 
-## Why
+## Repair Strategy
+List acceptance criteria. Map each to a verification action. Execute and capture evidence. Reopen the task if red.
 
-Work is declared complete without running the relevant tests, checks, build, reproduction, or observable verification.
+## Decision Branches
+If verification is blocked, state the blocker and remaining risk—do not label the work done. If only a subset applies, say which and why.
 
-## What to do
+## Wrong Fixes
+LGTM from reading the diff alone on behavioral changes. "Should work" without running. Relying on CI you did not trigger for local claims.
 
-Completion was claimed without verification. Run the relevant behavioral checks and report the actual result.
+## Verification
+Evidence of the relevant commands exists; failures would have blocked the claim.
 
-## Reference
+## Done When
+Completion claims are backed by executed, relevant verification evidence.
 
-Family H, enforcement-h01, ordinal 71.
+## Scope and Authority
+Behavioral deliverables and bug fixes. Not pure idea dumps.

@@ -1,15 +1,22 @@
 # repeat-until-pass — Main
 
-Tip already selected by Enforcer. Next step: apply the nudge.
+## What To Do Now
+Stop looping until green. Capture the failure, remove the nondeterminism (time, order, shared state, network), and make one run sufficient.
 
-## Why
+## Repair Strategy
+Quarantine the flaky command. Fix root cause: inject clocks, isolate state, wait on signals, bound concurrency. Delete retry-until-pass scripts and CI rerun crutches used as proof.
 
-A test or command is rerun until it happens to succeed, and the successful repetition is treated as verification.
+## Decision Branches
+If infrastructure flakes are external, gate on a health check with capped retries and still fail the job when exhausted. Never hide product nondeterminism behind reruns.
 
-## What to do
+## Wrong Fixes
+CI "rerun failed jobs" as the merge strategy. Local shells looping pytest until exit 0. Calling a flaky suite stable because the third try passed.
 
-Repetition is hiding a nondeterministic failure. Make one run deterministic instead of retrying until green.
+## Verification
+A single clean run passes repeatedly; deliberate fault injection fails once without needing loops.
 
-## Reference
+## Done When
+Verification is a single deterministic run; repeat-until-pass is gone from scripts and habits.
 
-Family G, enforcement-g06, ordinal 66.
+## Scope and Authority
+Tests and verification commands. Not user-facing product retry UX with idempotency.

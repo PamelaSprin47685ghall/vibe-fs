@@ -28,9 +28,9 @@ test('ENFORCER_resource_folder_rulebook_loads_with_contiguous_ordinals', () => {
   assert.ok(rules.length > 0, 'rulebook must contain at least one rule')
   assert.equal(rules.length, 120)
 
-  const ordinals = rules.map((r) => r.CatalogOrdinal).sort((a, b) => a - b)
+  const orders = rules.map((r) => r.LexicalOrder).sort((a, b) => a - b)
   assert.deepEqual(
-    ordinals,
+    orders,
     Array.from({ length: rules.length }, (_, i) => i + 1),
   )
 
@@ -50,11 +50,13 @@ test('ENFORCER_resource_folder_rulebook_loads_with_contiguous_ordinals', () => {
     assert.equal(rule.Name, rule.FieldName)
     assert.ok(rule.EnforcerText.trim().length > 0)
     assert.ok(rule.MainText.trim().length > 0)
-    assert.ok(rule.Nudge.trim().length > 0)
-    assert.ok(rule.ScoreWhen.trim().length > 0)
+    assert.equal(rule.ScoreWhen, undefined)
+    assert.equal(rule.Nudge, undefined)
+    assert.equal(rule.Family, undefined)
+    assert.equal(rule.CatalogOrdinal, undefined)
   }
 
-  // Lexical directory order drives CatalogOrdinal.
+  // Lexical directory order drives LexicalOrder.
   const dirs = fs
     .readdirSync(enforcerRoot, { withFileTypes: true })
     .filter((d) => d.isDirectory())
@@ -92,9 +94,9 @@ test('ENFORCER_resource_rulebook_load_independent_of_process_cwd', () => {
     process.chdir('/')
     const rules = enforcerCatalogResource.load()
     assert.ok(rules.length > 0)
-    const ordinals = rules.map((r) => r.CatalogOrdinal)
+    const orders = rules.map((r) => r.LexicalOrder)
     assert.deepEqual(
-      [...ordinals].sort((a, b) => a - b),
+      [...orders].sort((a, b) => a - b),
       Array.from({ length: rules.length }, (_, i) => i + 1),
     )
   } finally {
