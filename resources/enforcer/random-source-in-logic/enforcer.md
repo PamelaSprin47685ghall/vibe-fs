@@ -1,32 +1,22 @@
 # random-source-in-logic — Enforcer
 
 ## Definition
-Domain policy draws randomness internally, so the same inputs cannot replay to the same decisions.
+Randomness is hidden in logic when a domain decision draws entropy internally, making the decision depend on an input absent from its signature and difficult to replay.
+
+## Governing Principle
+Randomness is still input. A function that samples it internally only conceals the input channel, so identical visible state can lead to different events with no reproducible explanation. For simulations, allocation, games, sampling, and tie-breaking, replayability requires preserving either the generated choice or the seed/source from which the choice is deterministically derived.
 
 ## Trigger When
-Domain logic generates randomness internally and cannot be replayed from explicit input.
+Trigger when core policy directly calls random/UUID/entropy APIs to decide domain outcomes without receiving the random choice/source explicitly.
 
 ## Do Not Trigger When
-Do not fire when randomness lives only in an adapter (UI jitter, crypto nonce generation) outside pure domain decision functions.
+Do not trigger for cryptographic nonce/key generation or UI-only jitter confined to an adapter where replay of business policy is irrelevant.
 
 ## Distinguish From
-time-source-in-logic hides the clock; this tip hides entropy. Both destroy replay.
+time-source-in-logic hides the clock. impure-core is the broader architecture smell. This rule specifically hides entropy as an undeclared decision input.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Ask whether replaying the same command/state should reproduce the same domain decision. If yes, inject a deterministic random source/seed or record the sampled value as part of the event/input.
 
 ## Nudge
-Randomness is hidden inside policy. Inject a seed or random source and preserve replayability.
-
-## Examples
-### Positive
-Domain logic generates randomness internally and cannot be replayed from explicit input.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when randomness lives only in an adapter (UI jitter, crypto nonce generation) outside pure domain decision functions.
+Entropy is an input, not magic. Make it explicit or record its result so a past decision can be reproduced and explained.

@@ -1,32 +1,22 @@
 # rule-spaghetti — Enforcer
 
 ## Definition
-Business rules are buried in nested conditionals, temporary flags, mutation, and early exits so readers must simulate execution to recover the rule.
+Rule spaghetti exists when a business rule is encoded primarily as nested branches, mutable flags, early exits, and temporary state, so its meaning can be recovered only by mentally executing the program.
+
+## Governing Principle
+Policy is a relation between facts and conclusions. Control flow is merely one possible interpreter of that relation. When the interpreter becomes the only specification, readers must simulate paths to discover the rule, and small changes alter both meaning and execution topology at once. A rule is better represented when its propositions are named directly and composition exposes the logic without requiring a private program counter in the reader’s head.
 
 ## Trigger When
-A rule set is expressed through nested conditionals, temporary flags, mutation, and early exits such that the reader must simulate execution to recover the rule.
+Trigger when understanding eligibility, permission, validation, routing, or transition policy requires tracing several nested conditionals or mutable intermediates rather than reading named predicates or cases.
 
 ## Do Not Trigger When
-Do not fire when the rule is already a declarative table, combinator pipeline, or pattern match that reads as the specification.
+Do not trigger when branching mirrors a genuinely sequential dependency and the code already reads as the domain rule with each prerequisite explicit.
 
 ## Distinguish From
-wrong-rule-composition mis-wires combinators; missing-rule-combinator lacks composition tools; this tip is imperative spaghetti hiding the rule.
+missing-rule-combinator lacks reusable composition for already clean rules. wrong-rule-composition combines rules with the wrong failure semantics. This rule is earlier: the policy itself has disappeared into imperative execution.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+State the policy in domain sentences first. Name each proposition, identify which checks depend on prior facts, and choose a composition that preserves those logical dependencies without incidental mutable control state.
 
 ## Nudge
-The business rule is buried in control flow. Rewrite it so the rule can be read directly from the code.
-
-## Examples
-### Positive
-A rule set is expressed through nested conditionals, temporary flags, mutation, and early exits such that the reader must simulate execution to recover the rule.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when the rule is already a declarative table, combinator pipeline, or pattern match that reads as the specification.
+Code should let the rule be read, not simulated. Extract named propositions and compose them so the source resembles the policy it enforces.

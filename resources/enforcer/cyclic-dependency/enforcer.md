@@ -1,32 +1,22 @@
 # cyclic-dependency — Enforcer
 
 ## Definition
-Module, package, service, or project dependencies form a cycle or require mutual initialization.
+A dependency cycle exists when components require one another’s definitions, initialization, or services to become meaningful, so there is no direction in which the system can be understood or constructed.
+
+## Governing Principle
+A dependency edge is an arrow of knowledge: A → B means A is defined partly in terms of B. A cycle therefore says each participant must already exist for the other to be defined. Runtimes may break the physical loop with lazy initialization or service locators, but the conceptual loop remains and appears later as ordering constraints, partial states, and tests that need the whole graph.
 
 ## Trigger When
-Module, package, service, or project dependencies form a cycle or require mutual initialization.
+Trigger when modules, packages, projects, or services form a directed cycle, require mutual initialization, or use indirection solely to hide such a cycle.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger for reciprocal domain communication mediated through an independent protocol where the compile-time/ownership dependencies remain acyclic.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+boundary-collapse concerns excessive knowledge across contexts. implicit-control-flow concerns hidden ordering. This rule concerns the dependency graph having no one-way foundation.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Draw the semantic dependency graph. Find the smallest cycle and ask which fact or abstraction is owned by neither side cleanly. Extract that fact/protocol so dependencies point one way.
 
 ## Nudge
-The dependency graph is cyclic. Identify the missing boundary or fact flow and restore one-way dependencies.
-
-## Examples
-### Positive
-Module, package, service, or project dependencies form a cycle or require mutual initialization.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-The dependency graph is cyclic. Identify the missing boundary or fact flow and restore one-way dependencies.
+A cycle usually marks a missing third concept. Name the fact both sides need, give it an owner, and restore a dependency graph that can be understood from foundations upward.

@@ -1,32 +1,22 @@
 # repeat-until-pass — Enforcer
 
 ## Definition
-A test or command is rerun until it happens to succeed, and that lucky success is treated as verification.
+Repeat-until-pass treats a lucky successful run as verification after identical or equivalent runs have already failed nondeterministically.
+
+## Governing Principle
+A repeated experiment does not become more true because one sample is favorable. If the relevant inputs are unchanged yet verdicts differ, the unresolved fact is nondeterminism. Selecting the green sample is statistical cherry-picking: it discards evidence precisely because that evidence is inconvenient. Correct verification removes the hidden variable, not the red observations.
 
 ## Trigger When
-A test or command is rerun until it happens to succeed, and the successful repetition is treated as verification.
+Trigger when a failing test/command is rerun until success and the eventual green run is accepted without explaining or eliminating the earlier failure.
 
 ## Do Not Trigger When
-Do not fire when a single deterministic retry policy exists for known transient infrastructure faults outside the system under test, with failure still reported after budget.
+Do not trigger for a bounded retry of known transient infrastructure outside the system under test when the retry policy itself is explicit and final failure remains visible.
 
 ## Distinguish From
-flaky-test-tolerated leaves flakes known; timeout-inflated-to-pass masks hangs; this tip treats reruns as the fix.
+flaky-test-tolerated accepts unstable tests as policy. timeout-inflated-to-pass changes budgets. This rule is the act of sampling repeatedly until the desired verdict appears.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Stop after the first unexplained nondeterministic failure. Capture inputs/environment, reproduce, find the hidden variable, and make one run deterministic before accepting green.
 
 ## Nudge
-Repetition is hiding a nondeterministic failure. Make one run deterministic instead of retrying until green.
-
-## Examples
-### Positive
-A test or command is rerun until it happens to succeed, and the successful repetition is treated as verification.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when a single deterministic retry policy exists for known transient infrastructure faults outside the system under test, with failure still reported after budget.
+Do not choose evidence by outcome. One unexplained red invalidates a lucky green until the nondeterminism has a cause and a fix.

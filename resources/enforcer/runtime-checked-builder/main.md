@@ -1,22 +1,19 @@
 # runtime-checked-builder — Main
 
 ## What To Do Now
-Replace setter-then-validate builders with a single validated constructor or staged builders that make missing fields unrepresentable before `build`.
+Replace post-hoc mutable construction with one validated constructor or a staged API whose type makes required construction steps explicit.
+
+## Why This Matters
+A builder that can be incomplete enlarges the program with temporary worlds nobody wants. Callers need runtime checks, reuse becomes hazardous, and error handling grows around omissions the API itself invited. Strong construction narrows the state space before a domain value ever exists.
 
 ## Repair Strategy
-List required fields and invariants. Collapse into one constructor or typed stages. Move validation to the boundary that creates the value once.
-
-## Decision Branches
-If a true multi-step UI wizard is needed, keep a draft DTO separate from the domain type and only promote after full validation.
+Collect mandatory data in constructor parameters or encode stages so each method returns the next valid construction type. Keep dynamic business validation as a typed constructor result rather than as an exception at the end of a setter chain.
 
 ## Wrong Fixes
-Adding more runtime checks at every setter without preventing incomplete `build`. Throwing from `build` while still exposing partial objects. Keeping public mutable setters on the domain type.
+Do not add more `isValid` checks to the same mutable builder. Detection after the illegal intermediate exists is weaker than removing the construction path.
 
 ## Verification
-Attempt incomplete construction; it must be a type or API error, not a late runtime surprise after the object escaped.
+Attempt to omit or reorder required stages and construct contradictory combinations. Static structure or the single constructor boundary should reject them before an invalid domain instance escapes.
 
 ## Done When
-No incomplete intermediate domain instance can be observed; construction encodes required stages.
-
-## Scope and Authority
-Domain and API object construction. Not every optional config bag with documented defaults.
+Every produced object is valid by construction, and incomplete builder state is either unrepresentable or confined to an internal scope that cannot masquerade as the domain value.

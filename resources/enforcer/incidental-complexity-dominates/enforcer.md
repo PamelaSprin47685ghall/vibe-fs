@@ -1,32 +1,22 @@
 # incidental-complexity-dominates — Enforcer
 
 ## Definition
-Configuration, glue, wrappers, lifecycle management, serialization ceremony, or framework rituals occupy more attention than the actual domain problem.
+Incidental complexity dominates when glue, configuration, wrappers, lifecycle management, serialization ceremony, or tooling occupies more reasoning than the domain problem itself.
+
+## Governing Principle
+Software cannot eliminate essential complexity; it can only choose where to pay for it. Good design compresses everything not inherent to the problem so reader attention remains available for the irreducible decisions. When accidental machinery becomes the visible architecture, the system has inverted its budget: humans spend most of their scarce reasoning capacity on artifacts introduced by the solution rather than facts imposed by the domain.
 
 ## Trigger When
-Configuration, glue, wrappers, lifecycle management, serialization ceremony, or framework rituals occupy more attention than the actual domain problem.
+Trigger when understanding or changing a simple domain rule requires traversing disproportionate adapters, configuration, framework lifecycle, wrappers, translation layers, or boilerplate.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger when the apparent complexity corresponds to real domain states, external protocols, security constraints, or scale requirements that cannot honestly be removed.
 
 ## Distinguish From
-pattern-sprawl, premature-optimization, leftover-scaffolding
+framework-tax is framework-specific ceremony. pattern-sprawl is OO/pattern scaffolding. This rule is the higher-level condition where accidental structure eclipses essential structure regardless of source.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Separate concepts into “the problem requires this” and “our solution introduced this.” Rework the second set until its cost is subordinate to the first.
 
 ## Nudge
-Incidental complexity is dominating the design. Remove ceremony until the essential domain concepts become the visible structure.
-
-## Examples
-### Positive
-Configuration, glue, wrappers, lifecycle management, serialization ceremony, or framework rituals occupy more attention than the actual domain problem.
-
-### Near miss
-Looks related to pattern-sprawl but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+Spend complexity only on reality. Remove solution-imposed ceremony until the domain’s essential concepts again dominate the code’s visible structure.

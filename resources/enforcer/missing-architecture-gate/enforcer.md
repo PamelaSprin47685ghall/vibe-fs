@@ -1,32 +1,22 @@
 # missing-architecture-gate — Enforcer
 
 ## Definition
-A critical boundary or forbidden dependency relies only on team discipline even though a static architecture gate could enforce it.
+An architecture gate is missing when a critical dependency or ownership rule exists only as human convention even though the repository can check the rule mechanically.
+
+## Governing Principle
+An invariant without enforcement is a request to future attention. Architecture is especially vulnerable because violations are locally convenient: importing one internal module often makes a task easier while invisibly degrading the global graph. A static gate moves the burden from memory to mechanism, making the forbidden state expensive at the moment it is introduced rather than during a later redesign.
 
 ## Trigger When
-A critical boundary or forbidden dependency relies only on team discipline even though a static architecture gate could enforce it.
+Trigger when forbidden imports, layering, ownership boundaries, generated-file rules, or module dependencies are repeatedly reviewed by humans but no build/static check rejects violations.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger for principles that are inherently semantic and cannot be recognized mechanically without unacceptable false positives.
 
 ## Distinguish From
-missing-invariant-documentation, implicit-convention-magic, missing-rule-combinator
+missing-invariant-documentation lacks a durable statement of the rule. false-gate has an ineffective check. This rule assumes the invariant is known but leaves enforcement to discipline.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Express the boundary as a decidable predicate over repository structure. If a cheap deterministic check can recognize violation, make that check part of the standard gate.
 
 ## Nudge
-An architecture boundary relies on memory alone. Add a static gate that fails when the boundary is crossed.
-
-## Examples
-### Positive
-A critical boundary or forbidden dependency relies only on team discipline even though a static architecture gate could enforce it.
-
-### Near miss
-Looks related to missing-invariant-documentation but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+Do not ask memory to enforce what the machine can decide. Turn critical architecture boundaries into failing predicates in the build or check pipeline.

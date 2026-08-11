@@ -1,36 +1,19 @@
 # missing-rule-combinator — Main
 
 ## What To Do Now
-Repeated rule composition is being written by hand. Introduce a small combinator that exposes the shared rule algebra.
+Extract the shared rule signature and define the smallest combinators for its real semantics: sequential short-circuit, independent error accumulation, mapping, or conjunction.
+
+## Why This Matters
+Handwritten rule chains duplicate not just syntax but policy about how failures compose. Once that policy has one algebraic owner, readers can reason at the level of rules rather than temporary variables and nested conditionals.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Keep each rule small and named, make the combinator generic only over the stable input/output shape, and write law-like tests for ordering and error behavior.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not create a large rules engine, DSL, or framework merely to avoid a few function calls. The useful abstraction is the minimal composition law already present in the code.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Equivalent rule sets should produce the same outcomes regardless of call site, and dependent versus independent rules should compose according to their explicitly chosen law.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Three or more rules with the same input/output shape are manually chained instead of composed through a reusable validation or policy combinator.
+Business policy reads as a composition of named rules, while the mechanics of sequencing and error collection exist in one small reusable vocabulary.

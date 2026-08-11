@@ -1,22 +1,19 @@
 # unrecorded-lesson — Main
 
 ## What To Do Now
-Write the lesson into the durable skill/runbook/tip plane while context is fresh. Include trigger, failure mode, and fix.
+Capture the reusable discovery in the project artifact future engineers will naturally consult: a regression test, runbook, rule, decision note, contract documentation, or maintained troubleshooting guide.
+
+## Why This Matters
+Debugging cost compounds when discoveries are not retained. The next incident starts with the same false hypotheses, repeated probes, and provider surprises because the system’s durable memory did not improve when its humans did.
 
 ## Repair Strategy
-Summarize what burned time. Store it where the next agent will load it. Link from the work log.
-
-## Decision Branches
-If the lesson changes an existing tip, update that tip. If it is provider-specific, scope the record accordingly.
+Record the causal lesson rather than a diary of commands. Include the symptom, underlying fact, how to verify it, and the action or constraint it implies. Prefer executable preservation where a test or gate can carry the knowledge.
 
 ## Wrong Fixes
-Leaving the lesson only in chat. Assuming you will remember next session. Recording a vague "be careful" without the concrete trigger.
+Do not dump raw session logs and call the lesson captured. Evidence without synthesis recreates the original investigation burden for the next reader.
 
 ## Verification
-The lesson is loadable from the repo/skills without the original session transcript.
+A teammate who did not witness the discovery should be able to find the artifact from the affected concept and avoid the known dead end or verify the quirk directly.
 
 ## Done When
-Reusable learning is durably recorded in the appropriate plane.
-
-## Scope and Authority
-Session and incident learning with reuse value.
+The project’s durable knowledge has increased, so the same class of problem begins from today’s conclusion rather than yesterday’s ignorance.

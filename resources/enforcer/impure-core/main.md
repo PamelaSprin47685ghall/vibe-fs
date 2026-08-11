@@ -1,36 +1,19 @@
 # impure-core — Main
 
 ## What To Do Now
-Business policy is entangled with effects. Move effects to the shell and pass explicit values into a pure core.
+Move external observation and side effects to the shell. Pass time, random choices, loaded data, and other required facts explicitly into pure decision functions.
+
+## Why This Matters
+Hidden dependencies make behavior contingent on an environment the signature does not reveal. Tests need mocks, replay changes with the clock, and auditing cannot reconstruct why a decision occurred. Purity is not aesthetic restraint; it is preservation of causal evidence.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Separate “observe the world” from “decide what it means.” Let adapters obtain current facts, let the core compute next state/events or typed failure, then let the shell execute effects.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not hide effects behind a globally injected service locator or mock-heavy interface while policy still decides when to perform them. Dependency inversion without causal separation leaves the core impure.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Call the core twice with identical explicit inputs and require identical outputs without starting infrastructure, touching the clock, or mutating global state.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Core business decisions directly read clocks, random sources, databases, networks, environment state, or mutable globals.
+Business decisions are replayable values of explicit inputs, and the external world appears only at narrow shell boundaries that gather facts or enact results.

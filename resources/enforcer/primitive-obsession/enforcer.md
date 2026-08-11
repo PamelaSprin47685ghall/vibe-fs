@@ -1,32 +1,22 @@
 # primitive-obsession — Enforcer
 
 ## Definition
-A domain concept such as an account ID, order ID, money amount, path, digest, or capability crosses a meaningful boundary as an undifferentiated string, number, or boolean.
+Primitive obsession exists when distinct domain concepts cross a meaningful boundary as the same undifferentiated string, number, or boolean, allowing substitutions the domain itself forbids.
+
+## Governing Principle
+A primitive preserves representation while erasing identity. `string` can carry an account ID, order ID, path, digest, capability, or currency code, so the type system sees all substitutions as legitimate even when the domain sees category errors. A named type restores the missing proposition: this value is not merely text; it belongs to this concept and may cross only where that concept is accepted.
 
 ## Trigger When
-A domain concept such as an account ID, order ID, money amount, path, digest, or capability crosses a meaningful boundary as an undifferentiated string, number, or boolean.
+Trigger when identifiers, money, paths, digests, capabilities, units, or other domain values cross module/API boundaries as generic primitives and unrelated values of the same primitive type can be accidentally interchanged.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger for truly generic textual/numeric data whose domain identity is irrelevant at that boundary, or when a validated named domain type already encloses the primitive.
 
 ## Distinguish From
-null-ambiguity, illegal-state-representable, misleading-name
+null-ambiguity erases outcome identity in absence. illegal-state-representable admits invalid combinations. misleading-name lies in vocabulary. This rule concerns erased nominal identity between values with the same physical representation.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Name the concept and boundary, then ask whether a value of the same primitive but a different domain meaning could pass type checking there. If yes, introduce a distinct type.
 
 ## Nudge
-A domain concept is crossing a boundary as a primitive. Introduce a distinct type so invalid substitutions become impossible.
-
-## Examples
-### Positive
-A domain concept such as an account ID, order ID, money amount, path, digest, or capability crosses a meaningful boundary as an undifferentiated string, number, or boolean.
-
-### Near miss
-Looks related to null-ambiguity but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+Representation is not identity. Give the domain concept a type so the compiler can reject substitutions that reality rejects.

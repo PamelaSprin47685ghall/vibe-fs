@@ -1,36 +1,19 @@
 # memory-before-disk — Main
 
 ## What To Do Now
-Memory was updated before durability. Commit the fact first, then derive runtime state from it.
+Reorder the write path so the durable fact commits first; only after success may authoritative memory advance and downstream observers see the new state.
+
+## Why This Matters
+A process can lie to itself before it crashes. If memory changes first, subsequent commands may act on a state that restart cannot recover, creating a split between the world that influenced behavior and the world that left evidence.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Compute the intended transition without mutating authority, append/commit the durable fact, then derive and swap the new in-memory state. Treat durable failure as “the command did not happen.”
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not mutate memory and attempt to roll it back if persistence fails; rollback itself becomes another failure path and cannot erase effects already observed by other work.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Inject failure before and during durable commit. Memory and observers must remain at the old state. After successful commit, crash/restart replay must reconstruct exactly the state that was exposed.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Authoritative in-memory state is changed before the durable fact that justifies the change is committed.
+No authoritative runtime state can get ahead of the durable evidence from which recovery derives it.

@@ -1,32 +1,22 @@
 # ignored-tdd — Enforcer
 
 ## Definition
-Production behavior is implemented or changed before a failing behavioral test demonstrates the required outcome.
+TDD is ignored when production behavior is changed before a failing behavioral test establishes what must become true.
+
+## Governing Principle
+Red-first is not ceremony; it separates specification from implementation influence. A test written after the code is already green is vulnerable to describing what was built rather than what was required. Seeing the test fail for the right reason proves two things at once: the requirement was absent before the change, and the test is capable of detecting that absence.
 
 ## Trigger When
-Production behavior is implemented or changed before a failing behavioral test demonstrates the required outcome.
+Trigger when new or changed production behavior is implemented first and the test is added afterward without ever demonstrating the old behavior fails the requirement.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger for pure refactors with already sufficient behavioral coverage and intentionally unchanged semantics.
 
 ## Distinguish From
-missing-regression-test, guess-based-fix, order-dependent-test
+missing-regression-test concerns defect fixes specifically. coverage-theater concerns weak assertions. This rule concerns the temporal order that establishes independence between requirement and implementation.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Before production edits, write the smallest behavioral test that expresses the required observable difference. Run it and inspect the failure reason. Only then change implementation.
 
 ## Nudge
-TDD order was skipped. Add a failing behavioral test before changing the implementation.
-
-## Examples
-### Positive
-Production behavior is implemented or changed before a failing behavioral test demonstrates the required outcome.
-
-### Near miss
-Looks related to missing-regression-test but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+Make the requirement capable of accusing the old code before teaching the code how to satisfy it. Red proves the test is independent evidence; green then proves the change.

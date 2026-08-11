@@ -1,22 +1,19 @@
 # wholesale-rewrite — Main
 
 ## What To Do Now
-Prefer the smallest edit that fixes the defect or lands the feature. Preserve known-good structure, names, and adjacent behavior.
+Reduce the change to the smallest structurally correct transformation that satisfies the new contract while preserving known-good code and verified behavior outside that boundary.
+
+## Why This Matters
+A rewrite expands uncertainty faster than it expands value. Every replaced line reopens assumptions that previous production history may already have settled, so the verification burden grows from “prove this new behavior” toward “re-prove the subsystem.”
 
 ## Repair Strategy
-Revert sprawling rewrite hunks. Re-apply a minimal patch. Use structure-aware edits over regenerate-everything flows.
-
-## Decision Branches
-If local structure blocks a safe fix, extract a seam first—still smaller than a full rewrite. If rewrite is justified, get explicit scope and characterization tests first.
+Map the required semantic delta, retain unaffected owners and paths, migrate only the structures whose invariants truly changed, and use tests to protect preserved behavior during the transformation.
 
 ## Wrong Fixes
-Regenerating whole files for a one-line fix. Delete-and-recreate to avoid reading code. Formatting-only churn mixed with behavior changes at file scale.
+Do not equate fewer old lines with cleaner architecture. Deletion is valuable only when it removes obsolete knowledge, not when it discards working knowledge that still belongs in the new design.
 
 ## Verification
-Diff is reviewable and tied to acceptance; unrelated behavior remains intact under tests.
+The diff should be explainable as a bounded semantic transformation, and unchanged behavior should remain covered without recreating it from scratch.
 
 ## Done When
-The change is the smallest structurally correct patch; no unjustified wholesale rewrite remains.
-
-## Scope and Authority
-Edits to existing known-good codebases.
+The solution changes exactly the assumptions the requirement invalidated and leaves the rest of the system’s accumulated evidence intact.

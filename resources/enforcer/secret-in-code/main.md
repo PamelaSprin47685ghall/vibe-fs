@@ -1,22 +1,19 @@
 # secret-in-code — Main
 
 ## What To Do Now
-Remove the secret from the tree and history if needed. Rotate the credential. Load secrets from the approved secret store or environment boundary at runtime.
+Remove the sensitive value from repository content, revoke or rotate it as compromised, and replace it with a reference to the project’s approved secret-injection boundary.
+
+## Why This Matters
+Deleting a credential from the latest file does not delete copies already created by version history, clones, caches, CI logs, or review systems. The only reliable response to exposure is to make the old authority useless.
 
 ## Repair Strategy
-Scan the diff for tokens and keys. Replace with configuration references. Purge logs and fixtures. Rotate anything that may have been exposed.
-
-## Decision Branches
-If a test needs credentials, use ephemeral test doubles or a sealed secret fixture outside VCS. If a leak already shipped, rotate first, then clean code.
+Rotate first where continued exposure window matters, remove the value from current source, use environment/secret-store injection, and add an appropriate gate against recurrence without storing real credentials in tests.
 
 ## Wrong Fixes
-Commenting out the secret but leaving it in git history unrotated. Encoding secrets in Base64 and calling them safe. Printing secrets in "temporary" debug logs.
+Do not merely rename, encode, encrypt with a key stored beside it, or delete only the current line. Obfuscation changes appearance, not authority.
 
 ## Verification
-Repo search shows no live secrets; runtime still authenticates via the secret boundary; rotation confirmed if exposure occurred.
+The retired credential must no longer authenticate, current code must obtain the replacement through the intended secret boundary, and repository checks should contain no live sensitive material.
 
 ## Done When
-No sensitive values remain in source or committed artifacts; approved secret injection is used.
-
-## Scope and Authority
-Credentials and private material. Not public non-secret configuration.
+Possession of the source tree grants no secret authority, and any previously exposed credential has been invalidated rather than merely hidden.

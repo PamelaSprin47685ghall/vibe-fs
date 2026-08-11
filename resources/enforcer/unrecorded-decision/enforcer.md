@@ -1,32 +1,22 @@
 # unrecorded-decision — Enforcer
 
 ## Definition
-A material architecture choice, rejected alternative, compatibility decision, or operational tradeoff is made without a durable decision record.
+A decision is unrecorded when a material architecture, compatibility, operational, or tradeoff choice changes what future engineers are allowed to assume but its rationale and rejected alternatives exist only in the moment of discussion.
+
+## Governing Principle
+Code preserves what was chosen; it rarely preserves why alternatives were rejected. Without rationale, future maintainers encounter only the surviving shape and may rationally “simplify” it back toward a discarded design because the constraints that ruled that design out are invisible. A decision record carries the counterfactual knowledge implementation cannot express by itself.
 
 ## Trigger When
-A material architecture choice, rejected alternative, compatibility decision, or operational tradeoff is made without a durable decision record.
+Trigger when a consequential design choice, compatibility boundary, operational compromise, or rejected alternative will influence future changes and no durable record states the reason.
 
 ## Do Not Trigger When
-Do not fire for trivial local choices with no lasting consequence, or when an ADR/decision note already covers the choice.
+Do not trigger for trivial local choices whose alternatives have no lasting consequence, or when an existing authoritative decision record already captures the same rationale.
 
 ## Distinguish From
-unrecorded-lesson is reusable learning from incidents; this tip is deliberate design decisions without durable rationale.
+unrecorded-lesson captures reusable discovery after experience. missing-invariant-documentation captures a correctness rule. This rule preserves why one durable path was chosen over credible alternatives.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Ask whether a future competent maintainer could reasonably choose the rejected alternative from code alone. If yes, record context, decision, alternatives, rationale, and consequences at the project’s decision authority.
 
 ## Nudge
-A material decision lacks a durable record. Document the choice, rationale, rejected alternatives, and consequences.
-
-## Examples
-### Positive
-A material architecture choice, rejected alternative, compatibility decision, or operational tradeoff is made without a durable decision record.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire for trivial local choices with no lasting consequence, or when an ADR/decision note already covers the choice.
+Implementation remembers the winner but forgets the argument. Record consequential choices so future engineers inherit the constraints, not merely the shape those constraints produced.

@@ -1,22 +1,19 @@
 # resource-not-scoped — Main
 
 ## What To Do Now
-Wrap acquisition and disposal in one scope (bracket, use, defer, try/finally, owning type). Ensure failure paths dispose. Prefer ownership types over manual close calls scattered across functions.
+Wrap acquisition and disposal in one lexical/structured lifetime and make ownership transfer explicit where a resource legitimately escapes.
+
+## Why This Matters
+Manual cleanup makes lifetime a property of every control path. As code evolves, one new early return or cancellation path can leak a resource whose acquisition looked locally correct. Scoping reduces many path obligations to one structural guarantee.
 
 ## Repair Strategy
-Identify every resource open site. Attach a single owner. Add cleanup on cancel and exception. For subprocesses and worktrees, register teardown with the parent session.
-
-## Decision Branches
-If lifetime spans requests, make the session object the owner and document end conditions. If a pool is required, bound it and define eviction.
+Use native resource constructs, keep handles inside the smallest owning scope, and compose nested resources so teardown runs deterministically in reverse ownership order.
 
 ## Wrong Fixes
-Opening handles in helpers and hoping callers close them. Catch blocks that return without dispose. Leaking worktrees after agent exit.
+Do not add cleanup calls to currently known branches one by one. That solution scales with control-flow complexity and fails again when the graph changes.
 
 ## Verification
-Fault-inject mid-lifetime; resources are released. Process/fd counts return to baseline after the scope ends.
+Force success, exception, cancellation, and early exit; every acquired resource must reach its release condition exactly once.
 
 ## Done When
-Every acquired resource has a clear owner and deterministic disposal on all exits.
-
-## Scope and Authority
-I/O and process resources. Not pure value lifetimes.
+A reader can locate a resource’s complete lifetime from structure alone, and no exit path can abandon ownership without explicit transfer.

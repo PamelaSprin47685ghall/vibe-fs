@@ -1,32 +1,22 @@
 # unversioned-schema — Enforcer
 
 ## Definition
-A durable event, file, wire shape, or cache format changes without an explicit schema version and compatibility rule.
+A schema is unversioned when a durable or cross-version representation can change meaning without carrying an explicit identity for the language in which its bytes were written.
+
+## Governing Principle
+Persistence creates communication across time. Old code is a producer and future code is a consumer separated by deployments rather than machines. Without schema version, the consumer must infer which grammar and semantics produced the data, turning compatibility into guesswork. Versioning makes historical interpretation a dispatch on evidence instead of a heuristic on shape.
 
 ## Trigger When
-A durable event, file, wire shape, or cache format changes without an explicit schema version and compatibility rule.
+Trigger when persisted events, files, wire messages, caches with cross-version lifetime, or other durable contracts evolve without an explicit version and deterministic compatibility/migration rule.
 
 ## Do Not Trigger When
-Do not fire when the format is ephemeral, never persisted, and never crosses a compatibility boundary.
+Do not trigger for values whose lifetime is strictly within one process/deployment and which never cross a compatibility boundary.
 
 ## Distinguish From
-stale-documentation is docs drift; weak-boundary-parsing is untyped ingress; this tip is persistent contracts without versions.
+guessed-migration is the downstream attempt to recover missing historical semantics. stale-documentation is disagreement in specification. This rule creates the temporal ambiguity by failing to identify the schema itself.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Ask whether bytes produced by an older version may be consumed by a newer one. If yes, assign an explicit schema identity and define how each supported version is read, migrated, or rejected.
 
 ## Nudge
-A persistent contract changed without versioning. Add an explicit version and deterministic compatibility policy.
-
-## Examples
-### Positive
-A durable event, file, wire shape, or cache format changes without an explicit schema version and compatibility rule.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when the format is ephemeral, never persisted, and never crosses a compatibility boundary.
+Durable bytes are messages to future code. Put the language version in the message and make compatibility a deterministic rule rather than an archaeological inference.

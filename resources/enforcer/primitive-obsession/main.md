@@ -1,36 +1,19 @@
 # primitive-obsession — Main
 
 ## What To Do Now
-A domain concept is crossing a boundary as a primitive. Introduce a distinct type so invalid substitutions become impossible.
+Introduce a distinct domain type at the boundary and migrate callers so values with the same primitive representation but different meanings are no longer interchangeable.
+
+## Why This Matters
+A primitive tells the compiler how bits are stored, not what they mean. When semantic categories collapse into one representation, the compiler cannot help with one of the most valuable classes of mistakes: a valid-looking value supplied to the wrong concept.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Wrap or define the concept with its validation and operations, keep conversion at explicit ingress/egress boundaries, and avoid exposing the raw primitive again across domain APIs.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not merely rename parameters `accountId` and `orderId` while both remain strings; humans see the distinction, the type checker still does not.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Attempt to pass a sibling concept with the same underlying primitive. The program should reject the substitution at compile/construction time.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): A domain concept such as an account ID, order ID, money amount, path, digest, or capability crosses a meaningful boundary as an undifferentiated string, number, or boolean.
+The boundary carries domain identity as part of the type, invalid substitutions are unrepresentable, and conversion to raw primitives is confined to adapters that genuinely require it.

@@ -1,32 +1,22 @@
 # manual-toil-repeat — Enforcer
 
 ## Definition
-A repeated mechanical procedure is performed manually again despite being deterministic and suitable for a script, generator, or reusable skill.
+Manual toil repeats when a deterministic mechanical procedure is performed by hand again despite having stable inputs, steps, and outputs suitable for automation.
+
+## Governing Principle
+Repetition reveals an algorithm. Once the same human sequence is executed several times, the organization is using attention as an interpreter for a program it has refused to write down. Human execution adds variance and consumes scarce judgment on work whose defining feature is that judgment is no longer needed.
 
 ## Trigger When
-A repeated mechanical procedure is performed manually again despite being deterministic and suitable for a script, generator, or reusable skill.
+Trigger when the same mechanical edit, generation, validation, packaging, migration, or operational procedure is repeatedly executed by humans with materially identical rules.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger when each instance genuinely requires contextual judgment that cannot be stated as stable input/output rules, or when automation cost clearly exceeds expected repetition.
 
 ## Distinguish From
-leftover-scaffolding, missing-architecture-gate, incidental-complexity-dominates
+leftover-scaffolding is temporary tooling that should disappear or be promoted. serial-investigation concerns independent research steps. This rule is recurring deterministic labor itself.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Write the procedure as inputs → deterministic steps → outputs. If that description is stable and has recurred enough to create error or attention cost, encode it as a maintained tool or project check.
 
 ## Nudge
-Repeated mechanical work remains manual. Automate it and preserve the procedure as a maintained tool.
-
-## Examples
-### Positive
-A repeated mechanical procedure is performed manually again despite being deterministic and suitable for a script, generator, or reusable skill.
-
-### Near miss
-Looks related to leftover-scaffolding but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+When work becomes algorithmic, stop spending human judgment to execute it. Encode the procedure once and let people supervise exceptions rather than repeat mechanics.

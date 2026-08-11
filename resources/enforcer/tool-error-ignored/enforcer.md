@@ -1,32 +1,22 @@
 # tool-error-ignored — Enforcer
 
 ## Definition
-A tool, command, test, patch, search, or process reports an error that is skipped or treated as irrelevant without resolution.
+A tool error is ignored when an operation reports that evidence gathering or mutation failed, yet subsequent reasoning proceeds as though the intended observation or change had succeeded.
+
+## Governing Principle
+A failed tool call creates an epistemic gap. The desired fact was not established, so any conclusion that depends on it has lost a premise. Continuing can be legitimate only if the error is explicitly classified and an independent source supplies equivalent evidence. Otherwise the workflow silently converts “unknown” into “probably fine.”
 
 ## Trigger When
-A tool, command, test, patch, search, or process reports an error that is skipped or treated as irrelevant without resolution.
+Trigger when commands, tests, patches, searches, builds, or external tools return errors that are skipped without resolution while later steps rely on their intended result.
 
 ## Do Not Trigger When
-Do not fire when the error is explicitly classified as non-blocking with a recorded reason and alternative evidence covers the goal.
+Do not trigger when the failure is consciously classified as irrelevant to the goal, the reason is recorded, and alternate evidence fully discharges the same proof obligation.
 
 ## Distinguish From
-unverified-completion-claim skips checks entirely; false-gate pretends green; this tip ignores a raised error and continues.
+unverified-completion-claim declares success without enough evidence. false-gate produces misleading green. This rule concerns a concrete red signal that was observed and then discarded.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Name what the failed tool was supposed to establish. Either repair/retry it under understood semantics, or obtain equivalent evidence elsewhere and state why the original failure is non-blocking.
 
 ## Nudge
-A tool error was ignored. Resolve or explicitly account for it before proceeding.
-
-## Examples
-### Positive
-A tool, command, test, patch, search, or process reports an error that is skipped or treated as irrelevant without resolution.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when the error is explicitly classified as non-blocking with a recorded reason and alternative evidence covers the goal.
+An error removes a premise until accounted for. Resolve it or replace its missing evidence explicitly; never continue as though a failed observation succeeded.

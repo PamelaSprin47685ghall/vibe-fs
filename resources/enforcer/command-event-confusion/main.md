@@ -1,35 +1,19 @@
 # command-event-confusion — Main
 
 ## What To Do Now
-Commands and events are being conflated. Validate intentions now, then record completed facts as immutable history.
+Separate the request from the fact it may produce. Validate the command against current state and policy; only after success append an event describing what actually occurred.
+
+## Why This Matters
+History must remain replayable under tomorrow’s code. If replay asks today’s authorization rules whether yesterday was allowed, the past changes whenever policy changes. Conversely, storing an unvalidated intention as an event grants history to something that may never have become true.
 
 ## Repair Strategy
-1. Confirm the tip applies at the real boundary, not a symptom downstream.
-2. Restore the missing name, ownership, test, or control so the ScoreWhen condition no longer holds.
-3. Prefer one canonical fix over a local workaround that leaves the invariant broken.
-
-## Decision Branches
-- If the root cause is a missing domain type or named case: introduce the type at the boundary and migrate callers.
-- If the root cause is a collapsed or bypassed boundary: restore the interface and stop sharing internals.
-- If the root cause is missing proof: add a durable assertion, contract test, or canary that would fail under a realistic defect.
-- If the change is destructive or speculative: stop, establish authority and the true owner first.
+Give commands and events distinct types, names, and handlers. Commands return typed rejection or emitted events. Event application must be deterministic and policy-free: it reconstructs, it does not renegotiate.
 
 ## Wrong Fixes
-- Papering over the symptom with another flag, catch-all, facade, or compatibility shim.
-- Leaving dual paths, commented-out code, or ephemeral probes as the only record of the fix.
-- Testing private helpers instead of the supported entry point when the contract is public.
+Do not add an `isValidated` flag to one shared message shape. Do not catch replay failures caused by new policy and skip old events. Those approaches preserve the category error.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition is gone.
-- Exercise the success path and the relevant failure, cancellation, or near-miss path.
-- Ensure no duplicate source of truth, silent catch-all, or unowned helper remains.
+Replay the same event stream under changed current policy; reconstructed historical state must remain identical. Invalid commands must fail before emitting facts.
 
 ## Done When
-- The nudge is applied at the owning boundary.
-- Callers and proofs use the canonical representation.
-- A reviewer can see why the tip no longer fires without relying on tribal knowledge.
-
-## Scope and Authority
-- Touch only the owning module, contract, and directly affected callers.
-- Do not expand into unrelated cleanup, renames, or framework churn.
-- Destructive actions require explicit authority and a verified target.
+Every stored event means “this happened,” every command means “please attempt this,” and no code path needs to guess which meaning a record currently carries.

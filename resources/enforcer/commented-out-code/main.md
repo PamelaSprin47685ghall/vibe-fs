@@ -1,35 +1,19 @@
 # commented-out-code — Main
 
 ## What To Do Now
-Commented-out code is being used as storage. Delete it and rely on version control.
+Delete the commented implementation. Recover it from version control if it ever becomes relevant again.
+
+## Why This Matters
+A source file is valuable because readers can treat its visible structure as present tense. Commented code breaks that compact: it looks operational, carries stale names and assumptions, and competes for attention even though the compiler cannot verify it. The result is uncertainty without capability.
 
 ## Repair Strategy
-1. Confirm the tip applies at the real boundary, not a symptom downstream.
-2. Restore the missing name, ownership, test, or control so the ScoreWhen condition no longer holds.
-3. Prefer one canonical fix over a local workaround that leaves the invariant broken.
-
-## Decision Branches
-- If the root cause is a missing domain type or named case: introduce the type at the boundary and migrate callers.
-- If the root cause is a collapsed or bypassed boundary: restore the interface and stop sharing internals.
-- If the root cause is missing proof: add a durable assertion, contract test, or canary that would fail under a realistic defect.
-- If the change is destructive or speculative: stop, establish authority and the true owner first.
+Remove the dead fragment. If it contains a durable design reason not captured elsewhere, preserve the reason—not the old implementation—in the owning documentation or decision record.
 
 ## Wrong Fixes
-- Papering over the symptom with another flag, catch-all, facade, or compatibility shim.
-- Leaving dual paths, commented-out code, or ephemeral probes as the only record of the fix.
-- Testing private helpers instead of the supported entry point when the contract is public.
+Do not wrap the fragment in another comment, preprocessor branch, or “temporary” archive file. Do not retain it because it may be useful someday; Git is specifically built for that possibility.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition is gone.
-- Exercise the success path and the relevant failure, cancellation, or near-miss path.
-- Ensure no duplicate source of truth, silent catch-all, or unowned helper remains.
+The source should contain only current implementation plus comments that convey non-obvious durable knowledge.
 
 ## Done When
-- The nudge is applied at the owning boundary.
-- Callers and proofs use the canonical representation.
-- A reviewer can see why the tip no longer fires without relying on tribal knowledge.
-
-## Scope and Authority
-- Touch only the owning module, contract, and directly affected callers.
-- Do not expand into unrelated cleanup, renames, or framework churn.
-- Destructive actions require explicit authority and a verified target.
+A reader never has to ask whether a visible block is old code being kept “just in case”; the file states only the program and the knowledge that govern it now.

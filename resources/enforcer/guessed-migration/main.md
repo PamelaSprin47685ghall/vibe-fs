@@ -1,36 +1,19 @@
 # guessed-migration — Main
 
 ## What To Do Now
-An old schema is being guessed into a new one. Use an explicit migration or fail closed.
+Replace heuristic legacy detection with explicit schema versions and deterministic migrations from each supported historical version.
+
+## Why This Matters
+Durable data is a conversation with past code. If the past did not record which language it was speaking, present code cannot safely infer meaning from resemblance. Silent guessing can produce valid-looking state whose provenance is false—the most dangerous kind of corruption because recovery appears successful.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Establish authoritative version evidence. Write pure migration steps that transform one known schema to the next and test representative historical fixtures. For ambiguous unversioned data, fail closed or perform a separately authorized migration with documented assumptions.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not stack more shape heuristics until fixtures pass. More guesses increase the number of ambiguous histories accepted as truth.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+The same old bytes must always produce the same upgraded value, independent of clock, environment, or current filesystem state, and unknown versions must be rejected explicitly.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Old durable data is heuristically interpreted or silently upgraded without a specified migration.
+Recovery never asks “what schema does this look like?”; it reads a version and applies a defined semantic transformation.

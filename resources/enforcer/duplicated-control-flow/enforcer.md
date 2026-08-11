@@ -1,32 +1,22 @@
 # duplicated-control-flow — Enforcer
 
 ## Definition
-The same workflow, retry sequence, validation order, or state transition algorithm is independently implemented in multiple places.
+Control flow is duplicated when the same workflow, validation order, retry protocol, or state transition is independently re-expressed in more than one owner.
+
+## Governing Principle
+Duplication matters when it duplicates knowledge, not text. A workflow encodes temporal knowledge: which step precedes which, what failure cancels what, which result permits continuation. Copying that sequence creates two authorities over one protocol. They can remain textually similar while becoming semantically different one edit at a time.
 
 ## Trigger When
-The same workflow, retry sequence, validation order, or state transition algorithm is independently implemented in multiple places.
+Trigger when multiple places independently implement the same ordered algorithm or transition protocol and changes to the rule must be synchronized manually.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger for superficially similar sequences whose reasons to change, failure semantics, or owners are genuinely independent.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+duplicated-truth concerns multiple authoritative representations of a fact. premature-unification warns against abstracting mere similarity. This rule applies when the repeated sequence is demonstrably one piece of knowledge.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Ask whether a policy change to the sequence should require one edit or several coordinated edits. If one conceptual change demands several, establish a canonical owner.
 
 ## Nudge
-The same control algorithm has multiple owners. Establish one canonical implementation and route all callers through it.
-
-## Examples
-### Positive
-The same workflow, retry sequence, validation order, or state transition algorithm is independently implemented in multiple places.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-The same control algorithm has multiple owners. Establish one canonical implementation and route all callers through it.
+Do not copy a protocol. Give the shared ordering and failure semantics one canonical implementation, then route callers through that owner.

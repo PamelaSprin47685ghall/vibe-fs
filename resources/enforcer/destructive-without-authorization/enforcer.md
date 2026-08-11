@@ -1,32 +1,22 @@
 # destructive-without-authorization — Enforcer
 
 ## Definition
-Data, files, branches, worktrees, resources, or external state are deleted or overwritten without explicit authority and a verified target.
+A destructive action is unauthorized when it can irreversibly remove or overwrite state without both explicit authority for the action and verified identity of the target.
+
+## Governing Principle
+Irreversibility changes the proof burden. For additive or inspectable actions, a mistake can often be corrected later; deletion collapses possible futures. Therefore “I probably know what this is” is not sufficient evidence. Safe destruction requires two independent facts: someone entitled to decide has authorized the class of action, and the concrete object about to be destroyed is the intended object.
 
 ## Trigger When
-Data, files, branches, worktrees, resources, or external state are deleted or overwritten without explicit authority and a verified target.
+Trigger before deleting or overwriting data, files, branches, worktrees, external resources, credentials, or other nontrivial state when authorization or target verification is implicit, inferred, or stale.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger for ephemeral, reproducible local artifacts whose deletion is already part of an explicit scoped operation and cannot affect user/external state.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+scope-creep concerns work beyond intent. secret-in-code concerns credential exposure. This rule is specifically the missing authority/identity proof before irreversible change.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Ask two separate questions: who authorized this destructive class of action, and what evidence proves this exact target is the authorized target? Both must have concrete answers before execution.
 
 ## Nudge
-A destructive action lacks explicit authorization or target verification. Stop and establish both before proceeding.
-
-## Examples
-### Positive
-Data, files, branches, worktrees, resources, or external state are deleted or overwritten without explicit authority and a verified target.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-A destructive action lacks explicit authorization or target verification. Stop and establish both before proceeding.
+Destruction needs two proofs: authority and identity. Do not proceed on inference where a wrong target cannot be trivially restored.

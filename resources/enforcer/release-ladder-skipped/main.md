@@ -1,22 +1,19 @@
 # release-ladder-skipped — Main
 
 ## What To Do Now
-Run the applicable ladder in order: pure unit/property → contract/boundary → replay/integration → canary/limited release → full promote. Do not claim higher rungs while lower ones are red or unrun.
+Run the applicable verification rungs in order: pure behavior, contract boundaries, replay/recovery, then real-environment canary or release checks where relevant.
+
+## Why This Matters
+A broad test mixes many causes. When it fails, diagnosis is expensive; when it passes, the specific local invariant may still have escaped exercise. Narrow proofs establish small truths first, so later stages test only what cannot be proven below.
 
 ## Repair Strategy
-List required gates for this change class. Execute missing lower gates first. Only then re-run the higher signal that originally looked attractive.
-
-## Decision Branches
-If a gate is inapplicable, record why and skip explicitly. If a lower gate is slow, still run a focused subset that covers the changed contract before promotion.
+Map the change surface to proof levels and clear each applicable gate before promotion. Keep every discovered regression at the lowest level that can express it faithfully.
 
 ## Wrong Fixes
-Shipping because the UI smoke passed while domain tests failed. Inflating canary scope to replace unit proof. Declaring ladder complete from CI green on unrelated packages.
+Do not compensate for missing unit/contract proof by running a larger end-to-end suite repeatedly. More environment does not imply more precision.
 
 ## Verification
-Evidence exists for each required rung in order; higher rungs were not the first or only signal.
+Each rung should be green through the project’s standard command before the next rung is treated as meaningful evidence.
 
 ## Done When
-Every applicable lower gate passed before promotion; skip reasons are explicit where a rung does not apply.
-
-## Scope and Authority
-Behavioral and release changes. Content-only edits may use a shorter documented path.
+Completion is supported by an ordered chain of proofs, each responsible for the class of uncertainty only that level can settle.

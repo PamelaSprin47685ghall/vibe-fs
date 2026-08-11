@@ -1,22 +1,19 @@
 # weak-boundary-parsing — Main
 
 ## What To Do Now
-Parse and validate at the edge into domain types. Downstream code accepts only those types. Reject invalid payloads before business logic.
+Parse and validate external data once at ingress, then expose a normalized strong internal type instead of passing raw payload shape deeper into the system.
+
+## Why This Matters
+Repeated parsing means repeated uncertainty. Each downstream layer knows less about provenance yet must reconstruct the same distinctions, so validation drifts and malformed states travel farther before failing. A boundary should exchange ambiguity for guarantees.
 
 ## Repair Strategy
-Introduce schema validation at ingress. Replace `dict`/`JsonElement` plumbing with typed models. Centralize codecs.
-
-## Decision Branches
-If multiple ingress points share a shape, share one codec. If partial payloads are allowed, model optionality explicitly in the type.
+Decode schema/version, validate required relations, normalize units/names, and construct domain values at the adapter. Keep raw protocol forms private unless a lower layer is explicitly the protocol owner.
 
 ## Wrong Fixes
-Passing raw JSON through many layers. Re-validating differently in each feature. Trusting query strings as ints without parse.
+Do not scatter helper predicates such as `hasField` or `isValidShape` across consumers. That distributes one parsing contract into many partial opinions.
 
 ## Verification
-Invalid payloads fail at the boundary; domain functions never see raw untrusted shapes.
+Malformed and unsupported payloads should fail at ingress with typed outcomes; valid payloads should require no repeated shape checks once inside.
 
 ## Done When
-Ingress is normalized once; internal code is strongly typed against the result.
-
-## Scope and Authority
-Untrusted and cross-language ingress boundaries.
+The system crosses from weak external representation to strong internal meaning at one identifiable boundary and never has to rediscover that meaning downstream.

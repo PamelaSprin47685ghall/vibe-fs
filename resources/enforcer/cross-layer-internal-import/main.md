@@ -1,35 +1,19 @@
 # cross-layer-internal-import — Main
 
 ## What To Do Now
-A layer is reaching through another layer’s boundary. Depend on the public contract, not its internals.
+Remove the internal import. Either expose the required fact through the provider’s deliberate public contract or relocate the behavior to the layer that already owns the necessary knowledge.
+
+## Why This Matters
+Internal imports create obligations no architecture document records. A provider appears free to refactor but is not; a consumer appears dependent only on an interface but actually knows storage layout, helper structure, or lifecycle detail. This is coupling without an honest contract.
 
 ## Repair Strategy
-1. Confirm the tip applies at the real boundary, not a symptom downstream.
-2. Restore the missing name, ownership, test, or control so the ScoreWhen condition no longer holds.
-3. Prefer one canonical fix over a local workaround that leaves the invariant broken.
-
-## Decision Branches
-- If the root cause is a missing domain type or named case: introduce the type at the boundary and migrate callers.
-- If the root cause is a collapsed or bypassed boundary: restore the interface and stop sharing internals.
-- If the root cause is missing proof: add a durable assertion, contract test, or canary that would fail under a realistic defect.
-- If the change is destructive or speculative: stop, establish authority and the true owner first.
+Identify why the consumer reached inward. If it needs a stable fact, add the smallest public abstraction that owns that fact. If it needs implementation detail to perform policy, ownership is probably misplaced; move the policy instead.
 
 ## Wrong Fixes
-- Papering over the symptom with another flag, catch-all, facade, or compatibility shim.
-- Leaving dual paths, commented-out code, or ephemeral probes as the only record of the fix.
-- Testing private helpers instead of the supported entry point when the contract is public.
+Do not re-export the same internal symbol under a public name without defining a stable semantic contract. Renaming leakage is still leakage.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition is gone.
-- Exercise the success path and the relevant failure, cancellation, or near-miss path.
-- Ensure no duplicate source of truth, silent catch-all, or unowned helper remains.
+Architecture checks should fail on renewed internal imports. The provider’s internal layout should be changeable without touching the consumer.
 
 ## Done When
-- The nudge is applied at the owning boundary.
-- Callers and proofs use the canonical representation.
-- A reviewer can see why the tip no longer fires without relying on tribal knowledge.
-
-## Scope and Authority
-- Touch only the owning module, contract, and directly affected callers.
-- Do not expand into unrelated cleanup, renames, or framework churn.
-- Destructive actions require explicit authority and a verified target.
+Every cross-layer dependency points at an intentional contract whose owner accepts responsibility for its stability.

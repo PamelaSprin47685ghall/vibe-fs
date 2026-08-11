@@ -1,32 +1,22 @@
 # illegal-state-representable — Enforcer
 
 ## Definition
-Nullable fields and flags allow combinations that cannot exist in the real domain.
+An illegal state is representable when the program’s data type admits combinations of fields or flags that the domain says can never legitimately exist.
+
+## Governing Principle
+A type is not merely storage; it is a theorem about possibility. Every constructible value is a state the rest of the program must be prepared to handle. If nullable fields and flags admit contradictory combinations, the type has enlarged reality and pushed the burden of disproving those invented worlds into every consumer. Correctness then depends on repeated runtime discipline instead of construction.
 
 ## Trigger When
-Nullable fields and flags allow combinations that cannot exist in the real domain.
+Trigger when optional fields or boolean/state flags can be combined into values that have no valid domain interpretation, or when callers repeatedly assert “this field must be present when that flag is true.”
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger when every representable combination is meaningful by contract, even if some cases are uncommon.
 
 ## Distinguish From
-null-ambiguity, primitive-obsession, non-exhaustive-transition
+boolean-blindness focuses on booleans erasing named choices. null-ambiguity focuses on one absence value carrying multiple outcomes. This rule is the broader mismatch between representable and legitimate state spaces.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Enumerate valid domain states first. Compare that set with the Cartesian product admitted by the current fields. If the type permits extra worlds, replace the product with a sum of valid cases.
 
 ## Nudge
-Illegal domain states are representable. Encode each valid state explicitly and attach only the data meaningful in that state.
-
-## Examples
-### Positive
-Nullable fields and flags allow combinations that cannot exist in the real domain.
-
-### Near miss
-Looks related to null-ambiguity but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+Make the type tell the truth about possibility. Encode valid states directly and attach only the data meaningful in each state, so contradictions cannot be constructed.

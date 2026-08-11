@@ -1,36 +1,19 @@
 # program-counter-state — Main
 
 ## What To Do Now
-Control flow has been reified as mutable program-counter state. Replace it with structured control flow and local continuations.
+Remove fields whose primary purpose is to remember execution position. Express sequencing with local continuations/structured control flow and persist only states the domain genuinely recognizes.
+
+## Why This Matters
+Persisted program counters freeze an implementation strategy into the data model. Refactoring the control flow then becomes a data migration, while concurrency and recovery must interpret partially executed code as if it were business state.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Separate real workflow facts from interpreter position. If the domain has named statuses, model them explicitly; otherwise keep step/next-action data within the lifetime of the operation that needs it.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not rename `currentStep` to `status` while preserving the same execution-pointer semantics. Domain language should reflect external meaning, not disguise implementation state.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Change the internal sequencing structure conceptually. Durable state should not need to change unless the domain-visible workflow itself changed.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Stage, phase, lease, generation, next-action, current-step, owner, or equivalent fields encode where the program should execute next rather than a real-world fact.
+Stored/shared state describes reality, while “where the code should continue” is owned by control flow rather than masquerading as a domain fact.

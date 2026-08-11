@@ -1,22 +1,19 @@
 # race-first-wins-semantics — Main
 
 ## What To Do Now
-Stop treating completion order as authority. Collect all relevant results (or a defined subset), then merge with an explicit deterministic policy keyed by identity, version, or domain priority.
+Remove scheduler order from the business decision. Gather the information the rule actually needs and apply a deterministic merge, or explicitly define first-writer semantics if timing truly belongs to the domain.
+
+## Why This Matters
+“Whichever finishes first” makes load and latency part of the product model without admitting it. Replays, tests, and retries can then produce different answers from the same logical inputs because execution timing—not data—decides truth.
 
 ## Repair Strategy
-Introduce a gather/merge step. Prefer associative, commutative merges where possible. Record the merge rule next to the concurrent fan-out.
-
-## Decision Branches
-If true first-arrival semantics are required, name and test that policy explicitly. If partial failure is possible, define timeout and incomplete-set handling. If results are identical by construction, document why order is irrelevant.
+Define stable identities and the domain merge law. Use concurrency only to obtain inputs faster; join before deciding unless the protocol intentionally elects a winner by time/order.
 
 ## Wrong Fixes
-Adding sleeps or locks to "stabilize" order. Picking an arbitrary winner without recording why. Silently dropping slower results that carry unique facts.
+Do not add tiny delays to make one branch usually win, or depend on current task scheduling behavior. Those turn nondeterminism into a fragile bias rather than a rule.
 
 ## Verification
-Inject controlled completion orders in tests; the domain result must be identical for every permutation under the merge policy.
+Permute completion order across the same logical inputs. Results must remain identical unless the documented domain semantics explicitly say otherwise.
 
 ## Done When
-Domain outcomes no longer depend on scheduler races; merge policy is named, tested, and deterministic.
-
-## Scope and Authority
-Concurrent domain aggregation and multi-source reads. Not every fire-and-forget notification.
+Business outcomes depend on declared facts and merge rules, not on incidental scheduler timing.

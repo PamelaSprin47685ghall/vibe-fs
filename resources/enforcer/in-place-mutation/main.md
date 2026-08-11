@@ -1,36 +1,19 @@
 # in-place-mutation — Main
 
 ## What To Do Now
-Shared state is being mutated in place. Compute a new value or record an explicit transition instead.
+Replace shared in-place updates with immutable state transitions or explicit events. Keep any mutation confined to local implementation where no observer can see intermediate identity.
+
+## Why This Matters
+Mutation compresses “old value + transition + new value” into “whatever the object contains now.” That saves allocation but discards causal structure. Concurrency, audit, rollback, and testing then recover that structure indirectly through locks, logs, snapshots, or defensive copies.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Define the transition as a pure function from current state and input to next state (and, where relevant, events). Swap the authoritative reference only after the transition is complete and any durability contract is satisfied.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not clone a mutable object and then expose both copies to mutation. Do not add observers around field updates to simulate transactional coherence.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Old values should remain stable after a transition, intermediate states should be unobservable, and repeated reasoning about the same input state should not depend on hidden object identity.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Shared or externally visible state is overwritten in place, destroying the explicit transition from the previous value to the next value.
+State changes are explicit values/facts, while mutation—if present—has no semantic visibility beyond a narrow local scope.

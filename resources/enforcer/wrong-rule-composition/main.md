@@ -1,22 +1,19 @@
 # wrong-rule-composition — Main
 
 ## What To Do Now
-Classify rules as dependent or independent. Use applicative/accumulating composition for independents and monadic/short-circuit for dependents.
+Classify rules by dependence, then use sequential short-circuit composition for prerequisite chains and accumulating composition for independent validations.
+
+## Why This Matters
+Error behavior is part of policy. Running a rule after its premise failed manufactures misleading errors; stopping after one independent failure withholds other facts the same input already proves. The right composition preserves the logical structure of the domain rather than imposing one control-flow habit everywhere.
 
 ## Repair Strategy
-Refactor validation pipelines. Stop reporting cascade noise after a missing prerequisite. Gather all field-level errors that do not depend on each other.
-
-## Decision Branches
-If a UX needs partial dependent hints, compute them separately from hard gate composition. If performance requires fail-fast everywhere, document that product choice.
+Draw dependencies between rules, separate prerequisite establishment from independent constraints, and encode both semantics in small named combinators. Keep error types rich enough to distinguish prerequisite failure from independently accumulated violations.
 
 ## Wrong Fixes
-Always fail-fast on multi-field forms. Always accumulating after a null parent access that makes child errors nonsense. Mixing both randomly per call site.
+Do not choose “fail fast” or “collect all” as a project-wide ideology. Neither is universally correct; each follows from a different logical relation between propositions.
 
 ## Verification
-Dependent failure yields one root error without cascade junk; independent invalid fields all appear together.
+Create cases with a failed prerequisite plus downstream rules, and cases with several independent violations. The former should report only meaningful reachable errors; the latter should return the complete independent set.
 
 ## Done When
-Composition matches dependency structure; error sets are meaningful and complete.
-
-## Scope and Authority
-Validation and business rule pipelines.
+The rule engine’s control semantics are derivable from logical dependence, so every reported error is meaningful and no independent truth is hidden by arbitrary evaluation order.

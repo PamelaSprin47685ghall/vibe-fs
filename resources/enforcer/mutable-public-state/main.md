@@ -1,36 +1,19 @@
 # mutable-public-state — Main
 
 ## What To Do Now
-Public mutable fields bypass the object’s rules. Encapsulate the state and expose invariant-preserving operations.
+Remove public write access to invariant-bearing fields and expose domain operations that produce valid next state instead.
+
+## Why This Matters
+Public mutation distributes authority without distributing complete knowledge. Each caller can create a state the object itself would never choose, then every downstream consumer must defend against those possibilities. Encapsulation pays the reasoning cost once at the transition boundary.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Keep state immutable or privately owned, define named operations for legitimate transitions, and make each operation return the new value or typed failure. Avoid generic setters when fields have domain meaning.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not hide fields behind setters that accept any value. A setter is still public mutation if it performs no invariant-preserving domain decision.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Attempt the formerly invalid direct update from a caller. It should be impossible without invoking the operation that owns and verifies the transition.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Callers can directly modify fields that should be protected by invariants or domain behavior.
+All authoritative state changes pass through a small set of named invariant-preserving operations, and callers cannot bypass the domain’s rules by assignment.

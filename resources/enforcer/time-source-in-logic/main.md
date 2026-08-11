@@ -1,22 +1,19 @@
 # time-source-in-logic — Main
 
 ## What To Do Now
-Pass `now` or a clock port into domain functions. Keep `UtcNow` at the edge. Persist decision time with the fact when audit matters.
+Move system-clock reads to the shell and pass an explicit instant or clock value into the domain decision that needs temporal context.
+
+## Why This Matters
+Hidden time makes identical visible inputs non-identical in reality. That breaks deterministic tests, event replay, incident reconstruction, and explanations of why a deadline or eligibility decision differed between runs.
 
 ## Repair Strategy
-Find ambient clock reads in domain code. Thread explicit instants. Update callers and tests to supply time.
-
-## Decision Branches
-If multiple reads during one decision must match, take one instant at the boundary and reuse it. If monotonic deadlines differ from wall time, name both ports.
+Read the clock once at the owning boundary, normalize zone/precision there, and pass the instant through pure policy. Use a clock port only when multiple observations during one operation are semantically necessary.
 
 ## Wrong Fixes
-Calling DateTime.UtcNow deep in pure folds. Seeding "random" from the clock inside domain services. Tests that cannot freeze expiration logic.
+Do not globally mock `now()` in tests while production logic still reaches ambient time. A controllable global remains a hidden dependency.
 
 ## Verification
-Same inputs and same provided time yield identical decisions; expiration tests advance a fake clock.
+Run the core repeatedly with the same supplied instant and require identical outcomes; vary the instant explicitly to test the temporal rule’s boundaries.
 
 ## Done When
-Domain logic receives time explicitly; no hidden ambient clock remains in policy code.
-
-## Scope and Authority
-Domain and pure application decisions. Edge adapters may read OS time.
+Every time-sensitive decision can be replayed from recorded inputs because the moment it used is visible data rather than an ambient observation.

@@ -1,32 +1,25 @@
 # blocking-event-loop — Enforcer
 
 ## Definition
-A synchronous wait, blocking process, filesystem call, sleep, or CPU-heavy loop runs on an event-loop or hook thread.
+An event loop is blocked when one task retains the loop while waiting on work whose completion does not require the loop’s exclusive attention.
+
+## Governing Principle
+An event loop buys concurrency by making a strict bargain: each callback may borrow the thread briefly, never own it while the world is slow. Blocking I/O, sleeps, synchronous process waits, and long CPU loops break that bargain. One local wait becomes global head-of-line blocking because unrelated progress shares the same executor.
 
 ## Trigger When
-A synchronous wait, blocking process, filesystem call, sleep, or CPU-heavy loop runs on an event-loop or hook thread.
+Trigger when synchronous filesystem, process, network, sleep, lock wait, or CPU-heavy work runs on an event-loop, hook, UI, or reactor thread.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger for bounded trivial computation whose worst-case latency is demonstrably below the loop’s service budget.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+serial-when-parallel wastes available concurrency. sleep-based-synchronization uses delay as causality. This rule concerns monopolizing the shared progress engine itself.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+1. Identify the thread or executor.
+2. Determine whether other work depends on its prompt return.
+3. Bound the operation’s worst-case duration.
+4. Move unbounded waits or heavy computation behind async I/O or a worker boundary.
 
 ## Nudge
-Blocking work is running on the event loop. Move it behind an asynchronous boundary or worker.
-
-## Examples
-### Positive
-A synchronous wait, blocking process, filesystem call, sleep, or CPU-heavy loop runs on an event-loop or hook thread.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-Blocking work is running on the event loop. Move it behind an asynchronous boundary or worker.
+The loop is a scheduler, not a workplace. Return it quickly; move blocking or heavy work to a boundary that can wait without freezing unrelated progress.

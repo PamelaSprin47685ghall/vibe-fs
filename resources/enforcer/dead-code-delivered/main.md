@@ -1,35 +1,19 @@
 # dead-code-delivered — Main
 
 ## What To Do Now
-Dead production code remains. Delete it and let version control preserve history.
+Delete production code that has no current caller, activation path, or contractual role.
+
+## Why This Matters
+Dead code has zero runtime value but nonzero reasoning cost. It creates false alternatives in the reader’s model and makes searches, refactors, security review, and ownership analysis less trustworthy. Keeping it “for later” transfers uncertainty to every future maintainer.
 
 ## Repair Strategy
-1. Confirm the tip applies at the real boundary, not a symptom downstream.
-2. Restore the missing name, ownership, test, or control so the ScoreWhen condition no longer holds.
-3. Prefer one canonical fix over a local workaround that leaves the invariant broken.
-
-## Decision Branches
-- If the root cause is a missing domain type or named case: introduce the type at the boundary and migrate callers.
-- If the root cause is a collapsed or bypassed boundary: restore the interface and stop sharing internals.
-- If the root cause is missing proof: add a durable assertion, contract test, or canary that would fail under a realistic defect.
-- If the change is destructive or speculative: stop, establish authority and the true owner first.
+Trace references and activation paths, remove the dead surface, then clean imports, tests, flags, and documentation that existed only to support it. Preserve historical availability in version control rather than the source tree.
 
 ## Wrong Fixes
-- Papering over the symptom with another flag, catch-all, facade, or compatibility shim.
-- Leaving dual paths, commented-out code, or ephemeral probes as the only record of the fix.
-- Testing private helpers instead of the supported entry point when the contract is public.
+Do not comment it out, hide it behind an always-false flag, or move it to a “legacy” folder. Those preserve the same ambiguity under a different label.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition is gone.
-- Exercise the success path and the relevant failure, cancellation, or near-miss path.
-- Ensure no duplicate source of truth, silent catch-all, or unowned helper remains.
+Build and test after removal. Search for references to the retired names and ensure no documented supported behavior depended on them.
 
 ## Done When
-- The nudge is applied at the owning boundary.
-- Callers and proofs use the canonical representation.
-- A reviewer can see why the tip no longer fires without relying on tribal knowledge.
-
-## Scope and Authority
-- Touch only the owning module, contract, and directly affected callers.
-- Do not expand into unrelated cleanup, renames, or framework churn.
-- Destructive actions require explicit authority and a verified target.
+Every production path has a current reason to exist, and the source tree no longer asks readers to distinguish the live system from its abandoned possibilities.

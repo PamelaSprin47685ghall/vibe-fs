@@ -1,36 +1,19 @@
 # math-flavored-name — Main
 
 ## What To Do Now
-Mathematical naming is obscuring an ordinary domain concept. Use names that expose the actual meaning.
+Rename pseudo-mathematical identifiers to the concrete domain concepts they represent unless the code is implementing a formal model where the notation is genuinely standard.
+
+## Why This Matters
+A symbol is only shorter when its meaning is already shared. Otherwise the missing characters reappear as reader effort: inspect assignments, trace types, decode comments, then remember the result. Domain names spend a few bytes to save repeated reconstruction.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Translate each abstract identifier into the noun or action a domain discussion would use. Preserve established mathematical notation only inside narrow scopes where the formula or algorithm makes the mapping explicit.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not replace single letters with equally abstract words such as `value`, `item`, or `data`. The goal is semantic specificity, not merely alphabetic length.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Read declarations and call sites without implementation detail. The names should reveal what business or algorithmic fact each value carries.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Mathematical symbols or abstract single-letter names are used without a real algebraic model and make ordinary domain code harder to read.
+Notation compresses established mathematics where appropriate, and ordinary domain code speaks ordinary domain language everywhere else.

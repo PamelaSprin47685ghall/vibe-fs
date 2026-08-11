@@ -1,36 +1,19 @@
 # log-as-recovery-protocol — Main
 
 ## What To Do Now
-Diagnostic logs are being used as recovery facts. Recover from the journal and authoritative external state instead.
+Remove diagnostic logs from the recovery decision path. Use the durable journal, transaction result, or authoritative external state that actually owns the fact.
+
+## Why This Matters
+A log line can precede a crash, fail to flush, change wording, or be emitted twice while the underlying business effect has entirely different semantics. Building recovery on it confuses evidence for operators with commitment for machines.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Identify every recovery question—what was requested, what committed, what external effect is known—and map it to a durable typed source. Keep logs only as supplemental explanation of those facts.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not stabilize log wording and call it a protocol. A string format does not supply atomicity, ordering, idempotency, or durability guarantees.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Delete or suppress diagnostic output in a test environment; recovery correctness must remain unchanged. Conversely, a durable fact should be sufficient even if no human-readable log survives.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Diagnostic logs, log messages, or log ordering are used to decide what durable business work occurred.
+Recovery depends exclusively on channels designed to carry truth, while logs return to their proper role: helping humans understand execution after the fact.

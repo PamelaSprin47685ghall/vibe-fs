@@ -1,32 +1,22 @@
 # facade-hides-mess — Enforcer
 
 ## Definition
-A new facade or wrapper makes an unhealthy architecture look clean while leaving duplicated ownership or boundary violations underneath.
+A facade hides mess when a clean-looking entry point is placed over duplicated ownership, tangled dependencies, or broken boundaries without changing the structure beneath it.
+
+## Governing Principle
+Abstraction is compression only when it removes knowledge from callers because the hidden details have one coherent owner. A facade over disorder does the opposite: it hides evidence while preserving every underlying coupling. The public surface becomes simpler, but the system itself does not; complexity is merely moved out of sight, where it can grow without pressure to become coherent.
 
 ## Trigger When
-A new facade or wrapper makes an unhealthy architecture look clean while leaving duplicated ownership or boundary violations underneath.
+Trigger when a new wrapper/facade primarily forwards into an unhealthy subsystem and is presented as the architectural fix even though ownership and dependency violations remain unchanged.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger when the facade genuinely defines and enforces a stable subsystem boundary whose internals already have coherent ownership.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+translator-layer-bloat concerns pure forwarding ceremony. dirty-hack concerns local workaround. This rule is architectural concealment: a neat front door over unresolved internal structure.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Ignore the facade and inspect the dependency/ownership graph beneath it. If the same violations still exist and the wrapper enforces no new invariant, it is concealment rather than abstraction.
 
 ## Nudge
-A facade is concealing unresolved architecture. Repair the underlying ownership and dependency structure.
-
-## Examples
-### Positive
-A new facade or wrapper makes an unhealthy architecture look clean while leaving duplicated ownership or boundary violations underneath.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-A facade is concealing unresolved architecture. Repair the underlying ownership and dependency structure.
+A clean entrance does not make a tangled house well designed. Repair ownership and dependency structure first; keep a facade only if it represents a real boundary afterward.

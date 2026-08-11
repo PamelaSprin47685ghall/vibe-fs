@@ -1,36 +1,19 @@
 # guess-based-fix — Main
 
 ## What To Do Now
-The fix is based on trial and error. Establish the cause, then encode it in a regression test.
+Reproduce the failure, form a falsifiable causal hypothesis, and keep only the change whose mechanism explains the observed defect.
+
+## Why This Matters
+A speculative patch can make a symptom vanish by changing timing or incidental state while leaving the underlying defect intact. Without causality, the team learns only that one configuration happened to pass once; it cannot predict adjacent cases or know what future refactors must preserve.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Reduce the failure to the smallest observable mechanism. Use targeted experiments to separate competing hypotheses, then implement the fix at the owning invariant and add a regression that fails under the old mechanism.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not stack several speculative changes and call the bundle the fix. Do not keep “harmless” changes whose contribution is unknown; they destroy the experiment’s ability to teach.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+The causal explanation should predict the original failure, the corrected behavior, and at least one discriminating case beyond “tests are green.”
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Changes are tried speculatively until symptoms disappear without a causal explanation or regression test.
+The patch is an explanation encoded in code and test, not a lucky point in the space of possible edits.

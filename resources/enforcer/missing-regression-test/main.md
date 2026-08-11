@@ -1,36 +1,19 @@
 # missing-regression-test — Main
 
 ## What To Do Now
-A bug fix lacks a regression test. Capture the failure before considering the fix complete.
+Capture the reported defect as a behavioral test that fails against the old mechanism and passes only after the repair.
+
+## Why This Matters
+A fix changes code; a regression test changes institutional memory. The test turns a one-time debugging discovery into a permanent constraint on future implementations, preventing the same failure from becoming expensive knowledge twice.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Use the smallest input that demonstrates the original bug through its owning boundary. Assert the externally meaningful wrong/right outcome, not the incidental implementation detail that happened to cause it.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not write a test that can only run against the new structure, or one that merely exercises the repaired line. It must distinguish the buggy behavior from the correct contract.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Temporarily restore the old defect or mutation and confirm the test turns red for the expected reason.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): A defect is fixed without a test that fails on the old behavior and passes on the corrected behavior.
+The repository contains an executable memory of the bug, and any future implementation that recreates it must fail before delivery.

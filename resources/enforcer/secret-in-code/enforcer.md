@@ -1,32 +1,22 @@
 # secret-in-code — Enforcer
 
 ## Definition
-A password, token, private key, credential, or other sensitive value is embedded in source, fixtures, logs, prompts, or committed configuration.
+A secret is in code when authentication material is embedded in source, fixtures, logs, prompts, or committed configuration, placing confidential authority inside a medium designed for replication and history.
+
+## Governing Principle
+Source control optimizes for copying, retention, review, and recovery—the exact opposite properties required by secrets. Once a credential enters repository history, deletion of the visible line does not restore secrecy because clones, caches, diffs, and logs may already preserve it. The security boundary is therefore temporal: exposure requires revocation, not cosmetic removal.
 
 ## Trigger When
-A password, token, private key, credential, or sensitive value is embedded in source, fixtures, logs, prompts, or committed configuration.
+Trigger when passwords, API tokens, private keys, signing secrets, session credentials, or equivalent sensitive material appears in committed or broadly replicated project content.
 
 ## Do Not Trigger When
-Do not fire for clearly fake placeholders in docs that cannot authenticate anything, or for public client IDs that are not secrets by design.
+Do not trigger for unmistakably nonfunctional placeholders or identifiers explicitly public by protocol design.
 
 ## Distinguish From
-debug-print-left may leak data accidentally; this tip is embedding or committing credentials as material.
+debug-print-left may accidentally expose sensitive values through temporary diagnostics. This rule concerns confidential authority being stored in a replicated code/document medium at all.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Determine whether possession of the value grants authority or reveals protected material. If yes, assume repository exposure compromises it, remove the value, rotate/revoke it, and replace the source with the approved secret reference boundary.
 
 ## Nudge
-Sensitive material appears in code or committed data. Remove and rotate it, then use the approved secret boundary.
-
-## Examples
-### Positive
-A password, token, private key, credential, or sensitive value is embedded in source, fixtures, logs, prompts, or committed configuration.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire for clearly fake placeholders in docs that cannot authenticate anything, or for public client IDs that are not secrets by design.
+A repository is a distribution system, not a vault. Remove exposed credentials, rotate them, and inject secrets only through the boundary designed to keep authority out of source history.

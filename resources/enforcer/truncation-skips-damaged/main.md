@@ -1,22 +1,19 @@
 # truncation-skips-damaged — Main
 
 ## What To Do Now
-Fail closed on interior corruption. Allow truncation only of a trailing incomplete frame. Alert and require repair before applying later facts.
+Fail recovery on interior corruption. Permit truncation only when the storage contract proves the damaged bytes are an incomplete final record beyond a verified committed prefix.
+
+## Why This Matters
+Later events are interpreted against state produced by earlier events. Skipping a damaged interior segment destroys that state while pretending the later stream remains meaningful, producing a reconstruction with no valid historical derivation.
 
 ## Repair Strategy
-Detect checksum/parse failures with offsets. If not at the tail, stop replay and surface repair tooling. Never jump the gap.
-
-## Decision Branches
-If a known bad segment has an authorized repair event, apply the repair procedure—do not silently skip. If dual logs exist, reconcile explicitly.
+Use checksums/framing/versioning to distinguish a torn tail from committed records. Stop at the first interior inconsistency and surface repair/restore from authoritative backup rather than guessing past the gap.
 
 ## Wrong Fixes
-catch-and-continue on decode errors mid-log. Dropping "bad" events to keep uptime. Rebuilding state from a suffix of the log.
+Do not scan for the next plausible record boundary and continue. Syntactic resynchronization cannot recover the semantic state that missing committed history would have produced.
 
 ## Verification
-Inject mid-log corruption; recovery halts. Inject truncated tail only; recovery truncates cleanly and continues after append.
+Corrupt the tail and an interior record separately. Tail recovery may truncate only under the documented contract; interior corruption must deterministically fail closed.
 
 ## Done When
-Interior corruption fails closed; only trailing incomplete records may be truncated.
-
-## Scope and Authority
-Durable log/event recovery paths.
+Every replayed record rests on a fully verified committed prefix, and recovery never manufactures continuity across missing history.

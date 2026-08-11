@@ -1,32 +1,22 @@
 # missing-rule-combinator — Enforcer
 
 ## Definition
-Three or more rules with the same input/output shape are manually chained instead of composed through a reusable validation or policy combinator.
+A rule combinator is missing when several policies share the same input/output algebra but are repeatedly sequenced by bespoke control flow rather than composed through that algebra.
+
+## Governing Principle
+Repeated rule composition reveals a language. If each rule is `A → Result<B,E>` or `A → E option`, then sequencing, short-circuiting, and accumulation are not incidental syntax; they are operations over that common shape. Naming those operations once turns imperative repetition into a small algebra whose laws can be tested independently.
 
 ## Trigger When
-Three or more rules with the same input/output shape are manually chained instead of composed through a reusable validation or policy combinator.
+Trigger when three or more rules with the same semantic shape are manually chained, folded, accumulated, or short-circuited in several places.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger when only one or two isolated rules exist or their apparently similar signatures carry different semantics that would make one combinator misleading.
 
 ## Distinguish From
-pattern-sprawl, premature-unification, phase-flag-accumulation
+wrong-rule-composition chooses the wrong short-circuit/accumulation semantics. rule-spaghetti hides policy in control flow. This rule concerns absence of a reusable composition vocabulary after a real algebra has emerged.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Write the rule signature and the desired composition laws. If several callers reimplement those laws, define the smallest named combinators and use them everywhere.
 
 ## Nudge
-Repeated rule composition is being written by hand. Introduce a small combinator that exposes the shared rule algebra.
-
-## Examples
-### Positive
-Three or more rules with the same input/output shape are manually chained instead of composed through a reusable validation or policy combinator.
-
-### Near miss
-Looks related to pattern-sprawl but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+When rules share a shape, composition itself becomes domain knowledge. Name that algebra once instead of rewriting its control flow at every call site.

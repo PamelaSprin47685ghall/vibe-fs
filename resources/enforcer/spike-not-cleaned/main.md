@@ -1,22 +1,19 @@
 # spike-not-cleaned — Main
 
 ## What To Do Now
-Rebuild the production path with explicit types, boundaries, error contracts, and tests. Delete spike shortcuts, hard-coded credentials, and throwaway structure.
+Treat the spike as evidence, not as the final implementation. Preserve what it proved, then replace experimental shortcuts with explicit contracts, owned state, failure semantics, and production verification.
+
+## Why This Matters
+Prototype code is often correct only inside the narrow experiment that gave it meaning. Shipping it unchanged silently extends that local success into claims about concurrency, recovery, security, malformed inputs, and maintenance that were never tested.
 
 ## Repair Strategy
-List every known spike compromise. Either fix each before promote or keep the spike out of the release path. Prefer a clean reimplementation over polishing the experiment in place when structure is wrong.
-
-## Decision Branches
-If time forces a phased harden, gate the spike and track each compromise as required work—do not call it done.
+Extract the essential idea, discard hard-coded and exploratory structure, then rebuild the smallest production design around the real boundaries and invariants. Delete the spike when its knowledge has transferred.
 
 ## Wrong Fixes
-Renaming spike folders and shipping. Adding one test and declaring production-ready. Leaving TODOs on critical paths (see todo-bomb).
+Do not keep both “prototype” and “production wrapper” paths where the wrapper merely calls the spike. A label does not change the assumptions inside the implementation.
 
 ## Verification
-Production entry points use contracted code; spike artifacts are removed or quarantined; acceptance tests pass on the hardened path.
+Exercise the production boundary, failure paths, and lifecycle rather than only the successful demo scenario that motivated the spike.
 
 ## Done When
-Promoted code meets production contracts; experimental shortcuts are gone from the live path.
-
-## Scope and Authority
-Promotion of experiments into production. Not exploratory branches that stay isolated.
+The shipped code owes its structure to production contracts, while the prototype’s only surviving contribution is the knowledge it discovered.

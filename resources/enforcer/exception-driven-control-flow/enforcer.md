@@ -1,32 +1,22 @@
 # exception-driven-control-flow — Enforcer
 
 ## Definition
-Exceptions are intentionally thrown and caught to express ordinary branching, iteration, absence, or expected retries.
+Exception-driven control flow uses stack unwinding to represent an ordinary branch the program expects to take as part of normal operation.
+
+## Governing Principle
+Exceptions deliberately erase local control structure: they jump across frames until some handler recognizes them. That power is appropriate when normal reasoning has broken down. Using it for absence, iteration, branching, or expected retry turns ordinary policy into non-local control flow, so a reader cannot discover possible outcomes from the function’s type or immediate syntax.
 
 ## Trigger When
-Exceptions are intentionally thrown and caught to express ordinary branching, iteration, absence, or expected retries.
+Trigger when code intentionally throws and catches exceptions to express common alternatives such as “not found,” loop termination, optional parsing, branch selection, or routine retry.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger when an exceptional condition truly violates assumptions required to continue and the ordinary caller cannot reasonably recover as part of its domain flow.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+expected-failure-as-exception focuses on foreseeable business failures. This rule is broader: even non-business ordinary branches become exceptions. stringly-typed-error concerns parsing prose after failure.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Ask whether callers are expected to encounter and handle the outcome during normal operation. If yes, make it an explicit return case or branch rather than hidden stack control.
 
 ## Nudge
-Exceptions are being used as ordinary control flow. Replace them with explicit branches or typed results.
-
-## Examples
-### Positive
-Exceptions are intentionally thrown and caught to express ordinary branching, iteration, absence, or expected retries.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-Exceptions are being used as ordinary control flow. Replace them with explicit branches or typed results.
+Reserve non-local control for genuinely exceptional failure. Represent ordinary alternatives where callers can see them—in the type and local control flow.

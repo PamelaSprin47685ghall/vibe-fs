@@ -1,32 +1,22 @@
 # commented-out-code — Enforcer
 
 ## Definition
-Old implementation code is retained in comments instead of being removed.
+Commented-out implementation is dead code kept inside the living source as an informal archive.
+
+## Governing Principle
+Source should describe the program that exists. Version control already describes programs that used to exist. Mixing those temporal roles forces every reader to classify code before understanding it: executable truth and historical residue occupy the same visual channel. The repository then stops being a precise statement of the current system.
 
 ## Trigger When
-Old implementation code is retained in comments instead of being removed.
+Trigger when obsolete functions, branches, declarations, imports, or implementation fragments remain in comments for possible future reuse or fear of losing history.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger for short illustrative snippets in documentation comments whose purpose is explanatory rather than preserving removed production code.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+dead-code-delivered is still compilable but unreachable/unused code. comment-theater is commentary that narrates obvious behavior. This rule is former implementation preserved as comments.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Ask whether deleting the comment changes the current program or removes unique explanatory knowledge. If neither, version control is its proper home.
 
 ## Nudge
-Commented-out code is being used as storage. Delete it and rely on version control.
-
-## Examples
-### Positive
-Old implementation code is retained in comments instead of being removed.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-Commented-out code is being used as storage. Delete it and rely on version control.
+Keep the working tree about the present. Delete commented-out implementation; history already has a lossless archive.

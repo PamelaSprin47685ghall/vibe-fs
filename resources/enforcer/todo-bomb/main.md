@@ -1,22 +1,19 @@
 # todo-bomb — Main
 
 ## What To Do Now
-Implement the missing behavior now, or refuse to ship the incomplete path (feature flag off, API not exposed, hard error at boundary with no false success).
+Complete the correctness-critical behavior or explicitly remove that case from the supported contract before delivery.
+
+## Why This Matters
+A reachable TODO is a known hole hidden behind future tense. The code already knows a valid path can arrive somewhere it cannot honor, yet shifts the cost to whichever user or maintainer encounters it first.
 
 ## Repair Strategy
-Inventory TODO/FIXME/unimplemented on the change path. Close each that correctness depends on. Delete false success stubs.
-
-## Decision Branches
-If scope truly excludes the path, make it unreachable and document the out-of-scope edge—do not leave a soft TODO on a live branch.
+Trace whether the placeholder is reachable from supported inputs. Implement the real behavior and test it, or move rejection to the public boundary with a typed unsupported outcome if the product intentionally does not support the case.
 
 ## Wrong Fixes
-throw new Error("TODO") on a production branch that can be hit. Returning empty success from unimplemented handlers. "Fix later" on security or durability paths.
+Do not replace `TODO` with a quieter default, empty result, or generic catch. Silencing the marker preserves the missing semantics while removing the warning.
 
 ## Verification
-No live path depends on placeholder behavior; tests cover the finished branch or prove it is unreachable.
+Every reachable supported case must have defined behavior and a test; every intentionally unsupported case must be rejected explicitly before entering an incomplete path.
 
 ## Done When
-Required behavior is implemented or the incomplete change is not shippable.
-
-## Scope and Authority
-Correctness-critical paths in delivered code.
+No production path relies on a promise that only a comment makes about future work.

@@ -1,32 +1,22 @@
 # shared-mutable-concurrency — Enforcer
 
 ## Definition
-Concurrent workers coordinate by mutating shared state under ad hoc locks instead of ownership or message passing.
+Shared mutable concurrency coordinates workers by letting several execution contexts directly mutate the same state and relying on locks or timing discipline to keep those mutations coherent.
+
+## Governing Principle
+The hard part of concurrency is not parallel execution; it is shared authority over change. A lock protects moments, not meaning: readers must still determine which fields belong to one invariant, which lock protects them, and which lock order avoids deadlock. Single ownership reverses the problem. One actor/writer owns mutation; others exchange messages or immutable values, so serialization follows authority rather than being reconstructed from lock choreography.
 
 ## Trigger When
-Concurrent workers coordinate by mutating shared state protected by ad hoc locks rather than owning state or exchanging messages.
+Trigger when concurrent workers read and mutate shared domain state under ad hoc locks, especially when multiple locks or compound invariants are involved.
 
 ## Do Not Trigger When
-Do not fire when a single-threaded owner or actor model already serializes mutation, or when a well-bounded concurrent structure is the documented design.
+Do not trigger when one owner serializes mutation, or a well-defined concurrent data structure provides the exact atomic semantics required without exposing compound mutable invariants.
 
 ## Distinguish From
-in-place-mutation is general mutability; race-first-wins-semantics is about completion order as truth; this tip is shared mutable coordination.
+in-place-mutation is the general mutation smell. lost-update is one concrete conflict. race-first-wins-semantics concerns timing choosing business truth. This rule is shared write authority itself.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Identify the state’s semantic owner. If several workers can independently mutate it, ask whether ownership can be centralized and communication expressed as commands/messages or immutable snapshots.
 
 ## Nudge
-Concurrent workers share mutable state. Prefer ownership, message passing, or a single serialized writer.
-
-## Examples
-### Positive
-Concurrent workers coordinate by mutating shared state protected by ad hoc locks rather than owning state or exchanging messages.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when a single-threaded owner or actor model already serializes mutation, or when a well-bounded concurrent structure is the documented design.
+Remove shared authority before adding smarter locks. Give mutable state one owner and let concurrency communicate across ownership boundaries instead of editing the same world together.

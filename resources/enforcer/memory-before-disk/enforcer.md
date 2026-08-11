@@ -1,32 +1,22 @@
 # memory-before-disk — Enforcer
 
 ## Definition
-Authoritative in-memory state is changed before the durable fact that justifies the change is committed.
+Memory is updated before disk when authoritative runtime state begins reflecting a fact before the durable record that justifies that fact has committed.
+
+## Governing Principle
+Volatile state may be fast, but after a crash only durable history gets to testify about what happened. If memory moves first, the running process can observe a future that recovery cannot reconstruct. Correct ordering therefore follows epistemic authority: durable commitment establishes the fact; memory is merely a projection permitted to advance afterward.
 
 ## Trigger When
-Authoritative in-memory state is changed before the durable fact that justifies the change is committed.
+Trigger when command handling mutates authoritative in-memory state, publishes the new state, or performs dependent work before the event/journal/transaction establishing that transition is durably committed.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger when memory is explicitly speculative and cannot escape or influence authoritative behavior before the durable commit succeeds.
 
 ## Distinguish From
-log-as-recovery-protocol, partial-write-assumption, overwrite-history
+blob-after-event orders durable references and content. overwrite-history mutates committed past facts. This rule concerns volatile authority outrunning durable evidence.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Crash the process at every boundary. If any externally visible or authoritative memory state can survive long enough to influence behavior while its justifying fact would vanish on restart, the order is wrong.
 
 ## Nudge
-Memory was updated before durability. Commit the fact first, then derive runtime state from it.
-
-## Examples
-### Positive
-Authoritative in-memory state is changed before the durable fact that justifies the change is committed.
-
-### Near miss
-Looks related to log-as-recovery-protocol but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+Memory may project history; it must not precede history. Commit the fact first, then advance authoritative runtime state from the committed result.

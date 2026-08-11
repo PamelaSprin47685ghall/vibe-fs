@@ -1,32 +1,22 @@
 # log-as-recovery-protocol — Enforcer
 
 ## Definition
-Diagnostic logs, log messages, or log ordering are used to decide what durable business work occurred.
+A diagnostic log becomes a false recovery protocol when recovery decides what durable work happened by parsing log messages, their order, or their presence.
+
+## Governing Principle
+Logs are observations about execution; durable facts are commitments by the system. The distinction matters because logging usually has weaker guarantees: messages may be dropped, reordered, reformatted, sampled, duplicated, or emitted before the effect they describe is committed. Treating such commentary as history grants authority to a channel that was never designed to bear it.
 
 ## Trigger When
-Diagnostic logs, log messages, or log ordering are used to decide what durable business work occurred.
+Trigger when restart/recovery logic parses logs or infers completed business effects from diagnostic messages rather than a journal, transaction outcome, or authoritative external state.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger when the “log” is in fact the deliberately designed append-only event journal with explicit schema, durability, ordering, and replay semantics.
 
 ## Distinguish From
-memory-before-disk, partial-write-assumption, overwrite-history
+memory-before-disk orders volatile state against durable facts. recovery-by-filesystem-state infers lifecycle from residue. This rule specifically elevates diagnostic output into recovery authority.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Ask whether the channel has a contractual guarantee that every committed fact appears exactly as recovery requires. If not, it may aid diagnosis but cannot define truth.
 
 ## Nudge
-Diagnostic logs are being used as recovery facts. Recover from the journal and authoritative external state instead.
-
-## Examples
-### Positive
-Diagnostic logs, log messages, or log ordering are used to decide what durable business work occurred.
-
-### Near miss
-Looks related to memory-before-disk but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+Diagnostics may explain history; they must not create it. Recover from committed facts and authoritative external state, never from prose emitted along the way.

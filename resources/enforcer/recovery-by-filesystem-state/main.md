@@ -1,22 +1,19 @@
 # recovery-by-filesystem-state — Main
 
 ## What To Do Now
-Write an explicit lifecycle record (status, step, cursor, epoch) to the journal or store. Recover by reading that fact, not by scanning leftover paths.
+Replace lifecycle inference from file/directory residue with explicit durable events or records whose schema states the recovery fact directly.
+
+## Why This Matters
+Incidental artifacts are ambiguous because they can exist before or after the business milestone they seem to imply. Crashes preserve arbitrary prefixes of execution, so existence is not equivalent to completion unless the protocol deliberately makes it so.
 
 ## Repair Strategy
-Enumerate stages the FS scrape currently implies. Replace each scrape with a committed state transition. Delete reliance on temp file presence as a signal.
-
-## Decision Branches
-If migrating old residue-based recovery, one-shot import residue into facts, then disable path sniffing. If only crash markers exist, convert them into typed recovery events.
+Name each recoverable lifecycle fact and persist it at the point of commitment. On restart, read those facts and reconstruct state; use filesystem artifacts only as data referenced by the durable record, not as the record’s substitute.
 
 ## Wrong Fixes
-Checking whether a lock file exists as the sole progress bit. Treating partial directories as committed stages. Rebuilding policy from glob patterns.
+Do not add more filename conventions, timestamp comparisons, or directory heuristics. Those enlarge the accidental protocol rather than creating authoritative state.
 
 ## Verification
-Simulate crash mid-stage; recovery reaches the same state from the lifecycle record with residue deleted or rearranged.
+Create crash points around artifact creation/cleanup. Recovery must remain correct even when incidental filesystem shape is misleading.
 
 ## Done When
-Recovery path reads durable lifecycle facts; incidental FS layout is irrelevant to progress.
-
-## Scope and Authority
-Workflow/session recovery and resumable jobs. Not ordinary config file loading.
+Renaming or reorganizing implementation files cannot silently change workflow recovery semantics because lifecycle truth lives in an explicit durable protocol.

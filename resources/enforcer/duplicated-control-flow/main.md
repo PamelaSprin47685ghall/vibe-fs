@@ -1,35 +1,19 @@
 # duplicated-control-flow — Main
 
 ## What To Do Now
-The same control algorithm has multiple owners. Establish one canonical implementation and route all callers through it.
+Move the genuinely shared workflow or transition protocol to one owner and make every caller invoke that canonical behavior.
+
+## Why This Matters
+Copied control flow duplicates time-sensitive knowledge: ordering, short-circuit rules, retry boundaries, and cleanup. Drift rarely appears as a dramatic fork; one branch gets a new condition, another misses it, and the system quietly acquires multiple definitions of the same process.
 
 ## Repair Strategy
-1. Confirm the tip applies at the real boundary, not a symptom downstream.
-2. Restore the missing name, ownership, test, or control so the ScoreWhen condition no longer holds.
-3. Prefer one canonical fix over a local workaround that leaves the invariant broken.
-
-## Decision Branches
-- If the root cause is a missing domain type or named case: introduce the type at the boundary and migrate callers.
-- If the root cause is a collapsed or bypassed boundary: restore the interface and stop sharing internals.
-- If the root cause is missing proof: add a durable assertion, contract test, or canary that would fail under a realistic defect.
-- If the change is destructive or speculative: stop, establish authority and the true owner first.
+Prove first that the sequences represent the same knowledge. Then extract the smallest operation that owns their common protocol, parameterizing only true variation rather than exposing the whole algorithm as callbacks.
 
 ## Wrong Fixes
-- Papering over the symptom with another flag, catch-all, facade, or compatibility shim.
-- Leaving dual paths, commented-out code, or ephemeral probes as the only record of the fix.
-- Testing private helpers instead of the supported entry point when the contract is public.
+Do not abstract merely because lines look alike. Do not create a generic orchestration framework whose parameters are more complex than the duplicated sequence. Shared knowledge deserves one owner; coincidental shape does not.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition is gone.
-- Exercise the success path and the relevant failure, cancellation, or near-miss path.
-- Ensure no duplicate source of truth, silent catch-all, or unowned helper remains.
+A future change to ordering or failure semantics should have one authoritative edit point, with callers covered by behavior tests.
 
 ## Done When
-- The nudge is applied at the owning boundary.
-- Callers and proofs use the canonical representation.
-- A reviewer can see why the tip no longer fires without relying on tribal knowledge.
-
-## Scope and Authority
-- Touch only the owning module, contract, and directly affected callers.
-- Do not expand into unrelated cleanup, renames, or framework churn.
-- Destructive actions require explicit authority and a verified target.
+One protocol has one implementation owner, and no caller can silently evolve a private version of the same workflow.

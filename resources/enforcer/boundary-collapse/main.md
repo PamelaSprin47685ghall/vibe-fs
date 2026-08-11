@@ -1,35 +1,19 @@
 # boundary-collapse — Main
 
 ## What To Do Now
-A context boundary has collapsed. Restore a clear interface and pass only the facts that genuinely cross it.
+Re-establish an explicit interface between the contexts and reduce what crosses it to the smallest set of facts required by the consumer.
+
+## Why This Matters
+Architecture is a theory of permitted knowledge. When one context can depend on another’s internals, private implementation choices become public obligations by accident. The cost appears later as synchronized migrations, defensive adapters, and changes that cannot be reasoned about locally.
 
 ## Repair Strategy
-1. Confirm the tip applies at the real boundary, not a symptom downstream.
-2. Restore the missing name, ownership, test, or control so the ScoreWhen condition no longer holds.
-3. Prefer one canonical fix over a local workaround that leaves the invariant broken.
-
-## Decision Branches
-- If the root cause is a missing domain type or named case: introduce the type at the boundary and migrate callers.
-- If the root cause is a collapsed or bypassed boundary: restore the interface and stop sharing internals.
-- If the root cause is missing proof: add a durable assertion, contract test, or canary that would fail under a realistic defect.
-- If the change is destructive or speculative: stop, establish authority and the true owner first.
+Give each context ownership of its own model and invariants. Define the crossing in consumer-relevant terms, translate explicitly, and prevent internal imports or mutation mechanically where the language/build system permits.
 
 ## Wrong Fixes
-- Papering over the symptom with another flag, catch-all, facade, or compatibility shim.
-- Leaving dual paths, commented-out code, or ephemeral probes as the only record of the fix.
-- Testing private helpers instead of the supported entry point when the contract is public.
+Do not add a facade that forwards the same internals unchanged. Do not share a “common” mega-model to avoid translation. Both preserve the collapsed knowledge boundary while making it less visible.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition is gone.
-- Exercise the success path and the relevant failure, cancellation, or near-miss path.
-- Ensure no duplicate source of truth, silent catch-all, or unowned helper remains.
+A change to one context’s internal representation should not require edits in the other unless the declared cross-boundary fact itself changed.
 
 ## Done When
-- The nudge is applied at the owning boundary.
-- Callers and proofs use the canonical representation.
-- A reviewer can see why the tip no longer fires without relying on tribal knowledge.
-
-## Scope and Authority
-- Touch only the owning module, contract, and directly affected callers.
-- Do not expand into unrelated cleanup, renames, or framework churn.
-- Destructive actions require explicit authority and a verified target.
+Each context can evolve behind its contract, cross-boundary data has an explicit owner and meaning, and no caller relies on another context’s private representation or lifecycle.

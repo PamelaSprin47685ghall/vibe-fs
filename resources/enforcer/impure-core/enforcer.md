@@ -1,32 +1,22 @@
 # impure-core — Enforcer
 
 ## Definition
-Core business decisions directly read clocks, random sources, databases, networks, environment state, or mutable globals.
+A core is impure when business decisions reach outward for time, randomness, storage, network, environment, or mutable global state instead of receiving the facts they need as explicit inputs.
+
+## Governing Principle
+A policy function is easiest to trust when its result is a mathematical consequence of visible inputs. Hidden effects enlarge the input set without enlarging the signature: the same call can mean different things tomorrow, on another machine, or after another test. Replay, audit, and local reasoning then fail for the same reason—the function has dependencies it refuses to name.
 
 ## Trigger When
-Core business decisions directly read clocks, random sources, databases, networks, environment state, or mutable globals.
+Trigger when domain logic directly reads clocks, random generators, databases, networks, environment variables, files, or mutable globals while deciding business outcomes.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger at adapters/shells whose explicit responsibility is to observe the external world and supply values to the core.
 
 ## Distinguish From
-mixed-side-effect-boundaries, in-place-mutation, mutable-public-state
+mixed-side-effect-boundaries mixes several effects. time-source-in-logic and random-source-in-logic are specific hidden inputs. This rule is the architectural principle that policy should not own observation of the outside world.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Write the decision as `state × command × observed facts → result`. Any required fact currently fetched inside the function belongs in the input or in a narrow injected port at the shell boundary.
 
 ## Nudge
-Business policy is entangled with effects. Move effects to the shell and pass explicit values into a pure core.
-
-## Examples
-### Positive
-Core business decisions directly read clocks, random sources, databases, networks, environment state, or mutable globals.
-
-### Near miss
-Looks related to mixed-side-effect-boundaries but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+Make policy a consequence, not an observation. Move effects outward and pass the core every fact it needs explicitly so identical inputs imply identical decisions.

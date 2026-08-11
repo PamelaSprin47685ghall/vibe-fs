@@ -1,32 +1,25 @@
 # abbreviation-anxiety — Enforcer
 
 ## Definition
-Unfamiliar, overloaded, or unnecessary abbreviations force readers to decode names repeatedly.
+An abbreviation is harmful when understanding the name requires a private decoding step that the domain itself does not require. The defect is not shortness; it is hidden vocabulary.
+
+## Governing Principle
+A name is an address into the reader’s existing model. Good names reuse domain language so recognition is immediate. Private acronyms allocate a second language beside the first, forcing every reader to pay translation cost on every encounter. That tax compounds: the shorter the token, the more context must be reconstructed around it.
 
 ## Trigger When
-Unfamiliar, overloaded, or unnecessary abbreviations force readers to decode names repeatedly.
+Trigger when an unfamiliar, overloaded, or locally invented abbreviation appears in a name that carries domain meaning, and a reader must expand it before reasoning about the code.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger for abbreviations that are genuinely universal in the relevant domain and cannot plausibly be read another way there: HTTP, URL, UUID, CPU, SQL, and similar established vocabulary.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+misleading-name concerns a false claim about meaning or guarantee. domain-language-drift concerns inconsistent vocabulary across contexts. This rule concerns needless decoding even when the expansion itself is correct.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+1. Read the identifier without its implementation.
+2. Ask whether the intended expansion is immediate to a competent domain reader.
+3. If not, spell the concept as the domain names it.
+4. Prefer a longer stable word over a shorter private cipher.
 
 ## Nudge
-Abbreviations are increasing cognitive load. Use the full domain term unless the abbreviation is genuinely universal here.
-
-## Examples
-### Positive
-Unfamiliar, overloaded, or unnecessary abbreviations force readers to decode names repeatedly.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-Abbreviations are increasing cognitive load. Use the full domain term unless the abbreviation is genuinely universal here.
+Remove the private decoding step. Use the full domain term unless the abbreviation is already part of the domain’s public language.

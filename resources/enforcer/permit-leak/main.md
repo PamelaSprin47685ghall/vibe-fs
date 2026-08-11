@@ -1,36 +1,19 @@
 # permit-leak — Main
 
 ## What To Do Now
-A concurrency permit can leak. Acquire it through a scoped construct that guarantees release.
+Move permit acquisition into a scoped construct that guarantees exactly one release on success, error, cancellation, and early return.
+
+## Why This Matters
+A leaked permit is capacity that disappears without evidence. Enough leaks convert bounded concurrency into eventual deadlock or starvation, often far from the operation that failed to release. The root problem is lifetime accounting hidden in control flow.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Use `using`/`defer`/`finally`/bracket or a language-specific scoped primitive. Keep the acquired token inside that lexical lifetime and avoid transferring it unless transfer is explicit in the type/protocol.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not add releases to known catch branches one by one. The next exit path recreates the leak. Structure should guarantee the accounting identity globally.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Force exception, cancellation, timeout, and early-return paths; capacity after each must equal capacity before acquisition.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): A semaphore, gate, lock, lease, or capacity permit can be lost on exceptions, cancellation, or early return.
+Every acquisition has one structurally guaranteed release and permit accounting no longer depends on manually auditing every control-flow path.

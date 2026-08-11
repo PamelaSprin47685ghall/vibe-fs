@@ -1,32 +1,22 @@
 # expected-failure-as-exception — Enforcer
 
 ## Definition
-A foreseeable business outcome such as not found, unauthorized, insufficient balance, or invalid transition is represented by an exception.
+An expected failure is misrepresented when a foreseeable domain outcome—unauthorized, not found, insufficient balance, invalid transition, conflict—is thrown as an exception instead of returned as part of the operation’s contract.
+
+## Governing Principle
+A function’s type should describe the worlds its caller must be prepared to inhabit. Foreseeable refusal is one of those worlds. Hiding it in an exception channel makes the signature overclaim success and lets callers accidentally ignore a required branch. Typed failure restores honesty: it turns policy from an ambient runtime surprise into an explicit obligation.
 
 ## Trigger When
-A foreseeable business outcome such as not found, unauthorized, insufficient balance, or invalid transition is represented by an exception.
+Trigger when ordinary business rejection is thrown/caught as an exception or mapped to a generic exceptional channel.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger for infrastructure or programmer failures that make the requested operation impossible to reason about as an ordinary domain outcome.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+exception-driven-control-flow covers ordinary branching generally. null-ambiguity hides several outcomes in absence. This rule specifically concerns expected business refusal.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Ask whether the product can name the outcome before running the code and whether a caller has a legitimate response to it. If yes, give it a named result case.
 
 ## Nudge
-An expected business outcome is being treated as an exception. Return a typed result that forces callers to handle it.
-
-## Examples
-### Positive
-A foreseeable business outcome such as not found, unauthorized, insufficient balance, or invalid transition is represented by an exception.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-An expected business outcome is being treated as an exception. Return a typed result that forces callers to handle it.
+Foreseeable refusal belongs in the contract. Return a closed typed outcome so every caller must confront the business branch explicitly.

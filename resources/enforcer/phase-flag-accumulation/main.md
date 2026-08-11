@@ -1,36 +1,19 @@
 # phase-flag-accumulation — Main
 
 ## What To Do Now
-Lifecycle flags are accumulating into an implicit state machine. Replace the flag product with a smaller explicit model or structured flow.
+Replace interacting lifecycle flags with a smaller explicit state model or structured control flow whose valid phases and transitions are named.
+
+## Why This Matters
+Flags scale as combinations, while real lifecycles usually scale as a sequence or small graph. The gap becomes illegal states and conditional logic whose purpose is to rule out worlds the representation should never have admitted.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+List valid lifecycle states and the data meaningful in each. Encode them as closed cases or keep phase-local data inside the control scope that owns it. Remove obsolete flags rather than mirroring the new state with old booleans.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not add a master `phase` enum while retaining all old flags “for convenience.” Two lifecycle representations immediately recreate duplicated truth.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Every valid transition should be explicit and every former contradictory flag combination should become unconstructable.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): New flags are repeatedly added to patch interactions between lifecycle phases, producing combinatorial behavior.
+The lifecycle has one representation whose state space matches reality, and new behavior extends named transitions rather than adding another boolean patch.

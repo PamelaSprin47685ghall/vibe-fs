@@ -1,36 +1,19 @@
 # implicit-convention-magic — Main
 
 ## What To Do Now
-Correctness depends on hidden convention. Replace it with an explicit typed registration or contract.
+Replace correctness-critical discovery conventions with explicit typed registration or a build-time contract that makes participation visible and checkable.
+
+## Why This Matters
+Convention saves syntax by spending memory. The more correctness depends on hidden names, paths, and annotations, the more the codebase requires folklore to assemble. Failures become omissions rather than type errors: nothing happens because some invisible ritual was missed.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Identify the relationship the convention encodes, represent it as data or a typed declaration, and have one owner validate completeness. Keep convention only as optional sugar that compiles down to the explicit model.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not merely document more magic. Documentation can teach a convention but cannot make violating it impossible or even visible.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Rename, move, or omit a participant in a controlled fixture. The build/startup gate should fail with a precise contract error rather than silently changing runtime behavior.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Correctness depends on file names, registration order, reflection, annotations, directory placement, or framework discovery that is not mechanically visible at the call site.
+Critical relationships are discoverable from code and checked mechanically, while directory shape and naming conventions no longer carry hidden semantic authority.

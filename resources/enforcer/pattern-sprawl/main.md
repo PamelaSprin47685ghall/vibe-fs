@@ -1,36 +1,19 @@
 # pattern-sprawl — Main
 
 ## What To Do Now
-Design-pattern scaffolding is obscuring a simpler algebraic model. Prefer closed data and direct composition.
+Collapse pattern scaffolding into the language feature that directly represents its semantic job: closed cases, pattern matching, first-class functions, modules, or immutable constructors.
+
+## Why This Matters
+Indirection is useful when it buys a capability the language lacks. Once that capability is native, the same indirection becomes translation overhead: readers must map factories back to choices, strategies back to functions, visitors back to case analysis.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Identify whether variability is closed data or replaceable behavior. Model closed alternatives explicitly and exhaustively; pass behavior as functions; compose small modules where ownership matters. Preserve open interfaces only where third-party/open-world extension is real.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not mechanically convert every class to a union or every interface to a function. Simplification follows the variation model, not an anti-pattern slogan.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+The rewritten code should expose the same domain distinctions with fewer concepts and stronger exhaustiveness/typing guarantees.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Class hierarchies, factories, visitors, strategies, or interfaces simulate behavior that sealed data, pattern matching, and first-class functions could express directly.
+Every remaining design pattern earns its indirection through a real extensibility or lifecycle requirement rather than historical habit.

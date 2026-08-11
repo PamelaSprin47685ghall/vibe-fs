@@ -1,32 +1,22 @@
 # mixed-side-effect-boundaries — Enforcer
 
 ## Definition
-A single function or module simultaneously owns unrelated effects such as storage, network, process control, UI, Git, and policy decisions.
+Side-effect boundaries are mixed when one function or module simultaneously owns unrelated effects—storage, network, process control, UI, Git, filesystem—and business policy decides among them in the same imperative body.
+
+## Governing Principle
+Effects differ not merely by API but by failure model, lifetime, retry semantics, and authority. Mixing them collapses these distinct contracts into one control-flow surface, so tests need to simulate the whole world and policy becomes inseparable from orchestration accidents. Isolation restores a crucial asymmetry: policy may decide what should happen without knowing how each external world performs it.
 
 ## Trigger When
-A single function or module simultaneously owns unrelated effects such as storage, network, process control, UI, Git, and policy decisions.
+Trigger when one unit directly coordinates multiple unrelated effect systems while also containing domain decisions or mutable shared state.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger for a thin application shell whose explicit role is to execute already-decided commands across effects and which contains no hidden policy.
 
 ## Distinguish From
-god-module, impure-core, mock-hidden-state
+god-module concerns multiple responsibilities broadly. impure-core concerns effects inside business decisions. This rule focuses on unrelated external contracts sharing one owner.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+List effects and their distinct failure/lifetime semantics. Give each a narrow port/adapter, move policy to pure code, and let orchestration compose typed outcomes at one explicit shell.
 
 ## Nudge
-Unrelated side-effect boundaries are mixed together. Isolate each effect behind a narrow port and keep policy pure.
-
-## Examples
-### Positive
-A single function or module simultaneously owns unrelated effects such as storage, network, process control, UI, Git, and policy decisions.
-
-### Near miss
-Looks related to god-module but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+Different external worlds have different failure laws. Isolate each effect behind its own boundary and keep policy from becoming the place where those laws are entangled.

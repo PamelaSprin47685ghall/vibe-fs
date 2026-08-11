@@ -1,36 +1,19 @@
 # leftover-scaffolding — Main
 
 ## What To Do Now
-Temporary scaffolding remains in the delivery. Remove it or promote it into a maintained tool with a clear owner.
+Delete temporary artifacts whose transition is complete. If one now serves an enduring workflow, explicitly promote it into a maintained tool.
+
+## Why This Matters
+Scaffolding becomes dangerous by aging: future readers cannot distinguish “still required” from “forgotten,” so they preserve it defensively. The longer it survives, the more apparent authority it acquires without ever earning a stable contract.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Review flags, scripts, fixtures, probes, temporary files, and migration helpers introduced by the work. Remove those with no ongoing consumer. For promoted artifacts, give them a clear name, normal test path, and owner.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not move temporary files into a `tools` or `legacy` directory merely to tidy the tree. A new folder does not create a permanent purpose.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Search for references and documented workflows before removal; afterward, standard tests/builds should pass without relying on the transitional artifact.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Temporary files, experimental branches, probes, fixtures, flags, scripts, or migration scaffolding remain in the delivered result without a permanent role.
+Every delivered artifact either participates in a maintained workflow or is gone; nothing survives solely because nobody was certain it was safe to delete.

@@ -1,22 +1,19 @@
 # unbounded-fanout — Main
 
 ## What To Do Now
-Introduce a concurrency limit (pool, semaphore, bounded map). Define cancel/backpressure when the bound is hit. Prefer streaming over loading all work into flight.
+Introduce a bounded map, worker pool, semaphore, or queue that caps active work independently of input size and propagates cancellation through the whole fan-out.
+
+## Why This Matters
+Parallel work competes for finite resources. If every input can become active immediately, a perfectly valid large input can turn into resource exhaustion, provider overload, or self-inflicted denial of service. A bound makes capacity a deliberate invariant rather than an emergent property of workload size.
 
 ## Repair Strategy
-Count worst-case spawn. Add a bound derived from resources. Propagate cancellation to children. Test overload behavior.
-
-## Decision Branches
-If work is hierarchical, bound each level. If external APIs rate-limit, align the bound with quotas.
+Choose the resource being protected, set the active bound from its capacity/SLO, preserve deterministic result association, and stop or drain queued work according to explicit cancellation/failure policy.
 
 ## Wrong Fixes
-Promise.all over unbounded user input. Spawning one agent per file in a huge tree. Relying on the OS to thrash as backpressure.
+Do not choose an enormous constant merely to silence the rule. The number should correspond to a finite resource or known safe service envelope.
 
 ## Verification
-Load tests show concurrency ≤ bound; cancel stops in-flight children; no runaway process growth.
+Exercise inputs much larger than the concurrency bound. Active work must remain capped, queued work must not leak after cancellation, and logical results must not depend on completion order.
 
 ## Done When
-All fan-out paths have an explicit finite bound and cancellation policy.
-
-## Scope and Authority
-Concurrent spawn sites in runtime and agent orchestration.
+The system can accept arbitrarily larger workloads without translating their cardinality directly into arbitrarily larger simultaneous resource demand.

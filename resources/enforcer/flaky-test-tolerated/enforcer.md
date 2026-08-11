@@ -1,32 +1,22 @@
 # flaky-test-tolerated — Enforcer
 
 ## Definition
-A nondeterministic test is accepted, quarantined indefinitely, or treated as harmless.
+A flaky test is tolerated when nondeterministic red/green results are accepted as normal rather than treated as a defect in the test or system boundary.
+
+## Governing Principle
+A test is a measuring instrument. If identical relevant inputs can produce different verdicts, the instrument cannot distinguish product change from measurement noise. Once flakes are normalized, every red result acquires plausible deniability and every green result loses evidentiary weight. The damage is systemic: one unreliable test teaches the team not to trust the suite.
 
 ## Trigger When
-A nondeterministic test is accepted, quarantined indefinitely, or treated as harmless.
+Trigger when a nondeterministic test is routinely rerun, quarantined without a removal plan, ignored, or described as harmless despite changing verdict under equivalent conditions.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger for a genuinely stochastic property test whose randomness is controlled/reproducible and whose pass criterion is deterministic for the recorded seed.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+repeat-until-pass uses reruns as verification. time-dependent-test and order-dependent-test name common causes. This rule is the policy failure of accepting nondeterminism itself.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Reproduce with recorded inputs and isolate all hidden sources: time, randomness, shared state, ordering, races, external services. A test is not repaired until one run has one meaning.
 
 ## Nudge
-A flaky test is being tolerated. Find and remove the nondeterminism before relying on the suite.
-
-## Examples
-### Positive
-A nondeterministic test is accepted, quarantined indefinitely, or treated as harmless.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-A flaky test is being tolerated. Find and remove the nondeterminism before relying on the suite.
+A flaky test is a broken instrument. Remove the nondeterminism or remove the test; never teach the suite that red may mean nothing.

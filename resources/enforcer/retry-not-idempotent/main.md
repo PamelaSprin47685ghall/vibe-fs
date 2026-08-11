@@ -1,22 +1,19 @@
 # retry-not-idempotent — Main
 
 ## What To Do Now
-Give the effect a stable idempotency key or natural identity. Make handlers safe under at-least-once delivery. Prove double execution does not double-apply.
+Give the logical operation a stable identity that survives physical retries, or make the operation explicitly non-retryable when repeated effects cannot be collapsed safely.
+
+## Why This Matters
+A retry is not a second business intention; it is a second transport attempt to realize the first intention. If the receiver cannot recognize that equivalence, network uncertainty leaks into the domain as duplicated facts. The defect therefore is not “too many retries” but absence of an identity relation between attempts.
 
 ## Repair Strategy
-Introduce dedupe keys, upsert semantics, or outbox with unique constraints. Separate "accept command" from "apply effect" when needed.
-
-## Decision Branches
-If the effect cannot be made idempotent, remove automatic retry and require explicit operator replay with safeguards. If only parts are safe, retry only the safe segment.
+Allocate the idempotency key before the first effect, persist or propagate it through every retry, and make the receiver deduplicate or return the original outcome for that key. For operations whose provider cannot support such semantics, refuse automatic retry after uncertain execution.
 
 ## Wrong Fixes
-Blind HTTP retries on POST that creates records. Re-sending prompts that charge tokens without dedupe. Catch-and-retry around multi-step side effects.
+Do not rely on short retry windows, low probability, or duplicate detection after the side effect has already escaped. Probability does not restore semantic identity.
 
 ## Verification
-Execute the path twice with the same identity; observable side effects remain single-applied.
+Execute the same logical request multiple times under the same key, including after acknowledgement loss. Exactly one logical effect should remain observable.
 
 ## Done When
-Retry policy only wraps idempotent effects, or identity-based dedupe is proven.
-
-## Scope and Authority
-Effects under retry/at-least-once delivery. Not pure CPU recomputation.
+Transport may repeat attempts arbitrarily within policy, yet the business history contains one operation because physical repetition and logical identity are no longer confused.

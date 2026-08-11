@@ -1,36 +1,19 @@
 # legacy-cruft-retained — Main
 
 ## What To Do Now
-Obsolete compatibility code is being retained. Complete the clean break and remove the old surface.
+Delete the obsolete surface the clean-break decision already retired: aliases, adapters, old names, compatibility branches, and legacy formats.
+
+## Why This Matters
+A migration that keeps its predecessor alive has not reduced complexity; it has merely renamed one side “legacy.” Every surviving branch remains a supported possibility until code makes it impossible, so tests, docs, and future refactors must keep asking whether the old world still matters.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Use the clean-break decision as authority, migrate any remaining repository-owned callers, and remove the old representation completely. Record only explicit external exceptions with a retirement condition.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not keep a hidden alias “for safety,” a deprecated parser “just in case,” or commented guidance for the old path. Those reintroduce ambiguity the clean break was meant to eliminate.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Search for old names and formats, exercise the canonical path, and ensure architecture/tests contain no fallback that silently accepts the retired surface.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Obsolete code, aliases, compatibility branches, or old names are kept despite an explicit clean-break policy.
+The codebase supports the post-break world only, and version control—not production code—carries the memory of what came before.

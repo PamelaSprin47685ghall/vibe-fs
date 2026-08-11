@@ -1,32 +1,22 @@
 # lost-update — Enforcer
 
 ## Definition
-Concurrent writers perform read-modify-write without version checking, compare-and-swap, serialization, or another conflict protocol.
+A lost update occurs when concurrent writers derive new state from the same old version and later writes can overwrite earlier committed changes without detecting the conflict.
+
+## Governing Principle
+Read-modify-write contains an unstated premise: “the state I read is still the state I am modifying.” Concurrency invalidates that premise unless a protocol proves it. Locks, compare-and-swap, versions, or a single writer are not implementation decorations; they are mechanisms for preserving the causal link between the premise and the commit.
 
 ## Trigger When
-Concurrent writers perform read-modify-write without version checking, compare-and-swap, serialization, or another conflict protocol.
+Trigger when multiple writers can read the same mutable record/state, compute independent updates, and write back without version checking, serialization, or a merge law.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger when ownership guarantees one writer, or the storage operation is an atomic commutative update whose semantics do not depend on a stale read.
 
 ## Distinguish From
-in-place-mutation, optimistic-retry-assumption, permit-leak
+shared-mutable-concurrency concerns coordination architecture broadly. optimistic-retry-assumption concerns unknown external effects. This rule is specifically stale-read overwrite of another writer’s accepted update.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+For each read-modify-write ask what proves the read version is still current at commit time. If nothing does, either serialize ownership or include the version in an atomic compare-and-swap.
 
 ## Nudge
-Concurrent updates can overwrite each other. Add a versioned compare-and-swap or a single writer.
-
-## Examples
-### Positive
-Concurrent writers perform read-modify-write without version checking, compare-and-swap, serialization, or another conflict protocol.
-
-### Near miss
-Looks related to in-place-mutation but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+A write derived from version N is valid only against version N. Enforce that fact with a single writer, CAS/version check, or a true merge operation.

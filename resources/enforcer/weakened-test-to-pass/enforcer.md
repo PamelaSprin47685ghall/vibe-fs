@@ -1,32 +1,22 @@
 # weakened-test-to-pass — Enforcer
 
 ## Definition
-Assertions, cases, fixtures, or expected outcomes are removed or weakened primarily to make a failing test pass.
+A test is weakened to pass when assertions, cases, fixtures, or expected outcomes are removed or relaxed primarily because the implementation fails them, without an independently justified change to the contract.
+
+## Governing Principle
+A failing test is evidence of disagreement between implementation and specification. There are only two legitimate resolutions: the implementation is wrong, or the specification has intentionally changed. Weakening the test merely because red is inconvenient erases the witness instead of settling the disagreement. It converts verification from an adversary of defects into a servant of the current implementation.
 
 ## Trigger When
-Assertions, cases, fixtures, or expected outcomes are removed or weakened primarily to make a failing test pass.
+Trigger when meaningful expectations are loosened, edge cases deleted, assertions generalized, or fixtures simplified chiefly to make an otherwise failing implementation green.
 
 ## Do Not Trigger When
-Do not fire when tests are correctly updated because the specified contract intentionally changed and old expectations are obsolete.
+Do not trigger when an explicit product/contract decision changed the required behavior and the old expectation is demonstrably obsolete.
 
 ## Distinguish From
-test-implementation-coupled asserts internals; coverage-theater pads metrics; this tip dilutes expectations to hide defects.
+test-implementation-coupled removes assertions that should never have been contractual. coverage-theater lacks strong assertions to begin with. This rule abandons a valid behavioral claim under pressure from a failure.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Before changing the test, state which contract changed and where that decision is authorized. If no independent contract change exists, preserve the expectation and repair the implementation.
 
 ## Nudge
-The test was weakened instead of fixing the defect. Restore the behavioral expectation and repair the implementation.
-
-## Examples
-### Positive
-Assertions, cases, fixtures, or expected outcomes are removed or weakened primarily to make a failing test pass.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when tests are correctly updated because the specified contract intentionally changed and old expectations are obsolete.
+Do not resolve disagreement by silencing the witness. Change a test only because the contract changed—not because the implementation would prefer a weaker question.

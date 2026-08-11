@@ -1,32 +1,25 @@
 # blob-after-event — Enforcer
 
 ## Definition
-A journal event referencing large content is appended before the referenced blob is durably written.
+A reference event is invalidly ordered when it becomes durable before the content it names is itself durably retrievable.
+
+## Governing Principle
+A durable event is a promise to every future replay: “this fact existed.” If the event points to a blob that can still disappear, the log has recorded a world that never became reconstructible. Referential integrity is therefore temporal, not merely structural: the referent must become durable before the reference may become history.
 
 ## Trigger When
-A journal event referencing large content is appended before the referenced blob is durably written.
+Trigger when a journal, event store, manifest, or index appends a durable reference to large content before the blob write has completed and been verified according to the storage contract.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger when the blob and reference are committed atomically by one storage transaction, or the reference deliberately denotes a content address already guaranteed durable.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+memory-before-disk orders volatile state against durable facts. partial-write-assumption invents storage states. This rule concerns durable references whose targets may not yet exist durably.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+1. Identify the durable reference.
+2. Identify the storage guarantee for its target.
+3. Ask whether replay can observe the reference before the target is guaranteed readable.
+4. If yes, reverse the order or make the commit atomic.
 
 ## Nudge
-A durable event can point to missing content. Write and verify the blob before appending the reference.
-
-## Examples
-### Positive
-A journal event referencing large content is appended before the referenced blob is durably written.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-A durable event can point to missing content. Write and verify the blob before appending the reference.
+Durability must flow from referent to reference. Persist and verify the blob first; only then append the event that makes its existence part of history.

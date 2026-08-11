@@ -1,32 +1,22 @@
 # framework-tax — Enforcer
 
 ## Definition
-Configuration, lifecycle hooks, dependency injection ceremony, generated layers, or framework conventions exceed the essential complexity of the problem.
+Framework tax is the accidental complexity paid when lifecycle, configuration, registration, indirection, and generated structure occupy more of the design than the domain operation they are meant to support.
+
+## Governing Principle
+A framework is justified when it compresses recurring complexity the application truly has. When the problem is smaller than the framework’s ceremony, the abstraction expands rather than compresses: readers must learn container lifecycles, hook order, annotations, configuration dialects, and extension rules before they can see a simple operation. The tool has become the problem’s dominant ontology.
 
 ## Trigger When
-Configuration, lifecycle hooks, dependency injection ceremony, generated layers, or framework conventions exceed the essential complexity of the problem.
+Trigger when configuration, DI wiring, lifecycle hooks, generated layers, or framework conventions materially exceed the essential domain logic and are not buying corresponding capability.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger when the framework genuinely centralizes difficult cross-cutting behavior whose local reimplementation would create more complexity or risk.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+dependency-bloat is the decision to import excessive machinery. incidental-complexity-dominates is the broad symptom. This rule focuses on framework ceremony specifically.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Describe the domain operation without framework nouns. Then count the additional concepts required only to make the framework perform that operation. If those concepts dominate, expose the operation more directly.
 
 ## Nudge
-Framework ceremony is larger than the problem. Remove the framework tax and expose the underlying operation directly.
-
-## Examples
-### Positive
-Configuration, lifecycle hooks, dependency injection ceremony, generated layers, or framework conventions exceed the essential complexity of the problem.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-Framework ceremony is larger than the problem. Remove the framework tax and expose the underlying operation directly.
+An abstraction should make the problem smaller. If framework ritual is larger than the domain operation, remove the ritual until the problem is visible again.

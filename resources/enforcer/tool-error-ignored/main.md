@@ -1,22 +1,19 @@
 # tool-error-ignored — Main
 
 ## What To Do Now
-Stop. Read the error. Fix the cause or document why it is irrelevant with compensating verification. Do not continue as if it succeeded.
+Resolve the failed tool operation or replace the missing evidence with an explicit alternative before continuing any conclusion that depended on it.
+
+## Why This Matters
+A tool failure is not merely an inconvenience; it changes what is known. Ignoring it causes later steps to inherit a premise that was never established, so a polished final result can rest on a silent hole in the evidence chain.
 
 ## Repair Strategy
-Re-run the failing tool. Address root cause. If the tool is wrong, fix the invocation. If the check is obsolete, remove or update it—do not ignore output.
-
-## Decision Branches
-If multiple errors cascade, fix the first root error and re-run. If flaky infrastructure, bound retries then fail—do not ignore.
+Classify the failure, inspect its cause, rerun only when retry semantics are sound, or use an independent source that proves the same property. Record non-blocking rationale when the failed operation was genuinely irrelevant.
 
 ## Wrong Fixes
-Scrolling past red output. `|| true` on critical checks. Claiming success because a later command looked fine.
+Do not hide stderr, append `|| true`, or quote later success as proof that the earlier failed check did not matter unless that success actually covers the same property.
 
 ## Verification
-The previously failing command is green, or a written exception with alternate proof exists.
+Every observed error should end in one of two states: resolved, or explicitly superseded by equivalent evidence with a stated reason.
 
 ## Done When
-No unresolved tool errors remain on the critical path without explicit accounting.
-
-## Scope and Authority
-Agent and developer workflows consuming tool output.
+No conclusion depends on the imagined success of a tool that actually reported failure.

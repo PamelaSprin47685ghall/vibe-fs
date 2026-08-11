@@ -1,35 +1,19 @@
 # boolean-blindness — Main
 
 ## What To Do Now
-Boolean flags are hiding distinct domain meanings. Replace them with named cases or explicit types.
+Replace boolean parameters and flag clusters that stand for named domain choices with explicit cases or distinct types.
+
+## Why This Matters
+A call such as `open(true, false)` is information-poor even when the implementation is correct. The meaning lives outside the expression, in memory or comments. Worse, flag combinations create states that may have no counterpart in reality. Every downstream branch then pays to rediscover the distinction the type erased.
 
 ## Repair Strategy
-1. Confirm the tip applies at the real boundary, not a symptom downstream.
-2. Restore the missing name, ownership, test, or control so the ScoreWhen condition no longer holds.
-3. Prefer one canonical fix over a local workaround that leaves the invariant broken.
-
-## Decision Branches
-- If the root cause is a missing domain type or named case: introduce the type at the boundary and migrate callers.
-- If the root cause is a collapsed or bypassed boundary: restore the interface and stop sharing internals.
-- If the root cause is missing proof: add a durable assertion, contract test, or canary that would fail under a realistic defect.
-- If the change is destructive or speculative: stop, establish authority and the true owner first.
+Enumerate the legitimate alternatives first. Model exactly those alternatives, attach state-specific data to the cases that need it, and make callers construct the domain choice by name. Let exhaustive matching expose future additions.
 
 ## Wrong Fixes
-- Papering over the symptom with another flag, catch-all, facade, or compatibility shim.
-- Leaving dual paths, commented-out code, or ephemeral probes as the only record of the fix.
-- Testing private helpers instead of the supported entry point when the contract is public.
+Do not merely rename `flag` to `isSpecial`. Do not keep old boolean overloads “for convenience.” A named boolean still has only two anonymous values and compatibility overloads preserve the ambiguity.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition is gone.
-- Exercise the success path and the relevant failure, cancellation, or near-miss path.
-- Ensure no duplicate source of truth, silent catch-all, or unowned helper remains.
+Search call sites for unexplained boolean literals and tests for impossible combinations. The new type should make invalid combinations fail to compile or construct.
 
 ## Done When
-- The nudge is applied at the owning boundary.
-- Callers and proofs use the canonical representation.
-- A reviewer can see why the tip no longer fires without relying on tribal knowledge.
-
-## Scope and Authority
-- Touch only the owning module, contract, and directly affected callers.
-- Do not expand into unrelated cleanup, renames, or framework churn.
-- Destructive actions require explicit authority and a verified target.
+The valid state space is visible in the type, call sites read in domain language, and no comment is needed to explain what `true` means.

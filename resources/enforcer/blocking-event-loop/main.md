@@ -1,35 +1,19 @@
 # blocking-event-loop — Main
 
 ## What To Do Now
-Blocking work is running on the event loop. Move it behind an asynchronous boundary or worker.
+Remove blocking waits and long-running computation from the event-loop thread. Use native asynchronous APIs for waiting and a bounded worker mechanism for CPU or unavoidable blocking work.
+
+## Why This Matters
+The loop is a shared liveness resource. Latency introduced there is multiplied by every unrelated operation queued behind it. A five-second synchronous wait is therefore not one five-second delay; it is five seconds during which the system has surrendered its ability to make independent progress.
 
 ## Repair Strategy
-1. Confirm the tip applies at the real boundary, not a symptom downstream.
-2. Restore the missing name, ownership, test, or control so the ScoreWhen condition no longer holds.
-3. Prefer one canonical fix over a local workaround that leaves the invariant broken.
-
-## Decision Branches
-- If the root cause is a missing domain type or named case: introduce the type at the boundary and migrate callers.
-- If the root cause is a collapsed or bypassed boundary: restore the interface and stop sharing internals.
-- If the root cause is missing proof: add a durable assertion, contract test, or canary that would fail under a realistic defect.
-- If the change is destructive or speculative: stop, establish authority and the true owner first.
+Separate parsing, pure computation, and dispatch from slow effects. Keep each turn small. Preserve cancellation and error semantics across the new boundary instead of merely wrapping a blocking call in an async-looking function.
 
 ## Wrong Fixes
-- Papering over the symptom with another flag, catch-all, facade, or compatibility shim.
-- Leaving dual paths, commented-out code, or ephemeral probes as the only record of the fix.
-- Testing private helpers instead of the supported entry point when the contract is public.
+Do not increase timeouts, add sleeps, or call blocking work from an async wrapper on the same executor. Syntax does not create concurrency; ownership of the waiting thread does.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition is gone.
-- Exercise the success path and the relevant failure, cancellation, or near-miss path.
-- Ensure no duplicate source of truth, silent catch-all, or unowned helper remains.
+Exercise the slow path while unrelated work is active. The loop must remain responsive and cancellation must still reach the displaced work.
 
 ## Done When
-- The nudge is applied at the owning boundary.
-- Callers and proofs use the canonical representation.
-- A reviewer can see why the tip no longer fires without relying on tribal knowledge.
-
-## Scope and Authority
-- Touch only the owning module, contract, and directly affected callers.
-- Do not expand into unrelated cleanup, renames, or framework churn.
-- Destructive actions require explicit authority and a verified target.
+No unbounded wait or heavy computation can monopolize the shared event-loop executor, and unrelated tasks continue to make progress while slow work is pending.

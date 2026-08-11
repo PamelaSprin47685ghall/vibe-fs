@@ -1,36 +1,19 @@
 # ignored-tdd — Main
 
 ## What To Do Now
-TDD order was skipped. Add a failing behavioral test before changing the implementation.
+Write the behavioral test first, run it red for the intended reason, then make the smallest production change that turns that same test green.
+
+## Why This Matters
+A post-hoc test can be perfectly aligned with an accidental implementation because the implementation has already shaped what the author thinks to assert. Red-first creates a counterfactual baseline: this requirement is demonstrably not met before the code changes.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Express the requirement at the public behavioral boundary, avoid assertions on private structure, and keep the first failure as evidence that the test detects the missing behavior rather than a fixture mistake.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not write a test after implementation and assume it would have failed before. Do not weaken the test when the implementation resists it; revisit the contract or the code instead.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+The test must be able to distinguish old behavior from new behavior and remain meaningful after internal refactoring.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Production behavior is implemented or changed before a failing behavioral test demonstrates the required outcome.
+Requirement, failure, implementation, and proof form a causal sequence: red identifies the gap, green closes it, and refactoring preserves the behavior.

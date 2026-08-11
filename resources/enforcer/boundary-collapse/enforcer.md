@@ -1,32 +1,22 @@
 # boundary-collapse — Enforcer
 
 ## Definition
-Modules with different invariants or lifecycles directly share internals, mutate each other’s state, or bypass explicit translation at the boundary.
+A boundary has collapsed when two contexts that own different invariants can directly reach into one another’s representation, state, or lifecycle.
+
+## Governing Principle
+A boundary exists to make one side ignorant of facts it has no right to depend on. Once internals cross freely, each context acquires accidental knowledge of the other’s timing, storage, and representation. The system may still be split into files, but its change graph has become one object: any local revision can invalidate remote assumptions no interface records.
 
 ## Trigger When
-Modules with different invariants or lifecycles directly share internals, mutate each other’s state, or bypass explicit translation at the boundary.
+Trigger when modules directly mutate each other’s state, import internal types, share a mutable model across contexts, or bypass an explicit translation/contract that should mediate the crossing.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger when the shared surface is itself the declared contract and both sides depend only on stable facts intentionally exported there.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+cross-layer-internal-import is a specific dependency violation. context-model-leak reuses one model across meanings. This rule is the broader loss of sovereignty between contexts.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Name each context’s invariant and lifecycle. Then list exactly which facts must cross. If either side can observe or change more than that list, restore the border.
 
 ## Nudge
-A context boundary has collapsed. Restore a clear interface and pass only the facts that genuinely cross it.
-
-## Examples
-### Positive
-Modules with different invariants or lifecycles directly share internals, mutate each other’s state, or bypass explicit translation at the boundary.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-A context boundary has collapsed. Restore a clear interface and pass only the facts that genuinely cross it.
+A boundary is not a folder line; it is a limit on knowledge. Export only the facts another context is entitled to know, and translate them explicitly at the crossing.

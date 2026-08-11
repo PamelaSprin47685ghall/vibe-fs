@@ -1,32 +1,22 @@
 # comment-theater — Enforcer
 
 ## Definition
-Comments narrate obvious syntax, apologize for complexity, or describe intent that should be expressed through names and structure.
+Comment theater appears when prose repeats syntax, apologizes for design, or carries intent that the executable structure itself ought to make evident.
+
+## Governing Principle
+Comments and code age under different authorities: the compiler constrains one and ignores the other. Therefore every fact expressible in types, names, control structure, or tests is safer there than in prose. A comment earns its existence only when it records knowledge the program cannot naturally encode—why a constraint exists, which external fact forces it, or what tempting alternative is deliberately forbidden.
 
 ## Trigger When
-Comments narrate obvious syntax, apologize for complexity, or describe intent that should be expressed through names and structure.
+Trigger when comments narrate the next line, translate poor names, explain tangled control flow, or say “this is ugly but” instead of repairing the representation.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger for durable rationale, protocol quirks, mathematical derivations, safety constraints, or external facts that cannot be inferred from the code alone.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+stale-documentation concerns authoritative docs disagreeing with behavior. status-announcement-noise concerns progress chatter. This rule concerns comments being used as a substitute for legible structure.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Delete the comment mentally. If the code becomes unclear, first ask whether naming, types, or decomposition can make the same fact mechanically visible. Keep prose only when the answer is no.
 
 ## Nudge
-Comments are compensating for unclear code. Improve the structure and keep comments only for durable non-obvious constraints.
-
-## Examples
-### Positive
-Comments narrate obvious syntax, apologize for complexity, or describe intent that should be expressed through names and structure.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-Comments are compensating for unclear code. Improve the structure and keep comments only for durable non-obvious constraints.
+Do not narrate code that can speak for itself. Move intent into structure; reserve comments for durable knowledge the compiler cannot carry.

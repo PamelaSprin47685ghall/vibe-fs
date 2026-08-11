@@ -1,35 +1,19 @@
 # clone-and-mutate-derived — Main
 
 ## What To Do Now
-A derived value is being made through clone-and-mutate. Construct the intended immutable value directly.
+Replace clone-then-patch construction with an explicit immutable constructor or record copy whose preserved fields are intentionally part of the same value semantics.
+
+## Why This Matters
+Clone-and-mutate makes future fields opt in to propagation automatically. A field added next month can flow into derived values nobody reviewed, because omission means inheritance. That is the opposite of a stable constructor, where new information must be deliberately supplied or deliberately defaulted.
 
 ## Repair Strategy
-1. Confirm the tip applies at the real boundary, not a symptom downstream.
-2. Restore the missing name, ownership, test, or control so the ScoreWhen condition no longer holds.
-3. Prefer one canonical fix over a local workaround that leaves the invariant broken.
-
-## Decision Branches
-- If the root cause is a missing domain type or named case: introduce the type at the boundary and migrate callers.
-- If the root cause is a collapsed or bypassed boundary: restore the interface and stop sharing internals.
-- If the root cause is missing proof: add a durable assertion, contract test, or canary that would fail under a realistic defect.
-- If the change is destructive or speculative: stop, establish authority and the true owner first.
+Name the semantic relationship between source and derived value. Pass only the source facts that relationship preserves, and require all other fields explicitly. Keep mutation local only as an implementation detail that cannot escape construction.
 
 ## Wrong Fixes
-- Papering over the symptom with another flag, catch-all, facade, or compatibility shim.
-- Leaving dual paths, commented-out code, or ephemeral probes as the only record of the fix.
-- Testing private helpers instead of the supported entry point when the contract is public.
+Do not deep-clone more carefully. Do not add comments listing fields that “should stay the same.” The defect is that structure, rather than domain meaning, decides what is inherited.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition is gone.
-- Exercise the success path and the relevant failure, cancellation, or near-miss path.
-- Ensure no duplicate source of truth, silent catch-all, or unowned helper remains.
+Add or imagine a new field on the source type. The derivation should force an explicit decision about that field rather than copying it silently.
 
 ## Done When
-- The nudge is applied at the owning boundary.
-- Callers and proofs use the canonical representation.
-- A reviewer can see why the tip no longer fires without relying on tribal knowledge.
-
-## Scope and Authority
-- Touch only the owning module, contract, and directly affected callers.
-- Do not expand into unrelated cleanup, renames, or framework churn.
-- Destructive actions require explicit authority and a verified target.
+The derived value’s contents can be explained from its constructor and domain relation alone, without knowing which fields happened to exist on a mutable prototype.

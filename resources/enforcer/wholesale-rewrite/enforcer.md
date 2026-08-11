@@ -1,32 +1,22 @@
 # wholesale-rewrite — Enforcer
 
 ## Definition
-A broad rewrite, generated replacement, or large delete-and-recreate is chosen instead of a precise change that preserves known-good structure.
+A wholesale rewrite replaces a broad region of known-working structure when the required change can be established through a smaller transformation that preserves verified behavior and local knowledge.
+
+## Governing Principle
+Existing code contains more information than its visible design: bug fixes, operational constraints, edge cases, and compatibility facts accumulated through history. A rewrite discards that information wholesale and asks tests to rediscover every relevant constraint at once. Precision is therefore an epistemic strategy: preserve what is already proven and invalidate only the smallest assumptions the new requirement makes false.
 
 ## Trigger When
-A broad rewrite, generated replacement, or large delete-and-recreate operation is chosen instead of a precise change preserving known-good structure.
+Trigger when large delete-and-recreate, generated replacement, or broad rearchitecture is chosen for a task whose acceptance criteria affect a materially smaller surface.
 
 ## Do Not Trigger When
-Do not fire when the task is an authorized greenfield replacement with explicit scope, or when the existing structure is irredeemably wrong and a rewrite is the decided path.
+Do not trigger for an explicitly authorized greenfield replacement, or when a documented architecture decision establishes that the old structure itself is the defect and incremental preservation would perpetuate it.
 
 ## Distinguish From
-scope-creep expands intent; half-finished-refactor leaves migration incomplete; this tip prefers blast-radius rewrites over precise repair.
+scope-creep expands the intent of a change. half-finished-refactor fails to complete a necessary migration. This rule concerns choosing unnecessary blast radius as the implementation strategy.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Identify the smallest set of existing invariants the new requirement invalidates. Preserve everything else mechanically and change only the ownership/representation that must become different.
 
 ## Nudge
-A wholesale rewrite is replacing a targeted repair. Make the smallest structurally correct change.
-
-## Examples
-### Positive
-A broad rewrite, generated replacement, or large delete-and-recreate operation is chosen instead of a precise change preserving known-good structure.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when the task is an authorized greenfield replacement with explicit scope, or when the existing structure is irredeemably wrong and a rewrite is the decided path.
+Known-good structure is evidence, not clutter. Rewrite only when the structure itself is what must change; otherwise preserve proofs and make the smallest transformation that establishes the new contract.

@@ -1,32 +1,22 @@
 # property-test-missing — Enforcer
 
 ## Definition
-A general invariant over a parser, serializer, fold, transition, merge, normalization, or algebraic operation is covered only by a few hand-picked examples.
+A property test is missing when code implements a general law over a large input space but verification consists only of a few hand-picked examples.
+
+## Governing Principle
+Examples prove points; laws describe spaces. For parsers, serializers, normalization, folds, merges, and state machines, correctness often has algebraic form: round trips preserve values, normalization is idempotent, merges are associative/commutative under stated conditions, transitions preserve invariants. Testing only examples leaves most of the law’s quantifier unchecked.
 
 ## Trigger When
-A parser, serializer, fold, state transition, merge, normalization, round trip, or algebraic operation is tested only with a few examples despite clear general invariants.
+Trigger when a stable general invariant exists over many generated inputs and current tests exercise only a small curated sample.
 
 ## Do Not Trigger When
-Do not fire when the operation is a one-off glue path with no stable algebraic invariant, or when property tests already cover the invariant space.
+Do not trigger for one-off glue with no meaningful general law, or when exhaustive finite enumeration already covers the full relevant input space.
 
 ## Distinguish From
-weakened-test-to-pass removes assertions to go green; failure-path-untested omits negative cases; this tip is about missing generative coverage of a known general law.
+coverage-theater lacks meaningful assertions. failure-path-untested misses negative cases. This rule concerns a known universal property whose quantifier deserves generative evidence.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+State the invariant with “for all valid x…” or a relation among generated values. If meaningful, encode generators and shrinkable property checks around that law.
 
 ## Nudge
-A general invariant is covered only by examples. Add property-based tests for the full input space.
-
-## Examples
-### Positive
-A parser, serializer, fold, state transition, merge, normalization, round trip, or algebraic operation is tested only with a few examples despite clear general invariants.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when the operation is a one-off glue path with no stable algebraic invariant, or when property tests already cover the invariant space.
+When correctness is a law, test the law—not a handful of anecdotes. Generate the input space and let counterexamples discover cases humans did not imagine.

@@ -1,22 +1,19 @@
 # serial-when-parallel — Main
 
 ## What To Do Now
-Identify independent units, run them concurrently with a bound, and merge results in a deterministic order for downstream logic.
+Run independent operations concurrently under a clear finite bound and preserve ordering only where the data or external protocol requires it.
+
+## Why This Matters
+Artificial serialization lengthens the critical path while communicating a dependency that does not exist. Correct concurrency is architectural compression: it makes elapsed time reflect the longest true dependency chain rather than the sum of unrelated waits.
 
 ## Repair Strategy
-Draw the dependency graph. Parallelize disconnected nodes. Add a semaphore or bounded map. Define how partial failures combine.
-
-## Decision Branches
-If side effects conflict, serialize only the conflicting section. If result order matters for UX, parallelize execution but present deterministically.
+Partition work by dependency, choose a capacity bound from the resource being protected, propagate cancellation, and gather outcomes deterministically so concurrency does not leak scheduler order into semantics.
 
 ## Wrong Fixes
-Awaiting each independent promise in sequence. Spawning unbounded tasks as the "fix". Relying on race order for merge (see race-first-wins-semantics).
+Do not replace serialization with unbounded `all`/spawn behavior. Independence justifies overlap, not unlimited resource demand.
 
 ## Verification
-Independent units overlap in time under a bound; outputs remain deterministic across runs.
+Reordering completion of independent operations must not change the logical result, and active concurrency must never exceed the chosen bound.
 
 ## Done When
-Independent work runs concurrently within bounds; serial sections are justified by real dependencies.
-
-## Scope and Authority
-Runtime and agent tool orchestration for independent units of work.
+The schedule expresses two facts honestly: dependent work waits, independent work overlaps, and finite resources remain explicitly bounded.

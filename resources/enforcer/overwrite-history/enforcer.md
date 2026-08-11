@@ -1,32 +1,22 @@
 # overwrite-history — Enforcer
 
 ## Definition
-Previously committed facts are edited or deleted to represent correction instead of appending a compensating or superseding fact.
+History is overwritten when previously committed facts are edited or deleted to represent correction instead of preserving the original fact and appending the correcting fact.
+
+## Governing Principle
+A fact may later become superseded without ceasing to have happened. Historical systems derive trust from that distinction. Rewriting old records destroys evidence of both the original belief and the later correction, collapsing two events into one timeless value. Audit, replay, causality, and learning all lose the transition that actually occurred.
 
 ## Trigger When
-Previously committed facts are edited or deleted to represent correction instead of appending a compensating or superseding fact.
+Trigger when durable events, journal entries, audit facts, or historical records are mutated/deleted so the past appears as though the corrected state had always been true.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger for mutable projections/caches explicitly derived from immutable history and rebuildable from it.
 
 ## Distinguish From
-memory-before-disk, in-place-mutation, log-as-recovery-protocol
+in-place-mutation changes current shared state. snapshot-as-truth elevates a projection. This rule concerns destruction of committed historical evidence.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Ask whether the record answers “what did we know/do then?” If yes, correction belongs in a new compensating/superseding fact, not an edit to the old one.
 
 ## Nudge
-History is being rewritten. Preserve the original fact and append an explicit correction or replacement.
-
-## Examples
-### Positive
-Previously committed facts are edited or deleted to represent correction instead of appending a compensating or superseding fact.
-
-### Near miss
-Looks related to memory-before-disk but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+Correction is itself history. Preserve the original fact and append the fact that changes its current interpretation; do not erase the path the system actually took.

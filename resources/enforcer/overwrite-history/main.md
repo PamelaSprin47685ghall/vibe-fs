@@ -1,36 +1,19 @@
 # overwrite-history — Main
 
 ## What To Do Now
-History is being rewritten. Preserve the original fact and append an explicit correction or replacement.
+Stop editing committed historical facts. Append a correction, compensation, revocation, or superseding event that preserves both what happened and how understanding changed.
+
+## Why This Matters
+An overwrite gives the present power to forge the past. Even when the new value is “more correct,” the system loses when and why the correction occurred, which decisions were made under the earlier fact, and whether replay would reproduce the same historical trajectory.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Keep the event/journal append-only. Derive current views by folding original facts plus corrections. If privacy or legal deletion requirements exist, handle them through an explicitly designed redaction/cryptographic policy rather than casual mutation.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not copy the latest truth back into old records to simplify reads. Read convenience is not worth destroying causal evidence.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Replay history before and after the correction point. Earlier states must remain historically faithful; later current views must reflect the compensating fact.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Previously committed facts are edited or deleted to represent correction instead of appending a compensating or superseding fact.
+The system can answer both “what was recorded then?” and “what is believed now?” without forcing one question to erase the other.

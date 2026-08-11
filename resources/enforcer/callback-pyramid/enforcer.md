@@ -1,32 +1,22 @@
 # callback-pyramid — Enforcer
 
 ## Definition
-Nested callbacks or promise chains obscure resource scope, cancellation, error propagation, or the linear story of the operation.
+A callback pyramid exists when the lexical nesting of continuations becomes the primary representation of sequencing, so resource lifetime and failure propagation are encoded by indentation rather than structure.
+
+## Governing Principle
+Control flow should preserve the operation’s causal order in a form a reader can scan linearly. Deep callback nesting fractures that order into suspended fragments. Every new branch inherits hidden questions—who owns cancellation, which scope releases the resource, where an exception travels, whether later work still runs. The problem is not aesthetic depth; it is loss of a single visible lifetime.
 
 ## Trigger When
-Nested callbacks or promise chains obscure resource scope, cancellation, error propagation, or the linear story of the operation.
+Trigger when nested callbacks or promise continuations make it difficult to state the operation’s sequence, cleanup, cancellation, or failure path without mentally simulating multiple closures.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger for shallow callback composition whose lifetime is obvious and whose API is inherently callback-based at the adapter edge.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+implicit-control-flow hides ordering in frameworks or registration. resource-not-scoped concerns missing lifetime ownership. This rule is lexical continuation nesting that obscures both.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Write the intended operation as a linear causal sequence. If the code cannot be mapped to that sequence without jumping among nested closures, flatten it with structured async control.
 
 ## Nudge
-Nested continuations are obscuring the operation. Flatten the flow with structured async control and scoped resources.
-
-## Examples
-### Positive
-Nested callbacks or promise chains obscure resource scope, cancellation, error propagation, or the linear story of the operation.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-Nested continuations are obscuring the operation. Flatten the flow with structured async control and scoped resources.
+Make causality read top to bottom. Use structured async flow so sequence, cancellation, failure, and resource lifetime share one visible scope.

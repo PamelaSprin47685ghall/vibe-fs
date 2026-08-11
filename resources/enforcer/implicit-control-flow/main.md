@@ -1,36 +1,19 @@
 # implicit-control-flow — Main
 
 ## What To Do Now
-Essential control flow is implicit. Make the ordering and ownership explicit in ordinary program structure.
+Move correctness-critical ordering into explicit structured control flow, with named phases or direct sequencing where the dependency is real.
+
+## Why This Matters
+Invisible order is an undeclared protocol. It survives only while every participant remembers when hooks run, imports fire, or callbacks were registered. Refactors that preserve all local functions can still break the global behavior because the causal relation lived nowhere explicit.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Write down the required happens-before graph, then encode it using ordinary calls, structured async scopes, explicit state transitions, or a small orchestrator that owns only sequencing—not hidden global registration.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not add comments saying “must register before X” while leaving the runtime free to violate it. Do not add more phase flags to recover hidden ordering after the fact.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Tests should permute or isolate components where possible and demonstrate that correctness follows the explicit sequence rather than incidental construction order.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Critical ordering depends on callbacks, registration order, hidden lifecycle hooks, global initialization, or undocumented framework conventions.
+A reader can see the temporal contract in normal program structure and no critical behavior depends on remembering undocumented hook or registration order.

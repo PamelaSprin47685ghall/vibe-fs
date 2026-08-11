@@ -1,32 +1,22 @@
 # debug-print-left — Enforcer
 
 ## Definition
-Temporary logging, tracing, dumps, breakpoints, or debug output remains in production paths.
+A debug artifact is left behind when temporary output or instrumentation created to answer one local question remains on a production path after that question is settled.
+
+## Governing Principle
+Diagnostics are an interface to future operators. Temporary prints have no such contract: their vocabulary, volume, sensitivity, and lifetime were chosen for one investigation. Leaving them in production turns private investigative context into permanent observable behavior without deciding whether anyone should rely on it.
 
 ## Trigger When
-Temporary logging, tracing, dumps, breakpoints, or debug output remains in production paths.
+Trigger when ad hoc `print`, dump, trace, breakpoint, verbose console output, temporary file, or one-off instrumentation remains in shipped code.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger for intentional structured diagnostics with a named operational purpose, stable fields, appropriate level, and sensitivity policy.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+status-announcement-noise concerns routine progress chatter even when intentional. secret-in-code concerns embedded credentials. This rule is accidental persistence of temporary debugging machinery.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Ask who consumes this diagnostic after the original investigation and what decision it supports. If there is no durable consumer and contract, remove it.
 
 ## Nudge
-Temporary debugging output remains. Remove it or convert it into intentional structured diagnostics.
-
-## Examples
-### Positive
-Temporary logging, tracing, dumps, breakpoints, or debug output remains in production paths.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-Temporary debugging output remains. Remove it or convert it into intentional structured diagnostics.
+Investigation output is disposable unless promoted deliberately. Remove temporary diagnostics or redesign them as intentional operational signals with a real owner.

@@ -1,32 +1,22 @@
 # math-flavored-name — Enforcer
 
 ## Definition
-Mathematical symbols or abstract single-letter names are used without a real algebraic model and make ordinary domain code harder to read.
+A math-flavored name uses symbols, single letters, or abstract algebraic vocabulary where the code has no corresponding mathematical model and the notation hides an ordinary domain concept.
+
+## Governing Principle
+Mathematical notation is powerful because a compact symbol recalls a precisely defined structure. Without that shared structure, compactness becomes ambiguity: `x`, `f`, `Δ`, or “monoid” saves characters by forcing the reader to reverse-engineer what concrete thing the symbol stands for. Compression is valuable only after meaning is stable and communal.
 
 ## Trigger When
-Mathematical symbols or abstract single-letter names are used without a real algebraic model and make ordinary domain code harder to read.
+Trigger when abstract or single-letter names appear in ordinary domain code and readers need implementation context to infer their real business meaning.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger inside genuine mathematical algorithms where notation is standard, locally defined, and maps directly to the formal model being implemented.
 
 ## Distinguish From
-misleading-name, abbreviation-anxiety, primitive-obsession
+abbreviation-anxiety concerns private shorthand generally. misleading-name concerns a false semantic claim. This rule is specifically pseudo-mathematical compression without mathematical payoff.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Ask whether a domain expert or algorithm reader would naturally use this symbol for the same concept. If not, name the concrete thing the code manipulates.
 
 ## Nudge
-Mathematical naming is obscuring an ordinary domain concept. Use names that expose the actual meaning.
-
-## Examples
-### Positive
-Mathematical symbols or abstract single-letter names are used without a real algebraic model and make ordinary domain code harder to read.
-
-### Near miss
-Looks related to misleading-name but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+Use mathematical notation only where mathematics supplies the shared meaning. Otherwise name the domain fact directly and remove gratuitous decoding.

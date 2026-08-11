@@ -1,32 +1,22 @@
 # duplicated-truth — Enforcer
 
 ## Definition
-The same fact has multiple authoritative representations that can drift or already disagree.
+Truth is duplicated when the same fact has more than one representation that may be independently written and each is treated as authoritative.
+
+## Governing Principle
+A fact can have many projections but only one authority. Once two writable representations claim equal status, disagreement becomes a legal system state and every read must answer a new question: which copy wins? Synchronization code cannot eliminate this problem; it merely defines increasingly elaborate rituals for repairing the contradiction after the model allowed it.
 
 ## Trigger When
-The same fact has multiple authoritative representations that can drift or already disagree.
+Trigger when one fact is stored, configured, cached, or encoded in multiple independently mutable places with no strict derivation relation.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger when secondary representations are read-only projections that can be rebuilt deterministically from a declared source of truth.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+overwrite-history changes prior facts. snapshot-as-truth promotes a projection to authority. This rule concerns simultaneous authorities for one present fact.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+For any disagreement, ask which representation the system is obligated to believe. If the answer is ambiguous or context-dependent, choose one authority and make the others derived.
 
 ## Nudge
-One fact has multiple sources of truth. Choose a single canonical representation and derive the others.
-
-## Examples
-### Positive
-The same fact has multiple authoritative representations that can drift or already disagree.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-One fact has multiple sources of truth. Choose a single canonical representation and derive the others.
+Many views are fine; many authorities are not. Choose one writable truth and derive every other representation from it.

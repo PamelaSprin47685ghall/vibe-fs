@@ -1,32 +1,22 @@
 # type-erosion-at-boundary — Enforcer
 
 ## Definition
-`any`, unchecked casts, reflection, dynamic property access, or unboxing escape the designated adapter boundary and enter domain logic.
+Type erosion occurs when dynamic, unchecked, reflective, or unboxed representations cross the adapter boundary and continue circulating inside code that should reason in domain types.
+
+## Governing Principle
+A boundary is where uncertainty should be spent. External data may arrive weakly typed, but once admitted inward the system should have paid the cost of parsing and validation and gained stronger propositions in return. Allowing `any`, unchecked casts, or reflective lookup to persist means every downstream use reopens the same uncertainty and can fail far from the point where evidence was available.
 
 ## Trigger When
-`any`, unchecked casts, reflection, dynamic property access, or unboxing escape the designated adapter boundary and enter domain logic.
+Trigger when `any`, reflection, dynamic property access, unboxing, unchecked casts, or generic maps escape protocol/adapters into domain/application logic.
 
 ## Do Not Trigger When
-Do not fire when dynamic decoding is confined to adapters that emit validated domain types before crossing inward.
+Do not trigger when dynamic decoding is confined to the edge and produces validated domain values before crossing inward.
 
 ## Distinguish From
-weak-boundary-parsing leaves data weakly typed; primitive-obsession overuses primitives; this tip is dynamic/unchecked types leaking past the adapter.
+weak-boundary-parsing delays validation of external shape. primitive-obsession preserves weak identity despite static primitives. This rule specifically loses static type information through dynamic/unchecked representation.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Locate the last point that possesses the raw external representation. Validate and translate there, then expose a type whose constructors encode the facts downstream code is entitled to assume.
 
 ## Nudge
-Type information is being discarded beyond the adapter boundary. Contain dynamic decoding and expose a typed contract.
-
-## Examples
-### Positive
-`any`, unchecked casts, reflection, dynamic property access, or unboxing escape the designated adapter boundary and enter domain logic.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when dynamic decoding is confined to adapters that emit validated domain types before crossing inward.
+Spend uncertainty once at the edge. Dynamic data may enter through an adapter, but only validated typed values should leave it for the domain.

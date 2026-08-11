@@ -1,32 +1,22 @@
 # recovery-by-filesystem-state — Enforcer
 
 ## Definition
-Workflow recovery guesses progress from incidental files, directories, temp artifacts, or working-tree shape instead of durable lifecycle facts.
+Recovery by filesystem state infers workflow progress from incidental files, directories, temp names, or working-tree shape instead of from durable lifecycle facts explicitly written for recovery.
+
+## Governing Principle
+Filesystem residue records implementation side effects, not necessarily business commitments. A temp file may survive a crash before completion; a directory may exist because creation preceded validation; cleanup may lag success. Inferring lifecycle from shape promotes accidents of execution order into protocol states and makes refactoring filenames/layout equivalent to changing recovery semantics.
 
 ## Trigger When
-Recovery infers workflow progress from incidental files, directories, temporary artifacts, or working-tree shape instead of durable lifecycle facts.
+Trigger when restart logic decides what work happened by checking existence, path names, temp artifacts, branch/worktree shape, or directory contents that were not designed as versioned durable facts.
 
 ## Do Not Trigger When
-Do not fire when the filesystem path is the deliberately versioned event/store artifact and recovery reads its schema-backed contents, not directory residue.
+Do not trigger when the filesystem artifact is itself the explicit durable store and recovery reads schema-backed contents with defined commit semantics rather than incidental presence.
 
 ## Distinguish From
-snapshot-as-truth treats a projection as authority; log-as-recovery-protocol misuses logs; this tip is about inferring lifecycle from FS shape.
+log-as-recovery-protocol elevates diagnostics. snapshot-as-truth elevates a projection. This rule elevates incidental filesystem topology into lifecycle authority.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+For each recovery decision, ask which durable fact proves it. If the answer is “because this file/directory happens to exist,” record the lifecycle fact explicitly instead.
 
 ## Nudge
-Recovery is guessing progress from filesystem residue. Record the lifecycle fact explicitly and recover from it.
-
-## Examples
-### Positive
-Recovery infers workflow progress from incidental files, directories, temporary artifacts, or working-tree shape instead of durable lifecycle facts.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when the filesystem path is the deliberately versioned event/store artifact and recovery reads its schema-backed contents, not directory residue.
+Filesystem residue is evidence of execution, not proof of business progress. Recover from explicit durable lifecycle facts and treat incidental paths as disposable implementation detail.

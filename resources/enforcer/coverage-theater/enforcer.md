@@ -1,32 +1,22 @@
 # coverage-theater — Enforcer
 
 ## Definition
-A test or metric increases coverage but does not assert meaningful behavior, identities, values, or failure outcomes.
+Coverage theater occurs when execution metrics are treated as evidence of correctness even though the tests assert little or nothing that distinguishes correct behavior from plausible defects.
+
+## Governing Principle
+Coverage measures reachability, not truth. A line can execute under a test that would remain green if its result were inverted, its identity corrupted, or its error swallowed. Verification begins only where a test states a proposition capable of being false. The value of an assertion is therefore not that it exists, but that a realistic defect would violate it.
 
 ## Trigger When
-A test or metric increases coverage but does not assert meaningful behavior, identities, values, or failure outcomes.
+Trigger when tests increase line/branch/function coverage yet omit meaningful values, identities, invariants, ordering, or failure outcomes.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger when coverage is used only as a navigation signal and behavioral assertions independently prove the relevant contract.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+weakened-test-to-pass removes meaningful expectations. test-implementation-coupled asserts the wrong surface. This rule mistakes traversal of code for proof about code.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+For each test, ask: which plausible defect makes this assertion fail? If no concrete defect can be named, the test is observation without judgment.
 
 ## Nudge
-Coverage is being mistaken for verification. Add assertions that would fail under a realistic defect.
-
-## Examples
-### Positive
-A test or metric increases coverage but does not assert meaningful behavior, identities, values, or failure outcomes.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-Coverage is being mistaken for verification. Add assertions that would fail under a realistic defect.
+Execution is not verification. Assert a property whose violation would matter to a caller, and make the test capable of turning red under a realistic defect.

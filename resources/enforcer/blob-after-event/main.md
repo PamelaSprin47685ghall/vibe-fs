@@ -1,35 +1,19 @@
 # blob-after-event — Main
 
 ## What To Do Now
-A durable event can point to missing content. Write and verify the blob before appending the reference.
+Write the blob to its durable store, verify the store’s success condition, then append the event or manifest entry that references it.
+
+## Why This Matters
+A history that names missing content is not merely incomplete; it is self-contradictory. Replay trusts committed events as facts. Once such a reference is admitted, every recovery path must either lie about the past or invent exceptional repair semantics for a state that correct ordering could have made impossible.
 
 ## Repair Strategy
-1. Confirm the tip applies at the real boundary, not a symptom downstream.
-2. Restore the missing name, ownership, test, or control so the ScoreWhen condition no longer holds.
-3. Prefer one canonical fix over a local workaround that leaves the invariant broken.
-
-## Decision Branches
-- If the root cause is a missing domain type or named case: introduce the type at the boundary and migrate callers.
-- If the root cause is a collapsed or bypassed boundary: restore the interface and stop sharing internals.
-- If the root cause is missing proof: add a durable assertion, contract test, or canary that would fail under a realistic defect.
-- If the change is destructive or speculative: stop, establish authority and the true owner first.
+Make blob durability the precondition of reference publication. Prefer content-addressed identity where appropriate, and treat a failed blob write as “the event did not happen.” If atomic multi-object commit exists, use its actual guarantee rather than simulating one in memory.
 
 ## Wrong Fixes
-- Papering over the symptom with another flag, catch-all, facade, or compatibility shim.
-- Leaving dual paths, commented-out code, or ephemeral probes as the only record of the fix.
-- Testing private helpers instead of the supported entry point when the contract is public.
+Do not append first and “fill the blob soon after.” Do not tolerate missing blobs during replay as normal. Retries without stable blob identity can multiply the inconsistency.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition is gone.
-- Exercise the success path and the relevant failure, cancellation, or near-miss path.
-- Ensure no duplicate source of truth, silent catch-all, or unowned helper remains.
+Crash the reasoning at every boundary: before blob commit, after blob commit but before event append, and after event append. Every surviving durable state must be replayable.
 
 ## Done When
-- The nudge is applied at the owning boundary.
-- Callers and proofs use the canonical representation.
-- A reviewer can see why the tip no longer fires without relying on tribal knowledge.
-
-## Scope and Authority
-- Touch only the owning module, contract, and directly affected callers.
-- Do not expand into unrelated cleanup, renames, or framework churn.
-- Destructive actions require explicit authority and a verified target.
+No committed reference can exist without a durably readable referent, and recovery never needs to guess whether referenced content once existed.

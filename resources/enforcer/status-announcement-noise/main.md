@@ -1,22 +1,19 @@
 # status-announcement-noise — Main
 
 ## What To Do Now
-Delete routine "starting/done/working on" chatter. Emit signals only when a decision is made, a phase completes with a result, or action is required.
+Remove or aggregate routine status chatter and retain communication only where it changes the recipient’s understanding, decision, or required action.
+
+## Why This Matters
+A communication channel has finite human bandwidth. Low-information updates dilute high-information events and train recipients to skim, precisely the behavior that makes a later failure or decision easy to miss.
 
 ## Repair Strategy
-Audit log and message sites. Keep error and decision lines. Collapse multi-line progress into one summary at boundaries. Prefer structured events over prose spam.
-
-## Decision Branches
-If operators need heartbeats, use a single metric or sparse heartbeat with timestamps—not paragraph status. If debugging, gate verbose traces behind a flag.
+Define meaningful phase boundaries, report concise evidence at those boundaries, and prefer final results over narration of every internal action. Use structured telemetry for machine consumption rather than conversational noise.
 
 ## Wrong Fixes
-Logging every loop iteration as INFO. Agent turns that only narrate tool intent without results. Comments that restate the next line as "now we process".
+Do not simply make every status line shorter while preserving the same frequency and lack of information. Noise is about semantic value, not character count.
 
 ## Verification
-Output under normal load is scannable; each remaining line carries decision, result, failure, or action.
+Each remaining status message should answer at least one useful question: what changed, what was decided, what failed, what remains uncertain, or what must the receiver do?
 
 ## Done When
-Routine status spam is gone; remaining messages are actionable or decision-bearing.
-
-## Scope and Authority
-Logs, agent messages, and user-visible operational output. Not required audit trails.
+The channel is sparse enough that a new message deserves attention and dense enough in information that reading it updates the recipient’s model of the work.

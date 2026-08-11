@@ -1,32 +1,22 @@
 # legacy-cruft-retained — Enforcer
 
 ## Definition
-Obsolete code, aliases, compatibility branches, or old names are kept despite an explicit clean-break policy.
+Legacy cruft is retained when obsolete aliases, names, formats, branches, or code paths survive despite a deliberate clean-break decision that removed any compatibility obligation.
+
+## Governing Principle
+A clean break is valuable because it collapses the state space: after the boundary, the old world is no longer a world the system must interpret. Retaining legacy paths nullifies that benefit. The project pays both histories forever while pretending the migration is complete, and future developers cannot know whether the old path is forbidden, tolerated, or secretly required.
 
 ## Trigger When
-Obsolete code, aliases, compatibility branches, or old names are kept despite an explicit clean-break policy.
+Trigger when an explicit clean-break policy exists yet obsolete code, aliases, compatibility branches, old names, or legacy formats remain reachable.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger when a current external contract explicitly requires the old surface for a bounded migration period.
 
 ## Distinguish From
-leftover-scaffolding, half-finished-refactor, misleading-name
+compatibility-cruft lacks a justified external requirement. half-finished-refactor leaves migration incomplete. This rule is sharper: a decision already said the old world should cease to exist.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Find the clean-break decision and identify every remaining representation of the retired surface. If no authorized exception exists, remove all of them rather than re-litigating the decision in code.
 
 ## Nudge
-Obsolete compatibility code is being retained. Complete the clean break and remove the old surface.
-
-## Examples
-### Positive
-Obsolete code, aliases, compatibility branches, or old names are kept despite an explicit clean-break policy.
-
-### Near miss
-Looks related to leftover-scaffolding but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+A clean break should reduce the number of supported worlds to one. Honor the decision: remove the legacy surface instead of carrying a ghost contract forward.

@@ -1,32 +1,22 @@
 # release-ladder-skipped — Enforcer
 
 ## Definition
-Validation jumps to a high-level test or release without clearing required lower pure, contract, replay, and canary gates.
+The release ladder is skipped when verification jumps to a broad or expensive stage without first clearing the lower-level proofs that isolate simpler classes of failure.
+
+## Governing Principle
+Verification levels form an information hierarchy. Pure tests prove local logic cheaply; contract tests prove boundaries; replay tests prove history; canaries prove real hosts. A high-level success cannot substitute cleanly for lower proofs because failure there has many possible causes, while success may not exercise the specific property a lower rung targets. The ladder orders evidence from narrow causality to broad realism.
 
 ## Trigger When
-Validation jumps directly to a high-level test or release without passing the required lower-level pure, contract, replay, and canary stages.
+Trigger when applicable lower gates are bypassed and work proceeds directly to integration, canary, release, or completion claims.
 
 ## Do Not Trigger When
-Do not fire when the change is docs-only or pure content with no behavioral surface, or when the ladder stages that apply are already green.
+Do not trigger when a lower rung is genuinely irrelevant to the change—for example pure content with no runtime surface—and the applicable ladder is still followed.
 
 ## Distinguish From
-unverified-completion-claim skips verification entirely; canary-skipped is one rung; this tip is skipping the ordered ladder.
+canary-skipped omits one real-boundary rung. unverified-completion-claim lacks sufficient verification generally. This rule is specifically violation of the ordered proof strategy.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+List which layers the change touches, map each to the narrowest proof that can fail there, and run from cheapest/local to broadest/real before promotion.
 
 ## Nudge
-The verification ladder was skipped. Pass each lower-level gate before promoting the change.
-
-## Examples
-### Positive
-Validation jumps directly to a high-level test or release without passing the required lower-level pure, contract, replay, and canary stages.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when the change is docs-only or pure content with no behavioral surface, or when the ladder stages that apply are already green.
+Do not use a broad test to compensate for missing narrow proofs. Climb from local causality to real-environment evidence so each failure has a small search space.

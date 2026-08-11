@@ -1,32 +1,22 @@
 # spike-not-cleaned — Enforcer
 
 ## Definition
-Experimental or proof-of-concept code is promoted without replacing shortcuts, hard-coded assumptions, and missing contracts.
+A spike is uncleaned when experimental code built to discover feasibility is promoted into the production path without replacing assumptions, shortcuts, and missing contracts that were acceptable only while learning.
+
+## Governing Principle
+A prototype optimizes for epistemic speed: it asks “can this work?” Production optimizes for durable correctness: “under which contracts will this keep working?” Confusing those objectives promotes evidence-gathering scaffolds into architecture. Hard-coded inputs, skipped failure semantics, global state, and hand-waved ownership then acquire permanence merely because the experiment succeeded.
 
 ## Trigger When
-Experimental code or a proof of concept is promoted without replacing shortcuts, hard-coded assumptions, and missing contracts.
+Trigger when proof-of-concept code becomes shipping implementation while retaining experimental shortcuts, implicit assumptions, fake boundaries, or unhandled lifecycle/failure cases.
 
 ## Do Not Trigger When
-Do not fire when the spike remains clearly isolated behind a flag or sandbox and is not the production path.
+Do not trigger when the spike remains isolated from production or has been deliberately rebuilt/refactored until production contracts are explicit and verified.
 
 ## Distinguish From
-leftover-scaffolding is temporary harness residue; dirty-hack is a local shortcut; this tip is promoting the spike as design.
+leftover-scaffolding concerns temporary support artifacts. dirty-hack is a local workaround. This rule is the promotion of an epistemic prototype into the system’s enduring design.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+List every assumption the spike was allowed to make because it was temporary. Before promotion, either turn each into an explicit contract with proof or remove the assumption through redesign.
 
 ## Nudge
-A spike is being shipped as production design. Rebuild it around explicit contracts and remove experimental shortcuts.
-
-## Examples
-### Positive
-Experimental code or a proof of concept is promoted without replacing shortcuts, hard-coded assumptions, and missing contracts.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when the spike remains clearly isolated behind a flag or sandbox and is not the production path.
+A successful experiment answers feasibility, not maintainability. Rebuild the discovered idea around production invariants before letting prototype shortcuts become architecture.

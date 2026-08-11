@@ -1,32 +1,22 @@
 # time-dependent-test — Enforcer
 
 ## Definition
-A test depends on real current time, wall-clock delays, time zones, or timing luck.
+A test is time-dependent when its verdict depends on the real clock, elapsed wall time, time zone, or scheduler timing rather than on explicit temporal facts under test control.
+
+## Governing Principle
+Time is an input even when an API hides it. Real clocks make test premises move while the test is running: midnight, DST, machine load, and scheduling alter the scenario without changing source. Deterministic temporal tests freeze the relevant instant or advance a controlled clock, separating domain rules about time from accidents of when the suite happened to execute.
 
 ## Trigger When
-A test depends on real current time, wall-clock delays, time zones, or timing luck.
+Trigger when tests call the real current time, wait for wall-clock duration, rely on local timezone defaults, or assert completion within fragile timing windows.
 
 ## Do Not Trigger When
-Do not fire when the suite intentionally exercises the real clock in a narrow integration smoke with stable tolerances and no flake history.
+Do not trigger for a deliberately narrow real-clock integration smoke whose purpose is to verify clock wiring itself and whose tolerance is stable and non-semantic.
 
 ## Distinguish From
-time-source-in-logic is production code reading the clock; sleep-based-synchronization uses sleep for causality; this tip is tests coupled to real time.
+time-source-in-logic is production policy reading ambient time. sleep-based-synchronization uses delay as a causal signal. This rule concerns nondeterministic temporal premises in verification.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Name the temporal facts the scenario requires—instant, duration, zone, deadline—and supply them explicitly through a fake/manual clock or fixed values.
 
 ## Nudge
-A test depends on real time. Inject time and make the scenario deterministic.
-
-## Examples
-### Positive
-A test depends on real current time, wall-clock delays, time zones, or timing luck.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when the suite intentionally exercises the real clock in a narrow integration smoke with stable tolerances and no flake history.
+Tests should choose time, not discover it. Inject or control the relevant temporal facts so the same scenario means the same thing whenever it runs.

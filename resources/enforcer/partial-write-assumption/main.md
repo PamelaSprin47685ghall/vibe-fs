@@ -1,36 +1,19 @@
 # partial-write-assumption — Main
 
 ## What To Do Now
-Recovery is inventing a partial-write state. Follow the storage contract’s explicit committed and unknown outcomes.
+Replace speculative partial-write recovery with the exact outcome model promised by the storage/effect boundary.
+
+## Why This Matters
+Recovery code is only as sound as its failure model. Invented intermediate states make the application more complex while weakening correctness because subsequent actions—truncate, retry, compensate—may be based on a state that never actually existed.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Read the owner’s atomicity/durability contract, represent its outcomes explicitly, and handle unknown separately from known failure. Where torn data is genuinely possible, rely on durable markers/checksums that can prove it.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not infer partial commit from timeout length, file size, or “what disks usually do.” Physical intuition is not a substitute for the API’s observable semantics.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Fault tests should cover every documented outcome and no branch should require an unobservable invented state.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Recovery logic assumes an append or effect may be partially committed despite the storage contract defining committed versus unknown outcomes.
+Recovery’s state space is exactly the boundary’s state space: no fewer cases than reality permits, and no extra cases created by fear.

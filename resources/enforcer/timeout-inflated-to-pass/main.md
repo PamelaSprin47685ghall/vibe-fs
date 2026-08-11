@@ -1,22 +1,19 @@
 # timeout-inflated-to-pass — Main
 
 ## What To Do Now
-Revert the inflated timeout. Find the missing signal, deadlock, leak, or overload. Fix the cause; set timeouts from real budgets afterward.
+Restore a principled timeout and diagnose the missing completion signal, blocked resource, deadlock, or unbounded work that caused the original delay.
+
+## Why This Matters
+Increasing a timeout changes when the system admits failure, not whether progress is possible. A hidden hang can therefore become slower and less visible while remaining structurally identical. Good timeout values bound healthy uncertainty; they do not make unhealthy execution healthy.
 
 ## Repair Strategy
-Capture traces under the hang. Check for missing await signals, lock cycles, unbounded work, and leaked resources. Restore a tight timeout that fails closed.
-
-## Decision Branches
-If load genuinely needs more time, document the measurement and SLO—distinct from greenwashing a flake.
+Instrument the causal milestones, identify where progress stops, repair synchronization/resource lifetime, then measure legitimate tail latency and set the budget from that evidence and the required SLO.
 
 ## Wrong Fixes
-timeout: 60000 because 5000 failed. Triple retries with triple timeouts until CI is quiet. Disabling timeouts entirely.
+Do not stack a longer timeout with retries or sleeps. That compounds waiting while further obscuring the point where causality failed.
 
 ## Verification
-With a correct fix, a reasonable timeout passes reliably; breaking the signal fails fast again.
+The operation should complete because its causal condition occurs, not because the new budget is generous. Fault cases must still time out within an intentional bound.
 
 ## Done When
-Timeouts reflect real budgets; hangs are fixed at the causal root.
-
-## Scope and Authority
-Tests and operational timeouts adjusted to hide failures.
+The timeout expresses a measured service policy and no green result depends on merely waiting longer for an unexplained condition.

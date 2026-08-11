@@ -1,22 +1,19 @@
 # type-erosion-at-boundary — Main
 
 ## What To Do Now
-Keep dynamic decoding inside the adapter. Validate once and expose a typed domain contract. Ban `any`/unchecked casts in domain modules.
+Contain dynamic decoding and unchecked operations inside the adapter, then expose a validated domain type to every inward caller.
+
+## Why This Matters
+Weak representations move uncertainty rather than remove it. If a cast or dynamic field access survives past ingress, downstream code repeatedly asks questions the boundary could have settled once, and failures occur after provenance has been lost.
 
 ## Repair Strategy
-Find casts and dynamic access inward of adapters. Move parsing out. Introduce DTOs and mappers that fail at the edge.
-
-## Decision Branches
-If a language boundary forces reflection, wrap it in one module with a typed façade and tests. If legacy forces gradual typing, stop the bleed with a firewall package.
+Parse, validate, normalize, and construct the strong type at the edge. Keep raw payloads private to the adapter and eliminate casts in policy code by making the boundary return the exact domain alternatives it can establish.
 
 ## Wrong Fixes
-Passing `obj` through domain services. Catch-and-cast everywhere. Using reflection to reach private domain state from plugins without a protocol.
+Do not wrap `any` in a generically named object and call it typed. A nominal shell without validated semantics merely hides erosion.
 
 ## Verification
-Domain projects compile/lint without `any` escapes; adapter tests cover invalid payloads failing before domain entry.
+Search inward layers for dynamic access and unchecked casts. Malformed external input should fail at the boundary; valid input should emerge as a type downstream code can trust without rechecking shape.
 
 ## Done When
-Dynamic typing stops at adapters; domain code consumes validated types only.
-
-## Scope and Authority
-Trust and type boundaries between adapters and domain.
+Type uncertainty has one owner at ingress and cannot leak inward as a recurring proof obligation.

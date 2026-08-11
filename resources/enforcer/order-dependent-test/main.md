@@ -1,36 +1,19 @@
 # order-dependent-test — Main
 
 ## What To Do Now
-A test depends on execution order. Give every test isolated, explicit setup and cleanup.
+Make the test create every premise it needs and clean up every resource/state it owns within the test’s own lifecycle.
+
+## Why This Matters
+Suite order is not a business input. When a test depends on residue from another case, a hidden global state machine emerges and failures shift location as the runner parallelizes or reorders work. Isolation restores the meaning of a test as an independently reproducible claim.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Reset or replace globals, use fresh storage/identities, scope environment changes, and stop sharing mutable fixtures across cases. If the steps truly form one lifecycle, combine them into one explicit scenario instead of pretending they are independent tests.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not force a fixed suite order. That codifies the hidden dependency instead of removing it.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Run the case alone, first, last, and under randomized/parallel suite order where supported. Its verdict must be unchanged.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): A test passes only after another test, depends on global residue, or changes behavior with suite ordering.
+Every test is self-contained evidence: its result is determined by its own explicit premises, not by history left behind by neighboring tests.

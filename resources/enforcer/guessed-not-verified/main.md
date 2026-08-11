@@ -1,36 +1,19 @@
 # guessed-not-verified — Main
 
 ## What To Do Now
-A material claim was guessed rather than verified. Inspect the authoritative source or run a targeted experiment.
+Identify the factual premise that the current decision relies on and verify it against the source that actually owns that fact.
+
+## Why This Matters
+A guessed premise contaminates every downstream conclusion while often remaining invisible because the reasoning itself looks coherent. The cost of checking early is usually tiny compared with repairing a design built on an API, file, lifecycle, or failure model that never existed.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Prefer direct evidence in this order: owning source/contract, targeted executable observation, then secondary explanation. Record the result in tests or durable docs when future work will depend on it again.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not accumulate more reasoning around the guess, search for confirming snippets only, or treat a familiar name as a contract. Plausibility is not authority.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+The material claim should be supportable by a concrete source or reproducible observation, and the implementation should no longer depend on unstated assumptions.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Behavior, API shape, file content, Host semantics, or failure cause is asserted without reading the source or running a direct check.
+Load-bearing premises are facts with provenance, hypotheses remain labeled as hypotheses, and uncertainty is resolved before it hardens into architecture.

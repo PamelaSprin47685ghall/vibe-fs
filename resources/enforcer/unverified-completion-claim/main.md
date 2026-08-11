@@ -1,22 +1,19 @@
 # unverified-completion-claim — Main
 
 ## What To Do Now
-Run the checks that prove the acceptance criteria. Report commands and outcomes. Only then claim completion.
+Run the verification that corresponds to the promises changed by the work and report the observed outcomes before declaring completion.
+
+## Why This Matters
+A diff is a hypothesis about the desired system. Tests, builds, reproductions, and canaries are attempts to falsify that hypothesis. Skipping them turns implementation confidence into evidence and makes the completion statement stronger than what is actually known.
 
 ## Repair Strategy
-List acceptance criteria. Map each to a verification action. Execute and capture evidence. Reopen the task if red.
-
-## Decision Branches
-If verification is blocked, state the blocker and remaining risk—do not label the work done. If only a subset applies, say which and why.
+Map each acceptance criterion to the lowest faithful check, execute applicable higher boundary checks where needed, and include failures or skipped stages explicitly rather than converting them into optimistic prose.
 
 ## Wrong Fixes
-LGTM from reading the diff alone on behavioral changes. "Should work" without running. Relying on CI you did not trigger for local claims.
+Do not cite code inspection alone when behavior can be executed, and do not report “should pass” as though it meant “passed.” Modal verbs are not test results.
 
 ## Verification
-Evidence of the relevant commands exists; failures would have blocked the claim.
+The evidence should be recent, relevant to the changed surface, and capable of failing under a realistic defect in that surface.
 
 ## Done When
-Completion claims are backed by executed, relevant verification evidence.
-
-## Scope and Authority
-Behavioral deliverables and bug fixes. Not pure idea dumps.
+The word “complete” summarizes an evidence chain already established rather than substituting for one.

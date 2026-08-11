@@ -1,32 +1,22 @@
 # compatibility-cruft — Enforcer
 
 ## Definition
-Compatibility layers, aliases, duplicate formats, or dual paths are added without a real external compatibility requirement.
+Compatibility cruft is a second representation, alias, adapter, or execution path preserved without a concrete external contract that still requires it.
+
+## Governing Principle
+Compatibility is not free kindness; it is a promise to support two histories at once. Every retained surface multiplies states the system must understand, test, document, migrate, and eventually remove. Without an identified consumer and retirement condition, “just in case” compatibility converts uncertainty into permanent architecture.
 
 ## Trigger When
-Compatibility layers, aliases, duplicate formats, or dual paths are added without a real external compatibility requirement.
+Trigger when aliases, old formats, dual writes, fallback parsers, adapters, or parallel code paths are added or retained solely to reduce fear of breaking an unspecified caller.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger when a named external consumer, version contract, rollout plan, or data migration genuinely requires overlap for a bounded period.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+legacy-cruft-retained violates an explicit clean-break decision. half-finished-refactor leaves migration incomplete. This rule is compatibility machinery whose obligation was never established.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Name the consumer, the exact old contract it still exercises, and the condition that ends support. If any of those cannot be named, treat the duplicate surface as unjustified.
 
 ## Nudge
-Compatibility machinery lacks a justified external contract. Remove the duplicate path and keep one canonical interface.
-
-## Examples
-### Positive
-Compatibility layers, aliases, duplicate formats, or dual paths are added without a real external compatibility requirement.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-Compatibility machinery lacks a justified external contract. Remove the duplicate path and keep one canonical interface.
+Compatibility is a contract, not a superstition. Keep a second path only for a named consumer and a bounded migration; otherwise preserve one canonical interface.

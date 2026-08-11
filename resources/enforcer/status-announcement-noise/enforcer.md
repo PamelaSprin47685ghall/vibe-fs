@@ -1,32 +1,22 @@
 # status-announcement-noise — Enforcer
 
 ## Definition
-Production output, comments, logs, or agent messages repeatedly announce routine progress without a decision, result, failure, or required action.
+Status announcement noise is communication that repeatedly reports routine motion without adding a decision, changed fact, failure, uncertainty, or action the recipient can use.
+
+## Governing Principle
+Attention is a finite channel. Messages that carry no new state consume the same interruption budget as messages that matter, reducing the signal-to-noise ratio until important information becomes easier to miss. Progress communication earns its place when it changes the receiver’s model of the work, not merely when another internal step happened.
 
 ## Trigger When
-Production output, code comments, logs, or agent messages repeatedly announce routine progress without conveying a decision, result, failure, or required action.
+Trigger when logs, comments, production output, or agent/user messages repeatedly narrate ordinary progress such as “starting,” “still working,” or each mechanical substep without a meaningful state transition.
 
 ## Do Not Trigger When
-Do not fire for structured progress required by a protocol, user-facing multi-step UX, or a single concise status at a real phase boundary.
+Do not trigger for protocol-required progress, user interfaces where progress itself is a product need, or concise updates at genuine phase boundaries during long work.
 
 ## Distinguish From
-comment-theater is non-owning comments in code; this tip is noisy status chatter in logs/messages/output.
+comment-theater is redundant prose around code. debug-print-left is accidental investigation output. This rule concerns intentional but low-information status communication.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+For each message ask what new decision, result, risk, failure, or required action the recipient learns. If the answer is none, remove or aggregate it.
 
 ## Nudge
-Status announcements are adding noise. Report only decisions, meaningful progress, failures, and actionable results.
-
-## Examples
-### Positive
-Production output, code comments, logs, or agent messages repeatedly announce routine progress without conveying a decision, result, failure, or required action.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire for structured progress required by a protocol, user-facing multi-step UX, or a single concise status at a real phase boundary.
+Report changes in meaning, not motion. Preserve attention for decisions, material progress, failures, uncertainty, and actions the recipient can actually use.

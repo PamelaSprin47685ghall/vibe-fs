@@ -1,22 +1,19 @@
 # scope-creep — Main
 
 ## What To Do Now
-Cut the diff back to the task contract. Park unrelated cleanup and redesigns as separate work with their own acceptance.
+Remove unrelated edits from the current delivery and keep only changes that follow directly from the requested outcome or an invariant that outcome necessarily disturbs.
+
+## Why This Matters
+Broad changes make causality expensive. When behavior, cleanup, architecture, and migration move together, reviewers cannot tell which edit proves which requirement and regressions inherit a much larger suspect set. Small coherent scope is a reasoning optimization.
 
 ## Repair Strategy
-Re-read the task acceptance criteria. Revert or split out opportunistic edits. Keep only dependency-forced touch points.
-
-## Decision Branches
-If a blocker forces a small adjacent fix, keep it minimal and name it. If architecture work is truly required, renegotiate scope explicitly before continuing.
+Map each changed area to a requirement. Preserve necessary transitive edits, but defer independent improvements as separate work with their own acceptance criteria.
 
 ## Wrong Fixes
-Drive-by renames across the repo. "While I am here" refactors that obscure the review. Mixing feature work with unrelated dependency upgrades.
+Do not keep unrelated changes because they are individually good. Correctness of an edit does not establish relevance to this change.
 
 ## Verification
-Every changed file maps to the stated acceptance criteria or a forced compile/migration edge.
+The final diff should admit a concise explanation from every material edit back to the task’s contract, with no branch of work requiring a separate motivation.
 
 ## Done When
-The delivery matches the justified scope; unrelated work is split out or dropped.
-
-## Scope and Authority
-Task and PR boundaries. Not multi-step planned migrations that are the task itself.
+The delivery is complete without being expansive: every edit participates in the same causal story, and unrelated opportunities remain separate rather than hidden inside it.

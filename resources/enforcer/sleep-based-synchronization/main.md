@@ -1,22 +1,19 @@
 # sleep-based-synchronization — Main
 
 ## What To Do Now
-Replace sleep with an await on a condition, event, readiness probe, or state transition. Bound the wait and fail closed on timeout.
+Replace fixed sleeps with a wait on the real readiness, completion, notification, lock release, or observable state transition that the next step requires.
+
+## Why This Matters
+A sleep is simultaneously too long when the system is fast and too short when it is slow. It sacrifices latency without buying certainty. Causal signals adapt naturally because they encode the condition itself rather than an estimate of how long the condition usually takes.
 
 ## Repair Strategy
-Name the causal event being approximated. Subscribe or poll that condition with a deadline. Delete fixed delays from tests and production coordination.
-
-## Decision Branches
-If only a coarse health endpoint exists, poll it with backoff and a cap—still condition-based, not a single blind sleep. If the system cannot signal, add the signal.
+Expose an awaitable completion, poll a real state under a bounded timeout when no event exists, or use synchronization primitives whose semantics match the dependency. Keep timeout only as failure policy, never as success evidence.
 
 ## Wrong Fixes
-sleep(2) in tests "to let CI catch up". Production Thread.Sleep to order microservices. Increasing sleep until flakes drop.
+Do not increase the delay until the flake becomes rare. Rarity is not correctness and load eventually finds the longer tail.
 
 ## Verification
-Under slow and fast conditions, waits complete on the signal; removing the signal fails deterministically without relying on duration luck.
+Vary machine speed and inject long scheduling delays. The flow should advance immediately after the causal condition and never before it.
 
 ## Done When
-Synchronization is signal-based with bounded waits; fixed sleeps are not load-bearing for correctness.
-
-## Scope and Authority
-Coordination and tests. Not product UX timers that are the feature.
+Progress is licensed by an observable cause, while clocks only bound how long the system is willing to wait for that cause.

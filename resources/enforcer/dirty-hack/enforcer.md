@@ -1,32 +1,22 @@
 # dirty-hack — Enforcer
 
 ## Definition
-A fallback, bypass, compatibility shim, duplicated path, or special case is added to avoid repairing the underlying model or boundary.
+A dirty hack is a local exception added to make an observed path work while leaving the governing model or invariant known to be wrong.
+
+## Governing Principle
+Every special case is a claim about reality. If the exception has no domain meaning and exists only because the current abstraction cannot express the truth, the codebase acquires two models: the official one and the workaround that knows where it fails. Repeating this process does not stabilize the system; it distributes the real specification across escape hatches.
 
 ## Trigger When
-A fallback, bypass, compatibility shim, duplicated path, or special case is added to avoid repairing the underlying model or boundary.
+Trigger when a fallback, bypass, compatibility shim, duplicated path, magic condition, or one-off exception is introduced primarily to avoid repairing the underlying ownership, state model, or boundary.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger for genuine domain exceptions that have stable names, explicit rules, tests, and ownership because reality itself contains the exceptional case.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+compatibility-cruft preserves unjustified historical surfaces. facade-hides-mess conceals broad architecture debt. This rule is a local patch whose only semantics are “make the broken model survive here.”
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Ask what domain fact justifies the special case. If the answer is only an implementation defect or historical accident, repair the abstraction that made the case necessary.
 
 ## Nudge
-A workaround is hiding the root cause. Repair the governing abstraction or invariant instead.
-
-## Examples
-### Positive
-A fallback, bypass, compatibility shim, duplicated path, or special case is added to avoid repairing the underlying model or boundary.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-A workaround is hiding the root cause. Repair the governing abstraction or invariant instead.
+A workaround without domain meaning is a second secret model. Fix the invariant or ownership boundary so the exceptional path ceases to be necessary.

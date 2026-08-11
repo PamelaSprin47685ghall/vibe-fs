@@ -1,32 +1,22 @@
 # command-event-confusion — Enforcer
 
 ## Definition
-An intention is stored as though it already happened, or an immutable fact is later revalidated and rejected using today’s rules.
+Command/event confusion occurs when a request to change the world is stored as though the change already happened, or when a recorded fact is later subjected again to present-day permission or business rules.
+
+## Governing Principle
+Intention and fact have opposite epistemic status. A command says “please make this true” and may be refused; an event says “this became true” and may not be vetoed by a later interpretation. Conflating them corrupts either authorization or history: commands gain undeserved certainty, while events become revocable opinions.
 
 ## Trigger When
-An intention is stored as though it already happened, or an immutable fact is later revalidated and rejected using today’s rules.
+Trigger when desired actions are persisted before validation as completed facts, or replay re-runs current policy to decide whether historical events are still acceptable.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger when the persisted record is explicitly an intent/request with its own lifecycle, distinct from the event that records eventual completion.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+overwrite-history edits past facts. guessed-migration reinterprets old data. This rule is the semantic category error between rejectable intention and irrevocable occurrence.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+For each message ask: can the system legitimately say “no” to it now? If yes, it is command-like. Has it already happened and must replay preserve it? If yes, it is event-like. Never assign both roles to one record.
 
 ## Nudge
-Commands and events are being conflated. Validate intentions now, then record completed facts as immutable history.
-
-## Examples
-### Positive
-An intention is stored as though it already happened, or an immutable fact is later revalidated and rejected using today’s rules.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-Commands and events are being conflated. Validate intentions now, then record completed facts as immutable history.
+Validate intention in the present; record occurrence for the future. Commands may be rejected. Events must be replayed as facts.

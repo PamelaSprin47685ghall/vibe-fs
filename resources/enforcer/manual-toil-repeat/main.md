@@ -1,36 +1,19 @@
 # manual-toil-repeat — Main
 
 ## What To Do Now
-Repeated mechanical work remains manual. Automate it and preserve the procedure as a maintained tool.
+Turn the repeated deterministic procedure into a maintained script, generator, command, or project skill with explicit inputs and outputs.
+
+## Why This Matters
+Manual repetition is executable knowledge stored in muscle memory. It scales by consuming attention and degrades through skipped steps, local variations, and forgotten context. Automation makes the procedure inspectable, repeatable, reviewable, and available to everyone.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Capture the smallest stable algorithm, keep configuration explicit, and integrate it into the normal workflow. Preserve human review at decisions that actually require judgment instead of automating ambiguity.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not create an opaque one-off script that only its author understands, and do not automate a process whose rules are still changing because the domain has not settled.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Running the tool from the same inputs should produce the same required outputs and replace the prior manual sequence without hidden cleanup steps.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): A repeated mechanical procedure is performed manually again despite being deterministic and suitable for a script, generator, or reusable skill.
+Humans no longer spend recurring attention reenacting a known algorithm, and the maintained automation becomes the durable statement of that procedure.

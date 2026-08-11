@@ -1,32 +1,22 @@
 # truncation-skips-damaged — Enforcer
 
 ## Definition
-Recovery skips corruption in the middle of durable history and continues applying later facts.
+Recovery skips damage when it encounters corruption inside durable history, discards or bypasses the damaged region, and continues applying later records as though the missing prefix still had a defined meaning.
+
+## Governing Principle
+An ordered log gives later facts meaning relative to the prefix before them. Interior corruption removes part of that premise, so subsequent replay no longer has a trustworthy starting state. A final incomplete record is different: if the storage contract permits torn tail writes, truncating only that uncommitted suffix preserves a complete committed prefix. Interior damage breaks the chain of derivation itself.
 
 ## Trigger When
-Recovery skips corruption in the middle of durable history and continues applying later facts.
+Trigger when recovery ignores malformed/checksum-failed/missing records in the middle of durable history and resumes at later entries.
 
 ## Do Not Trigger When
-Do not fire when only a final incomplete record is truncated by design and interior history remains intact and verified.
+Do not trigger when only the final record is provably incomplete under the storage protocol and recovery truncates precisely that uncommitted tail while preserving the verified prefix.
 
 ## Distinguish From
-overwrite-history mutates past facts; recovery-by-filesystem-state sniffs paths; this tip continues past mid-stream corruption.
+overwrite-history deliberately edits past facts. partial-write-assumption invents failure states. This rule concerns proceeding after actual interior historical evidence is no longer trustworthy.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Locate the first damaged byte/record and determine whether a verified committed record follows it. If yes, fail closed: the later history cannot be interpreted safely without the missing prefix.
 
 ## Nudge
-Recovery is continuing past corrupted history. Only a final incomplete record may be truncated; interior corruption must fail closed.
-
-## Examples
-### Positive
-Recovery skips corruption in the middle of durable history and continues applying later facts.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when only a final incomplete record is truncated by design and interior history remains intact and verified.
+A log is a causal chain, not a bag of records. Truncate only a provably incomplete tail; interior corruption destroys the premise of every later replay step and must fail closed.

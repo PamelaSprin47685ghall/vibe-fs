@@ -1,36 +1,19 @@
 # premature-unification — Main
 
 ## What To Do Now
-Similarity was mistaken for shared knowledge. Separate concepts that change for different reasons.
+Separate concepts that were unified by appearance rather than shared invariant. Let each owner evolve independently until common knowledge—not merely common shape—becomes undeniable.
+
+## Why This Matters
+A premature abstraction converts coincidental similarity into a coupling contract. The first real divergence then appears as “exceptions” to the abstraction, and the code begins accumulating flags and optional hooks to preserve a unity the domain never had.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Split the model/API along lifecycle and reason to change. Duplicate small amounts of code if necessary; observe whether future changes remain parallel. Extract only the part that repeatedly changes for the same reason across both contexts.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not keep one generic type with context flags. That preserves the false unity while making the differences less explicit.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+A change specific to one concept should no longer require conditional logic or edits in the other.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Similar-looking code or concepts with different lifecycles, invariants, or reasons to change are unified before they represent the same knowledge.
+Shared abstractions correspond to shared knowledge, and independent concepts are allowed to look alike without being forced to live together.

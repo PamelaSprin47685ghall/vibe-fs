@@ -1,32 +1,22 @@
 # serial-investigation — Enforcer
 
 ## Definition
-Independent searches, file reads, source inspections, or diagnostics run one-by-one despite having no ordering dependency.
+Investigation is unnecessarily serial when independent questions are answered one after another despite having no informational dependency.
+
+## Governing Principle
+Inquiry has a dependency graph just as computation does. Serializing independent evidence gathering imposes an artificial critical path: later facts wait for earlier facts they do not need. Parallel investigation is not haste; it is faithful execution of the epistemic graph, followed by synthesis only where evidence actually converges.
 
 ## Trigger When
-Independent searches, file reads, source inspections, or diagnostics are performed one by one despite having no dependency.
+Trigger when unrelated file reads, searches, source inspections, logs, or diagnostics are performed sequentially while each could be issued from the same current knowledge.
 
 ## Do Not Trigger When
-Do not fire when each step truly needs the prior result to choose the next query, or when tool limits force serialization.
+Do not trigger when each result determines the next question, shared tooling imposes a limit, or the investigation must preserve ordering to avoid destructive interference.
 
 ## Distinguish From
-serial-when-parallel is the general concurrency smell for any independent work; this tip focuses on investigation/read fan-out.
+serial-when-parallel is the general execution smell. This rule focuses on evidence gathering, where unnecessary serialization delays the moment competing hypotheses can be compared.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Draw the current questions as nodes and add an edge only when one answer is needed to formulate another. Issue all edge-free questions concurrently, then synthesize before the next dependent wave.
 
 ## Nudge
-Independent investigation is unnecessarily serial. Run the reads and searches concurrently, then synthesize the evidence.
-
-## Examples
-### Positive
-Independent searches, file reads, source inspections, or diagnostics are performed one by one despite having no dependency.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when each step truly needs the prior result to choose the next query, or when tool limits force serialization.
+Investigate according to dependency, not habit. Gather independent evidence in parallel and spend serial attention only where one fact truly determines the next question.

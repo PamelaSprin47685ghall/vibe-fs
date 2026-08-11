@@ -1,32 +1,22 @@
 # misleading-name — Enforcer
 
 ## Definition
-A name suggests stronger guarantees, different ownership, broader scope, or a different domain meaning than the implementation provides.
+A name is misleading when it claims a stronger guarantee, different owner, broader scope, or different domain meaning than the implementation actually provides.
+
+## Governing Principle
+Names are executable assumptions in human reasoning. Readers use them to skip re-reading implementation; that is precisely why a false name is more dangerous than a vague one. Each encounter imports a wrong premise into downstream reasoning, so the cost compounds with reuse. A name must therefore describe the contract, not the aspiration or history of the code.
 
 ## Trigger When
-A name suggests stronger guarantees, different ownership, broader scope, or a different domain meaning than the implementation provides.
+Trigger when an identifier suggests atomicity, durability, uniqueness, authorization, ownership, completion, scope, or domain identity that the implementation does not guarantee.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger for concise names whose guarantee is clear from the immediate type/context and does not plausibly imply more than reality provides.
 
 ## Distinguish From
-math-flavored-name, primitive-obsession, illegal-state-representable
+domain-language-drift concerns inconsistent vocabulary across the system. abbreviation-anxiety concerns decoding cost. This rule is a semantic lie in a specific name.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Write the strongest reasonable claim a reader would infer from the name, then compare it with the actual contract. If the inferred claim is stronger or different, rename the concept or strengthen the implementation to make the claim true.
 
 ## Nudge
-A name misrepresents the concept or guarantee. Rename it to match the actual domain fact.
-
-## Examples
-### Positive
-A name suggests stronger guarantees, different ownership, broader scope, or a different domain meaning than the implementation provides.
-
-### Near miss
-Looks related to math-flavored-name but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+A name is a promise readers rely on without checking. Make that promise exactly as strong—and no stronger—than the implementation’s real contract.

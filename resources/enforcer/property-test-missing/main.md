@@ -1,22 +1,19 @@
 # property-test-missing — Main
 
 ## What To Do Now
-Identify the invariant (round-trip, associativity, idempotence, normalization fixpoint, etc.). Add property-based tests that generate inputs across the space and assert the law. Keep a few example tests for readability, but do not treat them as sufficient coverage of a general rule.
+Express the general invariant as a property and test it over generated inputs with useful shrinking and explicit validity constraints.
+
+## Why This Matters
+A few examples can establish familiarity but not a universal law. When the code claims behavior over a combinatorial space, property testing lets the machine search for the smallest counterexample to the actual invariant rather than to cases humans happened to foresee.
 
 ## Repair Strategy
-Name the law in a comment or test title. Prefer a small generator over dozens of brittle fixtures. If the domain type is hard to generate, introduce a smart constructor or shrink strategy rather than abandoning properties.
-
-## Decision Branches
-If no clear invariant exists, document why example tests suffice and stop. If an invariant is suspected but unproven, write the property first and let failures refine the law. If only boundary cases matter, keep focused examples and skip generative noise.
+Write the law first, choose generators that reflect the true domain, avoid filtering so heavily that difficult cases disappear, and preserve found counterexamples as regressions when they reveal meaningful defects.
 
 ## Wrong Fixes
-Spamming random inputs without an asserted law. Duplicating the implementation inside the property. Replacing all examples with opaque generators that hide regressions.
+Do not generate random inputs without a stable property; randomness alone is not deeper testing. Do not assert only “does not throw.”
 
 ## Verification
-Run the new properties repeatedly; confirm they fail on a deliberate law break and pass on the fixed implementation.
+Deliberately break the law in a plausible way and confirm generation finds a counterexample with a useful minimized case.
 
 ## Done When
-At least one property test encodes each claimed general invariant, and example-only coverage is no longer the sole proof.
-
-## Scope and Authority
-Applies to pure domain operations with stated or obvious laws. Does not mandate property tests for every UI click path.
+General behavior is guarded by general evidence, while examples remain only as readable illustrations of the same law.

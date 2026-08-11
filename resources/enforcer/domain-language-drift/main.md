@@ -1,35 +1,19 @@
 # domain-language-drift — Main
 
 ## What To Do Now
-Domain language is drifting. Choose one term per concept and separate concepts that currently share a name.
+Choose the canonical domain term for each concept within the owning context and rename code, tests, events, and docs until that vocabulary is consistent.
+
+## Why This Matters
+A stable vocabulary compresses reasoning: once a term is learned, every occurrence recalls the same concept. Drift reverses that compression. Readers must repeatedly ask which synonym or meaning is active, and cross-team discussion loses the guarantee that identical words denote identical things.
 
 ## Repair Strategy
-1. Confirm the tip applies at the real boundary, not a symptom downstream.
-2. Restore the missing name, ownership, test, or control so the ScoreWhen condition no longer holds.
-3. Prefer one canonical fix over a local workaround that leaves the invariant broken.
-
-## Decision Branches
-- If the root cause is a missing domain type or named case: introduce the type at the boundary and migrate callers.
-- If the root cause is a collapsed or bypassed boundary: restore the interface and stop sharing internals.
-- If the root cause is missing proof: add a durable assertion, contract test, or canary that would fail under a realistic defect.
-- If the change is destructive or speculative: stop, establish authority and the true owner first.
+Start from domain distinctions, not existing identifiers. Separate overloaded concepts first, then converge accidental synonyms. At bounded-context borders, preserve local language and make translation explicit instead of forcing a false global vocabulary.
 
 ## Wrong Fixes
-- Papering over the symptom with another flag, catch-all, facade, or compatibility shim.
-- Leaving dual paths, commented-out code, or ephemeral probes as the only record of the fix.
-- Testing private helpers instead of the supported entry point when the contract is public.
+Do not create a glossary that excuses inconsistent code indefinitely. Do not mechanically rename distinct context concepts merely because their English words resemble each other.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition is gone.
-- Exercise the success path and the relevant failure, cancellation, or near-miss path.
-- Ensure no duplicate source of truth, silent catch-all, or unowned helper remains.
+Search for retired synonyms and overloaded uses. A domain expert and a code reader should be able to point to the same term and mean the same thing in the same context.
 
 ## Done When
-- The nudge is applied at the owning boundary.
-- Callers and proofs use the canonical representation.
-- A reviewer can see why the tip no longer fires without relying on tribal knowledge.
-
-## Scope and Authority
-- Touch only the owning module, contract, and directly affected callers.
-- Do not expand into unrelated cleanup, renames, or framework churn.
-- Destructive actions require explicit authority and a verified target.
+Names, types, tests, and documentation form one coherent language map, with explicit translation only where genuine context boundaries require it.

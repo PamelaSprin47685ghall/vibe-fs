@@ -1,32 +1,22 @@
 # failure-path-untested — Enforcer
 
 ## Definition
-New error handling, cancellation, rollback, retry, malformed input, or recovery behavior has no direct test.
+A failure path is untested when newly introduced error handling, cancellation, rollback, retry, malformed-input, or recovery logic has never been forced to execute under test.
+
+## Governing Principle
+Failure code is usually least exercised in production until the moment correctness depends on it most. Its plausibility is therefore dangerous: branches that “obviously” release, rollback, or retry can remain dead assumptions for months. A failure path has no evidence merely because the happy path survives; it must be driven by the condition that gives it meaning.
 
 ## Trigger When
-New error handling, cancellation, rollback, retry, malformed input, or recovery behavior has no direct test.
+Trigger when code adds or changes a failure/recovery branch and no test creates the actual precondition that selects that branch and observes its externally relevant result.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger when an existing test already forces the exact failure mode through the same ownership boundary and protects its observable semantics.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+missing-regression-test concerns a known defect. coverage-theater concerns weak assertions. This rule is specifically about unexecuted newly significant failure semantics.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Name the failure, how it is induced, what cleanup/state/result must follow, and what must not happen. If no test demonstrates those four facts, the path is unproven.
 
 ## Nudge
-A newly introduced failure path is untested. Add a test that exercises the actual failure and its observable result.
-
-## Examples
-### Positive
-New error handling, cancellation, rollback, retry, malformed input, or recovery behavior has no direct test.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-A newly introduced failure path is untested. Add a test that exercises the actual failure and its observable result.
+Failure handling is executable policy, not insurance prose. Force the real failure and prove its result, cleanup, and forbidden side effects.

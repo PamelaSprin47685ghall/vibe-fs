@@ -1,32 +1,22 @@
 # implicit-control-flow — Enforcer
 
 ## Definition
-Critical ordering depends on callbacks, registration order, hidden lifecycle hooks, global initialization, or undocumented framework conventions.
+Control flow is implicit when essential ordering is determined by registration, hidden callbacks, lifecycle hooks, global initialization, or framework convention rather than visible program structure.
+
+## Governing Principle
+Correctness that depends on order should make order a first-class fact. Hidden sequencing turns causality into ambient knowledge: readers see components but not the temporal relation that makes them correct. The system then behaves like a distributed protocol without an explicit protocol—events may be locally valid yet globally wrong because nobody owns the happens-before relation.
 
 ## Trigger When
-Critical ordering depends on callbacks, registration order, hidden lifecycle hooks, global initialization, or undocumented framework conventions.
+Trigger when correctness depends on callback registration order, hook phase, import side effect, global startup order, or another lifecycle convention not evident at the call site.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger when the runtime order is explicitly modeled, documented as a stable contract, and mechanically guarded where misuse is possible.
 
 ## Distinguish From
-implicit-convention-magic, program-counter-state, phase-flag-accumulation
+implicit-convention-magic concerns hidden discovery/configuration generally. program-counter-state reifies control as mutable fields. This rule concerns invisible temporal causality.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+State the required happens-before relations. Locate where each is enforced. If enforcement exists only as convention or incidental registration order, replace it with explicit structured sequencing.
 
 ## Nudge
-Essential control flow is implicit. Make the ordering and ownership explicit in ordinary program structure.
-
-## Examples
-### Positive
-Critical ordering depends on callbacks, registration order, hidden lifecycle hooks, global initialization, or undocumented framework conventions.
-
-### Near miss
-Looks related to implicit-convention-magic but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+If order is part of correctness, make order part of the program. Express the causal sequence explicitly instead of trusting lifecycle folklore.

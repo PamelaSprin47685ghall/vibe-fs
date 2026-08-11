@@ -1,32 +1,22 @@
 # race-first-wins-semantics — Enforcer
 
 ## Definition
-Business meaning is decided by scheduler order or whichever concurrent call finishes first, even when the calls carry different information.
+Race-first-wins semantics arise when scheduler timing or whichever concurrent operation finishes first determines a business result even though the competing operations carry different information.
+
+## Governing Principle
+Scheduling order is usually an accident of load, network, and runtime, not a domain fact. If “first completion” chooses truth, identical logical inputs can produce different outcomes under different timing. The system has then delegated business semantics to the scheduler. Determinism requires either an explicit first-writer rule with stable identity or a merge function over the complete relevant information.
 
 ## Trigger When
-Scheduling order or the first completing concurrent call determines a domain result even though the calls may carry different information.
+Trigger when concurrent requests/results race and the first observed completion becomes authoritative despite no domain rule saying temporal arrival order should decide.
 
 ## Do Not Trigger When
-Do not fire when a documented first-writer-wins or quorum rule is an explicit domain decision with stable identity and merge policy.
+Do not trigger when first-writer-wins, lowest-latency replica, election timeout, or another timing rule is itself the documented protocol and carries the necessary identity/quorum semantics.
 
 ## Distinguish From
-shared-mutable-concurrency is about lock-protected shared mutation; unbounded-fanout is about missing concurrency bounds; this tip is about race order becoming domain truth.
+shared-mutable-concurrency concerns coordination through shared state. lost-update concerns overwrite conflicts. This rule concerns scheduler order becoming domain meaning.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Ask whether swapping completion order while keeping logical inputs identical should change the result. If not, collect required results and merge using a deterministic rule independent of timing.
 
 ## Nudge
-A scheduler race is deciding business semantics. Collect the complete set and merge it deterministically.
-
-## Examples
-### Positive
-Scheduling order or the first completing concurrent call determines a domain result even though the calls may carry different information.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when a documented first-writer-wins or quorum rule is an explicit domain decision with stable identity and merge policy.
+Do not let the scheduler invent business truth. Either make arrival order an explicit domain rule or derive the result from complete information with deterministic merge semantics.

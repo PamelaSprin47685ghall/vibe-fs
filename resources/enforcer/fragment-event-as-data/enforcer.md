@@ -1,32 +1,22 @@
 # fragment-event-as-data — Enforcer
 
 ## Definition
-Partial stream events, deltas, update ordering, or transport fragments are assembled into business facts instead of reading a complete snapshot.
+A transport fragment is mistaken for domain data when partial stream updates, deltas, callback order, or notification payloads are assembled as though they were the authoritative business fact.
+
+## Governing Principle
+Notification and state answer different questions. A notification says “something changed”; authoritative state says “what is true now.” Transport systems may coalesce, reorder, duplicate, or omit intermediate fragments while still honoring their contract. Building domain truth from those fragments silently strengthens the transport guarantee into one it never promised.
 
 ## Trigger When
-Partial stream events, deltas, update ordering, or transport fragments are assembled into business facts instead of reading a complete snapshot.
+Trigger when business state is reconstructed from incremental provider/stream events even though a complete authoritative snapshot is available and event delivery is not itself the durable source of truth.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger for true event-sourced protocols where each event is an ordered durable domain fact and replay is the specified authority.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+log-as-recovery-protocol elevates diagnostics to facts. snapshot-as-truth elevates a derived projection. This rule concerns ephemeral transport deltas being promoted into domain truth.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Classify the stream: fact log or wake-up signal? If the contract permits missing/coalesced/reordered fragments, it cannot safely define domain state. React to it, then read the authoritative snapshot.
 
 ## Nudge
-Transport fragments are being treated as domain data. Use events only as wake-up signals and read the complete authoritative snapshot.
-
-## Examples
-### Positive
-Partial stream events, deltas, update ordering, or transport fragments are assembled into business facts instead of reading a complete snapshot.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-Transport fragments are being treated as domain data. Use events only as wake-up signals and read the complete authoritative snapshot.
+Do not infer truth from notification choreography. Treat fragments as signals unless the protocol explicitly makes them durable ordered facts; read the authoritative state for meaning.

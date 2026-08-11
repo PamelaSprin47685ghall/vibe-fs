@@ -1,32 +1,22 @@
 # timeout-inflated-to-pass — Enforcer
 
 ## Definition
-A timeout or retry budget is increased mainly to turn a failing test or hanging operation green.
+A timeout is inflated to pass when a larger waiting budget is used to convert a failure or hang into apparent success without explaining why the operation requires the additional time.
+
+## Governing Principle
+A timeout is a policy about how long uncertainty may persist; it is not a mechanism that causes progress. Raising it can hide missing signals, deadlocks, resource leaks, pathological scheduling, or unbounded work while changing none of those causes. A justified timeout follows from measured service behavior and an SLO; an unjustified one merely moves the point at which evidence becomes inconvenient.
 
 ## Trigger When
-A timeout or retry budget is increased mainly to turn a failing test or hanging operation green.
+Trigger when a failing test or operation is made green primarily by increasing timeout/retry duration without root-cause analysis or measured capacity evidence.
 
 ## Do Not Trigger When
-Do not fire when a timeout is raised from measured capacity planning with a defined SLO and root-cause analysis, not to silence a hang.
+Do not trigger when measurement shows the old budget contradicts a defined latency/SLO envelope and the underlying operation remains causally healthy.
 
 ## Distinguish From
-repeat-until-pass loops runs; sleep-based-synchronization uses fixed delay; this tip grows budgets to hide failure.
+sleep-based-synchronization substitutes delay for a readiness signal. repeat-until-pass selects a lucky run. This rule changes the failure threshold to conceal the same unresolved wait.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Determine what event should complete the operation and why it did not occur within the old budget. Fix causality first; adjust the timeout only from measured legitimate latency afterward.
 
 ## Nudge
-A larger timeout is masking the failure. Fix the missing causal signal or resource leak instead.
-
-## Examples
-### Positive
-A timeout or retry budget is increased mainly to turn a failing test or hanging operation green.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when a timeout is raised from measured capacity planning with a defined SLO and root-cause analysis, not to silence a hang.
+A larger clock does not repair a missing cause. Explain the delay, fix the stalled mechanism, then set timeout from evidence rather than from the value that happens to make tests green.

@@ -1,32 +1,22 @@
 # missing-invariant-documentation — Enforcer
 
 ## Definition
-A non-obvious invariant is essential to correctness but exists only in implementation details or tribal knowledge.
+An invariant is undocumented when correctness depends on a non-obvious relation or forbidden state that exists only in implementation shape, memory, or tribal explanation rather than at the contract that owns it.
+
+## Governing Principle
+An invariant is knowledge that survives individual code paths: many implementations may preserve it, and many future changes can violate it. If the rule is not named at its owner, maintainers must rediscover it from symptoms or reverse-engineer it from defensive code. Hidden invariants are therefore delayed defects—correctness depends on knowledge the system has not made transmissible.
 
 ## Trigger When
-A non-obvious invariant is essential to correctness but exists only in implementation details or tribal knowledge.
+Trigger when a material rule such as ordering, uniqueness, ownership, durability, or state relation is essential yet absent from authoritative documentation/types/tests and not obvious from local structure.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger when the invariant is already made explicit by a strong type or small clear contract whose meaning is mechanically evident and needs no redundant prose.
 
 ## Distinguish From
-missing-architecture-gate, missing-regression-test, guessed-not-verified
+missing-architecture-gate lacks enforcement for a known structural rule. unrecorded-decision lacks rationale for a choice. This rule concerns a correctness property whose existence itself is not durably stated.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Name the invariant as a falsifiable sentence, locate its semantic owner, and record it there. Add mechanical enforcement when the property can be checked.
 
 ## Nudge
-A critical invariant is undocumented. State it at the owning contract and add a mechanical guard where possible.
-
-## Examples
-### Positive
-A non-obvious invariant is essential to correctness but exists only in implementation details or tribal knowledge.
-
-### Near miss
-Looks related to missing-architecture-gate but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+Hidden correctness is borrowed time. State the invariant where it is owned and let types, tests, or gates enforce as much of it as the machine can.

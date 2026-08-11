@@ -1,32 +1,22 @@
 # stringly-typed-error — Enforcer
 
 ## Definition
-Callers decide program behavior by interpreting error strings, localized text, message fragments, or regular expressions.
+An error is stringly typed when program behavior depends on parsing, matching, or recognizing human-readable error prose rather than a stable closed error value.
+
+## Governing Principle
+Presentation text and control information have different audiences and different stability requirements. Prose evolves for clarity, localization, and diagnostics; control values must remain unambiguous under those changes. Parsing text couples machine semantics to editorial wording, turning punctuation and phrasing into undocumented protocol fields.
 
 ## Trigger When
-Callers interpret error strings, localized text, message fragments, or regular expressions to determine program behavior.
+Trigger when callers branch on error substrings, regexes, exact messages, localization text, or exception prose to decide retry, status, authorization, or recovery behavior.
 
 ## Do Not Trigger When
-Do not fire when strings are display-only and control flow already branches on a typed code/case before formatting.
+Do not trigger when strings are produced only after the caller has already matched a typed error code/case and are used solely for human display or diagnostics.
 
 ## Distinguish From
-weak-boundary-parsing is general untyped data; expected-failure-as-exception is control via exceptions; this tip is parsing error prose for logic.
+weak-boundary-parsing leaves general input shape untyped. expected-failure-as-exception chooses the wrong failure channel. This rule specifically makes human prose carry machine-control identity.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+List the program decisions derived from the message. Define one closed error case/code for each semantic distinction and format prose only after control flow has matched the case.
 
 ## Nudge
-Program logic is parsing error prose. Replace the string contract with a closed typed error value.
-
-## Examples
-### Positive
-Callers interpret error strings, localized text, message fragments, or regular expressions to determine program behavior.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when strings are display-only and control flow already branches on a typed code/case before formatting.
+Machines need identities; humans need explanations. Branch on a typed error value and generate prose afterward—never make wording itself the protocol.

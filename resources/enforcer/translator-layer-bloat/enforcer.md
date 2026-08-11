@@ -1,32 +1,22 @@
 # translator-layer-bloat — Enforcer
 
 ## Definition
-Translator, broker, governor, coordinator, manager, adapter, or mediator layers merely forward calls without enforcing a real boundary or transformation.
+A translator layer is bloated when a broker, coordinator, manager, adapter, governor, or mediator exists chiefly to forward calls and rename values without owning a semantic transformation or invariant.
+
+## Governing Principle
+A layer earns existence by changing the terms under which reasoning is valid: translating protocols, enforcing authorization, normalizing representation, batching, isolating failure, or owning policy. Pure forwarding adds another place to search and another vocabulary to learn while preserving the same knowledge on both sides. Indirection without information hiding is distance, not abstraction.
 
 ## Trigger When
-Translator, broker, governor, coordinator, manager, adapter, or mediator layers merely forward calls without enforcing a real boundary or transformation.
+Trigger when a layer mostly delegates method-for-method, mirrors DTOs, or passes values through while enforcing no distinct contract, lifecycle, or transformation.
 
 ## Do Not Trigger When
-Do not fire when the layer enforces auth, validation, protocol mapping, batching, or another real invariant not present on either side.
+Do not trigger when the layer performs a real semantic boundary: validation, auth, protocol mapping, transaction ownership, batching, anti-corruption translation, or another invariant absent from both neighbors.
 
 ## Distinguish From
-facade-hides-mess conceals a tangle; generic-helper-bucket is grab-bag utils; this tip is pure forwarding ceremony.
+facade-hides-mess gives a clean surface over unresolved internals. generic-helper-bucket has no conceptual owner. This rule concerns an intermediate layer whose only behavior is forwarding ceremony.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Remove the layer mentally and connect its neighbors. If no invariant, information boundary, or failure model is lost, delete it; otherwise name that invariant and make the layer visibly own it.
 
 ## Nudge
-A forwarding layer adds ceremony without a concept. Remove it or give it a genuine invariant and ownership boundary.
-
-## Examples
-### Positive
-Translator, broker, governor, coordinator, manager, adapter, or mediator layers merely forward calls without enforcing a real boundary or transformation.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when the layer enforces auth, validation, protocol mapping, batching, or another real invariant not present on either side.
+Indirection must buy a boundary. Remove layers that only relay calls, or give them a genuine semantic transformation that justifies making callers cross them.

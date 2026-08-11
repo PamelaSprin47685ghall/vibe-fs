@@ -1,32 +1,22 @@
 # sleep-based-synchronization — Enforcer
 
 ## Definition
-Fixed sleeps or delays stand in for readiness, completion, ordering, or propagation causality.
+Sleep-based synchronization substitutes elapsed wall time for a causal fact such as readiness, completion, visibility, ownership transfer, or propagation.
+
+## Governing Principle
+Time passing does not imply the event being awaited occurred. A fixed delay merely chooses a probability that the cause will have happened by then, coupling correctness to machine load and environment speed. Causal synchronization waits on evidence produced by the event itself, so the program advances because the prerequisite became true rather than because a clock expired.
 
 ## Trigger When
-Fixed sleeps or delays are used to wait for readiness, completion, ordering, or propagation.
+Trigger when fixed sleeps/delays are used to make tests or production flows wait for another operation to become ready, complete, release, or propagate.
 
 ## Do Not Trigger When
-Do not fire for intentional rate limits, backoff ceilings paired with real signals, or human-facing animation delays unrelated to correctness.
+Do not trigger for rate limiting, protocol backoff, deliberate human-facing delay, or timeout budgets that bound waiting while an actual causal signal remains the success condition.
 
 ## Distinguish From
-time-dependent-test is tests coupled to wall clocks; timeout-inflated-to-pass grows budgets to hide hangs; this tip is sleep as synchronization.
+time-dependent-test concerns tests depending on wall time broadly. timeout-inflated-to-pass lengthens a budget to hide failure. This rule specifically confuses duration with causation.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Name the fact the code hopes will become true during the sleep. Identify an observable event/state/awaitable that proves that fact directly and wait on it instead.
 
 ## Nudge
-A fixed sleep is standing in for causality. Wait for an explicit signal or observable state transition.
-
-## Examples
-### Positive
-Fixed sleeps or delays are used to wait for readiness, completion, ordering, or propagation.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire for intentional rate limits, backoff ceilings paired with real signals, or human-facing animation delays unrelated to correctness.
+Do not wait for time when you mean to wait for cause. Synchronize on the event or state transition that makes progress legitimate.

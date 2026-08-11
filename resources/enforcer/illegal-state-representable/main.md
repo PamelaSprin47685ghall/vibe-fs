@@ -1,36 +1,19 @@
 # illegal-state-representable — Main
 
 ## What To Do Now
-Illegal domain states are representable. Encode each valid state explicitly and attach only the data meaningful in that state.
+Replace the field/flag product with explicit domain states so only legitimate combinations can be constructed.
+
+## Why This Matters
+Every illegal value admitted by a type becomes a proof obligation for all code that reads it. Guards multiply because the model keeps re-asking whether the value is real. A stronger type pays that proof once, at construction, and lets the rest of the program reason under a smaller truthful state space.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+List valid states and the data meaningful in each. Model them as distinct cases or validated constructors, then make state transitions explicit and exhaustive. Remove fields whose only purpose was to be nullable outside their phase.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not add more runtime assertions around the same impossible combinations. Assertions detect a modeling failure after construction; they do not prevent the false world from entering the program.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Attempt to construct each formerly illegal combination. It should be impossible by type/constructor rather than merely rejected later.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Nullable fields and flags allow combinations that cannot exist in the real domain.
+Representable state equals legitimate domain state, and downstream code no longer spends branches proving that its input was constructed coherently.

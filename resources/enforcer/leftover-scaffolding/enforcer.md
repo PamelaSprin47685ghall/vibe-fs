@@ -1,32 +1,22 @@
 # leftover-scaffolding — Enforcer
 
 ## Definition
-Temporary files, experimental branches, probes, fixtures, flags, scripts, or migration scaffolding remain in the delivered result without a permanent role.
+Scaffolding is leftover when temporary files, flags, probes, fixtures, scripts, migration aids, or experimental branches remain after the task that justified their temporary existence has ended.
+
+## Governing Principle
+Temporary structure has a different contract from maintained structure: it is optimized for a transition, not for indefinite ownership. Once the transition ends, leaving scaffolding in place silently promotes it without assigning the maintenance duties promotion requires. The repository then accumulates artifacts whose intended lifetime is unknown and whose deletion risk grows simply because they have survived.
 
 ## Trigger When
-Temporary files, experimental branches, probes, fixtures, flags, scripts, or migration scaffolding remain in the delivered result without a permanent role.
+Trigger when temporary support created for debugging, migration, rollout, experimentation, or one-time generation remains in the delivered result without a permanent role and owner.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger when the artifact has been deliberately promoted into a maintained tool with stable purpose, tests, documentation, and ownership.
 
 ## Distinguish From
-legacy-cruft-retained, half-finished-refactor, manual-toil-repeat
+spike-not-cleaned ships experimental design itself. half-finished-refactor leaves dual architecture. This rule concerns ancillary temporary artifacts that outlive the transition they served.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+For each temporary artifact, state its ongoing user, maintenance contract, and trigger for execution. If those do not exist, remove it now rather than let age create false legitimacy.
 
 ## Nudge
-Temporary scaffolding remains in the delivery. Remove it or promote it into a maintained tool with a clear owner.
-
-## Examples
-### Positive
-Temporary files, experimental branches, probes, fixtures, flags, scripts, or migration scaffolding remain in the delivered result without a permanent role.
-
-### Near miss
-Looks related to legacy-cruft-retained but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+Temporary means “must disappear unless promoted deliberately.” Remove scaffolding after the transition, or give it the full contract of a maintained tool.

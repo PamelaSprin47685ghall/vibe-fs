@@ -1,36 +1,19 @@
 # optimistic-retry-assumption — Main
 
 ## What To Do Now
-An unknown external effect is being retried optimistically. Establish idempotency or an explicit at-most-once protocol.
+Treat an unknown external outcome as its own state. Resolve it through idempotency identity, status lookup, deduplication, or an explicit at-most-once protocol before repeating the effect.
+
+## Why This Matters
+A timeout removes knowledge, not history. If the remote side committed before the response vanished, an unqualified retry can duplicate charges, prompts, publications, resource creation, or writes while both attempts appear individually successful.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Assign stable operation identity before the first attempt and carry it through retries. Where the provider lacks idempotency, design recovery around querying authoritative state or refusing automatic retry when duplication cannot be ruled out.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not assume “no response = no effect,” and do not add exponential backoff as if delay changed semantics. Backoff manages load; identity manages duplication.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Simulate “effect committed, acknowledgement lost.” Recovery must converge to one logical effect rather than issue an indistinguishable second one.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): An external effect is retried because its result is unknown, without an idempotency identity or at-most-once recovery contract.
+Every retry after uncertainty is semantically safe because the system can prove whether repeated execution denotes the same logical operation.

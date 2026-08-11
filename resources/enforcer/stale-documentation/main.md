@@ -1,22 +1,19 @@
 # stale-documentation — Main
 
 ## What To Do Now
-Update the owning spec, schema, examples, and diagrams in the same change as the behavior. Delete or relocate obsolete statements.
+Update every authoritative document, schema, example, or diagram whose contract changed, in the same delivery as the implementation.
+
+## Why This Matters
+Stale authoritative prose creates two competing truths. The next engineer may faithfully implement the written contract and thereby reintroduce the behavior the code had already replaced. Synchronization is therefore part of correctness, not clerical cleanup.
 
 ## Repair Strategy
-Diff behavior against docs. Patch the authoritative plane first or together. Link the change notes to the doc update.
-
-## Decision Branches
-If docs live in another package, land a coordinated change. If a doc is superseded, mark it and point to the new authority rather than leaving both live.
+Trace the changed concept to its owning documentation, update semantics rather than merely examples, and remove obsolete descriptions instead of leaving historical alternatives in current docs.
 
 ## Wrong Fixes
-Shipping code first and promising a doc follow-up that never lands. Updating a blog but not the schema contract. Leaving examples that fail against the new API.
+Do not add a note saying “docs may be outdated” or duplicate the new behavior in a second document. Authority must converge, not disclaim itself.
 
 ## Verification
-Follow docs-only instructions against the new code; they work. No contradictory authoritative page remains.
+Read the documentation as though the implementation were unavailable. It should predict the observable contract exercised by tests and current code.
 
 ## Done When
-Authoritative documentation matches the shipped contract in the same delivery.
-
-## Scope and Authority
-Owning specs, schemas, and official examples. Not every chat transcript.
+Every authoritative representation tells the same present-tense story, and a reader cannot follow maintained documentation into an obsolete API or invariant.

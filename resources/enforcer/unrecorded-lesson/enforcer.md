@@ -1,32 +1,22 @@
 # unrecorded-lesson — Enforcer
 
 ## Definition
-A reusable engineering lesson, debugging discovery, provider quirk, or recovery principle emerges but is not recorded durably.
+A lesson is unrecorded when debugging, operations, integration, or recovery reveals a reusable fact about the system and that fact disappears with the people or session that discovered it.
+
+## Governing Principle
+Experience becomes engineering capital only after it is externalized. An incident may reveal a provider quirk, ordering constraint, failed hypothesis, diagnostic shortcut, or recovery law that source code alone does not make obvious. If that knowledge remains conversational, the organization has learned biologically but not structurally; turnover or context loss resets the system’s effective memory.
 
 ## Trigger When
-A reusable engineering lesson, debugging discovery, provider quirk, or recovery principle emerges but is not recorded durably.
+Trigger when an investigation produces a fact or method likely to reduce future search space and no maintained runbook, rule, test, decision record, or project knowledge artifact captures it.
 
 ## Do Not Trigger When
-Do not fire when the lesson is already captured in skills, tips, runbooks, or ADRs, or is a one-off with no reuse value.
+Do not trigger when the lesson is genuinely one-off with no plausible reuse, or its substance is already encoded durably in an authoritative artifact.
 
 ## Distinguish From
-unrecorded-decision is design choice rationale; repeated-known-mistake ignores existing records; this tip fails to capture new learning.
+unrecorded-decision preserves rationale for a deliberate choice. repeated-known-mistake fails to reuse existing memory. This rule is the failure to convert newly acquired experience into durable project memory.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Ask whether a future engineer facing a similar symptom would benefit materially from this discovery. If yes, record the smallest durable statement at the artifact type that future work will naturally consult.
 
 ## Nudge
-A reusable lesson emerged but was not recorded. Capture it with the skill-creator tool so it survives this session.
-
-## Examples
-### Positive
-A reusable engineering lesson, debugging discovery, provider quirk, or recovery principle emerges but is not recorded durably.
-
-### Near miss
-A related situation that shares vocabulary but does not cross this tip's boundary — see Distinguish From.
-
-### Counterexample
-Do not fire when the lesson is already captured in skills, tips, runbooks, or ADRs, or is a one-off with no reuse value.
+A discovery that dies with the session was rented, not learned. Convert reusable experience into tests, runbooks, rules, or records where future work will encounter it before repeating the search.

@@ -1,22 +1,19 @@
 # weakened-test-to-pass — Main
 
 ## What To Do Now
-Restore the strong assertion. Fix the product code. If the contract truly changed, update the spec and tests to the new stronger story—not a looser one that hides bugs.
+Restore the behavioral expectation unless a separate authoritative decision changed the contract; then fix the implementation until it satisfies the preserved test.
+
+## Why This Matters
+A test exists to make some implementations unacceptable. Weakening it solely because the current code fails removes exactly the pressure that gives verification value. The suite becomes a description of whatever the code already does rather than a constraint on what it is allowed to do.
 
 ## Repair Strategy
-Diff the test change. Reintroduce removed cases. Confirm the failure mode. Patch implementation until the original behavioral intent holds.
-
-## Decision Branches
-If the old test was wrong, replace it with a correct strong test—not `assert true`. If flaky, fix determinism rather than deleting the check.
+Recover the original requirement, isolate the failure mechanism, and repair production behavior. If the requirement truly changed, record that decision and rewrite the test to the new contract for that reason—not as a route to green.
 
 ## Wrong Fixes
-Deleting the only failing assertion. Broadening equality to "not null". Marking tests skipped to go green permanently.
+Do not replace exact outcomes with broad truthiness, delete edge cases, or loosen fixtures without explaining the semantic requirement that disappeared.
 
 ## Verification
-Restored tests fail on the old bug and pass on the fix; suite strength is not reduced.
+Temporarily restore the old defective implementation. The preserved/newly justified test should distinguish it from the required behavior for a contract-level reason.
 
 ## Done When
-Behavioral expectations remain strong; the defect is fixed in implementation.
-
-## Scope and Authority
-Test changes responding to failures.
+Green means the implementation satisfies an independently chosen contract, not that the contract was reduced until the implementation could satisfy it.

@@ -1,35 +1,19 @@
 # false-gate — Main
 
 ## What To Do Now
-A quality gate can pass without checking the intended property. Add a self-test that proves the gate turns red.
+Add a self-test or known-bad fixture that demonstrates the gate turns red for the exact property it claims to enforce.
+
+## Why This Matters
+Green has meaning only as the negation of a possible red. A gate that cannot observe violations is not neutral; it is a confidence amplifier disconnected from reality. Teams then optimize for passing a ritual rather than preserving the invariant.
 
 ## Repair Strategy
-1. Confirm the tip applies at the real boundary, not a symptom downstream.
-2. Restore the missing name, ownership, test, or control so the ScoreWhen condition no longer holds.
-3. Prefer one canonical fix over a local workaround that leaves the invariant broken.
-
-## Decision Branches
-- If the root cause is a missing domain type or named case: introduce the type at the boundary and migrate callers.
-- If the root cause is a collapsed or bypassed boundary: restore the interface and stop sharing internals.
-- If the root cause is missing proof: add a durable assertion, contract test, or canary that would fail under a realistic defect.
-- If the change is destructive or speculative: stop, establish authority and the true owner first.
+Trace the gate’s subject discovery, matching logic, exit propagation, and CI wiring. Prove each link with a fixture that should fail, then remove any fail-open behavior that converts “checked nothing” into success.
 
 ## Wrong Fixes
-- Papering over the symptom with another flag, catch-all, facade, or compatibility shim.
-- Leaving dual paths, commented-out code, or ephemeral probes as the only record of the fix.
-- Testing private helpers instead of the supported entry point when the contract is public.
+Do not merely add more logging or trust a successful manual run on clean code. Clean input cannot demonstrate that a detector detects.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition is gone.
-- Exercise the success path and the relevant failure, cancellation, or near-miss path.
-- Ensure no duplicate source of truth, silent catch-all, or unowned helper remains.
+Run the gate against both a known violation and a known valid case. It must be red for the former and green for the latter through the same standard entry point.
 
 ## Done When
-- The nudge is applied at the owning boundary.
-- Callers and proofs use the canonical representation.
-- A reviewer can see why the tip no longer fires without relying on tribal knowledge.
-
-## Scope and Authority
-- Touch only the owning module, contract, and directly affected callers.
-- Do not expand into unrelated cleanup, renames, or framework churn.
-- Destructive actions require explicit authority and a verified target.
+A green gate is evidence because its red state has been demonstrated, not because the command happened to exit successfully on today’s tree.

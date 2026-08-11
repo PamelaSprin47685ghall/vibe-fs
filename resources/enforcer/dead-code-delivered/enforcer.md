@@ -1,32 +1,22 @@
 # dead-code-delivered — Enforcer
 
 ## Definition
-Unreachable, unused, superseded, or unreferenced production code is left behind.
+Delivered dead code is production code with no reachable role in the current system: unused, superseded, unreferenced, or impossible to execute.
+
+## Governing Principle
+Version control is the archive; the working tree is the proposition “this is the system.” Dead code weakens that proposition by preserving alternatives that no longer participate in behavior. Readers must still reason about them, tools still index them, and future maintainers cannot tell whether the path is intentionally dormant or merely forgotten.
 
 ## Trigger When
-Unreachable, unused, superseded, or unreferenced production code is left behind.
+Trigger when production functions, branches, modules, aliases, or paths are unreachable or have no remaining caller after a change.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger for intentionally dormant extension points or feature paths whose activation contract and owner are explicit and tested.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+commented-out-code stores old code in comments. legacy-cruft-retained keeps obsolete compatibility surfaces. This rule concerns executable source that no longer belongs to any current behavior.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Find the caller, activation condition, or contract that gives the code a present role. If none exists, delete it rather than preserve hypothetical utility.
 
 ## Nudge
-Dead production code remains. Delete it and let version control preserve history.
-
-## Examples
-### Positive
-Unreachable, unused, superseded, or unreferenced production code is left behind.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-Dead production code remains. Delete it and let version control preserve history.
+Keep only code with a present proof of life. Delete unreachable production paths; history can recover them if the future ever needs them again.

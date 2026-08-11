@@ -1,32 +1,22 @@
 # canary-skipped — Enforcer
 
 ## Definition
-A behavior that depends on undocumented Host or provider ordering is changed without a real integration canary.
+A canary is skipped when correctness depends on behavior owned by a real Host, provider, runtime, or deployment environment, yet verification stops at mocks or documentation.
+
+## Governing Principle
+Undocumented external behavior is an empirical premise. No amount of internal proof can derive it, because the proposition is not owned by the code under test. When correctness depends on ordering, framing, identity, timing, or lifecycle supplied by another system, the final proof obligation must cross that system’s actual boundary.
 
 ## Trigger When
-A behavior that depends on undocumented Host or provider ordering is changed without a real integration canary.
+Trigger when a change relies on Host/provider behavior that is undocumented, weakly specified, or historically surprising and no narrow real-environment canary proves the assumption.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger when the dependency is fully specified by a stable contract already exercised by an equivalent contract test, or when the change cannot reach that boundary.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+contract-test-missing concerns a declared boundary contract. release-ladder-skipped concerns verification order generally. This rule targets an empirical Host assumption that only the real system can settle.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+State the external assumption as a falsifiable sentence. Build the smallest real interaction that would disprove it. Treat the observation, not the mock, as authority.
 
 ## Nudge
-An undocumented Host assumption lacks a canary. Prove it against the real boundary before release.
-
-## Examples
-### Positive
-A behavior that depends on undocumented Host or provider ordering is changed without a real integration canary.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-An undocumented Host assumption lacks a canary. Prove it against the real boundary before release.
+When the premise belongs to the Host, ask the Host. Add a narrow real canary that can falsify the assumption before release.

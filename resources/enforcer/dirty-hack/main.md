@@ -1,35 +1,19 @@
 # dirty-hack — Main
 
 ## What To Do Now
-A workaround is hiding the root cause. Repair the governing abstraction or invariant instead.
+Remove the workaround and repair the model, ownership, or boundary whose mismatch made the workaround appear necessary.
+
+## Why This Matters
+A hack is expensive not because it is ugly but because it creates an undocumented exception to the system’s explanatory model. Future code must remember both the rule and the place where the rule is false. Enough such exceptions turn architecture into folklore.
 
 ## Repair Strategy
-1. Confirm the tip applies at the real boundary, not a symptom downstream.
-2. Restore the missing name, ownership, test, or control so the ScoreWhen condition no longer holds.
-3. Prefer one canonical fix over a local workaround that leaves the invariant broken.
-
-## Decision Branches
-- If the root cause is a missing domain type or named case: introduce the type at the boundary and migrate callers.
-- If the root cause is a collapsed or bypassed boundary: restore the interface and stop sharing internals.
-- If the root cause is missing proof: add a durable assertion, contract test, or canary that would fail under a realistic defect.
-- If the change is destructive or speculative: stop, establish authority and the true owner first.
+Trace the symptom to the first violated invariant. Change the representation or owner there, migrate callers, and delete the bypass rather than preserving it as fallback insurance.
 
 ## Wrong Fixes
-- Papering over the symptom with another flag, catch-all, facade, or compatibility shim.
-- Leaving dual paths, commented-out code, or ephemeral probes as the only record of the fix.
-- Testing private helpers instead of the supported entry point when the contract is public.
+Do not add another flag, adapter, catch, retry, or duplicate path around the workaround. Layering defenses over a false model increases the number of stories the system can tell about the same fact.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition is gone.
-- Exercise the success path and the relevant failure, cancellation, or near-miss path.
-- Ensure no duplicate source of truth, silent catch-all, or unowned helper remains.
+The original failing behavior must be explained and covered by a regression test at the correct boundary. Removing the workaround alone should no longer reintroduce the defect.
 
 ## Done When
-- The nudge is applied at the owning boundary.
-- Callers and proofs use the canonical representation.
-- A reviewer can see why the tip no longer fires without relying on tribal knowledge.
-
-## Scope and Authority
-- Touch only the owning module, contract, and directly affected callers.
-- Do not expand into unrelated cleanup, renames, or framework churn.
-- Destructive actions require explicit authority and a verified target.
+There is one coherent model of the behavior, no special path exists solely to compensate for a known structural mistake, and the fix can be explained without “except here.”

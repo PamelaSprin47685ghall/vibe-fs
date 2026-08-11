@@ -1,36 +1,19 @@
 # non-exhaustive-transition — Main
 
 ## What To Do Now
-State transitions are not exhaustive. Enumerate the legal cases and reject impossible transitions explicitly.
+Write the transition relation exhaustively: every reachable state and input pair must either produce a named successor/result or an explicit typed rejection.
+
+## Why This Matters
+A wildcard in a finite state machine is a policy decision without a name. It silently grants the same semantics to cases that may deserve different treatment now or after the model grows. Exhaustiveness converts missing decisions into compile-time or test-time pressure.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Model states/events as closed cases, enumerate transitions, and keep illegal transitions explicit rather than dropping them. Let exhaustive matching force review whenever a new case is introduced.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not route unspecified transitions to “ignore” or “invalid” without deciding whether each pair is truly equivalent. Generic rejection can hide legitimate future behavior just as generic success can.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Build a table/property test over all finite pairs and assert the expected successor or rejection for each.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): A finite state transition can silently ignore or generically accept a state/event pair that should be explicitly legal or illegal.
+The transition function is a complete readable specification of the state machine, with no semantic cells filled by default control flow.

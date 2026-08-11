@@ -1,32 +1,22 @@
 # contract-test-missing — Enforcer
 
 ## Definition
-A Host, provider, storage, process, network, plugin, or language boundary is changed without a contract-level test.
+A contract test is missing when a boundary owned by another runtime, process, language, store, provider, or plugin changes without a proof of the observable agreement at that boundary.
+
+## Governing Principle
+A boundary is where independent implementations meet. Internal tests can prove each side is self-consistent while both sides disagree about bytes, ordering, identity, defaults, failure, or lifetime. The contract is therefore not the code on either side; it is the intersection of what one emits and the other accepts.
 
 ## Trigger When
-A Host, provider, storage, process, network, plugin, or language boundary is changed without a contract-level test.
+Trigger when a Host, provider, storage, process, network, plugin, wire, or language boundary changes and no test exercises the exact supported input/output and failure semantics.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger when an existing contract-level test already covers the changed behavior through the same boundary and would fail on incompatibility.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+behavioral-boundary-untested concerns a public boundary within the product. canary-skipped concerns undocumented behavior requiring the real environment. This rule concerns a declared inter-system contract.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Name the producer, consumer, exchanged representation, identity rules, and failure semantics. Add a test at the narrowest point where both sides’ assumptions become observable.
 
 ## Nudge
-A boundary contract changed without a contract test. Verify the exact input, output, identity, and failure semantics.
-
-## Examples
-### Positive
-A Host, provider, storage, process, network, plugin, or language boundary is changed without a contract-level test.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-A boundary contract changed without a contract test. Verify the exact input, output, identity, and failure semantics.
+Two correct components can still disagree. Test the agreement itself: exact shape, identity, ordering, and failure semantics at the real contract boundary.

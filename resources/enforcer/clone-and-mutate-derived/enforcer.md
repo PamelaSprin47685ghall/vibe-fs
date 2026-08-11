@@ -1,32 +1,22 @@
 # clone-and-mutate-derived — Enforcer
 
 ## Definition
-A new domain value is created by cloning a mutable prototype and patching selected fields.
+Clone-and-mutate derives a domain value by copying a mutable prototype and patching selected fields, so the new value’s meaning is defined by what happened not to be changed.
+
+## Governing Principle
+A value should state its own truth. Prototype cloning instead defines truth negatively: every inherited field is accepted by omission. As objects evolve, newly added fields silently propagate into old derivation code, turning structural reuse into semantic inheritance. The derived value then depends on the prototype’s entire future shape, not only on the facts its constructor intended to preserve.
 
 ## Trigger When
-A new domain value is created by cloning a mutable prototype and patching selected fields.
+Trigger when domain values are produced by cloning/copying a mutable object and then assigning differences field by field.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when the observed pattern is intentional, documented, and verified at the owning contract.
+Do not trigger for immutable record-copy syntax where preserved fields are intentionally part of the same domain value and invariants remain constructor-safe.
 
 ## Distinguish From
-Related tips that share vocabulary but different boundary.
+in-place-mutation changes an existing shared value. runtime-checked-builder permits invalid construction phases. This rule concerns deriving a new semantic value by inheriting an overly broad prototype.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+List the facts the new value should carry. If that list is smaller or more meaningful than “everything the old object currently has except these patches,” construct from the list directly.
 
 ## Nudge
-A derived value is being made through clone-and-mutate. Construct the intended immutable value directly.
-
-## Examples
-### Positive
-A new domain value is created by cloning a mutable prototype and patching selected fields.
-
-### Near miss
-A similar surface symptom appears, but the governing boundary already names and enforces the concept.
-
-### Counterexample
-A derived value is being made through clone-and-mutate. Construct the intended immutable value directly.
+Derivation should be positive, not accidental inheritance. Construct the intended immutable value from the facts that define it.

@@ -1,36 +1,19 @@
 # half-finished-refactor — Main
 
 ## What To Do Now
-A refactor stopped halfway. Finish the ownership transfer and remove the obsolete path.
+Choose the post-refactor owner, migrate every repository-owned caller to it, and remove obsolete adapters, aliases, flags, and duplicate implementations.
+
+## Why This Matters
+A half migration preserves the cost of the old model while adding the cost of the new one. Every future change must answer which path to update, which representation is canonical, and whether divergence is intentional. The refactor has increased entropy instead of reducing it.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+List all old-surface references and eliminate them systematically. Collapse temporary conversion layers once the last legitimate caller moves. Keep compatibility only where an external consumer and retirement plan require it.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not declare the migration “good enough” because both paths work. Dual success is exactly what makes the transitional state capable of surviving forever.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Search for retired names and paths, run behavior tests through the new owner, and confirm no internal caller still depends on transitional compatibility.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Old and new structures coexist without a completed migration, leaving duplicated ownership, temporary adapters, or inconsistent conventions.
+The repository tells one story about ownership again: new structure is authoritative, old structure is gone, and no bridge exists without a bounded external reason.

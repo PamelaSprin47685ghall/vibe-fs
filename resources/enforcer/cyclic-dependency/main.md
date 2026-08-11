@@ -1,35 +1,19 @@
 # cyclic-dependency — Main
 
 ## What To Do Now
-The dependency graph is cyclic. Identify the missing boundary or fact flow and restore one-way dependencies.
+Break the smallest semantic cycle by extracting the shared fact, protocol, or policy into an owner both sides may depend on without depending on each other.
+
+## Why This Matters
+Cycles destroy locality. To understand A you must understand B, but to understand B you must already understand A. Construction inherits the same paradox through lazy initialization, mutable registries, or runtime lookups. The code can execute, yet no component has an independent definition.
 
 ## Repair Strategy
-1. Confirm the tip applies at the real boundary, not a symptom downstream.
-2. Restore the missing name, ownership, test, or control so the ScoreWhen condition no longer holds.
-3. Prefer one canonical fix over a local workaround that leaves the invariant broken.
-
-## Decision Branches
-- If the root cause is a missing domain type or named case: introduce the type at the boundary and migrate callers.
-- If the root cause is a collapsed or bypassed boundary: restore the interface and stop sharing internals.
-- If the root cause is missing proof: add a durable assertion, contract test, or canary that would fail under a realistic defect.
-- If the change is destructive or speculative: stop, establish authority and the true owner first.
+Draw dependency arrows by meaning, not file references. Decide which direction reflects authority. Move shared abstractions toward the stable foundation or introduce message/data contracts that let peers communicate without importing each other.
 
 ## Wrong Fixes
-- Papering over the symptom with another flag, catch-all, facade, or compatibility shim.
-- Leaving dual paths, commented-out code, or ephemeral probes as the only record of the fix.
-- Testing private helpers instead of the supported entry point when the contract is public.
+Do not hide the cycle behind dependency injection, a global service locator, dynamic import, or callback registry. Those techniques can erase a static edge while preserving mutual semantic ownership.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition is gone.
-- Exercise the success path and the relevant failure, cancellation, or near-miss path.
-- Ensure no duplicate source of truth, silent catch-all, or unowned helper remains.
+The module/package graph should be acyclic, initialization should have a clear order, and either side should be testable against a contract without constructing the other’s implementation.
 
 ## Done When
-- The nudge is applied at the owning boundary.
-- Callers and proofs use the canonical representation.
-- A reviewer can see why the tip no longer fires without relying on tribal knowledge.
-
-## Scope and Authority
-- Touch only the owning module, contract, and directly affected callers.
-- Do not expand into unrelated cleanup, renames, or framework churn.
-- Destructive actions require explicit authority and a verified target.
+Dependencies form a one-way explanation of the system: lower concepts can be understood before higher ones, and no component requires its dependent in order to define itself.

@@ -1,36 +1,19 @@
 # premature-optimization — Main
 
 ## What To Do Now
-Optimization was introduced without evidence of a bottleneck. Keep the simple design until measurement justifies complexity.
+Return to the simplest correct design unless a measured bottleneck or explicit resource budget justifies the added complexity.
+
+## Why This Matters
+Speculative optimization hardens assumptions about where cost lives. Those assumptions often outlive the workload that inspired them, while the complexity they introduced remains real in every test, refactor, and failure path.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Define the performance objective, benchmark/profile the simple path, and optimize the dominant measured cost only. Keep the optimization isolated enough that its proof and rollback remain local.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not defend complexity with “this might scale better.” Future scale is not measurable evidence. Equally, do not ignore known asymptotic limits when the workload already makes them binding.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+Measure before and after under representative load and confirm the improvement is material to the stated budget.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Complexity is introduced for performance before a measured bottleneck or explicit resource constraint exists.
+Every nontrivial performance complexity can point to the constraint it satisfies and the measurement that proves it earns its maintenance cost.

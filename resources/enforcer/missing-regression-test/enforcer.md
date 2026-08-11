@@ -1,32 +1,22 @@
 # missing-regression-test — Enforcer
 
 ## Definition
-A defect is fixed without a test that fails on the old behavior and passes on the corrected behavior.
+A regression test is missing when a defect is corrected without preserving an executable example that fails under the old behavior and passes under the repaired behavior.
+
+## Governing Principle
+A bug report is new knowledge about the system’s reachable state space. Fixing the implementation removes the symptom; a regression test preserves the knowledge that this region of state space is dangerous. Without it, the team pays for the discovery once and then permits future refactors to forget it completely.
 
 ## Trigger When
-A defect is fixed without a test that fails on the old behavior and passes on the corrected behavior.
+Trigger when a concrete defect is fixed and no test reproduces the original failure through the relevant behavioral boundary.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger when an existing test already fails on the buggy behavior and was the evidence that drove the repair.
 
 ## Distinguish From
-ignored-tdd, guess-based-fix, order-dependent-test
+ignored-tdd concerns red-first order for all behavior changes. failure-path-untested concerns failure branches. This rule is the durable memory obligation created by a known defect.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Reproduce the bug in the smallest behavioral test before or alongside the fix. Confirm the old implementation fails for the reported reason, then require the corrected implementation to pass.
 
 ## Nudge
-A bug fix lacks a regression test. Capture the failure before considering the fix complete.
-
-## Examples
-### Positive
-A defect is fixed without a test that fails on the old behavior and passes on the corrected behavior.
-
-### Near miss
-Looks related to ignored-tdd but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+A bug that taught the project nothing can return unchanged. Preserve the failure as a regression test so the repository remembers what humans had to discover.

@@ -1,32 +1,22 @@
 # god-module — Enforcer
 
 ## Definition
-One module owns several unrelated side-effect boundaries, policies, resources, or domains merely because they are currently convenient to colocate.
+A god module owns several unrelated policies, effects, resources, or domains because colocating them is convenient, not because one invariant requires their joint ownership.
+
+## Governing Principle
+Size is a symptom; mixed reasons to change are the disease. A module becomes “god-like” when it sits above multiple independent truths and therefore must know how they interact. Every new responsibility increases the Cartesian product of contexts visible inside it, until local changes require understanding storage, network, policy, lifecycle, and presentation at once.
 
 ## Trigger When
-One module owns several unrelated side-effect boundaries, policies, resources, or domains merely because they are currently convenient to colocate.
+Trigger when one module controls several side-effect boundaries or domain policies whose lifecycles and invariants can vary independently.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger merely because a cohesive module is large. A large implementation with one governing invariant may still have one owner.
 
 ## Distinguish From
-mixed-side-effect-boundaries, premature-unification, pattern-sprawl
+mixed-side-effect-boundaries focuses on combining effects in one function/module. generic-helper-bucket lacks ownership entirely. This rule concerns one owner accumulating several distinct sovereignties.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+List the module’s reasons to change. If several can change independently and have different invariants, split by those reasons—not by arbitrary line count.
 
 ## Nudge
-One module owns unrelated responsibilities. Split it along real domain or side-effect boundaries, not arbitrary file size.
-
-## Examples
-### Positive
-One module owns several unrelated side-effect boundaries, policies, resources, or domains merely because they are currently convenient to colocate.
-
-### Near miss
-Looks related to mixed-side-effect-boundaries but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+Do not split by size; split by sovereignty. Give each independent invariant and side-effect boundary an owner small enough to reason about without importing the others.

@@ -1,36 +1,19 @@
 # incidental-complexity-dominates — Main
 
 ## What To Do Now
-Incidental complexity is dominating the design. Remove ceremony until the essential domain concepts become the visible structure.
+Identify machinery introduced by the solution rather than demanded by the domain, then remove or compress it until essential concepts become the main visible structure.
+
+## Why This Matters
+Reader attention is the scarce resource architecture allocates. Every wrapper, lifecycle rule, configuration key, and translation step consumes that resource before any business reasoning begins. When accidental mechanisms dominate, even simple changes require global context.
 
 ## Repair Strategy
-1. Confirm the ScoreWhen condition against the current change, not a guessed future risk.
-2. Apply the nudge at the owning boundary; do not paper over symptoms downstream.
-3. Remove obsolete paths, adapters, or temporary flags created by the wrong fix.
-4. Leave a mechanical check or named type where the boundary can regress.
-
-## Decision Branches
-- If the smell is real and local: apply the nudge and verify the boundary.
-- If a sibling tip fits better: switch to that tip rather than stretching this one.
-- If the boundary is already explicit and guarded: stop; this tip does not apply.
+Trace one representative domain operation end to end. Collapse pass-through layers, use language/platform primitives directly, remove duplicate representations, and keep only machinery that protects a real invariant or external constraint.
 
 ## Wrong Fixes
-- Renaming without changing ownership or representation.
-- Adding comments or TODOs instead of a type, test, or gate.
-- Dual-writing old and new paths "just in case".
-- Broad refactors that leave half-finished ownership.
+Do not merely shorten files or hide ceremony behind generators. Generated or encapsulated complexity still exists if maintainers must understand it to change behavior safely.
 
 ## Verification
-- Re-read the changed boundary and confirm the ScoreWhen condition no longer holds.
-- Run the narrowest check that would fail if the old smell returned.
-- Ensure no leftover scaffolding or compatibility shim remains without an owner.
+A reader should be able to explain the domain operation mostly in domain terms, with infrastructure concepts appearing only where reality forces a boundary.
 
 ## Done When
-- The nudge is applied at the source boundary.
-- Obsolete dual paths are gone.
-- A reader can see the concept, ownership, and guard without tribal knowledge.
-
-## Scope and Authority
-- Tip substance comes from ScoreWhen/Nudge; do not invent extra product requirements.
-- Prefer the smallest change that closes the boundary; escalate only when ownership is unclear.
-- Why (context): Configuration, glue, wrappers, lifecycle management, serialization ceremony, or framework rituals occupy more attention than the actual domain problem.
+The code’s conceptual mass is proportional to the problem’s irreducible complexity rather than to frameworks, glue, and historical accidents of implementation.

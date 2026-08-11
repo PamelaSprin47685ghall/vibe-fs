@@ -1,32 +1,22 @@
 # guessed-not-verified — Enforcer
 
 ## Definition
-Behavior, API shape, file content, Host semantics, or failure cause is asserted without reading the source or running a direct check.
+A claim is guessed when material behavior, API shape, file content, Host semantics, or failure cause is asserted from expectation rather than inspected from its authoritative source.
+
+## Governing Principle
+Engineering reasoning is conditional: if premise P is false, every flawless deduction from P is still wrong. Material premises therefore deserve stronger evidence in proportion to the cost of acting on them. Source code, actual files, direct experiments, and documented contracts outrank naming conventions, memory, and what a tool “usually” does.
 
 ## Trigger When
-Behavior, API shape, file content, Host semantics, or failure cause is asserted without reading the source or running a direct check.
+Trigger when a decision depends on an unverified factual claim that could be settled by reading the owner or running a focused check.
 
 ## Do Not Trigger When
-Do not fire when the concept is already a named domain type at the boundary, or when an explicit contract already makes the boundary and ownership mechanically visible.
+Do not trigger for explicitly labeled hypotheses used to guide investigation before evidence is available, provided they are not treated as established facts.
 
 ## Distinguish From
-guess-based-fix, missing-invariant-documentation
+guess-based-fix acts speculatively until symptoms move. blind-edit mutates before understanding ownership. This rule is epistemic: an uncertain premise is being smuggled into reasoning as fact.
 
 ## Decision Procedure
-1. Name the concept
-2. Name the boundary
-3. Ask if a primitive crosses it
-4. Prefer a distinct type
+Identify the load-bearing claim, then identify the authority capable of settling it. Read or test that source before letting downstream reasoning depend on the claim.
 
 ## Nudge
-A material claim was guessed rather than verified. Inspect the authoritative source or run a targeted experiment.
-
-## Examples
-### Positive
-Behavior, API shape, file content, Host semantics, or failure cause is asserted without reading the source or running a direct check.
-
-### Near miss
-Looks related to guess-based-fix but the decisive signal here is different.
-
-### Counterexample
-Do not fire when the concept is already a named domain type at the boundary, or when the suspected smell is only surface similarity.
+Do not spend deductions on an unverified premise. Inspect the authoritative source or run the smallest experiment that can make the claim true or false.
