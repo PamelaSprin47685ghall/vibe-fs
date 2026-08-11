@@ -1773,3 +1773,49 @@ Tests
 - 每个大文件拆分后：一个文件一句话能说清属于它/绝不属于它的知识；调用点全部迁移；旧文件删除。
 - `kolmogorov-size` 门禁纳入 `scripts/check.mjs`，`npm run check` 全绿。
 - 全仓 `npm run check:release` 通过（E2E 涉及 EnforcerHost/HostForkRuntime/SyncDelegateRuntime/SpikePlugin 等）。
+
+---
+
+## Final outcome
+
+> 本文件是历史变更记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
+
+全部 5 个 Wave 已实施并验证闭环（`npm run check` 全绿：lint 18 门禁 →
+build → unit 2315 → integration 273）。按"一 commit 一 owner"执行，无
+facade/转发过渡，旧路径迁移完成即删除。
+
+### Wave 0 — 基线（e322b8a1, 52fa09ea, 5b318f92, 4ccf93ab）
+- 删除 EnforcerNudge/EnforcerThrottle 编译 tombstone（含 fsproj 条目与测试）
+- 清理 sessionDeadRefusal compatibility no-op
+- 新建 scripts/checks/kolmogorov-size.mjs ratchet（274 文件基线）
+
+### Wave 1 — 安全拆分（b57edca9, de658697, 081d274e）
+- JsTools.fs 1149 → 6 owner 文件（Capability/Description/Surface/Failure/Anchor/Transaction）
+- ProjectionAlgebra.fs 890 → Intent(234)/Planner(263)/Renderer(401)
+- tests/unit/support/domain.mjs 6193 → domain/ 10 family 文件 + re-export 过渡入口 + test-boundary 门禁
+
+### Wave 2 — god-module（939a2e4e, 2f9f0c53, f98b4e3f）
+- PluginRuntimeScope 530 → 235（Strength/Blogger/Session/Recovery 四 owner 组合）
+- Journal/Fold.fs 1139 → 132 dispatcher + 8 family fold 模块 + FoldRejection/ProjectionUpdate 两代数
+- EnforcerHost.fs 1988 → 905（TipGuidance/CycleDecode/CycleCommit/FrameRecovery/Repair 五 owner + 主链）
+
+### Wave 3 — 运行时协调（04380b8e, aeda2594, fe337ba9, 944c4339, 10af3c87, 1a1d2b11）
+- HostForkRuntime 630 → 286 + HostForkJoin 396（join/await 工作流）
+- SyncDelegateRuntime 600 → 345（CallStore/Wait/Workflow 组合，API 不变）
+- ManagerNarrativeTransform raw 解析全部收敛回 Codec（613 → 552）
+- Codec/Projection 747 → ProviderWireDecode(264)/ProviderWireCapture(166)/ProjectionMessageEdit(354)，66 调用点迁移
+- JsToolsFs 633 → JsUtf8Fs/JsGlobFs/JsAnchorFs/JsMutationFs 四 adapter
+- SpikePlugin 884 → 21 行装配图 + 6 wiring 模块；修复 transform 柯里化错位（pairedHook→curriedHook）
+
+### Wave 4/5 — 重审与收尾（3aa502ed）
+- Fact.fs/Identity.fs 等 10 个单世界 vocabulary/代数/适配器获批 kolmogorov-size 例外（owner+reason）
+- 协调器长尾（EnforcerHost 905/HostSignalBootstrap 483/BloggerCoordinator 403/Reconciler 451 等）保持 ratchet 压力，留待后续二级拆分
+
+### 过程中的真实回归（均已修复并被测试兜住）
+- ClearRecovery 误清 attempt plans（xwire probe 测试捕获）
+- SpikePlugin transform 柯里化错位导致 transform 无效果（rewrite-consistency 测试捕获）
+
+### 遗留（非本 Proposal 范围）
+- 协调器类 >300 文件可继续按已成熟方法拆（保持 ratchet，未批准例外）
+- `npm run check:release`（E2E/warmup/package）未在本轮执行，交付前建议跑一次
