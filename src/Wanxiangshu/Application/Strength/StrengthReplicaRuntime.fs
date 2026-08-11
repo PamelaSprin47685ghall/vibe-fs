@@ -104,7 +104,7 @@ type StrengthReplicaRuntime
         emitJsExpr (completed, timedOut) "Promise.race([$0, $1])"
 
     let complete terminal (state: StrengthReplicaDecisionState) =
-        state.Completion.TrySetResult(outcome terminal state) |> ignore
+        AsyncSupport.trySetResult state.Completion (outcome terminal state) |> ignore
 
     let abortReplica (state: StrengthReplicaDecisionState) =
         task {

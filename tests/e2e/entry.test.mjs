@@ -65,20 +65,30 @@ if (!runStaticGate([fileURLToPath(import.meta.url)]).passed) {
 
 const NATIVE_TODO_CANARY_PROMPT =
   'NATIVE_TODO_CANARY: exercise the default build session todowrite hook.';
+const STRENGTH_HOST_CANARY_PROMPT =
+  'STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica path.';
 
-const preFlowNativeTodoCanary = async (scenario) => {
+const runPreFlowPrompt = async (scenario, lane, prompt, agent) => {
   const created = await scenario.client.createSession({});
   const sessionID = getSessionId(created);
-  assert.ok(sessionID, `native todo canary session creation failed: ${JSON.stringify(created)}`);
+  assert.ok(sessionID, `${lane} session creation failed: ${JSON.stringify(created)}`);
   if (!scenario.sessionIds.includes(sessionID)) scenario.sessionIds.push(sessionID);
-  bindLaneSession(scenario.provider, sessionID, 'native-todo-canary');
+  bindLaneSession(scenario.provider, sessionID, lane);
 
   const turn = scenario.turn.start(sessionID);
   const response = await scenario.client.request('POST', `/session/${sessionID}/prompt_async`, {
-    body: { parts: [{ type: 'text', text: NATIVE_TODO_CANARY_PROMPT }] },
+    body: {
+      parts: [{ type: 'text', text: prompt }],
+      ...(agent ? { agent } : {}),
+    },
   });
-  assert.ok(response.ok, `native todo canary prompt failed: ${JSON.stringify(response.data)}`);
+  assert.ok(response.ok, `${lane} prompt failed: ${JSON.stringify(response.data)}`);
   await turn.awaitTerminal();
+};
+
+const preFlowNativeTodoCanary = async (scenario) => {
+  await runPreFlowPrompt(scenario, 'native-todo-canary', NATIVE_TODO_CANARY_PROMPT);
+  await runPreFlowPrompt(scenario, 'strength-canary-owner', STRENGTH_HOST_CANARY_PROMPT, 'deep-coder');
 };
 
 /**

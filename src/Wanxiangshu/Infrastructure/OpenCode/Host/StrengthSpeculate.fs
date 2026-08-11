@@ -286,6 +286,56 @@ module StrengthSpeculate =
                                                 | StrengthEligibility.Ineligible _ -> ()
 
                                                 return ()
+                                            | StrengthRolloutMode.DryRun ->
+                                                // Host canary path: exercise the real nested Replica,
+                                                // request profile, readonly tool loop and K1 stop, but
+                                                // never publish Prepared or change primary bytes.
+                                                let canaryOpportunity =
+                                                    { opportunity with
+                                                        CostModelAvailable = true
+                                                        HostCanaryHealthy = true }
+
+                                                match StrengthPolicy.eligibility canaryOpportunity, fastAgent with
+                                                | StrengthEligibility.Eligible, Some agent ->
+                                                    let id =
+                                                        decisionId
+                                                            settings.PolicyVersion
+                                                            owner
+                                                            authority.AuthorityRootUserMessageId
+                                                            target
+
+                                                    match
+                                                        StrengthFrame.tryLocalizeMirror
+                                                            HostDigest.sha256Hex
+                                                            id
+                                                            anchorDigest
+                                                            wire.Messages
+                                                    with
+                                                    | Error _ -> return ()
+                                                    | Ok replicaMirror ->
+                                                        let! outcome =
+                                                            runtime.StartDecision(
+                                                                owner,
+                                                                id,
+                                                                target,
+                                                                StrengthBudget.K1,
+                                                                agent,
+                                                                replicaMirror,
+                                                                anchorDigest
+                                                            )
+
+                                                        match outcome with
+                                                        | Ok completed ->
+                                                            match completed.Terminal with
+                                                            | StrengthReplicaTerminal.InvalidFrame reason ->
+                                                                scope.TripStrengthFuse(
+                                                                    "Strength dry-run invalid frame: " + reason
+                                                                )
+                                                            | _ -> ()
+                                                        | Error _ -> ()
+
+                                                        return ()
+                                                | _ -> return ()
                                             | StrengthRolloutMode.Off -> return ()
                                             | StrengthRolloutMode.Treatment ->
                                                 let decision =

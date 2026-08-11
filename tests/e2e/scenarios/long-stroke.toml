@@ -67,7 +67,7 @@ pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fal
 #                      not a DU-algebra equality. Journal is the exact semantic pin.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
 # Headroom kept after canary wrapper noise; Manager does not advertise todowrite yet.
-setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["native-todo-title", "native-todo"], maxJournalEvents = 400, maxSseEvents = 1900, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n" } } }
+setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["native-todo-title", "native-todo", "strength-canary-title", "strength-canary-replica", "strength-canary-owner"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run" }, maxJournalEvents = 400, maxSseEvents = 1900, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 
@@ -91,6 +91,12 @@ must = [
 ]
 
 flow = [
+  # STRENGTH-011 real Host dry-run canary: one nested readonly Replica request,
+  # no K+1 delivery and no Prepared/Candidate intervention into the owner.
+  { assertDeliveries = { id = "strength-canary-replica.0", eq = 1 } },
+  { assertDeliveries = { id = "strength-canary-owner.0", eq = 1 } },
+  { assertFacts = { name = "StrengthCandidatePrepared", eq = 0 } },
+
   # External injections before any wait (register holds / retire hooks / conflict).
   { custom = "holdChildC1UntilLabor" },
   { custom = "bindFinalityReviseThenPerfect" },
@@ -192,6 +198,33 @@ tools = ["todowrite"]
 
   [[turn.step]]
   respond = { type = "text", text = "Native todowrite canary completed." }
+
+[[turn]]
+id = "strength-canary-title"
+lane = "strength-canary-owner"
+kind = "title"
+user = "STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica path."
+
+  [[turn.step]]
+  respond = { type = "title", text = "Strength Host Canary" }
+
+[[turn]]
+id = "strength-canary-replica"
+internal = true
+user = "STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica path."
+tools = ["glob", "grep", "read"]
+forbiddenTools = ["bash-honeypot", "edit", "inspector", "js-coder", "mv", "rm", "write"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "read", args = { filePath = "README.md" } }
+
+[[turn]]
+id = "strength-canary-owner"
+lane = "strength-canary-owner"
+user = "STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica path."
+
+  [[turn.step]]
+  respond = { type = "text", text = "Strength dry-run canary owner completed." }
 
 [[turn]]
 id = "title"

@@ -38,6 +38,7 @@ module StrengthSettings =
             |> Option.map (fun value -> value.ToLowerInvariant())
         with
         | Some "off" -> StrengthRolloutMode.Off
+        | Some "dry-run" -> StrengthRolloutMode.DryRun
         | Some "treatment" -> StrengthRolloutMode.Treatment
         | Some "shadow"
         | None -> StrengthRolloutMode.Shadow

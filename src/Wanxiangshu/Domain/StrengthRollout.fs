@@ -4,6 +4,7 @@ namespace Wanxiangshu.Domain
 type StrengthRolloutMode =
     | Off
     | Shadow
+    | DryRun
     | Treatment
 
 /// STRENGTH-010: every non-probability term is explicit in one comparable unit.
@@ -49,4 +50,5 @@ module StrengthRollout =
         function
         | StrengthRolloutMode.Shadow -> true
         | StrengthRolloutMode.Off
+        | StrengthRolloutMode.DryRun
         | StrengthRolloutMode.Treatment -> false
