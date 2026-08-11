@@ -1810,7 +1810,7 @@ facade/转发过渡，旧路径迁移完成即删除。
 
 ### Wave 4/5 — 重审与收尾（3aa502ed）
 - Fact.fs/Identity.fs 等 10 个单世界 vocabulary/代数/适配器获批 kolmogorov-size 例外（owner+reason）
-- 协调器长尾（EnforcerHost 905/HostSignalBootstrap 483/BloggerCoordinator 403/Reconciler 451 等）保持 ratchet 压力，留待后续二级拆分
+- 协调器长尾（HostSignalBootstrap 483/BloggerCoordinator 403/Reconciler 451 等）保持 ratchet 压力，留待后续二级拆分；`EnforcerHost` 已二次拆分（905 → 314，`EnforcerContinuation.fs` 承载三分支，提交 4991b8b5）
 
 ### 过程中的真实回归（均已修复并被测试兜住）
 - ClearRecovery 误清 attempt plans（xwire probe 测试捕获）
