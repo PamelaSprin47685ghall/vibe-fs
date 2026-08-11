@@ -13,7 +13,6 @@ open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Journal
-open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.Process
 open Wanxiangshu.Session
 
@@ -46,6 +45,7 @@ module HostSignalBootstrap =
         (eventPort: IEventObservationPort)
         (snapshotOpt: ISessionSnapshotPort option)
         (journal: AgentJournal option)
+        (strengthDurability: StrengthDurabilityPort option)
         (scope: PluginRuntimeScope)
         (input: obj)
         /// Workspace root for graceful Casebook finalize (SpikePlugin → CasebookLifecycle).
@@ -110,24 +110,24 @@ module HostSignalBootstrap =
                         // continuation can be admitted. This writer is independent
                         // of rollout/fuse state because a provider may already have
                         // consumed a durable Candidate.
-                        match scope.StrengthPersistence with
+                        match strengthDurability with
                         | None -> ()
-                        | Some(raw, store) ->
-                            match StrengthStore.loadProjection raw (store.OpenSnapshot()) with
+                        | Some durability ->
+                            match durability.LoadProjection() with
                             | Error error ->
-                                raise (InvalidOperationException("Strength promotion projection failed: " + error))
+                                let reason = "Strength promotion projection failed: " + error
+                                scope.TripStrengthFuse reason
+                                raise (InvalidOperationException reason)
                             | Ok projection ->
-                                match StrengthLifecycle.promotionEvent projection turn with
+                                match StrengthLifecycle.reconcileEvent projection turn with
                                 | None -> ()
                                 | Some event ->
-                                    match StrengthStore.append store HostDigest.sha256Hex event with
-                                    | Ok _ -> ()
+                                    match durability.Append event with
+                                    | Ok() -> ()
                                     | Error error ->
-                                        raise (
-                                            InvalidOperationException(
-                                                sprintf "Strength promotion commit failed closed: %A" error
-                                            )
-                                        )
+                                        let reason = "Strength promotion commit failed closed: " + error
+                                        scope.TripStrengthFuse reason
+                                        raise (InvalidOperationException reason)
 
                         // RECOVERY-FAMILY: family recovery before business effects of a turn.
                         let! recovery = scope.EnsureRecoveryDone turn.SessionId
@@ -282,6 +282,13 @@ module HostSignalBootstrap =
                     reconciler.Signal signal
                 | SessionDeleted sessionId ->
                     scope.LoopSensor.DropSession sessionId
+
+                    // STRENGTH-004/011: owner deletion cancels the decision-local
+                    // InternalLeaf immediately. CancelOwner completes the waiting
+                    // decision before its best-effort physical abort, so no deleted
+                    // owner can keep a Replica eligible for later collection.
+                    scope.StrengthReplicaRuntime
+                    |> Option.iter (fun runtime -> runtime.CancelOwner sessionId |> ignore)
 
                     // Graceful owner teardown: finalize bound Inspector draft once before cancel.
                     // Unexpected delete of a non-owner / incomplete draft never finalizes

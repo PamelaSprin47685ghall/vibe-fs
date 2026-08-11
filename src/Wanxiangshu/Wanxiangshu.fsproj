@@ -91,6 +91,7 @@
     <Compile Include="Domain/StrengthProjection.fs"/>
     <Compile Include="Domain/StrengthCommit.fs"/>
     <Compile Include="Domain/StrengthPromotion.fs"/>
+    <Compile Include="Application/Strength/StrengthDurabilityPort.fs"/>
     <Compile Include="Domain/JsTools.fs"/>
     <Compile Include="Domain/Casebook.fs"/>
     <Compile Include="Infrastructure/Persist/StoreTypes.fs"/>
@@ -100,6 +101,7 @@
     <Compile Include="Infrastructure/Persist/EventStoreFold.fs"/>
     <Compile Include="Infrastructure/Persist/EventStore.fs"/>
     <Compile Include="Infrastructure/Persist/StrengthStore.fs"/>
+    <Compile Include="Infrastructure/Persist/StrengthDurability.fs"/>
     <Compile Include="Infrastructure/Persist/GitObjectDatabase.fs"/>
     <Compile Include="Infrastructure/Persist/ProcessGitRawStore.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ManagedAgent.fs"/>

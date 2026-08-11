@@ -37,6 +37,10 @@ module SpikePlugin =
 
             let scope = new PluginRuntimeScope(journal)
 
+            let strengthFailClosed (reason: string) =
+                scope.TripStrengthFuse reason
+                raise (InvalidOperationException reason)
+
             PluginHost.restoreSessionParents journal scope.SessionParents
 
             let familyParent (sessionId: SessionId) =
@@ -70,10 +74,11 @@ module SpikePlugin =
                 // acquired by AgentJournal boot. Keep the handle in the composition
                 // root rather than PluginRuntimeScope so Journal and EventStore
                 // writers never become one dual-write owner.
-                let strengthPersistence =
+                let strengthDurability =
                     match journal, workspaceDirectory with
                     | Some _, Some workspace ->
                         WorkspaceEventStore.tryCurrent (RuntimePath.gitCommonDir workspace)
+                        |> Option.map (fun (raw, store) -> StrengthDurability.create raw store)
                     | _ -> None
 
                 // Causal wait bridge must stay on the root workspace so E2E
@@ -93,6 +98,7 @@ module SpikePlugin =
                         eventPort
                         snapshotOpt
                         journal
+                        strengthDurability
                         scope
                         input
                         workspaceDirectory
@@ -245,51 +251,66 @@ module SpikePlugin =
                         // Candidate material is never read here. Existing Host rows
                         // are preserved object-for-object; only algebra-owned
                         // synthetic rows are inserted at the target assistant anchor.
-                        match projectionSessionIdOpt, scope.StrengthPersistence with
-                        | Some sessionId, Some(raw, store) ->
+                        match projectionSessionIdOpt, strengthDurability with
+                        | Some sessionId, Some durability ->
                             let owner = SessionId.create sessionId
                             let rawMessages = unbox<obj array> outObj?messages |> Array.toList
+                            let coveredThroughSequence =
+                                journal
+                                |> Option.bind (fun durable ->
+                                    AgentProjection.tryFind
+                                        owner
+                                        (AgentJournal.snapshot durable).AgentProjections
+                                    |> Option.bind (fun state -> state.Blog)
+                                    |> Option.map (fun blog -> blog.Coverage.IngestedThroughSequence))
 
-                            match StrengthStore.loadProjection raw (store.OpenSnapshot()) with
+                            match durability.LoadProjection() with
                             | Error error ->
-                                raise (InvalidOperationException("Strength replay projection failed: " + error))
+                                strengthFailClosed ("Strength replay projection failed: " + error)
                             | Ok strengthProjection ->
                                 match
                                     StrengthLifecycle.replayPlans
                                         owner
                                         Projection.hostMessageId
                                         rawMessages
-                                        (StrengthStore.loadFrameBundle raw HostDigest.sha256Hex)
+                                        durability.LoadFrameBundle
                                         strengthProjection
                                 with
-                                | Error error -> raise (InvalidOperationException error)
-                                | Ok [] -> ()
+                                | Error error -> strengthFailClosed error
                                 | Ok plans ->
-                                    strengthReplayPlans <- plans
-                                    let wire = Projection.decodeMessageView rawMessages
-                                    let snapshot =
-                                        { CurrentProjection = ProviderProjection.toSemantic wire
-                                          CommittedPrefix = None
-                                          BlogFrames = []
-                                          TransportMessages = Set.empty
-                                          HostReanchor = None }
+                                    let plans =
+                                        plans
+                                        |> List.filter (StrengthLifecycle.needsRawReplay coveredThroughSequence)
 
-                                    let rendered =
-                                        ProjectionRenderer.renderMessagesWithHostIds
-                                            HostDigest.sha256Hex
-                                            snapshot
-                                            wire.Messages
-                                            (StrengthLifecycle.replayIntents plans)
+                                    match plans with
+                                    | [] -> ()
+                                    | _ ->
+                                        strengthReplayPlans <- plans
+                                        let wire = Projection.decodeMessageView rawMessages
+                                        let snapshot =
+                                            { CurrentProjection = ProviderProjection.toSemantic wire
+                                              CommittedPrefix = None
+                                              BlogFrames = []
+                                              TransportMessages = Set.empty
+                                              HostReanchor = None }
 
-                                    match
-                                        Projection.tryApplyRenderedInsertionsPreservingBase
-                                            sessionId
-                                            HostDigest.sha256Hex
-                                            rawMessages
-                                            rendered
-                                    with
-                                    | Error error -> raise (InvalidOperationException("Strength replay render failed: " + error))
-                                    | Ok replayed -> HostMessageProjection.replaceMessagesInPlace outObj replayed
+                                        let rendered =
+                                            ProjectionRenderer.renderMessagesWithHostIds
+                                                HostDigest.sha256Hex
+                                                snapshot
+                                                wire.Messages
+                                                (StrengthLifecycle.replayIntents plans)
+
+                                        match
+                                            Projection.tryApplyRenderedInsertionsPreservingBase
+                                                sessionId
+                                                HostDigest.sha256Hex
+                                                rawMessages
+                                                rendered
+                                        with
+                                        | Error error ->
+                                            strengthFailClosed ("Strength replay render failed: " + error)
+                                        | Ok replayed -> HostMessageProjection.replaceMessagesInPlace outObj replayed
                         | _ -> ()
 
                         // COMPANION-003/007: keep the XTrace in step with the
@@ -323,7 +344,7 @@ module SpikePlugin =
                                 | Some ids when XTraceCapture.supportsStableInsertion journal sessionIdentity ->
                                     match XTraceCapture.captureProjectionStable journal sessionIdentity ids semantic with
                                     | Ok state -> state
-                                    | Error error -> raise (InvalidOperationException error)
+                                    | Error error -> strengthFailClosed error
                                 | _ -> XTraceCapture.captureProjection journal sessionIdentity semantic
 
                             // STRENGTH-008: close Promoted -> Traced after capture.
@@ -331,8 +352,8 @@ module SpikePlugin =
                             // after a crash between XTrace append and this EventStore
                             // append. Legacy positional traces fall back to a unique
                             // canonical frame match; ambiguity is fail closed.
-                            match journal, scope.StrengthPersistence, traceState with
-                            | Some durable, Some(_, store), Some updated ->
+                            match journal, strengthDurability, traceState with
+                            | Some durable, Some durability, Some updated ->
                                 let rec resolveObserved
                                     (remaining: XTracePartRef list)
                                     (acc: StrengthTraceObservedPart list)
@@ -411,30 +432,22 @@ module SpikePlugin =
 
                                         match range with
                                         | Error error ->
-                                            raise (InvalidOperationException("Strength Traced recovery failed: " + error))
+                                            strengthFailClosed ("Strength Traced recovery failed: " + error)
                                         | Ok None ->
-                                            raise (
-                                                InvalidOperationException(
-                                                    "Strength Promoted frame is absent from XTrace after replay capture"
-                                                )
-                                            )
+                                            strengthFailClosed
+                                                "Strength Promoted frame is absent from XTrace after replay capture"
                                         | Ok(Some traced) ->
                                             match
-                                                StrengthStore.append
-                                                    store
-                                                    HostDigest.sha256Hex
-                                                    (StrengthEvents.traced
+                                                durability.Append(
+                                                    StrengthEvents.traced
                                                         plan.Prepared.DecisionId
                                                         traced.StartInclusive
-                                                        traced.EndExclusive)
-                                            with
-                                            | Ok _ -> ()
-                                            | Error error ->
-                                                raise (
-                                                    InvalidOperationException(
-                                                        sprintf "Strength Traced commit failed closed: %A" error
-                                                    )
+                                                        traced.EndExclusive
                                                 )
+                                            with
+                                            | Ok() -> ()
+                                            | Error error ->
+                                                strengthFailClosed ("Strength Traced commit failed closed: " + error)
                             | _ -> ()
 
                             traceState
@@ -597,7 +610,7 @@ module SpikePlugin =
                         // STRENGTH-009: freeze the post-Enforcer semantic view and
                         // complete any eligible speculation before the Pair marker.
                         // Prepared publication precedes Candidate visibility.
-                        do! StrengthSpeculate.tryApply snapshotOpt journal scope outObj
+                        do! StrengthSpeculate.tryApply snapshotOpt journal strengthDurability scope outObj
 
                         // HOST-013：永久 pair-programming auto-injected。
                         // XTrace 之后、ReviewSeal 之前。恢复 durable 历史 pair，

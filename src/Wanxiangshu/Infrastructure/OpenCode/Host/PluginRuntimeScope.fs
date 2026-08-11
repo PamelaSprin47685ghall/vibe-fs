@@ -100,6 +100,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let strengthRecentPrimary = Dictionary<string, StrengthPrimarySymbol list>()
     let strengthPendingFirst = Dictionary<string, ProviderRunIdentity * StrengthFeatureKey>()
     let strengthPendingSecond = Dictionary<string, StrengthFeatureKey>()
+    // DSL-MUTABLE: resource — process-local Strength fuse latch
+    let mutable strengthFuseReason: string option = None
 
     member _.Journal = journal
     member _.StrengthRuntime = strengthRuntime
@@ -119,6 +121,12 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
     member _.StrengthPrediction(feature: StrengthFeatureKey) =
         StrengthPredictor.predict feature strengthPredictorState
+
+    member _.TripStrengthFuse(reason: string) =
+        if strengthFuseReason.IsNone then
+            strengthFuseReason <- Some reason
+
+    member _.StrengthFuseReason = strengthFuseReason
 
     member _.ArmStrengthCounterfactual(sessionId: SessionId, targetRun: ProviderRunIdentity, feature: StrengthFeatureKey) =
         let key = SessionId.value sessionId
@@ -434,6 +442,9 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         this.VerdictSessions.Remove sessionId |> ignore
         this.AbortedSessions.Remove sessionId |> ignore
         this.RecoveryArming.Remove sessionId |> ignore
+        strengthRecentPrimary.Remove sessionId |> ignore
+        strengthPendingFirst.Remove sessionId |> ignore
+        strengthPendingSecond.Remove sessionId |> ignore
         this.LoopSensor.DropSession(SessionId.create sessionId)
         // HOST-004 Q-10: a deleted session's idle permits die forever.
         this.Quiescence.DropSession(SessionId.create sessionId)

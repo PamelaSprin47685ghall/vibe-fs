@@ -14,7 +14,7 @@ type StrengthReplayPlan =
 [<RequireQualifiedAccess>]
 module StrengthLifecycle =
 
-    let promotionEvent (projection: StrengthProjection) (turn: ReconciledTurn) : StrengthEvent option =
+    let reconcileEvent (projection: StrengthProjection) (turn: ReconciledTurn) : StrengthEvent option =
         match StrengthProjection.tryDecisionForTarget turn.ProviderRun projection with
         | None -> None
         | Some decisionId ->
@@ -32,8 +32,15 @@ module StrengthLifecycle =
                             view.Prepared.FrameDigest
                             view.Prepared.MaterialPayloads
                     )
-                | StrengthPromotionDecision.IgnoreWrongRun
-                | StrengthPromotionDecision.AwaitOrAbandon -> None
+                | StrengthPromotionDecision.IgnoreWrongRun -> None
+                | StrengthPromotionDecision.AwaitOrAbandon ->
+                    match turn.Outcome with
+                    | ReconcileProgram.TurnCompleted
+                    | ReconcileProgram.TurnAborted _
+                    | ReconcileProgram.TurnFailed _ ->
+                        Some(StrengthEvents.abandoned view.Prepared.DecisionId view.Prepared.TargetProviderRun)
+                    | ReconcileProgram.TurnNeedsContinuation _
+                    | ReconcileProgram.TurnInProgress -> None
 
     /// Build deterministic replay plans for every unretired Promoted decision owned
     /// by this Session. The caller supplies Host message ids and payload loading;
@@ -87,6 +94,11 @@ module StrengthLifecycle =
 
         loop candidates []
 
+    let needsRawReplay (coveredThroughSequence: int64 option) (plan: StrengthReplayPlan) =
+        match plan.ExistingTraceRange, coveredThroughSequence with
+        | Some range, Some covered -> covered < range.EndExclusive - 1L
+        | _ -> true
+
     let replayIntents (plans: StrengthReplayPlan list) : ProjectionIntent list =
         plans
         |> List.map (fun plan ->
@@ -102,18 +114,3 @@ module StrengthLifecycle =
         bundle.Batches
         |> List.sumBy (fun batch -> batch.Exchanges.Length * 2)
 
-    /// When replay occurs immediately before XTrace capture, synthetic frame parts
-    /// are the first newly appended XTrace parts. Produce exact non-overlapping
-    /// ranges for the Traced facts. A crash after XTrace but before these facts is
-    /// recovered separately by matching the canonical frame sequence.
-    let tracedEventsFromHead (headBeforeCapture: int64) (plans: StrengthReplayPlan list) : StrengthEvent list =
-        let _, reversed =
-            plans
-            |> List.fold
-                (fun (cursor, events) plan ->
-                    let count = int64 (framePartCount plan.Bundle)
-                    let next = cursor + count
-                    next, StrengthEvents.traced plan.Prepared.DecisionId cursor next :: events)
-                (headBeforeCapture + 1L, [])
-
-        List.rev reversed

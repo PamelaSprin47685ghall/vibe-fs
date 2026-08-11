@@ -8,6 +8,9 @@ open Wanxiangshu.Domain
 [<RequireQualifiedAccess>]
 module StrengthSettings =
 
+    let HostCanaryFingerprint =
+        "opencode-ai@1.18.14|@opencode-ai/plugin@>=1.17.4|strength-host-canary-v1"
+
     let private env name =
         match Environment.GetEnvironmentVariable name with
         | null -> None
@@ -71,11 +74,9 @@ module StrengthSettings =
             None
 
     let hostCanaryHealthy () =
-        match env "WANXIANGSHU_STRENGTH_HOST_CANARY" |> Option.map (fun value -> value.ToLowerInvariant()) with
-        | Some "pass"
-        | Some "passed"
-        | Some "true" -> true
-        | _ -> false
+        match env "WANXIANGSHU_STRENGTH_HOST_CANARY" with
+        | Some value -> String.Equals(value, HostCanaryFingerprint, StringComparison.Ordinal)
+        | None -> false
 
     let load () : StrengthRolloutConfig =
         let k1Margin = nonNegativeFloat "WANXIANGSHU_STRENGTH_K1_MARGIN" |> Option.defaultValue 0.0

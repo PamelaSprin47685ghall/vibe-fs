@@ -56,12 +56,17 @@ module StrengthTraceRecovery =
             match matches with
             | [] -> Ok None
             | [ index ] ->
-                let first = observed |> List.item index
-                let last = observed |> List.item (index + width - 1)
+                let window = observed |> List.skip index |> List.truncate width
+                let first = List.head window
+                let contiguous =
+                    window
+                    |> List.mapi (fun offset part -> part.CursorSequence = first.CursorSequence + int64 offset)
+                    |> List.forall id
 
-                if last.CursorSequence < first.CursorSequence then
-                    Error "Strength XTrace match has a non-monotonic cursor range"
+                if not contiguous then
+                    Error "Strength XTrace match is not a contiguous cursor range"
                 else
+                    let last = List.last window
                     Ok(
                         Some
                             { StartInclusive = first.CursorSequence

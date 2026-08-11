@@ -7,7 +7,6 @@ open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Host
-open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
@@ -96,9 +95,41 @@ module StrengthSpeculate =
             HostMessageProjection.replaceMessagesInPlace output projected
             Ok()
 
+    let private recoverPrepared
+        (durability: StrengthDurabilityPort)
+        (owner: SessionId)
+        (target: ProviderRunIdentity)
+        (rawMessages: obj list)
+        (projection: StrengthProjection)
+        (output: obj)
+        : Result<bool, string> =
+        match StrengthProjection.tryDecisionForTarget target projection with
+        | None -> Ok false
+        | Some decisionId ->
+            match StrengthProjection.tryCandidate decisionId projection with
+            | None -> Error "Strength target index points to a missing Candidate"
+            | Some view when view.Prepared.OwnerSessionId <> owner ->
+                Error "Strength target index belongs to a different owner Session"
+            | Some view when view.Promoted || view.Abandoned -> Ok true
+            | Some view ->
+                let anchorDigest =
+                    Projection.decodeMessageView rawMessages
+                    |> ProviderProjection.toSemantic
+                    |> ProviderProjection.renderSemantic
+                    |> HostDigest.sha256Hex
+
+                if anchorDigest <> view.Prepared.AnchorDigest then
+                    Error "Strength Prepared recovery anchor digest changed before target consumption"
+                else
+                    durability.LoadFrameBundle view.Prepared
+                    |> Result.bind (fun bundle ->
+                        renderCandidate owner target view.Prepared.DecisionId bundle output
+                        |> Result.map (fun () -> true))
+
     let tryApply
         (snapshotPort: ISessionSnapshotPort option)
         (journal: AgentJournal option)
+        (strengthDurability: StrengthDurabilityPort option)
         (scope: PluginRuntimeScope)
         (output: obj)
         : Task<unit> =
@@ -107,11 +138,11 @@ module StrengthSpeculate =
                 journal,
                 snapshotPort,
                 scope.StrengthReplicaRuntime,
-                scope.StrengthPersistence,
+                strengthDurability,
                 scope.ManagedAgentInventory,
                 Projection.projectionSessionIdFromMessages output
             with
-            | Some durable, Some snapshots, Some runtime, Some(raw, store), Some inventory, Some sessionIdText ->
+            | Some durable, Some snapshots, Some runtime, Some durability, Some inventory, Some sessionIdText ->
                 let owner = SessionId.create sessionIdText
 
                 if runtime.IsReplica owner then
@@ -138,23 +169,22 @@ module StrengthSpeculate =
                                 | Some authority ->
                                     let settings = StrengthSettings.load ()
 
-                                    if settings.Mode = StrengthRolloutMode.Off then
-                                        return ()
-                                    else
-                                        match StrengthStore.loadProjection raw (store.OpenSnapshot()) with
+                                    match durability.LoadProjection() with
+                                    | Error error ->
+                                        let reason = "Strength opportunity cannot prove EventStore health: " + error
+                                        scope.TripStrengthFuse reason
+                                        raise (InvalidOperationException reason)
+                                    | Ok durableStrength ->
+                                        // Recovery is independent of rollout state: once Prepared is
+                                        // durable, only its bound target may consume the same bytes.
+                                        match recoverPrepared durability owner target rawMessages durableStrength output with
                                         | Error error ->
-                                            raise (
-                                                InvalidOperationException(
-                                                    "Strength opportunity cannot prove EventStore health: " + error
-                                                )
-                                            )
-                                        | Ok durableStrength ->
-                                            // One TargetProviderRun may own at most one decision. A
-                                            // durable Prepared from an earlier transform is replayed
-                                            // through the Candidate path rather than spawning a new leaf.
-                                            match StrengthProjection.tryDecisionForTarget target durableStrength with
-                                            | Some _ -> return ()
-                                            | None ->
+                                            let reason = "Strength Prepared recovery failed closed: " + error
+                                            scope.TripStrengthFuse reason
+                                            raise (InvalidOperationException reason)
+                                        | Ok true -> return ()
+                                        | Ok false when settings.Mode = StrengthRolloutMode.Off -> return ()
+                                        | Ok false ->
                                                 let currentPlan = scope.TryAttemptPlan owner target
                                                 let requestKind, effectiveAgent, hasPrefixProbe =
                                                     match currentPlan with
@@ -181,6 +211,10 @@ module StrengthSpeculate =
                                                         ))
 
                                                 let costsAvailable = settings.Costs.IsSome
+                                                let stableCaptureEligible =
+                                                    XTraceCapture.supportsStableInsertion (Some durable) owner
+                                                    && (rawMessages
+                                                        |> List.forall (Projection.hostMessageId >> Option.isSome))
 
                                                 let opportunity =
                                                     { IsRootWork =
@@ -209,7 +243,10 @@ module StrengthSpeculate =
                                                       OwnerCancelled = false
                                                       TargetProviderRunBound = true
                                                       EventStoreHealthy = true
-                                                      HostCanaryHealthy = StrengthSettings.hostCanaryHealthy ()
+                                                      HostCanaryHealthy =
+                                                        StrengthSettings.hostCanaryHealthy ()
+                                                        && stableCaptureEligible
+                                                        && scope.StrengthFuseReason.IsNone
                                                       FastPeerAvailable = fastAgent.IsSome
                                                       ModelBindingsDistinct = modelsDistinct
                                                       CostModelAvailable = costsAvailable }
@@ -296,60 +333,59 @@ module StrengthSpeculate =
 
                                                             match outcome with
                                                             | Error _ -> return ()
-                                                            | Ok completed when List.isEmpty completed.Batches ->
-                                                                return ()
                                                             | Ok completed ->
-                                                                match
-                                                                    StrengthFrame.tryBuild
-                                                                        HostDigest.sha256Hex
-                                                                        runtime.MaxFrameBytes
-                                                                        completed.Batches
-                                                                with
-                                                                | Error _ -> return ()
-                                                                | Ok bundle ->
-                                                                    let payload = StrengthStore.encodeFrameBundlePayload bundle
-
+                                                                match completed.Terminal with
+                                                                | StrengthReplicaTerminal.InvalidFrame reason ->
+                                                                    scope.TripStrengthFuse(
+                                                                        "Strength Replica invalid frame: " + reason
+                                                                    )
+                                                                    return ()
+                                                                | _ when List.isEmpty completed.Batches -> return ()
+                                                                | _ ->
                                                                     match
-                                                                        StrengthStore.publishWithPayloads
-                                                                            store
+                                                                        StrengthFrame.tryBuild
                                                                             HostDigest.sha256Hex
-                                                                            [ payload ]
-                                                                            (fun refs ->
-                                                                                StrengthEvents.prepared
-                                                                                    owner
-                                                                                    id
-                                                                                    target
-                                                                                    completed.ReplicaSessionId
-                                                                                    budget
-                                                                                    anchorDigest
-                                                                                    bundle.Digest
-                                                                                    bundle.ByteLength
-                                                                                    refs)
+                                                                            runtime.MaxFrameBytes
+                                                                            completed.Batches
                                                                     with
-                                                                    | Error(PublishError.StorageInvalid error) ->
-                                                                        raise (
-                                                                            InvalidOperationException(
-                                                                                sprintf
-                                                                                    "Strength Prepared storage invalid: %A"
-                                                                                    error
-                                                                            )
+                                                                    | Error error ->
+                                                                        scope.TripStrengthFuse(
+                                                                            sprintf "Strength Replica bundle invalid: %A" error
                                                                         )
-                                                                    | Error _ ->
-                                                                        // Definite pre-intervention publication failure:
-                                                                        // fail open to K0. No candidate bytes are visible.
                                                                         return ()
-                                                                    | Ok _ ->
-                                                                        match renderCandidate owner target id bundle output with
-                                                                        | Ok() -> return ()
-                                                                        | Error error ->
-                                                                            // Prepared is durable but target has not been
-                                                                            // allowed to leave this transform. Wrong/failed
-                                                                            // rendering is therefore fail closed.
-                                                                            raise (
-                                                                                InvalidOperationException(
+                                                                    | Ok bundle ->
+                                                                        match
+                                                                            durability.PublishPrepared
+                                                                                owner
+                                                                                id
+                                                                                target
+                                                                                completed.ReplicaSessionId
+                                                                                budget
+                                                                                anchorDigest
+                                                                                bundle
+                                                                        with
+                                                                        | StrengthPreparedPublish.StorageInvalid error ->
+                                                                            let reason =
+                                                                                "Strength Prepared storage invalid: " + error
+                                                                            scope.TripStrengthFuse reason
+                                                                            raise (InvalidOperationException reason)
+                                                                        | StrengthPreparedPublish.Rejected _ ->
+                                                                            // Definite pre-intervention publication failure:
+                                                                            // fail open to K0. No candidate bytes are visible.
+                                                                            return ()
+                                                                        | StrengthPreparedPublish.Published ->
+                                                                            match
+                                                                                renderCandidate owner target id bundle output
+                                                                            with
+                                                                            | Ok() -> return ()
+                                                                            | Error error ->
+                                                                                // Prepared is durable but target has not been
+                                                                                // allowed to leave this transform. Wrong/failed
+                                                                                // rendering is therefore fail closed.
+                                                                                let reason =
                                                                                     "Strength Candidate render failed closed: "
                                                                                     + error
-                                                                                )
-                                                                            )
+                                                                                scope.TripStrengthFuse reason
+                                                                                raise (InvalidOperationException reason)
             | _ -> return ()
         }
