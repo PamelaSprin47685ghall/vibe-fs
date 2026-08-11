@@ -90,16 +90,16 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let strengthRuntime = StrengthRuntime()
     // PROMPT-002/AGENT-003: Host-final managed inventory is captured from the
     // config gate so Strength can prove same-role fast/deep model bindings differ.
-    // DSL-MUTABLE: resource — managed agent inventory slot
+    // DSL-MUTABLE: resource — process-local Host-final managed-agent inventory cache
     let mutable managedAgentInventory: ManagedAgentConfig.ManagedAgentInventory option =
         None
     // STRENGTH-004: physical coordinator is attached after Host ports are wired.
     // The Session StrengthRuntime above remains the sole live ownership/capability registry.
-    // DSL-MUTABLE: resource — strength replica runtime slot
+    // DSL-MUTABLE: resource — attached process-local Replica coordinator
     let mutable strengthReplicaRuntime: StrengthReplicaRuntime option = None
     // STRENGTH-010: bounded process-local predictor cache. Losing it on restart
     // only lowers evidence back toward K0; it is never lifecycle authority.
-    // DSL-MUTABLE: resource — strength predictor state cache
+    // DSL-MUTABLE: resource — restart-discardable predictor evidence cache
     let mutable strengthPredictorState = StrengthPredictor.empty
     let strengthRecentPrimary = Dictionary<string, StrengthPrimarySymbol list>()
 
