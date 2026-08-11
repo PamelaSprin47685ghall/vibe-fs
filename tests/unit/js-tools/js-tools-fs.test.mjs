@@ -19,7 +19,8 @@ import {
   commitPlan as commitPlan,
   rollbackPlan as rollbackPlan,
 } from '../../../dist/Infrastructure/JsToolsFs.js'
-import { AnchorSpec, JsFailureModule_code as failureCode } from '../../../dist/Domain/JsTools.js'
+import { AnchorSpec } from '../../../dist/Domain/JsAnchor.js'
+import { JsFailureModule_code as failureCode } from '../../../dist/Domain/JsFailure.js'
 import { listItems, resultOf, toList } from '../support/domain.mjs'
 
 const anchorCaseIndex = (name) => Object.create(AnchorSpec.prototype).cases().indexOf(name)

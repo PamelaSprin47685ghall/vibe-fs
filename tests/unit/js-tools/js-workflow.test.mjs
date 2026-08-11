@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { JsToolWorkflow_run as workflowRun } from '../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js'
-import { JsToolGenerator_generate as generate } from '../../../dist/Domain/JsTools.js'
+import { JsToolGenerator_generate as generate } from '../../../dist/Domain/JsSurface.js'
 import { ToolPermission } from '../../../dist/Kernel/Roles.js'
 import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Set.js'
 import { parse as parseToml } from 'smol-toml'

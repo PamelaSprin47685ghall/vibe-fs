@@ -13,7 +13,7 @@ import { join } from 'node:path'
 
 import { createApi } from '../../../dist/Infrastructure/JsToolsBindings.js'
 import { run, wrapProgram } from '../../../dist/Process/JsSandbox.js'
-import { JsToolGenerator_generate as generate } from '../../../dist/Domain/JsTools.js'
+import { JsToolGenerator_generate as generate } from '../../../dist/Domain/JsSurface.js'
 import { ToolPermission } from '../../../dist/Kernel/Roles.js'
 import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Set.js'
 import { listItems, resultOf } from '../support/domain.mjs'

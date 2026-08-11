@@ -13,7 +13,7 @@ import {
   JsToolGenerator_generate as generate,
   JsToolGenerator_isGeneratedToolName as isGeneratedToolName,
   JsToolGenerator_memberBinding as memberBinding,
-} from '../../../dist/Domain/JsTools.js'
+} from '../../../dist/Domain/JsSurface.js'
 import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Set.js'
 import { isNone, isSome, listItems, roles } from '../support/domain.mjs'
 

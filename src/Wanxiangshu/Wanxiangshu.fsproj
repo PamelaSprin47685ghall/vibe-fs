@@ -91,7 +91,12 @@
     <Compile Include="Domain/StrengthCommit.fs"/>
     <Compile Include="Domain/StrengthPromotion.fs"/>
     <Compile Include="Application/Strength/StrengthDurabilityPort.fs"/>
-    <Compile Include="Domain/JsTools.fs"/>
+    <Compile Include="Domain/JsCapability.fs"/>
+    <Compile Include="Domain/JsDescription.fs"/>
+    <Compile Include="Domain/JsSurface.fs"/>
+    <Compile Include="Domain/JsFailure.fs"/>
+    <Compile Include="Domain/JsAnchor.fs"/>
+    <Compile Include="Domain/JsTransaction.fs"/>
     <Compile Include="Domain/Casebook.fs"/>
     <Compile Include="Infrastructure/Persist/StoreTypes.fs"/>
     <Compile Include="Infrastructure/Persist/CanonicalEventCodec.fs"/>

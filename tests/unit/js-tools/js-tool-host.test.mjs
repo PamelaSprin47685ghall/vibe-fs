@@ -16,7 +16,7 @@ import {
   BuiltinToolDescriptionHook_validateRecommendation as validateRecommendation,
   BuiltinToolDescriptionHook_BuiltinFilesystemTools as builtinTools,
 } from '../../../dist/Infrastructure/OpenCode/Tools/JsToolHost.js'
-import { JsToolGenerator_generate as generate } from '../../../dist/Domain/JsTools.js'
+import { JsToolGenerator_generate as generate } from '../../../dist/Domain/JsSurface.js'
 import { ToolPermission } from '../../../dist/Kernel/Roles.js'
 import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Set.js'
 import { resultOf, stringSet } from '../support/domain.mjs'
