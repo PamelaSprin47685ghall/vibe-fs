@@ -4,24 +4,26 @@ namespace Wanxiangshu.Domain
 /// Bridge fields (ScoreWhen/Nudge/Family/CatalogOrdinal) keep existing consumers compiling
 /// until Observation EventStore vocabulary lands; they are derived at load, not authored JSON.
 type EnforcerRule =
-    { /// Directory basename = TipIdentity = provider enum value.
-      Name: string
-      /// Full text of resources/enforcer/<name>/enforcer.md
-      EnforcerText: string
-      /// Full text of resources/enforcer/<name>/main.md
-      MainText: string
-      /// Durable tip id; clean break = Name (no enforcement-a01).
-      RuleId: string
-      /// Provider-facing tip enum value; = Name.
-      FieldName: string
-      /// Optional authoring family tag parsed from stub header; not a second identity.
-      Family: string
-      /// Detection seed (enforcer ScoreWhen section or full enforcer body).
-      ScoreWhen: string
-      /// Main guidance seed (Nudge / What to do / main body excerpt).
-      Nudge: string
-      /// Lexical folder order index 1..N (deterministic enum/prompt order only).
-      CatalogOrdinal: int }
+    {
+        /// Directory basename = TipIdentity = provider enum value.
+        Name: string
+        /// Full text of resources/enforcer/<name>/enforcer.md
+        EnforcerText: string
+        /// Full text of resources/enforcer/<name>/main.md
+        MainText: string
+        /// Durable tip id; clean break = Name (no enforcement-a01).
+        RuleId: string
+        /// Provider-facing tip enum value; = Name.
+        FieldName: string
+        /// Optional authoring family tag parsed from stub header; not a second identity.
+        Family: string
+        /// Detection seed (enforcer ScoreWhen section or full enforcer body).
+        ScoreWhen: string
+        /// Main guidance seed (Nudge / What to do / main body excerpt).
+        Nudge: string
+        /// Lexical folder order index 1..N (deterministic enum/prompt order only).
+        CatalogOrdinal: int
+    }
 
 /// ENFORCER-004 / 021: tip identity after rulebook resolve.
 /// FieldName is provider-facing; RuleId is durable — both equal TipName after folder cutover.
@@ -89,7 +91,11 @@ module EnforcerCatalog =
                             || r.Name <> r.FieldName)
                     with
                     | Some bad ->
-                        Error(sprintf "enforcer catalog empty text or identity mismatch on rule ordinal %d" bad.CatalogOrdinal)
+                        Error(
+                            sprintf
+                                "enforcer catalog empty text or identity mismatch on rule ordinal %d"
+                                bad.CatalogOrdinal
+                        )
                     | None -> Ok ordered
 
     /// ENFORCER-021: exact field/TipName → rule. No fuzzy match (ENFORCER-024).
@@ -102,8 +108,7 @@ module EnforcerCatalog =
             if trimmed.Length = 0 then
                 None
             else
-                rules
-                |> List.tryFind (fun r -> r.FieldName = trimmed || r.Name = trimmed)
+                rules |> List.tryFind (fun r -> r.FieldName = trimmed || r.Name = trimmed)
 
     /// Provider enum values: TipName list in lexical (CatalogOrdinal) order.
     let fieldNames (rules: EnforcerRule list) : string list =

@@ -56,6 +56,7 @@ module HostSignalBootstrap =
         task {
             let finalizeInspector = defaultArg tryFinalizeInspector (fun _ _ -> Ok())
             let cleanupInspectorDraft = defaultArg cleanupInspector (fun _ -> ())
+
             let snapshot =
                 match snapshotOpt with
                 | Some port -> port
@@ -244,8 +245,7 @@ module HostSignalBootstrap =
                         match runtime.TryFind(sessionId, SyncDelegateRole.Inspector) with
                         | Some inspectorId ->
                             workspaceDirectory
-                            |> Option.iter (fun root ->
-                                finalizeInspector root (SessionId.value inspectorId) |> ignore)
+                            |> Option.iter (fun root -> finalizeInspector root (SessionId.value inspectorId) |> ignore)
                         | None -> ()
 
                         runtime.CancelSession sessionId

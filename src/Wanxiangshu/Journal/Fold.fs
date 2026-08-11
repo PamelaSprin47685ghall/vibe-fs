@@ -1022,18 +1022,11 @@ module Fold =
                     AgentProjection.update
                         payload.SessionId
                         (fun session ->
-                            let prior =
-                                session.TipDelivery
-                                |> Option.defaultValue TipDeliveryProjection.empty
+                            let prior = session.TipDelivery |> Option.defaultValue TipDeliveryProjection.empty
 
                             { session with
                                 TipDelivery =
-                                    Some(
-                                        TipDeliveryProjection.apply
-                                            payload.TipName
-                                            payload.Presentation
-                                            prior
-                                    ) })
+                                    Some(TipDeliveryProjection.apply payload.TipName payload.Presentation prior) })
                         projection
                 )
 

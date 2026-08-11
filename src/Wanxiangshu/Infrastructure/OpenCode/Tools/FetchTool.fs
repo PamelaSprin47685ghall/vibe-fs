@@ -43,15 +43,14 @@ module FetchTool =
               "a", ToolHostCodec.TString answer
               "refresh", ToolHostCodec.TString "required" ]
 
-    let private runFetch
-        (workspaceRoot: string)
-        (store: IEventStore)
-        (raw: IGitRawStore)
-        (sessionId: string)
-        : string =
+    let private runFetch (workspaceRoot: string) (store: IEventStore) (raw: IGitRawStore) (sessionId: string) : string =
         match CasebookWorkflow.fetchCase store raw 256 sessionId with
-        | Error err -> ToolHostCodec.tomlObject [ "error", ToolHostCodec.TString(sprintf "casebook fetch failed: %s" err) ]
-        | Ok None -> ToolHostCodec.tomlObject [ "status", ToolHostCodec.TString "no-case"; "session_id", ToolHostCodec.TString sessionId ]
+        | Error err ->
+            ToolHostCodec.tomlObject [ "error", ToolHostCodec.TString(sprintf "casebook fetch failed: %s" err) ]
+        | Ok None ->
+            ToolHostCodec.tomlObject
+                [ "status", ToolHostCodec.TString "no-case"
+                  "session_id", ToolHostCodec.TString sessionId ]
         | Ok(Some case) ->
             let replayed = CasebookReplay.replayAll workspaceRoot case.Observations
 
@@ -108,8 +107,7 @@ module FetchTool =
                                             try
                                                 return runFetch workspaceRoot store raw sessionId
                                             finally
-                                                lock fetchGate (fun () ->
-                                                    fetchInFlight.Remove sessionId |> ignore)
+                                                lock fetchGate (fun () -> fetchInFlight.Remove sessionId |> ignore)
                                         }
 
                                     fetchInFlight.[sessionId] <- work

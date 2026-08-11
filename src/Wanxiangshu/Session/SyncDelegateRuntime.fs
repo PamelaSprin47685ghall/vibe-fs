@@ -468,8 +468,7 @@ type SyncDelegateRuntime
         for role in [ SyncDelegateRole.Inspector; SyncDelegateRole.Coder ] do
             attached.Remove(sessionId, role) |> ignore
 
-        inspectorOwned
-        |> Option.iter (fun id -> cleanupInspectorDraft (sessionKey id))
+        inspectorOwned |> Option.iter (fun id -> cleanupInspectorDraft (sessionKey id))
 
         inspectorAsDelegate
         |> Option.iter (fun id -> cleanupInspectorDraft (sessionKey id))

@@ -326,8 +326,5 @@ module StrengthReplicaAssociationHints =
 
     /// Look up the active StrengthReplica session for an owner from a process-local
     /// owner → replica map. Not a durable association fold.
-    let tryStrengthReplica
-        (ownerSessionId: SessionId)
-        (replicasByOwner: Map<SessionId, SessionId>)
-        : SessionId option =
+    let tryStrengthReplica (ownerSessionId: SessionId) (replicasByOwner: Map<SessionId, SessionId>) : SessionId option =
         Map.tryFind ownerSessionId replicasByOwner

@@ -17,12 +17,10 @@ module CasebookIndex =
     let mutable private frozen: Snapshot option = None
     let mutable private dirty = true
 
-    let tryGet () : Snapshot option =
-        lock gate (fun () -> frozen)
+    let tryGet () : Snapshot option = lock gate (fun () -> frozen)
 
     /// Force the next successful refresh to advance epoch (Captured/Refreshed/Evicted).
-    let invalidate () : unit =
-        lock gate (fun () -> dirty <- true)
+    let invalidate () : unit = lock gate (fun () -> dirty <- true)
 
     let private sessionIdsOf (cases: Map<string, Case>) : string list =
         cases |> Map.toList |> List.map fst |> List.sort
@@ -39,25 +37,18 @@ module CasebookIndex =
             | Ok events ->
                 let ids = CasebookStore.project capacity events |> sessionIdsOf
 
-                let prevEpoch =
-                    frozen |> Option.map (fun s -> s.Epoch) |> Option.defaultValue -1L
+                let prevEpoch = frozen |> Option.map (fun s -> s.Epoch) |> Option.defaultValue -1L
 
                 let setChanged =
                     match frozen with
                     | None -> true
                     | Some s -> s.SessionIds <> ids
 
-                let epoch =
-                    if dirty || setChanged then
-                        prevEpoch + 1L
-                    else
-                        prevEpoch
+                let epoch = if dirty || setChanged then prevEpoch + 1L else prevEpoch
 
                 dirty <- false
 
-                let snap =
-                    { Epoch = epoch
-                      SessionIds = ids }
+                let snap = { Epoch = epoch; SessionIds = ids }
 
                 frozen <- Some snap
                 snap)

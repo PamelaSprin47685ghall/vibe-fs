@@ -90,10 +90,12 @@ module EnforcerHost =
     /// Tip guidance body for Main auto-injected marker (without pair-programming trailer).
     [<RequireQualifiedAccess>]
     type TipGuidance =
-        { TipName: string
-          Presentation: TipPresentation
-          /// Marker tip half only (Full = name header + main.md; Identity = tip: name).
-          Text: string }
+        {
+            TipName: string
+            Presentation: TipPresentation
+            /// Marker tip half only (Full = name header + main.md; Identity = tip: name).
+            Text: string
+        }
 
     let private tipIdentityText (tipName: string) : string = sprintf "tip: %s" tipName
 
@@ -105,10 +107,7 @@ module EnforcerHost =
         else
             sprintf "# Enforcer Tip\ntip = \"%s\"\n\n%s" tipName body
 
-    let private tryOwnerMainSession
-        (journal: AgentJournal)
-        (mainOrBloggerSession: SessionId)
-        : SessionId option =
+    let private tryOwnerMainSession (journal: AgentJournal) (mainOrBloggerSession: SessionId) : SessionId option =
         let associations = (AgentJournal.snapshot journal).AgentProjections.Associations
 
         match SessionAssociationProjection.tryMainSessionOf mainOrBloggerSession associations with
@@ -120,11 +119,11 @@ module EnforcerHost =
             | None when SessionAssociationProjection.isCompanion mainOrBloggerSession associations -> None
             | None -> Some mainOrBloggerSession
 
-    let private latestOwnerTipField
-        (journal: AgentJournal)
-        (mainSessionId: SessionId)
-        : string option =
-        match (AgentJournal.snapshot journal).AgentProjections.Sessions |> Map.tryFind mainSessionId with
+    let private latestOwnerTipField (journal: AgentJournal) (mainSessionId: SessionId) : string option =
+        match
+            (AgentJournal.snapshot journal).AgentProjections.Sessions
+            |> Map.tryFind mainSessionId
+        with
         | None -> None
         | Some session ->
             session.Enforcement
@@ -134,7 +133,10 @@ module EnforcerHost =
             |> Option.map (fun tip -> tip.FieldName)
 
     let private hasFullTipDelivered (journal: AgentJournal) (mainSessionId: SessionId) (tipName: string) : bool =
-        match (AgentJournal.snapshot journal).AgentProjections.Sessions |> Map.tryFind mainSessionId with
+        match
+            (AgentJournal.snapshot journal).AgentProjections.Sessions
+            |> Map.tryFind mainSessionId
+        with
         | None -> false
         | Some session ->
             session.TipDelivery

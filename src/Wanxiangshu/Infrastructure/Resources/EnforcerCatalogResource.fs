@@ -10,7 +10,8 @@ open Wanxiangshu.Domain
 /// `catalog.json` is not read and must not be required at runtime.
 module EnforcerCatalogResource =
 
-    let private kebabNamePattern = Regex(@"^[a-z0-9]+(-[a-z0-9]+)*$", RegexOptions.Compiled)
+    let private kebabNamePattern =
+        Regex(@"^[a-z0-9]+(-[a-z0-9]+)*$", RegexOptions.Compiled)
 
     let private isKebab (name: string) = kebabNamePattern.IsMatch name
 
@@ -42,11 +43,7 @@ module EnforcerCatalogResource =
             if List.isEmpty acc then
                 None
             else
-                let body =
-                    acc
-                    |> List.rev
-                    |> String.concat "\n"
-                    |> fun s -> s.Trim()
+                let body = acc |> List.rev |> String.concat "\n" |> (fun s -> s.Trim())
 
                 if body.Length = 0 then None else Some body
 
@@ -56,10 +53,7 @@ module EnforcerCatalogResource =
         else
             let m = Regex.Match(markdown, @"Family:\s*([A-Za-z0-9_-]+)")
 
-            if m.Success then
-                Some(m.Groups.[1].Value.Trim())
-            else
-                None
+            if m.Success then Some(m.Groups.[1].Value.Trim()) else None
 
     let private firstNonEmptyParagraph (markdown: string) : string =
         markdown.Replace("\r\n", "\n").Split([| "\n\n" |], StringSplitOptions.None)
@@ -76,11 +70,7 @@ module EnforcerCatalogResource =
         let ordered = rules |> List.sortBy (fun r -> r.CatalogOrdinal)
         let parts = ResizeArray<string>()
 
-        let baseText =
-            if isNull basePrompt then
-                ""
-            else
-                basePrompt.TrimEnd()
+        let baseText = if isNull basePrompt then "" else basePrompt.TrimEnd()
 
         if baseText.Length > 0 then
             parts.Add(baseText)
@@ -133,8 +123,7 @@ module EnforcerCatalogResource =
                     raise (InvalidOperationException(sprintf "main.md empty for rule %s" name))
 
                 let scoreWhen =
-                    trySection enforcerText "ScoreWhen"
-                    |> Option.defaultValue enforcerText
+                    trySection enforcerText "ScoreWhen" |> Option.defaultValue enforcerText
 
                 let nudge =
                     trySection enforcerText "Nudge"

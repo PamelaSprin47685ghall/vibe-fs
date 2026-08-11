@@ -8,7 +8,6 @@ namespace Wanxiangshu.Domain
 ///
 /// Phase 0 does not append these events. Stubs exist so later phases extend
 /// one vocabulary rather than inventing parallel shapes.
-
 /// Candidate prepared for a single TargetProviderRun (not yet consumed).
 type StrengthCandidatePrepared =
     { FrameBundleRef: PayloadRef

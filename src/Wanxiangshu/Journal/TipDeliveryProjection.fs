@@ -5,8 +5,10 @@ open Wanxiangshu.Kernel.Fact
 /// Restart-safe Main tip Full/Identity delivery history (Rulebook §14–16).
 /// Folded only from HostFact.TipGuidanceDelivered — never a private file ledger.
 type TipDeliveryProjectionState =
-    { /// TipNames that have received Full main.md in this Main session.
-      FullDeliveredTips: Set<string> }
+    {
+        /// TipNames that have received Full main.md in this Main session.
+        FullDeliveredTips: Set<string>
+    }
 
 module TipDeliveryProjection =
 
@@ -28,6 +30,5 @@ module TipDeliveryProjection =
             state
         else
             match presentation with
-            | TipPresentation.Full ->
-                { FullDeliveredTips = Set.add (tipName.Trim()) state.FullDeliveredTips }
+            | TipPresentation.Full -> { FullDeliveredTips = Set.add (tipName.Trim()) state.FullDeliveredTips }
             | TipPresentation.IdentityOnly -> state

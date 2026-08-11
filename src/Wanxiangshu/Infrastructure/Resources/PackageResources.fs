@@ -39,8 +39,7 @@ module PackageResources =
         let here = dirname (fileURLToPath importMetaUrl)
         pathJoin (pathJoin (pathJoin (here, ".."), ".."), "..")
 
-    let private resourcesRoot () =
-        pathJoin (packageRoot (), "resources")
+    let private resourcesRoot () = pathJoin (packageRoot (), "resources")
 
     let private resolveResource (relativeResourcePath: string) : string =
         pathJoin (resourcesRoot (), relativeResourcePath)
