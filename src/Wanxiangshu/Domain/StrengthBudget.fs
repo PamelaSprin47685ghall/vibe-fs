@@ -1,0 +1,37 @@
+namespace Wanxiangshu.Domain
+
+/// Strength K0/K1/K2 budget — request-gated progression.
+/// K0 = no speculation. K1 = one request batch. K2 = two request batches.
+/// Request count is the unit, not tool-call count.
+/// Threshold is holdout-measured ExpectedValue(K) > margin.
+
+[<RequireQualifiedAccess>]
+type StrengthBudget =
+    | K0
+    | K1
+    | K2
+
+module StrengthBudget =
+
+    let parse =
+        function
+        | "K0" -> Some StrengthBudget.K0
+        | "K1" -> Some StrengthBudget.K1
+        | "K2" -> Some StrengthBudget.K2
+        | _ -> None
+
+    let wire =
+        function
+        | StrengthBudget.K0 -> "K0"
+        | StrengthBudget.K1 -> "K1"
+        | StrengthBudget.K2 -> "K2"
+
+    /// Holdout-gated promotion: K0->K1 needs ExpectedValue(K1) > K1Margin.
+    /// K1->K2 needs ExpectedValue(K2) > K2Margin where K2Margin > K1Margin.
+    let canPromoteToK1 (expectedValueK1: float) (k1Margin: float) : bool = expectedValueK1 > k1Margin
+
+    let canPromoteToK2 (expectedValueK2: float) (k2Margin: float) : bool = expectedValueK2 > k2Margin
+
+    /// Gate: K2 never before minimum evidence floor, steering risk higher for K2.
+    /// Ineligible / unknown cost -> stay K0. Non-deep / fallback side -> K0.
+    let isEligibleForK2 (evidenceCount: int) (minFloor: int) : bool = evidenceCount >= minFloor

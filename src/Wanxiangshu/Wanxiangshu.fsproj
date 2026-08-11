@@ -57,6 +57,8 @@
     <Compile Include="Domain/ManagerLifecyclePrompt.fs"/>
     <Compile Include="Domain/FinalityPrompt.fs"/>
     <Compile Include="Domain/HostReviewPrompt.fs"/>
+    <Compile Include="Domain/StrengthBudget.fs"/>
+    <Compile Include="Domain/StrengthCostModel.fs"/>
     <Compile Include="Domain/ToolResultBound.fs"/>
     <Compile Include="Domain/RuntimeNudge.fs"/>
     <Compile Include="Session/LoopDetector.fs"/>
@@ -312,6 +314,7 @@
     <Compile Include="Infrastructure/CasebookStore.fs"/>
     <Compile Include="Infrastructure/CasebookReplay.fs"/>
     <Compile Include="Infrastructure/ObservationCollector.fs"/>
+    <Compile Include="Infrastructure/CasebookSessionDraft.fs"/>
     <Compile Include="Infrastructure/CasebookWorkflow.fs"/>
     <Compile Include="Infrastructure/JsToolsBindings.fs"/>
     <Compile Include="Infrastructure/JsToolsTransactionStore.fs"/>
