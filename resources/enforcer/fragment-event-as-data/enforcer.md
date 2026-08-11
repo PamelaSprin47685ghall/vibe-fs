@@ -1,7 +1,7 @@
 # fragment-event-as-data — Enforcer
 
 ## Definition
-A transport fragment is mistaken for domain data when partial stream updates, deltas, callback order, or notification payloads are assembled as though they were the authoritative business fact.
+A transport fragment is mistaken for domain data when partial stream updates, deltas, callback order, or notification payloads are assembled as though they were the authoritative business fact. The root-cause is that transport fragments that may drop, coalesce, or reorder are assembled as domain truth, so the client believes a world the source never promised.
 
 ## Governing Principle
 Notification and state answer different questions. A notification says “something changed”; authoritative state says “what is true now.” Transport systems may coalesce, reorder, duplicate, or omit intermediate fragments while still honoring their contract. Building domain truth from those fragments silently strengthens the transport guarantee into one it never promised.

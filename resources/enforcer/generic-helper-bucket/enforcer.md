@@ -1,7 +1,7 @@
 # generic-helper-bucket — Enforcer
 
 ## Definition
-A generic helper bucket is a module named by its lack of ownership—`utils`, `helpers`, `common`, `misc`, `core`—that accumulates operations whose only common property is that no domain owner was chosen.
+A generic helper bucket is a module named by its lack of ownership—`utils`, `helpers`, `common`, `misc`, `core`—that accumulates operations whose only common property is that no domain owner was chosen. The root-cause is that a nameless module has no exclusion rule, so unrelated orphans and their dependencies accumulate into a coupling hub.
 
 ## Governing Principle
 A module boundary is useful when its name predicts what belongs inside and what does not. Generic buckets have no exclusion principle, so they grow monotonically. Every convenient orphan can enter, unrelated dependencies converge there, and the module becomes a hidden coupling hub precisely because its name makes no semantic claim that could reject new contents.

@@ -1,7 +1,7 @@
 # exception-driven-control-flow — Main
 
 ## What To Do Now
-Replace expected throw/catch branches with explicit alternatives: option/result types, ordinary branching, iterator protocols, or typed retry outcomes.
+Replace expected throw/catch branches with explicit alternatives: option/result types, ordinary branching, iterator protocols, or typed retry outcomes. The function’s return type and local control structure are who own expected alternatives; exception handlers own only failures that invalidate ordinary continuation.
 
 ## Why This Matters
 Normal control flow should be visible where it is invoked. Exceptions hide possible paths outside the function signature and couple behavior to distant handlers. The result is code whose real branching structure can be understood only by tracking dynamic stack unwinding.

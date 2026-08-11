@@ -1,7 +1,7 @@
 # flaky-test-tolerated — Enforcer
 
 ## Definition
-A flaky test is tolerated when nondeterministic red/green results are accepted as normal rather than treated as a defect in the test or system boundary.
+A flaky test is tolerated when nondeterministic red/green results are accepted as normal rather than treated as a defect in the test or system boundary. The root-cause is that changing verdicts under equivalent inputs are treated as normal, so red loses actionability and green loses evidentiary weight.
 
 ## Governing Principle
 A test is a measuring instrument. If identical relevant inputs can produce different verdicts, the instrument cannot distinguish product change from measurement noise. Once flakes are normalized, every red result acquires plausible deniability and every green result loses evidentiary weight. The damage is systemic: one unreliable test teaches the team not to trust the suite.

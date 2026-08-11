@@ -1,7 +1,7 @@
 # facade-hides-mess — Enforcer
 
 ## Definition
-A facade hides mess when a clean-looking entry point is placed over duplicated ownership, tangled dependencies, or broken boundaries without changing the structure beneath it.
+A facade hides mess when a clean-looking entry point is placed over duplicated ownership, tangled dependencies, or broken boundaries without changing the structure beneath it. The root-cause is that a clean wrapper is offered as the architectural fix while the underlying ownership and dependency graph stay violated, so complexity is concealed rather than reduced.
 
 ## Governing Principle
 Abstraction is compression only when it removes knowledge from callers because the hidden details have one coherent owner. A facade over disorder does the opposite: it hides evidence while preserving every underlying coupling. The public surface becomes simpler, but the system itself does not; complexity is merely moved out of sight, where it can grow without pressure to become coherent.

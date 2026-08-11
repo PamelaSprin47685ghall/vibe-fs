@@ -1,7 +1,7 @@
 # flaky-test-tolerated — Main
 
 ## What To Do Now
-Find the hidden input that changes the verdict—time, random seed, order, shared residue, race, external state—and make it explicit or remove it.
+Find the hidden input that changes the verdict—time, random seed, order, shared residue, race, external state—and make it explicit or remove it. The test as a measuring instrument is who owns one-input-one-verdict; retries, quarantine labels, and widened timeouts are not.
 
 ## Why This Matters
 A nondeterministic test cannot serve as evidence. More importantly, tolerated flakes poison interpretation of the whole suite: engineers begin rerunning failures instead of investigating them, turning probability into a substitute for causality.

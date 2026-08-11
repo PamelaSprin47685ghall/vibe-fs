@@ -1,7 +1,7 @@
 # ephemeral-verification — Enforcer
 
 ## Definition
-Verification is ephemeral when the only evidence for correctness is an unreproducible shell probe, temporary script, manual inspection, or debug output that disappears with the session.
+Verification is ephemeral when the only evidence for correctness is an unreproducible shell probe, temporary script, manual inspection, or debug output that disappears with the session. The root-cause is that an unreproducible session probe is treated as proof, so the discovered invariant evaporates and cannot turn red when the defect returns.
 
 ## Governing Principle
 A discovery that cannot be replayed is not part of the engineering system. It may convince one person once, but it cannot defend the invariant tomorrow, teach the next maintainer, or turn red when the defect returns. Durable verification converts private confidence into shared executable memory.

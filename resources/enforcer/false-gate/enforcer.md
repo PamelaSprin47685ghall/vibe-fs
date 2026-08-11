@@ -1,7 +1,7 @@
 # false-gate — Enforcer
 
 ## Definition
-A gate is false when its green state does not logically imply that the property it claims to guard was actually checked.
+A gate is false when its green state does not logically imply that the property it claims to guard was actually checked. The root-cause is that green does not imply the claimed property was checked, so a reachable violation can still pass and the gate manufactures confidence.
 
 ## Governing Principle
 A quality gate has value only if there exists a reachable bad state that forces it red. If the scanner points at the wrong path, matches nothing, ignores exit status, or asserts a tautology, the gate is ceremonial: its success is independent of the property. A lock that cannot lock is worse than no lock because it manufactures confidence.

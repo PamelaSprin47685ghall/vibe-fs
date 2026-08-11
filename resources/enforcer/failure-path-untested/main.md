@@ -1,7 +1,7 @@
 # failure-path-untested — Main
 
 ## What To Do Now
-Add a test that induces the real failure condition and asserts the resulting state, error, cleanup, and absence of forbidden side effects.
+Add a test that induces the real failure condition and asserts the resulting state, error, cleanup, and absence of forbidden side effects. The test that induces the real failure at the owning boundary is who owns evidence for that recovery contract; happy-path coverage is not.
 
 ## Why This Matters
 Failure handling often contains the strongest guarantees in the system—no duplicate charge, no leaked permit, no partial commit, no stale mutation. Yet those guarantees are frequently represented only by code branches nobody has executed deliberately. That is specification by optimism.

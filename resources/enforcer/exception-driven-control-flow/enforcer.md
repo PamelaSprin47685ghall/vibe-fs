@@ -1,7 +1,7 @@
 # exception-driven-control-flow — Enforcer
 
 ## Definition
-Exception-driven control flow uses stack unwinding to represent an ordinary branch the program expects to take as part of normal operation.
+Exception-driven control flow uses stack unwinding to represent an ordinary branch the program expects to take as part of normal operation. The root-cause is that an ordinary expected branch is implemented as throw/catch, so possible outcomes leave the type and local syntax and live only in non-local handlers.
 
 ## Governing Principle
 Exceptions deliberately erase local control structure: they jump across frames until some handler recognizes them. That power is appropriate when normal reasoning has broken down. Using it for absence, iteration, branching, or expected retry turns ordinary policy into non-local control flow, so a reader cannot discover possible outcomes from the function’s type or immediate syntax.

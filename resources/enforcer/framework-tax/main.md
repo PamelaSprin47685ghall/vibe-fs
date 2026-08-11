@@ -1,7 +1,7 @@
 # framework-tax — Main
 
 ## What To Do Now
-Strip away framework mechanisms that do not carry real domain or operational value and expose the underlying operation through the simplest native construct that fits.
+Strip away framework mechanisms that do not carry real domain or operational value and expose the underlying operation through the simplest native construct that fits. The domain operation is who owns the design’s dominant structure; container, hook, and config machinery own only the complexity they actually remove.
 
 ## Why This Matters
 Every framework concept consumes reader attention before business reasoning begins. When that cost is not repaid by eliminated complexity, the architecture becomes a tutorial for the framework rather than a model of the system.

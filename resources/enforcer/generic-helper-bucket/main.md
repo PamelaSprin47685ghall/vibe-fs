@@ -1,7 +1,7 @@
 # generic-helper-bucket — Main
 
 ## What To Do Now
-Empty the generic bucket by assigning each operation to the domain, boundary, or technical concept that actually owns it.
+Empty the generic bucket by assigning each operation to the domain, boundary, or technical concept that actually owns it. The domain, boundary, or narrowly named technical concept that would be incomplete without the operation is who owns it; `utils`, `helpers`, and `common` are not.
 
 ## Why This Matters
 A module named `utils` cannot defend a boundary because almost anything can be called useful. Over time it attracts unrelated dependencies and becomes the easiest place to put code that nobody wants to model, concentrating accidental coupling while hiding the reason each function exists.

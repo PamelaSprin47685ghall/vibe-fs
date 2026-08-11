@@ -1,7 +1,7 @@
 # ephemeral-verification — Main
 
 ## What To Do Now
-Translate the successful manual probe into the narrowest durable automated check that preserves the discovered invariant.
+Translate the successful manual probe into the narrowest durable automated check that preserves the discovered invariant. The project’s standard test, gate, or canary entry is who owns that invariant; a one-off probe is not.
 
 ## Why This Matters
 Manual verification proves a moment, not a system. Its setup, commands, and observations disappear, so the next regression begins from ignorance. A repository improves only when debugging knowledge is converted into something that future changes must pass.

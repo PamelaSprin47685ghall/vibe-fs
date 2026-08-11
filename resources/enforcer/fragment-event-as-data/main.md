@@ -1,7 +1,7 @@
 # fragment-event-as-data — Main
 
 ## What To Do Now
-Use partial transport events only to trigger a fresh read of the complete authoritative state, unless the protocol explicitly defines those events as durable ordered facts.
+Use partial transport events only to trigger a fresh read of the complete authoritative state, unless the protocol explicitly defines those events as durable ordered facts. The authoritative snapshot—or a documented durable ordered event log—is who owns domain facts; wake-up deltas are not.
 
 ## Why This Matters
 Incremental delivery is usually optimized for responsiveness, not historical completeness. A client that assembles business meaning from fragments implicitly depends on every update, exact ordering, and stable delta semantics. One dropped or coalesced fragment then creates a state that never existed at the source.

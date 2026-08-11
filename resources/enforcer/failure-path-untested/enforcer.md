@@ -1,7 +1,7 @@
 # failure-path-untested — Enforcer
 
 ## Definition
-A failure path is untested when newly introduced error handling, cancellation, rollback, retry, malformed-input, or recovery logic has never been forced to execute under test.
+A failure path is untested when newly introduced error handling, cancellation, rollback, retry, malformed-input, or recovery logic has never been forced to execute under test. The root-cause is that newly written failure, cancel, rollback, or retry logic is assumed correct because the happy path is green, so the branch that matters most has never been forced to execute.
 
 ## Governing Principle
 Failure code is usually least exercised in production until the moment correctness depends on it most. Its plausibility is therefore dangerous: branches that “obviously” release, rollback, or retry can remain dead assumptions for months. A failure path has no evidence merely because the happy path survives; it must be driven by the condition that gives it meaning.

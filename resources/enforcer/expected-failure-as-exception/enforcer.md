@@ -1,7 +1,7 @@
 # expected-failure-as-exception — Enforcer
 
 ## Definition
-An expected failure is misrepresented when a foreseeable domain outcome—unauthorized, not found, insufficient balance, invalid transition, conflict—is thrown as an exception instead of returned as part of the operation’s contract.
+An expected failure is misrepresented when a foreseeable domain outcome—unauthorized, not found, insufficient balance, invalid transition, conflict—is thrown as an exception instead of returned as part of the operation’s contract. The root-cause is that a named, foreseeable business refusal is thrown instead of returned, so the signature overclaims success and callers can skip a required domain branch.
 
 ## Governing Principle
 A function’s type should describe the worlds its caller must be prepared to inhabit. Foreseeable refusal is one of those worlds. Hiding it in an exception channel makes the signature overclaim success and lets callers accidentally ignore a required branch. Typed failure restores honesty: it turns policy from an ambient runtime surprise into an explicit obligation.

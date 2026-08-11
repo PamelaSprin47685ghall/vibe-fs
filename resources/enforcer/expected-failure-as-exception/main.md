@@ -1,7 +1,7 @@
 # expected-failure-as-exception — Main
 
 ## What To Do Now
-Move foreseeable business failures into a closed typed result and make callers match the cases explicitly.
+Move foreseeable business failures into a closed typed result and make callers match the cases explicitly. The operation’s closed result type is who owns every foreseeable business refusal; the exception channel is not.
 
 ## Why This Matters
 An exception says the normal contract was interrupted. “Insufficient balance” or “not authorized” is usually not an interruption; it is one of the contract’s legitimate answers. Encoding it exceptionally makes the API claim a simpler world than the business actually permits.

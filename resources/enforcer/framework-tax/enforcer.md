@@ -1,7 +1,7 @@
 # framework-tax — Enforcer
 
 ## Definition
-Framework tax is the accidental complexity paid when lifecycle, configuration, registration, indirection, and generated structure occupy more of the design than the domain operation they are meant to support.
+Framework tax is the accidental complexity paid when lifecycle, configuration, registration, indirection, and generated structure occupy more of the design than the domain operation they are meant to support. The root-cause is that framework lifecycle, configuration, and registration become the dominant ontology for a smaller domain operation, so readers pay ceremony before they can see the problem.
 
 ## Governing Principle
 A framework is justified when it compresses recurring complexity the application truly has. When the problem is smaller than the framework’s ceremony, the abstraction expands rather than compresses: readers must learn container lifecycles, hook order, annotations, configuration dialects, and extension rules before they can see a simple operation. The tool has become the problem’s dominant ontology.
