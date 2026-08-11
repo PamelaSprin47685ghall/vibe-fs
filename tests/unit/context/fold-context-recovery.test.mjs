@@ -33,7 +33,7 @@ const next = (factValue, run) =>
 
 const entryFact = ({ epoch = 0, from, to, cutoffFrom, cutoffTo, digest = `d-${cutoffTo}`, n = 1, run = `msg_e${n}` }) =>
   next(
-    fact('BlogEntryCommitted', {
+    fact('BlogObservationCommitted', {
       SessionId: session,
       BloggerSessionId: blogger,
       RequestId: bloggerRequestId(`req-e${n}`),
@@ -57,7 +57,7 @@ const entryFact = ({ epoch = 0, from, to, cutoffFrom, cutoffTo, digest = `d-${cu
 
 const squashFact = ({ previousEpoch, nextEpoch, count, n = 1, run = `msg_s${n}` }) =>
   next(
-    fact('BlogSquashCommitted', {
+    fact('BlogObservationsSquashed', {
       SessionId: session,
       BloggerSessionId: blogger,
       RequestId: bloggerRequestId(`req-s${n}`),
@@ -156,7 +156,7 @@ test('PERSIST_010_a_stale_frame_epoch_fails_the_fold_closed', () => {
   ])
 
   assert.equal(result.ok, false, 'a stale frame epoch must not be absorbed')
-  assert.equal(result.error.Fact, 'BlogEntryCommitted')
+  assert.equal(result.error.Fact, 'BlogObservationCommitted')
   assert.match(result.error.Reason, /frame epoch 1 is in force but the line was written against 0/)
   assert.match(result.error.Reason, /PERSIST-010/)
 })

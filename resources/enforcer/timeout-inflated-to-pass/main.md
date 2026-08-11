@@ -9,11 +9,17 @@ Increasing a timeout changes when the system admits failure, not whether progres
 ## Repair Strategy
 Instrument the causal milestones, identify where progress stops, repair synchronization/resource lifetime, then measure legitimate tail latency and set the budget from that evidence and the required SLO.
 
-## Wrong Fixes
-Do not stack a longer timeout with retries or sleeps. That compounds waiting while further obscuring the point where causality failed.
+## Decision Branches
+If the operation is not making progress, restore the old bound and fix the missing cause.
+If measurement shows healthy work exceeding a mis-set SLO, change the timeout from evidence, not from the first green value.
+
+## Common Wrong Fixes
+- Stack a longer timeout with retries or sleeps to further obscure where causality failed.
+- Raise only CI timeouts while production keeps the hang-hiding budget.
+- Disable the timeout entirely so the test waits until the process is killed.
 
 ## Verification
-The operation should complete because its causal condition occurs, not because the new budget is generous. Fault cases must still time out within an intentional bound.
+Invariant: completion must follow the causal condition, not a more generous clock. Fault cases must still time out within an intentional bound; green must not depend on waiting longer for an unexplained condition.
 
 ## Done When
 The timeout expresses a measured service policy and no green result depends on merely waiting longer for an unexplained condition.

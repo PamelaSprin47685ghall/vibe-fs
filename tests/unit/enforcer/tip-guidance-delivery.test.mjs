@@ -59,7 +59,7 @@ const seedOwnerWithTip = (journal, { tip = 'primitive-obsession', runSuffix = '1
   append(
     journal,
     main,
-    agentFact('BlogEntryCommitted', {
+    agentFact('BlogObservationCommitted', {
       SessionId: main,
       BloggerSessionId: blogger,
       RequestId: bloggerRequestId(`req-tip-${runSuffix}`),

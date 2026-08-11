@@ -55,7 +55,7 @@ const seed = ({ withAssociation = true, withTip = true } = {}) => {
 
   if (withTip) {
     const field = 'primitive-obsession'
-    append(journal, main, agentFact('BlogEntryCommitted', {
+    append(journal, main, agentFact('BlogObservationCommitted', {
       SessionId: main,
       BloggerSessionId: blogger,
       RequestId: bloggerRequestId('req-nudge-1'),

@@ -1,6 +1,6 @@
 // tests/unit/Journal/blog-entry-committed.test.mjs — ENFORCER-045 atomic fold.
 //
-// One BlogEntryCommitted fact updates Blog AND Enforcement atomically. No
+// One BlogObservationCommitted fact updates Blog AND Enforcement atomically. No
 // separate EnforcementCycleCommitted exists; the fold refuses its name as a
 // pre-0.5.0 legacy line (PERSIST-005).
 
@@ -30,7 +30,7 @@ let seq = 0
 const next = (factValue, run) =>
   envelope({ seq: (seq += 1), stream: stream.session(session), run, fact: factValue })
 
-/** BlogEntryCommitted with full enforcement half (tip v2: TipRuleId, no ScoreVectorRef). */
+/** BlogObservationCommitted with full enforcement half (tip v2: TipRuleId, no ScoreVectorRef). */
 const entryWithEnforcement = ({
   epoch = 0,
   from,
@@ -47,7 +47,7 @@ const entryWithEnforcement = ({
   prefixEpoch = 0,
 }) =>
   next(
-    fact('BlogEntryCommitted', {
+    fact('BlogObservationCommitted', {
       SessionId: session,
       BloggerSessionId: blogger,
       RequestId: bloggerRequestId(`req-e${n}`),
@@ -187,7 +187,7 @@ test('ENFORCER_045_no_enforcement_cycle_committed_fact_exists', () => {
 
 test('CTX_012_squash_does_not_advance_coverage', () => {
   const squash = next(
-    fact('BlogSquashCommitted', {
+    fact('BlogObservationsSquashed', {
       SessionId: session,
       BloggerSessionId: blogger,
       RequestId: bloggerRequestId('req-s1'),

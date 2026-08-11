@@ -8,7 +8,7 @@ open Wanxiangshu.Kernel.Identity
 ///
 /// Append-only within one lifecycle: `Opening` is captured once and never
 /// overwritten, `Parts` grow strictly by cursor, `Terminal` is captured once.
-/// `RecordCoverage` (what Y has consumed) advances via `BlogEntryCommitted`,
+/// `RecordCoverage` (what Y has consumed) advances via `BlogObservationCommitted`,
 /// NOT here — this module holds the record itself, the Blog projection holds
 /// the ingest position, so the two can be validated against each other in the
 /// fold without a second copy.

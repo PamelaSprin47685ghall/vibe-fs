@@ -10,13 +10,21 @@ Version control is the archive; the working tree is the proposition “this is t
 Trigger when production functions, branches, modules, aliases, or paths are unreachable or have no remaining caller after a change.
 
 ## Do Not Trigger When
-Do not trigger for intentionally dormant extension points or feature paths whose activation contract and owner are explicit and tested.
+- The path is an intentionally dormant extension point whose activation contract and owner are explicit and tested.
+- The code is a supported compatibility surface with a named owner and a documented retirement plan, not an abandoned leftover.
+- A feature flag still has a live activation contract, tests, and an owner; the off path is dormant by design, not forgotten.
+- Tests, fixtures, or generated snapshots exist only to prove current behavior and are themselves referenced by the suite.
 
 ## Distinguish From
-commented-out-code stores old code in comments. legacy-cruft-retained keeps obsolete compatibility surfaces. This rule concerns executable source that no longer belongs to any current behavior.
+`commented-out-code` stores old code in comments. `legacy-cruft-retained` keeps obsolete compatibility surfaces. This rule concerns executable source that no longer belongs to any current behavior. Tie-break: if the source still compiles and could run but has no present caller or contract, this rule owns the case.
 
 ## Decision Procedure
 Find the caller, activation condition, or contract that gives the code a present role. If none exists, delete it rather than preserve hypothetical utility.
+
+## Examples
+- positive: a production helper remains after its last caller was removed; searches still surface it as if it were live.
+- near-miss: a plugin hook with an explicit owner, activation test, and documented off-by-default contract.
+- counterexample: delete the unreachable path and let version control keep history.
 
 ## Nudge
 Keep only code with a present proof of life. Delete unreachable production paths; history can recover them if the future ever needs them again.

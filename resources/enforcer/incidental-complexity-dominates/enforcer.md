@@ -10,13 +10,20 @@ Software cannot eliminate essential complexity; it can only choose where to pay 
 Trigger when understanding or changing a simple domain rule requires traversing disproportionate adapters, configuration, framework lifecycle, wrappers, translation layers, or boilerplate.
 
 ## Do Not Trigger When
-Do not trigger when the apparent complexity corresponds to real domain states, external protocols, security constraints, or scale requirements that cannot honestly be removed.
+- Do not trigger when the apparent complexity corresponds to real domain states, external protocols, security constraints, or scale requirements that cannot honestly be removed.
+- Do not trigger for a thin adapter required by an external protocol you do not control.
+- Do not trigger while a spike is still measuring whether the machinery is essential; trigger when it ships as the visible architecture.
 
 ## Distinguish From
-framework-tax is framework-specific ceremony. pattern-sprawl is OO/pattern scaffolding. This rule is the higher-level condition where accidental structure eclipses essential structure regardless of source.
+framework-tax is framework-specific ceremony. pattern-sprawl is OO/pattern scaffolding. This rule is the higher-level condition where accidental structure eclipses essential structure regardless of source. Tie-break: if the mass is a specific framework’s ceremony, use framework-tax; if accidental structure from any source dominates the domain, use this rule.
 
 ## Decision Procedure
 Separate concepts into “the problem requires this” and “our solution introduced this.” Rework the second set until its cost is subordinate to the first.
+
+## Examples
+- positive: Changing one pricing rule requires navigating DI, mapper, DTO, wrapper, and lifecycle config before the rule appears.
+- near-miss: A thin client for a mandated external protocol sits beside a small domain model that still dominates the code.
+- counterexample: The domain types and transitions are the main visible structure; infrastructure appears only at the boundary.
 
 ## Nudge
 Spend complexity only on reality. Remove solution-imposed ceremony until the domain’s essential concepts again dominate the code’s visible structure.

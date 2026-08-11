@@ -795,7 +795,7 @@ export const journal = {
   deserializeFact: (json) => resultOf(FactCodec.deserializeFact(json)),
   containsLegacyFallbackFields: (json) => FactCodec.containsLegacyFallbackFields(json),
   pre050MigrationMessage: FactCodec.pre050MigrationMessage,
-  /** ENFORCER-072: ScoreVectorRef-era BlogEntryCommitted (no max-score migration). */
+  /** ENFORCER-072: ScoreVectorRef-era BlogObservationCommitted (no max-score migration). */
   containsLegacyScoreVectorEntry: (json) => FactCodec.containsLegacyScoreVectorEntry(json),
   tipV2CleanBreakMessage: FactCodec.tipV2CleanBreakMessage,
   compareSortKey: (a, b) => Envelopes.compareSortKey(a, b),
@@ -2671,7 +2671,7 @@ export const blogProjection = (() => {
 })()
 
 /**
- * ENFORCER-045/070/154: enforcement half of BlogEntryCommitted + bounded RecentTips.
+ * ENFORCER-045/070/154: enforcement half of BlogObservationCommitted + bounded RecentTips.
  * VERIFY-008: tip RuleId / FieldName / CycleId only via this facade.
  */
 export const enforcementProjection = (() => {

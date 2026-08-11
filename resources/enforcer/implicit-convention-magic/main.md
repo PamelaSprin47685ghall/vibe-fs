@@ -9,11 +9,17 @@ Convention saves syntax by spending memory. The more correctness depends on hidd
 ## Repair Strategy
 Identify the relationship the convention encodes, represent it as data or a typed declaration, and have one owner validate completeness. Keep convention only as optional sugar that compiles down to the explicit model.
 
-## Wrong Fixes
-Do not merely document more magic. Documentation can teach a convention but cannot make violating it impossible or even visible.
+## Decision Branches
+- If discovery currently carries correctness, replace it with explicit registration or a mechanical completeness gate.
+- If convention is only navigation sugar over an already-checked model, leave the sugar and keep the model authoritative.
+
+## Common Wrong Fixes
+- Do not merely document more magic. Documentation can teach a convention but cannot make violating it impossible or even visible.
+- Do not add linter comments that remind people of the filename rule while runtime still discovers by name.
+- Do not scan more directories to “make the convention easier.” Wider discovery enlarges the invisible API.
 
 ## Verification
-Rename, move, or omit a participant in a controlled fixture. The build/startup gate should fail with a precise contract error rather than silently changing runtime behavior.
+Rename, move, or omit a participant in a controlled fixture. The build/startup gate should fail with a precise contract error rather than silently changing runtime behavior. The invariant is: participation is visible and checked, not implied by path.
 
 ## Done When
 Critical relationships are discoverable from code and checked mechanically, while directory shape and naming conventions no longer carry hidden semantic authority.

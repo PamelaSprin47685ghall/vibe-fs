@@ -9,11 +9,19 @@ Remove scheduler order from the business decision. Gather the information the ru
 ## Repair Strategy
 Define stable identities and the domain merge law. Use concurrency only to obtain inputs faster; join before deciding unless the protocol intentionally elects a winner by time/order.
 
-## Wrong Fixes
-Do not add tiny delays to make one branch usually win, or depend on current task scheduling behavior. Those turn nondeterminism into a fragile bias rather than a rule.
+## Decision Branches
+- If the domain merge is independent of arrival, collect all required results and apply the merge after the join.
+- If first-writer or election-by-time is the real protocol, document identity, quorum, and tie-break so timing is an explicit rule, not an accident.
+- If only one owner should decide, serialize through that owner and stop racing writers.
+
+## Common Wrong Fixes
+- Add tiny delays to make one branch usually win.
+- Depend on current task scheduling or thread priority as a substitute for a merge law.
+- Keep first-completion as the result while adding retries that sample a different winner.
+- Treat flaky tests as noise instead of evidence that timing is still choosing truth.
 
 ## Verification
-Permute completion order across the same logical inputs. Results must remain identical unless the documented domain semantics explicitly say otherwise.
+Permute completion order across the same logical inputs. Results must remain identical unless the documented domain semantics explicitly say otherwise. The invariant is: logical inputs plus declared merge/identity determine the outcome, not scheduler order.
 
 ## Done When
 Business outcomes depend on declared facts and merge rules, not on incidental scheduler timing.

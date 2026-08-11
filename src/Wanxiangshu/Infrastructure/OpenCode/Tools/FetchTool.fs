@@ -35,7 +35,7 @@ module FetchTool =
               "session_id", ToolHostCodec.TString sessionId
               "a", ToolHostCodec.TString answer ]
 
-    /// Stale path after mechanical Bookkeeper failed or still-stale post-refresh.
+    /// Stale path after Bookkeeper synthesis failed or still-stale post-refresh.
     let private emitStale (sessionId: string) (answer: string) : string =
         ToolHostCodec.tomlObject
             [ "status", ToolHostCodec.TString "stale"
@@ -57,9 +57,9 @@ module FetchTool =
             match CasebookWorkflow.checkFreshness case replayed with
             | ReplayResult.Fresh -> emitFresh workspaceRoot sessionId case.A
             | ReplayResult.Stale ->
-                // CASE-006 minimal: Host mechanical refresh once (same Q/A +
-                // replayed observations). No LLM edit-qa. Maintenance failure
-                // keeps the old Case and still returns stale — never a fetch error.
+                // CASE-006: Host Bookkeeper synthesis once (edit-qa transaction
+                // + stability verify). Maintenance failure keeps the old Case
+                // and still returns stale — never a fetch error.
                 match CasebookBookkeeper.refreshStale store raw workspaceRoot sessionId with
                 | Ok true ->
                     match CasebookWorkflow.fetchCase store raw 256 sessionId with

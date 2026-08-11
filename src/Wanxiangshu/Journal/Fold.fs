@@ -856,7 +856,7 @@ module Fold =
                 | Error reason -> reject "BloggerRequestAbandoned" reason
                 | Ok updated -> Ok updated
 
-            | ContextFactCases.BlogEntryCommitted payload ->
+            | ContextFactCases.BlogObservationCommitted payload ->
                 // ENFORCER-045 + C5: Blog + Enforcement + unified cycle receipt.
                 let applyEnforcementAndReceipt session =
                     let enforcement =
@@ -888,7 +888,7 @@ module Fold =
                                 BloggerCycles = Some cycleUpdated }))
 
                 match AgentProjection.tryUpdate payload.SessionId applyEnforcementAndReceipt projection with
-                | Error reason -> reject "BlogEntryCommitted" reason
+                | Error reason -> reject "BlogObservationCommitted" reason
                 | Ok updated ->
                     tryUpdateBlog
                         payload.SessionId
@@ -903,11 +903,11 @@ module Fold =
                               Digest = payload.TextDigest
                               TextRef = payload.TextRef })
                         updated
-                    |> blogOutcome "BlogEntryCommitted"
+                    |> blogOutcome "BlogObservationCommitted"
 
-            | ContextFactCases.BlogSquashCommitted payload ->
+            | ContextFactCases.BlogObservationsSquashed payload ->
                 // Blog frames squash + Enforcement tip co-truncate on the same main session
-                // (payload.SessionId — same owner BlogEntryCommitted uses for Enforcement).
+                // (payload.SessionId — same owner BlogObservationCommitted uses for Enforcement).
                 let applyReceiptAndTips session =
                     let cycles = Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
 
@@ -926,7 +926,7 @@ module Fold =
                             Enforcement = Some enforcement })
 
                 match AgentProjection.tryUpdate payload.SessionId applyReceiptAndTips projection with
-                | Error reason -> reject "BlogSquashCommitted" reason
+                | Error reason -> reject "BlogObservationsSquashed" reason
                 | Ok updated ->
                     tryUpdateBlog
                         payload.SessionId
@@ -938,7 +938,7 @@ module Fold =
                               Digest = payload.TextDigest
                               TextRef = payload.TextRef })
                         updated
-                    |> blogOutcome "BlogSquashCommitted"
+                    |> blogOutcome "BlogObservationsSquashed"
 
             | ContextFactCases.PrefixRebaseCommitted payload ->
                 tryUpdatePrefix

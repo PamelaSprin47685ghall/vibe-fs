@@ -9,8 +9,14 @@ Undocumented invariants survive only inside people who have already paid the cos
 ## Repair Strategy
 State what must always be true, what boundary owns the rule, and what evidence would falsify it. Keep prose concise, then move enforceable parts into construction, exhaustive matching, architecture checks, or behavioral tests.
 
-## Wrong Fixes
-Do not scatter the same rule across comments near symptoms. One invariant needs one authoritative definition, with other sites linking or enforcing rather than redefining it.
+## Decision Branches
+- If the property can be made unrepresentable by a type or construction rule, encode it there and keep a one-sentence owner statement.
+- If it cannot be typed, record the falsifiable sentence at the owner and add the cheapest test or gate that detects violation.
+
+## Common Wrong Fixes
+- Scatter the same rule across comments near symptoms instead of one authoritative definition.
+- Write vague prose ("be careful with ordering") that cannot be falsified.
+- Duplicate the invariant in several modules so later edits diverge.
 
 ## Verification
 A new contributor should be able to locate the invariant from the owning concept and identify the mechanism that prevents or detects violation.

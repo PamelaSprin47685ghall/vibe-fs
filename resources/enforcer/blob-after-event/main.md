@@ -9,11 +9,19 @@ A history that names missing content is not merely incomplete; it is self-contra
 ## Repair Strategy
 Make blob durability the precondition of reference publication. Prefer content-addressed identity where appropriate, and treat a failed blob write as “the event did not happen.” If atomic multi-object commit exists, use its actual guarantee rather than simulating one in memory.
 
-## Wrong Fixes
-Do not append first and “fill the blob soon after.” Do not tolerate missing blobs during replay as normal. Retries without stable blob identity can multiply the inconsistency.
+## Decision Branches
+- If the store offers a true atomic commit of blob plus reference, use that guarantee and do not simulate it in memory.
+- If commits are separate, persist and verify the blob first; append the reference only after that success condition.
+- If the blob write fails, do not append; the event did not happen.
+
+## Common Wrong Fixes
+- Do not append first and “fill the blob soon after.”
+- Do not tolerate missing blobs during replay as a normal path.
+- Do not retry uploads under a new identity after the old identity was already referenced.
+- Do not treat an in-memory write as durability for a history event.
 
 ## Verification
-Crash the reasoning at every boundary: before blob commit, after blob commit but before event append, and after event append. Every surviving durable state must be replayable.
+Crash the reasoning at every boundary: before blob commit, after blob commit but before event append, and after event append. Every surviving durable state must be replayable. The invariant is that no committed reference exists without a durably readable referent.
 
 ## Done When
 No committed reference can exist without a durably readable referent, and recovery never needs to guess whether referenced content once existed.

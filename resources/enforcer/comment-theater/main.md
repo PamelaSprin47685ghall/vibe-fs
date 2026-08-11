@@ -9,11 +9,19 @@ A compensating comment creates two representations of one fact, but only one is 
 ## Repair Strategy
 For each noisy comment, identify the knowledge it tries to supply. If it is “what,” encode it in naming and types. If it is “how,” simplify the control flow. If it is a durable “why” imposed from outside the code, keep the shortest precise explanation and name the source of the constraint.
 
-## Wrong Fixes
-Do not rewrite obvious comments in more polished prose. Do not add comments around every branch. Better theater is still theater.
+## Decision Branches
+- If the comment restates syntax or translates a poor name, delete it and repair the structure.
+- If the comment explains tangled control flow, untangle the flow instead of polishing the prose.
+- If the knowledge cannot live in types, names, or tests, keep the shortest durable why.
+
+## Common Wrong Fixes
+- Do not rewrite obvious comments in more polished prose.
+- Do not add comments around every branch.
+- Do not leave the unclear code and add a longer apology.
+- Do not move theater into a README while the structure stays opaque.
 
 ## Verification
-Read the implementation with routine comments hidden. The governing behavior should remain understandable; remaining comments should add information unavailable from the code itself.
+Read the implementation with routine comments hidden. The governing behavior should remain understandable; remaining comments should add information unavailable from the code itself. The invariant is that executable meaning lives in structure; prose carries only knowledge the compiler cannot enforce.
 
 ## Done When
 Prose no longer carries executable meaning the structure could own, and every surviving comment protects a genuine piece of non-obvious knowledge.

@@ -9,11 +9,17 @@ A test that depends on the current clock has moving premises. It may cross midni
 ## Repair Strategy
 Fix instants and zones in test data, use a manual clock for deadlines and expiration, and reserve real-time integration only for proving the adapter that reads the system clock.
 
-## Wrong Fixes
-Do not widen timing tolerances until the test usually passes. Larger windows reduce sensitivity while preserving the hidden temporal dependency.
+## Decision Branches
+If the scenario needs a temporal fact (instant, duration, zone, deadline), supply it explicitly via a fake/manual clock.
+If the test’s purpose is only to prove clock wiring, keep a narrow non-semantic smoke and do not use it as a domain verdict.
+
+## Common Wrong Fixes
+- Widen timing tolerances until the test usually passes.
+- Sleep longer to outrun scheduler noise while still using wall time as the premise.
+- Globally mock `Date.now` in one test file while other tests still read ambient time.
 
 ## Verification
-Run the test at arbitrary real times and zones; its meaning and verdict must remain unchanged because all relevant temporal facts are explicit.
+Invariant: the test’s meaning and verdict must be independent of the host’s real clock. Run it at arbitrary real times and zones; results must stay identical because all relevant temporal facts are explicit.
 
 ## Done When
 Temporal behavior is tested as data and policy, while wall-clock timing no longer participates accidentally in the test’s premises.

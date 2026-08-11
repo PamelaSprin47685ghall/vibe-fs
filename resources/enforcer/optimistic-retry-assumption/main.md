@@ -9,11 +9,17 @@ A timeout removes knowledge, not history. If the remote side committed before th
 ## Repair Strategy
 Assign stable operation identity before the first attempt and carry it through retries. Where the provider lacks idempotency, design recovery around querying authoritative state or refusing automatic retry when duplication cannot be ruled out.
 
-## Wrong Fixes
-Do not assume “no response = no effect,” and do not add exponential backoff as if delay changed semantics. Backoff manages load; identity manages duplication.
+## Decision Branches
+- If the outcome is unknown and the effect may have committed, resolve via identity or status lookup before any repeat.
+- If failure is known to precede the effect, or the op is read-only/idempotent, retry is not this defect.
+
+## Common Wrong Fixes
+- Assume "no response = no effect."
+- Add exponential backoff as if delay changed duplication semantics.
+- Retry with a fresh identity, guaranteeing a second logical effect.
 
 ## Verification
-Simulate “effect committed, acknowledgement lost.” Recovery must converge to one logical effect rather than issue an indistinguishable second one.
+Simulate "effect committed, acknowledgement lost." Recovery must converge to one logical effect rather than issue an indistinguishable second one. The invariant is that unknown is not treated as failure-before-effect.
 
 ## Done When
 Every retry after uncertainty is semantically safe because the system can prove whether repeated execution denotes the same logical operation.

@@ -10,13 +10,21 @@ Ingress is the moment of maximum evidence and minimum trust. The raw payload, pr
 Trigger when dictionaries, loosely typed JSON, optional-field bags, raw strings, or cross-language payloads circulate beyond their adapter and downstream code repeatedly checks fields, formats, or variants.
 
 ## Do Not Trigger When
-Do not trigger when input is parsed, validated, normalized, and converted at ingress into domain types whose constructors express the guarantees internal code relies on.
+- Input is parsed, validated, normalized, and converted at ingress into domain types whose constructors express the guarantees internal code relies on.
+- Internal layers receive already-validated domain values and do not re-interrogate payload shape.
+- The protocol owner retains raw bytes at the same boundary for signature or checksum verification, then still constructs the strong type before leaving.
+- Tests drive the adapter with raw fixtures and assert typed outcomes at the boundary.
 
 ## Distinguish From
-type-erosion-at-boundary lets dynamic types leak inward after decoding. stringly-typed-error makes prose a control protocol. This rule concerns delayed or repeated interpretation of external input itself.
+`type-erosion-at-boundary` lets dynamic types leak inward after decoding. `stringly-typed-error` makes prose a control protocol. Tie-break: if the defect is delayed or repeated interpretation of external input itself, use this rule; if decoded data remains `any`/unchecked inward, use `type-erosion-at-boundary`.
 
 ## Decision Procedure
 Identify the first trusted boundary. Enumerate the external alternatives there, reject malformed values, normalize representation, and construct the strongest internal type justified by the evidence.
+
+## Examples
+- positive: handlers pass `dict` JSON through services that each call `if "email" in body`.
+- near-miss: the adapter validates and returns `Email` / `Order`, and services never see the raw map.
+- counterexample: retry logic parses `e.message` for `"timeout"` — that is `stringly-typed-error`.
 
 ## Nudge
 Parse where uncertainty enters. Turn external shape into internal meaning once, at the boundary, so the rest of the system reasons about facts rather than repeatedly interrogating payloads.

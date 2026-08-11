@@ -20,7 +20,7 @@ open Wanxiangshu.Session
 /// ENFORCER-044: when the Host has collected a provider step's tool results and
 /// enters the continuation transform, this module re-reads the full assistant
 /// snapshot, re-canonicalises every `blog` call, merges them by PartOrdinal, and
-/// commits ONE BlogEntryCommitted atomically (ENFORCER-045/154) — the single
+/// commits ONE BlogObservationCommitted atomically (ENFORCER-045/154) — the single
 /// fact that appends the frame, advances coverage, and records the enforcement
 /// half.
 ///
@@ -415,7 +415,7 @@ module EnforcerHost =
                 else
                     Ok(merged, callIds)
 
-    /// Commit one cycle: blobs first, then the single BlogEntryCommitted
+    /// Commit one cycle: blobs first, then the single BlogObservationCommitted
     /// append (PERSIST-009 shape: durable effect → fact). The fold refuses a
     /// duplicate ProviderRun, so replay of an already-committed step is a no-op
     /// at the caller's idempotency check (ENFORCER-154).
@@ -529,7 +529,7 @@ module EnforcerHost =
                                 let tip = merged.CanonicalTip
 
                                 let fact =
-                                    ContextFact.BlogEntryCommitted
+                                    ContextFact.BlogObservationCommitted
                                         {| SessionId = mainSessionId
                                            BloggerSessionId = bloggerSessionId
                                            RequestId = coverage.RequestId
@@ -559,7 +559,7 @@ module EnforcerHost =
                                 | Error failure -> classifyAppendFailure failure
                                 | Ok _ -> CycleCommitOutcome.KnownCommitted
 
-    /// CTX-012: single production constructor path for BlogSquashCommitted from tool loop.
+    /// CTX-012: single production constructor path for BlogObservationsSquashed from tool loop.
     let private commitSquash
         (journal: AgentJournal)
         (mainSessionId: SessionId)
@@ -582,7 +582,8 @@ module EnforcerHost =
         | None ->
             match projections.AgentProjections.Sessions |> Map.tryFind mainSessionId with
             | None ->
-                CycleCommitOutcome.KnownNotCommitted "BlogSquashCommitted requires an existing work session projection"
+                CycleCommitOutcome.KnownNotCommitted
+                    "BlogObservationsSquashed requires an existing work session projection"
             | Some session ->
                 match session.Companion |> Option.bind (fun c -> c.BloggerSessionId) with
                 | Some linked when linked = bloggerSessionId ->
@@ -591,22 +592,22 @@ module EnforcerHost =
 
                     if k < 1 || k > List.length blog.Frames then
                         CycleCommitOutcome.KnownNotCommitted(
-                            sprintf "BlogSquashCommitted covers %d frames but %d exist" k (List.length blog.Frames)
+                            sprintf "BlogObservationsSquashed covers %d frames but %d exist" k (List.length blog.Frames)
                         )
                     elif blog.FrameEpochId <> squash.FrameEpochId then
-                        CycleCommitOutcome.KnownNotCommitted "BlogSquashCommitted frame epoch mismatch"
+                        CycleCommitOutcome.KnownNotCommitted "BlogObservationsSquashed frame epoch mismatch"
                     else
                         let selected = List.truncate k blog.Frames
                         let digests = selected |> List.map (fun f -> f.Digest)
 
                         if digests <> squash.FrameDigests then
-                            CycleCommitOutcome.KnownNotCommitted "BlogSquashCommitted frame digests mismatch"
+                            CycleCommitOutcome.KnownNotCommitted "BlogObservationsSquashed frame digests mismatch"
                         else
                             match journal.WriteBlob squashText with
                             | Error error -> CycleCommitOutcome.KnownNotCommitted error
                             | Ok blob ->
                                 let fact =
-                                    ContextFact.BlogSquashCommitted
+                                    ContextFact.BlogObservationsSquashed
                                         {| SessionId = mainSessionId
                                            BloggerSessionId = bloggerSessionId
                                            RequestId = squash.RequestId
@@ -629,7 +630,8 @@ module EnforcerHost =
                 | Some _ ->
                     CycleCommitOutcome.KnownNotCommitted "Squash completion belongs to a different Blogger session"
                 | None ->
-                    CycleCommitOutcome.KnownNotCommitted "BlogSquashCommitted requires a durably linked Blogger session"
+                    CycleCommitOutcome.KnownNotCommitted
+                        "BlogObservationsSquashed requires a durably linked Blogger session"
 
     type FrameLoadError =
         | MissingAssociation

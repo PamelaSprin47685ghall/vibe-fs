@@ -9,11 +9,19 @@ A universal model creates semantic coupling disguised as reuse. Changes become c
 ## Repair Strategy
 Start from each context’s questions and invariants, not from the existing field list. Create the smallest model that makes those rules natural. Translate identifiers and stable facts at the boundary instead of importing a foreign context wholesale.
 
-## Wrong Fixes
-Do not add more nullable fields, view flags, or context enums to the universal model. That turns bounded contexts into modes of one giant object rather than restoring separate meanings.
+## Decision Branches
+- If one type answers different contexts’ questions, split it and translate only shared facts.
+- If a field is meaningless in a context, it must be unrepresentable there, not nullable on a master object.
+- If a tiny value object truly has identical meaning everywhere, sharing it is not a leak.
+
+## Common Wrong Fixes
+- Do not add more nullable fields to the universal model.
+- Do not add view flags or context enums to keep one mega-type.
+- Do not copy the master model into each package without changing ownership of meaning.
+- Do not “namespace” fields on the same object (`authEmail`, `billingEmail`) as a substitute for split types.
 
 ## Verification
-A context should compile and make sense using only its own model plus explicit boundary contracts. Fields irrelevant to that context should be unrepresentable there.
+A context should compile and make sense using only its own model plus explicit boundary contracts. Fields irrelevant to that context should be unrepresentable there. The invariant is that each model has one semantic owner and one reason to change.
 
 ## Done When
 Each model has one semantic owner and one reason to change, while cross-context communication carries facts rather than leaking another context’s representation.

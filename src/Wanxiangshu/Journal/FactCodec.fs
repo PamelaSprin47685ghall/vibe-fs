@@ -14,10 +14,11 @@ module FactCodec =
         "Wanxiangshu 0.5.0 does not support pre-0.5.0 runtime journals.\nArchive or remove the old Wanxiangshu runtime journal before starting."
 
     /// ENFORCER-072 / PERSIST-005: tip v2 clean break. Old ScoreVectorRef-era
-    /// BlogEntryCommitted lines cannot losslessly become a single tip (ties,
-    /// empties, multi-high scores). Refuse — never invent a tip from max score.
+    /// BlogObservationCommitted (legacy BlogEntryCommitted) lines cannot losslessly
+    /// become a single tip (ties, empties, multi-high scores). Refuse — never invent
+    /// a tip from max score.
     let tipV2CleanBreakMessage =
-        "Wanxiangshu tip v2 requires BlogEntryCommitted.TipRuleId; ScoreVectorRef-era entries are not supported (ENFORCER-072 / PERSIST-005).\nArchive or remove the old Wanxiangshu runtime journal before starting."
+        "Wanxiangshu tip v2 requires BlogObservationCommitted.TipRuleId; ScoreVectorRef-era entries are not supported (ENFORCER-072 / PERSIST-005).\nArchive or remove the old Wanxiangshu runtime journal before starting."
 
     /// Field and case names that only a pre-0.5.0 journal can contain.
     ///
@@ -67,10 +68,15 @@ module FactCodec =
         pre050Markers
         |> Array.exists (fun marker -> json.IndexOf(marker, StringComparison.Ordinal) >= 0)
 
-    /// ENFORCER-072: BlogEntryCommitted carrying ScoreVectorRef, or lacking
-    /// TipRuleId, is a pre-tip-v2 shape. Explicit refuse — no max-score migration.
+    /// ENFORCER-072: BlogObservationCommitted / legacy BlogEntryCommitted carrying
+    /// ScoreVectorRef, or lacking TipRuleId, is a pre-tip-v2 shape. Explicit refuse
+    /// — no max-score migration. Check both tags so old journals still fail closed.
     let containsLegacyScoreVectorEntry (json: string) =
-        if json.IndexOf("\"BlogEntryCommitted\"", StringComparison.Ordinal) < 0 then
+        let isObservationCommit =
+            json.IndexOf("\"BlogObservationCommitted\"", StringComparison.Ordinal) >= 0
+            || json.IndexOf("\"BlogEntryCommitted\"", StringComparison.Ordinal) >= 0
+
+        if not isObservationCommit then
             false
         else
             let hasScoreVector =
@@ -78,6 +84,13 @@ module FactCodec =
 
             let hasTipRuleId = json.IndexOf("\"TipRuleId\"", StringComparison.Ordinal) >= 0
             hasScoreVector || not hasTipRuleId
+
+    /// Dual-decode: physical writes use BlogObservationCommitted /
+    /// BlogObservationsSquashed; journals may still carry the pre-cutover tags.
+    let rewriteLegacyObservationTags (json: string) : string =
+        json
+            .Replace("\"BlogEntryCommitted\"", "\"BlogObservationCommitted\"")
+            .Replace("\"BlogSquashCommitted\"", "\"BlogObservationsSquashed\"")
 
     /// HOST-013 anchored replay clean break: the legacy unanchored
     /// `PairProgrammingGuidelineAppended` carried only Ordinal / CallId /
@@ -249,5 +262,11 @@ module FactCodec =
         elif containsLegacyUnanchoredGuideline json then
             Error legacyGuidelineCleanBreakMessage
         else
-            Decode.Auto.fromString<Fact> (json |> migrateHandleCompleted |> migrateHandleOwnership, extra = extra)
+            Decode.Auto.fromString<Fact> (
+                json
+                |> migrateHandleCompleted
+                |> migrateHandleOwnership
+                |> rewriteLegacyObservationTags,
+                extra = extra
+            )
             |> Result.map pinToUtc

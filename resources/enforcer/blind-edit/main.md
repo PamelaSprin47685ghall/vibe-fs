@@ -9,11 +9,19 @@ The cheapest edit is not the fewest changed lines; it is the edit that restores 
 ## Repair Strategy
 Work backward from the observable failure to the governing contract, then forward through the implementation. Preserve known-correct structure and modify the smallest point that owns the wrong fact or transition.
 
-## Wrong Fixes
-Do not add downstream guards, adapters, or fallbacks because they make the symptom disappear. Do not infer an API or lifecycle from naming alone. A patch without a causal account is deferred debugging.
+## Decision Branches
+- If the owner and causal path are unknown, stop editing and map them first.
+- If the owner is known and the first violated invariant is identified, edit there and nowhere downstream.
+- If a downstream guard would hide the symptom, reject it; repair the source of the wrong fact.
+
+## Common Wrong Fixes
+- Do not add downstream guards, adapters, or fallbacks because they make the symptom disappear.
+- Do not infer an API or lifecycle from naming alone.
+- Do not spray similar patches across every file that mentions the symptom.
+- Do not treat a green local tweak as proof of ownership without a causal account.
 
 ## Verification
-The regression test should fail at the original behavior, pass after the owner-level repair, and make sense from the contract without knowledge of the patch.
+The regression test should fail at the original behavior, pass after the owner-level repair, and make sense from the contract without knowledge of the patch. The invariant is that the edit restores the owning contract rather than silencing a witness of the violation.
 
 ## Done When
 You can explain why the defect occurred, why this boundary owns the correction, and why the same mechanism cannot silently reappear downstream.

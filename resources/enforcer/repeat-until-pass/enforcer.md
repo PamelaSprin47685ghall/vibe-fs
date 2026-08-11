@@ -10,13 +10,21 @@ A repeated experiment does not become more true because one sample is favorable.
 Trigger when a failing test/command is rerun until success and the eventual green run is accepted without explaining or eliminating the earlier failure.
 
 ## Do Not Trigger When
-Do not trigger for a bounded retry of known transient infrastructure outside the system under test when the retry policy itself is explicit and final failure remains visible.
+- A bounded retry of known transient infrastructure outside the system under test is explicit, and final failure remains visible.
+- The first failure was explained, the hidden input was fixed, and a subsequent green run is a new experiment under controlled inputs.
+- The command is a poll that waits on a causal readiness signal with a timeout, not a rerun of an already-failed assertion.
+- A flaky test is being quarantined or deleted as policy work rather than rerun until green to ship.
 
 ## Distinguish From
-flaky-test-tolerated accepts unstable tests as policy. timeout-inflated-to-pass changes budgets. This rule is the act of sampling repeatedly until the desired verdict appears.
+flaky-test-tolerated accepts unstable tests as policy. timeout-inflated-to-pass changes budgets. This rule is the act of sampling repeatedly until the desired verdict appears. Tie-break: fire here when the operator/CI retries until green; fire flaky-test-tolerated when instability is left in the suite as accepted policy; fire timeout-inflated-to-pass when the hidden variable is masked by a larger wait.
 
 ## Decision Procedure
 Stop after the first unexplained nondeterministic failure. Capture inputs/environment, reproduce, find the hidden variable, and make one run deterministic before accepting green.
+
+## Examples
+- positive: a unit test fails twice, then passes on the third identical invocation, and the green run is committed as proof.
+- near-miss: CI retries a known GitHub API 429 with a bounded backoff and still fails the job if all attempts error.
+- counterexample: after finding a race and adding a lock, a single green run under the fixed inputs is accepted.
 
 ## Nudge
 Do not choose evidence by outcome. One unexplained red invalidates a lucky green until the nondeterminism has a cause and a fix.

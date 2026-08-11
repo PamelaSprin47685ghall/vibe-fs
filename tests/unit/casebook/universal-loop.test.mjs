@@ -73,7 +73,8 @@ test('G6_G_lifecycle_note_finalize_fetch_and_cleanup', () => {
     const sessionId = 'reuse-insp-1'
     notePrompt(sessionId, 'Who owns PromptAuthority?')
     collect(collector, sessionId, 'read', { path: 'a.txt' }, 'hello')
-    noteAnswer(sessionId, 'Host owns PromptAuthority.')
+    const rawA = 'Host owns PromptAuthority.'
+    noteAnswer(sessionId, rawA)
 
     const fin = resultOf(tryFinalizeInspector(dir, sessionId))
     assert.equal(fin.ok, true, `finalize ok: ${JSON.stringify(fin.error)}`)
@@ -83,21 +84,25 @@ test('G6_G_lifecycle_note_finalize_fetch_and_cleanup', () => {
     const fetched = resultOf(fetch(store, raw, 10, sessionId))
     assert.equal(fetched.ok, true)
     assert.equal(fetched.value.Q, 'Who owns PromptAuthority?')
-    assert.equal(fetched.value.A, 'Host owns PromptAuthority.')
+    assert.notEqual(fetched.value.A, rawA, 'finalize synthesizes A')
+    assert.equal(fetched.value.A.startsWith(rawA), true)
     assert.equal(listItems(fetched.value.Observations).length, 1)
+
+    const publishedA = fetched.value.A
 
     // CancelSession-style cleanup never writes (draft already taken by finalize)
     cleanupInspector(sessionId)
     const still = resultOf(fetch(store, raw, 10, sessionId))
-    assert.equal(still.value.A, 'Host owns PromptAuthority.', 'cleanup must not delete published case')
+    assert.equal(still.value.A, publishedA, 'cleanup must not delete published case')
 
-    // worktree drift → mechanical Bookkeeper advances obs, keeps A
+    // worktree drift → Bookkeeper synthesizes again and advances obs
     writeFileSync(join(dir, 'a.txt'), 'drift', 'utf8')
     const mech = resultOf(refreshStale(store, raw, dir, sessionId))
     assert.equal(mech.ok, true)
     assert.equal(mech.value, true)
     const after = resultOf(fetch(store, raw, 10, sessionId))
-    assert.equal(after.value.A, 'Host owns PromptAuthority.')
+    assert.notEqual(after.value.A, publishedA, 'refresh revises A again')
+    assert.equal(after.value.A.startsWith(publishedA), true)
     assert.equal(listItems(after.value.Observations)[0].fields[1], contentHash('drift'))
   } finally {
     setEnabled(undefined)

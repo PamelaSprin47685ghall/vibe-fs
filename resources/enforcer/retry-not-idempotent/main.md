@@ -9,11 +9,19 @@ A retry is not a second business intention; it is a second transport attempt to 
 ## Repair Strategy
 Allocate the idempotency key before the first effect, persist or propagate it through every retry, and make the receiver deduplicate or return the original outcome for that key. For operations whose provider cannot support such semantics, refuse automatic retry after uncertain execution.
 
-## Wrong Fixes
-Do not rely on short retry windows, low probability, or duplicate detection after the side effect has already escaped. Probability does not restore semantic identity.
+## Decision Branches
+- If the provider supports idempotency keys, allocate the key before the first effect and reuse it on every retry.
+- If the provider cannot collapse duplicates, disable retry after uncertain execution and surface the unknown outcome.
+- If the operation is already naturally idempotent, keep retries and document the identity (same key, same body).
+
+## Common Wrong Fixes
+- Rely on short retry windows, low probability, or duplicate detection after the side effect has already escaped.
+- Generate a new request id on each retry.
+- Catch timeouts and “just POST again” without a key.
+- Deduplicate only in logs or metrics, not at the effect boundary.
 
 ## Verification
-Execute the same logical request multiple times under the same key, including after acknowledgement loss. Exactly one logical effect should remain observable.
+Execute the same logical request multiple times under the same key, including after acknowledgement loss. Exactly one logical effect should remain observable. The invariant is: physical retries of one intent converge to one business effect.
 
 ## Done When
 Transport may repeat attempts arbitrarily within policy, yet the business history contains one operation because physical repetition and logical identity are no longer confused.

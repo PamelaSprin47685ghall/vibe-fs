@@ -1,5 +1,5 @@
-// tests/unit/casebook/bookkeeper-mechanical.test.mjs — G6-E minimal:
-// Host mechanical CaseRefresh (same Q/A + replayed observations; no LLM).
+// tests/unit/casebook/bookkeeper-mechanical.test.mjs — G6-E:
+// Host Bookkeeper CaseRefresh (synthesized Q/A + replayed observations; no LLM).
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -26,7 +26,7 @@ const sandbox = () => {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-test('CASE006_mechanical_refresh_publishes_refreshed_with_same_qa', () => {
+test('CASE006_synthesis_refresh_publishes_refreshed_with_revised_a', () => {
   const { dir, cleanup } = sandbox()
   try {
     const raw = createRaw()
@@ -45,18 +45,20 @@ test('CASE006_mechanical_refresh_publishes_refreshed_with_same_qa', () => {
     assert.equal(resultOf(needsRefresh(store, raw, 10, 's-mech-1', dir)).value, false)
     assert.equal(resultOf(refreshStale(store, raw, dir, 's-mech-1')).value, false)
 
-    // content change → stale → mechanical refresh keeps Q/A, advances obs
+    // content change → stale → synthesis revises A (not identity), advances obs
     writeFileSync(join(dir, 'a.txt'), 'changed', 'utf8')
     assert.equal(resultOf(needsRefresh(store, raw, 10, 's-mech-1', dir)).value, true)
 
     const refreshed = resultOf(refreshStale(store, raw, dir, 's-mech-1'))
     assert.equal(refreshed.ok, true, `refreshStale ok, got ${JSON.stringify(refreshed.error)}`)
-    assert.equal(refreshed.value, true, 'mechanical refresh must publish')
+    assert.equal(refreshed.value, true, 'synthesis refresh must publish')
 
     const fetched = resultOf(fetchCase(store, raw, 10, 's-mech-1'))
     assert.equal(fetched.ok, true)
     assert.equal(fetched.value.Q, 'Q keep')
-    assert.equal(fetched.value.A, 'A keep')
+    assert.notEqual(fetched.value.A, 'A keep', 'default synthesizer must revise A')
+    assert.equal(fetched.value.A.startsWith('A keep'), true)
+    assert.equal(fetched.value.A.includes('evidence:'), true)
     const obs = listItems(fetched.value.Observations)
     assert.equal(obs.length, 1)
     assert.equal(obs[0].fields[1], hash('changed'), 'observation hash advanced to worktree')
@@ -107,8 +109,8 @@ test('CASE006_mechanical_refresh_missing_file_still_publishes', () => {
     assert.equal(r.value, true)
 
     const fetched = resultOf(fetchCase(store, raw, 10, 's-gone'))
-    // replay drops missing files → empty obs published; Q/A retained
-    assert.equal(fetched.value.A, 'A')
+    // replay drops missing files → empty obs published; A is still synthesized
+    assert.notEqual(fetched.value.A, 'A')
     assert.equal(listItems(fetched.value.Observations).length, 0)
   } finally {
     cleanup()

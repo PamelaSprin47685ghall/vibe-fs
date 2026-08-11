@@ -9,11 +9,19 @@ A source file is valuable because readers can treat its visible structure as pre
 ## Repair Strategy
 Remove the dead fragment. If it contains a durable design reason not captured elsewhere, preserve the reason—not the old implementation—in the owning documentation or decision record.
 
-## Wrong Fixes
-Do not wrap the fragment in another comment, preprocessor branch, or “temporary” archive file. Do not retain it because it may be useful someday; Git is specifically built for that possibility.
+## Decision Branches
+- If the comment is former implementation kept “just in case,” delete it.
+- If a durable why would be lost, record that reason in the owning decision or docs, still without the old code.
+- If the snippet is genuinely explanatory and not a warehouse, leave the explanation, not the archive.
+
+## Common Wrong Fixes
+- Do not wrap the fragment in another comment or preprocessor branch.
+- Do not move it to a “temporary” archive file in the working tree.
+- Do not retain it because it may be useful someday; Git is built for that possibility.
+- Do not convert it to an always-false runtime branch to “keep it compiling.”
 
 ## Verification
-The source should contain only current implementation plus comments that convey non-obvious durable knowledge.
+The source should contain only current implementation plus comments that convey non-obvious durable knowledge. The invariant is that visible source is present tense: no block asks the reader to classify it as historical residue.
 
 ## Done When
 A reader never has to ask whether a visible block is old code being kept “just in case”; the file states only the program and the knowledge that govern it now.

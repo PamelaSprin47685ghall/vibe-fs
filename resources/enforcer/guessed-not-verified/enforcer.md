@@ -10,13 +10,20 @@ Engineering reasoning is conditional: if premise P is false, every flawless dedu
 Trigger when a decision depends on an unverified factual claim that could be settled by reading the owner or running a focused check.
 
 ## Do Not Trigger When
-Do not trigger for explicitly labeled hypotheses used to guide investigation before evidence is available, provided they are not treated as established facts.
+- Do not trigger for explicitly labeled hypotheses used to guide investigation before evidence is available, provided they are not treated as established facts.
+- Do not trigger for a documented contract already read in this session when the claim is exactly that contract.
+- Do not trigger for aesthetic or naming preferences that do not load-bear on behavior.
 
 ## Distinguish From
-guess-based-fix acts speculatively until symptoms move. blind-edit mutates before understanding ownership. This rule is epistemic: an uncertain premise is being smuggled into reasoning as fact.
+guess-based-fix acts speculatively until symptoms move. blind-edit mutates before understanding ownership. This rule is epistemic: an uncertain premise is being smuggled into reasoning as fact. Tie-break: if the false certainty is a premise, use this rule; if edits already hunt a passing state, use guess-based-fix.
 
 ## Decision Procedure
 Identify the load-bearing claim, then identify the authority capable of settling it. Read or test that source before letting downstream reasoning depend on the claim.
+
+## Examples
+- positive: “This Host API returns null on miss” is treated as fact from memory; the code path is never read.
+- near-miss: A labeled hypothesis guides a grep/experiment, then the result replaces the guess.
+- counterexample: The owning source and contract were inspected; the claim cites that provenance.
 
 ## Nudge
 Do not spend deductions on an unverified premise. Inspect the authoritative source or run the smallest experiment that can make the claim true or false.

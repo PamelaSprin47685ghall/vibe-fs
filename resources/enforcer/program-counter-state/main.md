@@ -9,11 +9,17 @@ Persisted program counters freeze an implementation strategy into the data model
 ## Repair Strategy
 Separate real workflow facts from interpreter position. If the domain has named statuses, model them explicitly; otherwise keep step/next-action data within the lifetime of the operation that needs it.
 
-## Wrong Fixes
-Do not rename `currentStep` to `status` while preserving the same execution-pointer semantics. Domain language should reflect external meaning, not disguise implementation state.
+## Decision Branches
+- If an external observer would not care about the field under a different control structure, stop persisting it and keep sequencing local.
+- If the product promises a workflow status, model that status as domain state—not as `currentStep` of the implementation.
+
+## Common Wrong Fixes
+- Rename `currentStep` to `status` while preserving execution-pointer semantics.
+- Persist more step fields so recovery can jump into the middle of a function.
+- Encode the next function name in the database.
 
 ## Verification
-Change the internal sequencing structure conceptually. Durable state should not need to change unless the domain-visible workflow itself changed.
+Change the internal sequencing structure conceptually. Durable state should not need to change unless the domain-visible workflow itself changed. The invariant is that stored/shared state describes reality, not the instruction pointer.
 
 ## Done When
-Stored/shared state describes reality, while “where the code should continue” is owned by control flow rather than masquerading as a domain fact.
+Stored/shared state describes reality, while "where the code should continue" is owned by control flow rather than masquerading as a domain fact.

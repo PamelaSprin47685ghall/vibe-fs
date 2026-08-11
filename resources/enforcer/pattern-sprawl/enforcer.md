@@ -10,13 +10,20 @@ A design pattern is historically a compensation mechanism: it encodes a missing 
 Trigger when class/interface scaffolding primarily exists to select among finite cases, inject behavior, traverse closed data, construct values, or compose functions that native language features can express with less indirection.
 
 ## Do Not Trigger When
-Do not trigger when runtime extensibility across independently deployed components or open-world substitution is a real requirement that closed algebraic data cannot satisfy.
+- Runtime extensibility across independently deployed components or open-world substitution is a real requirement that closed algebraic data cannot satisfy.
+- The pattern encodes a lifecycle or ownership boundary the language does not provide.
+- The "pattern" is already the native form (a function, a union, a module).
 
 ## Distinguish From
-incidental-complexity-dominates is broader. premature-unification concerns false abstraction. This rule specifically targets pattern machinery whose semantic job has become native syntax.
+incidental-complexity-dominates is broader design weight. premature-unification concerns false abstraction. Tie-break: if pattern machinery's semantic job is now native syntax, this rule; if complexity is high for many reasons, incidental-complexity-dominates; if one abstraction falsely merges different knowledge, premature-unification.
 
 ## Decision Procedure
 State what variability the pattern represents. If the set is closed, use data + exhaustive match; if behavior is the variable, pass a function; if both are simple, prefer composition over hierarchy.
+
+## Examples
+- positive: A five-class visitor hierarchy exists only to switch on a closed AST the language can match exhaustively.
+- near-miss: A plugin interface is loaded from independently deployed packages; closed data cannot name those types.
+- counterexample: Closed variants are a union with exhaustive match and behavior is passed as functions.
 
 ## Nudge
 Do not preserve a simulation after the language gains the thing being simulated. Express closed data as data and variable behavior as functions; keep class machinery only for genuinely open-world contracts.

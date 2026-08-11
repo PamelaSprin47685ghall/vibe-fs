@@ -9,11 +9,17 @@ A primitive tells the compiler how bits are stored, not what they mean. When sem
 ## Repair Strategy
 Wrap or define the concept with its validation and operations, keep conversion at explicit ingress/egress boundaries, and avoid exposing the raw primitive again across domain APIs.
 
-## Wrong Fixes
-Do not merely rename parameters `accountId` and `orderId` while both remain strings; humans see the distinction, the type checker still does not.
+## Decision Branches
+- If two domain meanings share a primitive at a module/API boundary, give each a distinct type and confine raw conversion to adapters.
+- If the value is generic payload with no identity at that boundary, leave the primitive.
+
+## Common Wrong Fixes
+- Rename parameters `accountId` and `orderId` while both remain strings; humans see the distinction, the type checker still does not.
+- Add runtime asserts in every caller instead of a constructing type.
+- Alias the primitive (`type AccountId = string`) with no distinctness.
 
 ## Verification
-Attempt to pass a sibling concept with the same underlying primitive. The program should reject the substitution at compile/construction time.
+Attempt to pass a sibling concept with the same underlying primitive. The program should reject the substitution at compile/construction time. The invariant is that domain identity travels with the type across the boundary.
 
 ## Done When
 The boundary carries domain identity as part of the type, invalid substitutions are unrepresentable, and conversion to raw primitives is confined to adapters that genuinely require it.

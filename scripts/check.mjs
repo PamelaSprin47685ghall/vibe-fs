@@ -38,9 +38,10 @@ for (const script of checks) {
       '--root=src/Wanxiangshu',
     )
   }
-  // Constitution headings (Definition/Trigger When/Nudge + What To Do Now/Verification/Done When)
-  // are complete across all 120 tips — enable require-headings for the rulebook gate.
-  if (script.endsWith('enforcer-rulebook-gate.mjs')) args.push('--require-headings')
+  // Constitution headings + structural rubric (Appendix A37/A38) across all 120 tips.
+  if (script.endsWith('enforcer-rulebook-gate.mjs')) {
+    args.push('--require-headings', '--strict')
+  }
   const result = spawnSync(process.execPath, args, { stdio: 'inherit' })
   if (result.status !== 0) process.exit(result.status ?? 1)
 }

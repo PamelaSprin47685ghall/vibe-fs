@@ -152,7 +152,7 @@ flow = [
   { wait = "mgr-bless.2" },
   { wait = "manager-finality-reviewer.0", timeoutMs = 30000 },
   { wait = "manager-finality-reviewer.1", timeoutMs = 30000 },
-  { waitFact = { name = "FinalityBlessed", gte = 1, renewOn = ["ReviewVerdictRecorded", "ConfirmedReviewWitness", "FinalityReviewerEnlisted", "BlogEntryCommitted"] }, timeoutMs = 180000 },
+  { waitFact = { name = "FinalityBlessed", gte = 1, renewOn = ["ReviewVerdictRecorded", "ConfirmedReviewWitness", "FinalityReviewerEnlisted", "BlogObservationCommitted"] }, timeoutMs = 180000 },
   { wait = "mgr-bless.3", timeoutMs = 30000 },
   { wait = "mgr-bless.4", timeoutMs = 30000 },
   { waitFact = { name = "LifeCompleted", gte = 1 } },

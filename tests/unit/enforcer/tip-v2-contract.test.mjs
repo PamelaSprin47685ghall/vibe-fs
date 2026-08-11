@@ -222,10 +222,10 @@ test('ENFORCER_TIP_12_squash_co_truncates_recent_tips', () => {
   const rule1 = enforcer.tryFindByField(f1)
 
   // BlogProjection.applyEntry never advances FrameEpochId — both frames must
-  // be written against epoch 0 (only BlogSquashCommitted advances it).
+  // be written against epoch 0 (only BlogObservationsSquashed advances it).
   const entry = (n, run, rule, field) =>
     env(
-      fact('BlogEntryCommitted', {
+      fact('BlogObservationCommitted', {
         SessionId: session,
         BloggerSessionId: blogger,
         RequestId: bloggerRequestId(`req-e${n}`),
@@ -248,7 +248,7 @@ test('ENFORCER_TIP_12_squash_co_truncates_recent_tips', () => {
     )
 
   const squash = env(
-    fact('BlogSquashCommitted', {
+    fact('BlogObservationsSquashed', {
       SessionId: session,
       BloggerSessionId: blogger,
       RequestId: bloggerRequestId('req-s1'),

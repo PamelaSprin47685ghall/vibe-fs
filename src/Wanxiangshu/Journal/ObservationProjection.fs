@@ -5,11 +5,10 @@ open Wanxiangshu.Kernel.Identity
 
 /// Observation view over Journal Blog + Enforcement substrate.
 ///
-/// Rulebook names `BlogObservationCommitted` / `BlogObservationsSquashed` as the
-/// desired EventStore vocabulary. Until that cutover, physical facts remain
-/// `BlogEntryCommitted` (frame append + enforcement tip half) and
-/// `BlogSquashCommitted` (frame collapse + tip co-truncate). This module only
-/// **names** the paired fold — it does not own a second store or new event types.
+/// Cutover DONE: physical EventStore / journal facts ARE
+/// `BlogObservationCommitted` (frame append + enforcement tip half) and
+/// `BlogObservationsSquashed` (frame collapse + tip co-truncate). This module
+/// names the paired fold over those facts — it does not own a second store.
 ///
 /// Coverage stays a BlogProjection fold field (not a private coverage file).
 [<RequireQualifiedAccess>]
@@ -43,7 +42,7 @@ module ObservationProjection =
     let observationsOfSession (session: SessionAgentProjection) : WorkLogObservation list =
         observationsOf session.Enforcement session.Blog
 
-    /// After Observation squash (`BlogSquashCommitted` + `EnforcementProjection.applySquash`),
+    /// After Observation squash (`BlogObservationsSquashed` + `EnforcementProjection.applySquash`),
     /// re-derive the paired list. Pure convenience over `observationsOf`.
     let observationsAfterSquash
         (coveredFrameCount: int)

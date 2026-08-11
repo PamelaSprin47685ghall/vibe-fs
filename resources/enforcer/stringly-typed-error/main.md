@@ -9,11 +9,17 @@ Error prose is allowed to improve; machine semantics are not allowed to change a
 ## Repair Strategy
 Introduce domain/infrastructure error cases with stable identity and structured data. Translate provider errors once at the adapter, branch on typed cases internally, and format messages only for humans.
 
-## Wrong Fixes
-Do not centralize regexes into one helper and call the contract fixed. A single brittle parser is still a prose protocol.
+## Decision Branches
+If a decision depends on error identity, introduce a closed typed case and branch on that case.
+If the string is only for humans after the case is known, keep formatting at the presentation boundary.
+
+## Common Wrong Fixes
+- Centralize regexes into one helper and call the contract fixed.
+- Freeze current wording as an unofficial protocol instead of adding typed identity.
+- Map every provider string to a generic `Unknown` and still parse remaining prose downstream.
 
 ## Verification
-Change the rendered error wording without changing the typed case. Program behavior must remain identical; changing the typed case should be the only way to alter control semantics.
+Invariant: control semantics must be independent of rendered wording. Change the error prose without changing the typed case and program behavior must remain identical; changing the typed case should be the only way to alter control semantics.
 
 ## Done When
 No machine decision depends on human wording, and error messages can be clarified or localized without risking retries, routing, or recovery behavior.

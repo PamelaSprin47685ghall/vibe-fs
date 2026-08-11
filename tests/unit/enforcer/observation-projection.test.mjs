@@ -1,6 +1,6 @@
 // Journal ObservationProjection: Blog + Enforcement as Observation substrate.
-// Physical facts stay BlogEntryCommitted / BlogSquashCommitted; this view only
-// names the paired fold (rulebook BlogObservation* residual).
+// Cutover DONE: physical facts ARE BlogObservationCommitted / BlogObservationsSquashed;
+// this view names the paired fold (no second store).
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
@@ -81,7 +81,7 @@ test('OBS_PROJ_002_zip_recent_tips_with_blog_frame_digests', () => {
 })
 
 test('OBS_PROJ_003_squash_co_moves_tips_and_frames_as_observation', () => {
-  // 1:1 Entry → tip. BlogSquashCommitted collapses oldest K frames; Enforcement
+  // 1:1 Entry → tip. BlogObservationsSquashed collapses oldest K frames; Enforcement
   // applySquash drops oldest K tips — Observation history moves together.
   let blogState = blog.empty
   let enfState = enf.empty

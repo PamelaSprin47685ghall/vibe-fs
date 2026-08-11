@@ -50,7 +50,8 @@ test('lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once', () => {
     const sessionId = 'insp-finalize-1'
     notePrompt(sessionId, 'What owns PromptAuthority?')
     collect(collector, sessionId, 'read', { path: 'a.txt' }, 'hello')
-    noteAnswer(sessionId, 'PromptAuthority is owned by the Host.')
+    const rawA = 'PromptAuthority is owned by the Host.'
+    noteAnswer(sessionId, rawA)
 
     const first = resultOf(tryFinalizeInspector(dir, sessionId))
     assert.equal(first.ok, true, `first finalize ok, got ${JSON.stringify(first.error)}`)
@@ -61,8 +62,11 @@ test('lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once', () => {
     assert.equal(fetched.ok, true)
     assert.equal(fetched.value !== undefined && fetched.value !== null, true, 'case present after finalize')
     assert.equal(fetched.value.Q, 'What owns PromptAuthority?')
-    assert.equal(fetched.value.A, 'PromptAuthority is owned by the Host.')
+    assert.notEqual(fetched.value.A, rawA, 'finalize synthesizes A (not raw noteAnswer)')
+    assert.equal(fetched.value.A.startsWith(rawA), true)
     assert.equal(listItems(fetched.value.Observations).length, 1)
+
+    const publishedA = fetched.value.A
 
     // Re-seed and finalize again — finalizeCase refuses the second publication.
     notePrompt(sessionId, 'Q2')
@@ -72,7 +76,7 @@ test('lifecycle_notePrompt_noteAnswer_tryFinalize_creates_case_once', () => {
     assert.equal(String(second.error).includes('already finalized'), true)
 
     const still = resultOf(fetchCase(store, raw, 10, sessionId))
-    assert.equal(still.value.A, 'PromptAuthority is owned by the Host.', 'original case retained')
+    assert.equal(still.value.A, publishedA, 'original synthesized case retained')
   } finally {
     setEnabled(undefined)
     cleanup()

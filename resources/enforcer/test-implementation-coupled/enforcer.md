@@ -10,13 +10,21 @@ A test should constrain what must remain true while leaving implementations free
 Trigger when tests assert private methods, exact helper call counts, internal object layout, intermediate variables, or incidental algorithm sequence without a caller-visible guarantee requiring them.
 
 ## Do Not Trigger When
-Do not trigger when an interaction itself is contractual—for example exactly-once publication, no external call under rejection, or a required transaction boundary—and the test double observes that public effect.
+- The interaction itself is contractual—exactly-once publication, no external call under rejection, or a required transaction boundary—and the test double observes that public effect.
+- Assertions target a documented public API or wire contract, including required ordering of that public surface.
+- Characterization of a frozen third-party protocol adapter where the protocol sequence is the supported contract.
+- White-box tests used only to pin a known-unsafe internal invariant that the public API cannot yet express, and that limitation is recorded.
 
 ## Distinguish From
-coverage-theater asserts too little meaning. weakened-test-to-pass deliberately dilutes expectations. This rule asserts details that should remain free.
+`coverage-theater` asserts too little meaning. `weakened-test-to-pass` deliberately dilutes expectations. Tie-break: if a valid behavioral claim was relaxed to go green, use `weakened-test-to-pass`; if the test freezes private choreography that was never a promise, use this rule.
 
 ## Decision Procedure
 For each assertion ask whether a conforming alternative implementation may legitimately violate it. If yes, move the assertion outward to the observable contract.
+
+## Examples
+- positive: a unit test asserts private helper call counts and intermediate field values for a refactor-safe algorithm.
+- near-miss: a test asserts that a rejected command emits zero side-effecting publish calls, which is the public effect.
+- counterexample: deleting an edge-case assertion solely because production fails it is `weakened-test-to-pass`.
 
 ## Nudge
 Tests should freeze promises, not implementations. Assert the behavior or durable interaction the caller owns and leave private decomposition available to refactor.

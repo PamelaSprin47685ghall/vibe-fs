@@ -9,11 +9,19 @@ The loop is a shared liveness resource. Latency introduced there is multiplied b
 ## Repair Strategy
 Separate parsing, pure computation, and dispatch from slow effects. Keep each turn small. Preserve cancellation and error semantics across the new boundary instead of merely wrapping a blocking call in an async-looking function.
 
-## Wrong Fixes
-Do not increase timeouts, add sleeps, or call blocking work from an async wrapper on the same executor. Syntax does not create concurrency; ownership of the waiting thread does.
+## Decision Branches
+- If the work is waiting on I/O, use the native async API so the loop thread is released while pending.
+- If the work is CPU-heavy or unavoidably blocking, move it to a bounded worker and keep the loop as the completion dispatcher.
+- If an `async` wrapper still calls blocking APIs on the same executor, treat it as still blocking.
+
+## Common Wrong Fixes
+- Do not increase timeouts so the blocked loop appears healthy.
+- Do not add sleeps to “yield” while still holding the loop.
+- Do not wrap blocking work in `async` on the same executor and call it concurrency.
+- Do not drop cancellation or error mapping when moving work off the loop.
 
 ## Verification
-Exercise the slow path while unrelated work is active. The loop must remain responsive and cancellation must still reach the displaced work.
+Exercise the slow path while unrelated work is active. The loop must remain responsive and cancellation must still reach the displaced work. The invariant is that no unbounded wait or heavy computation monopolizes the shared event-loop executor.
 
 ## Done When
 No unbounded wait or heavy computation can monopolize the shared event-loop executor, and unrelated tasks continue to make progress while slow work is pending.

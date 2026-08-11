@@ -10,13 +10,21 @@ Scheduling order is usually an accident of load, network, and runtime, not a dom
 Trigger when concurrent requests/results race and the first observed completion becomes authoritative despite no domain rule saying temporal arrival order should decide.
 
 ## Do Not Trigger When
-Do not trigger when first-writer-wins, lowest-latency replica, election timeout, or another timing rule is itself the documented protocol and carries the necessary identity/quorum semantics.
+- First-writer-wins, lowest-latency replica, election timeout, or another timing rule is itself the documented protocol and carries the necessary identity/quorum semantics.
+- Concurrency is used only to fetch inputs, then a deterministic join/merge decides after all required results arrive.
+- A single-owner queue serializes commands so completion order cannot choose among competing payloads.
+- The “winner” is selected by an explicit domain key (version, timestamp field, priority), not by which future resolved first.
 
 ## Distinguish From
-shared-mutable-concurrency concerns coordination through shared state. lost-update concerns overwrite conflicts. This rule concerns scheduler order becoming domain meaning.
+shared-mutable-concurrency concerns coordination through shared state. lost-update concerns overwrite conflicts. This rule concerns scheduler order becoming domain meaning. Tie-break: fire here when arrival order invents the answer; fire shared-mutable-concurrency when several writers share mutation authority; fire lost-update when a later write silently overwrites without merge.
 
 ## Decision Procedure
 Ask whether swapping completion order while keeping logical inputs identical should change the result. If not, collect required results and merge using a deterministic rule independent of timing.
+
+## Examples
+- positive: two price quotes race and the first HTTP response becomes the booked price even though both quotes are valid inputs to a documented min/max merge.
+- near-miss: a leader-election timeout is specified as the protocol; the first heartbeat after the timeout is the documented winner.
+- counterexample: a map-reduce job waits for every shard, then folds with an associative reducer; scheduler order does not change the result.
 
 ## Nudge
 Do not let the scheduler invent business truth. Either make arrival order an explicit domain rule or derive the result from complete information with deterministic merge semantics.

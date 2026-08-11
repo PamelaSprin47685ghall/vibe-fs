@@ -10,12 +10,20 @@
  *   - optional constitution body headings (`requireHeadings` / `--require-headings`):
  *       enforcer.md → ## Definition / ## Trigger When / ## Nudge
  *       main.md     → ## What To Do Now / ## Verification / ## Done When
+ *   - optional structural rubric (`requireRubric` / `--strict` / `--require-rubric`):
+ *       enforcer.md → Do Not Trigger When ≥3 bullets; Distinguish From ≥2 sibling names;
+ *                     Examples positive / near-miss / counterexample markers
+ *       main.md     → Common Wrong Fixes ≥3 items; Decision Branches ≥2;
+ *                     Verification mentions invariant/不变量; Done When present
  *
  * Usage:
  *   node scripts/checks/enforcer-rulebook-gate.mjs
  *   node scripts/checks/enforcer-rulebook-gate.mjs --require-headings
+ *   node scripts/checks/enforcer-rulebook-gate.mjs --strict
+ *   node scripts/checks/enforcer-rulebook-gate.mjs --require-rubric
  *
- * check.mjs enables --require-headings once all 120 tips carry constitution headings.
+ * check.mjs enables `--require-headings --strict` (120/120 headings + structural rubric).
+ * Bare invocation stays headings-off / rubric-off for unit fixtures.
  */
 
 import {
@@ -86,11 +94,13 @@ export const missingHeadings = (text, headings, fileRel) => {
 
 /**
  * Parse CLI flags for the gate.
+ * `--strict` and `--require-rubric` enable the same structural-rubric flag.
  * @param {string[]} argv
- * @returns {{ requireHeadings: boolean }}
+ * @returns {{ requireHeadings: boolean, requireRubric: boolean }}
  */
 export const parseCliArgs = (argv = process.argv.slice(2)) => {
   let requireHeadings = false
+  let requireRubric = false
   for (const arg of argv) {
     if (arg === '--require-headings') {
       requireHeadings = true
@@ -103,9 +113,189 @@ export const parseCliArgs = (argv = process.argv.slice(2)) => {
     if (arg.startsWith('--require-headings=')) {
       const v = arg.slice('--require-headings='.length).toLowerCase()
       requireHeadings = v !== 'false' && v !== '0' && v !== 'off'
+      continue
+    }
+    if (arg === '--strict' || arg === '--require-rubric') {
+      requireRubric = true
+      continue
+    }
+    if (arg === '--no-strict' || arg === '--no-require-rubric') {
+      requireRubric = false
+      continue
+    }
+    if (arg.startsWith('--strict=') || arg.startsWith('--require-rubric=')) {
+      const v = arg.slice(arg.indexOf('=') + 1).toLowerCase()
+      requireRubric = v !== 'false' && v !== '0' && v !== 'off'
     }
   }
-  return { requireHeadings }
+  return { requireHeadings, requireRubric }
+}
+
+/**
+ * Body of an ATX `## <heading>` section (until the next H2), or `''` if absent.
+ * @param {string} text
+ * @param {string} heading
+ */
+const extractSection = (text, heading) => {
+  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const re = new RegExp(`^##\\s+${escaped}\\s*$`, 'm')
+  const match = re.exec(text)
+  if (!match) return ''
+  const rest = text.slice(match.index + match[0].length)
+  const next = /^##\s+/m.exec(rest)
+  return next ? rest.slice(0, next.index) : rest
+}
+
+/** Markdown list items: `-` / `*` / `+` / ordered `1.` / `1)`. */
+const LIST_ITEM_RE = /^[ \t]*(?:[-*+]|\d+[.)])[ \t]+\S/gm
+
+/**
+ * @param {string} text
+ * @returns {number}
+ */
+const countListItems = (text) => {
+  LIST_ITEM_RE.lastIndex = 0
+  const matches = text.match(LIST_ITEM_RE)
+  return matches ? matches.length : 0
+}
+
+/**
+ * Sibling-like tip names: kebab-case (`foo-bar`) or `resources/enforcer/<name>` refs.
+ * @param {string} text
+ * @returns {Set<string>}
+ */
+const collectSiblingNames = (text) => {
+  /** @type {Set<string>} */
+  const names = new Set()
+  const resourceRe = /resources\/enforcer\/([a-z0-9]+(?:-[a-z0-9]+)*)/g
+  let m
+  while ((m = resourceRe.exec(text))) {
+    names.add(m[1])
+  }
+  const kebabRe = /\b[a-z][a-z0-9]*(?:-[a-z0-9]+)+\b/g
+  while ((m = kebabRe.exec(text))) {
+    names.add(m[0])
+  }
+  return names
+}
+
+const hasPositiveExampleMarker = (text) =>
+  /\bpositive\b|正例/i.test(text)
+
+const hasNearMissExampleMarker = (text) =>
+  /near[-\s]?miss|近邻/i.test(text)
+
+const hasCounterexampleMarker = (text) =>
+  /counter[-\s]?example|反例/i.test(text)
+
+/**
+ * Structural rubric for `enforcer.md` (Appendix A37 subset).
+ * Independent of constitution heading presence.
+ * @param {string} text
+ * @returns {{ code: string, path?: string, detail?: string }[]}
+ */
+export const checkEnforcerRubric = (text) => {
+  /** @type {{ code: string, path?: string, detail?: string }[]} */
+  const out = []
+  const body = String(text ?? '')
+
+  const dnt = extractSection(body, 'Do Not Trigger When')
+  const dntCount = countListItems(dnt)
+  if (dntCount < 3) {
+    out.push({
+      code: 'rubric-do-not-trigger-count',
+      detail: `Do Not Trigger When must contain ≥3 bullets (found ${dntCount})`,
+    })
+  }
+
+  const distinguish = extractSection(body, 'Distinguish From')
+  const siblings = collectSiblingNames(distinguish)
+  if (siblings.size < 2) {
+    out.push({
+      code: 'rubric-distinguish-siblings',
+      detail: `Distinguish From must mention ≥2 sibling-like kebab names or resources/enforcer/ refs (found ${siblings.size})`,
+    })
+  }
+
+  const examples = extractSection(body, 'Examples')
+  if (!hasPositiveExampleMarker(examples)) {
+    out.push({
+      code: 'rubric-examples-positive',
+      detail: "Examples must contain a positive / 正例 marker",
+    })
+  }
+  if (!hasNearMissExampleMarker(examples)) {
+    out.push({
+      code: 'rubric-examples-near-miss',
+      detail: "Examples must contain a near-miss / 近邻 marker",
+    })
+  }
+  if (!hasCounterexampleMarker(examples)) {
+    out.push({
+      code: 'rubric-examples-counterexample',
+      detail: "Examples must contain a counterexample / 反例 marker",
+    })
+  }
+
+  return out
+}
+
+/**
+ * Count decision-branch cues: list items, or If/When/Otherwise lines.
+ * @param {string} text
+ */
+const countDecisionBranches = (text) => {
+  const items = countListItems(text)
+  const cueRe = /^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*(?:if|when|otherwise|else(?:\s+if)?)\b/gim
+  const cues = text.match(cueRe)
+  const cueCount = cues ? cues.length : 0
+  return Math.max(items, cueCount)
+}
+
+/**
+ * Structural rubric for `main.md` (Appendix A38 subset).
+ * @param {string} text
+ * @returns {{ code: string, path?: string, detail?: string }[]}
+ */
+export const checkMainRubric = (text) => {
+  /** @type {{ code: string, path?: string, detail?: string }[]} */
+  const out = []
+  const body = String(text ?? '')
+
+  const wrongFixes = extractSection(body, 'Common Wrong Fixes')
+  const wrongCount = countListItems(wrongFixes)
+  if (wrongCount < 3) {
+    out.push({
+      code: 'rubric-wrong-fixes-count',
+      detail: `Common Wrong Fixes must contain ≥3 items (found ${wrongCount})`,
+    })
+  }
+
+  const branches = extractSection(body, 'Decision Branches')
+  const branchCount = countDecisionBranches(branches)
+  if (branchCount < 2) {
+    out.push({
+      code: 'rubric-decision-branches-count',
+      detail: `Decision Branches must contain ≥2 branches (found ${branchCount})`,
+    })
+  }
+
+  const verification = extractSection(body, 'Verification')
+  if (!/invariant|不变量/i.test(verification)) {
+    out.push({
+      code: 'rubric-verification-invariant',
+      detail: 'Verification must mention invariant / 不变量',
+    })
+  }
+
+  if (!hasHeading(body, 'Done When')) {
+    out.push({
+      code: 'rubric-done-when',
+      detail: "missing required heading '## Done When'",
+    })
+  }
+
+  return out
 }
 
 /**
@@ -122,6 +312,7 @@ export const parseCliArgs = (argv = process.argv.slice(2)) => {
  *   expectedCount?: number,
  *   requireTitle?: boolean,
  *   requireHeadings?: boolean,
+ *   requireRubric?: boolean,
  * }} [opts]
  * @returns {{ ok: boolean, count: number, violations: Violation[] }}
  */
@@ -130,6 +321,8 @@ export const scanRulebook = (rootAbs, opts = {}) => {
   const requireTitle = opts.requireTitle !== false
   // Default false: unit fixtures are structural-only. CLI / check.mjs enable true.
   const requireHeadings = opts.requireHeadings === true
+  // Default false: unit fixtures are headings-only. CLI `--strict` / check.mjs enable true.
+  const requireRubric = opts.requireRubric === true
   /** @type {Violation[]} */
   const violations = []
 
@@ -327,6 +520,18 @@ export const scanRulebook = (rootAbs, opts = {}) => {
           violations.push(...missingHeadings(text, required, fileRel))
         }
       }
+
+      if (requireRubric) {
+        const rubric =
+          req === 'enforcer.md'
+            ? checkEnforcerRubric(text)
+            : req === 'main.md'
+              ? checkMainRubric(text)
+              : []
+        for (const v of rubric) {
+          violations.push({ ...v, path: v.path ?? fileRel })
+        }
+      }
     }
   }
 
@@ -354,14 +559,15 @@ const formatViolation = (v) => {
 }
 
 const runCli = () => {
-  const { requireHeadings } = parseCliArgs()
-  const result = scanRepoRulebook(process.cwd(), { requireHeadings })
+  const { requireHeadings, requireRubric } = parseCliArgs()
+  const result = scanRepoRulebook(process.cwd(), { requireHeadings, requireRubric })
   if (result.ok) {
     const headingNote = requireHeadings
       ? '; constitution headings enforced'
       : '; constitution headings not required (pass --require-headings)'
+    const rubricNote = requireRubric ? '; structural rubric enforced' : ''
     console.log(
-      `enforcer-rulebook-gate: OK — ${result.count} kebab-case rule dirs, each with enforcer.md + main.md (no catalog.json)${headingNote}`,
+      `enforcer-rulebook-gate: OK — ${result.count} kebab-case rule dirs, each with enforcer.md + main.md (no catalog.json)${headingNote}${rubricNote}`,
     )
     process.exit(0)
   }

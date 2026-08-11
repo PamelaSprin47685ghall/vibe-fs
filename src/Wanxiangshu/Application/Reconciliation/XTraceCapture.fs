@@ -295,7 +295,7 @@ module XTraceCapture =
     /// The Blogger chunker works in semantic (turn/part) coordinates against the
     /// same projection, so the XTrace must mirror it part-for-part or the
     /// `SemanticCursor → XTrace cursor` mapping cannot advance monotonically
-    /// (measured: `BlogEntryCommitted` was rejected as "consumed nothing" when
+    /// (measured: `BlogObservationCommitted` was rejected as "consumed nothing" when
     /// the XTrace lagged the projection).
     ///
     /// Idempotent by `(reanchorGen, turn, part)` provenance: the same Host view is
@@ -348,7 +348,7 @@ module XTraceCapture =
                         | Error error ->
                             // PERSIST-003: a part that cannot be proven stored must
                             // fail closed. Swallowing here desyncs XTrace from the
-                            // provider projection and later rejects BlogEntryCommitted.
+                            // provider projection and later rejects BlogObservationCommitted.
                             raise (InvalidOperationException(sprintf "XTrace part blob write failed: %s" error))
                         | Ok blob ->
                             CompanionFact.XTracePartAppended

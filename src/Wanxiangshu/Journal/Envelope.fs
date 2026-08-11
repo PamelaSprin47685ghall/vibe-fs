@@ -78,13 +78,14 @@ module Envelope =
 
     /// PERSIST-005: a pre-0.5.0 / pre-tip-v2 line is refused, never guessed into shape.
     /// Tip v2 must be checked here (Boot reads envelopes) not only in FactCodec.deserializeFact:
-    /// Auto-decode of BlogEntryCommitted without TipRuleId yields an opaque Thoth error,
-    /// Boot truncates the stream mid-file, later Abandon/Commit vanish, and fold then
-    /// dies on "already has open request" — a lie about the real cause.
+    /// Auto-decode of BlogObservationCommitted (or legacy BlogEntryCommitted) without
+    /// TipRuleId yields an opaque Thoth error, Boot truncates the stream mid-file, later
+    /// Abandon/Commit vanish, and fold then dies on "already has open request" — a lie
+    /// about the real cause.
     let deserialize (json: string) : Result<Envelope, string> =
         if FactCodec.containsLegacyFallbackFields json then
             Error FactCodec.pre050MigrationMessage
         elif FactCodec.containsLegacyScoreVectorEntry json then
             Error FactCodec.tipV2CleanBreakMessage
         else
-            Decode.Auto.fromString<Envelope> (json, extra = extra)
+            Decode.Auto.fromString<Envelope> (FactCodec.rewriteLegacyObservationTags json, extra = extra)

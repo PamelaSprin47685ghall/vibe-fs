@@ -9,11 +9,19 @@ Architecture is a theory of permitted knowledge. When one context can depend on 
 ## Repair Strategy
 Give each context ownership of its own model and invariants. Define the crossing in consumer-relevant terms, translate explicitly, and prevent internal imports or mutation mechanically where the language/build system permits.
 
-## Wrong Fixes
-Do not add a facade that forwards the same internals unchanged. Do not share a “common” mega-model to avoid translation. Both preserve the collapsed knowledge boundary while making it less visible.
+## Decision Branches
+- If one context mutates or imports another’s internals, restore a declared interface and cut the private reach.
+- If a shared mutable model is the crossing, split ownership and translate facts instead of sharing representation.
+- If the existing surface already exports only contracted facts, do not invent extra wrapping.
+
+## Common Wrong Fixes
+- Do not add a facade that forwards the same internals unchanged.
+- Do not share a “common” mega-model to avoid translation.
+- Do not move both contexts into one package so the import “looks local.”
+- Do not document “please do not touch these fields” while leaving them reachable.
 
 ## Verification
-A change to one context’s internal representation should not require edits in the other unless the declared cross-boundary fact itself changed.
+A change to one context’s internal representation should not require edits in the other unless the declared cross-boundary fact itself changed. The invariant is that each context’s private representation and lifecycle remain invisible across the border.
 
 ## Done When
 Each context can evolve behind its contract, cross-boundary data has an explicit owner and meaning, and no caller relies on another context’s private representation or lifecycle.

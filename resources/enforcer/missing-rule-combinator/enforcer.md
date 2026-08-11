@@ -10,13 +10,20 @@ Repeated rule composition reveals a language. If each rule is `A → Result<B,E>
 Trigger when three or more rules with the same semantic shape are manually chained, folded, accumulated, or short-circuited in several places.
 
 ## Do Not Trigger When
-Do not trigger when only one or two isolated rules exist or their apparently similar signatures carry different semantics that would make one combinator misleading.
+- Only one or two isolated rules exist, so a combinator would be speculative.
+- Apparently similar signatures carry different semantics that would make one combinator misleading.
+- A named combinator already owns sequencing and callers use it.
 
 ## Distinguish From
-wrong-rule-composition chooses the wrong short-circuit/accumulation semantics. rule-spaghetti hides policy in control flow. This rule concerns absence of a reusable composition vocabulary after a real algebra has emerged.
+wrong-rule-composition chooses the wrong short circuit or accumulation semantics. rule-spaghetti hides policy in control flow. Tie-break: if a real algebra has emerged but composition vocabulary is absent, this rule; if combinators exist but the wrong law is used, wrong-rule-composition; if policy is tangled in ad hoc control flow without a shared shape, rule-spaghetti.
 
 ## Decision Procedure
 Write the rule signature and the desired composition laws. If several callers reimplement those laws, define the smallest named combinators and use them everywhere.
+
+## Examples
+- positive: Five validators of type `Input → Result<Input, Error>` are nested with copy-pasted `if err return` in three call sites.
+- near-miss: Two one-off checks with different failure meanings; forcing one combinator would hide that difference.
+- counterexample: Rules already compose through `andThen` / `all` with tests for the composition laws.
 
 ## Nudge
 When rules share a shape, composition itself becomes domain knowledge. Name that algebra once instead of rewriting its control flow at every call site.

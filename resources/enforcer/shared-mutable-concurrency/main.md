@@ -9,11 +9,19 @@ Locks distribute the proof of correctness across every access path: which lock, 
 ## Repair Strategy
 Place mutation behind an actor/queue/single-writer boundary, send typed commands inward, and publish immutable results outward. Keep unavoidable shared concurrent structures narrow and limited to semantics they natively guarantee.
 
-## Wrong Fixes
-Do not merely add a larger global lock. That may remove races while preserving one giant shared authority and replacing concurrency bugs with contention or deadlock risk.
+## Decision Branches
+- If several workers mutate one domain object, introduce a single writer and turn others into command senders.
+- If a standard concurrent structure already matches the needed atomic, keep it narrow and do not expose compound fields around it.
+- If the sharing is only reads of immutable snapshots, leave it; this rule is about write authority.
+
+## Common Wrong Fixes
+- Add a larger global lock around the same shared object.
+- Sprinkle more synchronized blocks without naming an owner.
+- Make every field atomic and hope compound invariants hold.
+- Document “remember to take the lock” as the architecture.
 
 ## Verification
-Concurrent callers should be unable to mutate owned state directly, and varying scheduler order must preserve declared command semantics.
+Concurrent callers should be unable to mutate owned state directly, and varying scheduler order must preserve declared command semantics. The invariant is: mutation authority is singular; concurrency communicates across that boundary.
 
 ## Done When
 Concurrency exists between owners, not inside one shared mutable object, and synchronization follows the domain’s authority boundaries rather than ad hoc lock placement.

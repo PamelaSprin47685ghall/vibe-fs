@@ -10,13 +10,20 @@ An invariant without enforcement is a request to future attention. Architecture 
 Trigger when forbidden imports, layering, ownership boundaries, generated-file rules, or module dependencies are repeatedly reviewed by humans but no build/static check rejects violations.
 
 ## Do Not Trigger When
-Do not trigger for principles that are inherently semantic and cannot be recognized mechanically without unacceptable false positives.
+- The principle is inherently semantic and cannot be recognized mechanically without unacceptable false positives.
+- The remark is a one-off review comment about a specific import, not a standing architecture rule.
+- The build already rejects the forbidden edge via an existing layer, import, or ownership check.
 
 ## Distinguish From
-missing-invariant-documentation lacks a durable statement of the rule. false-gate has an ineffective check. This rule assumes the invariant is known but leaves enforcement to discipline.
+missing-invariant-documentation lacks a durable statement of the rule. false-gate has a check that does not actually fail. Tie-break: if the invariant is known and mechanically decidable but left to discipline, this rule; if the wording is missing, missing-invariant-documentation; if a check exists but is ineffective, false-gate.
 
 ## Decision Procedure
 Express the boundary as a decidable predicate over repository structure. If a cheap deterministic check can recognize violation, make that check part of the standard gate.
+
+## Examples
+- positive: Reviewers keep catching `internal/` imports across packages, but CI has no import-graph check.
+- near-miss: The boundary is "do not leak domain meaning into adapters," which no cheap static check can decide.
+- counterexample: An existing dependency-cruiser rule already fails forbidden edges in the same command CI runs.
 
 ## Nudge
 Do not ask memory to enforce what the machine can decide. Turn critical architecture boundaries into failing predicates in the build or check pipeline.

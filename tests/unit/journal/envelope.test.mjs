@@ -12,10 +12,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { agentFactCaseOf,
+  blobDigest,
+  blobRef,
+  bloggerRequestId,
   caseOf,
   envelope,
   fact,
   fold,
+  frameEpochId,
   idValue,
   journal,
   kWayMerge,
@@ -23,6 +27,8 @@ import { agentFactCaseOf,
   offsetAt,
   offsetMinutesOf,
   payloadOf,
+  prefixEpochId,
+  providerRun,
   sessionId,
   stream,
 } from '../support/domain.mjs'
@@ -264,58 +270,94 @@ test('PERSIST_005_malformed_json_is_an_error_value_not_an_exception', () => {
   }
 })
 
-test('ENFORCER_072_BlogEntryCommitted_without_TipRuleId_is_refused_at_envelope_decode', () => {
+test('ENFORCER_072_observation_commit_without_TipRuleId_is_refused_at_envelope_decode', () => {
   // Boot reads envelopes, not FactCodec alone. Without this check Thoth fails
   // opaquely, Boot truncates mid-stream, and fold invents "already has open request".
-  const legacy = JSON.stringify({
-    RuntimeId: ['RuntimeId', 'rt1'],
-    LocalSeq: ['LocalSeq', '1'],
-    ObservedAt: '2026-01-01T00:00:00.000+00:00',
-    EventId: ['EventId', 'e1'],
-    Stream: ['Session', ['SessionId', 'ses_a']],
-    Fact: [
-      'Agent',
-      [
-        'BlogEntryCommitted',
-        {
-          SessionId: ['SessionId', 'ses_a'],
-          BloggerSessionId: ['SessionId', 'ses_b'],
-          // no TipRuleId, optional ScoreVectorRef-era shape
-          TextDigest: ['BlobDigest', 'sha'],
-          TextRef: ['BlobRef', 'blobs/sha'],
-        },
+  for (const tag of ['BlogEntryCommitted', 'BlogObservationCommitted']) {
+    const legacy = JSON.stringify({
+      RuntimeId: ['RuntimeId', 'rt1'],
+      LocalSeq: ['LocalSeq', '1'],
+      ObservedAt: '2026-01-01T00:00:00.000+00:00',
+      EventId: ['EventId', 'e1'],
+      Stream: ['Session', ['SessionId', 'ses_a']],
+      Fact: [
+        'Agent',
+        [
+          tag,
+          {
+            SessionId: ['SessionId', 'ses_a'],
+            BloggerSessionId: ['SessionId', 'ses_b'],
+            // no TipRuleId, optional ScoreVectorRef-era shape
+            TextDigest: ['BlobDigest', 'sha'],
+            TextRef: ['BlobRef', 'blobs/sha'],
+          },
+        ],
       ],
-    ],
-  })
-  assert.equal(journal.containsLegacyScoreVectorEntry(legacy), true)
-  const decoded = journal.deserialize(legacy)
-  assert.equal(decoded.ok, false)
-  assert.equal(decoded.error, journal.tipV2CleanBreakMessage)
+    })
+    assert.equal(journal.containsLegacyScoreVectorEntry(legacy), true, tag)
+    const decoded = journal.deserialize(legacy)
+    assert.equal(decoded.ok, false, tag)
+    assert.equal(decoded.error, journal.tipV2CleanBreakMessage)
+  }
 })
 
 test('ENFORCER_072_ScoreVectorRef_era_entry_is_refused_at_envelope_decode', () => {
-  const legacy = JSON.stringify({
-    RuntimeId: ['RuntimeId', 'rt1'],
-    LocalSeq: ['LocalSeq', '1'],
-    ObservedAt: '2026-01-01T00:00:00.000+00:00',
-    EventId: ['EventId', 'e1'],
-    Stream: ['Session', ['SessionId', 'ses_a']],
-    Fact: [
-      'Agent',
-      [
-        'BlogEntryCommitted',
-        {
-          SessionId: ['SessionId', 'ses_a'],
-          TipRuleId: 'ignored-if-score-vector-present',
-          ScoreVectorRef: ['BlobRef', 'blobs/old'],
-        },
+  for (const tag of ['BlogEntryCommitted', 'BlogObservationCommitted']) {
+    const legacy = JSON.stringify({
+      RuntimeId: ['RuntimeId', 'rt1'],
+      LocalSeq: ['LocalSeq', '1'],
+      ObservedAt: '2026-01-01T00:00:00.000+00:00',
+      EventId: ['EventId', 'e1'],
+      Stream: ['Session', ['SessionId', 'ses_a']],
+      Fact: [
+        'Agent',
+        [
+          tag,
+          {
+            SessionId: ['SessionId', 'ses_a'],
+            TipRuleId: 'ignored-if-score-vector-present',
+            ScoreVectorRef: ['BlobRef', 'blobs/old'],
+          },
+        ],
       ],
-    ],
+    })
+    assert.equal(journal.containsLegacyScoreVectorEntry(legacy), true, tag)
+    const decoded = journal.deserialize(legacy)
+    assert.equal(decoded.ok, false, tag)
+    assert.match(String(decoded.error), /TipRuleId|ScoreVectorRef|tip v2/)
+  }
+})
+
+test('PERSIST_005_envelope_dual_decodes_legacy_observation_tags', () => {
+  const observation = fact('BlogObservationCommitted', {
+    SessionId: SESSION,
+    BloggerSessionId: sessionId('ses_b'),
+    RequestId: bloggerRequestId('req-obs'),
+    FrameEpochId: frameEpochId(0),
+    PreviousIngestedThroughSequence: 0n,
+    NextIngestedThroughSequence: 1n,
+    PreviousCoverableTurnCutoffExclusive: 0,
+    NextCoverableTurnCutoffExclusive: 1,
+    NextCoveredPrefixDigest: 'd-1',
+    TextRef: blobRef('blob-obs'),
+    TextDigest: blobDigest('sha-obs'),
+    ProviderRun: providerRun('run-obs'),
+    ToolCallIds: [],
+    TipRuleId: 'rule-obs',
+    FieldNameAtCommit: 'field-obs',
+    EvidenceRef: undefined,
+    ObservedPrefixEpochId: prefixEpochId(0),
   })
-  assert.equal(journal.containsLegacyScoreVectorEntry(legacy), true)
+  const value = envelope({ seq: 4, stream: stream.session(SESSION), run: 'run-obs', fact: observation })
+  const line = journal.serialize(value)
+  assert.equal(line.includes('"BlogObservationCommitted"'), true)
+  assert.equal(line.includes('"BlogEntryCommitted"'), false)
+
+  const legacy = line.replaceAll('"BlogObservationCommitted"', '"BlogEntryCommitted"')
   const decoded = journal.deserialize(legacy)
-  assert.equal(decoded.ok, false)
-  assert.match(String(decoded.error), /TipRuleId|ScoreVectorRef|tip v2/)
+  assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
+  assert.equal(agentFactCaseOf(payloadOf(decoded.value.Fact)), 'BlogObservationCommitted')
+  assert.equal(journal.serialize(decoded.value), line)
 })
 
 // ── PERSIST-002: two append outcomes, and replay agrees with them ────────────

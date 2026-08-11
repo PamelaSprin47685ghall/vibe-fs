@@ -10,13 +10,21 @@ A value should state its own truth. Prototype cloning instead defines truth nega
 Trigger when domain values are produced by cloning/copying a mutable object and then assigning differences field by field.
 
 ## Do Not Trigger When
-Do not trigger for immutable record-copy syntax where preserved fields are intentionally part of the same domain value and invariants remain constructor-safe.
+- Immutable record-copy syntax preserves fields that are intentionally part of the same domain value, and invariants remain constructor-safe.
+- A shallow copy is an implementation detail inside a constructor that then freezes or seals the result before escape.
+- Updating a truly mutable entity in place is not derivation of a new semantic value (see `in-place-mutation`).
+- Test fixtures that build independent literals per case are not prototype inheritance.
 
 ## Distinguish From
-in-place-mutation changes an existing shared value. runtime-checked-builder permits invalid construction phases. This rule concerns deriving a new semantic value by inheriting an overly broad prototype.
+`in-place-mutation` changes an existing shared value. `runtime-checked-builder` permits invalid construction phases. This rule concerns deriving a new semantic value by inheriting an overly broad prototype. Tie-break: if the new value’s contents are “whatever the prototype had, minus these patches,” this rule owns the case.
 
 ## Decision Procedure
 List the facts the new value should carry. If that list is smaller or more meaningful than “everything the old object currently has except these patches,” construct from the list directly.
+
+## Examples
+- positive: `const next = clone(order); next.status = 'paid'` so future fields on `order` silently appear on `next`.
+- near-miss: an immutable record update that names the preserved value and constructor-checks invariants.
+- counterexample: construct the derived value from the explicit facts the domain relation preserves, requiring a decision on new fields.
 
 ## Nudge
 Derivation should be positive, not accidental inheritance. Construct the intended immutable value from the facts that define it.

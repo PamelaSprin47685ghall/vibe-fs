@@ -59,7 +59,7 @@ const materialize = ({ requestId = 'req-1', kind = 'main', n = 1, run } = {}) =>
 
 const entry = ({ requestId = 'req-1', run = 'msg_e1', n = 1 } = {}) =>
   next(
-    fact('BlogEntryCommitted', {
+    fact('BlogObservationCommitted', {
       SessionId: session,
       BloggerSessionId: blogger,
       RequestId: bloggerRequestId(requestId),
@@ -83,7 +83,7 @@ const entry = ({ requestId = 'req-1', run = 'msg_e1', n = 1 } = {}) =>
 
 const squash = ({ requestId = 'req-s1', run = 'msg_s1', n = 1 } = {}) =>
   next(
-    fact('BlogSquashCommitted', {
+    fact('BlogObservationsSquashed', {
       SessionId: session,
       BloggerSessionId: blogger,
       RequestId: bloggerRequestId(requestId),
@@ -120,7 +120,7 @@ test('C5_same_provider_run_cannot_be_both_entry_and_squash', () => {
     // Need a frame for squash — seed with entry first then try same run squash via
     // a second line with same ProviderRun is enough for receipt reject.
     next(
-      fact('BlogSquashCommitted', {
+      fact('BlogObservationsSquashed', {
         SessionId: session,
         BloggerSessionId: blogger,
         RequestId: bloggerRequestId('req-s1'),
@@ -235,7 +235,7 @@ test('C5_request_id_cannot_rebind_to_different_provider_run', () => {
     entry({ requestId: 'req-bind', run: 'msg_a', n: 1 }),
     // Second entry advances coverage but reuses RequestId with a different run.
     next(
-      fact('BlogEntryCommitted', {
+      fact('BlogObservationCommitted', {
         SessionId: session,
         BloggerSessionId: blogger,
         RequestId: bloggerRequestId('req-bind'),

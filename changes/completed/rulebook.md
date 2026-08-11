@@ -3346,3 +3346,24 @@ TipGuidanceDelivered remains HostFact / Journal path as delivered above
 - G7 **full residual closed** → `changes/completed/rulebook.md`（本 Final outcome）  
 - Strength（G8）仍由 `changes/active/strength.md` 并行 owner 持有；**本 Change 不触碰 Strength**；G8 保持 **PARTIAL**  
 - G9：`enforcer-rulebook-gate --require-headings` + `capability-isomorphism-gate` 已接线；entry 快照同步  
+
+## Amendment (2026-08-11 strict audit)
+
+**Status correction — Gate reclassified to PARTIAL (runtime) per `changes/proposed/entry.md` §0.1 (living-status authority).** The frozen body and `Final outcome` above are retained verbatim; this section is the only honesty amendment and does not rewrite history.
+
+Deferred — two blockers (not DONE):
+- **Rubric-vs-headings gap** deferred — authoring rubric semantic review not evidenced. Enforcer gate `enforcer-rulebook-gate --require-headings` only checks mandatory headings (Definition / Trigger When / Do Not Trigger When / Distinguish From / etc.), not the semantic rubric: ≥3 non-trigger bullets, ≥2 sibling rules with tie-break, positive / near-miss / counterexample coverage, ≥3 wrong-fixes / ≥2 decision branches / invariant-specific verification, etc. (Appendix A/A37–A38).
+- **Observation vocabulary cutover** deferred — first-class `BlogObservationCommitted` / `BlogObservationsSquashed` EventStore event vocabulary not cut over. Physical durable blog facts remain `BlogEntryCommitted` / `BlogSquashCommitted` on `JournalEnvelope` substrate; `BlogObservationCommitted`/`Squashed` are desired names only. Domain `ObservationProjection`/`RulebookObservation` naming is present, physical event type rename is not.
+
+Headings/physical-substrate surface remains as described in the frozen body; full rubric + first-class Observation vocabulary remains PARTIAL. `entry.md` §0.1 is authoritative.
+
+## Amendment (2026-08-11 implementation closeout)
+
+Supersedes the honesty-only amendment above for living status. Frozen body retained.
+
+**G7 authoring gate:** `scripts/checks/enforcer-rulebook-gate.mjs --require-headings --strict` is GREEN on all 120 tips (Do Not Trigger ≥3, Distinguish From ≥2 siblings, Examples positive/near-miss/counterexample, Wrong Fixes ≥3, Decision Branches ≥2, Verification invariant). `scripts/check.mjs` passes `--require-headings --strict`.
+
+**G7 Observation vocabulary:** Domain facts are `BlogObservationCommitted` / `BlogObservationsSquashed`. `FactCodec` dual-decodes legacy `BlogEntryCommitted` / `BlogSquashCommitted` JSON tags. This is the EventStore cutover; no second store.
+
+Human paired-history eval of 120 tips remains out of CI (structural rubric is the automated Exit). Strength (G8) remains `changes/active/strength.md` PARTIAL.
+

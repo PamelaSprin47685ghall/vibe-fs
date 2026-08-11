@@ -9,11 +9,17 @@ A stateful fixture can make tests pass only because they issue calls in the expe
 ## Repair Strategy
 Model legitimate protocol state explicitly, keyed by stable identity when needed. Otherwise use a pure request → response function. Make scenario variation part of test input rather than mutable hidden setup.
 
-## Wrong Fixes
-Do not reset the mock cursor more carefully between tests. Better cleanup preserves the same invisible dependency inside each test.
+## Decision Branches
+- If the real provider is stateless for that request, make the mock a pure function of the visible request.
+- If the protocol is stateful, model that state explicitly and key responses by it, never by call count.
+
+## Common Wrong Fixes
+- Reset the mock cursor more carefully between tests while keeping the invisible dependency inside each test.
+- Add more canned answers in call order instead of binding them to requests.
+- Assert call sequence on the mock to paper over the hidden cursor.
 
 ## Verification
-Reorder equivalent independent calls and repeat identical requests. Results should change only when visible request or explicit protocol state changes.
+Reorder equivalent independent calls and repeat identical requests. Results should change only when visible request or explicit protocol state changes. The invariant is that identical visible inputs in the same modeled state yield identical mock outputs.
 
 ## Done When
 The mock can be understood as a small model of the external contract, not as a secret state machine driven by how the test happens to call it.

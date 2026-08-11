@@ -9,11 +9,17 @@ A rewrite expands uncertainty faster than it expands value. Every replaced line 
 ## Repair Strategy
 Map the required semantic delta, retain unaffected owners and paths, migrate only the structures whose invariants truly changed, and use tests to protect preserved behavior during the transformation.
 
-## Wrong Fixes
-Do not equate fewer old lines with cleaner architecture. Deletion is valuable only when it removes obsolete knowledge, not when it discards working knowledge that still belongs in the new design.
+## Decision Branches
+If the requirement invalidates only a small set of invariants, preserve the rest and transform that set.
+If a recorded decision says the structure itself is the defect, rewrite that structure and still keep unrelated proven code.
+
+## Common Wrong Fixes
+- Equate fewer old lines with cleaner architecture.
+- Copy behavior into a new package while leaving the old one half-alive.
+- Rewrite tests from scratch so preserved behavior is no longer pinned.
 
 ## Verification
-The diff should be explainable as a bounded semantic transformation, and unchanged behavior should remain covered without recreating it from scratch.
+Invariant: the diff is a bounded semantic transformation of invalidated assumptions only. Unchanged behavior should remain covered without recreating it from scratch.
 
 ## Done When
 The solution changes exactly the assumptions the requirement invalidated and leaves the rest of the system’s accumulated evidence intact.

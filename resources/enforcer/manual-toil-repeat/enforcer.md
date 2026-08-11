@@ -10,13 +10,20 @@ Repetition reveals an algorithm. Once the same human sequence is executed severa
 Trigger when the same mechanical edit, generation, validation, packaging, migration, or operational procedure is repeatedly executed by humans with materially identical rules.
 
 ## Do Not Trigger When
-Do not trigger when each instance genuinely requires contextual judgment that cannot be stated as stable input/output rules, or when automation cost clearly exceeds expected repetition.
+- Do not trigger when each instance genuinely requires contextual judgment that cannot be stated as stable input/output rules, or when automation cost clearly exceeds expected repetition.
+- Do not trigger for a first-time procedure still being discovered (no stable algorithm yet).
+- Do not trigger when a maintained tool already exists and the human work is supervising exceptions it cannot encode.
 
 ## Distinguish From
-leftover-scaffolding is temporary tooling that should disappear or be promoted. serial-investigation concerns independent research steps. This rule is recurring deterministic labor itself.
+leftover-scaffolding is temporary tooling that should disappear or be promoted. serial-investigation concerns independent research steps. This rule is recurring deterministic labor itself. Tie-break: if the work is investigation with unknown next questions, use serial-investigation; if the steps are a known algorithm repeated by hand, use this rule.
 
 ## Decision Procedure
 Write the procedure as inputs → deterministic steps → outputs. If that description is stable and has recurred enough to create error or attention cost, encode it as a maintained tool or project check.
+
+## Examples
+- positive: Every release, a human copies the same five files, edits the same version strings, and runs the same checklist.
+- near-miss: A one-off migration is still being discovered; the next instance will differ.
+- counterexample: A maintained command takes the same inputs and produces the same outputs; humans review exceptions only.
 
 ## Nudge
 When work becomes algorithmic, stop spending human judgment to execute it. Encode the procedure once and let people supervise exceptions rather than repeat mechanics.

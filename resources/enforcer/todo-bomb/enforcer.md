@@ -10,13 +10,21 @@ A TODO is not deferred work unless the current system remains complete without i
 Trigger when TODO/FIXME placeholders, temporary exceptions, `not implemented`, dummy returns, or panic branches stand in for behavior required by a reachable production contract.
 
 ## Do Not Trigger When
-Do not trigger for genuine backlog notes about optional future improvement that do not weaken correctness of any currently supported path.
+- Genuine backlog notes about optional future improvement that do not weaken correctness of any currently supported path.
+- Explicit boundary rejection of an unsupported case with a typed outcome, even if a later product increment may add it.
+- TODOs in tests or docs describing future coverage that is not claimed as shipped behavior.
+- Scaffolding in an unmerged spike branch that cannot reach production.
 
 ## Distinguish From
-half-finished-refactor leaves migration incomplete. spike-not-cleaned ships prototype shortcuts. This rule specifically marks known required correctness postponed inside delivered code.
+`half-finished-refactor` leaves migration incomplete. `spike-not-cleaned` ships prototype shortcuts. Tie-break: if known required correctness is postponed inside delivered code via a placeholder, use this rule; if a prototype shortcut shipped without cleanup, use `spike-not-cleaned`.
 
 ## Decision Procedure
 Ask whether a valid supported input can reach the placeholder today. If yes, either implement the behavior or narrow the supported contract so the case is explicitly and intentionally rejected.
+
+## Examples
+- positive: a reachable production branch returns a dummy value with `// TODO: compute tax`.
+- near-miss: a backlog comment on an optional report the product does not yet offer, and no supported path enters that code.
+- counterexample: a merged spike still using a hardcoded table “for now” is `spike-not-cleaned`.
 
 ## Nudge
 A comment cannot fulfill a contract. Finish required behavior before delivery, or make the unsupported case an explicit boundary rather than a hidden promise to the future.

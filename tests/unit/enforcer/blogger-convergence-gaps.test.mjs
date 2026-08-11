@@ -271,7 +271,7 @@ test('C0_park_only_after_KnownCommitted', () => {
 })
 
 test('C0_commit_drains_via_tryRefresh_before_park', () => {
-  // One external wake may need many ≤200 KiB cycles. After BlogEntryCommitted the
+  // One external wake may need many ≤200 KiB cycles. After BlogObservationCommitted the
   // continuation must re-chunk from durable coverage (tryRefresh) and continue
   // without waiting for a new main-session wake. Stale PendingOffer is not enough.
   const host = prodText('src/Wanxiangshu/Session/EnforcerHost.fs')
@@ -297,7 +297,7 @@ test('C0_no_EnforcementCycleCommitted_fact', () => {
   assert.equal(
     /\| EnforcementCycleCommitted\b/.test(fact),
     false,
-    'EnforcementCycleCommitted must stay deleted; BlogEntryCommitted is the atomic fact',
+    'EnforcementCycleCommitted must stay deleted; BlogObservationCommitted is the atomic fact',
   )
   // FactCodec may list it only as a pre-0.5.0 refuse marker (escaped JSON case name).
   const codec = prodText('src/Wanxiangshu/Journal/FactCodec.fs')

@@ -507,7 +507,7 @@ module Fact =
         /// Tip v2 (ENFORCER-020..026 / 045): TipRuleId is the stable catalog
         /// identity; FieldNameAtCommit is an optional audit snapshot.
         /// ScoreVectorRef is deleted (ENFORCER-072).
-        | BlogEntryCommitted of
+        | BlogObservationCommitted of
             {| SessionId: SessionId
                BloggerSessionId: SessionId
                RequestId: BloggerRequestId
@@ -532,7 +532,7 @@ module Fact =
         /// Carries no coverage fields: a squash changes how B is REPRESENTED, not
         /// which X turns it covers. Including them would let a writer silently
         /// move coverage under cover of a compression.
-        | BlogSquashCommitted of
+        | BlogObservationsSquashed of
             {| SessionId: SessionId
                BloggerSessionId: SessionId
                RequestId: BloggerRequestId
@@ -788,11 +788,11 @@ module Fact =
     /// Constructor surface for the ContextFact family: each function wraps its
     /// family case in the single-case Context dispatch.
     module ContextFact =
-        let inline BlogEntryCommitted payload =
-            AgentFact.Context(ContextFactCases.BlogEntryCommitted payload)
+        let inline BlogObservationCommitted payload =
+            AgentFact.Context(ContextFactCases.BlogObservationCommitted payload)
 
-        let inline BlogSquashCommitted payload =
-            AgentFact.Context(ContextFactCases.BlogSquashCommitted payload)
+        let inline BlogObservationsSquashed payload =
+            AgentFact.Context(ContextFactCases.BlogObservationsSquashed payload)
 
         let inline BloggerRequestMaterialized payload =
             AgentFact.Context(ContextFactCases.BloggerRequestMaterialized payload)

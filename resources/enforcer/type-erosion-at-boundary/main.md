@@ -9,11 +9,17 @@ Weak representations move uncertainty rather than remove it. If a cast or dynami
 ## Repair Strategy
 Parse, validate, normalize, and construct the strong type at the edge. Keep raw payloads private to the adapter and eliminate casts in policy code by making the boundary return the exact domain alternatives it can establish.
 
-## Wrong Fixes
-Do not wrap `any` in a generically named object and call it typed. A nominal shell without validated semantics merely hides erosion.
+## Decision Branches
+If dynamic or unchecked forms are still visible to domain/application code, stop them at the adapter and return a validated type.
+If decoding already yields a constructor-enforced domain value, do not reintroduce `any` or casts inward.
+
+## Common Wrong Fixes
+- Wrap `any` in a generically named object and call it typed.
+- Add assertions at every call site instead of one validated constructor at the edge.
+- Use unchecked casts “just for this handler” that then leak into shared policy.
 
 ## Verification
-Search inward layers for dynamic access and unchecked casts. Malformed external input should fail at the boundary; valid input should emerge as a type downstream code can trust without rechecking shape.
+Invariant: type uncertainty has one owner at ingress and cannot leak inward. Search inward layers for dynamic access and unchecked casts. Malformed input should fail at the boundary; valid input should emerge as a type downstream can trust without rechecking shape.
 
 ## Done When
 Type uncertainty has one owner at ingress and cannot leak inward as a recurring proof obligation.

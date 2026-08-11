@@ -27,7 +27,7 @@ Proposal 相互覆盖时如何落地
 
 Unified Storage / Session / Casebook 等 cutover 是 **clean break**：旧 Journal / Blob / feature-owned store 上的历史数据可以丢弃或留在原地不再读取；新世界只认最终 EventStore 语义。禁止为“迁旧数据”“双向兼容”“旧档可读性”投入工期。
 
-**进度快照最后同步：** 2026-08-11（§0.1 为 Gate 状态权威；正文历史章节若与 §0.1 冲突，以 §0.1 为准。G0–G7 已收口；G8 PARTIAL active strength；G9 PARTIAL ratchet + capability-isomorphism / headings gates）
+**进度快照最后同步：** 2026-08-11（§0.1 为 Gate 状态权威；正文历史章节若与 §0.1 冲突，以 §0.1 为准。G0/G1/G2/G3/G3.5/G4/G7 DONE；G5/G6 DONE-with-amendment；G8/G9 PARTIAL）
 
 > **权威声明：** §0.1 Gate 总览是 living status 唯一权威。后文 G4/G5/G6 等章节标题里若仍残留 “IN PROGRESS / BLOCKED / NOT STARTED”，那是施工手册原文，不覆盖 §0.1。
 
@@ -41,17 +41,17 @@ Completed（本 Playbook 相关）:
   changes/completed/causal-ce-observability.md
   changes/completed/orchestrator-e2e-timeout.md
   changes/completed/storage.md                          — G4 DONE
-  changes/completed/js-capability-projected-tools.md    — G5 DONE
-  changes/completed/universal.md                        — G2/G3/G6 Casebook lifecycle 收口
-  changes/completed/perm-inspector.md                   — G6 Casebook / mechanical Bookkeeper 收口
-  changes/completed/rulebook.md                         — G7 DONE（runtime + residual closeout；见 Final outcome）
+  changes/completed/js-capability-projected-tools.md    — G5 DONE-with-amendment(C-3)
+  changes/completed/universal.md                        — G2 DONE (Q1/Q2/Q3) + G3 DONE + G6 synthesis+Host-path
+  changes/completed/perm-inspector.md                   — G6 DONE-with-amendment (deterministic Bookkeeper synthesizer)
+  changes/completed/rulebook.md                         — G7 DONE（--strict rubric 120/120 + Observation event vocabulary）
 
 Proposed（Playbook 本身 + 独立 Lane）:
   changes/proposed/entry.md        — 本文件；Integration Playbook，不是产品 Change；不迁 completed
   changes/proposed/magic-todo.md   — 不在本 Playbook Gate 序列内；保持 proposed；不入 G0–G9 gates
 ```
 
-已解决的历史 anomaly：`storage` / `universal` / `perm-inspector` / `rulebook` 均已 completed；Strength 仍 active。
+已解决的历史 anomaly：`storage` / `universal` / `perm-inspector` / `rulebook` 文件在 `changes/completed/`。Gate 状态以 §0.1 为准；Strength 仍 active。
 
 这些 Change 不能按照“每个 Proposal 自己从 Phase 0 一路做到完成”的方式独立实施。
 
@@ -89,17 +89,17 @@ Strength
 |---|---|---|
 | **G0** Governance + Baseline | **DONE** | Storage path 唯一化；baseline 已建 |
 | **G1** Causal CE + Orchestrator canaries | **DONE** | `changes/completed/causal-ce-observability.md` + `orchestrator-e2e-timeout.md`；release **0.6.0** |
-| **G2** Universal Runtime Foundation | **DONE** | `ReuseScope` / `SessionOwnership` / `SyncDelegate` + CausalAwait dual-await；`ca9fd08a` |
+| **G2** Universal Runtime Foundation | **DONE** | Q1/Q2/Q3 same Inspector SessionId + same agent + serial + return→TurnCompleted + owner cancel：`tests/unit/session/sync-delegate-runtime.test.mjs` (`G2_inspector_Q1_Q2_Q3_same_session_serial_reuse`, `G2_inspector_cancel_owner_fails_pending_invoke_no_extra_child`). |
 | **G3** Universal Clean Break | **DONE** | Student/Teacher/QA/SKILL 删除；Meditator → Inspector only；`student-teacher-absence` ratchet green |
 | **G3.5** Storage cutover scope 修订 | **DONE** | Amendment G3.5-A；Student QA retired；no migrator / dual-write |
 | **G4** Unified Storage | **DONE** | `changes/completed/storage.md` Final outcome；G4R（`changes/completed/test.md`）；`unified-store-gate` |
-| **G5** JS Capability-Projected Tools | **DONE** | `changes/completed/js-capability-projected-tools.md` Final outcome；C-3 按用户裁决 |
-| **G6** perm-inspector + Casebook | **DONE** | CasebookLifecycle session wiring + mechanical Bookkeeper + Index；`changes/completed/universal.md` + `changes/completed/perm-inspector.md` |
-| **G7** Rulebook | **DONE** | `changes/completed/rulebook.md` Final outcome residual closeout：folder SSOT；Full/Identity `TipGuidanceDelivered` + compaction re-Full；squash co-move；blogger compose；**120/120** mandatory headings（`bad=0`）；bridge fields dropped（`LexicalOrder`）；domain `ObservationProjection` + `RulebookObservation`（物理事实仍 `BlogEntryCommitted` / JournalEnvelope）；docs enforcer plane rewrite；`enforcer-rulebook-gate --require-headings` OK。无 open Deferred 表。 |
-| **G8** Strength | **PARTIAL** | Change 仍 `changes/active/strength.md`（并行 owner）。K0 splice / algebra 可测；**不** claim K1/K2/shadow DONE。G8 保持 active PARTIAL。 |
-| **G9** Global Convergence | **PARTIAL** | ratchets：`student-teacher-absence`（含 `SatelliteKind.Replica`）、`session-ownership-ratchet`、`enforcer-rulebook-gate`（含 `--require-headings`）、`capability-isomorphism-gate`、`unified-store-gate`、`js-surface-gate`、`g4r-*`。`npm run check` + Long Stroke GREEN（journal 372）。G9 整体仍 PARTIAL（非 full release close）。 |
+| **G5** JS Capability-Projected Tools | **DONE-with-amendment** | `changes/completed/js-capability-projected-tools.md` Final outcome；Amendment C-3 (2026-08-10 user裁决): builtin `read`/`edit`/`write`/`glob`/`grep`/`patch` retained, coexists with js-ROLE; legacy-absent clause superseded. |
+| **G6** perm-inspector + Casebook | **DONE-with-amendment** | One `QaSynthesize` provider transaction on CaseRefresh (edit-qa + stability verify → `InspectorCaseRefreshed`) and on ReuseScope close (exactly one CaseFinalize). Host-path Q1/Q2/Q3 → finalize → cold fetch: `tests/unit/casebook/g6-host-reuse-finalize.test.mjs`. Amendment: synthesizer is deterministic evidence-digest (not a live LLM InternalLeaf session). |
+| **G7** Rulebook | **DONE** | (a) `enforcer-rulebook-gate --require-headings --strict` 120/120 GREEN. Wired in `scripts/check.mjs`. (b) Physical EventStore vocabulary is `BlogObservationCommitted` / `BlogObservationsSquashed`; codec dual-decodes legacy tags. |
+| **G8** Strength | **PARTIAL** | Change 仍 `changes/active/strength.md`（并行 owner）。K0 splice / algebra 可测；**不** claim K1/K2/shadow DONE。G7 full gate is now green; G8 remains active PARTIAL. |
+| **G9** Global Convergence | **PARTIAL** | ratchets include `enforcer-rulebook-gate --require-headings --strict` and expanded `session-ownership-ratchet`. Still smoke-check, not full release-close. |
 
-**当前主线位置：** G0–G7 **DONE**（G7 residual closed）；G8 **PARTIAL**（strength active）；G9 **PARTIAL**（capability-isomorphism + headings gates 已接线，非 full convergence close）。entry 保持 `proposed/`。
+**当前主线位置：** G0/G1/G2/G3/G3.5/G4/G7 DONE；G5/G6 DONE-with-amendment；G8/G9 PARTIAL。entry 保持 `proposed/`；§0.1 为权威。
 
 ## 0.2 自 Playbook 落地以来关键 commit（`31d456ec` 之后）
 
@@ -125,14 +125,15 @@ ac41ef8f  session abort diagnostic
 | 证明切片 | 状态 |
 |---|---|
 | 静态 ratchet：`student-teacher-absence`（含 `SatelliteKind.Replica` 禁止）+ `session-ownership-ratchet` + `unified-store-gate` + `g4r-*` | **GREEN** |
-| `enforcer-rulebook-gate --require-headings` + `capability-isomorphism-gate` | **GREEN**（G7 residual / G9 静态闸） |
+| `enforcer-rulebook-gate --require-headings --strict` + `capability-isomorphism-gate` | **GREEN**（G7 rubric + G9 静态闸） |
 | `npm run check`（lint + build + unit + integration） | **GREEN** |
 | enforcer / strength / verify unit | **256 PASS** |
 | `npm run test:e2e` Long Stroke | **GREEN**（48 steps；journal ceiling 372；三连稳定） |
-| Storage G4 / JS G5 / Universal+perm-inspector G6 / Rulebook G7 | **DONE**（均在 `changes/completed/`；G7 residual closeout 见 rulebook Final outcome） |
-| 已知 residual | G8 Strength 全量仍 active PARTIAL（`active/strength.md` 并行 owner）；G9 非 full release close；magic-todo 仍 proposed。**G7 无 open Deferred。** |
+| Storage G4 / JS G5 | **DONE / DONE-with-amendment(C-3)** |
+| Universal+perm-inspector G6 / Rulebook G7 | **DONE-with-amendment / DONE** — G6 synthesizer + Host-path e2e; G7 `--strict` 120/120 + Observation event names |
+| 已知 residual | G6 非 live LLM Bookkeeper session；G8 PARTIAL；G9 PARTIAL smoke-check only；magic-todo 仍 proposed。 |
 
-## 0.4 合法中间状态（现在）— **G0–G7 DONE；G8/G9 PARTIAL**
+## 0.4 合法中间状态（现在）— **G0–G4/G7 DONE; G5/G6 DONE-with-amendment; G8/G9 PARTIAL**
 
 ```text
 ✓ Causal waits 可解释；orchestrator canaries 无历史 timeout
@@ -141,13 +142,11 @@ ac41ef8f  session abort diagnostic
 ✓ Runtime durability = EventStore（Strategy A：AgentJournal 作 adapter surface）
 ✓ 无 legacy NDJSON writer / 无 dual-write / 无 migrator
 ✓ Storage completed（G4）
-✓ JS capability-projected tools（G5）
-✓ Casebook lifecycle / mechanical Bookkeeper / Index（G6；universal + perm-inspector completed）
-✓ Rulebook G7 full residual closed：folder SSOT、Full/Identity + compaction re-Full、squash co-move、
-  120/120 headings、bridge fields dropped、domain ObservationProjection/RulebookObservation、
-  docs enforcer plane、enforcer-rulebook --require-headings（物理 blog facts 仍 BlogEntryCommitted）
+✓ JS capability-projected tools（G5 DONE-with-amendment C-3）
+✓ Casebook synthesizer transaction + Host-path Q1/Q2/Q3 finalize/fetch（G6 DONE-with-amendment: deterministic Bookkeeper, not live LLM）
+✓ Rulebook G7：`--require-headings --strict` 120/120；physical events `BlogObservationCommitted` / `BlogObservationsSquashed`（legacy tags dual-decode）
 ◐ Strength：K0 splice 类型在树；Change 仍 active/strength.md（并行 owner；G8 PARTIAL；非 full DONE）
-◐ G9：既有 ratchets + capability-isomorphism-gate + enforcer-rulebook headings；非 full release close
+◐ G9：既有 ratchets + capability-isomorphism-gate + enforcer-rulebook `--require-headings --strict`；ratchet 仍为 smoke，非 full release close
 ○ magic-todo — 独立 Lane；保持 proposed；不入主 Gate
 ○ entry — Playbook；保持 proposed；不迁 completed
 ```
@@ -2493,28 +2492,30 @@ CURRENT（2026-08-11；§0.1 权威）
     clean break cutover
         │
         ▼
-[6] Capability-Projected JS Tools            ✓ DONE
+[6] Capability-Projected JS Tools            ✓ DONE-with-amendment(C-3)
         │
         ▼
-[7] Inspector Casebook                       ✓ DONE（G6）
-    CasebookLifecycle + Bookkeeper + Index
+[7] Inspector Casebook                       ✓ DONE-with-amendment
+    QaSynthesize transaction + Host-path Q1–Q3 finalize/fetch; deterministic synthesizer (not live LLM)
         │
         ▼
-[8] Rulebook                                 ✓ DONE（G7 residual closed）
-    120 headings / docs plane / domain Observation / headings gate
+[8] Rulebook                                 ✓ DONE
+    --require-headings --strict 120/120; BlogObservationCommitted / BlogObservationsSquashed
         │
         ▼
 [9] Strength                                 ◐ PARTIAL（active/strength）
-    K1/K2 / holdout — 并行 owner
+    K1/K2 / holdout — 并行 owner；G7 已 full green，G8 仍非 full DONE
         │
         ▼
 [10] Full ratchet + release                  ◐ PARTIAL（G9）
-    session-ownership + headings + capability-isomorphism 已接线
+    session-ownership + headings+strict + capability-isomorphism 已接线；ratchet 仍为 smoke
 ```
 
 ---
 
 # 33. Definition of Done
+
+> **2026-08-11 closeout:** §0.1 is authoritative. G0–G4/G7 DONE; G5/G6 DONE-with-amendment (G5 C-3 supersedes `legacy five tool implementation = absent`; G6 Bookkeeper is a deterministic evidence-digest synthesizer, not a live LLM InternalLeaf). G8/G9 remain PARTIAL. The checklist below is the *product* convergence DoD — G8 Strength + G9 full ratchet are still open, so this list is **not** all-green.
 
 只有以下全部成立，才能认为这一批 Proposal 真正“收敛”，而不是“分别实现过”：
 
@@ -2538,6 +2539,8 @@ no dual write / fallback old store
 
 File capability = exact generated projection
 legacy five tool implementation = absent
+    // SUPERSEDED by Amendment C-3 (2026-08-10): builtin read/edit/write/glob/grep/patch
+    // retained; coexistence is the Exit. See §0.1 G5 DONE-with-amendment.
 
 Reusable Inspector:
     hot transcript reuse

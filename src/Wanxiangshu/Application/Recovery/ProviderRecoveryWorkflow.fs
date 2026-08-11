@@ -14,7 +14,7 @@ open Wanxiangshu.Session
 /// (G4R-CE S2 / CausalAwait.untilSignalOrDeadline). No slice poll, no UtcNow.
 module ProviderRecoveryWorkflow =
 
-    /// CTX-006 hasMaterial for X: BlogEntryCommitted coverage on the main session.
+    /// CTX-006 hasMaterial for X: BlogObservationCommitted coverage on the main session.
     let private sessionHasCoverage (durable: AgentJournal) (sessionId: SessionId) =
         AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections
         |> Option.bind (fun state -> state.Blog)

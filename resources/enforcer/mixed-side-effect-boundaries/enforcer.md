@@ -10,13 +10,20 @@ Effects differ not merely by API but by failure model, lifetime, retry semantics
 Trigger when one unit directly coordinates multiple unrelated effect systems while also containing domain decisions or mutable shared state.
 
 ## Do Not Trigger When
-Do not trigger for a thin application shell whose explicit role is to execute already-decided commands across effects and which contains no hidden policy.
+- The unit is a thin application shell whose explicit role is to execute already-decided commands across effects and which contains no hidden policy.
+- The function talks to one effect system only.
+- Related operations share one effect contract (for example several queries on the same store port).
 
 ## Distinguish From
-god-module concerns multiple responsibilities broadly. impure-core concerns effects inside business decisions. This rule focuses on unrelated external contracts sharing one owner.
+god-module concerns multiple responsibilities broadly. impure-core concerns effects inside business decisions. Tie-break: if unrelated external contracts share one owner, this rule; if the module is large for many reasons, god-module; if domain logic itself performs effects, impure-core.
 
 ## Decision Procedure
 List effects and their distinct failure/lifetime semantics. Give each a narrow port/adapter, move policy to pure code, and let orchestration compose typed outcomes at one explicit shell.
+
+## Examples
+- positive: One service method writes the database, shells out to Git, and posts HTTP while deciding retry policy inline.
+- near-miss: `main` sequences already-built commands across adapters and contains no domain branching.
+- counterexample: A repository adapter performs only persistence; policy lives in a pure function that returns commands.
 
 ## Nudge
 Different external worlds have different failure laws. Isolate each effect behind its own boundary and keep policy from becoming the place where those laws are entangled.

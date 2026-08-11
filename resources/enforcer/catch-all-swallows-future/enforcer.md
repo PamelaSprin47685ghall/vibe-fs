@@ -10,13 +10,21 @@ Exhaustiveness is a maintenance alarm. In a finite domain, a new case should cre
 Trigger when wildcard/default branches, broad catches, generic fallbacks, or “unknown → ignore” paths absorb domain variants that should require an explicit decision when added.
 
 ## Do Not Trigger When
-Do not trigger when the domain is intentionally open and the fallback behavior is itself the documented contract for unknown extension values.
+- The domain is intentionally open and the fallback behavior is itself the documented contract for unknown extension values.
+- The match is exhaustive over a closed type and the remaining arm is a named `Never`/`unreachable` proof, not a semantic default.
+- A logging sink that records unknown wire values without applying domain meaning is not deciding future semantics.
+- Transient I/O retries on a typed error are not a domain wildcard over future variants.
 
 ## Distinguish From
-non-exhaustive-transition concerns legal state/event pairs. stringly-typed-error concerns prose-driven branching. This rule concerns a fallback that prevents future semantic changes from becoming visible.
+`non-exhaustive-transition` concerns legal state/event pairs. `stringly-typed-error` concerns prose-driven branching. This rule concerns a fallback that prevents future semantic changes from becoming visible. Tie-break: if a new domain case would inherit today’s default silently, this rule owns the case.
 
 ## Decision Procedure
 Ask what should happen if a new domain case is introduced tomorrow. If the correct answer requires human judgment, remove the catch-all and make that judgment mechanically unavoidable.
+
+## Examples
+- positive: `switch (kind) { case A: …; default: ignore }` on a closed domain so tomorrow’s `B` inherits ignore.
+- near-miss: a versioned protocol documents “unknown fields must be preserved,” and the fallback is that contract.
+- counterexample: exhaustive cases on the closed type so adding a variant fails to compile until its semantics are chosen.
 
 ## Nudge
 Do not let today’s default decide tomorrow’s meaning. Make closed domains exhaustive so a new case breaks loudly until its semantics are chosen.

@@ -105,7 +105,7 @@ const seedBlogFrame = (append, writeBlob, { body = 'frame body', cutoff = 2, dig
   const written = agentJournal.writeBlob(body, writeBlob)
   assert.equal(written.ok, true, written.ok ? '' : JSON.stringify(written.error))
   append(
-    agentFact('BlogEntryCommitted', {
+    agentFact('BlogObservationCommitted', {
       SessionId: session,
       BloggerSessionId: sessionId('ses_blogger'),
       RequestId: { tag: 0, fields: ['req-e1'] },

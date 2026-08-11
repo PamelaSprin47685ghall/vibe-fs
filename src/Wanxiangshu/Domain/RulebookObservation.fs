@@ -4,8 +4,8 @@ namespace Wanxiangshu.Domain
 ///
 /// Rulebook residual vocabulary as a **domain view** only — fold of tips + frames.
 /// CompanionProjectionBuilder already interleaves tip/frame provider messages with the
-/// same front-zip; this type names the unit without Journal cutover or new EventStore
-/// event types. Do not rename BlogEntryCommitted.
+/// same front-zip; this type names the unit. Physical journal events are
+/// `BlogObservationCommitted` / `BlogObservationsSquashed` (no second store).
 type ObservationUnit =
     {
         TipName: string option
@@ -17,10 +17,10 @@ type ObservationUnit =
 
 /// Named work-log Observation: tip identity paired with an optional frame digest.
 ///
-/// Domain name for the rulebook BlogObservation* residual. Physical substrate remains
-/// Journal `BlogEntryCommitted` (frame + tip half) and `BlogSquashCommitted` (Observation
-/// squash: frames and tips co-truncate). Not a second projection store and not a new
-/// EventStore event family — pair Enforcement RecentTips with Blog frames at the boundary.
+/// Domain name for the rulebook BlogObservation* residual. Physical journal facts are
+/// `BlogObservationCommitted` (frame + tip half) and `BlogObservationsSquashed`
+/// (Observation squash: frames and tips co-truncate). Not a second projection store —
+/// pair Enforcement RecentTips with Blog frames at the boundary.
 type WorkLogObservation =
     { TipName: string
       CycleId: string

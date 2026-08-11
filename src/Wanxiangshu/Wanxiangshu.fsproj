@@ -348,8 +348,8 @@
     <Compile Include="Infrastructure/OpenCode/Tools/JsToolHost.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ToolRegistry.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/WorkspaceEventStore.fs"/>
-    <Compile Include="Infrastructure/CasebookLifecycle.fs"/>
     <Compile Include="Infrastructure/CasebookBookkeeper.fs"/>
+    <Compile Include="Infrastructure/CasebookLifecycle.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FetchTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/CasebookTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginHost.fs"/>

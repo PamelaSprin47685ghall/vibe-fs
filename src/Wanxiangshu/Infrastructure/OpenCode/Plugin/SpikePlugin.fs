@@ -322,7 +322,7 @@ module SpikePlugin =
                         // never absorbs synthetic heads (Companion memory / prefix
                         // replacement) as raw parts.
                         // Idempotent by (turn, part) provenance; a lagging trace
-                        // would stall BlogEntryCommitted.
+                        // would stall BlogObservationCommitted.
                         match projectionSessionIdOpt with
                         | Some sessionId ->
                             let rawMessages = unbox<obj array> outObj?messages |> Array.toList

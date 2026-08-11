@@ -9,11 +9,17 @@ A communication channel has finite human bandwidth. Low-information updates dilu
 ## Repair Strategy
 Define meaningful phase boundaries, report concise evidence at those boundaries, and prefer final results over narration of every internal action. Use structured telemetry for machine consumption rather than conversational noise.
 
-## Wrong Fixes
-Do not simply make every status line shorter while preserving the same frequency and lack of information. Noise is about semantic value, not character count.
+## Decision Branches
+If the message changes a decision, fact, failure, uncertainty, or required action, keep it.
+If it only narrates routine motion, remove or aggregate it to the next real phase boundary.
+
+## Common Wrong Fixes
+- Shorten every status line while keeping the same frequency and empty semantics.
+- Mute the entire channel, including genuine failures and decisions.
+- Relocate the same chatter into a dashboard that still emits low-information events.
 
 ## Verification
-Each remaining status message should answer at least one useful question: what changed, what was decided, what failed, what remains uncertain, or what must the receiver do?
+Invariant: each remaining status message must change the recipient’s model. Confirm every leftover update answers what changed, what was decided, what failed, what remains uncertain, or what the receiver must do.
 
 ## Done When
 The channel is sparse enough that a new message deserves attention and dense enough in information that reading it updates the recipient’s model of the work.

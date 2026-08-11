@@ -9,11 +9,17 @@ Debugging cost compounds when discoveries are not retained. The next incident st
 ## Repair Strategy
 Record the causal lesson rather than a diary of commands. Include the symptom, underlying fact, how to verify it, and the action or constraint it implies. Prefer executable preservation where a test or gate can carry the knowledge.
 
-## Wrong Fixes
-Do not dump raw session logs and call the lesson captured. Evidence without synthesis recreates the original investigation burden for the next reader.
+## Decision Branches
+If a future engineer with the same symptom would save search space, write the smallest durable artifact they will actually consult.
+If the fact is already in a test, runbook, or rule, point to it rather than creating a second copy.
+
+## Common Wrong Fixes
+- Dump raw session logs and call the lesson captured.
+- Put the finding only in chat or a personal note the project will not search.
+- Write a vague “be careful with retries” without the symptom, fact, and verification step.
 
 ## Verification
-A teammate who did not witness the discovery should be able to find the artifact from the affected concept and avoid the known dead end or verify the quirk directly.
+Invariant: a teammate who did not witness the discovery can find the artifact from the affected concept and avoid the known dead end or verify the quirk directly. Durable knowledge must increase.
 
 ## Done When
 The project’s durable knowledge has increased, so the same class of problem begins from today’s conclusion rather than yesterday’s ignorance.

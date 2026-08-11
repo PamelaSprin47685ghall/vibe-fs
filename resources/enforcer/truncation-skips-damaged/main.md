@@ -9,11 +9,17 @@ Later events are interpreted against state produced by earlier events. Skipping 
 ## Repair Strategy
 Use checksums/framing/versioning to distinguish a torn tail from committed records. Stop at the first interior inconsistency and surface repair/restore from authoritative backup rather than guessing past the gap.
 
-## Wrong Fixes
-Do not scan for the next plausible record boundary and continue. Syntactic resynchronization cannot recover the semantic state that missing committed history would have produced.
+## Decision Branches
+If a verified committed record follows the first damaged byte, fail closed.
+If only the uncommitted tail is torn under the storage contract, truncate precisely that suffix.
+
+## Common Wrong Fixes
+- Scan for the next plausible record boundary and continue.
+- Zero-fill the gap and treat later records as still well-founded.
+- Truncate from the damage through the end, discarding verified committed history after a recoverable tail issue.
 
 ## Verification
-Corrupt the tail and an interior record separately. Tail recovery may truncate only under the documented contract; interior corruption must deterministically fail closed.
+Invariant: every replayed record rests on a fully verified committed prefix. Corrupt the tail and an interior record separately: tail recovery may truncate only under the documented contract; interior corruption must deterministically fail closed.
 
 ## Done When
 Every replayed record rests on a fully verified committed prefix, and recovery never manufactures continuity across missing history.

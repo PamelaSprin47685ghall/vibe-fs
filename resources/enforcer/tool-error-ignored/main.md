@@ -9,11 +9,17 @@ A tool failure is not merely an inconvenience; it changes what is known. Ignorin
 ## Repair Strategy
 Classify the failure, inspect its cause, rerun only when retry semantics are sound, or use an independent source that proves the same property. Record non-blocking rationale when the failed operation was genuinely irrelevant.
 
-## Wrong Fixes
-Do not hide stderr, append `|| true`, or quote later success as proof that the earlier failed check did not matter unless that success actually covers the same property.
+## Decision Branches
+If later conclusions depend on the failed operation’s intended result, repair, retry under sound semantics, or replace it with equivalent evidence.
+If the failure is irrelevant and another source already proves the same property, record that classification and continue.
+
+## Common Wrong Fixes
+- Hide stderr, append `|| true`, or treat a later unrelated success as covering the failed check.
+- Retry blindly without understanding whether retry is safe or idempotent.
+- Quote a previous green run as if it replaced the failed current observation.
 
 ## Verification
-Every observed error should end in one of two states: resolved, or explicitly superseded by equivalent evidence with a stated reason.
+Invariant: every observed error ends resolved or explicitly superseded by equivalent evidence with a stated reason. No later conclusion may assume success of a tool that reported failure.
 
 ## Done When
 No conclusion depends on the imagined success of a tool that actually reported failure.

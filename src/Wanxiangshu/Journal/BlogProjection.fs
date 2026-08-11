@@ -36,7 +36,7 @@ type BlogCoverage =
     {
         /// RecordCoverage: how much of the XTrace the Companion has consumed.
         /// Durable across Host compaction/reanchor (COMPANION-008); only
-        /// BlogEntryCommitted advances it.
+        /// BlogObservationCommitted advances it.
         IngestedThroughSequence: int64
         /// PrefixCoverage: the complete-turn boundary the probe may replace up to.
         CoverableTurnCutoffExclusive: int
@@ -122,7 +122,7 @@ module BlogProjection =
         let m = frameCount state
         if m = 0 then 0 else (m + 1) / 2
 
-    /// PERSIST-010 `BlogEntryCommitted`. Frame append and coverage advance are one
+    /// PERSIST-010 `BlogObservationCommitted`. Frame append and coverage advance are one
     /// commit, so one function applies both or neither.
     ///
     /// `IngestedThroughSequence` advances in XTraceCursor coordinates; the turn/part
@@ -169,7 +169,7 @@ module BlogProjection =
                             else
                                 state.Coverage.CoverableFrameCount } }
 
-    /// PERSIST-010 `BlogSquashCommitted`. Replaces the oldest `count` frames with
+    /// PERSIST-010 `BlogObservationsSquashed`. Replaces the oldest `count` frames with
     /// one, advances the frame epoch, and leaves coverage untouched.
     ///
     /// `count = frameCount` is allowed: collapsing every frame into one is a

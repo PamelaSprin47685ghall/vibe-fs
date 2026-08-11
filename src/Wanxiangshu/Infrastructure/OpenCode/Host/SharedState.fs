@@ -53,7 +53,7 @@ module SharedState =
     /// Same cross-instance rule as SessionParents: the worktree plugin materializes
     /// the companion request (SetCurrentRequest) while the blogger session itself
     /// lives under RootWorkspace, so BlogTool runs on the root plugin instance.
-    /// Per-instance flights made HasFlight miss → AbortSession → no BlogEntryCommitted
+    /// Per-instance flights made HasFlight miss → AbortSession → no BlogObservationCommitted
     /// → Finality hung on journal-work-log (orchestrator-publish frontier).
     let BloggerFlightGate = obj ()
     let BloggerFlights = Dictionary<string, BloggerRequestContext>()

@@ -9,11 +9,17 @@ A test exists to make some implementations unacceptable. Weakening it solely bec
 ## Repair Strategy
 Recover the original requirement, isolate the failure mechanism, and repair production behavior. If the requirement truly changed, record that decision and rewrite the test to the new contract for that reason—not as a route to green.
 
-## Wrong Fixes
-Do not replace exact outcomes with broad truthiness, delete edge cases, or loosen fixtures without explaining the semantic requirement that disappeared.
+## Decision Branches
+If no independent contract change exists, restore the expectation and fix the implementation.
+If an authorized contract change exists, rewrite the test to the new promise for that reason, not to silence a failure.
+
+## Common Wrong Fixes
+- Replace exact outcomes with broad truthiness, delete edge cases, or loosen fixtures without a disappeared requirement.
+- Mark the test skipped or flaky instead of settling the disagreement.
+- Assert only that no exception was thrown when the original claim was a specific result.
 
 ## Verification
-Temporarily restore the old defective implementation. The preserved/newly justified test should distinguish it from the required behavior for a contract-level reason.
+Invariant: green means the implementation satisfies an independently chosen contract. Temporarily restore the old defective implementation; the preserved or newly justified test should distinguish it from the required behavior for a contract-level reason.
 
 ## Done When
 Green means the implementation satisfies an independently chosen contract, not that the contract was reduced until the implementation could satisfy it.

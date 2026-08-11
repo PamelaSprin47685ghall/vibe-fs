@@ -9,11 +9,19 @@ Deleting a credential from the latest file does not delete copies already create
 ## Repair Strategy
 Rotate first where continued exposure window matters, remove the value from current source, use environment/secret-store injection, and add an appropriate gate against recurrence without storing real credentials in tests.
 
-## Wrong Fixes
-Do not merely rename, encode, encrypt with a key stored beside it, or delete only the current line. Obfuscation changes appearance, not authority.
+## Decision Branches
+- If the value grants real authority, rotate/revoke immediately, then remove it from current source and history-facing artifacts.
+- If tests need credentials, use fakes or an injected secret boundary—never committed live material.
+- If the string is a documented public identifier or obvious placeholder, do not treat it as this defect.
+
+## Common Wrong Fixes
+- Merely rename, encode, or encrypt with a key stored beside the ciphertext.
+- Delete only the current line and skip rotation.
+- Move the secret to another committed file (docs, fixtures, scripts).
+- Add `.gitignore` after the value was already committed and assume history is clean.
 
 ## Verification
-The retired credential must no longer authenticate, current code must obtain the replacement through the intended secret boundary, and repository checks should contain no live sensitive material.
+The retired credential must no longer authenticate, current code must obtain the replacement through the intended secret boundary, and repository checks should contain no live sensitive material. The invariant is: possession of the source tree grants no secret authority.
 
 ## Done When
 Possession of the source tree grants no secret authority, and any previously exposed credential has been invalidated rather than merely hidden.

@@ -10,13 +10,20 @@ State change contains information: both that A existed and that the system moved
 Trigger when shared/exposed domain state is mutated field-by-field or overwritten in place and correctness depends on observers seeing a coherent transition.
 
 ## Do Not Trigger When
-Do not trigger for purely local mutation inside a function whose mutable cell cannot escape, carries no identity, and is only an efficient implementation of a pure result.
+- Do not trigger for purely local mutation inside a function whose mutable cell cannot escape, carries no identity, and is only an efficient implementation of a pure result.
+- Do not trigger for builder or accumulator objects that never escape the constructing function.
+- Do not trigger for hardware/FFI buffers whose API is inherently mutating when domain state still transitions as values at the wrapper boundary.
 
 ## Distinguish From
-mutable-public-state exposes mutation authority to callers. overwrite-history mutates durable past facts. This rule concerns destructive update of current shared state.
+mutable-public-state exposes mutation authority to callers. overwrite-history mutates durable past facts. This rule concerns destructive update of current shared state. Tie-break: if callers can mutate the object, use mutable-public-state; if a shared current value is overwritten in place, use this rule.
 
 ## Decision Procedure
 Ask whether any other component can observe, retain, race with, or reason about the old value. If yes, compute a new value or record an explicit transition instead of mutating shared identity.
+
+## Examples
+- positive: A shared domain record is updated field-by-field while other components hold the same reference.
+- near-miss: A local buffer is mutated inside a function and never escapes; the function returns a new value.
+- counterexample: Next state is computed as a new value or event; the authoritative reference swaps after the transition is complete.
 
 ## Nudge
 A transition is information. Preserve it by producing a new value or event; use mutation only as a local unobservable implementation detail.

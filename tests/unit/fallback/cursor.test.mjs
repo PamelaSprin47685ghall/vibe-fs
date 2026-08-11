@@ -388,7 +388,7 @@ test('FALLBACK_004_recording_success_clears_the_dedupe_window_too', () => {
 })
 
 test('ENFORCER_063_success_clears_failures_after_multiple_advances_without_touching_offset', () => {
-  // BlogEntryCommitted is BloggerMain business success: zero the budget, park the
+  // BlogObservationCommitted is BloggerMain business success: zero the budget, park the
   // offset. Multi-failure path proves the clear is not a one-shot edge case.
   let current = fallbackProjection.forAuthority(RUN, ROOT)
   for (let attempt = 1; attempt <= 3; attempt += 1) {

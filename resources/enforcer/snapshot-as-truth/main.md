@@ -9,11 +9,19 @@ Snapshots deliberately discard information to make recovery fast. Treating them 
 ## Repair Strategy
 Record enough identity—event count, version, digest, source position—to prove which fact prefix the snapshot represents. On mismatch, reject the snapshot and replay from a trusted point.
 
-## Wrong Fixes
-Do not compare only file timestamps or sizes and assume alignment. Incidental metadata is not proof that two semantic histories correspond.
+## Decision Branches
+- If a stronger fact history exists, treat the snapshot as rebuildable and reject it on provenance mismatch.
+- If the snapshot is the contracted system of record, stop calling it a snapshot and stop expecting a hidden stronger log.
+- If both snapshot and log are writable, that is duplicated-truth—collapse write authority first.
+
+## Common Wrong Fixes
+- Compare only file timestamps or sizes and assume alignment.
+- Keep the snapshot on mismatch “because it is newer.”
+- Rebuild from the snapshot into the log, reversing provenance.
+- Add a second snapshot for redundancy without a source digest.
 
 ## Verification
-Corrupt, stale, or swap a snapshot while preserving the fact source. Recovery must detect the mismatch and converge to the state obtained by replaying authoritative facts.
+Corrupt, stale, or swap a snapshot while preserving the fact source. Recovery must detect the mismatch and converge to the state obtained by replaying authoritative facts. The invariant is: deleting snapshots may cost time, never semantic information.
 
 ## Done When
 Snapshots can accelerate reconstruction but cannot change truth: deleting every snapshot may cost time, never semantic information.

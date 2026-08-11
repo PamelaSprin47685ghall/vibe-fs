@@ -5393,3 +5393,16 @@ crash recovery 只从 EventStore facts/payloads 重建。
 5. **§107 满足性（用户裁决后）**：Authority / Generator / SDK / File API / Primitive Semantics / Return / Transaction（含 EventStore durable + crash recovery）/ Security / Migration / Parallel（Host 串行合同）/ Proof 全勾选；Builtin Coexistence + Hook 按「共存 + 钩子函数交付、不接入运行时」满足；Student 项按 Amendment JS-G3 排除。
 
 **Gate 移交**：G5 Exit 达成 → 按 Playbook §0.1/§14，下一步 G6（perm-inspector + Universal Casebook completion）。
+
+## Amendment (2026-08-11 strict audit)
+
+**Scope correction — G5 Exit is DONE-with-amendment per `changes/proposed/entry.md` §0.1 (living-status authority).** The frozen body and `Final outcome` above are retained verbatim; this section is the only honesty amendment and does not rewrite history.
+
+**Amendment C-3 (2026-08-10 用户裁决) is the authoritative scope change:**
+- builtin `read` / `edit` / `write` / `glob` / `grep` / `patch` retained (original schema / original Host implementation);
+- no alias takeover (builtins are not aliases of `js-ROLE`);
+- coexistence + hook not wired to runtime accepted (`BuiltinToolDescriptionHook` delivered as pure functions; `tool.definition` not mounted because it lacks agent/session context).
+
+Playbook G5 Exit clause `legacy implementation absent` is superseded by C-3. `entry.md` §0.1 marks this Gate **DONE-with-amendment**.
+
+If C-3 were not authoritative, G5 would be unmet (legacy builtins still present). Frozen Final outcome retained.

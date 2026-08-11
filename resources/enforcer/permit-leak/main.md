@@ -9,11 +9,17 @@ A leaked permit is capacity that disappears without evidence. Enough leaks conve
 ## Repair Strategy
 Use `using`/`defer`/`finally`/bracket or a language-specific scoped primitive. Keep the acquired token inside that lexical lifetime and avoid transferring it unless transfer is explicit in the type/protocol.
 
-## Wrong Fixes
-Do not add releases to known catch branches one by one. The next exit path recreates the leak. Structure should guarantee the accounting identity globally.
+## Decision Branches
+- If release depends on reaching a later statement, wrap acquire in a scoped/bracketed construct that runs on every exit.
+- If transfer is required, make the transfer linear/explicit so exactly one owner remains obligated to release.
+
+## Common Wrong Fixes
+- Add releases to known catch branches one by one; the next exit path recreates the leak.
+- Release in a timeout callback while also releasing on success, causing double-release.
+- Document "always release in finally" without making finally structural.
 
 ## Verification
-Force exception, cancellation, timeout, and early-return paths; capacity after each must equal capacity before acquisition.
+Force exception, cancellation, timeout, and early-return paths; capacity after each must equal capacity before acquisition. The invariant is acquire/release conservation: exactly one release per acquisition.
 
 ## Done When
 Every acquisition has one structurally guaranteed release and permit accounting no longer depends on manually auditing every control-flow path.

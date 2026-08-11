@@ -9,11 +9,17 @@ Persisted data outlives the code that wrote it. Without a version, future reader
 ## Repair Strategy
 Version at the semantic boundary, not merely by deployment number. Keep migrations pure and test them with historical fixtures; reject unknown future versions rather than best-effort parsing them into current meaning.
 
-## Wrong Fixes
-Do not detect versions from field presence or filenames if an explicit marker can be stored. Shape is evidence only until two historical schemas share it.
+## Decision Branches
+If bytes may be read by a newer or older deployment, add explicit schema identity and compatibility rules.
+If the value never leaves one process/deployment, do not invent a versioned store for it.
+
+## Common Wrong Fixes
+- Detect versions from field presence or filenames if an explicit marker can be stored.
+- Stamp a deployment number that changes without semantic change, or stays put across semantic change.
+- Best-effort parse unknown versions into today’s types.
 
 ## Verification
-Every supported historical fixture should deterministically migrate or read, and unknown versions should fail with a typed compatibility outcome.
+Invariant: interpretation begins only after schema identity is known. Every supported historical fixture should deterministically migrate or read, and unknown versions should fail with a typed compatibility outcome.
 
 ## Done When
 Any durable value carries enough evidence for future code to know which schema semantics produced it before interpretation begins.

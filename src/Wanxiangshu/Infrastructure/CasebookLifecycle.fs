@@ -41,8 +41,11 @@ module CasebookLifecycle =
         CasebookDraftStore.clear inspectorSessionId
         collector.Drain inspectorSessionId |> ignore
 
-    /// Graceful owner scope close: if draft has Q+A, drain+finalizeCase once; then clear.
-    /// Best-effort Result — missing draft/A is Ok no-op; store failures surface as Error.
+    /// Graceful owner scope close: if draft has Q+A, drain observations, run
+    /// exactly one CaseFinalize provider transaction (`QaSynthesize`), then
+    /// finalizeCase once. Unexpected cleanup never synthesizes.
+    /// Best-effort Result — missing draft/A is Ok no-op; store/synthesizer
+    /// failures surface as Error.
     let tryFinalizeInspector (workspaceRoot: string) (inspectorSessionId: string) : Result<unit, string> =
         if not (CasebookFeature.isEnabled workspaceRoot) then
             cleanupInspector inspectorSessionId
@@ -63,19 +66,22 @@ module CasebookLifecycle =
                         let raw, store = WorkspaceEventStore.acquire commonDir
                         let observations = collector.Drain inspectorSessionId
 
-                        let case: Case =
-                            { SessionId = inspectorSessionId
-                              Q = draft.Q
-                              A = a
-                              Observations = observations
-                              LastAccessOrder = 0L }
-
-                        match CasebookWorkflow.finalizeCase store raw case with
-                        | Ok() ->
-                            CasebookIndex.invalidate ()
-                            CasebookIndex.refresh store raw 256 |> ignore
-                            Ok()
+                        match CasebookBookkeeper.synthesize draft.Q a observations with
                         | Error err -> Error err
+                        | Ok(q', a') ->
+                            let case: Case =
+                                { SessionId = inspectorSessionId
+                                  Q = q'
+                                  A = a'
+                                  Observations = observations
+                                  LastAccessOrder = 0L }
+
+                            match CasebookWorkflow.finalizeCase store raw case with
+                            | Ok() ->
+                                CasebookIndex.invalidate ()
+                                CasebookIndex.refresh store raw 256 |> ignore
+                                Ok()
+                            | Error err -> Error err
                     with ex ->
                         collector.Drain inspectorSessionId |> ignore
                         Error ex.Message

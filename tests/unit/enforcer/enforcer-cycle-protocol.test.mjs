@@ -926,7 +926,7 @@ test('ENFORCER_host_completed_blog_without_live_request_is_noop_not_commit', asy
     assertNonEmptyMessages(out, 'unowned completed blog stop payload')
     assert.match(String(stopReasonOf(out)), /unowned-completed-blog/)
     const session = fold.session(AgentJournalModule_snapshot(journal), MAIN)
-    assert.equal(session?.Blog, undefined, 'unowned completed blog must not invent BlogEntryCommitted')
+    assert.equal(session?.Blog, undefined, 'unowned completed blog must not invent BlogObservationCommitted')
     assert.equal(hasFlight(scope), false)
   })
 })

@@ -10,13 +10,21 @@ A completion claim is unverified when work is declared done before the relevant 
 Trigger when implementation is reported complete without running the tests, checks, build, reproduction, or observable verification appropriate to the changed contract.
 
 ## Do Not Trigger When
-Do not trigger for planning-only work with no behavioral artifact, or when applicable verification has run and its actual results are part of the completion evidence.
+- Planning-only work with no behavioral artifact to verify.
+- Applicable verification has run and its actual results are part of the completion evidence.
+- Remaining verification is listed explicitly and the work is not claimed complete.
+- The changed surface has no executable check yet, and that gap is reported as incomplete rather than done.
 
 ## Distinguish From
-false-gate produces unreliable verification. tool-error-ignored discards known failed evidence. release-ladder-skipped omits ordered proof stages. This rule concerns making the final claim before sufficient evidence exists at all.
+`false-gate` produces unreliable verification. `tool-error-ignored` discards known failed evidence. `release-ladder-skipped` omits ordered proof stages. Tie-break: if the final claim is made before sufficient evidence exists at all, use this rule; if a red tool result was seen and skipped, use `tool-error-ignored`.
 
 ## Decision Procedure
 Translate “done” into falsifiable acceptance statements, run the narrowest checks that can disprove each one, and report the observed result rather than the intended result.
+
+## Examples
+- positive: a patch is declared complete after editing files, with tests never run.
+- near-miss: the relevant tests and build ran, failures are listed, and the claim is “not done.”
+- counterexample: tests ran red and were ignored while still claiming success — that is `tool-error-ignored`.
 
 ## Nudge
 Completion is a conclusion, not a feeling about the diff. Earn the word “done” with evidence that could have said “not done.”

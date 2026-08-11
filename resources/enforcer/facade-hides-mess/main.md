@@ -9,11 +9,19 @@ A facade can reduce caller knowledge only when the hidden system has a coherent 
 ## Repair Strategy
 Map the actual owners and dependency edges beneath the wrapper. Eliminate duplicate authority and illicit cross-boundary knowledge, then decide whether one stable public entry point naturally follows from the repaired structure.
 
-## Wrong Fixes
-Do not add more wrapper methods, adapters, or “service” layers to make the surface look uniform. Uniform forwarding is not a model.
+## Decision Branches
+- If the wrapper forwards into unchanged violations, strip it as the “fix” and repair the graph beneath.
+- If internals become coherent, a narrow facade may remain as the real boundary.
+- If the pain is extra forwarding with no mess beneath, use `translator-layer-bloat`.
+
+## Common Wrong Fixes
+- Do not add more wrapper methods, adapters, or “service” layers to make the surface look uniform.
+- Do not keep the facade and “clean internals later.”
+- Do not rename the tangled module and call the rename a boundary.
+- Do not hide cycles or dual ownership behind DI registration in the facade.
 
 ## Verification
-Internal components should have clear owners and acyclic, intentional dependencies even if the facade is temporarily removed from the diagram.
+Internal components should have clear owners and acyclic, intentional dependencies even if the facade is temporarily removed from the diagram. The invariant is that a retained facade hides coherent implementation detail, not architectural contradiction.
 
 ## Done When
 The facade, if retained, hides coherent implementation detail rather than architectural debt, and deleting it would reveal complexity—not contradiction.

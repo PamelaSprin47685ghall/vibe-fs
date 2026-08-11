@@ -9,11 +9,17 @@ Handwritten rule chains duplicate not just syntax but policy about how failures 
 ## Repair Strategy
 Keep each rule small and named, make the combinator generic only over the stable input/output shape, and write law-like tests for ordering and error behavior.
 
-## Wrong Fixes
-Do not create a large rules engine, DSL, or framework merely to avoid a few function calls. The useful abstraction is the minimal composition law already present in the code.
+## Decision Branches
+- If several callers reimplement the same short-circuit or accumulation law, name that law once and replace the copies.
+- If signatures look alike but composition meanings differ, keep separate combinators or do not unify.
+
+## Common Wrong Fixes
+- Create a large rules engine, DSL, or framework merely to avoid a few function calls.
+- Invent a combinator whose law does not match how failures actually compose.
+- Genericize over unstable shapes so every new rule needs escape hatches.
 
 ## Verification
-Equivalent rule sets should produce the same outcomes regardless of call site, and dependent versus independent rules should compose according to their explicitly chosen law.
+Equivalent rule sets should produce the same outcomes regardless of call site, and dependent versus independent rules should compose according to their explicitly chosen law. The invariant is that composition semantics live in one vocabulary.
 
 ## Done When
 Business policy reads as a composition of named rules, while the mechanics of sequencing and error collection exist in one small reusable vocabulary.

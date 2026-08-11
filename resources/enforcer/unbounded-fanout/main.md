@@ -9,11 +9,17 @@ Parallel work competes for finite resources. If every input can become active im
 ## Repair Strategy
 Choose the resource being protected, set the active bound from its capacity/SLO, preserve deterministic result association, and stop or drain queued work according to explicit cancellation/failure policy.
 
-## Wrong Fixes
-Do not choose an enormous constant merely to silence the rule. The number should correspond to a finite resource or known safe service envelope.
+## Decision Branches
+If active work scales with input size, add a finite bound and a cancellation/drain policy.
+If a bound already exists and cancellation is defined, keep it and do not spawn extra unbounded children beside it.
+
+## Common Wrong Fixes
+- Choose an enormous constant merely to silence the rule.
+- Bound only in tests while production still fans out 1:1.
+- Fire tasks without joining or cancelling, so the “bound” is only on the spawning loop.
 
 ## Verification
-Exercise inputs much larger than the concurrency bound. Active work must remain capped, queued work must not leak after cancellation, and logical results must not depend on completion order.
+Invariant: active work remains capped independent of input cardinality. Exercise inputs much larger than the bound; queued work must not leak after cancellation, and logical results must not depend on completion order.
 
 ## Done When
 The system can accept arbitrarily larger workloads without translating their cardinality directly into arbitrarily larger simultaneous resource demand.

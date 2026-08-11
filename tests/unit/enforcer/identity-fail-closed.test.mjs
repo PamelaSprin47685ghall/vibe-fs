@@ -10,7 +10,7 @@
 //     COMMITS a single cycle (NOT fail-closed); the "enforcer-protocol-violation"
 //     Diagnostic.emit is silent by design (HOST-007: emit never prints), so this
 //     suite asserts the observable contract — no enforcer-cycle-failed fatal AND the
-//     coverage advances to a committed BlogEntryCommitted. The emit's own validity is
+//     coverage advances to a committed BlogObservationCommitted. The emit's own validity is
 //     locked separately in tests/unit/context/ctx014.test.mjs
 //     (CTX_014_enforcer_protocol_violation_fields_are_whitelisted), which guarantees
 //     the multi-call emit does not throw.
@@ -77,7 +77,7 @@ const seedBloggerAuthority = (journal) => {
  * Drive the real handleContinuation with a crafted provider step, then hand the
  * harness the captured fatals + a commit-mode runner. `messageId` is overridable so
  * the empty-id fail-closed path is reachable. Commit mode swaps ParkTransform for an
- * immediate settle so a valid multi-call actually finalises its BlogEntryCommitted.
+ * immediate settle so a valid multi-call actually finalises its BlogObservationCommitted.
  */
 const withHarness = async (fn, { messageId = 'asst-identity' } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'enforcer-identity-'))
@@ -220,7 +220,7 @@ test('ENFORCER_043_no_provable_provider_run_fails_closed', async () => {
 
 test('ENFORCER_042_multi_call_commits_single_cycle_with_protocol_violation', async () => {
   // Distinct callIDs, valid tips/text: multi-call is a protocol violation but must
-  // NOT fail closed. It still merges defensively (single canonical BlogEntryCommitted)
+  // NOT fail closed. It still merges defensively (single canonical BlogObservationCommitted)
   // and emits the silent "enforcer-protocol-violation" diagnostic (HOST-007).
   // The observable contract asserted here: no enforcer-cycle-failed fatal, and the
   // coverage advances (commit happened). The diagnostic's own field validity is locked
@@ -234,6 +234,6 @@ test('ENFORCER_042_multi_call_commits_single_cycle_with_protocol_violation', asy
     // Single cycle still commits: coverage advances 0 → 1 and one enforcement receipt.
     assert.equal(Number(mainSessionCoverage().IngestedThroughSequence), 1)
     assert.equal(Number(mainSessionCoverage().CoverableTurnCutoffExclusive), 1)
-    assert.equal(enforcementReceiptCount(), 1, 'one BlogEntryCommitted receipt by ProviderRun')
+    assert.equal(enforcementReceiptCount(), 1, 'one BlogObservationCommitted receipt by ProviderRun')
   })
 })

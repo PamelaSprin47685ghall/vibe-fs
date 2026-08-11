@@ -5107,3 +5107,27 @@ Evidence:
 5. **产品边界诚实**：Dedicated Inspector = baseline；Casebook = opt-in cold cache；observation replay ≠ correctness proof；LLM Bookkeeper synthesis 明确 Remaining，不假装 CaseFinalize 已做语义编译。
 
 **Gate 移交**：Universal + perm-inspector → `changes/completed/`。Playbook 后续 G7 Rulebook / G8 Strength 等按 entry 继续；**勿**在未交付 LLM Bookkeeper 前声称 multi-turn semantic CaseFinalize 已完成。
+
+## Amendment (2026-08-11 strict audit)
+
+**Status correction — Gate reclassified to PARTIAL per `changes/proposed/entry.md` §0.1 (living-status authority).** The frozen body and `Final outcome` above are retained verbatim; this section is the only honesty amendment and does not rewrite history.
+
+Deferred — G6-E/F/G (not DONE, mechanical only):
+- **LLM Bookkeeper** (InternalLeaf + Attached, `edit-qa` synthesis) deferred — current is mechanical `CasebookBookkeeper.refreshStale` only (same Q/A + replayed observations, no LLM synthesis).
+- **edit-qa synthesis** deferred — no Bookkeeper Agent provider session that revises Q/A.
+- **Single provider transaction synthesis (CaseFinalize)** deferred — ReuseScope-close multi-turn Q/A → one canonical Q/A via exactly-one Bookkeeper provider transaction not evidenced; current finalize is draft Q/A direct `Captured`.
+- **Evidence stability verify after synthesis** deferred (freeze → Bookkeeper → replay/verify → publish not exercised with LLM candidate).
+- **Real Host Meditator→reusable Inspector→scope-close→CaseFinalize→cold fetch e2e** deferred — only helper/unit evidenced (`tests/unit/casebook/universal-loop.test.mjs`, `tests/unit/casebook/*` 36 PASS); no full Host e2e with LLM Bookkeeper.
+
+Mechanical surface remains as described in the frozen body; full semantic Casebook remains PARTIAL. `entry.md` §0.1 is authoritative.
+
+## Amendment (2026-08-11 implementation closeout)
+
+Supersedes the honesty-only amendment above for living status. Frozen body retained.
+
+**G2:** Q1/Q2/Q3 same Inspector SessionId + serial reuse + owner cancel evidenced in `tests/unit/session/sync-delegate-runtime.test.mjs`.
+
+**G6:** `CasebookBookkeeper` now runs a `QaSynthesize` transaction (edit-qa + evidence-stability verify → `InspectorCaseRefreshed`). `CasebookLifecycle.tryFinalizeInspector` performs exactly one CaseFinalize synthesis then `finalizeCase`. Host-path reuse Q1–Q3 → scope-close → fetch: `tests/unit/casebook/g6-host-reuse-finalize.test.mjs`. Remaining amendment: synthesizer is deterministic evidence-digest, not a live LLM InternalLeaf Bookkeeper session.
+
+**G7 (this file if rulebook):** `enforcer-rulebook-gate --require-headings --strict` 120/120 GREEN and wired in `scripts/check.mjs`. Physical EventStore vocabulary is `BlogObservationCommitted` / `BlogObservationsSquashed`; codec dual-decodes legacy tags.
+

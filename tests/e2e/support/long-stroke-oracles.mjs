@@ -399,7 +399,7 @@ export const PLANNED_WAIT_FACTS = Object.freeze({
   finalityRejected: waitFactShape('FinalityRejected', { gte: 1 }),
   finalityBlessed: waitFactShape('FinalityBlessed', {
     gte: 1,
-    renewOn: ['ReviewVerdictRecorded', 'ConfirmedReviewWitness', 'FinalityReviewerEnlisted', 'BlogEntryCommitted'],
+    renewOn: ['ReviewVerdictRecorded', 'ConfirmedReviewWitness', 'FinalityReviewerEnlisted', 'BlogObservationCommitted'],
   }),
   conflictDetected: waitFactShape('ConflictDetected', { gte: 1 }),
   // Orchestrator-tagged Published (bare "Published" false-matches assignment text).

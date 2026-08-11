@@ -9,11 +9,17 @@ Repeated parsing means repeated uncertainty. Each downstream layer knows less ab
 ## Repair Strategy
 Decode schema/version, validate required relations, normalize units/names, and construct domain values at the adapter. Keep raw protocol forms private unless a lower layer is explicitly the protocol owner.
 
-## Wrong Fixes
-Do not scatter helper predicates such as `hasField` or `isValidShape` across consumers. That distributes one parsing contract into many partial opinions.
+## Decision Branches
+If raw or loosely typed payload is visible past ingress, parse and construct the strong type at the adapter.
+If a layer is the protocol owner (signatures, framing), keep raw bytes there and still emit the domain type before other code runs.
+
+## Common Wrong Fixes
+- Scatter helper predicates such as `hasField` or `isValidShape` across consumers.
+- Validate in the controller and still pass the original map inward.
+- Treat a TypeScript interface on `any` JSON as parsing.
 
 ## Verification
-Malformed and unsupported payloads should fail at ingress with typed outcomes; valid payloads should require no repeated shape checks once inside.
+Invariant: the system crosses from weak external representation to strong internal meaning at one identifiable boundary. Malformed and unsupported payloads should fail at ingress with typed outcomes; valid payloads should require no repeated shape checks once inside.
 
 ## Done When
 The system crosses from weak external representation to strong internal meaning at one identifiable boundary and never has to rediscover that meaning downstream.

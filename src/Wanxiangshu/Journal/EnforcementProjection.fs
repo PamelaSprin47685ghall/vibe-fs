@@ -3,7 +3,7 @@ namespace Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
-/// ENFORCER-045/154: one committed enforcement cycle, derived from BlogEntryCommitted.
+/// ENFORCER-045/154: one committed enforcement cycle, derived from BlogObservationCommitted.
 /// Tip v2: TipRuleId replaces CycleScoreRef (ENFORCER-072).
 type EnforcementCycleRecord =
     { MainSessionId: SessionId
@@ -25,7 +25,7 @@ type RecentTip =
       CycleId: string }
 
 /// ENFORCER-150 + PERSIST-008: O(1) index by ProviderRun + bounded RecentTips.
-/// No separate fact — fold derives this from BlogEntryCommitted.
+/// No separate fact — fold derives this from BlogObservationCommitted.
 type EnforcementProjectionState =
     { ByProviderRun: Map<ProviderRunIdentity, EnforcementCycleRecord>
       RecentTips: RecentTip list }
@@ -44,7 +44,7 @@ module EnforcementProjection =
 
         if n <= limit then tips else tips |> List.skip (n - limit)
 
-    /// Apply the enforcement half of BlogEntryCommitted.
+    /// Apply the enforcement half of BlogObservationCommitted.
     /// Duplicate ProviderRun → Error (ENFORCER-154). Caller may absorb as idempotent.
     /// Appends RecentTips and keeps last RecentTipLimit (ENFORCER-070).
     let applyFromEntry
@@ -55,7 +55,7 @@ module EnforcementProjection =
         | Some _ ->
             Error(
                 sprintf
-                    "BlogEntryCommitted enforcement half already recorded for provider run %s (ENFORCER-154)"
+                    "BlogObservationCommitted enforcement half already recorded for provider run %s (ENFORCER-154)"
                     (ProviderRunIdentity.value record.ProviderRun)
             )
         | None ->
@@ -73,14 +73,14 @@ module EnforcementProjection =
                 { ByProviderRun = Map.add record.ProviderRun record state.ByProviderRun
                   RecentTips = keepLast RecentTipLimit (state.RecentTips @ [ tip ]) }
 
-    /// Observation squash half of `BlogSquashCommitted`.
+    /// Observation squash half of `BlogObservationsSquashed`.
     ///
-    /// Co-truncate RecentTips when BlogSquashCommitted collapses the oldest `count`
+    /// Co-truncate RecentTips when BlogObservationsSquashed collapses the oldest `count`
     /// frames. Together with BlogProjection.applySquash this is the Journal substrate
     /// for rulebook `BlogObservationsSquashed`: work-log frames and tips move as one
     /// Observation history (see `ObservationProjection.observationsOf`).
     ///
-    /// Assumption (1:1): each BlogEntryCommitted appends one Entry frame and one tip.
+    /// Assumption (1:1): each BlogObservationCommitted appends one Entry frame and one tip.
     /// Squash frames do not add tips. On squash of the oldest `count` frames, drop the
     /// oldest `min(count, tips.Length)` tips so tip history collapses with the covered
     /// frame range (ENFORCER observation co-move; imperfect if a prior squash frame is
