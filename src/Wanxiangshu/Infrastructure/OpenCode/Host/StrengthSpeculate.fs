@@ -20,10 +20,7 @@ open Wanxiangshu.Session
 [<RequireQualifiedAccess>]
 module StrengthSpeculate =
 
-    let private zeroEstimate : StrengthValueEstimate =
-        { V0 = 0.0
-          V1 = 0.0
-          V2 = 0.0 }
+    let private zeroEstimate: StrengthValueEstimate = { V0 = 0.0; V1 = 0.0; V2 = 0.0 }
 
     let private decisionId
         (policyVersion: string)
@@ -52,10 +49,7 @@ module StrengthSpeculate =
         | Some fast, Some deep -> Some(fastName, fast.Model, deep.Model)
         | _ -> None
 
-    let private rootWork
-        (sessionId: SessionId)
-        (associations: Map<SessionId, SessionAssociation>)
-        =
+    let private rootWork (sessionId: SessionId) (associations: Map<SessionId, SessionAssociation>) =
         match SessionOwnershipClassification.tryClassify sessionId associations with
         | Some(SessionExecutionClass.Work, Some SessionOwnership.Root) -> true
         | _ -> false
@@ -69,6 +63,7 @@ module StrengthSpeculate =
         : Result<unit, string> =
         let rawMessages = Projection.messagesFromTransformOutput output
         let wire = Projection.decodeMessageView rawMessages
+
         let snapshot =
             { CurrentProjection = ProviderProjection.toSemantic wire
               CommittedPrefix = None
