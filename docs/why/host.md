@@ -70,17 +70,16 @@ Transform input 为空对象是 Host 能力现实；绑定必须用「已创建�
 - **选择方案**：process-local `SessionQuiescenceGate`，状态转换 `BeginProviderAttempt / ObserveIdle / TryConsume / RevokeCurrentAttempt / DropSession`。permit 从 idle 观察随 reconcile 携带到发送边界，物理发送前再次 `TryConsume`（与 dispatcher send 之间零 await）。typed `AttemptAborted` 立即 `RevokeCurrentAttempt` 并以 `AbortWake` 进入 Reconciler；该 wake 永远无 repair/idle rights。业务决策 × 物理发送资格 = 允许的副作用；stale 或 revoked permit → `Superseded`（不写 claim、不发消息）。不写 Journal、不参与 crash recovery、重启清空（安全侧失败）。
 
 ### 15. HOST-008 所有权：ExecutionClass × Ownership vs SatelliteKind 单轴
-- **被拒方案**：继续以 `SatelliteKind = { Companion, Teacher }` 为唯一所有权模型，并把 SyncInspector /
-  SyncCoder / Bookkeeper 硬塞进 SatelliteKind。Dedicated Sync* 是长期 hot-knowledge Work Session，需要
-  Companion/context 能力；塞进 Teacher-style leaf/no-Companion 拓扑会在长上下文下撞容量，也与
-  Bookkeeper ephemeral leaf 混为一谈。
-- **被拒方案**：为 SyncDelegate 复制一套独立 parent/child map，或宣称 Teacher Satellite 已删除后只留新模型。
-  G2 只落地所有权正交化与 SyncDelegate 基础；Student/Teacher 删除属后续 gate。
+- **被拒方案**：继续以历史 `SatelliteKind = { Companion, Teacher }` 解释所有内部 Session，或把 SyncInspector /
+  SyncCoder / Bookkeeper / StrengthReplica 全塞进 SatelliteKind。Dedicated Sync* 是长期 hot-knowledge Work Session，
+  需要 Companion/context 能力；Bookkeeper/StrengthReplica 则是短生命周期 leaf，两者不共享执行能力边界。
+- **被拒方案**：为 SyncDelegate 或 Strength 复制独立 parent/child map、恢复、取消、retire 框架。所有权事实若有
+  多个 owner，崩溃恢复与级联取消必然分叉。
 - **选择方案**：分离 `SessionExecutionClass`（Work | InternalLeaf）与 `SessionOwnership`
   （Root | Attached of AttachmentKind）。Dedicated SyncInspector/SyncCoder = Work+Attached（MAY Companion）；
-  Companion/Bookkeeper = InternalLeaf+Attached。复用 Teacher 的 Returned→Completion 调用代数，不复用其
-  leaf/no-Companion Session 分类。G2 过渡期 Teacher 仍可作为 transitional InternalLeaf 存在（非长期
-  AttachmentKind）。HOST-015 物理扁平与恢复 fail-closed 不变：逻辑可嵌套 Attached，物理一律挂 family root。
+  Companion/Bookkeeper/StrengthReplica = InternalLeaf+Attached。SyncDelegate 的 Returned→Completion 只是调用代数，
+  不定义 Session 分类。G3 已 clean-break 删除 Student/Teacher；HOST-014/ARCH-013 保留空号作为 absence ratchet。
+  HOST-015 物理扁平与恢复 fail-closed 不变：逻辑可嵌套 Attached，物理一律挂 family root。
 
 ### 16. Magic Todo membrane：三钩子 overlay vs 改 Host core / 同名覆盖
 - **被拒方案**：修改 OpenCode 源码，或 plugin `tool` 同名覆盖 builtin `todowrite`。前者违反 compatibility 策略；后者丢掉 Host store / UI 事件契约，并把 canonical 与 sink 再次揉成一体。

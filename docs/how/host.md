@@ -104,15 +104,15 @@ query family root children（owner ≠ root 时并查 owner children，兼容扁
 登记顺序：先写入 `SessionAssociation`（`ExecutionClass` + `Ownership`），再发送首个 prompt。
 
 ```text
-Companion / Bookkeeper
+Companion / Bookkeeper / StrengthReplica
   → InternalLeaf + Attached；Transform 见 InternalLeaf 则跳过 Companion 创建
 
 SyncInspector / SyncCoder
   → Work + Attached；MAY 再创建自己的 Companion（Work 能力路径）
-  → 复用 Teacher CE 代数（Returned → Completion），不登记为 InternalLeaf
+  → 调用协议为 Returned → Completion，不登记为 InternalLeaf
 
-G2 过渡 Teacher
-  → 仍可作为 transitional InternalLeaf 创建/恢复（legacy 关联，非长期 AttachmentKind）；不得当作已删除
+Student / Teacher
+  → G3 clean-break absent；不得创建、恢复、兼容映射或复活 legacy Satellite kind
 ```
 
 `AttachedSessionRuntime` 是 Attached 的唯一创建、恢复、级联 abort/retire owner；owner 删除/取消时
@@ -226,7 +226,7 @@ in-flight `msg` 已落盘但不在输入里；绑定时经 SDK 读会话（会�
 
 ---
 
-## Student / Teacher source canary（OpenCode v1.18.14）
+## Host source canary（OpenCode v1.18.14）
 
 生产依赖 `opencode-ai=1.18.14`，证据读取 `../opencode` 的同名 tag：
 
@@ -236,12 +236,13 @@ in-flight `msg` 已落盘但不在输入里；绑定时经 SDK 读会话（会�
 - `session/processor.ts`：普通 tool result 后返回 `continue`；`session/prompt.ts:runLoop` 在后续无 tool-call
   的 Assistant finish 才退出。
 - `client.session.abort` 只停止当前 processing；Session 记录保留，可接受下一次 `prompt_async`。
-- `client.session.children` 返回 `id/parentID/agent/title`，可证明 Teacher 复用、永久丢失或歧义。
+- `client.session.children` 返回 `id/parentID/agent/title`，供 Attached Session 恢复验证 identity；冲突或歧义 fail closed。
 
-这些锚点必须有安装版本 gate 与真实 Host e2e；仅源码存在不替代 provider-visible schema、return 路由和
-同 Session 三轮复用 canary。
-任一条不满足（经 SDK 读到 0 或 ≥2 未完成 assistant；或突变窗口读到旧快照）→ 不写 seal，
-Review 只见 PendingIdentity/Rejected（REVIEW-010）。开裂侧安全：宁缺 seal 不赌同一身。
+这些锚点必须有安装版本 gate 与真实 Host e2e；仅源码存在不替代 provider-visible schema、request profile、
+Attached recovery 与 transform/run binding canary。Student/Teacher 不再是 canary 对象；其不存在由 HOST-014 /
+ARCH-013 absence ratchet 单独证明。
+任一 transform/run binding 条件不满足（经 SDK 读到 0 或 ≥2 未完成 assistant；或突变窗口读到旧快照）→
+不写 seal，Review 只见 PendingIdentity/Rejected（REVIEW-010）。开裂侧安全：宁缺 seal 不赌同一身。
 
 ---
 

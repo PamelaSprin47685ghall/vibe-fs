@@ -53,11 +53,9 @@ Work↔Companion 深度逻辑 1（InternalLeaf）；Dedicated SyncInspector/Sync
 | InternalLeaf | Companion / Bookkeeper / StrengthReplica = InternalLeaf+Attached；不持有 Companion、不递归挂叶 | HOST-008、STRENGTH-004/014 |
 | StrengthReplica 分类 | owner 最多一个 active StrengthReplica；非 SatelliteKind；retire 后不跨 decision 复用 | HOST-008、STRENGTH-004/014 |
 | Host children 恢复 | journal id 匹配复用、id 丢失 Replacement、无关联新建不收养、冲突/查询失败 fail closed；物理 parent 恒为 family root | HOST-008、HOST-015 |
-| G2 Teacher 过渡 | Teacher 仍可作为 transitional InternalLeaf 存在（非长期 AttachmentKind）；Student/Teacher canary 与 HOST-014 继续有效；不得证明“已删除” | HOST-008、HOST-014 |
-| Teacher 三轮调用 | 同一 Teacher SessionId；普通正文不完成父工具 | HOST-014、AGENT-020 |
-| Teacher return | 文本只成为父 `teacher` 结果；固定 terminal 正常完成，无 abort/interrupted，Session 可继续 | HOST-014 |
-| Student final return | QA 删除先于最终 Assistant completion；message 成为最终回复 | HOST-014、EXEC-027 |
-| 非 Student 回归 | provider schema、hooks、Companion 行为字节/语义不变 | HOST-014 |
+| G3 absence | `scripts/checks/student-teacher-absence.mjs` 与 capability/store ratchet 证明生产 Role、Agent、request kind、tool、QA storage、Satellite kind 均无 Student/Teacher 复活 | HOST-014、AGENT-020、PROMPT-012 |
+| SyncDelegate 非兼容壳 | Inspector/Coder 使用 Work+Attached 与 Returned→Completion；不存在 Student/Teacher fallthrough、alias 或 legacy recovery | HOST-008、EXEC-026/028、HOST-014 |
+| Strength leaf 隔离 | StrengthReplica 只走 InternalLeaf+Attached，Session deletion / attempt abort 级联取消；不借 Student/Teacher 身份或 Satellite kind | HOST-008、STRENGTH-004/011/014 |
 
 ## Magic Todo V1 membrane canaries（Phase 0 blocking）
 

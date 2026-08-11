@@ -2,15 +2,14 @@
 
 行为见 `what/architecture.md`，边界见 `shape/architecture.md`，实现要点见 `how/architecture.md`。
 
-## Student / Teacher
+## Student / Teacher absence
 
 | 证明 | 条款 |
 |------|------|
-| 无 QA 内容解析、问卷、coverage/decision 旁路状态 | ARCH-011、ARCH-013 |
-| Teacher/Companion 共用 Satellite create/recover/cancel/retire owner | ARCH-013、HOST-008、EXEC-026 |
-| 控制字段不进 QA；QA 正文不进 Journal/log/Companion/XTrace | ARCH-013、PERSIST-011 |
-| 只用公开 hook/SDK；源码版本 canary | ARCH-003、HOST-014 |
-| 非 Student Agent 的 profile、schema、transform 与 runtime 无变化 | ARCH-013、HOST-014 |
+| `scripts/checks/student-teacher-absence.mjs` 证明生产源码无 Student/Teacher Agent、Role、request kind、tool、Satellite kind 与 QA runtime | ARCH-013、HOST-014、AGENT-020、PROMPT-012 |
+| unified-store gate 的 `student-qa-revival` fixture 必须能红，生产扫描保持绿；禁止隐藏 QA storage/feature ref 复活 | ARCH-013、PERSIST-007 |
+| SyncInspector/SyncCoder 只走 Work+Attached 与 EXEC Returned→Completion，不存在 legacy Student/Teacher fallthrough | ARCH-013、HOST-008、EXEC-026/028 |
+| Host 仍只用公开 hook/SDK；Student/Teacher absence 不以 Host patch 或 alias 实现 | ARCH-003、ARCH-013 |
 
 ## 层 0（无产物即可跑）
 

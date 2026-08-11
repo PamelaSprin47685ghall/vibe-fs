@@ -127,14 +127,9 @@ string ↛ origin / authority / phase / next action
 
 该边界只限制 tool 返回 wire，不改变内部完整结果的事实来源。
 
-## ARCH-013：Student 知识与控制分离
+## ARCH-013：（空缺）Student / Teacher 知识控制模型 — G3 已删除
 
-Student/Teacher runtime 只可靠地执行：维持 Session、转交自由文本、冻结 request profile、观察 idle、
-原子持久化 QA、清理临时资源。发现未知、判断信息价值/收敛、建立第一性原理、保留语义差异和划分
-SKILL 边界全部留给模型 Prompt；禁止增加问卷、coverage 表、知识图谱、决策表或内容分类器。
-
-QA 是知识状态；`ManagedSessionKind`、request kind、single-flight、PromptKey 和 pending return 是控制身份。
-两者不得互相反解析：QA 不记录控制字段，runtime 不从自然语言推测阶段/完成/下一问题。
-
-Teacher 必须复用统一 SatelliteRuntime（HOST-008/EXEC-026）；禁止为 Teacher 复制一套 parent/child map、
-恢复、取消或 retire 框架。Host 本体不修改（ARCH-003）。
+**编号永久空缺。** G3 clean-break 删除 Student/Teacher runtime、QA store、`teacher` 工具、Student request kind、
+Teacher Satellite 与全部兼容恢复路径。不得以 alias、deprecated type、隐藏 storage 或 SyncDelegate fallthrough 复活。
+通用“状态先于表示”原则由 ARCH-011 拥有；Session ownership 由 HOST-008 拥有；SyncInspector/SyncCoder 的
+Returned→Completion 调用协议由 EXEC-026/028 拥有。Host 本体仍遵守 ARCH-003。

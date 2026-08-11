@@ -304,7 +304,7 @@ module SyncDelegateAssociationHints =
     let dedicatedOwnership (owner: SessionId) (role: SyncDelegateRole) : SessionOwnership =
         SessionOwnership.Attached(owner, SyncDelegate.delegateRoleToAttachment role)
 
-/// StrengthReplica classification (HOST-008 / Strength Phase 0).
+/// StrengthReplica classification (HOST-008 / STRENGTH-014).
 ///
 /// StrengthReplica is Universal `InternalLeaf × Attached(_, StrengthReplica)`.
 /// It is NOT a `SatelliteKind` case and is NOT durable on `SessionAssociation` /
