@@ -39,6 +39,9 @@ module ToolRegistry =
         | "coder" -> fun r -> r = Role.DevOps
         | "blog" -> fun r -> r = Role.Blogger && BlogTool.hasLiveCycle parkedHost sessionId
         | "return" -> fun r -> r = Role.Inspector || r = Role.Coder
+        // CASE-009: fetch is the next-session Casebook read. Inspector/Coder
+        // consume reusable Q/A; Bookkeeper is edit-qa only (gateExecute).
+        | "fetch" -> fun r -> r = Role.Inspector || r = Role.Coder
         // JS-001: the js-* gate — the invoked name must be this role's own
         // generated name AND the role must actually hold a filesystem
         // capability (four-layer exactness, forged names fail closed).

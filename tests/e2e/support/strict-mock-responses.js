@@ -43,10 +43,14 @@ async function respondStream(res, chunks, exp) {
   res.end();
 }
 
-function toolCallChunks(id, exp, parsed, strict, promptTokens) {
+function toolCallChunks(id, exp, parsed, strict, promptTokens, state) {
   const args = typeof exp.respond.args === 'function'
     ? exp.respond.args(parsed)
     : { ...exp.respond.args };
+  if (typeof state?.rewriteToolArgs === 'function') {
+    const rewritten = state.rewriteToolArgs(exp, args, parsed);
+    if (rewritten && typeof rewritten === 'object') Object.assign(args, rewritten);
+  }
   if (!strict) decorateLegacyArgs(args);
 
   const argsText = exp.respond.malformedArgs
@@ -152,7 +156,7 @@ export async function respond(state, res, exp, parsed) {
   if (exp.respond.type === 'disconnect') return respondDisconnect(res, id);
 
   const chunks = exp.respond.type === 'tool-call'
-    ? toolCallChunks(id, exp, parsed, state.strict, promptTokens)
+    ? toolCallChunks(id, exp, parsed, state.strict, promptTokens, state)
     : exp.respond.emptyAssistant
       ? buildTextChunks(id, '', promptTokens)
       : exp.respond.reasoningOnly

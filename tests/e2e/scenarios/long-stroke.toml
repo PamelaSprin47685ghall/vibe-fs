@@ -67,11 +67,17 @@ pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fal
 #                      not a DU-algebra equality. Journal is the exact semantic pin.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
 # Headroom kept after canary wrapper noise; Manager does not advertise todowrite yet.
-setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["native-todo-title", "native-todo", "strength-canary-title", "strength-canary-replica", "strength-canary-owner"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run" }, maxJournalEvents = 400, maxSseEvents = 1900, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n" } } }
+setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["native-todo-title", "native-todo", "strength-canary-title", "strength-canary-replica", "strength-canary-owner", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g6-bookkeeper-title", "g6-bookkeeper-finalize", "g6-fetch-title", "g6-fetch"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run" }, maxJournalEvents = 480, maxSseEvents = 2100, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", ".wanxiang/casebook/.keep" = "" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 
 must = [
+  "g2-inspector-owner.0",
+  "g2-inspector-q1.0",
+  "g2-inspector-q2.0",
+  "g2-inspector-q3.0",
+  "g6-bookkeeper-finalize.0",
+  "g6-fetch.0",
   "orch.0",
   "manager.0",
   "manager.1",
@@ -95,7 +101,13 @@ flow = [
   # no K+1 delivery and no Prepared/Candidate intervention into the owner.
   { assertDeliveries = { id = "strength-canary-replica.0", eq = 1 } },
   { assertDeliveries = { id = "strength-canary-owner.0", eq = 1 } },
+  { assertDeliveries = { id = "g2-inspector-q1.0", eq = 1 } },
+  { assertDeliveries = { id = "g2-inspector-q2.0", eq = 1 } },
+  { assertDeliveries = { id = "g2-inspector-q3.0", eq = 1 } },
+  { assertDeliveries = { id = "g6-bookkeeper-finalize.0", eq = 1 } },
+  { assertDeliveries = { id = "g6-fetch.0", eq = 1 } },
   { assertFacts = { name = "StrengthCandidatePrepared", eq = 0 } },
+  { assertFacts = { name = "InspectorCaseCaptured", gte = 1 } },
 
   # External injections before any wait (register holds / retire hooks / conflict).
   { custom = "holdChildC1UntilLabor" },
@@ -225,6 +237,124 @@ user = "STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica 
 
   [[turn.step]]
   respond = { type = "text", text = "Strength dry-run canary owner completed." }
+
+[[turn]]
+id = "g2-inspector-title"
+lane = "g2-inspector-owner"
+kind = "title"
+user = "G2_INSPECTOR_PREFIX_CANARY: reuse one inspector for Q1, Q2, then Q3."
+
+  [[turn.step]]
+  respond = { type = "title", text = "G2 Inspector Prefix Canary" }
+
+[[turn]]
+id = "g2-inspector-owner"
+lane = "g2-inspector-owner"
+user = "G2_INSPECTOR_PREFIX_CANARY: reuse one inspector for Q1, Q2, then Q3."
+tools = ["inspector"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "inspector", args = { prompt = "G2Q1: who owns PromptAuthority?" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "inspector", args = { prompt = "G2Q2: what is ReuseScope?" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "inspector", args = { prompt = "G2Q3: when does CaseFinalize run?" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "G2 inspector prefix canary owner completed." }
+
+[[turn]]
+id = "g2-inspector-child-title"
+internal = true
+kind = "title"
+user = "G2Q1: who owns PromptAuthority?"
+
+  [[turn.step]]
+  respond = { type = "title", text = "G2 Inspector Child" }
+
+[[turn]]
+id = "g2-inspector-q1"
+internal = true
+user = "G2Q1: who owns PromptAuthority?"
+tools = ["return"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "return", args = { message = "G2A1: Host owns PromptAuthority." } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Inspector Q1 returned." }
+
+[[turn]]
+id = "g2-inspector-q2"
+internal = true
+user = "G2Q2: what is ReuseScope?"
+tools = ["return"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "return", args = { message = "G2A2: Owner session scope for one Inspector." } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Inspector Q2 returned." }
+
+[[turn]]
+id = "g2-inspector-q3"
+internal = true
+user = "G2Q3: when does CaseFinalize run?"
+tools = ["return"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "return", args = { message = "G2A3: On owner ReuseScope close." } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Inspector Q3 returned." }
+
+[[turn]]
+id = "g6-bookkeeper-title"
+internal = true
+kind = "title"
+user = "CaseFinalize"
+
+  [[turn.step]]
+  respond = { type = "title", text = "G6 Bookkeeper Finalize" }
+
+[[turn]]
+id = "g6-bookkeeper-finalize"
+internal = true
+user = "CaseFinalize"
+tools = ["edit-qa"]
+forbiddenTools = ["inspector", "write", "edit", "bash-honeypot"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "edit-qa", args = { document = "Q.md", old_text = "G2Q3: when does CaseFinalize run?", new_text = "What is the Inspector reuse contract?" } }
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "edit-qa", args = { document = "A.md", old_text = "G2A3: On owner ReuseScope close.", new_text = "One Inspector child, serial Q/A, finalize on owner close." } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Bookkeeper CaseFinalize idle." }
+
+[[turn]]
+id = "g6-fetch-title"
+lane = "g6-fetch-owner"
+kind = "title"
+user = "G6_CASEBOOK_FETCH_CANARY: fetch the finalized Inspector case."
+
+  [[turn.step]]
+  respond = { type = "title", text = "G6 Casebook Fetch Canary" }
+
+[[turn]]
+id = "g6-fetch"
+lane = "g6-fetch-owner"
+user = "G6_CASEBOOK_FETCH_CANARY: fetch the finalized Inspector case."
+tools = ["fetch"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "fetch", args = { session_id = "$inspector" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "G6 fetch canary completed." }
 
 [[turn]]
 id = "title"

@@ -29,6 +29,7 @@ import {
   factPayloads,
 } from './journal-observer.js';
 import { WAIT_FACT_WINDOW_MS } from './time-budget.js';
+import { isAppendOnlyPrefix, sealHolds, wireOf } from './provider-wire.js';
 
 /** ≤50ms wall guard matching scenario-driver FACT_WAKE_GUARD_MS. */
 const FACT_WAKE_GUARD_MS = 50;
@@ -494,6 +495,110 @@ export const ADVERSITY_ORACLES = Object.freeze({
   assertPublishReconcile,
   assertLifeCompleted,
 });
+
+export const G2_INSPECTOR_CANARY_PROMPT =
+  'G2_INSPECTOR_PREFIX_CANARY: reuse one inspector for Q1, Q2, then Q3.';
+export const G2_Q1 = 'G2Q1: who owns PromptAuthority?';
+export const G2_Q2 = 'G2Q2: what is ReuseScope?';
+export const G2_Q3 = 'G2Q3: when does CaseFinalize run?';
+export const G2_A1 = 'G2A1: Host owns PromptAuthority.';
+export const G2_A2 = 'G2A2: Owner session scope for one Inspector.';
+export const G2_A3 = 'G2A3: On owner ReuseScope close.';
+export const G6_CANONICAL_Q = 'What is the Inspector reuse contract?';
+export const G6_CANONICAL_A = 'One Inspector child, serial Q/A, finalize on owner close.';
+export const G6_FETCH_CANARY_PROMPT = 'G6_CASEBOOK_FETCH_CANARY: fetch the finalized Inspector case.';
+
+const lastUserText = (body) => {
+  const messages = Array.isArray(body?.messages) ? body.messages : [];
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i]?.role === 'user') return contentText(messages[i].content);
+  }
+  return '';
+};
+
+const requestTools = (body) =>
+  (Array.isArray(body?.tools) ? body.tools : [])
+    .map((tool) => tool?.function?.name ?? tool?.name)
+    .filter((name) => typeof name === 'string');
+
+const chatRequests = (requests) =>
+  (requests ?? []).filter((body) => {
+    const messages = Array.isArray(body?.messages) ? body.messages : [];
+    return !messages.slice(0, 4).some(
+      (message) => typeof message?.content === 'string' && message.content.startsWith('Generate a title for this conversation:'),
+    );
+  });
+
+export function extractInspectorIdFromOwnerRequests(requests) {
+  for (const text of publicToolResults(requests, 'inspector')) {
+    const match = String(text).match(/inspector_id\s*=\s*"([^"]+)"/);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+/**
+ * G2 PREFIX LAW on the reused Inspector child (mock LLM + real OpenCode).
+ * Uses Domain isAppendOnlyPrefix via provider-wire.js — not a second helper.
+ */
+export function assertG2InspectorPrefixLaw(scenario) {
+  const requests = chatRequests(scenario.provider.requests);
+  const q1 = requests.filter((body) => lastUserText(body).includes(G2_Q1) && requestTools(body).includes('return'));
+  const q2 = requests.filter((body) => lastUserText(body).includes(G2_Q2) && requestTools(body).includes('return'));
+  const q3 = requests.filter((body) => lastUserText(body).includes(G2_Q3) && requestTools(body).includes('return'));
+  assert.equal(q1.length, 1, `G2: expected one Inspector Q1 provider request, got ${q1.length}`);
+  assert.equal(q2.length, 1, `G2: expected one Inspector Q2 provider request, got ${q2.length}`);
+  assert.equal(q3.length, 1, `G2: expected one Inspector Q3 provider request, got ${q3.length}`);
+
+  const sessionId = q1[0].sessionID;
+  assert.ok(typeof sessionId === 'string' && sessionId.length > 0, 'G2: Inspector Q1 missing sessionID');
+  assert.equal(q2[0].sessionID, sessionId, 'G2: Q2 must reuse the Inspector SessionId');
+  assert.equal(q3[0].sessionID, sessionId, 'G2: Q3 must reuse the Inspector SessionId');
+
+  const modelOf = (body) => (typeof body?.model === 'string' ? body.model : body?.model?.id ?? body?.model?.modelID);
+  const model = modelOf(q1[0]);
+  assert.ok(typeof model === 'string' && model.length > 0, 'G2: Inspector wire ModelId missing');
+  assert.equal(modelOf(q2[0]), model, 'G2: same model Q1→Q2');
+  assert.equal(modelOf(q3[0]), model, 'G2: same model Q2→Q3');
+
+  const wire1 = wireOf(q1[0]);
+  const wire2 = wireOf(q2[0]);
+  const wire3 = wireOf(q3[0]);
+  assert.equal(sealHolds(wire1, q2[0]), true, 'G2: sealHolds Q1 prefix-of Q2');
+  assert.equal(sealHolds(wire2, q3[0]), true, 'G2: sealHolds Q2 prefix-of Q3');
+  assert.equal(isAppendOnlyPrefix(wire1, wire2), true, 'G2 PREFIX LAW isAppendOnlyPrefix(Q1,Q2)');
+  assert.equal(isAppendOnlyPrefix(wire2, wire3), true, 'G2 PREFIX LAW isAppendOnlyPrefix(Q2,Q3)');
+  assert.equal(isAppendOnlyPrefix(wire2, wire1), false, 'G2: prefix is directional');
+  return { inspectorSessionId: sessionId, model };
+}
+
+/**
+ * G6 Host path (mock LLM Bookkeeper): CaseFinalize envelope + edit-qa + captured fact.
+ * Fetch is asserted separately once session_id is known.
+ */
+export function assertG6BookkeeperFinalize(scenario) {
+  const requests = chatRequests(scenario.provider.requests);
+  const finalize = requests.filter(
+    (body) => lastUserText(body).includes('CaseFinalize') && requestTools(body).includes('edit-qa'),
+  );
+  assert.ok(finalize.length >= 1, 'G6: Bookkeeper CaseFinalize provider request with edit-qa missing');
+  assert.equal(
+    scenario.provider.matchCount('g6-bookkeeper-finalize.0') >= 1,
+    true,
+    'G6: edit-qa Q.md step must run',
+  );
+  assert.equal(
+    scenario.provider.matchCount('g6-bookkeeper-finalize.1') >= 1,
+    true,
+    'G6: edit-qa A.md step must run',
+  );
+  const captured = countFactCase(scenario.host.workDir, 'InspectorCaseCaptured');
+  const named = readJournal(scenario.host.workDir, 'InspectorCaseCaptured').named;
+  assert.ok(
+    captured >= 1 || named >= 1,
+    `G6: InspectorCaseCaptured missing (countFact=${captured} named=${named})`,
+  );
+}
 
 export const CUSTOMS = {
   holdChildC1UntilLabor,

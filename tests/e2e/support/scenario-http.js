@@ -112,6 +112,11 @@ export class HttpClient {
   }
   async abort(sessionID) { return this.request('POST', `/session/${sessionID}/abort`, { body: {} }); }
 
+  /// Host session.deleted (not abort). G6 CaseFinalize awaits this on the owner.
+  async deleteSession(sessionID) {
+    return this.request('DELETE', `/session/${sessionID}`);
+  }
+
 }
 
 export function getSessionId(sess) {
