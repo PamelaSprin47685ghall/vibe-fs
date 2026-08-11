@@ -313,20 +313,29 @@ module StrengthSpeculate =
                                                                 authority.AuthorityRootUserMessageId
                                                                 target
 
-                                                        let! outcome =
-                                                            runtime.StartDecision(
-                                                                owner,
-                                                                id,
-                                                                target,
-                                                                budget,
-                                                                agent,
-                                                                wire.Messages,
+                                                        match
+                                                            StrengthFrame.tryLocalizeMirror
+                                                                HostDigest.sha256Hex
+                                                                id
                                                                 anchorDigest
-                                                            )
-
-                                                        match outcome with
+                                                                wire.Messages
+                                                        with
                                                         | Error _ -> return ()
-                                                        | Ok completed ->
+                                                        | Ok replicaMirror ->
+                                                            let! outcome =
+                                                                runtime.StartDecision(
+                                                                    owner,
+                                                                    id,
+                                                                    target,
+                                                                    budget,
+                                                                    agent,
+                                                                    replicaMirror,
+                                                                    anchorDigest
+                                                                )
+
+                                                            match outcome with
+                                                            | Error _ -> return ()
+                                                            | Ok completed ->
                                                             match completed.Terminal with
                                                             | StrengthReplicaTerminal.InvalidFrame reason ->
                                                                 scope.TripStrengthFuse(

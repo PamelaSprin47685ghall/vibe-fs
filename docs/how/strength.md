@@ -74,9 +74,9 @@ write raw frame payload
 → 成功后才声明 InsertStrengthFrames(Candidate,targetRun)
 ```
 
-raw payload 与 event 的 publish 原子性服从 PERSIST-002/007。Prepared metadata inline 只放小字段，payload 正文只经 opaque `PayloadRef`。
+raw payload 与 event 的 publish 原子性服从 PERSIST-002/007。Prepared metadata inline 只放小字段，payload 正文只经 opaque `PayloadRef`。Application/Host 只依赖 `StrengthDurabilityPort`；`IGitRawStore` / `IEventStore` 只出现在 Persist adapter，禁止与 `AgentJournal` 形成 dual-write bridge。
 
-append `Rejected/StorageInvalid` 等明确失败 → K0，不插入。`CommitUnknown` → 按 DecisionId/TargetProviderRun 查 StrengthProjection；同 digest+refs 已存在则继续，明确不存在则 K0，无法证明则阻止 target request。
+append `Rejected/StorageInvalid` 等明确失败 → K0，不插入。`CommitUnknown` → 按 DecisionId/TargetProviderRun 查 StrengthProjection；同 digest+refs 已存在则继续，明确不存在则 K0，无法证明则阻止 target request。若重启时已有未消费 Prepared，则**先于 rollout/fuse 开关**按同 TargetProviderRun + AnchorDigest 重建同一 Candidate；anchor 或 payload 不再等价 → fail closed。
 
 ## Promotion reconcile
 
@@ -84,17 +84,18 @@ Reconciler 对每个 `ReconciledTurn` 查询 `TargetProviderRun` 索引：
 
 ```text
 无 Prepared → no-op
-Prepared + no usable provider output → no-op/abandon only when run definitively terminated
-Prepared + same run usable output → append Promoted
+Prepared + same run InProgress → no-op
+Prepared + same run NeedsContinuation/Completed 且有 usable provider output → append Promoted
+Prepared + Failed/Aborted，或 Completed 但无 usable provider output → append Abandoned
 ```
 
-Promoted 校验 Prepared、run、digest、payload refs 完全一致；重复同事实幂等。append CommitUnknown 同样重读 resolve。Promotion 未证明前禁止该 run 的下一 continuation。
+Promoted 校验 Prepared、run、digest、payload refs 完全一致；重复同事实幂等。Failed/Aborted 即使带部分 provider output 也不得 Promotion。Abandoned 释放 TargetProviderRun 索引且永不转 Promoted。append CommitUnknown 同样重读 resolve。Promotion 未证明前禁止该 run 的下一 continuation。
 
 ## Replay → Traced
 
-下一主 transform 查询 Promoted 且仍需 raw replay 的 decisions，按 target assistant anchor 确定性插入。XTraceCapture 识别 Strength synthetic stable identity 后写入正常 XTrace parts；得到首次/末次 cursor 后 append `StrengthFramesTraced`。若 crash 在 XTrace 已写、Traced 未写之间，下一次 capture 从 stable identity + Host generation 找回同一 range 并补写幂等 fact。
+下一主 transform 查询 Promoted 且仍需 raw replay 的 decisions，按 target assistant anchor 确定性插入。多个 Promoted decision 的 `BeforeMessageIndex` 是**原始 base 的绝对索引**：planner 先 canonical sort，renderer 按 index 倒序插入，注册顺序不得改变 bytes。XTraceCapture 识别 Strength synthetic stable identity 后写入正常 XTrace parts；得到首次/末次 cursor 后 append `StrengthFramesTraced`。若 crash 在 XTrace 已写、Traced 未写之间，下一次 capture 优先按 stable Host message identity 找 range，旧 positional trace 只允许 canonical body 唯一且 cursor 连续匹配，否则 fail closed。
 
-raw replay retirement 条件只能由现有 semantic coverage 证明：traced range 已被 Companion/Prefix representation 的 `IngestedThroughSequence/CoveredXTraceThrough` 覆盖。物理 message cutoff 不参与这个判断。
+raw replay retirement 条件只能由现有 semantic coverage 证明：当前实现读取 Companion `IngestedThroughSequence`，覆盖到 traced range 最后一项后才停止 raw replay。物理 message cutoff 不参与这个判断；未来若改用其它 representation，只能读取该 owner 已有的 `CoveredXTraceThrough` 等价事实。
 
 ## Predictor labels
 
@@ -114,9 +115,10 @@ V2 = P1*SavedDeep1 + P1*P2*SavedDeep2
 ## Crash / fuse
 
 - Replica 尚未 Prepared：重启丢弃，只读副作用为零。
-- Prepared durable、target 未消费：同 run 可重放同 Candidate；run 已不可能消费则不 Promotion。
-- provider 已输出、Promotion 前 crash：reconcile 以 ProviderRunIdentity 补 Promotion。
+- Prepared durable、target 未消费：同 run + 同 AnchorDigest 重放同 Candidate；run 明确终止且未消费则 Abandoned。
+- provider 已产生可用 output、Promotion 前 crash：reconcile 以 ProviderRunIdentity 补 Promotion；Failed/Aborted 不补 Promotion。
 - Promoted、XTrace 未捕获：StrengthReplay 重建。
-- XTrace 已捕获、Traced 缺失：stable identity 补 range fact。
+- XTrace 已捕获、Traced 缺失：stable identity 或唯一 canonical contiguous range 补 fact。
 - durable outcome 无法证明：fail closed；普通 pre-commit Replica failure：fail open K0。
-- fuse 只禁止新 speculation；replay/recovery writer 永不被 feature switch 关闭。
+- process-local fuse 记住首个 durable/projection/schema/frame 不一致，只禁止**新** speculation；Prepared recovery、Promoted replay/promotion/tracing 永不被 feature switch/fuse 关闭。
+- treatment 的 Host canary 不是布尔开关：`WANXIANGSHU_STRENGTH_HOST_CANARY` 必须逐字等于当前 `opencode-ai` + `@opencode-ai/plugin` 版本指纹；依赖版本变化自动回到 K0，直到新 canary 重新证明。

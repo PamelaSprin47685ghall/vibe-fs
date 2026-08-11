@@ -54,7 +54,7 @@ K1/K2 由纯 value policy 比较 `V0=0`、`V1`、`V2`；成本必须来自显式
 
 ## STRENGTH-011：失败、取消与熔断
 
-Replica 创建/请求/工具普通失败只终止本 decision；已完整验证 batch 可按规则使用，未完整 batch 丢弃，owner 正常继续。owner cancellation/delete 级联取消并 retire Replica，未消费 Candidate 不 Promotion。durable Candidate/Promotion 歧义、wrong-target render、ProjectionConflict、schema/execution-gate mismatch、promotion recovery failure、关键 Host canary 失败或成本/质量熔断时，新 decision 全部 K0；已有 Promoted history 仍必须 replay/recover，已有 Candidate 只按其已绑定 target run 完成或自然失效。
+Replica 创建/请求/工具普通失败只终止本 decision；已完整验证 batch 可按规则使用，未完整 batch 丢弃，owner 正常继续。owner cancellation/delete 级联取消并 retire Replica，未消费 Candidate 不 Promotion。durable Candidate/Promotion 歧义、wrong-target render、ProjectionConflict、schema/execution-gate mismatch、promotion recovery failure、关键 Host canary 失败或成本/质量熔断时，新 decision 全部 K0；process-local fuse 一旦因这些一致性失败触发，在进程余生不得重新开启新 speculation。Host canary 必须绑定当前安装的 OpenCode/plugin 版本指纹，不能以通用 `true/pass` 代替。已有 Promoted history 仍必须 replay/recover，已有 Candidate 只按其已绑定 target run 完成或自然失效。
 
 ## STRENGTH-012：模型不可见、系统可审计
 

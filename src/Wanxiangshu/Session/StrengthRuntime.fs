@@ -20,7 +20,7 @@ type StrengthReplicaBinding =
       Budget: StrengthBudget
       MaxFrameBytes: int
       SemanticDigest: string
-      MirrorMessages: ProviderProjection.WireMessage list
+      LocalizedMirrorMessages: ProviderProjection.WireMessage list
       ToolCapabilitySet: Set<ToolPermission> }
 
 [<RequireQualifiedAccess>]

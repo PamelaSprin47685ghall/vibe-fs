@@ -104,7 +104,7 @@ test('STRENGTH_INTEGRATION_Prepared_candidate_consumption_Promoted_restart_repla
   const consumed = {
     ProviderRun: target,
     Parts: [providerCall('real-call', 'read', '{"filePath":"other"}')],
-    Outcome: TurnOutcome.TurnInProgress,
+    Outcome: new TurnOutcome(1, ['continue']),
   }
   const promotion = Lifecycle.StrengthLifecycle_reconcileEvent(projection, consumed)
   assert.equal(caseOf(promotion), 'Promoted')

@@ -58,4 +58,13 @@ module StrengthTurnEvidence =
         (targetProviderRun: Wanxiangshu.Kernel.Identity.ProviderRunIdentity)
         (turn: ReconciledTurn)
         : StrengthPromotionDecision =
-        StrengthPromotion.decide targetProviderRun turn.ProviderRun (classifyParts turn.Parts)
+        if targetProviderRun <> turn.ProviderRun then
+            StrengthPromotionDecision.IgnoreWrongRun
+        else
+            match turn.Outcome with
+            | ReconcileProgram.TurnCompleted
+            | ReconcileProgram.TurnNeedsContinuation _ ->
+                StrengthPromotion.decide targetProviderRun turn.ProviderRun (classifyParts turn.Parts)
+            | ReconcileProgram.TurnFailed _
+            | ReconcileProgram.TurnAborted _
+            | ReconcileProgram.TurnInProgress -> StrengthPromotionDecision.AwaitOrAbandon

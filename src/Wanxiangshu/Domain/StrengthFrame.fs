@@ -31,6 +31,12 @@ type StrengthFrameError =
     | UnsupportedTool of toolName: string
     | ByteLimitExceeded of actualBytes: int * maxBytes: int
 
+[<RequireQualifiedAccess>]
+type StrengthMirrorError =
+    | DuplicateToolCallId of ToolCallId
+    | OrphanToolResultId of ToolCallId
+    | MediaCannotCrossSession
+
 module StrengthFrame =
 
     let private allowedTools = set [ "read"; "glob"; "grep" ]
@@ -125,6 +131,66 @@ module StrengthFrame =
                         { Batches = batches
                           Digest = sha256 canonical
                           ByteLength = bytes }
+
+    /// STRENGTH-009: strip owner-local tool-call identity while preserving the
+    /// exact semantic projection and call/result pairing. The resulting IDs are
+    /// deterministic for one decision but carry no owner wire identity. Media is
+    /// fail-closed because its digest is intentionally one-way and cannot recreate
+    /// provider-visible bytes in another Session.
+    let tryLocalizeMirror
+        (sha256: string -> string)
+        (decisionId: StrengthDecisionId)
+        (semanticDigest: string)
+        (messages: ProviderProjection.WireMessage list)
+        : Result<ProviderProjection.WireMessage list, StrengthMirrorError> =
+        let localId ordinal =
+            String.concat
+                "\u001f"
+                [ "strength-mirror-v1"
+                  StrengthDecisionId.value decisionId
+                  string ordinal
+                  semanticDigest ]
+            |> sha256
+            |> ToolCallId.create
+
+        let rec localizeParts parts nextOrdinal idMap localized =
+            match parts with
+            | [] -> Ok(List.rev localized, nextOrdinal, idMap)
+            | ProviderProjection.WireToolCall(ownerId, name, arguments) :: tail ->
+                let ownerKey = ToolCallId.value ownerId
+
+                if Map.containsKey ownerKey idMap then
+                    Error(StrengthMirrorError.DuplicateToolCallId ownerId)
+                else
+                    let replicaId = localId nextOrdinal
+
+                    localizeParts
+                        tail
+                        (nextOrdinal + 1)
+                        (Map.add ownerKey replicaId idMap)
+                        (ProviderProjection.WireToolCall(replicaId, name, arguments) :: localized)
+            | ProviderProjection.WireToolResult(ownerId, result) :: tail ->
+                match Map.tryFind (ToolCallId.value ownerId) idMap with
+                | None -> Error(StrengthMirrorError.OrphanToolResultId ownerId)
+                | Some replicaId ->
+                    localizeParts
+                        tail
+                        nextOrdinal
+                        idMap
+                        (ProviderProjection.WireToolResult(replicaId, result) :: localized)
+            | ProviderProjection.WireMedia _ :: _ -> Error StrengthMirrorError.MediaCannotCrossSession
+            | part :: tail -> localizeParts tail nextOrdinal idMap (part :: localized)
+
+        let rec localizeMessages remaining nextOrdinal idMap localized =
+            match remaining with
+            | [] -> Ok(List.rev localized)
+            | message :: tail ->
+                match localizeParts message.Parts nextOrdinal idMap [] with
+                | Error error -> Error error
+                | Ok(parts, next, nextMap) ->
+                    localizeMessages tail next nextMap ({ message with Parts = parts } :: localized)
+
+        localizeMessages messages 1 Map.empty []
 
     /// Host-only synthetic message identity for one rendered half of a provider
     /// request batch. This identity is stable across replay/restart and is used by

@@ -59,7 +59,11 @@ test('STRENGTH_007_lifecycle_promotes_only_exact_target_with_real_provider_outpu
   const frame = bundle()
   let projection = apply(Projection.StrengthProjectionModule_empty, prepared(frame))
 
-  const realTurn = { ProviderRun: run('run-1'), Parts: [call('c1', 'read', '{}')] }
+  const realTurn = {
+    ProviderRun: run('run-1'),
+    Parts: [call('c1', 'read', '{}')],
+    Outcome: TurnOutcome.TurnCompleted,
+  }
   const event = Lifecycle.StrengthLifecycle_reconcileEvent(projection, realTurn)
   assert.equal(caseOf(event), 'Promoted')
   assert.equal(Id.StrengthDecisionIdModule_value(event.fields[0].DecisionId), 'd1')
@@ -69,7 +73,7 @@ test('STRENGTH_007_lifecycle_promotes_only_exact_target_with_real_provider_outpu
 
   const abandoned = Lifecycle.StrengthLifecycle_reconcileEvent(projection, {
     ProviderRun: run('run-1'),
-    Parts: [],
+    Parts: [call('partial', 'read', '{}')],
     Outcome: new TurnOutcome(4, ['failed']),
   })
   assert.equal(caseOf(abandoned), 'Abandoned')
