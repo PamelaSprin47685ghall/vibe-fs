@@ -177,20 +177,18 @@ module XWire =
                 | Some _, None ->
                     raise (InvalidOperationException "StrengthReplica cannot plan without the public session snapshot")
                 | None, _ ->
-                    match scope.TryRecoveryArming sessionId with
-                | None -> return ()
-                | Some arming ->
                     let rawMessages = Projection.messagesFromTransformOutput output
                     let physical = Projection.lastUserMessageId rawMessages
 
-                    match physical, snapshot with
-                    | None, _ ->
+                    match scope.TryRecoveryArming sessionId, physical, snapshot with
+                    | None, _, _ -> return ()
+                    | Some _, None, _ ->
                         raise (InvalidOperationException "X-wire cannot plan a retry without a physical user message")
-                    | _, None ->
+                    | Some _, _, None ->
                         raise (
                             InvalidOperationException "X-wire cannot plan a retry without the public session snapshot"
                         )
-                    | Some physical, Some snapshotPort ->
+                    | Some arming, Some physical, Some snapshotPort ->
                         let! snapshotResult = snapshotPort.GetMessages sessionId
 
                         match snapshotResult with

@@ -211,6 +211,7 @@
     <Compile Include="Infrastructure/OpenCode/Host/SessionSnapshotPort.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/OpenCodePort.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Sessions.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/HostMessageProjection.fs"/>
     <Compile Include="Application/Strength/StrengthReplicaTransform.fs"/>
     <Compile Include="Session/SatelliteRuntime.fs"/>
     <Compile Include="Application/Prompting/PromptDispatcher.fs"/>
@@ -248,7 +249,6 @@
     <Compile Include="Session/CompanionHostBlogger.fs"/>
     <Compile Include="Session/CompanionJournalPort.fs"/>
     <Compile Include="Session/CompanionHost.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Host/HostMessageProjection.fs"/>
     <Compile Include="Session/BloggerCoordinator.fs"/>
     <Compile Include="Session/FamilyRecoveryCoordinator.fs"/>
     <Compile Include="Application/Reconciliation/BloggerRecoveryProbe.fs"/>

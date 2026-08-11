@@ -11,6 +11,7 @@ open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Host
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Session
 open Wanxiangshu.Tools
 
 [<RequireQualifiedAccess>]
@@ -295,6 +296,9 @@ type StrengthReplicaRuntime
                                   TargetProviderRun = targetProviderRun
                                   CanonicalRole = managed.Role
                                   Budget = budget
+                                  MaxFrameBytes = frameByteLimit
+                                  SemanticDigest = mirrorSemanticDigest
+                                  MirrorMessages = frozenMirror
                                   ToolCapabilitySet = capabilities }
 
                             match liveRegistry.Register binding with
@@ -313,9 +317,8 @@ type StrengthReplicaRuntime
                                 if not collectorClaimed then
                                     liveRegistry.Retire replica |> ignore
                                     do! abortReplica state
-                                    return Error "StrengthReplica collector state collided after live registration"
-                                else
-                                    registerReplica owner replica fastAgent
+                                    raise (InvalidOperationException "StrengthReplica collector state collided after live registration")
+                                registerReplica owner replica fastAgent
 
                                 let tools = StrengthReplicaTools.exactReadonlyHostToolMap
 
@@ -323,7 +326,8 @@ type StrengthReplicaRuntime
                                     // Mechanism-neutral bootstrap text. The Replica transform
                                     // replaces this physical child history with FrozenMirror
                                     // before the provider sees request #1.
-                                    match!
+                                    let!
+                                        dispatchResult =
                                         dispatcher.SendAgentOwnerRootWithTools
                                             sessions
                                             replica
@@ -333,9 +337,11 @@ type StrengthReplicaRuntime
                                             PromptDispatcher.AwaitMode.Detached
                                             None
                                             tools
-                                    with
+
+                                    match dispatchResult with
                                     | Error error ->
                                         complete (StrengthReplicaTerminal.Failed error) state
+                                        do! abortReplica state
                                     | Ok _ -> ()
 
                                     let deadline = timer.Delay latencyMs
