@@ -3207,3 +3207,72 @@ no Rulebook private journal/blob/coverage/delivery filesystem stores in proposed
 
 16. No score vector, numeric severity, throttle, fuzzy matching, shadow metadata, or fake-user enforcement overlay returns through this redesign.
 ```
+
+---
+
+# Active work
+
+## Work origin
+
+- entry.md Gate **G7** — Rulebook v2 real exit path (folder SSOT), not ponytail.
+- Activated from `changes/proposed/rulebook.md` → `changes/active/rulebook.md` (original frozen above).
+
+## Amendments（本切片落地）
+
+1. **Authored SSOT = directories only**  
+   `resources/enforcer/<TipName>/{enforcer.md,main.md}`。`catalog.json` **retired and deleted**.  
+   TipName = directory basename = provider `blog.tip` enum = durable `RuleId` / `FieldName`（clean break；不再使用 `enforcement-a01` 等旧 id）。
+
+2. **Runtime durability = EventStore only**  
+   Observation / Tip delivery / Coverage **不得**落 Rulebook 私有 journal、blob、coverage.state、delivery-history、tips.jsonl、observations.ndjson。  
+   本切片 **不**实现完整 Observation EventStore vocabulary（见 Remaining）；禁止以“还要读旧 journal”为由恢复私有 store。
+
+3. **No dual-write / no feature-owned storage**  
+   Loader 只读 package resources 目录；不写回仓库、不维护第二份 metadata。
+
+4. **Bridge fields（临时）**  
+   `ScoreWhen` / `Nudge` / `Family` / `CatalogOrdinal` 仍保留在 `EnforcerRule` 上以保持现有 consumers 编译：  
+   - `ScoreWhen` ← enforcer.md `## ScoreWhen` 或全文  
+   - `Nudge` ← enforcer.md `## Nudge` 或 main.md `## What to do` / 首段  
+   - `Family` ← stub header `Family: X` 或 `"rulebook"`  
+   - `CatalogOrdinal` ← **lexical directory order** index `1..N`（仅 deterministic order，不表达 priority）  
+   新增：`Name`、`EnforcerText`、`MainText`。
+
+5. **Blogger effective system prompt（本切片已做最小 composer）**  
+   `RuntimeResources.load`：`blogger-system.md` + 全部 `enforcer.md` 全文（`EnforcerCatalogResource.composeBloggerSystemPrompt`）。Derived only。
+
+6. **Main tip nudge**  
+   `latestTipNudge` 仍解析 RecentTip → rulebook；优先 `Nudge`，空则 `MainText`。Full/Identity delivery 与 EventStore TipDeliveryProjection 留 Remaining。
+
+7. **Paired Observation squash note（paired with next wave）**  
+   现有 `RecentTips` 独立于 frame squash 的语义是 **已知 residual**。  
+   下一波必须：`BlogObservationCommitted` / `BlogObservationsSquashed` 原子携带 work-log + TipName；squash **同时**压缩 tip 与 work log；删除“squash frames 后 tips 仍独立存活”。本切片故意不扩 EventStore vocabulary，避免与 G6/G8 横切冲突。
+
+## Remaining work
+
+- [ ] Observation EventStore vocabulary + Projection（BlogObservationCommitted / Squashed；Coverage fold-only）
+- [ ] Blogger history：paired observation units（禁止 tips∥frames 平行 stream）
+- [ ] Squash acts on Observation[] only；删独立 RecentTips 生命周期
+- [ ] Main Full/Identity delivery via EventStore TipDeliveryProjection + MarkerText replay
+- [ ] Compaction referential integrity for identity-only tips
+- [ ] 120× constitution rewrite of enforcer.md/main.md（content lane；stubs OK until then）
+- [ ] Authoring gates：token budget、mandatory headings、no third file under rule dirs
+- [ ] Docs plane（what/how/shape/why/proof/enforcer）统一 folder SSOT + dual-consumer tip 叙述
+- [ ] Optional：drop bridge fields once all consumers use Name/EnforcerText/MainText only
+- [ ] INVENTORY.md：移出 `resources/enforcer/` 或删（不得作为 runtime SSOT）
+
+## Completion criteria（G7 exit）
+
+- [x] rulebook Active + Active work
+- [x] Runtime loads directories，不读 `catalog.json`
+- [x] `catalog.json` removed
+- [x] `blog.tip` enum = directory names（lexical）
+- [x] Folder loader fail-fast；count ≥ 1；package/build gates updated
+- [x] Effective blogger prompt concatenates all enforcer.md（minimal composer）
+- [ ] Full Observation/delivery EventStore path + squash paired semantics
+- [ ] Constitution content + docs + remaining ratchets
+- [ ] targeted tests + build green for this slice
+
+## Blockers
+
+- None for folder-loader slice. Observation EventStore wave depends on stable EventStore surfaces already in tree; schedule after this loader cutover is green.

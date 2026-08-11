@@ -5115,7 +5115,7 @@ export const enforcer = (() => {
     'missing required argument: tip'
 
   return {
-    /** Packaged rulebook rules (resources/enforcer/*/ folders, ENFORCER-170). */
+    /** Packaged rulebook rules (resources/enforcer/<tip>/ folders, ENFORCER-170). */
     rules: catalogRules,
     ruleCount: catalogRules.length,
     fieldNames: () => listItems(catalogDomain.fieldNames(toList(catalogRules))),
