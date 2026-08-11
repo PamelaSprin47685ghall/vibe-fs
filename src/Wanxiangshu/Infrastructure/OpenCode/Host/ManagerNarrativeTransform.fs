@@ -21,12 +21,6 @@ open Wanxiangshu.Kernel.Identity
 /// untouched (GLORY-007/026).
 module ManagerNarrativeTransform =
 
-    let private readField (value: obj) (name: string) : obj =
-        if isNull value then
-            null
-        else
-            emitJsExpr (value, name) "$0[$1]"
-
     /// GLORY-012: only a HumanRoot-managed Manager opens Lives. An
     /// AgentOwnerRoot Manager (an Orchestrator's forked ManagerJob) receives
     /// assignments from the Host, not from a user, and must not be rewritten.
@@ -46,26 +40,6 @@ module ManagerNarrativeTransform =
         |> Option.exists (fun authority ->
             authority.AcceptedContinuationIds
             |> Map.exists (fun id _ -> PhysicalUserMessageId.value id = messageId))
-
-    /// The Host compaction pseudo-run marker (SessionSnapshotPort): any of
-    /// `agent`/`mode` = "compaction" or `summary` = true.
-    let private isCompactionMarker (raw: obj) =
-        let info =
-            if isNull raw then null
-            elif not (isNull raw?info) then raw?info
-            else raw
-
-        if isNull info then
-            false
-        else
-            let label (name: string) =
-                let v = info?name
-
-                if isNull v then "" else string v
-
-            (label "agent").ToLowerInvariant() = "compaction"
-            || (label "mode").ToLowerInvariant() = "compaction"
-            || (label "summary").ToLowerInvariant() = "true"
 
     /// The last `role=user` message and its raw object, or `None`.
     let private lastUserMessage (rawMessages: obj list) =
@@ -87,30 +61,8 @@ module ManagerNarrativeTransform =
             |> Option.map (fun part -> part.Cursor.Sequence)
 
     /// The `PromptKey` a Host message carries in its metadata (PROMPT-011).
-    let private promptKeyOfMessage (raw: obj) =
-        let fromMetadata (source: obj) =
-            if isNull source || isNull source?metadata then
-                None
-            else
-                let value = source?metadata?(PromptMetadataCodec.PromptKeyField)
-
-                if isNull value then None else Some(unbox<string> value)
-
-        let info =
-            if isNull raw then null
-            elif not (isNull raw?info) then raw?info
-            else raw
-
-        let fromParts () =
-            if isNull raw || isNull raw?parts then
-                None
-            else
-                unbox<obj array> raw?parts
-                |> Array.tryPick (fun part -> if isNull part then None else fromMetadata part)
-
-        [ fromMetadata info; fromMetadata raw; fromParts () ]
-        |> List.tryPick id
-        |> Option.map PromptKey.create
+    /// Read via the Codec boundary (Projection.promptKeyOfMessage).
+    let private promptKeyOfMessage (raw: obj) = Projection.promptKeyOfMessage raw
 
     let private isMessageFromCompletedLife (traceState: XTraceProjectionState option) (messageId: string) =
         match traceState with
@@ -160,11 +112,7 @@ module ManagerNarrativeTransform =
             if index <> messageIndex then
                 raw
             else
-                let parts =
-                    if isNull raw || isNull raw?parts then
-                        [||]
-                    else
-                        unbox<obj array> raw?parts
+                let parts = Projection.rawPartsOf raw
 
                 let narrativeParts =
                     projection.Parts
@@ -177,15 +125,11 @@ module ManagerNarrativeTransform =
 
                 let nonText =
                     parts
-                    |> Array.filter (fun part ->
-                        let kind =
-                            if isNull part then
-                                ""
-                            else
-                                let value = readField part "type"
-                                if isNull value then "" else unbox<string> value
-
-                        kind <> "text")
+                    |> List.filter (fun part ->
+                        match Projection.decodePart part with
+                        | Some(WireText _) -> false
+                        | _ -> true)
+                    |> List.toArray
 
                 let rewritten = Array.append narrativeParts nonText
 
@@ -280,17 +224,12 @@ module ManagerNarrativeTransform =
                         // (Host 1.18 assembly), not in `parts`.
                         let isTitleRequest =
                             let fromContent =
-                                let value = readField raw "content"
-
-                                if isNull value then
-                                    false
-                                else
-                                    unbox<string> value
-                                    |> fun text ->
-                                        text.StartsWith(
-                                            "Generate a title for this conversation:",
-                                            StringComparison.Ordinal
-                                        )
+                                Projection.topLevelString raw "content"
+                                |> Option.exists (fun text ->
+                                    text.StartsWith(
+                                        "Generate a title for this conversation:",
+                                        StringComparison.Ordinal
+                                    ))
 
                             fromContent
                             || (match Projection.decodeMessage raw with
@@ -307,7 +246,7 @@ module ManagerNarrativeTransform =
 
                         // GLORY-012: not a title request, not a continuation, not
                         // a compaction replay.
-                        if isTitleRequest || isCompactionMarker raw then
+                        if isTitleRequest || Projection.isCompactionMarker raw then
                             None
                         elif
                             isAcceptedContinuation durable sid messageId

@@ -639,6 +639,54 @@ module Projection =
         let info = infoObject rawObj
         readString info "id" |> Option.orElse (readString rawObj "id")
 
+    /// Top-level string field of a raw Host message (e.g. the title-request
+    /// `content` preamble). Host messages are the only objects this reads —
+    /// domain policy never touches raw objects.
+    let topLevelString (rawObj: obj) (name: string) : string option = readString rawObj name
+
+    /// Raw `parts` array of a Host message, for write-back paths that must
+    /// preserve non-text parts verbatim.
+    let rawPartsOf (rawObj: obj) : obj list =
+        rawArray (if isNull rawObj then null else rawObj?parts)
+
+    /// The Host compaction pseudo-run marker (SessionSnapshotPort): any of
+    /// `agent`/`mode` = "compaction" or `summary` = true.
+    let isCompactionMarker (rawObj: obj) : bool =
+        let info = infoObject rawObj
+
+        if isNull info then
+            false
+        else
+            let label (name: string) =
+                let v = readField info name
+                if isNull v then "" else string v
+
+            (label "agent").ToLowerInvariant() = "compaction"
+            || (label "mode").ToLowerInvariant() = "compaction"
+            || (label "summary").ToLowerInvariant() = "true"
+
+    /// The `PromptKey` a Host message carries in its metadata (PROMPT-011).
+    /// Reads the field PromptMetadataCodec wrote; single-message variant of
+    /// PromptIngressCodec's input/output pair reader.
+    let promptKeyOfMessage (rawObj: obj) : PromptKey option =
+        let fromMetadata (source: obj) =
+            if isNull source || isNull source?metadata then
+                None
+            else
+                let value = source?metadata?(PromptMetadataCodec.PromptKeyField)
+
+                if isNull value then None else Some(unbox<string> value)
+
+        let info = infoObject rawObj
+
+        let fromParts () =
+            rawArray (if isNull rawObj then null else rawObj?parts)
+            |> List.tryPick (fun part -> if isNull part then None else fromMetadata part)
+
+        [ fromMetadata info; fromMetadata rawObj; fromParts () ]
+        |> List.tryPick id
+        |> Option.map PromptKey.create
+
     /// Extract the single, unambiguous session id from a transform output's
     /// `messages` array. Used by hooks that need to identify the managed session
     /// before the Host has bound the run.
