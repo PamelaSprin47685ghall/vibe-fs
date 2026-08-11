@@ -171,7 +171,7 @@ module XWire =
         task {
             match journal, sessionIdOfOutput output with
             | Some durable, Some sessionId when not (isCompanionSession durable sessionId) ->
-                let replicaBinding = scope.StrengthRuntime.TryFindByReplica sessionId
+                let replicaBinding = scope.Strength.StrengthRuntime.TryFindByReplica sessionId
 
                 match replicaBinding with
                 | Some binding ->

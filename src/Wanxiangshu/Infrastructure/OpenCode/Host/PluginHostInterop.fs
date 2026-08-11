@@ -82,7 +82,7 @@ module PluginHostInterop =
                 eventPort
                 (Some(scope :> IParkedTransformHost))
                 scope.SyncDelegateRuntime
-                (Some scope.StrengthRuntime)
+                (Some scope.Strength.StrengthRuntime)
                 finalityReviewerTimeoutMs
                 casebookToolSpecs
 

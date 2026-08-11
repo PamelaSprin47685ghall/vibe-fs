@@ -271,6 +271,7 @@
     <Compile Include="Application/Reconciliation/SessionRecoveryWorkflow.fs"/>
     <Compile Include="Application/Reconciliation/Join.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SharedState.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/PluginStrengthScope.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginRuntimeScope.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostSessionNudge.fs"/>
     <Compile Include="Application/Reconciliation/TurnBinding.fs"/>

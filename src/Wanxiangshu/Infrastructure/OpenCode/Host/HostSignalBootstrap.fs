@@ -89,7 +89,7 @@ module HostSignalBootstrap =
                     let turn = context.Turn
 
                     let strengthHandled =
-                        scope.StrengthReplicaRuntime
+                        scope.Strength.StrengthReplicaRuntime
                         |> Option.exists (fun runtime -> runtime.HandleTurn turn)
 
                     if strengthHandled then
@@ -103,7 +103,7 @@ module HostSignalBootstrap =
                         // STRENGTH-010: only primary (non-Replica) turns feed the
                         // counterfactual predictor. Pending shadow/control labels
                         // are target-bound inside the scope.
-                        scope.ObserveStrengthPrimary(
+                        scope.Strength.ObserveStrengthPrimary(
                             turn.SessionId,
                             turn.ProviderRun,
                             StrengthTurnEvidence.primarySymbol turn.Parts
@@ -119,7 +119,7 @@ module HostSignalBootstrap =
                             match durability.LoadProjection() with
                             | Error error ->
                                 let reason = "Strength promotion projection failed: " + error
-                                scope.TripStrengthFuse reason
+                                scope.Strength.TripStrengthFuse reason
                                 raise (InvalidOperationException reason)
                             | Ok projection ->
                                 match StrengthLifecycle.reconcileEvent projection turn with
@@ -129,7 +129,7 @@ module HostSignalBootstrap =
                                     | Ok() -> ()
                                     | Error error ->
                                         let reason = "Strength promotion commit failed closed: " + error
-                                        scope.TripStrengthFuse reason
+                                        scope.Strength.TripStrengthFuse reason
                                         raise (InvalidOperationException reason)
 
                         // RECOVERY-FAMILY: family recovery before business effects of a turn.
@@ -283,7 +283,7 @@ module HostSignalBootstrap =
                 | AttemptAborted sessionId ->
                     scope.Quiescence.RevokeCurrentAttempt sessionId
 
-                    scope.StrengthReplicaRuntime
+                    scope.Strength.StrengthReplicaRuntime
                     |> Option.iter (fun runtime -> runtime.CancelOwner sessionId |> ignore)
 
                     reconciler.Signal signal
@@ -294,7 +294,7 @@ module HostSignalBootstrap =
                     // InternalLeaf immediately. CancelOwner completes the waiting
                     // decision before its best-effort physical abort, so no deleted
                     // owner can keep a Replica eligible for later collection.
-                    scope.StrengthReplicaRuntime
+                    scope.Strength.StrengthReplicaRuntime
                     |> Option.iter (fun runtime -> runtime.CancelOwner sessionId |> ignore)
 
                     // OpenCode recursively emits child SessionDeleted before the owner

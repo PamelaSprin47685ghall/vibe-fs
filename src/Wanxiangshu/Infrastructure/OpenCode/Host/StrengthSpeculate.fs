@@ -132,9 +132,9 @@ module StrengthSpeculate =
             match
                 journal,
                 snapshotPort,
-                scope.StrengthReplicaRuntime,
+                scope.Strength.StrengthReplicaRuntime,
                 strengthDurability,
-                scope.ManagedAgentInventory,
+                scope.Strength.ManagedAgentInventory,
                 Projection.projectionSessionIdFromMessages output
             with
             | Some durable, Some snapshots, Some runtime, Some durability, Some inventory, Some sessionIdText ->
@@ -167,7 +167,7 @@ module StrengthSpeculate =
                                     match durability.LoadProjection() with
                                     | Error error ->
                                         let reason = "Strength opportunity cannot prove EventStore health: " + error
-                                        scope.TripStrengthFuse reason
+                                        scope.Strength.TripStrengthFuse reason
                                         raise (InvalidOperationException reason)
                                     | Ok durableStrength ->
                                         // Recovery is independent of rollout state: once Prepared is
@@ -177,7 +177,7 @@ module StrengthSpeculate =
                                         with
                                         | Error error ->
                                             let reason = "Strength Prepared recovery failed closed: " + error
-                                            scope.TripStrengthFuse reason
+                                            scope.Strength.TripStrengthFuse reason
                                             raise (InvalidOperationException reason)
                                         | Ok true -> return ()
                                         | Ok false when settings.Mode = StrengthRolloutMode.Off -> return ()
@@ -235,7 +235,7 @@ module StrengthSpeculate =
                                                   HostCanaryHealthy =
                                                     StrengthSettings.hostCanaryHealthy ()
                                                     && stableCaptureEligible
-                                                    && scope.StrengthFuseReason.IsNone
+                                                    && scope.Strength.StrengthFuseReason.IsNone
                                                   FastPeerAvailable = fastAgent.IsSome
                                                   ModelBindingsDistinct = modelsDistinct
                                                   CostModelAvailable = costsAvailable }
@@ -246,13 +246,13 @@ module StrengthSpeculate =
                                             let anchorDigest = HostDigest.sha256Hex semanticText
 
                                             let feature =
-                                                scope.StrengthFeature(
+                                                scope.Strength.StrengthFeature(
                                                     owner,
                                                     authority.CanonicalRole,
                                                     StrengthFrame.utf8ByteCount semanticText
                                                 )
 
-                                            let prediction = scope.StrengthPrediction feature
+                                            let prediction = scope.Strength.StrengthPrediction feature
 
                                             let estimate =
                                                 settings.Costs
@@ -282,7 +282,7 @@ module StrengthSpeculate =
 
                                                 match StrengthPolicy.eligibility observationOpportunity with
                                                 | StrengthEligibility.Eligible ->
-                                                    scope.ArmStrengthCounterfactual(owner, target, feature)
+                                                    scope.Strength.ArmStrengthCounterfactual(owner, target, feature)
                                                 | StrengthEligibility.Ineligible _ -> ()
 
                                                 return ()
@@ -346,7 +346,7 @@ module StrengthSpeculate =
 
                                                             match completed.Terminal with
                                                             | StrengthReplicaTerminal.InvalidFrame reason ->
-                                                                scope.TripStrengthFuse(
+                                                                scope.Strength.TripStrengthFuse(
                                                                     "Strength dry-run invalid frame: " + reason
                                                                 )
                                                             | _ -> ()
@@ -371,7 +371,7 @@ module StrengthSpeculate =
                                                 match decision with
                                                 | StrengthDecision.Skip _ -> return ()
                                                 | StrengthDecision.ControlHoldout ->
-                                                    scope.ArmStrengthCounterfactual(owner, target, feature)
+                                                    scope.Strength.ArmStrengthCounterfactual(owner, target, feature)
                                                     return ()
                                                 | StrengthDecision.Speculate(budget, _) ->
                                                     match fastAgent with
@@ -409,7 +409,7 @@ module StrengthSpeculate =
                                                             | Ok completed ->
                                                                 match completed.Terminal with
                                                                 | StrengthReplicaTerminal.InvalidFrame reason ->
-                                                                    scope.TripStrengthFuse(
+                                                                    scope.Strength.TripStrengthFuse(
                                                                         "Strength Replica invalid frame: " + reason
                                                                     )
 
@@ -423,7 +423,7 @@ module StrengthSpeculate =
                                                                             completed.Batches
                                                                     with
                                                                     | Error error ->
-                                                                        scope.TripStrengthFuse(
+                                                                        scope.Strength.TripStrengthFuse(
                                                                             sprintf
                                                                                 "Strength Replica bundle invalid: %A"
                                                                                 error
@@ -447,7 +447,7 @@ module StrengthSpeculate =
                                                                                 "Strength Prepared storage invalid: "
                                                                                 + error
 
-                                                                            scope.TripStrengthFuse reason
+                                                                            scope.Strength.TripStrengthFuse reason
                                                                             raise (InvalidOperationException reason)
                                                                         | StrengthPreparedPublish.Rejected _ ->
                                                                             // Definite pre-intervention publication failure:
@@ -471,7 +471,7 @@ module StrengthSpeculate =
                                                                                     "Strength Candidate render failed closed: "
                                                                                     + error
 
-                                                                                scope.TripStrengthFuse reason
+                                                                                scope.Strength.TripStrengthFuse reason
                                                                                 raise (InvalidOperationException reason)
             | _ -> return ()
         }

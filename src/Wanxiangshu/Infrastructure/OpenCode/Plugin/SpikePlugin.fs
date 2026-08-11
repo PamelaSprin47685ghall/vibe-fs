@@ -38,7 +38,7 @@ module SpikePlugin =
             let scope = new PluginRuntimeScope(journal)
 
             let strengthFailClosed (reason: string) =
-                scope.TripStrengthFuse reason
+                scope.Strength.TripStrengthFuse reason
                 raise (InvalidOperationException reason)
 
             PluginHost.restoreSessionParents journal scope.SessionParents
@@ -163,12 +163,12 @@ module SpikePlugin =
                             sessionPort,
                             dispatcher,
                             Wanxiangshu.Process.PtyTiming.nodeTimerPort (),
-                            scope.StrengthRuntime,
+                            scope.Strength.StrengthRuntime,
                             registerStrengthReplica,
                             ?workspaceDirectory = workspaceDirectory
                         )
 
-                    scope.AttachStrengthReplicaRuntime strengthReplicaRuntime
+                    scope.Strength.AttachStrengthReplicaRuntime strengthReplicaRuntime
                 | None -> ()
 
                 // GREEN-4: mandatory SessionRecoveryPorts. Real RestoreHandles/RecoverJobs.
@@ -685,7 +685,7 @@ module SpikePlugin =
                         projectionSessionIdOpt |> Option.iter wired.RegisterOwned
 
                         let strengthReplica =
-                            match projectionSessionIdOpt, scope.StrengthReplicaRuntime with
+                            match projectionSessionIdOpt, scope.Strength.StrengthReplicaRuntime with
                             | Some sessionId, Some runtime when runtime.IsReplica(SessionId.create sessionId) ->
                                 Some runtime
                             | _ -> None
@@ -763,7 +763,7 @@ module SpikePlugin =
                           "config",
                           box (fun (config: obj) ->
                               let inventory = ManagerConfig.configureManager config
-                              scope.RecordManagedAgentInventory inventory
+                              scope.Strength.RecordManagedAgentInventory inventory
                               scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config))
                           // HOST-006: this hook cannot refuse a compaction — its output
                           // has no cancel field (`plugin/index.ts:305`) and
