@@ -468,7 +468,7 @@ module Projection =
             match remaining, pending with
             | [], None -> Ok(List.rev acc)
             | [], Some _ -> Error "Strength Host adapter ended with an incomplete tool batch"
-            | (index, (message, hostId, _)) :: tail, currentPending ->
+            | (index, (message, hostId, _)) :: tail, pendingBatch ->
                 let calls =
                     message.Parts
                     |> List.choose (function
@@ -484,7 +484,7 @@ module Projection =
                 if not (List.isEmpty calls) && not (List.isEmpty results) then
                     Error "Strength Host adapter refuses a message mixing tool calls and results"
                 elif not (List.isEmpty calls) then
-                    match currentPending with
+                    match pendingBatch with
                     | Some _ -> Error "Strength Host adapter saw a new tool batch before the previous batch completed"
                     | None when not (String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)) ->
                         Error "Strength tool calls must originate from an assistant message"
@@ -512,7 +512,7 @@ module Projection =
 
                                 encodeMessages tail (Some(pendingCalls, regularParts, index, message, hostId)) acc
                 elif not (List.isEmpty results) then
-                    match currentPending with
+                    match pendingBatch with
                     | None -> Error "Strength Host adapter found tool results without a preceding call batch"
                     | Some(pendingCalls, regularParts, callIndex, callMessage, callHostId) ->
                         if not (String.Equals(message.Role, "tool", StringComparison.OrdinalIgnoreCase)) then
@@ -547,7 +547,7 @@ module Projection =
 
                                     encodeMessages tail None (raw :: acc)
                 else
-                    match currentPending with
+                    match pendingBatch with
                     | Some _ ->
                         Error "Strength Host adapter requires tool results immediately after the tool-call message"
                     | None ->

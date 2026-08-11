@@ -211,7 +211,7 @@ module JsCanonicalDescription =
       return String(pattern);
     };
 
-    const findNext = pattern => {
+    const locatePattern = pattern => {
       if (typeof pattern === "string") {
         if (pattern.length === 0)
           fail("EMPTY_ANCHOR_CONTENT", "string anchor patterns must be non-empty");
@@ -281,7 +281,7 @@ module JsCanonicalDescription =
       if (anchors.has(begin) || anchors.has(end))
         fail("INVALID_ANCHOR_PATTERN", `anchor ${declaration}: names must be unique`);
 
-      const match = findNext(pattern);
+      const match = locatePattern(pattern);
 
       if (!match)
         fail(
@@ -929,11 +929,7 @@ module JsFailure =
     /// Map a structured sandbox sentinel `{ code, reason }` to a typed failure.
     /// Classification uses the code field, never exception-message sniffing (JS-019).
     let ofWire (code: string) (reason: string) : JsFailure =
-        let text =
-            if System.String.IsNullOrEmpty reason then
-                code
-            else
-                reason
+        let text = if System.String.IsNullOrEmpty reason then code else reason
 
         let after (prefix: string) =
             if text.StartsWith prefix then
@@ -957,7 +953,8 @@ module JsFailure =
         | "ANCHOR_NOT_FOUND" -> JsFailure.AnchorNotFound text
         | "ANCHOR_NOT_UNIQUE" -> JsFailure.AnchorNotUnique
         | "ANCHOR_CROSS_FILE" -> JsFailure.AnchorCrossFile
-        | "DUPLICATE_MUTATION_TARGET" -> JsFailure.DuplicateMutationTarget(after "the same path was mutated twice in one program: ")
+        | "DUPLICATE_MUTATION_TARGET" ->
+            JsFailure.DuplicateMutationTarget(after "the same path was mutated twice in one program: ")
         | "RESULT_TOO_LARGE" -> JsFailure.ResultTooLarge None
         | "INVALID_RETURN_VALUE" -> JsFailure.InvalidReturnValue
         | "FILE_CHANGED" -> JsFailure.FileChanged(after "target changed since the read snapshot; no implicit retry: ")

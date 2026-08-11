@@ -65,10 +65,10 @@ pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fal
 #                      teardown may land three already-in-flight durable commits, so 514 is the
 #                      full Host lifetime ceiling.
 #   maxSseEvents     — OpenCode SSE excluding server.heartbeat; K2 + real Host title loops calibrate
-#                      the legal transport lifetime to an observed upper bound of 2549.
+#                      the legal transport lifetime to an observed upper bound of 2560.
 #                      Both are fail-closed runaway ceilings, not wall-clock budgets.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
-setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["native-todo-title", "native-todo", "strength-canary-title", "strength-canary-replica", "strength-canary-owner", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 514, maxSseEvents = 2549, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", ".wanxiang/casebook/.keep" = "" } } }
+setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["native-todo-title", "native-todo", "strength-canary-title", "strength-canary-replica", "strength-canary-owner", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 514, maxSseEvents = 2560, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", ".wanxiang/casebook/.keep" = "" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 

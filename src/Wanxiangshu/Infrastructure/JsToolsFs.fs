@@ -306,6 +306,7 @@ module JsToolsFs =
 
     let private collectVisibleFiles (root: string) (collectCap: int) (visitCap: int) : string list * bool =
         let files = ResizeArray<string>()
+        // DSL-MUTABLE: resource — file collector truncation and visit counters
         let mutable truncated = false
         let mutable visits = 0
 
@@ -419,6 +420,7 @@ module JsToolsFs =
         | Error failure -> Error failure
         | Ok listing ->
             let acc = ResizeArray<JsGrepHit>()
+            // DSL-MUTABLE: resource — grep match truncation latch
             let mutable truncated = listing.Truncated
 
             for rel in listing.Paths do

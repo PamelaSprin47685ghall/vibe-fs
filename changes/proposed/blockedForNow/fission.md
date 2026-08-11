@@ -2266,9 +2266,9 @@ FissionWorkBundle
 ## Agent
 
 ```text
-AGENT-026  Fission role eligibility
-AGENT-027  Fission same-role/tier/authority projection
-AGENT-028  Role prompt responsibility/collaboration guidance
+AGENT-*  Fission role eligibility
+AGENT-*  Fission same-role/tier/authority projection
+AGENT-*  Role prompt responsibility/collaboration guidance
 ```
 
 具体空号需激活时核对正式 docs，不能盲占已使用 ID。

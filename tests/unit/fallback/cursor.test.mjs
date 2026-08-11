@@ -269,14 +269,22 @@ test('FALLBACK_007_the_next_offset_must_be_the_modulo_four_successor', () => {
   }
 })
 
-test('FALLBACK_007_the_count_must_advance_by_exactly_one', () => {
+test('FALLBACK_007_the_count_must_advance_by_exactly_one_or_restart_at_one_after_success', () => {
+  // Continuing streak: exactly +1
   assert.equal(cursor.isValidAdvance(0, 1, 4, 5), true)
+  assert.equal(cursor.isValidAdvance(1, 2, 0, 1), true)
+  assert.equal(cursor.isValidAdvance(2, 3, 2, 3), true)
+
+  // Intervening success reset the count to 0 in memory; next failure restarts count at 1
+  assert.equal(cursor.isValidAdvance(2, 3, 2, 1), true)
+  assert.equal(cursor.isValidAdvance(3, 0, 5, 1), true)
 
   for (const [previousCount, nextCount] of [
     [4, 4],
     [4, 6],
     [4, 3],
     [4, 0],
+    [4, 2],
   ]) {
     assert.equal(cursor.isValidAdvance(0, 1, previousCount, nextCount), false, `${previousCount}→${nextCount} refused`)
   }
@@ -537,6 +545,20 @@ test('FALLBACK_007_a_replayed_journal_reaches_the_same_cursor', () => {
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
   const state = fallbackOf(folded.value)
   assert.deepEqual({ offset: state.offset, failures: state.failures }, { offset: 3, failures: 3 })
+})
+
+test('FALLBACK_007_a_replayed_journal_with_intervening_success_streak_restart_reaches_the_same_cursor', () => {
+  // Intervening success reset failure streak to 0; subsequent failure advances offset from 2 to 3 with count 1
+  const folded = foldFacts([
+    rootFact(),
+    advanceFact({ run: 'run_1', previous: 0, next: 1, count: 1 }),
+    advanceFact({ run: 'run_2', previous: 1, next: 2, count: 2 }),
+    advanceFact({ run: 'run_3', previous: 2, next: 3, count: 1 }),
+  ])
+
+  assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
+  const state = fallbackOf(folded.value)
+  assert.deepEqual({ offset: state.offset, failures: state.failures }, { offset: 3, failures: 1 })
 })
 
 test('FALLBACK_003_a_duplicate_line_is_absorbed_because_replay_produces_it', () => {

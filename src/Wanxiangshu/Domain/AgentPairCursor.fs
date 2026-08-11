@@ -176,15 +176,17 @@ module AgentPairCursor =
     let forNewAuthorityRoot: FallbackCursor = initial
 
     /// FALLBACK-007 fold validation: NextOffset must be the modulo-4 successor,
-    /// and the count must advance by exactly one. A journal line failing either
-    /// check is rejected rather than absorbed.
+    /// and the count must advance by exactly one from the preceding state (or restart
+    /// at one when a prior attempt succeeded and reset the consecutive failure streak).
+    /// A journal line failing either check is rejected rather than absorbed.
     let isValidAdvance
         (previousOffset: FallbackOffset)
         (nextOffset: FallbackOffset)
         (previousCount: int)
         (nextCount: int)
         : bool =
-        nextOffset = advance previousOffset && nextCount = previousCount + 1
+        nextOffset = advance previousOffset
+        && (nextCount = previousCount + 1 || nextCount = 1)
 
     /// The identity used to deduplicate one failed attempt (FALLBACK-003).
     /// Constructed here so callers never assemble it field by field from
