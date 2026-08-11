@@ -33,8 +33,8 @@ type private StrengthReplicaDecisionState =
       Replica: SessionId
       DecisionId: StrengthDecisionId
       Completion: TaskCompletionSource<StrengthReplicaOutcome>
-      mutable RequestsAdmitted: int
-      mutable Batches: StrengthRequestBatch list }
+      RequestsAdmitted: int
+      Batches: StrengthRequestBatch list }
 
 /// STRENGTH-003/004/009/011: physical coordinator for one decision-local leaf.
 ///
@@ -67,6 +67,14 @@ type StrengthReplicaRuntime
             match byReplica.TryGetValue(key replica) with
             | true, state -> Some state
             | false, _ -> None)
+
+    let replaceState (previous: StrengthReplicaDecisionState) (next: StrengthReplicaDecisionState) =
+        lock gate (fun () ->
+            match byReplica.TryGetValue(key previous.Replica) with
+            | true, current when Object.ReferenceEquals(current.Completion, previous.Completion) ->
+                byReplica.[key previous.Replica] <- next
+                true
+            | _ -> false)
 
     let requestsFor terminal (state: StrengthReplicaDecisionState) =
         match terminal with
@@ -146,28 +154,35 @@ type StrengthReplicaRuntime
                     match transformed with
                     | StrengthReplicaTransformOutcome.NotReplica -> return false
                     | StrengthReplicaTransformOutcome.Ready batches ->
-                        state.Batches <- batches
-
                         let limit =
                             liveRegistry.TryFindByReplica replica
                             |> Option.map (fun binding -> StrengthBudget.requestLimit binding.Budget)
                             |> Option.defaultValue 0
 
-                        state.RequestsAdmitted <- min limit (List.length batches + 1)
+                        let next =
+                            { state with
+                                RequestsAdmitted = min limit (List.length batches + 1)
+                                Batches = batches }
+
+                        replaceState state next |> ignore
                         return true
                     | StrengthReplicaTransformOutcome.Retired(reason, batches) ->
-                        state.Batches <- batches
-                        state.RequestsAdmitted <- List.length batches
+                        let next =
+                            { state with
+                                RequestsAdmitted = List.length batches
+                                Batches = batches }
+
+                        replaceState state next |> ignore
 
                         if reason = "provider-request-budget-reached" then
-                            complete StrengthReplicaTerminal.BudgetReached state
+                            complete StrengthReplicaTerminal.BudgetReached next
                         elif
                             reason.StartsWith("invalid-replica-frame", StringComparison.Ordinal)
                             || reason.StartsWith("projection-conflict", StringComparison.Ordinal)
                         then
-                            complete (StrengthReplicaTerminal.InvalidFrame reason) state
+                            complete (StrengthReplicaTerminal.InvalidFrame reason) next
                         else
-                            complete (StrengthReplicaTerminal.Failed reason) state
+                            complete (StrengthReplicaTerminal.Failed reason) next
 
                         return true
         }
@@ -302,15 +317,17 @@ type StrengthReplicaRuntime
                                         if completed then
                                             deadline.Cancel()
                                         else
-                                            complete StrengthReplicaTerminal.TimedOut state
-                                            do! abortReplica state
+                                            let current = tryState replica |> Option.defaultValue state
+                                            complete StrengthReplicaTerminal.TimedOut current
+                                            do! abortReplica current
 
                                         let! result = completionTask
                                         removeState state
                                         return Ok result
                                     with ex ->
-                                        complete (StrengthReplicaTerminal.Failed ex.Message) state
-                                        do! abortReplica state
+                                        let current = tryState replica |> Option.defaultValue state
+                                        complete (StrengthReplicaTerminal.Failed ex.Message) current
+                                        do! abortReplica current
                                         let! result = state.Completion.Task
                                         removeState state
                                         return Ok result

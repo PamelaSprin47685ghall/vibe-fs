@@ -32,69 +32,75 @@ module StrengthBatchCollector =
             | ProviderProjection.WireToolResult(callId, result) -> Some(callId, result)
             | _ -> None)
 
-    let collectCompleteBatches (messages: ProviderProjection.WireMessage list) : StrengthRequestBatch list =
-        let all = List.toArray messages
-        let collected = ResizeArray<StrengthRequestBatch>()
-        let mutable index = 0
-        let mutable requestOrdinal = 0
-        let mutable stopped = false
+    let private isRequestBoundary (message: ProviderProjection.WireMessage) =
+        String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)
+        || String.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase)
 
-        while index < all.Length && not stopped do
-            let message = all.[index]
-
-            if String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase) then
-                requestOrdinal <- requestOrdinal + 1
-                let calls = callsOf message
-
-                if List.isEmpty calls then
-                    // A text/reasoning-only provider completion terminates the
-                    // speculative loop; there can be no later batch in this decision.
-                    stopped <- true
-                else
-                    let callIds = calls |> List.map (fun call -> ToolCallId.value call.Id) |> Set.ofList
-                    let results = System.Collections.Generic.Dictionary<string, string>()
-                    let mutable duplicateOrForeign = false
-                    let mutable cursor = index + 1
-                    let mutable boundary = false
-
-                    while cursor < all.Length && not boundary do
-                        let next = all.[cursor]
-
-                        if
-                            String.Equals(next.Role, "assistant", StringComparison.OrdinalIgnoreCase)
-                            || String.Equals(next.Role, "user", StringComparison.OrdinalIgnoreCase)
-                        then
-                            boundary <- true
-                        else
-                            for callId, result in resultParts next do
+    let private collectResults
+        (all: ProviderProjection.WireMessage array)
+        (callIds: Set<string>)
+        (startIndex: int)
+        : Result<Map<string, string> * int, unit> =
+        let rec loop index results =
+            if index >= all.Length || isRequestBoundary all.[index] then
+                Ok(results, index)
+            else
+                let nextResults =
+                    resultParts all.[index]
+                    |> List.fold
+                        (fun state (callId, result) ->
+                            state
+                            |> Result.bind (fun current ->
                                 let key = ToolCallId.value callId
 
-                                if not (Set.contains key callIds) || results.ContainsKey key then
-                                    duplicateOrForeign <- true
+                                if not (Set.contains key callIds) || Map.containsKey key current then
+                                    Error()
                                 else
-                                    results.[key] <- result
+                                    Ok(Map.add key result current)))
+                        (Ok results)
 
-                            cursor <- cursor + 1
+                match nextResults with
+                | Error() -> Error()
+                | Ok current -> loop (index + 1) current
 
-                    if duplicateOrForeign || results.Count <> calls.Length then
-                        // Preserve earlier complete batches, but never jump over an
-                        // incomplete request: that would relabel provider request N+1
-                        // as N and corrupt K accounting.
-                        stopped <- true
-                    else
-                        let exchanges =
-                            calls
-                            |> List.map (fun call ->
-                                { ToolName = call.Name.Trim().ToLowerInvariant()
-                                  CanonicalArguments = call.Arguments
-                                  CanonicalResult = results.[ToolCallId.value call.Id] })
+        loop startIndex Map.empty
 
-                        collected.Add
-                            { RequestOrdinal = requestOrdinal
-                              Exchanges = exchanges }
+    let collectCompleteBatches (messages: ProviderProjection.WireMessage list) : StrengthRequestBatch list =
+        let all = List.toArray messages
 
-                    index <- if boundary then cursor else max cursor (index + 1)
+        let rec loop index requestOrdinal collected =
+            if index >= all.Length then
+                List.rev collected
             else
-                index <- index + 1
+                let message = all.[index]
 
-        collected |> Seq.toList
+                if not (String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)) then
+                    loop (index + 1) requestOrdinal collected
+                else
+                    let nextOrdinal = requestOrdinal + 1
+                    let calls = callsOf message
+
+                    if List.isEmpty calls then
+                        List.rev collected
+                    else
+                        let callIds = calls |> List.map (fun call -> ToolCallId.value call.Id) |> Set.ofList
+
+                        match collectResults all callIds (index + 1) with
+                        | Error() -> List.rev collected
+                        | Ok(results, nextIndex) when Map.count results <> List.length calls -> List.rev collected
+                        | Ok(results, nextIndex) ->
+                            let exchanges =
+                                calls
+                                |> List.map (fun call ->
+                                    { ToolName = call.Name.Trim().ToLowerInvariant()
+                                      CanonicalArguments = call.Arguments
+                                      CanonicalResult = Map.find (ToolCallId.value call.Id) results })
+
+                            loop
+                                nextIndex
+                                nextOrdinal
+                                ({ RequestOrdinal = nextOrdinal
+                                   Exchanges = exchanges }
+                                 :: collected)
+
+        loop 0 0 []
