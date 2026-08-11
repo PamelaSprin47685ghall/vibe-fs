@@ -28,6 +28,7 @@ type AttachmentKind =
     | SyncInspector
     | SyncCoder
     | Bookkeeper of transactionId
+    | StrengthReplica
 
 type SessionOwnership =
     | Root
@@ -46,8 +47,11 @@ Dedicated SyncInspector / SyncCoder
   = Work + Attached(SyncInspector|SyncCoder)
   MAY 拥有自己的 Companion（Work 能力路径）
 
-Companion / Bookkeeper
-  = InternalLeaf + Attached(Companion|Bookkeeper _)
+Companion / Bookkeeper / StrengthReplica
+  = InternalLeaf + Attached(Companion|Bookkeeper _|StrengthReplica)
+
+StrengthReplica
+  = decision-local InternalLeaf；无 Companion/SyncDelegate/嵌套 Attached，完成即 retire（STRENGTH-004/014）
 
 Work + Root
   = 普通主会话；恰好一个 Companion（InternalLeaf + Attached Companion）
@@ -69,6 +73,7 @@ InternalLeaf 不持有 Companion（BloggerSessionId / Companion 侧 = None），
 Work + Root：恰好一个 Companion/BloggerSessionId，且 ≠ owner
 Work + Attached Sync*：Companion 可选；若有则 ≠ owner、≠ 该 Sync* 自身
 Bookkeeper 绑定具体 transactionId；不得与 Companion / Sync* 身份混用
+StrengthReplica 每个 owner 最多一个 active attachment；不得进入 SatelliteKind，且不跨 Strength decision 复用 transcript
 ```
 
 `AttachedSessionRuntime` 是 Attached 会话的唯一创建、恢复、

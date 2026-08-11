@@ -15,6 +15,7 @@
 | 证明 | 条款 |
 |------|------|
 | AttemptExecutionProfile 原子：禁止拼装 | PROMPT-008 |
+| StrengthReplica：same-role profile，schema/execution gate 恰为 Read/Glob/Grep，mayCarryProbe=false，成功不清 owner failure count | PROMPT-008、STRENGTH-004/015 |
 | 发送 `Agent=EffectiveAgent`，`Model=None` | PROMPT-006 |
 | Fire-and-forget 仍完整 claim | PROMPT-007 |
 

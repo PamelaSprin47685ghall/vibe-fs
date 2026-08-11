@@ -2107,3 +2107,37 @@ Strength 仍然值得做，但今天正确的形状已经不是“给旧系统�
 > **在当前 Work Session 的 provider request 临界点，按 Universal ownership 启一个 `InternalLeaf × Attached(StrengthReplica)` 同角色 fast leaf session，通过现有 AttemptExecutionProfile 把它约束成只读；它最多提前执行两个真实 provider request。其输出先作为 EventStore `StrengthCandidatePrepared`（frame/predictor material 仅经 `payload_refs`）绑定当前 TargetProviderRun；只有主 run 产生消费证据后才 Promotion，并在下一次早期 projection 中进入 XTrace/Companion 的 durable semantic history。预测器只用 shadow/control primary 行为训练，普通失败 K0，durable 因果不确定则 fail closed。不使用 Journal NDJSON / RuntimePath blob，不使用 `SatelliteKind.Replica`，不依赖 Student/Teacher。**
 
 这保留了旧提案真正有价值的第一性原理，同时删除了所有已经被当前 repo 基础设施取代、或会重新制造第二套 owner 的实现包袱。
+
+---
+
+# Active work
+
+> 本文件是变更工作记录，不是当前产品规范；当前产品语义仅以 `docs/` 正式层为准。
+
+## Specification impact
+
+- 在正式 `why/what/shape/how/proof` 中定义 Strength 的只读投机价值、eligible/K、Candidate→Promotion→XTrace 语义、Universal ownership、PromptAuthority、Projection Algebra、EventStore `payload_refs`、recovery/control/canary 边界。
+- 既有 agent/host/prompt/projection/companion/context/fallback/review/persist/execution 条款保持 owner；Strength 只增加合法 case 与交叉引用，不建立第二套 runtime/storage/fallback/projection authority。
+
+## Remaining work
+
+1. 对齐正式 docs 与 glossary/navigation，消除旧 Phase-0/Student-Teacher/feature-owned storage 语义漂移。
+2. 完成纯 Domain：eligibility/control/value policy、semantic frame/digest/wire identity、Strength events/projection、Projection intents 与冲突规则。
+3. 完成 EventStore codec/fold/index 与 payload material durability；实现 Prepared/Promoted/Traced 幂等、冲突与 wrong-target 约束。
+4. 完成 decision-local StrengthReplica runtime、same-role fast profile、readonly schema+execution gate、K1/K2 request budget 与停止语义。
+5. 完成 StrengthSpeculate/Promotion/Replay/XTrace/Companion wiring、CommitUnknown resolve、cancellation/recovery/fuse。
+6. 建立 proposal 要求的 domain/projection/persist/integration/statistical/Host canary 永久 proof；通过仓库标准 build/test/spec/lint 门禁。
+7. 清理 Phase-0 stub、旧 Strength 残留与无价值临时脚手架；关闭 Change 并记录 Final outcome。
+
+## Completion criteria
+
+- Proposal §31 的 21 条最终不变量均有正式 Clause 与机械 proof。
+- Candidate 只有绑定 TargetProviderRun 消费后才能 Promotion；Promoted history 在 crash/restart/compaction/continuation 后可恢复并最终进入 XTrace/Companion。
+- StrengthReplica 为 `InternalLeaf × Attached(StrengthReplica)`，same-role fast peer，provider schema 与 execution gate 恰为 `read/glob/grep`；不影响 owner fallback/review/finality。
+- 大 material 只经 EventStore `payload_refs`；不存在 Strength Journal NDJSON、RuntimePath blob 或独立 storage ref 类型。
+- 启用策略只基于 shadow/control 可识别数据与显式成本；证据/成本/canary 不足时新 decision 必为 K0，已 Promoted 历史继续 replay。
+- 标准仓库检查全绿，无未解决 blocker。
+
+## Blockers
+
+- 无。

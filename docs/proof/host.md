@@ -44,13 +44,14 @@ Work↔Companion 深度逻辑 1（InternalLeaf）；Dedicated SyncInspector/Sync
 
 代表：`tests/unit/plugin/host-hooks.test.mjs`、host-compaction unit、e2e compaction/reanchor 路径。
 
-## Attached 所有权与 Student/Teacher（G2）
+## Attached 所有权
 
 | 证明 | 期望 | 条款 |
 |------|------|------|
-| 正交投影 | ExecutionClass×Ownership 可 O(1) 分辨 Work/InternalLeaf 与 Root/Attached；AttachmentKind 含 Companion/SyncInspector/SyncCoder/Bookkeeper | HOST-008 |
-| Sync* 分类 | Dedicated SyncInspector/SyncCoder = Work+Attached，可走 Companion 能力路径；不得实现成 Teacher-style InternalLeaf | HOST-008 |
-| InternalLeaf | Companion / Bookkeeper = InternalLeaf+Attached；不持有 Companion、不递归挂叶 | HOST-008 |
+| 正交投影 | ExecutionClass×Ownership 可 O(1) 分辨 Work/InternalLeaf 与 Root/Attached；AttachmentKind 含 Companion/SyncInspector/SyncCoder/Bookkeeper/StrengthReplica | HOST-008 |
+| Sync* 分类 | Dedicated SyncInspector/SyncCoder = Work+Attached，可走 Companion 能力路径；不得实现成 InternalLeaf | HOST-008 |
+| InternalLeaf | Companion / Bookkeeper / StrengthReplica = InternalLeaf+Attached；不持有 Companion、不递归挂叶 | HOST-008、STRENGTH-004/014 |
+| StrengthReplica 分类 | owner 最多一个 active StrengthReplica；非 SatelliteKind；retire 后不跨 decision 复用 | HOST-008、STRENGTH-004/014 |
 | Host children 恢复 | journal id 匹配复用、id 丢失 Replacement、无关联新建不收养、冲突/查询失败 fail closed；物理 parent 恒为 family root | HOST-008、HOST-015 |
 | G2 Teacher 过渡 | Teacher 仍可作为 transitional InternalLeaf 存在（非长期 AttachmentKind）；Student/Teacher canary 与 HOST-014 继续有效；不得证明“已删除” | HOST-008、HOST-014 |
 | Teacher 三轮调用 | 同一 Teacher SessionId；普通正文不完成父工具 | HOST-014、AGENT-020 |

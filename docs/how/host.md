@@ -250,8 +250,9 @@ Review 只见 PendingIdentity/Rejected（REVIEW-010）。开裂侧安全：宁�
 链序（seal 之前）：
 
 ```text
-XTraceCapture → Companion → XWire → EnforcerHost
-→ PairProgrammingThoughtTransform → HostMessageProjection.sanitizeMessages (HOST-016) → ReviewSeal
+StrengthReplay → XTraceCapture → Companion → XWire → EnforcerHost
+→ StrengthSpeculate → PairProgrammingThoughtTransform
+→ HostMessageProjection.sanitizeMessages (HOST-016) → ReviewSeal
 ```
 
 - 适用判定：仅 `SessionExecutionClass.Work` 进入本程序。`journal` 存在时以 SessionAssociation 为准：
@@ -281,7 +282,8 @@ Start 组（ordinal 升序）
 - pair 的 synthetic side-channel 标识为 `source = "pair-programming-auto-injected"`；两侧均按 source 排除于 XTrace 等非 provider 投影，禁止按正文识别或过滤。
 - `CallId = digest(transcript identity + source + Ordinal)`；禁止随机、时间、anchor 或 tip 文本参与身份。正文与 source 单点定义。
 - 不变量校验至少：全部历史 anchor 已解析、无重复 placement、call/result 同 callID、synthetic 字节确定（同输入同输出）、当前 placement 与决策算法一致。
-- ReviewSeal 覆盖恢复后的全部历史 pair 与本次新 pair；历史 pair 原位不变，以保持 Prefix Cache。Blogger 跳过注入时 ReviewSeal 只覆盖无 auto-injected 的消息视图。
+- Strength frames 必须在本轮 pair placement 决策前已进入 raw view（STRENGTH-009）；因此新 tool-result anchor 仍被 PairProgrammingThought 覆盖。StrengthReplay 只重建 Promoted 历史且发生在 XTraceCapture 前；StrengthSpeculate 只为当前 target request 注入 Candidate 且发生在 XTraceCapture 后（STRENGTH-006..009）。
+- ReviewSeal 覆盖恢复后的全部历史 pair、本次新 pair与所有 Strength provider-visible bytes；历史 pair 原位不变，以保持 Prefix Cache。Reviewer 路径 Strength 恒 K0。Blogger 跳过注入时 ReviewSeal 只覆盖无 auto-injected 的消息视图。
 - tip nudge 查找：`latestTipNudge` 仅在非 Companion 路径调用；不得以当前 session 是 Blogger 为由把 tip 写进 Blogger transcript。
 - 实现点：`SpikePlugin` transform 在 `PairProgrammingThoughtTransform.tryInject` 之前用 association 门禁短路。
 - 注入旁路：`WANXIANGSHU_SKIP_AUTO_INJECTED=1` 或 transcript provider 为 `cursor` 时，`tryInject` 仍 strip + replay 历史 pair，但跳过「本轮 placement 尚不存在 → append 新 fact」分支（`PairProgrammingThoughtTransform.skipAutoInjectedRequested`；provider 由 `providerIdFromMessages` 读取）。
