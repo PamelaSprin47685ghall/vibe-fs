@@ -137,7 +137,7 @@ repair 注入本身就是预算标记（ENFORCER-153 派生），因此 `AbortRe
 
 ---
 
-## ENFORCER-070：Observation 配对与 RecentTips
+## Observation 配对与 RecentTips（ENFORCER-070）
 
 ### 提交路径
 

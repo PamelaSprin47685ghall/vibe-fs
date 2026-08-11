@@ -91,7 +91,7 @@ type BloggerToolRecovery =
 
 `InteractionNudgeIssued` 携带触发 Nudge 的真实 terminal run。相同 run 重入只表示同一观察重放；不同 run 再次无效才证明 Nudge 语义失败。不得退化成计数器，Coordinator 与 Host 不得各维护一套。
 
-## ENFORCER-070（shape）：Observation 所有权
+## Observation 所有权（ENFORCER-070）
 
 | 半边 | Writer / fold | 非所有者 |
 |------|---------------|----------|
@@ -119,7 +119,7 @@ TipDelivery Full 集合按 **Main** session 隔离；Blogger satellite 经 assoc
 
 catch-up / repair 处理有界；禁止无限环。
 
-## ENFORCER-170（shape）：规则包边界
+## 规则包边界（ENFORCER-170）
 
 | 层 | 拥有 | 禁止 |
 |----|------|------|
