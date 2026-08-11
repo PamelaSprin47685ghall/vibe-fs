@@ -5,7 +5,7 @@
 多行/单行字符串写法、转义、closing delimiter 位置，全仓库**唯一**格式来源。  
 业务模块不得各自决定引号、缩进或 delimiter 方言。
 
-实现落点：统一 renderer / string codec（见生产 `SyntheticToml` 一类入口）；inventory 与 golden 只认该 owner。
+实现落点：统一 renderer / string codec / 值树编码（见生产 `SyntheticToml` 一类入口）；inventory 与 golden 只认该 owner。bool / int / float / array / table / quoted key 不得由业务模块另造方言。Blogger 等现有字符串面可继续只用字符串 API。
 
 ## Renderer 边界
 

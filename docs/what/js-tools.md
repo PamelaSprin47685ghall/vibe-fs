@@ -52,7 +52,7 @@ gitignore / wildmatch 风格的有界确定性路径枚举。`pattern` 相对 ca
 
 ## JS-010 JSON-compatible return
 
-`run()` 的返回值必须是 JSON-compatible 结构化结果；query 可以零 mutation。成功结果形状稳定（见 proof 的 golden）。
+`run()` 的返回值必须是 JSON-compatible 结构化结果；query 可以零 mutation。允许：`null`、boolean、finite number、string、array、plain object。下列在 **commit 前** 失败为 `INVALID_RETURN_VALUE`：`undefined` / BigInt / NaN / Infinity / function / symbol / cyclic；数组（任意深度）含 `null`；同一数组混有对象与非对象。对象字段 `null` 合法，渲染时省略该键。顶层 `null` 合法。成功 LLM-visible 形状见 JS-016。
 
 ## JS-011 Sandbox capability boundary
 
@@ -76,7 +76,14 @@ normal 失败路径回滚全部 staged 效果。crash 恢复只从 EventStore fa
 
 ## JS-016 Synthetic TOML result
 
-工具结果经 Synthetic TOML 渲染（`ARCH-010` 唯一渲染 owner），受 ToolResultBound 约束。
+工具结果经 Synthetic TOML 渲染（`ARCH-010` 唯一渲染 owner），受 ToolResultBound 约束。沙箱 `JSON.stringify` 只是 VM 出口，不得再包进 TOML 字符串字段。
+
+两份文档，无 `status` discriminator，无 `result` / `written` / `created`：
+
+- **失败**：instruction 恰好 `# failed`；根级 `code` / `reason`（JS-019）。无 `[data]`，无 `[fs]`。
+- **成功**：instruction 恰好 `# ok`；程序值进入 `data`（对象 → `[data]`；原始值/原始值数组 → `data = …`；对象数组 → `[[data]]`）；有磁盘效果时文末 `[fs]`，`rewritten` / `created` 为非空路径数组。空提交不出现 `[fs]`；`[fs]` 不含空数组或空字符串。顶层 `null` 无 data 体。
+
+程序键活在 `[data]` 内，与 Host `[fs]`、失败根级 `code` 不合体。值编码（省略对象 `null` 字段、整数/浮点、quoted key、裸字段先于表）由 `SyntheticToml` 决定，见 `how/synthetic-toml.md`。
 
 ## JS-017 Builtin tools remain
 
@@ -88,4 +95,4 @@ normal 失败路径回滚全部 staged 效果。crash 恢复只从 EventStore fa
 
 ## JS-019 Failure algebra
 
-失败以稳定失败码表达（proposal §77.1：`INVALID_PROGRAM` / `PROGRAM_FAILED` / `PROGRAM_TIMEOUT` / `PERMISSION_DENIED` / `PATH_DENIED` / `FILE_NOT_FOUND` / `FILE_ALREADY_EXISTS` / `INVALID_UTF8` / `ANCHOR_NOT_FOUND` / `ANCHOR_NOT_UNIQUE` / `DUPLICATE_MUTATION_TARGET` / `RESULT_TOO_LARGE` / `INVALID_RETURN_VALUE` / `FILE_CHANGED` / `TRANSACTION_*` / `UNKNOWN_MEMBER`），LLM-visible errors 可读且稳定；不把程序可预见失败伪装成异常，不从 exception message 反推业务错误种类。
+失败以稳定失败码表达（proposal §77.1：`INVALID_PROGRAM` / `PROGRAM_FAILED` / `PROGRAM_TIMEOUT` / `PERMISSION_DENIED` / `PATH_DENIED` / `FILE_NOT_FOUND` / `FILE_ALREADY_EXISTS` / `INVALID_UTF8` / `ANCHOR_NOT_FOUND` / `ANCHOR_NOT_UNIQUE` / `DUPLICATE_MUTATION_TARGET` / `RESULT_TOO_LARGE` / `INVALID_RETURN_VALUE` / `FILE_CHANGED` / `TRANSACTION_*` / `UNKNOWN_MEMBER`），LLM-visible errors 可读且稳定；不把程序可预见失败伪装成异常，不从 exception message 反推业务错误种类。LLM-visible 失败文档形状见 JS-016；失败码集合不因渲染改动而增减。

@@ -10,7 +10,7 @@
 | BuiltinToolDescriptionHook | builtin 工具 description 的 `Prefer js-ROLE` 推荐文案 | builtin schema / executor |
 | Sandbox Runner | 任意 JS 进程执行：deadline / kill / reap / resource budgets | 业务语义、权限 |
 | JsTransaction | staged filesystem effect：preflight / prepare / commit / rollback / recovery | 模型 JS 执行 |
-| SyntheticToml | LLM-visible result 渲染 | 执行语义 |
+| SyntheticToml | LLM-visible 字符串规则与值树编码 | 执行语义；js-* 成败文档组装 |
 
 ## 责任区
 
@@ -33,6 +33,7 @@ Builtin 工具名不决定 js-* 权限
 Description 钩子不改变 builtin schema/executor
 Model JS 不拥有 ambient OS authority
 Transaction engine 不执行模型 JavaScript
+JsToolsResult 只组 document（instruction + data/fs）；值树 API 属 SyntheticToml
 同一路径同一 program 只允许一个 mutation 意图
 mutation 在 commit 前不可见（含同一 program 内后续读取）
 ```

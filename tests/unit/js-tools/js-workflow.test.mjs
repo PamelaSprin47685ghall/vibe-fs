@@ -14,6 +14,7 @@ import { JsToolWorkflow_run as workflowRun } from '../../../dist/Infrastructure/
 import { JsToolGenerator_generate as generate } from '../../../dist/Domain/JsTools.js'
 import { ToolPermission } from '../../../dist/Kernel/Roles.js'
 import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Set.js'
+import { parse as parseToml } from 'smol-toml'
 import { caseOf, listItems, resultOf } from '../support/domain.mjs'
 
 const sandbox = () => {
@@ -55,8 +56,7 @@ test('JS085_workflow_reads_and_commits_rewrite', async () => {
 }`
     const { outcome } = await runWorkflow(dir, program)
     assert.equal(caseName(outcome), 'Succeeded')
-    assert.deepEqual(JSON.parse(outcome.fields[0]), { before: 'hello world' })
-    assert.deepEqual(listItems(outcome.fields[1]), ['a.txt']) // written
+    assert.deepEqual(listItems(outcome.fields[1]), ['a.txt']) // rewritten
     assert.deepEqual(listItems(outcome.fields[2]), []) // created
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'goodbye world', 'committed to disk')
   } finally {
@@ -179,18 +179,102 @@ test('JS016_result_renders_stable_toml_shapes', async () => {
     const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
     const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
     const toml = render(outcome)
-    assert.equal(toml.includes('status = "ok"'), true)
-    // renderString escapes inner quotes: result = "{\"before\":\"x\"}"
-    assert.equal(toml.includes('result = "{\\"'), true)
-    assert.equal(toml.includes('before'), true)
-    assert.equal(toml.includes('written = "a.txt"'), true)
-    // failed shape
+    assert.equal(toml.startsWith('# ok\n'), true)
+    assert.equal(/(?:^|\n)status =/m.test(toml), false)
+    assert.equal(/(?:^|\n)result =/m.test(toml), false)
+    assert.equal(/(?:^|\n)written =/m.test(toml), false)
+    const doc = parseToml(toml)
+    assert.equal(doc.data.before, 'x')
+    assert.deepEqual(doc.fs.rewritten, ['a.txt'])
+    assert.equal(doc.fs.created, undefined)
     const failing = await workflowRun(dir, surface.BaseClassSource, `class Js extends JsProgram {
   async run() { throw new Error('boom'); }
 }`, 2000, Date.now() + 60_000, 1 << 20)
     const failedToml = render(failing)
-    assert.equal(failedToml.includes('status = "failed"'), true)
-    assert.equal(failedToml.includes('code = "PROGRAM_FAILED"'), true)
+    assert.equal(failedToml.startsWith('# failed\n'), true)
+    assert.equal(failedToml.includes('status ='), false)
+    const failed = parseToml(failedToml)
+    assert.equal(failed.code, 'PROGRAM_FAILED')
+    assert.equal(typeof failed.reason, 'string')
+    assert.equal(failed.data, undefined)
+    assert.equal(failed.fs, undefined)
+  } finally {
+    cleanup()
+  }
+})
+
+test('JS010_016_query_object_has_data_and_no_fs', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
+    const surface = generate('Coder', coderCaps)
+    const program = `class Js extends JsProgram {
+  async run() {
+    return { paths: ['a.txt'], truncated: false }
+  }
+}`
+    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+    const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
+    const toml = render(outcome)
+    const doc = parseToml(toml)
+    assert.deepEqual(doc.data.paths, ['a.txt'])
+    assert.equal(doc.data.truncated, false)
+    assert.equal(doc.fs, undefined)
+    assert.equal(toml.includes('[fs]'), false)
+  } finally {
+    cleanup()
+  }
+})
+
+test('JS010_016_primitive_return_uses_data_field', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const surface = generate('Coder', coderCaps)
+    const program = `class Js extends JsProgram {
+  async run() { return 42 }
+}`
+    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+    const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
+    const toml = render(outcome)
+    assert.equal(parseToml(toml).data, 42)
+  } finally {
+    cleanup()
+  }
+})
+
+test('JS010_array_null_is_invalid_and_does_not_commit', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'old', 'utf8')
+    const surface = generate('Coder', coderCaps)
+    const program = `class Js extends JsProgram {
+  async run() {
+    this.rewrite('a.txt', 'new')
+    return [null]
+  }
+}`
+    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+    assert.equal(caseName(outcome), 'Failed')
+    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'old')
+    const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
+    const failed = parseToml(render(outcome))
+    assert.equal(failed.code, 'INVALID_RETURN_VALUE')
+  } finally {
+    cleanup()
+  }
+})
+
+test('JS010_mixed_object_array_is_invalid', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const surface = generate('Coder', coderCaps)
+    const program = `class Js extends JsProgram {
+  async run() { return [1, { a: 1 }] }
+}`
+    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+    assert.equal(caseName(outcome), 'Failed')
+    const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
+    assert.equal(parseToml(render(outcome)).code, 'INVALID_RETURN_VALUE')
   } finally {
     cleanup()
   }

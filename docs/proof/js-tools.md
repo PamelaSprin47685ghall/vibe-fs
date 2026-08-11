@@ -12,7 +12,7 @@
 | **Anchor/regex** | 有序匹配、消歧、零宽、`^`/`$` 绝对语义、5 类拒绝 |
 | **read/glob/grep** | 快照隔离；UTF-8 拒绝；gitignore glob（含零段 `**`、跳过 `.git`、应用 ignore、匹配计数有界、`truncated` 可见）；Host `grep()` 返回 path+line+column；非 UTF-8 跳过；capability 边界外不可见 |
 | **write/rewrite 区分** | 目标缺失/存在的双向失败 |
-| **Structured return** | golden 形状稳定；query 零 mutation |
+| **Structured return** | JS-016 golden：成功 `# ok` + `[data]`/`data =`，有改盘则文末 `[fs]` 路径数组；失败 `# failed` + `code`/`reason`；无 `status`/`result`/`written`/`created`；query 零 mutation；TOML 可 parse |
 | **Multi-file transaction** | preflight 全过才动；任一失败全部零提交；同路径单意图；无 lost update |
 | **Conflict** | 快照后外部修改 → FILE_CHANGED fail closed |
 | **Rollback** | normal 失败路径 staged 效果归零 |
@@ -20,6 +20,7 @@
 | **Sandbox** | 无 ambient authority（fs/network/process/env 不可得）；escape RED 测试；deadline kill；memory/output bounded |
 | **Parallel** | 同消息串行确定性；同文件无 lost update；异文件独立 all-or-nothing |
 | **G3 rebase debt** | production 无 js-student / js-teacher / StudentLearn / StudentCompile（static ratchet） |
+| **Invalid return before commit** | 数组 `null`、异构对象数组 → `INVALID_RETURN_VALUE`；磁盘未变 |
 | **Static gates** | spec / architecture / unified-store-gate（no feature store）/ g4r-freeze / lint 全绿 |
 
 ## 门禁

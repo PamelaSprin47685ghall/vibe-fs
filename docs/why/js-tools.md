@@ -25,3 +25,7 @@
 **walk-then-filter + `**`→`.*` vs gitignore wildmatch。** 拒前者：DFS 字典序先进入 `.git`，硬上限打在枚举前缀而非匹配条数，`src/**/*.fs` 在真仓库变成空集；naive `**` 还要求额外目录段。有界必须打在匹配结果上；pattern 方言必须是 gitignore/wildmatch（含零段 `**`、无斜杠则任意深度、应用 `.gitignore`、永不进入 `.git`）。截断必须是返回值上的可见位，不能伪装成「无匹配」（JS-007）。
 
 **Grep 仅作 `glob()+file()+RegExp` 组合 vs Host `grep()` member。** 原文 `#5` 以「可表达」否定 primitive。可表达 ≠ 实用：glob 假阴性让组合零命中；即便 glob 正确，沙箱内逐文件 `file()` 仍被 timeout / `RESULT_TOO_LARGE` / 二进制文件放大。修正案：`ToolPermission.Grep` 投影为 Host `grep()`（gitignore 选文件、跳过非 UTF-8、返回 path+line+column+匹配子串、匹配条数有界且截断可见）。builtin `grep` RPC 仍独立存在。Read+Glob 而无 Grep 时组合仍合法，不再是唯一搜索面（JS-020）。
+
+**结果：JSON stringify 进 TOML 字符串字段 vs 值树进 SyntheticToml。** 拒前者：`status` / `result = "{...}"` / 逗号拼接 `written` 是两套语法叠信封；空字符串噪声；路径含逗号不可消歧。`run()` 的 JSON 兼容值仍是沙箱边界；LLM 看见的是 ARCH-010 文档。Host 事实与程序值分表，不用 `status` discriminator（JS-016）。
+
+**数组 `null` / 异构对象数组放行 vs commit 前 `INVALID_RETURN_VALUE`。** 拒放行：TOML 不能诚实表示 `null` 元素，对象与原始值混列也无法用一种 array 记法。对象字段 `null` 省略；顶层 `null` 无 data 体（JS-010）。

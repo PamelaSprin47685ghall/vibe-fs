@@ -395,3 +395,13 @@ test('ARCH_010_byteCount_agrees_with_the_platform_encoder', () => {
     )
   }
 })
+
+test('ARCH_010_value_tree_scalars_and_keys', () => {
+  assert.equal(toml.renderBool(true), 'true')
+  assert.equal(toml.renderBool(false), 'false')
+  assert.equal(toml.renderInt(42), '42')
+  assert.equal(toml.renderKey('paths'), 'paths')
+  assert.equal(toml.renderKey('/egg/i'), '"/egg/i"')
+  assert.equal(toml.tableEntry('data', ['truncated = false']).startsWith('[data]'), true)
+  assert.equal(toml.tableEntry('data', ['truncated = false']).includes('[['), false)
+})

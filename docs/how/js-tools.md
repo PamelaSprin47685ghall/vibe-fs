@@ -14,11 +14,11 @@ resolve Attempt
 → 创建 sandbox，注入生成的 runtime bindings
 → 执行 class Js { async run() { ... } }
 → 收集 return + ReadSet + WriteSet
-→ result validation（commit 前）
+→ 解析 JSON 为值树并 JS-010 校验（失败则零提交）
 → snapshot/path validation（preflight）
 → 若 WriteSet 非空：transaction prepare → commit
-→ 若 WriteSet 空（纯查询）：跳过事务，直接渲染
-→ 渲染 result（Synthetic TOML）
+→ 若 WriteSet 空（纯查询）：跳过事务
+→ 渲染 Synthetic TOML（JS-016：`# ok`/`# failed` + `[data]`/`[fs]`）
 ```
 
 ## 生成规则（deterministic）
@@ -91,6 +91,22 @@ ReadSet/WriteSet 由 sandbox 收集（typed execution 捕获，不从 transcript
 
 runner 只获得显式注入的数据（路径字符串、FileView 内容、glob 结果），不获得文件句柄 / 环境 / 网络 / 进程。`new Function` 仅作 invocation mechanism。deadline 超时 kill + reap；stdout/stderr 不是编辑结果（编辑结果只来自 staged effects）。
 
+
+
+## Result 渲染（JS-016）
+
+```text
+sandbox JSON string
+→ parse 值树
+→ validate（数组 null / 异构对象数组 → INVALID_RETURN_VALUE，此时尚未 prepare/commit）
+→ preflight / 事务
+→ JsToolsResult：
+     Failed → document(["failed"], code + reason)
+     Succeeded → document(["ok"], encodeData(value) ++ optional [fs])
+→ ARCH-012 bound（ToolHostCodec）
+```
+
+`[fs]` 仅含非空 `rewritten` / `created` 路径数组，且为最后一个 table block。对象字段 `null` 省略。根原始值用 `data = …`。
 ## Failure algebra
 
 程序可预见失败 = 稳定失败码返回（proposal §77.1：`FILE_NOT_FOUND` / `FILE_ALREADY_EXISTS` / `FILE_CHANGED` / `INVALID_UTF8` / `ANCHOR_*` / `PERMISSION_DENIED` / `PATH_DENIED` / `PROGRAM_*` / `TRANSACTION_*` / `DUPLICATE_MUTATION_TARGET` / `RESULT_TOO_LARGE` / `INVALID_RETURN_VALUE`）。异常只留给程序无法继续的事故（进程崩溃、Host 故障）；不从 exception message 反推业务错误种类。

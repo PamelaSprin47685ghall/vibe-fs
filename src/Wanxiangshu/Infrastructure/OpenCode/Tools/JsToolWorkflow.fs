@@ -1,9 +1,125 @@
 namespace Wanxiangshu.Infrastructure
 
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.Process
+
+/// Parse the sandbox JSON string into SyntheticToml.DataValue and enforce JS-010.
+module JsToolsData =
+
+    [<Emit("$0 === null")>]
+    let private jsNull (value: obj) : bool = jsNative
+
+    [<Emit("typeof $0")>]
+    let private jsType (value: obj) : string = jsNative
+
+    [<Emit("Array.isArray($0)")>]
+    let private jsIsArray (value: obj) : bool = jsNative
+
+    [<Emit("Object.keys($0)")>]
+    let private jsKeys (value: obj) : string[] = jsNative
+
+    [<Emit("$0[$1]")>]
+    let private jsGet (value: obj) (key: obj) : obj = jsNative
+
+    [<Emit("$0.length")>]
+    let private jsLength (value: obj) : int = jsNative
+
+    [<Emit("Number.isInteger($0)")>]
+    let private jsIsInteger (value: obj) : bool = jsNative
+
+    [<Emit("Number.isFinite($0)")>]
+    let private jsIsFinite (value: obj) : bool = jsNative
+
+    let private maxSafeInteger = 9007199254740991.0
+
+    let rec private isPrimitiveTree (value: SyntheticToml.DataValue) =
+        match value with
+        | SyntheticToml.DataValue.Bool _
+        | SyntheticToml.DataValue.Integer _
+        | SyntheticToml.DataValue.Float _
+        | SyntheticToml.DataValue.String _ -> true
+        | SyntheticToml.DataValue.Array items -> List.forall isPrimitiveTree items
+        | SyntheticToml.DataValue.Null
+        | SyntheticToml.DataValue.Object _ -> false
+
+    let private validateArray (items: SyntheticToml.DataValue list) : Result<unit, JsFailure> =
+        if
+            items
+            |> List.exists (function
+                | SyntheticToml.DataValue.Null -> true
+                | _ -> false)
+        then
+            Error JsFailure.InvalidReturnValue
+        elif List.isEmpty items then
+            Ok()
+        elif
+            items
+            |> List.forall (function
+                | SyntheticToml.DataValue.Object _ -> true
+                | _ -> false)
+        then
+            Ok()
+        elif List.forall isPrimitiveTree items then
+            Ok()
+        else
+            Error JsFailure.InvalidReturnValue
+
+    let rec private ofJsValue (value: obj) : Result<SyntheticToml.DataValue, JsFailure> =
+        if jsNull value then
+            Ok SyntheticToml.DataValue.Null
+        else
+            match jsType value with
+            | "boolean" -> Ok(SyntheticToml.DataValue.Bool(unbox value))
+            | "string" -> Ok(SyntheticToml.DataValue.String(unbox value))
+            | "number" ->
+                if not (jsIsFinite value) then
+                    Error JsFailure.InvalidReturnValue
+                elif jsIsInteger value then
+                    let n: float = unbox value
+
+                    if abs n <= maxSafeInteger then
+                        Ok(SyntheticToml.DataValue.Integer(int64 n))
+                    else
+                        Ok(SyntheticToml.DataValue.Float n)
+                else
+                    Ok(SyntheticToml.DataValue.Float(unbox value))
+            | "object" when jsIsArray value ->
+                let rec loop index acc =
+                    if index = jsLength value then
+                        let items = List.rev acc
+
+                        match validateArray items with
+                        | Error failure -> Error failure
+                        | Ok() -> Ok(SyntheticToml.DataValue.Array items)
+                    else
+                        match ofJsValue (jsGet value index) with
+                        | Error failure -> Error failure
+                        | Ok item -> loop (index + 1) (item :: acc)
+
+                loop 0 []
+            | "object" ->
+                let keys = jsKeys value
+
+                let rec loop index acc =
+                    if index = keys.Length then
+                        Ok(SyntheticToml.DataValue.Object(List.rev acc))
+                    else
+                        match ofJsValue (jsGet value keys.[index]) with
+                        | Error failure -> Error failure
+                        | Ok item -> loop (index + 1) ((keys.[index], item) :: acc)
+
+                loop 0 []
+            | _ -> Error JsFailure.InvalidReturnValue
+
+    let parse (json: string) : Result<SyntheticToml.DataValue, JsFailure> =
+        try
+            ofJsValue (JS.JSON.parse json)
+        with _ ->
+            Error JsFailure.InvalidReturnValue
 
 /// JS-085: one js-* tool invocation, end to end — the only orchestration of
 /// sandbox execution, staging, preflight, durable prepare, commit and the
@@ -13,10 +129,10 @@ open Wanxiangshu.Process
 /// recovery can undo only what was provably written.
 module JsToolWorkflow =
 
-    /// Outcome of one invocation: the program's JSON result plus the commit
-    /// report (files written / files created) — or a stable JsFailure.
+    /// Outcome of one invocation: the program's structured value plus the
+    /// commit report — or a stable JsFailure.
     type JsToolOutcome =
-        | Succeeded of resultJson: string * written: string list * created: string list
+        | Succeeded of value: SyntheticToml.DataValue * rewritten: string list * created: string list
         | Failed of JsFailure
 
     /// Run a model program against root. `baseClassSource` is the generated
@@ -44,109 +160,106 @@ module JsToolWorkflow =
             match sandboxResult with
             | Error failure -> return Failed failure
             | Ok resultJson ->
-                // 2. preflight: the pure transaction rules over live fs facts
-                let mutations = staging |> Seq.toList
-
-                let exists (path: string) : bool =
-                    JsToolsFs.existsPath (JsToolsFs.resolveToolPath root path)
-
-                let readCurrent (path: string) : string option =
-                    match JsToolsFs.readUtf8Classified (JsToolsFs.resolveToolPath root path) with
-                    | Ok text -> Some text
-                    | Error _ -> None
-
-                match JsTransaction.preflight exists readCurrent mutations with
+                match JsToolsData.parse resultJson with
                 | Error failure -> return Failed failure
-                | Ok() when List.isEmpty mutations ->
-                    // pure query: no transaction, no durable facts (JS-085)
-                    return Succeeded(resultJson, [], [])
-                | Ok() ->
-                    // 3. durable prepare BEFORE any filesystem effect (JS-012)
-                    let prepared =
-                        { TransactionId = JsTransactionId.generate ()
-                          WorkspaceRoot = root
-                          Mutations = JsTransactionFacts.ofStaged mutations }
+                | Ok value ->
+                    // 2. preflight: the pure transaction rules over live fs facts
+                    let mutations = staging |> Seq.toList
 
-                    match persistence with
-                    | None ->
-                        // ephemeral path (tests / no store available)
-                        match JsToolsFs.commitPlan root (JsTransaction.commitPlan mutations) with
-                        | Error failure -> return Failed failure
-                        | Ok() ->
-                            let written =
-                                mutations
-                                |> List.choose (fun m ->
-                                    match m with
-                                    | JsStagedMutation.Rewrite(path, _, _) -> Some path
-                                    | JsStagedMutation.Create _ -> None)
+                    let exists (path: string) : bool =
+                        JsToolsFs.existsPath (JsToolsFs.resolveToolPath root path)
 
-                            let created =
-                                mutations
-                                |> List.choose (fun m ->
-                                    match m with
-                                    | JsStagedMutation.Create(path, _) -> Some path
-                                    | JsStagedMutation.Rewrite _ -> None)
+                    let readCurrent (path: string) : string option =
+                        match JsToolsFs.readUtf8Classified (JsToolsFs.resolveToolPath root path) with
+                        | Ok text -> Some text
+                        | Error _ -> None
 
-                            return Succeeded(resultJson, written, created)
-                    | Some(eventStore, raw) ->
-                        let snapshot = eventStore.OpenSnapshot()
+                    match JsTransaction.preflight exists readCurrent mutations with
+                    | Error failure -> return Failed failure
+                    | Ok() when List.isEmpty mutations ->
+                        // pure query: no transaction, no durable facts (JS-085)
+                        return Succeeded(value, [], [])
+                    | Ok() ->
+                        // 3. durable prepare BEFORE any filesystem effect (JS-012)
+                        let prepared =
+                            { TransactionId = JsTransactionId.generate ()
+                              WorkspaceRoot = root
+                              Mutations = JsTransactionFacts.ofStaged mutations }
 
-                        let head =
-                            match JsToolsTransactionStore.loadEvents raw snapshot with
-                            | Ok events -> JsToolsTransactionStore.streamHead events
-                            | Error _ -> None
-
-                        match JsToolsTransactionStore.appendPrepared eventStore (Option.toList head) prepared with
-                        | Error _ -> return Failed JsFailure.TransactionPrepareFailed
-                        | Ok preparedEventId ->
-                            // 4. commit: all-or-nothing
+                        match persistence with
+                        | None ->
+                            // ephemeral path (tests / no store available)
                             match JsToolsFs.commitPlan root (JsTransaction.commitPlan mutations) with
                             | Error failure -> return Failed failure
                             | Ok() ->
-                                // 5. the commit fact (JS-012): its absence after
-                                // Prepared is what recovery uses to undo
-                                match
-                                    JsToolsTransactionStore.appendCommitted
-                                        eventStore
-                                        [ preparedEventId ]
-                                        prepared.TransactionId
-                                with
-                                | Error _ -> return Failed JsFailure.TransactionCommitFailed
-                                | Ok _ ->
-                                    let written =
-                                        mutations
-                                        |> List.choose (fun m ->
-                                            match m with
-                                            | JsStagedMutation.Rewrite(path, _, _) -> Some path
-                                            | JsStagedMutation.Create _ -> None)
+                                let written =
+                                    mutations
+                                    |> List.choose (fun m ->
+                                        match m with
+                                        | JsStagedMutation.Rewrite(path, _, _) -> Some path
+                                        | JsStagedMutation.Create _ -> None)
 
-                                    let created =
-                                        mutations
-                                        |> List.choose (fun m ->
-                                            match m with
-                                            | JsStagedMutation.Create(path, _) -> Some path
-                                            | JsStagedMutation.Rewrite _ -> None)
+                                let created =
+                                    mutations
+                                    |> List.choose (fun m ->
+                                        match m with
+                                        | JsStagedMutation.Create(path, _) -> Some path
+                                        | JsStagedMutation.Rewrite _ -> None)
 
-                                    return Succeeded(resultJson, written, created)
+                                return Succeeded(value, written, created)
+                        | Some(eventStore, raw) ->
+                            let snapshot = eventStore.OpenSnapshot()
+
+                            let head =
+                                match JsToolsTransactionStore.loadEvents raw snapshot with
+                                | Ok events -> JsToolsTransactionStore.streamHead events
+                                | Error _ -> None
+
+                            match JsToolsTransactionStore.appendPrepared eventStore (Option.toList head) prepared with
+                            | Error _ -> return Failed JsFailure.TransactionPrepareFailed
+                            | Ok preparedEventId ->
+                                // 4. commit: all-or-nothing
+                                match JsToolsFs.commitPlan root (JsTransaction.commitPlan mutations) with
+                                | Error failure -> return Failed failure
+                                | Ok() ->
+                                    // 5. the commit fact (JS-012): its absence after
+                                    // Prepared is what recovery uses to undo
+                                    match
+                                        JsToolsTransactionStore.appendCommitted
+                                            eventStore
+                                            [ preparedEventId ]
+                                            prepared.TransactionId
+                                    with
+                                    | Error _ -> return Failed JsFailure.TransactionCommitFailed
+                                    | Ok _ ->
+                                        let written =
+                                            mutations
+                                            |> List.choose (fun m ->
+                                                match m with
+                                                | JsStagedMutation.Rewrite(path, _, _) -> Some path
+                                                | JsStagedMutation.Create _ -> None)
+
+                                        let created =
+                                            mutations
+                                            |> List.choose (fun m ->
+                                                match m with
+                                                | JsStagedMutation.Create(path, _) -> Some path
+                                                | JsStagedMutation.Rewrite _ -> None)
+
+                                        return Succeeded(value, written, created)
         }
 
-/// JS-016/JS-078.1: stable LLM-visible result shapes, rendered as Synthetic
-/// TOML (the only rendering owner; ARCH-010). Success carries the program
-/// JSON plus the commit report; failure carries the stable code + reason.
+/// JS-016: stable LLM-visible result shapes, rendered as Synthetic TOML
+/// (the only rendering owner; ARCH-010). Success is `# ok` plus data/fs;
+/// failure is `# failed` plus code/reason.
 module JsToolsResult =
 
     let render (outcome: JsToolWorkflow.JsToolOutcome) : string =
         match outcome with
-        | JsToolWorkflow.JsToolOutcome.Succeeded(resultJson, written, created) ->
-            SyntheticToml.document
-                []
-                [ SyntheticToml.field "status" (SyntheticToml.renderString "ok")
-                  SyntheticToml.field "result" (SyntheticToml.renderString resultJson)
-                  SyntheticToml.field "written" (SyntheticToml.renderString (String.concat "," written))
-                  SyntheticToml.field "created" (SyntheticToml.renderString (String.concat "," created)) ]
+        | JsToolWorkflow.JsToolOutcome.Succeeded(value, rewritten, created) ->
+            SyntheticToml.document [ "ok" ] (SyntheticToml.encodeData value @ SyntheticToml.encodeFs rewritten created)
         | JsToolWorkflow.JsToolOutcome.Failed failure ->
             SyntheticToml.document
-                []
-                [ SyntheticToml.field "status" (SyntheticToml.renderString "failed")
-                  SyntheticToml.field "code" (SyntheticToml.renderString (JsFailure.code failure))
+                [ "failed" ]
+                [ SyntheticToml.field "code" (SyntheticToml.renderString (JsFailure.code failure))
                   SyntheticToml.field "reason" (SyntheticToml.renderString (JsFailure.reason failure)) ]

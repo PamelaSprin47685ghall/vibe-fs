@@ -126,6 +126,11 @@ module SyntheticToml =
     /// `name = <rendered value>`. The value must already be rendered by `renderString`.
     let field (name: string) (renderedValue: string) : string = name + " = " + renderedValue
 
+
+    /// A `[name]` table: header plus its fields, as one block.
+    let tableEntry (name: string) (fields: string list) : string =
+        String.concat "\n" (("[" + name + "]") :: fields)
+
     /// A `[[name]]` entry: the header plus its own fields, as one block.
     ///
     /// Takes the fields rather than returning a bare header so an entry cannot be assembled with
@@ -133,6 +138,177 @@ module SyntheticToml =
     /// reassign those fields to a different table.
     let tableArrayEntry (name: string) (fields: string list) : string =
         String.concat "\n" (("[[" + name + "]]") :: fields)
+
+
+    let renderBool (value: bool) = if value then "true" else "false"
+
+    let renderInt (value: int64) = string value
+
+    /// Non-integer finite floats only. If the runtime string has no decimal and
+    /// no exponent, append `.0` so the token cannot be read as an integer.
+    let renderFloat (value: float) =
+        let text = string value
+
+        if text.IndexOf '.' >= 0 || text.IndexOf 'e' >= 0 || text.IndexOf 'E' >= 0 then
+            text
+        else
+            text + ".0"
+
+    let private isBareKey (name: string) =
+        name.Length > 0
+        && name
+           |> Seq.forall (fun c ->
+               (c >= 'A' && c <= 'Z')
+               || (c >= 'a' && c <= 'z')
+               || (c >= '0' && c <= '9')
+               || c = '_'
+               || c = '-')
+
+    let renderKey (name: string) =
+        if isBareKey name then
+            name
+        else
+            "\"" + escapeBasic (normalizeNewlines name) + "\""
+
+    let private formatPath (segments: string list) =
+        segments |> List.map renderKey |> String.concat "."
+
+    /// JSON-compatible value tree for structured TOML data (js-* results).
+    type DataValue =
+        | Null
+        | Bool of bool
+        | Integer of int64
+        | Float of float
+        | String of string
+        | Array of DataValue list
+        | Object of (string * DataValue) list
+
+    let rec private isPrimitiveTree (value: DataValue) =
+        match value with
+        | Bool _
+        | Integer _
+        | Float _
+        | String _ -> true
+        | Array items -> List.forall isPrimitiveTree items
+        | Null
+        | Object _ -> false
+
+    let rec private renderInline (value: DataValue) : string =
+        match value with
+        | Bool b -> renderBool b
+        | Integer n -> renderInt n
+        | Float n -> renderFloat n
+        | String s -> renderString s
+        | Array items -> "[" + String.concat ", " (List.map renderInline items) + "]"
+        | Null
+        | Object _ -> "false"
+
+    let rec encodeData (value: DataValue) : string list =
+        let rec encodeObject (path: string list) (fields: (string * DataValue) list) : string list =
+            let present =
+                fields
+                |> List.choose (fun (key, item) ->
+                    match item with
+                    | Null -> None
+                    | _ -> Some(key, item))
+
+            let localFields, nested =
+                present
+                |> List.fold
+                    (fun (local, nested) (key, item) ->
+                        match item with
+                        | Object row -> local, nested @ encodeObject (path @ [ key ]) row
+                        | Array items when
+                            not (List.isEmpty items)
+                            && List.forall
+                                (function
+                                | Object _ -> true
+                                | _ -> false)
+                                items
+                            ->
+                            let rows =
+                                items
+                                |> List.collect (function
+                                    | Object row -> encodeObjectRow (path @ [ key ]) row
+                                    | _ -> [])
+
+                            local, nested @ rows
+                        | Null -> local, nested
+                        | _ -> local @ [ field (renderKey key) (renderInline item) ], nested)
+                    ([], [])
+
+            let self =
+                match localFields, nested with
+                | [], [] -> [ tableEntry (formatPath path) [] ]
+                | [], _ -> []
+                | _, _ -> [ tableEntry (formatPath path) localFields ]
+
+            self @ nested
+
+        and encodeObjectRow (path: string list) (fields: (string * DataValue) list) : string list =
+            let present =
+                fields
+                |> List.choose (fun (key, item) ->
+                    match item with
+                    | Null -> None
+                    | _ -> Some(key, item))
+
+            let localFields, nested =
+                present
+                |> List.fold
+                    (fun (local, nested) (key, item) ->
+                        match item with
+                        | Object row -> local, nested @ encodeObject (path @ [ key ]) row
+                        | Array items when
+                            not (List.isEmpty items)
+                            && List.forall
+                                (function
+                                | Object _ -> true
+                                | _ -> false)
+                                items
+                            ->
+                            let rows =
+                                items
+                                |> List.collect (function
+                                    | Object row -> encodeObjectRow (path @ [ key ]) row
+                                    | _ -> [])
+
+                            local, nested @ rows
+                        | Null -> local, nested
+                        | _ -> local @ [ field (renderKey key) (renderInline item) ], nested)
+                    ([], [])
+
+            tableArrayEntry (formatPath path) localFields :: nested
+
+        match value with
+        | Null -> []
+        | Bool _
+        | Integer _
+        | Float _
+        | String _ -> [ field "data" (renderInline value) ]
+        | Array [] -> [ field "data" "[]" ]
+        | Array items when
+            List.forall
+                (function
+                | Object _ -> true
+                | _ -> false)
+                items
+            ->
+            items
+            |> List.collect (function
+                | Object row -> encodeObjectRow [ "data" ] row
+                | _ -> [])
+        | Array items -> [ field "data" (renderInline (DataValue.Array items)) ]
+        | Object fields -> encodeObject [ "data" ] fields
+
+    let encodeFs (rewritten: string list) (created: string list) : string list =
+        let fields =
+            [ if rewritten <> [] then
+                  field "rewritten" (renderInline (DataValue.Array(List.map DataValue.String rewritten)))
+              if created <> [] then
+                  field "created" (renderInline (DataValue.Array(List.map DataValue.String created))) ]
+
+        if fields = [] then [] else [ tableEntry "fs" fields ]
 
     /// Is this block a table header rather than a bare field?
     ///

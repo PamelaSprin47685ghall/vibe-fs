@@ -52,6 +52,22 @@ trust 或 historicity 自动决定。原料从不自我提升；采用是显式 
 
 closing delimiter、换行和 escape 规则只由该 codec 决定。
 
+### Value tree（js-* 结果等结构化 data）
+
+同一 owner 编码 JSON 兼容值树。决定性规则：
+
+- `null` 只允许作对象字段（省略）或根（无 data 块）；数组元素 `null` 拒绝，不在此层发明哨兵。
+- boolean → `true` / `false`；安全整数（`Number.isInteger` 且 |n| ≤ 2^53−1）→ TOML integer；其它有限数 → TOML float（无小数点且无指数时补 `.0`）。
+- 字符串走上文 String encoding。
+- 原始值（及嵌套原始值数组）→ inline array；空数组 → `[]`。
+- 全对象数组 → `[[path]]` array of tables；行内标量字段写在该 entry；行内嵌套对象/对象数组作为随后的子表，附着于最近一条 aot。
+- 对象 → `[path]`；仅有嵌套子表、无本地标量时省略空表头；空对象发空表头。
+- 键：`[A-Za-z0-9_-]+` 裸写，否则 basic quoted key（与字符串同一套 escape）。
+- 表路径用 `.` 连接已渲染的键。
+- `document` 仍把裸字段排到任何表头之前。
+
+无法按上表编码：renderer 边界 typed failure，不回退 JSON 字符串字段，不回退裸英语。
+
 ### Local schemas
 
 每个 surface 只定义完成本地语义所需的最小字段。不得添加全局 `kind/origin/authority`
