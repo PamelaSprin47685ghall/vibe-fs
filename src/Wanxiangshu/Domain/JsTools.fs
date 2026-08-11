@@ -485,7 +485,7 @@ module JsCanonicalDescription =
         + "2. Let Host resolve those positions.\n"
         + "3. Read with text(from, to). Adjacent headers make a body slice:\n"
         + "   text(\"h1end\", \"h2\"). A window around a hit is text(\"h1\", \"h1+200\").\n"
-        + "4. For edits, build the complete file from text(...) slices plus new content.\n"
+        + "4. For edits, build the complete resulting file from text(...) slices plus new content.\n"
         + "5. Use indexOf / replaceAll only when anchor-and-splice is genuinely inconvenient.\n"
         + "\n"
         + "Prefer:\n"
@@ -509,10 +509,11 @@ module JsCanonicalDescription =
         + "count. grep does not grant file()."
 
     let editRules =
-        "rewrite(path, newText) stages replacement of an existing UTF-8 file. The target\n"
-        + "must exist in the transaction snapshot or the call fails FILE_NOT_FOUND.\n"
-        + "newText must be a string. The call does not write immediately; it adds a\n"
-        + "StagedRewrite to this program's WriteSet. You do not have to file(path) first."
+        "rewrite(path, newText) stages replacement of an existing UTF-8 file. newText is\n"
+        + "the complete resulting file, not a patch. The target must exist in the\n"
+        + "transaction snapshot or the call fails FILE_NOT_FOUND. newText must be a string.\n"
+        + "The call does not write immediately; it adds a StagedRewrite to this program's\n"
+        + "WriteSet. You do not have to file(path) first."
 
     let writeRules =
         "write(path, newText) stages creation of a missing UTF-8 file. If the target\n"
