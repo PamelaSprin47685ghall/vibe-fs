@@ -221,7 +221,7 @@ module CompanionTransform =
 
                         let! _ =
                             BloggerCoordinator.onMainMaterial
-                                (scope :> IParkedTransformHost)
+                                scope.ParkedTransformHost
                                 companion
                                 journal
                                 (SessionId.create sessionId)

@@ -126,7 +126,7 @@ const withHarness = async (fn, { material = 0 } = {}) => {
   let transcript = []
   const run = async (messages) => {
     const input = toList([...transcript, ...listItems(messages)])
-    const out = await handleContinuation(scope, journal, undefined, undefined, probe, sessionId(BLOG), input)
+    const out = await handleContinuation(parkedTransform.host(scope), journal, undefined, undefined, probe, sessionId(BLOG), input)
     transcript = [...transcript, ...outcomeMessages(out)]
     return out
   }
@@ -149,12 +149,12 @@ const withHarness = async (fn, { material = 0 } = {}) => {
 }
 
 const withImmediatePark = async (scope, fn) => {
-  const original = scope.ParkTransform.bind(scope)
-  scope.ParkTransform = (_sessionId, _lifetime) => Promise.resolve(false)
+  const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
+  parkedTransform.host(scope).ParkTransform = (_sessionId, _lifetime) => Promise.resolve(false)
   try {
     return await fn()
   } finally {
-    scope.ParkTransform = original
+    parkedTransform.host(scope).ParkTransform = original
   }
 }
 
@@ -216,7 +216,7 @@ const mainJson = (overrides = {}) => ({
 test('ENFORCER_reload_main_context_from_open_materialization', async () => {
   await withHarness(async ({ journal, scope }) => {
     materializeOpen(journal, { requestId: 'req-m', json: mainJson() })
-    const reloaded = resolveCycleContext(scope, journal, sessionId(MAIN), sessionId(BLOG))
+    const reloaded = resolveCycleContext(parkedTransform.host(scope), journal, sessionId(MAIN), sessionId(BLOG))
     assert.notEqual(reloaded, undefined)
     assert.equal(caseOf(reloaded), 'Main')
     const m = reloaded.fields[0]
@@ -245,7 +245,7 @@ test('ENFORCER_reload_squash_context_from_open_materialization', async () => {
         observed_prefix_epoch: 0,
       },
     })
-    const reloaded = resolveCycleContext(scope, journal, sessionId(MAIN), sessionId(BLOG))
+    const reloaded = resolveCycleContext(parkedTransform.host(scope), journal, sessionId(MAIN), sessionId(BLOG))
     assert.notEqual(reloaded, undefined)
     assert.equal(caseOf(reloaded), 'Squash')
     const s = reloaded.fields[0]
@@ -259,7 +259,7 @@ test('ENFORCER_reload_defaults_when_blob_is_sparse', async () => {
   await withHarness(async ({ journal, scope }) => {
     // Only kind present: every field falls back to the open-request defaults.
     materializeOpen(journal, { requestId: 'req-sparse', json: { kind: 'main' } })
-    const reloaded = resolveCycleContext(scope, journal, sessionId(MAIN), sessionId(BLOG))
+    const reloaded = resolveCycleContext(parkedTransform.host(scope), journal, sessionId(MAIN), sessionId(BLOG))
     assert.equal(caseOf(reloaded), 'Main')
     const m = reloaded.fields[0]
     assert.equal(m.Toml, '')
@@ -286,7 +286,7 @@ test('ENFORCER_reload_parses_string_numbers_and_derives_delta_digest', async () 
     })
     delete json.delta_digest
     materializeOpen(journal, { requestId: 'req-str', json })
-    const reloaded = resolveCycleContext(scope, journal, sessionId(MAIN), sessionId(BLOG))
+    const reloaded = resolveCycleContext(parkedTransform.host(scope), journal, sessionId(MAIN), sessionId(BLOG))
     assert.equal(caseOf(reloaded), 'Main')
     const m = reloaded.fields[0]
     assert.equal(m.PreviousIngestedThroughSequence, 4n)
@@ -302,7 +302,7 @@ test('ENFORCER_reload_derives_delta_digest_from_context_digest_when_toml_empty',
     const json = mainJson({ toml: '' })
     delete json.delta_digest
     const openReq = materializeOpen(journal, { requestId: 'req-nodigest', json })
-    const reloaded = resolveCycleContext(scope, journal, sessionId(MAIN), sessionId(BLOG))
+    const reloaded = resolveCycleContext(parkedTransform.host(scope), journal, sessionId(MAIN), sessionId(BLOG))
     const m = reloaded.fields[0]
     assert.equal(m.Toml, '')
     assert.equal(m.DeltaDigest.fields[0], openReq.ContextDigest.fields[0], 'ContextDigest is the fallback')
@@ -314,7 +314,7 @@ test('ENFORCER_reload_unreadable_blob_returns_none', async () => {
     const openReq = materializeOpen(journal, { requestId: 'req-gone', json: mainJson() })
     // EventStore BlobRef is blobs/<gitOid> in IGitRawStore — not a RuntimePath file.
     agentJournal.deleteBlob(journal, openReq.ContextRef)
-    const reloaded = resolveCycleContext(scope, journal, sessionId(MAIN), sessionId(BLOG))
+    const reloaded = resolveCycleContext(parkedTransform.host(scope), journal, sessionId(MAIN), sessionId(BLOG))
     assert.equal(reloaded, undefined)
   })
 })
@@ -324,7 +324,7 @@ test('ENFORCER_reload_corrupt_json_returns_none', async () => {
     const openReq = materializeOpen(journal, { requestId: 'req-badjson', json: mainJson() })
     // Unterminated JSON → JSON.parse throws → decoder returns None (fail closed).
     agentJournal.replaceBlobContent(journal, openReq.ContextRef, '{"kind": "main", "toml": ')
-    const reloaded = resolveCycleContext(scope, journal, sessionId(MAIN), sessionId(BLOG))
+    const reloaded = resolveCycleContext(parkedTransform.host(scope), journal, sessionId(MAIN), sessionId(BLOG))
     assert.equal(reloaded, undefined)
   })
 })
@@ -347,7 +347,7 @@ test('ENFORCER_resolve_cycle_prefers_live_request_over_open', async () => {
       deltaDigest: sha256Hex('live-toml'),
     })
     parkedTransform.setCurrentRequest(scope, BLOG, live)
-    const resolved = resolveCycleContext(scope, journal, sessionId(MAIN), sessionId(BLOG))
+    const resolved = resolveCycleContext(parkedTransform.host(scope), journal, sessionId(MAIN), sessionId(BLOG))
     assert.equal(caseOf(resolved), 'Main')
     assert.equal(resolved.fields[0].Toml, 'live-toml')
   })
@@ -356,7 +356,7 @@ test('ENFORCER_resolve_cycle_prefers_live_request_over_open', async () => {
 // ── squash refusals through the cycle path ─────────────────────────────────
 
 const primeCycle = (scope, journal) => {
-  const ctx = tryRefreshMainContextFromJournal(scope, journal, sessionId(MAIN), sessionId(BLOG))
+  const ctx = tryRefreshMainContextFromJournal(parkedTransform.host(scope), journal, sessionId(MAIN), sessionId(BLOG))
   assert.notEqual(ctx, undefined)
   parkedTransform.setCurrentRequest(scope, BLOG, ctx)
 }

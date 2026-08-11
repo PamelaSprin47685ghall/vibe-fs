@@ -114,7 +114,7 @@ const withHarness = async (fn, { link = true, material = 0 } = {}) => {
   let transcript = []
   const run = async (messages) => {
     const input = toList([...transcript, ...listItems(messages)])
-    const out = await handleContinuation(scope, journal, undefined, undefined, probe, sessionId(BLOG), input)
+    const out = await handleContinuation(parkedTransform.host(scope), journal, undefined, undefined, probe, sessionId(BLOG), input)
     transcript = [...transcript, ...outcomeMessages(out)]
     return out
   }
@@ -228,8 +228,8 @@ test('ENFORCER_whitespace_message_id_fails_cycle_validation', async () => {
 test('ENFORCER_blog_call_with_name_field_and_lowercase_id_commits', async () => {
   await withHarness(async ({ journal, scope, fatals, run, assistantStep, mainSession }) => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
-    const original = scope.ParkTransform.bind(scope)
-    scope.ParkTransform = () => Promise.resolve(false)
+    const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
+    parkedTransform.host(scope).ParkTransform = () => Promise.resolve(false)
     try {
       // Part uses `name` instead of `tool` and lowercase `callId` — both
       // accepted by blogCallFromPart.
@@ -242,7 +242,7 @@ test('ENFORCER_blog_call_with_name_field_and_lowercase_id_commits', async () => 
       assert.equal(fatals.length, 0, JSON.stringify(fatals))
       assert.equal(Number(mainSession().Blog.Coverage.IngestedThroughSequence), 1)
     } finally {
-      scope.ParkTransform = original
+      parkedTransform.host(scope).ParkTransform = original
     }
   })
 })
@@ -400,8 +400,8 @@ test('ENFORCER_load_effective_frames_resolves_committed_frame', async () => {
   await withHarness(
     async ({ journal, scope, run, assistantStep, mainSession }) => {
       parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
-      const original = scope.ParkTransform.bind(scope)
-      scope.ParkTransform = () => Promise.resolve(false)
+      const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
+      parkedTransform.host(scope).ParkTransform = () => Promise.resolve(false)
       try {
         await run(
           assistantStep('asst-f1', [
@@ -409,7 +409,7 @@ test('ENFORCER_load_effective_frames_resolves_committed_frame', async () => {
           ]),
         )
       } finally {
-        scope.ParkTransform = original
+        parkedTransform.host(scope).ParkTransform = original
       }
       const result = loadEffectiveFrames(journal, sessionId(MAIN))
       assert.equal(result.tag, 0)
@@ -428,8 +428,8 @@ test('ENFORCER_load_effective_frames_missing_blob_fails_closed', async () => {
   await withHarness(
     async ({ journal, scope, run, assistantStep, mainSession }) => {
       parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
-      const original = scope.ParkTransform.bind(scope)
-      scope.ParkTransform = () => Promise.resolve(false)
+      const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
+      parkedTransform.host(scope).ParkTransform = () => Promise.resolve(false)
       try {
         await run(
           assistantStep('asst-f2', [
@@ -437,7 +437,7 @@ test('ENFORCER_load_effective_frames_missing_blob_fails_closed', async () => {
           ]),
         )
       } finally {
-        scope.ParkTransform = original
+        parkedTransform.host(scope).ParkTransform = original
       }
       const frame = listItems(mainSession().Blog.Frames)[0]
       agentJournal.deleteBlob(journal, frame.TextRef)
@@ -453,8 +453,8 @@ test('ENFORCER_load_effective_frames_digest_mismatch_fails_closed', async () => 
   await withHarness(
     async ({ journal, scope, run, assistantStep, mainSession }) => {
       parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
-      const original = scope.ParkTransform.bind(scope)
-      scope.ParkTransform = () => Promise.resolve(false)
+      const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
+      parkedTransform.host(scope).ParkTransform = () => Promise.resolve(false)
       try {
         await run(
           assistantStep('asst-f3', [
@@ -462,7 +462,7 @@ test('ENFORCER_load_effective_frames_digest_mismatch_fails_closed', async () => 
           ]),
         )
       } finally {
-        scope.ParkTransform = original
+        parkedTransform.host(scope).ParkTransform = original
       }
       const frame = listItems(mainSession().Blog.Frames)[0]
       agentJournal.replaceBlobContent(journal, frame.TextRef, 'tampered body')
@@ -478,8 +478,8 @@ test('ENFORCER_rebuild_falls_back_to_raw_when_frame_blob_lost', async () => {
   await withHarness(
     async ({ journal, scope, run, assistantStep, mainSession, fatals }) => {
       parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
-      const original = scope.ParkTransform.bind(scope)
-      scope.ParkTransform = () => Promise.resolve(false)
+      const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
+      parkedTransform.host(scope).ParkTransform = () => Promise.resolve(false)
       try {
         await run(
           assistantStep('asst-f4', [
@@ -487,7 +487,7 @@ test('ENFORCER_rebuild_falls_back_to_raw_when_frame_blob_lost', async () => {
           ]),
         )
       } finally {
-        scope.ParkTransform = original
+        parkedTransform.host(scope).ParkTransform = original
       }
       // Corrupt the frame blob in IGitRawStore: rebuild fails closed and
       // the continuation must fall back to the raw transcript (never []).

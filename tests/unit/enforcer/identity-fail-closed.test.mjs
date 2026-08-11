@@ -136,18 +136,18 @@ const withHarness = async (fn, { messageId = 'asst-identity' } = {}) => {
     ])
 
   const run = async (parts) => {
-    await handleContinuation(scope, journal, undefined, undefined, () => undefined, blog, rawMessagesFor(parts))
+    await handleContinuation(parkedTransform.host(scope), journal, undefined, undefined, () => undefined, blog, rawMessagesFor(parts))
   }
 
   // Owned commit with no further XTrace material reaches ParkTransform; settle it
   // immediately so coverage commit finalises (same technique as enforcer-cycle-protocol).
   const runOwnedCommit = async (parts) => {
-    const original = scope.ParkTransform.bind(scope)
-    scope.ParkTransform = (_sessionId, _lifetime) => Promise.resolve(false)
+    const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
+    parkedTransform.host(scope).ParkTransform = (_sessionId, _lifetime) => Promise.resolve(false)
     try {
       await run(parts)
     } finally {
-      scope.ParkTransform = original
+      parkedTransform.host(scope).ParkTransform = original
     }
   }
 

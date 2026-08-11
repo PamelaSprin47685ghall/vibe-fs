@@ -949,6 +949,9 @@ export const bloggerRuntime = (() => {
 export const parkedTransform = (() => {
   const ParkedTransform = ParkedTransformModule.ParkedTransform
   const PluginRuntimeScope = PluginRuntimeScopeModule.PluginRuntimeScope
+  // Fable compiles `member _.ParkedTransformHost` to a module-level getter.
+  const getParkedTransformHost =
+    PluginRuntimeScopeModule.PluginRuntimeScope__get_ParkedTransformHost
 
   const entry = (value) => ({
     sessionId: value.SessionId,
@@ -988,23 +991,26 @@ export const parkedTransform = (() => {
       SharedStateModule.clearBloggerFlightsForTests()
       return new PluginRuntimeScope(null)
     },
-    park: (scope, sessionId, lifetimeMs) => scope.ParkTransform(sessionId, lifetimeMs),
-    resumeParked: (scope, sessionId) => scope.ResumeParked(sessionId),
-    cancelParked: (scope, sessionId) => scope.CancelParked(sessionId),
-    setPendingOffer: (scope, sessionId, context) => scope.SetPendingOffer(sessionId, context),
+    // The IParkedTransformHost view of a scope (Blogger owner), for call sites
+    // whose parameters are typed `IParkedTransformHost` (e.g. handleContinuation).
+    host: (scope) => getParkedTransformHost(scope),
+    park: (scope, sessionId, lifetimeMs) => getParkedTransformHost(scope).ParkTransform(sessionId, lifetimeMs),
+    resumeParked: (scope, sessionId) => getParkedTransformHost(scope).ResumeParked(sessionId),
+    cancelParked: (scope, sessionId) => getParkedTransformHost(scope).CancelParked(sessionId),
+    setPendingOffer: (scope, sessionId, context) => getParkedTransformHost(scope).SetPendingOffer(sessionId, context),
     // Back-compat alias used by parked-transform tests (PendingOffer path).
-    offerParked: (scope, sessionId, context) => scope.SetPendingOffer(sessionId, context),
-    hasParked: (scope, sessionId) => scope.HasParked(sessionId),
-    hasFlight: (scope, sessionId) => scope.HasFlight(sessionId),
-    tryGetFlight: (scope, sessionId) => projectContext(scope.TryGetFlight(sessionId)),
-    consumeStaged: (scope, sessionId) => projectContext(scope.TryTakePendingOffer(sessionId)),
-    setCurrentRequest: (scope, sessionId, context) => scope.SetCurrentRequest(sessionId, context),
-    peekCurrentRequest: (scope, sessionId) => projectContext(scope.TryPeekCurrentRequest(sessionId)),
-    clearCurrentRequest: (scope, sessionId) => scope.ClearCurrentRequest(sessionId),
+    offerParked: (scope, sessionId, context) => getParkedTransformHost(scope).SetPendingOffer(sessionId, context),
+    hasParked: (scope, sessionId) => getParkedTransformHost(scope).HasParked(sessionId),
+    hasFlight: (scope, sessionId) => getParkedTransformHost(scope).HasFlight(sessionId),
+    tryGetFlight: (scope, sessionId) => projectContext(getParkedTransformHost(scope).TryGetFlight(sessionId)),
+    consumeStaged: (scope, sessionId) => projectContext(getParkedTransformHost(scope).TryTakePendingOffer(sessionId)),
+    setCurrentRequest: (scope, sessionId, context) => getParkedTransformHost(scope).SetCurrentRequest(sessionId, context),
+    peekCurrentRequest: (scope, sessionId) => projectContext(getParkedTransformHost(scope).TryPeekCurrentRequest(sessionId)),
+    clearCurrentRequest: (scope, sessionId) => getParkedTransformHost(scope).ClearCurrentRequest(sessionId),
     // Physical drain-window slot (PR7 Slice 4 D6: cell dual-write removed).
-    getDrainWindow: (scope, sessionId) => scope.GetDrainWindow(sessionId),
-    setDrainWindow: (scope, sessionId, window) => scope.SetDrainWindow(sessionId, window),
-    isDrainOpen: (scope, sessionId) => scope.IsDrainOpen(sessionId),
+    getDrainWindow: (scope, sessionId) => getParkedTransformHost(scope).GetDrainWindow(sessionId),
+    setDrainWindow: (scope, sessionId, window) => getParkedTransformHost(scope).SetDrainWindow(sessionId, window),
+    isDrainOpen: (scope, sessionId) => getParkedTransformHost(scope).IsDrainOpen(sessionId),
     dispose: (scope) => scope.Dispose(),
   }
 })()

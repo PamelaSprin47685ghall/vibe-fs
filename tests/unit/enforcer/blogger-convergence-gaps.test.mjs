@@ -121,7 +121,8 @@ test('C0_physical_HasFlight_is_the_only_busy_definition', () => {
 test('C0_CurrentRequest_and_PendingOffer_are_separate_slots', () => {
   // Dual slots: PendingOffer dictionary + flight ownership registry.
   // Forbidden: a second `currentRequest` dict or InFlight shadow fallback.
-  const scope = prodText('src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs')
+  // Blogger parking/flight/drain state moved to PluginBloggerScope (Wave 2).
+  const scope = prodText('src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginBloggerScope.fs')
   assert.equal(/parkedOffer/.test(scope), false, 'parkedOffer single-slot is forbidden')
   assert.match(scope, /pendingOffer/, 'PendingOffer dictionary required')
   // Flights are process-shared (HOST-012 / worktree↔root BlogTool) via SharedState.

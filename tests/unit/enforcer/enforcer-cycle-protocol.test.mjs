@@ -241,7 +241,7 @@ const withHarness = async (fn, { portMode = 'ok' } = {}) => {
   let transcript = []
   const run = async (messages) => {
     const input = toList([...transcript, ...listItems(messages)])
-    const out = await handleContinuation(scope, journal, repairNudge, confirmedFailure, recoveryProbe, blog, input)
+    const out = await handleContinuation(parkedTransform.host(scope), journal, repairNudge, confirmedFailure, recoveryProbe, blog, input)
     transcript = [...transcript, ...outcomeMessages(out)]
     return out
   }
@@ -492,7 +492,7 @@ test('ENFORCER_blog_tool_without_CurrentRequest_rejects_not_ok', async () => {
 
   await withHarness(async ({ scope }) => {
     parkedTransform.clearCurrentRequest(scope, BLOG)
-    assert.equal(BlogTool.hasLiveCycle(scope, BLOG), false, 'no flight without CurrentRequest')
+    assert.equal(BlogTool.hasLiveCycle(parkedTransform.host(scope), BLOG), false, 'no flight without CurrentRequest')
 
     // withHarness starts with CurrentRequest before fn; re-arm physical ownership.
     const toml = 'work'
@@ -509,7 +509,7 @@ test('ENFORCER_blog_tool_without_CurrentRequest_rejects_not_ok', async () => {
       deltaDigest: digestForToml(toml),
     })
     parkedTransform.setCurrentRequest(scope, BLOG, ctx)
-    assert.equal(BlogTool.hasLiveCycle(scope, BLOG), true, 'CurrentRequest flight authorises blog')
+    assert.equal(BlogTool.hasLiveCycle(parkedTransform.host(scope), BLOG), true, 'CurrentRequest flight authorises blog')
   })
 })
 
@@ -869,12 +869,12 @@ test('ENFORCER_delta_digest_mismatch_is_fatal', async () => {
  * Time-independent: no sleep, no poll, no 10m timer.
  */
 const runOwnedCommit = async (scope, run, messages) => {
-  const original = scope.ParkTransform.bind(scope)
-  scope.ParkTransform = (_sessionId, _lifetime) => Promise.resolve(false)
+  const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
+  parkedTransform.host(scope).ParkTransform = (_sessionId, _lifetime) => Promise.resolve(false)
   try {
     return await run(messages)
   } finally {
-    scope.ParkTransform = original
+    parkedTransform.host(scope).ParkTransform = original
   }
 }
 
@@ -990,7 +990,7 @@ test('ENFORCER_host_completed_blog_second_window_advances_coverage_not_resend', 
 
 test('ENFORCER_resolveCycleContext_prefers_live_inflight_request', async () => {
   await withHarness(async ({ journal, scope, blog, main, ctx }) => {
-    const live = resolveCycleContext(scope, journal, main, blog)
+    const live = resolveCycleContext(parkedTransform.host(scope), journal, main, blog)
     assert.ok(live)
     assert.equal(caseOf(live), 'Main')
     assert.equal(bloggerRequestContext.toml(live), bloggerRequestContext.toml(ctx))
@@ -998,7 +998,7 @@ test('ENFORCER_resolveCycleContext_prefers_live_inflight_request', async () => {
     // Clear InFlight without open materialization → None (not a silent invent).
     parkedTransform.clearCurrentRequest(scope, BLOG)
     assert.equal(hasFlight(scope), false)
-    const missing = resolveCycleContext(scope, journal, main, blog)
+    const missing = resolveCycleContext(parkedTransform.host(scope), journal, main, blog)
     assert.equal(missing, undefined)
   })
 })

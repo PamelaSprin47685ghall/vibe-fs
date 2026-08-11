@@ -433,7 +433,7 @@ module HostSignalBootstrap =
                     match SessionAssociationProjection.tryBloggerOf mainSessionId associations with
                     | None -> ()
                     | Some bloggerId ->
-                        BloggerCoordinator.reactivateAfterNewRoot (scope :> IParkedTransformHost) bloggerId root
+                        BloggerCoordinator.reactivateAfterNewRoot scope.ParkedTransformHost bloggerId root
 
             let promptIngressHook =
                 PromptIngress.createHook

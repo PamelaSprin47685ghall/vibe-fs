@@ -141,7 +141,7 @@ const withHarness = async (fn, { material = 0 } = {}) => {
   let transcript = []
   const run = async (messages) => {
     const input = toList([...transcript, ...listItems(messages)])
-    const out = await handleContinuation(scope, journal, undefined, undefined, probe, sessionId(BLOG), input)
+    const out = await handleContinuation(parkedTransform.host(scope), journal, undefined, undefined, probe, sessionId(BLOG), input)
     transcript = [...transcript, ...outcomeMessages(out)]
     return out
   }
@@ -167,12 +167,13 @@ const withHarness = async (fn, { material = 0 } = {}) => {
 
 /** Commit one cycle with ParkTransform settling immediately (resumed=false). */
 const withImmediatePark = async (scope, fn) => {
-  const original = scope.ParkTransform.bind(scope)
-  scope.ParkTransform = (_sessionId, _lifetime) => Promise.resolve(false)
+  const host = parkedTransform.host(scope)
+  const original = host.ParkTransform.bind(host)
+  host.ParkTransform = (_sessionId, _lifetime) => Promise.resolve(false)
   try {
     return await fn()
   } finally {
-    scope.ParkTransform = original
+    host.ParkTransform = original
   }
 }
 
@@ -183,7 +184,7 @@ const stopReason = (outcome) => {
 
 /** Stage the next coverage window (from durable XTrace) as the live request. */
 const primeCycle = (scope, journal) => {
-  const ctx = tryRefreshMainContextFromJournal(scope, journal, sessionId(MAIN), sessionId(BLOG))
+  const ctx = tryRefreshMainContextFromJournal(parkedTransform.host(scope), journal, sessionId(MAIN), sessionId(BLOG))
   assert.notEqual(ctx, undefined, 'material must yield a window')
   parkedTransform.setCurrentRequest(scope, BLOG, ctx)
   return ctx
@@ -495,14 +496,14 @@ test('ENFORCER_park_resumed_without_material_projects_raw', async () => {
     // No XTrace material: after commit the transform parks; the wake resolves
     // true (main offered), but re-chunk still finds nothing → project raw.
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
-    const original = scope.ParkTransform.bind(scope)
-    scope.ParkTransform = (_sid, _lifetime) => Promise.resolve(true)
+    const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
+    parkedTransform.host(scope).ParkTransform = (_sid, _lifetime) => Promise.resolve(true)
     try {
       const out = await run(blogStep('asst-1', 'c1', 'window one'))
       assert.equal(caseOf(out), 'ProjectMessages')
       assert.notEqual(out, undefined)
     } finally {
-      scope.ParkTransform = original
+      parkedTransform.host(scope).ParkTransform = original
     }
   })
 })
@@ -511,10 +512,10 @@ test('ENFORCER_park_resumed_with_fresh_material_drains', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep }) => {
       primeCycle(scope, journal)
-      const original = scope.ParkTransform.bind(scope)
+      const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
       // Main session offers material while the transform is parked: the wake
       // resolves true and the re-chunk finds the new window.
-      scope.ParkTransform = async (_sid, _lifetime) => {
+      parkedTransform.host(scope).ParkTransform = async (_sid, _lifetime) => {
         // Re-capture the seed turns plus two NEW turns (capture dedupes by
         // provenance, so only the fresh turns land in the XTrace).
         xTraceCapture.captureProjection(
@@ -540,7 +541,7 @@ test('ENFORCER_park_resumed_with_fresh_material_drains', async () => {
         assert.equal(next.previousIngested, 2n)
         assert.equal(next.nextIngested, 4n, 'new turns covered')
       } finally {
-        scope.ParkTransform = original
+        parkedTransform.host(scope).ParkTransform = original
       }
     },
     { material: 2 },
@@ -551,10 +552,10 @@ test('ENFORCER_park_resumed_with_flight_projects_directly', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep }) => {
       primeCycle(scope, journal)
-      const original = scope.ParkTransform.bind(scope)
+      const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
       // A concurrent physical send re-armed the flight while parked: the
       // resumed transform must project the live view without re-binding.
-      scope.ParkTransform = async (_sid, _lifetime) => {
+      parkedTransform.host(scope).ParkTransform = async (_sid, _lifetime) => {
         const fresh = bloggerRequestContext.main({
           requestId: 'req-flight',
           mainSession: MAIN,
@@ -574,7 +575,7 @@ test('ENFORCER_park_resumed_with_flight_projects_directly', async () => {
         const out = await run(blogStep('asst-1', 'c1', 'window one'))
         assert.equal(caseOf(out), 'ProjectMessages')
       } finally {
-        scope.ParkTransform = original
+        parkedTransform.host(scope).ParkTransform = original
       }
     },
     { material: 2 },
@@ -585,8 +586,8 @@ test('ENFORCER_park_expired_with_fresh_material_drains', async () => {
   await withHarness(
     async ({ journal, scope, run, blogStep }) => {
       primeCycle(scope, journal)
-      const original = scope.ParkTransform.bind(scope)
-      scope.ParkTransform = async (_sid, _lifetime) => {
+      const original = parkedTransform.host(scope).ParkTransform.bind(parkedTransform.host(scope))
+      parkedTransform.host(scope).ParkTransform = async (_sid, _lifetime) => {
         xTraceCapture.captureProjection(
           journal,
           sessionId(MAIN),
@@ -607,7 +608,7 @@ test('ENFORCER_park_expired_with_fresh_material_drains', async () => {
         assert.notEqual(next, undefined)
         assert.equal(next.kind, 'Main')
       } finally {
-        scope.ParkTransform = original
+        parkedTransform.host(scope).ParkTransform = original
       }
     },
     { material: 2 },
@@ -623,7 +624,7 @@ test('ENFORCER_no_journal_projects_raw_messages', async () => {
     const input = toList([
       { info: { id: 'u-1', role: 'user' }, parts: [{ type: 'text', text: 'hello' }] },
     ])
-    const out = await handleContinuation(scope2, undefined, undefined, undefined, probe, sessionId(BLOG), input)
+    const out = await handleContinuation(parkedTransform.host(scope2), undefined, undefined, undefined, probe, sessionId(BLOG), input)
     assert.equal(caseOf(out), 'ProjectMessages')
     assert.deepEqual(listItems(out.fields[0]), listItems(input))
   })
@@ -633,7 +634,7 @@ test('ENFORCER_no_journal_empty_messages_is_empty_projection_fatal', async () =>
   await withHarness(async ({ scope, fatals }) => {
     const probe = () => 'NoRecovery'
     const out = await handleContinuation(
-      parkedTransform.scope(),
+      parkedTransform.host(parkedTransform.scope()),
       undefined,
       undefined,
       undefined,
@@ -668,7 +669,7 @@ test('ENFORCER_first_request_rebuilds_from_typed_context', async () => {
     const input = toList([
       { info: { id: 'u-1', role: 'user' }, parts: [{ type: 'text', text: 'raw toml here' }] },
     ])
-    const out = await handleContinuation(scope, journal, undefined, undefined, () => 'NoRecovery', sessionId(BLOG), input)
+    const out = await handleContinuation(parkedTransform.host(scope), journal, undefined, undefined, () => 'NoRecovery', sessionId(BLOG), input)
     assert.equal(caseOf(out), 'ProjectMessages')
     const msgs = listItems(out.fields[0])
     assert.ok(msgs.length > 0, 'rebuilt view is non-empty')

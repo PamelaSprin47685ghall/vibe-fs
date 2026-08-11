@@ -199,13 +199,10 @@ module SpikePlugin =
                     scope.AttachFamilyRecoveryPorts(
                         { Journal = durable
                           Snapshot = snapshot
-                          ParkedHost = scope :> IParkedTransformHost
+                          ParkedHost = scope.ParkedTransformHost
                           RecoverPromptClaims = SessionRecoveryWorkflow.defaultRecoverPromptClaims durable snapshot
                           RecoverBlogger =
-                            SessionRecoveryWorkflow.defaultRecoverBlogger
-                                durable
-                                (scope :> IParkedTransformHost)
-                                snapshot
+                            SessionRecoveryWorkflow.defaultRecoverBlogger durable scope.ParkedTransformHost snapshot
                           RestoreHandles = restoreHandles
                           RecoverJobs = recoverJobs }
                     )
@@ -553,7 +550,7 @@ module SpikePlugin =
 
                                         let! outcome =
                                             EnforcerHost.handleContinuation
-                                                scope
+                                                scope.ParkedTransformHost
                                                 journal
                                                 (Some repairNudge)
                                                 (Some confirmedFailure)
