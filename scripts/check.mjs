@@ -15,6 +15,7 @@ const checks = [
   join(root, 'checks/p0-recovery-join.mjs'),
   join(root, 'checks/causal-wait-boundary.mjs'),
   join(root, 'checks/student-teacher-absence.mjs'),
+  join(root, 'checks/session-ownership-ratchet.mjs'),
   join(root, 'checks/js-surface-gate.mjs'),
   join(root, 'checks/unified-store-gate.mjs'),
   join(root, 'checks/g4r-freeze.mjs'),

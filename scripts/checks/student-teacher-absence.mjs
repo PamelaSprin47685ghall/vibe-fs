@@ -25,6 +25,8 @@ export const FORBIDDEN_TOKENS = [
   'StudentTeacherTools',
   'StudentSkill',
   'SatelliteKind.Teacher',
+  // Strength ownership is AttachmentKind.StrengthReplica (Universal); never SatelliteKind.Replica.
+  'SatelliteKind.Replica',
 ]
 
 const norm = (path) => path.replace(/\\/g, '/')

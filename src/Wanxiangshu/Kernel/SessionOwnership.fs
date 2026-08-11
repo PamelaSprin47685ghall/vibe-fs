@@ -23,7 +23,7 @@ type AttachmentKind =
     | SyncCoder
     | Bookkeeper of transactionId: string
     /// Strength Phase 0: short-lived InternalLeaf replica attachment.
-    /// Not `SatelliteKind.Replica` — Universal ownership only.
+    /// Not a SatelliteKind case — Universal AttachmentKind ownership only.
     | StrengthReplica
 
 /// HOST-008: Root work vs Attached ownership under one ownerSessionId.

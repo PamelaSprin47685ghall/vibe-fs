@@ -27,28 +27,31 @@ Proposal 相互覆盖时如何落地
 
 Unified Storage / Session / Casebook 等 cutover 是 **clean break**：旧 Journal / Blob / feature-owned store 上的历史数据可以丢弃或留在原地不再读取；新世界只认最终 EventStore 语义。禁止为“迁旧数据”“双向兼容”“旧档可读性”投入工期。
 
-**进度快照最后同步：** 2026-08-10（G4 `532dbaad` / G5 `c4e1d596` 已收口；HEAD `c4e1d596`；详见 §0.1/§0.4/§11-§12；G4/G5 证据均在 `ac41ef8f`→`3c3e1c65` 区间内）
+**进度快照最后同步：** 2026-08-11（§0.1 为 Gate 状态权威；正文历史章节若与 §0.1 冲突，以 §0.1 为准。G0–G6 已收口；G7 runtime DONE / constitution residual；G8 PARTIAL K0；G9 PARTIAL ratchet）
+
+> **权威声明：** §0.1 Gate 总览是 living status 唯一权威。后文 G4/G5/G6 等章节标题里若仍残留 “IN PROGRESS / BLOCKED / NOT STARTED”，那是施工手册原文，不覆盖 §0.1。
 
 当前 Change 分布：
 
 ```text
 Active:
-  changes/active/universal.md      — G2/G3 DONE；G6 Casebook 待做
+  changes/active/strength.md       — G8 PARTIAL：K0 splice（AttachmentKind.StrengthReplica 等）已在树；Change 仍 active，交并行 owner 续做；勿 playbook-close
 
 Completed（本 Playbook 相关）:
   changes/completed/causal-ce-observability.md
   changes/completed/orchestrator-e2e-timeout.md
-  changes/completed/storage.md                          — G4 DONE（532dbaad；Final outcome；Amendment G3.5-A 生效）
-  changes/completed/js-capability-projected-tools.md    — G5 DONE（c4e1d596；54 单测 + check + Long Stroke 绿；C-3 用户裁决）
+  changes/completed/storage.md                          — G4 DONE
+  changes/completed/js-capability-projected-tools.md    — G5 DONE
+  changes/completed/universal.md                        — G2/G3/G6 Casebook lifecycle 收口
+  changes/completed/perm-inspector.md                   — G6 Casebook / mechanical Bookkeeper 收口
+  changes/completed/rulebook.md                         — G7 runtime DONE（constitution residual 记在 Final outcome）
 
-Proposed（尚未激活主线 Gate）:
-  perm-inspector
-  rulebook
-  strength
-  magic-todo                    — 不在本 Playbook Gate 序列内；可独立 Lane
+Proposed（Playbook 本身 + 独立 Lane）:
+  changes/proposed/entry.md        — 本文件；Integration Playbook，不是产品 Change；不迁 completed
+  changes/proposed/magic-todo.md   — 不在本 Playbook Gate 序列内；保持 proposed；不入 G0–G9 gates
 ```
 
-已解决的历史 anomaly：`storage` 已从 `changes/proposed/` 迁至 `changes/active/storage.md`（G3.5 激活）。
+已解决的历史 anomaly：`storage` / `universal` / `perm-inspector` / `rulebook` 均已 completed；Strength 仍 active。
 
 这些 Change 不能按照“每个 Proposal 自己从 Phase 0 一路做到完成”的方式独立实施。
 
@@ -87,16 +90,16 @@ Strength
 | **G0** Governance + Baseline | **DONE** | Storage path 唯一化；baseline 已建 |
 | **G1** Causal CE + Orchestrator canaries | **DONE** | `changes/completed/causal-ce-observability.md` + `orchestrator-e2e-timeout.md`；release **0.6.0** |
 | **G2** Universal Runtime Foundation | **DONE** | `ReuseScope` / `SessionOwnership` / `SyncDelegate` + CausalAwait dual-await；`ca9fd08a` |
-| **G3** Universal Clean Break | **DONE** | Student/Teacher/QA/SKILL 删除；Meditator → Inspector only；ratchet green |
+| **G3** Universal Clean Break | **DONE** | Student/Teacher/QA/SKILL 删除；Meditator → Inspector only；`student-teacher-absence` ratchet green |
 | **G3.5** Storage cutover scope 修订 | **DONE** | Amendment G3.5-A；Student QA retired；no migrator / dual-write |
-| **G4** Unified Storage | **DONE** | `changes/completed/storage.md` Final outcome；G4R（`changes/completed/test.md`）后验证：`npm run check` GREEN + Long Stroke GREEN（48 steps / 5.0s / ceilings 367/367）；`check:release` GREEN |
-| **G5** JS Capability-Projected Tools | **DONE** | `changes/completed/js-capability-projected-tools.md` Final outcome；54 js-tools 单测 + `npm run check` + `check:release` + Long Stroke 全绿；C-3 按用户裁决（共存满足 §107，钩子不接入） |
-| **G6** perm-inspector + Casebook | **DONE** | G6-A..F workflow + Host after钩子(12ce0aca) + drainCollectorAndArchive helper + universal-loop proof；spec 389绿；casebook 21单测绿 |
-| **G7** Rulebook | **DONE** | ENFORCER 域+EventStore型式复用，389 clauses绿（ponytail: authored 120-dir重写待后触） |
-| **G8** Strength | **DONE (K0 baseline)** | StrengthReplica=InternalLeaf+Attached已正；K0=现状无Replica，K1/K2待holdout/cost infra（ponytail deferred） |
-| **G9** Global Convergence | **DONE** | ratchets绿(student-teacher-absence+unified-store-gate)，spec 389绿；entry快照终版 |
+| **G4** Unified Storage | **DONE** | `changes/completed/storage.md` Final outcome；G4R（`changes/completed/test.md`）；`unified-store-gate` |
+| **G5** JS Capability-Projected Tools | **DONE** | `changes/completed/js-capability-projected-tools.md` Final outcome；C-3 按用户裁决 |
+| **G6** perm-inspector + Casebook | **DONE** | CasebookLifecycle session wiring + mechanical Bookkeeper + Index；`changes/completed/universal.md` + `changes/completed/perm-inspector.md` |
+| **G7** Rulebook | **DONE（runtime）** | `changes/completed/rulebook.md`；folder SSOT（无 catalog.json）；Full/Identity `TipGuidanceDelivered`；squash co-move；blogger compose enforcer。**Residual（非 runtime 阻塞，记在 Final outcome）：** constitution 120 rewrite、docs plane enforcer、Observation EventStore vocabulary 全量 rename、compaction identity integrity、INVENTORY.md |
+| **G8** Strength | **PARTIAL** | K0 splice 类型已在树（`AttachmentKind.StrengthReplica`、StrengthPolicy、`ProviderRequestKind.StrengthReplica` 等，见 `c1348308` 区间）。**Change 仍 `changes/active/strength.md`，交并行 owner；NOT playbook-closed。禁止扩 Strength feature 当 G8 DONE** |
+| **G9** Global Convergence | **PARTIAL** | 既有 ratchet：`student-teacher-absence`（含禁止 `SatelliteKind.Replica`）、`unified-store-gate`、`js-surface-gate`、`g4r-*`。本快照增量：`session-ownership-ratchet`（AttachmentKind 必含 Companion/SyncInspector/SyncCoder/Bookkeeper/StrengthReplica）。capability-isomorphism 等仍可后续加硬 |
 
-**当前主线位置：** G6-G9 DONE — entry Playbook 收敛完成；下一里程按新提案进入下一轮。
+**当前主线位置：** G0–G6 **DONE**；G7 runtime **DONE**（constitution/docs residual）；G8 **PARTIAL**（active/strength，并行 owner）；G9 **PARTIAL**（ratchet 增补中）。entry 本身保持 `proposed/` Playbook，不迁 completed。
 
 ## 0.2 自 Playbook 落地以来关键 commit（`31d456ec` 之后）
 
@@ -117,17 +120,16 @@ ac41ef8f  session abort diagnostic
 17d583cb  G4R implemented（Long Stroke 唯一 e2e；旧 canary 全删）
 ```
 
-## 0.3 当前证明状态（2026-08-10 EOD）
+## 0.3 当前证明状态（2026-08-11）
 
 | 证明切片 | 状态 |
 |---|---|
-| `npm run check`（静态门 + build + unit + integration；含 unified-store-gate / student-teacher-absence / g4r-freeze） | GREEN |
-| `npm run test:e2e` Long Stroke（`tests/e2e/entry.test.mjs` 唯一入口；spawn==1） | GREEN（48 steps / 5.0s；ceilings 367/367） |
-| `npm run check:release` | GREEN（G4R Final outcome） |
-| Storage G4 Exit Gate（§43 + §48，受 G3.5-A 修订；move completed） | **DONE**（`changes/completed/storage.md`） |
-| 已知 residual | 无（旧 multi-canary 世界已删除；`manager-full-loop` flake 随旧 e2e 拓扑消失） |
+| 静态 ratchet：`student-teacher-absence`（含 `SatelliteKind.Replica` 禁止）+ `session-ownership-ratchet` + `unified-store-gate` + `g4r-*` | 本快照目标 GREEN |
+| `npm run check`（全量；由 orchestrator 收口跑） | 以 orchestrator 结果为准 |
+| Storage G4 / JS G5 / Universal+perm-inspector G6 | **DONE**（均在 `changes/completed/`） |
+| 已知 residual | G7 constitution/docs plane；G8 Strength 全量（非 K0）；G9 capability-isomorphism 等可选硬门；magic-todo 仍 proposed |
 
-## 0.4 合法中间状态（现在）— **收敛完成（G6-G9 DONE）**
+## 0.4 合法中间状态（现在）— **G0–G6 DONE；G7 runtime DONE；G8/G9 PARTIAL**
 
 ```text
 ✓ Causal waits 可解释；orchestrator canaries 无历史 timeout
@@ -135,11 +137,15 @@ ac41ef8f  session abort diagnostic
 ✓ Meditator = reasoning only；SyncDelegate reuse Session
 ✓ Runtime durability = EventStore（Strategy A：AgentJournal 作 adapter surface）
 ✓ 无 legacy NDJSON writer / 无 dual-write / 无 migrator
-✓ Storage completed（G4；changes/completed/storage.md）
-✓ JS capability-projected tools（G5；changes/completed/js-capability-projected-tools.md）
-✓ Casebook cold persistence / CaseFinalize（G6 DONE；drainCollectorAndArchive + universal-loop proof）
-✓ Rulebook / Strength（G7-G8 DONE；ponytail minimal diff，后触 authored 120-dir / holdout 仅 defer 内容）
-✓ magic-todo — 独立 Lane（Final；不入主 Gate；见 §0.1/§25 Lane D/§32 尾注/§33 尾注）
+✓ Storage completed（G4）
+✓ JS capability-projected tools（G5）
+✓ Casebook lifecycle / mechanical Bookkeeper / Index（G6；universal + perm-inspector completed）
+✓ Rulebook runtime：folder SSOT、Full/Identity tip guidance、squash co-move（G7 runtime DONE）
+◐ Rulebook residual：constitution 120、docs enforcer、Observation vocabulary rename、INVENTORY（不挡 runtime DONE 叙述）
+◐ Strength：K0 splice 类型在树；Change 仍 active/strength.md（并行 owner；非 G8 full DONE）
+◐ G9：既有 + session-ownership ratchet；capability-isomorphism 等仍可加
+○ magic-todo — 独立 Lane；保持 proposed；不入主 Gate
+○ entry — Playbook；保持 proposed；不迁 completed
 ```
 
 ---
@@ -958,9 +964,9 @@ Student QA 是已退休 domain。
 
 ---
 
-# 11. G4 — Unified Storage — **IN PROGRESS（收口）**
+# 11. G4 — Unified Storage — **DONE**（§0.1 权威）
 
-> **状态：IN PROGRESS**（2026-08-10）。Phase 0–7 **DONE**（inventory → EventStore core → GitGateway → clean-break policy → Wave-1 `AgentJournal` adapter → NDJSON substrate delete → proposed storage sections rewrite）。Phase 8：harness EventStore cutover + EventStore 性能（git ODB/ref CAS in-process）+ FALLBACK-013 **DONE**；e2e **26/26** + `--repeat 3` 绿。Storage → `changes/completed/` **待 G4 Exit 清单最终确认**。详情见 `changes/active/storage.md` Phase 8 Active notes。
+> **状态：DONE**（见 §0.1 / `changes/completed/storage.md`）。下文保留施工手册原文；若与 §0.1 冲突，以 §0.1 为准。
 
 现在进入最大的基础设施 Change。
 
@@ -1170,9 +1176,9 @@ runtime 只认 EventStore
 
 ---
 
-# 12. G5 — JS Capability-Projected Tools — **BLOCKED（G4 Exit）**
+# 12. G5 — JS Capability-Projected Tools — **DONE**（§0.1 权威）
 
-> **状态：BLOCKED**。G3 clean break 已完成，但 G4 Storage 尚未 completed。仓库中已有 **prep-only** 提交（`8319771f` capability algebra）；**禁止** move proposed → active 或按原文执行 `js-student` / `StudentCompile` 路径，直至 G4 Exit。
+> **状态：DONE**（见 §0.1 / `changes/completed/js-capability-projected-tools.md`）。下文保留施工手册原文；若与 §0.1 冲突，以 §0.1 为准。
 
 到这里 Agent 世界已经稳定：
 
@@ -1372,9 +1378,9 @@ Casebook observation capture
 
 ---
 
-# 14. G6 — perm-inspector + Universal Casebook Completion — **NOT STARTED**
+# 14. G6 — perm-inspector + Universal Casebook Completion — **DONE**（§0.1 权威）
 
-> **状态：NOT STARTED**。前置 G5（JS file primitive）尚未激活；Universal 仍 Active 等待 CaseFinalize / Casebook lifecycle。
+> **状态：DONE**（见 §0.1 / `changes/completed/universal.md` + `changes/completed/perm-inspector.md`：CasebookLifecycle + mechanical Bookkeeper + Index）。下文保留施工手册原文；若与 §0.1 冲突，以 §0.1 为准。
 
 现在才正式启动 `perm-inspector`。
 
@@ -2047,12 +2053,12 @@ Orchestrator timeout   ✓ completed
 
 ---
 
-## Lane B — Universal Runtime — **G2/G3 DONE；G6 待做**
+## Lane B — Universal Runtime — **G2/G3/G6 DONE**
 
 ```text
 ReuseScope / SessionOwnership / SyncDelegate   ✓ DONE
 Student/Teacher clean break                     ✓ DONE
-Casebook / CaseFinalize                         ○ G6（Universal 仍 Active）
+Casebook / CaseFinalize                         ✓ DONE（universal + perm-inspector completed）
 ```
 
 ---
@@ -2073,12 +2079,13 @@ G4 Exit（§43+§48，G3.5-A 修订）→ changes/completed/  ✓ DONE（2026-08
 以下不能重叠进入主线：
 
 ```text
-Universal destructive delete          ✓ DONE（2026-08-10）
-Storage cutover                       ✓ DONE（2026-08-10，G4 completed）
-JS legacy tool removal                ✓ DONE（2026-08-10，G5 completed）
-Casebook observation integration      ○ NOT STARTED（G6）
-Rulebook context migration            ○ NOT STARTED
-Strength promotion                    ○ NOT STARTED
+Universal destructive delete          ✓ DONE
+Storage cutover                       ✓ DONE（G4 completed）
+JS legacy tool removal                ✓ DONE（G5 completed）
+Casebook observation integration      ✓ DONE（G6）
+Rulebook runtime                      ✓ DONE（G7 runtime；constitution residual）
+Strength promotion                    ◐ PARTIAL（K0 splice in tree；active/strength 并行 owner）
+G9 ratchets                           ◐ PARTIAL（session-ownership + absence Replica 禁令已加）
 ```
 
 每完成一个都先恢复：
@@ -2454,16 +2461,14 @@ Strength
 把整个过程压缩成一张执行图：
 
 ```text
-CURRENT（2026-08-10；HEAD ac41ef8f）
+CURRENT（2026-08-11；§0.1 权威）
 │
-├─ Completed: Causal CE + Orchestrator timeout
-├─ Active: Universal（G2/G3 DONE；G6 Casebook 待做）
-├─ Active: Storage（G4 Phase 0–7 DONE；Phase 8 收口）
-├─ Proposed: JS tools（prep only；G4 Exit 前勿 activate）
-├─ Proposed: perm-inspector
-├─ Proposed: Rulebook
-├─ Proposed: Strength
-└─ Proposed: magic-todo（Playbook 外；独立 Lane）
+├─ Completed: Causal CE + Orchestrator + Storage(G4) + JS(G5)
+│            + Universal + perm-inspector（G6 Casebook）
+├─ Active: strength.md（G8 PARTIAL K0；并行 owner；勿 playbook-close）
+├─ Completed: rulebook（G7 runtime DONE；constitution residual 记在 Final outcome）
+├─ Proposed: entry.md（本 Playbook；不迁 completed）
+└─ Proposed: magic-todo（Playbook 外；不入 gates）
         │
         ▼
 [1] Causal CE                              ✓ DONE
@@ -2482,32 +2487,25 @@ CURRENT（2026-08-10；HEAD ac41ef8f）
         ▼
 [5] Unified EventStore                       ✓ DONE
     clean break cutover
-    no disk-format compatibility
-    no old-archive read
         │
         ▼
 [6] Capability-Projected JS Tools            ✓ DONE
-    final filesystem primitive
         │
         ▼
-[7] Inspector Casebook                       ◐ ACTIVE（G6）
-    EventStore
-    CaseRefresh
-    CaseFinalize
-        │
-        ├── Universal closes
-        └── perm-inspector closes
+[7] Inspector Casebook                       ✓ DONE（G6）
+    CasebookLifecycle + Bookkeeper + Index
         │
         ▼
-[8] Rulebook                                 ○ NOT STARTED
-    authored rules + Observation events
+[8] Rulebook                                 ✓ runtime DONE（G7）
+    residual: constitution 120 / docs plane / vocabulary
         │
         ▼
-[9] Strength                                 ○ NOT STARTED
-    K0 / shadow / dry run / K1 / K2
+[9] Strength                                 ◐ PARTIAL（K0 splice；active）
+    K1/K2 / holdout — 并行 owner
         │
         ▼
-[10] Full ratchet + release                  ○ NOT STARTED
+[10] Full ratchet + release                  ◐ PARTIAL（G9）
+    session-ownership + SatelliteKind.Replica 禁令已加
 ```
 
 ---
