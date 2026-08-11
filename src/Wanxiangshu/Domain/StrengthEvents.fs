@@ -1,40 +1,94 @@
 namespace Wanxiangshu.Domain
 
-/// Strength EventStore vocabulary stubs (Phase 0 architecture splice).
-///
-/// Large material is referenced only via opaque `PayloadRef` / envelope
-/// `payload_refs`. No Journal NDJSON writer, no RuntimePath blob path, no
-/// independent FrameBundleRef/PredictorSnapshotRef storage types.
-///
-/// Phase 0 does not append these events. Stubs exist so later phases extend
-/// one vocabulary rather than inventing parallel shapes.
+open Wanxiangshu.Kernel.Identity
 
-/// Candidate prepared for a single TargetProviderRun (not yet consumed).
+/// STRENGTH-006: Prepared is durable material bound to exactly one owner decision
+/// and TargetProviderRun. Large bodies are opaque EventStore PayloadRefs only.
 type StrengthCandidatePrepared =
-    { FrameBundleRef: PayloadRef
-      PredictorSnapshotRef: PayloadRef option }
+    { OwnerSessionId: SessionId
+      DecisionId: StrengthDecisionId
+      TargetProviderRun: ProviderRunIdentity
+      ReplicaSessionId: SessionId
+      Budget: StrengthBudget
+      AnchorDigest: string
+      FrameDigest: string
+      ByteLength: int
+      MaterialPayloads: PayloadRef list }
 
-/// Candidate promoted after proven consumption by the target provider run.
-type StrengthCandidatePromoted = { FrameBundleRef: PayloadRef }
+/// STRENGTH-007: Promotion repeats the causal identity/digest/refs so the fold can
+/// reject a writer that attempts to promote different material or the wrong run.
+type StrengthCandidatePromoted =
+    { OwnerSessionId: SessionId
+      DecisionId: StrengthDecisionId
+      TargetProviderRun: ProviderRunIdentity
+      FrameDigest: string
+      MaterialPayloads: PayloadRef list }
 
-/// Candidate abandoned without promotion (wrong run, expiry, or kill switch).
-type StrengthCandidateAbandoned = { FrameBundleRef: PayloadRef option }
+/// STRENGTH-008: association between a Promoted decision and the existing XTrace
+/// cursor range it actually entered. End is exclusive.
+type StrengthFramesTraced =
+    { DecisionId: StrengthDecisionId
+      StartInclusive: int64
+      EndExclusive: int64 }
+
+type StrengthCandidateAbandoned =
+    { DecisionId: StrengthDecisionId
+      TargetProviderRun: ProviderRunIdentity }
 
 [<RequireQualifiedAccess>]
 type StrengthEvent =
     | Prepared of StrengthCandidatePrepared
     | Promoted of StrengthCandidatePromoted
+    | Traced of StrengthFramesTraced
     | Abandoned of StrengthCandidateAbandoned
 
 module StrengthEvents =
 
-    let prepared (frameBundleRef: PayloadRef) (predictorSnapshotRef: PayloadRef option) : StrengthEvent =
+    let private canonicalRefs refs = PayloadRefs.canonicalize refs
+
+    let prepared
+        (ownerSessionId: SessionId)
+        (decisionId: StrengthDecisionId)
+        (targetProviderRun: ProviderRunIdentity)
+        (replicaSessionId: SessionId)
+        (budget: StrengthBudget)
+        (anchorDigest: string)
+        (frameDigest: string)
+        (byteLength: int)
+        (materialPayloads: PayloadRef list)
+        : StrengthEvent =
         StrengthEvent.Prepared
-            { FrameBundleRef = frameBundleRef
-              PredictorSnapshotRef = predictorSnapshotRef }
+            { OwnerSessionId = ownerSessionId
+              DecisionId = decisionId
+              TargetProviderRun = targetProviderRun
+              ReplicaSessionId = replicaSessionId
+              Budget = budget
+              AnchorDigest = anchorDigest
+              FrameDigest = frameDigest
+              ByteLength = byteLength
+              MaterialPayloads = canonicalRefs materialPayloads }
 
-    let promoted (frameBundleRef: PayloadRef) : StrengthEvent =
-        StrengthEvent.Promoted { FrameBundleRef = frameBundleRef }
+    let promoted
+        (ownerSessionId: SessionId)
+        (decisionId: StrengthDecisionId)
+        (targetProviderRun: ProviderRunIdentity)
+        (frameDigest: string)
+        (materialPayloads: PayloadRef list)
+        : StrengthEvent =
+        StrengthEvent.Promoted
+            { OwnerSessionId = ownerSessionId
+              DecisionId = decisionId
+              TargetProviderRun = targetProviderRun
+              FrameDigest = frameDigest
+              MaterialPayloads = canonicalRefs materialPayloads }
 
-    let abandoned (frameBundleRef: PayloadRef option) : StrengthEvent =
-        StrengthEvent.Abandoned { FrameBundleRef = frameBundleRef }
+    let traced (decisionId: StrengthDecisionId) (startInclusive: int64) (endExclusive: int64) : StrengthEvent =
+        StrengthEvent.Traced
+            { DecisionId = decisionId
+              StartInclusive = startInclusive
+              EndExclusive = endExclusive }
+
+    let abandoned (decisionId: StrengthDecisionId) (targetProviderRun: ProviderRunIdentity) : StrengthEvent =
+        StrengthEvent.Abandoned
+            { DecisionId = decisionId
+              TargetProviderRun = targetProviderRun }

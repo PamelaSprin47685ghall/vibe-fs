@@ -14,7 +14,7 @@
 | armedByFailure | FALLBACK-012：局部控制流事实，非持久状态 |
 | AttemptExecutionProfile | PROMPT-008：一次 provider request 的原子档案 |
 | Authority Root | PROMPT-002：有权改变执行档案的消息来源 |
-| AttachmentKind | HOST-008：Companion / SyncInspector / SyncCoder / Bookkeeper；Attached 所有权的附着种类 |
+| AttachmentKind | HOST-008：Companion / SyncInspector / SyncCoder / Bookkeeper / StrengthReplica；Attached 所有权的附着种类 |
 
 ## B
 
@@ -126,7 +126,7 @@
 | PrefixProbe | CTX-010：attempt-local 候选前缀，失败不成为事实 |
 | PrefixRebaseCommitted | CTX-012：probe 提升的唯一持久事实 |
 | PromptDispatcher | PROMPT-005：四阶段（Claimed/Submitted/PhysicalAccepted/Abandoned） |
-| ProviderRequestKind | PROMPT-008：WorkMain / BloggerMain / BloggerSquash / InteractionRepair |
+| ProviderRequestKind | PROMPT-008：WorkMain / BloggerMain / BloggerSquash / InteractionRepair / StrengthReplica |
 | Provider-visible projection | COMPANION-012：正进入模型的字段排除非模型 metadata |
 | ParentJoinCorrectionRequested | EXEC-022：已退休假 abort 的确定性 replacement 后通知父侧作废 |
 | PulseAgentHandle | EXEC-024：agent mailbox 仅唤醒信号；结果只读 Journal |
@@ -164,6 +164,10 @@
 | SelectedAgent | PROMPT-002：由 Authority Root 冻结、Fallback 不得改写的 Agent |
 | SessionExecutionClass | HOST-008：Work / InternalLeaf |
 | SessionOwnership | HOST-008：Root / Attached(ownerSessionId, AttachmentKind) |
+| StrengthCandidate | STRENGTH-006：已 durable 准备且仅绑定一个 TargetProviderRun、尚未成为语义历史的只读 frame bundle |
+| StrengthDecisionId | STRENGTH-005/006：一次 decision 的稳定身份；frame wire identity 与 durable Candidate 的幂等键 |
+| StrengthReplica | STRENGTH-004/014：`InternalLeaf × Attached(StrengthReplica)` 的 same-role fast decision-local leaf |
+| StrengthBudget | STRENGTH-003：K0/K1/K2；单位为 Replica provider request |
 | SyncCoder | HOST-008：AttachmentKind；EXEC-026 / EXEC-028：dedicated Coder SyncDelegate |
 | SyncDelegate | EXEC-026 / EXEC-028：同步委派（Returned→Completion）；AGENT-024：DAG 边 |
 | SyncInspector | HOST-008：AttachmentKind；EXEC-026 / EXEC-028：dedicated Inspector SyncDelegate |

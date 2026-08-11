@@ -485,22 +485,32 @@ module PromptAuthority =
     /// (AGENT-010) would stop being structurally guaranteed.
     let systemPromptIdFor (role: Role) : SystemPromptId = SystemPromptId.create (roleLabel role)
 
-    /// StrengthReplica provider-visible tools: Read / Glob / Grep only.
-    /// Intersected with the role matrix so ineligible roles stay empty.
+    /// STRENGTH-004 / PROMPT-008: the request-specific authority is exact, not
+    /// inferred by intersecting the ordinary role surface. Meditator is eligible
+    /// even though its ordinary WorkMain surface delegates reads through Inspector;
+    /// Browser/Reviewer are intentionally ineligible despite having readonly tools.
     let private strengthReplicaReadonly =
         set [ ToolPermission.Read; ToolPermission.Glob; ToolPermission.Grep ]
 
-    /// AGENT-007: tool capabilities are the role's permission set (AGENT-010),
-    /// narrowed by request-specific kinds (StrengthReplica → readonly set).
+    let private strengthReplicaEligibleRole =
+        function
+        | Role.Coder
+        | Role.Inspector
+        | Role.DevOps
+        | Role.Meditator -> true
+        | Role.Manager
+        | Role.Orchestrator
+        | Role.Browser
+        | Role.Reviewer
+        | Role.Executor
+        | Role.Blogger -> false
+
+    /// AGENT-007: ordinary requests use role permissions; StrengthReplica uses
+    /// its own narrower request contract and fails closed for every ineligible role.
     let toolCapabilitiesFor (role: Role) (requestKind: ProviderRequestKind) : Set<ToolPermission> =
         match requestKind with
         | ProviderRequestKind.StrengthReplica ->
-            let rolePerms = Roles.permissions role
-
-            if Set.isEmpty (Set.intersect rolePerms strengthReplicaReadonly) then
-                Set.empty
-            else
-                strengthReplicaReadonly
+            if strengthReplicaEligibleRole role then strengthReplicaReadonly else Set.empty
         | ProviderRequestKind.WorkMain
         | ProviderRequestKind.BloggerMain
         | ProviderRequestKind.BloggerSquash

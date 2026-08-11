@@ -38,7 +38,7 @@ Host 通过 `WorkspaceEventStore` 按 git common-dir 取得 process-local raw+st
 
 ## 写入口纪律
 
-领域事实的 durable append 最终进入 EventStore；Strategy A 下 Application/Session 可继续调用 `AgentJournal`，但其成功路径只写入 `IEventStore` / `IGitRawStore`。  
+领域事实的 durable append 最终进入 EventStore；Strategy A 下 Application/Session 可继续调用 `AgentJournal`，但其成功路径只写入 `IEventStore` / `IGitRawStore`。Strength 的 Prepared/Promoted/Traced 也只走该边界；frame/predictor 大 material 只能成为 envelope `payload_refs`，不得建立 Strength NDJSON、RuntimePath blob 或 feature ref（STRENGTH-006/017）。  
 各领域外部效果的 Requested/Accepted 成对出现（PERSIST-009），不得旁路「先改内存再补盘」。
 
 上下文恢复事实（PERSIST-010）的单一观察写入口是相应 reconcile 路径（例如 compaction → `ContextReanchored`），禁止多处随手写 fold 特例。

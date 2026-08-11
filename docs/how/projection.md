@@ -34,10 +34,12 @@ Canonical Renderer
 intent 排序锚点固定为「当前被投影前缀锚」。canonical order、可合并组合与冲突必须先于实现固定，禁止依赖注册顺序：
 
 ```text
-keepPhysicalPrefix        // 无 X 恢复时兜底：物理前缀原样
-activatePrefixEpoch       // X probe 已提交并成为 active snapshot
+keepPhysicalPrefix        // 普通 Work base：物理前缀原样
+activatePrefixEpoch       // 普通 Work base：active prefix snapshot
+useStrengthMirror         // StrengthReplica-only base；与前两者互斥
 insertBlogFrames          // Y 有效帧（Entry/Squash）插入历史槽
 insertRepair              // Interaction Repair 回合
+insertStrengthFrames      // Candidate / Promoted / Replica-local；显式 visibility+anchor
 suppressTransportOnly     // transport-only 消息剔除（COMPANION-012）
 appendReviewChallenge     // skeptical challenge
 reanchorAfterCompaction   // ContextReanchored → Snapshot=None
@@ -48,7 +50,7 @@ HOST-013 pair-programming marker 不占 intent（wire 无消息地址，anchored
 
 消息级 `suppressTransportOnly` intent 路径以 proof/实现为准；当前生产未声明该 intent（`TransportMessages` 恒空）。COMPANION-012 字段级过滤由模型边界 / `toSemantic` 承担。
 
-同锚 intent 必须先按规范定义的稳定总序归一化，再执行显式合并或返回 `ProjectionConflict`。禁止依赖模块注册顺序。
+同锚 intent 必须先按规范定义的稳定总序归一化，再执行显式合并或返回 `ProjectionConflict`。禁止依赖模块注册顺序。Strength 的 `useStrengthMirror` 只能作为 StrengthReplica base；与 `keepPhysicalPrefix/activatePrefixEpoch` 同批即冲突。`insertStrengthFrames` 同 DecisionId+digest 幂等；同 anchor/DecisionId 不同 digest、Candidate target 不匹配或 Promoted 反射进当前 Replica mirror均冲突（STRENGTH-009/016）。
 
 合并函数只需证明其真实代数性质：重放型 intent 必须幂等；有序追加型 intent 必须保持 canonical order，不能被虚构为可交换。任何尚未定义的组合 fail closed。PrefixEpoch 始终是冻结 X 前缀选择；`insertBlogFrames` 只在其后构造 Y 可见历史，不得“合入”或改写 active X epoch。
 
@@ -104,6 +106,7 @@ seal 一经发出不可变（COMPANION-009 字节级 sealed 屏障）。
 | LWR / delta | Semantic 源同 XTrace、不同投影（COMPANION-007；delta 见 how/context.md CTX-013） |
 | reanchor | transform 观察到 compaction → `reanchorAfterCompaction`（how/host.md HOST-006） |
 | challenge / seal | how/review.md REVIEW-003/004/006 |
+| Strength Replica base / frames | `useStrengthMirror` / `insertStrengthFrames`（how/strength.md；STRENGTH-009/016） |
 | pair-programming marker | how/host.md HOST-013 — 由 `PairProgrammingThoughtTransform` 直接按 durable gap anchor replay（wire 级 DSL 无消息地址，无法做 anchored 渲染，故不占用 intent）；参与 Wire/seal，不进 XTrace |
 
 ---

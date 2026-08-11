@@ -60,6 +60,7 @@
     <Compile Include="Domain/StrengthBudget.fs"/>
     <Compile Include="Domain/StrengthCostModel.fs"/>
     <Compile Include="Domain/StrengthPolicy.fs"/>
+    <Compile Include="Domain/StrengthFrame.fs"/>
     <Compile Include="Domain/ToolResultBound.fs"/>
     <Compile Include="Domain/RuntimeNudge.fs"/>
     <Compile Include="Session/LoopDetector.fs"/>
@@ -83,6 +84,7 @@
     <Compile Include="Domain/AttemptPlanner.fs"/>
     <Compile Include="Domain/EventStore.fs"/>
     <Compile Include="Domain/StrengthEvents.fs"/>
+    <Compile Include="Domain/StrengthProjection.fs"/>
     <Compile Include="Domain/JsTools.fs"/>
     <Compile Include="Domain/Casebook.fs"/>
     <Compile Include="Infrastructure/Persist/StoreTypes.fs"/>

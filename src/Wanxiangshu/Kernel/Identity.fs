@@ -90,6 +90,10 @@ module Identity =
     /// same attempt equal" an askable but meaningless question.
     type ProviderRunIdentity = private ProviderRunIdentity of string
 
+    /// STRENGTH-005/006: one speculation decision. Derived by the Strength
+    /// coordinator from frozen owner/run facts; never a clock/random identity.
+    type StrengthDecisionId = private StrengthDecisionId of string
+
     /// One tool invocation inside a provider run. `ToolContext.callID`.
     ///
     /// Distinct from ProviderRunIdentity because REVIEW-004 requires both: two
@@ -295,6 +299,10 @@ module Identity =
     module ProviderRunIdentity =
         let create (value: string) = ProviderRunIdentity value
         let value (ProviderRunIdentity v) = v
+
+    module StrengthDecisionId =
+        let create (value: string) = StrengthDecisionId value
+        let value (StrengthDecisionId v) = v
 
     module ToolCallId =
         let create (value: string) = ToolCallId value

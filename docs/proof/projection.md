@@ -33,7 +33,7 @@
 
 | 证明项 | 状态 |
 |--------|------|
-| 七 intent 定义（KeepPhysicalPrefix / ActivatePrefixEpoch / InsertBlogFrames / InsertRepair / SuppressTransportOnly / AppendReviewChallenge / ReanchorAfterCompaction；HOST-013 pair 渲染归 `PairProgrammingThoughtTransform`，见 host proof） | Domain + unit |
+| 九 intent 定义（KeepPhysicalPrefix / ActivatePrefixEpoch / UseStrengthMirror / InsertBlogFrames / InsertRepair / InsertStrengthFrames / SuppressTransportOnly / AppendReviewChallenge / ReanchorAfterCompaction；HOST-013 pair 渲染归 `PairProgrammingThoughtTransform`，见 host proof） | Domain + unit；Strength 冲突/顺序见 `proof/strength.md` |
 | Canonical Rank 0–5 | unit |
 | plan 幂等 / 冲突（含 ConflictingPrefixLifecycle 等） | unit |
 | `renderMessagesWithIntents` fold | unit |

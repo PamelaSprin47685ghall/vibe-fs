@@ -32,7 +32,7 @@
 | 证明 | 条款 |
 |------|------|
 | 查询 O(1) 积分，不扫全史 | PERSIST-008 |
-| payload closure：先 blob 后 event；dangling / 缺 closure fail closed | PERSIST-007 |
+| payload closure：先 blob 后 event；dangling / 缺 closure fail closed；Strength frame/predictor material 只经 envelope payload_refs，无 feature-owned blob/NDJSON | PERSIST-007、STRENGTH-006/017 |
 | AgentJournal 成功路径无 `.ndjson`、无磁盘 `blobs/` 目录 | PERSIST-006、007 |
 | Requested-only 先核对领域物理证据；禁止盲重试；Accepted 不折回 | PERSIST-009 |
 
