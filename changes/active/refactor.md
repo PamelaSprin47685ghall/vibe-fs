@@ -1764,7 +1764,7 @@ Tests
 
 - [x] Wave 0：删除 `EnforcerNudge/Throttle`、清 `sessionDeadRefusal`、建 `kolmogorov-size` ratchet
 - [x] Wave 1：拆 `JsTools.fs`、`ProjectionAlgebra.fs`、`tests/unit/support/domain.mjs`
-- [ ] Wave 2：拆 `PluginRuntimeScope.fs`、`Journal/Fold.fs`、`EnforcerHost.fs`
+- [x] Wave 2：拆 `PluginRuntimeScope.fs`（四 owner）、`Journal/Fold.fs`（8 family 模块）、`EnforcerHost.fs`（五 owner）
 - [ ] Wave 3：收 `HostForkRuntime`、`SyncDelegateRuntime`、`ManagerNarrativeTransform`、`Codec/Projection`、`JsToolsFs.fs`、`SpikePlugin.fs`
 - [ ] Wave 4/5：重审 `Fact.fs` 等 + 再扫全部 >300 行文件
 
