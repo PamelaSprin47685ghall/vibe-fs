@@ -510,7 +510,10 @@ module PromptAuthority =
     let toolCapabilitiesFor (role: Role) (requestKind: ProviderRequestKind) : Set<ToolPermission> =
         match requestKind with
         | ProviderRequestKind.StrengthReplica ->
-            if strengthReplicaEligibleRole role then strengthReplicaReadonly else Set.empty
+            if strengthReplicaEligibleRole role then
+                strengthReplicaReadonly
+            else
+                Set.empty
         | ProviderRequestKind.WorkMain
         | ProviderRequestKind.BloggerMain
         | ProviderRequestKind.BloggerSquash

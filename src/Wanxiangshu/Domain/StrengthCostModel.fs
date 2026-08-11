@@ -19,10 +19,7 @@ type StrengthValueInputs =
       Risk1: float
       Risk2: float }
 
-type StrengthValueEstimate =
-    { V0: float
-      V1: float
-      V2: float }
+type StrengthValueEstimate = { V0: float; V1: float; V2: float }
 
 module StrengthCostModel =
 
@@ -46,8 +43,7 @@ module StrengthCostModel =
         { V0 = 0.0
           V1 = p1 * savedDeep1 - fast1 - byte1 - delay1 - risk1
           V2 =
-            p1 * savedDeep1
-            + p1 * p2 * savedDeep2
+            p1 * savedDeep1 + p1 * p2 * savedDeep2
             - fast1
             - p1 * fast2
             - byte2

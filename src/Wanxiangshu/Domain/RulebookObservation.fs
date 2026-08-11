@@ -7,11 +7,13 @@ namespace Wanxiangshu.Domain
 /// same front-zip; this type names the unit without Journal cutover or new EventStore
 /// event types. Do not rename BlogEntryCommitted.
 type ObservationUnit =
-    { TipName: string option
-      /// Hex digest of the durable frame blob when present.
-      FrameDigest: string option
-      /// Optional resolved frame body (or body ref text); absent when unpaired tip.
-      FrameBody: string option }
+    {
+        TipName: string option
+        /// Hex digest of the durable frame blob when present.
+        FrameDigest: string option
+        /// Optional resolved frame body (or body ref text); absent when unpaired tip.
+        FrameBody: string option
+    }
 
 /// Pure tip↔frame pairing for Observation history (rulebook §2).
 ///
@@ -25,10 +27,7 @@ module RulebookObservation =
     /// Semantics match CompanionProjectionBuilder's private pairTipFrameUnits:
     /// while both sides remain, emit tipᵢ then frameᵢ as one unit; leftover tips or
     /// frames append unpaired. Prefer this over tips∥frames parallel streams.
-    let pairTipsAndFrames
-        (tips: string list)
-        (frames: (string * string option) list)
-        : ObservationUnit list =
+    let pairTipsAndFrames (tips: string list) (frames: (string * string option) list) : ObservationUnit list =
         let rec loop tipRest frameRest acc =
             match tipRest, frameRest with
             | t :: ts, (digest, body) :: fs ->

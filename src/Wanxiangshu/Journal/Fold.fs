@@ -979,9 +979,7 @@ module Fold =
                             { session with
                                 PrefixEpoch = Some retired
                                 Blog = session.Blog |> Option.map BlogProjection.applyReanchor
-                                TipDelivery =
-                                    session.TipDelivery
-                                    |> Option.map TipDeliveryProjection.applyReanchor }))
+                                TipDelivery = session.TipDelivery |> Option.map TipDeliveryProjection.applyReanchor }))
                     projection
                 |> prefixOutcome "ContextReanchored" projection
 
