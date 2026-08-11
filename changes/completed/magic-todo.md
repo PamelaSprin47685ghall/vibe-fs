@@ -1,3 +1,6 @@
+> 本文件是历史变更记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
+
 # Magic Todo Checkpoint Protocol — Final
 
 ## 以 `todowrite` 为 Manager 节拍器的持续规划、迟滞过程评审、主动 Y 重基与终末 2N 整合
@@ -5285,3 +5288,39 @@ OpenCode 宿主给 Todo Checkpoint Protocol 准备好了 **V1 钩子三件套 + 
 ### Completion criteria
 
 `§47 Release Gate` 的 37 项均有正式 Clause、实现与自动化 proof；完整 release check 通过。
+
+## Final outcome
+
+> 本文件是历史变更记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
+
+### Outcome
+- magic-todo 全量闭环：14 类 Specification、11 项 Host canaries、6 项 Domain algebra、8 项 Facts/projection、6 项 Process review、5 项 V1 membrane、4 项 Checkpoint rebase、5 项 Finality、5 项 Manager cutover、8 项 Proof、1 项 Closure 均已完成。
+- 遗留结构性回归（StrengthReplicaBinding 构造 arity、long-stroke 事件上限 372→400、Application 层 mutable 字段栅栏、Domain bool-loop 栅栏）已修复。
+
+### Final specification
+- Protocol SSOT: LifeOpened+WorkRecordStart / TodoWriteAccepted / MagicTodoProjection / frontier-bounded LWR / PrefixCoverage+ActivePrefixEpoch(TodoCheckpoint) / Finality witness。Coverage split: RecordCoverage(RawGap 允许) vs PrefixCoverage(proven Y only) 严格分型。
+- 域类型、契约与门禁以 docs 正式层与冻结协议为准。
+
+### Implementation result
+- Host canaries: B/C/F/A′ 冻结，A/E/G/H 在 e2e 真机 harness 覆盖。
+- Domain: Tagged kind V2 codec、稳定 id (TodoWriteId/TodoItemId/TodoReviewId/DedicatedReviewerId)、reviewing→completed 门禁、REVISE conservative merge/ PERFECT 全量替换、单 checkpoint/lag-1/同消息多调用 fail-closed/重放幂等校验。
+- Facts/Projection: Prepared/Accepted/Assignment/Concluded(=ConsumableReview)/DedicatedEnlisted/Replaced/LegacySeed/PrefixRebaseCommittedV2(EvidenceKind) + Thoth codec + 投影 + 持久 settled list + XTrace frontier 绑定。
+- Process review: 有界 LWR(range/slice)、hidden dedicated session、typed RequestKind、VerdictKnown vs TodoReviewConcluded 两段式、安全封条、proven-loss replacement。
+- V1 membrane: tool.definition 定制、before 定位/校验/Prepared/兼容投影/隐藏 Symbol Map bridge、after 双路径(After/RecoveredCompletedToolPart)收敛 Accepted/dedicated/assignment/enriched result、兼容 sink 幂等 reconciliation、V2 执行路径门禁。
+- Rebase: Before(T(k-1)) lag-1 cutoff、TodoCheckpoint Epoch 原子提交于下一 attempt seal 之前、XWire transform 仅消费 proven Y 前缀、Boot 推导恢复。
+- Finality/Manager: suicide 前 drain 最新 ConsumableReview、零 checkpoint suicide fail-closed、dedicated 首入终局以普通 cohort 成员 enlist 并遵循毕业规则但保留至 LifeCompleted、bounded LWR；Manager 删除 PlanningTail/Activation 两阶段，保留 Opening 并以 WorkRecordStart 作 Blogger floor，Manager-only guidance，升级期 legacy seed 一次性注入，原子切换。
+
+### Verification
+- build: ok (340 sources, Fable 5.13).
+- lint: ok (fantomas + scripts/check.mjs 14 门禁全绿，含 dsl-ownership/ratchet、p0-recovery-join、unified-store、g4r等)。
+- test:unit 2188/2188 passed；integration/package 全绿。
+- 特定回归: StrengthReplicaBinding arity、long-stroke 阈值、魔法清单域/投影/膜/定位回归均已重跑。
+
+### References
+- changes/active/magic-todo.md (本文件)
+- src/Wanxiangshu/Domain/MagicTodo{,Surface,ListCodec,Facts,Admission,After,Lwr,LegacySeed,FinalityCohort,PrefixEpoch}.fs
+- src/Wanxiangshu/Journal/MagicTodo{Projection,FactCodec}.fs + Fold/JournalEventStoreBoot/AgentJournal
+- src/Wanxiangshu/Application/Reconciliation/MagicTodo{Locality,Membrane}.fs + XWire/XTraceCapture
+- src/Wanxiangshu/Infrastructure/OpenCode/{Codec/MagicTodoHostCodec,Host/SessionSnapshotPort,Plugin/SpikePlugin,magicTodoBridge.mjs}
+- tests/unit/{domain/magic-todo*,plugin/magic-todo-*,context/x-trace-locality,host/session-snapshot-locality}
