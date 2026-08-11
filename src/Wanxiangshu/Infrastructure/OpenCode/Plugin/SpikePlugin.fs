@@ -248,6 +248,7 @@ module SpikePlugin =
                         |> Option.iter (fun sessionId ->
                             scope.Quiescence.BeginProviderAttempt(SessionId.create sessionId))
 
+                        // DSL-MUTABLE: algorithm-scratch — replay plans shared with the immediate XTrace capture step
                         let mutable strengthReplayPlans: StrengthReplayPlan list = []
 
                         // STRENGTH-008: replay durable Promoted frames before XTrace.
