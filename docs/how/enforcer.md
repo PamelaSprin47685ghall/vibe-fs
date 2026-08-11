@@ -12,7 +12,7 @@
 
 ## 目标与 System Prompt 契约（ENFORCER-001 / ENFORCER-030）
 
-Blogger 以 `blog` 工具提交稠密工作日志。fast/deep blogger 统一加载静态配置资源 `resources/prompts/blogger-system.md` 与 `resources/enforcer/catalog.json` 构建 System Prompt。系统契约强制约定：**模型在每轮响应中必须且仅能调用一次 `blog` 工具**，携带有效非空的 `text` 与符合 catalog 的 `tip` 枚举。
+Blogger 以 `blog` 工具提交稠密工作日志。fast/deep blogger 统一加载 `resources/prompts/blogger-system.md`，并与 folder SSOT `resources/enforcer/*/enforcer.md` 合成 effective system prompt（无 `catalog.json`）。系统契约强制约定：**模型在每轮响应中必须且仅能调用一次 `blog` 工具**，携带有效非空的 `text` 与符合目录 tip enum 的 `tip`。
 
 ### 多调用 tip 选择算法（ENFORCER-025）
 

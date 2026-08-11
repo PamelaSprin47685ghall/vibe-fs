@@ -3,7 +3,7 @@
 条款前缀：`ENFORCER-`。  
 Cycle 写入口与恢复证据边界见 `shape/enforcer.md`。
 归并、nudge、continuation、compaction 接线见 `how/enforcer.md`。  
-规则实例：`resources/enforcer/catalog.json`。
+规则实例 SSOT：`resources/enforcer/<TipName>/{enforcer.md,main.md}`（目录名 = tip；无 `catalog.json`）。完整 docs 面 rewrite 见 `changes/completed/rulebook.md` Deferred。
 
 ## ENFORCER-001：目标
 
