@@ -3,11 +3,11 @@
 条款前缀：`ENFORCER-`。  
 Cycle 写入口与恢复证据边界见 `shape/enforcer.md`。
 归并、nudge、continuation、compaction 接线见 `how/enforcer.md`。  
-规则实例 SSOT：`resources/enforcer/<TipName>/{enforcer.md,main.md}`（目录名 = tip；无 `catalog.json`）。完整 docs 面 rewrite 见 `changes/completed/rulebook.md` Deferred。
+规则实例 SSOT：`resources/enforcer/<TipName>/{enforcer.md,main.md}`（目录名 = TipName = provider tip enum；无 `catalog.json`）。
 
 ## ENFORCER-001：目标
 
-Blogger 以 `blog` 工具提交稠密工作日志；tip 绑定 catalog 字段；cycle 原子提交 coverage。
+Blogger 以 `blog` 工具提交稠密工作日志；tip 绑定目录 TipName；cycle 原子提交 coverage。
 
 ## ENFORCER-002：非目标
 

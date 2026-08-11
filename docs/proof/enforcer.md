@@ -1,21 +1,21 @@
 # Enforcer / Blogger — 证明
 
 行为见 `what/enforcer.md`，所有权见 `shape/enforcer.md`，程序见 `how/enforcer.md`。  
-规则实例实现面：`resources/enforcer/catalog.json`。  
+规则实例实现面：`resources/enforcer/<TipName>/{enforcer.md,main.md}`（目录名 = TipName；无 `catalog.json`）。  
 本文件只列证明项与真实证据路径；不重新定义任何 `ENFORCER-*` Clause。
 
 > 提示：多调用 tip 选择按 **provider-visible `PartOrdinal` 最早**（`EnforcerCycle.fs` 的
-> `mergeCalls`）证明，不是按 catalog ordinal。`docs/how/enforcer.md` ENFORCER-025 已改为
+> `mergeCalls`）证明，不是按 lexical ordinal。`docs/how/enforcer.md` ENFORCER-025 已改为
 > PartOrdinal-first-only，`docs/shape/enforcer.md` 已改为物理所有权（`HasFlight` /
 > `HasParked` / `PendingOffer` / `DrainWindow`）。此前的 baseline gap（catalog-ordinal tip
-> 选择、纯 cell 转移）均已关闭；本证明按当前 FIXED 文档与 0.5.4 实现引用。
+> 选择、纯 cell 转移）均已关闭；本证明按当前 FIXED 文档与实现引用。
 
-## 资源与启动（§13.1 Catalog）
+## 资源与启动（§13.1 Rulebook folders）
 
 | 证明 | 证据路径 |
 |------|----------|
-| 打包 catalog 可加载；缺失 / JSON 非法 / Domain 校验失败 → 启动 fail fast，无代码内 fallback | `tests/unit/enforcer/catalog-validation.test.mjs`；`tests/unit/enforcer/catalog.test.mjs`；资源 `resources/enforcer/catalog.json` |
-| 恰好 120 条规则；`field` / `id` 唯一；ordinal 连续 `1..N` | `tests/unit/enforcer/catalog.test.mjs`（`ENFORCER_170_*`）；`tests/unit/enforcer/catalog-validation.test.mjs`（`ENFORCER_170_validate_*`） |
+| 打包 rulebook 目录可加载；缺失 / 非法目录 / Domain 校验失败 → 启动 fail fast，无代码内 fallback | `tests/unit/enforcer/catalog-validation.test.mjs`；`tests/unit/enforcer/catalog.test.mjs`；`tests/integration/resources/enforcer-rulebook.test.mjs`；资源 `resources/enforcer/*/` |
+| 恰好 120 条规则；TipName/`field`/`id` 唯一；ordinal 连续 `1..N`（lexical） | `tests/unit/enforcer/catalog.test.mjs`（`ENFORCER_170_*`）；`tests/unit/enforcer/catalog-validation.test.mjs`（`ENFORCER_170_validate_*`） |
 | `package.json` files 含 `resources/` → pack 后仍可加载 | integration 资源 / package 套件覆盖加载失败路径 |
 
 ## 领域与 codec / tip（§13.1）
