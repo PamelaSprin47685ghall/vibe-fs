@@ -11,43 +11,46 @@ type JsCapability =
     | Write
     | Edit
     | Glob
+    | Grep
 
 module JsCapability =
 
     /// The only ToolPermission → JsCapability mapping. Non-filesystem
     /// permissions produce no js-* member (JS-004 four-layer exactness).
-    /// Grep is not a js-* primitive: builtin grep visibility stays on
-    /// ToolPermission.Grep; the SDK teaches grep as Read+Glob+RegExp.
     let ofToolPermission (permission: ToolPermission) : JsCapability option =
         match permission with
         | ToolPermission.Read -> Some JsCapability.Read
         | ToolPermission.Write -> Some JsCapability.Write
         | ToolPermission.Edit -> Some JsCapability.Edit
         | ToolPermission.Glob -> Some JsCapability.Glob
+        | ToolPermission.Grep -> Some JsCapability.Grep
         | _ -> None
 
     let ofToolCapabilities (capabilities: Set<ToolPermission>) : Set<JsCapability> =
         capabilities |> Set.toList |> List.choose ofToolPermission |> Set.ofList
 
-    /// Fixed canonical member order (JS-002/§46): file, glob, rewrite, write.
+    /// Fixed canonical member order (JS-002): file, glob, grep, rewrite, write.
     let order (capability: JsCapability) : int =
         match capability with
         | JsCapability.Read -> 0
         | JsCapability.Glob -> 1
-        | JsCapability.Edit -> 2
-        | JsCapability.Write -> 3
+        | JsCapability.Grep -> 2
+        | JsCapability.Edit -> 3
+        | JsCapability.Write -> 4
 
 /// One capability's complete SDK projection: the single source for member
 /// name, description, canonical example, and runtime binding key. The four
 /// layers must stay identical or the surface lies (JS-002/004).
 type JsCapabilityFragment =
-    { Capability: JsCapability
-      MemberName: string
-      /// LLM-visible method signature in the public base class (JS-002).
-      Signature: string
-      Description: string
-      CanonicalExample: string
-      RuntimeBindingKey: string }
+    {
+        Capability: JsCapability
+        MemberName: string
+        /// LLM-visible method signature in the public base class (JS-002).
+        Signature: string
+        Description: string
+        CanonicalExample: string
+        RuntimeBindingKey: string
+    }
 
 /// Fixed registry of all fragments: the only place a js-* member can be born.
 module JsFragmentRegistry =
@@ -73,8 +76,8 @@ module JsFragmentRegistry =
           MemberName = "glob"
           Signature = "async glob(pattern)"
           Description =
-            "glob(pattern) — bounded, deterministically ordered path enumeration. "
-            + "Returns canonical paths. Does not grant Read on those paths."
+            "glob(pattern) — gitignore-style bounded path enumeration. Returns "
+            + "{ paths, truncated }. Does not grant Read on those paths."
           CanonicalExample =
             "class Js extends JsProgram {\n"
             + "  async run() {\n"
@@ -82,6 +85,22 @@ module JsFragmentRegistry =
             + "  }\n"
             + "}"
           RuntimeBindingKey = "js.glob" }
+
+    let grep: JsCapabilityFragment =
+        { Capability = JsCapability.Grep
+          MemberName = "grep"
+          Signature = "async grep(needle, pattern = \"**/*\")"
+          Description =
+            "grep(needle, pattern = \"**/*\") — search UTF-8 files selected by the same "
+            + "gitignore-style glob. needle is a non-empty string or RegExp. Returns "
+            + "{ matches, truncated } with 1-based line/column. Does not grant file()."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    return await this.grep(/TODO:.+/, \"src/**/*.js\");\n"
+            + "  }\n"
+            + "}"
+          RuntimeBindingKey = "js.grep" }
 
     let rewrite: JsCapabilityFragment =
         { Capability = JsCapability.Edit
@@ -125,8 +144,7 @@ module JsFragmentRegistry =
             + "}"
           RuntimeBindingKey = "js.write" }
 
-    /// Member fragments only. Grep is a derived example (Read+Glob), not a member.
-    let all: JsCapabilityFragment list = [ read; glob; rewrite; write ]
+    let all: JsCapabilityFragment list = [ read; glob; grep; rewrite; write ]
 
     let byCapability: Map<JsCapability, JsCapabilityFragment> =
         all |> List.map (fun fragment -> fragment.Capability, fragment) |> Map.ofList
@@ -270,6 +288,9 @@ module JsCanonicalDescription =
 
     let globStub = "  async glob(pattern) {\n    // Host capability\n  }"
 
+    let grepStub =
+        "  async grep(needle, pattern = \"**/*\") {\n    // Host capability\n  }"
+
     let rewriteStub = "  rewrite(path, newText) {\n    // Host capability\n  }"
 
     let writeStub = "  write(path, newText) {\n    // Host capability\n  }"
@@ -277,8 +298,7 @@ module JsCanonicalDescription =
     let runStub =
         "  async run() {\n    throw new Error(\"Js.run() must be implemented.\");\n  }"
 
-    let has (capabilities: Set<JsCapability>) (capability: JsCapability) =
-        Set.contains capability capabilities
+    let has (capabilities: Set<JsCapability>) (capability: JsCapability) = Set.contains capability capabilities
 
     let publicBaseClass (capabilities: Set<JsCapability>) : string =
         let methods =
@@ -286,6 +306,8 @@ module JsCanonicalDescription =
                   fileAlgorithm "const source = await HOST_READ_IMMUTABLE_UTF8_SNAPSHOT(path);"
               if has capabilities JsCapability.Glob then
                   globStub
+              if has capabilities JsCapability.Grep then
+                  grepStub
               if has capabilities JsCapability.Edit then
                   rewriteStub
               if has capabilities JsCapability.Write then
@@ -301,7 +323,9 @@ module JsCanonicalDescription =
                   fileAlgorithm
                       "const snapshot = this._api.js.read(path);\n    if (snapshot && snapshot.ok === false) throw new Error(snapshot.reason || snapshot.code);\n    const source = snapshot.text;"
               if has capabilities JsCapability.Glob then
-                  "  async glob(pattern) {\n    const result = this._api.js.glob(pattern);\n    if (result && result.ok === false) throw new Error(result.reason || result.code);\n    return result.paths;\n  }"
+                  "  async glob(pattern) {\n    const result = this._api.js.glob(pattern);\n    if (result && result.ok === false) throw new Error(result.reason || result.code);\n    return { paths: result.paths, truncated: result.truncated === true };\n  }"
+              if has capabilities JsCapability.Grep then
+                  "  async grep(needle, pattern = \"**/*\") {\n    const result = this._api.js.grep(needle, pattern);\n    if (result && result.ok === false) throw new Error(result.reason || result.code);\n    return { matches: result.matches, truncated: result.truncated === true };\n  }"
               if has capabilities JsCapability.Edit then
                   "  rewrite(path, newText) {\n    const result = this._api.js.edit(path, newText);\n    if (result && result.ok === false) throw new Error(result.reason || result.code);\n  }"
               if has capabilities JsCapability.Write then
@@ -313,8 +337,13 @@ module JsCanonicalDescription =
     let contract (toolName: string) (capabilities: Set<JsCapability>) =
         let verbs =
             List.concat
-                [ if has capabilities JsCapability.Read then [ "read" ] else []
-                  if has capabilities JsCapability.Read && has capabilities JsCapability.Glob then
+                [ if has capabilities JsCapability.Read then
+                      [ "read" ]
+                  else
+                      []
+                  if has capabilities JsCapability.Grep then
+                      [ "search" ]
+                  elif has capabilities JsCapability.Read && has capabilities JsCapability.Glob then
                       [ "search" ]
                   else
                       []
@@ -322,7 +351,10 @@ module JsCanonicalDescription =
                       [ "transform"; "rewrite" ]
                   else
                       []
-                  if has capabilities JsCapability.Write then [ "create" ] else [] ]
+                  if has capabilities JsCapability.Write then
+                      [ "create" ]
+                  else
+                      [] ]
             |> String.concat ", "
 
         let parallelLine =
@@ -398,9 +430,21 @@ module JsCanonicalDescription =
         + "  f.text(\"^\", \"begin\") + \"newString\" + f.text(\"end\", \"$\")"
 
     let globRules =
-        "glob(pattern) returns the deterministically sorted canonical paths inside the\n"
-        + "current path boundary. It does not grant Read. A profile with Glob and without\n"
-        + "Read can enumerate paths but cannot call file()."
+        "glob(pattern) enumerates files with gitignore/wildmatch semantics under the\n"
+        + "current path boundary. * does not cross /. ** matches zero or more directories.\n"
+        + "A pattern without a slash matches at any depth (*.md matches every .md file).\n"
+        + "{a,b} expands to alternatives. Results omit .git, omit gitignored paths, do\n"
+        + "not follow symlinks, and are sorted. The return value is { paths, truncated }.\n"
+        + "The bound is on match count; truncated is true when matches were cut. glob\n"
+        + "does not grant Read."
+
+    let grepRules =
+        "grep(needle, pattern = \"**/*\") searches UTF-8 files selected by the same\n"
+        + "gitignore-style glob. needle is a non-empty string (literal) or a RegExp\n"
+        + "(caller g/y/lastIndex ignored). Unreadable or non-UTF-8 files are skipped.\n"
+        + "Returns { matches: [{ path, line, column, text }], truncated }. line and\n"
+        + "column are 1-based. text is the matched substring. The bound is on match\n"
+        + "count. grep does not grant file()."
 
     let editRules =
         "rewrite(path, newText) stages replacement of an existing UTF-8 file. The target\n"
@@ -419,7 +463,7 @@ module JsCanonicalDescription =
         + "\n"
         + "The generated class has no commit, rollback, snapshot, or transaction methods.\n"
         + "run() returning normally → Host preflight → prepare → commit. run() throwing or\n"
-        + "any file()/glob() failure discards every staged mutation.\n"
+        + "any file()/glob()/grep() failure discards every staged mutation.\n"
         + "\n"
         + "run() must return a JSON-compatible value: null, boolean, finite number, string,\n"
         + "array, or plain object (recursive). undefined, BigInt, NaN, Infinity, function,\n"
@@ -431,6 +475,8 @@ module JsCanonicalDescription =
                   readRules
               if has capabilities JsCapability.Glob then
                   globRules
+              if has capabilities JsCapability.Grep then
+                  grepRules
               if has capabilities JsCapability.Edit then
                   editRules
               if has capabilities JsCapability.Write then
@@ -445,11 +491,13 @@ module JsCanonicalDescription =
             Source = JsFragmentRegistry.read.CanonicalExample }
           { Requires = set [ JsCapability.Glob ]
             Source = JsFragmentRegistry.glob.CanonicalExample }
+          { Requires = set [ JsCapability.Grep ]
+            Source = JsFragmentRegistry.grep.CanonicalExample }
           { Requires = set [ JsCapability.Read; JsCapability.Glob ]
             Source =
               "class Js extends JsProgram {\n"
               + "  async run() {\n"
-              + "    const paths = await this.glob(\"src/**/*.js\");\n"
+              + "    const { paths } = await this.glob(\"src/**/*.js\");\n"
               + "    const hits = [];\n"
               + "    for (const path of paths) {\n"
               + "      const file = await this.file(path);\n"
@@ -586,7 +634,7 @@ module JsCanonicalDescription =
             Source =
               "class Js extends JsProgram {\n"
               + "  async run() {\n"
-              + "    const paths = await this.glob(\"src/**/*.js\");\n"
+              + "    const { paths } = await this.glob(\"src/**/*.js\");\n"
               + "    const changed = [];\n"
               + "    for (const path of paths) {\n"
               + "      const file = await this.file(path);\n"

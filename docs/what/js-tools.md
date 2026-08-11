@@ -30,7 +30,17 @@ Clause 前缀 `JS-`。本页只冻结 observable semantics，不规定内部模�
 
 ## JS-007 glob()
 
-有界确定性路径枚举：返回匹配路径的稳定排序；结果受当前 capability 边界约束（不可见的路径不出现）。不跟随符号链接逃逸 capability 根。
+gitignore / wildmatch 风格的有界确定性路径枚举。`pattern` 相对 capability 根：
+
+- `*` 不跨 `/`；`**` 匹配零段或多段目录；`?` 匹配一个非 `/` 字符；`[abc]` / `[a-z]` 为字符类；`{a,b}` 先展开为交替再匹配。
+- pattern 不含 `/` 时匹配任意深度（`*.md` 命中全树 `.md`）；含 `/` 或前导 `/` 时相对根锚定。
+- 永不进入 `.git`；应用根与子目录 `.gitignore` 以及 `.git/info/exclude`（若存在）；不跟随符号链接。
+- 有界打在**匹配条数**，不打在 DFS 枚举前缀。返回 `{ paths, truncated }`：`paths` 为稳定排序的 canonical 相对路径；截断时 `truncated = true`，不得把截断伪装成空匹配。
+- 不授予 Read。capability 边界外的路径不出现。
+
+## JS-020 grep()
+
+`ToolPermission.Grep` 投影为 `grep(needle, pattern = "**/*")`。needle 为非空字符串（字面量）或 RegExp（忽略调用方 g/y/`lastIndex`）。`pattern` 与 JS-007 同一套 gitignore 选文件。Host 在选中的严格 UTF-8 文件上搜索；不可读或非法 UTF-8 的文件跳过，不使整次调用失败。返回 `{ matches: [{ path, line, column, text }], truncated }`：`line` / `column` 为 1-based；`text` 为匹配子串；有界打在匹配条数；截断可见。不授予 `file()`。builtin `grep` RPC 仍独立存在（JS-003/017）。Read+Glob 而无 Grep 时，仍可用 `glob()+file()+RegExp` 组合，但那不是 Grep capability 的投影。
 
 ## JS-008 rewrite()
 

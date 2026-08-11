@@ -5325,6 +5325,34 @@ js-transaction.db / transaction-v2.json / special feature ref / feature-owned du
 crash recovery 只从 EventStore facts/payloads 重建。
 ```
 
+### Amendment JS-GITIGNORE-GREP — gitignore glob + Host grep（2026-08-11）
+
+Requested by：用户明确修正批准范围。原文 `#5` / `#23` / `#33` / `#91` 以「Grep = glob+file+RegExp、无 special backend」和未规定的 glob 方言为第一版。
+
+Change：
+
+```text
+JS-007 glob = gitignore/wildmatch
+  * 不跨 /
+  ** 含零段
+  无斜杠 = 任意深度
+  {a,b} 交替
+  跳过 .git；应用 .gitignore 与 .git/info/exclude
+  不跟随 symlink
+  有界 = 匹配条数，非 DFS 前缀
+  返回 { paths, truncated }
+
+JS-020 grep = ToolPermission.Grep 投影的 Host member
+  grep(needle, pattern = "**/*")
+  同一套 gitignore 选文件
+  跳过非 UTF-8
+  返回 { matches: [{ path, line, column, text }], truncated }
+  builtin grep RPC 仍独立存在
+  Read+Glob 组合仍合法，但不再是唯一搜索面
+```
+
+Reason：第一版 walk-then-filter 被 `.git` 饿死匹配；derived grep 在真仓库零命中。可表达不是实用。
+
 ## Remaining work
 
 按 proposal §104 Implementation Order（Student/Teacher 项按 Amendment JS-G3 删除）：

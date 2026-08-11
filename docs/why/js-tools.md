@@ -21,3 +21,7 @@
 **事务先写盘再执行 vs staged + all-or-nothing。** 拒半途可见：编辑结果在 commit 前必须不可见，否则崩溃后磁盘与 EventStore 事实分歧。durable prepare 只经统一 EventStore，禁止 `js-transaction.db` / feature store（JS-012/015）。
 
 **结果在 commit 后才发现不可用 vs 先验证后提交。** 拒前者：result validation 必须在 commit 前，成功 return 与 commit 耦合（JS-013）。
+
+**walk-then-filter + `**`→`.*` vs gitignore wildmatch。** 拒前者：DFS 字典序先进入 `.git`，硬上限打在枚举前缀而非匹配条数，`src/**/*.fs` 在真仓库变成空集；naive `**` 还要求额外目录段。有界必须打在匹配结果上；pattern 方言必须是 gitignore/wildmatch（含零段 `**`、无斜杠则任意深度、应用 `.gitignore`、永不进入 `.git`）。截断必须是返回值上的可见位，不能伪装成「无匹配」（JS-007）。
+
+**Grep 仅作 `glob()+file()+RegExp` 组合 vs Host `grep()` member。** 原文 `#5` 以「可表达」否定 primitive。可表达 ≠ 实用：glob 假阴性让组合零命中；即便 glob 正确，沙箱内逐文件 `file()` 仍被 timeout / `RESULT_TOO_LARGE` / 二进制文件放大。修正案：`ToolPermission.Grep` 投影为 Host `grep()`（gitignore 选文件、跳过非 UTF-8、返回 path+line+column+匹配子串、匹配条数有界且截断可见）。builtin `grep` RPC 仍独立存在。Read+Glob 而无 Grep 时组合仍合法，不再是唯一搜索面（JS-020）。

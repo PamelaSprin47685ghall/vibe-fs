@@ -32,10 +32,10 @@ const PERMISSION_NAMES = [
 const toolPermissionByName = Object.fromEntries(PERMISSION_NAMES.map((n) => [n, ToolPermission[n]]))
 const permsOf = (names) => names.map((n) => toolPermissionByName[n])
 const fsPermissionsOf = (role) =>
-  roles.permissions(roles.of(role)).filter((n) => ['Read', 'Write', 'Edit', 'Glob'].includes(n))
+  roles.permissions(roles.of(role)).filter((n) => ['Read', 'Write', 'Edit', 'Glob', 'Grep'].includes(n))
 
-const MEMBER_BY_PERMISSION = { Read: 'file', Glob: 'glob', Edit: 'rewrite', Write: 'write' }
-const BINDING_BY_MEMBER = { file: 'js.read', glob: 'js.glob', rewrite: 'js.edit', write: 'js.write' }
+const MEMBER_BY_PERMISSION = { Read: 'file', Glob: 'glob', Grep: 'grep', Edit: 'rewrite', Write: 'write' }
+const BINDING_BY_MEMBER = { file: 'js.read', glob: 'js.glob', grep: 'js.grep', rewrite: 'js.edit', write: 'js.write' }
 
 // The four layers a capability must light up: member, description, example,
 // runtime binding, base class. A member missing from any layer is exactly a
@@ -86,14 +86,14 @@ test('JS002_generation_is_deterministic_and_names_js_role', () => {
   assert.equal(a.Description, b.Description)
   assert.equal(a.BaseClassSource, b.BaseClassSource)
   assert.deepEqual(a.Examples, b.Examples)
-  assert.equal(a.Capabilities.size, 4)
+  assert.equal(a.Capabilities.size, 5)
 })
 
 test('JS004_four_layer_exactness_coder', () => {
   const result = surface('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
   assert.equal(isSome(result), true)
   const layers = layersOf(result)
-  assert.deepEqual(Object.keys(layers).sort(), ['file', 'glob', 'rewrite', 'write'])
+  assert.deepEqual(Object.keys(layers).sort(), ['file', 'glob', 'grep', 'rewrite', 'write'])
   for (const [member, layer] of Object.entries(layers)) {
     assert.equal(layer.inBaseClass, true, `${member} in base class`)
     assert.equal(layer.inDescription, true, `${member} in description`)
@@ -105,7 +105,7 @@ test('JS004_four_layer_exactness_coder', () => {
 test('JS004_absent_capability_is_absent_in_all_four_layers', () => {
   const result = surface('Inspector', ['Read', 'Glob', 'Grep']) // no Edit / Write
   assert.equal(isSome(result), true)
-  assert.deepEqual(memberNames(result), ['file', 'glob'])
+  assert.deepEqual(memberNames(result), ['file', 'glob', 'grep'])
   assert.equal(result.Description.includes('rewrite(path'), false)
   assert.equal(result.Description.includes('write(path'), false)
   assert.equal(result.BaseClassSource.includes('js.edit'), false)
@@ -126,6 +126,7 @@ test('JS004_member_gate_binds_present_members_only', () => {
   const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
   assert.equal(memberBinding('Inspector', perms, 'file'), 'js.read')
   assert.equal(memberBinding('Inspector', perms, 'glob'), 'js.glob')
+  assert.equal(memberBinding('Inspector', perms, 'grep'), 'js.grep')
   assert.equal(memberBinding('Inspector', perms, 'rewrite'), undefined)
   assert.equal(memberBinding('Inspector', perms, 'write'), undefined)
   assert.equal(memberBinding('Meditator', caps(ToolPermission.Inspector), 'file'), undefined)
@@ -144,7 +145,7 @@ test('JS002_same_capabilities_same_surface_across_roles', () => {
 })
 
 test('JS001_non_fs_permissions_never_produce_members', () => {
-  for (const name of PERMISSION_NAMES.filter((n) => !['Read', 'Write', 'Edit', 'Glob'].includes(n))) {
+  for (const name of PERMISSION_NAMES.filter((n) => !['Read', 'Write', 'Edit', 'Glob', 'Grep'].includes(n))) {
     const result = generate('Coder', caps(toolPermissionByName[name]))
     assert.equal(isNone(result), true, `${name} alone must not generate a surface`)
   }
