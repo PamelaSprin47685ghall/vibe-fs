@@ -18,7 +18,7 @@ Trigger when understanding or changing a simple domain rule requires traversing 
 framework-tax is framework-specific ceremony. pattern-sprawl is OO/pattern scaffolding. This rule is the higher-level condition where accidental structure eclipses essential structure regardless of source. Tie-break: if the mass is a specific framework’s ceremony, use framework-tax; if accidental structure from any source dominates the domain, use this rule.
 
 ## Decision Procedure
-Separate concepts into “the problem requires this” and “our solution introduced this.” Rework the second set until its cost is subordinate to the first.
+Separate concepts into “the problem requires this” and “our solution introduced this.” The root-cause is solution-imposed mass that eclipses essential structure; rework the second set until its cost is subordinate to the first. Prefer this over a single wrapper or framework tax when accidental structure from any source is what dominates.
 
 ## Examples
 - positive: Changing one pricing rule requires navigating DI, mapper, DTO, wrapper, and lifecycle config before the rule appears.

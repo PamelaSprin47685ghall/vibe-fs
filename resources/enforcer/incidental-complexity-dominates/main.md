@@ -1,7 +1,7 @@
 # incidental-complexity-dominates — Main
 
 ## What To Do Now
-Identify machinery introduced by the solution rather than demanded by the domain, then remove or compress it until essential concepts become the main visible structure.
+Repair at the root-cause owner of the domain operation: who owns that end-to-end path must collapse solution-imposed machinery until essential concepts dominate. Do not add another wrapper around the ceremony.
 
 ## Why This Matters
 Reader attention is the scarce resource architecture allocates. Every wrapper, lifecycle rule, configuration key, and translation step consumes that resource before any business reasoning begins. When accidental mechanisms dominate, even simple changes require global context.

@@ -1,7 +1,7 @@
 # in-place-mutation — Main
 
 ## What To Do Now
-Replace shared in-place updates with immutable state transitions or explicit events. Keep any mutation confined to local implementation where no observer can see intermediate identity.
+Repair at the root-cause owner: who owns the shared identity must publish the transition as a new value or event, then swap the authoritative reference. Keep mutation only where no observer can see intermediate identity.
 
 ## Why This Matters
 Mutation compresses “old value + transition + new value” into “whatever the object contains now.” That saves allocation but discards causal structure. Concurrency, audit, rollback, and testing then recover that structure indirectly through locks, logs, snapshots, or defensive copies.

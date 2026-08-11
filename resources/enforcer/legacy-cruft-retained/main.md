@@ -1,7 +1,7 @@
 # legacy-cruft-retained — Main
 
 ## What To Do Now
-Delete the obsolete surface the clean-break decision already retired: aliases, adapters, old names, compatibility branches, and legacy formats.
+Honor the clean-break at the root-cause owner: who owns the retired surface must delete aliases, adapters, old names, compatibility branches, and legacy formats rather than keep a ghost path.
 
 ## Why This Matters
 A migration that keeps its predecessor alive has not reduced complexity; it has merely renamed one side “legacy.” Every surviving branch remains a supported possibility until code makes it impossible, so tests, docs, and future refactors must keep asking whether the old world still matters.

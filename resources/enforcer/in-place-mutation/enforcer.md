@@ -18,7 +18,7 @@ Trigger when shared/exposed domain state is mutated field-by-field or overwritte
 mutable-public-state exposes mutation authority to callers. overwrite-history mutates durable past facts. This rule concerns destructive update of current shared state. Tie-break: if callers can mutate the object, use mutable-public-state; if a shared current value is overwritten in place, use this rule.
 
 ## Decision Procedure
-Ask whether any other component can observe, retain, race with, or reason about the old value. If yes, compute a new value or record an explicit transition instead of mutating shared identity.
+Ask whether any other component can observe, retain, race with, or reason about the old value. If yes, the root-cause is destruction of the transition at that shared identity: compute a new value or record an explicit transition instead of mutating it. Prefer this over downstream locks, logs, or snapshots that merely reconstruct what overwrite destroyed.
 
 ## Examples
 - positive: A shared domain record is updated field-by-field while other components hold the same reference.

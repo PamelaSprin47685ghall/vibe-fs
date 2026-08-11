@@ -18,7 +18,7 @@ Trigger when an explicit clean-break policy exists yet obsolete code, aliases, c
 compatibility-cruft lacks a justified external requirement. half-finished-refactor leaves migration incomplete. This rule is sharper: a decision already said the old world should cease to exist. Tie-break: if no clean break was decided and dual owners remain, use half-finished-refactor; if the break was decided and the old surface still lives, use this rule.
 
 ## Decision Procedure
-Find the clean-break decision and identify every remaining representation of the retired surface. If no authorized exception exists, remove all of them rather than re-litigating the decision in code.
+Find the clean-break decision and identify every remaining representation of the retired surface. The root-cause is a ghost contract after the break already retired the old world; if no authorized exception exists, remove all of them rather than re-litigating the decision in code. Prefer this over incomplete migration when the decision already said the old surface must cease.
 
 ## Examples
 - positive: A v1 parser and alias remain reachable after the project declared v2 the only supported format.

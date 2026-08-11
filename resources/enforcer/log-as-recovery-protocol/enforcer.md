@@ -18,7 +18,7 @@ Trigger when restart/recovery logic parses logs or infers completed business eff
 memory-before-disk orders volatile state against durable facts. recovery-by-filesystem-state infers lifecycle from residue. This rule specifically elevates diagnostic output into recovery authority. Tie-break: if truth is inferred from log prose, use this rule; if from incidental files, use recovery-by-filesystem-state; if memory outruns disk, use memory-before-disk.
 
 ## Decision Procedure
-Ask whether the channel has a contractual guarantee that every committed fact appears exactly as recovery requires. If not, it may aid diagnosis but cannot define truth.
+Ask whether the channel has a contractual guarantee that every committed fact appears exactly as recovery requires. If not, the root-cause is granting recovery authority to diagnostic prose; logs may aid diagnosis but cannot define truth. Prefer this over memory-before-disk when restart infers completed work from log lines rather than from a journal.
 
 ## Examples
 - positive: Restart scans `INFO committed order` lines to decide which orders exist.

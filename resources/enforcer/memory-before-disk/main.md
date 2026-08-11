@@ -1,7 +1,7 @@
 # memory-before-disk — Main
 
 ## What To Do Now
-Reorder the write path so the durable fact commits first; only after success may authoritative memory advance and downstream observers see the new state.
+Reorder at the root-cause owner: who owns the write path must commit the durable fact first; only after success may authoritative memory advance and downstream observers see the new state.
 
 ## Why This Matters
 A process can lie to itself before it crashes. If memory changes first, subsequent commands may act on a state that restart cannot recover, creating a split between the world that influenced behavior and the world that left evidence.

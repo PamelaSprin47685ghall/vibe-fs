@@ -1,7 +1,7 @@
 # lost-update — Main
 
 ## What To Do Now
-Add a concurrency protocol that binds every update to the version it was derived from: versioned compare-and-swap, serialized ownership, or a mathematically valid merge.
+Install the protocol at the root-cause owner: who owns the record must bind every update to the version it was derived from—versioned compare-and-swap, serialized ownership, or a mathematically valid merge.
 
 ## Why This Matters
 Without conflict detection, the last writer does not merely win—it can erase information that was already accepted. The system then produces histories in which a successful update effectively never happened, violating the intuitive meaning of commit.

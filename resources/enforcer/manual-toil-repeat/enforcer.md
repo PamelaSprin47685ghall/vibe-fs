@@ -18,7 +18,7 @@ Trigger when the same mechanical edit, generation, validation, packaging, migrat
 leftover-scaffolding is temporary tooling that should disappear or be promoted. serial-investigation concerns independent research steps. This rule is recurring deterministic labor itself. Tie-break: if the work is investigation with unknown next questions, use serial-investigation; if the steps are a known algorithm repeated by hand, use this rule.
 
 ## Decision Procedure
-Write the procedure as inputs → deterministic steps → outputs. If that description is stable and has recurred enough to create error or attention cost, encode it as a maintained tool or project check.
+Write the procedure as inputs → deterministic steps → outputs. If that description is stable and has recurred enough to create error or attention cost, the root-cause is humans interpreting an unwritten program: encode it as a maintained tool or project check. Prefer this over leftover-scaffolding when the defect is recurring labor, not an artifact that should disappear.
 
 ## Examples
 - positive: Every release, a human copies the same five files, edits the same version strings, and runs the same checklist.

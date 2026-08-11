@@ -18,7 +18,7 @@ Trigger when command handling mutates authoritative in-memory state, publishes t
 blob-after-event orders durable references and content. overwrite-history mutates committed past facts. This rule concerns volatile authority outrunning durable evidence. Tie-break: if memory is treated as truth before commit, use this rule; if a durable past fact is rewritten, use overwrite-history.
 
 ## Decision Procedure
-Crash the process at every boundary. If any externally visible or authoritative memory state can survive long enough to influence behavior while its justifying fact would vanish on restart, the order is wrong.
+Crash the process at every boundary. If any externally visible or authoritative memory state can survive long enough to influence behavior while its justifying fact would vanish on restart, the root-cause is volatile authority outrunning durable evidence. Prefer this over log-as-recovery-protocol when memory itself moved before commit, even if logs later look consistent.
 
 ## Examples
 - positive: The in-memory aggregate is updated, then the journal write is attempted; a crash leaves observers ahead of recovery.

@@ -18,7 +18,7 @@ Trigger when temporary support created for debugging, migration, rollout, experi
 spike-not-cleaned ships experimental design itself. half-finished-refactor leaves dual architecture. This rule concerns ancillary temporary artifacts that outlive the transition they served. Tie-break: if the leftover is dual ownership architecture, use half-finished-refactor; if it is a probe/script/flag that should have vanished, use this rule.
 
 ## Decision Procedure
-For each temporary artifact, state its ongoing user, maintenance contract, and trigger for execution. If those do not exist, remove it now rather than let age create false legitimacy.
+For each temporary artifact, state its ongoing user, maintenance contract, and trigger for execution. If those do not exist, the root-cause is an artifact that outlived its transition: remove it now rather than let age create false legitimacy. Prefer this over dual-architecture leftovers when the residue is a probe, flag, or script that should have vanished.
 
 ## Examples
 - positive: A debug dump script and `TEMP_SKIP_AUTH` flag remain after the investigation that created them.

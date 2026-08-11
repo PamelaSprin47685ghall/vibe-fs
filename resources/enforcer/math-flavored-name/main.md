@@ -1,7 +1,7 @@
 # math-flavored-name — Main
 
 ## What To Do Now
-Rename pseudo-mathematical identifiers to the concrete domain concepts they represent unless the code is implementing a formal model where the notation is genuinely standard.
+Rename at the root-cause owner: who owns the identifier must replace pseudo-mathematical names with the concrete domain concept, unless the code implements a formal model where that notation is genuinely standard.
 
 ## Why This Matters
 A symbol is only shorter when its meaning is already shared. Otherwise the missing characters reappear as reader effort: inspect assignments, trace types, decode comments, then remember the result. Domain names spend a few bytes to save repeated reconstruction.

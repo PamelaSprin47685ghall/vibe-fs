@@ -1,7 +1,7 @@
 # misleading-name — Main
 
 ## What To Do Now
-Rename the identifier to match the guarantee and ownership the implementation actually provides, or strengthen the implementation if the stronger name reflects the intended contract.
+Align the name at the root-cause owner: who owns the identifier must make its implied contract equal the implementation—rename to the real guarantee, or strengthen the implementation if the stronger name is the intended contract.
 
 ## Why This Matters
 Readers treat names as cached understanding. A misleading name poisons that cache: every call site starts reasoning from a false premise and only discovers the mismatch when inspecting implementation or debugging a failure.

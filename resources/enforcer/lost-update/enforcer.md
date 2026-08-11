@@ -18,7 +18,7 @@ Trigger when multiple writers can read the same mutable record/state, compute in
 shared-mutable-concurrency concerns coordination architecture broadly. optimistic-retry-assumption concerns unknown external effects. This rule is specifically stale-read overwrite of another writer’s accepted update. Tie-break: if the defect is a missing concurrency protocol in general, use shared-mutable-concurrency; if a committed update can be silently erased by a stale write, use this rule.
 
 ## Decision Procedure
-For each read-modify-write ask what proves the read version is still current at commit time. If nothing does, either serialize ownership or include the version in an atomic compare-and-swap.
+For each read-modify-write ask what proves the read version is still current at commit time. If nothing does, the root-cause is a stale premise that can erase another writer’s accepted update: serialize ownership or include the version in an atomic compare-and-swap. Prefer this over a generic missing-lock smell when a committed change can vanish silently.
 
 ## Examples
 - positive: Two workers load the same counter, each add one, both write the result; one increment vanishes.

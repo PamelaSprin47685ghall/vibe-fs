@@ -1,7 +1,7 @@
 # log-as-recovery-protocol — Main
 
 ## What To Do Now
-Remove diagnostic logs from the recovery decision path. Use the durable journal, transaction result, or authoritative external state that actually owns the fact.
+Move recovery to the root-cause owner: who owns the durable fact (journal, transaction outcome, or authoritative external state) must answer restart. Remove diagnostic logs from that decision path.
 
 ## Why This Matters
 A log line can precede a crash, fail to flush, change wording, or be emitted twice while the underlying business effect has entirely different semantics. Building recovery on it confuses evidence for operators with commitment for machines.

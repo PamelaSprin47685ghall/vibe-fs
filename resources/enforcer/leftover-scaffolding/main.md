@@ -1,7 +1,7 @@
 # leftover-scaffolding — Main
 
 ## What To Do Now
-Delete temporary artifacts whose transition is complete. If one now serves an enduring workflow, explicitly promote it into a maintained tool.
+Act at the root-cause owner: who owns the leftover artifact must delete it if the transition is complete, or promote it into a maintained tool with tests, docs, and an owner if a durable workflow now exists.
 
 ## Why This Matters
 Scaffolding becomes dangerous by aging: future readers cannot distinguish “still required” from “forgotten,” so they preserve it defensively. The longer it survives, the more apparent authority it acquires without ever earning a stable contract.

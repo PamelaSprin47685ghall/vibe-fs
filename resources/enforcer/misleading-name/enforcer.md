@@ -18,7 +18,7 @@ Trigger when an identifier suggests atomicity, durability, uniqueness, authoriza
 domain-language-drift concerns inconsistent vocabulary across the system. abbreviation-anxiety concerns decoding cost. This rule is a semantic lie in a specific name. Tie-break: if the same concept has several names, use domain-language-drift; if one name claims a false contract, use this rule.
 
 ## Decision Procedure
-Write the strongest reasonable claim a reader would infer from the name, then compare it with the actual contract. If the inferred claim is stronger or different, rename the concept or strengthen the implementation to make the claim true.
+Write the strongest reasonable claim a reader would infer from the name, then compare it with the actual contract. If the inferred claim is stronger or different, the root-cause is a name broadcasting a false contract: rename the concept or strengthen the implementation to make the claim true. Prefer this over domain-language-drift when one identifier lies rather than the vocabulary merely splitting.
 
 ## Examples
 - positive: `commitDurable` writes only to a process-local map and never fsyncs.

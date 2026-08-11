@@ -1,7 +1,7 @@
 # manual-toil-repeat — Main
 
 ## What To Do Now
-Turn the repeated deterministic procedure into a maintained script, generator, command, or project skill with explicit inputs and outputs.
+Encode the procedure at the root-cause owner: who owns the workflow must ship a maintained script, generator, command, or project skill with explicit inputs and outputs, not another human checklist.
 
 ## Why This Matters
 Manual repetition is executable knowledge stored in muscle memory. It scales by consuming attention and degrades through skipped steps, local variations, and forgotten context. Automation makes the procedure inspectable, repeatable, reviewable, and available to everyone.

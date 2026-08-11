@@ -18,7 +18,7 @@ Trigger when abstract or single-letter names appear in ordinary domain code and 
 abbreviation-anxiety concerns private shorthand generally. misleading-name concerns a false semantic claim. This rule is specifically pseudo-mathematical compression without mathematical payoff. Tie-break: if the name lies about a guarantee, use misleading-name; if it is algebraic decoration on ordinary domain data, use this rule.
 
 ## Decision Procedure
-Ask whether a domain expert or algorithm reader would naturally use this symbol for the same concept. If not, name the concrete thing the code manipulates.
+Ask whether a domain expert or algorithm reader would naturally use this symbol for the same concept. If not, the root-cause is algebraic decoration without a shared model: name the concrete thing the code manipulates. Prefer this over misleading-name when the identifier hides meaning rather than claiming a false guarantee.
 
 ## Examples
 - positive: Order totals are named `σ` and `f(x)` in a billing module with no formal model.
