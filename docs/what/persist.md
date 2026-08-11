@@ -114,6 +114,7 @@ PrefixRebaseCommitted
 ContextReanchored
   Epoch +1；同一 ObservedCompactionMessageId 只接受一次
   Snapshot→None；PrefixCoverage 归零；RecordCoverage 与 Frames 保留
+  TipDelivery.FullDeliveredTips 清空（与 Blog/Prefix 同原子 session 更新；重锚后 resolve 再发 Full main.md）
 ```
 
 **Durable Todo 事实（合法 vocabulary，不削弱上表 probe/coverage 不变量）**：  

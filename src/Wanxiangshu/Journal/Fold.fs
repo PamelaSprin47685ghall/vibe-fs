@@ -962,8 +962,10 @@ module Fold =
                 // atomicity is structural, not something a reader has to verify by
                 // tracing whether the second step was reached.
                 //
-                // Frames and RecordCoverage (IngestedThrough) survive. Only the Host
-                // prefix mapping is zeroed (BlogProjection.applyReanchor / COMPANION-008).
+                // Frames and RecordCoverage (IngestedThrough) survive. Host prefix
+                // mapping is zeroed (BlogProjection.applyReanchor / COMPANION-008).
+                // TipDelivery Full set also clears so post-compaction resolveTipGuidance
+                // re-emits Full main.md instead of stranding Main on IdentityOnly.
                 AgentProjection.tryUpdate
                     payload.SessionId
                     (fun session ->
@@ -976,7 +978,10 @@ module Fold =
                         |> Result.map (fun retired ->
                             { session with
                                 PrefixEpoch = Some retired
-                                Blog = session.Blog |> Option.map BlogProjection.applyReanchor }))
+                                Blog = session.Blog |> Option.map BlogProjection.applyReanchor
+                                TipDelivery =
+                                    session.TipDelivery
+                                    |> Option.map TipDeliveryProjection.applyReanchor }))
                     projection
                 |> prefixOutcome "ContextReanchored" projection
 

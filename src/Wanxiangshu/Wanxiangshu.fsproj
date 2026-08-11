@@ -70,6 +70,7 @@
     <Compile Include="Domain/CompanionPrompt.fs"/>
     <Compile Include="Domain/CompanionIdentity.fs"/>
     <Compile Include="Domain/CompanionProjectionBuilder.fs"/>
+    <Compile Include="Domain/RulebookObservation.fs"/>
     <Compile Include="Domain/ProjectionAlgebra.fs"/>
     <Compile Include="Domain/BloggerDelta.fs"/>
     <Compile Include="Domain/BloggerRequestContext.fs"/>

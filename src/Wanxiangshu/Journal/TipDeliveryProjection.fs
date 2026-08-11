@@ -32,3 +32,10 @@ module TipDeliveryProjection =
             match presentation with
             | TipPresentation.Full -> { FullDeliveredTips = Set.add (tipName.Trim()) state.FullDeliveredTips }
             | TipPresentation.IdentityOnly -> state
+
+    /// HOST-006: ContextReanchored voids Full history so Main re-emits main.md after compaction.
+    /// Identity-only must not strand the post-reanchor transcript (FullDeliveredTips → empty).
+    let applyReanchor (_state: TipDeliveryProjectionState) : TipDeliveryProjectionState = empty
+
+    /// Explicit clear alias for callers that do not care about the reanchor name.
+    let clear (state: TipDeliveryProjectionState) : TipDeliveryProjectionState = applyReanchor state
