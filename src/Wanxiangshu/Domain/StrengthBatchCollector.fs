@@ -32,61 +32,75 @@ module StrengthBatchCollector =
             | ProviderProjection.WireToolResult(callId, result) -> Some(callId, result)
             | _ -> None)
 
-    let private isBoundary (message: ProviderProjection.WireMessage) =
+    let private isRequestBoundary (message: ProviderProjection.WireMessage) =
         String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)
         || String.Equals(message.Role, "user", StringComparison.OrdinalIgnoreCase)
 
-    let private collectResults (boundarySlice: ProviderProjection.WireMessage list) =
-        boundarySlice
-        |> List.collect resultParts
-        |> List.fold
-            (fun (valid, acc: Map<string, string>) (callId, result) ->
-                let key = ToolCallId.value callId
+    let private collectResults
+        (all: ProviderProjection.WireMessage array)
+        (callIds: Set<string>)
+        (startIndex: int)
+        : Result<Map<string, string> * int, unit> =
+        let rec loop index results =
+            if index >= all.Length || isRequestBoundary all.[index] then
+                Ok(results, index)
+            else
+                let nextResults =
+                    resultParts all.[index]
+                    |> List.fold
+                        (fun state (callId, result) ->
+                            state
+                            |> Result.bind (fun current ->
+                                let key = ToolCallId.value callId
 
-                if not valid || Map.containsKey key acc then
-                    false, acc
-                else
-                    true, Map.add key result acc)
-            (true, Map.empty)
+                                if not (Set.contains key callIds) || Map.containsKey key current then
+                                    Error()
+                                else
+                                    Ok(Map.add key result current)))
+                        (Ok results)
+
+                match nextResults with
+                | Error() -> Error()
+                | Ok current -> loop (index + 1) current
+
+        loop startIndex Map.empty
 
     let collectCompleteBatches (messages: ProviderProjection.WireMessage list) : StrengthRequestBatch list =
-        let rec loop (remaining: ProviderProjection.WireMessage list) ordinal acc =
-            match remaining with
-            | [] -> List.rev acc
-            | message :: tail ->
-                if String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase) then
+        let all = List.toArray messages
+
+        let rec loop index requestOrdinal collected =
+            if index >= all.Length then
+                List.rev collected
+            else
+                let message = all.[index]
+
+                if not (String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase)) then
+                    loop (index + 1) requestOrdinal collected
+                else
+                    let nextOrdinal = requestOrdinal + 1
                     let calls = callsOf message
 
                     if List.isEmpty calls then
-                        List.rev acc
+                        List.rev collected
                     else
-                        let callIdSet = calls |> List.map (fun c -> ToolCallId.value c.Id) |> Set.ofList
-                        let toolMessages = tail |> List.takeWhile (not << isBoundary)
-                        let rest = tail |> List.skipWhile (not << isBoundary)
+                        let callIds = calls |> List.map (fun call -> ToolCallId.value call.Id) |> Set.ofList
 
-                        let noForeignCalls =
-                            toolMessages
-                            |> List.collect resultParts
-                            |> List.forall (fun (id, _) -> Set.contains (ToolCallId.value id) callIdSet)
-
-                        let noDuplicates, resultMap = collectResults toolMessages
-
-                        if noForeignCalls && noDuplicates && Map.count resultMap = List.length calls then
+                        match collectResults all callIds (index + 1) with
+                        | Error() -> List.rev collected
+                        | Ok(results, nextIndex) when Map.count results <> List.length calls -> List.rev collected
+                        | Ok(results, nextIndex) ->
                             let exchanges =
                                 calls
                                 |> List.map (fun call ->
                                     { ToolName = call.Name.Trim().ToLowerInvariant()
                                       CanonicalArguments = call.Arguments
-                                      CanonicalResult = resultMap.[ToolCallId.value call.Id] })
+                                      CanonicalResult = Map.find (ToolCallId.value call.Id) results })
 
-                            let batch =
-                                { RequestOrdinal = ordinal
-                                  Exchanges = exchanges }
+                            loop
+                                nextIndex
+                                nextOrdinal
+                                ({ RequestOrdinal = nextOrdinal
+                                   Exchanges = exchanges }
+                                 :: collected)
 
-                            loop rest (ordinal + 1) (batch :: acc)
-                        else
-                            List.rev acc
-                else
-                    loop tail ordinal acc
-
-        loop messages 1 []
+        loop 0 0 []

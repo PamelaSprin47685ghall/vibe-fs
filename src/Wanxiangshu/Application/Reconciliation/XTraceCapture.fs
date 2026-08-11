@@ -407,9 +407,9 @@ module XTraceCapture =
                 let recorded =
                     existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
 
-                // DSL-MUTABLE: algorithm-scratch
+                // DSL-MUTABLE: algorithm-scratch — monotone stable-capture cursor
                 let mutable cursor = XTraceProjection.headSequence existing
-                // DSL-MUTABLE: algorithm-scratch
+                // DSL-MUTABLE: algorithm-scratch — first write failure during one capture fold
                 let mutable failure: string option = None
 
                 List.zip messageIds messages
