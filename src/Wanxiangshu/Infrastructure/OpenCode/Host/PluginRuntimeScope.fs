@@ -85,8 +85,12 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let mutable satelliteRuntime: SatelliteRuntime option = None
     // DSL-MUTABLE: resource — sync-delegate runtime attachment slot
     let mutable syncDelegateRuntime: SyncDelegateRuntime option = None
+    // STRENGTH-014: decision-local replica ownership/capability registry. Durable
+    // causality remains in EventStore; this is only live physical-session state.
+    let strengthRuntime = StrengthRuntime()
 
     member _.Journal = journal
+    member _.StrengthRuntime = strengthRuntime
 
     member _.AttachSatelliteRuntime(runtime: SatelliteRuntime) = satelliteRuntime <- Some runtime
 

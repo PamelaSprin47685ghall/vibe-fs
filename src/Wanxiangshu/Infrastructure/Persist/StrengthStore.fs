@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Infrastructure.Persist
 
+open System.Text
 open Thoth.Json
 open Wanxiangshu.Domain
 open Wanxiangshu.Kernel.Identity
@@ -76,6 +77,59 @@ module StrengthStore =
             Encode.object
                 [ "decision_id", Encode.string (decisionText abandoned.DecisionId)
                   "target_provider_run", Encode.string (ProviderRunIdentity.value abandoned.TargetProviderRun) ]
+
+    let encodeFrameBundlePayload (bundle: StrengthFrameBundle) : byte[] =
+        let encodeExchange (exchange: StrengthToolExchange) =
+            Encode.object
+                [ "tool_name", Encode.string exchange.ToolName
+                  "arguments", Encode.string exchange.CanonicalArguments
+                  "result", Encode.string exchange.CanonicalResult ]
+
+        let encodeBatch (batch: StrengthRequestBatch) =
+            Encode.object
+                [ "request_ordinal", Encode.int batch.RequestOrdinal
+                  "exchanges", Encode.list (List.map encodeExchange batch.Exchanges) ]
+
+        Encode.object
+            [ "version", Encode.int 1
+              "digest", Encode.string bundle.Digest
+              "byte_length", Encode.int bundle.ByteLength
+              "batches", Encode.list (List.map encodeBatch bundle.Batches) ]
+        |> Encode.toString 0
+        |> Encoding.UTF8.GetBytes
+
+    let decodeFrameBundlePayload
+        (sha256: string -> string)
+        (content: byte[])
+        : Result<StrengthFrameBundle, string> =
+        let exchangeDecoder =
+            Decode.object (fun get ->
+                { ToolName = get.Required.Field "tool_name" Decode.string
+                  CanonicalArguments = get.Required.Field "arguments" Decode.string
+                  CanonicalResult = get.Required.Field "result" Decode.string })
+
+        let batchDecoder =
+            Decode.object (fun get ->
+                { RequestOrdinal = get.Required.Field "request_ordinal" Decode.int
+                  Exchanges = get.Required.Field "exchanges" (Decode.list exchangeDecoder) })
+
+        let decoder =
+            Decode.object (fun get ->
+                get.Required.Field "version" Decode.int,
+                get.Required.Field "digest" Decode.string,
+                get.Required.Field "byte_length" Decode.int,
+                get.Required.Field "batches" (Decode.list batchDecoder))
+
+        match Encoding.UTF8.GetString content |> Decode.fromString decoder with
+        | Error error -> Error error
+        | Ok(version, digest, byteLength, batches) when version <> 1 ->
+            Error(sprintf "unsupported Strength frame payload version: %d" version)
+        | Ok(_, digest, byteLength, batches) ->
+            match StrengthFrame.tryBuild sha256 byteLength batches with
+            | Error error -> Error(sprintf "invalid Strength frame payload: %A" error)
+            | Ok bundle when bundle.Digest <> digest || bundle.ByteLength <> byteLength ->
+                Error "Strength frame payload digest/length mismatch"
+            | Ok bundle -> Ok bundle
 
     let private payloadRefsOf =
         function
@@ -187,6 +241,26 @@ module StrengthStore =
     let tryReadPayload (raw: IGitRawStore) (payloadRef: PayloadRef) : byte[] option =
         raw.ReadObject(GitObjectId.create (PayloadRef.value payloadRef))
 
+    let loadFrameBundle
+        (raw: IGitRawStore)
+        (sha256: string -> string)
+        (prepared: StrengthCandidatePrepared)
+        : Result<StrengthFrameBundle, string> =
+        match prepared.MaterialPayloads with
+        | [ payloadRef ] ->
+            match tryReadPayload raw payloadRef with
+            | None -> Error(sprintf "missing Strength frame payload: %s" (PayloadRef.value payloadRef))
+            | Some bytes ->
+                match decodeFrameBundlePayload sha256 bytes with
+                | Error error -> Error error
+                | Ok bundle when bundle.Digest <> prepared.FrameDigest ->
+                    Error "Strength Prepared frame digest does not match payload"
+                | Ok bundle when bundle.ByteLength <> prepared.ByteLength ->
+                    Error "Strength Prepared byte length does not match payload"
+                | Ok bundle -> Ok bundle
+        | [] -> Error "Strength Prepared has no frame payload"
+        | _ -> Error "Strength Prepared has ambiguous frame payload closure"
+
     let append
         (store: IEventStore)
         (sha256: string -> string)
@@ -194,6 +268,33 @@ module StrengthStore =
         : Result<StoreSnapshot, AppendError> =
         let envelope = toEnvelope sha256 event
         store.Append(store.OpenSnapshot(), [ envelope ])
+
+    /// PERSIST-002/007 + STRENGTH-006: construct opaque payload refs from bytes
+    /// without pre-writing them, then publish the complete payload closure and its
+    /// event in one unified-store candidate. The event builder receives only
+    /// Domain PayloadRefs; GitObjectId never crosses the Persist boundary.
+    let publishWithPayloads
+        (store: IEventStore)
+        (sha256: string -> string)
+        (contents: byte[] list)
+        (buildEvent: PayloadRef list -> StrengthEvent)
+        : Result<StoreSnapshot * StrengthEvent, PublishError> =
+        let preparedPayloads = contents |> List.map GitRawStore.preparePayload
+
+        let payloadRefs =
+            preparedPayloads
+            |> List.map (fun (oid, _) -> oid |> GitObjectId.value |> PayloadRef.create)
+            |> PayloadRefs.canonicalize
+
+        let event = buildEvent payloadRefs
+        let envelope = toEnvelope sha256 event
+
+        let candidate =
+            { BaseSnapshot = store.OpenSnapshot()
+              NewEvents = [ envelope ]
+              NewPayloads = preparedPayloads }
+
+        store.Publish candidate |> Result.map (fun snapshot -> snapshot, event)
 
     let private loadEnvelopes (raw: IGitRawStore) (snapshot: StoreSnapshot) : Result<EventEnvelope list, string> =
         match EventStoreMergeSpec.merge raw (MergeInput.ofList [ snapshot ]) with

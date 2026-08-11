@@ -26,6 +26,13 @@ module StrengthBudget =
         | StrengthBudget.K1 -> "K1"
         | StrengthBudget.K2 -> "K2"
 
+    /// STRENGTH-003: K is a provider-request budget, never a tool-call budget.
+    let requestLimit =
+        function
+        | StrengthBudget.K0 -> 0
+        | StrengthBudget.K1 -> 1
+        | StrengthBudget.K2 -> 2
+
     /// Holdout-gated promotion: K0->K1 needs ExpectedValue(K1) > K1Margin.
     /// K1->K2 needs ExpectedValue(K2) > K2Margin where K2Margin > K1Margin.
     let canPromoteToK1 (expectedValueK1: float) (k1Margin: float) : bool = expectedValueK1 > k1Margin

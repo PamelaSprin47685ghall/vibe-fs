@@ -151,6 +151,7 @@
     <Compile Include="Session/CausalAwait.fs"/>
     <Compile Include="Session/ReuseScope.fs"/>
     <Compile Include="Session/AttachedSessionRuntime.fs"/>
+    <Compile Include="Session/StrengthRuntime.fs"/>
     <Compile Include="Session/ForkRecovery.fs"/>
     <Compile Include="Session/ForkRuntime.fs"/>
     <Compile Include="Application/Recovery/FallbackEvidence.fs"/>
@@ -213,6 +214,7 @@
     <Compile Include="Session/SatelliteRuntime.fs"/>
     <Compile Include="Application/Prompting/PromptDispatcher.fs"/>
     <Compile Include="Application/Prompting/PromptDispatcherSend.fs"/>
+    <Compile Include="Application/Strength/StrengthReplicaRuntime.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/PromptIngressCodec.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostSessionContext.fs"/>
     <Compile Include="Application/Reconciliation/CompletedTurnClassifier.fs"/>

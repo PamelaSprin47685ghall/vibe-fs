@@ -76,6 +76,7 @@ module ToolRegistry =
         (eventPort: IEventObservationPort option)
         (parkedHost: IParkedTransformHost option)
         (syncDelegateRuntime: SyncDelegateRuntime option)
+        (strengthRuntime: StrengthRuntime option)
         (finalityReviewerTimeoutMs: int option)
         (casebookToolSpecs: ToolSpec list)
         =
@@ -160,27 +161,41 @@ module ToolRegistry =
             fun args (ctx: HostToolContext) ->
                 task {
                     let allowed = rolePredicate spec.Name parkedHost ctx.SessionId
+                    let isStrengthReplica =
+                        match strengthRuntime with
+                        | Some strength when not (String.IsNullOrWhiteSpace ctx.SessionId) ->
+                            strength.TryFindByReplica(SessionId.create ctx.SessionId) |> Option.isSome
+                        | _ -> false
 
-                    match runtime.RoleFor ctx with
-                    | Some role when allowed role -> return! original args ctx
-                    | Some role when spec.Name = "blog" && role = Role.Blogger -> return! stopBlogNoLiveCycle ctx
-                    | Some role -> return denyRole role
-                    | None ->
-                        match! runtime.EnsureRoleFor ctx with
+                    if isStrengthReplica then
+                        // STRENGTH-004: Host-native read/glob/grep are the entire
+                        // replica tool surface. Every plugin-registered tool is
+                        // therefore a forged/hidden path and fails closed here.
+                        return
+                            ToolHostCodec.tomlObject
+                                [ "error",
+                                  tString (sprintf "Tool '%s' is not permitted for StrengthReplica" spec.Name) ]
+                    else
+                        match runtime.RoleFor ctx with
                         | Some role when allowed role -> return! original args ctx
                         | Some role when spec.Name = "blog" && role = Role.Blogger -> return! stopBlogNoLiveCycle ctx
                         | Some role -> return denyRole role
                         | None ->
-                            // AGENT-007: an unresolved Role means an empty tool set.
-                            // Executing under an unknown role is unauthorised.
-                            return
-                                ToolHostCodec.tomlObject
-                                    [ "error",
-                                      tString (
-                                          sprintf
-                                              "Tool '%s' rejected: no Authority Root fixes this session's role"
-                                              spec.Name
-                                      ) ]
+                            match! runtime.EnsureRoleFor ctx with
+                            | Some role when allowed role -> return! original args ctx
+                            | Some role when spec.Name = "blog" && role = Role.Blogger -> return! stopBlogNoLiveCycle ctx
+                            | Some role -> return denyRole role
+                            | None ->
+                                // AGENT-007: an unresolved Role means an empty tool set.
+                                // Executing under an unknown role is unauthorised.
+                                return
+                                    ToolHostCodec.tomlObject
+                                        [ "error",
+                                          tString (
+                                              sprintf
+                                                  "Tool '%s' rejected: no Authority Root fixes this session's role"
+                                                  spec.Name
+                                          ) ]
                 }
 
         let specs =

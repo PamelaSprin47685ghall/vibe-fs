@@ -304,6 +304,13 @@ type InMemoryGitRawStore() =
 
 [<RequireQualifiedAccess>]
 module GitRawStore =
+
+    /// Persist-side payload candidate for EventStore.Publish. Computes the same
+    /// immutable Git blob identity as WriteBlob without publishing bytes first,
+    /// so feature adapters can submit payload closure + events atomically through
+    /// the unified store publication path.
+    let preparePayload (content: byte[]) : GitObjectId * byte[] =
+        GitObjectCodec.hashBlob content
     let createInMemory () : IGitRawStore = InMemoryGitRawStore() :> IGitRawStore
 
     let private buildEventsTree (store: IGitRawStore) (events: EventEnvelope list) : GitObjectId =

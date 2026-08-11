@@ -287,7 +287,7 @@ module Projection =
         (sha256: string -> string)
         (rendered: Wanxiangshu.Domain.RenderedMessages)
         : Result<obj list, string> =
-        let rec encodeParts remaining acc =
+        let rec encodeParts (remaining: WirePart list) (acc: obj list) : Result<obj list, string> =
             match remaining with
             | [] -> Ok(List.rev acc)
             | part :: tail ->
@@ -299,7 +299,10 @@ module Projection =
             List.zip3 rendered.Messages rendered.HostMessageIds rendered.HostIsPhysical
             |> List.mapi (fun index triple -> index, triple)
 
-        let rec encodeMessages remaining acc =
+        let rec encodeMessages
+            (remaining: (int * (WireMessage * string option * bool)) list)
+            (acc: obj list)
+            : Result<obj list, string> =
             match remaining with
             | [] -> Ok(List.rev acc)
             | (index, (message, hostId, _)) :: tail ->
@@ -309,7 +312,7 @@ module Projection =
                     let id =
                         hostId
                         |> Option.defaultWith (fun () ->
-                            let single =
+                            let single: ProviderWireProjection =
                                 { ProviderId = None
                                   ModelId = None
                                   Variant = None
@@ -317,7 +320,7 @@ module Projection =
                                   System = []
                                   Messages = [ message ] }
 
-                            sha256 (sprintf "%d\u001f%s" index (ProviderProjection.renderWire single)))
+                            sha256 (sprintf "%d\u001f%s" index (renderWire single)))
 
                     let raw =
                         createObj
