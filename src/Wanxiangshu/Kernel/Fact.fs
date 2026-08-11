@@ -922,3 +922,5 @@ module Fact =
         | Runtime of RuntimeFact
         | Agent of AgentFact
         | ManagerLifecycle of ManagerLifecycleFact
+        /// Typed Magic Todo facts cross this earlier Kernel boundary as canonical codec bytes.
+        | MagicTodo of payload: string

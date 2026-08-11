@@ -10,12 +10,17 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Outcome
+open Wanxiangshu.Domain.MagicTodoFacts
 
 /// One successful fold after append. Wake payload for revision subscribers.
 /// No retained history: only the latest change is kept for the recheck path.
 type JournalChange =
     { Revision: JournalRevision
       Envelope: Envelope }
+
+type MagicTodoAppendReceipt =
+    { EventId: EventId
+      Projection: ProjectionSet }
 
 type JournalAppendFailure =
     /// PERSIST-002 / PERSIST-003: the write did not complete cleanly. Whether it
@@ -152,6 +157,24 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
         (fact: AgentFact)
         : Result<ProjectionSet, JournalAppendFailure> =
         this.AppendEnvelope stream providerRun (Fact.Agent fact)
+        |> Result.map fst
+
+    /// Append a Magic Todo fact and return its durable envelope identity.
+    ///
+    /// `TodoWriteAccepted` must name the exact Prepared envelope; returning the
+    /// receipt here prevents a caller from inventing or rediscovering that ref.
+    member this.AppendMagicTodo
+        (stream: StreamId)
+        (providerRun: ProviderRunIdentity option)
+        (fact: MagicTodoFact)
+        : Result<MagicTodoAppendReceipt, JournalAppendFailure> =
+        fact
+        |> MagicTodoFactCodec.encode
+        |> Fact.MagicTodo
+        |> this.AppendEnvelope stream providerRun
+        |> Result.map (fun (updated, envelope) ->
+            { EventId = envelope.EventId
+              Projection = updated })
 
     /// GLORY-010: append one Manager lifecycle fact. Envelope `ProviderRun` is
     /// `None` — the payload carries its own run identities (FinalityRequested).
@@ -160,12 +183,13 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
         (fact: ManagerLifecycleFact)
         : Result<ProjectionSet, JournalAppendFailure> =
         this.AppendEnvelope stream None (Fact.ManagerLifecycle fact)
+        |> Result.map fst
 
     member private _.AppendEnvelope
         (stream: StreamId)
         (providerRun: ProviderRunIdentity option)
         (fact: Fact)
-        : Result<ProjectionSet, JournalAppendFailure> =
+        : Result<ProjectionSet * Envelope, JournalAppendFailure> =
         // DSL-MUTABLE: buffer — waiters to notify after lock release
         let mutable notify: (TaskCompletionSource<JournalChange> * JournalChange) list = []
 
@@ -203,7 +227,7 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
                                 waiters.Add item
 
                             notify <- List.ofSeq ready
-                            Ok updated
+                            Ok(updated, envelope)
                         | Error rejection ->
                             rejected <- Some(envelope.EventId, rejection)
                             Error(FactRejected(envelope.EventId, rejection)))
@@ -244,6 +268,14 @@ module AgentJournal =
         (journal: AgentJournal)
         : Result<ProjectionSet, JournalAppendFailure> =
         journal.AppendAgent stream providerRun fact
+
+    let appendMagicTodo
+        (stream: StreamId)
+        (providerRun: ProviderRunIdentity option)
+        (fact: MagicTodoFact)
+        (journal: AgentJournal)
+        : Result<MagicTodoAppendReceipt, JournalAppendFailure> =
+        journal.AppendMagicTodo stream providerRun fact
 
     /// GLORY-010: append one Manager lifecycle fact.
     let appendManagerLifecycle

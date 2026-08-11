@@ -58,7 +58,8 @@ todoCheckpointBefore:
   6. allocateNewIds（仅 kind:new）→ unique ids → existing∈Ck → transitions（TODO-003 completed 门禁）
   7. preview = semanticMerge(Ck, Pk)（不写入 canonical）
   8. append TodoWritePrepared
-       - 冻结 BaseTodo/Proposed digests
+       - 冻结 tagged provider arguments 的 canonical `ProviderInputDigest` 与 BaseTodo/Proposed digests
+       - 返回真实 Journal `EventId`；after/recovery 仅以它填 `TodoWriteAccepted.PreparedFactRef`
        - ReviewFrontier = 本 tool-call 前 exclusive cursor（绑 ManagerLifeId）
   9. install ephemeral bridge（process-local Map + hidden Symbol；非 durable）
  10. mutateArgsInPlace → V1 compatibility list（剥 kind/id；reviewing sink 策略见 HOST canary）

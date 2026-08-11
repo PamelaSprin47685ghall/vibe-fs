@@ -65,9 +65,11 @@ TodoStatus = pending | in_progress | reviewing | completed | cancelled
 
 1. **同 message 多 todowrite**：同一 assistant message 出现 >1 个不同 `ToolCallId` 的 `todowrite` → **全部 fail closed**；无 ordinal winner、无 hook 到达顺序/wall-clock 仲裁。  
 2. **单 inflight**：同一 Manager Life 同时最多一个新 checkpoint admission。  
-3. **Same ToolCallId replay**：幂等为同一 `TodoWriteId` / 同一 obligation；input digest（及 Life / BaseTodo / ordinal 合同）必须与既有 Prepared 一致，否则 identity corruption fail closed；不新增 checkpoint / review。  
+3. **Same ToolCallId replay**：幂等为同一 `TodoWriteId` / 同一 obligation；`TodoWritePrepared.ProviderInputDigest`（tagged provider arguments 的 canonical digest）及 Life / BaseTodo / ordinal 合同必须与既有 Prepared 一致，否则 identity corruption fail closed；不新增 checkpoint / review。  
 4. **不同 ToolCallId**：即使 list 相同也是新 checkpoint。  
 5. **Physical success 双路径**（live after-success / recovery completed ToolPart）必须收敛到同一 `TodoWriteId + input digest + output digest` 才可 `TodoWriteAccepted`。
+
+`TodoWriteAccepted.PreparedFactRef` 必须是 append 对应 `TodoWritePrepared` 返回的真实 Journal `EventId`；不得重猜、伪造或用逻辑 id 代替。fold 必须拒绝不匹配的引用。
 
 **V2 fail-closed**：在 V2 runner 获得与 V1 等价的 tool definition / before / after hook contract 及 canary 证明之前，Magic-Todo Manager Attempt **不得**使用 V2 todowrite execution path。不是「V1 有协议、V2 暂时裸奔」。无 hook parity → 禁止上线；长期不维护两套不同 Magic Todo 语义。
 

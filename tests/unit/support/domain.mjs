@@ -95,6 +95,10 @@ const [
   Challenge,
   ProviderProj,
   XTraceModule,
+  MagicTodoModule,
+  MagicTodoFactsModule,
+  MagicTodoProjectionModule,
+  MagicTodoFactCodecModule,
   LifecycleWorkRecordModule,
   ManagedAgentCatalogModule,
   XTraceCaptureModule,
@@ -186,6 +190,10 @@ const [
   prod('Domain/ReviewChallenge'),
   prod('Domain/ProviderProjection'),
   prod('Domain/XTrace'),
+  prod('Domain/MagicTodo'),
+  prod('Domain/MagicTodoFacts'),
+  prod('Journal/MagicTodoProjection'),
+  prod('Journal/MagicTodoFactCodec'),
   prod('Domain/LifecycleWorkRecord'),
   prod('Domain/ManagedAgentCatalog'),
   prod('Application/Reconciliation/XTraceCapture'),
@@ -710,6 +718,9 @@ const buildManagerLifecycleFact = unionCase(FactModule.ManagerLifecycleFact, 'Ma
 export const managerLifecycleFact = (caseName, payload) =>
   buildFact('ManagerLifecycle', [buildManagerLifecycleFact(caseName, [payload])])
 
+/** Canonical opaque-wire top-level fact for typed MagicTodoFact codec bytes. */
+export const magicTodoFactEnvelope = (payload) => buildFact('MagicTodo', [payload])
+
 /**
  * `RuntimeStarted`, wrapped as a top-level Fact.
  *
@@ -1166,6 +1177,74 @@ export const syntheticToml = (() => {
     tableArrayEntry: (name, fields) => m.tableArrayEntry(name, toList(fields)),
     document: (instructions, body) => m.document(toList(instructions), toList(body)),
     byteCount: (text) => m.byteCount(text),
+  }
+})()
+
+/**
+ * Magic Todo pure algebra façade. Tests construct Fable values through this one
+ * boundary instead of depending on emitted union ordinals or module spellings.
+ */
+export const magicTodo = (() => {
+  const input = unionCase(MagicTodoModule.MagicTodoInputItem, 'MagicTodoInputItem')
+  const m = bind(MagicTodoModule, 'MagicTodo', [
+    'todoWriteId',
+    'todoItemId',
+    'todoReviewId',
+    'dedicatedReviewerId',
+    'listDigest',
+    'validateCompletedGate',
+    'normalizeProposed',
+    'semanticMerge',
+    'settle',
+    'admitTodowriteBatch',
+    'checkPreparedReplay',
+    'desiredLag1Cutoff',
+    'workRecordStart',
+    'bloggerEffectiveStart',
+    'requireCheckpointBeforeFirstSuicide',
+  ])
+
+  return {
+    ...m,
+    TodoStatus: MagicTodoModule.TodoStatus,
+    MagicTodoInputItem: MagicTodoModule.MagicTodoInputItem,
+    MagicTodoItem: MagicTodoModule.MagicTodoItem,
+    ProcessReviewVerdict: MagicTodoModule.ProcessReviewVerdict,
+    PreparedIdentity: MagicTodoModule.PreparedIdentity,
+    todoItemIdCreate: MagicTodoModule.TodoItemIdModule_create,
+    todoItemIdValue: MagicTodoModule.TodoItemIdModule_value,
+    todoWriteIdCreate: MagicTodoModule.TodoWriteIdModule_create,
+    todoWriteIdValue: MagicTodoModule.TodoWriteIdModule_value,
+    existing: (id, content, status, priority) => input('Existing', [id, content, status, priority]),
+    new: (content, status, priority) => input('New', [content, status, priority]),
+    item: (id, content, status, priority) => new MagicTodoModule.MagicTodoItem(id, content, status, priority),
+    perfect: MagicTodoModule.ProcessReviewVerdict.Perfect,
+    revise: MagicTodoModule.ProcessReviewVerdict.Revise,
+  }
+})()
+
+/**
+ * Magic Todo durable-fact/projection façade.
+ */
+export const magicTodoJournal = (() => {
+  const fact = unionCase(MagicTodoFactsModule.MagicTodoFact, 'MagicTodoFact')
+  const m = bind(MagicTodoProjectionModule, 'MagicTodoProjection', ['fold', 'foldConcluded'])
+  const codec = bind(MagicTodoFactCodecModule, 'MagicTodoFactCodec', ['encode', 'tryDecode'])
+
+  return {
+    ...m,
+    ...codec,
+    fold: (event, state, value) => m.fold(event, state, value),
+    empty: MagicTodoProjectionModule.empty,
+    MagicTodoFact: fact,
+    PhysicalSuccessEvidence: MagicTodoFactsModule.PhysicalSuccessEvidence,
+    TodoWritePrepared: MagicTodoFactsModule.TodoWritePrepared,
+    TodoWriteAccepted: MagicTodoFactsModule.TodoWriteAccepted,
+    TodoProcessReviewAssigned: MagicTodoFactsModule.TodoProcessReviewAssigned,
+    TodoReviewConcluded: MagicTodoFactsModule.TodoReviewConcluded,
+    DedicatedTodoReviewerEnlisted: MagicTodoFactsModule.DedicatedTodoReviewerEnlisted,
+    LegacyTodoSeedAdopted: MagicTodoFactsModule.LegacyTodoSeedAdopted,
+    XTraceCursor: XTraceModule.XTraceCursor,
   }
 })()
 

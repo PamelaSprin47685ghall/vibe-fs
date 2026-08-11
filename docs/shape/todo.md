@@ -11,7 +11,7 @@
 | Provider-visible V2 schema（tagged union、examples、decoder、result renderer 同源） | Magic Todo definition / codec module | 禁止 optional-id 回流；禁止 before/after/test 另写 schema（TODO-002、TODO-012） |
 | Canonical todo list | `MagicTodoProjection`（Journal fold） | Host `TodoTable` **不是** canonical；不得反向 adopt（TODO-007） |
 | Checkpoint + process-review obligation SSOT | `TodoWriteAccepted` | `Prepared` alone 不派生 Rk；Host store 已写 Pk ≠ Accepted（TODO-004、TODO-006） |
-| BaseTodo / Proposed / ReviewFrontier 冻结 | `TodoWritePrepared` | 禁止事后用新 merge 重猜 frontier（TODO-004、TODO-006） |
+| ProviderInput / BaseTodo / Proposed / ReviewFrontier 冻结 | `TodoWritePrepared` | `ProviderInputDigest` 是 tagged provider arguments 的 canonical digest；禁止事后用新 merge 重猜 frontier（TODO-004、TODO-006） |
 | ConsumableReview | `TodoReviewConcluded`（≡ ConsumableReview） | `VerdictKnown` 属 Reviewer 域，不得冒充可消费；禁止 AwaitingReport Stage（TODO-006、TODO-012） |
 | Process-review assignment range | `TodoProcessReviewAssigned.ReviewWorkStartCursor` | exclusive end after assignment authority；禁止 session head / Opening 冒充（TODO-006、TODO-008） |
 | semanticMerge | 单一 domain merge owner | before preview、tool result、Finality drain、test helper **共用**；禁止平行 merge（TODO-005、TODO-012） |

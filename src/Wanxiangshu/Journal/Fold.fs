@@ -1062,6 +1062,34 @@ module Fold =
             |> Result.map (fun agents ->
                 { projection with
                     AgentProjections = agents })
+        | MagicTodo payload ->
+            match MagicTodoFactCodec.tryDecode payload with
+            | Error reason -> reject "MagicTodo" ("invalid canonical payload: " + reason)
+            | Ok(MagicTodoFacts.MagicTodoFact.PrefixRebaseCommittedV2 rebase) ->
+                tryUpdatePrefix
+                    rebase.SessionId
+                    (PrefixEpochProjection.applyRebase
+                        rebase.PreviousEpochId
+                        rebase.NextEpochId
+                        { FrozenRecordPrefixRef = rebase.FrozenRecordPrefixRef
+                          FrozenRecordPrefixDigest = rebase.FrozenRecordPrefixDigest
+                          CutoffExclusive = rebase.CutoffExclusive
+                          CoveredPrefixDigest = rebase.CoveredPrefixDigest
+                          SealRoot = rebase.SealRoot
+                          SyntheticMessageId = rebase.SyntheticMessageId })
+                    projection.AgentProjections
+                |> prefixOutcome "PrefixRebaseCommittedV2" projection.AgentProjections
+                |> Result.map (fun agents -> { projection with AgentProjections = agents })
+            | Ok fact ->
+                MagicTodoProjection.fold envelope.EventId projection.AgentProjections.MagicTodo fact
+                |> Result.mapError (fun rejection ->
+                    { Fact = "MagicTodo"
+                      Reason = sprintf "%A" rejection })
+                |> Result.map (fun magicTodo ->
+                    { projection with
+                        AgentProjections =
+                            { projection.AgentProjections with
+                                MagicTodo = magicTodo } })
         | ManagerLifecycle fact ->
             // GLORY-010: lifecycle facts fold onto the session's lifecycle
             // projection. Replays are idempotent inside the projection fold;
