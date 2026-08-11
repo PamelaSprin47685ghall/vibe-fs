@@ -179,12 +179,37 @@ test('ENFORCER_TIP_11_recent_tips_order_oldest_to_newest', () => {
   )
 })
 
-// ── 12. squash does not clear RecentTips (projection independent of frames) ─
+// ── 12. squash co-truncates RecentTips with covered frames ──────────────────
 
-test('ENFORCER_TIP_12_squash_does_not_clear_recent_tips', () => {
-  // RecentTips live on EnforcementProjection, not Blog frames. Fold the real
-  // causal chain: Entry → Entry → Squash; squash replaces Blog frames only
-  // and must leave RecentTips untouched.
+test('ENFORCER_TIP_12_squash_co_truncates_recent_tips', () => {
+  // 1:1 assumption: each Entry appends one tip. Squash of oldest K frames drops
+  // oldest min(K, tips) tips on the same main session (observation co-move).
+  let state = enf.empty
+  const fields = enforcer.fieldNames()
+  for (let n = 1; n <= 2; n++) {
+    const applied = enf.applyFromEntry(state, cycleRecord(n, fields[n - 1]))
+    assert.equal(applied.ok, true, applied.ok ? '' : applied.error)
+    state = applied.value
+  }
+  assert.equal(enf.recentTips(state).length, 2)
+
+  // Direct projection: squash 1 of 2 tips → keep newest.
+  const afterOne = enf.applySquash(1, state)
+  assert.deepEqual(
+    enf.recentTips(afterOne).map((t) => t.cycleId),
+    ['msg_tip_2'],
+  )
+
+  // Squash count ≥ tips length clears tips.
+  assert.deepEqual(enf.recentTips(enf.applySquash(2, state)), [])
+  assert.deepEqual(enf.recentTips(enf.applySquash(5, state)), [])
+  // count ≤ 0 is a no-op.
+  assert.deepEqual(enf.recentTips(enf.applySquash(0, state)).map((t) => t.cycleId), [
+    'msg_tip_1',
+    'msg_tip_2',
+  ])
+
+  // Fold causal chain: Entry → Entry → Squash(1) leaves one tip + one Squash frame.
   let seq = 0
   const session = sessionId('ses-main')
   const blogger = sessionId('ses-blog')
@@ -229,7 +254,7 @@ test('ENFORCER_TIP_12_squash_does_not_clear_recent_tips', () => {
       RequestId: bloggerRequestId('req-s1'),
       PreviousFrameEpochId: frameEpochId(0),
       NextFrameEpochId: frameEpochId(1),
-      CoveredFrameCount: 2,
+      CoveredFrameCount: 1,
       TextRef: blobRef('blob-s1'),
       TextDigest: blobDigest('sha-s1'),
       ProviderRun: providerRun('msg_s1'),
@@ -243,18 +268,17 @@ test('ENFORCER_TIP_12_squash_does_not_clear_recent_tips', () => {
   assert.ok(s.Enforcement, 'enforcement projection exists after fold')
 
   const tips = enf.recentTips(s.Enforcement)
-  assert.equal(tips.length, 2)
+  assert.equal(tips.length, 1)
   assert.deepEqual(
     tips.map((t) => t.cycleId),
-    ['msg_tip_1', 'msg_tip_2'],
+    ['msg_tip_2'],
   )
-  assert.equal(tips[0].fieldName, f0)
-  assert.equal(tips[1].fieldName, f1)
-  // Squash replaced both frames with one — projection independence is real.
-  assert.deepEqual(blog.frameKinds(s.Blog), ['Squash'])
+  assert.equal(tips[0].fieldName, f1)
+  // Squash replaces oldest K frames in-place with one Squash frame at the front.
+  assert.deepEqual(blog.frameKinds(s.Blog), ['Squash', 'Entry'])
 })
 
-// ── 13. work record previous_enforcer_tip blocks ────────────────────────────
+// ── 13. work record previous_enforcer_tip blocks (paired with frames) ───────
 
 test('ENFORCER_TIP_13_work_record_contains_previous_enforcer_tip_blocks', () => {
   const block = toml.renderPreviousEnforcerTip('primitive-obsession', 'msg_c1')
@@ -267,7 +291,10 @@ test('ENFORCER_TIP_13_work_record_contains_previous_enforcer_tip_blocks', () => 
     blogger: 'ses_y',
     epoch: 0,
     kind: proj.normal,
-    frames: [{ digest: 'sha-f0', body: 'frame body 0' }],
+    frames: [
+      { digest: 'sha-f0', body: 'frame body 0' },
+      { digest: 'sha-f1', body: 'frame body 1' },
+    ],
     delta: { messageId: 'msg_delta', toml: '[[new_work_to_record]]\nuser = "work"' },
     previousTips: [
       { field: 'primitive-obsession', cycleId: 'msg_c1' },
@@ -279,10 +306,12 @@ test('ENFORCER_TIP_13_work_record_contains_previous_enforcer_tip_blocks', () => 
   assert.equal(tipTexts.length, 2)
   assert.match(tipTexts[0], /tip = "primitive-obsession"/)
   assert.match(tipTexts[1], /tip = "ignored-tdd"/)
-  assert.equal(plan.roles[0], 'assistant')
-  assert.equal(plan.roles[1], 'assistant')
-  // Tips precede frames then delta.
-  assert.equal(plan.texts[2].includes('historic_frame'), true)
+  // Paired observation units: tip₀, frame₀, tip₁, frame₁, delta (not tips∥frames).
+  assert.equal(plan.roles.length, 5)
+  assert.match(plan.texts[0], /previous_enforcer_tip/)
+  assert.equal(plan.texts[1].includes('historic_frame'), true)
+  assert.match(plan.texts[2], /previous_enforcer_tip/)
+  assert.equal(plan.texts[3].includes('historic_frame'), true)
   assert.equal(plan.messages.at(-1).physical, true)
 })
 

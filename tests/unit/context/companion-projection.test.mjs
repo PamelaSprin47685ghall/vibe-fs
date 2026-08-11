@@ -271,6 +271,70 @@ test('COMPANION_009_the_same_epoch_and_frames_produce_byte_identical_messages', 
   assert.deepEqual(proj.build(spy, args).messages, proj.build(spy, args).messages)
 })
 
+// ── paired tip + frame observation units (rulebook §2 / ENFORCER-071) ──────
+
+const isPreviousTip = (text) => text.includes('previous_enforcer_tip')
+
+test('ENFORCER_071_normal_interleaves_tips_with_frames_then_delta', () => {
+  const plan = proj.build(spy, {
+    blogger: 'ses_y',
+    epoch: 0,
+    kind: proj.normal,
+    frames: frames(2),
+    delta: { messageId: 'msg_delta', toml: dataToml },
+    previousTips: [
+      { field: 'primitive-obsession', cycleId: 'msg_c1' },
+      { field: 'ignored-tdd', cycleId: 'msg_c2' },
+    ],
+  })
+
+  assert.deepEqual(
+    plan.texts.map((t) => {
+      if (isPreviousTip(t)) return 'tip'
+      if (isHistoricFrame(t)) return 'frame'
+      if (isCombinedNormalDelta(t)) return 'delta'
+      return 'other'
+    }),
+    ['tip', 'frame', 'tip', 'frame', 'delta'],
+  )
+  assert.match(plan.texts[0], /tip = "primitive-obsession"/)
+  assert.equal(plan.texts[1], toml.renderHistoricFrame('frame body 0'))
+  assert.match(plan.texts[2], /tip = "ignored-tdd"/)
+  assert.equal(plan.texts[3], toml.renderHistoricFrame('frame body 1'))
+  assert.equal(plan.messages.at(-1).physical, true)
+})
+
+test('ENFORCER_071_unpaired_tips_or_frames_append_after_zip', () => {
+  const extraTip = proj.build(spy, {
+    blogger: 'ses_y',
+    epoch: 0,
+    kind: proj.normal,
+    frames: frames(1),
+    delta: { messageId: 'msg_d', toml: dataToml },
+    previousTips: [
+      { field: 'primitive-obsession', cycleId: 'c1' },
+      { field: 'ignored-tdd', cycleId: 'c2' },
+    ],
+  })
+  assert.deepEqual(
+    extraTip.texts.map((t) => (isPreviousTip(t) ? 'tip' : isHistoricFrame(t) ? 'frame' : 'delta')),
+    ['tip', 'frame', 'tip', 'delta'],
+  )
+
+  const extraFrame = proj.build(spy, {
+    blogger: 'ses_y',
+    epoch: 0,
+    kind: proj.normal,
+    frames: frames(2),
+    delta: { messageId: 'msg_d', toml: dataToml },
+    previousTips: [{ field: 'primitive-obsession', cycleId: 'c1' }],
+  })
+  assert.deepEqual(
+    extraFrame.texts.map((t) => (isPreviousTip(t) ? 'tip' : isHistoricFrame(t) ? 'frame' : 'delta')),
+    ['tip', 'frame', 'frame', 'delta'],
+  )
+})
+
 // ── the squash projection (CTX-012) ────────────────────────────────────────
 
 test('CTX_012_squash_projects_only_oldest_historic_frames_then_instruction', () => {
@@ -292,6 +356,35 @@ test('CTX_012_squash_projects_only_oldest_historic_frames_then_instruction', () 
   assert.deepEqual(plan.physicalFlags, [false, false, false])
   assert.deepEqual(plan.roles, ['assistant', 'assistant', 'user'])
   assert.equal(plan.system, undefined)
+})
+
+test('CTX_012_squash_pairs_tips_with_covered_frames_then_instruction', () => {
+  const plan = proj.build(spy, {
+    blogger: 'ses_y',
+    epoch: 1,
+    kind: proj.squash(2),
+    frames: frames(4),
+    delta: undefined,
+    previousTips: [
+      { field: 'primitive-obsession', cycleId: 'c1' },
+      { field: 'ignored-tdd', cycleId: 'c2' },
+    ],
+  })
+
+  assert.deepEqual(
+    plan.texts.map((t) => {
+      if (isPreviousTip(t)) return 'tip'
+      if (isHistoricFrame(t)) return 'frame'
+      if (t === prompt.squashInstruction) return 'instruction'
+      return 'other'
+    }),
+    ['tip', 'frame', 'tip', 'frame', 'instruction'],
+  )
+  // Only oldest k=2 frames; later bodies must not appear.
+  assert.equal(
+    plan.texts.some((t) => t.includes('frame body 2') || t.includes('frame body 3')),
+    false,
+  )
 })
 
 test('CTX_012_a_squash_ignores_a_delta_even_if_one_is_supplied', () => {

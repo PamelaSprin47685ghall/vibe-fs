@@ -30,22 +30,35 @@ module CompanionProjectionBuilder =
         | CompanionRequestKind.Normal -> "normal"
         | CompanionRequestKind.Squash _ -> "squash"
 
-    /// ENFORCER-071: low-trust previous tip messages (oldest → newest).
+    /// ENFORCER-071: one low-trust previous tip message.
     /// Domain shape is (FieldName, CycleId); Journal maps RecentTips into this.
-    let private tipMessages
+    let private tipMessage
         (sha256: string -> string)
         (bloggerSessionId: SessionId)
-        (previousTips: (string * string) list)
-        : CompanionProjectedMessage list =
-        previousTips
-        |> List.map (fun (tipField, cycleId) ->
-            { MessageId = CompanionIdentity.previousTipMessageId sha256 bloggerSessionId cycleId
-              Role = "assistant"
-              Text = CompanionPrompt.previousTipMessage tipField cycleId
-              IsPhysical = false })
+        (tipField: string, cycleId: string)
+        : CompanionProjectedMessage =
+        { MessageId = CompanionIdentity.previousTipMessageId sha256 bloggerSessionId cycleId
+          Role = "assistant"
+          Text = CompanionPrompt.previousTipMessage tipField cycleId
+          IsPhysical = false }
 
-    /// Normal: previous_enforcer_tip blocks + historic frames + one user delta.
-    /// Squash: previous_enforcer_tip blocks + oldest k frames + squash instruction LAST.
+    /// Pair tips with frames into interleaved tip+frame observation units (oldest → newest).
+    /// Zip from the front: tipᵢ then frameᵢ while both remain; leftover tips or frames
+    /// append unpaired. Prefer this over tips∥frames parallel streams (rulebook §2).
+    let private pairTipFrameUnits
+        (tips: CompanionProjectedMessage list)
+        (frames: CompanionProjectedMessage list)
+        : CompanionProjectedMessage list =
+        let rec loop tipRest frameRest acc =
+            match tipRest, frameRest with
+            | t :: ts, f :: fs -> loop ts fs (f :: t :: acc)
+            | ts, [] -> List.rev acc @ ts
+            | [], fs -> List.rev acc @ fs
+
+        loop tips frames []
+
+    /// Normal: paired previous_enforcer_tip + historic_frame units + one user delta.
+    /// Squash: paired tip+frame units over oldest k frames + squash instruction LAST.
     /// Tips cover normal / squash / restart / recovery / compaction rebuilds because
     /// every rebuild path calls this builder with the same RecentTips projection.
     ///
@@ -65,7 +78,7 @@ module CompanionProjectionBuilder =
             | CompanionRequestKind.Normal -> frameBodies
             | CompanionRequestKind.Squash count -> frameBodies |> List.truncate count
 
-        let tips = tipMessages sha256 bloggerSessionId previousTips
+        let tipMsgs = previousTips |> List.map (tipMessage sha256 bloggerSessionId)
 
         let frameMessages =
             selected
@@ -75,6 +88,8 @@ module CompanionProjectionBuilder =
                   Role = "assistant"
                   Text = CompanionPrompt.workingRecordMessage body
                   IsPhysical = false })
+
+        let pairedHistory = pairTipFrameUnits tipMsgs frameMessages
 
         match kind with
         | CompanionRequestKind.Normal ->
@@ -87,8 +102,8 @@ module CompanionProjectionBuilder =
                         IsPhysical = true } ]
                 | None -> []
 
-            // Tips then frames then combined delta last (HOST-010).
-            { Messages = tips @ frameMessages @ deltaMessages }
+            // Paired observation units then combined delta last (HOST-010).
+            { Messages = pairedHistory @ deltaMessages }
         | CompanionRequestKind.Squash _ ->
             let instruction =
                 { MessageId = CompanionIdentity.instructionMessageId sha256 bloggerSessionId frameEpoch (kindLabel kind)
@@ -96,7 +111,7 @@ module CompanionProjectionBuilder =
                   Text = CompanionPrompt.SquashInstruction
                   IsPhysical = false }
 
-            { Messages = tips @ frameMessages @ [ instruction ] }
+            { Messages = pairedHistory @ [ instruction ] }
 
     /// First-turn shape: one physical combined delta (instruction header + data), no frames.
     let isFirstTurnShape (plan: CompanionProjectionPlan) =

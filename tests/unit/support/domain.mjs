@@ -2544,6 +2544,7 @@ export const enforcementProjection = (() => {
   const m = bind(EnforcementProj, 'EnforcementProjection', [
     'empty',
     'applyFromEntry',
+    'applySquash',
     'tryFindByProviderRun',
     'recentTips',
   ])
@@ -2578,6 +2579,9 @@ export const enforcementProjection = (() => {
     }),
 
     applyFromEntry: (state, record) => resultOf(m.applyFromEntry(state, record)),
+
+    /** Co-truncate oldest tips with BlogSquash covered frame count. */
+    applySquash: (count, state) => m.applySquash(count, state),
 
     tryFindByProviderRun: (run, state) => {
       const key = typeof run === 'string' ? providerRun(run) : run

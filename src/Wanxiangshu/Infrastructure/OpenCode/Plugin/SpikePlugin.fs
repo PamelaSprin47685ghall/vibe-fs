@@ -380,8 +380,10 @@ module SpikePlugin =
                             let markerText =
                                 match journal, projectionSessionIdOpt with
                                 | Some durable, Some sessionId ->
-                                    match EnforcerHost.latestTipNudge durable (SessionId.create sessionId) with
-                                    | Some nudge -> nudge + "\n\n" + ProjectionConstants.PairProgrammingGuidelineText
+                                    // Main session id: resolveTipGuidance maps owner via association.
+                                    match EnforcerHost.latestTipGuidance durable (SessionId.create sessionId) with
+                                    | Some guidance ->
+                                        guidance + "\n\n" + ProjectionConstants.PairProgrammingGuidelineText
                                     | None -> ProjectionConstants.PairProgrammingGuidelineText
                                 | _ -> ProjectionConstants.PairProgrammingGuidelineText
 

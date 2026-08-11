@@ -599,6 +599,12 @@ module Fact =
                NextEpochId: PrefixEpochId
                ObservedCompactionRun: ProviderRunIdentity |}
 
+    /// Rulebook Main tip presentation for auto-injected guidance (Full vs IdentityOnly).
+    [<RequireQualifiedAccess>]
+    type TipPresentation =
+        | Full
+        | IdentityOnly
+
     /// HOST-013: permanent auto-injected pairs for one provider transcript.
     type HostFactCases =
         /// One permanent auto-injected pair was anchored.
@@ -618,6 +624,13 @@ module Fact =
                MarkerText: string
                CallGap: TranscriptGap
                ResultGap: TranscriptGap |}
+
+        /// Main session received tip guidance (Full main.md or IdentityOnly name).
+        /// Folded into TipDeliveryProjection so first/repeat is restart-safe.
+        | TipGuidanceDelivered of
+            {| SessionId: SessionId
+               TipName: string
+               Presentation: TipPresentation |}
 
     // There is deliberately no `CompanionEpochSwitched`. COMPANION-009's epoch has
     // exactly two movers now — `PrefixRebaseCommitted` (CTX-012) and
@@ -643,6 +656,9 @@ module Fact =
     module HostFact =
         let inline PairProgrammingGuidelineAnchored payload =
             AgentFact.Host(HostFactCases.PairProgrammingGuidelineAnchored payload)
+
+        let inline TipGuidanceDelivered payload =
+            AgentFact.Host(HostFactCases.TipGuidanceDelivered payload)
 
     /// Constructor surface for the PromptFact family: each function wraps its
     /// family case in the single-case Prompt dispatch.

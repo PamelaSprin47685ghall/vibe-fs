@@ -85,11 +85,19 @@ const seed = ({ withAssociation = true, withTip = true } = {}) => {
   }
 }
 
-test('ENFORCER_TIP_NUDGE_001_latest_tip_uses_owner_recent_tip_catalog_nudge', () => {
+test('ENFORCER_TIP_NUDGE_001_latest_tip_first_delivery_is_full_main_md', () => {
   const fixture = seed()
   try {
     const result = latestTipNudge(fixture.journal, blogger)
-    assert.equal(result, 'A domain concept is crossing a boundary as a primitive. Introduce a distinct type so invalid substitutions become impossible.')
+    assert.ok(typeof result === 'string' && result.length > 0, 'expected tip guidance text')
+    assert.match(result, /tip = "primitive-obsession"/)
+    assert.match(
+      result,
+      /Introduce a distinct type so invalid substitutions become impossible/,
+    )
+    // Second call for same tip must be identity-only (durable Full delivery recorded).
+    const again = latestTipNudge(fixture.journal, blogger)
+    assert.equal(again, 'tip: primitive-obsession')
   } finally {
     fixture.dispose()
   }

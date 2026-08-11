@@ -903,8 +903,14 @@ module Fold =
                     |> blogOutcome "BlogEntryCommitted"
 
             | ContextFactCases.BlogSquashCommitted payload ->
-                let applyReceipt session =
+                // Blog frames squash + Enforcement tip co-truncate on the same main session
+                // (payload.SessionId — same owner BlogEntryCommitted uses for Enforcement).
+                let applyReceiptAndTips session =
                     let cycles = Option.defaultValue BloggerCycleProjection.empty session.BloggerCycles
+
+                    let enforcement =
+                        Option.defaultValue EnforcementProjection.empty session.Enforcement
+                        |> EnforcementProjection.applySquash payload.CoveredFrameCount
 
                     BloggerCycleProjection.recordReceipt
                         { ProviderRun = payload.ProviderRun
@@ -913,9 +919,10 @@ module Fold =
                         cycles
                     |> Result.map (fun updated ->
                         { session with
-                            BloggerCycles = Some updated })
+                            BloggerCycles = Some updated
+                            Enforcement = Some enforcement })
 
-                match AgentProjection.tryUpdate payload.SessionId applyReceipt projection with
+                match AgentProjection.tryUpdate payload.SessionId applyReceiptAndTips projection with
                 | Error reason -> reject "BlogSquashCommitted" reason
                 | Ok updated ->
                     tryUpdateBlog
@@ -1008,6 +1015,27 @@ module Fold =
                                 "placement (%A, %A) already exists in this transcript (HOST-013 §8)"
                                 callGap
                                 resultGap)
+
+            | HostFactCases.TipGuidanceDelivered payload ->
+                // Idempotent: Full tips accumulate; IdentityOnly is a no-op on the set.
+                Ok(
+                    AgentProjection.update
+                        payload.SessionId
+                        (fun session ->
+                            let prior =
+                                session.TipDelivery
+                                |> Option.defaultValue TipDeliveryProjection.empty
+
+                            { session with
+                                TipDelivery =
+                                    Some(
+                                        TipDeliveryProjection.apply
+                                            payload.TipName
+                                            payload.Presentation
+                                            prior
+                                    ) })
+                        projection
+                )
 
     let foldEnvelope (projection: ProjectionSet) (envelope: Envelope) : Result<ProjectionSet, FoldRejection> =
         match envelope.Fact with

@@ -42,6 +42,8 @@ type SessionAgentProjection =
         ManagerLife: ManagerLifeProjection option
         /// HOST-013: permanent auto-injected pairs for this transcript.
         Guidelines: GuidelineProjectionState option
+        /// Rulebook Main tip Full/Identity delivery (TipGuidanceDelivered fold).
+        TipDelivery: TipDeliveryProjectionState option
     }
 
 type AgentProjectionSet =
@@ -81,7 +83,8 @@ module AgentProjection =
           Enforcement = None
           BloggerCycles = None
           ManagerLife = None
-          Guidelines = None }
+          Guidelines = None
+          TipDelivery = None }
 
     let empty =
         { Sessions = Map.empty
