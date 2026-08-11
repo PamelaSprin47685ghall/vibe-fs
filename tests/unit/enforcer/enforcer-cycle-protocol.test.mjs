@@ -46,16 +46,14 @@ runtimeResources.installFromPackage()
 const { AgentJournalModule_appendAgent, AgentJournalModule_snapshot } = await import(
   '../../../dist/Journal/AgentJournal.js'
 )
-const {
-  handleContinuation,
-  RepairInstruction,
-  resolveCycleContext,
-} = await import('../../../dist/Session/EnforcerHost.js')
+const { handleContinuation } = await import('../../../dist/Session/EnforcerHost.js')
+const { RepairInstruction } = await import('../../../dist/Session/EnforcerRepair.js')
+const { resolveCycleContext } = await import('../../../dist/Session/EnforcerFrameRecovery.js')
 const HostSessionNudge = await import('../../../dist/Infrastructure/OpenCode/Host/HostSessionNudge.js')
 const FallbackLedger = await import('../../../dist/Application/Recovery/FallbackLedger.js')
 const AgentPairCursor = await import('../../../dist/Domain/AgentPairCursor.js')
 const BloggerRecoveryProbe = await import('../../../dist/Application/Reconciliation/BloggerRecoveryProbe.js')
-const { lastAssistantStep } = await import('../../../dist/Session/EnforcerHost.js')
+const { lastAssistantStep } = await import('../../../dist/Session/EnforcerCycleDecode.js')
 const BlogTool = await import('../../../dist/Infrastructure/OpenCode/Tools/BlogTool.js')
 
 /**

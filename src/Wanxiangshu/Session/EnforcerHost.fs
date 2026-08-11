@@ -45,12 +45,6 @@ module EnforcerHost =
     /// ENFORCER-042: defensive multi-call cap (protocol violation still merged).
     let MaxMergedToolCalls = 32
 
-    /// Item 14: three commit outcomes. Park only on KnownCommitted.
-    [<RequireQualifiedAccess>]
-    type CycleCommitOutcome =
-        | KnownCommitted
-        | KnownNotCommitted of reason: string
-        | CommitUnknown of reason: string
 
     /// Local outcome of one continuation cycle body (no program-counter bools).
     [<RequireQualifiedAccess>]
@@ -87,333 +81,10 @@ module EnforcerHost =
     let private projectMessages (messages: obj list) (fallback: obj list) : ContinuationOutcome =
         ContinuationOutcome.ProjectMessages(ensureNonEmpty messages fallback)
 
-    /// Tip guidance body for Main auto-injected marker (without pair-programming trailer).
-    [<RequireQualifiedAccess>]
-    type TipGuidance =
-        {
-            TipName: string
-            Presentation: TipPresentation
-            /// Marker tip half only (Full = name header + main.md; Identity = tip: name).
-            Text: string
-        }
-
-    let private tipIdentityText (tipName: string) : string = sprintf "tip: %s" tipName
-
-    let private tipFullText (tipName: string) (mainText: string) : string =
-        let body = if isNull mainText then "" else mainText.Trim()
-
-        if body.Length = 0 then
-            tipIdentityText tipName
-        else
-            sprintf "# Enforcer Tip\ntip = \"%s\"\n\n%s" tipName body
-
-    let private tryOwnerMainSession (journal: AgentJournal) (mainOrBloggerSession: SessionId) : SessionId option =
-        let associations = (AgentJournal.snapshot journal).AgentProjections.Associations
-
-        match SessionAssociationProjection.tryMainSessionOf mainOrBloggerSession associations with
-        | Some owner -> Some owner
-        | None ->
-            // Already a main / work session (or unassociated): treat as main session id.
-            match SessionAssociationProjection.tryBloggerOf mainOrBloggerSession associations with
-            | Some _ -> Some mainOrBloggerSession
-            | None when SessionAssociationProjection.isCompanion mainOrBloggerSession associations -> None
-            | None -> Some mainOrBloggerSession
-
-    let private latestOwnerTipField (journal: AgentJournal) (mainSessionId: SessionId) : string option =
-        match
-            (AgentJournal.snapshot journal).AgentProjections.Sessions
-            |> Map.tryFind mainSessionId
-        with
-        | None -> None
-        | Some session ->
-            session.Enforcement
-            |> Option.map EnforcementProjection.recentTips
-            |> Option.defaultValue []
-            |> List.tryLast
-            |> Option.map (fun tip -> tip.FieldName)
-
-    let private hasFullTipDelivered (journal: AgentJournal) (mainSessionId: SessionId) (tipName: string) : bool =
-        match
-            (AgentJournal.snapshot journal).AgentProjections.Sessions
-            |> Map.tryFind mainSessionId
-        with
-        | None -> false
-        | Some session ->
-            session.TipDelivery
-            |> Option.map (TipDeliveryProjection.hasFullDelivered tipName)
-            |> Option.defaultValue false
-
-    /// Record that Full tip guidance was injected for this Main session (restart-safe).
-    let private recordFullTipDelivered (journal: AgentJournal) (mainSessionId: SessionId) (tipName: string) : unit =
-        let fact =
-            HostFact.TipGuidanceDelivered
-                {| SessionId = mainSessionId
-                   TipName = tipName
-                   Presentation = TipPresentation.Full |}
-
-        match AgentJournal.appendAgent (StreamId.Session mainSessionId) None fact journal with
-        | Ok _ -> ()
-        | Error failure ->
-            // Delivery still proceeds with computed Full text; durability failure is
-            // visible via diagnostic so a later Identity-only cannot silently strand.
-            Diagnostic.emit
-                "tip-guidance-delivery-append-failed"
-                [ "session_id", SessionId.value mainSessionId
-                  "tip", tipName
-                  "result", JournalAppendFailure.describe failure ]
-
-    /// Resolve Main tip guidance for the auto-injected marker tip half.
-    ///
-    /// First Full delivery of a tip in this Main session → main.md body (+ name header).
-    /// Subsequent → compact `tip: <name>` identity only. Decision is TipDeliveryProjection
-    /// (TipGuidanceDelivered fold), not process-local memory.
-    ///
-    /// `mainOrBloggerSession` may be the Main session id (SpikePlugin) or the Blogger
-    /// satellite id; owner is resolved through SessionAssociation.
-    let resolveTipGuidance (journal: AgentJournal) (mainOrBloggerSession: SessionId) : TipGuidance option =
-        match tryOwnerMainSession journal mainOrBloggerSession with
-        | None -> None
-        | Some mainSessionId ->
-            match latestOwnerTipField journal mainSessionId with
-            | None -> None
-            | Some field ->
-                match EnforcerCatalog.tryFindByField field (RuntimeResources.current().EnforcerRules) with
-                | None -> None
-                | Some rule ->
-                    let tipName =
-                        if not (isNull rule.Name) && rule.Name.Trim().Length > 0 then
-                            rule.Name.Trim()
-                        else
-                            field.Trim()
-
-                    if tipName.Length = 0 then
-                        None
-                    elif hasFullTipDelivered journal mainSessionId tipName then
-                        Some
-                            { TipName = tipName
-                              Presentation = TipPresentation.IdentityOnly
-                              Text = tipIdentityText tipName }
-                    else
-                        let text = tipFullText tipName rule.MainText
-                        recordFullTipDelivered journal mainSessionId tipName
-
-                        Some
-                            { TipName = tipName
-                              Presentation = TipPresentation.Full
-                              Text = text }
-
-    /// Latest tip guidance text for Main marker (Full or Identity). None when no tip.
-    let latestTipGuidance (journal: AgentJournal) (mainOrBloggerSession: SessionId) : string option =
-        resolveTipGuidance journal mainOrBloggerSession |> Option.map (fun g -> g.Text)
-
-    /// Backward-compatible alias: same as latestTipGuidance (Full/Identity, not Nudge-only).
-    let latestTipNudge (journal: AgentJournal) (mainOrBloggerSession: SessionId) : string option =
-        latestTipGuidance journal mainOrBloggerSession
-
     let private stopPhysicalRun (messages: obj list) (fallback: obj list) (reason: string) : ContinuationOutcome =
         ContinuationOutcome.StopPhysicalRun(ensureNonEmpty messages fallback, reason)
 
-    /// Item 15: stable minimal repair instruction (no dynamic context resend).
-    /// Domain 单源 — `ProjectionConstants.RepairInstruction`（PROJ-008 Step4）。
-    let RepairInstruction = ProjectionConstants.RepairInstruction
 
-    let private classifyAppendFailure (failure: JournalAppendFailure) : CycleCommitOutcome =
-        match failure with
-        | WriteUnknown(_, _) -> CycleCommitOutcome.CommitUnknown(JournalAppendFailure.describe failure)
-        | FactRejected(_, _) -> CycleCommitOutcome.KnownNotCommitted(JournalAppendFailure.describe failure)
-
-    /// Raw part object → completed `blog` call arguments.
-    ///
-    /// ENFORCER-041: identity comes from the part itself here (the transform
-    /// boundary has no ToolContext), and the fold's replay path reads the same
-    /// shape — the assistant message id IS the ProviderRunIdentity, exactly as
-    /// XWire derives it (`ProviderRunIdentity.create assistant.Id`).
-    let private blogCallFromPart (part: obj) : (ToolCallId * obj) option =
-        if isNull part then
-            None
-        else
-            let kind =
-                if isNull part?``type`` then
-                    ""
-                else
-                    unbox<string> part?``type``
-
-            let name =
-                if isNull part?tool then
-                    if isNull part?name then "" else unbox<string> part?name
-                else
-                    unbox<string> part?tool
-
-            if kind <> "tool" || name <> "blog" then
-                None
-            else
-                let callId =
-                    if isNull part?callID then
-                        if isNull part?callId then
-                            None
-                        else
-                            Some(unbox<string> part?callId)
-                    else
-                        Some(unbox<string> part?callID)
-
-                let status =
-                    if isNull part?state then
-                        None
-                    else
-                        match part?state?status with
-                        | null -> None
-                        | value -> Some(unbox<string> value)
-
-                match callId, status with
-                | Some id, Some "completed" ->
-                    let input =
-                        if isNull part?state || isNull part?state?input then
-                            createEmpty
-                        else
-                            part?state?input
-
-                    Some(ToolCallId.create id, input)
-                | _ -> None
-
-    /// The last assistant message of a transform snapshot and its parts.
-    /// Host sets `time.completed` only when the run ends or is interrupted
-    /// (SessionSnapshotPort). Outbound `messages.transform` creates the assistant
-    /// shell first — completed is unset. ENFORCER-060 must not fire on that shell.
-    let private assistantIsCompleted (message: obj) : bool =
-        if isNull message then
-            false
-        else
-            let info = if isNull message?info then message else message?info
-
-            let timeCompleted (source: obj) =
-                if isNull source || isNull source?time then
-                    null
-                else
-                    source?time?completed
-
-            not (isNull (timeCompleted info)) || not (isNull (timeCompleted message))
-
-    /// Last assistant terminal as (messageId, calls, completed); public so the
-    /// Application-layer recovery probe can bind a claim to the same terminal.
-    let lastAssistantStep (rawMessages: obj list) : (string * obj list * bool) option =
-        rawMessages
-        |> List.choose (fun message ->
-            if isNull message then
-                None
-            else
-                let info = if isNull message?info then message else message?info
-
-                let role =
-                    if isNull info then
-                        None
-                    else
-                        (if isNull info?role then
-                             None
-                         else
-                             Some(unbox<string> info?role))
-
-                let id =
-                    if isNull info || isNull info?id then
-                        None
-                    else
-                        Some(unbox<string> info?id)
-
-                match role, id with
-                | Some "assistant", Some messageId ->
-                    let parts =
-                        if isNull message?parts then
-                            []
-                        else
-                            unbox<obj array> message?parts |> Array.toList
-
-                    Some(messageId, parts, assistantIsCompleted message)
-                | _ -> None)
-        |> List.tryLast
-
-    /// Decode a raw JS object into a string-keyed map (the codec's input shape).
-    let private decodeObject (value: obj) : Map<string, obj> =
-        if isNull value then
-            Map.empty
-        else
-            let keys: string array = emitJsExpr value "Object.keys($0)"
-
-            keys
-            |> Array.fold (fun acc key -> Map.add key (emitJsExpr (value, key) "$0[$1]") acc) Map.empty
-
-    /// ENFORCER-042: (PartOrdinal, ToolCallId, CanonicalBlogCall) for one
-    /// provider step, in provider-visible order. The ordinal is the part's
-    /// index in the assistant message — the only ordering that survives
-    /// parallel execution.
-    ///
-    /// ENFORCER-023: only calls that pass tip re-validation enter the list.
-    /// Failed tip decode is a protocol skip (execute should already have
-    /// rejected; defense in depth at transform).
-    let extractCalls
-        (rawMessages: obj list)
-        : (string * (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list * bool) option =
-        match lastAssistantStep rawMessages with
-        | None -> None
-        | Some(messageId, parts, completed) ->
-            let rules = RuntimeResources.current().EnforcerRules
-
-            let calls =
-                parts
-                |> List.mapi (fun ordinal part -> ordinal, blogCallFromPart part)
-                |> List.choose (fun (ordinal, parsed) ->
-                    parsed
-                    |> Option.bind (fun (callId, input) ->
-                        match EnforcerCodec.decodeCall rules (decodeObject input) with
-                        | Ok call -> Some(ordinal, callId, call)
-                        | Error reason ->
-                            // CTX-014: fold identity into result — no whitelist growth for
-                            // protocol-skip diagnostics that are never recovery inputs.
-                            Diagnostic.emit
-                                "enforcer-blog-call-invalid"
-                                [ "result",
-                                  sprintf "ordinal=%d call_id=%s %s" ordinal (ToolCallId.value callId) reason ]
-
-                            None))
-
-            Some(messageId, calls, completed)
-
-    /// ENFORCER-043: a cycle is valid when the provider run is provable, at
-    /// least one call exists, the merged text is non-empty, and every
-    /// ToolCallId is unique. Tip is required on each call (decode already).
-    let private validateCycle
-        (messageId: string)
-        (calls: (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list)
-        : Result<EnforcerCycle.MergedCycle * ToolCallId list, string> =
-        if String.IsNullOrWhiteSpace messageId then
-            Error "blog cycle has no provable provider run (ENFORCER-043)"
-        elif List.isEmpty calls then
-            Error "blog cycle has no completed blog calls (ENFORCER-043)"
-        elif List.length calls > MaxMergedToolCalls then
-            Error(sprintf "blog cycle exceeds MaxMergedToolCalls=%d" MaxMergedToolCalls)
-        else
-            let callIds = calls |> List.map (fun (_, callId, _) -> callId)
-
-            if List.length (List.distinct callIds) <> List.length calls then
-                Error "blog cycle has duplicate ToolCallIds (ENFORCER-043)"
-            else
-                let merged =
-                    EnforcerCycle.mergeCalls (calls |> List.map (fun (ordinal, _, call) -> ordinal, call))
-
-                if merged.MultiCall then
-                    // ENFORCER-042: multi-call is a protocol violation; still merge defensively.
-                    Diagnostic.emit
-                        "enforcer-protocol-violation"
-                        [ "result",
-                          "multiple blog calls in one provider step; tip = first by PartOrdinal (ENFORCER-025)"
-                          "call_count", string (List.length calls) ]
-
-                if not (EnforcerCycle.isValidCycle merged) then
-                    Error "blog cycle merged text is empty after canonicalisation (ENFORCER-043)"
-                elif SyntheticToml.byteCount merged.MergedText > MaxBlogTextBytes then
-                    Error(sprintf "blog cycle text exceeds MaxBlogTextBytes=%d" MaxBlogTextBytes)
-                elif SyntheticToml.byteCount merged.MergedEvidence > MaxEvidenceBytes then
-                    Error(sprintf "blog cycle evidence exceeds MaxEvidenceBytes=%d" MaxEvidenceBytes)
-                else
-                    Ok(merged, callIds)
 
     /// Commit one cycle: blobs first, then the single BlogObservationCommitted
     /// append (PERSIST-009 shape: durable effect → fact). The fold refuses a
@@ -423,776 +94,8 @@ module EnforcerHost =
     /// ENFORCER-045: coverage advance is ONLY the staged typed context. Re-deriving
     /// from XTrace head is forbidden — that path freezes PrefixCoverage at 0 and
     /// leaves CoveredPrefixDigest empty, so CTX-011 probes never arm.
-    let private commitCycle
-        (journal: AgentJournal)
-        (mainSessionId: SessionId)
-        (bloggerSessionId: SessionId)
-        (providerRun: ProviderRunIdentity)
-        (toolCallIds: ToolCallId list)
-        (merged: EnforcerCycle.MergedCycle)
-        (declared: BloggerMainRequestContext option)
-        : CycleCommitOutcome =
-        let projections = AgentJournal.snapshot journal
 
-        let already =
-            projections.AgentProjections.Sessions
-            |> Map.tryFind mainSessionId
-            |> Option.bind (fun session -> session.Enforcement)
-            |> Option.map (fun state -> EnforcementProjection.tryFindByProviderRun providerRun state)
-            |> Option.flatten
 
-        // CommitUnknown reconcile: receipt already present → treat as KnownCommitted.
-        match already with
-        | Some _ -> CycleCommitOutcome.KnownCommitted
-        | None ->
-            match declared with
-            | None -> CycleCommitOutcome.KnownNotCommitted "blog cycle has no staged coverage context (ENFORCER-045)"
-            | Some coverage ->
-                // PERSIST-010 precheck (writer-side CAS): fold rejects IngestCursorMismatch
-                // only AFTER the line is durable, which poisons the journal. Staged
-                // PreviousIngestedThroughSequence is frozen at materialization; concurrent
-                // commit / crash-resume may advance coverage first. Refuse before append so
-                // failure is KnownNotCommitted (recoverable abandon), never FactRejected.
-                let liveBlog =
-                    projections.AgentProjections.Sessions
-                    |> Map.tryFind mainSessionId
-                    |> Option.bind (fun session -> session.Blog)
-                    |> Option.defaultValue BlogProjection.empty
-
-                let liveIngest = liveBlog.Coverage.IngestedThroughSequence
-                let liveCutoff = liveBlog.Coverage.CoverableTurnCutoffExclusive
-                let liveFrameEpoch = liveBlog.FrameEpochId
-
-                if coverage.PreviousIngestedThroughSequence <> liveIngest then
-                    CycleCommitOutcome.KnownNotCommitted(
-                        sprintf
-                            "staged previous ingest cursor %d disagrees with projection %d (PERSIST-010 precheck)"
-                            coverage.PreviousIngestedThroughSequence
-                            liveIngest
-                    )
-                elif coverage.PreviousCoverableTurnCutoffExclusive <> liveCutoff then
-                    CycleCommitOutcome.KnownNotCommitted(
-                        sprintf
-                            "staged previous coverable cutoff %d disagrees with projection %d (PERSIST-010 precheck)"
-                            coverage.PreviousCoverableTurnCutoffExclusive
-                            liveCutoff
-                    )
-                elif coverage.FrameEpochId <> liveFrameEpoch then
-                    CycleCommitOutcome.KnownNotCommitted(
-                        sprintf
-                            "staged frame epoch %d disagrees with projection %d (PERSIST-010 precheck)"
-                            (FrameEpochId.value coverage.FrameEpochId)
-                            (FrameEpochId.value liveFrameEpoch)
-                    )
-                elif coverage.NextIngestedThroughSequence <= coverage.PreviousIngestedThroughSequence then
-                    CycleCommitOutcome.KnownNotCommitted "coverage did not advance"
-                else
-                    // C5: use epoch frozen at request materialization, never live PrefixEpoch.
-                    let epoch = coverage.ObservedPrefixEpochId
-
-                    match journal.WriteBlob merged.MergedText with
-                    | Error error -> CycleCommitOutcome.KnownNotCommitted error
-                    | Ok textBlob ->
-                        // ENFORCER-045 tip v2: TipRuleId + FieldNameAtCommit on the fact;
-                        // no score-vector blob (ENFORCER-072).
-                        let writeEvidence () =
-                            match merged.MergedEvidence with
-                            | "" -> Ok None
-                            | evidence -> journal.WriteBlob evidence |> Result.map Some
-
-                        match writeEvidence () with
-                        | Error error -> CycleCommitOutcome.KnownNotCommitted error
-                        | Ok evidenceRef ->
-                            // Re-read after blobs: only coverage-advancing facts race us;
-                            // refuse still-stale staged cursor without writing the fact.
-                            let latestBlog =
-                                AgentJournal.snapshot journal
-                                |> fun snap -> snap.AgentProjections.Sessions
-                                |> Map.tryFind mainSessionId
-                                |> Option.bind (fun session -> session.Blog)
-                                |> Option.defaultValue BlogProjection.empty
-
-                            if
-                                coverage.PreviousIngestedThroughSequence
-                                <> latestBlog.Coverage.IngestedThroughSequence
-                                || coverage.PreviousCoverableTurnCutoffExclusive
-                                   <> latestBlog.Coverage.CoverableTurnCutoffExclusive
-                                || coverage.FrameEpochId <> latestBlog.FrameEpochId
-                            then
-                                CycleCommitOutcome.KnownNotCommitted(
-                                    sprintf
-                                        "staged previous ingest cursor %d disagrees with projection %d after blob write (PERSIST-010 precheck)"
-                                        coverage.PreviousIngestedThroughSequence
-                                        latestBlog.Coverage.IngestedThroughSequence
-                                )
-                            else
-                                let tip = merged.CanonicalTip
-
-                                let fact =
-                                    ContextFact.BlogObservationCommitted
-                                        {| SessionId = mainSessionId
-                                           BloggerSessionId = bloggerSessionId
-                                           RequestId = coverage.RequestId
-                                           FrameEpochId = coverage.FrameEpochId
-                                           PreviousIngestedThroughSequence = coverage.PreviousIngestedThroughSequence
-                                           NextIngestedThroughSequence = coverage.NextIngestedThroughSequence
-                                           PreviousCoverableTurnCutoffExclusive =
-                                            coverage.PreviousCoverableTurnCutoffExclusive
-                                           NextCoverableTurnCutoffExclusive = coverage.NextCoverableTurnCutoffExclusive
-                                           NextCoveredPrefixDigest = coverage.NextCoveredPrefixDigest
-                                           TextRef = textBlob.BlobRef
-                                           TextDigest = textBlob.BlobDigest
-                                           ProviderRun = providerRun
-                                           ToolCallIds = toolCallIds
-                                           TipRuleId = tip.RuleId
-                                           FieldNameAtCommit = Some tip.FieldName
-                                           EvidenceRef = evidenceRef |> Option.map (fun blob -> blob.BlobRef)
-                                           ObservedPrefixEpochId = epoch |}
-
-                                match
-                                    AgentJournal.appendAgent
-                                        (StreamId.Session mainSessionId)
-                                        (Some providerRun)
-                                        fact
-                                        journal
-                                with
-                                | Error failure -> classifyAppendFailure failure
-                                | Ok _ -> CycleCommitOutcome.KnownCommitted
-
-    /// CTX-012: single production constructor path for BlogObservationsSquashed from tool loop.
-    let private commitSquash
-        (journal: AgentJournal)
-        (mainSessionId: SessionId)
-        (bloggerSessionId: SessionId)
-        (providerRun: ProviderRunIdentity)
-        (squash: BloggerSquashRequestContext)
-        (squashText: string)
-        : CycleCommitOutcome =
-        let projections = AgentJournal.snapshot journal
-
-        // CommitUnknown reconcile via unified receipt.
-        let alreadyReceipt =
-            projections.AgentProjections.Sessions
-            |> Map.tryFind mainSessionId
-            |> Option.bind (fun s -> s.BloggerCycles)
-            |> Option.bind (fun cycles -> BloggerCycleProjection.tryReceipt providerRun cycles)
-
-        match alreadyReceipt with
-        | Some _ -> CycleCommitOutcome.KnownCommitted
-        | None ->
-            match projections.AgentProjections.Sessions |> Map.tryFind mainSessionId with
-            | None ->
-                CycleCommitOutcome.KnownNotCommitted
-                    "BlogObservationsSquashed requires an existing work session projection"
-            | Some session ->
-                match session.Companion |> Option.bind (fun c -> c.BloggerSessionId) with
-                | Some linked when linked = bloggerSessionId ->
-                    let blog = session.Blog |> Option.defaultValue BlogProjection.empty
-                    let k = squash.CoveredFrameCount
-
-                    if k < 1 || k > List.length blog.Frames then
-                        CycleCommitOutcome.KnownNotCommitted(
-                            sprintf "BlogObservationsSquashed covers %d frames but %d exist" k (List.length blog.Frames)
-                        )
-                    elif blog.FrameEpochId <> squash.FrameEpochId then
-                        CycleCommitOutcome.KnownNotCommitted "BlogObservationsSquashed frame epoch mismatch"
-                    else
-                        let selected = List.truncate k blog.Frames
-                        let digests = selected |> List.map (fun f -> f.Digest)
-
-                        if digests <> squash.FrameDigests then
-                            CycleCommitOutcome.KnownNotCommitted "BlogObservationsSquashed frame digests mismatch"
-                        else
-                            match journal.WriteBlob squashText with
-                            | Error error -> CycleCommitOutcome.KnownNotCommitted error
-                            | Ok blob ->
-                                let fact =
-                                    ContextFact.BlogObservationsSquashed
-                                        {| SessionId = mainSessionId
-                                           BloggerSessionId = bloggerSessionId
-                                           RequestId = squash.RequestId
-                                           PreviousFrameEpochId = blog.FrameEpochId
-                                           NextFrameEpochId = FrameEpochId.next blog.FrameEpochId
-                                           CoveredFrameCount = k
-                                           TextRef = blob.BlobRef
-                                           TextDigest = blob.BlobDigest
-                                           ProviderRun = providerRun |}
-
-                                match
-                                    AgentJournal.appendAgent
-                                        (StreamId.Session mainSessionId)
-                                        (Some providerRun)
-                                        fact
-                                        journal
-                                with
-                                | Error failure -> classifyAppendFailure failure
-                                | Ok _ -> CycleCommitOutcome.KnownCommitted
-                | Some _ ->
-                    CycleCommitOutcome.KnownNotCommitted "Squash completion belongs to a different Blogger session"
-                | None ->
-                    CycleCommitOutcome.KnownNotCommitted
-                        "BlogObservationsSquashed requires a durably linked Blogger session"
-
-    type FrameLoadError =
-        | MissingAssociation
-        | MissingBlogSession
-        | MissingFrameBlob of digest: string
-        | DigestMismatch of digest: string
-        | EpochMismatch
-
-    /// C6: unique fail-closed loader for effective BlogFrames.
-    /// Silent List.choose drop of bad frames is forbidden.
-    /// Kind is preserved so ProjectionSnapshot.BlogFrames can carry ProjectionBlogFrameKind.
-    let loadEffectiveFrames
-        (journal: AgentJournal)
-        (mainSessionId: SessionId)
-        : Result<ResolvedBlogFrame list * FrameEpochId, FrameLoadError> =
-        let projections = AgentJournal.snapshot journal
-
-        match SessionAssociationProjection.tryBloggerOf mainSessionId projections.AgentProjections.Associations with
-        | None -> Error FrameLoadError.MissingAssociation
-        | Some _ ->
-            match projections.AgentProjections.Sessions |> Map.tryFind mainSessionId with
-            | None -> Error FrameLoadError.MissingBlogSession
-            | Some session ->
-                let blog = session.Blog |> Option.defaultValue BlogProjection.empty
-
-                if List.isEmpty blog.Frames then
-                    Ok([], blog.FrameEpochId)
-                else
-                    let rec load remaining acc =
-                        match remaining with
-                        | [] -> Ok(List.rev acc, blog.FrameEpochId)
-                        | frame :: rest ->
-                            match journal.Writer.BlobWriter.Read frame.TextRef with
-                            | Error _ -> Error(FrameLoadError.MissingFrameBlob(BlobDigest.value frame.Digest))
-                            | Ok text ->
-                                if HostDigest.sha256Hex text <> BlobDigest.value frame.Digest then
-                                    Error(FrameLoadError.DigestMismatch(BlobDigest.value frame.Digest))
-                                else
-                                    let kind =
-                                        match frame.Kind with
-                                        | BlogFrameKind.Entry -> ProjectionBlogFrameKind.Entry
-                                        | BlogFrameKind.Squash -> ProjectionBlogFrameKind.Squash
-
-                                    let resolved: ResolvedBlogFrame =
-                                        { Kind = kind
-                                          Digest = BlobDigest.value frame.Digest
-                                          Body = text }
-
-                                    load rest (resolved :: acc)
-
-                    load blog.Frames []
-
-    /// ENFORCER-051 / PROJ-008 step 3b: rebuild via Projection Algebra.
-    /// Snapshot → InsertBlogFrames → Planner → Builder-shaped Host messages.
-    /// Missing association / frame load → None so the caller keeps rawMessages.
-    /// Never return an empty list: that blanks the Host transcript (mock lastUser=null).
-    let private tryRebuildFromContext
-        (journal: AgentJournal)
-        (bloggerSessionId: SessionId)
-        (ctx: BloggerRequestContext)
-        : obj list option =
-        let projections = AgentJournal.snapshot journal
-
-        let mainSessionId =
-            SessionAssociationProjection.tryMainSessionOf bloggerSessionId projections.AgentProjections.Associations
-
-        match mainSessionId with
-        | None -> None
-        | Some owner ->
-            // Zero frames is legitimate (first Main before any Entry). Missing
-            // association was already filtered. Blob load still fail-closed.
-            match loadEffectiveFrames journal owner with
-            | Error FrameLoadError.MissingAssociation
-            | Error FrameLoadError.MissingBlogSession -> None
-            | Error(FrameLoadError.MissingFrameBlob _)
-            | Error(FrameLoadError.DigestMismatch _)
-            | Error FrameLoadError.EpochMismatch -> None
-            | Ok(resolvedFrames, frameEpoch) ->
-                let requestKind, squashCount, delta =
-                    match ctx with
-                    | BloggerRequestContext.Main main ->
-                        let messageId =
-                            CompanionIdentity.newWorkMessageId HostDigest.sha256Hex bloggerSessionId main.DeltaDigest
-
-                        "normal", 0, Some(messageId, main.Toml)
-                    | BloggerRequestContext.Squash squash -> "squash", squash.CoveredFrameCount, None
-
-                // ENFORCER-070/071: RecentTips from main session (oldest → newest).
-                // Same source for normal / squash / restart / recovery / compaction rebuilds.
-                let previousTips =
-                    match projections.AgentProjections.Sessions |> Map.tryFind owner with
-                    | Some session ->
-                        session.Enforcement
-                        |> Option.map EnforcementProjection.recentTips
-                        |> Option.defaultValue []
-                        |> List.map (fun tip -> tip.FieldName, tip.CycleId)
-                    | None -> []
-
-                let blogFramesIntent: BlogFramesIntent =
-                    { RequestKind = requestKind
-                      SquashFrameCount = squashCount
-                      BloggerSessionId = SessionId.value bloggerSessionId
-                      FrameEpoch = FrameEpochId.value frameEpoch
-                      PhysicalDelta = delta
-                      PreviousTips = previousTips }
-
-                let emptyCurrent: ProviderProjection.ProviderSemanticProjection =
-                    { ProviderId = None
-                      ModelId = None
-                      Variant = None
-                      Tools = []
-                      System = []
-                      Messages = [] }
-
-                let snapshot: ProjectionSnapshot =
-                    { CurrentProjection = emptyCurrent
-                      CommittedPrefix = None
-                      BlogFrames = resolvedFrames
-                      TransportMessages = Set.empty
-                      HostReanchor = None }
-
-                let intents = [ ProjectionIntent.InsertBlogFrames blogFramesIntent ]
-
-                match ProjectionPlanner.plan intents with
-                | Error _ -> None
-                | Ok ordered ->
-                    // PROJ-004：Canonical Renderer 单次产出 wire + Host id 侧信道。
-                    // 禁止二次 CompanionProjectionBuilder.build。
-                    let rendered =
-                        ProjectionRenderer.renderMessagesWithHostIds HostDigest.sha256Hex snapshot [] ordered
-
-                    let n = List.length rendered.Messages
-
-                    if
-                        List.length rendered.HostMessageIds <> n
-                        || List.length rendered.HostIsPhysical <> n
-                    then
-                        None
-                    else
-                        // C6: rebuild frames/instruction are synthetic projections, not new
-                        // user authority. New Work delta is marked physical for diagnostics;
-                        // HOST-010 still binds authority pre-transform.
-                        // Fail-closed：每条 rebuild 消息必须带代数 MessageId。
-                        let zipped =
-                            List.zip3 rendered.Messages rendered.HostMessageIds rendered.HostIsPhysical
-
-                        let rec toHost
-                            (acc: obj list)
-                            (items: (ProviderProjection.WireMessage * string option * bool) list)
-                            =
-                            match items with
-                            | [] -> Some(List.rev acc)
-                            | (msg, None, _) :: _ -> None
-                            | (msg, Some messageId, isPhysical) :: tail ->
-                                let text =
-                                    msg.Parts
-                                    |> List.tryPick (function
-                                        | ProviderProjection.WireText t -> Some t
-                                        | _ -> None)
-                                    |> Option.defaultValue ""
-
-                                let hostMsg =
-                                    createObj
-                                        [ "info",
-                                          box (
-                                              createObj
-                                                  [ "id", box messageId
-                                                    "role", box msg.Role
-                                                    "synthetic", box (not isPhysical)
-                                                    "source",
-                                                    box (
-                                                        if isPhysical then
-                                                            "physical-delta"
-                                                        else
-                                                            "synthetic-projection"
-                                                    ) ]
-                                          )
-                                          "parts", box [| createObj [ "type", box "text"; "text", box text ] |] ]
-
-                                toHost (hostMsg :: acc) tail
-
-                        toHost [] zipped
-
-    /// Dead-code hygiene: never default a rebuild miss to []. Callers that still
-    /// need a list must pass the Host rawMessages as fallback.
-    let private rebuildFromContext journal bloggerSessionId ctx (fallback: obj list) =
-        tryRebuildFromContext journal bloggerSessionId ctx
-        |> Option.defaultValue fallback
-
-    /// Map chunk NextCursor (first unconsumed semantic position) → XTrace sequence
-    /// of the last COVERED part. Paired with `semanticCursorFor`'s `>`: the next
-    /// delta starts strictly after this sequence (COMPANION-003 / CTX-011).
-    ///
-    /// Scoped to the current reanchor generation's Turn/Part labels (HOST-006).
-    /// `None` = mapping failed (empty trace, or Host cursor not present on XTrace).
-    /// NEVER default to 0: silent 0 with Prev>0 stages Next≤Prev and dies at commit.
-    let private lastCoveredSequence (xTrace: XTraceProjectionState) (nextCursor: SemanticCursor) : int64 option =
-        XTraceProjection.currentGenerationParts xTrace.Parts
-        |> List.tryFindBack (fun part ->
-            part.Turn < nextCursor.TurnIndex
-            || (part.Turn = nextCursor.TurnIndex && part.PartIndex < nextCursor.PartIndex))
-        |> Option.map (fun part -> part.Cursor.Sequence)
-
-    /// COMPANION-011: digest of X's provider-visible prefix at the coverable cutoff.
-    /// When the cutoff does not move, the previous digest is kept so a mid-turn
-    /// chunk cannot rewrite a proof that still describes the same turns.
-    let private coveredPrefixDigest
-        (previousCutoff: int)
-        (previousDigest: string)
-        (nextCutoff: int)
-        (projection: ProviderProjection.ProviderSemanticProjection)
-        : string =
-        if nextCutoff = previousCutoff then
-            previousDigest
-        else
-            let coveredMessages =
-                projection.Messages
-                |> List.truncate (min nextCutoff (List.length projection.Messages))
-
-            HostDigest.sha256Hex (
-                ProviderProjection.renderSemantic
-                    { projection with
-                        Messages = coveredMessages }
-            )
-
-    /// C5: inverse of BloggerCoordinator.materializeRequest blob.
-    /// Full typed context — never leave cutoff/digest at zero defaults.
-    let tryReloadRequestContext (journal: AgentJournal) (openReq: OpenBloggerRequest) : BloggerRequestContext option =
-        match journal.Writer.BlobWriter.Read openReq.ContextRef with
-        | Error _ -> None
-        | Ok json ->
-            try
-                let raw = Fable.Core.JS.JSON.parse json
-
-                let hasKey (key: string) : bool =
-                    emitJsExpr (raw, key) "$0 != null && Object.prototype.hasOwnProperty.call($0, $1)"
-
-                let asString (key: string) : string =
-                    if not (hasKey key) then
-                        ""
-                    else
-                        let value = raw?(key)
-
-                        if isNull value then
-                            ""
-                        elif emitJsExpr value "typeof $0 === 'string'" then
-                            unbox<string> value
-                        elif emitJsExpr value "typeof $0 === 'number'" then
-                            string (unbox<float> value)
-                        else
-                            ""
-
-                let asInt64 (key: string) : int64 option =
-                    if not (hasKey key) then
-                        None
-                    else
-                        let value = raw?(key)
-
-                        if isNull value then
-                            None
-                        elif emitJsExpr value "typeof $0 === 'number'" then
-                            Some(int64 (unbox<float> value))
-                        elif emitJsExpr value "typeof $0 === 'bigint'" then
-                            Some(int64 (unbox<float> (emitJsExpr value "Number($0)")))
-                        elif emitJsExpr value "typeof $0 === 'string'" then
-                            let text = unbox<string> value
-
-                            if String.IsNullOrWhiteSpace text then
-                                None
-                            else
-                                Some(int64 (float text))
-                        else
-                            None
-
-                let asInt (key: string) : int option =
-                    if not (hasKey key) then
-                        None
-                    else
-                        let value = raw?(key)
-
-                        if isNull value then
-                            None
-                        elif emitJsExpr value "typeof $0 === 'number'" then
-                            Some(int (unbox<float> value))
-                        elif emitJsExpr value "typeof $0 === 'string'" then
-                            let text = unbox<string> value
-
-                            if String.IsNullOrWhiteSpace text then
-                                None
-                            else
-                                Some(int (float text))
-                        else
-                            None
-
-                if openReq.RequestKind = "squash" then
-                    let covered =
-                        asInt "covered_frame_count"
-                        |> Option.defaultValue (List.length openReq.SelectedFrameDigests)
-
-                    Some(
-                        BloggerRequestContext.Squash
-                            { RequestId = openReq.RequestId
-                              MainSessionId = openReq.MainSessionId
-                              BloggerSessionId = openReq.BloggerSessionId
-                              FrameEpochId = openReq.FrameEpochId
-                              CoveredFrameCount = covered
-                              FrameDigests = openReq.SelectedFrameDigests
-                              ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
-                    )
-                else
-                    let toml = asString "toml"
-                    let deltaDigestRaw = asString "delta_digest"
-
-                    let deltaDigest =
-                        if String.IsNullOrWhiteSpace deltaDigestRaw then
-                            if String.IsNullOrWhiteSpace toml then
-                                openReq.ContextDigest
-                            else
-                                BlobDigest.create (HostDigest.sha256Hex toml)
-                        else
-                            BlobDigest.create deltaDigestRaw
-
-                    let prevIngest =
-                        asInt64 "prev_ingest"
-                        |> Option.defaultValue openReq.PreviousIngestedThroughSequence
-
-                    let nextIngest =
-                        asInt64 "next_ingest" |> Option.defaultValue openReq.NextIngestedThroughSequence
-
-                    Some(
-                        BloggerRequestContext.Main
-                            { RequestId = openReq.RequestId
-                              MainSessionId = openReq.MainSessionId
-                              BloggerSessionId = openReq.BloggerSessionId
-                              Toml = toml
-                              PreviousIngestedThroughSequence = prevIngest
-                              NextIngestedThroughSequence = nextIngest
-                              PreviousCoverableTurnCutoffExclusive = asInt "prev_cutoff" |> Option.defaultValue 0
-                              NextCoverableTurnCutoffExclusive = asInt "next_cutoff" |> Option.defaultValue 0
-                              NextCoveredPrefixDigest = asString "next_prefix_digest"
-                              FrameEpochId = openReq.FrameEpochId
-                              DeltaDigest = deltaDigest
-                              ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
-                    )
-            with _ ->
-                None
-
-    /// Live commit authority: InFlight payload only.
-    /// Completed-blog transform must NEVER heal InFlight from durable open —
-    /// Host msgs end on the historical last assistant (new outbound shell is
-    /// not in the list). Healing open here re-binds a new RequestId to an old
-    /// provider run (stale-cycle race). Crash recovery re-arms InFlight before
-    /// handleContinuation when the open request is still live.
-    let tryLiveCycleContext (scope: IParkedTransformHost) (bloggerSessionId: SessionId) : BloggerRequestContext option =
-        scope.TryPeekCurrentRequest(SessionId.value bloggerSessionId)
-
-    /// Rebuild / empty-calls only: live InFlight, else reload open without
-    /// committing. Does not SetCurrentRequest (no side effect on authority).
-    let resolveCycleContext
-        (scope: IParkedTransformHost)
-        (journal: AgentJournal)
-        (mainSessionId: SessionId)
-        (bloggerSessionId: SessionId)
-        : BloggerRequestContext option =
-        let key = SessionId.value bloggerSessionId
-
-        match scope.TryPeekCurrentRequest key with
-        | Some ctx -> Some ctx
-        | None ->
-            let openReq =
-                (AgentJournal.snapshot journal).AgentProjections.Sessions
-                |> Map.tryFind mainSessionId
-                |> Option.bind (fun session -> session.BloggerCycles)
-                |> Option.bind (fun cycles -> BloggerCycleProjection.tryOpenByBlogger bloggerSessionId cycles)
-
-            match openReq with
-            | None -> None
-            | Some req -> tryReloadRequestContext journal req
-
-    let private tryOpenByBlogger
-        (journal: AgentJournal)
-        (mainSessionId: SessionId)
-        (bloggerSessionId: SessionId)
-        : OpenBloggerRequest option =
-        (AgentJournal.snapshot journal).AgentProjections.Sessions
-        |> Map.tryFind mainSessionId
-        |> Option.bind (fun session -> session.BloggerCycles)
-        |> Option.bind (fun cycles -> BloggerCycleProjection.tryOpenByBlogger bloggerSessionId cycles)
-
-    let private isBlogToolPart (part: obj) : bool =
-        if isNull part then
-            false
-        else
-            let kind =
-                if isNull part?``type`` then
-                    ""
-                else
-                    unbox<string> part?``type``
-
-            let name =
-                if not (isNull part?tool) then unbox<string> part?tool
-                elif not (isNull part?name) then unbox<string> part?name
-                else ""
-
-            kind = "tool" && name = "blog"
-
-    let private blogPartStatus (part: obj) : string option =
-        if isNull part || isNull part?state then
-            None
-        else
-            match part?state?status with
-            | null -> None
-            | value -> Some(unbox<string> value)
-
-    /// pending/running blog: Host will re-enter after tool completion — not pure prose.
-    let private hasIncompleteBlogTool (rawMessages: obj list) : bool =
-        match lastAssistantStep rawMessages with
-        | None -> false
-        | Some(_, parts, _) ->
-            parts
-            |> List.exists (fun part ->
-                isBlogToolPart part
-                && match blogPartStatus part with
-                   | Some "pending"
-                   | Some "running" -> true
-                   | _ -> false)
-
-    /// Any blog tool part on the last assistant (completed/error/pending/running).
-    /// Host cleanup after abort marks hanging tools status=error + interrupted=true
-    /// and sets assistant time.completed — that is NOT ENFORCER-060 pure prose.
-    let private hasAnyBlogToolPart (rawMessages: obj list) : bool =
-        match lastAssistantStep rawMessages with
-        | None -> false
-        | Some(_, parts, _) -> parts |> List.exists isBlogToolPart
-
-    let private blogPartInterrupted (part: obj) : bool =
-        if isNull part || isNull part?state then
-            false
-        else
-            let meta = part?state?metadata
-
-            if isNull meta then
-                false
-            else
-                match meta?interrupted with
-                | null -> false
-                | value -> unbox<bool> value = true
-
-    /// Host abort/cleanup terminal: `SessionProcessor.cleanup` marks every hanging
-    /// tool `status=error` + `metadata.interrupted=true`
-    /// (`../opencode/packages/opencode/src/session/processor.ts:589`). That is the
-    /// owner turn being killed, not the Blogger producing a bad cycle, so LOOP-006
-    /// forbids it from spending the primary A/A/B/B budget.
-    let private hasAbortedBlogAttempt (rawMessages: obj list) : bool =
-        match lastAssistantStep rawMessages with
-        | None -> false
-        | Some(_, parts, _) ->
-            parts
-            |> List.exists (fun part ->
-                isBlogToolPart part
-                && match blogPartStatus part with
-                   | Some "completed" -> false
-                   | Some "pending"
-                   | Some "running" -> false
-                   | _ -> blogPartInterrupted part)
-
-    /// ENFORCER-065 `ToolExecutionError`: the blog call itself failed without an
-    /// abort — a real invalid cycle, which skips the nudge and goes to Fallback.
-    let private hasErroredBlogAttempt (rawMessages: obj list) : bool =
-        match lastAssistantStep rawMessages with
-        | None -> false
-        | Some(_, parts, _) ->
-            parts
-            |> List.exists (fun part ->
-                isBlogToolPart part
-                && not (blogPartInterrupted part)
-                && match blogPartStatus part with
-                   | Some "error" -> true
-                   | _ -> false)
-
-    /// Extract the requestKey from an interaction-repair synthetic user message.
-    let private repairRequestKey (message: obj) : string option =
-        if isNull message then
-            None
-        else
-            let info = if isNull message?info then message else message?info
-
-            if
-                not (isNull info)
-                && not (isNull info?source)
-                && unbox<string> info?source = "interaction-repair"
-                && not (isNull info?synthetic)
-                && unbox<bool> info?synthetic
-                && not (isNull info?requestKey)
-            then
-                Some(unbox<string> info?requestKey)
-            else
-                None
-
-    /// ENFORCER-060/061: InteractionRepair via Projection algebra (PROJ-008 Step4).
-    ///
-    /// 消息正文 / 顺序来自 `InsertRepair` → plan → renderMessagesWithIntents。
-    /// Host `createObj` 只写回 id / source / requestKey 侧信道；id 规则保持
-    /// `enforcer-repair-` + sha256(requestKey + "|" + RepairInstruction).Substring(0, 24)。
-    let private withRepairInstruction (rawMessages: obj list) (requestKey: string) : obj list =
-        let baseWire = rawMessages |> List.choose Projection.decodeMessage
-
-        let emptyCurrent: ProviderProjection.ProviderSemanticProjection =
-            { ProviderId = None
-              ModelId = None
-              Variant = None
-              Tools = []
-              System = []
-              Messages = [] }
-
-        let snapshot: ProjectionSnapshot =
-            { CurrentProjection = emptyCurrent
-              CommittedPrefix = None
-              BlogFrames = []
-              TransportMessages = Set.empty
-              HostReanchor = None }
-
-        let intents = [ ProjectionIntent.InsertRepair { RequestKey = requestKey } ]
-
-        match ProjectionPlanner.plan intents with
-        | Error _ ->
-            // fail-closed: 不注入手写 list；返回未改 raw（调用方仍 project 原视图）
-            rawMessages
-        | Ok ordered ->
-            let wire = ProjectionRenderer.renderMessagesWithIntents snapshot baseWire ordered
-
-            let msgId =
-                "enforcer-repair-"
-                + (HostDigest.sha256Hex (requestKey + "|" + ProjectionConstants.RepairInstruction))
-                    .Substring(0, 24)
-
-            // InsertRepair 只追加：前缀保留原始 raw（含 id）；尾部正文来自 algebra。
-            let repairText =
-                wire
-                |> List.tryLast
-                |> Option.bind (fun msg ->
-                    msg.Parts
-                    |> List.tryPick (function
-                        | ProviderProjection.WireText t -> Some t
-                        | _ -> None))
-                |> Option.defaultValue ProjectionConstants.RepairInstruction
-
-            let repairMsg =
-                createObj
-                    [ "info",
-                      box (
-                          createObj
-                              [ "id", box msgId
-                                "role", box "user"
-                                "synthetic", box true
-                                "source", box "interaction-repair"
-                                "requestKey", box requestKey ]
-                      )
-                      "parts", box [| createObj [ "type", box "text"; "text", box repairText ] |] ]
-
-            rawMessages @ [ repairMsg ]
 
     let private isEmptyTextCycleFailure (reason: string) : bool =
         reason.IndexOf("merged text is empty", StringComparison.Ordinal) >= 0
@@ -1269,12 +172,12 @@ module EnforcerHost =
         (projection: ProviderProjection.ProviderSemanticProjection)
         (chunk: BloggerDeltaChunk)
         : BloggerRequestContext option =
-        match lastCoveredSequence xTrace chunk.NextCursor with
+        match EnforcerFrameRecovery.lastCoveredSequence xTrace chunk.NextCursor with
         | None -> None
         | Some nextSeq when nextSeq <= blog.Coverage.IngestedThroughSequence -> None
         | Some nextSeq ->
             let nextDigest =
-                coveredPrefixDigest
+                EnforcerFrameRecovery.coveredPrefixDigest
                     blog.Coverage.CoverableTurnCutoffExclusive
                     blog.Coverage.CoveredPrefixDigest
                     chunk.NextCoverableTurnCutoffExclusive
@@ -1401,7 +304,7 @@ module EnforcerHost =
                         bloggerSessionId
                         (AgentJournal.snapshot j).AgentProjections.Associations)
 
-            match journal, mainSessionId, extractCalls rawMessages with
+            match journal, mainSessionId, EnforcerCycleDecode.extractCalls rawMessages with
             | Some durable, Some owner, Some(_messageId, calls, assistantCompleted) when List.isEmpty calls ->
                 // Host transform msgs do NOT include the newly created outbound assistant
                 // (prompt.ts: updateMessage then trigger transform on prior msgs).
@@ -1409,7 +312,7 @@ module EnforcerHost =
                 // 1) pending/running blog — Host re-enters after tool completion
                 // 2) abort cleanup: blog status=error+interrupted, assistant completed
                 //    → NOT pure prose; fail closed if still InFlight
-                // 3) outbound after prior success is non-empty extractCalls (other arm)
+                // 3) outbound after prior success is non-empty EnforcerCycleDecode.extractCalls (other arm)
                 // 4) pure prose terminal (no blog parts at all) — ENFORCER-060 once when live
                 // 5) no live request + interrupted/prose terminal → stop, never invent repair
                 let key = SessionId.value bloggerSessionId
@@ -1417,17 +320,17 @@ module EnforcerHost =
                 let currentCtx =
                     match scope.TryPeekCurrentRequest key with
                     | Some c -> Some c
-                    | None -> resolveCycleContext scope durable owner bloggerSessionId
+                    | None -> EnforcerFrameRecovery.resolveCycleContext scope durable owner bloggerSessionId
 
                 // Repair injection requires LIVE InFlight authority only.
                 // Durable-re-derived currentCtx is for rebuild/fatal/abandon — never for aabbRepair.
                 // Abort residue (stop → Host interrupted blog) has no live cycle to repair.
-                let liveCtx = tryLiveCycleContext scope bloggerSessionId
+                let liveCtx = EnforcerFrameRecovery.tryLiveCycleContext scope bloggerSessionId
 
                 let rebuild () =
                     match currentCtx with
                     | Some c ->
-                        tryRebuildFromContext durable bloggerSessionId c
+                        EnforcerFrameRecovery.tryRebuildFromContext durable bloggerSessionId c
                         |> Option.defaultValue rawMessages
                     | None -> rawMessages
 
@@ -1469,10 +372,10 @@ module EnforcerHost =
                         let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId fresh)
 
                         let rebuilt =
-                            tryRebuildFromContext durable bloggerSessionId fresh
+                            EnforcerFrameRecovery.tryRebuildFromContext durable bloggerSessionId fresh
                             |> Option.defaultValue rawMessages
 
-                        project (withRepairInstruction rebuilt requestKey)
+                        project (EnforcerRepair.withRepairInstruction rebuilt requestKey)
 
                 /// ENFORCER-068 AABB: record the confirmed failure on the primary cursor,
                 /// then inject the repair. Used for: nudge hard-fail, second pure prose,
@@ -1491,7 +394,7 @@ module EnforcerHost =
                         // the repair projection is then NOT injected. ContinueRecovery
                         // covers Advanced / AlreadyRecorded / NoActiveRun (FALLBACK-001).
                         let providerRun =
-                            match lastAssistantStep rawMessages with
+                            match EnforcerCycleDecode.lastAssistantStep rawMessages with
                             | Some(messageId, _, _) when not (String.IsNullOrWhiteSpace messageId) ->
                                 ProviderRunIdentity.create messageId
                             | _ -> ProviderRunIdentity.create "unknown-prose-run"
@@ -1537,7 +440,13 @@ module EnforcerHost =
                             return aabbRepair ctx ("nudge-no-port: " + reason)
                         | Some send ->
                             let! sent =
-                                send bloggerSessionId RepairInstruction None journal terminalRun "blogger-missing-tool"
+                                send
+                                    bloggerSessionId
+                                    EnforcerRepair.RepairInstruction
+                                    None
+                                    journal
+                                    terminalRun
+                                    "blogger-missing-tool"
 
                             match sent with
                             | Ok _ ->
@@ -1560,9 +469,9 @@ module EnforcerHost =
                                 return aabbRepair ctx ("nudge-failed: " + err)
                     }
 
-                if hasIncompleteBlogTool rawMessages then
+                if EnforcerRepair.hasIncompleteBlogTool rawMessages then
                     return project rawMessages
-                elif hasAbortedBlogAttempt rawMessages then
+                elif EnforcerRepair.hasAbortedBlogAttempt rawMessages then
                     // LOOP-006: an interrupted tool call is Host cleanup after abort, so it
                     // is not a confirmed model failure and must not consume the owner's
                     // A/A/B/B offset or budget — otherwise one owner provider failure is
@@ -1580,7 +489,7 @@ module EnforcerHost =
                         // No live cycle: interrupted blog without authority is stop/abort residue,
                         // not a repair opportunity. Stop, never inject # Protocol repair.
                         return stop "unowned-interrupted-blog-without-CurrentRequest"
-                elif hasErroredBlogAttempt rawMessages then
+                elif EnforcerRepair.hasErroredBlogAttempt rawMessages then
                     // ENFORCER-065 ToolExecutionError: a genuine failed cycle → unified
                     // Fallback (ENFORCER-062), one AABB, then exhaust.
                     match liveCtx with
@@ -1589,14 +498,14 @@ module EnforcerHost =
                         | BloggerToolRecovery.AabbRepairConsumed -> return fatalEnd "blog tool error; aabb exhausted"
                         | _ -> return aabbRepair ctx "blog tool error without completed call"
                     | None -> return stop "unowned-errored-blog-without-CurrentRequest"
-                elif hasAnyBlogToolPart rawMessages then
+                elif EnforcerRepair.hasAnyBlogToolPart rawMessages then
                     return project (rebuild ())
                 elif not assistantCompleted then
                     return project (rebuild ())
                 else
                     // ENFORCER-060/064..068: completed assistant, zero blog parts → pure prose.
                     let terminalRun =
-                        match lastAssistantStep rawMessages with
+                        match EnforcerCycleDecode.lastAssistantStep rawMessages with
                         | Some(messageId, _, _) when not (String.IsNullOrWhiteSpace messageId) ->
                             ProviderRunIdentity.create messageId
                         | _ -> ProviderRunIdentity.create "unknown-prose-run"
@@ -1639,7 +548,7 @@ module EnforcerHost =
                 let providerRun = ProviderRunIdentity.create messageId
                 let key = SessionId.value bloggerSessionId
                 // Peek only — never heal InFlight from open on this arm.
-                let liveCtx = tryLiveCycleContext scope bloggerSessionId
+                let liveCtx = EnforcerFrameRecovery.tryLiveCycleContext scope bloggerSessionId
 
                 let snapshot = AgentJournal.snapshot durable
 
@@ -1659,7 +568,7 @@ module EnforcerHost =
                     |> Option.isSome
 
                 let resumeWithContext ctx =
-                    tryRebuildFromContext durable bloggerSessionId ctx
+                    EnforcerFrameRecovery.tryRebuildFromContext durable bloggerSessionId ctx
                     |> Option.defaultValue rawMessages
 
                 let mainBlocks () =
@@ -1706,7 +615,7 @@ module EnforcerHost =
                     if assistantCompleted then
                         return stop "unowned-completed-blog-without-CurrentRequest"
                     else
-                        match tryOpenByBlogger durable mainSessionId bloggerSessionId with
+                        match EnforcerRepair.tryOpenByBlogger durable mainSessionId bloggerSessionId with
                         | Some _ ->
                             Diagnostic.fatal
                                 "enforcer-cycle-failed"
@@ -1756,11 +665,11 @@ module EnforcerHost =
                             (recoveryProbe durable bloggerSessionId rawMessages ctx) = BloggerToolRecovery.AabbRepairConsumed
                         | None -> false
 
-                    match validateCycle messageId calls with
+                    match EnforcerCycleDecode.validateCycle messageId calls with
                     | Error reason when
                         isEmptyTextCycleFailure reason
                         && not (aabbConsumed ())
-                        && not (hasIncompleteBlogTool rawMessages)
+                        && not (EnforcerRepair.hasIncompleteBlogTool rawMessages)
                         ->
                         // ENFORCER-061: empty text keeps one AABB repair budget (not pure-prose nudge).
                         let fresh =
@@ -1783,13 +692,20 @@ module EnforcerHost =
                         match liveCtx with
                         | Some(BloggerRequestContext.Squash squash) ->
                             match
-                                commitSquash durable mainSessionId bloggerSessionId providerRun squash merged.MergedText
+                                EnforcerCycleCommit.commitSquash
+                                    durable
+                                    mainSessionId
+                                    bloggerSessionId
+                                    providerRun
+                                    squash
+                                    merged.MergedText
                             with
-                            | CycleCommitOutcome.KnownCommitted ->
+                            | EnforcerCycleCommit.CycleCommitOutcome.KnownCommitted ->
                                 disposition <- CycleDisposition.Committed None
                                 scope.ClearCurrentRequest key
-                            | CycleCommitOutcome.KnownNotCommitted reason -> abandonStaleCycle reason
-                            | CycleCommitOutcome.CommitUnknown reason ->
+                            | EnforcerCycleCommit.CycleCommitOutcome.KnownNotCommitted reason ->
+                                abandonStaleCycle reason
+                            | EnforcerCycleCommit.CycleCommitOutcome.CommitUnknown reason ->
                                 disposition <- CycleDisposition.CommitUnknown
 
                                 Diagnostic.fatal "enforcer-cycle-commit-unknown" [ "session_id", key; "result", reason ]
@@ -1801,7 +717,7 @@ module EnforcerHost =
                             // without a new open slot — only the open that matches this
                             // RequestId must carry a PromptKey.
                             let openUnbound =
-                                tryOpenByBlogger durable mainSessionId bloggerSessionId
+                                EnforcerRepair.tryOpenByBlogger durable mainSessionId bloggerSessionId
                                 |> Option.exists (fun openReq ->
                                     openReq.RequestId = main.RequestId && openReq.PromptKey.IsNone)
 
@@ -1813,7 +729,7 @@ module EnforcerHost =
                                 unexpectedEnd "open request has no PromptKey binding"
                             else
                                 match
-                                    commitCycle
+                                    EnforcerCycleCommit.commitCycle
                                         durable
                                         mainSessionId
                                         bloggerSessionId
@@ -1822,7 +738,7 @@ module EnforcerHost =
                                         merged
                                         (Some main)
                                 with
-                                | CycleCommitOutcome.KnownCommitted ->
+                                | EnforcerCycleCommit.CycleCommitOutcome.KnownCommitted ->
                                     disposition <- CycleDisposition.Committed None
 
                                     // Handle may have sealed during the cycle.
@@ -1835,8 +751,9 @@ module EnforcerHost =
                                         BloggerRuntimeHost.forceSealCellDropOffer scope key
 
                                     scope.ClearCurrentRequest key
-                                | CycleCommitOutcome.KnownNotCommitted reason -> abandonStaleCycle reason
-                                | CycleCommitOutcome.CommitUnknown reason ->
+                                | EnforcerCycleCommit.CycleCommitOutcome.KnownNotCommitted reason ->
+                                    abandonStaleCycle reason
+                                | EnforcerCycleCommit.CycleCommitOutcome.CommitUnknown reason ->
                                     disposition <- CycleDisposition.CommitUnknown
 
                                     Diagnostic.fatal
@@ -1877,7 +794,7 @@ module EnforcerHost =
                             return failwith "unreachable: fatalEnd ends the cycle"
                         | _ ->
                             let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId ctx)
-                            return project (withRepairInstruction (resumeWithContext ctx) requestKey)
+                            return project (EnforcerRepair.withRepairInstruction (resumeWithContext ctx) requestKey)
                     | CycleDisposition.CommitUnknown -> return project rawMessages
                     | CycleDisposition.AbandonThenCatchUp ->
                         // Stale staged coverage abandoned: rebuild next window from live
@@ -1981,7 +898,7 @@ module EnforcerHost =
                 | Some durable, Some ctx ->
                     return
                         project (
-                            tryRebuildFromContext durable bloggerSessionId ctx
+                            EnforcerFrameRecovery.tryRebuildFromContext durable bloggerSessionId ctx
                             |> Option.defaultValue rawMessages
                         )
                 | _ -> return project rawMessages

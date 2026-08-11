@@ -43,12 +43,16 @@ const {
 const {
   handleContinuation,
   tryRefreshMainContextFromJournal,
-  CycleCommitOutcome_$reflection,
   CycleDisposition_$reflection,
   ContinuationOutcome_$reflection,
+} = await import('../../../dist/Session/EnforcerHost.js')
+const {
+  CycleCommitOutcome_$reflection,
+} = await import('../../../dist/Session/EnforcerCycleCommit.js')
+const {
   FrameLoadError_$reflection,
   FrameLoadError,
-} = await import('../../../dist/Session/EnforcerHost.js')
+} = await import('../../../dist/Session/EnforcerFrameRecovery.js')
 
 const MAIN = 'ses-main'
 const BLOG = 'ses-blog'

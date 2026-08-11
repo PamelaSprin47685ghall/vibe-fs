@@ -32,6 +32,10 @@ const enforcerSrc = readFileSync(
   join(ROOT, 'src/Wanxiangshu/Session/EnforcerHost.fs'),
   'utf8',
 )
+const repairSrc = readFileSync(
+  join(ROOT, 'src/Wanxiangshu/Session/EnforcerRepair.fs'),
+  'utf8',
+)
 
 const probeModuleSrc = readFileSync(
   join(ROOT, 'src/Wanxiangshu/Application/Reconciliation/BloggerRecoveryProbe.fs'),
@@ -215,7 +219,7 @@ test('ENFORCER_153_cold_rejudge_never_invents_AabbRepairConsumed', () => {
 test('ENFORCER_153_hot_path_aabb_infers_from_visible_transcript', () => {
   // The hot path injects a synthetic repair message with info.requestKey; the next
   // transform uses its presence (not a mutable flag) to decide AabbRepairConsumed.
-  assert.match(enforcerSrc, /requestKey[\s\S]*?interaction-repair/)
+  assert.match(repairSrc, /requestKey[\s\S]*?interaction-repair/)
   assert.match(enforcerSrc, /BloggerToolRecovery\.InteractionNudgeIssued _[\s\S]*?aabbRepair/)
   assert.match(enforcerSrc, /BloggerToolRecovery\.AabbRepairConsumed[\s\S]*?fatalEnd/)
 })

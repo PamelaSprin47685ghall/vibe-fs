@@ -94,12 +94,12 @@ module BloggerCrashRecovery =
             host.ClearCurrentRequest key
             host.SetDrainWindow(key, DrainWindow.Closed)
 
-    /// C5: one reload path — EnforcerHost.tryReloadRequestContext (full cutoff/digest).
+    /// C5: one reload path — EnforcerFrameRecovery.tryReloadRequestContext (full cutoff/digest).
     let private tryReloadMainContext
         (journal: AgentJournal)
         (openReq: OpenBloggerRequest)
         : BloggerRequestContext option =
-        EnforcerHost.tryReloadRequestContext journal openReq
+        EnforcerFrameRecovery.tryReloadRequestContext journal openReq
 
     /// Startup pass: walk open materializations + receipts.
     let reconcile

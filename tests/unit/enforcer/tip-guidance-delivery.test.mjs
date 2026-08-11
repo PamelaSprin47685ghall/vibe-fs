@@ -25,10 +25,10 @@ runtimeResources.installFromPackage()
 
 const { AgentJournalModule_appendAgent } = await import('../../../dist/Journal/AgentJournal.js')
 const {
-  latestTipGuidance,
-  latestTipNudge,
-  resolveTipGuidance,
-} = await import('../../../dist/Session/EnforcerHost.js')
+  EnforcerTipGuidance_latestTipGuidance: latestTipGuidance,
+  EnforcerTipGuidance_latestTipNudge: latestTipNudge,
+  EnforcerTipGuidance_resolveTipGuidance: resolveTipGuidance,
+} = await import('../../../dist/Session/EnforcerTipGuidance.js')
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const MAIN_MD = readFileSync(

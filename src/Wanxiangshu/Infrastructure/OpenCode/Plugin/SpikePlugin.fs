@@ -531,7 +531,7 @@ module SpikePlugin =
                                             : EnforcerHost.RecoveryStageProbe =
                                             fun ctx ->
                                                 let terminalRun =
-                                                    match EnforcerHost.lastAssistantStep rawMessages with
+                                                    match EnforcerCycleDecode.lastAssistantStep rawMessages with
                                                     | Some(messageId, _, _) when
                                                         not (String.IsNullOrWhiteSpace messageId)
                                                         ->
@@ -615,7 +615,9 @@ module SpikePlugin =
                                 match journal, projectionSessionIdOpt with
                                 | Some durable, Some sessionId ->
                                     // Main session id: resolveTipGuidance maps owner via association.
-                                    match EnforcerHost.latestTipGuidance durable (SessionId.create sessionId) with
+                                    match
+                                        EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId)
+                                    with
                                     | Some guidance ->
                                         guidance + "\n\n" + ProjectionConstants.PairProgrammingGuidelineText
                                     | None -> ProjectionConstants.PairProgrammingGuidelineText

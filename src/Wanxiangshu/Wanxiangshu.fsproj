@@ -270,6 +270,11 @@
     <Compile Include="Session/BloggerRuntimeHost.fs"/>
     <Compile Include="Session/BloggerAbandon.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/LoopSensor.fs"/>
+    <Compile Include="Session/EnforcerTipGuidance.fs"/>
+    <Compile Include="Session/EnforcerCycleDecode.fs"/>
+    <Compile Include="Session/EnforcerCycleCommit.fs"/>
+    <Compile Include="Session/EnforcerFrameRecovery.fs"/>
+    <Compile Include="Session/EnforcerRepair.fs"/>
     <Compile Include="Session/EnforcerHost.fs"/>
     <Compile Include="Session/CompanionHostBlogger.fs"/>
     <Compile Include="Session/CompanionJournalPort.fs"/>

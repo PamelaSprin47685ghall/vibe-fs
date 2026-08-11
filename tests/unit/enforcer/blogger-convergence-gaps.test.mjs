@@ -151,10 +151,11 @@ test('C0_commit_uses_live_InFlight_only_not_open_heal', () => {
   // rebinds a new RequestId onto an old provider run (stale-cycle race).
   // Durable open reload stays for rebuild / crash recovery, not cycle commit.
   const host = prodText('src/Wanxiangshu/Session/EnforcerHost.fs')
+  const recovery = prodText('src/Wanxiangshu/Session/EnforcerFrameRecovery.fs')
   assert.match(host, /tryLiveCycleContext/, 'commit authority is live InFlight peek')
-  assert.match(host, /let liveCtx = tryLiveCycleContext/, 'completed-blog arm peeks live only')
+  assert.match(host, /let liveCtx = EnforcerFrameRecovery\.tryLiveCycleContext/, 'completed-blog arm peeks live only')
   assert.match(host, /resolveCycleContext/, 'rebuild/empty-calls still resolve typed context')
-  assert.match(host, /tryReloadRequestContext/, 'durable open materialization must reload full typed context')
+  assert.match(recovery, /tryReloadRequestContext/, 'durable open materialization must reload full typed context')
   assert.equal(
     /SetCurrentRequest\(key, ctx\)[\s\S]{0,80}Some ctx[\s\S]{0,40}resolveCycleContext|resolveCycleContext[\s\S]{0,200}SetCurrentRequest\(key, ctx\)/.test(
       host,
