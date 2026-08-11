@@ -47,8 +47,8 @@ const nodeTestSteps = [
     files: [path.join(here, 'resources/prompts.test.mjs')],
   },
   {
-    label: 'resources/enforcer-catalog.test.mjs',
-    files: [path.join(here, 'resources/enforcer-catalog.test.mjs')],
+    label: 'resources/enforcer-rulebook.test.mjs',
+    files: [path.join(here, 'resources/enforcer-rulebook.test.mjs')],
   },
   {
     label: 'plugin/manager-tool-contract.test.mjs',
