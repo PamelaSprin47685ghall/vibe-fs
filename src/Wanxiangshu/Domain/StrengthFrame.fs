@@ -153,7 +153,12 @@ module StrengthFrame =
             |> sha256
             |> ToolCallId.create
 
-        let rec localizeParts parts nextOrdinal idMap localized =
+        let rec localizeParts
+            (parts: ProviderProjection.WirePart list)
+            (nextOrdinal: int)
+            (idMap: Map<string, ToolCallId>)
+            (localized: ProviderProjection.WirePart list)
+            =
             match parts with
             | [] -> Ok(List.rev localized, nextOrdinal, idMap)
             | ProviderProjection.WireToolCall(ownerId, name, arguments) :: tail ->
@@ -181,7 +186,12 @@ module StrengthFrame =
             | ProviderProjection.WireMedia _ :: _ -> Error StrengthMirrorError.MediaCannotCrossSession
             | part :: tail -> localizeParts tail nextOrdinal idMap (part :: localized)
 
-        let rec localizeMessages remaining nextOrdinal idMap localized =
+        let rec localizeMessages
+            (remaining: ProviderProjection.WireMessage list)
+            (nextOrdinal: int)
+            (idMap: Map<string, ToolCallId>)
+            (localized: ProviderProjection.WireMessage list)
+            =
             match remaining with
             | [] -> Ok(List.rev localized)
             | message :: tail ->

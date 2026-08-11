@@ -42,7 +42,7 @@ Promoted frame 在现有 Companion/prefix representation 能以 XTrace coverage 
 
 ## STRENGTH-009：Projection 与 no-reflection
 
-Replica provider message base = owner 在 post-Enforcer、pre-Strength-candidate、pre-Pair-marker 冻结点的 ProviderSemanticProjection + 本 decision 已完成 local batches；Replica 的 model/system/tool schema 仍来自自身 AttemptExecutionProfile。当前 Candidate 在 freeze 之后才产生，因此不能反射回当前 Replica。fresh decision 不复用旧 Replica transcript；过去已经 Promoted 的历史作为 owner 正常语义可以出现在未来 decision mirror。
+Replica provider message base = owner 在 post-Enforcer、pre-Strength-candidate、pre-Pair-marker 冻结点的 ProviderSemanticProjection + 本 decision 已完成 local batches；Replica 的 model/system/tool schema 仍来自自身 AttemptExecutionProfile。跨 Session 只允许语义等价：owner ToolCallId 不得进入 Replica wire，Host 必须先确定性重定位为 decision-local id 并证明 `ProviderSemanticProjection` 不变；media/孤儿 result 等无法无损重定位的历史 → K0。当前 Candidate 在 freeze 之后才产生，因此不能反射回当前 Replica。fresh decision 不复用旧 Replica transcript；过去已经 Promoted 的历史作为 owner 正常语义可以出现在未来 decision mirror。
 
 Strength frame 插入必须早于 PairProgrammingThought marker；ReviewSeal 仍覆盖最终 provider bytes。Candidate wrong-target render、同 anchor 不同 payload、Strength mirror 与普通 Work base selection 同时出现均为 ProjectionConflict。
 

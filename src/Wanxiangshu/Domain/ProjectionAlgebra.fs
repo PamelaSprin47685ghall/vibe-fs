@@ -57,16 +57,17 @@ type RepairIntent = { RequestKey: string }
 /// `AppendReviewChallenge` 载荷：REVIEW-003 TextVersion。
 type ChallengeIntent = { TextVersion: int }
 
-/// STRENGTH-009/016: StrengthReplica base selection. `Messages` are the frozen
-/// owner wire messages whose semantic digest was proved by the Coordinator at
-/// the post-Enforcer/pre-candidate/pre-pair freeze point. The renderer does not
-/// invent a Semantic→Wire conversion (VERIFY-007).
+/// STRENGTH-009/016: StrengthReplica base selection. `LocalizedMessages` are a
+/// semantic-equivalent provider wire representation whose owner tool-call IDs were
+/// stripped and deterministically localized for this decision at the Host boundary.
+/// The renderer never receives owner-local wire identity and does not invent a
+/// general Semantic→Wire conversion (VERIFY-007).
 type StrengthMirrorIntent =
     private
         { DecisionId: StrengthDecisionId
           TargetProviderRun: ProviderRunIdentity
           SemanticDigest: string
-          Messages: ProviderProjection.WireMessage list }
+          LocalizedMessages: ProviderProjection.WireMessage list }
 
 [<RequireQualifiedAccess>]
 type StrengthFrameVisibility =
@@ -152,13 +153,13 @@ module ProjectionIntent =
         (decisionId: StrengthDecisionId)
         (targetRun: ProviderRunIdentity)
         (semanticDigest: string)
-        (messages: ProviderProjection.WireMessage list)
+        (localizedMessages: ProviderProjection.WireMessage list)
         : ProjectionIntent =
         ProjectionIntent.UseStrengthMirror
             { DecisionId = decisionId
               TargetProviderRun = targetRun
               SemanticDigest = semanticDigest
-              Messages = messages }
+              LocalizedMessages = localizedMessages }
 
     let private framesIntent (insertion: StrengthFrameInsertion) : ProjectionIntent =
         ProjectionIntent.InsertStrengthFrames { Items = [ insertion ] }
@@ -708,9 +709,9 @@ module ProjectionRenderer =
     /// STRENGTH-009: replace base messages with frozen owner wire messages.
     /// Host identity/physical channels reset — mirror bytes are not Host-owned.
     let private applyStrengthMirror (mirror: StrengthMirrorIntent) (_acc: RenderedMessages) : RenderedMessages =
-        { Messages = mirror.Messages
-          HostMessageIds = mirror.Messages |> List.map (fun _ -> None)
-          HostIsPhysical = mirror.Messages |> List.map (fun _ -> false) }
+        { Messages = mirror.LocalizedMessages
+          HostMessageIds = mirror.LocalizedMessages |> List.map (fun _ -> None)
+          HostIsPhysical = mirror.LocalizedMessages |> List.map (fun _ -> false) }
 
     /// Expand one StrengthFrameBundle into concurrent tool-call + tool-result message pairs.
     /// Each batch → one assistant (all WireToolCall) then one tool (all WireToolResult).

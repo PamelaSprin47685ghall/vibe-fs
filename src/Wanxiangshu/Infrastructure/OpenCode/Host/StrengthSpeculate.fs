@@ -336,71 +336,71 @@ module StrengthSpeculate =
                                                             match outcome with
                                                             | Error _ -> return ()
                                                             | Ok completed ->
-                                                            match completed.Terminal with
-                                                            | StrengthReplicaTerminal.InvalidFrame reason ->
-                                                                scope.TripStrengthFuse(
-                                                                    "Strength Replica invalid frame: " + reason
-                                                                )
-
-                                                                return ()
-                                                            | _ when List.isEmpty completed.Batches -> return ()
-                                                            | _ ->
-                                                                match
-                                                                    StrengthFrame.tryBuild
-                                                                        HostDigest.sha256Hex
-                                                                        runtime.MaxFrameBytes
-                                                                        completed.Batches
-                                                                with
-                                                                | Error error ->
+                                                                match completed.Terminal with
+                                                                | StrengthReplicaTerminal.InvalidFrame reason ->
                                                                     scope.TripStrengthFuse(
-                                                                        sprintf
-                                                                            "Strength Replica bundle invalid: %A"
-                                                                            error
+                                                                        "Strength Replica invalid frame: " + reason
                                                                     )
 
                                                                     return ()
-                                                                | Ok bundle ->
+                                                                | _ when List.isEmpty completed.Batches -> return ()
+                                                                | _ ->
                                                                     match
-                                                                        durability.PublishPrepared
-                                                                            { OwnerSessionId = owner
-                                                                              DecisionId = id
-                                                                              TargetProviderRun = target
-                                                                              ReplicaSessionId =
-                                                                                completed.ReplicaSessionId
-                                                                              Budget = budget
-                                                                              AnchorDigest = anchorDigest
-                                                                              Bundle = bundle }
+                                                                        StrengthFrame.tryBuild
+                                                                            HostDigest.sha256Hex
+                                                                            runtime.MaxFrameBytes
+                                                                            completed.Batches
                                                                     with
-                                                                    | StrengthPreparedPublish.StorageInvalid error ->
-                                                                        let reason =
-                                                                            "Strength Prepared storage invalid: "
-                                                                            + error
+                                                                    | Error error ->
+                                                                        scope.TripStrengthFuse(
+                                                                            sprintf
+                                                                                "Strength Replica bundle invalid: %A"
+                                                                                error
+                                                                        )
 
-                                                                        scope.TripStrengthFuse reason
-                                                                        raise (InvalidOperationException reason)
-                                                                    | StrengthPreparedPublish.Rejected _ ->
-                                                                        // Definite pre-intervention publication failure:
-                                                                        // fail open to K0. No candidate bytes are visible.
                                                                         return ()
-                                                                    | StrengthPreparedPublish.Published ->
+                                                                    | Ok bundle ->
                                                                         match
-                                                                            renderCandidate
-                                                                                owner
-                                                                                target
-                                                                                id
-                                                                                bundle
-                                                                                output
+                                                                            durability.PublishPrepared
+                                                                                { OwnerSessionId = owner
+                                                                                  DecisionId = id
+                                                                                  TargetProviderRun = target
+                                                                                  ReplicaSessionId =
+                                                                                    completed.ReplicaSessionId
+                                                                                  Budget = budget
+                                                                                  AnchorDigest = anchorDigest
+                                                                                  Bundle = bundle }
                                                                         with
-                                                                        | Ok() -> return ()
-                                                                        | Error error ->
-                                                                            // Prepared is durable but target has not been
-                                                                            // allowed to leave this transform. Wrong/failed
-                                                                            // rendering is therefore fail closed.
+                                                                        | StrengthPreparedPublish.StorageInvalid error ->
                                                                             let reason =
-                                                                                "Strength Candidate render failed closed: "
+                                                                                "Strength Prepared storage invalid: "
                                                                                 + error
 
                                                                             scope.TripStrengthFuse reason
                                                                             raise (InvalidOperationException reason)
+                                                                        | StrengthPreparedPublish.Rejected _ ->
+                                                                            // Definite pre-intervention publication failure:
+                                                                            // fail open to K0. No candidate bytes are visible.
+                                                                            return ()
+                                                                        | StrengthPreparedPublish.Published ->
+                                                                            match
+                                                                                renderCandidate
+                                                                                    owner
+                                                                                    target
+                                                                                    id
+                                                                                    bundle
+                                                                                    output
+                                                                            with
+                                                                            | Ok() -> return ()
+                                                                            | Error error ->
+                                                                                // Prepared is durable but target has not been
+                                                                                // allowed to leave this transform. Wrong/failed
+                                                                                // rendering is therefore fail closed.
+                                                                                let reason =
+                                                                                    "Strength Candidate render failed closed: "
+                                                                                    + error
+
+                                                                                scope.TripStrengthFuse reason
+                                                                                raise (InvalidOperationException reason)
             | _ -> return ()
         }

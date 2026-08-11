@@ -74,7 +74,7 @@ module StrengthReplicaTransform =
                                           binding.DecisionId
                                           binding.TargetProviderRun
                                           binding.SemanticDigest
-                                          binding.MirrorMessages
+                                          binding.LocalizedMirrorMessages
                                   match frame with
                                   | Some bundle ->
                                       yield

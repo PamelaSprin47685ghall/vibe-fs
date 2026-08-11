@@ -44,7 +44,7 @@ eligibility gate
 
 1. 解析 same-role fast peer；创建/复用仅当前 decision 的 `InternalLeaf × Attached(StrengthReplica)` leaf。
 2. 构造 `ProviderRequestKind.StrengthReplica` profile；tool schema 从 `ToolCapabilitySet` 生成，执行 gate 读取同一 set。
-3. `UseStrengthMirror` 以 frozen owner semantic history 作为 base；每完成一个 batch，把本 decision 的 prior batches 通过 `InsertStrengthFrames` 加入下一次 Replica view。
+3. `UseStrengthMirror` 以 frozen owner semantic history 作为 base。Host 边界只临时读取 owner wire 以保留 tool call/result 配对，随后按 `DecisionId + semantic digest + encounter ordinal` 把 owner ToolCallId 全部重定位为 decision-local deterministic id；`ProviderSemanticProjection` 必须前后相等，owner id 不得跨 Session。media 或无法唯一配对的历史不可逆，直接 K0；不建立通用 Semantic→Wire 逆变换。每完成一个 batch，把本 decision 的 prior batches 通过 `InsertStrengthFrames` 加入下一次 Replica view。
 4. 每次 provider request 完成后只收集真实 readonly call/result。并发调用按 Host/provider 稳定顺序收割；任一未配对、未知 tool、超 byte limit → 本 decision unusable。
 5. 请求计数达到 K 后，在下一 transform/reconcile 边界停止并 retire，禁止 K+1 外发。text-only completion 丢弃正文并停止；之前完整 batch 可保留。
 6. owner cancellation 立即 abort/retire leaf。Replica provider/tool 普通失败不进入 owner fallback。

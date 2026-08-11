@@ -222,7 +222,7 @@ type StrengthReplicaRuntime
             targetProviderRun: ProviderRunIdentity,
             budget: StrengthBudget,
             fastAgent: string,
-            frozenMirror: WireMessage list,
+            localizedMirror: WireMessage list,
             mirrorSemanticDigest: string
         ) : Task<Result<StrengthReplicaOutcome, string>> =
         task {
@@ -262,7 +262,7 @@ type StrengthReplicaRuntime
                                   Budget = budget
                                   MaxFrameBytes = frameByteLimit
                                   SemanticDigest = mirrorSemanticDigest
-                                  MirrorMessages = frozenMirror
+                                  LocalizedMirrorMessages = localizedMirror
                                   ToolCapabilitySet = capabilities }
 
                             match liveRegistry.Register binding with

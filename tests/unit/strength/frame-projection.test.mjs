@@ -5,6 +5,8 @@ import * as EventStore from '../../../dist/Domain/EventStore.js'
 import * as Frame from '../../../dist/Domain/StrengthFrame.js'
 import * as Events from '../../../dist/Domain/StrengthEvents.js'
 import * as Projection from '../../../dist/Domain/StrengthProjection.js'
+import * as Provider from '../../../dist/Domain/ProviderProjection.js'
+import * as HostDigest from '../../../dist/Host/HostDigest.js'
 import { StrengthBudget } from '../../../dist/Domain/StrengthBudget.js'
 import * as Id from '../../../dist/Kernel/Identity.js'
 import { ofArray as toList, toArray as listItems } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
@@ -52,6 +54,71 @@ test('STRENGTH_005_frame_bundle_accepts_only_complete_read_glob_grep_batches', (
   const empty = resultOf(Frame.StrengthFrame_tryBuild(H, 10000, toList([batch(1, [])])))
   assert.equal(empty.ok, false)
   assert.equal(caseOf(empty.error), 'EmptyBatch')
+})
+
+test('STRENGTH_009_replica_mirror_localizes_owner_call_ids_without_changing_semantics', () => {
+  const callId = (value) => Id.ToolCallIdModule_create(value)
+  const callPart = (id, name, args) => new Provider.WirePart(2, [callId(id), name, args])
+  const resultPart = (id, body) => new Provider.WirePart(3, [callId(id), body])
+  const message = (role, parts) => ({ Role: role, Parts: toList(parts) })
+  const ownerMessages = toList([
+    message('assistant', [
+      callPart('owner-a', 'read', '{"filePath":"a"}'),
+      callPart('owner-b', 'grep', '{"pattern":"x"}'),
+    ]),
+    message('tool', [resultPart('owner-b', 'hit'), resultPart('owner-a', 'alpha')]),
+  ])
+  const request = (messages) => ({
+    ProviderId: undefined,
+    ModelId: undefined,
+    Variant: undefined,
+    Tools: toList([]),
+    System: toList([]),
+    Messages: messages,
+  })
+  const ownerSemantic = Provider.toSemantic(request(ownerMessages))
+  const semanticDigest = HostDigest.sha256Hex(Provider.renderSemantic(ownerSemantic))
+
+  const first = resultOf(
+    Frame.StrengthFrame_tryLocalizeMirror(HostDigest.sha256Hex, decision('d1'), semanticDigest, ownerMessages),
+  )
+  const second = resultOf(
+    Frame.StrengthFrame_tryLocalizeMirror(HostDigest.sha256Hex, decision('d1'), semanticDigest, ownerMessages),
+  )
+  assert.equal(first.ok, true)
+  assert.equal(second.ok, true)
+  assert.deepEqual(Provider.toSemantic(request(first.value)), ownerSemantic)
+
+  const firstWire = Provider.renderWire(request(first.value))
+  assert.equal(firstWire, Provider.renderWire(request(second.value)))
+  assert.doesNotMatch(firstWire, /owner-a|owner-b/)
+
+  const localized = listItems(first.value)
+  const localizedCalls = listItems(localized[0].Parts).map((part) => Id.ToolCallIdModule_value(part.fields[0]))
+  const localizedResults = listItems(localized[1].Parts).map((part) => Id.ToolCallIdModule_value(part.fields[0]))
+  assert.deepEqual(localizedResults, [localizedCalls[1], localizedCalls[0]])
+
+  const orphan = resultOf(
+    Frame.StrengthFrame_tryLocalizeMirror(
+      HostDigest.sha256Hex,
+      decision('d2'),
+      semanticDigest,
+      toList([message('tool', [resultPart('missing', 'no-call')])]),
+    ),
+  )
+  assert.equal(orphan.ok, false)
+  assert.equal(caseOf(orphan.error), 'OrphanToolResultId')
+
+  const media = resultOf(
+    Frame.StrengthFrame_tryLocalizeMirror(
+      HostDigest.sha256Hex,
+      decision('d3'),
+      semanticDigest,
+      toList([message('user', [new Provider.WirePart(4, [undefined, 'digest'])])]),
+    ),
+  )
+  assert.equal(media.ok, false)
+  assert.equal(caseOf(media.error), 'MediaCannotCrossSession')
 })
 
 test('STRENGTH_005_frame_digest_and_owner_wire_ids_are_restart_stable', () => {
