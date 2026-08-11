@@ -61,7 +61,7 @@
     "src/Wanxiangshu/Infrastructure/OpenCode/Host/ManagerNarrativeTransform.fs": 613,
     "src/Wanxiangshu/Infrastructure/OpenCode/Host/OpenCodePort.fs": 442,
     "src/Wanxiangshu/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.fs": 529,
-    "src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs": 306,
+    "src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs": 235,
     "src/Wanxiangshu/Infrastructure/OpenCode/Host/SessionSnapshotPort.fs": 482,
     "src/Wanxiangshu/Infrastructure/OpenCode/Host/Sessions.fs": 204,
     "src/Wanxiangshu/Infrastructure/OpenCode/Host/StrengthSpeculate.fs": 477,

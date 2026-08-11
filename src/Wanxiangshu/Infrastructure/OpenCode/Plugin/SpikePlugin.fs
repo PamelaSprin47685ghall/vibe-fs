@@ -41,10 +41,10 @@ module SpikePlugin =
                 scope.Strength.TripStrengthFuse reason
                 raise (InvalidOperationException reason)
 
-            PluginHost.restoreSessionParents journal scope.SessionParents
+            PluginHost.restoreSessionParents journal scope.Sessions.SessionParents
 
             let familyParent (sessionId: SessionId) =
-                match scope.SessionParents.TryGetValue(SessionId.value sessionId) with
+                match scope.Sessions.SessionParents.TryGetValue(SessionId.value sessionId) with
                 | true, parentId -> Some(SessionId.create parentId)
                 | false, _ -> None
 
@@ -55,9 +55,9 @@ module SpikePlugin =
                 scope.AttachSharedTerminal(terminalKey, sharedTerminalPort)
                 scope.AttachSatelliteRuntime(SatelliteRuntime sessionPort)
 
-                for KeyValue(childId, parentId) in scope.SessionParents do
-                    scope.OwnedSessions.Add childId |> ignore
-                    scope.OwnedSessions.Add parentId |> ignore
+                for KeyValue(childId, parentId) in scope.Sessions.SessionParents do
+                    scope.Sessions.OwnedSessions.Add childId |> ignore
+                    scope.Sessions.OwnedSessions.Add parentId |> ignore
 
                 let gitTreePort =
                     match PluginHost.gitTreePortFromInput input with
@@ -113,7 +113,7 @@ module SpikePlugin =
                         AttachedSessionRuntime(
                             registerParent =
                                 (fun owner child ->
-                                    scope.SessionParents.[SessionId.value child] <- SessionId.value owner),
+                                    scope.Sessions.SessionParents.[SessionId.value child] <- SessionId.value owner),
                             isUsable = (fun _ -> true)
                         )
 
@@ -138,7 +138,7 @@ module SpikePlugin =
                             attached,
                             SyncDelegateTier.fromDispatcher dispatcher,
                             registerDelegate,
-                            scope.Quiescence,
+                            scope.Sessions.Quiescence,
                             ?workspaceDirectory = workspaceDirectory,
                             ?onInspectorPrompt = Some CasebookLifecycle.notePrompt,
                             ?onInspectorAnswer = Some CasebookLifecycle.noteAnswer,
@@ -150,7 +150,7 @@ module SpikePlugin =
                     let registerStrengthReplica (ownerId: SessionId) (replicaId: SessionId) (agent: string) =
                         let ownerKey = SessionId.value ownerId
                         let replicaKey = SessionId.value replicaId
-                        scope.SessionParents.[replicaKey] <- ownerKey
+                        scope.Sessions.SessionParents.[replicaKey] <- ownerKey
                         wired.RegisterOwned ownerKey
                         wired.RegisterOwned replicaKey
 
@@ -215,7 +215,7 @@ module SpikePlugin =
                         // 之前）调用，不得等 request 已运行才标 Running。
                         projectionSessionIdOpt
                         |> Option.iter (fun sessionId ->
-                            scope.Quiescence.BeginProviderAttempt(SessionId.create sessionId))
+                            scope.Sessions.Quiescence.BeginProviderAttempt(SessionId.create sessionId))
 
                         // DSL-MUTABLE: algorithm-scratch — replay plans shared with the immediate XTrace capture step
                         let mutable strengthReplayPlans: StrengthReplayPlan list = []
@@ -436,7 +436,7 @@ module SpikePlugin =
 
                             traceState
                             |> Option.iter (fun updated ->
-                                match scope.Companions.TryGetValue sessionId with
+                                match scope.Sessions.Companions.TryGetValue sessionId with
                                 | true, host -> host.RefreshXTrace updated
                                 | false, _ -> ())
 
@@ -463,8 +463,8 @@ module SpikePlugin =
 
                         do!
                             CompanionTransform.handleCompanionTransform
-                                scope.Companions
-                                scope.CompanionGate
+                                scope.Sessions.Companions
+                                scope.Sessions.CompanionGate
                                 scope
                                 sessionPort
                                 journal

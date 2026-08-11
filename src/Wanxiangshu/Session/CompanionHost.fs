@@ -146,7 +146,7 @@ type CompanionHost
     ///
     /// The default here is a no-op because `Plugin.fs` is the only owner of the
     /// `PluginRuntimeScope`; the composition root rebinds this when it constructs
-    /// the CompanionHost so the squash attempt lands in `scope.AttemptPlans` like
+    /// the CompanionHost so the squash attempt lands in `scope.Recovery.AttemptPlans` like
     /// any X attempt. A no-op is correct for a scope-less CompanionHost (tests,
     /// tools), which has no reconcile pass that could consult a plan.
     member val RecordSquashPlan: SessionId -> ProviderRunIdentity -> unit = fun _ _ -> () with get, set

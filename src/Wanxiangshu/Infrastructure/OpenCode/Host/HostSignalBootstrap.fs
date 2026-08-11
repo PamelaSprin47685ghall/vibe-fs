@@ -75,7 +75,7 @@ module HostSignalBootstrap =
             let recoveryTimerPort = PtyTiming.nodeTimerPort ()
 
             let reviewerContinuationPort =
-                HostReviewGuard.continuationPort sessionPort journal scope.NudgeSent
+                HostReviewGuard.continuationPort sessionPort journal scope.Sessions.NudgeSent
 
             let resolveProjection (sessionId: SessionId) : AgentProjectionSet option =
                 match journal with
@@ -152,7 +152,7 @@ module HostSignalBootstrap =
                                 // CTX-006 step 1 (Y half): a failed Blogger turn opens a one-shot
                                 // recovery opportunity on the Companion that owns it. Opportunity
                                 // = pending material waiter Task; material Offer consumes it once.
-                                for KeyValue(_, companion) in scope.Companions do
+                                for KeyValue(_, companion) in scope.Sessions.Companions do
                                     match companion.BloggerSession with
                                     | Some bloggerId when bloggerId = turn.SessionId ->
                                         companion.StartRecoveryOpportunity() |> ignore
@@ -176,12 +176,12 @@ module HostSignalBootstrap =
                                     journal
                                     scope.SyncDelegateRuntime
                                     reviewerContinuationPort
-                                    scope.NudgeSent
-                                    scope.JoinGuardNudges
+                                    scope.Sessions.NudgeSent
+                                    scope.Sessions.JoinGuardNudges
                                     scope.HasLivePty
-                                    scope.AbortedSessions
+                                    scope.Sessions.AbortedSessions
                                     (Some scope.LoopSensor)
-                                    scope.Quiescence
+                                    scope.Sessions.Quiescence
                                     context
                 }
 
@@ -273,7 +273,7 @@ module HostSignalBootstrap =
                     // HOST-004: the idle observation mints the quiescence permit that
                     // idle-derived continuations must hold at send time. The permit is
                     // process-local — never journalled.
-                    let permit = scope.Quiescence.ObserveIdle sessionId
+                    let permit = scope.Sessions.Quiescence.ObserveIdle sessionId
                     reconciler.SignalIdle(sessionId, permit)
                 | ProviderRetry _
                 | ProviderFailure _ -> reconciler.Signal signal
@@ -281,7 +281,7 @@ module HostSignalBootstrap =
                 // attempt's idle permits, then routes to the
                 // reconciler. Never ProviderFailure — it does not advance fallback.
                 | AttemptAborted sessionId ->
-                    scope.Quiescence.RevokeCurrentAttempt sessionId
+                    scope.Sessions.Quiescence.RevokeCurrentAttempt sessionId
 
                     scope.Strength.StrengthReplicaRuntime
                     |> Option.iter (fun runtime -> runtime.CancelOwner sessionId |> ignore)
@@ -329,7 +329,7 @@ module HostSignalBootstrap =
                                 // Residual draft if the deleted id itself held Inspector Q/A.
                                 cleanupInspectorDraft (SessionId.value sessionId)
 
-                            scope.Quiescence.DropSession sessionId
+                            scope.Sessions.Quiescence.DropSession sessionId
                             scope.DisposeSession(SessionId.value sessionId)
                             reconciler.Signal signal
                         }
@@ -340,14 +340,14 @@ module HostSignalBootstrap =
             // the session port, and leaves AABB to OrdinaryTurnWorkflow on TurnAborted.
             let loopSensor =
                 LoopSensor(
-                    (fun sessionId -> scope.OwnedSessions.Contains(SessionId.value sessionId)),
+                    (fun sessionId -> scope.Sessions.OwnedSessions.Contains(SessionId.value sessionId)),
                     (fun sessionId -> sessionPort.AbortSession sessionId)
                 )
 
             do scope.AttachLoopSensor loopSensor
 
             let signalRouter =
-                HostSignalRouter(scope.OwnedSessions, onSignal, onLoopEvent = loopSensor.Observe)
+                HostSignalRouter(scope.Sessions.OwnedSessions, onSignal, onLoopEvent = loopSensor.Observe)
 
             let! subscriptionResult = HostSignalSubscribe.trySubscribe input signalRouter.Observe None
 
@@ -369,7 +369,7 @@ module HostSignalBootstrap =
 
             let registerOwned (sessionId: string) =
                 if not (String.IsNullOrWhiteSpace sessionId) then
-                    scope.OwnedSessions.Add sessionId |> ignore
+                    scope.Sessions.OwnedSessions.Add sessionId |> ignore
                     signalRouter.RegisterOwned(SessionId.create sessionId)
 
             let bindUserMessage (sessionId: string) (messageId: string) =
@@ -379,7 +379,7 @@ module HostSignalBootstrap =
                 then
                     let sid = SessionId.create sessionId
                     let physical = PhysicalUserMessageId.create messageId
-                    scope.UserMessageBindings.[sessionId] <- physical
+                    scope.Sessions.UserMessageBindings.[sessionId] <- physical
 
                     let agentRole =
                         HostSessionNudge.tryActiveProfile journal sid
@@ -389,7 +389,7 @@ module HostSignalBootstrap =
                             |> AgentRoleIdentity.roleOfString)
 
                     reconciler.BindUserMessage(sid, physical, ?agentRole = agentRole)
-                    scope.AbortedSessions.Remove sessionId |> ignore
+                    scope.Sessions.AbortedSessions.Remove sessionId |> ignore
                     registerOwned sessionId
 
             let bindContinuationMessage (sessionId: string) (messageId: string) =
@@ -410,7 +410,7 @@ module HostSignalBootstrap =
                 // Authority Root is derived from it by PROMPT-002 promotion rather than
                 // read out of a second binding table.
                 let physical =
-                    match scope.UserMessageBindings.TryGetValue key with
+                    match scope.Sessions.UserMessageBindings.TryGetValue key with
                     | true, bound -> Some bound
                     | false, _ -> None
 
@@ -458,7 +458,7 @@ module HostSignalBootstrap =
                     // join attempts; with none active it is dropped as a join wake
                     // (the message itself stays in the normal Host queue). No future
                     // join is latched or woken by this older message (EXEC-017).
-                    | Some sessionId, Some _, None, false -> scope.JoinInterrupts.SignalUserMessage sessionId
+                    | Some sessionId, Some _, None, false -> scope.Sessions.JoinInterrupts.SignalUserMessage sessionId
                     | _ -> ()
 
                     promptIngressHook input output

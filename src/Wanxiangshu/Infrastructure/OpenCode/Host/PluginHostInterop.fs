@@ -70,10 +70,10 @@ module PluginHostInterop =
                 journal
                 gitTreePort
                 workspaceDirectory
-                scope.SessionParents
+                scope.Sessions.SessionParents
                 currentPhysicalUserMessage
-                scope.VerdictSessions
-                scope.SessionDirectories
+                scope.Sessions.VerdictSessions
+                scope.Sessions.SessionDirectories
                 onRunStarted
                 parentWorkRecordFor
                 childWorkRecordFor
@@ -90,5 +90,5 @@ module PluginHostInterop =
         registration.Runtime.AttachFamilyRecovery(fun root -> scope.RequireFamilyRecovery root)
         // EXEC-017: JoinTool Begin(user-message wake) shares this process-local
         // attempt-scoped registry.
-        registration.Runtime.AttachJoinAttempts scope.JoinInterrupts
+        registration.Runtime.AttachJoinAttempts scope.Sessions.JoinInterrupts
         registration

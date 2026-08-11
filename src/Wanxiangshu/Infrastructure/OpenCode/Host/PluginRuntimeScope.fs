@@ -26,6 +26,8 @@ type ISessionRuntimeOwner =
 type PluginRuntimeScope(journal: AgentJournal option) =
     let strength = PluginStrengthScope()
     let blogger = PluginBloggerScope()
+    let sessions = PluginSessionScope()
+    let recovery = PluginRecoveryScope()
 
     let toolRuntimeGate = obj ()
     // DSL-MUTABLE: resource — session tool runtime owner handle
@@ -56,15 +58,6 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     // DSL-MUTABLE: single-flight — HOST-006 startup probe one-shot latch
     let mutable startupProbeDone = false
 
-    /// Family recovery coordinator ports (PROMPT-011 + C5 + RECOVERY-FAMILY).
-    ///
-    /// Attached after `createHost`. First business entry point runs
-    /// SessionRecoveryWorkflow.recoverFamilyDirect under FamilyRecoveryCoordinator
-    /// single-flight; later callers await the same task.
-    // DSL-MUTABLE: resource — family recovery ports attachment slot
-    let mutable familyRecoveryPorts: SessionRecoveryWorkflow.Ports option = None
-    let recoveryGateLock = obj ()
-
     /// LOOP-006: process-local LoopKillArmed lives inside the sensor.
     /// Optional until HostSignalBootstrap wires abort + ownership.
     // DSL-MUTABLE: resource — loop sensor attachment slot
@@ -83,6 +76,12 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member _.Blogger = blogger
     member _.ParkedTransformHost: IParkedTransformHost = blogger :> IParkedTransformHost
 
+    /// Composition-of-owners: per-instance session registries live in their own scope.
+    member _.Sessions = sessions
+
+    /// Composition-of-owners: family recovery + attempt planning live in their own scope.
+    member _.Recovery = recovery
+
     member _.AttachSatelliteRuntime(runtime: SatelliteRuntime) = satelliteRuntime <- Some runtime
 
     member _.Satellites =
@@ -93,30 +92,6 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member _.AttachSyncDelegateRuntime(runtime: SyncDelegateRuntime) = syncDelegateRuntime <- Some runtime
 
     member _.SyncDelegateRuntime = syncDelegateRuntime
-
-    // HOST-012: 跨实例共享（模块级单例）——worktree 独立插件实例的 fork→verdict
-    // 链必须读写同一份。每实例独有状态（OwnedSessions、UserMessageBindings、
-    // Companions 等）保持 per-instance。
-    member val SessionDirectories = SharedState.SessionDirectories
-    member val OwnedSessions = HashSet<string>()
-    member val UserMessageBindings = Dictionary<string, PhysicalUserMessageId>()
-    member val SessionParents = SharedState.SessionParents
-    member val Companions = Dictionary<string, CompanionHost>()
-    member val CompanionGate = obj ()
-    member val VerdictSessions = SharedState.VerdictSessions
-    member val NudgeSent = HashSet<string>()
-    member val JoinGuardNudges = HashSet<string>()
-    member val AbortedSessions = HashSet<string>()
-    member val RecoveryArming = Dictionary<string, SlotArming>()
-    member val AttemptPlans = Dictionary<string, AttemptPlan>()
-    // HOST-004: process-local idle-derived continuation admission. Per plugin
-    // instance like NudgeSent / LoopSensor; never journalled (HOST-007). A
-    // worktree owner transfer starts a fresh gate — no old permit survives.
-    member val Quiescence = SessionQuiescenceGate()
-    /// EXEC-017: process-local attempt-scoped join registry. External user messages
-    /// signal only the CURRENT active JoinAttempt (UserMessageArrived), without
-    /// cancelling mailbox/runtime and without a future latch (not journaled).
-    member val JoinInterrupts: IJoinAttemptRegistry = JoinAttemptRegistry() :> IJoinAttemptRegistry
 
     member _.AttachLoopSensor(sensor: LoopSensor) = loopSensor <- Some sensor
 
@@ -132,47 +107,31 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             empty
 
     member this.AttachFamilyRecoveryPorts(ports: SessionRecoveryWorkflow.Ports) =
-        lock recoveryGateLock (fun () -> familyRecoveryPorts <- Some ports)
+        recovery.AttachFamilyRecoveryPorts ports
 
     /// RECOVERY-FAMILY: obtain FamilyRecovery for a parent before business work.
     /// Missing ports → FamilyBlocked (fail closed). Never synthetic FamilyReady.
-    member this.RequireFamilyRecovery(root: SessionId) : Task<FamilyRecovery> =
-        task {
-            match lock recoveryGateLock (fun () -> familyRecoveryPorts) with
-            | None ->
-                return FamilyRecovery.FamilyBlocked(NonEmpty.one (RecoveryBlock.RecoveryCoordinatorUnavailable root))
-            | Some ports ->
-                return! FamilyRecoveryCoordinator.runOnce (SessionRecoveryWorkflow.recoverFamilyDirect ports) root
-        }
+    member this.RequireFamilyRecovery(root: SessionId) : Task<FamilyRecovery> = recovery.RequireFamilyRecovery root
 
     /// Await family recovery before business effects. Returns FamilyRecovery so
     /// callers must match FamilyBlocked (P0-RECOVERY-JOIN-001: no collapse to unit).
-    member this.EnsureRecoveryDone(root: SessionId) : Task<FamilyRecovery> = this.RequireFamilyRecovery root
+    member this.EnsureRecoveryDone(root: SessionId) : Task<FamilyRecovery> = recovery.EnsureRecoveryDone root
 
-    member this.ArmRecovery(sessionId: SessionId) =
-        this.RecoveryArming.[SessionId.value sessionId] <- RecoverySlot.afterFailureAdvance
+    member this.ArmRecovery(sessionId: SessionId) = recovery.ArmRecovery sessionId
 
-    member this.TryRecoveryArming(sessionId: SessionId) =
-        match this.RecoveryArming.TryGetValue(SessionId.value sessionId) with
-        | true, arming -> Some arming
-        | false, _ -> None
+    member this.TryRecoveryArming(sessionId: SessionId) = recovery.TryRecoveryArming sessionId
 
     member this.RecordAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) (plan: AttemptPlan) =
-        this.AttemptPlans.[SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun] <- plan
+        recovery.RecordAttemptPlan sessionId providerRun plan
 
     member this.TryAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) =
-        let key =
-            SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun
-
-        match this.AttemptPlans.TryGetValue(key) with
-        | true, plan -> Some plan
-        | false, _ -> None
+        recovery.TryAttemptPlan sessionId providerRun
 
     member this.ClearRecovery(sessionId: SessionId) =
-        this.RecoveryArming.Remove(SessionId.value sessionId) |> ignore
+        recovery.ClearRecovery(SessionId.value sessionId)
 
     member this.ClearAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) =
-        this.AttemptPlans.Remove(SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun)
+        recovery.AttemptPlans.Remove(SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun)
         |> ignore
 
 
@@ -233,35 +192,11 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
         // C6 item 27: waiters are keyed by BloggerSessionId. When the MAIN is
         // deleted, cancel the linked Blogger's parked waiter + request slots too.
-        let linkedBloggerKeys =
-            match this.Companions.TryGetValue sessionId with
-            | true, companion ->
-                match companion.BloggerSession with
-                | Some bloggerId -> [ SessionId.value bloggerId ]
-                | None -> []
-            | false, _ ->
-                // sessionId may itself be a Blogger child being deleted.
-                [ sessionId ]
-
-        match this.Companions.TryGetValue sessionId with
-        | true, companion ->
-            this.Companions.Remove sessionId |> ignore
-            (companion :> IDisposable).Dispose()
-        | false, _ -> ()
-
-        this.OwnedSessions.Remove sessionId |> ignore
-        this.UserMessageBindings.Remove sessionId |> ignore
-        this.SessionParents.Remove sessionId |> ignore
-        this.SessionDirectories.Remove sessionId |> ignore
-        this.VerdictSessions.Remove sessionId |> ignore
-        this.AbortedSessions.Remove sessionId |> ignore
-        this.RecoveryArming.Remove sessionId |> ignore
+        let linkedBloggerKeys = sessions.LinkedBloggerKeys sessionId
+        sessions.ClearSession sessionId
+        recovery.ClearSession sessionId
         strength.ClearSession sessionId
         this.LoopSensor.DropSession(SessionId.create sessionId)
-        // HOST-004 Q-10: a deleted session's idle permits die forever.
-        this.Quiescence.DropSession(SessionId.create sessionId)
-        // SessionDeleted: drop join-interrupt waiters + one-shot user-message latch.
-        this.JoinInterrupts.ClearSession(SessionId.create sessionId)
 
         // Always cancel the deleted id; also cancel linked Blogger keys.
         let cancelKeys = (sessionId :: linkedBloggerKeys) |> List.distinct
@@ -273,10 +208,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
             blogger.DropDrainWindow key
 
-            this.AttemptPlans.Keys
-            |> Seq.filter (fun planKey -> planKey.StartsWith(key + "\u001f", StringComparison.Ordinal))
-            |> Seq.toList
-            |> List.iter (fun planKey -> this.AttemptPlans.Remove planKey |> ignore)
+            recovery.ClearAttemptPlansFor key
 
     member this.Dispose() =
         if not disposed then
@@ -290,10 +222,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                 toolRuntime |> Option.iter (fun owner -> owner.Dispose())
                 toolRuntime <- None)
 
-            for companion in this.Companions.Values |> Seq.toList do
-                (companion :> IDisposable).Dispose()
-
-            this.Companions.Clear()
+            sessions.Dispose()
             syncDelegateRuntime |> Option.iter (fun sd -> sd.Dispose())
             syncDelegateRuntime <- None
             strength.Dispose()
