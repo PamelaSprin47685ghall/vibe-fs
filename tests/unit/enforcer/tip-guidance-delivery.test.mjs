@@ -187,3 +187,35 @@ test('ENFORCER_TIP_DELIVERY_005_missing_tip_returns_none', () => {
     assert.equal(latestTipGuidance(journal, main), undefined)
   })
 })
+
+test('ENFORCER_TIP_DELIVERY_006_context_reanchor_clears_full_so_next_is_full_again', () => {
+  withJournal((journal) => {
+    seedOwnerWithTip(journal)
+    const first = resolveTipGuidance(journal, main)
+    assert.equal(presentationOf(first), 'Full')
+    assert.equal(presentationOf(resolveTipGuidance(journal, main)), 'IdentityOnly')
+
+    // HOST-006: compaction reanchor voids FullDeliveredTips with Blog/Prefix.
+    append(
+      journal,
+      main,
+      agentFact('ContextReanchored', {
+        SessionId: main,
+        PreviousEpochId: prefixEpochId(0),
+        NextEpochId: prefixEpochId(1),
+        ObservedCompactionRun: providerRun('run-compaction-tip'),
+      }),
+      providerRun('run-compaction-tip'),
+    )
+
+    const after = resolveTipGuidance(journal, main)
+    assert.ok(after, 'post-reanchor must still resolve tip')
+    assert.equal(presentationOf(after), 'Full', 'reanchor must re-emit Full main.md')
+    assert.match(textOf(after), /tip = "primitive-obsession"/)
+    assert.ok(
+      textOf(after).includes('Introduce a distinct type so invalid substitutions become impossible.') ||
+        textOf(after).includes(MAIN_MD),
+      're-Full must include main body',
+    )
+  })
+})

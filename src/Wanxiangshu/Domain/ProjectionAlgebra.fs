@@ -141,6 +141,70 @@ type ProjectionIntent =
     /// ContextReanchored → Snapshot=None；wire 字节 no-op。
     | ReanchorAfterCompaction
 
+/// STRENGTH-009/016: public factories for private Strength intent payloads.
+/// Fable exports as `ProjectionIntentModule_*`.
+[<RequireQualifiedAccess>]
+module ProjectionIntent =
+
+    let useStrengthMirror
+        (decisionId: StrengthDecisionId)
+        (targetRun: ProviderRunIdentity)
+        (semanticDigest: string)
+        (messages: ProviderProjection.WireMessage list)
+        : ProjectionIntent =
+        ProjectionIntent.UseStrengthMirror
+            { DecisionId = decisionId
+              TargetProviderRun = targetRun
+              SemanticDigest = semanticDigest
+              Messages = messages }
+
+    let private framesIntent (insertion: StrengthFrameInsertion) : ProjectionIntent =
+        ProjectionIntent.InsertStrengthFrames { Items = [ insertion ] }
+
+    let strengthCandidate
+        (ownerSession: SessionId)
+        (decisionId: StrengthDecisionId)
+        (targetRun: ProviderRunIdentity)
+        (currentRun: ProviderRunIdentity)
+        (bundle: StrengthFrameBundle)
+        : ProjectionIntent =
+        framesIntent
+            { OwnerSessionId = ownerSession
+              DecisionId = decisionId
+              FrameDigest = bundle.Digest
+              Bundle = bundle
+              Visibility = StrengthFrameVisibility.Candidate(targetRun, currentRun)
+              Anchor = StrengthFrameAnchor.Append }
+
+    let strengthPromoted
+        (ownerSession: SessionId)
+        (decisionId: StrengthDecisionId)
+        (targetRun: ProviderRunIdentity)
+        (beforeIndex: int)
+        (isReplicaRequest: bool)
+        (bundle: StrengthFrameBundle)
+        : ProjectionIntent =
+        framesIntent
+            { OwnerSessionId = ownerSession
+              DecisionId = decisionId
+              FrameDigest = bundle.Digest
+              Bundle = bundle
+              Visibility = StrengthFrameVisibility.Promoted(targetRun, isReplicaRequest)
+              Anchor = StrengthFrameAnchor.BeforeMessageIndex beforeIndex }
+
+    let strengthReplicaLocal
+        (ownerSession: SessionId)
+        (decisionId: StrengthDecisionId)
+        (bundle: StrengthFrameBundle)
+        : ProjectionIntent =
+        framesIntent
+            { OwnerSessionId = ownerSession
+              DecisionId = decisionId
+              FrameDigest = bundle.Digest
+              Bundle = bundle
+              Visibility = StrengthFrameVisibility.ReplicaLocal
+              Anchor = StrengthFrameAnchor.Append }
+
 /// PROJ-006：同锚意图冲突。fail-closed——禁止依赖注册顺序隐式选边。
 [<RequireQualifiedAccess>]
 type ProjectionConflict =
