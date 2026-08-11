@@ -57,6 +57,39 @@ type RepairIntent = { RequestKey: string }
 /// `AppendReviewChallenge` 载荷：REVIEW-003 TextVersion。
 type ChallengeIntent = { TextVersion: int }
 
+/// STRENGTH-009/016: StrengthReplica base selection. `Messages` are the frozen
+/// owner wire messages whose semantic digest was proved by the Coordinator at
+/// the post-Enforcer/pre-candidate/pre-pair freeze point. The renderer does not
+/// invent a Semantic→Wire conversion (VERIFY-007).
+type StrengthMirrorIntent =
+    private
+        { DecisionId: StrengthDecisionId
+          TargetProviderRun: ProviderRunIdentity
+          SemanticDigest: string
+          Messages: ProviderProjection.WireMessage list }
+
+[<RequireQualifiedAccess>]
+type StrengthFrameVisibility =
+    | Candidate of targetProviderRun: ProviderRunIdentity * currentProviderRun: ProviderRunIdentity
+    | Promoted of targetProviderRun: ProviderRunIdentity * isReplicaRequest: bool
+    | ReplicaLocal
+
+[<RequireQualifiedAccess>]
+type StrengthFrameAnchor =
+    | Append
+    | BeforeMessageIndex of index: int
+
+type StrengthFrameInsertion =
+    private
+        { OwnerSessionId: SessionId
+          DecisionId: StrengthDecisionId
+          FrameDigest: string
+          Bundle: StrengthFrameBundle
+          Visibility: StrengthFrameVisibility
+          Anchor: StrengthFrameAnchor }
+
+type StrengthFramesIntent = private { Items: StrengthFrameInsertion list }
+
 /// PROJ-002：一次 attempt 的只读投影快照——DSL 核心输入（PROJ-002）。
 ///
 /// attempt-local：字段覆盖一次 provider attempt 的投影输入。PROJ-008 step 3a 在
@@ -95,6 +128,12 @@ type ProjectionIntent =
     | InsertBlogFrames of BlogFramesIntent
     /// Interaction Repair 回合：追加协议修复指令。
     | InsertRepair of RepairIntent
+    /// STRENGTH-009: StrengthReplica-only base selection; mutually exclusive
+    /// with normal Work prefix selection.
+    | UseStrengthMirror of StrengthMirrorIntent
+    /// STRENGTH-009: Candidate/Promoted/Replica-local frame insertion. The
+    /// visibility/anchor is explicit; renderer never guesses from provenance.
+    | InsertStrengthFrames of StrengthFramesIntent
     /// transport-only 消息剔除（COMPANION-012）；目标 id 取自 Snapshot.TransportMessages。
     | SuppressTransportOnly
     /// REVIEW-003 skeptical challenge。
@@ -115,6 +154,16 @@ type ProjectionConflict =
     | ConflictingReviewChallenge
     /// `ActivatePrefixEpoch` 与 `ReanchorAfterCompaction` 同批出现。
     | ConflictingPrefixLifecycle
+    /// Same Strength decision appeared with non-identical frame material/anchor.
+    | ConflictingStrengthFrames of StrengthDecisionId
+    /// Candidate may only render into the ProviderRun it was Prepared for.
+    | StrengthCandidateWrongTarget of StrengthDecisionId
+    /// Promoted replay is owner history; explicit replay into Replica is reflection.
+    | StrengthPromotedReplicaReflection of StrengthDecisionId
+    /// Visibility and anchor disagree (for example Candidate BeforeIndex).
+    | InvalidStrengthAnchor of StrengthDecisionId
+    /// Intent frame digest must be the semantic bundle digest.
+    | StrengthFrameDigestMismatch of StrengthDecisionId
 
 /// PROJ-008：Domain 侧冻结常量。
 ///
