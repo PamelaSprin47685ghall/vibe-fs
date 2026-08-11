@@ -73,7 +73,9 @@
     <Compile Include="Domain/CompanionIdentity.fs"/>
     <Compile Include="Domain/CompanionProjectionBuilder.fs"/>
     <Compile Include="Domain/RulebookObservation.fs"/>
-    <Compile Include="Domain/ProjectionAlgebra.fs"/>
+    <Compile Include="Domain/ProjectionIntent.fs"/>
+    <Compile Include="Domain/ProjectionPlanner.fs"/>
+    <Compile Include="Domain/ProjectionRenderer.fs"/>
     <Compile Include="Domain/BloggerDelta.fs"/>
     <Compile Include="Domain/BloggerRequestContext.fs"/>
     <Compile Include="Domain/PrefixProbeSelection.fs"/>

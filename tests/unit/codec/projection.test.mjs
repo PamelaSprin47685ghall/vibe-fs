@@ -21,7 +21,8 @@ const {
   formalText,
 } = await import('../../../dist/Infrastructure/OpenCode/Codec/Projection.js')
 
-const { RenderedPrefix, PrefixActivation } = await import('../../../dist/Domain/ProjectionAlgebra.js')
+const { RenderedPrefix } = await import('../../../dist/Domain/ProjectionRenderer.js')
+const { PrefixActivation } = await import('../../../dist/Domain/ProjectionIntent.js')
 
 test('MISC_projection_decode_part_text_reasoning', () => {
   assert.equal(decodePart(null), undefined)

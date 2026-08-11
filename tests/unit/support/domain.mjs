@@ -86,7 +86,9 @@ const [
   CompanionBuilderModule,
   ProbeSelectionModule,
   XPrefixModule,
-  ProjectionAlgebraModule,
+  ProjectionIntentModule,
+  ProjectionPlannerModule,
+  ProjectionRendererModule,
   AttemptPlannerModule,
   ExecutorSummarize,
   Authority,
@@ -186,7 +188,9 @@ const [
   prod('Domain/CompanionProjectionBuilder'),
   prod('Domain/PrefixProbeSelection'),
   prod('Domain/XPrefixProjection'),
-  prod('Domain/ProjectionAlgebra'),
+  prod('Domain/ProjectionIntent'),
+  prod('Domain/ProjectionPlanner'),
+  prod('Domain/ProjectionRenderer'),
   prod('Domain/AttemptPlanner'),
   prod('Infrastructure/OpenCode/Tools/ExecutorSummarize'),
   prod('Domain/PromptAuthority'),
@@ -252,6 +256,14 @@ const [
   prod('Infrastructure/OpenCode/Signals/HostSignalSubscribe'),
   prod('Infrastructure/OpenCode/Host/ManagedAgentConfig'),
 ])
+
+// ProjectionAlgebra split into three owner files (Wave 1). Tests keep one
+// aggregate handle so the Fable-module naming boundary stays in one place.
+const ProjectionAlgebraModule = {
+  ...ProjectionIntentModule,
+  ...ProjectionPlannerModule,
+  ...ProjectionRendererModule,
+}
 
 const [NodeProcessWaitModule, NodeProcessHostModule, PtyTimingModule, FableTask, FableTypes] =
   await Promise.all([

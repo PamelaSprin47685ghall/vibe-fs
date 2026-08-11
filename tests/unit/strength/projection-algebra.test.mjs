@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import * as P from '../../../dist/Domain/ProjectionAlgebra.js'
+import * as Intent from '../../../dist/Domain/ProjectionIntent.js'
+import * as Planner from '../../../dist/Domain/ProjectionPlanner.js'
+import * as Renderer from '../../../dist/Domain/ProjectionRenderer.js'
+// Fable emits a bare `plan` for the single-module Planner file; keep the
+// historical prefixed name so call sites stay stable.
+const P = { ...Intent, ...Planner, ...Renderer, ProjectionPlanner_plan: Planner.plan }
 import * as Provider from '../../../dist/Domain/ProviderProjection.js'
 import * as Frame from '../../../dist/Domain/StrengthFrame.js'
 import * as Id from '../../../dist/Kernel/Identity.js'
