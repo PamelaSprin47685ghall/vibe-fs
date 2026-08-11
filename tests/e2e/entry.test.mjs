@@ -89,6 +89,13 @@ const runPreFlowPrompt = async (scenario, lane, prompt, agent) => {
 const preFlowNativeTodoCanary = async (scenario) => {
   await runPreFlowPrompt(scenario, 'native-todo-canary', NATIVE_TODO_CANARY_PROMPT);
   await runPreFlowPrompt(scenario, 'strength-canary-owner', STRENGTH_HOST_CANARY_PROMPT, 'deep-coder');
+
+  const replicaDeliveries = scenario.provider.matchCount('strength-canary-replica.0');
+  assert.equal(
+    replicaDeliveries,
+    1,
+    `Strength dry-run must issue exactly one real Replica provider request. Host stderr tail:\n${scenario.host.stderrLog.slice(-4000)}`,
+  );
 };
 
 /**

@@ -296,6 +296,19 @@ module StrengthSpeculate =
                                                         HostCanaryHealthy = true }
 
                                                 match StrengthPolicy.eligibility canaryOpportunity, fastAgent with
+                                                | StrengthEligibility.Ineligible reason, _ ->
+                                                    Diagnostic.emit
+                                                        "strength-dry-run-skip"
+                                                        [ "session_id", SessionId.value owner; "result", reason ]
+
+                                                    return ()
+                                                | StrengthEligibility.Eligible, None ->
+                                                    Diagnostic.emit
+                                                        "strength-dry-run-skip"
+                                                        [ "session_id", SessionId.value owner
+                                                          "result", "fast-peer-unavailable" ]
+
+                                                    return ()
                                                 | StrengthEligibility.Eligible, Some agent ->
                                                     let id =
                                                         decisionId
@@ -326,16 +339,24 @@ module StrengthSpeculate =
 
                                                         match outcome with
                                                         | Ok completed ->
+                                                            Diagnostic.emit
+                                                                "strength-dry-run-finished"
+                                                                [ "session_id", SessionId.value owner
+                                                                  "result", sprintf "%A" completed.Terminal ]
+
                                                             match completed.Terminal with
                                                             | StrengthReplicaTerminal.InvalidFrame reason ->
                                                                 scope.TripStrengthFuse(
                                                                     "Strength dry-run invalid frame: " + reason
                                                                 )
                                                             | _ -> ()
-                                                        | Error _ -> ()
+                                                        | Error error ->
+                                                            Diagnostic.emit
+                                                                "strength-dry-run-finished"
+                                                                [ "session_id", SessionId.value owner
+                                                                  "result", "start-error:" + error ]
 
                                                         return ()
-                                                | _ -> return ()
                                             | StrengthRolloutMode.Off -> return ()
                                             | StrengthRolloutMode.Treatment ->
                                                 let decision =
