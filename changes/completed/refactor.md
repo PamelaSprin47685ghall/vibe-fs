@@ -1818,4 +1818,4 @@ facade/转发过渡，旧路径迁移完成即删除。
 
 ### 遗留（非本 Proposal 范围）
 - 协调器类 >300 文件可继续按已成熟方法拆（保持 ratchet，未批准例外）
-- `npm run check:release`（E2E/warmup/package）未在本轮执行，交付前建议跑一次
+- `npm run check:release` 已补跑通过（warmup opencode 1.18.14 → check 2315 unit/273 integration → e2e → package 2 passed → pack dry-run 715 文件）
