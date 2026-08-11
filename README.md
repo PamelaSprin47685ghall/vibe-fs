@@ -146,7 +146,7 @@ artifacts/   中间产物与本地发布产物，不提交
 
 - 生产 F# 唯一根：`src/Wanxiangshu/`
 - 规范导航 [docs/README.md](docs/README.md)；词汇表 `docs/what/glossary.md`；变更工作流见 [changes/README.md](changes/README.md)
-- 测试：`tests/unit/`、`tests/integration/`（resources / journal / plugin / package / harness）、`tests/e2e/`（`scenarios/` + `cases/`）
+- 测试：`tests/unit/`、`tests/integration/`（resources / journal / plugin / package / harness）、`tests/e2e/`（单一 Long Stroke：`scenarios/` + `support/`）
 - 脚本：`scripts/build.mjs`、`scripts/check.mjs`、`scripts/checks/*`、`scripts/lib/walk.mjs`
 
 ### 开发环境
@@ -183,7 +183,7 @@ npm run check:release
 | `npm run lint` | `format:check` + `scripts/check.mjs` |
 | `npm run gate:dsl-ownership` | DSL 结构门禁检查（`threshold=0`） |
 | `npm run test:package` | tarball 内容、隔离安装、import、资源 |
-| `npm run test:e2e -- --repeat N` | e2e 多轮（发布链路内为 3 轮） |
+| `npm run test:e2e` | e2e 单次连续 OpenCode 生命周期（`tests/e2e/entry.test.mjs`） |
 
 ### 测试分层
 
@@ -191,7 +191,7 @@ npm run check:release
 |----|------|------|
 | unit | `tests/unit/run.mjs`（`npm test`） | 对 `dist/` 的契约；经 `tests/unit/support/domain.mjs` |
 | integration | `tests/integration/run.mjs` | resources、journal、plugin、package、harness |
-| e2e | `tests/e2e/run.mjs` | `scenarios/` + `cases/`；`--repeat N` |
+| e2e | `tests/e2e/entry.test.mjs` | `scenarios/long-stroke.toml` + `support/` oracles；单次连续生命周期 |
 
 `dist/` 陈旧时 unit 拒绝运行。资源路径由包内 `dist/` 相对定位到 `resources/`，不依赖 `process.cwd()`。
 
