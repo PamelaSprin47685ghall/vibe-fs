@@ -24,6 +24,7 @@ const checks = [
   join(root, 'checks/unified-store-gate.mjs'),
   join(root, 'checks/g4r-freeze.mjs'),
   join(root, 'checks/g4r-ce-vocabulary.mjs'),
+  join(root, 'checks/test-boundary.mjs'),
 ]
 
 for (const script of checks) {

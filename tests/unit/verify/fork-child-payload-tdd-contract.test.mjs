@@ -20,7 +20,7 @@ import test from 'node:test'
 const ROOT = new URL('../../../', import.meta.url).pathname
 const PAYLOAD_FS = join(ROOT, 'src/Wanxiangshu/Domain/ForkChildPayload.fs')
 const FORK_TOOL_FS = join(ROOT, 'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ForkTool.fs')
-const DOMAIN_FACADE = join(ROOT, 'tests/unit/support/domain.mjs')
+const DOMAIN_FACADE = join(ROOT, 'tests/unit/support/domain/execution.mjs')
 
 test('FORK_CHILD_PAYLOAD_TDD_001_assignment_carries_tdd_phase_field', () => {
   assert.ok(existsSync(PAYLOAD_FS), 'src/Wanxiangshu/Domain/ForkChildPayload.fs must exist')
@@ -61,12 +61,12 @@ test('FORK_CHILD_PAYLOAD_TDD_002_render_references_tdd_phase', () => {
 })
 
 test('FORK_CHILD_PAYLOAD_TDD_003_facade_render_destructures_tdd', () => {
-  assert.ok(existsSync(DOMAIN_FACADE), 'tests/unit/support/domain.mjs must exist')
+  assert.ok(existsSync(DOMAIN_FACADE), 'tests/unit/support/domain/execution.mjs must exist')
   const facade = readFileSync(DOMAIN_FACADE, 'utf8')
   const blockStart = facade.indexOf('export const forkChildPayload')
   const blockEnd = facade.indexOf('export const tddPhase')
 
-  assert.ok(blockStart !== -1, 'domain.mjs must export forkChildPayload')
+  assert.ok(blockStart !== -1, 'execution.mjs must export forkChildPayload')
   assert.ok(blockEnd !== -1 && blockEnd > blockStart, 'forkChildPayload must precede tddPhase')
   const block = facade.slice(blockStart, blockEnd)
 
