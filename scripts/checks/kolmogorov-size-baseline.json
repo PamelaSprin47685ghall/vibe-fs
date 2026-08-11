@@ -121,7 +121,7 @@
     "src/Wanxiangshu/Session/HostForkRunLifecycle.fs": 269,
     "src/Wanxiangshu/Session/HostForkRuntime.fs": 286,
     "src/Wanxiangshu/Session/JoinDrain.fs": 332,
-    "src/Wanxiangshu/Session/SyncDelegateRuntime.fs": 600,
+    "src/Wanxiangshu/Session/SyncDelegateRuntime.fs": 345,
     "src/Wanxiangshu/Tools/StaticTools.fs": 210,
     "tests/e2e/entry.test.mjs": 241,
     "tests/e2e/support/arch010.js": 263,

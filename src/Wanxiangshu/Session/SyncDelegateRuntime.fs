@@ -13,37 +13,12 @@ open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Tools
 
-type private SyncDelegateAnswer =
-    { Answer: string
-      ToolRun: ProviderRunIdentity }
-
-/// In-flight sync delegate call: dual CE await points (Returned, Completion).
-type private SyncDelegateCall =
-    { Owner: SessionId
-      OwnerScope: ReuseScopeId
-      Role: SyncDelegateRole
-      Delegate: SessionId
-      Agent: string
-      Returned: TaskCompletionSource<Result<SyncDelegateAnswer, string>>
-      Completion: TaskCompletionSource<Result<unit, string>>
-      Nudges: int }
-
-/// TextComplete rewrite arm only — presence must not select HandleTurn branches.
-type private PendingSyncCompletionText =
-    { Text: string
-      ToolRun: ProviderRunIdentity }
-
-type private SyncDelegateWait =
-    | ReturnFromDelegate of owner: SessionId * delegateSession: SessionId * role: SyncDelegateRole
-    | DelegateCompletionTerminal of
-        owner: SessionId *
-        delegateSession: SessionId *
-        role: SyncDelegateRole *
-        toolRun: ProviderRunIdentity
-
 /// EXEC-026 / EXEC-028: reusable SyncDelegate CE (Acquire → GetOrCreate → Send →
 /// await Returned → await Completion). Dual-await path for dedicated Inspector/Coder
 /// (Work+Attached); not SatelliteRuntime / SatelliteKind.
+///
+/// Composition seam: call state lives in SyncDelegateCallStore, the Invoke CE
+/// lives in SyncDelegateWorkflow, wait descriptors in SyncDelegateWait.
 type SyncDelegateRuntime
     (
         sessions: ISessionHostPort,
@@ -63,15 +38,7 @@ type SyncDelegateRuntime
         /// visible here, so the caller supplies the bound OpencodeModel.
         ?promptModel: OpencodeModel
     ) =
-    let gate = obj ()
-    let callsByOwnerScope = Dictionary<string, SyncDelegateCall>()
-    let callsByDelegate = Dictionary<string, SyncDelegateCall>()
-    let pendingCompletionTexts = Dictionary<string, PendingSyncCompletionText>()
-    // Host recursively emits attached-child SessionDeleted before the owner
-    // SessionDeleted that closes the ReuseScope. Keep only the retired Inspector
-    // id here; live reuse ownership remains in AttachedSessionRuntime.
-    let deletedInspectorsByOwnerScope = Dictionary<string, SessionId>()
-    let inFlightScopes = HashSet<string>()
+    let store = SyncDelegateCallStore()
     let recoveryBudget = AgentPairCursor.DefaultAutoRecoveryBudget
     let directory = workspaceDirectory
     let noteInspectorPrompt = defaultArg onInspectorPrompt (fun _ _ -> ())
@@ -104,137 +71,6 @@ type SyncDelegateRuntime
         |> StaticTools.requestToolMap
 
     let activeProfile sessionId = dispatcher.ActiveProfile sessionId
-
-    let describeWait (wait: SyncDelegateWait) : DiagnosticWait =
-        let toolOwner (owner: SessionId) =
-            CausalOwner.create "sync-delegate-tool" [ "session", SessionId.value owner ]
-
-        let delegateProducer (delegateSession: SessionId) =
-            WorkflowProducer(
-                CausalOwner.create "sync-delegate-session-workflow" [ "session", SessionId.value delegateSession ]
-            )
-
-        let cancelEscape (owner: SessionId) =
-            WaitEscape.CancelledBy(CausalOwner.create "owner-session" [ "session", SessionId.value owner ])
-
-        match wait with
-        | ReturnFromDelegate(owner, delegateSession, role) ->
-            DiagnosticWait.create
-                "sync-delegate-return"
-                (toolOwner owner)
-                [ "owner", SessionId.value owner
-                  "delegate", SessionId.value delegateSession
-                  "role", roleLabel role ]
-                (delegateProducer delegateSession)
-                [ cancelEscape owner; WaitEscape.SessionLifetime ]
-                "SyncDelegateRuntime.Invoke"
-
-        | DelegateCompletionTerminal(owner, delegateSession, role, toolRun) ->
-            DiagnosticWait.create
-                "sync-delegate-completion"
-                (toolOwner owner)
-                [ "owner", SessionId.value owner
-                  "delegate", SessionId.value delegateSession
-                  "role", roleLabel role
-                  "tool_run", ProviderRunIdentity.value toolRun ]
-                (delegateProducer delegateSession)
-                [ cancelEscape owner; WaitEscape.SessionLifetime ]
-                "SyncDelegateRuntime.Invoke"
-
-    let tryCallByOwnerScope (scope: ReuseScopeId) =
-        lock gate (fun () ->
-            match callsByOwnerScope.TryGetValue(scopeKey scope) with
-            | true, call -> Some call
-            | false, _ -> None)
-
-    let tryCallByDelegate (delegateSession: SessionId) =
-        lock gate (fun () ->
-            match callsByDelegate.TryGetValue(sessionKey delegateSession) with
-            | true, call -> Some call
-            | false, _ -> None)
-
-    let tryPendingText sessionId =
-        lock gate (fun () ->
-            match pendingCompletionTexts.TryGetValue(sessionKey sessionId) with
-            | true, pending -> Some pending
-            | false, _ -> None)
-
-    let armPendingText sessionId pending =
-        lock gate (fun () -> pendingCompletionTexts.[sessionKey sessionId] <- pending)
-
-    let clearPendingText sessionId =
-        lock gate (fun () -> pendingCompletionTexts.Remove(sessionKey sessionId) |> ignore)
-
-    let failCall (call: SyncDelegateCall) (error: string) =
-        AsyncSupport.trySetResult call.Returned (Error error) |> ignore
-        AsyncSupport.trySetResult call.Completion (Error error) |> ignore
-
-    let removeCall (call: SyncDelegateCall) =
-        lock gate (fun () ->
-            callsByOwnerScope.Remove(scopeKey call.OwnerScope) |> ignore
-            callsByDelegate.Remove(sessionKey call.Delegate) |> ignore)
-
-    let updateCall ownerScope (update: SyncDelegateCall -> SyncDelegateCall) =
-        lock gate (fun () ->
-            let key = scopeKey ownerScope
-
-            match callsByOwnerScope.TryGetValue key with
-            | true, current ->
-                let next = update current
-                callsByOwnerScope.[key] <- next
-                callsByDelegate.[sessionKey next.Delegate] <- next
-                Some next
-            | false, _ -> None)
-
-    let releaseFlight (scope: ReuseScopeId) =
-        lock gate (fun () -> inFlightScopes.Remove(scopeKey scope) |> ignore)
-
-    let beginCall
-        (owner: SessionId)
-        (ownerScope: ReuseScopeId)
-        (role: SyncDelegateRole)
-        (delegateSession: SessionId)
-        (agent: string)
-        : SyncDelegateCall * IDisposable =
-        let returned =
-            TaskCompletionSource<Result<SyncDelegateAnswer, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-        let completion =
-            TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-        let call =
-            { Owner = owner
-              OwnerScope = ownerScope
-              Role = role
-              Delegate = delegateSession
-              Agent = agent
-              Returned = returned
-              Completion = completion
-              Nudges = 0 }
-
-        let ownerKey = scopeKey ownerScope
-        let delegateKey = sessionKey delegateSession
-
-        lock gate (fun () ->
-            callsByOwnerScope.[ownerKey] <- call
-            callsByDelegate.[delegateKey] <- call)
-
-        let registration =
-            { new IDisposable with
-                member _.Dispose() =
-                    let stillOwned =
-                        lock gate (fun () ->
-                            match callsByOwnerScope.TryGetValue ownerKey with
-                            | true, current when Object.ReferenceEquals(current.Returned, call.Returned) ->
-                                callsByOwnerScope.Remove ownerKey |> ignore
-                                callsByDelegate.Remove delegateKey |> ignore
-                                true
-                            | _ -> false)
-
-                    if stillOwned then
-                        failCall call "Sync delegate call scope disposed" }
-
-        call, registration
 
     let createChild (owner: SessionId) (agentName: string) (childDirectory: string option) =
         sessions.CreateChildSession(
@@ -283,6 +119,24 @@ type SyncDelegateRuntime
                         boundPromptModel
         }
 
+    let deps: SyncDelegateWorkflow.Dependencies =
+        { Attached = attached
+          ResolveOwnerTier = resolveOwnerTier
+          CreateChild = createChild
+          OnDelegateReady = onDelegateReady
+          NoteInspectorPrompt = noteInspectorPrompt
+          CleanupInspectorDraft = cleanupInspectorDraft
+          Directory = directory
+          // SendAgentOwnerRootWithTools yields a PromptKey the CE discards;
+          // the workflow dependency contracts on the settle result only.
+          SendPrompt =
+            fun call message ->
+                task {
+                    let! result = sendDelegatePrompt call message
+                    return result |> Result.map ignore
+                }
+          DescribeWait = SyncDelegateWait.describe }
+
     member _.Attached = attached
 
     member _.TryFind(ownerSessionId: SessionId, role: SyncDelegateRole) = attached.TryFind(ownerSessionId, role)
@@ -292,39 +146,25 @@ type SyncDelegateRuntime
         | Some sessionId -> Some sessionId
         | None when role = SyncDelegateRole.Inspector ->
             let ownerScope = ReuseScope.ofSession ownerSessionId
-
-            lock gate (fun () ->
-                match deletedInspectorsByOwnerScope.TryGetValue(scopeKey ownerScope) with
-                | true, sessionId -> Some sessionId
-                | false, _ -> None)
+            store.TryGetDeletedInspector ownerScope
         | None -> None
 
     member _.StageDeletedInspector(ownerSessionId: SessionId, inspectorSessionId: SessionId) : bool =
         match attached.TryFind(ownerSessionId, SyncDelegateRole.Inspector) with
         | Some bound when bound = inspectorSessionId ->
-            match tryCallByDelegate inspectorSessionId with
+            match store.TryCallByDelegate inspectorSessionId with
             | Some call ->
-                clearPendingText inspectorSessionId
-                removeCall call
-                failCall call "Sync delegate Inspector session was deleted"
-                releaseFlight call.OwnerScope
-            | None -> clearPendingText inspectorSessionId
+                store.ClearPendingText inspectorSessionId
+                store.RemoveCall call
+                store.FailCall(call, "Sync delegate Inspector session was deleted")
+                store.ReleaseFlight call.OwnerScope
+            | None -> store.ClearPendingText inspectorSessionId
 
             attached.Remove(ownerSessionId, SyncDelegateRole.Inspector) |> ignore
 
             let ownerScope = ReuseScope.ofSession ownerSessionId
 
-            let replaced =
-                lock gate (fun () ->
-                    let key = scopeKey ownerScope
-
-                    let previous =
-                        match deletedInspectorsByOwnerScope.TryGetValue key with
-                        | true, sessionId -> Some sessionId
-                        | false, _ -> None
-
-                    deletedInspectorsByOwnerScope.[key] <- inspectorSessionId
-                    previous)
+            let replaced = store.PutDeletedInspector(ownerScope, inspectorSessionId)
 
             replaced
             |> Option.filter (fun previous -> previous <> inspectorSessionId)
@@ -334,91 +174,7 @@ type SyncDelegateRuntime
         | _ -> false
 
     member _.Invoke(ownerSessionKey: string, role: SyncDelegateRole, message: string) : Task<Result<string, string>> =
-        task {
-            let owner = SessionId.create ownerSessionKey
-            let ownerScope = ReuseScope.ofSession owner
-
-            if role = SyncDelegateRole.Inspector then
-                let staleDeletedInspector =
-                    lock gate (fun () ->
-                        let key = scopeKey ownerScope
-
-                        match deletedInspectorsByOwnerScope.TryGetValue key with
-                        | true, sessionId ->
-                            deletedInspectorsByOwnerScope.Remove key |> ignore
-                            Some sessionId
-                        | false, _ -> None)
-
-                staleDeletedInspector
-                |> Option.iter (fun sessionId -> cleanupInspectorDraft (sessionKey sessionId))
-
-            match resolveOwnerTier owner with
-            | None -> return Error "sync delegate rejected: owner tier unknown"
-            | Some ownerTier ->
-                let claimed =
-                    lock gate (fun () ->
-                        let key = scopeKey ownerScope
-
-                        if inFlightScopes.Contains key then
-                            false
-                        else
-                            inFlightScopes.Add key |> ignore
-                            true)
-
-                if not claimed then
-                    return Error "sync delegate rejected: another sync delegate call is in flight"
-                else
-                    let tier = SyncDelegate.tierForOwner ownerTier
-                    let agentName = SyncDelegate.agentNameFor role tier
-
-                    try
-                        match!
-                            attached.GetOrCreate(owner, role, agentName, directory, createChild, onDelegateReady)
-                        with
-                        | Error error ->
-                            releaseFlight ownerScope
-                            return Error error
-                        | Ok delegateSession ->
-                            let call, registration = beginCall owner ownerScope role delegateSession agentName
-
-                            use _registration = registration
-
-                            match! sendDelegatePrompt call message with
-                            | Error error ->
-                                failCall call error
-                                removeCall call
-                                releaseFlight ownerScope
-                                return Error error
-                            | Ok _ ->
-                                if role = SyncDelegateRole.Inspector then
-                                    noteInspectorPrompt (sessionKey delegateSession) message
-
-                                let! returned =
-                                    CausalAwait.awaitTask
-                                        CausalWaitHub.observer
-                                        (describeWait (ReturnFromDelegate(owner, delegateSession, role)))
-                                        call.Returned.Task
-
-                                match returned with
-                                | Error error ->
-                                    releaseFlight ownerScope
-                                    return Error error
-                                | Ok answer ->
-                                    let! confirmed =
-                                        CausalAwait.awaitTask
-                                            CausalWaitHub.observer
-                                            (describeWait (
-                                                DelegateCompletionTerminal(owner, delegateSession, role, answer.ToolRun)
-                                            ))
-                                            call.Completion.Task
-
-                                    releaseFlight ownerScope
-
-                                    return confirmed |> Result.map (fun () -> answer.Answer)
-                    with ex ->
-                        releaseFlight ownerScope
-                        return Error ex.Message
-        }
+        SyncDelegateWorkflow.invoke store deps ownerSessionKey role message
 
     member _.Return
         (delegateSessionKey: string, providerRunId: ProviderRunIdentity option, message: string)
@@ -426,24 +182,25 @@ type SyncDelegateRuntime
         task {
             let delegateSession = SessionId.create delegateSessionKey
 
-            match activeProfile delegateSession, providerRunId, tryCallByDelegate delegateSession with
+            match activeProfile delegateSession, providerRunId, store.TryCallByDelegate delegateSession with
             | None, _, _ -> return Error "return rejected: no active SyncDelegate Authority Root"
             | Some profile, _, _ when profile.CanonicalRole <> Role.Inspector && profile.CanonicalRole <> Role.Coder ->
                 return Error "return rejected: role is neither Inspector nor Coder delegate"
             | Some _, None, _ -> return Error "return rejected: Host provided no provider-run identity"
             | Some profile, Some _, None -> return Error "return rejected: SyncDelegate has no active caller"
-            | Some profile, Some toolRun, Some call when call.Delegate <> delegateSession ->
+            | Some profile, Some _, Some call when call.Delegate <> delegateSession ->
                 return Error "return rejected: delegate does not own the active sync call"
             | Some profile, Some toolRun, Some call when canonicalRole call.Role <> profile.CanonicalRole ->
                 return Error "return rejected: active profile role does not match SyncDelegate binding"
             | Some _, Some toolRun, Some call ->
-                if tryPendingText delegateSession |> Option.isSome then
+                if store.TryPendingText delegateSession |> Option.isSome then
                     return Error "return rejected: SyncDelegate return completion is already pending"
                 else
-                    armPendingText
-                        delegateSession
+                    store.ArmPendingText(
+                        delegateSession,
                         { Text = SyncDelegatePrompt.SyncDelegateReturnCompletion
                           ToolRun = toolRun }
+                    )
 
                     AsyncSupport.trySetResult call.Returned (Ok { Answer = message; ToolRun = toolRun })
                     |> ignore
@@ -463,49 +220,53 @@ type SyncDelegateRuntime
             let sessionId = SessionId.create (unbox<string> input?sessionID)
             let completionRun = ProviderRunIdentity.create (unbox<string> input?messageID)
 
-            match tryPendingText sessionId with
+            match store.TryPendingText sessionId with
             | Some pending when completionRun <> pending.ToolRun -> output?text <- pending.Text
             | _ -> ()
 
     member _.HandleTurn(turn: ReconciledTurn, permit: QuiescencePermit option) : Task<bool> =
         task {
-            match turn.Role, tryCallByDelegate turn.SessionId with
+            match turn.Role, store.TryCallByDelegate turn.SessionId with
             | Some(Role.Inspector | Role.Coder), Some call ->
                 match turn.Outcome with
                 | ReconcileProgram.TurnCompleted ->
                     let payload = normalizePayload (CompletedTurnClassifier.partsText turn.Parts)
 
                     if payload = normalizePayload SyncDelegatePrompt.SyncDelegateReturnCompletion then
-                        clearPendingText turn.SessionId
-                        removeCall call
+                        store.ClearPendingText turn.SessionId
+                        store.RemoveCall call
                         AsyncSupport.trySetResult call.Completion (Ok()) |> ignore
                         return true
                     else
                         match call.Nudges >= recoveryBudget with
                         | true ->
-                            clearPendingText turn.SessionId
-                            removeCall call
+                            store.ClearPendingText turn.SessionId
+                            store.RemoveCall call
 
-                            failCall
-                                call
+                            store.FailCall(
+                                call,
                                 (sprintf "SyncDelegate idle recovery budget exhausted after %i nudges" recoveryBudget)
+                            )
 
                             return true
                         | false ->
                             match! sendIdleNudge permit call with
                             | Ok _ ->
-                                updateCall call.OwnerScope (fun current ->
-                                    { current with
-                                        Nudges = current.Nudges + 1 })
+                                store.UpdateCall(
+                                    call.OwnerScope,
+                                    (fun current ->
+                                        { current with
+                                            Nudges = current.Nudges + 1 })
+                                )
                                 |> ignore
                             | Error _ -> ()
 
                             return true
                 | ReconcileProgram.TurnFailed error
                 | ReconcileProgram.TurnAborted error ->
-                    clearPendingText turn.SessionId
-                    removeCall call
-                    failCall call (sprintf "SyncDelegate run failed: %s" error)
+                    store.ClearPendingText turn.SessionId
+                    store.RemoveCall call
+                    store.FailCall(call, (sprintf "SyncDelegate run failed: %s" error))
                     return true
                 | _ -> return true
             | _ -> return false
@@ -515,21 +276,13 @@ type SyncDelegateRuntime
         let asOwnerScope = ReuseScope.ofSession sessionId
 
         let call =
-            tryCallByOwnerScope asOwnerScope
-            |> Option.orElseWith (fun () -> tryCallByDelegate sessionId)
+            store.TryCallByOwnerScope asOwnerScope
+            |> Option.orElseWith (fun () -> store.TryCallByDelegate sessionId)
 
         // Capture inspector draft holders before bindings are torn down.
         let inspectorOwned = attached.TryFind(sessionId, SyncDelegateRole.Inspector)
 
-        let stagedInspectorOwned =
-            lock gate (fun () ->
-                let key = scopeKey asOwnerScope
-
-                match deletedInspectorsByOwnerScope.TryGetValue key with
-                | true, inspectorId ->
-                    deletedInspectorsByOwnerScope.Remove key |> ignore
-                    Some inspectorId
-                | false, _ -> None)
+        let stagedInspectorOwned = store.ClearDeletedInspector asOwnerScope
 
         let inspectorAsDelegate =
             match call with
@@ -538,12 +291,12 @@ type SyncDelegateRuntime
 
         call
         |> Option.iter (fun scope ->
-            clearPendingText scope.Delegate
-            removeCall scope
-            failCall scope "Sync delegate call was cancelled"
-            releaseFlight scope.OwnerScope)
+            store.ClearPendingText scope.Delegate
+            store.RemoveCall scope
+            store.FailCall(scope, "Sync delegate call was cancelled")
+            store.ReleaseFlight scope.OwnerScope)
 
-        clearPendingText sessionId
+        store.ClearPendingText sessionId
         attached.RemoveByDelegateSession sessionId |> ignore
 
         for role in [ SyncDelegateRole.Inspector; SyncDelegateRole.Coder ] do
@@ -561,20 +314,12 @@ type SyncDelegateRuntime
         cleanupInspectorDraft (sessionKey sessionId)
 
     member _.Dispose() =
-        lock gate (fun () ->
-            for call in callsByOwnerScope.Values |> Seq.toList do
-                failCall call "SyncDelegate runtime disposed"
+        let retiredInspectors = store.ClearAll()
 
-            callsByOwnerScope.Clear()
-            callsByDelegate.Clear()
-            pendingCompletionTexts.Clear()
+        for inspectorId in retiredInspectors do
+            cleanupInspectorDraft (sessionKey inspectorId)
 
-            for inspectorId in deletedInspectorsByOwnerScope.Values |> Seq.toList do
-                cleanupInspectorDraft (sessionKey inspectorId)
-
-            deletedInspectorsByOwnerScope.Clear()
-            inFlightScopes.Clear()
-            attached.Clear())
+        attached.Clear()
 
     interface IDisposable with
         member runtime.Dispose() = runtime.Dispose()

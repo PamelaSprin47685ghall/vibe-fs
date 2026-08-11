@@ -249,6 +249,9 @@
     <Compile Include="Application/Prompting/PromptIngress.fs"/>
     <Compile Include="Application/Prompting/ChildPromptAuthority.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SessionQuiescenceGate.fs"/>
+    <Compile Include="Session/SyncDelegateWait.fs"/>
+    <Compile Include="Session/SyncDelegateCallStore.fs"/>
+    <Compile Include="Session/SyncDelegateWorkflow.fs"/>
     <Compile Include="Session/SyncDelegateRuntime.fs"/>
     <Compile Include="Application/Reconciliation/PromptRecovery.fs"/>
     <Compile Include="Session/HostPendingRun.fs"/>
