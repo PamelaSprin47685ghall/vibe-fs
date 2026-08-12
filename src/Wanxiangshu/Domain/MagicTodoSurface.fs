@@ -15,26 +15,22 @@ module MagicTodoSurface =
     /// Must NOT be merged into global PairProgrammingGuidelineText.
     [<Literal>]
     let MagicTodoManagerGuideline =
-        "Keep the todo list continuously accurate with todowrite.\n\
+        "Keep the mission's living obligations truthful with todowrite.\n\
          \n\
-         Planning and execution are one continuous activity.\n\
-         Do not stop for a separate planning-only phase.\n\
+         Planning and execution are one continuous activity. Do not stop for a\n\
+         separate planning-only phase.\n\
+         \n\
+         Each call replaces the whole obligation account with\n\
+         obligations: [{ name, work }]. Keep an obligation while it is still owed;\n\
+         remove it only when the work has actually discharged it. Keep each name\n\
+         stable while that obligation remains alive.\n\
          \n\
          Update todowrite whenever the truthful decomposition, discovered work,\n\
-         or progress has materially changed.\n\
+         or discharged work has materially changed.\n\
          \n\
-         For every previously returned todo, submit kind:\"existing\" with that exact id.\n\
-         For a genuinely new todo, submit kind:\"new\" and omit id.\n\
-         \n\
-         A todo must pass through reviewing before it can become completed.\n\
-         \n\
-         While preceding work is being reviewed, continue useful independent\n\
-         next-stage work. Do not idle merely waiting for that review.\n\
-         \n\
-         Each accepted todowrite synchronizes the preceding checkpoint review\n\
-         and starts the next checkpoint review.\n\
-         Do not emit multiple todowrite calls in the same assistant message;\n\
-         any such batch is rejected entirely."
+         Each accepted call synchronizes the preceding checkpoint review and\n\
+         starts the next checkpoint review. Do not emit multiple todowrite calls\n\
+         in the same assistant message; any such batch is rejected entirely."
 
     /// Whether the Magic Todo Manager fragment should be projected.
     let shouldProjectManagerGuideline (canonicalRole: string) (todowriteProviderVisible: bool) : bool =
@@ -45,65 +41,31 @@ module MagicTodoSurface =
     /// Provider-visible description. No dedicated reviewer / barrier / witness / 2N.
     [<Literal>]
     let TodoWriteDefinitionDescription =
-        "Replace the entire todo list with a tagged Magic Todo V2 payload.\n\
-         \n\
-         Each item is either:\n\
-         - {\"kind\":\"existing\",\"id\":\"…\",\"content\":\"…\",\"status\":\"…\",\"priority\":\"…\"}\n\
-           Reuse the exact id previously returned for that todo.\n\
-         - {\"kind\":\"new\",\"content\":\"…\",\"status\":\"…\",\"priority\":\"…\"}\n\
-           Omit id; the Host assigns a stable id in the tool result.\n\
-         \n\
-         Status values: pending | in_progress | reviewing | completed | cancelled.\n\
-         A todo must be reviewing before it can become completed\n\
-         (completed→completed is allowed; pending/in_progress/new→completed is rejected).\n\
-         \n\
-         Keep the list continuously accurate. Each accepted call synchronizes the\n\
-         preceding checkpoint's process review (PERFECT or REVISE) and starts the\n\
-         next checkpoint review. Do not emit multiple todowrite calls in the same\n\
-         assistant message — any such batch is rejected entirely."
+        "Replace the mission's entire living obligation account. Each obligation is\n\
+         {\"name\":\"stable human-readable name\",\"work\":\"what is still owed\"}.\n\
+         Keep an obligation while it remains owed and remove it only after the work\n\
+         has actually discharged it. Names must be non-empty and unique within one\n\
+         submitted account. Each accepted call synchronizes the preceding process\n\
+         review and starts the next checkpoint review. Do not emit multiple\n\
+         todowrite calls in the same assistant message; the whole batch is rejected."
 
     /// JSON Schema fragment for tool.definition parameters / jsonSchema (both must update).
     let todoWriteJsonSchema: string =
         """{
   "type": "object",
   "additionalProperties": false,
-  "required": ["todos"],
+  "required": ["obligations"],
   "properties": {
-    "todos": {
+    "obligations": {
       "type": "array",
       "items": {
-        "oneOf": [
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["kind", "id", "content", "status", "priority"],
-            "properties": {
-              "kind": { "const": "existing" },
-              "id": { "type": "string", "minLength": 1 },
-              "content": { "type": "string" },
-              "status": {
-                "type": "string",
-                "enum": ["pending", "in_progress", "reviewing", "completed", "cancelled"]
-              },
-              "priority": { "type": "string" }
-            }
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["kind", "content", "status", "priority"],
-            "properties": {
-              "kind": { "const": "new" },
-              "content": { "type": "string" },
-              "status": {
-                "type": "string",
-                "enum": ["pending", "in_progress", "reviewing", "completed", "cancelled"]
-              },
-              "priority": { "type": "string" }
-            },
-            "not": { "required": ["id"] }
-          }
-        ]
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "work"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "work": { "type": "string" }
+        }
       }
     }
   }
@@ -129,7 +91,7 @@ module MagicTodoSurface =
         | TodoStatus.Reviewing, ReviewingSinkStrategy.DowngradeToInProgress -> "in_progress"
         | other, _ -> TodoStatus.wire other
 
-    /// Strip kind/id before builtin executor (definition ads V2; executor still V1).
+    /// Strip historical identity/progress fields before the builtin executor.
     let toCompatibilityRows (strategy: ReviewingSinkStrategy) (items: MagicTodoList) : CompatibilityTodoRow list =
         items
         |> List.map (fun item ->
@@ -137,7 +99,28 @@ module MagicTodoSurface =
               Status = compatibilityStatus strategy item.Status
               Priority = item.Priority })
 
-    // ── Tagged input decode (§7) — structural, not optional-id guessing ───
+    /// GrandRewrite provider obligations projected into the Host's legacy TodoTable.
+    /// The sink is optimistic UI state only; these fields never round-trip into
+    /// canonical truth (TODO-007).
+    let obligationsToCompatibilityRows (items: ObligationList) : CompatibilityTodoRow list =
+        items
+        |> List.map (fun item ->
+            { Content = item.Name + ": " + item.Work
+              Status = "in_progress"
+              Priority = "medium" })
+
+    type RawObligationFields =
+        { Name: string option
+          Work: string option }
+
+    let decodeObligation (raw: RawObligationFields) : Obligation =
+        { Name = defaultArg raw.Name ""
+          Work = defaultArg raw.Work "" }
+
+    let decodeObligations (rows: RawObligationFields list) : ObligationList =
+        rows |> List.map decodeObligation
+
+    // ── Tagged input decode — historical recovery compatibility only ──────
 
     /// Minimal structural decode of one provider item object fields.
     /// Caller supplies already-parsed field map (Host JSON layer).
@@ -191,11 +174,47 @@ module MagicTodoSurface =
     // ── Canonical list wire (tool result / blob body) ──────────────────────
 
     let renderListWire (items: MagicTodoList) : string = MagicTodo.canonicalListWire items
-    // ── Enriched tool result (§22) — byte-stable renderer ──────────────────
+
+    let renderObligationListWire (items: ObligationList) : string =
+        MagicTodo.canonicalObligationListWire items
 
     type PreviousReviewView =
         { Verdict: ProcessReviewVerdict
           ReportText: string }
+
+    type ObligationWriteResult =
+        { Previous: PreviousReviewView option
+          Current: ObligationList
+          Submitted: ObligationList
+          Accepted: bool }
+
+    let renderObligationWriteResult (view: ObligationWriteResult) : string =
+        let sb = StringBuilder()
+        sb.AppendLine("Previous checkpoint review:") |> ignore
+
+        match view.Previous with
+        | None -> sb.AppendLine("None — this is the first checkpoint.") |> ignore
+        | Some prev ->
+            sb.Append("Verdict: ").AppendLine(ProcessReviewVerdict.wire prev.Verdict) |> ignore
+            sb.AppendLine() |> ignore
+            sb.AppendLine("Report:") |> ignore
+            sb.AppendLine(prev.ReportText) |> ignore
+
+        sb.AppendLine() |> ignore
+        sb.AppendLine("Current obligations:") |> ignore
+        sb.AppendLine(renderObligationListWire view.Current) |> ignore
+        sb.AppendLine() |> ignore
+        sb.AppendLine("Submitted obligations:") |> ignore
+        sb.AppendLine(renderObligationListWire view.Submitted) |> ignore
+
+        if view.Accepted then
+            sb.AppendLine() |> ignore
+            sb.AppendLine("This obligation checkpoint was accepted and is now under process review.") |> ignore
+            sb.AppendLine("Continue useful independent work; the next todowrite will synchronize the preceding review.") |> ignore
+
+        sb.ToString()
+
+    // ── Enriched historical tool result — recovery compatibility only ─────
 
     type EnrichedTodoWriteResult =
         { Previous: PreviousReviewView option

@@ -19,6 +19,30 @@ module ManagerWorkflow =
         |> Option.bind (fun session -> session.ManagerLife)
         |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
 
+    /// A fresh idle observation may arrive after this terminal fact was already
+    /// delivered on another wake. Only idle-derived labor may run again here.
+    let observeIdle
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (nudgeSent: HashSet<string>)
+        (hasLivePty: string -> bool)
+        (quiescence: SessionQuiescenceGate)
+        (context: ReconciledTurnContext)
+        : Task =
+        let turn = context.Turn
+
+        match turn.Outcome with
+        | ReconcileProgram.TurnCompleted when
+            not (TerminalPolicy.sessionDead journal turn.SessionId)
+            && not (TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId)
+            ->
+            match currentLife journal turn.SessionId with
+            | Some life when ManagerFinality.admitLabor life = ManagerFinality.LaborAdmission.LaborMayContinue ->
+                ManagerIdle.encourageLabor sessionPort eventPort journal nudgeSent quiescence context life
+            | _ -> AsyncSupport.completedTask ()
+        | _ -> AsyncSupport.completedTask ()
+
     /// Observe one Manager-role turn. Manager-specific business branches stay here;
     /// non-Manager terminal semantics are delegated through the injected ordinary
     /// workflow rather than returned as a handled-bool program counter.
@@ -67,9 +91,13 @@ module ManagerWorkflow =
                                 ->
                                 return ()
                             | _ ->
-                                match! ManagerActivation.ensureAccepted sessionPort eventPort journal turn with
-                                | ManagerActivation.EnsureAcceptedResult.Deferred -> return ()
-                                | ManagerActivation.EnsureAcceptedResult.Ready life ->
+                                // GLORY-018/070: production has no planning-terminal →
+                                // ManagerWorkActivation protocol. LifeOpened is already
+                                // sufficient to continue; T1/BlindPlan progression is
+                                // represented by Magic Todo / WorkRecord facts, not an
+                                // Activation continuation.
+                                match currentLife journal turn.SessionId with
+                                | Some life ->
                                     match ManagerFinality.admitLabor life with
                                     | ManagerFinality.LaborAdmission.FinalityOwnsLife -> return ()
                                     | ManagerFinality.LaborAdmission.LaborMayContinue ->
@@ -84,5 +112,6 @@ module ManagerWorkflow =
                                                 life
 
                                         return ()
+                                | None -> return ()
                 | _ -> return! observeOrdinary context
         }

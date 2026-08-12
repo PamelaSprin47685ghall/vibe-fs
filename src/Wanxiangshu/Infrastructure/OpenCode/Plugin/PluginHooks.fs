@@ -42,6 +42,30 @@ module PluginHooks =
                 | Some ws -> CasebookFeature.isEnabled ws
                 | None -> false
 
+            // TODO-002 / HOST-017..025: the builtin todowrite stays the physical
+            // executor while this three-hook membrane owns provider schema,
+            // durable checkpoint admission, and accepted-result enrichment.
+            let magicTodo = MagicTodoHostHooks.create journal snapshotOpt
+
+            let toolAfter (toolInput: obj) (toolOutput: obj) =
+                task {
+                    do! magicTodo.After toolInput toolOutput
+
+                    if casebookEnabled then
+                        let toolName = if isNull toolInput then "" else string (toolInput?tool)
+
+                        let sessionId =
+                            if isNull toolInput then
+                                ""
+                            else
+                                string (toolInput?sessionID)
+
+                        let rendered = if isNull toolOutput then "" else string (toolOutput?output)
+
+                        if not (System.String.IsNullOrWhiteSpace sessionId) then
+                            observationCollector.Collect(sessionId, toolName, toolInput?args, rendered)
+                }
+
             // HOST-009: the object handed to the Host carries Host hooks and
             // nothing else.
             //
@@ -99,30 +123,17 @@ module PluginHooks =
                       // unanswered relies on an upstream default staying harmless.
                       "experimental.compaction.autocontinue",
                       box (pairedHook (box HostCompactionGate.onCompactionAutoContinue))
-                      // CASE-003: typed observation capture at the tool
-                      // execution boundary (read/glob/grep). Best-effort —
-                      // unparseable executions are skipped, capture never
-                      // changes the tool result. Registered only when the
-                      // Casebook marker exists.
-                      "tool.execute.after",
-                      box (
-                          pairedHook (
-                              box (fun (toolInput: obj) (toolOutput: obj) ->
-                                  if casebookEnabled then
-                                      let toolName = if isNull toolInput then "" else string (toolInput?tool)
-
-                                      let sessionId =
-                                          if isNull toolInput then
-                                              ""
-                                          else
-                                              string (toolInput?sessionID)
-
-                                      let rendered = if isNull toolOutput then "" else string (toolOutput?output)
-
-                                      if not (System.String.IsNullOrWhiteSpace sessionId) then
-                                          observationCollector.Collect(sessionId, toolName, toolInput?args, rendered))
-                          )
-                      ) ]
+                      // Magic Todo definition/before/after are one V1 Host
+                      // membrane. Definition must replace both schema surfaces;
+                      // before mutates the original args object in place.
+                      "tool.definition",
+                      box (pairedHook (box (fun (hookInput: obj) (hookOutput: obj) -> magicTodo.Definition hookInput hookOutput)))
+                      "tool.execute.before",
+                      box (pairedHook (box (fun (hookInput: obj) (hookOutput: obj) -> magicTodo.Before hookInput hookOutput)))
+                      // CASE-003 shares the single after hook key with Magic Todo.
+                      // The checkpoint result is enriched first; observation then
+                      // sees the exact provider-visible result bytes.
+                      "tool.execute.after", box (pairedHook (box toolAfter)) ]
 
             hooks?event <- box wired.ObserveEvent
 

@@ -29,6 +29,18 @@ module MagicTodoAdmission =
           ToolPartOrdinal: int
           ProviderInputDigest: string }
 
+    /// GrandRewrite clean-break prepare plan. New provider calls carry only the
+    /// obligation account; historical tagged TodoItem plans remain decode-only.
+    type ObligationPrepareSuccess =
+        { TodoWriteId: TodoWriteId
+          Proposed: ObligationList
+          Base: ObligationList
+          BaseDigest: string
+          ProposedDigest: string
+          ReviewFrontier: XTraceCursor
+          ToolPartOrdinal: int
+          ProviderInputDigest: string }
+
     /// Optional frozen Prepared for same-ToolCallId replay.
     type ExistingPrepared =
         { Identity: PreparedIdentity
@@ -37,6 +49,12 @@ module MagicTodoAdmission =
     /// Result of Magic before admission prior to mutating Host args / appending Prepared.
     type AdmissionOutcome =
         | FreshPrepare of PrepareSuccess
+        | IdempotentReplay of TodoWriteId
+        | Rejected of MagicTodoReject
+
+    [<RequireQualifiedAccess>]
+    type ObligationAdmissionOutcome =
+        | FreshPrepare of ObligationPrepareSuccess
         | IdempotentReplay of TodoWriteId
         | Rejected of MagicTodoReject
 
@@ -85,6 +103,52 @@ module MagicTodoAdmission =
                               BaseTodoDigest = baseDigest
                               ProposedTodoDigest = proposedDigest
                               RevisePreview = MagicTodo.semanticMerge settledCurrent proposed
+                              ReviewFrontier = localized.ReviewFrontier
+                              ToolPartOrdinal = localized.ToolPartOrdinal
+                              ProviderInputDigest = localized.ProviderInputDigest }
+
+    /// GrandRewrite admission: same durable identity / lag-1 law, but no
+    /// provider-visible item ids or status machine. Duplicate names fail closed.
+    let admitObligations
+        (sha256: string -> string)
+        (lifeId: ManagerLifeId)
+        (settledCurrent: ObligationList)
+        (mayProceedPastLag1: Result<unit, MagicTodoReject>)
+        (existingPrepared: ExistingPrepared option)
+        (localized: LocalizedToolCall)
+        (submitted: ObligationList)
+        : ObligationAdmissionOutcome =
+        match MagicTodo.admitTodowriteBatch localized.TodowriteCallIdsInMessage with
+        | Error e -> ObligationAdmissionOutcome.Rejected e
+        | Ok() ->
+            let writeId = MagicTodo.todoWriteId sha256 lifeId localized.ToolCallId
+
+            match existingPrepared with
+            | Some existing when TodoWriteId.value existing.TodoWriteId = TodoWriteId.value writeId ->
+                let observed =
+                    { ManagerLifeId = lifeId
+                      ProviderInputDigest = localized.ProviderInputDigest
+                      BaseTodoDigest = MagicTodo.obligationListDigest sha256 settledCurrent
+                      ToolPartOrdinal = localized.ToolPartOrdinal }
+
+                match MagicTodo.checkPreparedReplay existing.Identity observed with
+                | Error e -> ObligationAdmissionOutcome.Rejected e
+                | Ok() -> ObligationAdmissionOutcome.IdempotentReplay writeId
+            | Some _ ->
+                ObligationAdmissionOutcome.Rejected(MagicTodoReject.IdentityCorruption "TodoWriteId")
+            | None ->
+                match mayProceedPastLag1 with
+                | Error e -> ObligationAdmissionOutcome.Rejected e
+                | Ok() ->
+                    match MagicTodo.validateObligations submitted with
+                    | Error e -> ObligationAdmissionOutcome.Rejected e
+                    | Ok proposed ->
+                        ObligationAdmissionOutcome.FreshPrepare
+                            { TodoWriteId = writeId
+                              Proposed = proposed
+                              Base = settledCurrent
+                              BaseDigest = MagicTodo.obligationListDigest sha256 settledCurrent
+                              ProposedDigest = MagicTodo.obligationListDigest sha256 proposed
                               ReviewFrontier = localized.ReviewFrontier
                               ToolPartOrdinal = localized.ToolPartOrdinal
                               ProviderInputDigest = localized.ProviderInputDigest }

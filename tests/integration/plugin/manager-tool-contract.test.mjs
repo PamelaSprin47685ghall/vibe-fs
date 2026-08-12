@@ -93,6 +93,7 @@ const EXPECTED_ARGUMENTS = {
   'js-inspector': { program: 'required' },
   'js-reviewer': { program: 'required' },
   horizon: {},
+  fission: { prompts: 'required' },
   mv: { source: 'required', destination: 'required' },
   rm: { path: 'required' },
   suicide: { last_words: 'required' },
@@ -163,6 +164,8 @@ const KNOWN_TOOL_KEYS = [
   'signal-terminal',
   'join',
   'horizon',
+  'todowrite',
+  'fission',
   'read',
   'write',
   'edit',
@@ -198,7 +201,7 @@ const KNOWN_TOOL_KEYS = [
 /** AGENT-006/011/013/014/015: the allowed tools per role. Everything else denies. */
 const ALLOWED_TOOLS = {
   orchestrator: ['commission', 'join', 'horizon'],
-  manager: ['fork', 'join', 'horizon', 'suicide'],
+  manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'suicide'],
   coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspect', 'fetch', 'mv', 'rm', 'bash-honeypot'],
   inspector: ['read', 'glob', 'grep', 'query-shell', 'fetch'],
   devops: [
@@ -288,6 +291,10 @@ const toolKeysForPermission = (role, permission) => {
       return ['join']
     case 'Horizon':
       return ['horizon']
+    case 'TodoWrite':
+      return ['todowrite']
+    case 'Fission':
+      return ['fission']
     case 'Read':
       return ['read']
     case 'Write':
@@ -442,7 +449,8 @@ const PROMPT_CLAUSES = {
   'fast-inquiry': {
     required: [
       /Architectural Strategist|Inquiry/i,
-      /only instrument is `inspect`/i,
+      /instruments are `inspect`, `sphinx_start`, and `sphinx_resume`/i,
+      /Sphinx owns its inquiry state|canonical answer/i,
     ],
     forbidden: [],
   },

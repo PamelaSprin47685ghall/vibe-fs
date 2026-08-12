@@ -135,22 +135,42 @@ const HOOK_FIXTURES = {
     },
   },
 
-  // CASE-003: typed observation capture — must accept the Host call shape and
-  // never throw; the Casebook marker is absent in the fixture workspace, so the
-  // collector path is inert.
+  // HOST-018: production now owns the todowrite definition overlay. This hook
+  // does not need session state, so exercise the real target rather than a no-op.
+  'tool.definition': {
+    input: { toolID: 'todowrite' },
+    output: {
+      description: 'seed-description',
+      parameters: { type: 'object', properties: {} },
+      jsonSchema: { type: 'object', properties: {} },
+    },
+    assert: (output) => {
+      assert.equal(output.parameters.required[0], 'obligations')
+      assert.equal(output.jsonSchema.required[0], 'obligations')
+    },
+  },
+
+  // HOST-020: completeness/positional fixture uses a non-todo tool so it need
+  // not fabricate durable locality. Actual todowrite before behavior is covered
+  // by the Magic Todo contract tests and e2e Host path.
+  'tool.execute.before': {
+    input: { tool: 'read', sessionID: SESSION, callID: 'call_before_probe' },
+    output: { args: { path: 'a.txt' } },
+  },
+
+  // CASE-003 + HOST-021 share this single after key. A read call exercises the
+  // observation/no-op path without fabricating a Magic Todo Prepared receipt.
   'tool.execute.after': {
     input: { tool: 'read', sessionID: SESSION, callID: 'call_x', args: { path: 'a.txt' } },
     output: { title: 'read', output: 'hello', metadata: undefined },
   },
 }
 
-// ── Magic Todo Phase 0 — fixture-level Host hook shape (registration only) ──
+// ── Magic Todo Host hook shape ──────────────────────────────────────────────
 //
-// Production SpikePlugin does not yet register tool.definition / execute.before.
-// Canaries B/C/F live in magic-todo-host-canaries.test.mjs against isolated
-// Host-path helpers. These fixtures freeze the positional (input, output)
-// call shape the membrane must satisfy once registered, without wiring
-// production membrane code into initSpikePlugin.
+// Production SpikePlugin registers all three V1 membrane hooks. These exported
+// fixtures remain useful to isolated Host-path canaries; HOST_009 completeness
+// above separately proves the production registration set.
 
 /** Host tool.definition output seed (registry.ts builds this object). */
 export const TOOL_DEFINITION_FIXTURE = {
@@ -167,15 +187,7 @@ export const TOOL_EXECUTE_BEFORE_FIXTURE = {
   input: { tool: 'todowrite', sessionID: SESSION, callID: 'call_todo_before' },
   output: {
     args: {
-      todos: [
-        {
-          content: 'fixture',
-          status: 'pending',
-          priority: 'high',
-          id: 'todo_fix',
-          kind: 'new',
-        },
-      ],
+      obligations: [{ name: 'fixture', work: 'exercise before-hook shape' }],
     },
   },
 }
@@ -317,6 +329,7 @@ test('HOST_009_the_tool_registry_is_a_registry_not_a_triggered_hook', async () =
       'chronicle',
       'commission',
       'establish-behavior',
+      'fission',
       'fork',
       'horizon',
       'inspect',

@@ -49,12 +49,20 @@ module ReviewerEvidence =
                 match managerLife with
                 | None -> true
                 | Some lifecycle ->
-                    lifecycle.CurrentLife
-                    |> Option.bind (fun life -> life.ActiveFinality)
-                    |> Option.filter ManagerLifecycleProjection.isOpen
-                    |> Option.filter (fun request -> not (cohortHasRevision snapshot.AgentProjections request))
-                    |> Option.bind (fun request -> Map.tryFind (SessionId.create reviewerKey) request.Members)
-                    |> Option.exists (fun enlisted -> enlisted.BarrierId = barrierId)
+                    // Finality may revoke continuation only for a reviewer that is
+                    // actually a member of the current finality request at this
+                    // barrier. Ordinary Orchestrator review barriers reuse the same
+                    // completed Manager session, so "ManagerLife exists" is not
+                    // evidence that this reviewer belongs to Finality.
+                    match lifecycle.CurrentLife |> Option.bind (fun life -> life.ActiveFinality) with
+                    | None -> true
+                    | Some request ->
+                        match Map.tryFind (SessionId.create reviewerKey) request.Members with
+                        | None -> true
+                        | Some enlisted when enlisted.BarrierId <> barrierId -> true
+                        | Some _ ->
+                            ManagerLifecycleProjection.isOpen request
+                            && not (cohortHasRevision snapshot.AgentProjections request)
             | _ -> true
         | _ -> true
 

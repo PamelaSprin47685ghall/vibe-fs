@@ -26,6 +26,10 @@ type ToolPermission =
     | Fork
     | Join
     | Horizon
+    /// Manager-only living-obligation checkpoint surface.
+    | TodoWrite
+    /// Manager-only one-line present-context split surface.
+    | Fission
     | Read
     | Write
     | Edit
@@ -58,6 +62,8 @@ module Roles =
                 [ ToolPermission.Fork
                   ToolPermission.Join
                   ToolPermission.Horizon
+                  ToolPermission.TodoWrite
+                  ToolPermission.Fission
                   ToolPermission.Finality ]
         | Role.Orchestrator -> set [ ToolPermission.Fork; ToolPermission.Join; ToolPermission.Horizon ]
         | Role.Coder ->

@@ -32,6 +32,7 @@ module ToolRegistry =
         | "signal-terminal" -> fun r -> r = Role.DevOps
         | "join" -> fun r -> Roles.isAllowed r ToolPermission.Join
         | "horizon" -> fun r -> Roles.isAllowed r ToolPermission.Horizon
+        | "fission" -> fun r -> Roles.isAllowed r ToolPermission.Fission
         | "judge" -> fun r -> Roles.isAllowed r ToolPermission.Judge
         | "suicide" -> fun r -> Roles.isAllowed r ToolPermission.Finality
         | "run" -> fun r -> r = Role.DevOps
@@ -114,6 +115,7 @@ module ToolRegistry =
               yield ForkTool.orchestratorSpec factory runtime
               yield JoinTool.spec runtime
               yield ListTool.spec runtime
+              yield FissionTool.spec factory
               yield VerdictTool.spec factory runtime
               // GLORY-034/036: the Manager's end-of-life tool.
               yield FinalityTool.spec factory runtime

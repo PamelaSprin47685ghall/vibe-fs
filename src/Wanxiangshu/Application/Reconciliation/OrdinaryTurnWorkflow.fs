@@ -13,6 +13,28 @@ open Wanxiangshu.Host
 /// match that drives repair, recovery, abort, and completed join-guard paths.
 module OrdinaryTurnWorkflow =
 
+    /// Revisit a previously delivered turn only for work whose authority comes
+    /// from a fresh idle observation. Terminal plumbing remains first-delivery only.
+    let observeIdle
+        (quiescence: SessionQuiescenceGate)
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (context: ReconciledTurnContext)
+        : Task =
+        match context.Turn.Observation with
+        | Some ReconcileProgram.TurnUnknown ->
+            InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
+        | None ->
+            match context.Turn.Outcome with
+            | ReconcileProgram.TurnInProgress ->
+                InteractionRepairWorkflow.repairIncompleteInteraction quiescence context sessionPort eventPort journal
+            | ReconcileProgram.TurnNeedsContinuation _ ->
+                InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
+            | ReconcileProgram.TurnCompleted
+            | ReconcileProgram.TurnAborted _
+            | ReconcileProgram.TurnFailed _ -> AsyncSupport.completedTask ()
+
     /// Own the reconciled ordinary-turn outcome match.
     /// `timerPort` and `abortParent` are injected by Host composition (Process is not Application).
     let observe

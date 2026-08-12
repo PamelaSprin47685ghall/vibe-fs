@@ -61,9 +61,80 @@ module MagicTodoLocality =
 
                 match matches with
                 | [] ->
-                    Error(
-                        LocalityRejection.XTraceMissing(located.ProviderRun, located.ToolCallId, located.HostToolPartId)
-                    )
+                    // The Host invokes tool.execute.before after persisting the
+                    // pending ToolPart but before the event observer appends that
+                    // same part to XTrace. In that narrow window the full SDK
+                    // snapshot is already authoritative for provider-run / part /
+                    // call identity. The XTrace head is therefore exactly the
+                    // exclusive frontier immediately before this call.
+                    match located.State with
+                    | SnapshotToolPartState.Pending ->
+                        let providerRunText = ProviderRunIdentity.value located.ProviderRun
+
+                        let messageMatches =
+                            messages
+                            |> List.filter (fun message ->
+                                message.Role = "assistant" && message.Id = providerRunText)
+
+                        match messageMatches with
+                        | [ message ] ->
+                            let partMatches =
+                                message.ToolParts
+                                |> Array.mapi (fun index part -> index, part)
+                                |> Array.filter (fun (_, part) ->
+                                    part.HostToolPartId = located.HostToolPartId
+                                    && part.ToolCallId = located.ToolCallId)
+
+                            match Array.toList partMatches with
+                            | [ (index, _) ] ->
+                                let frontier =
+                                    { Sequence = XTraceProjection.headSequence trace + 1L }
+
+                                let todowriteCallIds =
+                                    message.ToolParts
+                                    |> Array.filter (fun part -> part.ToolName = "todowrite")
+                                    |> Array.map (fun part -> part.ToolCallId)
+                                    |> Array.distinct
+                                    |> Array.toList
+
+                                Ok
+                                    { ProviderRun = located.ProviderRun
+                                      HostToolPartId = located.HostToolPartId
+                                      ToolCallId = located.ToolCallId
+                                      ToolName = located.ToolName
+                                      InputCanonical = located.InputCanonical
+                                      State = located.State
+                                      TodowriteCallIdsInMessage = todowriteCallIds
+                                      ToolPartOrdinal = index + 1
+                                      ReviewFrontier = frontier
+                                      Range =
+                                        { Start = frontier
+                                          EndExclusive = { Sequence = frontier.Sequence + 1L } } }
+                            | _ ->
+                                Error(
+                                    LocalityRejection.XTraceMissing(
+                                        located.ProviderRun,
+                                        located.ToolCallId,
+                                        located.HostToolPartId
+                                    )
+                                )
+                        | _ ->
+                            Error(
+                                LocalityRejection.XTraceMissing(
+                                    located.ProviderRun,
+                                    located.ToolCallId,
+                                    located.HostToolPartId
+                                )
+                            )
+                    | SnapshotToolPartState.Completed _
+                    | SnapshotToolPartState.Failed _ ->
+                        Error(
+                            LocalityRejection.XTraceMissing(
+                                located.ProviderRun,
+                                located.ToolCallId,
+                                located.HostToolPartId
+                            )
+                        )
                 | [ part ] ->
                     let toolPartOrdinal =
                         trace.Parts

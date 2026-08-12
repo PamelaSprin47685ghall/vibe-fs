@@ -659,14 +659,15 @@ export const runHostV1ToolExecutePath = async ({
   return observation
 }
 
-/** Strip V2-only identity fields so the original V1 decoder receives compatibility rows. */
-export const stripV2TodoIdentityFields = (args) => {
-  if (!args || typeof args !== 'object' || !Array.isArray(args.todos)) return args
-  args.todos = args.todos.map((todo) => {
-    if (!todo || typeof todo !== 'object') return todo
-    const { id: _id, kind: _kind, ...v1 } = todo
-    return v1
-  })
+/** Project clean-break obligations into the original Host V1 compatibility sink. */
+export const projectObligationsToV1TodoRows = (args) => {
+  if (!args || typeof args !== 'object' || !Array.isArray(args.obligations)) return args
+  args.todos = args.obligations.map((obligation) => ({
+    content: `${obligation.name}: ${obligation.work}`,
+    status: 'in_progress',
+    priority: 'medium',
+  }))
+  delete args.obligations
   return args
 }
 
@@ -712,85 +713,64 @@ export const hostTrigger = async (fn, input, output) => {
   return output
 }
 
-/** Sample V2 provider wire args (id/kind/reviewing) before membrane stripping. */
-export const sampleV2TodoWriteArgs = () => ({
-  todos: [
-    {
-      content: 'implement membrane',
-      status: 'reviewing',
-      priority: 'high',
-      id: 'todo_existing_1',
-      kind: 'existing',
-    },
-    {
-      content: 'write canaries',
-      status: 'pending',
-      priority: 'medium',
-      id: 'todo_new_1',
-      kind: 'new',
-    },
+/** Sample clean-break provider obligation account before sink projection. */
+export const sampleObligationTodoWriteArgs = () => ({
+  obligations: [
+    { name: 'membrane', work: 'implement the production membrane' },
+    { name: 'canaries', work: 'write permanent contract canaries' },
   ],
 })
 
-/** V2 advertisement surfaces the membrane will install via tool.definition. */
-export const sampleV2TodoWriteAdvertisement = () => ({
-  description:
-    'Magic Todo V2: tagged id/kind rows and reviewing status. Host sink remains V1.',
+/** Provider advertisement installed by tool.definition. */
+export const sampleObligationTodoWriteAdvertisement = () => ({
+  description: 'Replace the mission living obligation account with stable name/work pairs.',
   parameters: {
     type: 'object',
+    additionalProperties: false,
     properties: {
-      todos: {
+      obligations: {
         type: 'array',
         items: {
           type: 'object',
+          additionalProperties: false,
           properties: {
-            content: { type: 'string' },
-            status: {
-              type: 'string',
-              enum: ['pending', 'in_progress', 'reviewing', 'completed', 'cancelled'],
-            },
-            priority: { type: 'string', enum: ['high', 'medium', 'low'] },
-            id: { type: 'string' },
-            kind: { type: 'string', enum: ['existing', 'new'] },
+            name: { type: 'string', minLength: 1 },
+            work: { type: 'string' },
           },
-          required: ['content', 'status', 'priority', 'id', 'kind'],
+          required: ['name', 'work'],
         },
       },
     },
-    required: ['todos'],
+    required: ['obligations'],
   },
   jsonSchema: {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
     type: 'object',
+    additionalProperties: false,
     properties: {
-      todos: {
+      obligations: {
         type: 'array',
         items: {
           type: 'object',
+          additionalProperties: false,
           properties: {
-            content: { type: 'string' },
-            status: {
-              type: 'string',
-              enum: ['pending', 'in_progress', 'reviewing', 'completed', 'cancelled'],
-            },
-            priority: { type: 'string', enum: ['high', 'medium', 'low'] },
-            id: { type: 'string' },
-            kind: { type: 'string', enum: ['existing', 'new'] },
+            name: { type: 'string', minLength: 1 },
+            work: { type: 'string' },
           },
-          required: ['content', 'status', 'priority', 'id', 'kind'],
+          required: ['name', 'work'],
         },
       },
     },
-    required: ['todos'],
+    required: ['obligations'],
   },
 })
 
 /**
- * Fixture-level membrane hook set used only by unit canaries.
- * Not wired into production SpikePlugin.
+ * Fixture-level Host trigger model used by isolated unit canaries.
+ * Production SpikePlugin now wires the equivalent three-hook membrane.
  */
 export const createMagicTodoContractHooks = () => {
-  const advertisement = sampleV2TodoWriteAdvertisement()
+  const advertisement = sampleObligationTodoWriteAdvertisement()
   return {
     'tool.definition': async (input, output) => {
       if (input.toolID !== 'todowrite') return
@@ -801,7 +781,7 @@ export const createMagicTodoContractHooks = () => {
     'tool.execute.before': async (input, output) => {
       if (input.tool !== 'todowrite') return
       // Host only honors in-place mutation of the original args object.
-      stripV2TodoIdentityFields(output.args)
+      projectObligationsToV1TodoRows(output.args)
     },
     'tool.execute.after': async (_input, _output) => {
       // Observation-only in Phase 0 unit canaries.

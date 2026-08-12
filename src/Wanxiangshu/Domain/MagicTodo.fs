@@ -108,6 +108,16 @@ module MagicTodo =
 
     type MagicTodoList = MagicTodoItem list
 
+    /// GrandRewrite provider account. These are the only list fields that may
+    /// cross the provider horizon for a new Magic Todo checkpoint (TODO-002).
+    /// The older TodoItem/status representation remains an internal recovery /
+    /// compatibility shape only and is never decoded from new provider input.
+    type Obligation =
+        { Name: string
+          Work: string }
+
+    type ObligationList = Obligation list
+
     [<RequireQualifiedAccess>]
     type ProcessReviewVerdict =
         | Perfect
@@ -140,6 +150,8 @@ module MagicTodo =
         | IllegalCompletedTransition of id: string * fromStatus: string * toStatus: string
         | NewItemCompleted of ordinal: int
         | MultipleTodowriteInMessage of callIds: string list
+        | EmptyObligationName of ordinal: int
+        | DuplicateObligationName of name: string
         | IdentityCorruption of field: string
         | NoOpenManagerLife
         | AwaitingConsumableReview of pendingTodoWriteId: string
@@ -217,7 +229,44 @@ module MagicTodo =
     /// Canonical list digest for BaseTodoDigest / ProposedTodoDigest / identity checks.
     let listDigest (sha256: string -> string) (items: MagicTodoList) : string = canonicalListWire items |> sha256
 
-    // ── Completed gate (§8.1) ──────────────────────────────────────────────
+    /// Byte-stable provider account body. Object field order is frozen here so
+    /// Journal blob digests and replay identity do not depend on JS object order.
+    let canonicalObligationListWire (items: ObligationList) : string =
+        items
+        |> List.map (fun item -> sprintf """{"name":%s,"work":%s}""" (jsonString item.Name) (jsonString item.Work))
+        |> String.concat ","
+        |> sprintf "[%s]"
+
+    let obligationListDigest (sha256: string -> string) (items: ObligationList) : string =
+        canonicalObligationListWire items |> sha256
+
+    /// Provider-visible identity is the stable human-readable obligation name.
+    /// No status/id/priority state machine crosses the horizon (TODO-002/003).
+    let validateObligations (items: ObligationList) : Result<ObligationList, MagicTodoReject> =
+        let rec loop ordinal seen remaining =
+            match remaining with
+            | [] -> Ok items
+            | head :: tail when String.IsNullOrWhiteSpace head.Name ->
+                Error(MagicTodoReject.EmptyObligationName ordinal)
+            | head :: _ when Set.contains head.Name seen ->
+                Error(MagicTodoReject.DuplicateObligationName head.Name)
+            | head :: tail -> loop (ordinal + 1) (Set.add head.Name seen) tail
+
+        loop 0 Set.empty items
+
+    /// CurrentObligations settlement (TODO-005): PERFECT promotes the submitted
+    /// account exactly; REVISE keeps the prior settled account until the Manager
+    /// rewrites it after consuming the canonical process-review report.
+    let settleObligations
+        (old: ObligationList)
+        (proposed: ObligationList)
+        (verdict: ProcessReviewVerdict)
+        : ObligationList =
+        match verdict with
+        | ProcessReviewVerdict.Perfect -> proposed
+        | ProcessReviewVerdict.Revise -> old
+
+    // ── Completed gate (§8.1) — historical compatibility model ─────────────
 
     /// `old != completed AND proposed == completed` → old must be exactly reviewing.
     /// New items may never enter as completed.

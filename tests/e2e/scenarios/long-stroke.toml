@@ -92,6 +92,7 @@ must = [
   "conflict-resume.0",
   "coder-resolve.0",
   "barrier-reviewer.0",
+  "reviewer-confirm.0",
   # orch.2 = join harvest text after Published (orch-unhappy Stroke 6). EXEC-016
   "orch.2",
 ]
@@ -165,6 +166,7 @@ flow = [
   { wait = "manager-idle.4", timeoutMs = 30000 },
   { wait = "manager-idle.5", timeoutMs = 30000 },
   { waitFact = { name = "LifeCompleted", gte = 1 } },
+  { wait = "barrier-reviewer.0", timeoutMs = 30000 },
   { waitFact = { name = "CandidateReady", eq = 1 }, timeoutMs = 60000 },
 
   # Conflict resume on SAME Manager (no task restart) → resolve → Published
@@ -544,10 +546,7 @@ tools = ["glob", "grep", "read", "judge"]
   respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
-
-  [[turn.step]]
-  respond = { type = "text", text = "Barrier reviewer completed the double PERFECT." }
+  respond = { type = "text", text = "First barrier PERFECT submitted; awaiting challenge." }
 
 [[turn]]
 id = "reviewer-confirm"

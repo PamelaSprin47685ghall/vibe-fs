@@ -63,7 +63,18 @@ module ReconcilePass =
             | Some value ->
                 let decision = ReconcileProgram.publishDecision maps value
 
-                if decision.shouldPublish && isCurrent sessionId generation then
+                let delivery =
+                    if decision.shouldPublish then
+                        Some ReconciledTurnDelivery.Observation
+                    else
+                        match wake with
+                        | ReconcileProgram.ReconcileWake.IdleWake _ -> Some ReconciledTurnDelivery.IdleRevisit
+                        | ReconcileProgram.ReconcileWake.RetryWake
+                        | ReconcileProgram.ReconcileWake.FailureWake
+                        | ReconcileProgram.ReconcileWake.AbortWake -> None
+
+                match delivery with
+                | Some delivery when isCurrent sessionId generation ->
                     match Map.tryFind (ReconcileProgram.consumeKey value) turns with
                     | Some reconciled ->
                         let quiescence =
@@ -73,15 +84,16 @@ module ReconcilePass =
                             | ReconcileProgram.ReconcileWake.FailureWake
                             | ReconcileProgram.ReconcileWake.AbortWake -> None
 
-                        let context: ReconciledTurnContext =
-                            { Turn = reconciled
-                              Quiescence = quiescence }
+                        do!
+                            onTurn
+                                { Turn = reconciled
+                                  Quiescence = quiescence
+                                  Delivery = delivery }
 
-                        do! onTurn context
-
-                        if isCurrent sessionId generation then
+                        if decision.shouldPublish && isCurrent sessionId generation then
                             recordMaps sessionId decision.maps
                     | None -> logError "RECONCILE-PUBLISH" "publish token missing from observed turns"
+                | _ -> ()
 
                 if isCurrent sessionId generation then
                     match lastSnapshot with

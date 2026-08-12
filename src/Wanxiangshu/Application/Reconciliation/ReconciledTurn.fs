@@ -32,13 +32,22 @@ type ReconciledTurn =
         Observation: ReconcileProgram.SnapshotObservation option
     }
 
-/// The reconciled turn plus the quiescence evidence of the pass that published
-/// it (HOST-004). Only an IdleWake carries `Some permit`; retry / failure
-/// wakes carry None. The side-effect boundary re-checks the permit with the
-/// gate immediately before any physical idle-derived send.
+/// A reconciled fact is delivered once. A later fresh idle observation may revisit
+/// the same fact only to evaluate idle-derived work; it must not replay terminal
+/// plumbing, judgment, or other first-delivery effects (HOST-004).
+[<RequireQualifiedAccess>]
+type ReconciledTurnDelivery =
+    | Observation
+    | IdleRevisit
+
+/// The reconciled turn plus the quiescence evidence of the pass that delivered it.
+/// Only an IdleWake carries `Some permit`; retry / failure wakes carry None. The
+/// side-effect boundary re-checks the permit immediately before any physical
+/// idle-derived send.
 type ReconciledTurnContext =
     { Turn: ReconciledTurn
-      Quiescence: QuiescencePermit option }
+      Quiescence: QuiescencePermit option
+      Delivery: ReconciledTurnDelivery }
 
 type ActiveRunBinding =
     {

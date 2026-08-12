@@ -139,3 +139,59 @@ test('TODO-004 joins the persisted ToolPart to its exact durable XTrace range', 
   assert.equal(Number(localized.value.Range.EndExclusive.Sequence), 10)
   assert.equal(localized.value.ToolPartOrdinal, 1)
 })
+
+test('TODO-004 localizes a pending before-hook ToolPart from snapshot before XTrace capture', () => {
+  const projection = fold.one(
+    fold.empty,
+    envelope({
+      stream: stream.session(managerSession),
+      run: 'asst_prior_run',
+      fact: fact('XTracePartAppended', {
+        SessionId: managerSession,
+        CursorSequence: 8n,
+        Role: 'assistant',
+        Turn: 3,
+        PartIndex: 1,
+        Kind: 'text',
+        ToolName: undefined,
+        TextRef: blobRef('blobs/prior-text'),
+        TextDigest: blobDigest('digest:prior-text'),
+        Provenance: 'g:0/turn:3/part:1',
+        ProviderRun: providerRun('asst_prior_run'),
+        ToolCallId: undefined,
+        HostToolPartId: undefined,
+      }),
+    }),
+  )
+  assert.equal(projection.ok, true, projection.ok ? '' : JSON.stringify(projection.error))
+
+  const messages = sessionSnapshot.projectMessages([
+    {
+      info: { id: 'asst_pending_run', role: 'assistant' },
+      parts: [
+        {
+          id: 'part_pending_todo',
+          type: 'tool',
+          tool: 'todowrite',
+          callID: 'call_pending_todo',
+          state: { status: 'pending', input: { obligations: [{ name: 'proof', work: 'ship it' }] } },
+        },
+      ],
+    },
+  ])
+
+  const localized = magicTodoLocality.resolve(
+    managerSession,
+    messages,
+    projection.value,
+    toolCallId('call_pending_todo'),
+  )
+
+  assert.equal(localized.ok, true, localized.ok ? '' : JSON.stringify(localized.error))
+  assert.equal(idValue.providerRun(localized.value.ProviderRun), 'asst_pending_run')
+  assert.equal(idValue.hostToolPart(localized.value.HostToolPartId), 'part_pending_todo')
+  assert.equal(Number(localized.value.ReviewFrontier.Sequence), 9)
+  assert.equal(Number(localized.value.Range.Start.Sequence), 9)
+  assert.equal(Number(localized.value.Range.EndExclusive.Sequence), 10)
+  assert.equal(localized.value.ToolPartOrdinal, 1)
+})
