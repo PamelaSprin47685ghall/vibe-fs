@@ -495,9 +495,10 @@ T1 关闭 Opening 属 TODO-015 / COMPANION-014；Host membrane **不**拥有 Ope
 ## NEEDHELP sensor / reconcile（HOST-027 / AGENT-031）
 
 ```text
-message.part.delta(reasoning|thinking)
-→ NeedHelpEventCodec
-→ NeedHelpSensor rolling suffix + exact sentinel
+message.part.updated(part.type=reasoning)
+→ register exact (SessionId, ProviderRun, PartId)
+→ message.part.delta(same PartId, field=text)
+→ NeedHelpEventCodec / NeedHelpSensor rolling suffix + exact sentinel
 → arm (SessionId, ProviderRun) exactly once
 → AbortSession
 → reconciled TurnAborted
