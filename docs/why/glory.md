@@ -2,11 +2,13 @@
 
 条款正文见 `docs/what/glory.md`。本文记录 GLORY 设计的关键理由与裁决中被拒绝的方向，供未来变更回溯。Magic Todo 过程评审与 checkpoint 代数的正式理由见 `docs/why/todo.md` 与 `TODO-*`；此处只记录与 GLORY Life/Finality 交界的裁决。
 
-## 核心假设：持续 checkpoint 取代两阶段规划表演
+## 核心假设：BlindPlan 交托取代 Activation 阶段机
 
-被拒方案：保留 planning-only Birth → `ManagerWorkActivation` → Labor，再叠一层 Todo 阶段机。否决：两套阶段机会叠加复杂度，且与「规划与执行同一持续活动」直接冲突（TODO-001）。正式路径在 `LifeOpened` 后立即给予正常工作工具；每一次成功受理的 `todowrite` 才是过程评审与上下文同步节拍（TODO-006）。Opening 仍永久 raw，Blogger floor 改由结构性 `WorkRecordStart` 承担，而不是 Activation/`WorkActivated`（TODO-001；GLORY-006/023）。
+被拒方案：保留 planning-only Birth → `ManagerWorkActivation` → Labor，并在 Planning/Working 之间切换 system prompt。否决：两套阶段机叠加复杂度；prompt 切换破坏 prefix cache 与身份连续性，且开场即泄露「你携带一个任务」（TODO-001；系统 prompt 稳定性）。
 
-历史「伪装规划 tail + Activation 命令」可继续 decode，但不得再作为生产资格门（GLORY-018/021）。
+正式路径：Manager = BlindPlan Opening。Pre-T1 为 Planning Table（替他人规划）；第一次 accepted `todowrite` = T1 commitment；canonical T1 result 揭示「路是你的」。同一 Life 内 system prompt byte-identical——T1 / fallback / review / reanchor / Strength 均不改它。交托发生在 conversation + tool result，不发生在 office 身份切换。
+
+Opening 仍永久 raw；Blogger floor 由结构性 `WorkRecordStart` 承担，不是 Activation/`WorkActivated`（TODO-001；GLORY-006/023）。历史「伪装规划 tail + Activation 命令」可继续 decode，但不得再作为生产资格门（GLORY-018/021）。
 
 ## 为什么 Manager 不能知道隐藏 review 机制
 
@@ -16,7 +18,7 @@
 
 ## 为什么失败反馈是完整 canonical LWR 而不是结构化 findings
 
-被拒方案：结构化 `FinalityFinding` schema。拒绝理由：Reviewer 已经拥有完整工作记录；再抽取结构化 issue 会丢失推理关系与上下文、引入第二事实源、需要额外 parser、产生摘要漂移、让 Host 替 Reviewer 解释（GLORY-004/049/050；TODO-008）。完整 LWR（Y frames + raw gap + terminal，不含 Opening；request-range bounded）在证据完整性上无损，且复用现有 materializer，不需要第二套反馈通道。
+被拒方案：结构化 `FinalityFinding` schema，或任何 per-role fixed Closing report（`### Summary` / `### Files Changed` / …）。拒绝理由：Reviewer 已拥有完整工作记录；再抽结构化 issue 丢失推理关系、引入第二事实源、需要 parser、产生摘要漂移、让 Host 替 Reviewer 解释（GLORY-004/049/050；TODO-008）。Closing report = prose claim，不是 verdict，也不是固定字段义务——约束诚实，不约束骨架。完整 LWR（Y frames + raw gap + terminal，不含 Opening；request-range bounded）在证据完整性上无损，且复用现有 materializer。
 
 ## 为什么失败 nudge 必须组合鼓励与精确证据
 
@@ -54,7 +56,7 @@ REVISE 已是对本 request 的终局审查判断，继续发 challenge、等待
 
 ## 为什么 XTrace 保持 append-only 且不引入多 Opening
 
-被拒方向：为多 Life 立即改造通用 XTrace 为多 Opening。否决：非 Manager 角色不需要多 Opening；清空 XTrace 会破坏 append-only 不变量。通用 XTrace 继续 append semantic parts，ManagerLifecycle 单独记录每个 Life 的 opening/terminal 与 cursor range（GLORY-066/067），按 range 物化。
+被拒方向：为多 Life 立即改造通用 XTrace 为多 Opening。否决：非 Manager 角色不需要多 Opening；清空 XTrace 会破坏 append-only 不变量。通用 XTrace 继续 append semantic parts，ManagerLifecycle 单独记录每个 Life 的 opening/terminal 与 cursor range（GLORY-066/067），按 range 物化。OpeningMaterial = 该 range 上 preserved 区间，禁止 `OpeningPromptRaw` 重建。
 
 ## 其他被拒方向
 
@@ -62,7 +64,8 @@ REVISE 已是对本 request 的终局审查判断，继续发 challenge、等待
 - 自动清洗 Reviewer 工作记录中的叙事词：拒绝，证据完整性优先于词汇纯度（GLORY-048）。
 - 只发送 Reviewer terminal / 只发送纯 Y frames：拒绝，都存在信息缺口。
 - Manager 手动 fork Reviewer：拒绝，会把质量门重新变成显式 checklist（GLORY-002/031）。
-- 把 `verdict` 重命名为 `suicide`：拒绝，`verdict` 属于 Reviewer、`suicide` 属于 Manager，因果身份不同。
-- 保留生产 `ManagerWorkActivation`/`WorkActivated` 资格门：拒绝（TODO-001；GLORY-018）。
+- 把 `verdict`/`judge` 重命名为 `suicide`：拒绝，`judge` 属于 Reviewer、`suicide` 属于 Manager，因果身份不同。
+- 保留生产 `ManagerWorkActivation`/`WorkActivated` 资格门或 Activation 切换 system prompt：拒绝（TODO-001；GLORY-018）。
 - 用 RecordCoverage 证明 prefix 可替换或用 PrefixCoverage 填 LWR gap：拒绝（TODO-008/009；GLORY-050）。
 - 零 `TodoWriteAccepted` 的 first unblessed suicide 进 Finality：拒绝（TODO-010）。
+- 压缩 Opening / 把 Opening 纳入 Blogger/Y：拒绝——章程不可缩短。

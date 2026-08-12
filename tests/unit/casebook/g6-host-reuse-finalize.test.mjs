@@ -19,7 +19,6 @@ import {
 import {
   SyncDelegateRuntime,
   SyncDelegateRuntime__Invoke_1B1DD6DD as invoke,
-  SyncDelegateRuntime__Return_Z65460A0C as returnAnswer,
   SyncDelegateRuntime__HandleTurn_Z7791586C as handleTurn,
   SyncDelegateRuntime__Dispose as disposeRuntime,
 } from '../../../dist/Session/SyncDelegateRuntime.js'
@@ -94,11 +93,25 @@ const completionTurn = (delegateKey, role) =>
     undefined,
   )
 
-const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId) => {
-  const returned = resultOf(await returnAnswer(runtime, delegateKey, providerRun(runId), answer))
-  assert.equal(returned.ok, true, returned.ok ? '' : returned.error)
-
-  const handled = await handleTurn(runtime, completionTurn(delegateKey, role), undefined)
+const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = 'asst_turn') => {
+  const handled = await handleTurn(
+    runtime,
+    new ReconciledTurn(
+      sessionId(delegateKey),
+      physicalUser('msg_phys_turn'),
+      authorityRoot('msg_root_turn'),
+      providerRun(runId),
+      role,
+      undefined,
+      [reconcileSupervisor.textPart(answer)],
+      'stop',
+      undefined,
+      undefined,
+      TurnOutcome.TurnCompleted,
+      undefined,
+    ),
+    undefined,
+  )
   assert.equal(handled, true)
 }
 
@@ -209,7 +222,7 @@ test('G6_G_host_reusable_inspector_one_finalize_then_cold_fetch', async () => {
     const first = resultOf(await tryFinalizeInspector(dir, delegateId))
     assert.equal(first.ok, true, `exactly one finalize ok: ${JSON.stringify(first.error)}`)
     assert.equal(bookkeeper.createCalls.length, 1, 'exactly one Bookkeeper CreateChildSession')
-    assert.equal(bookkeeper.editQaCalls.length >= 2, true, 'edit-qa invoked')
+    assert.equal(bookkeeper.editQaCalls.length >= 2, true, 'js-bookkeeper invoked')
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)

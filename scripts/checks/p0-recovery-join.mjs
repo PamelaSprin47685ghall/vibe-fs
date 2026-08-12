@@ -185,7 +185,7 @@ export const RULES = [
   },
   {
     // P0 REVISE: production Tools agent-join must not bare-call runtime.Join(
-    // (JoinTool, ExecutorSummarize*, ExecutorTool). HostForkRuntime internal race
+    // (JoinTool, Distillation*, ExecutorTool). HostForkRuntime internal race
     // mailbox + ForkRuntime/CompletionMailbox are the sole whitelist (fileHint null
     // + basename allowlist below).
     // Allow runtime.Join(permit, ...) (permit-gated IExecutorRuntime); forbid Join() / Join(timeoutMs=...).
@@ -210,17 +210,17 @@ export const RULES = [
     label: 'ExecutorTool empty SessionId must fail closed (not return true)',
   },
   {
-    id: 'executor-summarize-join-with-permit',
-    fileHint: 'ExecutorSummarize.fs',
+    id: 'distillation-join-with-permit',
+    fileHint: 'Distillation.fs',
     pattern: /JoinWithPermit|AwaitAgentWithPermit/,
-    label: 'ExecutorSummarize must call JoinWithPermit / AwaitAgentWithPermit',
+    label: 'Distillation must call JoinWithPermit / AwaitAgentWithPermit',
     positive: true,
   },
   {
-    id: 'executor-runtime-join-with-permit',
-    fileHint: 'ExecutorSummarizeRuntime.fs',
+    id: 'distillation-runtime-join-with-permit',
+    fileHint: 'DistillationRuntime.fs',
     pattern: /JoinWithPermit|requirePermit/,
-    label: 'ExecutorSummarizeRuntime must wire JoinWithPermit + requirePermit',
+    label: 'DistillationRuntime must wire JoinWithPermit + requirePermit',
     positive: true,
   },
   {
@@ -400,7 +400,7 @@ const RECORD_COMPLETION_OWNER_BASENAMES = new Set([
 /**
  * Basename allowlist for tools-no-bare-runtime-join.
  * Only interpreter / HostForkRuntime race mailbox / low-level mailbox may call runtime.Join(.
- * Production Tools (JoinTool, ExecutorSummarize*, ExecutorTool) must not appear here.
+ * Production Tools (JoinTool, Distillation*, ExecutorTool) must not appear here.
  */
 const BARE_RUNTIME_JOIN_ALLOWLIST = new Set([
   'HostForkRuntime.fs',

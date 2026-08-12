@@ -191,7 +191,7 @@ export const arch010Cases = [
         'work activation must start with the activation imperative as a comment',
       );
       assertTrue(
-        payloads['glory: idle encouragement'].startsWith('# You are doing well'),
+        payloads['glory: idle encouragement'].startsWith('# You have done useful work'),
         'idle encouragement must start with the idle golden as a comment',
       );
       assertTrue(

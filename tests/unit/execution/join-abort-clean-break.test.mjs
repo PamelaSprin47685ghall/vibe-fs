@@ -120,8 +120,6 @@ const lifecycleOf = (projection, handle = HANDLE) =>
 // ── GREEN-3: agent join wire never renders aborted ───────────────────────────
 
 test('P0_CLEAN_BREAK_agent_join_wire_never_renders_aborted', () => {
-  // Agent path: failed is the only negative terminal besides abandoned.
-  // abortedRun factory is gone; failedRun must not emit status=aborted.
   const batch = nonEmptyBatch.ofHeadTail(
     agentCompletion.failedRun({
       runId: RUN_ID,
@@ -132,12 +130,10 @@ test('P0_CLEAN_BREAK_agent_join_wire_never_renders_aborted', () => {
     }),
   )
   const wire = joinResultRenderer.renderCompletedBatch(joinResultRenderer.stubRuntime(), batch)
-  assert.ok(
-    !wire.includes('status = "aborted"'),
-    'agent join wire must never render status = "aborted"',
-  )
-  assert.equal(parseToml(wire).result[0].status, 'failed')
-  assert.equal(parseToml(wire).result[0].kind, 'agent')
+  assert.ok(!wire.includes('status = "aborted"'), 'agent join wire must never render status = "aborted"')
+  assert.match(wire, /# fast-coder could not complete the charge\./)
+  assert.match(wire, /# host abort was observation, not finality/)
+  assert.ok(!/\bstatus\s*=/.test(wire))
 })
 
 // ── 1a. Weak proof abolished (codec layer) ───────────────────────────────────

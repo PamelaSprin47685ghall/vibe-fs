@@ -20,32 +20,36 @@ type ToolRegistration =
 
 module ToolRegistry =
 
-    /// AGENT-007 role gate, plus request-scoped `blog` (CurrentRequest / InFlight).
+    /// AGENT-007 role gate, plus request-scoped `chronicle` (CurrentRequest / InFlight).
     /// sessionId is the tool call's Host session; parkedHost is optional for tests.
     let rolePredicate (specName: string) (parkedHost: IParkedTransformHost option) (sessionId: string) : Role -> bool =
         match specName with
         | "fork" -> fun r -> r = Role.Manager
-        | "fork-manager" -> fun r -> r = Role.Orchestrator
-        | "fork-pty" -> fun r -> r = Role.DevOps
+        | "commission" -> fun r -> r = Role.Orchestrator
+        | "open-terminal"
+        | "send-terminal"
+        | "read-terminal"
+        | "signal-terminal" -> fun r -> r = Role.DevOps
         | "join" -> fun r -> Roles.isAllowed r ToolPermission.Join
-        | "list" -> fun r -> Roles.isAllowed r ToolPermission.List
-        | "verdict" -> fun r -> Roles.isAllowed r ToolPermission.Verdict
+        | "horizon" -> fun r -> Roles.isAllowed r ToolPermission.Horizon
+        | "judge" -> fun r -> Roles.isAllowed r ToolPermission.Judge
         | "suicide" -> fun r -> Roles.isAllowed r ToolPermission.Finality
-        | "executor" -> fun r -> Roles.isAllowed r ToolPermission.Exec
-        | "inspector" -> fun r -> Roles.isAllowed r ToolPermission.Inspector
+        | "run" -> fun r -> r = Role.DevOps
+        | "query-shell" -> fun r -> r = Role.Inspector
+        | "inspect" -> fun r -> Roles.isAllowed r ToolPermission.Inspect
         | "mv" -> fun r -> Roles.isAllowed r ToolPermission.Move
         | "rm" -> fun r -> Roles.isAllowed r ToolPermission.Remove
         | "bash-honeypot" -> fun r -> Roles.isAllowed r ToolPermission.BashHoneypot
-        | "coder" -> fun r -> r = Role.DevOps
-        | "blog" -> fun r -> r = Role.Blogger && BlogTool.hasLiveCycle parkedHost sessionId
-        | "return" -> fun r -> r = Role.Inspector || r = Role.Coder
+        | "establish-behavior"
+        | "repair-behavior" -> fun r -> r = Role.DevOps
+        | "chronicle" -> fun r -> r = Role.Blogger && BlogTool.hasLiveCycle parkedHost sessionId
         // CASE-009: fetch is the next-session Casebook read. Inspector/Coder
-        // consume reusable Q/A; Bookkeeper is edit-qa only (gateExecute).
+        // consume reusable Q/A; Bookkeeper is js-bookkeeper only (gateExecute).
         | "fetch" -> fun r -> r = Role.Inspector || r = Role.Coder
         // JS-001: the js-* gate — the invoked name must be this role's own
         // generated name AND the role must actually hold a filesystem
         // capability (four-layer exactness, forged names fail closed).
-        | name when name.StartsWith "js-" ->
+        | name when name.StartsWith "js-" && name <> "js-bookkeeper" ->
             let roleName = name.Substring 3
 
             let fsPermissions =
@@ -106,29 +110,27 @@ module ToolRegistry =
 
         let baseSpecs =
             [ yield ForkTool.managerSpec factory runtime
-              yield PtyTool.spec factory runtime
+              yield! PtyTool.specs factory runtime
               yield ForkTool.orchestratorSpec factory runtime
               yield JoinTool.spec runtime
               yield ListTool.spec runtime
               yield VerdictTool.spec factory runtime
               // GLORY-034/036: the Manager's end-of-life tool.
               yield FinalityTool.spec factory runtime
-              yield ExecutorTool.spec factory runtime
+              yield ExecutorTool.runSpec factory runtime
+              yield ExecutorTool.queryShellSpec factory runtime
               yield InspectorTool.spec factory runtime syncDelegateRuntime
-              yield CoderTool.spec factory runtime syncDelegateRuntime
+              yield CoderTool.establishSpec factory runtime syncDelegateRuntime
+              yield CoderTool.repairSpec factory runtime syncDelegateRuntime
               // AGENT-016/017/018: Coder-only POSIX mv/rm.
               yield FileMutationTools.mvSpec factory
               yield FileMutationTools.rmSpec factory
               // Coder-only bash honeypot: visible denial, never a shell.
               yield BashHoneypotTool.spec
-              // ENFORCER-010: Blogger's tool set is exactly { blog }.
+              // ENFORCER-010: Blogger's tool set is exactly { chronicle }.
               // parkedHost + CurrentRequest gate request-scoped execute (InFlight).
               yield BlogTool.spec factory runtime parkedHost
-              // SyncDelegate return: Inspector/Coder only.
-              yield SyncDelegateTools.returnSpec factory syncDelegateRuntime
-              // CASE-009: the conditional fetch tool — registered only when the
-              // marker exists AND an EventStore is available (schema + execution
-              // both gated).
+              // CASE-009: the conditional fetch / js-bookkeeper tools.
               yield! casebookToolSpecs
               // JS-001/JS-073: the capability-projected js-* tools. The surface
               // is generated from the role matrix (AGENT-007: profile capability
@@ -140,7 +142,7 @@ module ToolRegistry =
                   | None -> () ]
 
         // Role-gated tools: agent permission schema and this execute gate agree on
-        // CanonicalRole. blog is request-scoped on top of Role=Blogger: no live
+        // CanonicalRole. chronicle is request-scoped on top of Role=Blogger: no live
         // CurrentRequest must not complete as a soft tool error (Host step loop).
         let gateExecute (spec: ToolSpec) =
             let original = spec.Execute
@@ -150,9 +152,9 @@ module ToolRegistry =
                 ToolHostCodec.tomlObject
                     [ "error", tString (sprintf "Tool '%s' is not permitted for role '%A'" spec.Name role) ]
 
-            let stopBlogNoLiveCycle (ctx: HostToolContext) =
+            let stopChronicleNoLiveCycle (ctx: HostToolContext) =
                 task {
-                    Diagnostic.emit "blog-gate" [ "session_id", ctx.SessionId; "result", "no live CurrentRequest" ]
+                    Diagnostic.emit "chronicle-gate" [ "session_id", ctx.SessionId; "result", "no live CurrentRequest" ]
 
                     if not (String.IsNullOrWhiteSpace ctx.SessionId) then
                         let! _ = runtime.Sessions.AbortSession(SessionId.create ctx.SessionId)
@@ -179,33 +181,32 @@ module ToolRegistry =
                         // STRENGTH-004: Host-native read/glob/grep are the entire
                         // replica tool surface. Every plugin-registered tool is
                         // therefore a forged/hidden path and fails closed here.
-                        // StrengthReplica still denies edit-qa.
                         return
                             ToolHostCodec.tomlObject
                                 [ "error", tString (sprintf "Tool '%s' is not permitted for StrengthReplica" spec.Name) ]
                     elif isBookkeeper then
-                        // Inverted StrengthReplica special-case: Bookkeeper may
-                        // run edit-qa only. No Role.Bookkeeper.
-                        if spec.Name = "edit-qa" then
+                        // Bookkeeper may run js-bookkeeper only. No Role.Bookkeeper.
+                        if spec.Name = "js-bookkeeper" then
                             return! original args ctx
                         else
                             return
                                 ToolHostCodec.tomlObject
                                     [ "error", tString (sprintf "Tool '%s' is not permitted for Bookkeeper" spec.Name) ]
-                    elif spec.Name = "edit-qa" then
+                    elif spec.Name = "js-bookkeeper" then
                         return
                             ToolHostCodec.tomlObject
-                                [ "error", tString "Tool 'edit-qa' is only permitted for Bookkeeper attachment" ]
+                                [ "error", tString "Tool 'js-bookkeeper' is only permitted for Bookkeeper attachment" ]
                     else
                         match runtime.RoleFor ctx with
                         | Some role when allowed role -> return! original args ctx
-                        | Some role when spec.Name = "blog" && role = Role.Blogger -> return! stopBlogNoLiveCycle ctx
+                        | Some role when spec.Name = "chronicle" && role = Role.Blogger ->
+                            return! stopChronicleNoLiveCycle ctx
                         | Some role -> return denyRole role
                         | None ->
                             match! runtime.EnsureRoleFor ctx with
                             | Some role when allowed role -> return! original args ctx
-                            | Some role when spec.Name = "blog" && role = Role.Blogger ->
-                                return! stopBlogNoLiveCycle ctx
+                            | Some role when spec.Name = "chronicle" && role = Role.Blogger ->
+                                return! stopChronicleNoLiveCycle ctx
                             | Some role -> return denyRole role
                             | None ->
                                 // AGENT-007: an unresolved Role means an empty tool set.

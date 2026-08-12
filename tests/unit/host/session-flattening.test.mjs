@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+if (!process.env.WANXIANGSHU_PROVIDER_LANGUAGE) {
+  process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+}
+
 import { InjectedSessionPort_$ctor_Z60D0357E as createPort } from '../../../dist/Infrastructure/OpenCode/Host/Sessions.js'
 import { SessionIdModule_create as sessionId } from '../../../dist/Kernel/Identity.js'
 import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'

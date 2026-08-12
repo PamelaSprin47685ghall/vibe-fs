@@ -29,15 +29,15 @@ resources/prompts/blogger-system.md
   + 全部 tip 的 enforcer.md 全文（按 lexical 顺序拼入）
 ```
 
-契约固定：**每轮响应必须且仅能调用一次 `blog`**，携带有效非空 `text` 与目录 TipName enum 内的 `tip`。
+契约固定：**每轮响应必须且仅能调用一次 `chronicle`**，携带有效非空 `entry` 与目录 TipName enum 内的 `tip`。无 `evidence` 字段；旧名 `blog` 非法、无 alias。
 
 ### 多调用 tip 选择算法（ENFORCER-025）
 
-当一次 provider run 中出现多个 `blog` 工具调用时，按以下确定性算法筛选派生 canonical call：
+当一次 provider run 中出现多个 `chronicle` 工具调用时，按以下确定性算法筛选派生 canonical call：
 
 ```text
-1. 将所有 blog 工具调用按 PartOrdinal 升序排列。
-2. 过滤出包含有效 tip（tip 存在于 directory TipName enum 且 text 非空）的调用集合 S。
+1. 将所有 chronicle 工具调用按 PartOrdinal 升序排列。
+2. 过滤出包含有效 tip（tip 存在于 directory TipName enum 且 entry 规范化后非空）的调用集合 S。
 3. 若 S 为空：归并失败，Cycle 视为无有效调用。
 4. 若 S 非空：取 PartOrdinal 最小（排序后第一个）的调用派生 CanonicalTip。
    不在多调用 tip 选择上按 lexical ordinal / RuleId 做二级排序。
@@ -49,17 +49,17 @@ resources/prompts/blogger-system.md
 
 ## ENFORCER-042：多调用防御性归并
 
-同 run 多个 `blog` 按 PartOrdinal 防御性归并；正常协议仍是恰好一次。  
-text 按 PartOrdinal 以 `"\n\n"` 稳定合并；evidence 完全相同去重后 `"; "` 拼接。  
+同 run 多个 `chronicle` 按 PartOrdinal 防御性归并；正常协议仍是恰好一次。  
+entry 按 PartOrdinal 以 `"\n\n"` 稳定合并；**无**独立 evidence 通道——证据若改变 occurrence，须已写入 entry。  
 tip 选择规则见上述 ENFORCER-025。  
 multi-call 仍提交**单** cycle，并标记 protocol violation（`MultiCall=true`，静默诊断 HOST-007）。  
-硬界（fail closed）：合并 tool call 数 >32；合并 text >512 KiB UTF-8；合并 evidence >128 KiB UTF-8。
+硬界（fail closed）：合并 tool call 数 >32；合并 entry >512 KiB UTF-8。
 
 ---
 
 ## ENFORCER-046：Blogger Cycle 结果派生
 
-Cycle 结果从归并后的 canonical call 派生（canonical text、TipName→RuleId、可选 evidence、ToolCallIds）。
+Cycle 结果从归并后的 canonical call 派生（canonical entry、TipName→RuleId、ToolCallIds）。无 evidence 字段。
 
 ---
 
@@ -81,12 +81,12 @@ Cycle 结果从归并后的 canonical call 派生（canonical text、TipName→R
 
 | 响应结局 | 描述 | 是否进入 InteractionNudge | 后续动作 |
 |---------|------|--------------------------|---------|
-| `ValidCycle` | 成功产生 1 个有效 `blog` 调用 (含归并后) | 否 | 提交 `BlogEntryCommitted` 事实 |
-| `NoToolCall` | 模型仅输出普通文本/代码，未调用 `blog` | **是** | `NoRecovery` 时发送 Nudge Continuation |
-| `InvalidTip` | 提供了 `blog` 调用但 `tip` 缺失或不在目录 enum | **是** | `NoRecovery` 时发送 Nudge Continuation |
-| `EmptyText` | 提供了 `blog` 调用但 `text` 规范化后为空 | **是** | `NoRecovery` 时发送 Nudge Continuation |
-| `ToolExecutionError` | 工具解析崩溃或语法严重错乱（`status=error` 且无 `interrupted`） | **否** | 跳过 Nudge，直接进入 Fallback 流程 |
-| `AbortResidue` | Host abort 清理残留（`status=error` ∧ `metadata.interrupted=true`） | **否** | 注入一次 repair；**不推进 cursor**（FALLBACK-013 / LOOP-006） |
+| `ValidCycle` | 成功产生 1 个有效 `chronicle` 调用 (含归并后) | 否 | 提交 `BlogEntryCommitted` 事实 |
+| `NoToolCall` | 模型仅输出普通文本/代码，未调用 `chronicle` | **是** | `NoRecovery` 时发送 Nudge Continuation |
+| `InvalidTip` | 提供了 `chronicle` 调用但 `tip` 缺失或不在目录 enum | **是** | `NoRecovery` 时发送 Nudge Continuation |
+| `EmptyEntry` | 提供了 `chronicle` 调用但 `entry` 规范化后为空 | **是** | `NoRecovery` 时发送 Nudge Continuation |
+| `ToolExecutionError` | 工具解析崩溃或语法严重错乱（Host 标记失败且无 `interrupted`） | **否** | 跳过 Nudge，直接进入 Fallback 流程 |
+| `AbortResidue` | Host abort 清理残留（失败 ∧ `metadata.interrupted=true`） | **否** | 注入一次 repair；**不推进 cursor**（FALLBACK-013 / LOOP-006） |
 
 ---
 
@@ -125,12 +125,12 @@ canonical cycle 无效 ∧ InteractionNudgeIssued(run) ∧ 当前 terminal ≠ r
 | 已发生证据 | 决定 |
 |-----------|------|
 | `ValidBlogCycle` | 提交 `BlogEntryCommitted` |
-| `InvalidBlogCycle(NoToolCall/InvalidTip/EmptyText)` 且 `NoRecovery` | 发送一次 `InteractionNudge`，记录触发它的 terminal run |
+| `InvalidBlogCycle(NoToolCall/InvalidTip/EmptyEntry)` 且 `NoRecovery` | 发送一次 `InteractionNudge`，记录触发它的 terminal run |
 | 上述无效 Cycle 且 terminal run 等于 `InteractionNudgeIssued` 中的 run | 幂等等待，不重复副作用 |
 | 上述无效 Cycle 且 terminal run 不同 | Nudge 已产生新无效响应；调用 `FallbackController.recordConfirmedFailure` |
 | `ToolExecutionError` | 不 Nudge，调用 `FallbackController.recordConfirmedFailure` |
-| `AbortResidue`（blog 调用被 abort 清理打断） | 注入一次 repair，**不调用 `recordConfirmedFailure`**；repair marker 已注入则终局（FALLBACK-013） |
-| Fallback 返回 `MayContinue` | 按新的 `EffectiveAgent` 发送物理 attempt |
+| `AbortResidue`（chronicle 调用被 abort 清理打断） | 注入一次 repair，**不调用 `recordConfirmedFailure`**；repair marker 已注入则终局（FALLBACK-013） |
+| Fallback 返回 `MayContinue` | 按新的 `EffectiveAgent` 发送物理 attempt（Persona / language / system 字节不变，FALLBACK-014） |
 | Fallback 返回 `Exhausted` | 停止自动请求，等待新 Authority Root 或显式恢复 |
 
 repair 注入本身就是预算标记（ENFORCER-153 派生），因此 `AbortResidue` 不推进 cursor 也仍然有界：同一 cycle 第二次 abort 残留即终局。
@@ -187,29 +187,39 @@ Companion `build`：
 
 ## Main Full / Identity 交付（ENFORCER-071）
 
+两轴分离（不得压成单一 durable bool）：
+
+```text
+TipDeliveryFrontier     occurrence 单调；ContextReanchored 不重置
+TipSemanticCoverage     TipName / horizon-relative；ContextReanchored 可清空
+```
+
 `EnforcerHost.resolveTipGuidance`：
 
 ```text
 1. 经 SessionAssociation 解析 owner Main session（入参可以是 Main 或 Blogger satellite id）
-2. 取该 Main 最近已提交 tip FieldName；目录查找 EnforcerRule
-3. 读 TipDeliveryProjection.hasFullDelivered(TipName)
-   - false → Presentation=Full；Text = name header + rule.MainText
-            append HostFact.TipGuidanceDelivered { Full }（restart-safe）
-   - true  → Presentation=IdentityOnly；Text = "tip: <name>"
-            不改 FullDeliveredTips 集合
-4. ContextReanchored → TipDeliveryProjection.applyReanchor → FullDeliveredTips = ∅
-   下一 resolve 必须再发 Full main.md
+2. 取该 Main 最近已提交 tip FieldName；目录查找 EnforcerRule；定位当前 TipOccurrence
+3. 读 TipDeliveryFrontier + TipSemanticCoverage：
+   - occurrence ∉ Frontier ∨ Coverage 表明该 TipName 全文不可恢复
+        → Presentation=Full；Text = name header + rule.MainText
+        → 若 occurrence ∉ Frontier：append HostFact.TipGuidanceDelivered { Full }
+          （推进 Frontier；semantic restoration 不推进 Frontier）
+   - occurrence ∈ Frontier ∧ Coverage 仍可恢复全文
+        → Presentation=IdentityOnly；Text = "tip: <name>"
+        → 不推进 Frontier；不得把 Identity 写成「全文永久可恢复」durable bool
+4. ContextReanchored → 清空 TipSemanticCoverage（≠ 清空 Frontier）
+   下一 resolve：若 Coverage 不可恢复 → 必须再发 Full main.md（restoration，非新 occurrence）
 ```
 
 `latestTipGuidance` = resolve 的 Text；`latestTipNudge` 为同义别名（Full/Identity，不是旧 Nudge 字段）。  
-交付决策**只** fold `TipGuidanceDelivered`，禁止进程本地「已发送」集合。
+交付决策**只** fold TipDeliveryFrontier + TipSemanticCoverage（经 `TipGuidanceDelivered` 等），禁止进程本地「已发送」集合。
 
 ---
 
 ## ENFORCER-140：X 侧 Host Compaction
 
 X 侧重锚与 HOST-006 对齐，不在 Enforcer 另起 epoch 算术。  
-重锚同时清空 TipDelivery Full 集合（与 Blog/Prefix 同原子 session 更新）。
+重锚清空 TipSemanticCoverage（与 Blog/Prefix 同原子 session 更新）；**不**重置 TipDeliveryFrontier。
 
 ## ENFORCER-141：Prefix Probe Promote
 
@@ -244,4 +254,4 @@ Cycle 恢复：能证明 response 属于 request 才提交；否则不提交。
 
 ## ENFORCER-156：Clean Break
 
-schema clean break：不兼容旧评分模型，但保留 schema version 字段纪律（folder loader 固定 schemaVersion=1）。
+schema clean break：不兼容旧评分模型与旧 `blog`/`evidence` 合同，但保留 schema version 字段纪律（folder loader 固定 schemaVersion=1）。

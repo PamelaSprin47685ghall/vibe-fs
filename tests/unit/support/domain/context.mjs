@@ -811,6 +811,11 @@ export const managedAgentCatalog = (() => {
     'isLegacyAgentName',
     'formatLegacyNameNotSupported',
     'formatLegacyNameInConfig',
+    'bookkeeperNames',
+    'isBookkeeperName',
+    'tryParseBookkeeperTier',
+    'bookkeeperNameOf',
+    'bookkeeperPeerName',
   ])
 
   return {
@@ -835,7 +840,7 @@ export const managedAgentCatalog = (() => {
     allRoles: () => listItems(m.allRoles).map(caseOf),
     managerForkableRoles: () => listItems(m.managerForkableRoles).map(caseOf),
     managerForkableNames: () => listItems(m.managerForkableNames),
-    /** AGENT-002: exactly 20 names. */
+    /** AGENT-002: exactly 22 names (20 Role × tier + Bookkeeper pair). */
     requiredNames: () => listItems(m.requiredNames),
     orchestratorForkableNames: () => listItems(m.orchestratorForkableNames),
     inspectorToolNames: () => listItems(m.inspectorToolNames),
@@ -847,6 +852,12 @@ export const managedAgentCatalog = (() => {
     /** AGENT-004: version-agnostic rejection prose. */
     formatLegacyNameNotSupported: (name) => m.formatLegacyNameNotSupported(name),
     formatLegacyNameInConfig: (name) => m.formatLegacyNameInConfig(name),
+    /** AGENT-002: InternalLeaf Bookkeeper pair. */
+    bookkeeperNames: () => listItems(m.bookkeeperNames),
+    isBookkeeperName: (name) => m.isBookkeeperName(name),
+    tryParseBookkeeperTier: (name) => unwrapOption(m.tryParseBookkeeperTier(name)),
+    bookkeeperNameOf: (tier) => m.bookkeeperNameOf(tier),
+    bookkeeperPeerName: (name) => unwrapOption(m.bookkeeperPeerName(name)),
   }
 })()
 

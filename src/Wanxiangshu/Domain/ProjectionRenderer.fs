@@ -12,7 +12,7 @@ open Wanxiangshu.Kernel.Identity
 module ProjectionConstants =
     /// InteractionRepair 协议修复指令（ENFORCER-060/061）。Domain 单源。
     let RepairInstruction =
-        "# Protocol repair\n\nCall the blog tool exactly once with non-empty text. Do not answer in prose."
+        "# Protocol repair\n\nCall the chronicle tool exactly once with a non-empty entry. Do not answer in prose."
 
     /// HOST-013 pair-programming auto-injected marker 正文。Domain 单源。
     let PairProgrammingGuidelineText =

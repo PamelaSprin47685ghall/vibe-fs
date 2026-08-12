@@ -1,6 +1,6 @@
 // P1 unit surface: ReconcileSupervisor causal reread materialization,
 // ClearSession mid-pass, HostSignalSubscribe reconnect markers,
-// ForkRuntime AwaitAgent deadline, ExecutorSummarize cancelOwned on map failure.
+// ForkRuntime AwaitAgent deadline, Distillation cancelOwned on map failure.
 
 import assert from 'node:assert/strict'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
@@ -10,7 +10,7 @@ import test from 'node:test'
 import {
   caseOf,
   diagnostic,
-  executorSummarizeRuntime,
+  distillationRuntime,
   forkRuntime,
   hostEventPort,
   hostSignalSubscribe,
@@ -387,25 +387,25 @@ test('EXEC_fork_runtime_await_agent_timeout', async () => {
   assert.match(result.fields[0], /agent-hang/)
 })
 
-// ── 5. ExecutorSummarize cancelOwned on map failure ──────────────────────────
+// ── 5. Distillation cancelOwned on map failure ───────────────────────────────
 
-test('EXEC_executor_summarize_cancel_owned_on_failure', async () => {
+test('EXEC_distillation_cancel_owned_on_failure', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-sum-'))
   const spoolPath = join(dir, 'spool.bin')
    // One small chunk → one map agent; Join NotFound → map failure → cancelOwned.
   writeFileSync(spoolPath, Buffer.from('chunk-body-for-summarize'))
 
   const forked = []
-  const { runtime, cancelled } = executorSummarizeRuntime.fake({
+  const { runtime, cancelled } = distillationRuntime.fake({
     fork: (agentId) => {
       forked.push(agentId)
-      return executorSummarizeRuntime.forkOk(agentId)
+      return distillationRuntime.forkOk(agentId)
     },
-     join: () => executorSummarizeRuntime.notFound(),
+     join: () => distillationRuntime.notFound(),
   })
 
-  const summary = await executorSummarizeRuntime.summarizeSpool(runtime, spoolPath)
-  assert.ok(typeof summary === 'string', 'summarizeSpool returns partial text, not throw')
+  const summary = await distillationRuntime.distillSpool(runtime, spoolPath)
+  assert.ok(typeof summary === 'string', 'distillSpool returns partial text, not throw')
   assert.ok(forked.length >= 1, 'at least one map agent forked')
   assert.ok(
     cancelled.length >= 1,

@@ -98,7 +98,7 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
     /// Open a PTY for a managed agent.
     ///
     /// `agent` is required. It used to be an optional `Role` that no caller
-    /// supplied, so every completion reported `fast-executor` — PROMPT-008 forbids
+    /// supplied, so every completion reported `fast-distiller` — PROMPT-008 forbids
     /// inventing a managed name, and the only way to keep that true here is to make
     /// the real one non-optional.
     member this.Fork(command: string, agent: ManagedAgent, ?ptyId: PtyId, ?cwd: string) : PtyId =

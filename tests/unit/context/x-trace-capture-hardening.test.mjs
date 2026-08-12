@@ -240,12 +240,14 @@ test('COMPANION_003_parent_work_record_renders_the_opening_exactly_once', () => 
     assert.equal(typeof parentBound, 'string')
     // parent → child: Opening once; gap must not re-render the same text.
     assert.equal(parentBound.split('first task').length - 1, 1, 'opening appears exactly once for parent→child')
-    assert.ok(parentBound.includes('Opening task'), 'parent→child keeps Opening')
+    assert.ok(parentBound.includes('Opening\n'), 'parent→child keeps Opening')
+    assert.ok(!parentBound.includes('Opening task'), 'old Opening task heading is gone')
     assert.ok(parentBound.includes('assistant: work a'), 'the tail must carry the work after the opening')
 
     const joinBound = lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, false)
     assert.equal(typeof joinBound, 'string')
-    assert.ok(!joinBound.includes('Opening task'), 'child→parent join omits Opening')
+    assert.ok(!joinBound.includes('Opening\nfirst task'), 'child→parent join omits Opening')
+    assert.ok(!joinBound.includes('Opening task'), 'old Opening task heading is gone')
     assert.ok(!joinBound.includes('first task'), 'assignment text is not echoed to the parent')
     assert.ok(joinBound.includes('assistant: work a'), 'work tail still returns')
   })

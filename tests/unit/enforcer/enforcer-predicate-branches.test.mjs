@@ -194,7 +194,7 @@ test('ENFORCER_bad_tip_decode_is_protocol_skip_and_rebuilds', async () => {
     // protocol skip (extractCalls drops it), so the empty-calls arm rebuilds.
     const out = await run(
       assistantStep('asst-skip', [
-        { type: 'tool', tool: 'blog', callID: 'c-skip', state: { status: 'completed', input: { text: 'no tip' } } },
+        { type: 'tool', tool: 'chronicle', callID: 'c-skip', state: { status: 'completed', input: { text: 'no tip' } } },
       ]),
     )
     assert.equal(caseOf(out), 'ProjectMessages')
@@ -210,7 +210,7 @@ test('ENFORCER_whitespace_message_id_fails_cycle_validation', async () => {
       assistantStep('   ', [
         {
           type: 'tool',
-          tool: 'blog',
+          tool: 'chronicle',
           callID: 'c-ws',
           state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'work' } },
         },
@@ -233,7 +233,7 @@ test('ENFORCER_blog_call_with_name_field_and_lowercase_id_commits', async () => 
       // accepted by blogCallFromPart.
       const out = await run(
         assistantStep('asst-name', [
-          { type: 'tool', name: 'blog', callId: 'c-low', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'entry via name field' } } },
+          { type: 'tool', name: 'chronicle', callId: 'c-low', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'entry via name field' } } },
         ]),
       )
       assert.equal(caseOf(out), 'StopPhysicalRun')
@@ -254,7 +254,7 @@ test('ENFORCER_completed_blog_part_in_empty_arm_rebuilds', async () => {
     // sees completed → false; hasAnyBlogToolPart → rebuild.
     const out = await run(
       assistantStep('asst-completed-skip', [
-        { type: 'tool', tool: 'blog', callID: 'c1', state: { status: 'completed', input: {} } },
+        { type: 'tool', tool: 'chronicle', callID: 'c1', state: { status: 'completed', input: {} } },
         { type: 'text', text: 'plain' },
       ]),
     )
@@ -271,7 +271,7 @@ test('ENFORCER_interrupted_statusless_blog_part_aabbs', async () => {
     // metadata.interrupted=true → failed attempt → one AABB repair.
     const out = await run(
       assistantStep('asst-interrupted', [
-        { type: 'tool', tool: 'blog', callID: 'c-int', state: { metadata: { interrupted: true } } },
+        { type: 'tool', tool: 'chronicle', callID: 'c-int', state: { metadata: { interrupted: true } } },
       ]),
     )
     const msgs = outcomeMessagesOf(out)
@@ -297,7 +297,7 @@ test('ENFORCER_uninterrupted_statusless_blog_part_rebuilds', async () => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
     const out = await run(
       assistantStep('asst-clean', [
-        { type: 'tool', tool: 'blog', callID: 'c-clean', state: { metadata: { interrupted: false } } },
+        { type: 'tool', tool: 'chronicle', callID: 'c-clean', state: { metadata: { interrupted: false } } },
       ]),
     )
     assert.equal(caseOf(out), 'ProjectMessages')
@@ -311,7 +311,7 @@ test('ENFORCER_running_blog_part_projects_raw', async () => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
     const out = await run(
       assistantStep('asst-running', [
-        { type: 'tool', tool: 'blog', callID: 'c-run', state: { status: 'running' } },
+        { type: 'tool', tool: 'chronicle', callID: 'c-run', state: { status: 'running' } },
       ]),
     )
     assert.equal(caseOf(out), 'ProjectMessages')
@@ -326,7 +326,7 @@ test('ENFORCER_unknown_status_blog_part_is_not_a_failed_attempt', async () => {
     // running: hasFailedBlogAttempt falls to the interrupted check (false).
     const out = await run(
       assistantStep('asst-unknown-status', [
-        { type: 'tool', tool: 'blog', callID: 'c-un', state: { status: 'weird', metadata: { interrupted: false } } },
+        { type: 'tool', tool: 'chronicle', callID: 'c-un', state: { status: 'weird', metadata: { interrupted: false } } },
       ]),
     )
     assert.equal(caseOf(out), 'ProjectMessages')
@@ -340,7 +340,7 @@ test('ENFORCER_stateless_blog_part_has_no_status', async () => {
     parkedTransform.setCurrentRequest(scope, BLOG, manualCtx())
     // Blog tool part with no `state` at all: blogPartStatus is None.
     const out = await run(
-      assistantStep('asst-nostate', [{ type: 'tool', tool: 'blog', callID: 'c-ns' }]),
+      assistantStep('asst-nostate', [{ type: 'tool', tool: 'chronicle', callID: 'c-ns' }]),
     )
     assert.equal(caseOf(out), 'ProjectMessages')
     assert.equal(fatals.length, 0)
@@ -354,7 +354,7 @@ test('ENFORCER_statusless_blog_part_is_not_incomplete', async () => {
     // not completed → blogPartInterrupted(false) → rebuild path.
     const out = await run(
       assistantStep('asst-stateless', [
-        { type: 'tool', tool: 'blog', callID: 'c-st', state: {} },
+        { type: 'tool', tool: 'chronicle', callID: 'c-st', state: {} },
       ]),
     )
     assert.equal(caseOf(out), 'ProjectMessages')
@@ -403,7 +403,7 @@ test('ENFORCER_load_effective_frames_resolves_committed_frame', async () => {
       try {
         await run(
           assistantStep('asst-f1', [
-            { type: 'tool', tool: 'blog', callID: 'c-f1', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'frame body one' } } },
+            { type: 'tool', tool: 'chronicle', callID: 'c-f1', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'frame body one' } } },
           ]),
         )
       } finally {
@@ -431,7 +431,7 @@ test('ENFORCER_load_effective_frames_missing_blob_fails_closed', async () => {
       try {
         await run(
           assistantStep('asst-f2', [
-            { type: 'tool', tool: 'blog', callID: 'c-f2', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'frame body two' } } },
+            { type: 'tool', tool: 'chronicle', callID: 'c-f2', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'frame body two' } } },
           ]),
         )
       } finally {
@@ -456,7 +456,7 @@ test('ENFORCER_load_effective_frames_digest_mismatch_fails_closed', async () => 
       try {
         await run(
           assistantStep('asst-f3', [
-            { type: 'tool', tool: 'blog', callID: 'c-f3', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'frame body three' } } },
+            { type: 'tool', tool: 'chronicle', callID: 'c-f3', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'frame body three' } } },
           ]),
         )
       } finally {
@@ -481,7 +481,7 @@ test('ENFORCER_rebuild_falls_back_to_raw_when_frame_blob_lost', async () => {
       try {
         await run(
           assistantStep('asst-f4', [
-            { type: 'tool', tool: 'blog', callID: 'c-f4', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'frame body four' } } },
+            { type: 'tool', tool: 'chronicle', callID: 'c-f4', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'frame body four' } } },
           ]),
         )
       } finally {
@@ -493,7 +493,7 @@ test('ENFORCER_rebuild_falls_back_to_raw_when_frame_blob_lost', async () => {
       agentJournal.replaceBlobContent(journal, frame.TextRef, 'tampered')
       const out = await run(
         assistantStep('asst-f4', [
-          { type: 'tool', tool: 'blog', callID: 'c-f4', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'frame body four' } } },
+          { type: 'tool', tool: 'chronicle', callID: 'c-f4', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'frame body four' } } },
         ]),
       )
       // alreadyReceipt → catch-up drain stages the next window, but the frame

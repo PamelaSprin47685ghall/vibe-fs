@@ -40,7 +40,7 @@ module EnforcerCycleDecode =
                 else
                     unbox<string> part?tool
 
-            if kind <> "tool" || name <> "blog" then
+            if kind <> "tool" || name <> "chronicle" then
                 None
             else
                 let callId =

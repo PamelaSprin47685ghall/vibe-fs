@@ -41,7 +41,7 @@ X 的 lifecycle 语义轨迹是 append-only 的 `XTrace`（COMPANION-003）：
 
 Host compaction **不得删除** XTrace：否则 Y 落后补缺口与 LWR 自包含同时失效。compaction 只重锚 PrefixCoverage（HOST-006）。
 
-旧术语 `TerminalSessionA` / `ARecord` 废止；由 XTrace + OpeningPromptRaw + TerminalOutputRaw 取代。
+旧术语 `TerminalSessionA` / `ARecord` / `OpeningPromptRaw` 废止；由 XTrace + OpeningMaterial（preserved Opening 语义区间）+ TerminalOutputRaw 取代。
 
 ## HOST-006：Compaction — 预防与收容（行为）
 
@@ -72,7 +72,12 @@ Host compaction **不得删除** XTrace：否则 Y 落后补缺口与 LWR 自包
 
 ## HOST-013：结对编程 marker（行为）
 
-对**非 Companion / 非 Blogger** 的 provider transcript，每个尚未存在 HOST-013 synthetic bracket 的真实 provider/tool exchange（placement occasion）恰好产生一组 synthetic `auto-injected` pair：assistant tool-call + 使用同一 `callID` 的 completed tool-result。tool-call 输入为 `{}`；tool-result 正文有最近 prior tip 时为英文 Nudge、空行、`ProjectionConstants.PairProgrammingGuidelineText`，否则仅为该中文正文。
+对**非 Companion / 非 Blogger** 的 provider transcript，每个尚未存在 HOST-013 synthetic bracket 的真实 provider/tool exchange（placement occasion）恰好产生一组 synthetic `auto-injected` pair：assistant tool-call + 使用同一 `callID` 的 completed tool-result。tool-call 输入为 `{}`。
+
+tool-result 正文语言由不可变 `SessionProviderLanguage`（HOST-026）决定：English 或 SimplifiedChinese 各有一份 guideline 资源；有最近 prior tip 时在 guideline 前附加同语言 Nudge。  
+`SessionStartedAt` 在 session 创建时绑定一次并 durable；restart / fallback / Strength 不得改写；经 `IClockPort` 计量，不碰 ambient `UtcNow`。  
+每条**新** marker 携带一次 wall-clock 采样：`SessionStartedAt → now` 转为人类尺度（`N minutes M seconds` / `N 分 M 秒`），写入 durable `MarkerText`。  
+历史 marker **永不**因 replay / compaction / reanchor 重算 elapsed——只重放已存字节，以保持 append-only 前缀缓存（ARCH-004）。新 marker 只携带当下一次采样。
 
 **Bracket 结构**（规范，不是示意图）。synthetic pair 不是相邻的两条消息，而是跨越真实 response batch 的 temporal bracket。规范序列：
 
@@ -120,7 +125,7 @@ real history → synthetic call → synthetic result
 它**是**会影响 prompt bytes、Prefix Cache、ReviewSeal 的合成历史；**不是**私有思维、容量估算或通用恢复信号。
 
 **范围排除**：`AttachmentKind.Companion`（Blogger）的 transform **禁止**注入、恢复或追加任何
-auto-injected pair。Blogger 只消费 `blogger-system.md` + 工作日志 TOML；结对编程中文思考约束不得进入其
+auto-injected pair。Blogger 只消费 `blogger-system.md` + 工作日志 TOML；结对编程思考约束不得进入其
 provider-facing 历史。判断依据是 durable SessionAssociation（`Ownership = Attached(_, Companion)` /
 `isCompanion`），禁止按 agent 名字猜测。`SessionExecutionClass.Work`（含 Attached SyncInspector/SyncCoder）
 仍进入 HOST-013；InternalLeaf Bookkeeper 同 Companion 排除。
@@ -146,7 +151,7 @@ provider-facing 历史。判断依据是 durable SessionAssociation（`Ownership
 
 **编号永久空缺。** G3 clean-break 删除 Student/Teacher Host canary、QA bootstrap、`teacher` 工具双 await、
 Learn/Compile idle nudge 与 `StudentTeacherLinked`。无 alias、无 deprecated Host 路径。后继：SyncDelegate
-Inspector/Coder（HOST-008 / EXEC-026/028）；`return` **仅** SyncDelegate，无 StudentTeacher fallthrough。
+Inspector/Coder（HOST-008 / EXEC-026/028）。独立 `return` 工具通道已删除；无 StudentTeacher fallthrough。
 
 ## HOST-015：宿主 Session 树扁平，儿子的儿子是儿子
 
@@ -306,3 +311,16 @@ MagicTodo-enabled Manager Attempt
 ## HOST-025：sessionID+callID 定位 canary（blocking）
 
 before/after 仅有 `sessionID + callID`（HOST-011）。上线前必须证明经完整 SDK snapshot 能**唯一**定位：原 ToolPart、assistant message、provider run、ToolPart ordinal、其 XTrace range。不能唯一证明 → fail closed，membrane 不得上线。禁止用 callID 到别处猜配 messageID。
+
+## HOST-026：SessionProviderLanguage
+
+```text
+ProviderLanguage = English | SimplifiedChinese
+```
+
+全局语言偏好只在 **session 创建瞬间**读入，绑定为不可变 `SessionProviderLanguage`。  
+child / attached / InternalLeaf（含 Companion、SyncDelegate、Bookkeeper、StrengthReplica）继承 owner 或 commissioner 的语言，不得各自再读全局。  
+用户事后改全局偏好 → 只影响此后新建 session；已开 Life 的 Opening / Office Library / tool 后果 / HOST-013 marker 世界语保持字节连续。
+
+Fallback / Strength / restart / reanchor **不得**改写 `SessionProviderLanguage`。  
+翻译边界：localizable = system / Role Law / Common Law / Library / tool description / consequence / hints / WorkRecord headings；invariant = tool 名、argument 名、wire field、enum literal、路径、命令、`exit_code` 等技术标识（ARCH-016 Gate C）。

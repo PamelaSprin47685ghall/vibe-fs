@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Collections.Generic
+open Wanxiangshu.Domain
 open Wanxiangshu.Host
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
@@ -62,10 +63,13 @@ type PluginSessionScope() =
         this.SessionDirectories.Remove sessionId |> ignore
         this.VerdictSessions.Remove sessionId |> ignore
         this.AbortedSessions.Remove sessionId |> ignore
+        let sid = SessionId.create sessionId
+        SessionProviderLanguage.drop sid
+        SessionPersona.drop sid
         // HOST-004 Q-10: a deleted session's idle permits die forever.
-        this.Quiescence.DropSession(SessionId.create sessionId)
+        this.Quiescence.DropSession sid
         // SessionDeleted: drop join-interrupt waiters + one-shot user-message latch.
-        this.JoinInterrupts.ClearSession(SessionId.create sessionId)
+        this.JoinInterrupts.ClearSession sid
 
     /// Plugin dispose releases every companion host.
     member this.Dispose() =

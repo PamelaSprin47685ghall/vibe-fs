@@ -134,7 +134,7 @@ const withHarness = async (fn, { material = 0 } = {}) => {
     assistantStep(id, [
       {
         type: 'tool',
-        tool: 'blog',
+        tool: 'chronicle',
         callID: callId,
         state: { status: 'completed', input: { tip: 'primitive-obsession', text } },
       },

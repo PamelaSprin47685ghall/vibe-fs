@@ -82,14 +82,14 @@ test('VERDICT_unknown_manager_session_fails_closed', async () => {
   // sessionParents has no entry for the reviewer: owner resolution fails.
   const tool = spec(factory, scopeFor({ journal: fakeJournal({ CurrentBarrierId: 'bar-1' }) }))
   const result = await run(tool, { verdict: 'REVISE' }, context())
-  assert.equal(result.error, 'Verdict rejected because the manager session is unknown.')
+  assert.equal(result.error, 'Judgment rejected because the manager session is unknown.')
 })
 
 test('VERDICT_missing_git_tree_fails_closed', async () => {
   const parents = sessionMap([['ses-reviewer', 'ses-manager']])
   const tool = spec(factory, scopeFor({ journal: fakeJournal({ CurrentBarrierId: 'bar-1' }), sessionParents: parents }))
   const result = await run(tool, { verdict: 'REVISE' }, context())
-  assert.equal(result.error, 'Verdict rejected because the Git tree is unavailable.')
+  assert.equal(result.error, 'Judgment rejected because the Git tree is unavailable.')
 })
 
 test('VERDICT_no_open_review_barrier_fails_closed', async () => {
@@ -103,11 +103,11 @@ test('VERDICT_no_open_review_barrier_fails_closed', async () => {
     }),
   )
   const result = await run(tool, { verdict: 'PERFECT' }, context())
-  assert.equal(result.error, 'Verdict rejected because no review barrier is open for this tree.')
+  assert.equal(result.error, 'Judgment rejected because no review barrier is open for this tree.')
 })
 
 test('VERDICT_non_reviewer_role_is_refused_before_identity_checks', async () => {
   const tool = spec(factory, scopeFor())
   const result = await run(tool, { verdict: 'PERFECT' }, context({ sessionId: 'ses-coder' }))
-  assert.equal(result.error, 'Verdict rejected: the verdict tool is available only to reviewer sessions.')
+  assert.equal(result.error, 'Judgment rejected: the judge tool is available only to reviewer sessions.')
 })

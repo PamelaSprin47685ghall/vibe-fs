@@ -106,15 +106,15 @@ test('HFP_fork_pty_tracks_registers_and_resolves_last', async () => {
     'fork routes through the port handler with a Spawn command',
   )
 
-  // No-agent resolution targets the most recently created PTY.
-  const byEmpty = tryPty(liveCtx.runtime, '')
-  assert.equal(ptyIdValue(byEmpty), idValue)
+  // Explicit id resolution only — empty id does not mean "last PTY".
   const byId = tryPty(liveCtx.runtime, idValue)
   assert.equal(ptyIdValue(byId), idValue)
+  assert.equal(tryPty(liveCtx.runtime, ''), undefined)
 
-  // A second fork moves the "last" pointer.
+  // A second fork registers a distinct owned id.
   const second = okId(await forkPty(liveCtx.runtime, 'pwd', AGENT))
-  assert.equal(ptyIdValue(tryPty(liveCtx.runtime, '')), ptyIdValue(second))
+  assert.notEqual(ptyIdValue(second), idValue)
+  assert.equal(ptyIdValue(tryPty(liveCtx.runtime, ptyIdValue(second))), ptyIdValue(second))
   liveCtx.cleanup()
 })
 

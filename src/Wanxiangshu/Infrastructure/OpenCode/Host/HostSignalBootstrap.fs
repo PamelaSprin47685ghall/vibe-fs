@@ -179,7 +179,10 @@ module HostSignalBootstrap =
             let registerOwned (sessionId: string) =
                 if not (String.IsNullOrWhiteSpace sessionId) then
                     scope.Sessions.OwnedSessions.Add sessionId |> ignore
-                    signalRouter.RegisterOwned(SessionId.create sessionId)
+                    let sid = SessionId.create sessionId
+                    signalRouter.RegisterOwned sid
+                    // HOST-026: root / first-touch bind from global preference (idempotent).
+                    ProviderLanguageBinding.ensureRoot sid |> ignore
 
             let bindUserMessage (sessionId: string) (messageId: string) =
                 if

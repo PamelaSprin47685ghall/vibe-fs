@@ -24,7 +24,7 @@ const { PtyId_Create_Z721C83C5, PtyId__get_Value, PtyCommand, PtySignal } = awai
 )
 
 const id = (v) => PtyId_Create_Z721C83C5(v)
-const agent = { Name: 'fast-executor' }
+const agent = { Name: 'fast-distiller' }
 const write = new PtyCommand(1, [new TextEncoder().encode('x')])
 
 // The spawn failure is delivered through the async handler; let the task run.

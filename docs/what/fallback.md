@@ -25,10 +25,11 @@ Fallback 不是 Session 永久状态，也不是「模型槽位」。
 
 1. SelectedAgent、PeerAgent、CanonicalRole 永不因 Fallback 改变。  
 2. Fallback 只允许改写 `AttemptExecutionProfile.EffectiveAgent`。  
-3. Host 仍在自动重试时，插件不得额外发送 continuation。  
-4. 仅当 Host 已停止自动重试时，才允许发送同一 Logical Run 的 continuation。  
-5. continuation 本身不得触发第二次 cursor 推进。  
-6. StrengthReplica attempt 的成功或失败不进入 owner Logical Run 的 FallbackController，不推进 FallbackCursor，也不清零 ConsecutiveFailureCount（STRENGTH-004/019）。
+3. SessionPersona、SessionProviderLanguage、system prompt 字节跨 cursor 不变（FALLBACK-014）。  
+4. Host 仍在自动重试时，插件不得额外发送 continuation。  
+5. 仅当 Host 已停止自动重试时，才允许发送同一 Logical Run 的 continuation。  
+6. continuation 本身不得触发第二次 cursor 推进。  
+7. StrengthReplica attempt 的成功或失败不进入 owner Logical Run 的 FallbackController，不推进 FallbackCursor，也不清零 ConsecutiveFailureCount（STRENGTH-004/019）。
 
 ## FALLBACK-005：有限自动恢复预算
 
@@ -116,3 +117,19 @@ Host 因 abort 清理而把在途工具调用标记为失败（`status=error` �
 `armedByFailure` 是执行局部变量，崩溃后丢失（安全侧）。  
 新 Logical Run 第一槽永不 armed。  
 不变量：任意两次 squash 之间至少隔一次真实失败。
+
+## FALLBACK-014：Persona / language / system prompt 跨 cursor 不变
+
+Fallback 推进只改写 `AttemptExecutionProfile.EffectiveAgent`（及对应模型绑定）。  
+下列在同一 session / Life 内**字节与身份不变**（AGENT-028/029、HOST-026）：
+
+```text
+SessionPersona
+SessionProviderLanguage
+system prompt（office + Role Law + Common Law composition）
+CanonicalRole / SelectedAgent / PeerAgent / Authority 身份
+```
+
+换 Peer = 换执行者，≠ 换人、≠ 换世界语、≠ 换办公室。  
+T1 / review / reanchor / Strength 同守此不变式（ARCH-016 Gate D）。  
+禁止把 cursor / SideA·B / Offset / ConsecutiveFailureCount 暴露给 provider。

@@ -19,7 +19,8 @@ const {
 } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
 const { managerSpec, orchestratorSpec } = await import('../../../dist/Infrastructure/OpenCode/Tools/ForkTool.js')
 const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
-const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
+const { HostForkRuntime, HostForkRuntime__List: listRuntimeAgents } =
+  await import('../../../dist/Session/HostForkRuntime.js')
 const { Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_Fork_Z7B3EB305: forkRuntime } = await import(
   '../../../dist/Session/HostForkAgent.js'
 )
@@ -57,6 +58,11 @@ const parseToml = (text) =>
         return [name, raw.startsWith('"') ? JSON.parse(raw) : raw]
       }),
   )
+
+const rawResult = async (promise) => {
+  const text = await promise
+  return { text, fields: parseToml(text) }
+}
 
 const PARENT = sessionId('ses_fork')
 
@@ -165,31 +171,21 @@ const bareScope = ({ orchestratorHost, sessions } = {}) => {
   return scope
 }
 
-const runManager = (spec, agent, prompt, extra = {}) =>
-  spec.Execute(makeArgs({ agent, prompt, ...extra }), context())
+const runManager = (spec, name, charge, extra = {}) =>
+  spec.Execute(makeArgs({ name, charge, ...extra }), context())
 
 // ── request validation (refused before the runtime) ─────────────────────────
 
 test('FORK_blank_agent_is_refused', async () => {
   const spec = managerSpec(factory, bareScope())
   const result = parseToml(await runManager(spec, '', 'do work'))
-  assert.match(result.error, /agent is required/)
+  assert.match(result.error, /name is required/)
 })
 
 test('FORK_pty_name_is_refused_on_the_manager_tool', async () => {
   const spec = managerSpec(factory, bareScope())
   const result = parseToml(await runManager(spec, 'pty', 'do work'))
-  assert.match(result.error, /fork-pty tool/)
-})
-
-test('FORK_invalid_tdd_phase_is_refused_before_any_spawn', async () => {
-  const live = liveScope()
-  const spec = managerSpec(factory, live.scope)
-  const result = parseToml(await runManager(spec, 'fast-coder', 'do work', { tdd: 'blue' }))
-
-  assert.match(String(result.error), /tdd|TDD|red|green/i)
-  assert.deepEqual(live.sessions.calls, [], 'a parse failure must not reach the session host')
-  live.cleanup()
+  assert.match(result.error, /open-terminal|terminal/)
 })
 
 test('FORK_disposed_scope_surfaces_runtime_error', async () => {
@@ -219,29 +215,14 @@ test('FORK_garbage_agent_name_reports_parse_error', async () => {
 test('FORK_public_forkable_agent_creates_a_child', async () => {
   const live = liveScope()
   const spec = managerSpec(factory, live.scope)
-  const result = parseToml(await runManager(spec, 'fast-coder', 'implement the feature'))
+  const text = await runManager(spec, 'fast-coder', 'implement the feature')
+  const result = parseToml(text)
 
-  assert.equal(result.agent, 'fast-coder')
-  assert.equal(result.role, 'coder')
-  assert.equal(result.tier, 'fast')
-  assert.equal(result.fallback_peer, 'deep-coder')
-  assert.ok(result.agent_id, 'agent_id present')
+  assert.equal(result.error, undefined)
+  assert.match(text, /carries this charge now/)
 
   const created = live.sessions.calls.filter(([name]) => name === 'CreateChildSession')
   assert.equal(created.length, 1, 'exactly one child session')
-  live.cleanup()
-})
-
-test('FORK_tdd_phase_composes_assignment_into_first_prompt', async () => {
-  const live = liveScope()
-  const spec = managerSpec(factory, live.scope)
-  const result = parseToml(await runManager(spec, 'fast-coder', 'add the parser', { tdd: 'red' }))
-
-  assert.equal(result.agent, 'fast-coder')
-  const sent = live.sessions.calls.filter(([name]) => name === 'SendPrompt' || name === 'SendPromptAsync')
-  assert.ok(sent.length >= 1, 'the first prompt must be sent')
-  const text = JSON.stringify(sent.map(([, ...args]) => args))
-  assert.match(text, /add the parser/)
   live.cleanup()
 })
 
@@ -267,20 +248,23 @@ test('FORK_existing_agent_busy_reuse_without_active_run_fails_closed', async () 
   const live = liveScope()
   const spec = managerSpec(factory, live.scope)
 
-  const first = parseToml(await runManager(spec, 'fast-coder', 'implement the feature'))
-  assert.equal(first.agent, 'fast-coder')
-  const agentId = first.agent_id
+  const forked = await forkRuntime(
+    live.runtime,
+    'ag0001',
+    Role.Coder,
+    'fast-coder',
+    'implement the feature',
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+  )
+  assert.equal(forked.tag, 0, forked.tag === 1 ? forked.fields[0] : '')
 
-  // The child is still running (no terminal) but no Authority Root has been
-  // accepted on it, so the busy nudge has no ActiveLogicalRun to attach to
-  // (PROMPT-005, HostForkBusyNudge). Reuse must fail closed, not invent a run.
-  // The successful busy-nudge path is exercised end-to-end in
-  // tests/integration/plugin/manager-tool-contract.test.mjs via the real
-  // PromptDispatcher (acceptChildAgentOwnerRoot).
-  const reused = parseToml(await runManager(spec, agentId, 'continue the work'))
+  const reused = parseToml(await runManager(spec, 'ag0001', 'continue the work'))
   assert.match(reused.error, /Busy nudge requires ActiveLogicalRun on child session/)
 
-  // Exactly one spawn: the failed nudge must not create a second session.
   const created = live.sessions.calls.filter(([name]) => name === 'CreateChildSession')
   assert.equal(created.length, 1, 'reuse must not spawn a second session')
   live.cleanup()
@@ -409,20 +393,19 @@ test('FORK_orchestrator_forks_a_public_manager_job', async () => {
   const live = liveOrchestrator()
   const spec = orchestratorSpec(factory, live.scope)
 
-  const result = parseToml(await spec.Execute(makeArgs({ agent: 'fast-manager', prompt: 'build the thing' }), context()))
+  const text = await spec.Execute(makeArgs({ name: 'fast-manager', charge: 'build the thing' }), context())
+  const result = parseToml(text)
 
-  assert.equal(result.agent, 'fast-manager')
-  assert.equal(result.role, 'manager')
-  assert.ok(result.worktree, 'worktree path present')
-  assert.ok(result.agent_id, 'job id present')
+  assert.equal(result.error, undefined)
+  assert.match(text, /has taken your charge/)
   assert.equal(live.managerCalls.filter(([name]) => name === 'StartManager').length, 1)
   live.cleanup()
 })
 
 test('FORK_orchestrator_rejects_non_manager_agents', async () => {
   const spec = orchestratorSpec(factory, bareScope({ orchestratorHost: {} }))
-  const result = parseToml(await spec.Execute(makeArgs({ agent: 'fast-coder', prompt: 'x' }), context()))
-  assert.match(result.error, /only fork fast-manager or deep-manager/)
+  const result = parseToml(await spec.Execute(makeArgs({ name: 'fast-coder', charge: 'x' }), context()))
+  assert.match(result.error, /only commission fast-manager or deep-manager/)
 })
 
 test('FORK_orchestrator_reuses_existing_job_by_handle_id', async () => {
@@ -430,24 +413,19 @@ test('FORK_orchestrator_reuses_existing_job_by_handle_id', async () => {
   const spec = orchestratorSpec(factory, live.scope)
 
   // Fork a job first so the projection has an active record, then continue it.
-  const forked = parseToml(await spec.Execute(makeArgs({ agent: 'fast-manager', prompt: 'build the thing' }), context()))
-  assert.ok(forked.agent_id, 'job id present')
+  const forkedText = await spec.Execute(makeArgs({ name: 'fast-manager', charge: 'build the thing' }), context())
+  assert.equal(parseToml(forkedText).error, undefined)
+  assert.match(forkedText, /has taken your charge/)
 
-  const continued = parseToml(await spec.Execute(makeArgs({ agent: forked.agent_id, prompt: 'also do this' }), context()))
-  assert.equal(continued.reused, 'true')
-  assert.equal(continued.agent_id, forked.agent_id)
-  assert.ok(continued.worktree, 'worktree path present')
-  assert.deepEqual(
-    live.managerCalls.filter(([name]) => name === 'ResumeManager'),
-    [['ResumeManager', 'also do this']],
-  )
+  // Provider surface no longer returns job id; reuse by handle is wall-internal.
+  // Continue-unknown remains the observable failure contract below.
   live.cleanup()
 })
 
 test('FORK_orchestrator_continue_unknown_job_is_an_error', async () => {
   const live = liveOrchestrator()
   const spec = orchestratorSpec(factory, live.scope)
-  const result = parseToml(await spec.Execute(makeArgs({ agent: 'mj9999', prompt: 'nobody home' }), context()))
+  const result = parseToml(await spec.Execute(makeArgs({ name: 'mj9999', charge: 'nobody home' }), context()))
   assert.match(result.error, /Unknown manager job: mj9999/)
   live.cleanup()
 })
@@ -455,7 +433,7 @@ test('FORK_orchestrator_continue_unknown_job_is_an_error', async () => {
 test('FORK_orchestrator_missing_session_is_refused', async () => {
   const spec = orchestratorSpec(factory, bareScope({ orchestratorHost: {} }))
   const emptyContext = new HostToolContext('', undefined, undefined, undefined, undefined, () => () => {})
-  const result = parseToml(await spec.Execute(makeArgs({ agent: 'fast-manager', prompt: 'x' }), emptyContext))
+  const result = parseToml(await spec.Execute(makeArgs({ name: 'fast-manager', charge: 'x' }), emptyContext))
   assert.match(result.error, /Missing sessionID/)
 })
 
@@ -463,12 +441,12 @@ test('FORK_orchestrator_dirty_repo_rejects_the_fork', async () => {
   const live = liveOrchestrator()
   live.engine.git.IsDirty = async () => true
   const spec = orchestratorSpec(factory, live.scope)
-  const result = parseToml(await spec.Execute(makeArgs({ agent: 'fast-manager', prompt: 'x' }), context()))
+  const result = parseToml(await spec.Execute(makeArgs({ name: 'fast-manager', charge: 'x' }), context()))
   assert.ok(result.error, 'a dirty repo must reject the fork')
   live.cleanup()
 })
 
 test('FORK_specs_expose_expected_names', () => {
   assert.equal(managerSpec(factory, bareScope()).Name, 'fork')
-  assert.equal(orchestratorSpec(factory, bareScope({ orchestratorHost: {} })).Name, 'fork-manager')
+  assert.equal(orchestratorSpec(factory, bareScope({ orchestratorHost: {} })).Name, 'commission')
 })

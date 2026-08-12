@@ -24,7 +24,7 @@ module OneShotAgentTool =
             WorkRecord: string option
         }
 
-    /// Same management bound as ExecutorSummarize / HostForkRuntime join budget.
+    /// Same management bound as Distillation / HostForkRuntime join budget.
     /// Unbounded `completion.Task` hung callers when the child never went terminal.
     [<Literal>]
     let CompletionTimeoutMs = 600_000
@@ -107,7 +107,7 @@ module OneShotAgentTool =
                         directory
                         |> Option.iter (fun path -> scope.RegisterDirectory(SessionId.value childId, path))
 
-                        // COMPANION-003 / EXEC-006: child's OpeningPromptRaw is the
+                        // COMPANION-003 / EXEC-006: child's OpeningMaterial is the
                         // ORIGINAL oneshot assignment (not the rendered relay
                         // envelope), matching HostForkAgent. PromptIngress skips
                         // Opening for AgentOwnerRoot; capture before send.

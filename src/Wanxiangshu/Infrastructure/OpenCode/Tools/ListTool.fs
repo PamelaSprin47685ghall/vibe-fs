@@ -7,75 +7,37 @@ open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
 open Wanxiangshu.Session
 
-/// list() is the durable handle view joined with physical PTY records.
+/// horizon() — natural-language roster of who remains at the caller's horizon.
 module ListTool =
 
     let private tString = ToolHostCodec.TString
-    let private tBool = ToolHostCodec.TBool
 
-    let private optionalField (name: string) (value: string option) : (string * ToolHostCodec.TomlValue) list =
-        match value with
-        | Some v when not (String.IsNullOrWhiteSpace v) -> [ name, tString v ]
-        | _ -> []
+    let private lineForHandle (handle: HandleRecord) (runtimeRecord: AgentRecord option) : string =
+        let label =
+            if not (String.IsNullOrWhiteSpace handle.TargetAgent) then
+                handle.TargetAgent
+            else
+                match ManagedAgent.tryParse handle.TargetAgent with
+                | Some managed -> managed.Name
+                | None -> "someone"
 
-    let private agentEntry
-        (handle: HandleRecord)
-        (runtimeRecord: AgentRecord option)
-        : (string * ToolHostCodec.TomlValue) list =
-        let agentId =
-            match HandleId.tryAgent handle.Handle with
-            | Some value -> AgentHandleId.value value
-            | None -> invalidArg "handle" "listable handle is not an agent"
+        match handle.Lifecycle with
+        | HandleLifecycle.CompletedAwaitingJoin _ -> sprintf "# %s has returned." label
+        | HandleLifecycle.Active ->
+            match runtimeRecord with
+            | Some record when record.CompletionCellSettled -> sprintf "# %s has returned." label
+            | _ -> sprintf "# %s is still away." label
+        | HandleLifecycle.Abandoned _
+        | HandleLifecycle.Retired -> sprintf "# %s did not return from this charge." label
 
-        let status =
-            match handle.Lifecycle with
-            | HandleLifecycle.CompletedAwaitingJoin _ -> "completed-awaiting-join"
-            | HandleLifecycle.Active ->
-                runtimeRecord
-                |> Option.map (fun record -> record.Status.ToString().ToLowerInvariant())
-                |> Option.defaultValue "running"
-            | HandleLifecycle.Abandoned _
-            | HandleLifecycle.Retired -> invalidArg "handle" "retired or abandoned handle is not listable"
+    let private lineForPty (record: PtyRecord) : string =
+        let label =
+            if String.IsNullOrWhiteSpace record.Command then
+                "Terminal"
+            else
+                record.Command.Trim()
 
-        let baseFields =
-            [ "kind", tString "agent"
-              "agent_id", tString agentId
-              "child_session_id", tString (SessionId.value handle.ChildSessionId)
-              "status", tString status
-              "has_pending_completion",
-              tBool (
-                  match handle.Lifecycle with
-                  | HandleLifecycle.CompletedAwaitingJoin _ -> true
-                  | HandleLifecycle.Active ->
-                      runtimeRecord |> Option.exists (fun record -> record.CompletionCellSettled)
-                  | HandleLifecycle.Abandoned _
-                  | HandleLifecycle.Retired -> false
-              ) ]
-
-        let optionalFields =
-            optionalField "current_run_id" (runtimeRecord |> Option.bind (fun record -> record.CurrentRunId))
-            @ optionalField
-                "last_completion_status"
-                (runtimeRecord |> Option.bind (fun record -> record.TerminalStatusLabel))
-
-        let identity =
-            match ManagedAgent.tryParse handle.TargetAgent with
-            | Some managed ->
-                [ "agent", tString managed.Name
-                  "role", tString (ManagedAgent.roleName managed.Role)
-                  "tier", tString (ManagedAgent.tierName managed.Tier)
-                  "fallback_peer", tString (ManagedAgent.peer managed).Name ]
-            | None ->
-                [ "agent", tString handle.TargetAgent
-                  "role", tString (handle.CanonicalRole.ToString().ToLowerInvariant()) ]
-
-        baseFields @ optionalFields @ identity
-
-    let private ptyEntry (record: PtyRecord) : (string * ToolHostCodec.TomlValue) list =
-        [ "kind", tString "pty"
-          "pty_id", tString record.PtyId
-          "command", tString record.Command
-          "started_at", tString (record.StartedAt.ToString("O")) ]
+        sprintf "# %s remains open." label
 
     let private execute (scope: ToolRuntimeScope) (_args: HostToolArguments) context =
         task {
@@ -96,23 +58,32 @@ module ListTool =
                     let runtimeByAgentId =
                         agents |> List.map (fun record -> record.AgentId, record) |> Map.ofList
 
-                    let listableAgents =
+                    let agentLines =
                         HandleProjection.listable durableHandles
                         |> List.choose (fun handle ->
                             match HandleId.tryAgent handle.Handle with
                             | Some handleId ->
                                 let agentId = AgentHandleId.value handleId
-                                Some(agentEntry handle (Map.tryFind agentId runtimeByAgentId))
+                                Some(lineForHandle handle (Map.tryFind agentId runtimeByAgentId))
                             | None -> None)
 
-                    let ptyEntries =
-                        ptys |> List.sortBy (fun record -> record.PtyId) |> List.map ptyEntry
+                    let ptyLines =
+                        ptys |> List.sortBy (fun record -> record.PtyId) |> List.map lineForPty
 
-                    return ToolHostCodec.tomlTable "item" (List.append listableAgents ptyEntries)
+                    let lines = List.append agentLines ptyLines
+
+                    let instructions =
+                        if List.isEmpty lines then
+                            [ "# Nothing beyond your immediate sight presently asks for your attention." ]
+                        else
+                            lines
+
+                    return ToolHostCodec.tomlObjectWithInstructions instructions []
         }
 
     let spec scope =
-        { Name = "list"
-          Description = "List active agents and PTYs"
+        { Name = "horizon"
+          Description =
+            "Orient to what remains at your horizon — who is still away, who has returned, which terminals remain open."
           Arguments = []
           Execute = execute scope }

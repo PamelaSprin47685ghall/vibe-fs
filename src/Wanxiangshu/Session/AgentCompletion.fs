@@ -218,7 +218,7 @@ module PtyJoinItem =
         | PtyFailed f -> f.PtyId
         | PtyAborted a -> a.PtyId
 
-    /// Compat projection into RunCompletion for JoinWithPermit / ExecutorSummarize /
+    /// Compat projection into RunCompletion for JoinWithPermit / Distillation /
     /// CompletionMailbox.Join only. Production JoinTool batch path keeps PtyJoinItem
     /// (HostForkRuntime → JoinItem → renderer) so aborted is not lost on wire.
     /// PtyAborted projects with Code = "PTY_ABORTED" so ofRunCompletion can recover it;

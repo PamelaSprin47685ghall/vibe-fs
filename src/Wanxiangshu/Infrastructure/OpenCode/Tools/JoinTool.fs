@@ -154,6 +154,24 @@ module JoinTool =
                                     joinDescriptor
                                     (Join.joinAvailable runtime permit JoinBatch.Max waitTask)
 
+                            let resolveAgentName agentId =
+                                match runtime.TryFindAgent agentId with
+                                | Some record -> record.Agent
+                                | None -> ""
+
+                            let resolveTerminalLabel ptyId =
+                                let _, ptys = runtime.List()
+
+                                match ptys |> List.tryFind (fun record -> record.PtyId = ptyId) with
+                                | Some record when not (String.IsNullOrWhiteSpace record.Command) ->
+                                    record.Command.Trim()
+                                | _ ->
+                                    lock runtime.Gate (fun () ->
+                                        runtime.TerminalByName
+                                        |> Seq.tryPick (fun (KeyValue(name, id)) ->
+                                            if id = ptyId then Some name else None))
+                                    |> Option.defaultValue "Terminal"
+
                             match joined with
                             | Ok(Interrupted reason) ->
                                 match reason with
@@ -161,16 +179,11 @@ module JoinTool =
                                 | JoinInterruptReason.UserMessageArrived ->
                                     return JoinResultRenderer.renderInterrupted reason
                                 | JoinInterruptReason.DeadlineExpired ->
-                                    return JoinResultRenderer.renderForkError ForkError.TimedOut
+                                    return JoinResultRenderer.renderInterrupted JoinInterruptReason.DeadlineExpired
                             | Ok(ResultsAvailable batch) ->
                                 return
-                                    JoinResultRenderer.renderJoinItemBatch
-                                        (fun agentId ->
-                                            match runtime.TryFindAgent agentId with
-                                            | Some record -> record.Agent
-                                            | None -> "")
-                                        batch
-                            | Error joinError -> return JoinResultRenderer.renderForkError joinError
+                                    JoinResultRenderer.renderJoinItemBatch resolveAgentName batch resolveTerminalLabel
+                            | Error joinError -> return JoinResultRenderer.renderForkError joinError resolveAgentName
         }
 
     let spec scope =

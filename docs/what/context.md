@@ -138,14 +138,31 @@ Opening（永久 raw，byte-stable）
 
 非 Magic 路径（无 Accepted TodoCheckpoint 链）保持 CTX-010/012 既有行为不变。
 
-## CTX-016：WorkRecordStart Opening floor
+## CTX-016：WorkRecordStart Opening floor（BlindPlan 对齐）
+
+Opening = 交托关闭前的语义区间，不是「第一条消息」：
+
+```text
+Immediate role:
+  Opening = InitialCharge
+
+BlindPlan（Manager）:
+  Opening = InitialCharge
+          + pre-commitment reasoning / investigation
+          + delegated returns / user clarifications
+          + commitment call
+          + canonical accepted commitment result / revelation
+```
+
+Opening 在角色定义的 commitment 边界关闭后永不移动。  
+`OpeningMaterial` = 该区间上 preserved XTrace；禁止 `OpeningPromptRaw` 式拼接重建。
 
 删除 planning/Activation 业务 floor 后，Opening 保护改由结构性 cursor（不是 Stage）：
 
 ```text
 ManagerLife.WorkRecordStart
-  = Opening HumanRoot semantic range 的 exclusive end
-  （由 LifeOpened / XTrace Opening 纯推导）
+  = Opening 语义区间的 exclusive end
+  （由 LifeOpened / XTrace Opening 纯推导；BlindPlan 含 T1 commitment）
 
 Blogger effectiveStart
   = max(RecordCoverage, Life.WorkRecordStart)
@@ -155,6 +172,7 @@ Blogger effectiveStart
 Opening 永久 raw、byte-stable
 Opening 不交给 Y 改写，不随 TodoCheckpoint rebase 消失
 process-review LWR：includeOpening=false，不得再复制 Opening
+after Opening（WorkRecordStart）→ 普通 Chronicle / Recent work / Y 机械
 ```
 
 禁止：Blogger 从 0/session head 起步吞掉 Opening；把 Opening floor 绑回 `WorkActivated`（TODO-001）。

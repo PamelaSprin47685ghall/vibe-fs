@@ -4,6 +4,7 @@ namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
 open Wanxiangshu.Domain
+open Wanxiangshu.Finality
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure
 open Wanxiangshu.Journal
@@ -58,7 +59,10 @@ module PluginSessionWiring =
                     ?workspaceDirectory = workspaceDirectory,
                     ?onInspectorPrompt = Some CasebookLifecycle.notePrompt,
                     ?onInspectorAnswer = Some CasebookLifecycle.noteAnswer,
-                    ?onInspectorCleanup = Some CasebookLifecycle.cleanupInspector
+                    ?onInspectorCleanup = Some CasebookLifecycle.cleanupInspector,
+                    ?workRecordFor =
+                        Some(fun sessionId ->
+                            LifecycleWorkRecordProjection.lifecycleWorkRecord (Some durable) sessionId false)
                 )
 
             scope.AttachSyncDelegateRuntime syncDelegate

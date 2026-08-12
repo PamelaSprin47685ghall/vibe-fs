@@ -14,7 +14,7 @@ const kernel = await import(join(dist, 'Kernel/SembleMcp.js'))
 const { serverName, defaultRef, repo, toolName, maxSnippetLines, uvxCommand, fixtureCommand } = kernel
 const { parseText, parseToolResult } = await import(join(dist, 'Infrastructure/SembleSearchCodec.js'))
 const { launchFromVars, search } = await import(join(dist, 'Infrastructure/SembleMcpClient.js'))
-const ROLES = ['Manager', 'Orchestrator', 'Coder', 'Inspector', 'Browser', 'Meditator', 'Reviewer', 'DevOps', 'Executor', 'Blogger']
+const ROLES = ['Manager', 'Orchestrator', 'Coder', 'Inspector', 'Browser', 'Inquiry', 'Reviewer', 'DevOps', 'Distiller', 'Blogger', 'Bookkeeper']
 const TIERS = ['fast', 'deep']
 const agentName = (tier, role) => `${tier}-${role.toLowerCase()}`
 const uvxFrom = (ref) => ['uvx', '--from', `semble[mcp] @ git+https://github.com/MinishLab/semble.git@${ref}`, 'semble']

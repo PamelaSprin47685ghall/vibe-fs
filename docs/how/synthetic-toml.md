@@ -5,6 +5,7 @@
 - ARCH-010
 - ARCH-011
 - ARCH-012
+- ARCH-014 / ARCH-015（字段命名与 status plane 禁令）
 
 ## Ownership
 
@@ -80,25 +81,32 @@ CTX-013 的大小计量发生在完整渲染后的 UTF-8 字节上。该 surface
 historic frame 中的历史祈使句仍作为 data value，不提升为 comment；此为局部 surface
 合同，不是全局「凡历史一律 data」。
 
-### Join / fork
+### Join / fork / commission
 
 本地语义分类（owner 采用，非 trust 自动提升）：
 
 | 材料 | plane |
 |------|-------|
-| Fork assignment | instruction |
-| Fork parent_work_record | background data |
-| Fork original_user_requirement | data（由 instruction header 说明） |
-| Join 已完成 child work_record | entry-local guidance comments |
-| One-shot sync child work_record | entry-local guidance comments |
-| Join status / ordinal / kind / agent / failure / interrupt 元数据 | data |
+| Fork / commission assignment | instruction |
+| `commissioner_record`（旧名 `parent_work_record` 非法） | background data |
+| `root_requirement`（旧名 `original_user_requirement` 非法） | data（由 instruction header 说明） |
+| Join 已完成 child WorkRecord / LWR | entry-local guidance comments |
+| One-shot sync child WorkRecord / LWR | entry-local guidance comments |
 
-具体 wire 字段由 EXEC-004（Join）与 EXEC-028（One-shot sync）分别定义；本文件只规定它们使用统一 codec 与上述 plane 指派。
+**禁止**把 Join status plane 编进 provider data：
+
+```text
+status / count / ordinal / kind / agent / failure / interrupt 元数据 DTO
+```
+
+后果用自然语言 + WorkRecord（或 terminal 的 `exit_code` 等协议真需观测）；machine-semantic 结构仅留协议真需处（如 `exit_code`、`verdict` 参数、`root_requirement`）。
+
+具体 wire 由 EXEC-004（Join）、EXEC-028/031（sync）、EXEC-029（commission）定义；本文件只规定统一 codec 与上述 plane 指派。
 
 ### Tool results
 
 pass-through 与 marker+tail 都先通过同一 data renderer，再应用 ARCH-012 的行数和字节界；
-截断不得切断 Unicode scalar/surrogate pair。
+截断不得切断 Unicode scalar/surrogate pair。`js-bookkeeper` 等结果同服从 Horizon 滤镜。
 
 ## Failure handling
 

@@ -94,13 +94,13 @@ export const scriptedBookkeeperPort = () => {
         makeArgs({ document: 'Q.md', old_text: stagedQ, new_text: CANONICAL_Q }),
         context(sid),
       )
-      assert.equal(String(qOut).includes('replaced'), true, qOut)
+      assert.equal(String(qOut).includes('rewritten'), true, qOut)
       editQaCalls.push('Q.md')
       const aOut = await execute(
         makeArgs({ document: 'A.md', old_text: stagedA, new_text: CANONICAL_A }),
         context(sid),
       )
-      assert.equal(String(aOut).includes('replaced'), true, aOut)
+      assert.equal(String(aOut).includes('rewritten'), true, aOut)
       editQaCalls.push('A.md')
       for (const callback of terminals) callback(childSession, completedTerminal(childSession))
       return { tag: 0, fields: [] }
@@ -136,7 +136,7 @@ test('CASE006_create_child_once_per_refresh_via_edit_qa', async () => {
     assert.equal(refreshed.ok, true, JSON.stringify(refreshed.error))
     assert.equal(refreshed.value, true)
     assert.equal(createCalls.length, 1, 'exactly one CreateChildSession per refresh')
-    assert.equal(editQaCalls.length >= 2, true, 'edit-qa must write Q and A')
+    assert.equal(editQaCalls.length >= 2, true, 'js-bookkeeper must write Q and A')
     assert.equal(prompts.some((text) => String(text).includes('CaseRefresh')), true)
 
     const fetched = resultOf(fetchCase(store, raw, 10, 's-session-refresh'))
@@ -188,7 +188,7 @@ test('CASE010_finalize_create_child_once_and_cleanup_never_runs_bookkeeper', asy
     noteAnswer(sessionIdKey, 'cleanup A')
     cleanupInspector(sessionIdKey)
     assert.equal(createCalls.length, beforeCleanup, 'unexpected cleanup must not CreateChildSession')
-    assert.equal(editQaCalls.length, beforeEdits, 'unexpected cleanup must not call edit-qa')
+    assert.equal(editQaCalls.length, beforeEdits, 'unexpected cleanup must not call js-bookkeeper')
   } finally {
     resetSessionPort()
     setEnabled(undefined)

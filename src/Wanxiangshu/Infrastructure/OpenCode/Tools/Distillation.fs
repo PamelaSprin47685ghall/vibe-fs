@@ -13,26 +13,28 @@ open Wanxiangshu.Process
 open Wanxiangshu.Session
 open Wanxiangshu.Domain
 
-/// Bounded hierarchical map/reduce for spooled Executor output.
-module ExecutorSummarize =
+/// Bounded hierarchical map/reduce distillation for spooled command output.
+module Distillation =
 
     [<Literal>]
     let ReduceFanIn = 8
 
-    type IExecutorRuntime = ExecutorSummarizeRuntime.IExecutorRuntime
+    type IDistillationRuntime = DistillationRuntime.IDistillationRuntime
 
-    let asExecutorRuntime = ExecutorSummarizeRuntime.asExecutorRuntime
-    let ofForkRuntime = ExecutorSummarizeRuntime.ofForkRuntime
+    let asDistillationRuntime = DistillationRuntime.asDistillationRuntime
+    let ofForkRuntime = DistillationRuntime.ofForkRuntime
 
-    let summarizeChunkPrompt (index: int) : string =
-        sprintf
-            "Summarize command output chunk %d. Preserve errors, decisions, paths, and exact numbers; omit raw code."
-            index
+    [<Literal>]
+    let private DistillFragmentPromptText =
+        "Distill this fragment of command output. Preserve errors, decisions, paths, and exact numbers; omit raw code."
 
-    let reduceBatchPrompt (level: int) : string =
-        sprintf
-            "Reduce level-%d command-output summaries into one dense report. Preserve failures and exact facts; do not include raw code."
-            level
+    [<Literal>]
+    let private MergeDistillationsPromptText =
+        "Merge these command-output distillations into one dense account. Preserve failures and exact facts; do not include raw code."
+
+    let distillFragmentPrompt () = DistillFragmentPromptText
+
+    let mergeDistillationsPrompt () = MergeDistillationsPromptText
 
     let private agentId (processId: string) (level: int) (startChunk: int) (endChunk: int) =
         sprintf "exec-%s" (HostDigest.sha256Hex (sprintf "%s|%d|%d|%d" processId level startChunk endChunk))
@@ -44,7 +46,7 @@ module ExecutorSummarize =
         | AgentFailed payload -> raise (InvalidOperationException payload.Message)
         | AgentAbandoned(_, reason) -> raise (InvalidOperationException reason)
 
-    /// Per-chunk join budget. Prevents a single hung summarizer from blocking the
+    /// Per-chunk join budget. Prevents a single hung distiller from blocking the
     /// whole map/reduce forever (Part 1: unblock; Part 2 owns richer partial text).
     [<Literal>]
     let AwaitAgentTimeoutMs = 600_000
@@ -57,13 +59,8 @@ module ExecutorSummarize =
     /// Permit-gated targeted await (Journal-authoritative via HostForkRuntime).
     /// FamilyWaiting → ForkError.TimedOut: wait for a journal advance within one deadline.
     /// FamilyBlocked / real join timeout → ForkError.NotFound: hard fail, no retry.
-    let awaitAgentWithPermit (runtime: IExecutorRuntime) (agentId: string) =
+    let awaitAgentWithPermit (runtime: IDistillationRuntime) (agentId: string) =
         let deadline = DateTimeOffset.UtcNow.AddMilliseconds(float AwaitAgentTimeoutMs)
-
-        let deadlineExpired () : RunCompletion =
-            raise (
-                InvalidOperationException(sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs)
-            )
 
         let rec loop () : Task<RunCompletion> =
             task {
@@ -113,8 +110,8 @@ module ExecutorSummarize =
 
         loop ()
 
-    let runExecutorPrompt
-        (runtime: IExecutorRuntime)
+    let private runDistillerPrompt
+        (runtime: IDistillationRuntime)
         (forkedIds: ResizeArray<string>)
         (processId: string)
         (level: int)
@@ -127,7 +124,7 @@ module ExecutorSummarize =
             let id = agentId processId level startChunk endChunk
             // Track before fork so sibling cancel covers in-flight map/reduce agents.
             forkedIds.Add id
-            let! fork = runtime.Fork(id, Role.Executor, prompt, payload)
+            let! fork = runtime.Fork(id, Role.Distiller, prompt, payload)
 
             match fork with
             | Error error -> return raise (InvalidOperationException error)
@@ -136,8 +133,8 @@ module ExecutorSummarize =
                 return completionText completion
         }
 
-    let summarizeChunk
-        (runtime: IExecutorRuntime)
+    let distillFragment
+        (runtime: IDistillationRuntime)
         (forkedIds: ResizeArray<string>)
         (spoolPath: string)
         (chunk: byte[])
@@ -145,23 +142,32 @@ module ExecutorSummarize =
         =
         let content = Encoding.UTF8.GetString chunk
 
-        let prompt = summarizeChunkPrompt index
-
         let rootDigest = HostDigest.sha256Hex (sprintf "%s|%d" spoolPath index)
 
-        runExecutorPrompt runtime forkedIds rootDigest 0 index index prompt (Some content)
+        runDistillerPrompt runtime forkedIds rootDigest 0 index index (distillFragmentPrompt ()) (Some content)
 
-    let reduceBatch (runtime: IExecutorRuntime) (forkedIds: ResizeArray<string>) (level: int) (batch: string list) =
+    let mergeDistillations
+        (runtime: IDistillationRuntime)
+        (forkedIds: ResizeArray<string>)
+        (level: int)
+        (batch: string list)
+        =
         let combined = String.concat "\n" batch
-
-        let prompt = reduceBatchPrompt level
 
         let batchDigest = HostDigest.sha256Hex (String.concat "\n" batch)
 
-        runExecutorPrompt runtime forkedIds batchDigest level 0 (List.length batch - 1) prompt (Some combined)
+        runDistillerPrompt
+            runtime
+            forkedIds
+            batchDigest
+            level
+            0
+            (List.length batch - 1)
+            (mergeDistillationsPrompt ())
+            (Some combined)
 
     let private rippleInsert
-        (reduceBatch: int -> string list -> Task<string>)
+        (mergeDistillations: int -> string list -> Task<string>)
         (levels: ResizeArray<ResizeArray<string>>)
         (summary: string)
         =
@@ -176,7 +182,7 @@ module ExecutorSummarize =
             while levels.[lvl].Count >= ReduceFanIn do
                 let batch = levels.[lvl] |> Seq.toList
                 levels.[lvl].Clear()
-                let! reduced = reduceBatch (lvl + 1) batch
+                let! reduced = mergeDistillations (lvl + 1) batch
 
                 if levels.Count <= lvl + 1 then
                     levels.Add(ResizeArray())
@@ -186,7 +192,7 @@ module ExecutorSummarize =
         }
 
     let private foldLevels
-        (reduceBatch: int -> string list -> Task<string>)
+        (mergeDistillations: int -> string list -> Task<string>)
         (levels: ResizeArray<ResizeArray<string>>)
         =
         task {
@@ -203,7 +209,7 @@ module ExecutorSummarize =
                     | [] -> ()
                     | [ single ] when i = levels.Count - 1 -> carry <- [ single ]
                     | _ ->
-                        let! reduced = reduceBatch (i + 1) batch
+                        let! reduced = mergeDistillations (i + 1) batch
                         carry <- [ reduced ]
 
                 match carry with
@@ -211,21 +217,33 @@ module ExecutorSummarize =
                 | _ -> return ""
         }
 
-    let reduceOnline (reduceBatch: int -> string list -> Task<string>) (summaries: string list) : Task<string> =
+    let reduceOnline (mergeDistillations: int -> string list -> Task<string>) (summaries: string list) : Task<string> =
         task {
             let levels = ResizeArray<ResizeArray<string>>()
 
             for summary in summaries do
-                do! rippleInsert reduceBatch levels summary
+                do! rippleInsert mergeDistillations levels summary
 
-            return! foldLevels reduceBatch levels
+            return! foldLevels mergeDistillations levels
         }
 
+    let private rawTailText (chunks: ResizeArray<int * byte[]>) =
+        if chunks.Count = 0 then
+            ""
+        else
+            Encoding.UTF8.GetString(snd chunks.[chunks.Count - 1])
+
+    let private partialWithTail (account: string) (rawTail: string) =
+        if String.IsNullOrWhiteSpace account then
+            sprintf "Condensation unavailable.\n\nMost recent raw output:\n%s" rawTail
+        else
+            sprintf "%s\n\nCondensation incomplete.\n\nMost recent raw output:\n%s" account rawTail
+
     /// Maps bounded spool chunks concurrently (results sorted by chunk index),
-    /// then reduces online. Map/reduce failures yield partial summary plus the
+    /// then reduces online. Map/reduce failures yield partial account plus the
     /// last 200KB raw tail instead of dropping ProcessResult.
-    /// Agent waits go through IExecutorRuntime.AwaitAgentWithPermit (fresh permit each wait).
-    let summarizeSpool (runtime: IExecutorRuntime) (spoolPath: string) =
+    /// Agent waits go through IDistillationRuntime.AwaitAgentWithPermit (fresh permit each wait).
+    let distillSpool (runtime: IDistillationRuntime) (spoolPath: string) =
         task {
             let forkedIds = ResizeArray<string>()
 
@@ -249,7 +267,7 @@ module ExecutorSummarize =
                 [| for (chunkIndex, chunk) in chunks do
                        task {
                            try
-                               let! summary = summarizeChunk runtime forkedIds spoolPath chunk chunkIndex
+                               let! summary = distillFragment runtime forkedIds spoolPath chunk chunkIndex
                                return Choice1Of2(chunkIndex, summary)
                            with ex ->
                                return Choice2Of2(chunkIndex, chunk, ex.Message)
@@ -279,42 +297,21 @@ module ExecutorSummarize =
                     | Choice1Of2 _ -> None)
 
             let levels = ResizeArray<ResizeArray<string>>()
-            let reduce = reduceBatch runtime forkedIds
+            let merge = mergeDistillations runtime forkedIds
 
             try
                 for _, summary in successes do
-                    do! rippleInsert reduce levels summary
+                    do! rippleInsert merge levels summary
 
-                let! reduced = foldLevels reduce levels
+                let! reduced = foldLevels merge levels
+                let rawTail = rawTailText chunks
 
                 if failures.Length = 0 then
                     return reduced
                 else
                     cancelOwned ()
-
-                    let lastChunk =
-                        if chunks.Count = 0 then
-                            [||]
-                        else
-                            snd chunks.[chunks.Count - 1]
-
-                    let rawTail = Encoding.UTF8.GetString lastChunk
-
-                    if String.IsNullOrWhiteSpace reduced then
-                        return sprintf "partial summary unavailable\n--- raw tail ---\n%s" rawTail
-                    else
-                        return
-                            sprintf "%s\n--- partial: map/reduce incomplete ---\n--- raw tail ---\n%s" reduced rawTail
+                    return partialWithTail reduced rawTail
             with ex ->
                 cancelOwned ()
-
-                let lastChunk =
-                    if chunks.Count = 0 then
-                        [||]
-                    else
-                        snd chunks.[chunks.Count - 1]
-
-                let rawTail = Encoding.UTF8.GetString lastChunk
-
-                return sprintf "partial summary (reduce failed: %s)\n--- raw tail ---\n%s" ex.Message rawTail
+                return sprintf "Condensation failed: %s\n\nMost recent raw output:\n%s" ex.Message (rawTailText chunks)
         }

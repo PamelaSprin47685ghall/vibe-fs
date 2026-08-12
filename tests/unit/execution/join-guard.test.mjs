@@ -132,7 +132,7 @@ test('EXEC_016_active_manager_jobs_are_outstanding_for_orchestrator', () => {
 
 test('EXEC_016_outstandingBackground_false_for_roles_without_join', () => {
   // No journal, no live PTY: join-less roles must never trip the guard.
-  for (const name of ['Coder', 'Reviewer', 'Inspector', 'Browser', 'Meditator', 'Executor', 'Blogger']) {
+  for (const name of ['Coder', 'Reviewer', 'Inspector', 'Browser', 'Inquiry', 'Distiller', 'Blogger']) {
     assert.equal(
       outstandingBackground(undefined, () => true, agentRole(name), sessionId('ses_x')),
       false,

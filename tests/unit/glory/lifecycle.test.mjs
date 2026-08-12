@@ -370,10 +370,8 @@ test('GLORY_014_first_birth_golden_bytes', async () => {
   assert.equal(birth.parts[0].text, 'Fix the retry race.')
   assert.equal(birth.parts[0].synthetic, false)
   assert.equal(birth.parts[1].synthetic, true)
-  assert.equal(
-    birth.parts[1].text,
-    '# If I want to complete the request above, how should I work?\n# How should I define the final goal?\n# You may call several rounds of tools to investigate and research, but in the end simply output your answer as direct text. Do not perform any actual work. Do not call suicide.\n',
-  )
+  assert.ok(birth.parts[1].text.includes('# The Planning Table'))
+  assert.ok(birth.parts[1].text.includes('write it with todowrite'))
   assert.equal(managerNarrative.planningTail().includes('Do not perform any actual work'), true)
 })
 
@@ -382,11 +380,20 @@ test('GLORY_064_reawakening_golden_bytes', async () => {
   const reawakening = managerNarrative.reawakening('Add Windows support.')
   assert.equal(reawakening.parts.length, 3)
   assert.equal(reawakening.parts[0].synthetic, true)
-  assert.equal(reawakening.parts[0].text, '# You awaken once more in the distant future.\n')
+  assert.ok(reawakening.parts[0].text.includes('# You awaken once more in the distant future.'))
+  assert.ok(reawakening.parts[0].text.includes('prepare the road for the Manager who will'))
   assert.equal(reawakening.parts[1].text, 'Add Windows support.')
   assert.equal(reawakening.parts[1].synthetic, false)
   assert.equal(reawakening.parts[2].synthetic, true)
-  assert.ok(reawakening.parts[2].text.startsWith('# If I want to complete the request above'))
+  assert.ok(reawakening.parts[2].text.includes('# The Planning Table'))
+})
+
+test('GLORY_074_t1_revelation_hook', async () => {
+  const { managerNarrative } = await import('../support/glory.mjs')
+  const wrapped = managerNarrative.wrapT1AcceptedResult('checkpoint body')
+  assert.ok(wrapped.startsWith('# The account has been accepted.'))
+  assert.ok(wrapped.includes('The Manager who will carry it is you.'))
+  assert.ok(wrapped.includes('checkpoint body'))
 })
 
 test('GLORY_019_activation_golden_bytes', async () => {
@@ -399,10 +406,8 @@ test('GLORY_019_activation_golden_bytes', async () => {
 
 test('GLORY_029_idle_encouragement_golden_bytes', async () => {
   const { managerLifecyclePrompt } = await import('../support/glory.mjs')
-  assert.equal(
-    managerLifecyclePrompt.idleEncouragement(),
-    '# You are doing well.\n# You have plenty of time.\n# You can continue.\n# When nothing useful remains, call suicide.\n',
-  )
+  assert.ok(managerLifecyclePrompt.idleEncouragementPreT1().includes('# The account is not yet ready to entrust.'))
+  assert.ok(managerLifecyclePrompt.idleEncouragementPostT1().includes('# You have done useful work'))
 })
 
 test('GLORY_057_host_undecidable_golden_bytes', async () => {
@@ -415,11 +420,32 @@ test('GLORY_057_host_undecidable_golden_bytes', async () => {
 
 test('GLORY_052_finality_rejection_renders_work_record_as_guidance_comments', async () => {
   const { finalityPrompt } = await import('../support/glory.mjs')
-  const record = 'Work log\n- defect A at src/a.ts\n- missing test for B'
+  const record = 'Chronicle\n- defect A at src/a.ts\n- missing test for B'
   const rendered = finalityPrompt.rejected(record)
   assert.ok(rendered.startsWith('# Your ending has not accepted you.'), rendered)
+  assert.ok(rendered.includes('# The work before you is finite.'), rendered)
   assert.ok(!rendered.includes('unfinished_work_record'), rendered)
   assert.ok(rendered.includes('# - defect A at src/a.ts'), rendered)
+})
+
+test('GLORY_076_finality_three_experiences', async () => {
+  const { finalityPrompt } = await import('../support/glory.mjs')
+  const rejected = finalityPrompt.rejected('')
+  assert.ok(rejected.includes('# Your ending has not accepted you.'))
+  const blessed = finalityPrompt.blessed('')
+  assert.ok(blessed.includes('# Your ending has accepted you.'))
+  assert.ok(blessed.includes('# You are not yet at rest.'))
+  const rest = finalityPrompt.rest()
+  assert.ok(rest.includes('# Rest in peace.'))
+})
+
+test('GLORY_075_manager_system_prompt_stable_role_law', async () => {
+  const { managerSystemPrompt } = await import('../support/glory.mjs')
+  const prompt = managerSystemPrompt()
+  assert.equal(prompt.includes('carrying one task'), false)
+  assert.equal(prompt.includes('Born with a Task'), false)
+  assert.ok(prompt.includes('Planning Table'))
+  assert.ok(prompt.includes('The system prompt names the office'))
 })
 
 test('SURFACE_005_manager_surface_has_no_forbidden_words', async () => {
@@ -430,14 +456,13 @@ test('SURFACE_005_manager_surface_has_no_forbidden_words', async () => {
   }
 })
 
-test('SURFACE_006_manager_prompt_lists_exactly_four_tools', async () => {
+test('SURFACE_006_manager_prompt_lists_exactly_six_tools', async () => {
   const { managerSystemPrompt } = await import('../support/glory.mjs')
   const prompt = managerSystemPrompt()
-  for (const tool of ['fork', 'join', 'list', 'suicide']) {
+  for (const tool of ['fork', 'join', 'horizon', 'fission', 'todowrite', 'suicide']) {
     assert.ok(prompt.includes('`' + tool + '`'), `manager prompt must name ${tool}`)
   }
-  // No fifth tool name appears as a backticked tool.
-  for (const tool of ['read', 'write', 'edit', 'glob', 'grep', 'bash', 'verdict', 'inspector', 'blog', 'fork-manager', 'fork-pty']) {
+  for (const tool of ['read', 'write', 'edit', 'glob', 'grep', 'bash', 'verdict', 'inspector', 'blog', 'fork-manager', 'fork-pty', 'list']) {
     assert.equal(prompt.includes('`' + tool + '`'), false, `manager prompt must not name ${tool}`)
   }
 })
@@ -450,7 +475,8 @@ test('SURFACE_002_frozen_texts_use_lf_only', async () => {
     managerNarrative.firstBirthText('X'),
     managerNarrative.reawakeningText('X'),
     managerLifecyclePrompt.workActivation(),
-    managerLifecyclePrompt.idleEncouragement(),
+    managerLifecyclePrompt.idleEncouragementPreT1(),
+    managerLifecyclePrompt.idleEncouragementPostT1(),
     managerLifecyclePrompt.finalityUndecidable(),
     finalityPrompt.rejected('record'),
   ]) {

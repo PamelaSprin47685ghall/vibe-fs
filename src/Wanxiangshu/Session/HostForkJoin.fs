@@ -270,14 +270,14 @@ module HostForkJoin =
                 { RunId = payload.RunId
                   AgentId = payload.AgentId
                   AgentName = payload.AgentId
-                  Role = defaultArg payload.Role Role.Executor
+                  Role = defaultArg payload.Role Role.Distiller
                   Outcome = AgentFailed payload
                   CompletedAt = completedAt }
             | AgentItem(AgentAbandonedItem(agentId, reason)) ->
                 { RunId = "abandoned-" + agentId
                   AgentId = agentId
                   AgentName = agentId
-                  Role = Role.Executor
+                  Role = Role.Distiller
                   Outcome = AgentAbandoned(agentId, reason)
                   CompletedAt = completedAt }
             | PtyItem item -> PtyJoinItem.toRunCompletion item completedAt

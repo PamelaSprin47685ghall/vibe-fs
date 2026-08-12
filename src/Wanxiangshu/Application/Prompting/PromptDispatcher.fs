@@ -67,6 +67,8 @@ module PromptDispatcher =
         /// it from this fact's `AuthorityKind`, so a HumanRoot cannot be recorded
         /// without its requirement appearing with it.
         member this.RegisterAuthority(profile: PromptAuthority.AuthorityExecutionProfile) : Result<unit, string> =
+            PersonaBinding.ensureFromAuthority profile |> ignore
+
             PromptFact.AuthorityRootAccepted
                 {| SessionId = profile.SessionId
                    LogicalRunId = profile.LogicalRunId

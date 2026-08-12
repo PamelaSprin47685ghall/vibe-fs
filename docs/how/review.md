@@ -28,11 +28,13 @@ type ProviderInputSeal =
 messages.transform 返回最终消息视图
 → 生成 ProviderInputSeal
 → 下一 assistant/provider run 绑定 ProviderRunIdentity
-→ verdict 执行时查询该 run 的 seal
+→ judge 执行时查询该 run 的 seal
 → 证明 IncludedToolResultDigests 含 ChallengeContentDigest
 ```
 
 绑定失败 → 不写 seal，不确认 PERFECT。
+
+工具名稳定为 `judge`；参数字段 `verdict` ∈ {PERFECT|REVISE} 保留；旧名 `verdict`（工具）非法、无 alias；成功回执不 echo verdict（REVIEW-001）。
 
 本 seal 链仅服务 **FinalityReview** 二次 PERFECT（REVIEW-003）。TodoProcessReview 不签发 challenge，不查 challenge digest。
 
@@ -51,7 +53,7 @@ type ReviewAttemptIdentity =
 
 同一 `ProviderRunIdentity`（含同 assistant message 内并行/重复 tool call）中的额外 PERFECT 不计数、不写 Journal。
 
-Finality 使用完整五元组。TodoProcessReview 仍以 `ProviderRunId`/`ToolCallId` 标识 terminal verdict 尝试，但不分配 Finality `ReviewBarrierId` 见证语义。
+Finality 使用完整五元组。TodoProcessReview 仍以 `ProviderRunId`/`ToolCallId` 标识 terminal `judge` 尝试，但不分配 Finality `ReviewBarrierId` 见证语义。
 
 ---
 
@@ -73,7 +75,7 @@ Issued → IncludedInInputSeal → ConsumedByProviderRun
 第二次 PERFECT 判定只能返回：`Confirmed` | `PendingIdentity` | `Rejected`。  
 PhysicalBound 未完成时禁止 same-root 猜测成功。
 
-**TodoProcessReview** 不使用链 A/B：一次 durable verdict 即 `VerdictKnown`；可消费性走 REVIEW-014/017 的 LWR record-ready，不走 challenge seal。
+**TodoProcessReview** 不使用链 A/B：一次 durable `judge` 即 `VerdictKnown`；可消费性走 REVIEW-014/017 的 LWR record-ready，不走 challenge seal。
 
 ---
 
@@ -84,7 +86,7 @@ PhysicalBound 未完成时禁止 same-root 猜测成功。
 | RequestKind | prose-only | 首个 PERFECT | confirmed / 单次 terminal |
 |-------------|------------|--------------|---------------------------|
 | FinalityReview | `ReviewerGuard` | `ReviewConfirmation` | ConfirmedReviewWitness → cohort 消费 |
-| TodoProcessReview | process guard / 重试策略（无 challenge） | **不适用** | `VerdictKnown` → record-ready 路径 |
+| TodoProcessReview | process guard / 重试策略（无 challenge） | **不适用** | `VerdictKnown`（经 `judge`）→ record-ready 路径 |
 
 `HostReviewGuard` 只完成 claim / transport；`FinalityController` 与 process-review orchestrator 只等待 durable 事实，不直接冒充 Reviewer continuation writer。Finality request 关闭后，`ReviewerEvidence.continuationOpen` 以 manager/request/barrier 关系撤销未发送 capability。Process Rk 在 `VerdictKnown` 后无 confirmation capability 可发。
 
@@ -119,7 +121,7 @@ TodoWriteAccepted(Tk)
      同 TodoReviewId 幂等，禁止第二段 assignment range
 → materialize ManagerCheckpointLWR(k)（RecordCoverage，includeOpening=false；TODO-008）
 → 注入 OpeningRaw + LWR + Ck + Pk
-→ Reviewer 本 turn：prose 工作记录 + verdict(PERFECT|REVISE)
+→ Reviewer 本 turn：prose 工作记录 + judge(verdict=PERFECT|REVISE)
 → durable VerdictKnown(k)（Reviewer 域）
 → 业务 outcome 立即按 TODO-005 可推导
 → await 同 snapshot：ProcessReviewLWR(k) record-ready
@@ -139,7 +141,8 @@ else:
 → settle（TODO-005）；REVISE 时 Host TodoTable reconciliation 见 TODO-007（不派生新 R）
 ```
 
-`ensureReview` 可在 after、restart、下一 todowrite、suicide 任意重入；不创建第二 TodoWrite，不另开第二 assignment range（TODO-012）。
+`ensureReview` 可在 after、restart、下一 todowrite、suicide 任意重入；不创建第二 TodoWrite，不另开第二 assignment range（TODO-012）。  
+Persona（Examiner/Auditor）与 system 字节跨 Fallback/Strength 不变（AGENT-028、FALLBACK-014）。
 
 ---
 
@@ -149,7 +152,7 @@ else:
 loop:
   snap ← Journal.currentSnapshot
   if TodoReviewConcluded(k) ∈ snap: return Consumable
-  if VerdictKnown(k) 且同 snap 可物化 ProcessReviewLWR(k) 含正式 Work log:
+  if VerdictKnown(k) 且同 snap 可物化 ProcessReviewLWR(k) 含正式 Chronicle 段:
        WriteBlob / 持有 WorkRecordRef
        append TodoReviewConcluded(k)   // 仅此刻
        return Consumable
@@ -161,6 +164,8 @@ loop:
        // 不 append 空壳 Concluded，不伪 REVISE
 ```
 
+LWR 四标题：`Opening / Chronicle / Recent work / Closing report`（COMPANION-003；过程/终末 `includeOpening=false`）。
+
 禁止 timer/sleep/re-probe 轮询；禁止用 raw terminal 文本写入 `WorkRecordRef`（TODO-012）。
 
 Manager-facing 交付前走 Finality 同款 safety-seal：不能证明安全 → fail closed（REVIEW-016，TODO-013）。
@@ -171,7 +176,7 @@ Manager-facing 交付前走 Finality 同款 safety-seal：不能证明安全 →
 
 | 裂缝 | 动作 |
 |------|------|
-| Accepted 有、ConsumableReview 无 | 由 Accepted 派生义务 → ensure Dedicated → ensure 同 TodoReviewId assignment → ensureReview；仅 verdict 则走 record-ready 等待 |
+| Accepted 有、ConsumableReview 无 | 由 Accepted 派生义务 → ensure Dedicated → ensure 同 TodoReviewId assignment → ensureReview；仅 `judge`/VerdictKnown 则走 record-ready 等待 |
 | assignment 已发送、进程崩溃 | 从 Journal/physical 证明原 session/attempt → resume/observe；永久丢失 → REVIEW-019；不确定 → fail closed |
 | create/resume/LWR 物化失败 | 非 PERFECT/REVISE；义务 outstanding；可恢复则 event-driven ensure；否则 typed infra failure，阻塞下一 TodoWrite 与 Finality |
 | VerdictKnown 有、waiter 丢、尚无 Concluded | 从 assignment + frontier 重建等待；禁止提前 Concluded |

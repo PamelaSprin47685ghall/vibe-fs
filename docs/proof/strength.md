@@ -9,7 +9,7 @@ Strength 不是“能跑 Replica”即完成；每个 durable/authority boundary
 | 1 | Strength disabled / K0 → 普通 Work provider-visible bytes 与控制流无变化 | STRENGTH-001 | `host-policy.test.mjs`、`host-canary-k0.test.mjs` |
 | 2 | StrengthReplica = InternalLeaf × Attached(StrengthReplica)；无 Companion / SyncDelegate / 嵌套 Replica；禁止 `SatelliteKind.Replica` | STRENGTH-004/014 | `host-canary-k0.test.mjs`、`runtime.test.mjs` |
 | 3 | 没有 Replica Role / fast-replica / deep-replica Agent | STRENGTH-004/015 | `authority-policy.test.mjs`、`student-teacher-absence` ratchet |
-| 4 | Replica = `fast-<owner-role>`；system prompt 仍由 owner CanonicalRole 决定 | STRENGTH-004/015 | `host-canary-k0.test.mjs` same-role prompt |
+| 4 | Replica = `fast-<owner-role>`；**继承** owner SessionPersona / SessionProviderLanguage；只换 ExecutionBinding；system prompt 仍由 owner CanonicalRole 决定；不换人、不换世界语 | STRENGTH-004/015、FALLBACK-014、AGENT-028/029 | `host-canary-k0.test.mjs` same-role prompt + Persona |
 | 5 | schema 与 execution gate 恰为 `read/glob/grep` | STRENGTH-004、PROMPT-008 | `authority-policy.test.mjs`、`runtime.test.mjs`、`host-canary-k0.test.mjs` |
 | 6 | K 单位是 provider request；K ∈ {0,1,2} | STRENGTH-003 | `replica-transform.test.mjs`、`batch-collector.test.mjs` |
 | 7 | Candidate 消费前不进 XTrace / Companion / LWR / PrefixSnapshot | STRENGTH-006/008 | `lifecycle-recovery.test.mjs`、`tests/integration/strength/lifecycle.test.mjs` |
@@ -17,7 +17,7 @@ Strength 不是“能跑 Replica”即完成；每个 durable/authority boundary
 | 9 | 只有该 run 的真实 provider output 才能 Promotion | STRENGTH-007 | `lifecycle-recovery.test.mjs`、`turn-evidence.test.mjs` |
 | 10 | Promoted 在 crash/restart/continuation 后不从语义历史消失 | STRENGTH-007/008 | `tests/integration/strength/lifecycle.test.mjs` |
 | 11 | Promoted 最终进入 owner XTrace，并可被 Companion coverage 消化 | STRENGTH-008 | `lifecycle-recovery.test.mjs` traced + `needsRawReplay` |
-| 12 | 跨 Session 只比较 Semantic projection；wire id 确定性 localize；机制 provenance 不进模型字节 | STRENGTH-009/012 | `frame-projection.test.mjs`、`projection-adapter.test.mjs`、`invisibility.test.mjs` |
+| 12 | 跨 Session 只比较 Semantic projection；wire id 确定性 localize；机制 provenance 不进模型字节；Strength/Fallback 不改变 Agent self-identity | STRENGTH-009/012、FALLBACK-014、ARCH-016 Gate D | `frame-projection.test.mjs`、`projection-adapter.test.mjs`、`invisibility.test.mjs`；`tests/unit/invariants/prompt-stability.test.mjs` |
 | 13 | Replica 失败不推进 owner FallbackCursor，不触发 InteractionRepair | STRENGTH-004/019、FALLBACK-004 | `authority-policy.test.mjs`；`attempt-plan.test.mjs` |
 | 14 | Review / Finality / Attached / InternalLeaf 第一版恒 K0 | STRENGTH-002/019 | `host-canary-k0.test.mjs` |
 | 15 | PairProgrammingThought 覆盖 Strength tool-result anchor；ReviewSeal 仍最后 | STRENGTH-009 | `projection-algebra.test.mjs`；Host 顺序见 `how/host.md` |
@@ -76,17 +76,18 @@ Host/OpenCode 版本门禁必须机械验证。默认生产路径 canary 不健�
 2. 达 K 后 K+1 provider request 物理不外发。
 3. transform 能唯一绑定 TargetProviderRun；不能绑定时 K0。
 4. provider schema 恰为 read/glob/grep。
-5. execution gate 对 write/edit/executor/fork/join/network fail closed。
+5. execution gate 对 write/edit/run/fork/horizon/join/network fail closed。
 6. Replica 不产生 permission ask。
-7. deep owner 与 fast Replica role system prompt 语义一致，无 Strength 身份提示。
+7. deep owner 与 fast Replica role system prompt 语义一致；Persona / language 继承 owner；无 Strength 身份提示。
 8. owner→Replica message semantic projection 等价；Replica model/tools/profile 不被 owner 覆盖。
 9. 同 Decision replay synthetic ids/bytes 相同。
 10. 未 Promoted Candidate 不进 XTrace/Companion/LWR。
 11. Promotion 后 crash/restart，下一 request 仍有等价历史。
 12. Strength tool-result anchor 后仍有 PairProgrammingThought marker。
 13. ReviewSeal 覆盖最终 bytes，Reviewer 恒 K0。
-14. StrengthReplica 不创建 Companion/SyncDelegate/嵌套 Replica，不进入 fork/list/join surface，且不存在 `SatelliteKind.Replica`。
+14. StrengthReplica 不创建 Companion/SyncDelegate/嵌套 Replica，不进入 fork/horizon/join surface，且不存在 `SatelliteKind.Replica`。
 15. Host/OpenCode version fingerprint 变化时 canary 重新成立；任一关键项失败使新 decision K0。
+16. Strength/Fallback 推进后 owner system prompt 字节与 SessionPersona 不变（Gate D）。
 
 ## Statistical / rollout
 

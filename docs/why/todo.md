@@ -2,10 +2,15 @@
 
 把 `todowrite` 提升为 Manager 生命周期的因果 checkpoint，而不是再叠一层 Todo/Review/Compression 阶段机。控制点来自真实工具事实，非法状态尽量不可表达；恢复只认 durable facts。
 
+Manager BlindPlan：Pre-T1 = Planning Table（替他人规划）；第一次 accepted `todowrite` = T1 commitment；canonical result 揭示「路是你的」。交托在 tool result，不在 system prompt 切换。同一 Life 内 office prompt 永不因 T1 改字节。
+
 ## 备选与被拒
 
-**生命周期：持续 checkpoint vs planning→Activation 两阶段。**  
-拒两阶段并存：旧 stage 机 + 新 Todo stage 机会横向爆炸（TODO-001）。删除生产 Activation；Opening 保护改由结构性 `WorkRecordStart`，不是新 Stage。
+**生命周期：BlindPlan 持续 checkpoint vs planning→Activation 两阶段。**  
+拒两阶段并存：旧 stage 机 + 新 Todo stage 会横向爆炸；Planning→Working 换 system prompt 破坏 prefix cache 并泄露「你已携带任务」（TODO-001）。删除生产 Activation；Opening 保护改由结构性 `WorkRecordStart`。T1 帷幕只在计划无法因「知道谁来扛」而改写之后掀开。
+
+**BlindPlan 揭示：conversation T1 result vs Activation / `WorkActivated` / system identity 切换。**  
+拒身份切换：office 不变，entrustment 可变。Planning Table → validate → durable `TodoWriteAccepted(T1)` → 含 revelation 的 canonical provider-visible result。generic `lifecycle.activation` 若作语义资产，只指「新 owner 获 responsibility」，不得承载 Manager phase 或触发 prompt 替换。
 
 **Identity：tagged `kind` vs optional `id`。**  
 拒缺字段猜新旧与 content 猜 id：恢复与并发会静默错配（TODO-002）。
@@ -28,7 +33,7 @@
 拒 Host 表当 canonical：无稳定 id、整表 DELETE+INSERT、无法承载 reviewing/merge（TODO-007）。sink 可显示 working Pk，但 REVISE 消费后必须 reconcile；repair 不作 checkpoint。
 
 **证据：bounded LWR + coverage 分型 vs 纯 Y / session head / 第二 renderer。**  
-拒纯 Y：frontier 前合法 RawGap 会丢证据。拒 session head：串台历史污染单次 Rk/Finality。拒第二 renderer：双源漂移（TODO-008）。Prefix 只认 PrefixCoverage 可证 Y；LWR 只认 RecordCoverage。
+拒纯 Y：frontier 前合法 RawGap 会丢证据。拒 session head：串台历史污染单次 Rk/Finality。拒第二 renderer：双源漂移（TODO-008）。Prefix 只认 PrefixCoverage 可证 Y；LWR 只认 RecordCoverage。四段标题固定为 `Opening / Chronicle / Recent work / Closing report`；Closing = prose claim，拒固定报告 schema。
 
 **Dedicated：首次 enlist + ordinary graduate + process 留到 LifeCompleted vs 永不 graduate / 每轮强制回流。**  
 拒永不 graduate 特例：破坏既有 Finality 毕业语义。拒 Blessing 即释放 process session：后续 checkpoint/二次 suicide 无人可审（TODO-008/010）。process PERFECT 不计 terminal dual-PERFECT。
@@ -39,7 +44,7 @@
 拒 After(result)：刚返回的 review/settled/preview 可能立刻被压掉。
 
 **Finality 未完成项：process PERFECT/REVISE vs 机械 terminal-todo gate。**  
-拒机械全 completed 门：与用户过程评审需求无关且与 REVISE 续命冲突。仍要求 first unblessed suicide 至少一次 `TodoWriteAccepted`，防止零 checkpoint 绕过协议（TODO-010）。尾 drain 只能是 suicide，不能再 todowrite flush。
+拒机械全 completed 门：与用户过程评审需求无关且与 REVISE 续命冲突。仍要求 first unblessed suicide 至少一次 `TodoWriteAccepted`，防止零 checkpoint 绕过协议（TODO-010）。尾 drain 只能是 suicide，不能再 todowrite flush。T1 本身即该 Life 的第一次 accepted commitment，计入协议入口。
 
 **Legacy：升级前一次 seed vs 每 Life 从 Host 表 adopt / 空表忽略旧项。**  
 拒每 Life adopt：session 级 TodoTable 会污染同 session 新 Life。拒等首轮 todowrite 再分配 id：模型未见 id 无法 `existing`（TODO-011）。

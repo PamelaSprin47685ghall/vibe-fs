@@ -10,15 +10,14 @@ open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Process
 open Wanxiangshu.Session
 
-/// Non-interactive command execution with the request's sole 3x deadline and
-/// private Executor-agent summary mailbox.
+/// Bounded command execution. Provider verbs: `run` (DevOps) and `query-shell` (Inspector).
 module ExecutorTool =
 
     type Request =
         { Command: string
-          EstimatedOutputBytes: int64
-          EstimatedRunningSeconds: float
-          EstimatedMemory: EstimatedMemory }
+          DeadlineSeconds: float
+          OutputBudgetBytes: int64
+          WorldLock: bool }
 
     let private finitePositive (name: string) (value: float) =
         if Double.IsNaN value || Double.IsInfinity value || value <= 0.0 then
@@ -39,37 +38,43 @@ module ExecutorTool =
         else
             Ok(int64 value)
 
-    let private decode (args: HostToolArguments) =
+    let private decodeRun (args: HostToolArguments) =
         let command = args.Text "command"
+        let deadline = args.OptionalNumber "deadline_seconds" |> Option.defaultValue 30.0
 
-        let runtime =
-            args.OptionalNumber "estimated_running_secs" |> Option.defaultValue 30.0
+        let budget =
+            args.OptionalNumber "output_budget_bytes" |> Option.defaultValue 65536.0
 
-        let output =
-            args.OptionalNumber "estimated_output_bytes" |> Option.defaultValue 65536.0
-
-        let memory =
-            match args.Text "estimated_mem_usage" with
-            | "large" -> Ok EstimatedMemory.Large
-            | "medium"
-            | "" -> Ok EstimatedMemory.Medium
-            | _ -> Error "estimated_mem_usage must be medium or large"
+        let worldLock =
+            match args.OptionalBool "world_lock" with
+            | Some value -> Ok value
+            | None -> Ok false
 
         if String.IsNullOrWhiteSpace command then
             Error "Missing command"
         else
-            match
-                finitePositive "estimated_running_secs" runtime, finiteOutput "estimated_output_bytes" output, memory
-            with
-            | Ok runtimeSeconds, Ok outputBytes, Ok estimatedMemory ->
+            match finitePositive "deadline_seconds" deadline, finiteOutput "output_budget_bytes" budget, worldLock with
+            | Ok deadlineSeconds, Ok outputBytes, Ok lock ->
                 Ok
                     { Command = command
-                      EstimatedOutputBytes = outputBytes
-                      EstimatedRunningSeconds = runtimeSeconds
-                      EstimatedMemory = estimatedMemory }
+                      DeadlineSeconds = deadlineSeconds
+                      OutputBudgetBytes = outputBytes
+                      WorldLock = lock }
             | Error error, _, _
             | _, Error error, _
             | _, _, Error error -> Error error
+
+    let private decodeQueryShell (args: HostToolArguments) =
+        let command = args.Text "command"
+
+        if String.IsNullOrWhiteSpace command then
+            Error "Missing command"
+        else
+            Ok
+                { Command = command
+                  DeadlineSeconds = 30.0
+                  OutputBudgetBytes = 65536L
+                  WorldLock = false }
 
     let private error (message: string) = tomlObject [ "error", TString message ]
 
@@ -85,9 +90,13 @@ module ExecutorTool =
                         scope.DirectoryFor context.SessionId |> Option.orElse scope.WorkspaceDirectory
 
                 let estimate =
-                    { EstimatedRuntime = RuntimeSeconds request.EstimatedRunningSeconds
-                      EstimatedOutput = OutputBytes request.EstimatedOutputBytes
-                      EstimatedMemory = request.EstimatedMemory }
+                    { EstimatedRuntime = RuntimeSeconds request.DeadlineSeconds
+                      EstimatedOutput = OutputBytes request.OutputBudgetBytes
+                      EstimatedMemory =
+                        if request.WorldLock then
+                            EstimatedMemory.Large
+                        else
+                            EstimatedMemory.Medium }
 
                 let command =
                     { FileName = "sh"
@@ -114,16 +123,16 @@ module ExecutorTool =
                 match result with
                 | Error processError -> return error (processError.ToString())
                 | Ok(ProcessOutcome.Completed(exitCode, stdout, stderr, _)) ->
-                    return
-                        tomlObject
-                            [ "exit_code", TInt exitCode
-                              "stdout", TString stdout
-                              "stderr", TString stderr ]
-                | Ok(ProcessOutcome.Spooled(exitCode, spoolPath, totalBytes, chunkCount)) ->
+                    let fields =
+                        [ yield "exit_code", TInt exitCode
+                          if not (String.IsNullOrWhiteSpace stdout) then
+                              yield "stdout", TString stdout
+                          if not (String.IsNullOrWhiteSpace stderr) then
+                              yield "stderr", TString stderr ]
+
+                    return tomlObject fields
+                | Ok(ProcessOutcome.Spooled(exitCode, spoolPath, _totalBytes, _chunkCount)) ->
                     try
-                        // P0-RECOVERY-JOIN-001: map/reduce Join requires FamilyReady permit.
-                        // Empty SessionId fail closed (no skip). Fresh permit per JoinWithPermit
-                        // (map/reduce mutates family closure digest).
                         if String.IsNullOrWhiteSpace context.SessionId then
                             return error "Missing sessionID"
                         else
@@ -135,36 +144,27 @@ module ExecutorTool =
 
                                     match recovery with
                                     | FamilyRecovery.FamilyBlocked _ ->
-                                        return Error "RECOVERY_BLOCKED: family recovery blocked before executor join"
+                                        return Error "RECOVERY_BLOCKED: family recovery blocked before run join"
                                     | FamilyRecovery.FamilyWaiting _ ->
-                                        // Incomplete (HandlesWaiting / transient unreadable):
-                                        // not hard RECOVERY_BLOCKED. Retry until Ready or timeout
-                                        // inside awaitAgent; no permit issued while waiting.
-                                        return Error "RECOVERY_WAITING: family recovery incomplete before executor join"
+                                        return Error "RECOVERY_WAITING: family recovery incomplete before run join"
                                     | FamilyRecovery.FamilyReady permit -> return Ok permit
                                 }
 
-                            // Hard-fail only on definitive FamilyBlocked. Waiting/incomplete
-                            // must not abort map/reduce; JoinWithPermit retries requirePermit.
                             match! requirePermit () with
                             | Error msg when msg.StartsWith("RECOVERY_BLOCKED:", System.StringComparison.Ordinal) ->
                                 return error msg
                             | Error _
                             | Ok _ ->
-                                // Journal present → event-driven targeted await. Missing
-                                // journal → the pure fork runtime fails every chunk fork
-                                // fast, so a spooled summary still degrades to a partial
-                                // report instead of being dropped.
                                 let runtime =
                                     match scope.Journal with
                                     | Some journal ->
-                                        ExecutorSummarize.asExecutorRuntime
+                                        Distillation.asDistillationRuntime
                                             (scope.ExecutorRuntimeFor context)
                                             journal
                                             requirePermit
-                                    | None -> ExecutorSummarize.ofForkRuntime (ForkRuntime())
+                                    | None -> Distillation.ofForkRuntime (ForkRuntime())
 
-                                let! summary = ExecutorSummarize.summarizeSpool runtime spoolPath
+                                let! summary = Distillation.distillSpool runtime spoolPath
 
                                 let instructions =
                                     if System.String.IsNullOrWhiteSpace summary then
@@ -172,27 +172,36 @@ module ExecutorTool =
                                     else
                                         [ summary ]
 
-                                return
-                                    tomlObjectWithInstructions
-                                        instructions
-                                        [ "exit_code", TInt exitCode
-                                          "spool_path", TString spoolPath
-                                          "total_bytes", TInt64 totalBytes
-                                          "chunk_count", TInt chunkCount ]
+                                return tomlObjectWithInstructions instructions [ "exit_code", TInt exitCode ]
                     finally
                         Spool.delete spoolPath
         }
 
-    let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
-        { Name = "executor"
-          Description = "Execute a shell command with explicit output, time, and memory estimates."
+    let runSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
+        { Name = "run"
+          Description =
+            "Execute a bounded shell command. deadline_seconds and output_budget_bytes are willingness budgets; world_lock acquires the LargeGate."
           Arguments =
             [ "command", ToolHostCodec.stringSchema factory
-              "estimated_output_bytes", ToolHostCodec.numberSchema factory
-              "estimated_running_secs", ToolHostCodec.numberSchema factory
-              "estimated_mem_usage", ToolHostCodec.enumSchema [ "medium"; "large" ] factory ]
+              "deadline_seconds", ToolHostCodec.numberSchema factory
+              "output_budget_bytes", ToolHostCodec.numberSchema factory
+              "world_lock", ToolHostCodec.boolSchema factory ]
           Execute =
             fun args context ->
-                match decode args with
+                match decodeRun args with
                 | Ok request -> execute scope request context
                 | Error decodeError -> task { return error decodeError } }
+
+    let queryShellSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
+        { Name = "query-shell"
+          Description =
+            "Inspector-only static evidence query. Reveal an existing repository fact; do not create new behavioral observations."
+          Arguments = [ "command", ToolHostCodec.stringSchema factory ]
+          Execute =
+            fun args context ->
+                match decodeQueryShell args with
+                | Ok request -> execute scope request context
+                | Error decodeError -> task { return error decodeError } }
+
+    /// Legacy alias — prefer runSpec / queryShellSpec.
+    let spec factory scope = runSpec factory scope

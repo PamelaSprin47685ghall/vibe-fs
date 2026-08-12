@@ -55,7 +55,7 @@ export const REQUIRED_KINDS = Object.freeze([
   'hidden Reviewer',
   'StrengthReplica',
   'fork agent',
-  'Executor child',
+  'Distiller child',
 ])
 
 /** Structured questionnaire fields. Every value must be a non-empty string. */
@@ -83,8 +83,8 @@ export const relatedEvidenceToken = (kind) => {
       return 'Reviewer'
     case 'fork agent':
       return 'Fork'
-    case 'Executor child':
-      return 'Executor'
+    case 'Distiller child':
+      return 'Distiller'
     default:
       return kind
   }

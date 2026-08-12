@@ -6,6 +6,8 @@ Dispatcher 四阶段切开「我打算发」与「Host 真留下了 `msg_*`」�
 
 `AttemptExecutionProfile` 必须原子：从 session cache 拼装会让 Role、工具面、probe 选择在同一请求内不一致，后续 seal/review 全部失真。
 
+万象术没有单一 system prompt，只有语言系统。每个 provider-facing 文本恰属一个权威：World / Role / Library / Runtime / Mission。冲突按语义所有权边界裁决，不设「更靠近 system 者胜」全序。
+
 ## 备选与被拒
 
 **身份类型与错误表达：领域身份 vs 诊断详情。** `SessionId`、`LogicalRunId`、`ToolCallId` 等身份用独立包装类型，防止跨域误传。当前 Host 发送边界只提供不透明错误详情，因此 `PromptAbandonReason` 用有限 case 区分 `SendFailed` 与 `UnresolvedAfterRecovery`，内部字符串只供诊断，禁止据其散文分叉。不得在文档中虚构实现并不存在的 `DispatchError`；若 Host 边界未来能闭合分类，应原子修改类型、发送端与证明。
@@ -19,3 +21,21 @@ Dispatcher 四阶段切开「我打算发」与「Host 真留下了 `msg_*`」�
 **恢复预算与窗口取值。** PROMPT-011 选择有限尾部窗口，以 PromptKey 证据判定物理落地而不依赖容量估算；有限启动预算避免未知结局永久挂起，同时不伪装成功或盲目重发。数值只在 PROMPT-011 定义。
 
 **载体：metadata vs body 标签。** 拒 body：body 是 provider-visible prompt 的一部分，放恢复键会改变对话字节。放 metadata：不进入模型输入，恢复时按 key 检索（PROMPT-011）。
+
+**System prompt：Life 内 byte-identical vs Activation / T1 / Strength 切换。**  
+拒切换：`The system prompt names the office. The conversation tells you which road is yours.` Planning→Working 或 T1 改 system 会废 prefix cache、制造第二份 Role Law，并把 Manager BlindPlan 退化成旧 Activation。T1 revelation 只走 conversation tool result。
+
+**Office Library：knowledge ≠ authority vs 书扩大 Role 权。**  
+拒书授职权：书可教识别缺陷，不授修复权；可述验证技术，不授执行权。`Information may cross authority boundaries. Authority does not travel with it.` Library ≠ Common Law / 身份 / 工具面 / 运行时 / mission / 隐藏编排 / 证据替代 / 第二规范源。若他处已有 canonical，Library 组合引用，不复制第二真源。
+
+**权威冲突：语义所有权分类 vs World>Role>Library>… 全序覆盖。**  
+拒 later-text-wins / 高层覆盖一切：Mission 不能授予 Role 没有的权；Library 不能扩大 Role；Handbook 遇 concrete requirement 时具体要求胜；Rulebook 不是 present-case evidence。
+
+**Closing / 报告：散文 vs 固定报告 schema。**  
+拒 `### Summary` / `### Files Changed` / 逐角色 DTO：约束诚实，不约束骨架。machine 结构只留协议真需处。工具名、参数名、wire 字段、enum literals、路径、命令等 protocol identifiers 永不翻译。
+
+**ProviderLanguage：session 创建绑定 EN|zh-CN vs 运行中切语言 / 译 protocol id。**  
+拒中途改语言：破坏已 seal 前缀与 replay。全局偏好只影响未来 session；child/attached/internal 继承 owner。翻译改世界的语言，不改机械的标识符。WorkRecord headings 与 prose 可本地化；tool names / argument names / wire fields 不可。
+
+**生命周期文本：orient-only vs 教育 Host 实现 / Manager Activation phase。**  
+拒把 generic Activation 写成 Manager Planning/Working stage 或触发 system prompt 替换。六种生命周期文本（Activation/Reawakening/Continuation/Handoff/Fission/Departure）只 orient，不 educate，不叠第二套 envelope。

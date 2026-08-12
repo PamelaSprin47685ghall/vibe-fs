@@ -5,17 +5,20 @@ Witness / Seal 所有权见 `shape/review.md`。
 Seal 绑定、过程/终末算法见 `how/review.md`。  
 Magic Todo 节拍、settlement、surface 见 `what/todo.md`（TODO-001..014）；Finality cohort / record-ready 见 `what/glory.md`（GLORY-*）。
 
-## REVIEW-001：Verdict 工具
+## REVIEW-001：Judge 工具
 
 ```json
 { "verdict": "PERFECT | REVISE" }
 ```
 
-工具不接受描述字段。描述由 Reviewer formal report 承担。
+工具名稳定为 `judge`。旧名 `verdict`（工具）非法，无 alias。  
+参数字段 `verdict` 保留（模型自创的 typed judgment）。  
+工具不接受描述字段。描述由 Reviewer 的 prose / WorkRecord 承担——**无**固定 formal report schema。  
+成功回执不 echo verdict。
 
 ## REVIEW-002：REVISE
 
-任一 durable REVISE 立即关闭当前 request 的 Reviewer continuation capability 与 cohort：无 confirmation、不等待尚未 durable 的 sibling 新 terminal / 新 effect；未完成的 PERFECT 确认链同时作废，关闭后不得补发 challenge。`FinalityRejected` 必须另行满足 GLORY-072 的 record-ready，不能在 verdict 时抢先落盘（GLORY-044/055/072）。
+任一 durable REVISE 立即关闭当前 request 的 Reviewer continuation capability 与 cohort：无 confirmation、不等待尚未 durable 的 sibling 新 terminal / 新 effect；未完成的 PERFECT 确认链同时作废，关闭后不得补发 challenge。`FinalityRejected` 必须另行满足 GLORY-072 的 record-ready，不能在 `judge` 时抢先落盘（GLORY-044/055/072）。
 
 已 durable 的 sibling REVISE 不参与「等待新 terminal」：成功路径下先预置 rejecting primary 的 record-ready/`WriteBlob`，再入账 sibling 并物化为 Manager 的 steer continuation（instruction-only `# ` Synthetic TOML，GLORY-044 双轨交付），不得丢弃、不得并入 `FinalityRejected` 工具结果。Primary 硬物化失败 → `FinalityUndecided` 且零 `FinalitySiblingSteered`。任一 durable sibling 的 LWR 无法物化 → fail-closed `FinalityUndecided`，同样不得静默丢弃。
 
@@ -33,13 +36,13 @@ Magic Todo 节拍、settlement、surface 见 `what/todo.md`（TODO-001..014）�
 6. 第二次 provider input seal **包含**第一次 challenge result  
 7. 中间没有 REVISE  
 8. 中间没有 tree 变化  
-9. verdict 工具确实成功执行  
+9. `judge` 工具确实成功执行  
 
 禁止：仅凭 AuthorityRoot 或 PhysicalMessageId 确认。
 
 ReviewConfirmation prompt 只让 Host 启动下一次 provider request，**不是**确认事实本身。
 
-双 PERFECT 屏障完全由 Host 执行，Reviewer 提示词不灌输该流程（REVIEW-012）：Reviewer 只提交基于当前 tree 的独立 verdict，确认与计数由 Host 侧 witness / seal 完成。
+双 PERFECT 屏障完全由 Host 执行，Reviewer 提示词不灌输该流程（REVIEW-012）：Reviewer 只提交基于当前 tree 的独立判断，确认与计数由 Host 侧 witness / seal 完成。
 
 本条仅约束 **FinalityReview**（及既有 Orchestrator 终末复审）的因果双 PERFECT。**TodoProcessReview 一次 PERFECT/REVISE 即 terminal**，不适用 challenge 链（REVIEW-013/020）。
 
@@ -57,22 +60,23 @@ Post-rebase 必须全新双 PERFECT（即使 tree hash 碰巧相同）。
 
 Rebase 后旧 witness 无效，必须重新获得双 PERFECT，再允许 ff publish。
 
-## REVIEW-011：8 大代码质量支柱与评估报告
+## REVIEW-011：Examiner's Ledger 与 PERFECT+minor
 
-Reviewer 在给出 `verdict` 前，必须在其 formal text report 中根据 8 大代码质量支柱进行评估：
+Reviewer 在调用 `judge` 前，须按 Examiner's Ledger 的判断方向（含 Language & Algorithms、Radical Simplicity、Structural Elegance、Bounded Granularity、Imperative Test Coverage、Flawless Logic & Best Practices、Caller Ergonomics、Uncompromised Completeness）在思想上走完一遍；**只在有值得说的地方说话**。
 
-1. **Language & Algorithmic Mastery**（语言与算法）
-2. **Radical Simplicity**（极致简洁）
-3. **Structural Elegance**（结构优雅）
-4. **Bounded Granularity**（有界粒度）
-5. **Imperative Test Coverage**（必要测试覆盖）
-6. **Flawless Logic & Best Practices**（无瑕逻辑与最佳实践）
-7. **Caller Ergonomics**（调用方与用户体验）
-8. **Uncompromised Completeness**（完整性）
+Ledger / Rulebook：
 
-发现任何质量维度不达标或缺陷时必须提出 `verdict("REVISE")` ；仅当 8 维全部无瑕且需求完全满足时方可调用 `verdict("PERFECT")`。
+- 指导如何判断，**不是** checklist，**不是**固定 formal report schema  
+- **禁止**把八维烙成必填评估报告字段 / Pass 表 / 固定八段标题  
+- **禁止** tiny typo → 自动 REVISE  
+- **禁止**「测试必须总是跑过」之类万能律  
 
-TodoProcessReview 在给出过程 verdict 前，必须于本 request 内产生具体 prose 工作记录（缺陷/应改项，或 PERFECT 时已检查且未发现的实质问题）。无 prose 的 PERFECT 无效，不得形成 ConsumableReview（REVIEW-014/016）。
+发现 **material** 缺陷或不达标 → `judge("REVISE")`。  
+Acceptance 必须挣得；Rejection 也必须挣得。match 是 observation，defect 是 judgment。
+
+**PERFECT + minor 共存**：`judge("PERFECT")` 可与真实 non-blocking workmanship 观察共存。minor 进入 prose / blessing 层继续完成，**不**撤销已挣得的 acceptance；non-blocking ≠ 不必做。
+
+TodoProcessReview 在给出过程判断前，必须于本 request 内产生具体 prose 工作记录（缺陷/应改项，或 PERFECT 时已检查且未发现的实质问题）。无 prose 的 PERFECT 无效，不得形成 ConsumableReview（REVIEW-014/016）。过程报告同样无固定 DTO 骨架。
 
 ## REVIEW-013：TodoProcessReview 与 FinalityReview 分型
 
@@ -140,7 +144,7 @@ VerdictKnown(k)
 
 - 首次 `TodoWriteAccepted` 时若尚不存在 → Host-owned hidden session 创建并 durable enlist
 - 后续 checkpoint：同一 logical reviewer，优先同一 physical session；fresh `TodoReviewId` 与 process assignment
-- Manager 不得 fork / join / list / resume / inspect 该 session（TODO-013，GLORY-002）
+- Manager 不得 fork / join / horizon / resume / inspect 该 session（TODO-013，GLORY-002）
 - 不得经 Manager 可见 `task` 创建 dedicated reviewer
 
 资源生命周期与 Finality graduate 拆开（TODO-008/010）：
@@ -179,7 +183,7 @@ Manager-facing ProcessReviewLWR 复用 Finality safety-seal（TODO-013）：
 - 无法证明对 Manager 安全 → fail closed，不得伪造「洗过的报告」
 - 仅放宽过程协议本身允许的 PERFECT / REVISE / review 用词（GLORY-030 窄例外 → TODO-013）
 
-PERFECT 与 REVISE 在过程 verdict 前都必须产生本 request 的 canonical review work record；否则 ProcessReviewLWR 可能永不 record-ready，后续 TodoWrite / suicide 永久阻塞。
+PERFECT 与 REVISE 在过程判断前都必须产生本 request 的 canonical review work record；否则 ProcessReviewLWR 可能永不 record-ready，后续 TodoWrite / suicide 永久阻塞。
 
 ## REVIEW-017：同 snapshot record-ready 与禁止轮询
 

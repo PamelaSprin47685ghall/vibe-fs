@@ -13,6 +13,8 @@ import {
   AgentJournalModule,
   SessionSnapshotPortModule,
   PromptResourcesModule,
+  ProviderResourcesModule,
+  ProviderLanguageModule,
   Outcome,
   unionCase,
   bind,
@@ -365,5 +367,62 @@ export const promptResources = (() => {
   const api = bind(PromptResourcesModule, 'PromptResources', ['load'])
   return {
     load: () => api.load(),
+  }
+})()
+/** PROMPT-017 / HOST-026: ProviderLanguage parse + session bind-once inherit. */
+export const providerLanguage = (() => {
+  const build = unionCase(ProviderLanguageModule.ProviderLanguage, 'ProviderLanguage')
+  const lang = bind(ProviderLanguageModule, 'ProviderLanguage', [
+    'resourceDirectory',
+    'label',
+    'tryParse',
+    'parse',
+    'inheritFrom',
+  ])
+  const session = bind(ProviderLanguageModule, 'SessionProviderLanguage', [
+    'clearAllForTests',
+    'tryGet',
+    'drop',
+    'bindOnce',
+    'inheritFromOwner',
+  ])
+
+  const of = (name) => build(name, [])
+
+  return {
+    english: of('English'),
+    simplifiedChinese: of('SimplifiedChinese'),
+    of,
+    nameOf: (value) => caseOf(value),
+    resourceDirectory: (value) => lang.resourceDirectory(value),
+    label: (value) => lang.label(value),
+    tryParse: (raw) => unwrapOption(lang.tryParse(raw)),
+    parse: (raw) => lang.parse(raw),
+    inheritFrom: (owner) => lang.inheritFrom(owner),
+    clearAllForTests: () => session.clearAllForTests(),
+    tryGet: (id) => unwrapOption(session.tryGet(id)),
+    drop: (id) => session.drop(id),
+    bindOnce: (id, language) => resultOf(session.bindOnce(id, language)),
+    inheritFromOwner: (ownerLanguage, childId) => resultOf(session.inheritFromOwner(ownerLanguage, childId)),
+  }
+})()
+
+/** Phase 2 bilingual provider resource tree hooks. */
+export const providerResources = (() => {
+  const api = bind(ProviderResourcesModule, 'ProviderResources', [
+    'relativePath',
+    'exists',
+    'readText',
+    'tryReadText',
+    'requireLanguagePair',
+    'languageRootsPresent',
+  ])
+  return {
+    relativePath: (lang, semanticPath) => api.relativePath(lang, semanticPath),
+    exists: (lang, semanticPath) => api.exists(lang, semanticPath),
+    readText: (lang, semanticPath) => api.readText(lang, semanticPath),
+    tryReadText: (lang, semanticPath) => unwrapOption(api.tryReadText(lang, semanticPath)),
+    requireLanguagePair: (semanticPath) => api.requireLanguagePair(semanticPath),
+    languageRootsPresent: () => api.languageRootsPresent(),
   }
 })()

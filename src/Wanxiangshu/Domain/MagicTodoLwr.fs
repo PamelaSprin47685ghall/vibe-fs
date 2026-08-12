@@ -41,13 +41,13 @@ module MagicTodoLwr =
     /// Materialize a frontier-bounded LWR with includeOpening=false.
     ///
     /// `opening` is still required for LifecycleWorkRecord shape but is NOT rendered
-    /// (process-review / Finality dedicated reports pass OpeningRaw separately).
+    /// (process-review / Finality dedicated reports pass OpeningMaterial separately).
     /// `frames` = Y compressed middle covering into the range; uncovered suffix
-    /// becomes canonical RawGap via coverage vs range end.
+    /// becomes canonical Recent work via coverage vs range end.
     ///
     /// PrefixCoverage must NOT be derived from this — RawGap may be present.
     let materializeBounded
-        (opening: OpeningPromptRaw)
+        (opening: OpeningMaterial)
         (frames: string list)
         (fullTrace: XTraceItem list)
         (coverage: RecordCoverage)

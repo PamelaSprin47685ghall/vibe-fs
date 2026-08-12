@@ -414,8 +414,8 @@ reason = "prefix-probe"
 [[turn]]
 id = "manager-idle"
 internal = true
-user = ["# You are doing well.", "# You have plenty of time.", "# You can continue.", "# When nothing useful remains, call suicide."]
-tools = ["fork", "join", "list", "suicide"]
+user = ["# You have done useful work, and useful action may still remain.", "# Time spent is not time exhausted.", "# A long road is still a road.", "# Look again at what the mission still owes.", "# If useful action remains, continue.", "# When nothing useful remains, seek your end."]
+tools = ["fork", "join", "horizon", "fission", "todowrite", "suicide"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "suicide", args = { last_words = "first ending" } }

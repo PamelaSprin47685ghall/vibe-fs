@@ -5,8 +5,12 @@ open Wanxiangshu.Domain
 
 /// Bundle of package runtime data loaded once at plugin init.
 type RuntimeResources =
-    { Prompts: PromptCatalog
-      EnforcerRules: EnforcerRule list }
+    {
+        Prompts: PromptCatalog
+        EnforcerRules: EnforcerRule list
+        /// Phase 2: bilingual provider tree roots present (`resources/provider/{en,zh-CN}`).
+        ProviderLanguageRootsReady: bool
+    }
 
 module RuntimeResources =
 
@@ -24,7 +28,8 @@ module RuntimeResources =
                     EnforcerCatalogResource.composeBloggerSystemPrompt prompts.BloggerSystemPrompt rules }
 
         { Prompts = promptsWithRulebook
-          EnforcerRules = rules }
+          EnforcerRules = rules
+          ProviderLanguageRootsReady = ProviderResources.languageRootsPresent () }
 
     /// Single install site: plugin constructor before any consumer runs.
     let install (resources: RuntimeResources) : unit = installed <- Some resources

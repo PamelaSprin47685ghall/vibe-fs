@@ -43,3 +43,17 @@
 | **`SuppressTransportOnly`** | **仅 Domain + unit 骨架**；生产 `TransportMessages` 恒空、未声明 intent。COMPANION-012 字段级过滤由模型边界 / `toSemantic` 承担；消息级 Suppress 待 host-id 侧信道后续变更 |
 
 Seal 用 Wire；剧本键用 Semantic（VERIFY-003/007）——混用必须红。
+
+## Provider Horizon leak（PROJ + ARCH-014 / Gate B）
+
+Canonical Renderer 落 wire 前过 Horizon filter（`how/projection.md`）。本域证明：
+
+| 证明 | 期望 | 条款 |
+|------|------|------|
+| Semantic 去 ID；Wire 仅补合成 identity，不得回灌 Semantic / 模型 data 平面 | COMPANION-007/013、VERIFY-007 | unit projection + Gate B |
+| 禁止穿过 horizon | SessionId / AgentId / RunId / ToolCallId / Journal EventId / cursor / offset；status/code/error DTO；phase/ordinal/kind 机器态；spool_path；settled/proposed/reviewing/semanticMerge | ARCH-014、ARCH-016 Gate B |
+| 允许的最小观测 | consequences + WorkRecord；obligations `[{name, work}]`；`exit_code` / `verdict` 参数；`root_requirement` / `commissioner_record` prose | ARCH-015、EXEC-* |
+| MagicTodoProjection 只读 obligations 真值 | 禁止 Host TodoTable sink 枚举冒充 CurrentObligations | PROJ-009、TODO-007 |
+| LWR 四标题 | Opening / Chronicle / Recent work / Closing report；旧 Opening task / Work log / Uncompressed tail / Final output 非法 | COMPANION-003、§18 |
+
+代表：`scripts/checks/provider-leak-gate.mjs` + `tests/unit/verify/provider-leak-gate.test.mjs`（code phase）；既有 `tests/unit/context/projection-algebra.test.mjs`、join/LWR wire 套件须改断言词表，不得再靠旧 substring inventory。

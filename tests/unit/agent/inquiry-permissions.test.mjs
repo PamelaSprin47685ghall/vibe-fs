@@ -1,6 +1,6 @@
-// tests/unit/agent/meditator-permissions.test.mjs — G3 Meditator capability matrix.
+// tests/unit/agent/inquiry-permissions.test.mjs — Inquiry capability matrix (AGENT-025).
 //
-// Meditator is an Inspector-only reasoner: Roles.permissions carries Inspector
+// Inquiry is an Inspector-only reasoner: Roles.permissions carries Inspector
 // and must not carry Read/Glob/Grep. Host schema, PromptAuthority.toolCapabilitiesFor,
 // and ToolRegistry.rolePredicate all derive from that set (or deny when the
 // capability is absent).
@@ -26,54 +26,54 @@ test.before(() => {
   runtimeResources.installFromPackage()
 })
 
-test('G3_Meditator_permissions_are_inspector_only', () => {
-  const allowed = roles.permissions(roles.of('Meditator'))
-  assert.deepEqual(allowed, ['Inspector'])
+test('Inquiry_permissions_are_inspect_only', () => {
+  const allowed = roles.permissions(roles.of('Inquiry'))
+  assert.deepEqual(allowed, ['Inspect'])
   assert.equal(allowed.includes('Read'), false)
   assert.equal(allowed.includes('Glob'), false)
   assert.equal(allowed.includes('Grep'), false)
 })
 
-test('G3_Meditator_isAllowed_denies_read_glob_grep_and_allows_inspector', () => {
-  assert.equal(isAllowed(Role.Meditator, ToolPermission.Inspector), true)
+test('Inquiry_isAllowed_denies_read_glob_grep_and_allows_inspect', () => {
+  assert.equal(isAllowed(Role.Inquiry, ToolPermission.Inspect), true)
   for (const permission of READ_PERMISSIONS) {
-    assert.equal(isAllowed(Role.Meditator, permission), false, `Meditator must lack ${permission}`)
+    assert.equal(isAllowed(Role.Inquiry, permission), false, `Inquiry must lack ${permission}`)
   }
 })
 
-test('G3_Meditator_toolCapabilitiesFor_WorkMain_matches_Roles_permissions', () => {
-  const caps = names(toolCapabilitiesFor(Role.Meditator, ProviderRequestKind.WorkMain))
-  assert.deepEqual(caps, ['inspector'])
+test('Inquiry_toolCapabilitiesFor_WorkMain_matches_Roles_permissions', () => {
+  const caps = names(toolCapabilitiesFor(Role.Inquiry, ProviderRequestKind.WorkMain))
+  assert.deepEqual(caps, ['inspect'])
   for (const tool of READ_TOOLS) {
     assert.equal(caps.includes(tool), false, `toolCapabilitiesFor must omit ${tool}`)
   }
 })
 
-test('G3_Meditator_rolePredicate_inspector_allow_and_host_native_read_gap', () => {
+test('Inquiry_rolePredicate_inspector_allow_and_host_native_read_gap', () => {
   // Gap note: read/glob/grep are Host-native builtins — they are NOT ToolRegistry
   // specs, so rolePredicate has no isAllowed cases for them and falls through to
-  // default deny. The real Meditator gate for those tools is Roles.permissions /
+  // default deny. The real Inquiry gate for those tools is Roles.permissions /
   // Host permission schema (asserted above), not a ToolRegistry rolePredicate.
   for (const tool of READ_TOOLS) {
-    const allowed = rolePredicate(tool, undefined, 'ses-meditator')
+    const allowed = rolePredicate(tool, undefined, 'ses-inquiry')
     assert.equal(typeof allowed, 'function', `rolePredicate(${tool}) returns default-deny fn`)
-    assert.equal(allowed(Role.Meditator), false, `default deny for Host-native ${tool}`)
+    assert.equal(allowed(Role.Inquiry), false, `default deny for Host-native ${tool}`)
     assert.equal(allowed(Role.Inspector), false, `not role-gated: even Inspector is denied here`)
   }
 
   // inspector IS ToolRegistry-gated via Roles_isAllowed(Inspector).
-  const inspector = rolePredicate('inspector', undefined, 'ses-meditator')
-  assert.equal(inspector(Role.Meditator), true, 'rolePredicate(inspector) must allow Meditator')
+  const inspector = rolePredicate('inspect', undefined, 'ses-inquiry')
+  assert.equal(inspector(Role.Inquiry), true, 'rolePredicate(inspect) must allow Inquiry')
 })
 
-test('G3_Meditator_host_schema_allow_list_is_inspector_only', () => {
+test('Inquiry_host_schema_allow_list_is_inspect_only', () => {
   const config = {
     agent: {
-      'fast-meditator': { model: 'fast-meditator-model' },
-      'deep-meditator': { model: 'deep-meditator-model' },
+      'fast-inquiry': { model: 'fast-inquiry-model' },
+      'deep-inquiry': { model: 'deep-inquiry-model' },
     },
   }
-  // Fill the rest of the 20 required agents so configure accepts the config.
+  // Fill the rest of the 22 required agents so configure accepts the config.
   for (const tier of ['fast', 'deep']) {
     for (const role of [
       'manager',
@@ -83,8 +83,9 @@ test('G3_Meditator_host_schema_allow_list_is_inspector_only', () => {
       'browser',
       'reviewer',
       'devops',
-      'executor',
+      'distiller',
       'blogger',
+      'bookkeeper',
     ]) {
       const name = `${tier}-${role}`
       if (!config.agent[name]) config.agent[name] = { model: `${name}-model` }
@@ -94,10 +95,10 @@ test('G3_Meditator_host_schema_allow_list_is_inspector_only', () => {
   const outcome = managedAgentConfig.configure(config)
   assert.equal(outcome.ok, true, outcome.error)
 
-  for (const name of ['fast-meditator', 'deep-meditator']) {
+  for (const name of ['fast-inquiry', 'deep-inquiry']) {
     const permission = config.agent[name].permission
     assert.equal(permission['*'], 'deny')
-    assert.equal(permission.inspector, 'allow')
+    assert.equal(permission.inspect, 'allow')
     for (const tool of READ_TOOLS) {
       assert.notEqual(permission[tool], 'allow', `${name} must not allow ${tool}`)
     }

@@ -174,12 +174,12 @@ test('DSL_OWNERSHIP_RATCHET_rejects_executor_summarize_shaped_bare_mutable', asy
   const fx = makeFixture()
   t.after(fx.dispose)
 
-  const file = 'Infrastructure/OpenCode/Tools/ExecutorSummarize.fs'
+  const file = 'Infrastructure/OpenCode/Tools/Distillation.fs'
   // Adversarial shape: bare program-counter mutable co-located with the
   // historical timerTask → FamilyWaiting re-probe loop (ownership catches the
   // unannotated mutable; Infrastructure path must not hide it).
   const source = [
-    'module ExecutorSummarize',
+    'module Distillation',
     'let mutable probing = true',
     'let rec loop () =',
     '    task {',
@@ -196,7 +196,7 @@ test('DSL_OWNERSHIP_RATCHET_rejects_executor_summarize_shaped_bare_mutable', asy
   const result = await runRatchet(baseline, fx.dir, fx.dir)
   const out = output(result)
   assert.notEqual(result.code, 0, `expected non-zero exit, got ${result.code}: ${out}`)
-  assert.ok(out.includes(`${file} mutable 0 -> 1`), `expected ExecutorSummarize hint in output, got: ${out}`)
+  assert.ok(out.includes(`${file} mutable 0 -> 1`), `expected Distillation hint in output, got: ${out}`)
 })
 
 test('DSL_OWNERSHIP_RATCHET_allows_annotated_dsl_mutable_in_tools', async (t) => {

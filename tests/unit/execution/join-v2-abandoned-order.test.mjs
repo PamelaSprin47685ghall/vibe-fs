@@ -102,7 +102,7 @@ const linkDurable = (j, agentId, child, targetAgent = 'fast-coder') => {
 
 // ── EXEC-009: Abandoned wire is flat [[result]] item, not nested [error] ─────
 
-test('EXEC_009_abandoned_item_wire_is_flat_kind_status_agent_reason', () => {
+test('EXEC_009_abandoned_item_wire_is_natural_language_not_legacy_dto', () => {
   const batch = nonEmptyBatch.ofHeadTail(
     agentCompletion.abandonedRun({
       agentId: 'h-abandoned',
@@ -111,25 +111,13 @@ test('EXEC_009_abandoned_item_wire_is_flat_kind_status_agent_reason', () => {
     }),
   )
   const wire = joinResultRenderer.renderCompletedBatch(runtime, batch)
-  const parsed = parseWire(wire)
 
-  assert.equal(parsed.status, 'completed')
-  assert.equal(parsed.count, 1)
-  assert.deepEqual(parsed.result[0], {
-    ordinal: 1,
-    kind: 'agent',
-    status: 'abandoned',
-    agent: 'fast-coder',
-    reason: 'ParentCancelled',
-  })
-  assert.ok(!wire.includes('[error]'), 'Abandoned batch item must not nest [error]')
-  assert.ok(wire.includes('status = "abandoned"'))
-  assert.ok(!wire.includes('status = "failed"'))
+  assert.match(wire, /# fast-coder did not return from this charge\./)
+  assert.ok(!/\b(status|count|ordinal|kind|agent|code|message)\s*=/.test(wire))
+  assert.ok(!wire.includes('[error]'))
 })
 
-// ── EXEC-009: renderer still accepts mixed batch (wire shape only) ───────────
-
-test('EXEC_009_abandoned_and_completed_share_one_batch_wire_shape', () => {
+test('EXEC_009_abandoned_and_completed_share_one_batch_natural_language', () => {
   const batch = nonEmptyBatch.ofHeadTail(
     agentCompletion.abandonedRun({
       agentId: 'h1',
@@ -146,16 +134,11 @@ test('EXEC_009_abandoned_and_completed_share_one_batch_wire_shape', () => {
     ],
   )
   const wire = joinResultRenderer.renderCompletedBatch(runtime, batch)
-  const parsed = parseWire(wire)
 
-  assert.equal(parsed.status, 'completed')
-  assert.equal(parsed.count, 2)
-  assert.equal(parsed.result[0].status, 'abandoned')
-  assert.equal(parsed.result[0].reason, 'DeadlineExceeded')
-  assert.equal(parsed.result[0].agent, 'fast-coder')
-  assert.equal(parsed.result[1].status, 'completed')
-  assert.equal(parsed.result[1].agent, 'deep-coder')
-  assert.equal(parsed.error, undefined)
+  assert.match(wire, /# fast-coder did not return from this charge\./)
+  assert.match(wire, /# deep-coder has returned\./)
+  assert.match(wire, /# done/)
+  assert.ok(!/\b(status|count|ordinal|kind|agent|code|message)\s*=/.test(wire))
 })
 
 // ── EXEC-009: durable mixed batch via production JoinDrain.drainFromJournal ──
@@ -214,27 +197,27 @@ test('EXEC_009_drainFromJournal_mixed_abandoned_and_completed_one_batch_no_withh
     assert.equal(drained.items[0].workRecord, 'work-record-z')
 
     // Wire: one ResultsAvailable-shaped batch, no top-level failed withhold.
-    const batch = nonEmptyBatch.ofHeadTail(
-      agentCompletion.completedRun({
-        runId: drained.items[0].runId,
-        agentId: drained.items[0].agentId,
-        agentName: drained.items[0].agentName,
-        workRecord: drained.items[0].workRecord,
-      }),
-      [
-        agentCompletion.abandonedRun({
-          agentId: drained.items[1].agentId,
-          agentName: drained.items[1].agentName,
-          reason: drained.items[1].reason,
+    const wire = joinResultRenderer.renderCompletedBatch(
+      runtime,
+      nonEmptyBatch.ofHeadTail(
+        agentCompletion.completedRun({
+          runId: drained.items[0].runId,
+          agentId: drained.items[0].agentId,
+          agentName: drained.items[0].agentName,
+          workRecord: drained.items[0].workRecord,
         }),
-      ],
+        [
+          agentCompletion.abandonedRun({
+            agentId: drained.items[1].agentId,
+            agentName: drained.items[1].agentName,
+            reason: drained.items[1].reason,
+          }),
+        ],
+      ),
     )
-    const parsed = parseWire(joinResultRenderer.renderCompletedBatch(runtime, batch))
-    assert.equal(parsed.status, 'completed')
-    assert.equal(parsed.count, 2)
-    assert.equal(parsed.result[0].status, 'completed')
-    assert.equal(parsed.result[1].status, 'abandoned')
-    assert.equal(parsed.error, undefined)
+    assert.match(wire, /# zebra-agent has returned\./)
+    assert.match(wire, /# alpha-agent did not return from this charge\./)
+    assert.ok(!/\bstatus\s*=/.test(wire))
 
     // Each handle reported at most once: second drain empty; both retired.
     const again = joinDrain.drainFromJournal(j, PARENT, maxJoinBatch)
@@ -287,7 +270,7 @@ test('EXEC_009_consume_abandoned_writes_HandleRetired_second_AlreadyRetired', ()
 
 // ── EXEC-004: failed agent item still carries agent field ────────────────────
 
-test('EXEC_004_failed_item_carries_agent_field', () => {
+test('EXEC_004_failed_item_names_agent_in_natural_language', () => {
   const batch = nonEmptyBatch.ofHeadTail(
     agentCompletion.failedRun({
       runId: 'run-f',
@@ -298,10 +281,9 @@ test('EXEC_004_failed_item_carries_agent_field', () => {
     }),
   )
   const wire = joinResultRenderer.renderCompletedBatch(runtime, batch)
-  const parsed = parseWire(wire)
-  assert.equal(parsed.result[0].agent, 'fast-coder')
-  assert.equal(parsed.result[0].status, 'failed')
-  assert.equal(parsed.result[0].code, 'ERROR')
+  assert.match(wire, /# fast-coder could not complete the charge\./)
+  assert.match(wire, /# boom/)
+  assert.ok(!/\bstatus\s*=/.test(wire))
 })
 
 // ── EXEC-018: CreationOrder from HandleLinked fold order ─────────────────────

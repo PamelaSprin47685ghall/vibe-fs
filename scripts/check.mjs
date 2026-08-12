@@ -22,6 +22,9 @@ const checks = [
   join(root, 'checks/js-surface-gate.mjs'),
   join(root, 'checks/capability-isomorphism-gate.mjs'),
   join(root, 'checks/unified-store-gate.mjs'),
+  join(root, 'checks/tool-referential-integrity.mjs'),
+  join(root, 'checks/provider-leak-gate.mjs'),
+  join(root, 'checks/language-parity-gate.mjs'),
   join(root, 'checks/g4r-freeze.mjs'),
   join(root, 'checks/g4r-ce-vocabulary.mjs'),
   join(root, 'checks/test-boundary.mjs'),
@@ -50,6 +53,10 @@ for (const script of checks) {
   // Constitution headings + structural rubric (Appendix A37/A38) across all 120 tips.
   if (script.endsWith('enforcer-rulebook-gate.mjs')) {
     args.push('--require-headings', '--strict')
+  }
+  // ARCH-016 Gate B: grandfathered Join/horizon migration debt — counts must only shrink.
+  if (script.endsWith('provider-leak-gate.mjs')) {
+    args.push(`--baseline=${join(root, 'checks/provider-leak-gate-baseline.json')}`)
   }
   const result = spawnSync(process.execPath, args, { stdio: 'inherit' })
   if (result.status !== 0) process.exit(result.status ?? 1)

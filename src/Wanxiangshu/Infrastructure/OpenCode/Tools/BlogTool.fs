@@ -9,24 +9,19 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 
-/// docs/what/enforcer.md — the `blog` tool (ENFORCER-010/020/040/041/061 tip v2).
+/// docs/what/enforcer.md — the `chronicle` tool (ENFORCER-010/020/040/041/061 tip v2).
 ///
-/// Provider schema: required `text` + required `tip` (enum = rule directory names),
-/// optional `evidence`. No 120 numeric score fields (ENFORCER-020).
-/// Execute never suspends (ENFORCER-040). Runtime re-validates tip
-/// (ENFORCER-023) — schema alone is not trusted.
-///
-/// ENFORCER-061: empty/missing canonical text returns a readable error so the
-/// Host tool-loop can repair once. Valid entry still returns fixed "OK".
-/// Cycle merge stays at the continuation transform (ENFORCER-044).
+/// Provider schema: required `entry` + required `tip` (enum = rule directory names).
+/// Evidence field deleted (GrandRewrite). Execute never suspends (ENFORCER-040).
 module BlogTool =
 
     /// ENFORCER-061: tool-visible rejection for empty canonical text.
-    let EmptyTextError = "blog text is empty after canonicalisation (ENFORCER-061)"
+    let EmptyTextError =
+        "chronicle entry is empty after canonicalisation (ENFORCER-061)"
 
     /// No live Blogger cycle authority — reject, do not return OK.
     let NoLiveCycleError =
-        "blog rejected: no live CurrentRequest (Blogger cycle not InFlight)"
+        "chronicle rejected: no live CurrentRequest (Blogger cycle not InFlight)"
 
     /// ENFORCER-022/061 pure gate — same trim/non-empty rule as EnforcerCodec.
     let tryCanonicalText (rawText: string) : Result<string, string> =
@@ -50,8 +45,17 @@ module BlogTool =
     let tipFieldNames () : string list =
         EnforcerCatalog.fieldNames (enforcerRules ())
 
+    let private remembered () =
+        ToolHostCodec.tomlObjectWithInstructions [ "# The Chronicle remembers this." ] []
+
+    let private nothingToRemember () =
+        ToolHostCodec.tomlObjectWithInstructions [ "# There is no occurrence here to remember." ] []
+
+    let private unknownTip () =
+        ToolHostCodec.tomlObjectWithInstructions [ "# That lesson is not in the Rulebook." ] []
+
     /// ENFORCER-020 JSON Schema shape via Host zod builder:
-    /// required text + tip enum; optional evidence.
+    /// required entry + tip enum.
     let spec
         (factory: HostToolFactory)
         (runtime: ToolRuntimeScope)
@@ -61,24 +65,19 @@ module BlogTool =
         let ruleCount = List.length fields
 
         let catalogDescription =
-            sprintf
-                "Record one work-log entry with required tip (exactly one of %d rulebook TipNames). Optional evidence."
-                ruleCount
+            sprintf "Record one occurrence with required tip (exactly one of %d rulebook TipNames)." ruleCount
 
-        { Name = "blog"
+        { Name = "chronicle"
           Description = catalogDescription
           Arguments =
-            [ "text", ToolHostCodec.stringSchema factory
-              "tip", ToolHostCodec.enumSchema fields factory
-              "evidence", ToolHostCodec.optionalStringSchema factory ]
-          // text + tip are required; evidence is optional (.optional() on schema).
-          // Host schema surface uses isOptional(); bare string/enum = required.
+            [ "entry", ToolHostCodec.stringSchema factory
+              "tip", ToolHostCodec.enumSchema fields factory ]
           Execute =
             fun args ctx ->
                 task {
                     if not (hasLiveCycle parkedHost ctx.SessionId) then
                         Diagnostic.emit
-                            "blog-execute"
+                            "chronicle-execute"
                             [ "session_id", ctx.SessionId; "result", "no live CurrentRequest" ]
 
                         if not (String.IsNullOrWhiteSpace ctx.SessionId) then
@@ -87,33 +86,23 @@ module BlogTool =
 
                         return raise (InvalidOperationException(NoLiveCycleError))
                     else
-                        match tryCanonicalText (args.Text "text") with
-                        | Error err -> return ToolHostCodec.tomlObject [ "error", ToolHostCodec.TString err ]
+                        let entryRaw =
+                            let typed = args.Text "entry"
+
+                            if String.IsNullOrWhiteSpace typed then
+                                args.Text "text"
+                            else
+                                typed
+
+                        match tryCanonicalText entryRaw with
+                        | Error _ -> return nothingToRemember ()
                         | Ok _ ->
-                            // ENFORCER-023: runtime tip re-validation (do not trust schema alone).
                             let tipRaw = args.Text "tip"
 
                             if String.IsNullOrWhiteSpace tipRaw then
-                                return
-                                    ToolHostCodec.tomlObject
-                                        [ "error", ToolHostCodec.TString EnforcerCodec.MissingTipError ]
+                                return unknownTip ()
                             else
                                 match EnforcerCatalog.tryFindByField tipRaw (enforcerRules ()) with
-                                | None ->
-                                    return
-                                        ToolHostCodec.tomlObject
-                                            [ "error",
-                                              ToolHostCodec.TString(EnforcerCodec.unknownTipError (tipRaw.Trim())) ]
-                                | Some _ ->
-                                    match ctx.ProviderRunId, ctx.ToolCallId with
-                                    | Some _, Some _ ->
-                                        // ENFORCER-040: fixed OK. Merge is continuation's job (ENFORCER-044).
-                                        return ToolHostCodec.tomlObject [ "result", ToolHostCodec.TString "OK" ]
-                                    | _ ->
-                                        Diagnostic.emit
-                                            "blog-execute"
-                                            [ "session_id", ctx.SessionId
-                                              "result", "blog call without ToolContext identity (ENFORCER-041)" ]
-
-                                        return ToolHostCodec.tomlObject [ "result", ToolHostCodec.TString "OK" ]
+                                | None -> return unknownTip ()
+                                | Some _ -> return remembered ()
                 } }

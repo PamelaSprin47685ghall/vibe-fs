@@ -13,9 +13,8 @@ open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Tools
 
-/// EXEC-026 / EXEC-028: reusable SyncDelegate CE (Acquire → GetOrCreate → Send →
-/// await Returned → await Completion). Dual-await path for dedicated Inspector/Coder
-/// (Work+Attached); not SatelliteRuntime / SatelliteKind.
+/// EXEC-026 / EXEC-031: reusable SyncDelegate CE (Acquire → GetOrCreate → Send →
+/// ordinary Completion → bounded WorkRecord). No return tool / dual-await.
 ///
 /// Composition seam: call state lives in SyncDelegateCallStore, the Invoke CE
 /// lives in SyncDelegateWorkflow, wait descriptors in SyncDelegateWait.
@@ -36,24 +35,22 @@ type SyncDelegateRuntime
         /// G2 PREFIX LAW: bind the same ModelId on every Inspector/Coder child
         /// SendPrompt. ChatParamsHook leaves Model=None; Host agent config is not
         /// visible here, so the caller supplies the bound OpencodeModel.
-        ?promptModel: OpencodeModel
+        ?promptModel: OpencodeModel,
+        /// EXEC-031: bounded WorkRecord projector (includeOpening=false). Injected
+        /// from plugin wiring so Session does not depend on Finality compile order.
+        ?workRecordFor: SessionId -> string option
     ) =
     let store = SyncDelegateCallStore()
-    let recoveryBudget = AgentPairCursor.DefaultAutoRecoveryBudget
     let directory = workspaceDirectory
     let noteInspectorPrompt = defaultArg onInspectorPrompt (fun _ _ -> ())
     let noteInspectorAnswer = defaultArg onInspectorAnswer (fun _ _ -> ())
     let cleanupInspectorDraft = defaultArg onInspectorCleanup (fun _ -> ())
     let boundPromptModel = promptModel
+    let projectWorkRecord = defaultArg workRecordFor (fun _ -> None)
 
     let sessionKey (sessionId: SessionId) = SessionId.value sessionId
 
     let scopeKey (scope: ReuseScopeId) = ReuseScopeId.value scope
-
-    let roleLabel =
-        function
-        | SyncDelegateRole.Inspector -> "inspector"
-        | SyncDelegateRole.Coder -> "coder"
 
     let canonicalRole =
         function
@@ -62,15 +59,10 @@ type SyncDelegateRuntime
 
     let normalizePayload (text: string) = if isNull text then "" else text.Trim()
 
-    // EXEC-028: dedicated SyncDelegate Inspector/Coder must expose `return` on the
-    // per-request tools map (Returned → Completion). Static role permissions stay
-    // unchanged for forked OneShot-style children; only this CE path adds Return.
+    // EXEC-031: SyncDelegate uses ordinary WorkMain tools — no Return permission.
     let toolMap role =
         PromptAuthority.toolCapabilitiesFor role ProviderRequestKind.WorkMain
-        |> Set.add ToolPermission.Return
         |> StaticTools.requestToolMap
-
-    let activeProfile sessionId = dispatcher.ActiveProfile sessionId
 
     let createChild (owner: SessionId) (agentName: string) (childDirectory: string option) =
         sessions.CreateChildSession(
@@ -84,8 +76,6 @@ type SyncDelegateRuntime
         task {
             let tools = toolMap (canonicalRole call.Role)
 
-            // Wave B: each Invoke is AgentOwnerRoot (Detached). SyncDelegate
-            // ContinuationKind (question / idle) lands with tool cutover.
             return!
                 dispatcher.SendAgentOwnerRootWithTools
                     sessions
@@ -99,25 +89,10 @@ type SyncDelegateRuntime
                     boundPromptModel
         }
 
-    let sendIdleNudge (permit: QuiescencePermit option) (call: SyncDelegateCall) =
-        task {
-            match permit with
-            | None -> return Error "Superseded: no idle permit for SyncDelegateIdleNudge"
-            | Some current when not (quiescence.TryConsume current) ->
-                return Error "Superseded: idle permit stale for SyncDelegateIdleNudge"
-            | Some _ ->
-                return!
-                    dispatcher.SendAgentOwnerRootWithTools
-                        sessions
-                        call.Delegate
-                        SyncDelegatePrompt.idleNudge
-                        call.Agent
-                        directory
-                        PromptDispatcher.AwaitMode.Detached
-                        None
-                        (toolMap (canonicalRole call.Role))
-                        boundPromptModel
-        }
+    let materializeWorkRecord (delegateSession: SessionId) (fallback: string) =
+        match projectWorkRecord delegateSession with
+        | Some record when not (String.IsNullOrWhiteSpace record) -> record
+        | _ -> fallback
 
     let deps: SyncDelegateWorkflow.Dependencies =
         { Attached = attached
@@ -127,8 +102,6 @@ type SyncDelegateRuntime
           NoteInspectorPrompt = noteInspectorPrompt
           CleanupInspectorDraft = cleanupInspectorDraft
           Directory = directory
-          // SendAgentOwnerRootWithTools yields a PromptKey the CE discards;
-          // the workflow dependency contracts on the settle result only.
           SendPrompt =
             fun call message ->
                 task {
@@ -154,11 +127,10 @@ type SyncDelegateRuntime
         | Some bound when bound = inspectorSessionId ->
             match store.TryCallByDelegate inspectorSessionId with
             | Some call ->
-                store.ClearPendingText inspectorSessionId
                 store.RemoveCall call
                 store.FailCall(call, "Sync delegate Inspector session was deleted")
                 store.ReleaseFlight call.OwnerScope
-            | None -> store.ClearPendingText inspectorSessionId
+            | None -> ()
 
             attached.Remove(ownerSessionId, SyncDelegateRole.Inspector) |> ignore
 
@@ -176,54 +148,6 @@ type SyncDelegateRuntime
     member _.Invoke(ownerSessionKey: string, role: SyncDelegateRole, message: string) : Task<Result<string, string>> =
         SyncDelegateWorkflow.invoke store deps ownerSessionKey role message
 
-    member _.Return
-        (delegateSessionKey: string, providerRunId: ProviderRunIdentity option, message: string)
-        : Task<Result<string, string>> =
-        task {
-            let delegateSession = SessionId.create delegateSessionKey
-
-            match activeProfile delegateSession, providerRunId, store.TryCallByDelegate delegateSession with
-            | None, _, _ -> return Error "return rejected: no active SyncDelegate Authority Root"
-            | Some profile, _, _ when profile.CanonicalRole <> Role.Inspector && profile.CanonicalRole <> Role.Coder ->
-                return Error "return rejected: role is neither Inspector nor Coder delegate"
-            | Some _, None, _ -> return Error "return rejected: Host provided no provider-run identity"
-            | Some profile, Some _, None -> return Error "return rejected: SyncDelegate has no active caller"
-            | Some profile, Some _, Some call when call.Delegate <> delegateSession ->
-                return Error "return rejected: delegate does not own the active sync call"
-            | Some profile, Some toolRun, Some call when canonicalRole call.Role <> profile.CanonicalRole ->
-                return Error "return rejected: active profile role does not match SyncDelegate binding"
-            | Some _, Some toolRun, Some call ->
-                if store.TryPendingText delegateSession |> Option.isSome then
-                    return Error "return rejected: SyncDelegate return completion is already pending"
-                else
-                    store.ArmPendingText(
-                        delegateSession,
-                        { Text = SyncDelegatePrompt.SyncDelegateReturnCompletion
-                          ToolRun = toolRun }
-                    )
-
-                    AsyncSupport.trySetResult call.Returned (Ok { Answer = message; ToolRun = toolRun })
-                    |> ignore
-
-                    if call.Role = SyncDelegateRole.Inspector then
-                        noteInspectorAnswer delegateSessionKey message
-
-                    return Ok SyncDelegatePrompt.returnResult
-        }
-
-    member _.TextComplete(input: obj, output: obj) =
-        if
-            not (isNull input)
-            && not (isNull input?sessionID)
-            && not (isNull input?messageID)
-        then
-            let sessionId = SessionId.create (unbox<string> input?sessionID)
-            let completionRun = ProviderRunIdentity.create (unbox<string> input?messageID)
-
-            match store.TryPendingText sessionId with
-            | Some pending when completionRun <> pending.ToolRun -> output?text <- pending.Text
-            | _ -> ()
-
     member _.HandleTurn(turn: ReconciledTurn, permit: QuiescencePermit option) : Task<bool> =
         task {
             match turn.Role, store.TryCallByDelegate turn.SessionId with
@@ -231,40 +155,16 @@ type SyncDelegateRuntime
                 match turn.Outcome with
                 | ReconcileProgram.TurnCompleted ->
                     let payload = normalizePayload (CompletedTurnClassifier.partsText turn.Parts)
+                    let workRecord = materializeWorkRecord turn.SessionId payload
 
-                    if payload = normalizePayload SyncDelegatePrompt.SyncDelegateReturnCompletion then
-                        store.ClearPendingText turn.SessionId
-                        store.RemoveCall call
-                        AsyncSupport.trySetResult call.Completion (Ok()) |> ignore
-                        return true
-                    else
-                        match call.Nudges >= recoveryBudget with
-                        | true ->
-                            store.ClearPendingText turn.SessionId
-                            store.RemoveCall call
+                    if call.Role = SyncDelegateRole.Inspector then
+                        noteInspectorAnswer (sessionKey turn.SessionId) workRecord
 
-                            store.FailCall(
-                                call,
-                                (sprintf "SyncDelegate idle recovery budget exhausted after %i nudges" recoveryBudget)
-                            )
-
-                            return true
-                        | false ->
-                            match! sendIdleNudge permit call with
-                            | Ok _ ->
-                                store.UpdateCall(
-                                    call.OwnerScope,
-                                    (fun current ->
-                                        { current with
-                                            Nudges = current.Nudges + 1 })
-                                )
-                                |> ignore
-                            | Error _ -> ()
-
-                            return true
+                    store.RemoveCall call
+                    AsyncSupport.trySetResult call.Answer (Ok workRecord) |> ignore
+                    return true
                 | ReconcileProgram.TurnFailed error
                 | ReconcileProgram.TurnAborted error ->
-                    store.ClearPendingText turn.SessionId
                     store.RemoveCall call
                     store.FailCall(call, (sprintf "SyncDelegate run failed: %s" error))
                     return true
@@ -279,7 +179,6 @@ type SyncDelegateRuntime
             store.TryCallByOwnerScope asOwnerScope
             |> Option.orElseWith (fun () -> store.TryCallByDelegate sessionId)
 
-        // Capture inspector draft holders before bindings are torn down.
         let inspectorOwned = attached.TryFind(sessionId, SyncDelegateRole.Inspector)
 
         let stagedInspectorOwned = store.ClearDeletedInspector asOwnerScope
@@ -291,12 +190,10 @@ type SyncDelegateRuntime
 
         call
         |> Option.iter (fun scope ->
-            store.ClearPendingText scope.Delegate
             store.RemoveCall scope
             store.FailCall(scope, "Sync delegate call was cancelled")
             store.ReleaseFlight scope.OwnerScope)
 
-        store.ClearPendingText sessionId
         attached.RemoveByDelegateSession sessionId |> ignore
 
         for role in [ SyncDelegateRole.Inspector; SyncDelegateRole.Coder ] do
@@ -310,7 +207,6 @@ type SyncDelegateRuntime
         inspectorAsDelegate
         |> Option.iter (fun id -> cleanupInspectorDraft (sessionKey id))
 
-        // Deleted id may itself hold an inspector draft (no owner binding left).
         cleanupInspectorDraft (sessionKey sessionId)
 
     member _.Dispose() =

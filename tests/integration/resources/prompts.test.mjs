@@ -3,6 +3,7 @@
 // 10 role system prompts under resources/prompts/*-system.md load via
 // PromptResources / RuntimeResources; path is import.meta.url-relative, not cwd.
 // G3: Student/Teacher prompts deleted with the roles (AGENT-002 twenty-agent baseline).
+// GrandRewrite: Role Law prompts; no tdd/list/fork-manager/verdict legacy contracts.
 //
 // Not discovered by tests/unit/runner.mjs. Run standalone:
 //   node --test tests/integration/resources/prompts.test.mjs
@@ -19,9 +20,9 @@ const PROMPT_FIELDS = [
   'InspectorSystemPrompt',
   'ReviewerSystemPrompt',
   'BrowserSystemPrompt',
-  'MeditatorSystemPrompt',
+  'InquirySystemPrompt',
   'OrchestratorSystemPrompt',
-  'ExecutorSystemPrompt',
+  'DistillerSystemPrompt',
   'BloggerSystemPrompt',
 ]
 
@@ -34,6 +35,15 @@ const assertTenNonEmpty = (catalog, label) => {
   assert.equal(PROMPT_FIELDS.length, 10)
   assert.equal(catalog.StudentSystemPrompt, undefined, `${label}: StudentSystemPrompt must be absent`)
   assert.equal(catalog.TeacherSystemPrompt, undefined, `${label}: TeacherSystemPrompt must be absent`)
+}
+
+const assertNoLegacyToolVocabulary = (text, label) => {
+  assert.doesNotMatch(text, /\bfork-manager\b/)
+  assert.doesNotMatch(text, /\bblog\b/)
+  assert.doesNotMatch(text, /\bfork-pty\b/)
+  assert.doesNotMatch(text, /\bedit-qa\b/)
+  assert.doesNotMatch(text, /\bmeditator\b/i)
+  assert.doesNotMatch(text, /\bRole\.Executor\b|\bfast-executor\b|\bdeep-executor\b/i)
 }
 
 test('AGENT_002_resource_ten_prompts_load_via_PromptResources', () => {
@@ -59,91 +69,73 @@ test('ENFORCER_resource_prompts_load_independent_of_process_cwd', () => {
     process.chdir(previous)
   }
 })
-test('PROMPT_manager_sub_session_reuse_algorithm_is_executable', () => {
+
+test('PROMPT_manager_blindplan_and_horizon_vocabulary', () => {
   const text = promptResources.load().ManagerSystemPrompt
-  // Semantic fragments only — not whole-block brittle match.
-  assert.match(text, /\blist\b/)
-  assert.match(text, /agent_id/)
-  assert.match(text, /reuse/)
-  assert.match(text, /compatible context/)
-  assert.match(text, /Do not reuse when old context would make the new assignment ambiguous/)
-  assert.match(text, /Reuse must not reduce parallelism/)
+  assert.match(text, /Planning Table|planning table/i)
+  assert.match(text, /\bhorizon\b/)
+  assert.match(text, /\btodowrite\b/)
+  assert.match(text, /\bfork\b/)
+  assert.doesNotMatch(text, /carrying one task|Born with a Task/i)
+  assertNoLegacyToolVocabulary(text, 'Manager')
 })
 
-test('PROMPT_orchestrator_continues_manager_job_without_invented_reuse_api', () => {
+test('PROMPT_orchestrator_commission_roads_vocabulary', () => {
   const text = promptResources.load().OrchestratorSystemPrompt
-  assert.match(text, /originating Manager|existing Manager job|Continue the existing Manager/i)
-  assert.match(text, /truly independent|真正并行|parallel independent/i)
-  assert.match(text, /fork-manager\(existing_job_id|existing manager job id|reused=true/i)
-  assert.doesNotMatch(text, /There is no `fork-manager\(existing_id\)`|no `fork-manager\(existing_id\)`/i)
+  assert.match(text, /\bcommission\b/)
+  assert.match(text, /independent road|independent roads/i)
+  assert.doesNotMatch(text, /fork-manager|job_id|worktree/i)
+  assertNoLegacyToolVocabulary(text, 'Orchestrator')
 })
 
-test('PROMPT_coder_tdd_phase_discipline_and_scope', () => {
+test('PROMPT_coder_mutation_without_tdd_contract', () => {
   const text = promptResources.load().CoderSystemPrompt
-  assert.match(text, /red → green → refactor|red → green/)
-  assert.match(text, /tdd/)
-  assert.match(text, /Do not delete, skip, loosen, or rewrite/)
-  assert.match(text, /schema-required|schema-optional/)
-  assert.match(text, /Manager `fork` of a Coder role|prompt-required/)
-  assert.match(text, /DevOps or the parent agent must run the targeted suite/)
+  assert.match(text, /Mutation|mutation/i)
+  assert.match(text, /\binspect\b/)
+  assert.match(text, /bash-honeypot|shell/i)
+  assert.doesNotMatch(text, /\btdd\b/i)
+  assertNoLegacyToolVocabulary(text, 'Coder')
 })
 
-test('PROMPT_devops_coder_tdd_workflow_requires_observed_red', () => {
+test('PROMPT_devops_engine_room_and_terminals', () => {
   const text = promptResources.load().DevopsSystemPrompt
-  assert.match(text, /tdd="red"/)
-  assert.match(text, /tdd="green"/)
-  assert.match(text, /Confirm true red\/green|confirm.*red.*green|true red\/green/i)
-  assert.match(text, /named `coder` tool|synchronous `coder` tool/)
-  assert.match(text, /schema optional `tdd`|prompt-required for `fast-coder`|Manager `fork` of a Coder role/)
-  assert.match(text, /verbal claim is not enough|actually observe/)
+  assert.match(text, /Engine Room|engine room/i)
+  assert.match(text, /open-terminal|send-terminal|read-terminal|signal-terminal/)
+  assert.match(text, /\brun\b/)
+  assert.match(text, /establish-behavior|repair-behavior/)
+  assert.doesNotMatch(text, /\btdd\b/i)
+  assertNoLegacyToolVocabulary(text, 'DevOps')
 })
 
-test('PROMPT_manager_fork_coder_requires_tdd', () => {
-  const text = promptResources.load().ManagerSystemPrompt
-  assert.match(text, /tdd/)
-  assert.match(text, /tdd="red"/)
-  assert.match(text, /tdd="green"/)
-  // GLORY-027: delegation discipline lives in the prompt; the tdd schema and
-  // the ForkTool error carry the hard gate (ForkTool childPrompt).
-  assert.match(text, /failing test|already-established failing test/)
+test('PROMPT_reviewer_judge_without_formal_report_schema', () => {
+  const text = promptResources.load().ReviewerSystemPrompt
+  assert.match(text, /\bjudge\b/)
+  assert.match(text, /Examiner|Ledger|material/i)
+  assert.doesNotMatch(text, /### Evaluation Report|Formal Report Format/i)
+  assertNoLegacyToolVocabulary(text, 'Reviewer')
 })
 
-test('PROMPT_manager_forbids_full_text_and_query_dumps_from_inspector', () => {
-  const text = promptResources.load().ManagerSystemPrompt
-  // PROMPT-INSP-001: the "repeater" prohibition must be unmistakable — no
-  // whole-file, long-source, or query-dump demands; only locatable summaries.
-  assert.match(text, /query dump|query dumps/i)
-  assert.match(text, /only locatable summaries|locatable summaries|locatable pointers/i)
-})
-
-test('PROMPT_manager_devops_operational_closure_delegation', () => {
-  const text = promptResources.load().ManagerSystemPrompt
-  assert.match(text, /Do not ask DevOps to edit files directly/)
-  assert.match(
-    text,
-    /execution\/repair objective|bounded mechanical repair|autonomous mechanical repair|operational closure/i,
-  )
-  assert.match(text, /observed operational result|coordinate bounded Coder repairs/i)
-})
-
-test('PROMPT_devops_mechanical_repair_autonomy', () => {
-  const text = promptResources.load().DevopsSystemPrompt
-  assert.match(text, /Mechanical Repair Autonomy/)
-  assert.match(text, /Do not ask Manager for permission to make an obvious mechanical repair/)
-  assert.match(text, /operational closure/)
-  assert.match(text, /coder-driven mechanical repair|Coder-driven mechanical repair/i)
-  assert.match(
-    text,
-    /No Direct File Modification|cannot edit files directly|do not possess direct `write` or `edit`/i,
-  )
-  assert.match(text, /architecture|product/i)
-})
-
-test('PROMPT_inspector_resists_parent_full_text_and_returns_summary_only', () => {
+test('PROMPT_inspector_evidence_funnel_and_query_shell', () => {
   const text = promptResources.load().InspectorSystemPrompt
-  // PROMPT-INSP-002: even a Parent demand for full text must be refused, the
-  // overreach explicitly corrected, and only a structured summary delivered.
-  assert.match(text, /parent.*(asks|demands|requests).*full|refuse.*full-text|reject.*full-text/i)
-  assert.match(text, /correct.*overreach|rebuke/i)
-  assert.match(text, /structured summary only|only a structured summary/i)
+  assert.match(text, /Evidence|witness/i)
+  assert.match(text, /query-shell/)
+  assert.match(text, /Do not compile|do not compile|without changing/i)
+  assert.doesNotMatch(text, /There is no bash in Inspector/i)
+  assertNoLegacyToolVocabulary(text, 'Inspector')
+})
+
+test('PROMPT_inquiry_inspect_only_v1', () => {
+  const text = promptResources.load().InquirySystemPrompt
+  assert.match(text, /Inquiry|inquiry/i)
+  assert.match(text, /\binspect\b/)
+  assert.doesNotMatch(text, /Sphinx Kernel|Sphinx contribution|semantic contribution protocol/i)
+  assertNoLegacyToolVocabulary(text, 'Inquiry')
+})
+
+test('PROMPT_blogger_chronicle_occurrence_model', () => {
+  const text = promptResources.load().BloggerSystemPrompt
+  assert.match(text, /\bchronicle\b/)
+  assert.match(text, /occurrence|tip/i)
+  assert.doesNotMatch(text, /\bevidence\b/i)
+  assertNoLegacyToolVocabulary(text, 'Blogger')
 })

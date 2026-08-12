@@ -8,6 +8,8 @@ Transform input 为空对象是 Host 能力现实；绑定必须用「已创建�
 
 多实例按 directory 分叉时，跨实例共享的只能是身份注册表，不能是 Journal writer——实测第二实例读不到主实例 verdict 注册即来自此边界。
 
+**ProviderLanguage 在创建时钉死。** 全局偏好只在 session 创建瞬间读入，成为不可变 `SessionProviderLanguage`。child / attached / internal leaf 继承 owner（或 commissioner）语言，不各自再读全局。用户事后改全局偏好只影响未来 session——已开 Life 的世界语言与 Opening / Library / tool 后果必须字节连续；中途换语等于重写前缀并让父子对话说两种世界。
+
 ---
 
 ## 决策理由与被拒方案（A4 设计理由）
@@ -103,3 +105,8 @@ Transform input 为空对象是 Host 能力现实；绑定必须用「已创建�
 ### 20. reviewing 与 sink reconciliation
 - **被拒方案**：改 canonical status 迁就 UI；或 REVISE settlement 后永久留下否决的 Pk 在 Host TodoTable；或把 sink repair 写成新 checkpoint/review。
 - **选择方案**：先 canary 第五态消费者；能容忍则 passthrough `reviewing`，否则仅 sink 降为 `in_progress`（HOST-023）。canonical 仍 `reviewing`（TODO-003）。REVISE 被消费且 settlement 改变后幂等 reconcile 到 settled current（TODO-007）；repair 不产生 checkpoint/review。
+
+### 21. ProviderLanguage：每轮读全局 vs 创建绑定 + 子嗣继承
+- **被拒方案**：每个 provider attempt 或每个 child 再读一次全局语言偏好。fallback / Strength / restart 后父会话已用旧语，子会话或下一轮突然换语 → Opening、Office Library、tool 后果与历史 marker 不再同一世界；前缀缓存与身份连续性同时碎。
+- **被拒方案**：把语言绑在 Role 或 EffectiveAgent 上。换 Peer 会误换世界语言。
+- **选择方案**：创建时绑定一次 `SessionProviderLanguage`（不可变）；child / attached / StrengthReplica 等继承 owner/commissioner；全局偏好变更只作用于此后新建 session。protocol 标识符（tool 名、字段名、enum literal、路径、命令）不翻译——翻译改的是世界的语言，不是机器的标识。

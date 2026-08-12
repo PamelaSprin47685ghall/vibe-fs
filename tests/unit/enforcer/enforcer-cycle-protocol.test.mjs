@@ -292,7 +292,7 @@ const liveBlog = (id, callId, input) =>
     [
       {
         type: 'tool',
-        tool: 'blog',
+        tool: 'chronicle',
         callID: callId,
         state: { status: 'completed', input: withTip(input) },
       },
@@ -307,7 +307,7 @@ const historicalBlog = (id, callId, input) =>
     [
       {
         type: 'tool',
-        tool: 'blog',
+        tool: 'chronicle',
         callID: callId,
         state: { status: 'completed', input: withTip(input) },
       },
@@ -321,7 +321,7 @@ const pendingBlog = (id, callId) =>
     [
       {
         type: 'tool',
-        tool: 'blog',
+        tool: 'chronicle',
         callID: callId,
         state: { status: 'pending', input: { text: 'later' } },
       },
@@ -336,7 +336,7 @@ const interruptedBlog = (id, callId) =>
     [
       {
         type: 'tool',
-        tool: 'blog',
+        tool: 'chronicle',
         callID: callId,
         state: {
           status: 'error',
@@ -364,7 +364,7 @@ const erroredBlog = (id, callId) =>
     [
       {
         type: 'tool',
-        tool: 'blog',
+        tool: 'chronicle',
         callID: callId,
         state: {
           status: 'error',
@@ -576,7 +576,7 @@ test('ENFORCER_060_pure_prose_first_issues_interaction_nudge_not_aabb', async ()
     assert.equal(isAabb(messagesOf(out)), false)
     assert.equal(hasFlight(scope), true)
     assert.equal(capturedSends.length, 1, 'exactly one durable InteractionRepair send')
-    assert.match(String(capturedSends[0].text), /blog tool exactly once|Protocol repair/)
+    assert.match(String(capturedSends[0].text), /chronicle tool exactly once|Protocol repair/)
     assert.equal(fatals.length, 0)
   })
 })
@@ -1009,7 +1009,7 @@ test('ENFORCER_resolveCycleContext_prefers_live_inflight_request', async () => {
 
 test('ENFORCER_RepairInstruction_is_stable_minimal_protocol_text', () => {
   assert.match(RepairInstruction, /Protocol repair/)
-  assert.match(RepairInstruction, /blog tool exactly once/)
+  assert.match(RepairInstruction, /chronicle tool exactly once/)
   assert.equal(RepairInstruction.includes('{{'), false, 'no dynamic template')
   assert.equal(RepairInstruction.includes('toml'), false)
 })

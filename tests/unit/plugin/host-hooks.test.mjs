@@ -47,10 +47,11 @@ const ROLES = [
   'inspector',
   'devops',
   'browser',
-  'meditator',
+  'inquiry',
   'reviewer',
   'blogger',
-  'executor',
+  'distiller',
+  'bookkeeper',
 ]
 
 const hostFinalConfig = () => {
@@ -120,12 +121,6 @@ const HOOK_FIXTURES = {
     input: { sessionID: SESSION },
     output: { enabled: true },
     assert: (output) => assert.equal(output.enabled, false, 'HOST-006 requires autocontinue closed'),
-  },
-
-  'experimental.text.complete': {
-    input: { sessionID: SESSION, messageID: 'asst_probe', partID: 'part_probe' },
-    output: { text: 'unchanged' },
-    assert: (output) => assert.equal(output.text, 'unchanged', 'unrelated session text must be untouched'),
   },
 
   // The odd one out: `config` receives the live instance-state object ALONE and the
@@ -243,7 +238,7 @@ test('PROMPT_004_human_root_survives_host_synthetic_file_parts', async () => {
       },
     )
 
-    const listResult = parseToml(await hooks.tool.list.execute({}, toolContext(SESSION)))
+    const listResult = parseToml(await hooks.tool.horizon.execute({}, toolContext(SESSION)))
     assert.deepEqual(listResult, {})
     assert.equal('item' in listResult, false)
   })
@@ -265,7 +260,7 @@ test('AGENT_007_tool_gate_recovers_human_root_from_host_snapshot_on_resume', asy
   }
 
   await withPluginClient(client, async (hooks) => {
-    const listResult = parseToml(await hooks.tool.list.execute({}, toolContext(sessionID, assistantID)))
+    const listResult = parseToml(await hooks.tool.horizon.execute({}, toolContext(sessionID, assistantID)))
     assert.deepEqual(listResult, {})
     assert.equal('item' in listResult, false)
   })
@@ -319,25 +314,29 @@ test('HOST_009_the_tool_registry_is_a_registry_not_a_triggered_hook', async () =
     const toolNames = Object.keys(hooks.tool).sort()
     assert.deepEqual(toolNames, [
       'bash-honeypot',
-      'blog',
-      'coder',
-      'executor',
+      'chronicle',
+      'commission',
+      'establish-behavior',
       'fork',
-      'fork-manager',
-      'fork-pty',
-      'inspector',
+      'horizon',
+      'inspect',
       'join',
       'js-browser',
       'js-coder',
       'js-devops',
       'js-inspector',
       'js-reviewer',
-      'list',
+      'judge',
       'mv',
-      'return',
+      'open-terminal',
+      'query-shell',
+      'read-terminal',
+      'repair-behavior',
       'rm',
+      'run',
+      'send-terminal',
+      'signal-terminal',
       'suicide',
-      'verdict',
     ])
 
     for (const name of toolNames) {

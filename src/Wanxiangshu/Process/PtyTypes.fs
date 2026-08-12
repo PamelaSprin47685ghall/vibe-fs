@@ -71,7 +71,7 @@ type PtyId =
 /// `ManagedAgent` rather than a name plus a role. The previous shape had
 /// `AgentId: string option` and `Role: Role option`, and `PtyPort.Fork` was
 /// never called with either — so every PTY completion reported role `Executor` and
-/// a rebuilt name `fast-executor`, regardless of which DevOps agent opened it.
+/// a rebuilt name `fast-distiller`, regardless of which DevOps agent opened it.
 /// Keeping name and role as one parsed value makes that disagreement unrepresentable.
 type PtyHandle =
     { Id: PtyId

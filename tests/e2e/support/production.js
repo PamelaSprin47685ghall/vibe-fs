@@ -124,5 +124,7 @@ export const bloggerDocumentWith = (instructions, items) =>
 // Instruction-only SyntheticToml documents (already comment-prefixed).
 
 export const workActivation = () => LifecycleModule.WorkActivation;
-export const idleEncouragement = () => LifecycleModule.IdleEncouragement;
+export const idleEncouragement = () => LifecycleModule.IdleEncouragementPostT1;
+export const idleEncouragementPreT1 = () => LifecycleModule.IdleEncouragementPreT1;
+export const idleEncouragementPostT1 = () => LifecycleModule.IdleEncouragementPostT1;
 export const finalityUndecidable = () => LifecycleModule.FinalityUndecidable;

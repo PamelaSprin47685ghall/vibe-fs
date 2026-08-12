@@ -64,6 +64,20 @@ type HostToolArguments internal (raw: obj) =
             with _ ->
                 None
 
+    member _.OptionalBool(name: string) =
+        if isNull raw || isNull raw?(name) then
+            None
+        else
+            try
+                let value = raw?(name)
+
+                if emitJsExpr value "typeof $0 === 'boolean'" then
+                    Some(unbox<bool> value)
+                else
+                    None
+            with _ ->
+                None
+
 /// Typed subset of the OpenCode tool invocation context used by domain tools.
 ///
 /// No user-message field. HOST-011: the Host's `ToolContext` carries `sessionID`,
@@ -100,6 +114,9 @@ module ToolHostCodec =
 
     [<Emit("$0.schema.number()")>]
     let private rawNumberSchema (tool: obj) : obj = jsNative
+
+    [<Emit("$0.schema.boolean()")>]
+    let private rawBooleanSchema (tool: obj) : obj = jsNative
 
     [<Emit("$0.schema.enum($1)")>]
     let private rawEnumSchema (tool: obj) (values: string array) : obj = jsNative
@@ -215,6 +232,8 @@ module ToolHostCodec =
         HostSchema(rawStringSchemaDescribed factory description)
 
     let numberSchema (HostToolFactory factory) = HostSchema(rawNumberSchema factory)
+
+    let boolSchema (HostToolFactory factory) = HostSchema(rawBooleanSchema factory)
 
     let enumSchema values (HostToolFactory factory) =
         HostSchema(rawEnumSchema factory (List.toArray values))

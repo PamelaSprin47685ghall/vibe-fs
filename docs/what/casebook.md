@@ -11,11 +11,11 @@ Inspector Casebook 是 best-effort semantic cache：每个 Inspector Session 保
 - Q：逐字等于完整 Inspector initial prompt（不经过摘要）。
 - A：逐字等于实际 Inspector ToolResult body（oversized 先走现有 ToolResultBound，再作为 Captured payload）。
 - Observations：该答案依据的、可重放的 repository observations（能捕获多少捕获多少，缺失允许）。
-- Bookkeeper 可改 Q、可改 A、可连续多次 edit-qa；零 edit idle 合法；edit-qa 不能写第三个文件；最终 A 仍满足 ToolResultBound。
+- Bookkeeper 可改 Q、可改 A、可连续多次 `js-bookkeeper`；零 edit idle 合法；`js-bookkeeper` 不能写第三个文件；最终 A 仍满足 ToolResultBound。
 
 ## CASE-003 Observation capture
 
-Observation 从工具执行的 typed 结果捕获，从不从 transcript 文本推断。捕获不完整（如 executor 命令无法识别）不阻止归档：original Inspector 成功、Case 照常 Captured、缺失的 observation 只是未来少一次变化检测机会。executor 阅读：`cat` / `head` / `tail` / `sed` 单文件形式识别为 observation；命令替换、`sh -c`、`bash -c`、无法确定读取目标的复杂 pipeline 安全跳过且不报错。
+Observation 从工具执行的 typed 结果捕获，从不从 transcript 文本推断。捕获不完整（如命令无法识别）不阻止归档：original Inspector 成功、Case 照常 Captured、缺失的 observation 只是未来少一次变化检测机会。阅读类命令：`cat` / `head` / `tail` / `sed` 单文件形式识别为 observation；命令替换、`sh -c`、`bash -c`、无法确定读取目标的复杂 pipeline 安全跳过且不报错。
 
 ## CASE-004 fetch 语义
 
@@ -27,7 +27,11 @@ Observation 从工具执行的 typed 结果捕获，从不从 transcript 文本�
 
 ## CASE-006 Bookkeeper
 
-私有 Bookkeeper Agent 提供两个 request contract：`CaseRefresh`（changed evidence → edit-qa*（一个 provider transaction 内 0..N 次）→ stability verify → InspectorCaseRefreshed）与 `CaseFinalize`（ReuseScope close → freeze draft → exactly one finalize → InspectorCaseCaptured → retire/release reusable Inspector）。不新建 LearningCompiler / CaseSynthesizer / StudentReplacement。Bookkeeper 不可见；feature disabled 时不要求 Bookkeeper config；`edit-qa` 是唯一工具。
+私有 Bookkeeper Agent 提供两个 request contract：`CaseRefresh`（changed evidence → `js-bookkeeper`*（一个 provider transaction 内 0..N 次）→ stability verify → InspectorCaseRefreshed）与 `CaseFinalize`（ReuseScope close → freeze draft → exactly one finalize → InspectorCaseCaptured → retire/release reusable Inspector）。不新建 LearningCompiler / CaseSynthesizer / StudentReplacement。
+
+Bookkeeper 不可见（AGENT-008）；机器身份 `fast-bookkeeper` / `deep-bookkeeper`（强制内部 pair，AGENT-002）；Persona = Clerk / Curator（AGENT-028）；可复用 inspector 模型绑定，**不**复用 Inspector self-model。feature disabled 时不要求 Bookkeeper config。
+
+工具唯一：`js-bookkeeper(program)`。旧名 `edit-qa` 非法，无 alias。一次程序 = 一次原子 staged 变换；`setQuestion` / `setAnswer` 各至多一次；zero mutation 合法；无 filesystem capability。
 
 ## CASE-007 Storage
 
@@ -43,7 +47,7 @@ marker absent → Inspector 无 fetch schema、ToolRegistry execute fetch 也拒
 
 ## CASE-010 Lifecycle
 
-非复用 Inspector scope：terminal → archive（InspectorCaseCaptured）。复用 Inspector scope：调用期间只 capture，不逐次 finalize；ReuseScope close → exactly one CaseFinalize → retire/release reusable Inspector。禁止每个 return finalize / 每个 owner turn finalize / idle finalize / timer finalize / token 阈值 finalize。unexpected SessionDeleted → 仅 cleanup，不 reconstruct + synthesize（Casebook 是 cache，不值得 durable pending-finalize workflow）。
+非复用 Inspector scope：terminal → archive（InspectorCaseCaptured）。复用 Inspector scope：调用期间只 capture，不逐次 finalize；ReuseScope close → exactly one CaseFinalize → retire/release reusable Inspector。禁止每个 SyncDelegate invocation finalize / 每个 owner turn finalize / idle finalize / timer finalize / token 阈值 finalize。unexpected SessionDeleted → 仅 cleanup，不 reconstruct + synthesize（Casebook 是 cache，不值得 durable pending-finalize workflow）。
 
 ## CASE-011 并发与收敛
 

@@ -285,6 +285,8 @@ module MagicTodoMembrane =
             let concludedExists =
                 checkpoint |> Option.bind (fun value -> value.Concluded) |> Option.isSome
 
+            let isT1Commitment = List.isEmpty life.AcceptedOrder
+
             match
                 MagicTodoAfter.planAccept
                     bridge.Prepared
@@ -302,6 +304,12 @@ module MagicTodoMembrane =
             with
             | Error rejection -> Error(AcceptRejection.Planner rejection)
             | Ok plan ->
+                let enrichedResult =
+                    if isT1Commitment then
+                        ManagerNarrative.wrapT1AcceptedResult plan.EnrichedResult
+                    else
+                        plan.EnrichedResult
+
                 match
                     AgentJournal.appendMagicTodo
                         (StreamId.Session bridge.ManagerSessionId)
@@ -312,6 +320,6 @@ module MagicTodoMembrane =
                 | Error failure -> Error(AcceptRejection.JournalAppend(JournalAppendFailure.describe failure))
                 | Ok _ ->
                     Ok
-                        { EnrichedResult = plan.EnrichedResult
+                        { EnrichedResult = enrichedResult
                           NeedsDedicatedEnlist = plan.NeedsDedicatedEnlist
                           NeedsEnsureReview = plan.NeedsEnsureReview }

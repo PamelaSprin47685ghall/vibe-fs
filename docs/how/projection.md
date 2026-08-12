@@ -127,3 +127,41 @@ seal 一经发出不可变（COMPANION-009 字节级 sealed 屏障）。
 切换条件：所有历史 canary 轨迹 `LegacyDigest = DslDigest`；允许有意变化的差异须有明确的新 SSOT 条款。
 
 切换后删除 `LegacyProjection`，不长期维护双实现。
+
+---
+
+## Provider Horizon 渲染过滤（PROJ + ARCH-014）
+
+Canonical Renderer 落 wire 前，每个 provider-visible field 过 Horizon filter（ARCH-014）：
+
+```text
+Did the participant already know this?        → omit
+Did they just supply this themselves?          → omit
+Is it implied by successful completion?        → omit
+Is it useful only for correlation/debug?       → keep internal
+Would different values change next action?     → if no → omit
+Does the participant need the value itself
+  rather than merely its consequence?          → if no → render consequence
+                                                → if yes → preserve minimal observation
+```
+
+### 禁止穿过 horizon（本域渲染硬禁）
+
+```text
+SessionId / AgentId / RunId / ToolCallId / Journal EventId / cursor / offset
+status / code / error DTO / phase / ordinal / kind（机器态枚举）
+settled / proposed / reviewing / semanticMerge 标签
+Host TodoTable sink 枚举冒充 CurrentObligations
+spool_path（已删路径）/ 其它虚假 affordance
+```
+
+```text
+pass:
+  consequences + WorkRecord / obligations [{name, work}] / exit_code / verdict
+  / root_requirement / commissioner_record prose
+fail:
+  id 泄漏、状态机枚举、DTO decoder 字段
+```
+
+Semantic projection 去 ID（COMPANION-007）；Wire 仅补合成 identity（COMPANION-013），**不得**把机器 id/status 回灌 Semantic 或模型可见 data 平面。  
+MagicTodoProjection 只读 obligations 真值（PROJ-009）；REVISE sink 对齐不产生新 ProjectionIntent。

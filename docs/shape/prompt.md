@@ -91,3 +91,33 @@ type ProviderRequestKind =
 
 Host 在当前 provider assistant id 产生后才暴露 `ProviderRunIdentity`。transform/ToolContext 首次取得 id
 时只允许把它绑定一次，随后 provider schema、execution gate 与 terminal reconcile 均读取同一绑定。
+
+## Prompt composition · Persona · Library · Language 所有权
+
+行为：`what/prompt.md` PROMPT-014..017；Persona 矩阵：`AGENT-028/029`；语言绑定写：`HOST-026`。  
+本节只划唯一 owner；不复述层文案。
+
+| 关注点 | 唯一 owner | 边界 / 禁止 |
+|------|------|------|
+| Persona 矩阵（Role × initial tier → SessionPersona） | `PersonaCatalog`（AGENT-028） | Prompt 不另造第二矩阵；Binding 名不得冒充 Persona 自称（AGENT-029） |
+| `SessionPersona` 绑定写 | session 创建路径（一次） | 创建后不可重绑；Fallback / Strength / BlindPlan T1 / review 不得改写（PROMPT-014） |
+| System prompt 身份字节（同一 Life） | Prompt composition 装配（PROMPT-014/015） | byte-identical；不得因 T1 / Peer Fallback / Strength / compaction / reanchor 替换 |
+| Composition 层权威 | PROMPT-015 五层：World / Role / Library / Runtime / Mission | 层可互告知，不得互冒充；冲突按语义所有权裁决，**不**设「更靠近 system 者胜」全序 |
+| Common Law / Role Law 资源 | `resources/prompts/` 对应语义资产（SURFACE-004） | 文件名只存 localized representation；semantic identity 稳定 |
+| Office Library | PROMPT-016 + canonical volumes | 知识≠权威；不扩 Role 权；fast/deep 同书；他处已有 SSOT 则组合引用，不造第二真源 |
+| Tools surface | 当前 generated tool schema（Attempt profile） | Tools **不是** Role Prompt 章节；capability 变化不改人格 |
+| Lifecycle orient 文本 | Activation / Reawakening / Continuation / Handoff / Fission / Departure 各 owner | 只 orient；generic Activation ≠ Manager BlindPlan；不得触发 system prompt 替换（TODO-015） |
+| `ProviderLanguage` 类型 | PROMPT-017（`English` \| `SimplifiedChinese`） | protocol id / tool 名 / wire field / enum / path / command **永不翻译** |
+| `SessionProviderLanguage` 绑定写 | HOST-026（session 创建瞬间） | Prompt / Library / guideline **只读**已绑定语言；禁止 transform 重读全局偏好 |
+| child / attached / InternalLeaf 语言 | 继承 owner / commissioner（HOST-026） | 不得各自再绑 |
+| Magic Todo Manager-only fragment | TODO-013/015（`MagicTodoManagerGuideline` + Pre-T1/T1/Living Mission） | 禁止并入全局 `PairProgrammingGuidelineText`（HOST-013） |
+| Companion / Blogger system | COMPANION-004（`blogger-system.md`） | 不经本五层 composition 冒充；禁止动态 token/预算注入 |
+
+禁止平行 owner：
+
+```text
+OpeningPromptRaw / AssignmentText 拼接冒充 Mission 或 Opening
+Sphinx Kernel / semantic contribution 假装现行 Prompt 层（V1 absent）
+把 ExecutionBinding 变化写成 Persona / system prompt 换人
+把 Office Library 写成 Role Law 或 universal bible
+```

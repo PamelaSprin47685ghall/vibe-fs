@@ -27,11 +27,9 @@ module ProcessRunner =
         let (OutputBytes output) = estimate.EstimatedOutput
 
         if Double.IsNaN runtime || Double.IsInfinity runtime || runtime <= 0.0 then
-            Error(ProcessError.ExecutionFailed "estimated_running_secs must be a finite positive number")
+            Error(ProcessError.ExecutionFailed "deadline_seconds must be a finite positive number")
         elif output < 0L then
-            Error(ProcessError.ExecutionFailed "estimated_output_bytes must be non-negative")
-        elif output > Int64.MaxValue / 3L then
-            Error(ProcessError.ExecutionFailed "estimated_output_bytes too large")
+            Error(ProcessError.ExecutionFailed "output_budget_bytes must be non-negative")
         else
             Ok()
 

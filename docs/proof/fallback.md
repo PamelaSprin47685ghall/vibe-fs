@@ -37,3 +37,15 @@ provider 可见 A/A/B/B 的端到端固定：`tests/e2e/cases/fallback-aabb-trac
 （`waitFact FallbackCursorAdvanced eq = 4` + 恰好四次推进）。
 
 Fold 拒绝非法 NextOffset / 超预算 / Exhausted 后再 Advanced（FALLBACK-007）。
+
+## Persona / language / system（FALLBACK-014 / Gate D）
+
+| 证明 | 期望 | 条款 |
+|------|------|------|
+| Fallback 只改 `EffectiveAgent`（及模型绑定） | SelectedAgent / PeerAgent / CanonicalRole 不变 | FALLBACK-004/014 |
+| SessionPersona 跨 cursor 字节不变 | 换 Peer ≠ 换人 | FALLBACK-014、AGENT-028 |
+| SessionProviderLanguage 跨 cursor 不变 | 换 Peer ≠ 换世界语 | FALLBACK-014、HOST-026 |
+| system prompt（office + Role Law + Common Law）跨 cursor 字节相同 | T1 / review / reanchor / Strength 同守 | FALLBACK-014、ARCH-016 Gate D、AGENT-029 |
+| cursor / SideA·B / Offset / ConsecutiveFailureCount 永不进 provider | Gate B | FALLBACK-014、ARCH-014 |
+
+代表：`tests/unit/invariants/prompt-stability.test.mjs`（code phase）；既有 `tests/unit/fallback/*`、`tests/unit/strength/authority-policy.test.mjs`、`tests/unit/context/attempt-plan.test.mjs` 须钉 Persona 不变而非「system 因换边而变」。

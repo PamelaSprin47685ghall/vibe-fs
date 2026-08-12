@@ -9,9 +9,9 @@ type PromptCatalog =
       InspectorSystemPrompt: string
       ReviewerSystemPrompt: string
       BrowserSystemPrompt: string
-      MeditatorSystemPrompt: string
+      InquirySystemPrompt: string
       OrchestratorSystemPrompt: string
-      ExecutorSystemPrompt: string
+      DistillerSystemPrompt: string
       BloggerSystemPrompt: string }
 
 module PromptResources =
@@ -29,7 +29,7 @@ module PromptResources =
           InspectorSystemPrompt = loadPrompt "inspector-system.md"
           ReviewerSystemPrompt = loadPrompt "reviewer-system.md"
           BrowserSystemPrompt = loadPrompt "browser-system.md"
-          MeditatorSystemPrompt = loadPrompt "meditator-system.md"
+          InquirySystemPrompt = loadPrompt "inquiry-system.md"
           OrchestratorSystemPrompt = loadPrompt "orchestrator-system.md"
-          ExecutorSystemPrompt = loadPrompt "executor-system.md"
+          DistillerSystemPrompt = loadPrompt "distiller-system.md"
           BloggerSystemPrompt = loadPrompt "blogger-system.md" }

@@ -17,7 +17,7 @@ module PromptIngressCodec =
             ExplicitAgent: string option
             PromptKey: PromptKey option
             IsHostCompaction: bool
-            /// COMPANION-003: the message's text, for the OpeningPromptRaw capture
+            /// COMPANION-003/014: the message's text, for OpeningMaterial capture
             /// at the physical acceptance point. User text parts only.
             Text: string option
         }

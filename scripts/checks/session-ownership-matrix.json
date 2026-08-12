@@ -40,7 +40,7 @@
       "companion": "No. InternalLeaf does not hold a Companion.",
       "crashReconcile": "Process-local live map is not durable lifecycle authority. After crash do not reuse the child; next CaseRefresh/CaseFinalize creates a new InternalLeaf via CreateChildSession with a new txId. Not in-process digest. This questionnaire is still not full G9 release-close.",
       "evidencePath": "src/Wanxiangshu/Infrastructure/BookkeeperRuntime.fs",
-      "notes": "G6 landed BookkeeperRuntime.fs: one CreateChildSession per transaction, edit-qa against process-local staging, then AbortSession. OpenCodeChildOptions stays {Title, Agent, Directory}. CasebookBookkeeper synthesizer/digest is gone; refreshStale calls runTransaction CaseRefresh. AttachmentKind.Bookkeeper remains declared on SessionOwnership.fs."
+      "notes": "G6 landed BookkeeperRuntime.fs: one CreateChildSession per transaction, js-bookkeeper against process-local staging, then AbortSession. OpenCodeChildOptions stays {Title, Agent, Directory}. CasebookBookkeeper synthesizer/digest is gone; refreshStale calls runTransaction CaseRefresh. AttachmentKind.Bookkeeper remains declared on SessionOwnership.fs."
     },
     "hidden Reviewer": {
       "owner": "Host-owned Finality workflow. HostForkRuntime is constructed with HandleOwnership.HostOwnedHidden (FinalityHostPort); the Reviewer is not owned by the Manager list/join surface.",
@@ -72,15 +72,15 @@
       "crashReconcile": "HostForkRestart RestoreHandles → ChildRecoveryWorkflow; SessionRecoveryWorkflow.RestoreHandles. HostOwnedHidden handles are excluded from parent restore. Fail closed on missing proof.",
       "evidencePath": "src/Wanxiangshu/Session/HostForkRuntime.fs"
     },
-    "Executor child": {
-      "owner": "Calling session via HostForkRuntime (Executor tool parent). Map/reduce workers are forked with Role.Executor through ExecutorSummarizeRuntime.asExecutorRuntime.",
+    "Distiller child": {
+      "owner": "Calling session via HostForkRuntime (run tool parent). Map/reduce workers are forked with Role.Distiller through DistillationRuntime.asDistillationRuntime.",
       "reusable": "No. Agent ids are content-addressed per spool chunk (exec- + digest); one-shot map/reduce workers.",
-      "cancel": "IExecutorRuntime.CancelAgent → HostForkRuntime.CancelAgent. Cancels one owned map/reduce agent without tearing down the runtime.",
+      "cancel": "IDistillerRuntime.CancelAgent → HostForkRuntime.CancelAgent. Cancels one owned map/reduce agent without tearing down the runtime.",
       "retire": "JoinWithPermit / AwaitAgentWithPermit completion then Handle retire on the fork path; cancel retires or abandons that agent handle.",
-      "handle": "Yes. Private Executor mailbox handles on HostForkRuntime. Never Manager Join — only permit-gated JoinWithPermit / AwaitAgentWithPermit.",
-      "companion": "No. Executor is an internal Role (AGENT-008); not a Work+Companion path.",
+      "handle": "Yes. Private Distiller mailbox handles on HostForkRuntime. Never Manager Join — only permit-gated JoinWithPermit / AwaitAgentWithPermit.",
+      "companion": "No. Distiller is an internal Role (AGENT-008); not a Work+Companion path.",
       "crashReconcile": "FamilyRecoveryPermit required before join. FamilyBlocked fail closed; FamilyWaiting retries inside awaitAgent timeout. HostForkRestart restores DurableParentHandle children on the same fork path.",
-      "evidencePath": "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ExecutorSummarizeRuntime.fs"
+      "evidencePath": "src/Wanxiangshu/Infrastructure/OpenCode/Tools/DistillationRuntime.fs"
     }
   }
 }

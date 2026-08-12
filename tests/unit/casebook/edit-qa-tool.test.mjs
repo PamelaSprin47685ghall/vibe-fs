@@ -20,14 +20,11 @@ const {
   abort,
 } = await import('../../../dist/Infrastructure/BookkeeperStaging.js')
 
-const factory = ToolHostCodec_factory({
-  tool: {
-    schema: {
-      string: () => ({ kind: 'string-schema' }),
-      enum: (values) => ({ kind: 'enum-schema', values }),
-    },
-  },
-})
+const fakeSchema = {
+  string: () => ({ optional: () => ({ kind: 'string-optional' }) }),
+  enum: (values) => ({ optional: () => ({ kind: 'enum-optional', values }) }),
+}
+const factory = ToolHostCodec_factory({ tool: { schema: fakeSchema } })
 
 const context = (sessionId) =>
   new HostToolContext(sessionId, undefined, undefined, undefined, undefined, () => () => {})
@@ -37,31 +34,31 @@ const parseError = (text) => {
   return match ? JSON.parse(`"${match[1]}"`) : String(text)
 }
 
-test('edit_qa_unique_replace_q_and_a', async () => {
+test('js_bookkeeper_unique_replace_q_and_a', async () => {
   const tx = 'tx-edit-ok'
   const session = 'bk-edit-ok'
   beginTransaction(tx, 'keep the question', 'keep the answer')
   bindSession(session, tx, 'owner-1')
   try {
     const tool = spec(factory)
-    assert.equal(tool.Name, 'edit-qa')
+    assert.equal(tool.Name, 'js-bookkeeper')
     assert.deepEqual(
       listItems(tool.Arguments).map((pair) => pair[0]),
-      ['document', 'old_text', 'new_text'],
+      ['program', 'document', 'old_text', 'new_text'],
     )
 
     const qResult = await execute(
       makeArgs({ document: 'Q.md', old_text: 'the question', new_text: 'a canonical question' }),
       context(session),
     )
-    assert.equal(String(qResult).includes('replaced'), true)
+    assert.equal(String(qResult).includes('rewritten'), true)
     assert.equal(resultOf(read(tx, 'Q.md')).value, 'keep a canonical question')
 
     const aResult = await execute(
       makeArgs({ document: 'A.md', old_text: 'keep the answer', new_text: 'summary of several answers' }),
       context(session),
     )
-    assert.equal(String(aResult).includes('replaced'), true)
+    assert.equal(String(aResult).includes('rewritten'), true)
     assert.equal(resultOf(read(tx, 'A.md')).value, 'summary of several answers')
 
     const taken = resultOf(take(tx))
@@ -74,7 +71,7 @@ test('edit_qa_unique_replace_q_and_a', async () => {
   }
 })
 
-test('edit_qa_missing_old_text_fails', async () => {
+test('js_bookkeeper_missing_old_text_fails', async () => {
   const tx = 'tx-edit-missing'
   const session = 'bk-edit-missing'
   beginTransaction(tx, 'only once', 'body')
@@ -93,7 +90,7 @@ test('edit_qa_missing_old_text_fails', async () => {
   }
 })
 
-test('edit_qa_ambiguous_old_text_fails', async () => {
+test('js_bookkeeper_ambiguous_old_text_fails', async () => {
   const tx = 'tx-edit-amb'
   const session = 'bk-edit-amb'
   beginTransaction(tx, 'repeat repeat', 'body')
@@ -112,7 +109,7 @@ test('edit_qa_ambiguous_old_text_fails', async () => {
   }
 })
 
-test('edit_qa_rejects_unknown_document_and_unbound_session', async () => {
+test('js_bookkeeper_rejects_unknown_document_and_unbound_session', async () => {
   const tx = 'tx-edit-doc'
   beginTransaction(tx, 'Q', 'A')
   try {

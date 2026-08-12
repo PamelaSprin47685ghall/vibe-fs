@@ -28,7 +28,7 @@ const FABLE_PATTERN = /dist[/\\]fable_modules/
 // ── baseline (frozen at Wave 1 split; shrink with --generate) ──────────────
 // Grandfathered direct imports of dist/fable_modules/** in *.test.mjs.
 const EMBEDDED_BASELINE = {
-  "tests/unit/agent/meditator-permissions.test.mjs::import { toArray as setToArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Set.js'": "import { toArray as setToArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Set.js'",
+  "tests/unit/agent/inquiry-permissions.test.mjs::import { toArray as setToArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Set.js'": "import { toArray as setToArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Set.js'",
   "tests/unit/enforcer/observation-pair.test.mjs::import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'": "import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'",
   "tests/unit/host/session-flattening.test.mjs::import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'": "import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'",
   "tests/unit/host/session-flattening.test.mjs::import { FSharpResult$2_Ok as ok } from '../../../dist/fable_modules/fable-library-js.5.13.0/Result.js'": "import { FSharpResult$2_Ok as ok } from '../../../dist/fable_modules/fable-library-js.5.13.0/Result.js'",

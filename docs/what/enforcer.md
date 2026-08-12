@@ -7,7 +7,7 @@ Cycle 写入口与恢复证据边界见 `shape/enforcer.md`。
 
 ## ENFORCER-001：目标
 
-Blogger 以 `blog` 工具提交稠密工作日志；`tip` 绑定目录 TipName；一次有效 cycle 原子提交 Blog frame 与 RecordCoverage。  
+Blogger 以 `chronicle` 工具提交稠密工作日志；`tip` 绑定目录 TipName；一次有效 cycle 原子提交 Blog frame 与 RecordCoverage。  
 同一 tip 目录对双消费者各交付一份正文：
 
 - **Blogger（Y）**：装载 `enforcer.md` 全文进 effective system（与 `blogger-system.md` 合成），约束 tip 选择与检测边界。
@@ -21,24 +21,25 @@ Blogger 以 `blog` 工具提交稠密工作日志；`tip` 绑定目录 TipName�
 
 ## ENFORCER-003：Blogger Cycle
 
-一个 Blogger Cycle = 一次 provider run 上对 `blog` 的有效归并提交。
+一个 Blogger Cycle = 一次 provider run 上对 `chronicle` 的有效归并提交。
 
 ## ENFORCER-004：Blogger Cycle 结果
 
-结果携带 canonical text、tip→RuleId（= TipName）、可选 evidence；无效 cycle 不进 frames。  
+结果携带 canonical text（来自 `entry`）、tip→RuleId（= TipName）；无效 cycle 不进 frames。  
+**无**独立 `evidence` 字段——若证据改变 occurrence，它进入 `entry`。  
 提交成功时同时派生 Enforcement 半边：该 cycle 的 tip 进入有界 RecentTips（Observation 历史的 tip 侧）。
 
 ## ENFORCER-010：Blogger 工具权限
 
-Blogger 工具权限仅 `blog`。
+Blogger 工具权限仅 `chronicle`。
 
 ## ENFORCER-011：工具名称
 
-工具名稳定为 `blog`。
+工具名稳定为 `chronicle`。旧名 `blog` 非法，无 alias。
 
 ## ENFORCER-020：逻辑 schema
 
-必填：`text`、`tip`（目录 TipName 枚举）。可选：`evidence`。
+必填：`entry`、`tip`（目录 TipName 枚举）。无 `evidence`。
 
 ## ENFORCER-021：tip 枚举身份
 
@@ -54,12 +55,12 @@ Blogger 工具权限仅 `blog`。
 
 ## ENFORCER-024：字段识别
 
-只认合同字段名；未知字段不得静默充当 tip/text。  
+只认合同字段名；未知字段不得静默充当 tip/entry。  
 额外 numeric property 不得复活 score path。
 
 ## ENFORCER-025：多调用时 tip 选择
 
-多 `blog` 归并时 tip 选择规则确定（实现见 how 归并）；不得随机取，不得按 lexical ordinal 二级排序。
+多 `chronicle` 归并时 tip 选择规则确定（实现见 how 归并）；不得随机取，不得按 lexical ordinal 二级排序。
 
 ## ENFORCER-026：Transport 与 Semantic Schema 分离
 
@@ -67,20 +68,20 @@ Blogger 工具权限仅 `blog`。
 
 ## ENFORCER-030：统一 System Prompt
 
-fast/deep blogger 共用 authoritative system（`resources/prompts/blogger-system.md`），并与 folder SSOT 各 tip 的 **enforcer.md** 全文合成 effective system；工具合同在 system 中固定「恰好调用一次 blog」。  
+fast/deep blogger 共用 authoritative system（`resources/prompts/blogger-system.md`），并与 folder SSOT 各 tip 的 **enforcer.md** 全文合成 effective system；工具合同在 system 中固定「恰好调用一次 chronicle」。  
 `main.md` **不**进入 Blogger system——它只服务 Main Full/Identity 交付。
 
 ## ENFORCER-040：工具立即返回
 
-`blog.execute` 立即返回，不在工具内等待后续模型轮次。
+`chronicle.execute` 立即返回，不在工具内等待后续模型轮次。
 
 ## ENFORCER-060：缺少工具调用 — 总则
 
-无有效 blog → 进入 InteractionRepair / nudge 路径或 Fallback（见 how）。
+无有效 chronicle → 进入 InteractionRepair / nudge 路径或 Fallback（见 how）。
 
-## ENFORCER-061：无有效 text
+## ENFORCER-061：无有效 entry
 
-无有效 text → 不提交。
+无有效 entry → 不提交。
 
 ## ENFORCER-062：Fallback 切换
 
@@ -97,7 +98,24 @@ Observation 是 tip 与 Blog frame 的**配对**视图（domain `ObservationUnit
 `BlogSquashCommitted` 在折叠最老 `count` 个 frame 的同时 **co-truncate** 最老 tip（Observation squash / tip co-move）；squash frame 本身不新增 tip。  
 RecentTips 覆盖 normal / squash / restart / recovery / compaction 后重建路径（同一 projection 输入 Companion 重建）。
 
-## ENFORCER-071：双消费者 tip 呈现
+## ENFORCER-071：双消费者 tip 呈现；交付前沿 ≠ 语义覆盖
+
+### 两轴分离（不得压成单一 durable bool）
+
+```text
+TipDeliveryFrontier
+    哪些 TipOccurrence 已交付给该 Main
+    durable、monotonic、occurrence-based
+    ContextReanchored **不**重置
+
+TipSemanticCoverage
+    哪些 TipName 的 full main.md 语义此刻仍可从当前 provider horizon 恢复
+    TipName-based、horizon-relative
+    ContextReanchored 可重置 / 重导
+```
+
+IdentityOnly **仅当**当前 TipSemanticCoverage 表明该 TipName 全文仍可恢复时合法。  
+覆盖丢失后再次给出 full main.md = semantic restoration，**不是**新 TipOccurrence，也不推进 TipDeliveryFrontier。
 
 ### Blogger 侧（低信任 previous tip）
 
@@ -110,12 +128,12 @@ Main 自动 tip 半边经 `resolveTipGuidance`：
 
 | 条件 | Presentation | 正文 |
 |------|--------------|------|
-| 本 Main session 尚未 Full 交付过该 TipName | `TipPresentation.Full` | name header + **main.md** 全文 |
-| 已 Full 交付过 | `TipPresentation.IdentityOnly` | 紧凑 `tip: <name>` 身份 |
+| 该 TipOccurrence 尚未计入 TipDeliveryFrontier，或 TipSemanticCoverage 表明全文不可恢复 | `TipPresentation.Full` | name header + **main.md** 全文 |
+| TipDeliveryFrontier 已含该 occurrence **且** TipSemanticCoverage 仍可恢复全文 | `TipPresentation.IdentityOnly` | 紧凑 `tip: <name>` 身份 |
 
-决策只读 `TipDeliveryProjection`（fold `HostFact.TipGuidanceDelivered`），不读进程内存私账。  
-`ContextReanchored`（HOST-006）清空 `FullDeliveredTips`，重锚后必须再发 Full main.md，禁止 IdentityOnly 搁浅。  
-IdentityOnly 不写入 Full 集合（audit-only）。  
+决策只读 TipDeliveryFrontier + TipSemanticCoverage（fold `HostFact.TipGuidanceDelivered` 等 durable 事实），不读进程内存私账。  
+`ContextReanchored`（HOST-006）清空 TipSemanticCoverage；重锚后若全文不可恢复必须再发 Full main.md，禁止用过期 IdentityOnly 搁浅。  
+IdentityOnly 不把「全文永久可恢复」写成 durable bool；交付 marker 只记录 occurrence 与 presentation，不得冒充 TipSemanticCoverage。  
 不得向 Main 注入工程 fake-user 作为 tip Authority；Main 语义仍由正式域独有。
 
 ## ENFORCER-072：ScoreVector 删除与版本化 clean break

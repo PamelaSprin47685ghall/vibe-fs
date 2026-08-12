@@ -88,7 +88,7 @@ test('session_ownership_ratchet_documents_closed_kind_set', () => {
     'hidden Reviewer',
     'StrengthReplica',
     'fork agent',
-    'Executor child',
+    'Distiller child',
   ])
   assert.deepEqual([...MATRIX_FIELDS], [
     'owner',
@@ -109,7 +109,7 @@ test('session_ownership_ratchet_documents_closed_kind_set', () => {
   ])
   assert.equal(relatedEvidenceToken('hidden Reviewer'), 'Reviewer')
   assert.equal(relatedEvidenceToken('fork agent'), 'Fork')
-  assert.equal(relatedEvidenceToken('Executor child'), 'Executor')
+  assert.equal(relatedEvidenceToken('Distiller child'), 'Distiller')
   assert.equal(relatedEvidenceToken('Bookkeeper'), 'Bookkeeper')
   assert.equal(SESSION_OWNERSHIP_MATRIX_REL, 'scripts/checks/session-ownership-matrix.json')
 })

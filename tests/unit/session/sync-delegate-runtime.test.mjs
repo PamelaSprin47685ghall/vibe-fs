@@ -20,7 +20,6 @@ import {
 import {
   SyncDelegateRuntime,
   SyncDelegateRuntime__Invoke_1B1DD6DD as invoke,
-  SyncDelegateRuntime__Return_Z65460A0C as returnAnswer,
   SyncDelegateRuntime__HandleTurn_Z7791586C as handleTurn,
   SyncDelegateRuntime__CancelSession_Z31B28506 as cancelSession,
   SyncDelegateRuntime__StageDeletedInspector_59B1A0C0 as stageDeletedInspector,
@@ -42,25 +41,15 @@ import {
   sessionId,
 } from '../support/domain.mjs'
 
-const SYNC_RETURN_COMPLETION = 'Sync delegate answer returned to caller.'
-
-const waitFor = async (predicate, message, ms = 2000) => {
-  const deadline = Date.now() + ms
-  while (!predicate()) {
-    if (Date.now() >= deadline) throw new Error(message)
-    await new Promise((resolve) => setImmediate(resolve))
-  }
-}
-
-const completionTurn = (delegateKey, role) =>
+const completionTurn = (delegateKey, role, answer, runId = 'asst_turn') =>
   new ReconciledTurn(
     sessionId(delegateKey),
     physicalUser('msg_phys_turn'),
     authorityRoot('msg_root_turn'),
-    providerRun('asst_turn'),
+    providerRun(runId),
     role,
     undefined,
-    [reconcileSupervisor.textPart(SYNC_RETURN_COMPLETION)],
+    [reconcileSupervisor.textPart(answer)],
     'stop',
     undefined,
     undefined,
@@ -131,11 +120,16 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
   }
 }
 
-const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = 'asst_return') => {
-  const returned = resultOf(await returnAnswer(runtime, delegateKey, providerRun(runId), answer))
-  assert.equal(returned.ok, true, returned.ok ? '' : returned.error)
+const waitFor = async (predicate, message, ms = 2000) => {
+  const deadline = Date.now() + ms
+  while (!predicate()) {
+    if (Date.now() >= deadline) throw new Error(message)
+    await new Promise((resolve) => setImmediate(resolve))
+  }
+}
 
-  const handled = await handleTurn(runtime, completionTurn(delegateKey, role), undefined)
+const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = 'asst_return') => {
+  const handled = await handleTurn(runtime, completionTurn(delegateKey, role, answer, runId), undefined)
   assert.equal(handled, true)
 }
 
@@ -254,19 +248,13 @@ test('G2_inspector_Q1_Q2_Q3_same_session_serial_reuse', async () => {
       q2Result = value
     })
 
-    const returned = resultOf(await returnAnswer(runtime, delegateId, providerRun('asst_q2'), answers[1]))
-    assert.equal(returned.ok, true, returned.ok ? '' : returned.error)
-    await new Promise((resolve) => setImmediate(resolve))
-    await new Promise((resolve) => setImmediate(resolve))
-    assert.equal(q2Settled, false, 'reuse dual-await: Return must not settle Invoke before TurnCompleted')
-
     const earlyQ3 = resultOf(await invoke(runtime, owner, SyncDelegateRole.Inspector, 'Q3'))
     assert.equal(earlyQ3.ok, false)
     assert.match(earlyQ3.error, /in flight/i)
     assert.equal(createCalls.length, 1)
     assert.equal(prompts.length, 2)
 
-    const handled = await handleTurn(runtime, completionTurn(delegateId, inspector), undefined)
+    const handled = await handleTurn(runtime, completionTurn(delegateId, inspector, answers[1], 'asst_q2'), undefined)
     assert.equal(handled, true)
     await waitFor(() => q2Settled, 'Q2 Invoke did not complete after TurnCompleted')
     const q2Done = resultOf(q2Result)
@@ -358,43 +346,5 @@ test('G2_inspector_cancel_owner_fails_pending_invoke_no_extra_child', async () =
     assert.equal(done.ok, false)
     assert.match(done.error, /cancelled/i)
     assert.equal(createCalls.length, 1, 'cancel must not CreateChildSession again')
-  })
-})
-
-test('EXEC_028_sync_delegate_return_settles_before_completion_keeps_invoke_pending', async () => {
-  await withHarness(async ({ runtime, prompts, createCalls }) => {
-    const owner = 'ses_owner_dual'
-    const answer = 'durable answer for caller'
-    const invokeP = invoke(runtime, owner, SyncDelegateRole.Inspector, 'please answer')
-    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'Invoke did not reach await Returned')
-
-    let invokeSettled = false
-    let invokeResult
-    invokeP.then((value) => {
-      invokeSettled = true
-      invokeResult = value
-    })
-
-    const returned = resultOf(
-      await returnAnswer(runtime, createCalls[0].child, providerRun('asst_dual'), answer),
-    )
-    assert.equal(returned.ok, true, returned.ok ? '' : returned.error)
-
-    // Return settles the answer side; Completion is still open.
-    await new Promise((resolve) => setImmediate(resolve))
-    await new Promise((resolve) => setImmediate(resolve))
-    assert.equal(invokeSettled, false, 'Invoke must stay pending until HandleTurn Completion')
-
-    const handled = await handleTurn(
-      runtime,
-      completionTurn(createCalls[0].child, roles.of('Inspector')),
-      undefined,
-    )
-    assert.equal(handled, true)
-
-    await waitFor(() => invokeSettled, 'Invoke did not complete after TurnCompleted')
-    const done = resultOf(invokeResult)
-    assert.equal(done.ok, true)
-    assert.equal(done.value, answer)
   })
 })

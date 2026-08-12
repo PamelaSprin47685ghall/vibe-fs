@@ -250,6 +250,10 @@ type StrengthReplicaRuntime
                         match created with
                         | Error error -> return Error error
                         | Ok replica ->
+                            // AGENT-028/029 / STRENGTH-004: inherit owner Persona + language;
+                            // ExecutionBinding alone switches to fast-<role>.
+                            PersonaBinding.ensureInherited owner replica |> ignore
+
                             let capabilities =
                                 PromptAuthority.toolCapabilitiesFor managed.Role ProviderRequestKind.StrengthReplica
 

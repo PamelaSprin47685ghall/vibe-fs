@@ -11,8 +11,8 @@ module CompanionPrompt =
     /// Plain lines for ARCH-010 TOML instruction header (SyntheticToml.comment adds `# `).
     /// ENFORCER-030: required tip; no omit-scores wording.
     let NormalInstructionLines =
-        [ "Write the dense work-log continuation now by calling the blog tool exactly once."
-          "Put the continuation in `text`, set required tip to one catalog field, and do not"
+        [ "Write the dense work-log continuation now by calling the chronicle tool exactly once."
+          "Put the continuation in `entry`, set required tip to one catalog field, and do not"
           "output ordinary assistant prose." ]
 
     /// Standalone normal instruction (prompt_async claim / diagnostics). Same text as header.
@@ -24,8 +24,8 @@ module CompanionPrompt =
     /// CTX-012 / ENFORCER-030: final user message on a squash request (instruction-only).
     /// Squash must still choose exactly one tip.
     let SquashInstructionLines =
-        [ "Rewrite the preceding assistant work-log frames now by calling the blog tool"
-          "exactly once. Put the rewritten frame in `text`, set required tip to one catalog"
+        [ "Rewrite the preceding assistant work-log frames now by calling the chronicle tool"
+          "exactly once. Put the rewritten frame in `entry`, set required tip to one catalog"
           "field, and do not output ordinary assistant prose." ]
 
     let SquashInstruction =

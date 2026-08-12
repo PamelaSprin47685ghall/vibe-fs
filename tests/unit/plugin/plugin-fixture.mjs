@@ -10,6 +10,10 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+if (!process.env.WANXIANGSHU_PROVIDER_LANGUAGE || process.env.WANXIANGSHU_PROVIDER_LANGUAGE === 'undefined') {
+  process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+}
+
 const { initSpikePlugin } = await import('../../../dist/Infrastructure/OpenCode/Plugin/SpikePlugin.js')
 
 // ── the layer-3 executable fixture (EXEC-002, AGENT-007 layer two) ───────────

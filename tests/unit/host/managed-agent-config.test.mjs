@@ -29,10 +29,11 @@ const NAMES = [
   'fast-inspector', 'deep-inspector',
   'fast-devops', 'deep-devops',
   'fast-browser', 'deep-browser',
-  'fast-meditator', 'deep-meditator',
+  'fast-inquiry', 'deep-inquiry',
   'fast-reviewer', 'deep-reviewer',
   'fast-blogger', 'deep-blogger',
-  'fast-executor', 'deep-executor',
+  'fast-distiller', 'deep-distiller',
+  'fast-bookkeeper', 'deep-bookkeeper',
 ]
 
 // model differs per tier so no pair collides
@@ -97,7 +98,7 @@ test('MACFG_validate_ok_builds_full_inventory_with_trimmed_models', () => {
   assert.equal(ok.ok, true)
   const bindings = bindingsOf(ok.value)
   assert.equal(bindings['fast-coder'].Model, 'trimmed-model')
-  assert.equal(Object.keys(bindings).length, NAMES.length)
+  assert.equal(Object.keys(bindings).length, 20, 'bookkeeper pair validates but is not a Role binding')
   assert.equal(caseOf(bindings['deep-blogger'].Agent.Role), 'Blogger')
 })
 

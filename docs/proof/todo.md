@@ -10,7 +10,7 @@
 
 | 条款 | 证明焦点 | 义务类型 | 期望 |
 |------|------|------|------|
-| TODO-001 | 无 Activation；LifeOpened 后立即工作；WorkRecordStart Opening floor | unit + property + e2e + static | 0 新 `ManagerWorkActivation` / 新业务 `WorkActivated`；Opening byte-identical；Blogger/Y 不吞 Opening；不绑回 `WorkActivated` |
+| TODO-001 | BlindPlan Opening；无 Activation；LifeOpened 后立即工作；WorkRecordStart = OpeningBoundary（含 T1） | unit + property + e2e + static | 0 新 `ManagerWorkActivation` / 新业务 `WorkActivated`；OpeningMaterial byte-identical；Blogger/Y 不吞 Opening；不绑回 `WorkActivated`；Pre-T1 不钉死 WorkRecordStart |
 | TODO-002 | tagged `kind:existing\|new` | unit + canary B | existing 无 id / new 带 id / unknown id / 重复 id 拒绝；definition 与 codec 同源 |
 | TODO-003 | reviewing + completed 门禁 | unit | pending/in_progress/new→completed 拒；reviewing→completed 允；其它 transition Host 可过、真实性交 process review |
 | TODO-004 | 单 admission；同 message 全拒；replay；V2 fail closed | unit + canary A/G/H + static + integration | 同 message 多 ToolCallId 全 fail closed；同 call 幂等；digest 冲突 fail closed；不同 call 同 list 新 checkpoint；无 hook parity 的 V2 Manager Attempt 构造失败 |
@@ -24,6 +24,20 @@
 | TODO-012 | facts-only recovery；禁止 PC / 平行证据 | unit + static | crash matrix 全可恢复；无 TodoStage/Awaiting*/NeedRebase；无第二 LWR/epoch owner |
 | TODO-013 | Manager surface / guideline；隐藏 reviewer | static + e2e + golden | MagicTodo guidance Manager-only；Manager 无 reviewer/session/barrier/witness/2N；可见 PERFECT/REVISE/report；ProcessReviewLWR safety-seal 不 regex；GLORY-030/SURFACE-005 窄例外锚本条 |
 | TODO-014 | 跨层 ownership / §47 关闭 | static + release | 语义仅 what；shape/how/proof 不改合同；§47 37 项全绿 |
+| TODO-015 | BlindPlan T1 commitment | unit + property + e2e + golden | 本 Life 首次 `TodoWriteAccepted` = T1；canonical result 含 entrustment；T1 call/result ∈ OpeningMaterial；Opening 关闭 → WorkRecordStart；system prompt / Persona / Role Law **字节不变**（Gate D）；每新 Life 再入 BlindPlan |
+
+---
+
+## BlindPlan / T1（TODO-001/015；Gate D 交界）
+
+| 证明 | 期望 | 条款 |
+|------|------|------|
+| Pre-T1 | Planning Table；可调查；不得开始扛路；尚不关闭 Opening | TODO-015、GLORY-074 |
+| T1 accepted | durable Accepted → canonical entrustment result → Opening closes；WorkRecordStart = OpeningBoundary | TODO-015、COMPANION-014 |
+| T1 ∈ Opening | call + accepted result constitutive；不进 Recent work incidental 过滤 | TODO-015、COMPANION-014 |
+| Prompt 稳定 | T1 前后 office system prompt byte-identical；交托只走 conversation tool result | TODO-015、PROMPT-014、ARCH-016 D |
+| Reawakening | 新 Life 再入 BlindPlan；旧 Opening / obligations 不泄漏 | TODO-015、TODO-001/011 |
+| Opening 永不压缩 | Manager BlindPlan Opening never compressed（§19.15） | TODO-001、COMPANION-014 |
 
 ---
 
@@ -69,18 +83,19 @@
 
 ### Coverage / Opening / LWR / rebase
 
-- Opening 永 raw；WorkRecordStart 排除 Opening（TODO-001/008）
+- OpeningMaterial 永 raw；WorkRecordStart = OpeningBoundary exclusive end（BlindPlan 含 T1）；LWR 不重复 Opening（TODO-001/008/015）
 - desired cutoff 无 Requested fact；commit 在下一 seal 前；EvidenceKind=TodoCheckpoint 进既有 SSOT；失败不回滚（TODO-009）
 - Tk cutoff = before T(k-1)；最新 interval 保持 raw X；restart 同投影（TODO-009）
 - RecordCoverage ⇏ PrefixCoverage；RawGap ⇏ prefix replacement（TODO-008/009/012）
 - ManagerCheckpointLWR 不越 ReviewFrontier；并发 post-Tk 工作不漏进 Rk；ProcessReviewLWR 排除 assignment prompt 与 R(k-1) history；dedicated reviewer head 不作 report；includeOpening=false；Rk 可在 Y 落后时启动（TODO-008）
 - ReviewWorkStartCursor = assignment authority 落地后 exclusive end（TODO-006/008）
 - Manager-facing LWR safety-seal，无 regex wash（TODO-013）
+- 四段标题仅 Opening / Chronicle / Recent work / Closing report（COMPANION-003；TODO-001）
 
 ### Dedicated / Finality
 
 - 一 Life 一 logical reviewer；replacement 仅 proven loss（TODO-008/010）
-- process 输入 = OpeningRaw + bounded LWR + Ck + Pk（TODO-008）
+- process 输入 = OpeningMaterial（若投影）+ bounded LWR + Ck + Pk；生产 process/Finality `includeOpening=false`（TODO-008）
 - first unblessed 无 Accepted fail closed；drain；REVISE 阻 FinalityRequest；REVISE→sink reconcile；无机械 completeness gate（TODO-007/010）
 - D 首次 ordinary enlist + fresh dual-PERFECT；graduate 后 process 仍在；blessed 二次 suicide 无新 2N 仍 drain（TODO-010）
 
@@ -98,8 +113,8 @@ magic_todo_manager_unhappy_path_one_stroke
 
 | Stroke | 剧情要点 | 主要条款 |
 |--------|------|------|
-| 1 | 无 Activation，直接工作 | TODO-001 |
-| 2 | T1 checkpoint + Dedicated + R1 一次 | TODO-004/006/008 |
+| 1 | BlindPlan Opening；无 Activation，直接工作；Pre-T1 Planning Table | TODO-001/015 |
+| 2 | T1 commitment → Opening 关；checkpoint + Dedicated + R1 一次；system 字节不变 | TODO-004/006/008/015、PROMPT-014 |
 | 3 | R1 pending 时 Manager 续工；同 message 双 todowrite 全拒 | TODO-004/006 |
 | 4 | T2 阻塞至 Concluded；REVISE→merge+sink；仅 VerdictKnown 仍阻 | TODO-005/006/007 |
 | 5 | merge 拉低 progress 后 completed 被拒 | TODO-003/005 |
@@ -137,7 +152,7 @@ magic_todo_manager_unhappy_path_one_stroke
 | 43.7 One LWR renderer | TodoProcessReviewEvidenceProjection 等第二工作记录 | TODO-008/012 |
 | 43.8 Coverage split | RecordCoverage→prefix 或 PrefixCoverage→LWR gap 或 session-head LWR | TODO-008/012 |
 | 43.9 Tagged + single admission | optional-id；同 message winner；同 list 去重跳过新 call；digest mismatch 仍 Accepted | TODO-002/004 |
-| 43.10 Opening floor | Opening 保护绑回 WorkActivated | TODO-001 |
+| 43.10 Opening floor | Opening 保护绑回 WorkActivated；OpeningMaterial 重建；T1 改写 system prompt | TODO-001/015、PROMPT-014 |
 | 43.11 Desired ≠ committed | Accepted 立即 PrefixRebaseCommitted；RebaseRequested Stage；缺 Epoch 字段旁路；第二 ActivePrefixEpoch；成功才 commit/失败回滚；先发后补 | TODO-009/012 |
 | 43.12 ConsumableReview typing | 无 WorkRecordRef 的 Concluded；VerdictOnly Stage；VerdictKnown≡Consumable | TODO-006/012 |
 | 43.13 Zero-checkpoint Finality | first unblessed 无 Accepted 进 Finality | TODO-010 |
@@ -150,8 +165,8 @@ magic_todo_manager_unhappy_path_one_stroke
 Change Completed **当且仅当**下列全部成立（括号内主导条款 + 证明层）：
 
 1. 无新 Activation/WorkActivated 业务路径（TODO-001；static+e2e）
-2. LifeOpened 后可工作（TODO-001；e2e S1）
-3. WorkRecordStart 护 Opening（TODO-001；unit+property）
+2. LifeOpened 后 BlindPlan 可工作；T1 关 Opening（TODO-001/015；e2e S1–S2）
+3. WorkRecordStart / OpeningMaterial 护 Opening；T1 ∈ Opening；system 字节稳定（TODO-001/015、PROMPT-014；unit+property）
 4. MagicTodo guidance Manager-only（TODO-013；static+unit）
 5. tagged kind union（TODO-002；unit+canary B）
 6. 仅 new 分配 id；existing 已知 id（TODO-002；unit）
@@ -166,12 +181,12 @@ Change Completed **当且仅当**下列全部成立（括号内主导条款 + �
 15. tool result 含上一 LWR + preview/规则（TODO-005/013；e2e+canary E）
 16. review 期间 Manager 可续工（TODO-006；e2e S3/S7）
 17. 每 Life 一 dedicated process，留到 LifeCompleted（TODO-008/010；e2e S12–16）
-18. reviewer 输入 OpeningRaw+bounded LWR+todos（TODO-008；unit）
+18. reviewer 输入 bounded LWR+todos（`includeOpening=false`；TODO-008；unit）
 19. LWR 允许 RawGap；不等 Y 追平（TODO-008；unit）
 20. process/Finality LWR 非 session head（TODO-008；unit+static）
 21. desired 自 Accepted；seal 前 PrefixEpoch TodoCheckpoint；失败不回滚（TODO-009；e2e S9+unit）
 22. 只换 proven Y；RawGap 不进 prefix；无第二 epoch SSOT（TODO-008/009/012；static+property）
-23. Opening raw byte-stable；LWR 不重复 Opening（TODO-001/008；property）
+23. OpeningMaterial raw byte-stable；LWR 不重复 Opening；四段新标题（TODO-001/008/015；property）
 24. Prepared+success 可恢复 Accepted；mismatch/fail 永不（TODO-004/012；unit）
 25. first unblessed 至少一 Accepted；drain；process REVISE 不进 Finality（TODO-010；e2e S10）
 26. 无机械 terminal-todo gate（TODO-010；static+e2e）

@@ -9,15 +9,25 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 
-/// Vocabulary: Manager idle → labor encouragement (rabbit §8.3 / GLORY-029).
-///
-/// Owns occasion dedupe, durable idle claim check, quiescence admission, and
-/// the Detached ManagerIdleEncouragement send.
+/// GLORY-029: Manager idle → phase-aware encouragement (§7.4.6).
 module ManagerIdle =
 
-    /// Encourage the Manager to resume labor on this idle occasion.
-    /// At-most-once per (session, life, trigger ProviderRun); stale permits
-    /// supersede without error.
+    let private idleEncouragement (journal: AgentJournal option) (life: LifeProjection) =
+        let preT1 =
+            match journal with
+            | None -> true
+            | Some durable ->
+                let snapshot = AgentJournal.snapshot durable
+
+                Map.tryFind (ManagerLifeId.value life.LifeId) snapshot.AgentProjections.MagicTodo.ByLife
+                |> Option.map (fun todoLife -> List.isEmpty todoLife.AcceptedOrder)
+                |> Option.defaultValue true
+
+        if preT1 then
+            ManagerLifecyclePrompt.IdleEncouragementPreT1
+        else
+            ManagerLifecyclePrompt.IdleEncouragementPostT1
+
     let encourageLabor
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -53,7 +63,7 @@ module ManagerIdle =
                             permit
                             sessionPort
                             turn.SessionId
-                            ManagerLifecyclePrompt.IdleEncouragement
+                            (idleEncouragement journal life)
                             turn.Directory
                             journal
                             life.LifeId

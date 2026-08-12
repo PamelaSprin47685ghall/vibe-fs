@@ -70,10 +70,10 @@ module PromptIngress =
                 let root = PhysicalUserMessageId.promoteToAuthorityRoot physicalMessageId
                 onAuthorityRoot |> Option.iter (fun f -> f (sessionId, root))
 
-            // COMPANION-003: ONLY a HumanRoot's first prompt is captured as the
-            // OpeningPromptRaw here. An AgentOwnerRoot (a forked child's first
+            // COMPANION-003/014: ONLY a HumanRoot's first prompt is captured as
+            // OpeningMaterial here. An AgentOwnerRoot (a forked child's first
             // prompt) carries the rendered transport envelope — assignment,
-            // parent_work_record and instruction comments — so capturing it would
+            // commissioner_record and instruction comments — so capturing it would
             // nest the parent LWR inside the child's opening and grow recursively
             // with every generation (EXEC-006). The fork path captures the child's
             // opening from the ORIGINAL assignment before rendering.

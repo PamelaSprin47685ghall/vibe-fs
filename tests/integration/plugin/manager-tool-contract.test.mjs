@@ -32,7 +32,7 @@ import {
   activateLife,
 } from '../../unit/plugin/plugin-fixture.mjs'
 
-/** AGENT-002: the twenty managed agents, exactly as the Host-final config names them. */
+/** AGENT-002: Role-backed managed agents (Bookkeeper pair added in hostFinalConfig). */
 const ROLE_NAMES = [
   'orchestrator',
   'manager',
@@ -40,10 +40,10 @@ const ROLE_NAMES = [
   'inspector',
   'devops',
   'browser',
-  'meditator',
+  'inquiry',
   'reviewer',
   'blogger',
-  'executor',
+  'distiller',
 ]
 
 const hostFinalConfig = () => {
@@ -53,6 +53,9 @@ const hostFinalConfig = () => {
       agent[`${tier}-${role}`] = { model: `provider/${tier}-${role}-model` }
     }
   }
+  for (const tier of ['fast', 'deep']) {
+    agent[`${tier}-bookkeeper`] = { model: `provider/${tier}-bookkeeper-model` }
+  }
   return { agent }
 }
 
@@ -60,37 +63,40 @@ const hostFinalConfig = () => {
 
 /** Every argument of every tool, so a new or renamed argument fails here first. */
 const EXPECTED_ARGUMENTS = {
-  // ENFORCER-020 tip v2: required text + tip enum; optional evidence.
-  // No 120 numeric score properties.
   'bash-honeypot': {},
-  blog: {
-    text: 'required',
+  chronicle: {
+    entry: 'required',
     tip: 'required',
-    evidence: 'optional',
   },
-  coder: { tdd: 'required', prompt: 'optional', prompts: 'optional' },
-  executor: {
+  'establish-behavior': { charge: 'required' },
+  'repair-behavior': { charge: 'required' },
+  run: {
     command: 'required',
-    estimated_mem_usage: 'required',
-    estimated_output_bytes: 'required',
-    estimated_running_secs: 'required',
+    deadline_seconds: 'required',
+    output_budget_bytes: 'required',
+    world_lock: 'required',
   },
-  fork: { agent: 'required', prompt: 'optional', tdd: 'optional' },
-  'fork-manager': { agent: 'required', prompt: 'required' },
-  'fork-pty': { agent: 'required', prompt: 'optional', signal: 'optional' },
-  inspector: { prompt: 'optional', prompts: 'optional' },
+  'query-shell': {
+    command: 'required',
+  },
+  fork: { name: 'required', charge: 'optional' },
+  commission: { name: 'required', charge: 'required' },
+  'open-terminal': { name: 'required', command: 'required' },
+  'send-terminal': { name: 'required', input: 'required' },
+  'read-terminal': { name: 'required' },
+  'signal-terminal': { name: 'required', signal: 'required' },
+  inspect: { charge: 'required' },
   join: {},
   'js-browser': { program: 'required' },
   'js-coder': { program: 'required' },
   'js-devops': { program: 'required' },
   'js-inspector': { program: 'required' },
   'js-reviewer': { program: 'required' },
-  list: {},
+  horizon: {},
   mv: { source: 'required', destination: 'required' },
   rm: { path: 'required' },
-  return: { message: 'required' },
   suicide: { last_words: 'required' },
-  verdict: { verdict: 'required' },
+  judge: { verdict: 'required' },
 }
 
 /**
@@ -109,22 +115,22 @@ const EXPECTED_AGENT_ENUMS = {
     'deep-coder',
     'deep-devops',
     'deep-inspector',
-    'deep-meditator',
+    'deep-inquiry',
     'fast-browser',
     'fast-coder',
     'fast-devops',
     'fast-inspector',
-    'fast-meditator',
+    'fast-inquiry',
   ],
-  'fork-manager': ['deep-manager', 'fast-manager'],
+  commission: ['deep-manager', 'fast-manager'],
 }
 
 /**
  * The enum arm of an agent argument, whether or not it is wrapped in a union.
  *
- * `fork.agent` is `union([enum(...), string()])` while `fork-manager.agent` is a bare
+ * `fork.name` is `union([enum(...), string()])` while `commission.name` is a bare
  * enum (`ToolHostCodec.fs:90` vs `:78`). Measured consequence worth stating: the
- * string arm makes `fork.agent.safeParse('garbage')` SUCCEED, so this enum is a
+ * string arm makes `fork.name.safeParse('garbage')` SUCCEED, so this enum is a
  * provider-visible offer, not a validator. Rejecting an unknown agent happens inside
  * `execute` — which is the part of the original file that has never passed and is
  * recorded as a pending defect rather than migrated.
@@ -150,10 +156,13 @@ const KNOWN_TOOL_KEYS = [
   '*',
   'external_directory',
   'fork',
-  'fork-manager',
-  'fork-pty',
+  'commission',
+  'open-terminal',
+  'send-terminal',
+  'read-terminal',
+  'signal-terminal',
   'join',
-  'list',
+  'horizon',
   'read',
   'write',
   'edit',
@@ -162,13 +171,14 @@ const KNOWN_TOOL_KEYS = [
   'mv',
   'rm',
   'bash-honeypot',
-  'inspector',
-  'coder',
-  'executor',
+  'inspect',
+  'establish-behavior',
+  'repair-behavior',
+  'run',
+  'query-shell',
   'stealth-browser-mcp_*',
-  'verdict',
-  'blog',
-  'return',
+  'judge',
+  'chronicle',
   'fetch',
   'suicide',
   'js-manager',
@@ -176,26 +186,41 @@ const KNOWN_TOOL_KEYS = [
   'js-coder',
   'js-inspector',
   'js-browser',
-  'js-meditator',
+  'js-inquiry',
   'js-reviewer',
   'js-devops',
-  'js-executor',
+  'js-distiller',
   'js-blogger',
+  'js-bookkeeper',
 ]
 
 /** AGENT-006/011/013/014/015: the allowed tools per role. Everything else denies. */
 const ALLOWED_TOOLS = {
-  orchestrator: ['fork-manager', 'join'],
-  manager: ['fork', 'join', 'list', 'suicide'],
-  coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspector', 'fetch', 'mv', 'rm', 'bash-honeypot'],
-  inspector: ['read', 'glob', 'grep', 'executor', 'fetch'],
-  devops: ['fork-pty', 'join', 'list', 'read', 'glob', 'grep', 'inspector', 'coder', 'executor'],
+  orchestrator: ['commission', 'join', 'horizon'],
+  manager: ['fork', 'join', 'horizon', 'suicide'],
+  coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspect', 'fetch', 'mv', 'rm', 'bash-honeypot'],
+  inspector: ['read', 'glob', 'grep', 'query-shell', 'fetch'],
+  devops: [
+    'open-terminal',
+    'send-terminal',
+    'read-terminal',
+    'signal-terminal',
+    'join',
+    'horizon',
+    'read',
+    'glob',
+    'grep',
+    'inspect',
+    'establish-behavior',
+    'repair-behavior',
+    'run',
+  ],
   browser: ['read', 'glob', 'grep', 'stealth-browser-mcp_*'],
-  meditator: ['inspector'],
-  reviewer: ['read', 'glob', 'grep', 'verdict'],
-  // ENFORCER-010: Blogger's tool set is exactly { blog }.
-  blogger: ['blog'],
-  executor: [],
+  inquiry: ['inspect'],
+  reviewer: ['read', 'glob', 'grep', 'judge'],
+  // ENFORCER-010: Blogger's tool set is exactly { chronicle }.
+  blogger: ['chronicle'],
+  distiller: [],
   // JS-001: the generated js-ROLE tool — allowed iff the role has a
   // filesystem capability (Coder/Inspector/DevOps/Browser/Reviewer).
   'js-tools': {
@@ -212,8 +237,8 @@ const ALLOWED_TOOLS = {
  *
  * The facade returns `ToolPermission` case names (`Exec`, `Pty`, `Fork`), not tool
  * keys. Turning one into the other means re-implementing `StaticTools.permissionObj`'s
- * rename table — `Exec`→`executor`, `Pty`→`fork-pty`, Orchestrator's `Fork`→
- * `fork-manager`, DevOps' write/edit override. A test that mirrors the table it is
+ * rename table — `Exec`→`executor`, `Pty`→`open-terminal`, Orchestrator's `Fork`→
+ * `commission`, DevOps' write/edit override. A test that mirrors the table it is
  * checking stays green when the table is wrong, which is the false green
  * `design-script-forest.md:630` calls more dangerous than no verification at all.
  *
@@ -247,10 +272,10 @@ const FACADE_ROLE_CASES = {
   inspector: 'Inspector',
   devops: 'DevOps',
   browser: 'Browser',
-  meditator: 'Meditator',
+  inquiry: 'Inquiry',
   reviewer: 'Reviewer',
   blogger: 'Blogger',
-  executor: 'Executor',
+  distiller: 'Distiller',
 }
 
 // ── the prompt clauses ───────────────────────────────────────────────────────
@@ -266,7 +291,7 @@ const PROMPT_CLAUSES = {
   'fast-manager': {
     required: [
       /Manager thinks, delegates, and integrates/,
-      /Your tools are `fork`, `join`, `list`, and `suicide`/,
+      /Your tools are `fork`, `horizon`, `join`/,
       /Call `join` only when no useful unassigned work remains/,
       /A returned child record is evidence, not automatic completion/,
       /Coder edits\./,
@@ -274,41 +299,31 @@ const PROMPT_CLAUSES = {
       /Do not ask Coder to run commands/,
       /Do not ask DevOps to edit files directly/,
       /bounded mechanical repair|autonomous mechanical repair|operational closure|execution\/repair objective/i,
-      /agent_id/,
-      /\blist\b/,
       /compatible context/,
       /Do not reuse when old context would make the new assignment ambiguous/,
       /Reuse must not reduce parallelism/,
-      /tdd="red"/,
-      /tdd="green"/,
+      /establish-behavior\(charge\)/,
+      /repair-behavior\(charge\)/,
       /suicide\(last_words\)/,
       /When no useful action remains, call/,
-      // PROMPT-INSP-001: the Manager must forbid demanding full text, long
-      // source, or query dumps from Inspector, and may only ask for locatable
-      // summaries — the "repeater" prohibition must be unmistakable.
       /query dump|query dumps/i,
       /only locatable summaries|locatable summaries|locatable pointers/i,
     ],
     forbidden: [],
   },
 
-  // AGENT-012: Coder sees `inspector` but never learns it can execute.
   'fast-coder': {
     required: [
       /Coder edits/,
       /Surgical Precision/,
-      /Use Inspector only for a genuinely necessary static investigation/,
-      /inspector\(agent: "fast-inspector", prompts\)/,
+      /Use Inspector only for a genuinely necessary static investigation|call `inspect`/i,
       /Editing Is the Completion Boundary/,
       /Do not check whether the code compiles or works/,
-      /DO NOT use `inspector` to bypass that boundary/,
+      /inspect` as an opaque witness/i,
       /Never ask Inspector to run, reproduce, check, or diagnose compilation, builds, typechecks, linters, tests, programs, or runtime behavior/,
       /After the final required file edit, stop working/,
-      // Coder TDD phase discipline (red → green → refactor).
-      /red → green → refactor|red → green/,
-      /tdd/,
+      /establish behavior|repair behavior/i,
       /Do not delete, skip, loosen, or rewrite/,
-      /schema-required|schema-optional.*prompt-required|Manager `fork` of a Coder role/,
     ],
     forbidden: [/executor/i],
   },
@@ -316,48 +331,37 @@ const PROMPT_CLAUSES = {
   'fast-devops': {
     required: [
       /DevOps executes/,
-      /fork-pty/,
+      /open-terminal/,
       /No Direct File Modification/,
       /Mechanical Repair Autonomy/,
       /Do not ask Manager for permission to make an obvious mechanical repair/,
       /operational closure/,
-      /tdd="red"/,
-      /tdd="green"/,
-      /Confirm true red\/green|confirm.*red.*green|true red\/green/i,
-      /named `coder` tool|synchronous `coder` tool/,
-      /schema optional `tdd`|prompt-required for `fast-coder`|Manager `fork` of a Coder role/,
+      /establish-behavior/,
+      /repair-behavior/,
+      /horizon/,
     ],
     forbidden: [],
   },
 
   'fast-inspector': {
     required: [
-      /Investigative Inspector/,
-      /four investigative instruments: `read`, `glob`, `grep`, and `executor`/i,
-      /Absolute Codebase Read-Only Invariant/,
-      /Direct File Tools First; `executor` Only for Read-Only Queries/,
+      /Investigative Inspector|read-only instruments/i,
+      /`read`, `glob`, `grep`, `query-shell`/,
+      /Absolute Codebase Read-Only Invariant|read-only/i,
+      /query-shell/,
       /No Project Workloads or Verification/,
       /Never invoke a compiler, build system, typechecker, linter, formatter, test runner/,
-      /a request from Coder to compile, test, validate, reproduce, or modify remains forbidden/,
       /DO NOT compile, build, typecheck, lint, format, test, benchmark, run repository programs/,
-      // PROMPT-INSP-002: even when the Parent demands full text, Inspector must
-      // refuse that part, explicitly correct the overreach, and return only a
-      // structured summary — it must never become a full-text repeater.
-      /parent.*(asks|demands|requests).*full|refuse.*full-text|reject.*full-text/i,
-      /correct.*overreach|rebuke/i,
       /structured summary only|only a structured summary/i,
     ],
     forbidden: [],
   },
 
-  // REVIEW-003 is Host-owned: the Reviewer must not be told about the double-PERFECT
-  // rule, or it would try to run the confirmation itself.
   'fast-reviewer': {
     required: [
-      /Uncompromising Reviewer/,
-      /Quality Gatekeeper/,
-      /verdict\("PERFECT"\)/,
-      /verdict\("REVISE"\)/,
+      /Uncompromising Reviewer|Quality Gatekeeper/i,
+      /judge\("PERFECT"\)/,
+      /judge\("REVISE"\)/,
     ],
     forbidden: [/Double-PERFECT|two consecutive `PERFECT`|Nope, let's re-evaluate/i],
   },
@@ -373,41 +377,37 @@ const PROMPT_CLAUSES = {
     forbidden: [],
   },
 
-  'fast-meditator': {
+  'fast-inquiry': {
     required: [
-      /Architectural Strategist/,
-      /Transparent Trade-Off Evaluation/,
-      /inspector\(agent: "fast-inspector", prompts\)/,
+      /Architectural Strategist|Inquiry/i,
+      /only instrument is `inspect`/i,
     ],
     forbidden: [],
   },
 
   'fast-orchestrator': {
     required: [
-      /Multi-Worktree Director/,
-      /fork-manager/,
+      /Multi-Worktree Director|commission/i,
       /Host-owned Dual PERFECT/,
       /fast-manager|deep-manager/,
-      // PR B: continue same Manager job; no invented reuse API.
-      /originating Manager|existing Manager job|Continue the existing Manager/i,
+      /originating Manager|existing Manager|Continue the existing Manager/i,
       /truly independent|真正并行|parallel independent/i,
+      /`commission`, `horizon`, and `join`/,
     ],
     forbidden: [],
   },
 
-  // AGENT-008: Executor holds no tools; Blogger is also internal but
-  // has its dedicated private tool surface.
-  'fast-executor': {
-    required: [/Command Output Summarizer/, /AgentRole\.Executor/, /Tool Capability: \[\] \(NONE\)/],
+  'fast-distiller': {
+    required: [/Command Output Summarizer/, /AgentRole.Distiller/, /Tool Capability: \[\] \(NONE\)/],
     forbidden: [],
   },
 
   'fast-blogger': {
     required: [
-      /Work Log Blogger/,
-      /only tool is `blog`/,
+      /companion chronicler|Work Log Blogger/i,
+      /only instrument is `chronicle`/i,
       /exactly once/,
-      /Self-Compression/,
+      /Self-Compression|Compression without erasure/i,
     ],
     forbidden: [/Tools: \[\]/, /no tools/, /Do not call tools/, /DO NOT attempt/],
   },
@@ -443,14 +443,14 @@ test('AGENT_008_009_every_agent_argument_offers_exactly_its_declared_agents', as
     const observed = Object.fromEntries(
       Object.keys(EXPECTED_AGENT_ENUMS).map((toolName) => [
         toolName,
-        agentEnumEntries(hooks.tool[toolName].args.agent),
+        agentEnumEntries(hooks.tool[toolName].args.name),
       ]),
     )
 
     assert.deepEqual(observed, EXPECTED_AGENT_ENUMS)
 
     // EXEC-003: the PTY signal set, the only other enum on the model-visible surface.
-    assert.deepEqual(agentEnumEntries(hooks.tool['fork-pty'].args.signal.def.innerType).sort(), [
+    assert.deepEqual(agentEnumEntries(hooks.tool['signal-terminal'].args.signal).sort(), [
       'HUP',
       'INT',
       'KILL',
@@ -461,16 +461,16 @@ test('AGENT_008_009_every_agent_argument_offers_exactly_its_declared_agents', as
     ])
 
     // REVIEW-002: a verdict is a tool argument with exactly two values.
-    assert.deepEqual(agentEnumEntries(hooks.tool.verdict.args.verdict), ['PERFECT', 'REVISE'])
+    assert.deepEqual(agentEnumEntries(hooks.tool.judge.args.verdict), ['PERFECT', 'REVISE'])
 
     // AGENT-005: omitting the agent is not a defaultable choice.
     const omitted = Object.fromEntries(
       Object.keys(EXPECTED_AGENT_ENUMS).map((toolName) => [
         toolName,
-        hooks.tool[toolName].args.agent.safeParse(undefined).success,
+        hooks.tool[toolName].args.name.safeParse(undefined).success,
       ]),
     )
-    assert.deepEqual(omitted, { fork: false, 'fork-manager': false })
+    assert.deepEqual(omitted, { fork: false, commission: false })
   })
 })
 
@@ -814,9 +814,9 @@ test('AGENT_007_unresolved_role_denies_all_tools', async () => {
     const context = { sessionID: 'unresolved-role', agent: 'fast-manager' }
 
     for (const [toolName, args] of [
-      ['list', {}],
-      ['inspector', { prompts: ['git status'] }],
-      ['fork', { agent: 'fast-coder', prompt: 'work' }],
+      ['horizon', {}],
+      ['inspect', { charge: 'git status' }],
+      ['fork', { name: 'fast-coder', charge: 'work' }],
     ]) {
       const result = parseToml(await hooks.tool[toolName].execute(args, context))
       assert.deepEqual(Object.keys(result), ['error'], `${toolName} must reject, not run`)
@@ -826,33 +826,23 @@ test('AGENT_007_unresolved_role_denies_all_tools', async () => {
 })
 
 test('EXEC_002_sync_delegate_inspector_coder_refuse_invalid_args_via_plugin', async () => {
-  // Happy-path Invoke→Return→Completion is proved in
-  // tests/unit/tools/sync-delegate-tools.test.mjs. This plugin contract pins the
-  // fail-closed argument surface (EXEC-026: no agent; required tdd / prompt) that
-  // still executes through initSpikePlugin without Host reconcile HandleTurn.
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'meditator-contract', 'fast-meditator')
+    acceptAuthorityRoot(runtime, 'inquiry-contract', 'fast-inquiry')
     acceptAuthorityRoot(runtime, 'devops-contract', 'fast-devops')
 
-    const meditator = { sessionID: 'meditator-contract', agent: 'fast-meditator' }
+    const inquiry = { sessionID: 'inquiry-contract', agent: 'fast-inquiry' }
     const devops = { sessionID: 'devops-contract', agent: 'fast-devops' }
 
-    for (const args of [{}, { prompt: '   ' }, { prompts: [] }]) {
-      const refused = parseToml(await hooks.tool.inspector.execute(args, meditator))
-      assert.equal(refused.error, 'inspector prompt required')
+    for (const args of [{}, { charge: '   ' }]) {
+      const refused = parseToml(await hooks.tool.inspect.execute(args, inquiry))
+      assert.equal(refused.error, 'inspect charge required')
     }
 
-    const missingTdd = parseToml(await hooks.tool.coder.execute({ prompts: ['no tdd'] }, devops))
-    assert.match(missingTdd.error, /missing required argument: tdd/)
+    const missingCharge = parseToml(await hooks.tool['establish-behavior'].execute({}, devops))
+    assert.equal(missingCharge.error, 'establish-behavior charge required')
 
-    for (const bad of ['RED', 'test', 'refactor', 'blue', '']) {
-      const illegal = parseToml(await hooks.tool.coder.execute({ tdd: bad, prompt: 'x' }, devops))
-      assert.ok(illegal.error, `tdd=${JSON.stringify(bad)} must fail`)
-      assert.match(illegal.error, /missing required argument: tdd|UnknownTddPhase/)
-    }
-
-    const missingPrompt = parseToml(await hooks.tool.coder.execute({ tdd: 'green' }, devops))
-    assert.equal(missingPrompt.error, 'coder prompt required')
+    const repairMissing = parseToml(await hooks.tool['repair-behavior'].execute({}, devops))
+    assert.equal(repairMissing.error, 'repair-behavior charge required')
   })
 })
 test('GLORY_031_manager_fork_of_a_reviewer_is_denied_role_based', async () => {
@@ -863,7 +853,7 @@ test('GLORY_031_manager_fork_of_a_reviewer_is_denied_role_based', async () => {
     // the Reviewer is Host-owned. Denied by durable role, before any prompt.
     const result = parseToml(
       await hooks.tool.fork.execute(
-        { agent: 'fast-reviewer', prompt: 'Review the current tree.' },
+        { name: 'fast-reviewer', charge: 'Review the current tree.' },
         { sessionID: 'manager-reverted-root', agent: 'fast-manager' },
       ),
     )
@@ -873,7 +863,7 @@ test('GLORY_031_manager_fork_of_a_reviewer_is_denied_role_based', async () => {
 
     const deepResult = parseToml(
       await hooks.tool.fork.execute(
-        { agent: 'deep-reviewer', prompt: 'Review the same current tree.' },
+        { name: 'deep-reviewer', charge: 'Review the same current tree.' },
         { sessionID: 'manager-reverted-root', agent: 'fast-manager' },
       ),
     )
@@ -882,65 +872,32 @@ test('GLORY_031_manager_fork_of_a_reviewer_is_denied_role_based', async () => {
   })
 })
 
-test('EXEC_002_EXEC_004_fork_join_and_list_carry_the_same_mailbox_identity', async () => {
+test('EXEC_002_EXEC_004_fork_join_and_horizon_carry_natural_language_identity', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
-    // AGENT-013: fork/join/list belong to the Manager alone.
     acceptAuthorityRoot(runtime, 'manager-contract', 'fast-manager')
     const context = { sessionID: 'manager-contract', agent: 'fast-manager' }
 
-    // An unknown agent is rejected inside execute, not by the schema — the
-    // fork.agent schema is a union with string() (AGENT-009 note above). The
-    // near-miss suggestion is matched, not pinned whole (ManagedAgent.fs:140-143).
-    const unknown = parseToml(await hooks.tool.fork.execute({ agent: 'deep-inspecter', prompt: 'work' }, context))
+    const unknown = parseToml(await hooks.tool.fork.execute({ name: 'deep-inspecter', charge: 'work' }, context))
     assert.deepEqual(Object.keys(unknown), ['error'])
     assert.match(unknown.error, /Legacy agent name|Unknown managed agent 'deep-inspecter'/)
     assert.match(unknown.error, /fast-inspector|deep-inspector/)
 
-    const fork = parseToml(await hooks.tool.fork.execute({ agent: 'fast-coder', prompt: 'work' }, context))
-    // ForkTool.fs:22-37: the whole fork payload.
-    assert.deepEqual(Object.keys(fork).sort(), ['agent', 'agent_id', 'fallback_peer', 'role', 'tier'])
-    assert.match(fork.agent_id, /^[a-z0-9]{6}$/)
-    assert.equal(fork.agent, 'fast-coder')
-    assert.equal(fork.role, 'coder')
-    assert.equal(fork.tier, 'fast')
-    assert.equal(fork.fallback_peer, 'deep-coder')
+    const forkText = await hooks.tool.fork.execute({ name: 'fast-coder', charge: 'work' }, context)
+    assert.match(forkText, /# fast-coder carries this charge now\./)
+    assert.equal(parseToml(forkText).error, undefined)
 
-    // EXEC-004: register the forked handle so the terminal delivery below also
-    // claims the durable completion cell before join retires it (fixture docs).
-    runtime.recordFork('manager-contract', fork.agent_id, createdIds[0])
+    runtime.recordFork('manager-contract', 'ag-1', createdIds[0])
 
     const joinResultP = hooks.tool.join.execute({}, context)
     notifyCompleted(runtime, createdIds[0], 'forked coder session-wide A', 'forked coder turn formal report')
     const joinText = await joinResultP
-    const join = parseToml(joinText)
 
-    // EXEC-004 rev.2 / docs/how/synthetic-toml.md ### Join / fork: batch wire — status + count + [[result]].
-    // Single completion still uses [[result]] (count=1, ordinal=1, kind=agent).
-    // work_record is entry-local comment, never a TOML field.
-    // Fixture has no Opening capture → LWR empty → no # comment block before [[result]].
-    assert.equal(join.status, 'completed')
-    assert.equal(join.count, 1)
-    assert.ok(Array.isArray(join.result), '[[result]] must parse as array')
-    assert.equal(join.result.length, 1)
-    assert.deepEqual(join.result[0], {
-      ordinal: 1,
-      kind: 'agent',
-      status: 'completed',
-      agent: 'fast-coder',
-    })
-    assert.equal(join.work_record, undefined, 'work_record must not be a TOML field')
-    assert.ok(!joinText.includes('work_record ='), 'wire must not contain work_record = field line')
-    assert.ok(joinText.includes('[[result]]'), 'single result still uses [[result]]')
-    assert.ok(!joinText.includes('# Opening task'), 'join LWR must not echo the child opening')
-    assert.ok(!joinText.includes('forked coder turn formal report'))
-    assert.ok(!joinText.includes('run-'), 'no run id on the LLM-visible wire')
-    assert.ok(!joinText.includes('child_session_id'), 'no child session id on the wire')
+    assert.match(joinText, /# fast-coder has returned\./)
+    assert.ok(!/\b(status|count|ordinal|kind|agent_id)\s*=/.test(joinText))
 
-    const list = parseToml(await hooks.tool.list.execute({}, context))
-    // EXEC-005 明文「不包含 Retired」：join 已退休该 handle，派生视图为空。
-    // 此断言曾按「runtime record 保留完成记录」的假设期望一条 idle 条目——实测生产
-    // 返回 []，该假设是测试想象而非契约。
-    assert.deepEqual(list, {})
+    const horizonText = await hooks.tool.horizon.execute({}, context)
+    assert.match(horizonText, /Nothing beyond your immediate sight|has returned|still away/i)
+    assert.equal(parseToml(horizonText).error, undefined)
   })
 })
 
@@ -952,7 +909,7 @@ test('EXEC_017_blocked_join_wakes_on_user_message_from_chat_message', async () =
     acceptAuthorityRoot(runtime, 'manager-user-wake', 'fast-manager')
     const context = { sessionID: 'manager-user-wake', agent: 'fast-manager' }
 
-    const fork = parseToml(await hooks.tool.fork.execute({ agent: 'fast-coder', prompt: 'work' }, context))
+    const fork = parseToml(await hooks.tool.fork.execute({ name: 'fast-coder', charge: 'work' }, context))
     assert.equal(fork.error, undefined, `fork failed: ${fork.error}`)
     // Join blocks waiting only when an active handle is recorded.
     runtime.recordFork('manager-user-wake', fork.agent_id, createdIds[0])
@@ -1170,17 +1127,14 @@ test('EXEC_002_fork_optional_tdd_injects_phase_or_fail_closed', async () => {
   })
 })
 
-test('EXEC_002_fork_tool_description_states_create_or_reuse_by_agent_id', async () => {
+test('EXEC_002_fork_tool_description_states_create_or_reuse_by_name', async () => {
   await withPlugin(async (hooks) => {
     const description = hooks.tool.fork?.description
     assert.equal(typeof description, 'string', 'fork tool must expose description')
-    assert.match(description, /reuse|agent_id/i)
-    assert.match(description, /Create a managed agent|reuse\/nudge/i)
-    // orchestratorSpec stays create-only wording.
-    const managerJob = hooks.tool['fork-manager']?.description
-    assert.equal(typeof managerJob, 'string')
-    assert.match(managerJob, /Fork a manager job/)
-    assert.match(managerJob, /reuse|existing manager job|job id/i)
+    assert.match(description, /name \+ charge|compatible context/i)
+    const commission = hooks.tool.commission?.description
+    assert.equal(typeof commission, 'string')
+    assert.match(commission, /witness within a mission|reuse by the same name/i)
   })
 })
 
@@ -1231,14 +1185,10 @@ test('GLORY_038_suicide_with_outstanding_child_prompts_to_join', async () => {
     const context = { sessionID: 'manager-suicide-outstanding', agent: 'fast-manager', callID: 'call_suicide_1', messageID: 'msg_1' }
 
     // Fork a child agent so there is an active child handle
-    await hooks.tool.fork.execute(
-      { agent: 'fast-coder', prompt: 'Do work', tdd: 'green' },
-      context,
-    )
+    await hooks.tool.fork.execute({ name: 'fast-coder', charge: 'Do work' }, context)
 
-    // Outstanding-child refusal is instruction-only (comment wire); parseToml strips comments.
     const resultText = await hooks.tool.suicide.execute({ last_words: 'Finished.' }, context)
-    assert.match(resultText, /# Call join before seeking your end\./)
+    assert.match(resultText, /# Continue working and seek your end again when you are ready\./)
     assert.doesNotMatch(resultText, /^error\s*=/m)
     assert.equal(parseToml(resultText).error, undefined)
   })

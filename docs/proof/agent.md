@@ -6,10 +6,12 @@
 
 | 证明 | 期望 | 条款 |
 |------|------|------|
-| 二十名 Agent 齐全 | 缺一启动失败；无 student/teacher pair | AGENT-002 |
+| 二十二名 Agent 齐全 | 缺一启动失败；含 `fast\|deep-bookkeeper`；无 meditator/executor/student/teacher pair | AGENT-002 |
 | peer 对称 + model 非空互异 | 配置验证失败则 fail fast | AGENT-003 |
-| 非法旧名（含 student/teacher） | 无 alias，拒绝 | AGENT-004 |
+| 非法旧名（含 meditator/executor/student/teacher） | 无 alias，拒绝；不得映射到 Inquiry/Distiller/Inspector | AGENT-004 |
 | Authority 省略 agent | `HostContractUnsupported` | AGENT-005 |
+| SyncDelegate DAG 无环 | 仅 `Inquiry\|Coder\|DevOps → Inspector` 与 `DevOps → Coder`；启动静态证明 | AGENT-024 |
+| PersonaCatalog resolve-once | `Role × initial tier → SessionPersona` 创建路径冻结；Fallback/Strength/Peer 不得重绑 | AGENT-028、AGENT-029 |
 
 ## 权限
 
@@ -20,36 +22,54 @@
 | `external_directory=allow` | Host ruleset（flat merge + findLast）对任意外部 path 为 allow | AGENT-019 |
 | 唯一写入点 | 仅 `StaticTools.permissionObj` / `applyOwnedFields` | AGENT-019 |
 | fast/deep 权限相等 | 权限对象结构比较 | AGENT-010 |
-| 内部 Agent 不可见 | enum/schema 不含 blogger/executor | AGENT-008 |
-| Student/Teacher 生产零 | Role DU / catalog / permissions / tools 无 Student/Teacher；旧名 legacy reject | AGENT-002、AGENT-004、AGENT-020 |
+| 内部 Agent 不可见 | enum/schema 不含 blogger/distiller/bookkeeper | AGENT-008 |
+| 旧角色生产零 | Role DU / catalog / permissions / tools 无 Meditator/Executor/Student/Teacher；旧名 legacy reject | AGENT-002、AGENT-004、AGENT-020 |
+| 旧工具名非法 | `fork-manager`/`list`/`inspector`(工具)/`verdict`/`blog`/`executor`(工具)/`fork-pty`/`edit-qa`/`return` 无 alias | AGENT-006、AGENT-007 |
 
-## Meditator
+## Persona / Binding
+
+| 证明 | 期望 | 条款 |
+|------|------|------|
+| Persona 不可变 | session 创建后 Persona 字节稳定；Fallback 换模型不换 Persona | AGENT-028、AGENT-029 |
+| Binding ≠ Persona | Strength/Fallback 只改 ExecutionBinding；provider 自称不含 `fast-*`/`deep-*` | AGENT-029 |
+| Bookkeeper 独立 Persona | Clerk/Curator；机器身份 `fast\|deep-bookkeeper`；不进 public Role DU / fork 面 | AGENT-002、AGENT-028 |
+
+## Inquiry
 
 | 证明 | 落点 / 形态 | 条款 |
 |------|-------------|------|
-| 工具面仅 `inspector` | Host schema + ToolRegistry 均无 read/glob/grep/write/edit/executor/coder/fork/join/list/PTY/`stealth-browser-mcp_*` | AGENT-006、AGENT-025 |
-| SyncDelegate 边 | 仅 `Meditator → Inspector`；无反向 | AGENT-024 |
-| Epistemic style 在 prompt | meditator system prompt 含形成理解 / 反例 / 证据vs推论 / 综合 Inspector；无 LearningState/QA/Compile/return 协议 | AGENT-025 |
+| 工具面仅 `inspect` | Host schema + ToolRegistry 均无 read/glob/grep/write/edit/run/fork/commission/join/horizon/终端/`stealth-browser-mcp_*` | AGENT-006、AGENT-025 |
+| SyncDelegate 边 | 仅 `Inquiry → Inspector`；无反向；无独立 `return` | AGENT-024 |
+| Epistemic style 在 prompt | inquiry system prompt 含形成理解 / 反例 / 证据vs推论 / 综合 Inspector；无 LearningState/QA/Compile/return 协议 | AGENT-025 |
 | 无 Student workflow 移植 | 无 MeditatorLearn/Compile RequestKind；终端为普通 Assistant completion | AGENT-025 |
+| SyncDelegate 无 return | `InvocationMode=SynchronousDelegate` → ordinary completion → bounded WorkRecord；无 Returned 通道 | AGENT-024、EXEC-028、EXEC-031 |
 
 ## 能力矩阵
 
 | 证明 | 条款 |
 |------|------|
-| Manager 无普通工具；Orchestrator 只 fork manager | AGENT-011、AGENT-015 |
+| Manager 无普通工具；Orchestrator 只 `commission` Manager | AGENT-011、AGENT-015 |
 | mv/rm 仅 Coder；非空目录 rm 拒绝 | AGENT-016…018 |
-| bash-honeypot 仅 Coder；调用不跑 shell | AGENT-023 |
-| DevOps 独占 PTY；Reviewer 只读 | AGENT-013、AGENT-014 |
-| Meditator inspector-only | AGENT-025 |
+| bash-honeypot 仅 Coder；调用不跑 shell；instruction-only 无 error 字段 | AGENT-023 |
+| DevOps 独占终端/`run`；Reviewer 只读 + `judge` | AGENT-013、AGENT-014 |
+| Inquiry inspect-only | AGENT-025 |
+| Distiller 无工具且不可见 | AGENT-006、AGENT-008 |
 | Browser stealth-browser MCP | AGENT-026 |
 | 内部 Semble MCP | AGENT-027 |
+
+## Gate A — Tool Referential Integrity
+
+| 证明 | 期望 | 条款 |
+|------|------|------|
+| 同名唯一合同 | 同一工具名 → 唯一 schema owner + 唯一语义合同；`fork`≠`commission` | §17 Gate A；AGENT-006、AGENT-015 |
+| 新名齐全旧名缺席 | `commission`/`inspect`/`horizon`/`judge`/`chronicle`/`run`/`establish-behavior`/`repair-behavior`/终端四动词/`js-bookkeeper` 在位；旧名集合为空 | AGENT-006、AGENT-007 |
 
 ## stealth-browser MCP
 
 | 证明 | 期望 | 条款 |
 |------|------|------|
 | Host schema 键 | Browser allow `stealth-browser-mcp_*`；其它 role deny；无虚构 `network` | AGENT-006、AGENT-026 |
-| wildcard 求值 | Browser 对 `stealth-browser-mcp_get_debug_view` = allow；Coder/Meditator = deny | AGENT-007、AGENT-026 |
+| wildcard 求值 | Browser 对 `stealth-browser-mcp_get_debug_view` = allow；Coder/Inquiry = deny | AGENT-007、AGENT-026 |
 | config 注入 | `configureFromHostConfig` 写入 `mcp.stealth-browser-mcp`；不删其它 MCP | AGENT-026 |
 | 启动判定 | disabled / fixture / test / uvx ref 四分支确定性 | AGENT-026 |
 | 不进 ToolRegistry / js-* | plugin `tool` 注册表无 stealth-browser 名；js-browser 仍仅 fs 投影 | AGENT-026、JS-001 |
@@ -68,4 +88,4 @@
 代表测试：`tests/unit/agent/catalog.test.mjs`、`tests/unit/plugin/agent-permission-gate.test.mjs`、
 `tests/unit/agent/stealth-browser-mcp.test.mjs`、`tests/unit/agent/semble-mcp.test.mjs`、
 `tests/integration/plugin/manager-tool-contract.test.mjs`、`file-mutation-tools.test.mjs`；
-Meditator inspector-only / Student-Teacher absence ratchet 随 G3 落地。
+Inquiry inspect-only / Persona immutability / Gate A / 旧名 absence ratchet 随 GrandRewrite 落地。

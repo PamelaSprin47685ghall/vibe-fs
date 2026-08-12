@@ -10,17 +10,19 @@ Canonical Role 决定工具权限与 system prompt。
 ```fsharp
 type Role =
     | Orchestrator | Manager | Coder | Inspector | DevOps
-    | Browser | Meditator | Reviewer
-    | Blogger | Executor
+    | Browser | Inquiry | Reviewer
+    | Blogger | Distiller
 
 type AgentTier = Fast | Deep
 ```
 
-Tier **只**改变模型绑定。fast-ROLE 与 deep-ROLE 的 system prompt、工具权限、能力矩阵必须相同。
+`Bookkeeper` 保持 InternalLeaf + Attached：拥有机器身份与 Persona（AGENT-028），**不**进入本 public Role DU。
+
+Tier **只**改变模型绑定（Execution Binding，AGENT-029）。fast-ROLE 与 deep-ROLE 的 Role Law、工具权限、能力矩阵必须相同。
 
 Canonical Role **不**决定 Companion 资格（COMPANION-001/002）。
 
-## AGENT-002：必须存在的 20 个 Agent
+## AGENT-002：必须存在的 22 个 Agent
 
 ```text
 fast-orchestrator     deep-orchestrator
@@ -29,17 +31,21 @@ fast-coder            deep-coder
 fast-inspector        deep-inspector
 fast-devops           deep-devops
 fast-browser          deep-browser
-fast-meditator        deep-meditator
+fast-inquiry          deep-inquiry
 fast-reviewer         deep-reviewer
 fast-blogger          deep-blogger
-fast-executor         deep-executor
+fast-distiller        deep-distiller
+fast-bookkeeper       deep-bookkeeper
 ```
 
 缺任一 → 启动失败。每个 Agent 必须有非空且 pair 内互异的 model 字符串。
 
-G3 clean-break：`Role.Student` / `Role.Teacher` 与 `fast|deep-student|teacher` **已删除**；无 alias。
-Mandatory baseline = 20（Casebook Bookkeeper pair 仍为条件性扩展，不计入本表）。
-推理职责由 Meditator（AGENT-025）承接。
+`fast-bookkeeper` / `deep-bookkeeper` = 强制内部执行身份（Persona Clerk / Curator；可复用 inspector 模型绑定）。不进 Manager fork 面，不进 public Role DU。
+
+G3 clean-break：`Role.Student` / `Role.Teacher` 与 `fast|deep-student|teacher` **已删除**；无 alias。  
+GrandRewrite clean-break：`meditator` / `executor` **已删除**；无 alias。  
+Mandatory baseline = 22（含 Bookkeeper pair）。  
+推理职责由 Inquiry（AGENT-025）承接。
 
 ## AGENT-003：Peer
 
@@ -56,11 +62,14 @@ Peer 名称必须在启动配置验证阶段证明存在。
 
 ```text
 orchestrator, manager, build, plan, coder, inspector, devops,
-browser, meditator, reviewer, student, teacher, blogger, executor,
+browser, meditator, inquiry, reviewer, student, teacher,
+blogger, executor, distiller, bookkeeper,
 fast, deep, reviewer-fast, fast_reviewer
 ```
 
-`student` / `teacher` 及 `fast|deep-student|teacher` 一律 fail closed；不得映射到 Meditator / Inspector。
+`meditator` / `executor` 不得映射到 Inquiry / Distiller。  
+`student` / `teacher` 及 `fast|deep-student|teacher` 一律 fail closed；不得映射到 Inquiry / Inspector。  
+裸名（无 `fast-` / `deep-` 前缀）一律非法。
 
 ## AGENT-005：用户必须显式选择
 
@@ -71,30 +80,35 @@ fast, deep, reviewer-fast, fast_reviewer
 
 | 角色 | 工具 |
 |------|------|
-| Orchestrator | `fork-manager`, `join` |
-| Manager | `fork-agent`, `join`, `list` |
-| Coder | `read`, `write`, `edit`, `glob`, `grep`, `inspector`, `mv`, `rm`, `bash-honeypot` |
-| Inspector | `read`, `glob`, `grep`, `executor` |
-| DevOps | `fork-pty`, `executor`, `read`, `glob`, `grep`, `inspector`, `coder`, `join`, `list` |
-| Browser | `read`, `glob`, `grep`, stealth-browser MCP（AGENT-026） |
-| Meditator | `inspector` only（见 AGENT-025） |
-| Reviewer | `read`, `glob`, `grep`, `verdict` |
-| Blogger | `blog` |
-| Executor | 无工具 |
+| Orchestrator | `commission`, `join`, `horizon` |
+| Manager | `fork`, `join`, `horizon`, `todowrite`, `fission`, `suicide` |
+| Coder | `read`, `write`, `edit`, `glob`, `grep`, `inspect`, `mv`, `rm`, `bash-honeypot`, `js-coder` |
+| Inspector | `read`, `glob`, `grep`, `query-shell`, `fetch`, `js-inspector` |
+| DevOps | `read`, `glob`, `grep`, `js-devops`, `inspect`, `establish-behavior`, `repair-behavior`, `run`, `open-terminal`, `send-terminal`, `read-terminal`, `signal-terminal`, `horizon`, `join` |
+| Browser | `read`, `glob`, `grep`, `js-browser`, stealth-browser MCP（AGENT-026） |
+| Inquiry | `inspect` only（见 AGENT-025） |
+| Reviewer | `read`, `glob`, `grep`, `judge`, `js-reviewer` |
+| Blogger | `chronicle` |
+| Distiller | 无工具 |
+| Bookkeeper（内部） | `js-bookkeeper` |
+
+已删除（不得再出现于矩阵）：`list`、`verdict`、`blog`、`executor`（工具）、`fork-pty`、`edit-qa`、`return`、`fork-manager`、`fork-agent`、`inspector`（工具名）、`coder`（同步委派工具名）。
 
 ## AGENT-008：内部 Agent 不可见
 
-Blogger、Executor 不得出现在任何模型可见的 enum、schema 或工具参数提示中。
+Blogger、Distiller、Bookkeeper（含 `fast-bookkeeper` / `deep-bookkeeper`）不得出现在任何模型可见的 enum、schema 或工具参数提示中。
 
 ## AGENT-009：示踪面可见集合
 
-| 暴露面 | 可见 Agent |
-|--------|-----------|
-| Manager fork-agent | fast/deep coder, inspector, devops, browser, meditator |
-| Orchestrator fork-manager | fast-manager, deep-manager |
-| Inspector tool | fast-inspector, deep-inspector |
-| Coder tool | fast-coder, deep-coder |
-| list() | 当前运行中的 handle（非可创建清单） |
+| 暴露面 | 可见集合 |
+|--------|---------|
+| Manager `fork` | fast/deep coder, inspector, devops, browser, inquiry |
+| Orchestrator `commission` | fast-manager, deep-manager |
+| `inspect` 工具 | fast-inspector, deep-inspector |
+| `establish-behavior` / `repair-behavior` | fast-coder, deep-coder |
+| `horizon()` | 在场名册（Byname / TerminalName 等），无 id |
+
+不可 fork：reviewer、blogger、distiller、bookkeeper。
 
 ## AGENT-010：fast/deep 权限一致
 
@@ -106,27 +120,27 @@ permissions(fast-ROLE) = permissions(deep-ROLE)
 
 ## AGENT-011：Manager 无普通工具
 
-Manager 只有 `fork-agent` / `join` / `list`。  
-不能直接读文件、跑终端、改仓库。
+Manager 只有 `fork` / `join` / `horizon` / `todowrite` / `fission` / `suicide`。  
+不能直接读文件、跑终端、改仓库，也不能 `inspect`。
 
 ## AGENT-012：Coder 的 Inspector 不透明
 
-Coder 可见 `inspector` 工具，但 prompt 只能把它描述为不透明只读调查服务。  
-不得泄露 Executor 权限，不得把 Inspector 当常规验证代理。
+Coder 可见 `inspect` 工具，但 prompt 只能把它描述为不透明只读调查服务。  
+不得泄露 Inspector 的 `query-shell` / 取证权限，不得把 Inspector 当常规验证代理。
 
-## AGENT-013：DevOps 独占 PTY
+## AGENT-013：DevOps 独占终端与有界执行
 
-只有 DevOps 可创建/操作 PTY。  
-文件修改只能经同步 `coder` 工具委派，不能直接 `write`/`edit`。  
-DevOps 角色的 `join` 工具配置 10s 超时预算（`DevOpsJoinTimeoutMs = 10_000`），无完成项 10s 后返回 `ForkError.TimedOut` (`status="failed"`, `code="TIMED_OUT"`)，防止 PTY 进程 hang 死卡住控制流；Orchestrator 与 Manager 的 `join` 无 10s 超时。
+只有 DevOps 可 `open-terminal` / `send-terminal` / `read-terminal` / `signal-terminal`，以及 `run`。  
+文件修改只能经同步 `establish-behavior` / `repair-behavior` 委派，不能直接 `write`/`edit`。  
+DevOps 的 `join` 有 10s 等待预算：无完成项时结束本次等待（Host 事实）；不向 provider 暴露 `status` / `code` / `TIMED_OUT` 等 DTO 字段。Orchestrator 与 Manager 的 `join` 无此 10s 预算。
 
 ## AGENT-014：Reviewer 只读
 
-Reviewer = 只读工具 + `verdict`。不能写文件、不能跑命令。
+Reviewer = 只读工具 + `judge`。不能写文件、不能跑命令。
 
-## AGENT-015：Orchestrator 只 fork Manager
+## AGENT-015：Orchestrator 只 commission Manager
 
-`fork-manager` 接受 `fast-manager` / `deep-manager`（新 Job）或已有 Manager job id（同 job 续做，同 worktree/session，`reused=true`；GLORY-068）。
+`commission` 接受 `fast-manager` / `deep-manager`（新路）或按 Byname 续做既有路（同 job 续做，同 worktree/session；GLORY-068）。不暴露 job id / worktree / `reused` 等机器字段。
 
 ## AGENT-016：mv / rm 仅 Coder
 
@@ -149,7 +163,7 @@ Host 内置 `bash` 对所有 managed role 仍保持 deny（AGENT-007）；本工
 
 **编号永久空缺。** G3 clean-break 删除 `Role.Student` / `Role.Teacher`、`fast|deep-student|teacher`、
 Learn/Compile / QA / SKILL / `teacher` 工具协议。无 alias、无 deprecated mode。
-后继：推理 → Meditator（AGENT-025）；证据 → SyncDelegate Inspector（AGENT-024）。
+后继：推理 → Inquiry（AGENT-025）；证据 → SyncDelegate Inspector（AGENT-024）。
 
 ## AGENT-022：（空缺）Student SKILL — G3 已删除
 
@@ -157,38 +171,37 @@ Learn/Compile / QA / SKILL / `teacher` 工具协议。无 alias、无 deprecated
 
 ## AGENT-024：SyncDelegate DAG 与 InvocationMode
 
-允许的同步委派边（dedicated `inspector` / `coder` 工具 → SyncDelegate，见 EXEC-026/028）：
+允许的同步委派边（dedicated `inspect` / `establish-behavior` / `repair-behavior` → SyncDelegate，见 EXEC-026/028）：
 
 ```text
-Meditator → Inspector
-Coder     → Inspector
-DevOps    → Inspector
-DevOps    → Coder
+Inquiry → Inspector
+Coder   → Inspector
+DevOps  → Inspector
+DevOps  → Coder
 ```
 
-图必须是 DAG。禁止反向或成环边（例如 `Inspector → Coder`、`Inspector → Meditator`、`Coder → DevOps`）。
+图必须是 DAG。禁止反向或成环边（例如 `Inspector → Coder`、`Inspector → Inquiry`、`Coder → DevOps`）。
 嵌套 `DevOps → Coder → Inspector` 合法。启动/配置须静态证明 sync delegate 图无环。
 
-`InvocationMode = SynchronousDelegate` 时，callee 在角色基线工具面之上增加 `return`：
-`return` 是 AttemptExecutionProfile / InvocationMode 投影，**不是**业务程序计数器（PC）或新阶段；
-只完成当前同步 invocation（Returned），dedicated Session 生命周期仍由 OwnerReuseScope 决定（HOST-008）。
+`InvocationMode = SynchronousDelegate` 时：callee 按普通 Assistant completion 结束当前 invocation；Host 物化 bounded WorkRecord（`includeOpening=false`）并投影给 caller。  
+**删除**独立 `return` 通道与 `Returned → Completion` 双 await。细节见 EXEC（SyncDelegate / WorkRecord）。
 
-本条只宣布 SyncDelegate DAG 与 `InvocationMode`。不得把 Teacher leaf / no-Companion 拓扑套到
+本条只宣布 SyncDelegate DAG 与 `InvocationMode`。不得把已删除的 Teacher leaf / no-Companion 拓扑套到
 Dedicated Inspector/Coder（后者是 Work + Attached，HOST-008）。
 
-## AGENT-025：Meditator 能力（inspector-only + epistemic style）
+## AGENT-025：Inquiry 能力（inspect-only + epistemic style）
 
 正式工具面（普通 Work Session；事实调查只经 SyncDelegate）：
 
 ```text
-Meditator → { inspector }
+Inquiry → { inspect }
 ```
 
-禁止再持有：`read` / `glob` / `grep` / `write` / `edit` / `executor` / `coder` /
-`fork-agent` / `fork-manager` / `fork-pty` / `join` / `list` / stealth-browser MCP，以及任何 filesystem 直读面。
+禁止再持有：`read` / `glob` / `grep` / `write` / `edit` / `run` / `establish-behavior` /
+`repair-behavior` / `fork` / `commission` / 终端动词 / `join` / `horizon` / stealth-browser MCP，以及任何 filesystem 直读面。
 
 职责只有：reason / question / compare / challenge / synthesize。分层固定为
-`Meditator = reasoning`，`Inspector = evidence acquisition`（AGENT-024 边 `Meditator → Inspector`）。
+`Inquiry = reasoning`，`Inspector = evidence acquisition`（AGENT-024 边 `Inquiry → Inspector`）。
 
 Prompt discipline 吸收原 Student **epistemic style**（不是 workflow protocol）：
 
@@ -201,9 +214,10 @@ Prompt discipline 吸收原 Student **epistemic style**（不是 workflow protoc
 ```
 
 不得重新引入：`LearningState` / QA / Compile / `MeditatorLearn|Compile` / Student 式 final `return`
-作为 Meditator 业务阶段或 RequestKind。终端就是普通 Assistant completion。
+作为 Inquiry 业务阶段或 RequestKind。终端就是普通 Assistant completion。
 
-Student/Teacher 角色已删除（AGENT-020 空缺）；不得 alias 回本角色。
+不得把 Sphinx Kernel / Steward 写成现行能力。  
+Student/Teacher 角色已删除（AGENT-020 空缺）；`meditator` 不得 alias 回本角色。
 
 ## AGENT-026：Browser stealth-browser MCP
 
@@ -272,3 +286,37 @@ WANXIANGSHU_TEST 为真且无 fixture   → Disabled
 3. Strength Replica 工具面加入 Semble
 4. 在 `WANXIANGSHU_TEST` 且无 fixture 时 spawn 真实 `uvx`
 5. 新增 `@modelcontextprotocol/sdk` 依赖
+
+## AGENT-028：Persona Registry
+
+```text
+Role × initial selected tier → SessionPersona（创建时绑定，不可变）
+```
+
+| Role / 内部 office | Fast Persona | Deep Persona |
+|--------------------|--------------|--------------|
+| Orchestrator | Integrator | Director |
+| Manager | Coordinator | Lead |
+| Coder | Coder | Engineer |
+| Inspector | Scout | Investigator |
+| DevOps | Technician | Operator |
+| Browser | Navigator | Researcher |
+| Inquiry | Analyst | Inquirer |
+| Reviewer | Examiner | Auditor |
+| Blogger | Scribe | Chronicler |
+| Distiller | Condenser | Distiller |
+| Bookkeeper（内部，非 public Role） | Clerk | Curator |
+
+`fast-*` / `deep-*` 仍是内部 execution identity，不穿过 provider horizon 自称。  
+Steward 属未来预留，V1 不创建、不写入现行能力。
+
+## AGENT-029：Role / Persona / ExecutionBinding 分离
+
+```text
+Role            职责 office；决定工具矩阵与 Role Law；session 内不变
+Persona         自我模型（AGENT-028）；session 创建时一次绑定，不可变
+ExecutionBinding 物理模型 / tier / config（如 fast-coder）；可随 Peer Fallback / Strength 变化
+```
+
+Fallback 或 Strength 只改 ExecutionBinding：Persona 不变，system prompt 身份字节不变。  
+换执行者 ≠ 换人；不得把 Binding 名冒充 Persona 自称。

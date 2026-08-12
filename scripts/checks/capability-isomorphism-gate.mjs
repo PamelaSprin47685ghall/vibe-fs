@@ -68,7 +68,7 @@ export const scanToolRegistry = (text) => {
 
   // Handwritten ToolSpec / create paths that name a literal js-* role tool.
   const handwritten =
-    /\b(?:JsToolSpec\.create|ToolSpec\.create|name\s*=\s*)[^;\n]*["']js-(?:coder|inspector|reviewer|devops|browser|meditator|student|teacher)["']/i
+    /\b(?:JsToolSpec\.create|ToolSpec\.create|name\s*=\s*)[^;\n]*["']js-(?:coder|inspector|reviewer|devops|browser|inquiry|student|teacher)["']/i
   if (handwritten.test(text)) {
     violations.push({
       code: 'handwritten-js-tool-spec',

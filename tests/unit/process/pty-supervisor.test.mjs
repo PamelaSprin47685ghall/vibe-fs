@@ -380,7 +380,7 @@ const fakeTerm = (pid) => {
 // A port that already knows the id (Forked) so attach skips the SIGKILL sweep.
 const portWith = (pid) => {
   const p = new PtyPort()
-  PtyPort__Fork_515E235E(p, 'echo hi', { Name: 'fast-executor' }, id(pid))
+  PtyPort__Fork_515E235E(p, 'echo hi', { Name: 'fast-distiller' }, id(pid))
   return p
 }
 

@@ -2,7 +2,7 @@
 
 ## Implements
 
-行为合同见 `what/architecture.md`；本文件只描述事件收敛、结构化执行和包面装配。
+行为合同见 `what/architecture.md`；本文件只描述事件收敛、结构化执行、Horizon 滤镜、Gates 与包面装配。
 
 ## Ownership
 
@@ -32,13 +32,50 @@
 1. 平常只增 Y frames；X active prefix 字节不变。  
 2. PrefixEpoch 切换只绑 probe 提升 / ContextReanchored；BlogSquash 只推进 FrameEpoch。
 3. 入口 `dist/Infrastructure/OpenCode/Plugin/Plugin.js`。  
-4. 资源：`resources/prompts/*`、`resources/enforcer/catalog.json`；加载仅 `Infrastructure/Resources/`，fail fast。
+4. 资源：`resources/prompts/*`、`resources/enforcer/<TipName>/{enforcer.md,main.md}`；加载仅 `Infrastructure/Resources/`，fail fast。**无** `catalog.json` SSOT。
 
 ---
 
 ## 合成文本
 
-统一 string owner + renderer；inventory 与 golden 守 ARCH-010（`how/synthetic-toml.md`）。
+统一 string owner + renderer；inventory 与 golden 守 ARCH-010（`how/synthetic-toml.md`）。  
+Join/fork/commission payload 字段名：`commissioner_record`、`root_requirement`；禁止 Join status plane（`status`/`count`/`ordinal`/`kind`/`agent`/…）进 provider data。
+
+---
+
+## Provider Horizon 滤镜算法（ARCH-014）
+
+每个即将离开墙、进入 provider surface 的字段，按固定决策滤镜（what ARCH-014）：
+
+```text
+Did the participant already know this?        → omit
+Did they just supply this themselves?          → omit
+Is it implied by successful completion?        → omit
+Is it useful only for correlation/debug?       → keep internal
+Would different values change next action?     → if no → omit
+Does the participant need the value itself
+  rather than merely its consequence?          → if no → render consequence
+                                                → if yes → preserve minimal observation
+```
+
+实现落点：各域 tool renderer / JoinResultRenderer / horizon / commission 成功后果。  
+机器可尽知 Journal/CAS/cursor/UUID；穿过 horizon 的只能是后果、measurement 与 WorkRecord。  
+禁止：`status`/`code`/`error` DTO、SessionId/AgentId/JobId、fallback offset、`fast-`/`deep-` 自称、已删 spool 路径。
+
+---
+
+## Gates A–D 检查算法（ARCH-016）
+
+静态/契约门禁（可失败；不是业务状态机字段）：
+
+| Gate | how 检查 |
+|------|----------|
+| A Tool Referential Integrity | 同名工具 → 唯一 schema owner + 唯一 semantic contract；不同硬语义不得同名（`commission`≠`fork`；`judge`≠旧 `verdict` 工具名） |
+| B Provider Leak | 扫描 provider 输出 / schema / fixed prose：禁 SessionId/AgentId/ManagerJobId/PtyId/Fission/lane/worktree/offset/`fast-`·`deep-`/spool |
+| C Language Parity | 每个 provider semantic resource：EN 与 zh-CN 皆存在（HOST-026）；缺语言 fail |
+| D Prompt Stability | 同 session 上 Fallback / T1 / review / reanchor / Strength 后 system prompt 字节相同；只允许改 EffectiveAgent |
+
+证明面见 `proof/` 与 Proposal §17；各域不得以局部方便绕过。
 
 ---
 
@@ -46,8 +83,7 @@
 
 G3 clean-break：`Role.Student` / `Role.Teacher`、Learn/Compile、`StudentQaStore`、SKILL 制品门与
 `StudentTeacherRuntime` **不存在于生产**（AGENT-020…022 空缺；`scripts/checks/student-teacher-absence.mjs`）。
-不得写成 pending / 过渡 / 双写。后继同步委派见 SyncDelegate（EXEC-026/028）：Returned→Completion CE，
-dedicated Inspector/Coder = Work+Attached。
+不得写成 pending / 过渡 / 双写。后继同步委派：ordinary completion → bounded WorkRecord（EXEC-028/031）；**无**独立 `return` 工具 / 双 await。
 
 `SatelliteKind` 现仅 `Companion`。`AttachedSessionRuntime` 拥有 Attached 创建/恢复/retire；
 kind-specific 只提供 Agent、首个 Prompt 与 terminal handler。Prompt 文本是模型指令，绝不反向解析成

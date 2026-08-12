@@ -35,7 +35,9 @@ module EnforcerCodec =
     /// 缺 tip / tip 非 string / 未知 field → Error。
     /// 其它 property 忽略（ENFORCER-024）。不默认 tip。
     let decodeCall (rules: EnforcerRule list) (rawArgs: Map<string, obj>) : Result<CanonicalBlogCall, string> =
-        let text = tryStringArg rawArgs "text"
+        let text =
+            tryStringArg rawArgs "entry" |> Option.orElse (tryStringArg rawArgs "text")
+
         let evidence = tryStringArg rawArgs "evidence"
 
         match Map.tryFind "tip" rawArgs with

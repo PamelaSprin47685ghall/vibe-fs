@@ -272,7 +272,7 @@ test('H13_05_missing_anchor_pair_is_omitted_not_relocated', () => {
     // Rewritten view: covered u1/msg_7 gone; only a synthetic prefix + continue.
     const synthPrefix = {
       info: { id: 'synth-prefix-frozen', role: 'user' },
-      parts: [{ type: 'text', text: '# Opening task\ncovered work' }],
+      parts: [{ type: 'text', text: '# Opening\ncovered work' }],
     }
     const cont = userMsg('u-continue', '# Continue after provider failure.')
     const result = resultOf(tryInject(opened.journal, session, text, toList([synthPrefix, cont])))
@@ -313,7 +313,7 @@ test('H13_05b_xwire_drop_leading_continue_still_commits', () => {
     const cont = userMsg('u2', '# Continue after provider failure.')
     const synthPrefix = {
       info: { id: 'synth-prefix-frozen', role: 'user' },
-      parts: [{ type: 'text', text: '# Opening task\nX-B round 1\n\n# Work log\nframe' }],
+      parts: [{ type: 'text', text: '# Opening\nX-B round 1\n\n# Chronicle\nframe' }],
     }
 
     const wire1 = inject(opened.journal, session, [user1])

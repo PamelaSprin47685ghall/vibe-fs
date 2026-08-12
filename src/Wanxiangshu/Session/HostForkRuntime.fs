@@ -57,8 +57,8 @@ type HostForkRuntime
     let children = Dictionary<string, SessionId>()
     let pendingRuns = Dictionary<string, PendingHostRun>()
     let ptyRuns = HashSet<string>()
-    // DSL-MUTABLE: resource — most recent PTY id (survives a parent-provider restart)
-    let mutable lastPtyId: string option = None
+    /// Provider TerminalName → PtyId. Occupied until Join delivers closure.
+    let terminalByName = Dictionary<string, string>()
     let gate = obj ()
     // DSL-MUTABLE: single-flight — duplicate joins fail before waiting
     let mutable joinInFlight = false
@@ -152,13 +152,8 @@ type HostForkRuntime
                 | Error err -> return Error err
         }
 
-    /// 最近创建的 PTY id。fork-pty 写/读/signal 无 agent 时作用于它
-    /// （canary DSL 的「最近创建」语义；`TryPty ""` 的解析目标）。
-    member internal _.LastPtyId
-        with get () = lock gate (fun () -> lastPtyId)
-        and set value = lock gate (fun () -> lastPtyId <- value)
-
     member internal _.Gate = gate
+    member internal _.TerminalByName = terminalByName
     member internal _.Sessions = sessions
     member internal _.Journal = journal
     member internal _.SessionSnapshot = sessionSnapshot
