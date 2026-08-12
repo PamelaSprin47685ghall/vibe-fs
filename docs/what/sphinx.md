@@ -1,101 +1,158 @@
 # Sphinx — 可观察行为
 
-条款前缀：`SPHINX-`。万象术 Host 注入与 Inquiry 权限见 AGENT-030。
+条款前缀：`SPHINX-`。Host 自动注入与 Inquiry 权限见 AGENT-030。
 
 ## SPHINX-001：生成式认识状态求解器
 
-Sphinx 是由数学内核控制、经 MCP 与 LLM co-yield 的生成式认识状态求解器。
+Sphinx 是 Kernel 控制、经 MCP 与 LLM co-yield 的生成式认识状态求解器。
 
-用户给出疑问后，系统维护「目前知道什么、还不知道什么、什么问题值得继续问」的认识状态；不把一次自由文当作答案。
-
-```text
-Kernel → LLM：缺少该语义量，请测量 / 生成（structured request）
-LLM  → Kernel：结构化观测及不确定性（structured observation）
-```
-
-Kernel 拥有：认识状态、全局闭包、判重与约简、方法选择、下一步控制、停止、Canonical Answer。  
-LLM 只提供 Kernel 无法自行获得的语义观测与生成建议；不决定方法、下一步、真假裁决、posterior、停止时机或最终报告的认识内容。
-
-continuation 永远属于 Kernel。LLM 不是平权 coroutine。
-
-## SPHINX-002：handle 绑定 inquiry
-
-每次 inquiry 由不透明 `handle` 标识。进程内 `Map<handle, EpistemicState>` 持有状态。
+用户给出根问题后，系统维护影响未来认知决策的充分状态，不把 transcript、问题树或一轮自由文当状态本体。图、frontier、posterior、MCTS 统计、等价类均是可替换计算表示。
 
 ```text
-无 handle            → 无状态；不得隐式复用「上一问」
-未知 / 缺失 handle   → error
-同一 handle          → 同一 EpistemicState 续作
+Kernel reaches fixed point
+→ Kernel chooses cognitive action or Stop
+→ pure action: Kernel executes
+→ semantic/external action: yield structured Request
+→ LLM/tool returns structured Observation
+→ Kernel validates pending Request
+→ absorb
+→ GLOBAL CLOSURE
+→ fixed point
 ```
 
-V1 不跨进程持久化。进程退出 → handle 失效。
+continuation、方法激活、动作比较、停止与 Canonical Answer 唯一属于 Kernel。LLM 只提供 Kernel 无法自行获得的语义观测、候选生成与调查结果；不得自选下一步、跳过闭包、自封 answered 或直接写权威 posterior。
 
-禁止：无 handle 的隐式会话、把 transcript/history 冒充 EpistemicState、用墙钟或外部文件当权威状态。
+## SPHINX-002：handle 唯一绑定 inquiry
 
-## SPHINX-003：MCP 工具面 start / resume
-
-Sphinx 暴露为 Host MCP；服务器内工具名 `start` / `resume`。Host 把每个工具暴露为 `sphinx_<name>`（AGENT-030）。
-
-`start(question: string)` → JSON：
+每次 inquiry 由不透明 `handle` 标识。Sphinx 进程内 `SessionStore` 维护 `handle → EpistemicState`。
 
 ```text
-handle   （必填）
-status   = yield | answered | error
-yield    → request = structured Kernel→LLM request（Phase 0 首步：SemanticAssessmentRequest）
-answered → answer  = Canonical Answer（Kernel 写出，非 LLM 自由文）
-error    → 失败语义；不得假装 answered
+start(question)          → 新 handle
+resume(handle, obs)      → 仅续作该 handle
+缺失 handle              → error
+未知 handle              → error
+进程退出                 → handle 失效
 ```
 
-`resume(handle: string, observation: object)` → 同形。`observation` 必须是 structured semantic observation；禁止把自由散文当控制输入。
+禁止隐式“上一问”、用 transcript 复原权威状态、Host 再建并行会话表或跨进程伪持久化。
 
-禁止：第三工具名冒充控制面；无 handle 的 resume；把 LLM 原文直接当 Canonical Answer。
+## SPHINX-003：MCP 只有 start / resume
 
-## SPHINX-004：Phase 0 内核义务
-
-Phase 0 必须同时具备下列能力；缺一则不是 Sphinx Phase 0：
-
-1. Root Question  
-2. SemanticAssessment yield（inquiry 首步）  
-3. EpistemicState 最小表示 `S = (R, B, E, D, A, C)`  
-   - `R` Root Answer Contract belief  
-   - `B` belief / semantic uncertainty  
-   - `E` observation / evidence  
-   - `D` dependency / provenance  
-   - `A` 当前可执行认知动作  
-   - `C` cost / budget / constraints  
-4. GenerativeRule 接口：`G_i(S) → { Candidate Cognitive Actions }`  
-5. candidate cognitive actions  
-6. global Closure（absorb → infer → reduce → revalue → fixed point；仅 Core Reduction）  
-7. simple novelty / dedup（semantic key）  
-8. simple dominance replacement  
-9. root-relative value（粗糙启发式允许；比较权属 Kernel）  
-10. Stop 作为动作（与其它认知动作同一比较空间）  
-11. Canonical Answer（Kernel 写出）  
-12. MCP `start` / `resume` + handle（SPHINX-002/003）
-
-方法库 V1 恰好：
+服务器内工具面恰好：
 
 ```text
-Multidisciplinary | Abduction | Analogy | Counterexample | Synthesis
+start(question: string)
+resume(handle: string, observation: object)
 ```
 
-规则只生成候选动作；无调度权。Stop 与「问什么」同属控制问题：`V_stop ≥ max_a V(a)` 时停止最优。
+成功体必含 `handle` 与 `status = yield | answered`；失败体为 `status = error`。`yield` 必含 Kernel 生成的 structured `request`；`answered` 必含 Kernel 组装的 `answer`。
 
-每次外生 observation 后必须 `S' = Closure(S ⊕ Y)` 且 `Closure(S') = S'`，才允许下一次 yield。
-
-Phase 0 禁止实现完整 A*、通用 Bayesian Network、MCTS、e-graph / 高级表示优化、跨进程 durable journal。
-
-## SPHINX-005：正交边界
-
-Sphinx 是独立产品路径：`src/sphinx/` 纯 JS 内核 + MCP stdio server。
+首步必为 `SemanticAssessmentRequest`。之后 `observation` 必须与该 handle 的 pending Request 同型：
 
 ```text
-Sphinx 不得 import 万象术 domain / Kernel / Host 业务模块
-万象术不得内嵌 Sphinx 闭包 / EpistemicState / Canonical Answer 逻辑
+SemanticAssessmentRequest ↔ SemanticAssessment
+GenerateCandidatesRequest ↔ Candidates
+InvestigateRequest(a)     ↔ Investigation(actionKey = a.id)
+SynthesizeRequest         ↔ Synthesis
 ```
 
-万象术只拥有：MCP identity、launch 配置、`ToolPermission.Sphinx` → schema 键 `sphinx_*`、Inquiry allow（AGENT-030）。
+错型、错 actionKey 或无 pending Request → error，且状态不前进。
 
-Sphinx 路径允许 `@modelcontextprotocol/sdk`（及 zod）。AGENT-027「Semble 不引入 MCP SDK」仍只约束 Semble 路径。
+## SPHINX-004：EpistemicState 与全局闭包
 
-禁止：把 Sphinx 编进 ToolRegistry / `js-*`；依赖用户手写 `opencode.json` 配置该 MCP；把 Sphinx 能力漏给非 Inquiry managed role。
+权威状态至少显式拥有：RootContract、Findings、Evidence、Hypotheses、Dependencies、CognitiveActions、Budget、PendingRequest；A*/MCTS/Bayes/Representation 只作为求解投影存在。
+
+每个被接受的 Observation 后执行：
+
+```text
+absorb
+→ deterministic inference
+→ probability qualification / propagation
+→ root-relative revalue
+→ equivalence + Pareto reduction
+→ solver projections
+→ repeat
+→ fixed point
+```
+
+只有 `Closure(S) = S` 后才能 yield 或 answered。Closure 必须幂等；重复纯计算不得凭空制造 Evidence、独立依赖组或 posterior 质量。
+
+Canonical Answer 的认识基底必须显式分列 Findings / Evidence / Hypotheses；Synthesis 只是基于已入状态 finding keys 的组织投影，不能改写认识基底。
+
+## SPHINX-005：F# 单一实现与 Host 正交边界
+
+Sphinx 源码唯一位于 `src/Wanxiangshu/Sphinx/*.fs`，namespace 为 `Wanxiangshu.Sphinx.*`，随 `Wanxiangshu.fsproj` 由 Fable 编译到 `dist/Sphinx/*.js`。
+
+生产 MCP 入口唯一为：
+
+```text
+dist/Sphinx/McpServer.js
+```
+
+Sphinx 内核模块不得依赖 `Wanxiangshu.Domain`、Agent、Session、OpenCode Host 业务模块；Host 只拥有 MCP identity、launch 配置、`ToolPermission.Sphinx` 与 Inquiry 的 `sphinx_*` 权限。MCP SDK / zod 只允许停在 `Wanxiangshu.Sphinx.McpServer` wire 边界。
+
+禁止第二套手写 `src/sphinx/*.js`、build copy、ToolRegistry / `js-*` 注册或 Host 内嵌 Closure。
+
+## SPHINX-006：Proposal ≠ Evidence；No Free Information
+
+四类输入语义严格分层：
+
+| Observation | 可改变控制状态 | 可新增 Finding | 可新增 Evidence | 可改变 posterior |
+|---|---:|---:|---:|---:|
+| SemanticAssessment | 是 | 否 | 否 | 否 |
+| Candidates | 是 | 否 | 否 | 否 |
+| Investigation | 是 | 是 | 仅显式 Evidence | 仅资格成立时 |
+| Synthesis | 是 | 否 | 否 | 否 |
+
+SemanticAssessment、候选问题、方法建议、价值估计、Synthesis 文案都是 proposal / computation，不是世界证据。LLM 重述、递归、自我论证、重复采样不得增加 Evidence 或把相关信息伪装成独立来源。
+
+Finding 可无 Evidence，但 Canonical Answer 必把这类 claim 标记为 uncertainty；它不能因“模型说得更完整”升级成证据。Finding 自带的 LLM `confidence` 也不具数值资格，Kernel 吸收时丢弃；对象层数值置信只来自 SPHINX-008 的合格概率模型。
+
+## SPHINX-007：RootContract 保留分布；动作价值相对根问题
+
+`QuestionForm` 不做 argmax 硬分类。Kernel 保留完整 form belief，并线性派生 AnswerContract belief；Facets 独立多标签参与方法适用度。
+
+认知动作的比较量必须相对根问题。当前实现的控制近似：
+
+```text
+ΔV(a) = dependencyDiscount × (ExpectedRootGain + 0.65 × GatewayGain) − Cost
+U(stop) = − CurrentAnswerLoss
+U(a)    = U(stop) + ΔV(a)
+```
+
+`ExpectedRootGain` / `GatewayGain` 是控制层估计，不是对象层置信度。gateway question 即使一步信息增量小，只要能打开后续高价值动作，仍可被选中。
+
+Stop 与其它动作处于同一比较空间；`U(stop) ≥ max U(a)` 或预算耗尽时停止。Synthesis 也是 CognitiveAction，不拥有特殊终止权。
+
+## SPHINX-008：概率只接受合格数值证据
+
+正式 Bayesian posterior 只有同时满足下列条件才存在：
+
+1. 至少两个显式 Hypothesis；
+2. Evidence 明示 `numericQualified = true`；
+3. likelihood 覆盖全部 hypothesis key；
+4. 每个 likelihood 为有限 `[0,1]` 数；
+5. Evidence 有明确 `DependencyKey`。
+
+同一 `DependencyKey` 的多个 Evidence 不得按独立因子重复相乘。Kernel 先过滤不合格 Evidence，再在每个依赖组内选一个规范代表进入 likelihood product；不合格同源记录不得遮住合格记录。无合格因子 → `Bayesian = None`，不得用 LLM 猜测补 posterior；Judgment/Credence 答案必须显式携带 `numeric-credence-unqualified`。
+
+## SPHINX-009：经典算法是可验证退化求解器
+
+Sphinx ontology 不等于 A* / Bayes / MCTS；但约束收紧时必须能得到标准算法行为。
+
+- A*：确定图、非负 cost、固定 goal/heuristic → 按 `g+h` 展开，维护 best-g；closed 节点发现更低 g 时 reopen。
+- Bayes：固定 hypotheses、关闭生成、只吸收合格 likelihood evidence → 标准归一化 posterior。
+- MCTS：给定可展开模型与 terminal reward → selection / expansion / rollout / backup；同 semantic node key 共享统计，即 graph-MCTS transposition。
+
+这些 solver 不得把自身缓存、visit count、frontier 或 heuristic 冒充认识证据。
+
+## SPHINX-010：等价约简与方法库不偷换 ontology
+
+动作只有两种情况允许进入同一表示等价类：
+
+1. 上游显式给出 `EquivalenceKey`；或
+2. semantic key 与 dependency key 同时相同。
+
+相同问题若来自不同独立 dependency group，不得判重。等价类内仅当候选在 ExpectedRootGain、GatewayGain、value、provenance 均不差且 cost 不高，并至少一维严格更优时才支配另一候选；不可比较者保留 Pareto frontier。
+
+方法库是 generator library，不是流水线：Kernel 根据完整 QuestionForm belief + Facets 激活多个方法，再 yield 让语义 oracle 生成具体候选问题。核心五方法仍为 Multidisciplinary / Abduction / Analogy / Counterexample / Synthesis；扩展库包含 CausalMechanism、BaseRate、Dialectic、Falsification、BoundarySearch、SourceTriangulation、MeasurementCritique、OntologyRepair、UnknownExpansion、ScaleShift、ExperimentDesign。新增方法不得获得调度权。

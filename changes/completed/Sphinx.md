@@ -1,3 +1,6 @@
+> 本文件是历史变更记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
+
 # Sphinx — Generative Epistemic State Solver
 生成式认识状态求解器
 
@@ -1282,3 +1285,51 @@ Phase 0 Sphinx 已落地：正交 Node MCP（handle 有状态 co-yield）+ 万�
 - `docs/what/sphinx.md`、`docs/what/agent.md`（AGENT-028）
 - `src/sphinx/mcp-server.js`、`src/Wanxiangshu/Kernel/SphinxMcp.fs`
 - `tests/unit/sphinx/`、`tests/unit/agent/sphinx-mcp.test.mjs`
+
+## Corrective outcome — 2026-08-12
+
+用户明确判定上一次完成“十分草率，很多语义漂移”，并要求以仓库标准 F# → Fable JS 全部重写。上方 Original proposal 与旧 Active/Final 记录保留用于审计；旧 Final outcome 的完成声明已被本节取代，不能再解释当前实现。
+
+**Scope correction**
+
+- 旧 Active work 自行把批准范围收窄为 Phase 0，并把 Phase 1–5 标成 Out of scope；该收窄没有用户授权，违反 Change 生命周期合同。
+- 修复以 Original proposal 的认识论不变量为准：History ≠ State、Proposal ≠ Evidence、No Free Information、root-relative value、global closure、solver degeneration、dependency-aware equivalence。
+- 正式规范扩为 `SPHINX-001`…`010`；当前产品语义只读 `docs/{why,what,shape,how,proof}/sphinx.md`。
+
+**Semantic corrections**
+
+- 删除 `evidenceMass` 伪置信度；SemanticAssessment / Candidates / Synthesis 不再增加世界证据。
+- Candidate 恢复为“待调查认知动作”，必须经 Kernel 选择并 `InvestigateRequest` 后才能产生 Finding/Evidence。
+- QuestionForm 保留概率分布；RootContract 不再靠 primary argmax 偷换不确定性。
+- Evidence 强制 Source + DependencyKey；同依赖组不按独立因子重复计数。
+- Bayesian posterior 仅接受完整、有限 `[0,1]` likelihood 且 `numericQualified=true` 的 Evidence；否则无数值 posterior。
+- root-relative policy 纳入 GatewayGain；Stop 与 Investigate/Synthesis 位于同一 utility 比较空间。
+- 表示约简只接受显式 EquivalenceKey 或 semantic+dependency 同一；独立来源的同问题不得误判重；类内保留真实 Pareto frontier。
+- A* 改为标准 `g+h + bestG + reopen`；MCTS 改为 selection/expansion/rollout/backup + semantic transposition；两者均是 solver embedding，不是 ontology。
+
+**Implementation correction**
+
+- 生产源迁至 `src/Wanxiangshu/Sphinx/*.fs`，namespace = `Wanxiangshu.Sphinx.*`。
+- Sphinx 加入 `Wanxiangshu.fsproj`，统一由 Fable 输出 `dist/Sphinx/*.js`。
+- 生产 MCP 入口改为 `dist/Sphinx/McpServer.js`；`scripts/build.mjs` 不再复制平行 JS 源。
+- raw JS 只停在 `Sphinx/Codec.fs`；MCP SDK / zod 只停在 `Sphinx/McpServer.fs`；handle 可变索引只停在 `Sphinx/Session.fs`。
+- Host 仍只拥有 `SphinxMcp` identity / `SphinxMcpConfig` launch / `ToolPermission.Sphinx`；Inquiry 独占 `sphinx_*`。
+
+**Proof correction**
+
+- Sphinx unit 改为验证认识语义，而非验证 helper 名存在：control≠evidence、pending-request gate、closure idempotence、gateway value、qualified Bayes、dependency conservation、strict A* reopen、graph-MCTS、dependency-aware Pareto、真实 co-yield。
+- 代表测试：`tests/unit/sphinx/*.test.mjs`、`tests/unit/agent/sphinx-mcp.test.mjs`。
+
+**Verification**
+
+- `npm run build`：OK。
+- `node --test tests/unit/sphinx/*.test.mjs`：26 pass。
+- 其余仓库标准门禁以本次 corrective commit 的实际运行结果为准。
+
+**References**
+
+- `src/Wanxiangshu/Sphinx/`
+- `docs/what/sphinx.md`、`docs/shape/sphinx.md`、`docs/how/sphinx.md`、`docs/proof/sphinx.md`、`docs/why/sphinx.md`
+- `src/Wanxiangshu/Kernel/SphinxMcp.fs`
+- `src/Wanxiangshu/Infrastructure/OpenCode/Host/SphinxMcpConfig.fs`
+- `tests/unit/sphinx/`

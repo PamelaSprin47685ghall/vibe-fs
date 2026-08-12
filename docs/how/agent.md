@@ -58,7 +58,7 @@
 
 1. `applyOwnedFields` 入口调用 `SphinxMcpConfig.apply`。Ok / Error 都走该函数，fail-closed。
 2. 启动判定：`SPHINX_MCP_DISABLED` → disabled；`SPHINX_MCP_FIXTURE` 非空 → `node <fixture>`；
-   `WANXIANGSHU_TEST` 且无 fixture → disabled；否则 `node <packageRoot>/dist/sphinx/mcp-server.js`。
+   `WANXIANGSHU_TEST` 且无 fixture → disabled；否则 `node <packageRoot>/dist/Sphinx/McpServer.js`。
 3. 只覆盖 `config.mcp.sphinx`；其它 MCP 条目不动。
 4. 不注册 ToolRegistry spec，不生成 `js-*` 成员。
 

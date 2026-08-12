@@ -2,84 +2,109 @@
 
 行为：`what/sphinx.md`。边界：`shape/sphinx.md`。算法：`how/sphinx.md`。Host：AGENT-030。
 
-## Phase 0 内核
+## Kernel / co-yield
 
 | 证明 | 期望 | 条款 |
-|------|------|------|
-| start → handle | 返回必含 handle；无 handle 不可续作 | SPHINX-002、003 |
-| 首步 SemanticAssessment | start 后首次非 error 为 yield + SemanticAssessmentRequest | SPHINX-003、004 |
-| resume 缺/未知 handle | status=error；不创建隐式新会话 | SPHINX-002、003 |
-| absorb → Closure → fixed point | 每次 observation 后达 fixed point 才再 yield/answer | SPHINX-001、004 |
-| novelty / dominance | semantic-key 去重；simple dominance 可替换代表元 | SPHINX-004 |
-| Stop as action | V_stop 最优 → answered；Canonical Answer 由 Kernel 写 | SPHINX-001、004 |
-| 方法库 V1 | 仅 Multidisciplinary/Abduction/Analogy/Counterexample/Synthesis | SPHINX-004 |
-| 无 A*/Bayes/MCTS 本体 | Phase 0 路径不依赖完整搜索/概率图/MCTS 模块 | SPHINX-004 |
+|---|---|---|
+| start 首步 | `yield + SemanticAssessmentRequest` | SPHINX-001、003 |
+| RootContract 不坍缩 | Why/How 混合输入同时保留 Explanation/Plan 质量 | SPHINX-007 |
+| control ≠ evidence | SemanticAssessment / Candidates 后 Evidence、Findings 仍为空 | SPHINX-006 |
+| candidate 必调查 | Candidates 后 Kernel 选 `InvestigateRequest`，不把候选当答案 | SPHINX-006、007 |
+| pending request gate | 错 Observation type / action id → error；Revision 不变 | SPHINX-003 |
+| fixed point | `close(close(S)) = close(S)` | SPHINX-004 |
+| gateway value | low immediate gain + high GatewayGain 仍可被选中 | SPHINX-007 |
+| synthesis 守恒 | Synthesis 前后 Evidence.Count 不变 | SPHINX-006 |
+| ungrounded finding | 保留 claim，但 answer 显式 `ungrounded-finding:<key>`；wire confidence 不进入权威状态 | SPHINX-004、006 |
 
-## Phase 1 搜索
+代表测试：`tests/unit/sphinx/kernel.test.mjs`、`tests/unit/sphinx/semantics.test.mjs`。
 
-| 证明 | 期望 | 模块 |
-|------|------|------|
-| PriorityQueue | max/min 堆按 comparator 稳定出队 | `search.js` |
-| bestG + reopen | 更优 path cost 重开 closed 节点 | `search.js` |
-| belief reopen | evidenceMass 跳变 > ε 清空 closed | `closure.js` |
-| graph A* 退化 | `graphAstarExpandOrder` 按 g+h 展开 | `search.js` |
-| anytime answer | yield 含 `bestAnswer`（stopReason=anytime） | `inquire.js` / `answer.js` |
-| ExpandFrontierRequest | explore budget 内定向展开 frontier head | `inquire.js` |
+## Handle / MCP
 
-代表测试：`tests/unit/sphinx/search.test.mjs`。
+| 证明 | 期望 | 条款 |
+|---|---|---|
+| opaque handle | UUID 形态；同 handle 续作 | SPHINX-002 |
+| missing / unknown | error；不建隐式会话 | SPHINX-002 |
+| full co-yield | start → assess → candidates → investigate → synthesize → answered | SPHINX-001..004 |
+| Canonical basis | answer 分列 finding/evidence；synthesis 只引用 finding key | SPHINX-004、006 |
+| MCP surface | `_registeredTools` 恰好 `start`,`resume` | SPHINX-003 |
 
-## Phase 2 概率
+代表测试：`tests/unit/sphinx/mcp-handle.test.mjs`。
 
-| 证明 | 期望 | 模块 |
-|------|------|------|
-| posterior 更新 | supports/refutes 后 posterior 归一 | `bayes.js` |
-| frozen Bayes | `frozenBayesianInference` 纯推断退化 | `bayes.js` |
-| Closure 集成 | `syncBayesianBelief` 写入 `B.belief` | `closure.js` |
-| EVI | `expectedValueOfInformation` 影响 `actionValue` | `value.js` |
+## Bayesian qualification / dependency
+
+| 证明 | 期望 | 条款 |
+|---|---|---|
+| qualification gate | `numericQualified=false` 即使带 likelihood 也不产生 Bayesian | SPHINX-008 |
+| qualified posterior | 0.5/0.5 prior × 0.7/0.3 likelihood → 0.7/0.3 posterior | SPHINX-008、009 |
+| dependency conservation | 同 DependencyKey 两条 likelihood 不重复相乘 | SPHINX-006、008 |
+| qualification before grouping | 同依赖组不合格记录不得遮住后续合格 likelihood | SPHINX-008 |
 
 代表测试：`tests/unit/sphinx/bayes.test.mjs`。
 
-## Phase 3 MCTS
+## Strict graph A*
 
-| 证明 | 期望 | 模块 |
-|------|------|------|
-| UCT 退化 | 高 reward 节点最终被选中 | `mcts.js` |
-| visit backup | `backupMctsValue` 累积 visits/valueSum | `mcts.js` |
-| transposition | Closure 后 `mcts.transpositions >= 1` | `mcts.js` |
+| 证明 | 期望 | 条款 |
+|---|---|---|
+| g+h | 固定 graph 得到最短路径 | SPHINX-009 |
+| reopen | admissible-but-inconsistent heuristic 下更低 g 重开 closed node | SPHINX-009 |
+| nonnegative precondition | negative edge → reject | SPHINX-009 |
+
+代表测试：`tests/unit/sphinx/search.test.mjs`。
+
+## Graph-MCTS
+
+| 证明 | 期望 | 条款 |
+|---|---|---|
+| selection/rollout/backup | 多轮后高 terminal reward branch 胜出 | SPHINX-009 |
+| transposition | 两 parent 指向同 semantic key，共享 visit stats | SPHINX-009 |
+| unvisited UCT | unvisited node = +∞ exploration | SPHINX-009 |
 
 代表测试：`tests/unit/sphinx/mcts.test.mjs`。
 
-## Phase 4 表示优化
+## Representation equivalence
 
-| 证明 | 期望 | 模块 |
-|------|------|------|
-| Pareto 代表 | 等价类内保留非支配代表元 | `represent.js` |
-| pivot | `optimizeRepresentation` 写 `represent.pivots` | `represent.js` |
+| 证明 | 期望 | 条款 |
+|---|---|---|
+| dominance | 显式同 EquivalenceKey 且一方逐维支配 → 淘汰弱代表 | SPHINX-010 |
+| dependency separation | 同 semantic question + 不同 dependency → 两动作均保留 | SPHINX-010 |
+| Pareto frontier | 高收益高成本 vs 低收益低成本不可比较 → 两者均保留 | SPHINX-010 |
 
 代表测试：`tests/unit/sphinx/represent.test.mjs`。
 
-## Phase 5 方法库
+## Methodology
 
-| 证明 | 期望 | 模块 |
-|------|------|------|
-| V1 不变 | `METHODS` 仍恰好五方法 | `rules.js` |
-| V2 扩展 | `EXTENDED_METHODS` 生成候选 | `rules.js` |
+| 证明 | 期望 | 条款 |
+|---|---|---|
+| 核心五方法 | Phase-0 core names 保持五个 | SPHINX-010 |
+| 扩展库 | CausalMechanism / BaseRate / Falsification / SourceTriangulation / OntologyRepair 等存在 | SPHINX-010 |
+| 多方法激活 | Why+causal/explanatory 同时触发多个 generator | SPHINX-007、010 |
+| predictive Polar | BaseRate + Falsification + Counterexample 可同时激活 | SPHINX-007、010 |
 
 代表测试：`tests/unit/sphinx/methodology.test.mjs`。
 
-## 正交与 Host
+## F# / Host 边界
 
 | 证明 | 期望 | 条款 |
-|------|------|------|
-| Sphinx 不依赖万象术 domain | `src/sphinx` 无万象术 domain import | SPHINX-005 |
-| 万象术不内嵌闭包 | Host/Kernel 无 EpistemicState Closure 副本 | SPHINX-005、AGENT-030 |
-| config 注入 | `configureFromHostConfig` 写入 `mcp.sphinx`；不删其它 MCP | AGENT-030 |
-| 启动判定 | disabled / fixture / test / 生产 node 入口四分支确定性 | AGENT-030 |
-| Inquiry allow | Inquiry allow `sphinx_*`；其它 managed role deny | AGENT-006、030 |
-| 不进 ToolRegistry / js-* | plugin tool 注册表无 sphinx 名 | AGENT-030、SPHINX-005 |
-| AGENT-027 不变 | Semble 路径仍禁止新增 MCP SDK；Sphinx 路径可用 | AGENT-027、SPHINX-005 |
+|---|---|---|
+| Fable source | Sphinx 生产源只在 `src/Wanxiangshu/Sphinx/*.fs` | SPHINX-005 |
+| production entry | `dist/Sphinx/McpServer.js` | SPHINX-005、AGENT-030 |
+| build | `scripts/build.mjs` 不 copy `src/sphinx` | SPHINX-005 |
+| Host config | `config.mcp.sphinx.command = node <packageRoot>/dist/Sphinx/McpServer.js` | AGENT-030 |
+| permission | 仅 Inquiry allow `sphinx_*` | AGENT-006、AGENT-030 |
+| registry | 不进 ToolRegistry / `js-*` | SPHINX-005、AGENT-030 |
+| SDK boundary | MCP SDK / zod 仅 Sphinx McpServer；Semble 仍受 AGENT-027 | SPHINX-005 |
 
-代表测试（落地后）：`tests/unit/sphinx/*.test.mjs`（闭包、handle、start→resume→answer）、
-`tests/unit/agent/sphinx-mcp.test.mjs`（注入 / disabled / fixture / Inquiry allow）；
-可选 fixture：`tests/unit/support/sphinx-mcp-fixture.js`。
-门禁：`node scripts/checks/spec.mjs` 识别 `SPHINX-`。
+代表测试：`tests/unit/agent/sphinx-mcp.test.mjs`、`tests/unit/agent/inquiry-permissions.test.mjs`、plugin/integration permission contract。
+
+## 标准门禁
+
+```text
+npm run build
+node --test tests/unit/sphinx/*.test.mjs
+node scripts/checks/spec.mjs
+npm run format:check
+npm test
+npm run test:integration
+```
+
+完成声明以标准门禁实际结果为准；一次性脚本或手工 transcript 不构成 proof。

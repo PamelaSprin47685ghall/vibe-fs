@@ -1,53 +1,61 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  backupMctsValue,
-  degenerateMctsSelection,
-  selectMctsNode,
-  syncMcts,
-  createEpistemicState,
-  closure,
-} from '../../../src/sphinx/kernel/index.js'
 
-test('mcts_uct_prefers_higher_reward_after_rollouts', () => {
-  const selected = degenerateMctsSelection(
-    [
-      { id: 'weak', semanticKey: 'weak' },
-      { id: 'strong', semanticKey: 'strong' },
-    ],
-    { weak: 0.1, strong: 0.95 },
-    24,
+import { ofArray as listOfArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
+import { ofArray as mapOfArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Map.js'
+import { Model, run, uct } from '../../../dist/Sphinx/MonteCarlo.js'
+import { MonteCarloNode } from '../../../dist/Sphinx/RuntimeTypes.js'
+
+const comparer = { Compare: (a, b) => a.localeCompare(b) }
+const map = (entries) => mapOfArray(entries, comparer)
+const childMap = (entries) => map(entries.map(([key, children]) => [key, listOfArray(children)]))
+
+test('mcts_selection_expansion_rollout_backup_prefers_high_value_branch', () => {
+  const model = new Model(
+    'root',
+    childMap([
+      ['root', ['weak', 'strong']],
+      ['weak', ['weak-terminal']],
+      ['strong', ['strong-terminal']],
+    ]),
+    map([
+      ['weak-terminal', 0.1],
+      ['strong-terminal', 0.95],
+    ]),
+    map([
+      ['weak', 0.5],
+      ['strong', 0.5],
+    ]),
   )
-  assert.equal(selected.semanticKey, 'strong')
+
+  const result = run(40, model)
+  assert.equal(result.BestAction, 'strong')
+  assert.equal(result.Iterations, 40)
 })
 
-test('backup_mcts_value_accumulates_visits', () => {
-  let state = createEpistemicState('mcts?')
-  state = backupMctsValue(state, 'node:a', 0.8)
-  state = backupMctsValue(state, 'node:a', 0.6)
-  assert.equal(state.mcts.nodes['node:a'].visits, 2)
-  assert.ok(state.mcts.nodes['node:a'].valueSum > 1.3)
+test('graph_mcts_shares_transposition_statistics_by_semantic_node_key', () => {
+  const model = new Model(
+    'root',
+    childMap([
+      ['root', ['a', 'b']],
+      ['a', ['shared']],
+      ['b', ['shared']],
+    ]),
+    map([['shared', 0.8]]),
+    map([
+      ['a', 0.5],
+      ['b', 0.5],
+      ['shared', 0.8],
+    ]),
+  )
+
+  const result = run(20, model)
+  const shared = result.Nodes.get('shared')
+  assert.ok(shared.Visits > 1)
+  assert.ok(result.Nodes.size <= 4)
 })
 
-test('sync_mcts_attaches_transposition_nodes_in_closure', () => {
-  let state = createEpistemicState('rollout?')
-  state = closure(
-    state,
-    {
-      type: 'SemanticAssessment',
-      forms: { Why: 1 },
-      facets: { explanatory: 1 },
-    },
-    { exogenous: true },
-  )
-  state = closure(
-    state,
-    {
-      type: 'Candidates',
-      items: [{ method: 'Abduction', text: 'x', semanticKey: 'abd:x' }],
-    },
-    { exogenous: true },
-  )
-  assert.ok(state.mcts.transpositions >= 1)
-  assert.ok(selectMctsNode(state))
+test('uct_for_unvisited_node_is_infinite', () => {
+  const node = new MonteCarloNode('new', 0, 0, 0.5)
+  assert.equal(uct(10, Math.SQRT2, node), Number.POSITIVE_INFINITY)
 })

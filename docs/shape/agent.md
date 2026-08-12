@@ -94,7 +94,7 @@ Inquiry 正式工具面 = SyncDelegate `inspect` + Host MCP `sphinx_*`。所有�
 2. Epistemic style 只属于 Inquiry system prompt / prompt ownership，**不是** LearningState、QA、
    Compile、RequestKind 或 final `return` 协议；禁止为 Inquiry 新造 Student 式双门 profile。
 3. 不得把 `meditator`/`student`/`teacher` 旧名 alias 到 Inquiry（AGENT-004）。
-4. Sphinx 认识状态 / Closure / Canonical Answer 的 writer 在 `src/sphinx`（SPHINX-005）；
+4. Sphinx 认识状态 / Closure / Canonical Answer 的 writer 在 `src/Wanxiangshu/Sphinx`（SPHINX-005）；
    万象术只写 identity / launch / permission。
 
 ## Persona Registry 所有权（见 AGENT-028）
@@ -125,7 +125,7 @@ Bookkeeper Persona（Clerk/Curator）同表，仍为 InternalLeaf（AGENT-002/00
 | 服务器名 / 工具前缀 `sphinx_` / 生产 node 入口 / `isTool` | `Kernel/SphinxMcp` identity | env、Host 对象、Sphinx 闭包副本 |
 | 启动判定（disabled / fixture / test / 生产）+ `config.mcp.sphinx` 写入 | `SphinxMcpConfig` ← `ManagedAgentConfig.applyOwnedFields` | agent permission 矩阵 |
 | Host schema `sphinx_*` allow/deny | `StaticTools.permissionObj` ← `ToolPermission.Sphinx` | 第二套 role→MCP 表 |
-| EpistemicState / Closure / Canonical Answer | `src/sphinx` Inquiry Kernel | 万象术 domain、Inquiry prompt |
+| EpistemicState / Closure / Canonical Answer | `src/Wanxiangshu/Sphinx` F# Kernel | 万象术 domain、Inquiry prompt |
 
 禁止第二处注入 `mcp.sphinx`。禁止把 MCP 工具名写进 `Roles.permissions` 字符串集；域能力只留 `ToolPermission.Sphinx`。禁止万象术内嵌闭包逻辑。
 
