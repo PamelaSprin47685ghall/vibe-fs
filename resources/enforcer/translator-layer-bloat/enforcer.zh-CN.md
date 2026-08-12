@@ -1,31 +1,38 @@
-# translator-layer-bloat — Enforcer
+# translator-layer-bloat — Enforcer 中文版
 
-Translator-layer bloat 的问题，是一个 broker/manager/coordinator/adapter/facade 让调用多走一跳，却**没有改变 knowledge、representation、authority、lifecycle 或 failure contract**。
+## 定义
+中间层不是因为“薄”就有罪。真正的 translator-layer bloat 是：caller 每跨一层，都没有获得新的语义保证、表示转换、authority 限制、failure isolation 或 lifecycle ownership，只是多了一次转发和一次改名。
 
-一层 abstraction 值得存在，是因为跨过去以后有些事情真的不同：external ID 被映成 domain ID、wire error 变 typed error、authorization 被收紧、transaction/lifetime 被拥有、batching/backpressure 被建立、bounded context 被隔离。
+一个 layer 必须改变“跨过去以后可以相信什么”。如果去掉它，两个邻居直接相连，所有 invariant 完全不变，那么这层不是 abstraction，只是距离。
 
-如果所谓 layer 只是：
+## 何时触发
+- `Manager -> Service -> Coordinator -> Adapter` 方法一一对应、DTO 一样；
+- 中间对象只把 `foo(x)` 转成 `inner.foo(x)`；
+- 每一层都有 interface/mock/test，却没有独立 contract；
+- generic orchestration noun 很多，但问“这层独有地保护什么”没人能回答；
+- stack trace、debug、修改路径被 forwarding hops 拉长，却没有 information hiding。
 
-```text
-A.doX(dto) → B.doX(dto)
-A.getY(id) → B.getY(id)
-```
+## 不要误判
+- anti-corruption layer 真正转换 domain language / IDs / units / errors；
+- adapter 隔离 third-party failure/lifetime；
+- authorization/capability narrowing 在这一层发生；
+- transaction、batching、cache consistency、protocol framing 等 invariant 由它独占；
+- generated stub 就是实际 wire contract，不应为“少一层”而手写替代。
 
-同样 DTO、同样语义、同样失败、没有 invariant，那么它只增加了一个名字、文件、stack frame、test double 和搜索位置。Indirection 没有 information hiding，就是距离。
+## 刀口
+把这层从白板上擦掉。**有什么事实会因此失去 owner？有什么错误会因此无法被隔离？有什么 representation 会直接泄漏？**
 
-以下情形触发：
+答案是“没有，只是 caller 少调一个方法”，删它。
 
-- `Manager`/`Coordinator` 每个 method 逐字转发给 `Service`；
-- 两套 DTO 字段 1:1 copy，连 semantic name 都没变；
-- adapter 不做 validation/normalization/error mapping，只重新包装 call；
-- layer 唯一理由是“architecture 应该有 service/repository/facade”；
-- 每次真实 change 都必须穿过 layer，但 layer 从不作任何独立决定；
-- test/mock 数量因为空 hop 增加，却没有新增可证明 contract。
+## 与近邻区分
+`facade-hides-mess` 是漂亮 surface 掩盖内部坏 ownership；`translator-layer-bloat` 可以发生在内部本来就不乱，只是多了无意义转发。
 
-不要误杀真正薄 adapter。Boundary 可以很薄，只要它拥有真实差异，例如 protocol translation、anti-corruption、auth、resource lifetime、retry/failure isolation。价值不按行数衡量。
+`framework-tax` 是框架整体带来的 ceremony；这里聚焦于一个不改变语义的 hop。
 
-与 `facade-hides-mess` 区分：facade 可能确实给 caller 一个干净 surface，但下面 ownership 仍烂；translator bloat 则是中间 hop 自己没有 semantic job。与 `framework-tax` 区分：后者是框架 ceremony 主导 architecture；本规则可以完全没有 framework。
+## 例子
+- 正例：`UserManager.get()` 只调用 `UserService.get()`，后者只调用 `UserRepository.get()`，前两层无 policy。
+- 近邻：adapter 把 provider `string status + error prose` 转成 domain union。
+- 反例：删一层后 authorization check 会消失——那层确实有 contract，应该留下并按 invariant 命名。
 
-诊断问题：**把这一层删掉，让两边直接相连，会丢失哪条 invariant 或哪种知识变化？** 如果答不出，layer 没有赚回它的认知税。
-
-> Layer 不是因为“层次感”存在。每一次跨层，都应该让某种知识、权力或 failure semantics 发生真实变化。
+## 提醒
+抽象的价值不是“看起来有层次”，而是让某些知识在边界另一侧变得不必知道。

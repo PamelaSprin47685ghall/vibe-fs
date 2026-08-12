@@ -1,24 +1,34 @@
-# impure-core — Enforcer
+# impure-core — Enforcer 中文版
 
-Impure core 的问题，不是“business code 里不能 I/O”这种洁癖，而是 policy 在作决定时自己向外抓 time、randomness、DB、network、env、file、global state，于是**真实 inputs 比函数签名多**。
+## 定义
+Core 不纯，不是“函数有 side effect”这么机械。真正的病灶是：**policy 在作决定的同时，偷偷向外界索取决定所需的事实**，导致 signature 没有诚实列出它的输入。
 
-表面上 `decide(state, command)`，实际上结果还依赖：现在几点、DB 此刻返回什么、env 怎么设、某 file 是否存在、global cache 里有什么。相同 visible arguments 因此不再代表相同 decision；replay、audit、local reasoning 都必须重新把整个世界叫回来。
+如果相同显式参数在不同时间、不同机器、不同环境变量、不同 DB 内容下得到不同 business decision，那么函数的真实输入集合比类型签名更大。隐藏 dependency 让 replay、测试和因果解释一起失真。
 
-以下情形触发：
+## 何时触发
+- domain rule 内部直接 `now()`、random、读 env、查 DB、HTTP、filesystem；
+- policy 读取 mutable singleton / process global 决定业务结果；
+- test 必须 monkey-patch ambient world 才能让 core 可控；
+- 一次 domain decision 中“观察世界”和“解释事实”混成一个不可拆函数。
 
-- domain decision 内部查 DB 才决定 eligibility；
-- policy 直接读 clock/RNG/env/global singleton；
-- validation 同时发 network request，再根据 response 决定 rule；
-- event fold/reducer 读取 filesystem/provider；
-- incident 无法从 recorded inputs 重放，因为某个 decision fact 当时只存在外部世界；
-- unit test 必须 mock 半个 runtime，才能调用一个本该只是业务判断的函数。
+## 不要误判
+- shell/adapter 的职责本来就是观察外界，然后把事实交给 core；
+- logging/metrics 只观察已完成的结果、不会反过来改变决定；
+- core 收到明确 port 但 port 本质仍是“去外面查事实”，需要结合语义判断；不是见 interface 就自动纯；
+- 有些 policy 的业务语义确实要求多次实时观察，此时可显式注入 clock/query capability，而不是假装输入不存在。
 
-不要误杀 shell/adapter。它们的职责本来就是观察世界、执行 effects。Healthy architecture 不是“整个程序纯”，而是把 observation 与 judgment 分清：shell 读取外部 fact，core 根据 supplied facts 决定，shell 再执行 command/effect。
+## 刀口
+问：**要完整解释这个决定，除了函数参数，我还需要说“当时数据库/时钟/env/网络刚好是什么”吗？**
 
-Logging/metrics 若只观察已完成 decision、不会反向改变结果，也不一定污染 core semantics。真正标准是：外部 effect/fact 是否参与了 business conclusion。
+如果需要，而这些事实没有成为显式输入或明确 effect boundary，core 在隐瞒自己的 premise。
 
-与 `time-source-in-logic` / `random-source-in-logic` 区分：后两条是更具体的 hidden input；若问题只是一种 source，用具体规则更锋利。`mixed-side-effect-boundaries` 则关注一个 imperative owner 同时承担多种 external world 的 failure/lifetime contract；core 即使不复杂，只要 policy 自己抓外界 fact，本规则仍成立。
+## 与近邻区分
+`time-source-in-logic`、`random-source-in-logic` 是特定隐藏输入；`mixed-side-effect-boundaries` 是多个 effect law 缠在同一 owner。这里更根本：policy 自己承担了 observation。
 
-一个决定性问题：**为了完全解释这次 decision，需要列出哪些 inputs？** 如果其中有函数签名/recorded event 中看不到的 ambient observation，core 正在隐瞒自己的因果前提。
+## 例子
+- 正例：`isEligible(user)` 内部读当前时间和 feature flag service。
+- 近邻：shell 读取 `asOf` 与 `FeaturePolicy` snapshot，再调用 `isEligible(user, asOf, policy)`。
+- 反例：domain function 发 metrics 记录已算出的 verdict，但 metrics 成败不影响 verdict。
 
-> Pure core 的价值不是数学洁癖，而是让“为什么得出这个结论”只需要看显式事实，而不需要重演当时整个宇宙。
+## 提醒
+纯 core 的价值不是宗教洁癖，而是**让决定的理由可以被列举、保存、重放和反驳**。

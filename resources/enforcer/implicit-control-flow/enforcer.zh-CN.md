@@ -1,23 +1,37 @@
-# implicit-control-flow — Enforcer
+# implicit-control-flow — Enforcer 中文版
 
-Implicit control flow 的病，是系统 correctness 依赖一条 **happens-before** 关系，但这条关系只活在 registration order、hook phase、import side effect、startup convention、global initialization 或 framework folklore 里。
+## 定义
+控制流隐式化，不是因为“用了 callback/hook”。真正的问题是：正确性依赖某个 happens-before，而源码没有一个清楚的 owner 把这条因果关系表达出来。
 
-代码里看得见参与者，却看不见让它们正确的时间关系。于是每个 component 本地都可能完全合法，组合起来仍然错：A 必须先于 B、seal 必须最后、listener 必须在 event 前注册、cleanup 必须在 publication 后，但没有一个结构真正拥有这些 causal edges。
+注册顺序、import side effect、framework lifecycle、global startup phase、observer priority 都可能承载时序。但如果读者必须靠框架 folklore 才知道“为什么 B 一定在 A 之后”，系统其实把 protocol 藏进 ambient environment 里了。
 
-以下情形触发：
+## 何时触发
+- hook 必须按某个 registration order 才正确，却没有显式 ordering contract；
+- import 某 module 会偷偷注册行为，漏 import 就静默少一步；
+- startup/dispose 次序靠“目前文件加载顺序刚好如此”；
+- callback chain 中一个 side effect 必须在另一个前完成，但 relation 无类型、无状态、无显式 composition；
+- framework phase 改变后，业务正确性跟着悄悄变化。
 
-- “这个 hook 必须比那个先注册”只写在 comment；
-- import 某 module 的副作用决定 runtime initialization；
-- callback 顺序取决于 framework 遍历 registry 的偶然 order；
-- startup 需要按特定 module 顺序执行，否则出现 partial state；
-- 两个 independently valid event 的 arrival order 被假定为业务 causal order；
-- 一个 middleware/transform 只有放在数组某个位置才正确，却没有 typed/composed contract；
-- new participant 插入后，旧 order 约束静默失效。
+## 不要误判
+- framework lifecycle 本身就是稳定、文档化且启动时机械校验的 contract；
+- 普通高阶函数的 caller 明确传入 continuation，顺序一眼可见；
+- event-driven system 不必强行改成 imperative，只要真正重要的 causal edge 被明确建模；
+- 没有 correctness dependency 的 observer 顺序无需人为固定。
 
-不要误杀所有 framework lifecycle。若 runtime order 是稳定 public contract、代码显式建模 phase，并且 misuse 能在 build/startup 时 fail closed，happens-before 已经有 owner。Ordinary higher-order callback 若 call site 明确写出谁先谁后，也不隐式。
+## 刀口
+问：**如果把两个 callback/hook 的执行顺序交换，业务结果会不会变？**
 
-与 `implicit-convention-magic` 区分：那条问“谁参与”被 filename/annotation/discovery 隐藏；本规则问“谁先谁后”被 ambient lifecycle 隐藏。与 `program-counter-state` 相反：那里把 sequencing 过度持久化成 state；这里 sequencing 根本没有一等表示。
+会变，就必须回答谁拥有这条 ordering law，以及源码在哪里让它成为显式事实。
 
-最锋利的问题：**如果把所有 registration/import 语句随机重排，哪一条 business invariant 会坏？** 只要答案存在，而那条 causal relation 没有被 program structure/contract 明确表达，就有 implicit control flow。
+## 与近邻区分
+`implicit-convention-magic` 主要隐藏“谁参与”；这里隐藏“谁先谁后”。
 
-> Causality 不该靠文件加载顺序碰巧成立。谁依赖谁先发生，就让这条边成为程序能看见、能验证的事实。
+`callback-pyramid` 是 sequencing 被 lexical nesting 淹没；这里即使代码很平，也可能靠 ambient lifecycle 隐藏真正时序。
+
+## 例子
+- 正例：插件 A 必须先把 request normalize，插件 B 才授权，但两个 hook 都注册在一个数组里，顺序只来自 import order。
+- 近邻：Host 明确定义 transform phase → authorize phase，并拒绝非法 phase registration。
+- 反例：两个 metrics observer 顺序无业务含义，谁先上报都一样。
+
+## 提醒
+因果关系如果重要，就应该成为程序结构；不能只存在于“大家都知道这个 hook 会先跑”的组织记忆里。

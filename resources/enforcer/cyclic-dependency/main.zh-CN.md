@@ -1,36 +1,40 @@
-# cyclic-dependency — Main
+# cyclic-dependency — Main 中文版
 
-修 cycle 时先找 ownership，不要先找“能让 compiler 通过的 indirection”。
+## 现在该做什么
+不要用更多 indirection 把环藏起来。先画出真正的 knowledge / ownership graph，找出那个被双方共同需要却没有独立 owner 的事实，再把依赖改成有向关系。
 
-把 A ↔ B 拆开问：
+常见修法只有几种：
 
-- A 真正需要 B 的哪个 fact/capability？
-- B 真正需要 A 的哪个 fact/capability？
-- 这些 crossing facts 谁应该拥有？
-- 两边共同依赖的是不是一个应独立存在的 protocol/value？
-- 或者 A/B 其实从来不是两个可独立变化的 owner？
+- 抽出独立 contract / value / protocol，让双方都依赖它，而不是互相依赖；
+- 把真正拥有决策的 policy 移回一个 owner，另一方变成 caller；
+- 若是双向 runtime communication，保留消息往返，但让 compile-time ownership 仍单向；
+- 若“互相需要”来自初始化，拆 construction 与 operation，避免半初始化对象互相续命。
 
-常见正确形状有三种：
+## 为什么这很重要
+环最贵的地方不是编译器报错，而是它把局部推理毁掉。任何一侧都必须带着另一侧的知识才能解释自己，测试需要整张图，初始化需要顺序魔法，故障会表现成“偶尔拿到空引用”“启动时序不稳定”“某个 registry 还没填完”。
 
-1. **提取独立 contract**：A、B 都依赖更稳定的 C，而 C 不依赖任一方实现；
-2. **dependency inversion**：policy owner 定义需要的 capability，effect adapter 实现；
-3. **合并假边界**：若两边共享同一 invariant/lifecycle，承认它们属于一个 aggregate，而不是继续维护形式独立。
+这些不是独立 bug，而是同一个事实：系统没有清楚回答谁先定义谁。
 
-常见假修复：
+## 分支判断
+- 如果双方共享的是一个稳定概念，抽成第三个独立 owner。
+- 如果双方都在做同一个决定，选一个 owner，另一方只提供事实或请求。
+- 如果只是 runtime 双向消息，不要为了“去环”禁止业务往返；去掉的是定义环，不是通信本身。
+- 如果环仅靠 lazy/service locator 被掩盖，先恢复显式依赖图，再修 ownership。
 
-- lazy import / service locator / global registry 把 compile cycle 变 runtime lookup；
-- 接口抽到 `common` package，但 interface 字段仍是 A/B 私有 representation；
-- 两边 constructor 先收 nullable reference，startup 后互相 backfill；
-- 用 event bus 隐藏 direct call，但 event contract 仍由发送者/接收者私下耦合；
-- 为“打破 cycle”造一个 mediator，实际它只是知道 A/B 全部 internals，转成新的 god owner；
-- 把一个真实 aggregate 硬拆成两个 package，再靠十个 callback 保持同步。
+## 常见假修复
+- 用 interface 把 A→B→A 改成 A→IB→IA；名字变了，环没变。
+- 用 global registry/service locator 延迟取对象；依赖从 compile time 逃到了 runtime。
+- 靠 initialization order、nullable placeholder、`lateinit` 让两边互相回填。
+- 把共享类型复制两份，结果两个版本继续同步演化。
+- 单纯把某个 import 移到函数内部，仍然没有改变谁定义谁。
 
-验证不能只看 `rg import` 无环。尝试独立构造/测试每个 owner：它应该只依赖自己正式声明的 contract，不需要整个 runtime graph 才有意义。Startup order 也应不再靠“先注册 A 再回填 B”。
+## 验证
+修复后应能做到：
 
-再做 change test：改变 A 内部 implementation，B 若只依赖稳定 contract 就不应跟着改；反之亦然。
+- production dependency graph 对该区域可拓扑排序；
+- 每个 owner 可在不构造其 former peer implementation 的情况下独立测试核心规则；
+- 启动正确性不依赖“先 new A，再半 new B，再回填 A”；
+- 双向业务通信若仍需要，发生在明确 contract 上，而不是通过互相暴露 internals。
 
-如果抽出 C，确认 C 真的是稳定共同语言，而不是两边 internal types 的垃圾桶。一个能被 A/B 同时依赖的第三 owner，必须比双方 implementation 更基础、更少知道它们，而不是更多。
-
-完成时 dependency graph 有可解释方向：knowledge 从 policy/contract 指向 implementation，而不是双方互相需要完整存在才能被定义。
-
-> 真正打破 cycle 的不是多一层 interface，而是终于决定“这个共同事实到底归谁”。
+## 完成条件
+一个新读者能从依赖方向直接看出谁拥有事实、谁消费事实；系统不再需要 runtime 技巧来伪造一个本不存在的依赖方向。

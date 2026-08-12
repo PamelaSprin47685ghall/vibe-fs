@@ -1,24 +1,42 @@
-# cyclic-dependency — Enforcer
+# cyclic-dependency — Enforcer 中文版
 
-Cyclic dependency 真正的问题，不是图上“有个圈不好看”，而是两个 component 互相要求对方先存在，说明**双方都需要的那个事实/协议没有独立 owner**。
+## 定义
+依赖环不是“图上出现了一个圈”这么浅。真正的病灶是：两个或更多 owner 互相需要对方先成立，结果没有任何一方能独立解释、构造或初始化自己。
 
-Dependency edge 是知识箭头：A → B 表示 A 的定义部分依赖 B。A ↔ B 就意味着两边都必须先理解对方才能完整定义自己。Runtime 可以用 lazy init、service locator、DI container、callback registry 把 physical cycle 藏起来，但 conceptual cycle 会换个地方出现：初始化顺序、nullable partial state、startup race、whole-graph test fixture、无法单独构造。
+环意味着知识主权失去方向。`A -> B` 本来是在说“A 的一部分定义建立在 B 之上”；当 B 又反过来依赖 A，系统事实上承认：关键事实没有独立 owner，只能靠双方互相借存在感。
 
-以下情形触发：
+## 何时触发
+当模块、package、service 或 runtime component 出现以下情况时触发：
 
-- package/module/project 出现 compile/import cycle；
-- service A 构造时需要 B，B 又需要 A；
-- mutual initialization 靠先塞 `None/null` 再回填；
-- event callback/registry 只是为了绕 import cycle，却仍然双方拥有彼此 policy；
-- interface 抽到第三个 package，但里面装的仍是 A/B 私有概念，cycle 只是文字消失；
-- test 一个 component 必须启动整个 graph，因为它没有独立可解释的 boundary。
+- A 必须 import / initialize B，B 又必须 import / initialize A；
+- 必须靠 lazy、service locator、全局 registry、延迟绑定才能“把环藏起来”；
+- 单独构造任一侧都缺关键事实，测试也被迫启动整张图；
+- 初始化顺序、半初始化对象、空占位符成为正确性的组成部分；
+- 某个决定看似属于 A，又看似属于 B，双方都不能在没有对方的情况下作出。
 
-不要误杀双向业务通信。两个 peer 可以通过一个双方都不拥有的 protocol/bus/contract 来回发送 message，而 compile-time/ownership dependency 仍是 acyclic。Runtime message 往返不是 architectural dependency cycle。
+## 不要误判
+以下情况不是本规则：
 
-也不要把所有 mutual domain relation 都拆成 mediator。关键是**谁拥有双方共同需要的 invariant**。有时答案是抽出独立 protocol/value；有时是承认 A/B 本来就是一个 aggregate，应合并而不是强行保持假独立。
+- 两个 domain peer 通过一个独立协议双向通信，但 compile-time ownership 仍有方向；
+- A 发 command 给 B，B 通过 event 回给 A，消息的 contract 有独立 owner；
+- lazy 仅用于性能，而依赖图本身仍是 DAG；
+- test 依赖 production subject，不等于 production 反向依赖 test；
+- 两个概念彼此相关，不等于它们必须互相定义。
 
-与 `boundary-collapse` 区分：boundary collapse 可以是单向越权，不必有 cycle；cycle 更具体地说明 knowledge ownership 无法定向。与 `implicit-control-flow` 区分：cycle 常导致 startup order 魔法，但后者关注 happens-before 隐藏。
+## 刀口
+问一句：**如果把其中一边拿走，另一边还能完整说明“我是谁、我拥有什么事实、我需要什么 contract”吗？**
 
-诊断时问：如果必须删一条 dependency edge，哪一边真正应该知道另一边？或者两边共同依赖的概念其实属于第三个独立 owner？回答不出，通常说明 architecture 还没决定 sovereignty。
+如果不能，先别研究怎么用 DI container、forward declaration 或动态 import 把环跑起来。先找那个双方争抢、又没人真正拥有的事实。
 
-> Cycle 不是“箭头画成圆了”；它是在说系统无法回答谁先定义谁，因为共同事实还没有真正主人。
+## 与近邻区分
+`boundary-collapse` 是不同 owner 越界读取彼此 internals；`cyclic-dependency` 更进一步：双方已经互相成为定义前提。
+
+`implicit-control-flow` 可能表现为“启动顺序很玄学”；若玄学背后是 A/B 必须互相先初始化，根因仍是这里。
+
+## 例子
+- 正例：`OrderService` 依赖 `PaymentService` 判断是否可下单，`PaymentService` 又依赖 `OrderService` 判断支付是否有效；两者初始化互相注入。
+- 近邻：Order 发 `ChargeRequested`，Payment 消费后发 `Charged`；事件 contract 独立存在，两者不互相 import。
+- 反例：用 service locator 把直接 import 消掉，但运行时仍必须先塞 placeholder 再回填引用——环只是换了衣服。
+
+## 提醒
+不要问“怎样让环工作”。先问“哪个事实本来应该有一个第三方 owner，或者哪条依赖方向其实写反了”。

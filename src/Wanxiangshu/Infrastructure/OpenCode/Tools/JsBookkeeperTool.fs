@@ -11,6 +11,7 @@ open Wanxiangshu.Process
 /// staged question/answer Case. The sandbox has no filesystem capability.
 module JsBookkeeperTool =
 
+    /// DSL-state-combination: physical — one sandbox invocation's staged Q/A mutation scratch; discarded or atomically committed at the transaction boundary.
     type private StagedMutation =
         { mutable Question: string option
           mutable Answer: string option

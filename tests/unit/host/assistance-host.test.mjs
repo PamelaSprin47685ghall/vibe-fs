@@ -19,11 +19,16 @@ import {
   toList,
 } from '../support/domain.mjs'
 import { TurnOutcome } from '../../../dist/Domain/ReconcileProgram.js'
-import { ReconciledTurn } from '../../../dist/Application/Reconciliation/ReconciledTurn.js'
+import {
+  ReconciledTurn,
+  ReconciledTurnContext,
+  ReconciledTurnDelivery,
+} from '../../../dist/Application/Reconciliation/ReconciledTurn.js'
 import { forJournal, Runtime__AcceptHumanRoot } from '../../../dist/Application/Prompting/PromptDispatcher.js'
 import { captureOpening, captureTerminalText } from '../../../dist/Application/Reconciliation/XTraceCapture.js'
 import * as NeedHelpSensorModule from '../../../dist/Infrastructure/OpenCode/Host/NeedHelpSensor.js'
 import * as AssistanceHostModule from '../../../dist/Infrastructure/OpenCode/Host/AssistanceHost.js'
+import * as QuiescenceModule from '../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js'
 
 const sensorMethod = (name) => {
   const prefix = `NeedHelpSensor__${name}`
@@ -37,9 +42,31 @@ const assistanceMethod = (name) => {
   if (!key) throw new Error(`AssistanceHost method ${name} not found`)
   return AssistanceHostModule[key]
 }
+const quiescenceMethod = (name) => {
+  const prefix = `SessionQuiescenceGate__${name}`
+  const key = Object.keys(QuiescenceModule).find((entry) => entry === prefix || entry.startsWith(`${prefix}_`))
+  if (!key) throw new Error(`SessionQuiescenceGate method ${name} not found`)
+  return QuiescenceModule[key]
+}
 
 const arm = sensorMethod('TryArm')
-const handleTurn = assistanceMethod('HandleTurn')
+const rawHandleTurn = assistanceMethod('HandleTurn')
+const beginAttempt = quiescenceMethod('BeginProviderAttempt')
+const observeIdle = quiescenceMethod('ObserveIdle')
+const quiescenceByHost = new WeakMap()
+const handleTurn = async (host, turn) => {
+  const observed = await rawHandleTurn(
+    host,
+    new ReconciledTurnContext(turn, undefined, ReconciledTurnDelivery.Observation),
+  )
+  if (turn.Outcome.tag !== 3) return observed
+
+  const gate = quiescenceByHost.get(host)
+  assert.ok(gate, 'assistance harness must own the quiescence gate')
+  beginAttempt(gate, turn.SessionId)
+  const permit = observeIdle(gate, turn.SessionId)
+  return rawHandleTurn(host, new ReconciledTurnContext(turn, permit, ReconciledTurnDelivery.IdleRevisit))
+}
 const recover = assistanceMethod('Recover')
 const dropSession = assistanceMethod('DropSession')
 
@@ -134,13 +161,16 @@ const withHarness = async (selectedAgent, fn) => {
     GetMessages: async (sid) => okResult(toList(snapshotRuns.get(idValue.session(sid)) ?? [])),
   }
 
+  const quiescence = new QuiescenceModule.SessionQuiescenceGate()
   const host = new AssistanceHostModule.AssistanceHost(
     sessions,
     journal,
     sensor,
     snapshotPort,
+    quiescence,
     (child) => ownedChildren.push(idValue.session(child)),
   )
+  quiescenceByHost.set(host, quiescence)
 
   const bindRun = (run, agent = selectedAgent) => {
     snapshotRuns.set(owner, [{ Id: run, Role: 'assistant', Agent: agent }])

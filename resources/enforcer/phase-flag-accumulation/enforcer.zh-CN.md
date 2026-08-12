@@ -1,22 +1,37 @@
-# phase-flag-accumulation — Enforcer
+# phase-flag-accumulation — Enforcer 中文版
 
-Phase-flag accumulation 的病，是 lifecycle bug 每来一次，就再加一个 boolean/counter 去补丁，最后一组 flag 的组合偷偷变成了没人正式命名的 state machine。
+## 定义
+Phase flag accumulation 是一种“每修一个 lifecycle bug 就加一个 boolean”的设计债。`started/waiting/retrying/done/cancelled/...` 单看都合理，组合起来却在暗中形成一个没有名字、没有 transition table 的状态机。
 
-`started / waiting / retrying / cancelled / done / hasLease` 看起来每个都简单；但六个 boolean 理论上已经允许 64 个世界。真实 lifecycle 也许只有五个。剩下几十个 combination 全是 representation 自己制造的虚构状态，之后每个 reader 都要靠条件表达式把它们重新排除。
+每增加一个独立 flag，representation 都在乘法扩张；真实 lifecycle 通常没有这么多世界。多出来的组合不是 flexibility，而是代码以后必须不断排除的虚构状态。
 
-以下情形触发：
+## 何时触发
+- lifecycle bug 修复不断新增 bool/counter；
+- 分支条件开始出现 `started && !done && retrying && hasLease`；
+- 同一“阶段”需要从多字段组合猜出来；
+- 不合法组合只能靠 assertions/comments 禁止；
+- transition 不是 `State × Event -> State`，而是到处 set/unset flags。
 
-- 新 bug 的标准修法是“再加一个 `isX`”；
-- 同一 lifecycle 需要同时检查三四个 flag 才知道当前 phase；
-- `started && done && retrying` 这类 contradiction 可被构造；
-- transition 不是 `Running → Completed`，而是 scattered assignments：`waiting=false; done=true; retrying=false`；
-- recovery 要根据 flag combination 猜 resume semantics；
-- test 大量覆盖 bit combination，而不是命名 state/transition。
+## 不要误判
+- 真正独立、可以自由组合的 feature/capability flags 没问题；
+- local temporary boolean 不承担 durable/shared lifecycle；
+- 一个显式 state union 外加与 lifecycle 无关的独立属性，不是 accumulation；
+- bitset 若语义就是独立 capabilities，也不应硬改成巨型 enum。
 
-不要误杀真正独立 predicate。`notifyEmail` 与 `notifySms`、几个独立 capability、feature preference 如果所有组合都有意义，就应该保持独立，不需要硬塞进一个 enum。问题只在多个 flag 共同回答“**我们现在处于同一个 lifecycle 的哪里**”。
+## 刀口
+把所有 flag 做 truth table。**真实 domain 允许其中多少组合？**
 
-与 `boolean-blindness` 区分：那条更广，只要 boolean 抹掉命名 domain choice 就可能触发；本规则专门针对 flags 逐年累积成隐形 automaton。与 `program-counter-state` 区分：后者把 interpreter 下一步直接存进 durable/shared state；phase flags 仍可能描述真实 lifecycle，只是 representation 失控。
+如果 representation 允许 32 个，而业务只承认 5 个，剩下 27 个世界都是模型自己发明的。
 
-判定方法最简单：把所有 meaningful flag combinations 列出来并命名。如果合法组合只占整个 boolean product 的小部分，而且每个组合其实都有 phase 名，直接建模那些 phase 更诚实。
+## 与近邻区分
+`boolean-blindness` 更一般；这里专门指一组 flags 共同回答“我们现在处于 lifecycle 的哪里”。
 
-> 如果读者必须在脑中计算几个 boolean 才知道“现在在哪”，state machine 已经存在，只是代码拒绝承认它。
+`program-counter-state` 是直接持久化“下一步代码执行到哪里”；phase flags 则用 bits 间接拼出那个位置。
+
+## 例子
+- 正例：job 有 `started/waiting/retrying/done` 四个 bool，并不断修 `done && retrying` 的 bug。
+- 近邻：`notifyEmail/notifySms` 是可自由组合用户偏好。
+- 反例：`Pending | Running of Lease | WaitingRetry of DueAt | Completed`，每个 phase 只携带对自己有意义的数据。
+
+## 提醒
+如果几个 boolean 合起来是在回答“现在在哪个阶段”，就别再加 boolean。把那个阶段直接建模。

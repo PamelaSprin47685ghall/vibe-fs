@@ -1,1 +1,3 @@
-// Migration tombstone. The provider tool is owned by ChronicleTool.fs.
+namespace Wanxiangshu.OpenCode.MigrationTombstones
+
+// Empty source-graph tombstone. Runtime ownership lives in the renamed tool module.
