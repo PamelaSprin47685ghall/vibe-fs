@@ -43,12 +43,7 @@ module CoderTool =
                             }
 
                         match!
-                            sd.InvokePrepared(
-                                context.SessionId,
-                                SyncDelegateRole.Coder,
-                                charge,
-                                prepareProviderPrompt
-                            )
+                            sd.InvokePrepared(context.SessionId, SyncDelegateRole.Coder, charge, prepareProviderPrompt)
                         with
                         | Ok workRecord ->
                             let instructions =

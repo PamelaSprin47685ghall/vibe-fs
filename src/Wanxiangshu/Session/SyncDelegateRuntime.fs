@@ -151,13 +151,13 @@ type SyncDelegateRuntime
     /// EXEC-032 composition seam: caller supplies a low-trust provider prompt
     /// producer; workflow invokes it only after single-flight admission.
     member _.InvokePrepared
-        (
-            ownerSessionKey: string,
-            role: SyncDelegateRole,
-            charge: string,
-            prepareProviderPrompt: unit -> Task<string>
-        )
-        : Task<Result<string, string>> =
+        (ownerSessionKey: string, role: SyncDelegateRole, charge: string, prepareProviderPrompt: unit -> Task<string>) : Task<
+                                                                                                                             Result<
+                                                                                                                                 string,
+                                                                                                                                 string
+                                                                                                                              >
+                                                                                                                          >
+        =
         SyncDelegateWorkflow.invoke store deps ownerSessionKey role charge prepareProviderPrompt
 
     member _.HandleTurn(turn: ReconciledTurn, permit: QuiescencePermit option) : Task<bool> =

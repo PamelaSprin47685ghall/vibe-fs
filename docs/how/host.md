@@ -502,8 +502,9 @@ message.part.delta(reasoning|thinking)
 → AbortSession
 → reconciled TurnAborted
 → assistance owner consumes arm BEFORE loop/fallback/ordinary abort
+→ Host snapshot 精确找 assistant.id = ProviderRun，并读取 message.Agent
 → fast: explicit deep NeedHelpEscalation continuation
-→ deep: consultation child → NeedHelpAdvice continuation to original deep binding
+→ deep: one hidden durable consultation handle → real deep-inquiry child → NeedHelpAdvice to exact original deep binding
 ```
 
-Sensor 不读 visible text；rolling suffix 最长只需 sentinel 长度减一。Streaming callback 不直接 SendPrompt/CreateChild。reconcile 消费 arm 后立即清理 attempt state；session drop/cancel 同样清理。Assistance continuation 使用 PromptDispatcher typed claim，但绕过 `agentForActiveCursor`，由触发 occasion 冻结的 explicit binding 决定。
+Sensor 不读 visible text；rolling suffix 最长只需 sentinel 长度减一。Streaming callback 不直接 SendPrompt/CreateChild。reconcile 消费 arm 后立即清理 attempt state；若 LoopKill 也曾 arm，则 assistance claim 同步清除 LoopKillArmed。session drop/cancel 同样清理。StrengthReplica / Companion / InternalLeaf 不进入 sensor admission。Assistance continuation 使用 PromptDispatcher typed claim，但绕过 `agentForActiveCursor`，由触发 ProviderRun 的 Host `SessionMessage.Agent` 冻结 explicit binding 决定。XTrace capture 对 reasoning 做 exact sentinel strip，控制字节不进入 Chronicle/LWR；provider transcript 本身不据此重写。

@@ -294,12 +294,12 @@ WANXIANGSHU_TEST 为真且无 fixture   → Disabled
 
 Pair Hint 鼓励 managed Work agent 在当前视角不足、需要更强推理或独立视角时尽早在 reasoning 中发出精确 `[NEEDHELP]`。这是正常协作，不是 provider failure、资源匮乏、羞辱或失败声明；provider-visible guidance 不暴露 fast/deep 内部身份。
 
-升级规则由当前 attempt 的真实 `EffectiveAgent` tier 决定：
+升级规则由触发该 `ProviderRunIdentity` 的 Host assistant message 上真实 `Agent` binding 决定；不得从 FallbackCursor、SelectedAgent 或可选 AttemptPlan 反推。这样 fast→deep continuation 后即使 fallback cursor 仍停在 fast，下一次 deep `[NEEDHELP]` 也会正确进入 consultation：
 
 - `fast-ROLE` 命中：同一 Session、LogicalRun、AuthorityRoot、CanonicalRole、Persona 与 transcript 上，用对应 `deep-ROLE` 发送 typed `NeedHelpEscalation` continuation；只改变该 assistance continuation 的 ExecutionBinding，不写 FallbackCursor。
-- `deep-ROLE` 命中：创建一个真实、独立的 Meditator consultation child。冻结求助时的 parent frontier，物化 canonical `LifecycleWorkRecord(includeOpening=true)` 作为 `CommissionerRecord`；child assignment 必须以 `如何解决这个 agent 的当前困难？` 开头。Mediator 的普通完成再物化 `LifecycleWorkRecord(includeOpening=false)`，作为 typed `NeedHelpAdvice` continuation 返回**原来的 deep binding**。
+- `deep-ROLE` 命中：创建一个真实、独立的 consultation child。现行 managed catalog 已 clean-break 删除 legacy `meditator` 身份，因此 V1 以真实 `deep-inquiry` Work Session 承担 Meditator 职责，**不**复活 `meditator` alias。冻结求助时的 parent frontier，物化 canonical `LifecycleWorkRecord(includeOpening=true)` 作为 `CommissionerRecord`；child assignment 必须以 `如何解决这个 agent 的当前困难？` 开头。consultation 的普通完成再物化 `LifecycleWorkRecord(includeOpening=false)`，作为 typed `NeedHelpAdvice` continuation 返回**原来的 deep binding**。
 
-Mediator 是真实 child Session，不是假 completion、不是 hidden prose injection；它不继承 owner Persona，不得递归 NEEDHELP。每个 LogicalRun 的 consultation 次数有限、owner single-flight；取消/终结后迟到 advice 不得复活 owner。sentinel 自身不写入 WorkRecord evidence。
+consultation 是真实 child Session，不是假 completion、不是 hidden prose injection；它不继承 owner Persona，不得递归 NEEDHELP。每个 LogicalRun 的 consultation 次数有限、owner single-flight；额度耗尽只给确定性 continuation，不向 provider 暴露数值或 budget 机制。取消/终结后迟到 advice 不得复活 owner。sentinel 自身在 XTrace capture 前从 reasoning evidence 中剥离，不写入 WorkRecord/Chronicle evidence。
 
 ## AGENT-032：Repository Warm Start
 

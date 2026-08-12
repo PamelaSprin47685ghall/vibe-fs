@@ -105,7 +105,12 @@ module RepositoryWarmStartPrompt =
           yield! searches |> List.map renderSearch
           yield! hints |> List.map renderHint ]
 
-    let private renderDocument (charge: string) (searches: RepositoryWarmStartSearch list) (hints: RepositoryWarmStartHint list) omitted =
+    let private renderDocument
+        (charge: string)
+        (searches: RepositoryWarmStartSearch list)
+        (hints: RepositoryWarmStartHint list)
+        omitted
+        =
         SyntheticToml.document (instructions charge) (bodyBlocks searches hints omitted)
 
     let private appendixInstructions =
@@ -140,10 +145,7 @@ module RepositoryWarmStartPrompt =
     /// Add low-trust repository tables to an already-rendered authoritative
     /// provider prompt (ForkChildPayload). The 64 KiB budget applies only to the
     /// warm-start appendix, so a large pre-existing charge is never truncated.
-    let appendToProviderPrompt
-        (basePrompt: string)
-        (searches: RepositoryWarmStartSearch list)
-        : string =
+    let appendToProviderPrompt (basePrompt: string) (searches: RepositoryWarmStartSearch list) : string =
         let orderedHints =
             searches
             |> List.collect (fun search -> search.Hints)
@@ -154,7 +156,8 @@ module RepositoryWarmStartPrompt =
         let initialOmitted = max 0 (originalCount - List.length orderedHints)
 
         let rec fit kept omitted =
-            let appendix = SyntheticToml.document appendixInstructions (bodyBlocks searches kept omitted)
+            let appendix =
+                SyntheticToml.document appendixInstructions (bodyBlocks searches kept omitted)
 
             if SyntheticToml.byteCount appendix <= MaxWarmStartBytes then
                 basePrompt.TrimEnd() + "\n\n" + appendix

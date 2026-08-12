@@ -34,11 +34,7 @@ module InspectorTool =
                         let prepareProviderPrompt () =
                             task {
                                 match!
-                                    RepositoryWarmStart.prepare
-                                        Role.Inspector
-                                        scope.WorkspaceDirectory
-                                        keywords
-                                        charge
+                                    RepositoryWarmStart.prepare Role.Inspector scope.WorkspaceDirectory keywords charge
                                 with
                                 | Ok prompt -> return prompt
                                 | Error _ -> return charge

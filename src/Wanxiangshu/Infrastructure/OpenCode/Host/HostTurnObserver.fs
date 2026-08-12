@@ -29,6 +29,36 @@ module HostTurnObserver =
         task {
             let turn = context.Turn
 
+            // HOST-027: assistance is classified from the exact armed ProviderRun
+            // before Strength, family recovery, SyncDelegate, fallback, or ordinary
+            // abort handling can interpret the physical abort as business failure.
+            match! scope.HandleAssistanceTurn turn with
+            | AssistanceTurnDisposition.Handled ->
+                // HOST-027: if LoopSensor also armed before the physical abort
+                // settled, the explicit collaboration request owns this abort.
+                // Clear the competing process-local cause so it cannot leak into
+                // the next attempt as a phantom loop-kill.
+                scope.LoopSensor.ClearArmed turn.SessionId
+                XWire.reconcileAttempt journal scope turn
+                return ()
+            | AssistanceTurnDisposition.ClaimedButUnresolved ->
+                scope.LoopSensor.ClearArmed turn.SessionId
+                XWire.reconcileAttempt journal scope turn
+
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (TerminalOutcome.Failed "assistance escalation could not continue")
+                |> ignore
+
+                return ()
+            | AssistanceTurnDisposition.NotAssistance ->
+                match turn.Outcome with
+                | ReconcileProgram.TurnCompleted
+                | ReconcileProgram.TurnFailed _
+                | ReconcileProgram.TurnAborted _ -> scope.NeedHelpSensor.DropAttempt(turn.SessionId, turn.ProviderRun)
+                | ReconcileProgram.TurnNeedsContinuation _
+                | ReconcileProgram.TurnInProgress -> ()
+
             let strengthHandled =
                 scope.Strength.StrengthReplicaRuntime
                 |> Option.exists (fun runtime -> runtime.HandleTurn turn)

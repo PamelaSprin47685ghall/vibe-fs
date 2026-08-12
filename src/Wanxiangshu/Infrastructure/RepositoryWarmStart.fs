@@ -105,8 +105,7 @@ module RepositoryWarmStart =
             match! collectWithSearch search role workspaceDirectory keywordsRaw with
             | Error error -> return Error error
             | Ok None -> return Ok basePrompt
-            | Ok(Some searches) ->
-                return Ok(RepositoryWarmStartPrompt.appendToProviderPrompt basePrompt searches)
+            | Ok(Some searches) -> return Ok(RepositoryWarmStartPrompt.appendToProviderPrompt basePrompt searches)
         }
 
     let prepare

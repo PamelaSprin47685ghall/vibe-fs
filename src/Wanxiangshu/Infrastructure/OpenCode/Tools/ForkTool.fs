@@ -53,30 +53,21 @@ module ForkTool =
         | Role.Reviewer -> true
         | _ -> false
 
-    let private hasKeywords (request: Request) = not (String.IsNullOrWhiteSpace request.Keywords)
+    let private hasKeywords (request: Request) =
+        not (String.IsNullOrWhiteSpace request.Keywords)
 
-    let private warmStartAllowed role = RepositoryWarmStartPrompt.isDirectConsumer role
+    let private warmStartAllowed role =
+        RepositoryWarmStartPrompt.isDirectConsumer role
 
     let private warmStartError =
         "repository warm-start keywords are only available when fork targets Coder, Inspector, or DevOps"
 
-    let private prepareForkPrompt
-        (scope: ToolRuntimeScope)
-        (runtime: HostForkRuntime)
-        (role: Role)
-        (request: Request)
-        =
+    let private prepareForkPrompt (scope: ToolRuntimeScope) (runtime: HostForkRuntime) (role: Role) (request: Request) =
         task {
             let basePrompt =
-                ForkChildPayload.relay
-                    request.Charge
-                    (runtime.ParentWorkRecordOf runtime.ParentId)
-                    []
-                    None
+                ForkChildPayload.relay request.Charge (runtime.ParentWorkRecordOf runtime.ParentId) [] None
 
-            match!
-                RepositoryWarmStart.appendToBase role scope.WorkspaceDirectory request.Keywords basePrompt
-            with
+            match! RepositoryWarmStart.appendToBase role scope.WorkspaceDirectory request.Keywords basePrompt with
             | Ok prompt -> return prompt
             | Error _ -> return basePrompt
         }

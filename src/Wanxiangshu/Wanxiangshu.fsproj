@@ -74,6 +74,7 @@
     <Compile Include="Domain/MagicTodoLegacySeed.fs"/>
     <Compile Include="Domain/MagicTodoFinalityCohort.fs"/>
     <Compile Include="Domain/SyntheticToml.fs"/>
+    <Compile Include="Domain/AssistancePrompt.fs"/>
     <Compile Include="Domain/RepositoryWarmStartPrompt.fs"/>
     <Compile Include="Domain/ManagerNarrative.fs"/>
     <Compile Include="Domain/ManagerLifecyclePrompt.fs"/>
@@ -251,6 +252,8 @@
     <Compile Include="Infrastructure/OpenCode/Signals/HostSignal.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/HostEventCodec.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/LoopEventCodec.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Codec/NeedHelpEventCodec.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/NeedHelpSensor.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/HostMessageCodec.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/MagicTodoHostCodec.fs"/>
     <Compile Include="Infrastructure/OpenCode/Signals/HostSignalAdapter.fs"/>
@@ -363,6 +366,7 @@
     <Compile Include="Application/Finality/Types.fs"/>
     <Compile Include="Application/Finality/Ports.fs"/>
     <Compile Include="Application/Finality/LifecycleWorkRecordProjection.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/AssistanceHost.fs"/>
     <Compile Include="Application/Finality/RecordWorkflow.fs"/>
     <Compile Include="Application/Finality/CohortWorkflow.fs"/>
     <Compile Include="Application/Finality/RevisionWorkflow.fs"/>

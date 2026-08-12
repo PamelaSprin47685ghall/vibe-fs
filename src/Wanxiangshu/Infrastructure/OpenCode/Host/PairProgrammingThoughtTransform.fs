@@ -104,7 +104,11 @@ module PairProgrammingThoughtTransform =
     let private buildCursorMessage (callId: string) (markerText: string) (role: string) : obj =
         let normalizedRole = role.Trim().ToLowerInvariant()
 
-        if normalizedRole <> "assistant" && normalizedRole <> "user" && normalizedRole <> "system" then
+        if
+            normalizedRole <> "assistant"
+            && normalizedRole <> "user"
+            && normalizedRole <> "system"
+        then
             invalidArg "role" "Cursor Pair Hint role must be assistant, user, or system"
 
         createObj
@@ -322,8 +326,12 @@ module PairProgrammingThoughtTransform =
                 |> List.filter (fun pair -> gapPresent pair.CallGap && gapPresent pair.ResultGap)
 
             let starts = ResizeArray<PairProgrammingGuidelineWire * OccurrenceProjection>()
-            let before = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire * OccurrenceProjection>>()
-            let after = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire * OccurrenceProjection>>()
+
+            let before =
+                Dictionary<string, ResizeArray<PairProgrammingGuidelineWire * OccurrenceProjection>>()
+
+            let after =
+                Dictionary<string, ResizeArray<PairProgrammingGuidelineWire * OccurrenceProjection>>()
 
             let addAtGap pair projection gap =
                 let bucket
@@ -528,7 +536,11 @@ module PairProgrammingThoughtTransform =
         if isCursorProvider providerId then
             let normalizedRole = cursorRole.Trim().ToLowerInvariant()
 
-            if normalizedRole <> "assistant" && normalizedRole <> "user" && normalizedRole <> "system" then
+            if
+                normalizedRole <> "assistant"
+                && normalizedRole <> "user"
+                && normalizedRole <> "system"
+            then
                 invalidArg "cursorRole" "Cursor Pair Hint role must be assistant, user, or system"
 
         let history, append =
@@ -561,10 +573,8 @@ module PairProgrammingThoughtTransform =
                     |> List.tryFind (fun pair -> pair.CallGap = callGap && pair.ResultGap = resultGap)
 
                 match existing with
-                | Some _ ->
-                    replay providerId cursorRole realMessages history
-                | None when skipAutoInjectedRequested providerId ->
-                    replay providerId cursorRole realMessages history
+                | Some _ -> replay providerId cursorRole realMessages history
+                | None when skipAutoInjectedRequested providerId -> replay providerId cursorRole realMessages history
                 | None ->
                     let ordinal =
                         match history with

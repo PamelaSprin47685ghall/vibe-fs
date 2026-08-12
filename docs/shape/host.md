@@ -324,6 +324,6 @@ Host membrane **不**拥有 OpeningPolicy / OpeningMaterial；T1 关闭 Opening 
 
 ## NEEDHELP Host shape（HOST-027）
 
-`NeedHelpEventCodec` 只负责把 Host raw event 适配成 `{ SessionId; MessageId?; PartId?; Field; Delta }` reasoning delta；`NeedHelpSensor` 保存每个 live attempt 的有限 rolling suffix 与 armed identity。Attempt identity 必须来自当前 provider run，不能退化成 session-wide boolean。Sensor 只请求 `AbortSession` 并登记 assistance owner；实际 fast/deep/consultation 决策在 reconciliation/Application 完成，避免 streaming callback 同时拥有业务流程。
+`NeedHelpEventCodec` 只负责把 Host raw event 适配成 `{ SessionId; ProviderRun; PartId?; Field; Delta }` reasoning delta；`NeedHelpSensor` 保存每个 live attempt 的有限 rolling suffix 与 armed identity。Attempt identity 必须来自当前 provider run，不能退化成 session-wide boolean。Sensor 只请求 `AbortSession`；实际 fast/deep/consultation 决策在 reconciled turn 上完成，且请求者 binding 从同一 Host snapshot 中 `Id = ProviderRunIdentity` 的 assistant `SessionMessage.Agent` 精确读取，禁止从 fallback cursor / SelectedAgent 猜。
 
-LoopDetector/LoopSensor 状态、LoopKillArmed 与 NeedHelpArmed 分离。两者同 attempt 冲突时 first owner wins，reconcile 只消费一个 typed cause。
+LoopDetector/LoopSensor 状态、LoopKillArmed 与 NeedHelpArmed 分离。若物理 abort settle 前两者都已 arm，显式 NEEDHELP assistance 在 reconcile 有确定性优先级，并立即清除 LoopKillArmed；一个 abort 只消费一个 typed cause，竞争 cause 不得泄漏到下一 attempt。StrengthReplica、Companion/InternalLeaf 不进入 NEEDHELP raw sensor admission。

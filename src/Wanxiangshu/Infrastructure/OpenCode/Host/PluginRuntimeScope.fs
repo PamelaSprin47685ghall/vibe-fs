@@ -62,10 +62,20 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     /// Optional until HostSignalBootstrap wires abort + ownership.
     // DSL-MUTABLE: resource — loop sensor attachment slot
     let mutable loopSensor: LoopSensor option = None
+    // DSL-MUTABLE: resource — NEEDHELP reasoning sensor attachment slot
+    let mutable needHelpSensor: NeedHelpSensor option = None
     // DSL-MUTABLE: resource — satellite runtime attachment slot
     let mutable satelliteRuntime: SatelliteRuntime option = None
     // DSL-MUTABLE: resource — sync-delegate runtime attachment slot
     let mutable syncDelegateRuntime: SyncDelegateRuntime option = None
+    // DSL-MUTABLE: resource — assistance workflow callbacks attach after
+    // LifecycleWorkRecord composition, without reversing compile-layer ownership.
+    // DSL-MUTABLE: resource — assistance reconciled-turn handler attachment slot
+    let mutable assistanceTurnHandler: (ReconciledTurn -> Task<AssistanceTurnDisposition>) option =
+        None
+
+    // DSL-MUTABLE: resource — assistance session-drop handler attachment slot
+    let mutable assistanceDropSession: (SessionId -> unit) option = None
 
     member _.Journal = journal
 
@@ -93,7 +103,33 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
     member _.SyncDelegateRuntime = syncDelegateRuntime
 
+    member _.AttachAssistance
+        (handleTurn: ReconciledTurn -> Task<AssistanceTurnDisposition>, dropSession: SessionId -> unit)
+        =
+        assistanceTurnHandler <- Some handleTurn
+        assistanceDropSession <- Some dropSession
+
+    member _.HandleAssistanceTurn(turn: ReconciledTurn) =
+        match assistanceTurnHandler with
+        | Some handle -> handle turn
+        | None -> Task.FromResult AssistanceTurnDisposition.NotAssistance
+
+    member _.DropAssistanceSession(sessionId: SessionId) =
+        assistanceDropSession |> Option.iter (fun drop -> drop sessionId)
+
     member _.AttachLoopSensor(sensor: LoopSensor) = loopSensor <- Some sensor
+
+    member _.AttachNeedHelpSensor(sensor: NeedHelpSensor) = needHelpSensor <- Some sensor
+
+    member _.NeedHelpSensor =
+        match needHelpSensor with
+        | Some sensor -> sensor
+        | None ->
+            // Journal/unit-only scopes have no streaming source. Keep a no-op
+            // sensor so turn classification can still ask exact attempt identity.
+            let empty = NeedHelpSensor((fun _ -> false), (fun _ -> Task.FromResult(Ok())))
+            needHelpSensor <- Some empty
+            empty
 
     member _.LoopSensor =
         match loopSensor with
