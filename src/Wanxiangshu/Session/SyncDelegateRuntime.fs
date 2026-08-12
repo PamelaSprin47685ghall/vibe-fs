@@ -177,8 +177,10 @@ type SyncDelegateRuntime
                             noteInspectorAnswer (sessionKey turn.SessionId) workRecord
 
                         AsyncSupport.trySetResult call.Answer (Ok workRecord) |> ignore
+
                         for inv in call.Invocations do
                             AsyncSupport.trySetResult inv.Completion (Ok workRecord) |> ignore
+
                         return true
                     | ReconcileProgram.TurnFailed error
                     | ReconcileProgram.TurnAborted error ->

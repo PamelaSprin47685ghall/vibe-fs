@@ -46,8 +46,8 @@ test('TODO-002 decodes the clean-break obligations wire', () => {
   assert.equal(duplicateName.error, "todowrite duplicate obligation name 'same'")
 })
 
-test('TODO-007 projects obligations into the V1 sink by in-place mutation only', () => {
-  const args = { obligations: [{ name: 'provider-only', work: 'must disappear from sink args' }] }
+test('TODO-007 projects obligations into a non-enumerable V1 compatibility view', () => {
+  const args = { obligations: [{ name: 'provider-only', work: 'must remain durable provider input' }] }
   const output = { args }
   magicTodoHost.replaceCompatibilityArgs(output, [
     { Content: 'bridge: Review bridge', Status: 'in_progress', Priority: 'medium' },
@@ -55,8 +55,12 @@ test('TODO-007 projects obligations into the V1 sink by in-place mutation only',
 
   assert.equal(output.args, args, 'before must preserve the Host args object identity')
   assert.deepEqual(output.args, {
-    todos: [{ content: 'bridge: Review bridge', status: 'in_progress', priority: 'medium' }],
+    obligations: [{ name: 'provider-only', work: 'must remain durable provider input' }],
   })
+  assert.equal(Object.prototype.propertyIsEnumerable.call(output.args, 'todos'), false)
+  assert.deepEqual(output.args.todos, [
+    { content: 'bridge: Review bridge', status: 'in_progress', priority: 'medium' },
+  ])
 })
 
 test('TODO-002 replaces description, parameters, and jsonSchema with obligations', () => {

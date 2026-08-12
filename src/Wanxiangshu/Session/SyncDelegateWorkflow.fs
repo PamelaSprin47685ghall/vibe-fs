@@ -33,6 +33,7 @@ let invoke
     task {
         let owner = SessionId.create ownerSessionKey
         let ownerScope = ReuseScope.ofSession owner
+
         let completion =
             TaskCompletionSource<Result<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
@@ -64,6 +65,7 @@ let invoke
                 match deps.ResolveOwnerTier batchOwner with
                 | None ->
                     store.CompleteBatchPreparation(ownerScope, role)
+
                     for item in initialBatch do
                         AsyncSupport.trySetResult item.Completion (Error "sync delegate rejected: owner tier unknown")
                         |> ignore
@@ -84,6 +86,7 @@ let invoke
                         with
                         | Error error ->
                             store.CompleteBatchPreparation(ownerScope, role)
+
                             for item in initialBatch do
                                 AsyncSupport.trySetResult item.Completion (Error error) |> ignore
                         | Ok delegateSession ->
@@ -93,30 +96,26 @@ let invoke
                             let! preparedPrompts =
                                 task {
                                     let results = ResizeArray<string>()
+
                                     for item in batch do
                                         try
-                                            let! p = item.PrepareProviderPrompt ()
+                                            let! p = item.PrepareProviderPrompt()
                                             results.Add p
                                         with _ ->
                                             results.Add item.Charge
+
                                     return results |> Seq.toList
                                 }
 
                             let extraBatch2 = store.DrainBatch(ownerScope, role)
                             let fullBatch = batch @ extraBatch2
 
-                            let fullPrompts =
-                                preparedPrompts
-                                @ (extraBatch2 |> List.map (fun i -> i.Charge))
+                            let fullPrompts = preparedPrompts @ (extraBatch2 |> List.map (fun i -> i.Charge))
 
                             let combinedCharge =
-                                fullBatch
-                                |> List.map (fun i -> i.Charge)
-                                |> String.concat "\n\n"
+                                fullBatch |> List.map (fun i -> i.Charge) |> String.concat "\n\n"
 
-                            let combinedProviderPrompt =
-                                fullPrompts
-                                |> String.concat "\n\n"
+                            let combinedProviderPrompt = fullPrompts |> String.concat "\n\n"
 
                             let call, registration =
                                 store.BeginCall(batchOwner, ownerScope, role, delegateSession, agentName, fullBatch)
@@ -129,8 +128,7 @@ let invoke
                                 SyncDelegatePrompt.withProviderPrompt combinedCharge combinedProviderPrompt
 
                             match! deps.SendPrompt call request with
-                            | Error error ->
-                                store.FailCall(call, error)
+                            | Error error -> store.FailCall(call, error)
                             | Ok _ ->
                                 if role = SyncDelegateRole.Inspector then
                                     deps.NoteInspectorPrompt (SessionId.value delegateSession) request.Charge
@@ -145,6 +143,7 @@ let invoke
                                     AsyncSupport.trySetResult item.Completion answered |> ignore
                     with ex ->
                         store.CompleteBatchPreparation(ownerScope, role)
+
                         for item in initialBatch do
                             AsyncSupport.trySetResult item.Completion (Error ex.Message) |> ignore
 

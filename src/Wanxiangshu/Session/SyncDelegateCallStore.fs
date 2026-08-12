@@ -35,7 +35,8 @@ type internal SyncDelegateCallStore() as this =
     // DSL-MUTABLE: resource — retired Inspector ids staged between child and owner SessionDeleted
     let deletedInspectorsByOwnerScope = Dictionary<string, SessionId>()
     // DSL-MUTABLE: mailbox — pending sync delegate invocations being batched by (scopeKey, role)
-    let pendingBatches = Dictionary<string * SyncDelegateRole, ResizeArray<SyncDelegateInvocation>>()
+    let pendingBatches =
+        Dictionary<string * SyncDelegateRole, ResizeArray<SyncDelegateInvocation>>()
     // DSL-MUTABLE: single-flight — active preparing batch keys
     let preparingBatches = HashSet<string * SyncDelegateRole>()
 
@@ -45,6 +46,7 @@ type internal SyncDelegateCallStore() as this =
     member _.TryPeekCallByDelegate(delegateSession: SessionId) : SyncDelegateCall option =
         lock gate (fun () ->
             let key = sessionKey delegateSession
+
             match callsByDelegate.TryGetValue key with
             | true, q when q.Count > 0 -> Some(q.Peek())
             | _ -> None)
@@ -52,27 +54,37 @@ type internal SyncDelegateCallStore() as this =
     member _.TryPopCallByDelegate(delegateSession: SessionId) : SyncDelegateCall option =
         lock gate (fun () ->
             let key = sessionKey delegateSession
+
             match callsByDelegate.TryGetValue key with
             | true, q when q.Count > 0 ->
                 let call = q.Dequeue()
-                if q.Count = 0 then callsByDelegate.Remove key |> ignore
+
+                if q.Count = 0 then
+                    callsByDelegate.Remove key |> ignore
+
                 let ownerKey = scopeKey call.OwnerScope
+
                 match callsByOwnerScope.TryGetValue ownerKey with
                 | true, list ->
                     list.Remove call |> ignore
-                    if list.Count = 0 then callsByOwnerScope.Remove ownerKey |> ignore
+
+                    if list.Count = 0 then
+                        callsByOwnerScope.Remove ownerKey |> ignore
                 | false, _ -> ()
+
                 Some call
             | _ -> None)
 
     member _.FailCall(call: SyncDelegateCall, error: string) =
         AsyncSupport.trySetResult call.Answer (Error error) |> ignore
+
         for inv in call.Invocations do
             AsyncSupport.trySetResult inv.Completion (Error error) |> ignore
 
     member _.EnqueueForBatch(invocation: SyncDelegateInvocation) : bool =
         lock gate (fun () ->
             let key = (scopeKey invocation.OwnerScope, invocation.Role)
+
             let list =
                 match pendingBatches.TryGetValue key with
                 | true, l -> l
@@ -80,7 +92,9 @@ type internal SyncDelegateCallStore() as this =
                     let l = ResizeArray<SyncDelegateInvocation>()
                     pendingBatches.[key] <- l
                     l
+
             list.Add invocation
+
             if preparingBatches.Contains key then
                 false
             else
@@ -90,6 +104,7 @@ type internal SyncDelegateCallStore() as this =
     member _.DrainBatch(ownerScope: ReuseScopeId, role: SyncDelegateRole) : SyncDelegateInvocation list =
         lock gate (fun () ->
             let key = (scopeKey ownerScope, role)
+
             match pendingBatches.TryGetValue key with
             | true, list ->
                 let items = list |> Seq.toList
@@ -106,34 +121,46 @@ type internal SyncDelegateCallStore() as this =
     member _.CancelScope(scope: ReuseScopeId) =
         lock gate (fun () ->
             let sKey = scopeKey scope
+
             let matchingBatchKeys =
-                pendingBatches.Keys
-                |> Seq.filter (fun (sk, _) -> sk = sKey)
-                |> Seq.toList
+                pendingBatches.Keys |> Seq.filter (fun (sk, _) -> sk = sKey) |> Seq.toList
 
             for key in matchingBatchKeys do
                 match pendingBatches.TryGetValue key with
                 | true, list ->
                     for item in list do
-                        AsyncSupport.trySetResult item.Completion (Error "Sync delegate call was cancelled") |> ignore
+                        AsyncSupport.trySetResult item.Completion (Error "Sync delegate call was cancelled")
+                        |> ignore
+
                     pendingBatches.Remove key |> ignore
                 | false, _ -> ()
+
                 preparingBatches.Remove key |> ignore
 
             match callsByOwnerScope.TryGetValue sKey with
             | true, list ->
                 let calls = list |> Seq.toList
                 callsByOwnerScope.Remove sKey |> ignore
+
                 for call in calls do
                     let dKey = sessionKey call.Delegate
+
                     match callsByDelegate.TryGetValue dKey with
                     | true, q ->
                         let remaining =
-                            q |> Seq.filter (fun c -> not (Object.ReferenceEquals(c.Answer, call.Answer))) |> Seq.toList
+                            q
+                            |> Seq.filter (fun c -> not (Object.ReferenceEquals(c.Answer, call.Answer)))
+                            |> Seq.toList
+
                         q.Clear()
-                        for r in remaining do q.Enqueue r
-                        if q.Count = 0 then callsByDelegate.Remove dKey |> ignore
+
+                        for r in remaining do
+                            q.Enqueue r
+
+                        if q.Count = 0 then
+                            callsByDelegate.Remove dKey |> ignore
                     | false, _ -> ()
+
                     this.FailCall(call, "Sync delegate call was cancelled")
             | false, _ -> ())
 
@@ -169,6 +196,7 @@ type internal SyncDelegateCallStore() as this =
                     let list = ResizeArray<SyncDelegateCall>()
                     callsByOwnerScope.[ownerKey] <- list
                     list
+
             ownerCalls.Add call
 
             let delegateQueue =
@@ -178,6 +206,7 @@ type internal SyncDelegateCallStore() as this =
                     let q = Queue<SyncDelegateCall>()
                     callsByDelegate.[delegateKey] <- q
                     q
+
             delegateQueue.Enqueue call)
 
         let registration =
@@ -188,17 +217,26 @@ type internal SyncDelegateCallStore() as this =
                             match callsByOwnerScope.TryGetValue ownerKey with
                             | true, list ->
                                 let removed = list.Remove call
-                                if list.Count = 0 then callsByOwnerScope.Remove ownerKey |> ignore
+
+                                if list.Count = 0 then
+                                    callsByOwnerScope.Remove ownerKey |> ignore
+
                                 match callsByDelegate.TryGetValue delegateKey with
                                 | true, q ->
                                     let remaining =
                                         q
                                         |> Seq.filter (fun c -> not (Object.ReferenceEquals(c.Answer, call.Answer)))
                                         |> Seq.toList
+
                                     q.Clear()
-                                    for r in remaining do q.Enqueue r
-                                    if q.Count = 0 then callsByDelegate.Remove delegateKey |> ignore
+
+                                    for r in remaining do
+                                        q.Enqueue r
+
+                                    if q.Count = 0 then
+                                        callsByDelegate.Remove delegateKey |> ignore
                                 | false, _ -> ()
+
                                 removed
                             | false, _ -> false)
 
@@ -251,7 +289,9 @@ type internal SyncDelegateCallStore() as this =
         lock gate (fun () ->
             for list in pendingBatches.Values do
                 for item in list do
-                    AsyncSupport.trySetResult item.Completion (Error "SyncDelegate runtime disposed") |> ignore
+                    AsyncSupport.trySetResult item.Completion (Error "SyncDelegate runtime disposed")
+                    |> ignore
+
             pendingBatches.Clear()
             preparingBatches.Clear()
 
