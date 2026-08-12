@@ -5,7 +5,19 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readGlobalPreference } from '../../../dist/Infrastructure/OpenCode/Host/ProviderLanguageBinding.js'
 import { caseOf, providerLanguage, providerResources, sessionId } from '../support/domain.mjs'
+
+test('HOST_026_readGlobalPreference_defaults_when_env_unset', () => {
+  const previous = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+  delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+  try {
+    assert.equal(caseOf(readGlobalPreference()), 'English')
+  } finally {
+    if (previous === undefined) delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+    else process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previous
+  }
+})
 
 test('PROMPT_017_ProviderLanguage_parse_en_and_zh_CN', () => {
   assert.equal(caseOf(providerLanguage.parse('en')), 'English')

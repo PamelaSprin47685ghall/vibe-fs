@@ -221,6 +221,7 @@ export function createIsolatedEnv(opts) {
 
     // Zero-out the fallback continuation rate-limit governor in E2E.
     WANXIANGSHU_TEST: 'true',
+    WANXIANGSHU_PROVIDER_LANGUAGE: 'en',
 
     // Optional MCP fixture
     STEALTH_BROWSER_MCP_FIXTURE: fixturePath,

@@ -556,8 +556,16 @@ const chatRequests = (requests) =>
   });
 
 export function extractInspectorIdFromOwnerRequests(requests) {
-  for (const text of publicToolResults(requests, 'inspector')) {
-    const match = String(text).match(/inspector_id\s*=\s*"([^"]+)"/);
+  const chats = chatRequests(requests ?? []);
+  for (const body of chats) {
+    const text = lastUserText(body);
+    if (text.includes(G2_Q1) || text.includes(G2_Q2) || text.includes(G2_Q3)) {
+      const sid = body.sessionID;
+      if (typeof sid === 'string' && sid.length > 0) return sid;
+    }
+  }
+  for (const text of publicToolResults(requests, 'inspect')) {
+    const match = String(text).match(/session_id\s*=\s*"([^"]+)"/);
     if (match) return match[1];
   }
   return null;
@@ -569,14 +577,12 @@ export function extractInspectorIdFromOwnerRequests(requests) {
  */
 export function assertG2InspectorPrefixLaw(scenario) {
   const requests = chatRequests(scenario.provider.requests);
-  const q1 = requests.filter((body) => lastUserText(body).includes(G2_Q1) && requestTools(body).includes('return'));
-  const q2 = requests.filter((body) => lastUserText(body).includes(G2_Q2) && requestTools(body).includes('return'));
-  const q3 = requests.filter((body) => lastUserText(body).includes(G2_Q3) && requestTools(body).includes('return'));
+  const q1 = requests.filter((body) => lastUserText(body).includes(G2_Q1));
+  const q2 = requests.filter((body) => lastUserText(body).includes(G2_Q2));
+  const q3 = requests.filter((body) => lastUserText(body).includes(G2_Q3));
   // Each Inspector question begins with the SyncDelegate SendPrompt wire pinned by
-  // g2-inspector-qN.0. A real Host then performs a second provider request after
-  // the `return` tool result so the child loop can settle. PREFIX LAW compares the
-  // question-entry wires; the scenario's assertDeliveries owns duplicate-entry
-  // detection instead of mistaking the legal tool-loop continuation for a resend.
+  // g2-inspector-qN.0. After EXEC-031 the child completes with ordinary assistant
+  // text — no return tool on the wire.
   assert.ok(q1.length >= 1, 'G2: Inspector Q1 provider request missing');
   assert.ok(q2.length >= 1, 'G2: Inspector Q2 provider request missing');
   assert.ok(q3.length >= 1, 'G2: Inspector Q3 provider request missing');
