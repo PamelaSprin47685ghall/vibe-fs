@@ -6,7 +6,7 @@ import test from 'node:test'
 import {
   LocalizedToolCall,
   XTraceRange,
-  awaitMaterializedInput,
+  materializeInput,
 } from '../../../dist/Application/Reconciliation/MagicTodoLocality.js'
 import { MagicTodoHostHooks_create } from '../../../dist/Application/Reconciliation/MagicTodoMembrane.js'
 import { Obligation } from '../../../dist/Domain/MagicTodo.js'
@@ -161,54 +161,28 @@ const snapshotMessage = (call, inputCanonical) =>
     ],
   )
 
-test('HOST-019 before waits until Host materializes the exact provider input', async () => {
-  const session = sessionId('ses-magic-todo-await-input')
+test('HOST-019 before materializes the exact provider input', () => {
   const call = toolCallId('call-magic-todo-await-input')
   const expected = '{"obligations":[{"name":"diagnose","work":"Fix the todowrite snapshot race."}]}'
-  let reads = 0
-  const snapshot = {
-    GetMessages: async () => {
-      reads += 1
-      return {
-        tag: 0,
-        fields: [toList([snapshotMessage(call, reads === 1 ? '{}' : expected)])],
-      }
-    },
-  }
 
-  const result = await awaitMaterializedInput(
-    snapshot,
-    session,
+  const result = materializeInput(
     locality({ call, inputCanonical: '{}' }),
     expected,
   )
 
   assert.equal(result.tag, 0)
-  assert.equal(reads, 2, 'pending input must be reread rather than admitted as {}')
   assert.equal(result.fields[0].InputCanonical, expected)
 })
 
-test('HOST-019 waiting fails closed when the materialized provider input differs', async () => {
-  const session = sessionId('ses-magic-todo-await-conflict')
+test('HOST-019 materialization fails closed when the provider input differs', () => {
   const call = toolCallId('call-magic-todo-await-conflict')
-  const snapshot = {
-    GetMessages: async () => ({
-      tag: 0,
-      fields: [
-        toList([
-          snapshotMessage(
-            call,
-            '{"obligations":[{"name":"other","work":"Different provider input."}]}',
-          ),
-        ]),
-      ],
-    }),
-  }
 
-  const result = await awaitMaterializedInput(
-    snapshot,
-    session,
-    locality({ call, inputCanonical: '{}' }),
+  const result = materializeInput(
+    locality({
+      call,
+      inputCanonical: '{"obligations":[{"name":"other","work":"Different provider input."}]}',
+      state: new SnapshotToolPartState(1, []),
+    }),
     '{"obligations":[{"name":"diagnose","work":"Fix the todowrite snapshot race."}]}',
   )
 
