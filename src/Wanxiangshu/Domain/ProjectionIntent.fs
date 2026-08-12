@@ -57,8 +57,8 @@ type BlogFramesIntent =
 /// `InsertRepair` 载荷：InteractionRepair 的幂等键。
 type RepairIntent = { RequestKey: string }
 
-/// `AppendReviewChallenge` 载荷：REVIEW-003 TextVersion。
-type ChallengeIntent = { TextVersion: int }
+/// `AppendReviewChallenge` 载荷：REVIEW-003 TextVersion + 已本地化 Prompt 字节。
+type ChallengeIntent = { TextVersion: int; Prompt: string }
 
 /// STRENGTH-009/016: StrengthReplica base selection. `LocalizedMessages` are a
 /// semantic-equivalent provider wire representation whose owner tool-call IDs were
@@ -221,7 +221,7 @@ type ProjectionConflict =
     | ConflictingBlogFrames
     /// 两条 `InsertRepair` 的 RequestKey 不等。
     | ConflictingRepair
-    /// 两条 `AppendReviewChallenge` 的 TextVersion 不等。
+    /// 两条 `AppendReviewChallenge` 的 ChallengeIntent 整条不等。
     | ConflictingReviewChallenge
     /// `ActivatePrefixEpoch` 与 `ReanchorAfterCompaction` 同批出现。
     | ConflictingPrefixLifecycle

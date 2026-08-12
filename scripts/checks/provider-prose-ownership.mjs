@@ -18,6 +18,7 @@ const norm = (p) => p.replace(/\\/g, '/')
 /** Gate 0 owner surfaces — Domain prompts + OpenCode tool/renderer prose. */
 export const PROVIDER_PROSE_SCAN_ROOTS = Object.freeze([
   'src/Wanxiangshu/Domain/RuntimeNudge.fs',
+  'src/Wanxiangshu/Domain/ReviewChallenge.fs',
   'src/Wanxiangshu/Domain/ManagerNarrative.fs',
   'src/Wanxiangshu/Domain/ManagerLifecyclePrompt.fs',
   'src/Wanxiangshu/Domain/FinalityPrompt.fs',

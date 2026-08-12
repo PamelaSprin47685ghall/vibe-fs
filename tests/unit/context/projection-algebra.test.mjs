@@ -306,8 +306,7 @@ const REPAIR_INSTRUCTION =
   projectionConstants.RepairInstruction ??
   '# Protocol repair\n\nCall the blog tool exactly once with non-empty text. Do not answer in prose.'
 
-const REVIEW_CHALLENGE_PROMPT =
-  projectionConstants.ReviewChallengePrompt ?? reviewChallenge.prompt ?? `# ${reviewChallenge.text}\n`
+const REVIEW_CHALLENGE_PROMPT = reviewChallenge.prompt
 
 const wireOf = (raw) => providerProjection.decodeMessageView(toList(raw)).Messages
 
@@ -416,7 +415,7 @@ test('PROJ_008_step3a_AppendReviewChallenge_smoke_appends_challenge_text', () =>
   assert.equal(
     texts.some((t) => t === REVIEW_CHALLENGE_PROMPT || t === reviewChallenge.text || t.includes(reviewChallenge.text)),
     true,
-    'rendered view must carry ReviewChallenge.Prompt (or Text)',
+    'rendered view must carry the challenge Prompt bytes',
   )
 })
 
@@ -557,6 +556,15 @@ test('PROJ_008_step3a_different_Challenge_versions_conflict', () => {
   const result = projectionAlgebra.plan([
     projectionIntent.appendReviewChallenge({ TextVersion: 1 }),
     projectionIntent.appendReviewChallenge({ TextVersion: 2 }),
+  ])
+  assert.equal(result.ok, false)
+  assert.equal(result.conflict, 'ConflictingReviewChallenge')
+})
+
+test('PROJ_008_step3a_different_Challenge_prompts_conflict', () => {
+  const result = projectionAlgebra.plan([
+    projectionIntent.appendReviewChallenge({ TextVersion: 1, Prompt: '# a\n' }),
+    projectionIntent.appendReviewChallenge({ TextVersion: 1, Prompt: '# b\n' }),
   ])
   assert.equal(result.ok, false)
   assert.equal(result.conflict, 'ConflictingReviewChallenge')
@@ -749,8 +757,18 @@ test('PROJ_008_step5_AppendReviewChallenge_production_bytes_are_Prompt', () => {
   assert.equal(
     last?.parts[0]?.text,
     REVIEW_CHALLENGE_PROMPT,
-    'AppendReviewChallenge must emit ReviewChallenge.Prompt bytes for seal/nudge parity',
+    'AppendReviewChallenge must emit ChallengeIntent.Prompt bytes for seal/nudge parity',
   )
+})
+
+test('PROJ_008_step5_AppendReviewChallenge_emits_intent_Prompt', () => {
+  const custom = '# localized-challenge\n'
+  const raw = [{ info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] }]
+  const snapshot = stage3Snapshot(raw)
+  const intent = projectionIntent.appendReviewChallenge({ TextVersion: 1, Prompt: custom })
+  const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
+  const last = view[view.length - 1]
+  assert.equal(last?.parts[0]?.text, custom)
 })
 
 test('PROJ_008_step6_Reanchor_with_Keep_is_wire_noop_and_plan_ok', () => {

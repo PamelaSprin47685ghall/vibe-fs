@@ -40,6 +40,23 @@ messages.transform 返回最终消息视图
 
 ---
 
+## Challenge 装载（归属 REVIEW-003）
+
+语义路径 `review/challenge`。语言 = Reviewer session 的 `ProviderLanguage`（PROMPT-019）。Domain 只拥有 Path、TextVersion、`promptOf`、`contentDigest`。
+
+```text
+text   = ProviderProse.render lang review/challenge
+prompt = ProviderProse.document lang review/challenge   // ARCH-010 `# …\n`
+digest = ReviewChallenge.contentDigest sha256 prompt
+```
+
+第一次 PERFECT：`judge` tool result 用 `text`（JudgeTool 写入 instruction）；journal `ChallengeContentDigest` = digest。  
+ReviewConfirmation nudge 与 `AppendReviewChallenge` 发出 `prompt`。第二次 seal 搜索同一 digest。
+
+`ChallengeTextVersion` 只区分文案世代。英文 canonical 字节不变则版本保持 1。`SessionProviderLanguage` 创建后不可变，故同一 Reviewer session 两次 PERFECT 语言相同、digest 稳定。
+
+---
+
 ## REVIEW-004：ReviewAttemptIdentity
 
 ```fsharp

@@ -2,6 +2,8 @@
 // Review witness/challenge/seal/projection, provider projection, root/continuation
 // kinds, enforcer catalog/resource/codec/continuation.
 
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   Witness,
   Challenge,
@@ -28,6 +30,7 @@ import {
   isSome,
   stringSet,
   mapCount,
+  BUILD_ROOT,
 } from './interop.mjs'
 import {
   providerRun,
@@ -103,19 +106,26 @@ export const reviewWitness = {
   },
 }
 
-/** REVIEW-003: the fixed challenge, its version, and its digest. */
+/** REVIEW-003: path, version, prompt assembly, digest. English canonical from resources. */
 export const reviewChallenge = (() => {
-  // Resolved through `bind` rather than read off the module directly. `Text`
-  // emits as `Text$` (Fable escapes a reserved name), so `Challenge.Text` was
-  // `undefined` — a clause constant that silently became nothing.
-  const m = bind(Challenge, 'ReviewChallenge', ['Text', 'TextVersion', 'Prompt', 'contentDigest'])
+  const m = bind(Challenge, 'ReviewChallenge', ['Path', 'TextVersion', 'promptOf', 'contentDigest'])
+  const englishText = readFileSync(
+    join(BUILD_ROOT, '..', 'resources/provider/review/challenge/en.md'),
+    'utf8',
+  )
+    .replace(/\r\n/g, '\n')
+    .trim()
+  const englishPrompt = m.promptOf(englishText)
 
   return {
-    text: m.Text,
+    path: m.Path,
+    /** English canonical sentence (e2e / historical EN seals). Production follows session language. */
+    text: englishText,
     /** ARCH-010 instruction form (`# Text\\n`); seal / nudge / algebra AppendReviewChallenge. */
-    prompt: m.Prompt,
+    prompt: englishPrompt,
     textVersion: m.TextVersion,
-    contentDigest: (sha256) => m.contentDigest(sha256),
+    promptOf: (text) => m.promptOf(text),
+    contentDigest: (sha256, prompt) => m.contentDigest(sha256, prompt ?? englishPrompt),
 
     /** The `PerfectChallengeIssued` payload a first PERFECT journals. */
     issued: ({ barrier, tree, reviewer, run, call, digest, version = m.TextVersion }) => ({

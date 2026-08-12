@@ -88,7 +88,7 @@ Language 集中为律；Meaning 仍按 semantic owner 分布。禁止巨型 `Tra
 
 | Class | 规则 |
 |-------|------|
-| A Provider prose | 必须 i18n（system / Role / Library / runtime / finality / tool desc+consequence / assistance / …） |
+| A Provider prose | 必须 i18n（system / Role / Library / runtime / finality / tool desc+consequence / assistance / review challenge / …） |
 | B Technical literals | 永不翻译（tool names / args / wire / enum / path / command） |
 | C Internal diagnostics | 不进 horizon → 不属 Provider i18n |
 

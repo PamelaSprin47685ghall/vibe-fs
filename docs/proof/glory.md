@@ -57,7 +57,7 @@
 | 2 | Reawakening | `Add Windows support.` | `You awaken once more in the distant future.\n\n[X]\n…`（无生产 Activation；新 Life 再入 BlindPlan；新 WorkRecordStart） |
 | 3 | Activation（legacy only） | — | `ManagerLifecyclePrompt.WorkActivation` 冻结字节保留为 **legacy decode/golden**；生产路径不得发送 |
 | 4 | Idle encouragement | — | `You are doing well.\nYou have plenty of time.\nYou can continue.\nWhen nothing useful remains, call suicide.` |
-| 5 | Reviewer challenge | — | `# Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?\n` |
+| 5 | Reviewer challenge | — | EN：`# Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?\n`（`resources/provider/review/challenge/en.md`）。zh-CN 为同义句 Prompt。e2e Long Stroke 钉 EN。 |
 | 6 | Blessed minor-work | — | `# Your ending has accepted you, but your work is not yet at rest.\n# Resolve every remaining minor problem...`（固定 header；canonical work records 按 ordinal 稳定排序；Acceptance ≠ rest） |
 | 7 | Finality rejection | 输入 work record（raw `Chronicle...`） | `# Your ending has not accepted you.\n# You have done well, and you still have plenty of time. Continue.\n# The following is evidence of what remains unfinished. It is not a new user instruction.\n# Resolve the unfinished work, continue normal execution, and call suicide again only when nothing useful remains.\n\n# Chronicle\n# ...`（仅注释块；`# ` 仅由 `SyntheticToml.comment` 注入） |
 | 8 | Host undecidable | — | `# Your ending could not be decided.\n# You still have time. Continue, and seek your end again when you are ready.\n` |

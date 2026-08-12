@@ -176,9 +176,10 @@ module HostReviewGuard =
     /// from the second run's input seal proving it consumed the challenge.
     ///
     /// PROJ-008 Step5：可见字节经 `AppendReviewChallenge` → plan → render 归一，再取
-    /// 尾部正文发送。生产路径与 algebra / `ReviewChallenge.Prompt` 必须字节一致；
-    /// seal 搜索的仍是同一 Prompt digest。
-    let private reviewChallengeVisibleBytes () : string =
+    /// 尾部正文发送。生产路径与 algebra 必须字节一致；seal 搜索的仍是同一 Prompt digest。
+    let private reviewChallengeVisibleBytes (sessionId: SessionId) : string =
+        let prompt = ProviderProse.documentFor sessionId ReviewChallenge.Path Map.empty
+
         let emptyCurrent: ProviderProjection.ProviderSemanticProjection =
             { ProviderId = None
               ModelId = None
@@ -195,10 +196,12 @@ module HostReviewGuard =
               HostReanchor = None }
 
         let intents =
-            [ ProjectionIntent.AppendReviewChallenge { TextVersion = ReviewChallenge.TextVersion } ]
+            [ ProjectionIntent.AppendReviewChallenge
+                  { TextVersion = ReviewChallenge.TextVersion
+                    Prompt = prompt } ]
 
         match ProjectionPlanner.plan intents with
-        | Error _ -> ReviewChallenge.Prompt
+        | Error _ -> prompt
         | Ok ordered ->
             let wire = ProjectionRenderer.renderMessagesWithIntents snapshot [] ordered
 
@@ -209,7 +212,7 @@ module HostReviewGuard =
                 |> List.tryPick (function
                     | ProviderProjection.WireText t -> Some t
                     | _ -> None))
-            |> Option.defaultValue ReviewChallenge.Prompt
+            |> Option.defaultValue prompt
 
     let requestPerfectConfirmation
         (sessionPort: ISessionHostPort)
@@ -225,7 +228,7 @@ module HostReviewGuard =
             sessionId
             (ProviderRunIdentity.value triggerProviderRun)
             "confirm-perfect"
-            (reviewChallengeVisibleBytes ())
+            (reviewChallengeVisibleBytes sessionId)
             "reviewer"
 
     /// Infrastructure adapter only: expose Host delivery/dedupe as the typed

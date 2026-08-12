@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.8.1
+
+- REVIEW-003 skeptical challenge 迁入 `resources/provider/review/challenge`；tool result / nudge / seal 跟 Reviewer session `ProviderLanguage`；英文 canonical 字节不变（`ChallengeTextVersion = 1`）。
+- journal / 公开 wire 合同相对 0.8.0：无 domain protocol 破坏。
+
 ## 0.8.0
 
 - Provider-visible prose ownership（PROMPT-019 / ARCH-016 Gate E）：进入 participant horizon 的 Class A 自然语言经 `ProviderResources` 装载、由 session `ProviderLanguage` 管辖。Gate E baseline `{}`。

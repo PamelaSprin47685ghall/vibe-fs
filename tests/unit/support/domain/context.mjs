@@ -68,6 +68,7 @@ import {
   providerRun,
   toolCallId,
 } from './identity.mjs'
+import { reviewChallenge } from './enforcer.mjs'
 
 const providerRoot = join(BUILD_ROOT, '..', 'resources/provider')
 const readProviderLines = (semanticPath) =>
@@ -1113,7 +1114,13 @@ export const projectionIntent = (() => {
       return build('SuppressTransportOnly', [])
     },
     /** PROJ-008 step 5: REVIEW-003 skeptical challenge. */
-    appendReviewChallenge: (intent = { TextVersion: 1 }) => build('AppendReviewChallenge', [intent]),
+    appendReviewChallenge: (intent = {}) =>
+      build('AppendReviewChallenge', [
+        {
+          TextVersion: intent.TextVersion ?? reviewChallenge.textVersion,
+          Prompt: intent.Prompt ?? reviewChallenge.prompt,
+        },
+      ]),
     /** PROJ-008 step 6: Host compaction reanchor (renderer no-op on wire bytes). */
     get reanchorAfterCompaction() {
       return build('ReanchorAfterCompaction', [])
@@ -1284,11 +1291,11 @@ export const projectionAlgebra = (() => {
  * Kind resolution is lazy: missing Domain cases fail step-3a tests only.
  */
 /**
- * PROJ-008 Domain constants (ProjectionConstants). Single source for repair /
- * pair / challenge text; Host modules must reference these rather than literals.
+ * PROJ-008 Domain constants (ProjectionConstants). Repair instruction remains
+ * Domain-owned; challenge prose is a provider resource.
  */
 export const projectionConstants = (() => {
-  const names = ['RepairInstruction', 'ReviewChallengeText', 'ReviewChallengePrompt']
+  const names = ['RepairInstruction']
   const out = {}
   for (const name of names) {
     try {

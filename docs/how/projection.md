@@ -41,7 +41,7 @@ insertBlogFrames          // Y 有效帧（Entry/Squash）插入历史槽
 insertRepair              // Interaction Repair 回合
 insertStrengthFrames      // Candidate / Promoted / Replica-local；显式 visibility+anchor
 suppressTransportOnly     // transport-only 消息剔除（COMPANION-012）
-appendReviewChallenge     // skeptical challenge
+appendReviewChallenge     // skeptical challenge（已本地化 Prompt）
 reanchorAfterCompaction   // ContextReanchored → Snapshot=None
 ```
 

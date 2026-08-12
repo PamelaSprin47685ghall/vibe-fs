@@ -321,10 +321,10 @@ export const [NodeProcessWaitModule, NodeProcessHostModule, PtyTimingModule, Fab
 //
 // A third rule, discovered by `domain.meta.test.mjs` sweeping the facade for
 // undefined members: Fable appends `$` to an emitted name that would collide with
-// a JS built-in or reserved word. `ReviewChallenge.Text` emits as `Text$`, and
-// reading `.Text` off the module gave `undefined` — a bound clause constant that
-// silently became nothing. Trying the `$` spelling here is what makes that a
-// resolution rule instead of a per-call-site accident.
+// a JS built-in or reserved word. A past case was `ReviewChallenge.Text` emitting
+// as `Text$`; reading `.Text` off the module gave `undefined`. Trying the `$`
+// spelling here is what makes that a resolution rule instead of a per-call-site
+// accident.
 
 export const member = (mod, moduleName, name) => {
   const spellings = [

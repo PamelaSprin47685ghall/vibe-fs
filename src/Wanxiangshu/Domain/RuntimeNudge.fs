@@ -5,14 +5,10 @@ namespace Wanxiangshu.Domain
 /// Prose lives in `resources/provider/runtime/...`. Call sites bind language via
 /// `ProviderProse.documentFor` / `instructionLines`. Domain owns path constants only.
 ///
-/// ── one text deliberately NOT here ─────────────────────────────────────────
-///
-/// `ReviewChallenge.Text` now carries a `# ` prefix before it is sent. The prefix does not break
-/// REVIEW-003: `PerfectChallengeIssued` records the digest of the final sent bytes
-/// (`ReviewChallenge.Prompt`) and the second run's input seal is searched for those same bytes, so
-/// the record, the `verdict` tool result, and the nudge stay identical. A mismatch would still refuse
-/// every confirmation while looking like correct fail-closed behaviour — the failure mode
-/// `ReviewChallenge`'s own comment warns about.
+/// REVIEW-003 challenge prose is not a runtime nudge path: it lives in
+/// `resources/provider/review/challenge`. `PerfectChallengeIssued` records the
+/// digest of the ARCH-010 Prompt bytes; the second run's input seal is searched
+/// for those same bytes. Language follows the Reviewer session.
 ///
 /// ARCH-011: repair identity lives in typed `repairKind`, never in payload bytes.
 [<RequireQualifiedAccess>]

@@ -328,10 +328,10 @@ test('the AgentFact union is non-empty, so case resolution is meaningful', () =>
 
 // ── hazard 4: Fable escapes a reserved emitted name with `$` ─────────────────
 //
-// `ReviewChallenge.Text` emits as `Text$`, so reading `.Text` off the module gave
-// `undefined`. Nothing threw: the facade exported `reviewChallenge.text ===
-// undefined`, and a test asserting the challenge sentence would have compared
-// undefined to undefined and passed.
+// `ReviewChallenge.Text` used to emit as `Text$`, so reading `.Text` off the
+// module gave `undefined`. Nothing threw: the facade exported
+// `reviewChallenge.text === undefined`, and a test asserting the challenge
+// sentence would have compared undefined to undefined and passed.
 //
 // `member()` now tries the `$` spelling too. This sweep is what found it and is
 // what keeps the next one from shipping — it needs no knowledge of which members
@@ -368,10 +368,10 @@ test('member resolution prefers a real export over the escaped spelling', () => 
   // exporting both `foo` and `foo$` — Fable does this when a value and a type
   // share a name — would bind the wrong one.
   assert.equal(domain.reviewChallenge.textVersion, 1)
+  assert.equal(domain.reviewChallenge.path, 'review/challenge')
   assert.match(domain.reviewChallenge.text, /^Nope, let's re-evaluate: /)
 
-  // And the digest is derived from `ReviewChallenge.Prompt` (the instruction
-  // comment bytes), not from the bare `Text`.
+  // Digest is derived from the ARCH-010 Prompt bytes, not from the bare sentence.
   const digest = idValue.sealDigest(domain.reviewChallenge.contentDigest((input) => `H(${input})`))
   assert.equal(digest, `H(# ${domain.reviewChallenge.text}\n)`)
 })

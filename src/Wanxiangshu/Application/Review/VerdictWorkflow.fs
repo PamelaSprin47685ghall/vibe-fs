@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Review
 
 open Wanxiangshu.Domain
+open Wanxiangshu.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
@@ -94,7 +95,10 @@ module VerdictWorkflow =
                     if ReviewProjection.satisfiesGuard submission.GitTreeHash guard then
                         Ok VerdictDecision.AlreadyCounted
                     else
-                        let challengeDigest = ReviewChallenge.contentDigest sha256
+                        let lang = ProviderProse.languageOf submission.ReviewerSessionId
+                        let challengeText = ProviderProse.render lang ReviewChallenge.Path Map.empty
+                        let challengePrompt = ProviderProse.document lang ReviewChallenge.Path Map.empty
+                        let challengeDigest = ReviewChallenge.contentDigest sha256 challengePrompt
 
                         append submission.ReviewerSessionId submission.ProviderRun (verdictFact submission) journal
                         |> Result.bind (fun _ ->
@@ -109,7 +113,7 @@ module VerdictWorkflow =
                                        ChallengeContentDigest = challengeDigest |}
 
                             append submission.ReviewerSessionId submission.ProviderRun issued journal)
-                        |> Result.map (fun _ -> VerdictDecision.ChallengeIssued ReviewChallenge.Text)
+                        |> Result.map (fun _ -> VerdictDecision.ChallengeIssued challengeText)
 
                 | Some challenge ->
                     match provenSeal challenge submission.ProviderRun guard with

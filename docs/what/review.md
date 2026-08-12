@@ -24,7 +24,7 @@ Magic Todo 节拍、settlement、surface 见 `what/todo.md`（TODO-001..014）�
 
 ## REVIEW-003：PERFECT 需要因果证明
 
-第一次 PERFECT 产生 challenge 证据（`PerfectChallengeIssued`），tool result 使用固定 skeptical 英文句子（`ChallengeTextVersion = 1`）。
+第一次 PERFECT 产生 challenge 证据（`PerfectChallengeIssued`）。tool result、ReviewConfirmation nudge 与 `AppendReviewChallenge` 使用同一 skeptical 句：语言为该 Reviewer session 的 `ProviderLanguage`（`resources/provider/review/challenge`，PROMPT-019）。可见 Prompt 是 ARCH-010 指令注释（`# …\n`）；`ChallengeContentDigest` 哈希这组 Prompt 字节。`ChallengeTextVersion` 区分文案世代；英文 canonical 字节不变时版本保持 1。
 
 第二次 PERFECT 成立必须同时满足：
 

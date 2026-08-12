@@ -5,10 +5,9 @@ open Wanxiangshu.Kernel.Identity
 
 /// PROJ-008：Domain 侧冻结常量。
 ///
-/// `ReviewChallenge` 在 fsproj 中后于本文件编译，故在此镜像 Text / Prompt 字节而非
-/// 交叉引用模块。`EnforcerHost.RepairInstruction` 与
-/// `PairProgrammingThoughtTransform.text` 从本 path 装载 English canonical；
-/// 生产路径按 session 语言经 ProviderProse 装载，禁止第二处字面量。
+/// `EnforcerHost.RepairInstruction` 仍是本模块英文单源。HOST-013 pair guideline 与
+/// REVIEW-003 challenge 的 prose 在 `resources/provider/`；生产路径按 session
+/// 语言经 ProviderProse 装载，禁止第二处字面量。
 [<RequireQualifiedAccess>]
 module ProjectionConstants =
     /// InteractionRepair 协议修复指令（ENFORCER-060/061）。Domain 单源。
@@ -19,15 +18,6 @@ module ProjectionConstants =
     /// `resources/provider/host/pair-programming-guideline/{en,zh-CN}.md`.
     [<Literal>]
     let PairProgrammingGuidelinePath = "host/pair-programming-guideline"
-
-    /// InteractionRepair 协议修复指令（ENFORCER-060/061）。Domain 单源。
-    let ReviewChallengeText =
-        "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
-
-    /// 与 `ReviewChallenge.Prompt` 字节一致：ARCH-010 指令注释形式（`# Text\n`）。
-    /// seal / tool-result / nudge 的可见字节是 Prompt，不是 bare Text。
-    /// 经 SyntheticToml.document 生成，避免与 ReviewChallenge 历史字节漂移。
-    let ReviewChallengePrompt = SyntheticToml.document [ ReviewChallengeText ] []
 
 /// PROJ-004：渲染结果——写回 Host 的指令形态。
 [<RequireQualifiedAccess>]
@@ -355,9 +345,9 @@ module ProjectionRenderer =
         | ProjectionIntent.InsertRepair _ -> appendSynthetic "user" ProjectionConstants.RepairInstruction acc
         | ProjectionIntent.InsertStrengthFrames payload -> applyStrengthFrames sha256 payload acc
         | ProjectionIntent.SuppressTransportOnly -> applySuppressWithIds snapshot acc
-        | ProjectionIntent.AppendReviewChallenge _ ->
-            // REVIEW-003 生产可见字节 = Prompt（`# Text\n`），与 tool-result / nudge / seal 一致。
-            appendSynthetic "user" ProjectionConstants.ReviewChallengePrompt acc
+        | ProjectionIntent.AppendReviewChallenge intent ->
+            // REVIEW-003 生产可见字节 = 已本地化 Prompt（`# Text\n`），与 tool-result / nudge / seal 一致。
+            appendSynthetic "user" intent.Prompt acc
         // wire no-op：CommittedPrefix=None 的语义由 Coordinator 填 Snapshot；此处不改字节。
         | ProjectionIntent.ReanchorAfterCompaction -> acc
 

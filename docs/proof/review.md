@@ -16,6 +16,7 @@
 |------|------|------|
 | 单次 PERFECT 不足 | 无 Confirmed | REVIEW-003 |
 | 第二次含 challenge digest（seal）；`judge` 确实成功执行 | Confirmed | REVIEW-003、REVIEW-010 |
+| challenge 跟 session 语言；EN canonical 字节不变（TextVersion=1）；ZH digest ≠ EN；issue/nudge/seal 同 Prompt | unit + Gate C pair | REVIEW-003、PROMPT-019 |
 | 同 ProviderRun 额外 PERFECT | 不计数 | REVIEW-004 |
 | REVISE | 立即清未完成 PERFECT/关闭 cohort；延迟 `BlogEntryCommitted` 前不得写 `FinalityRejected`；不得在 `judge` 时抢先落盘 | REVIEW-002、GLORY-044/072 |
 | tree 变化 | pending 拒绝；confirmed 对 Guard 无效 | REVIEW-008 |

@@ -56,6 +56,8 @@ Persona（Examiner/Auditor）session 创建一次绑定（AGENT-028）；本域�
 双 PERFECT 流程不得写入 Reviewer 提示词（REVIEW-003）：屏障由 Host 侧执行，Reviewer 只需针对当前 tree 给出独立判断；提前告知流程会诱导模型自行扮演确认方。  
 禁止 formal report schema / 固定八段标题 / Pass 表（REVIEW-011）。
 
+Challenge 可见句所有权：`resources/provider/review/challenge/{en,zh-CN}.md`。Domain 只保留 Path / TextVersion / `promptOf` / `contentDigest`；装载在 Host/Application 边界经 ProviderProse。
+
 TodoProcessReview 的 assignment instruction 由 Host 按 RequestKind 注入（过程一次判断、有界 LWR 输入、old/proposed todo）；不得把 Finality challenge/2N/cohort 编排写入过程 prompt，也不得要求 Reviewer 描述隐藏 session / barrier / 消费方（REVIEW-013，TODO-013）。
 
 ## 模块所有权（过程 / 终末）

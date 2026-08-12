@@ -33,6 +33,7 @@ module LeakyPrompt =
 
 test('gate_e_scan_roots_cover_gate0_owners', () => {
   assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('RuntimeNudge.fs')))
+  assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('ReviewChallenge.fs')))
   assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('HorizonTool.fs')))
   assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('JoinResultRenderer.fs')))
   assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('MagicTodoSurface.fs')))

@@ -36,6 +36,8 @@ import {
   stream,
   verdict,
   verdictWitness,
+  providerLanguage,
+  providerResources,
 } from '../support/domain.mjs'
 
 // A visible stand-in for sha256: the property under test is which text is
@@ -75,8 +77,9 @@ const confirmOn = (guard, { challengeDigest = CHALLENGE_DIGEST, secondInputDiges
 // ── REVIEW-003: the fixed challenge is one fact viewed three ways ─────────────
 
 test('REVIEW_003_the_challenge_text_and_its_version_are_pinned', () => {
-  // Two distant call sites must agree exactly: the first PERFECT journals this
-  // digest, and the second PERFECT's input seal is searched for the same value.
+  // English canonical bytes are the historical EN seal. A new locale is not a
+  // new TextVersion; bump only when the English sentence itself changes.
+  assert.equal(reviewChallenge.path, 'review/challenge')
   assert.equal(
     reviewChallenge.text,
     "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?",
@@ -90,12 +93,28 @@ test('REVIEW_003_the_challenge_digest_is_the_digest_of_that_exact_text', () => {
   // spelled elsewhere would agree only by coincidence, and any drift would refuse
   // every confirmation while looking like correct fail-closed behaviour.
   //
-  // `ReviewChallenge.Prompt` renders `Text` as an ARCH-010 instruction comment;
-  // the digest is of those exact bytes (`# ...\n`), matching `ReviewChallenge.Prompt`.
+  // `promptOf` renders the sentence as an ARCH-010 instruction comment; the
+  // digest is of those exact bytes (`# ...\n`).
   assert.equal(CHALLENGE_DIGEST_TEXT, `H(# ${reviewChallenge.text}\n)`)
 
   // Deterministic: the same text digests the same way on any process.
   assert.equal(idValue.sealDigest(reviewChallenge.contentDigest(H)), CHALLENGE_DIGEST_TEXT)
+})
+
+test('REVIEW_003_challenge_follows_session_language', () => {
+  const en = providerResources.readText(providerLanguage.english, reviewChallenge.path)
+  const zh = providerResources.readText(
+    providerLanguage.simplifiedChinese,
+    reviewChallenge.path,
+  )
+  assert.equal(en, reviewChallenge.text)
+  assert.equal(zh, '不行，再评估一遍：它是否真的完整满足原任务，而没有偷工减料？')
+  assert.equal(reviewChallenge.promptOf(en), reviewChallenge.prompt)
+  assert.equal(reviewChallenge.promptOf(zh), `# ${zh}\n`)
+  assert.notEqual(
+    idValue.sealDigest(reviewChallenge.contentDigest(H, reviewChallenge.promptOf(zh))),
+    CHALLENGE_DIGEST_TEXT,
+  )
 })
 
 // ── REVIEW-004: one provider run counts once ─────────────────────────────────
