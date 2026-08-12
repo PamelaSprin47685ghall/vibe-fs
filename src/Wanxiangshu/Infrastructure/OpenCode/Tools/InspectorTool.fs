@@ -12,7 +12,7 @@ open ToolHostCodec
 module InspectorTool =
 
     let private consequence message =
-        tomlObjectWithInstructions [ "# " + message ] []
+        tomlObjectWithInstructions [ message ] []
 
     let private execute
         (syncDelegate: SyncDelegateRuntime option)
