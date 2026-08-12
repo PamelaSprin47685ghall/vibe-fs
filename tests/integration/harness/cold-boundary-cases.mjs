@@ -16,6 +16,10 @@ import { boundaryFor, sealDecision, validateBoundary } from '../../e2e/support/c
 import { wireOf } from '../../e2e/support/provider-wire.js';
 
 const SYSTEM = { role: 'system', content: 'You are a coder.' };
+const hostSystem = (model) => ({
+  role: 'system',
+  content: `You are a coder.\nYou are powered by the model named ${model}. The exact model ID is test/${model}`,
+});
 const user = (text) => ({ role: 'user', content: text });
 const assistant = (text) => ({ role: 'assistant', content: text });
 
@@ -33,6 +37,24 @@ const SIDE_SWITCHED = body('test-model-b', [SYSTEM, user('Round 1'), assistant('
 
 /** A side switch that also rewrote history — what the old exemption would have passed. */
 const SIDE_SWITCHED_AND_REWRITTEN = body('test-model-b', [SYSTEM, user('DIFFERENT'), user('Round 2')]);
+
+const ASSISTANCE_FIRST = body('test-model', [hostSystem('test-model'), user('Round 1')]);
+const ASSISTANCE_SWITCHED = body('test-model-b', [
+  hostSystem('test-model-b'),
+  user('Round 1'),
+  assistant('partial reasoning before NEEDHELP'),
+  user('NeedHelpEscalation'),
+]);
+const ASSISTANCE_REWRITTEN = body('test-model-b', [
+  hostSystem('test-model-b'),
+  user('DIFFERENT'),
+  user('NeedHelpEscalation'),
+]);
+const ASSISTANCE_SYSTEM_REWRITTEN = body('test-model-b', [
+  { ...hostSystem('test-model-b'), content: `${hostSystem('test-model-b').content}\nUNDECLARED` },
+  user('Round 1'),
+  user('NeedHelpEscalation'),
+]);
 
 /** COMPANION-009: the prefix is replaced by a companion-memory head. */
 const EPOCH_REBASED = body('test-model', [SYSTEM, user('[companion memory]'), user('Round 2')]);
@@ -152,6 +174,41 @@ export const coldBoundaryCases = [
     },
   },
 
+  // ── AGENT-031: NEEDHELP hidden execution-binding switch ────────────────
+
+  {
+    name: 'AGENT-031 assistance side admits only model identity plus append-only continuation',
+    fn: () => {
+      assertEq(
+        decide(ASSISTANCE_FIRST, ASSISTANCE_SWITCHED, at('assistance-side')).resealed,
+        'assistance-side',
+      );
+    },
+  },
+
+  {
+    name: 'AGENT-031 assistance side refuses transcript or non-model system rewrites',
+    fn: () => {
+      assertEq(
+        decide(ASSISTANCE_FIRST, ASSISTANCE_REWRITTEN, at('assistance-side')).broken,
+        'assistance-side-rewrote-prefix',
+      );
+      assertEq(
+        decide(ASSISTANCE_FIRST, ASSISTANCE_SYSTEM_REWRITTEN, at('assistance-side')).broken,
+        'assistance-side-rewrote-prefix',
+      );
+      const retooled = body(
+        'test-model-b',
+        ASSISTANCE_SWITCHED.messages,
+        ['write', 'read'],
+      );
+      assertEq(
+        decide(ASSISTANCE_FIRST, retooled, at('assistance-side')).broken,
+        'assistance-side-rewrote-prefix',
+      );
+    },
+  },
+
   // ── CTX-010: prefix probe ────────────────────────────────────────────────
 
   {
@@ -233,7 +290,7 @@ export const coldBoundaryCases = [
       // Same reasoning as an empty `attempts` list: the author believes a cold
       // boundary is covered, and the scenario silently stopped exercising it. Treating
       // it as harmless is how a scenario decays into an assertion about nothing.
-      for (const kind of ['epoch-switch', 'fallback-side']) {
+      for (const kind of ['epoch-switch', 'fallback-side', 'assistance-side']) {
         const decision = decide(FIRST, APPENDED, at(kind));
         assertEq(decision.broken, 'boundary-not-reached', `${kind} declared but seal held`);
         assertEq(decision.kind, kind, 'the diagnostic names which declaration went unused');
@@ -309,6 +366,7 @@ export const coldBoundaryCases = [
     fn: () => {
       assertEq(validateBoundary(at('epoch-switch')).length, 0);
       assertEq(validateBoundary(at('fallback-side')).length, 0);
+      assertEq(validateBoundary(at('assistance-side')).length, 0);
       assertEq(validateBoundary(at('prefix-probe')).length, 0);
       assertEq(validateBoundary(at('frame-commit')).length, 0);
       assertEq(validateBoundary(at('request-kind-switch')).length, 0);

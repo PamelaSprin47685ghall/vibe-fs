@@ -20,7 +20,8 @@ type PromptCatalog =
 
 module PromptResources =
 
-    let private roleSemanticPath = function
+    let private roleSemanticPath =
+        function
         | Role.Manager -> "role/manager"
         | Role.Orchestrator -> "role/orchestrator"
         | Role.Coder -> "role/coder"
@@ -56,7 +57,8 @@ module PromptResources =
 
     let private read lang path = ProviderResources.readText lang path
 
-    let private libraryPaths = function
+    let private libraryPaths =
+        function
         | Role.Manager -> [ "library/kolmogorov"; "library/scarcity" ]
         | Role.Coder -> [ "library/kolmogorov" ]
         | Role.Reviewer -> [ "library/kolmogorov"; "library/reviewer/quality-ledger" ]
@@ -86,9 +88,7 @@ module PromptResources =
             let books = inherited |> List.map (read lang)
 
             compose (
-                [ common
-                  law
-                  read lang "library/ingress" ]
+                [ common; law; read lang "library/ingress" ]
                 @ books
                 @ [ read lang "library/closing" ]
             )
@@ -114,7 +114,8 @@ module PromptResources =
           DistillerSystemPrompt = systemForRole lang Role.Distiller
           BloggerSystemPrompt = systemForRole lang Role.Blogger }
 
-    let load () : PromptCatalog = loadForLanguage ProviderLanguage.English
+    let load () : PromptCatalog =
+        loadForLanguage ProviderLanguage.English
 
     /// HOST-026: read bound session language; default English only for a truly
     /// unbound session at a read-only resource boundary.

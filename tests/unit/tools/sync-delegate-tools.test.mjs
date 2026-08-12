@@ -205,37 +205,42 @@ test('ESTABLISH_AND_REPAIR_specs_expose_charge_plus_optional_keywords', () => {
   assert.deepEqual(argNames(repair), ['charge', 'keywords'])
 })
 
-test('INSPECT_missing_sync_delegate_runtime_errors', async () => {
-  const { fields } = await runToml(inspectSpec(factory, bareScope(), undefined), { charge: 'look' }, context())
-  assert.equal(fields.error, 'SyncDelegate runtime unavailable')
+test('INSPECT_missing_sync_delegate_runtime_is_a_natural_consequence', async () => {
+  const { text, fields } = await runToml(inspectSpec(factory, bareScope(), undefined), { charge: 'look' }, context())
+  assert.match(text, /No Inspector is available from this execution context\./)
+  assert.equal(fields.error, undefined)
 })
 
-test('ESTABLISH_missing_sync_delegate_runtime_errors', async () => {
-  const { fields } = await runToml(
+test('ESTABLISH_missing_sync_delegate_runtime_is_a_natural_consequence', async () => {
+  const { text, fields } = await runToml(
     establishSpec(factory, bareScope(), undefined),
     { charge: 'establish failing test' },
     context(),
   )
-  assert.equal(fields.error, 'SyncDelegate runtime unavailable')
+  assert.match(text, /No Coder is available from this execution context\./)
+  assert.equal(fields.error, undefined)
 })
 
-test('INSPECT_missing_charge_is_refused', async () => {
-  const { fields } = await runToml(inspectSpec(factory, bareScope(), sentinelRuntime), {}, context())
-  assert.equal(fields.error, 'inspect charge required')
+test('INSPECT_missing_charge_is_refused_as_a_natural_consequence', async () => {
+  const { text, fields } = await runToml(inspectSpec(factory, bareScope(), sentinelRuntime), {}, context())
+  assert.match(text, /inspect needs a charge\./)
+  assert.equal(fields.error, undefined)
 })
 
-test('INSPECT_blank_charge_is_refused', async () => {
-  const { fields } = await runToml(
+test('INSPECT_blank_charge_is_refused_as_a_natural_consequence', async () => {
+  const { text, fields } = await runToml(
     inspectSpec(factory, bareScope(), sentinelRuntime),
     { charge: '   ' },
     context(),
   )
-  assert.equal(fields.error, 'inspect charge required')
+  assert.match(text, /inspect needs a charge\./)
+  assert.equal(fields.error, undefined)
 })
 
-test('ESTABLISH_missing_charge_is_refused', async () => {
-  const { fields } = await runToml(establishSpec(factory, bareScope(), sentinelRuntime), {}, context())
-  assert.equal(fields.error, 'establish-behavior charge required')
+test('ESTABLISH_missing_charge_is_refused_as_a_natural_consequence', async () => {
+  const { text, fields } = await runToml(establishSpec(factory, bareScope(), sentinelRuntime), {}, context())
+  assert.match(text, /establish-behavior needs a charge\./)
+  assert.equal(fields.error, undefined)
 })
 
 test('EXEC_032_prepared_provider_prompt_does_not_replace_semantic_inspector_charge', async () => {

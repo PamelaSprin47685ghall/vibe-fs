@@ -199,7 +199,10 @@ const SYSTEM_MARKER = 'You are a managed agent.';
 
 const user = (text) => ({ role: 'user', content: text });
 const assistant = (text) => ({ role: 'assistant', content: text });
-const systemMessage = () => ({ role: 'system', content: SYSTEM_MARKER });
+const systemMessage = (model) => ({
+  role: 'system',
+  content: `${SYSTEM_MARKER}\nYou are powered by the model named ${model}. The exact model ID is test/${model}`,
+});
 
 /** The declared text as one prefix-comparable string. */
 export const declaredText = (turn) => turnFragments(turn).join(FRAGMENT_GAP);
@@ -286,6 +289,9 @@ export function deriveRequests(scenario) {
     const requestKindSwitch = group.entries.some(
       (entry) => boundaryAt(scenario, entry)?.kind === 'request-kind-switch',
     );
+    const assistanceSwitch = group.entries.some(
+      (entry) => boundaryAt(scenario, entry)?.kind === 'assistance-side',
+    );
     const tools = continued && previousTools !== null && !requestKindSwitch ? previousTools : declaredTools;
     previousTools = tools;
 
@@ -300,12 +306,15 @@ export function deriveRequests(scenario) {
     // sequence must carry one too, or every probe-declared entry would look like it
     // rewrote the fixed parts. Title requests keep their marker shape (the seal does
     // not compare them).
+    const model = assistanceSwitch ? 'forest-lib-model-b' : 'forest-lib-model';
     const messages =
       requestKindSwitch && previousMessages !== null
         ? [...previousMessages, user(text)]
-        : first.kind === 'title'
-          ? [user(TITLE_MARKER), user(text)]
-          : [systemMessage(), user(text)];
+        : assistanceSwitch && previousMessages !== null
+          ? [systemMessage(model), ...previousMessages.slice(1), user(text)]
+          : first.kind === 'title'
+            ? [user(TITLE_MARKER), user(text)]
+            : [systemMessage(model), user(text)];
 
     let derivedStep = 0;
     for (const entry of entries) {
@@ -322,7 +331,7 @@ export function deriveRequests(scenario) {
           sessionId,
           body: {
             sessionID: sessionId,
-            model: 'forest-lib-model',
+            model,
             tools,
             messages: [...messages],
           },

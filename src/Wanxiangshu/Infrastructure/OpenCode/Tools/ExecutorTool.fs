@@ -76,7 +76,8 @@ module ExecutorTool =
                   OutputBudgetBytes = 65536L
                   WorldLock = false }
 
-    let private consequence (message: string) = tomlObjectWithInstructions [ message ] []
+    let private consequence (message: string) =
+        tomlObjectWithInstructions [ message ] []
 
     let private processConsequence (processError: ProcessError) =
         match processError with
@@ -142,7 +143,9 @@ module ExecutorTool =
                 | Ok(ProcessOutcome.Spooled(exitCode, spoolPath, _totalBytes, _chunkCount)) ->
                     try
                         if String.IsNullOrWhiteSpace context.SessionId then
-                            return consequence "The command output cannot be condensed until the caller's authority is established."
+                            return
+                                consequence
+                                    "The command output cannot be condensed until the caller's authority is established."
                         else
                             let root = SessionId.create context.SessionId
 
@@ -160,7 +163,9 @@ module ExecutorTool =
 
                             match! requirePermit () with
                             | Error msg when msg.StartsWith("RECOVERY_BLOCKED:", System.StringComparison.Ordinal) ->
-                                return consequence "The command finished, but its large output cannot be reconciled while recovery is blocked."
+                                return
+                                    consequence
+                                        "The command finished, but its large output cannot be reconciled while recovery is blocked."
                             | Error _
                             | Ok _ ->
                                 let runtime =

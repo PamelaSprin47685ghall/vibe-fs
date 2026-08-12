@@ -231,3 +231,58 @@ export { fixtureKey, isAppendOnlyPrefix, renderSemantic, renderWire, sealDigest,
  */
 export const sealHolds = (previousWire, nextBody) =>
   previousWire === null || previousWire === undefined ? true : isAppendOnlyPrefix(previousWire, wireOf(nextBody));
+
+const systemHead = (wire) => {
+  const messages = listToArray(wire.Messages);
+  if (messages.length === 0 || messages[0].Role !== 'system') return null;
+  const parts = listToArray(messages[0].Parts);
+  if (parts.length !== 1 || parts[0].cases()[parts[0].tag] !== 'WireText') return null;
+  return { text: parts[0].fields[0], tail: messages.slice(1) };
+};
+
+const normalizeModelIdentity = (text, modelId) =>
+  typeof modelId === 'string' && modelId.length > 0
+    ? text.split(modelId).join('<execution-model>')
+    : text;
+
+/**
+ * AGENT-031 Host canary boundary: a NEEDHELP fast→deep continuation changes the
+ * execution model while preserving Persona / authority / tools / transcript.
+ * OpenCode itself writes that model id into its leading system message, so the
+ * corresponding model-id substitution is the only tolerated system-byte change.
+ * Every other message still goes through production isAppendOnlyPrefix.
+ */
+export function assistanceBindingPrefixHolds(previousWire, nextBody) {
+  const nextWire = wireOf(nextBody);
+  if (previousWire.ModelId === nextWire.ModelId) return false;
+
+  const previousHead = systemHead(previousWire);
+  const nextHead = systemHead(nextWire);
+  if (previousHead === null || nextHead === null) return false;
+
+  if (
+    !previousHead.text.includes(previousWire.ModelId)
+    || !nextHead.text.includes(nextWire.ModelId)
+    || normalizeModelIdentity(previousHead.text, previousWire.ModelId)
+      !== normalizeModelIdentity(nextHead.text, nextWire.ModelId)
+  ) return false;
+
+  const previousTail = new ProviderWireProjection(
+    nextWire.ProviderId,
+    nextWire.ModelId,
+    nextWire.Variant,
+    previousWire.Tools,
+    previousWire.System,
+    ofArray(previousHead.tail),
+  );
+  const nextTail = new ProviderWireProjection(
+    nextWire.ProviderId,
+    nextWire.ModelId,
+    nextWire.Variant,
+    nextWire.Tools,
+    nextWire.System,
+    ofArray(nextHead.tail),
+  );
+
+  return isAppendOnlyPrefix(previousTail, nextTail);
+}

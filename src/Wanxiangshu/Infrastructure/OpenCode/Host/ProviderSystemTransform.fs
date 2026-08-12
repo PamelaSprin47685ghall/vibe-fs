@@ -23,7 +23,8 @@ module ProviderSystemTransform =
             |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile sessionId projections))
         |> Option.map (fun profile -> profile.CanonicalRole)
 
-    let private catalogPrompt (catalog: PromptCatalog) = function
+    let private catalogPrompt (catalog: PromptCatalog) =
+        function
         | Role.Manager -> catalog.ManagerSystemPrompt
         | Role.Orchestrator -> catalog.OrchestratorSystemPrompt
         | Role.Coder -> catalog.CoderSystemPrompt
