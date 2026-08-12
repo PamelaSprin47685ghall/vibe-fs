@@ -182,49 +182,17 @@ module MagicTodoLocality =
                         )
                     )
 
-    let rec awaitMaterializedInput
-        (snapshot: ISessionSnapshotPort)
-        (sessionId: SessionId)
+    let materializeInput
         (localized: LocalizedToolCall)
         (expectedInputCanonical: string)
-        : Task<Result<LocalizedToolCall, InputMaterializationRejection>> =
-        task {
-            if localized.InputCanonical = expectedInputCanonical then
-                return Ok localized
-            elif
-                localized.State <> SnapshotToolPartState.Pending
-                || localized.InputCanonical <> "{}"
-            then
-                return Error InputMaterializationRejection.InputMismatch
-            else
-                let! messagesResult = snapshot.GetMessages sessionId
-
-                match messagesResult with
-                | Error reason -> return Error(InputMaterializationRejection.SnapshotUnavailable reason)
-                | Ok messages ->
-                    match SessionSnapshotPort.locateToolCall localized.ToolCallId messages with
-                    | Error reason -> return Error(InputMaterializationRejection.Snapshot reason)
-                    | Ok located ->
-                        if
-                            located.ProviderRun <> localized.ProviderRun
-                            || located.HostToolPartId <> localized.HostToolPartId
-                            || located.ToolName <> localized.ToolName
-                        then
-                            return Error InputMaterializationRejection.CarrierChanged
-                        else
-                            let refreshed =
-                                { localized with
-                                    InputCanonical = located.InputCanonical
-                                    State = located.State }
-
-                            if refreshed.InputCanonical = expectedInputCanonical then
-                                return Ok refreshed
-                            elif
-                                refreshed.State = SnapshotToolPartState.Pending
-                                && refreshed.InputCanonical = "{}"
-                            then
-                                do! Wanxiangshu.Process.PtyTiming.timerTask 10
-                                return! awaitMaterializedInput snapshot sessionId refreshed expectedInputCanonical
-                            else
-                                return Error InputMaterializationRejection.InputMismatch
-        }
+        : Result<LocalizedToolCall, InputMaterializationRejection> =
+        if localized.InputCanonical = expectedInputCanonical then
+            Ok localized
+        elif
+            localized.State = SnapshotToolPartState.Pending
+            && (localized.InputCanonical = "{}"
+                || String.IsNullOrWhiteSpace localized.InputCanonical)
+        then
+            Ok { localized with InputCanonical = expectedInputCanonical }
+        else
+            Error InputMaterializationRejection.InputMismatch

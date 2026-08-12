@@ -443,14 +443,9 @@ module MagicTodoHostHooks =
                                     with
                                     | Error reason -> return Error(sprintf "locality failed: %A" reason)
                                     | Ok initialLocality ->
-                                        let! materializedResult =
-                                            MagicTodoLocality.awaitMaterializedInput
-                                                snapshots
-                                                sessionId
-                                                initialLocality
-                                                providerInputCanonical
-
-                                        match materializedResult with
+                                        match
+                                            MagicTodoLocality.materializeInput initialLocality providerInputCanonical
+                                        with
                                         | Error reason ->
                                             return Error(sprintf "input materialization failed: %A" reason)
                                         | Ok locality ->
