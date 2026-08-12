@@ -222,7 +222,7 @@ description 必须覆盖 Manager 可见纪律（与 TODO-002/003/004/006/013 一
 
 description **禁止**泄露隐藏编排（TODO-013）：dedicated reviewer、hidden agent/session、Finality cohort、barrier、witness、2N。Manager 只应看见过程 review 的 outcome/report 合同，不知编排身份。
 
-definition 改的是广告 schema，**不**自动替换原 executor decode schema；故 before 必须剥离 `kind`/`id` 后再交 sink（HOST-020）。
+definition 改的是广告 schema，**不**自动替换原 executor decode schema；故 before 必须额外挂载 V1 compatibility view（HOST-020）。该 view 不得改写 provider-visible enumerable input。
 
 ## HOST-019：pending materialization barrier + input 非别名（blocking canary）
 
@@ -251,14 +251,13 @@ before 输入形如 `{ tool, sessionID, callID }` + `{ args }`。executor 只观
 
 可观察义务（语义交叉引用，不在此重复）：
 
-1. 身份定位：仅 `sessionID + callID` → 完整 SDK snapshot 唯一定位 ToolPart / assistant / provider run / ordinal / XTrace range；不能唯一 → fail closed（与 HOST-011 半边边界一致；HOST-025）。
-2. admission / replay：TODO-004（同 message 多不同 ToolCallId 全拒；同 ToolCallId replay 幂等且 digest 一致）。
-3. 消费上一 ConsumableReview 后校验 proposed：TODO-006/003/002。
-4. 校验通过即 durable `TodoWritePrepared`（尚非 checkpoint）。
-5. 安装 ephemeral bridge（HOST-021）。
-6. 原地把 args 投影为原 executor 可 decode 的 V1：`{content,status,priority}`；剥离 `kind`/`id`。
+1. 同步 before：decode live provider obligations，并捕获其 canonical；在原 args 对象上定义 **non-enumerable** `todos` compatibility view，让原 V1 decoder 可读，同时 `JSON.stringify` / Host persistence 仍只见 provider `obligations`；随后启动 deferred prepare 并立即返回。
+2. deferred prepare：仅 `sessionID + callID` → 完整 SDK snapshot 唯一定位 ToolPart / assistant / provider run / ordinal / XTrace range；不能唯一 → fail closed（HOST-025）。`pending + {}` 必须等待 materialize；materialized canonical 必须等于步骤 1 捕获值。
+3. admission / replay：TODO-004（同 message 多不同 ToolCallId 全拒；同 ToolCallId replay 幂等且 digest 一致）。
+4. 消费上一 ConsumableReview 后校验 proposed：TODO-006/003/002。
+5. 校验通过即 durable `TodoWritePrepared`（尚非 checkpoint），并作为 deferred bridge 结果交给 after。
 
-`reviewing` 的 sink 字段策略见 HOST-023。before **不**启动 reviewer、**不**写 `TodoWriteAccepted`。
+`reviewing` 的 sink 字段策略见 HOST-023。before **不等待 snapshot/Journal IO**、**不**启动 reviewer、**不**写 `TodoWriteAccepted`。
 
 ## HOST-021：after — Accepted、ensureReview、富化 result
 

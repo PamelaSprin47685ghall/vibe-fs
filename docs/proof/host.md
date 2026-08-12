@@ -88,7 +88,7 @@ G2 PREFIX LAW / `promptModel` 证据见下表与上节「绑定与身份」。**
 |----|------|------|------|------|
 | A | deferred materialization + before 原地 mutation 达 executor | before 不等待 snapshot/Journal IO；`pending + {}` 在 deferred prepare 中等待，同一 physical ToolPart materialize 后 canonical input == captured live args，digest 取 materialized input；executor 见 V1 compatibility list；after 必须 await prepare 才可 Accepted | HOST-019 | **blocking** |
 | B | 同时替换 parameters + jsonSchema | provider 见 V2；原 executor 仍跑 V1 decoder | HOST-018 | blocking |
-| C | before 剥 kind/id | 原 decoder 接受 unknown 扩展字段剥离后的 V1 list | HOST-020 | blocking |
+| C | non-enumerable compatibility view | 原 V1 decoder 可读 `todos`；`Object.keys`/`JSON.stringify`/Host persistence 仍只见 provider `obligations` | HOST-019/020 | blocking |
 | D | `status="reviewing"` 经 TodoTable → todo.updated → API → TUI | 全容忍 → passthrough；否则冻结 sink→`in_progress` | HOST-023、TODO-003 | blocking（策略冻结） |
 | E | after 改写 `output.output` | 本次模型可见 ∧ 下一 provider history **同字节** | HOST-021、TODO-005/013 | blocking |
 | F | execute throw | 记录 after 是否运行；协议不依赖其运行 | HOST-021 | 冻结观测 |

@@ -107,7 +107,8 @@ test('HOST-019 before returns without waiting for snapshot or Journal IO', async
     ])
 
     assert.equal(outcome, 'returned', 'before must not await the deferred snapshot read')
-    assert.equal('obligations' in output.args, false)
+    assert.equal('obligations' in output.args, true)
+    assert.equal(Object.prototype.propertyIsEnumerable.call(output.args, 'todos'), false)
     assert.equal(output.args.todos[0].content, 'diagnose: Fix the todowrite snapshot race.')
   } finally {
     releaseSnapshot?.({ tag: 1, fields: ['test cleanup'] })

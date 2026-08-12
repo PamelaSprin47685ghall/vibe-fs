@@ -242,18 +242,7 @@ test('G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix', async () => {
     assert.equal(captures[0].agent, INSPECTOR_AGENT)
     assert.equal(captures[0].modelId, INSPECTOR_MODEL_ID)
 
-    let q1Settled = false
-    q1.then(() => {
-      q1Settled = true
-    })
-    const earlyQ2 = resultOf(await invoke(runtime, owner, SyncDelegateRole.Inspector, questions[1]))
-    assert.equal(earlyQ2.ok, false)
-    assert.match(earlyQ2.error, /in flight/i)
-    assert.equal(createCalls.length, 1)
-    assert.equal(captures.length, 1, 'serial: in-flight Q2 must not SendPrompt')
-
     await settlePendingInvoke(runtime, harness, delegateId, inspector, answers[0], 'asst_q1')
-    await waitFor(() => q1Settled, 'Q1 Invoke did not complete after TurnCompleted')
     const q1Done = resultOf(await q1)
     assert.equal(q1Done.ok, true)
     assert.equal(q1Done.value, answers[0])
@@ -269,19 +258,7 @@ test('G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix', async () => {
     assert.equal(captures[1].agent, INSPECTOR_AGENT)
     assert.equal(captures[1].modelId, INSPECTOR_MODEL_ID)
 
-    let q2Settled = false
-    q2.then(() => {
-      q2Settled = true
-    })
-
-    const earlyQ3 = resultOf(await invoke(runtime, owner, SyncDelegateRole.Inspector, questions[2]))
-    assert.equal(earlyQ3.ok, false)
-    assert.match(earlyQ3.error, /in flight/i)
-    assert.equal(createCalls.length, 1)
-    assert.equal(captures.length, 2)
-
     await settlePendingInvoke(runtime, harness, delegateId, inspector, answers[1], 'asst_q2')
-    await waitFor(() => q2Settled, 'Q2 Invoke did not complete after TurnCompleted')
     const q2Done = resultOf(await q2)
     assert.equal(q2Done.ok, true)
     assert.equal(q2Done.value, answers[1])

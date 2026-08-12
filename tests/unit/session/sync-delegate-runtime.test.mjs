@@ -133,21 +133,50 @@ const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = '
   assert.equal(handled, true)
 }
 
-test('EXEC_026_sync_delegate_second_invoke_while_in_flight_is_rejected', async () => {
+test('EXEC_026_sync_delegate_concurrent_invokes_are_coalesced_into_single_prompt', async () => {
   await withHarness(async ({ runtime, prompts, createCalls }) => {
     const owner = 'ses_owner_flight'
     const first = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect first')
+    const second = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect second')
+
+    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'coalesced Invoke did not send')
+    assert.equal(createCalls.length, 1)
+    assert.equal(prompts.length, 1)
+    assert.equal(prompts[0].text, 'inspect first\n\ninspect second')
+
+    await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), 'combined answer')
+    const firstDone = resultOf(await first)
+    const secondDone = resultOf(await second)
+    assert.equal(firstDone.ok, true)
+    assert.equal(firstDone.value, 'combined answer')
+    assert.equal(secondDone.ok, true)
+    assert.equal(secondDone.value, 'combined answer')
+  })
+})
+
+test('EXEC_026_sync_delegate_in_flight_invoke_prompts_directly_and_queues_on_session', async () => {
+  await withHarness(async ({ runtime, prompts, createCalls }) => {
+    const owner = 'ses_owner_inflight'
+    const first = invoke(runtime, owner, SyncDelegateRole.Inspector, 'first in flight')
 
     await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'first Invoke did not send')
 
-    const second = resultOf(await invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect second'))
-    assert.equal(second.ok, false)
-    assert.match(second.error, /in flight/i)
+    const second = invoke(runtime, owner, SyncDelegateRole.Inspector, 'second arrival')
+    await waitFor(() => prompts.length === 2, 'second Invoke did not send prompt directly')
 
-    await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), 'first answer')
+    assert.equal(createCalls.length, 1, 'GetOrCreate must reuse child session')
+    assert.equal(prompts[0].text, 'first in flight')
+    assert.equal(prompts[1].text, 'second arrival')
+
+    await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), 'first answer', 'asst_turn1')
     const firstDone = resultOf(await first)
     assert.equal(firstDone.ok, true)
     assert.equal(firstDone.value, 'first answer')
+
+    await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), 'second answer', 'asst_turn2')
+    const secondDone = resultOf(await second)
+    assert.equal(secondDone.ok, true)
+    assert.equal(secondDone.value, 'second answer')
   })
 })
 
@@ -217,18 +246,7 @@ test('G2_inspector_Q1_Q2_Q3_same_session_serial_reuse', async () => {
     assert.equal(prompts[0].session, delegateId)
     assert.equal(prompts[0].text, 'Q1')
 
-    let q1Settled = false
-    q1.then(() => {
-      q1Settled = true
-    })
-    const earlyQ2 = resultOf(await invoke(runtime, owner, SyncDelegateRole.Inspector, 'Q2'))
-    assert.equal(earlyQ2.ok, false)
-    assert.match(earlyQ2.error, /in flight/i)
-    assert.equal(createCalls.length, 1)
-    assert.equal(prompts.length, 1)
-
     await settlePendingInvoke(runtime, delegateId, inspector, answers[0], 'asst_q1')
-    await waitFor(() => q1Settled, 'Q1 Invoke did not complete after TurnCompleted')
     const q1Done = resultOf(await q1)
     assert.equal(q1Done.ok, true)
     assert.equal(q1Done.value, answers[0])
@@ -241,23 +259,9 @@ test('G2_inspector_Q1_Q2_Q3_same_session_serial_reuse', async () => {
     assert.equal(prompts[1].session, delegateId)
     assert.equal(prompts[1].text, 'Q2')
 
-    let q2Settled = false
-    let q2Result
-    q2.then((value) => {
-      q2Settled = true
-      q2Result = value
-    })
-
-    const earlyQ3 = resultOf(await invoke(runtime, owner, SyncDelegateRole.Inspector, 'Q3'))
-    assert.equal(earlyQ3.ok, false)
-    assert.match(earlyQ3.error, /in flight/i)
-    assert.equal(createCalls.length, 1)
-    assert.equal(prompts.length, 2)
-
     const handled = await handleTurn(runtime, completionTurn(delegateId, inspector, answers[1], 'asst_q2'), undefined)
     assert.equal(handled, true)
-    await waitFor(() => q2Settled, 'Q2 Invoke did not complete after TurnCompleted')
-    const q2Done = resultOf(q2Result)
+    const q2Done = resultOf(await q2)
     assert.equal(q2Done.ok, true)
     assert.equal(q2Done.value, answers[1])
 

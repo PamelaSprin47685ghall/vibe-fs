@@ -270,7 +270,8 @@ before/after **不得**猜配 messageID。定位 ToolPart/assistant/run/ordinal/
 ### deferred materialization barrier + 非别名边界（HOST-019）
 
 ```text
-before live args → 纯内存 V1 sink 投影 → executor
+before live args → non-enumerable `todos` V1 view → executor
+                  JSON persistence 仍只见 `obligations`
         ↘ captured canonical
            deferred prepare:
            snapshot {} → wait/reread same physical carrier

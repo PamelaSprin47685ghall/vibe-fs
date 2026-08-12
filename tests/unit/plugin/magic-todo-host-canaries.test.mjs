@@ -185,7 +185,9 @@ test('MAGIC_TODO_CANARY_C_obligations_project_to_original_v1_decoder_shape', asy
   const beforeOutput = { args }
   await hostTrigger(hooks['tool.execute.before'], { tool: 'todowrite', sessionID: SESSION, callID: CALL }, beforeOutput)
 
-  assert.equal('obligations' in beforeOutput.args, false, 'C: provider field is absent from sink args')
+  assert.equal('obligations' in beforeOutput.args, true, 'C: provider input remains materializable')
+  assert.equal(Object.prototype.propertyIsEnumerable.call(beforeOutput.args, 'todos'), false, 'C: compatibility view stays off JSON persistence')
+  assert.equal(JSON.stringify(beforeOutput.args), JSON.stringify(raw), 'C: JSON persistence remains provider obligations only')
   for (const todo of beforeOutput.args.todos) {
     assert.equal(typeof todo.content, 'string')
     assert.equal(todo.status, 'in_progress')
@@ -207,7 +209,9 @@ test('MAGIC_TODO_CANARY_C_projection_helper_mutates_original_args_in_place', () 
   const originalObligations = args.obligations
   const result = projectObligationsToV1TodoRows(args)
   assert.equal(result, originalArgs, 'C: projection mutates the args object in place')
-  assert.equal('obligations' in args, false)
+  assert.equal('obligations' in args, true)
+  assert.equal(Object.prototype.propertyIsEnumerable.call(args, 'todos'), false)
+  assert.equal(JSON.stringify(args), JSON.stringify({ obligations: originalObligations }))
   assert.equal(args.todos.length, originalObligations.length)
   assert.equal(args.todos.every((t) => t.status === 'in_progress' && t.priority === 'medium'), true)
 })
@@ -299,7 +303,9 @@ test('MAGIC_TODO_CANARY_A_PRE_before_in_place_mutation_reaches_executor_replacem
   assert.equal(inPlace.decode.ok, true)
   assert.equal(inPlace.executorSawArgs, inPlaceArgs, 'A′: executor receives original args reference')
   assert.equal(inPlaceArgs.todos[0].status, 'in_progress', 'A′: in-place field writes are visible')
-  assert.equal('obligations' in inPlaceArgs, false, 'A′: provider-only account is removed from sink args')
+  assert.equal('obligations' in inPlaceArgs, true, 'A′: provider account remains intact for Host materialization')
+  assert.equal(Object.prototype.propertyIsEnumerable.call(inPlaceArgs, 'todos'), false)
+  assert.equal(JSON.stringify(inPlaceArgs), JSON.stringify({ obligations: inPlaceArgs.obligations }))
 
   // Anti-pattern: replacing output.args entirely (Host does not rebind).
   const original = sampleObligationTodoWriteArgs()
@@ -350,7 +356,8 @@ test('MAGIC_TODO_CANARY_A_PRE_definition_before_after_accept_host_positional_tri
     { tool: 'todowrite', sessionID: SESSION, callID: CALL },
     beforeOut,
   )
-  assert.equal('obligations' in beforeOut.args, false, 'A′: before is positional (input, output)')
+  assert.equal('obligations' in beforeOut.args, true, 'A′: before preserves provider input bytes')
+  assert.equal(Object.prototype.propertyIsEnumerable.call(beforeOut.args, 'todos'), false)
   assert.equal(beforeOut.args.todos[0].status, 'in_progress')
 
   const afterOut = { title: 't', output: 'o', metadata: {} }

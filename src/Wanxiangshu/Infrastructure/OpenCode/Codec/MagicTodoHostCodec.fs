@@ -70,11 +70,13 @@ module MagicTodoHostCodec =
 
     let canonicalInputDigest (sha256: string -> string) (args: obj) : string = canonicalInput args |> sha256
 
-    [<Emit("delete $0[$1]")>]
-    let private deleteField (target: obj) (name: string) : unit = jsNative
+    [<Emit("Object.defineProperty($0, 'todos', { value: $1, enumerable: false, configurable: true, writable: true })")>]
+    let private defineCompatibilityTodos (target: obj) (todos: obj) : unit = jsNative
 
-    /// HOST-019: mutate fields on the original args object. Rebinding output.args
-    /// is invisible to the Host executor and would also weaken alias canaries.
+    /// HOST-019: expose the V1 compatibility view without changing the provider
+    /// wire that the Host still needs to materialize. `todos` is deliberately
+    /// non-enumerable: Effect Schema can decode it, while JSON persistence keeps
+    /// the original enumerable `obligations` bytes.
     let replaceCompatibilityArgs (output: obj) (rows: MagicTodoSurface.CompatibilityTodoRow list) =
         let args: obj = output?args
 
@@ -90,8 +92,7 @@ module MagicTodoHostCodec =
                       "priority", box row.Priority ])
             |> List.toArray
 
-        args?todos <- box todos
-        deleteField args "obligations"
+        defineCompatibilityTodos args (box todos)
 
     let replaceEnrichedResult (output: obj) (text: string) = output?output <- box text
 

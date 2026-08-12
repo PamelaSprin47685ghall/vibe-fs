@@ -386,7 +386,7 @@ schema 锚 = `todowrite(obligations: [{ name, work }])`（TODO-002）；descript
 输入：`{ tool, sessionID, callID }` + `{ args }`。executor 只读**原地** `args` 字段；禁止 `output.args = newArgs` 重绑。
 
 ```text
-1. 同步 before：decode live `output.args` obligations；保存其 canonical；原地投影 compatibility rows；启动 per-call deferred prepare 后立即返回，让 builtin executor 不被 snapshot/Journal IO 阻塞。
+1. 同步 before：decode live `output.args` obligations；保存其 canonical；在原 args 上定义 non-enumerable `todos` compatibility rows（V1 decoder 可读，JSON persistence 不可见）；启动 per-call deferred prepare 后立即返回，让 builtin executor 不被 snapshot/Journal IO 阻塞。
 2. deferred prepare（HOST-019/025）：
    - sessionID+callID → 完整 SDK snapshot 唯一定位 ToolPart / assistant / provider run / ordinal / XTrace range；
    - snapshot `state=pending,input={}` → 异步等待并重读同一 callID，直到 materialize；

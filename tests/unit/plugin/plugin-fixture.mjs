@@ -725,12 +725,16 @@ export const runHostV1ToolExecutePath = async ({
 /** Project clean-break obligations into the original Host V1 compatibility sink. */
 export const projectObligationsToV1TodoRows = (args) => {
   if (!args || typeof args !== 'object' || !Array.isArray(args.obligations)) return args
-  args.todos = args.obligations.map((obligation) => ({
-    content: `${obligation.name}: ${obligation.work}`,
-    status: 'in_progress',
-    priority: 'medium',
-  }))
-  delete args.obligations
+  Object.defineProperty(args, 'todos', {
+    value: args.obligations.map((obligation) => ({
+      content: `${obligation.name}: ${obligation.work}`,
+      status: 'in_progress',
+      priority: 'medium',
+    })),
+    enumerable: false,
+    configurable: true,
+    writable: true,
+  })
   return args
 }
 

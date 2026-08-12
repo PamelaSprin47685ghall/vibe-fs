@@ -91,21 +91,22 @@ let invoke
                             let batch = initialBatch @ extraBatch
 
                             let! preparedPrompts =
-                                batch
-                                |> List.map (fun item ->
-                                    task {
+                                task {
+                                    let results = ResizeArray<string>()
+                                    for item in batch do
                                         try
-                                            return! item.PrepareProviderPrompt ()
+                                            let! p = item.PrepareProviderPrompt ()
+                                            results.Add p
                                         with _ ->
-                                            return item.Charge
-                                    })
-                                |> Task.WhenAll
+                                            results.Add item.Charge
+                                    return results |> Seq.toList
+                                }
 
                             let extraBatch2 = store.DrainBatch(ownerScope, role)
                             let fullBatch = batch @ extraBatch2
 
                             let fullPrompts =
-                                (preparedPrompts |> Array.toList)
+                                preparedPrompts
                                 @ (extraBatch2 |> List.map (fun i -> i.Charge))
 
                             let combinedCharge =
