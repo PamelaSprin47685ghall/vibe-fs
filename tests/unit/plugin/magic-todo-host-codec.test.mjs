@@ -23,6 +23,27 @@ test('TODO-002 decodes the clean-break obligations wire', () => {
   const malformed = magicTodoHost.decodeObligations({ obligations: [{ name: 1, work: 'x' }] })
   assert.equal(malformed.ok, false)
   assert.equal(malformed.error, 'todowrite.name must be a string')
+
+  const missingWork = magicTodoHost.decodeObligations({ obligations: [{ name: 'bridge' }] })
+  assert.equal(missingWork.ok, false)
+  assert.equal(missingWork.error, "todowrite obligation item requires field 'work'")
+
+  const missingName = magicTodoHost.decodeObligations({ obligations: [{ work: 'some work' }] })
+  assert.equal(missingName.ok, false)
+  assert.equal(missingName.error, "todowrite obligation item requires field 'name'")
+
+  const emptyName = magicTodoHost.decodeObligations({ obligations: [{ name: '   ', work: 'some work' }] })
+  assert.equal(emptyName.ok, false)
+  assert.equal(emptyName.error, 'todowrite obligation.name must be a non-empty string')
+
+  const duplicateName = magicTodoHost.decodeObligations({
+    obligations: [
+      { name: 'same', work: 'first' },
+      { name: 'same', work: 'second' },
+    ],
+  })
+  assert.equal(duplicateName.ok, false)
+  assert.equal(duplicateName.error, "todowrite duplicate obligation name 'same'")
 })
 
 test('TODO-007 projects obligations into the V1 sink by in-place mutation only', () => {

@@ -22,19 +22,24 @@ module MagicTodoHostCodec =
     [<Emit("JSON.parse($0)")>]
     let private parseJson (json: string) : obj = jsNative
 
-    let private optionalText (row: obj) (field: string) : Result<string option, string> =
+    let private requiredText (row: obj) (field: string) : Result<string, string> =
         if isNull row || isNull row?(field) then
-            Ok None
+            Error(sprintf "todowrite obligation item requires field '%s'" field)
         else
             let value = row?(field)
 
             if isString value then
-                Ok(Some(unbox<string> value))
+                let text = unbox<string> value
+
+                if field = "name" && String.IsNullOrWhiteSpace text then
+                    Error "todowrite obligation.name must be a non-empty string"
+                else
+                    Ok text
             else
                 Error(sprintf "todowrite.%s must be a string" field)
 
-    let private decodeObligationRow (row: obj) : Result<MagicTodoSurface.RawObligationFields, string> =
-        match optionalText row "name", optionalText row "work" with
+    let private decodeObligationRow (row: obj) : Result<MagicTodo.Obligation, string> =
+        match requiredText row "name", requiredText row "work" with
         | Ok name, Ok work -> Ok { Name = name; Work = work }
         | Error error, _
         | _, Error error -> Error error
@@ -47,15 +52,19 @@ module MagicTodoHostCodec =
         else
             let rows = unbox<obj array> args?obligations
 
-            let rec decode remaining acc =
+            let rec decode remaining acc seen =
                 match remaining with
-                | [] -> Ok(List.rev acc |> MagicTodoSurface.decodeObligations)
+                | [] -> Ok(List.rev acc)
                 | row :: tail ->
                     match decodeObligationRow row with
-                    | Ok decoded -> decode tail (decoded :: acc)
                     | Error error -> Error error
+                    | Ok obligation ->
+                        if Set.contains obligation.Name seen then
+                            Error(sprintf "todowrite duplicate obligation name '%s'" obligation.Name)
+                        else
+                            decode tail (obligation :: acc) (Set.add obligation.Name seen)
 
-            decode (Array.toList rows) []
+            decode (Array.toList rows) [] Set.empty
 
     let canonicalInput (args: obj) : string = CanonicalJson.canonicalJson args
 
