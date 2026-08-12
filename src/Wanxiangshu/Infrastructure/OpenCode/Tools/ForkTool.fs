@@ -18,7 +18,7 @@ module ForkTool =
           Charge = args.Text "charge" }
 
     let private consequence (message: string) =
-        ToolHostCodec.tomlObjectWithInstructions [ "# " + message ] []
+        ToolHostCodec.tomlObjectWithInstructions [ message ] []
 
     let private successInstruction (text: string) =
         ToolHostCodec.tomlObjectWithInstructions [ text ] []
@@ -92,7 +92,7 @@ module ForkTool =
                                     | Some managed -> managed.Name
                                     | None -> record.Agent
 
-                                return successInstruction (sprintf "# %s carries this charge now." label)
+                                return successInstruction (sprintf "%s carries this charge now." label)
                     | _, None, None ->
                         match ManagedAgent.tryParse request.Name with
                         | Some managed when forbiddenManagerRole managed -> return consequence HiddenTargetDeniedText
@@ -106,7 +106,7 @@ module ForkTool =
                             | Ok _ ->
                                 return
                                     successInstruction (
-                                        sprintf "# %s carries this charge now." (bynameOf request managed.Name)
+                                        sprintf "%s carries this charge now." (bynameOf request managed.Name)
                                     )
                             | Error _ -> return consequence "The charge could not be placed."
                         | Some managed when forbiddenManagerRole managed -> return consequence HiddenTargetDeniedText
@@ -133,7 +133,7 @@ module ForkTool =
                     match! host.ForkManagerJob(managerId, managed.Name, request.Charge) with
                     | Ok _ ->
                         return
-                            successInstruction (sprintf "# %s has taken your charge." (bynameOf request managed.Name))
+                            successInstruction (sprintf "%s has taken your charge." (bynameOf request managed.Name))
                     | Error _ -> return consequence "That road could not be opened."
                 | Some _ -> return consequence "Only a Manager can take an independent road."
                 | None ->
@@ -146,7 +146,7 @@ module ForkTool =
                         | Ok _ ->
                             return
                                 successInstruction (
-                                    sprintf "# %s has taken your charge." (bynameOf request request.Name)
+                                    sprintf "%s has taken your charge." (bynameOf request request.Name)
                                 )
                         | Error _ -> return consequence "No continuing road is known by that name."
                     else
