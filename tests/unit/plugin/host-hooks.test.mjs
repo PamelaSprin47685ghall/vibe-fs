@@ -107,6 +107,15 @@ const HOOK_FIXTURES = {
     },
   },
 
+  // PROMPT-017: the dedicated provider-system-transform tests prove localization.
+  // Here the completeness gate exercises the Host positional shape and fail-closed
+  // no-authority case: Host-owned system bytes must remain untouched.
+  'experimental.chat.system.transform': {
+    input: { sessionID: SESSION },
+    output: { system: ['HOST-OWNED-SYSTEM-BYTES'] },
+    assert: (output) => assert.deepEqual(output.system, ['HOST-OWNED-SYSTEM-BYTES']),
+  },
+
   // HOST-006 containment: this hook has no cancel field, so the plugin can only
   // observe. It must not throw — a throw here escapes into a Host callback.
   'experimental.session.compacting': {

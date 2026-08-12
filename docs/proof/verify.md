@@ -159,15 +159,16 @@ provider 失败、SSE 中断、超时、畸形参数属于传输层故障，不�
 
 ```text
 COMPANION-009  Epoch 切换：新 SealRoot，允许一次显式 prefix rebase
-FALLBACK-014   Fallback 换边：只改 EffectiveAgent；SessionPersona / SessionProviderLanguage / system prompt 字节不变（Gate D）
+FALLBACK-014   Fallback 换边：只改 EffectiveAgent；SessionPersona / SessionProviderLanguage / Wanxiangshu-owned system prompt 不变（Gate D）
+AGENT-031      NEEDHELP 换边：fast→deep 只改隐藏 ExecutionBinding；Authority / Persona / tools / transcript 不变
 ```
 
-历史第三例外 `StudentLearn → StudentCompile`（AGENT-020 / PROMPT-012）：**G3 已删除（absent）**，
+历史例外 `StudentLearn → StudentCompile`（AGENT-020 / PROMPT-012）：**G3 已删除（absent）**，
 不得再作冷边界或 scenario 声明位。
 
-上述两处必须由 scenario 显式声明发生位置。禁止由 mock 嗅探请求形状推断（例如「tools 与 system 未变即视为 epoch 切换」）——那会放过在不该切换处发生的切换。
+上述三处必须由 scenario 显式声明发生位置。禁止由 mock 嗅探请求形状推断（例如「tools 与 system 未变即视为 epoch 切换」）——那会放过在不该切换处发生的切换。
 
-禁止把 Fallback 冷边界写成「system prompt 因此可变」——那与 FALLBACK-014 / ARCH-016 Gate D 直接冲突。
+Gate D 冻结的是 Wanxiangshu-owned system prompt 语义。OpenCode 会在最终 provider system message 中写入当前 physical model id；Fallback/NEEDHELP 的 ExecutionBinding 切换允许**仅该 Host-owned model identity 字样**随 model 改变，不允许其它 system、tools 或历史消息改写。mock 必须先验证该替换，再用生产 `ProviderProjection.isAppendOnlyPrefix` 校验剩余 transcript；不得把这条规则扩大成「model 变了所以 system 任意可变」。
 
 未声明处任何前缀断裂 fail closed。
 

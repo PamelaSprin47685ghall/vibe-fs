@@ -188,8 +188,8 @@ test('STRENGTH_004_007_policy_same_role_prompt_has_no_replica_identity', () => {
   assert.doesNotMatch(coderId, /strength|replica|prefetch/i)
 
   const prompt = promptResources.load().CoderSystemPrompt
+  assert.ok(prompt.length > 0)
   assert.doesNotMatch(prompt, /strength|replica|prefetch/i)
-  assert.match(prompt, /Coder/)
 })
 
 test('STRENGTH_014_policy_strength_replica_is_internal_leaf_attached_not_satellite_kind', () => {

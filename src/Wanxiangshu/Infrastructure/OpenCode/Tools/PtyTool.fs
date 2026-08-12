@@ -117,10 +117,7 @@ module PtyTool =
                             | Ok _ ->
                                 return
                                     instruction (
-                                        sprintf
-                                            "%s was sent to %s."
-                                            (signalRaw.Trim().ToUpperInvariant())
-                                            (name.Trim())
+                                        sprintf "%s was sent to %s." (signalRaw.Trim().ToUpperInvariant()) (name.Trim())
                                     )
                             | Error sendError -> return error sendError
         }
@@ -170,4 +167,3 @@ module PtyTool =
           sendSpec factory scope
           readSpec factory scope
           signalSpec factory scope ]
-

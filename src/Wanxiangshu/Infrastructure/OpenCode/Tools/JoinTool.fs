@@ -88,14 +88,12 @@ module JoinTool =
                                     .JoinPublishedAvailable(JoinBatch.Max, attempt.Wait))
 
                         match outcome with
-                        | Error _ ->
-                            return consequence [ "The orchestrator is not ready to join yet." ]
+                        | Error _ -> return consequence [ "The orchestrator is not ready to join yet." ]
                         | Ok(Interrupted reason) -> return JoinResultRenderer.renderInterrupted reason
                         | Ok(ResultsAvailable batch) -> return JoinResultRenderer.renderOrchestratorBatch batch
                     else
                         match scope.RuntimeFor context with
-                        | Error _ ->
-                            return consequence [ "Join is unavailable from this execution context." ]
+                        | Error _ -> return consequence [ "Join is unavailable from this execution context." ]
                         | Ok runtime ->
                             let isDevOps = scope.IsRole(context, Role.DevOps)
 

@@ -96,4 +96,3 @@ module CoderTool =
             factory
             scope
             syncDelegate
-

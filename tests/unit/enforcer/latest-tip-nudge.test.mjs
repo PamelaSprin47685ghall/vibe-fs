@@ -93,10 +93,7 @@ test('ENFORCER_TIP_NUDGE_001_latest_tip_first_delivery_is_full_main_md', () => {
     const result = latestTipNudge(fixture.journal, blogger)
     assert.ok(typeof result === 'string' && result.length > 0, 'expected tip guidance text')
     assert.match(result, /tip = "primitive-obsession"/)
-    assert.match(
-      result,
-      /Introduce a distinct (domain )?type/,
-    )
+    assert.match(result, /Create a distinct (domain )?type/)
     // Second call for same tip must be identity-only (durable Full delivery recorded).
     const again = latestTipNudge(fixture.journal, blogger)
     assert.equal(again, 'tip: primitive-obsession')

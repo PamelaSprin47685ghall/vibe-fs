@@ -263,6 +263,11 @@ user = "# 你刚刚主动请求了协作。现在以同一角色的更强推理�
   [[turn.step]]
   respond = { type = "text", reasoningOnly = "[NEEDHELP]" }
 
+[[epoch]]
+turn = "needhelp-owner-deep"
+step = 0
+reason = "assistance-side"
+
 [[turn]]
 id = "needhelp-consult-title"
 internal = true

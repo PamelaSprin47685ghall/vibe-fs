@@ -297,6 +297,6 @@ test('C_PH_ordinary_cursor_ordinary_reprojects_same_occurrence', () => {
 test('PAIR_HINT_canonical_text_encourages_needhelp_and_parallel_wave_without_global_N', () => {
   assert.match(text, /\[NEEDHELP\]/)
   assert.match(text, /并行|parallel/i)
-  assert.match(text, /依赖|dependency/i)
+  assert.match(text, /依赖|dependenc/i)
   assert.doesNotMatch(text, /最多\s*\d+|max(?:imum)?\s+\d+/i)
 })

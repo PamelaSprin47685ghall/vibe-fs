@@ -61,13 +61,12 @@ test('AGENT_017_mv_renames_a_directory', async () => {
 test('AGENT_017_mv_missing_source_returns_error', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'coder-mv-missing', 'fast-coder')
-    const result = parseToml(
-      await hooks.tool.mv.execute(
-        { source: join(directory, 'nope.txt'), destination: join(directory, 'x.txt') },
-        { sessionID: 'coder-mv-missing', agent: 'fast-coder' },
-      ),
+    const text = await hooks.tool.mv.execute(
+      { source: join(directory, 'nope.txt'), destination: join(directory, 'x.txt') },
+      { sessionID: 'coder-mv-missing', agent: 'fast-coder' },
     )
-    assert.match(result.error, /No such file or directory/)
+    assert.match(text, /No such file or directory/)
+    assert.equal(parseToml(text).error, undefined)
   })
 })
 
@@ -108,11 +107,10 @@ test('AGENT_018_rm_refuses_a_non_empty_directory', async () => {
     mkdirSync(path)
     writeFileSync(join(path, 'inner.txt'), 'payload')
 
-    const result = parseToml(
-      await hooks.tool.rm.execute({ path }, { sessionID: 'coder-rm-nonempty', agent: 'fast-coder' }),
-    )
+    const text = await hooks.tool.rm.execute({ path }, { sessionID: 'coder-rm-nonempty', agent: 'fast-coder' })
 
-    assert.match(result.error, /directory not empty/)
+    assert.match(text, /directory not empty/)
+    assert.equal(parseToml(text).error, undefined)
     assert.equal(isDirectory(path), true, 'non-empty directory must survive rm')
     assert.equal(existsSync(join(path, 'inner.txt')), true, 'contents must survive rm')
   })
@@ -121,10 +119,12 @@ test('AGENT_018_rm_refuses_a_non_empty_directory', async () => {
 test('AGENT_018_rm_missing_path_returns_error', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'coder-rm-missing', 'fast-coder')
-    const result = parseToml(
-      await hooks.tool.rm.execute({ path: join(directory, 'nope.txt') }, { sessionID: 'coder-rm-missing', agent: 'fast-coder' }),
+    const text = await hooks.tool.rm.execute(
+      { path: join(directory, 'nope.txt') },
+      { sessionID: 'coder-rm-missing', agent: 'fast-coder' },
     )
-    assert.match(result.error, /No such file or directory/)
+    assert.match(text, /No such file or directory/)
+    assert.equal(parseToml(text).error, undefined)
   })
 })
 
@@ -134,18 +134,16 @@ test('AGENT_016_mv_and_rm_are_denied_for_non_coder_roles', async () => {
     acceptAuthorityRoot(runtime, 'manager-mv-rm', 'fast-manager')
     const context = { sessionID: 'manager-mv-rm', agent: 'fast-manager' }
 
-    const mvResult = parseToml(
-      await hooks.tool.mv.execute(
-        { source: join(directory, 'a.txt'), destination: join(directory, 'b.txt') },
-        context,
-      ),
+    const mvResult = await hooks.tool.mv.execute(
+      { source: join(directory, 'a.txt'), destination: join(directory, 'b.txt') },
+      context,
     )
-    assert.match(mvResult.error, /not permitted for role/)
+    assert.match(mvResult, /mv is not available to Manager\./)
+    assert.equal(parseToml(mvResult).error, undefined)
 
-    const rmResult = parseToml(
-      await hooks.tool.rm.execute({ path: join(directory, 'a.txt') }, context),
-    )
-    assert.match(rmResult.error, /not permitted for role/)
+    const rmResult = await hooks.tool.rm.execute({ path: join(directory, 'a.txt') }, context)
+    assert.match(rmResult, /rm is not available to Manager\./)
+    assert.equal(parseToml(rmResult).error, undefined)
   })
 })
 
@@ -154,17 +152,15 @@ test('AGENT_016_mv_and_rm_are_denied_when_the_role_is_unresolved', async () => {
     // No Authority Root: AGENT-007 layer two fail-closed — the tool must not run.
     const context = { sessionID: 'unresolved-mv-rm', agent: 'fast-manager' }
 
-    const mvResult = parseToml(
-      await hooks.tool.mv.execute(
-        { source: join(directory, 'a.txt'), destination: join(directory, 'b.txt') },
-        context,
-      ),
+    const mvResult = await hooks.tool.mv.execute(
+      { source: join(directory, 'a.txt'), destination: join(directory, 'b.txt') },
+      context,
     )
-    assert.match(mvResult.error, /no Authority Root fixes this session's role/)
+    assert.match(mvResult, /This tool is unavailable until the caller's authority is established\./)
+    assert.equal(parseToml(mvResult).error, undefined)
 
-    const rmResult = parseToml(
-      await hooks.tool.rm.execute({ path: join(directory, 'a.txt') }, context),
-    )
-    assert.match(rmResult.error, /no Authority Root fixes this session's role/)
+    const rmResult = await hooks.tool.rm.execute({ path: join(directory, 'a.txt') }, context)
+    assert.match(rmResult, /This tool is unavailable until the caller's authority is established\./)
+    assert.equal(parseToml(rmResult).error, undefined)
   })
 })

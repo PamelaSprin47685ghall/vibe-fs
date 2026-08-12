@@ -22,11 +22,7 @@ module BookkeeperStaging =
             | false, _ -> Error missingTransaction
             | true, slot -> Ok(slot.Question, slot.Answer))
 
-    let apply
-        (txId: string)
-        (question: string option)
-        (answer: string option)
-        : Result<unit, string> =
+    let apply (txId: string) (question: string option) (answer: string option) : Result<unit, string> =
         lock gate (fun () ->
             match slots.TryGetValue txId with
             | false, _ -> Error missingTransaction

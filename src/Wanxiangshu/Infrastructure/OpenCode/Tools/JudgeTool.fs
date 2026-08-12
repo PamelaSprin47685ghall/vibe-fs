@@ -44,10 +44,7 @@ module JudgeTool =
         ToolHostCodec.tomlObjectWithInstructions [ "Your judgment has been received." ] []
 
     let private notReceived reason =
-        ToolHostCodec.tomlObjectWithInstructions
-            [ "Your judgment was not received."
-              reason ]
-            []
+        ToolHostCodec.tomlObjectWithInstructions [ "Your judgment was not received."; reason ] []
 
     let private challengeUnproven () =
         notReceived "The previous challenge is not proven to have reached this review turn."
@@ -97,8 +94,7 @@ module JudgeTool =
                 | None, _, _, _
                 | _, None, _, _
                 | _, _, None, _
-                | _, _, _, None ->
-                    return notReceived "The review context is incomplete, so no judgment was recorded."
+                | _, _, _, None -> return notReceived "The review context is incomplete, so no judgment was recorded."
                 | Some journal, Some managerSessionId, Some gitTree, Some barrierId ->
                     let managerJobId, worktreeIdentity = jobIdentity scope managerSessionId
 

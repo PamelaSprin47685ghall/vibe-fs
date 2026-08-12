@@ -14,9 +14,7 @@ module FetchTool =
         System.Collections.Generic.Dictionary<string, System.Threading.Tasks.Task<string>>()
 
     let private answerResult (consequence: string) (answer: string) =
-        ToolHostCodec.tomlObjectWithInstructions
-            [ consequence ]
-            [ "answer", ToolHostCodec.TString answer ]
+        ToolHostCodec.tomlObjectWithInstructions [ consequence ] [ "answer", ToolHostCodec.TString answer ]
 
     let private fresh workspaceRoot sessionId answer =
         CasebookLifecycle.touchAccess workspaceRoot sessionId
@@ -24,6 +22,7 @@ module FetchTool =
 
     let private refreshed workspaceRoot sessionId answer =
         CasebookLifecycle.touchAccess workspaceRoot sessionId
+
         answerResult
             "The evidence this case depended on had changed. The case was revised against the current evidence."
             answer
@@ -71,12 +70,7 @@ module FetchTool =
                     | Error _ -> return stale case.A
         }
 
-    let spec
-        (factory: HostToolFactory)
-        (workspaceRoot: string)
-        (store: IEventStore)
-        (raw: IGitRawStore)
-        : ToolSpec =
+    let spec (factory: HostToolFactory) (workspaceRoot: string) (store: IEventStore) (raw: IGitRawStore) : ToolSpec =
         { Name = "fetch"
           Description =
             "Fetch a completed Casebook account by shelfmark. Returns the exact canonical answer with a freshness consequence; never investigates or modifies the repository."
@@ -87,8 +81,7 @@ module FetchTool =
                     let shelfmark = args.Text "shelfmark"
 
                     if System.String.IsNullOrWhiteSpace shelfmark then
-                        return
-                            ToolHostCodec.tomlObjectWithInstructions [ "A Casebook shelfmark is required." ] []
+                        return ToolHostCodec.tomlObjectWithInstructions [ "A Casebook shelfmark is required." ] []
                     else
                         let! result =
                             lock fetchGate (fun () ->

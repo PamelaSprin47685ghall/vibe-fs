@@ -1,5 +1,5 @@
 /**
- * cold-boundary.js — the two declared exceptions to the prefix seal.
+ * cold-boundary.js — explicit declared exceptions to the prefix seal.
  *
  * ARCH-004 keeps the provider-visible prefix byte-stable so KV-cache hits. VERIFY-003
  * §"冷边界显式声明" names the only two legitimate exceptions and requires the scenario
@@ -7,6 +7,7 @@
  *
  *   COMPANION-009  epoch switch — new SealRoot, one explicit prefix rebase
  *   FALLBACK-004   fallback side switch — EffectiveAgent moves, so the model does
+ *   AGENT-031      assistance side switch — hidden execution binding moves fast→deep
  *
  * Sniffing is forbidden, and package K1 measured why. The deleted `epochCold`
  * exemption read "tools and the leading system message unchanged" and then admitted
@@ -26,12 +27,13 @@
  * declares it cannot use it to smuggle a message rewrite past the barrier.
  */
 
-import { isAppendOnlyPrefix, wireOf } from './provider-wire.js';
+import { assistanceBindingPrefixHolds, isAppendOnlyPrefix, wireOf } from './provider-wire.js';
 import { equals } from '../../../dist/fable_modules/fable-library-js.5.13.0/Util.js';
 
 export const BOUNDARY_KINDS = [
   'epoch-switch',
   'fallback-side',
+  'assistance-side',
   'prefix-probe',
   'frame-commit',
   'request-kind-switch',
@@ -165,6 +167,15 @@ export function sealDecision({ previousWire, body, boundary }) {
       return messagesStillAppendOnly(previousWire, nextWire)
         ? { resealed: 'fallback-side' }
         : { broken: 'fallback-side-rewrote-messages' };
+
+    // AGENT-031: NEEDHELP fast→deep changes only the hidden execution binding.
+    // Wanxiangshu-owned prompt semantics stay fixed; OpenCode's own leading system
+    // message substitutes the physical model id. The provider-wire helper admits
+    // exactly that substitution plus ordinary append-only transcript growth.
+    case 'assistance-side':
+      return assistanceBindingPrefixHolds(previousWire, body)
+        ? { resealed: 'assistance-side' }
+        : { broken: 'assistance-side-rewrote-prefix' };
 
     // CTX-010: an attempt-local X prefix probe replaces the committed prefix with a
     // synthetic companion-memory head plus the tail after the candidate cutoff. The

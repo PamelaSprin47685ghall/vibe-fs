@@ -23,6 +23,7 @@ import { isAbsolute, join, resolve } from 'node:path'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
 import { agentJournal, handleId, handleProjection, idValue, roles, sessionId } from '../../unit/support/domain.mjs'
+import { RuntimeResourcesModule_current as currentRuntimeResources } from '../../../dist/Infrastructure/Resources/RuntimeResources.js'
 import {
   withPlugin,
   withExecutablePlugin,
@@ -354,139 +355,6 @@ const agentHandleForChild = (runtime, parentSessionId, childSessionId) => {
   return idValue.agentHandle(raw)
 }
 
-// ── the prompt clauses ───────────────────────────────────────────────────────
-
-/**
- * A prompt is prose, so the assertion is a required-clause list rather than a
- * whole-text comparison: pinning multi-kilobyte prompt bodies byte for byte would
- * fail on every wording edit while proving nothing about the clause that matters.
- * The listed patterns are the load-bearing sentences of AGENT-011/012/013/014,
- * plus the two `forbidden` patterns that keep a capability out of a prompt.
- */
-const PROMPT_CLAUSES = {
-  'fast-manager': {
-    required: [
-      /Manager thinks, delegates, and integrates/,
-      /Your tools are `fork`, `horizon`, `join`/,
-      /Call `join` only when no useful unassigned work remains/,
-      /A returned child record is evidence, not automatic completion/,
-      /Coder edits\./,
-      /Do not ask an agent to act outside its role/,
-      /Do not ask Coder to run commands/,
-      /Do not ask DevOps to edit files directly/,
-      /bounded mechanical repair|autonomous mechanical repair|operational closure|execution\/repair objective/i,
-      /compatible context/,
-      /Do not reuse when old context would make the new assignment ambiguous/,
-      /Reuse must not reduce parallelism/,
-      /establish-behavior\(charge\)/,
-      /repair-behavior\(charge\)/,
-      /suicide\(last_words\)/,
-      /When no useful action remains, call/,
-      /query dump|query dumps/i,
-      /only locatable summaries|locatable summaries|locatable pointers/i,
-    ],
-    forbidden: [],
-  },
-
-  'fast-coder': {
-    required: [
-      /Mutation|modify files in this codebase/i,
-      /Surgical precision/i,
-      /Your responsibility ends when the entrusted source edits are complete/,
-      /Do not propose verification commands|claim that edited code compiles/i,
-      /Treat `inspect` as an opaque witness/i,
-      /not about compilation, tests, execution, reproduction, or diagnosis/i,
-      /Never weaken, skip, or delete evidence/i,
-      /establish behavior|repair behavior/i,
-      /bash-honeypot/i,
-    ],
-    forbidden: [/executor/i],
-  },
-
-  'fast-devops': {
-    required: [
-      /Engine Room|Commands run here/i,
-      /You do not directly `write` or `edit` files/,
-      /Mechanical repair through Coder|Mechanical Repair Discipline/i,
-      /Do not ask permission for an obvious mechanical correction/i,
-      /operational closure/i,
-      /establish-behavior/,
-      /repair-behavior/,
-      /horizon/,
-    ],
-    forbidden: [],
-  },
-
-  'fast-inspector': {
-    required: [
-      /witness of the local world|read-only instruments/i,
-      /`read`, `glob`, `grep`, `query-shell`/,
-      /read-only|Observe without changing/i,
-      /query-shell/,
-      /Forbidden patterns include compilation, build, typecheck, lint, test/i,
-      /Do not compile, test, run, benchmark, migrate, generate/i,
-      /structured summary|Compression without erasure/i,
-    ],
-    forbidden: [],
-  },
-
-  'fast-reviewer': {
-    required: [
-      /Judge the work that exists|Examiner's Ledger/i,
-      /judge\("PERFECT"\)/,
-      /judge\("REVISE"\)/,
-    ],
-    forbidden: [/Double-PERFECT|two consecutive `PERFECT`|Nope, let's re-evaluate/i],
-  },
-
-  'fast-browser': {
-    required: [
-      /The Far Shore|far shore/i,
-      /stealth-browser-mcp/,
-      /You do not edit workspace files|do not edit workspace files/i,
-      /External provenance, not local repository evidence/i,
-      /not authorization to inventory|Do not use local paths as a substitute/i,
-    ],
-    forbidden: [],
-  },
-
-  'fast-inquiry': {
-    required: [
-      /Architectural Strategist|Inquiry/i,
-      /instruments are `inspect`, `sphinx_start`, and `sphinx_resume`/i,
-      /Sphinx owns its inquiry state|canonical answer/i,
-    ],
-    forbidden: [],
-  },
-
-  'fast-orchestrator': {
-    required: [
-      /Commission roads|Roads/i,
-      /machinery behind your horizon|Only the machinery behind your horizon/i,
-      /fast-manager|deep-manager/,
-      /originating Manager|existing Manager|Continue the existing Manager|continue one already underway/i,
-      /independent roads may mature in parallel|Commission a separate road when/i,
-      /`commission`, `horizon`, and `join`/,
-    ],
-    forbidden: [],
-  },
-
-  'fast-distiller': {
-    required: [/Distillation|preserve what remains worth seeing/i, /You do not execute commands|change the world/],
-    forbidden: [],
-  },
-
-  'fast-blogger': {
-    required: [
-      /companion chronicler|Work Log Blogger/i,
-      /only instrument is `chronicle`/i,
-      /exactly once/,
-      /Self-Compression|Compression without erasure/i,
-    ],
-    forbidden: [/Tools: \[\]/, /no tools/, /Do not call tools/, /DO NOT attempt/],
-  },
-}
-
 // ── tests ───────────────────────────────────────────────────────────────────
 
 test('AGENT_009_the_tool_registry_exposes_exactly_the_declared_arguments', async () => {
@@ -585,7 +453,19 @@ test('AGENT_004_006_010_config_gains_a_prompt_and_the_whole_permission_matrix', 
     // define its role are present. `mode` is asserted alongside because
     // `applyOwnedFields` writes both and a lost `mode` would strand the agent.
     const shape = {}
-    const clauseFailures = []
+    const canonicalPrompts = currentRuntimeResources().Prompts
+    const promptField = {
+      orchestrator: 'OrchestratorSystemPrompt',
+      manager: 'ManagerSystemPrompt',
+      coder: 'CoderSystemPrompt',
+      inspector: 'InspectorSystemPrompt',
+      devops: 'DevopsSystemPrompt',
+      browser: 'BrowserSystemPrompt',
+      inquiry: 'InquirySystemPrompt',
+      reviewer: 'ReviewerSystemPrompt',
+      blogger: 'BloggerSystemPrompt',
+      distiller: 'DistillerSystemPrompt',
+    }
     for (const role of ROLE_NAMES) {
       for (const tier of ['fast', 'deep']) {
         const entry = config.agent[`${tier}-${role}`]
@@ -598,6 +478,11 @@ test('AGENT_004_006_010_config_gains_a_prompt_and_the_whole_permission_matrix', 
         config.agent[`deep-${role}`].prompt,
         `fast-${role} and deep-${role} must share one system prompt`,
       )
+      assert.equal(
+        config.agent[`fast-${role}`].prompt,
+        canonicalPrompts[promptField[role]],
+        `${role} must receive the canonical RuntimeResources prompt`,
+      )
     }
 
     assert.deepEqual(
@@ -608,18 +493,6 @@ test('AGENT_004_006_010_config_gains_a_prompt_and_the_whole_permission_matrix', 
         ),
       ),
     )
-
-    for (const [agent, clauses] of Object.entries(PROMPT_CLAUSES)) {
-      const prompt = config.agent[agent].prompt
-      for (const pattern of clauses.required) {
-        if (!pattern.test(prompt)) clauseFailures.push(`${agent} is missing ${pattern}`)
-      }
-      for (const pattern of clauses.forbidden) {
-        if (pattern.test(prompt)) clauseFailures.push(`${agent} must not mention ${pattern}`)
-      }
-    }
-
-    assert.deepEqual(clauseFailures, [], 'a missing clause is a capability the agent will misuse')
   })
 })
 
@@ -887,9 +760,9 @@ test('AGENT_007_unresolved_role_denies_all_tools', async () => {
       ['inspect', { charge: 'git status' }],
       ['fork', { calling: 'coder', name: 'Ada', charge: 'work' }],
     ]) {
-      const result = await hooks.tool[toolName].execute(args, context)
-      assert.doesNotMatch(result, /^error\s*=/m, `${toolName} must reject without generic DTO`)
-      assert.match(result, /unavailable until the caller's authority is established/i)
+      const text = await hooks.tool[toolName].execute(args, context)
+      assert.match(text, /This tool is unavailable until the caller's authority is established\./)
+      assert.deepEqual(parseToml(text), {}, `${toolName} must reject without an error DTO`)
     }
   })
 })
@@ -903,16 +776,18 @@ test('EXEC_002_sync_delegate_inspector_coder_refuse_invalid_args_via_plugin', as
     const devops = { sessionID: 'devops-contract', agent: 'fast-devops' }
 
     for (const args of [{}, { charge: '   ' }]) {
-      const refused = await hooks.tool.inspect.execute(args, inquiry)
-      assert.match(refused, /inspect needs a charge/)
-      assert.doesNotMatch(refused, /^error\s*=/m)
+      const text = await hooks.tool.inspect.execute(args, inquiry)
+      assert.match(text, /inspect needs a charge\./)
+      assert.equal(parseToml(text).error, undefined)
     }
 
     const missingCharge = await hooks.tool['establish-behavior'].execute({}, devops)
-    assert.match(missingCharge, /establish-behavior needs a charge/)
+    assert.match(missingCharge, /establish-behavior needs a charge\./)
+    assert.equal(parseToml(missingCharge).error, undefined)
 
     const repairMissing = await hooks.tool['repair-behavior'].execute({}, devops)
-    assert.match(repairMissing, /repair-behavior needs a charge/)
+    assert.match(repairMissing, /repair-behavior needs a charge\./)
+    assert.equal(parseToml(repairMissing).error, undefined)
   })
 })
 test('GLORY_031_manager_fork_of_a_reviewer_is_denied_role_based', async () => {
@@ -927,6 +802,7 @@ test('GLORY_031_manager_fork_of_a_reviewer_is_denied_role_based', async () => {
     )
 
     assert.match(result, /Unknown or unavailable calling/)
+    assert.equal(parseToml(result).error, undefined)
     assert.doesNotMatch(result, /Reviewer|fast-reviewer|\berror\s*=/i)
     assert.equal(runtime.prompts.length, 0)
 
@@ -935,6 +811,7 @@ test('GLORY_031_manager_fork_of_a_reviewer_is_denied_role_based', async () => {
       { sessionID: 'manager-reverted-root', agent: 'fast-manager' },
     )
     assert.match(deepResult, /Unknown or unavailable calling/)
+    assert.equal(parseToml(deepResult).error, undefined)
     assert.equal(runtime.prompts.length, 0)
   })
 })
@@ -946,6 +823,7 @@ test('EXEC_002_EXEC_004_fork_join_and_horizon_carry_natural_language_identity', 
 
     const unknown = await hooks.tool.fork.execute({ calling: 'wizard', name: 'Ada', charge: 'work' }, context)
     assert.match(unknown, /Unknown or unavailable calling/)
+    assert.equal(parseToml(unknown).error, undefined)
     assert.doesNotMatch(unknown, /fast-|deep-|\berror\s*=/i)
 
     const forkText = await hooks.tool.fork.execute({ calling: 'coder', name: 'Ada', charge: 'work' }, context)

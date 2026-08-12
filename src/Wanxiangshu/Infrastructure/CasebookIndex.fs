@@ -10,17 +10,11 @@ open Wanxiangshu.OpenCode
 /// identity remains an internal lookup key and never crosses the Casebook wire.
 module CasebookIndex =
 
-    type Entry =
-        { Shelfmark: string
-          Question: string }
+    type Entry = { Shelfmark: string; Question: string }
 
-    type Snapshot =
-        { Epoch: int64
-          Cases: Entry list }
+    type Snapshot = { Epoch: int64; Cases: Entry list }
 
-    type private ResolvedEntry =
-        { Public: Entry
-          Case: Case }
+    type private ResolvedEntry = { Public: Entry; Case: Case }
 
     let private gate = obj ()
     // DSL-MUTABLE: resource
@@ -42,26 +36,35 @@ module CasebookIndex =
                 |> Array.tryFind (String.IsNullOrWhiteSpace >> not)
                 |> Option.defaultValue "Untitled case"
 
-        let cleaned =
-            firstLine
-                .Trim()
-                .TrimStart([| '#'; '-'; '*'; ' '; '\t' |])
-                .Trim()
+        let cleaned = firstLine.Trim().TrimStart([| '#'; '-'; '*'; ' '; '\t' |]).Trim()
 
         let words =
             cleaned.Split([| ' '; '\t' |], StringSplitOptions.RemoveEmptyEntries)
             |> String.concat " "
 
-        let title = if String.IsNullOrWhiteSpace words then "Untitled case" else words
-        if title.Length <= 72 then title else title.Substring(0, 71).TrimEnd() + "…"
+        let title =
+            if String.IsNullOrWhiteSpace words then
+                "Untitled case"
+            else
+                words
+
+        if title.Length <= 72 then
+            title
+        else
+            title.Substring(0, 71).TrimEnd() + "…"
 
     /// Stable public locator. The suffix is a one-way catalog discriminator,
     /// never the durable session identity itself.
     let shelfmarkFor (sessionId: string) (canonicalQuestion: string) : string =
         let digest = ToolHostCodec.digest sessionId
+
         let discriminator =
             let colon = digest.IndexOf(':')
-            if colon >= 0 && colon + 1 < digest.Length then digest.Substring(colon + 1) else digest
+
+            if colon >= 0 && colon + 1 < digest.Length then
+                digest.Substring(colon + 1)
+            else
+                digest
 
         sprintf "%s · %s" (compactTitle canonicalQuestion) discriminator
 
@@ -109,14 +112,21 @@ module CasebookIndex =
                 | None -> { Epoch = 0L; Cases = [] }
             | Ok cases ->
                 let entries = publicEntries cases
-                let previousEpoch = frozen |> Option.map (fun snapshot -> snapshot.Epoch) |> Option.defaultValue -1L
+
+                let previousEpoch =
+                    frozen |> Option.map (fun snapshot -> snapshot.Epoch) |> Option.defaultValue -1L
 
                 let visibleChanged =
                     match frozen with
                     | None -> true
                     | Some snapshot -> snapshot.Cases <> entries
 
-                let epoch = if dirty || visibleChanged then previousEpoch + 1L else previousEpoch
+                let epoch =
+                    if dirty || visibleChanged then
+                        previousEpoch + 1L
+                    else
+                        previousEpoch
+
                 dirty <- false
 
                 let snapshot = { Epoch = epoch; Cases = entries }
