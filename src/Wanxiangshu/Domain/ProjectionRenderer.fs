@@ -22,9 +22,6 @@ module ProjectionConstants =
     let PairProgrammingGuidelineTextZhCn =
         "# 本工具是一个伪工具，由系统自动注入，并非你主动调用。它用于提醒你遵循与用户结对编程的理念：本轮推理请使用简体中文，即使 system prompt、tool description、tool output 或引用的代码使用其他语言。代码、标识符、文件路径、shell 命令以及未翻译的技术术语保持原文。"
 
-    let pairProgrammingGuidelineTextFor = function
-        | ProviderLanguage.English -> PairProgrammingGuidelineText
-        | ProviderLanguage.SimplifiedChinese -> PairProgrammingGuidelineTextZhCn
 
     /// 与 `ReviewChallenge.Text` 字节一致（REVIEW-003 bare sentence）。
     let ReviewChallengeText =

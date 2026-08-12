@@ -1,30 +1,57 @@
 # coverage-theater — Enforcer
 
 ## Definition
-Coverage theater occurs when execution metrics are treated as evidence of correctness even though the tests assert little or nothing that distinguishes correct behavior from plausible defects. The root-cause is that reachability metrics are treated as proof of correctness, so tests can stay green under defects that never violate an assertion.
+Coverage theater happens when **execution is presented as proof**.
+
+The code was reached. The branch counter moved. The file appeared in a report. None of those facts establish that the behavior was correct.
+
+The defect is not “coverage is bad.” Coverage is useful reconnaissance. The defect begins when reachability metrics are allowed to impersonate behavioral evidence.
 
 ## Governing Principle
-Coverage measures reachability, not truth. A line can execute under a test that would remain green if its result were inverted, its identity corrupted, or its error swallowed. Verification begins only where a test states a proposition capable of being false. The value of an assertion is therefore not that it exists, but that a realistic defect would violate it.
+A test earns its keep by making some plausible wrong implementation unacceptable.
+
+If a test would stay green when the returned identity is swapped, an error is swallowed, an ordering guarantee is reversed, an authorization check is bypassed, or a state transition is wrong, then hitting the relevant lines has not verified those properties.
+
+Modern coverage dashboards make this pathology seductive because they produce precise numbers. `94.7%` looks scientific. But precision about the wrong quantity is still ignorance. Line coverage can tell you where execution went. It cannot tell you whether the journey meant anything.
 
 ## Trigger When
-Trigger when tests increase line/branch/function coverage yet omit meaningful values, identities, invariants, ordering, or failure outcomes.
+Trigger when coverage or traversal is used as the central evidence for correctness while the assertions fail to distinguish realistic defects. Common forms:
+
+- tests call every method but assert only “not null,” “defined,” or “did not throw”;
+- snapshot assertions are so broad that nobody can name which semantic changes should fail them;
+- mocks are satisfied because calls occurred, while caller-visible outcome is never asserted;
+- tests exercise both branches but do not assert the branch-specific invariant;
+- a coverage threshold drives the addition of low-information tests whose only purpose is to color lines green;
+- mutation of a meaningful outcome would leave the suite green even though coverage remains high.
 
 ## Do Not Trigger When
-- Coverage is used only as a navigation signal and behavioral assertions independently prove the relevant contract.
-- A test asserts a caller-visible proposition that would fail under a realistic defect, even if it also raises coverage.
-- Measuring coverage in CI as a heatmap does not by itself constitute theater if it is not treated as the proof.
-- Property or contract tests that exercise many branches while asserting invariants are not metric substitutes.
+- Coverage is used as a map of unvisited risk after meaningful behavioral assertions already exist.
+- A smoke test intentionally proves only “the process starts” or “the endpoint responds,” and nobody claims it proves deeper semantics.
+- A broad property test touches many branches while asserting a real invariant capable of failing.
+- A test is narrow but protects the exact public behavior the change threatens; low coverage elsewhere is irrelevant to that claim.
 
 ## Distinguish From
-`weakened-test-to-pass` removes meaningful expectations. `test-implementation-coupled` asserts the wrong surface. This rule mistakes traversal of code for proof about code. Tie-break: if greenness comes from execution counts rather than a falsifiable proposition, this rule owns the case.
+`false-gate` means green is structurally disconnected from the advertised property. `coverage-theater` can have perfectly functioning tests and CI; the problem is that the proposition being tested is too weak.
+
+`test-implementation-coupled` may contain many assertions, but they constrain private choreography instead of useful behavior. `weakened-test-to-pass` begins when a formerly meaningful proposition is deliberately softened under pressure from red.
 
 ## Decision Procedure
-For each test, ask: which plausible defect makes this assertion fail? If no concrete defect can be named, the test is observation without judgment.
+For every test presented as evidence, ask:
+
+> Name one realistic defect in the changed behavior that would make this test fail.
+
+If the answer is “the line would not run,” “the mock would not be called,” or “coverage would drop,” keep asking. What wrong caller-visible result or violated invariant is actually rejected?
+
+Then mentally mutate the implementation: swap IDs, drop an error, reverse order, skip authorization, return stale state. If the test remains green, its execution count is not proof of that property.
 
 ## Examples
-- positive: a test calls every branch, asserts `expect(result).toBeDefined()`, and a swapped return still passes.
-- near-miss: coverage reports are consulted after tests that already assert identity, ordering, and failure outcomes.
-- counterexample: replace metric-only tests with assertions that fail if the caller-visible result, identity, or invariant is wrong.
+- positive: all branches of a parser execute, but the only assertion is `result !== undefined`; malformed input is silently accepted and coverage stays 100%.
+- positive: a service test snapshots a 500-line object; reviewers routinely update the snapshot wholesale without identifying which fields are contractual.
+- positive: a test verifies `repository.save` was called once but never asserts that the correct durable state was saved.
+- near-miss: coverage highlights an unvisited cancellation branch, prompting a new test that asserts cancellation actually prevents publication.
+- counterexample: a small contract test covers few implementation lines but fails if authorization, identity, or result semantics are wrong.
 
 ## Nudge
-Execution is not verification. Assert a property whose violation would matter to a caller, and make the test capable of turning red under a realistic defect.
+Coverage tells you where the flashlight passed.
+
+Verification asks whether you would notice the thief.

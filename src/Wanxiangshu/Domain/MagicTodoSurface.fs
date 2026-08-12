@@ -49,6 +49,10 @@ module MagicTodoSurface =
          review and starts the next checkpoint review. Do not emit multiple\n\
          todowrite calls in the same assistant message; the whole batch is rejected."
 
+    [<Literal>]
+    let TodoWriteDefinitionDescriptionZhCn =
+        "替换 mission 的完整 living obligation account。每个 obligation 使用 {\"name\":\"稳定且可读的名称\",\"work\":\"仍然欠下的工作\"}。只要 obligation 仍未解除就保留它；只有真实工作已经完成该义务后才移除。一次提交中的 name 必须非空且唯一。每次 accepted call 会同步前一个 process review，并启动下一次 checkpoint review。同一个 assistant message 不得发出多个 todowrite call；出现时整批拒绝。"
+
     /// JSON Schema fragment for tool.definition parameters / jsonSchema (both must update).
     let todoWriteJsonSchema: string =
         """{

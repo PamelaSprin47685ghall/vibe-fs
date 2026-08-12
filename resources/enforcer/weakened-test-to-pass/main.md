@@ -1,25 +1,61 @@
 # weakened-test-to-pass — Main
 
 ## What To Do Now
-Restore the behavioral expectation unless a separate authoritative decision changed the contract; then fix the implementation until it satisfies the preserved test. Change the test only if who owns the contract authorized a new promise.
+Restore the strongest expectation that the independently owned contract still requires.
+
+Then fix the implementation, not the examiner.
+
+If the contract truly changed, establish that fact first and rewrite the test to the new promise with explicit provenance. The green result should follow the decision; the decision must not be reverse-engineered from what the current implementation happens to pass.
 
 ## Why This Matters
-A test exists to make some implementations unacceptable. Weakening it solely because the current code fails removes exactly the pressure that gives verification value. The suite becomes a description of whatever the code already does rather than a constraint on what it is allowed to do.
+A test suite is one of the few places where the code is allowed to be told “no.”
+
+If production code can make its own failing witnesses less demanding, the suite stops governing behavior and becomes a generated autobiography of whatever the implementation currently does. Every regression can be normalized into a new expectation. Green becomes infinitely obtainable and therefore nearly meaningless.
+
+This is particularly acute when the same agent edits implementation and tests. Convenience collapses separation of powers. The remedy is not bureaucratic immobility; it is preserving a source of truth for **why the contract changed** that is independent of the failing code.
 
 ## Repair Strategy
-Recover the original requirement, isolate the failure mechanism, and repair production behavior. If the requirement truly changed, record that decision and rewrite the test to the new contract for that reason—not as a route to green.
+Recover the behavioral proposition before editing anything:
+
+- identify the original requirement, protocol, invariant, acceptance criterion, or caller dependency;
+- determine whether that proposition still belongs to the current task/product;
+- if it does, restore/preserve the test and repair production behavior;
+- if it does not, record the authoritative reason and write the new proposition precisely;
+- keep regression power: the old defective implementation should still fail for a contract-level reason unless the contract specifically legalized it.
+
+When snapshots are involved, review semantic differences field by field. Accept only intended changes. Prefer targeted assertions for critical fields rather than turning “update snapshot” into a rubber stamp.
+
+When a test was over-coupled to internals, remove the implementation detail and replace it with an observable contract assertion; do not merely delete pressure.
 
 ## Decision Branches
-If no independent contract change exists, restore the expectation and fix the implementation.
-If an authorized contract change exists, rewrite the test to the new promise for that reason, not to silence a failure.
+- **Requirement unchanged:** restore the expectation and fix implementation.
+- **Requirement intentionally changed:** cite/record the new contract and rewrite the test narrowly to it.
+- **Old test misunderstood the contract:** prove that from authoritative source, then correct the test; the current implementation's failure is not itself the proof.
+- **Assertion constrains private implementation only:** replace it with caller-visible behavior rather than preserve ceremony.
+- **Failure is nondeterministic:** fix nondeterminism; do not weaken the behavioral claim.
+- **Release pressure is the only reason:** the work is not green. Keep the failure visible and make an explicit risk/waiver decision if such authority exists.
 
 ## Common Wrong Fixes
-- Replace exact outcomes with broad truthiness, delete edge cases, or loosen fixtures without a disappeared requirement.
-- Mark the test skipped or flaky instead of settling the disagreement.
-- Assert only that no exception was thrown when the original claim was a specific result.
+- Replace exact equality with truthiness, broad ranges, substring checks, or “does not throw.”
+- Delete edge cases because “users probably won't do that” without a product boundary saying so.
+- Mark tests skipped/xfail/flaky and continue counting them as evidence.
+- Regenerate snapshots wholesale and rely on visual fatigue to hide unintended changes.
+- Change fixtures to easier inputs so the difficult boundary disappears.
+- Assert current implementation output as the expected value by importing/reusing the same production logic in the test.
+- Add comments explaining why the weaker assertion is “good enough.” Commentary does not create contract authority.
 
 ## Verification
-Invariant: green means the implementation satisfies an independently chosen contract. Temporarily restore the old defective implementation; the preserved or newly justified test should distinguish it from the required behavior for a contract-level reason.
+Prove that green remains adversarial.
+
+Temporarily reintroduce the defective behavior that motivated the weakening. If the contract did **not** change, the repaired test must go red.
+
+If the contract did change, construct a defect against the **new** promise and prove the rewritten test rejects it. A legitimate contract change changes which behavior is acceptable; it does not abolish the need for rejection power.
+
+Invariant:
+
+> The test suite constrains implementation according to an independently chosen contract; implementation failure cannot unilaterally redefine the contract.
 
 ## Done When
-Green means the implementation satisfies an independently chosen contract, not that the contract was reduced until the implementation could satisfy it.
+You can explain every relaxed expectation by pointing to a changed or corrected contract, not to a red build.
+
+The implementation may disagree with the test. It may not edit the disagreement out of existence.

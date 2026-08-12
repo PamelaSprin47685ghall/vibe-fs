@@ -20,6 +20,40 @@ type ToolRegistration =
 
 module ToolRegistry =
 
+    /// OpenCode `tool.definition` has no session id. Tool descriptions therefore
+    /// freeze to the process ProviderLanguage at registry creation; per-session
+    /// localization remains available for system/runtime prose where Host carries
+    /// session identity. Tool/argument names remain invariant.
+    let private descriptionFor (language: ProviderLanguage) (spec: ToolSpec) =
+        match language with
+        | ProviderLanguage.English -> spec.Description
+        | ProviderLanguage.SimplifiedChinese ->
+            match spec.Name with
+            | "fork" -> "把一项独立工作托付给另一个受管理的 Agent；返回的是工作已被托付的事实。"
+            | "commission" -> "委派一条由 Manager 独立承担并最终协调回共享目标的道路。"
+            | "open-terminal" -> "打开一个具名的持续交互 terminal，并在其中启动 command。"
+            | "send-terminal" -> "向具名 terminal 发送输入；缺少末尾换行时会自动补上。"
+            | "read-terminal" -> "读取具名 terminal 尚未读取的输出。"
+            | "signal-terminal" -> "向具名 terminal 发送结构化 process signal。"
+            | "join" -> "接收已经抵达或随后抵达的工作后果；仅在真实 dependency 需要时等待。"
+            | "horizon" -> "查看当前仍在远处、已经返回或仍存活的工作，用于方向判断而非读取内部状态机。"
+            | "fission" -> "请求让同一 Manager identity 获得多个独立 present。当前 MVP 在没有可证明容量时 fail closed，不创建虚假 lane。"
+            | "judge" -> "提交 Reviewer 对当前 review barrier 的判断。"
+            | "suicide" -> "当 mission 内已经没有有用工作时，寻求结束当前 Manager life。"
+            | "run" -> "在受限 deadline、output budget 与 shared-capacity 承诺下运行 command，并返回执行观察。"
+            | "query-shell" -> "通过静态 shell 查询建立 repository 中已经存在的事实；不得让项目运行起来。"
+            | "inspect" -> "请 Inspector 建立一个 repository 事实，并在普通完成后返回有界 WorkRecord。"
+            | "establish-behavior" -> "托付 Coder 写出能够建立目标 behavior 的源码证据；本工具自身不执行测试。"
+            | "repair-behavior" -> "托付 Coder 根据既有 runtime evidence 修复 behavior；执行验证仍属于 DevOps。"
+            | "mv" -> "移动或重命名文件或目录。"
+            | "rm" -> "删除文件或空目录；拒绝递归删除非空目录。"
+            | "bash-honeypot" -> "Honeypot：Coder 不得执行 bash；调用只会返回明确拒绝，不会运行任何 command。"
+            | "chronicle" -> "记录一个已经发生、值得未来记住的 occurrence，并选择它教会当前 participant 的 Tip。"
+            | "fetch" -> "读取一个已经完成并可复用的 Casebook case；不会重新调查世界。"
+            | "js-bookkeeper" -> "在 Bookkeeper 的 process-local staging 上原子更新当前 question/answer case。"
+            | name when name.StartsWith "js-" -> "在一次可编程调用中组合当前角色获授权的 repository 操作；不会扩大该角色的 capability。"
+            | _ -> spec.Description
+
     /// AGENT-007 role gate, plus request-scoped `chronicle` (CurrentRequest / InFlight).
     /// sessionId is the tool call's Host session; parkedHost is optional for tests.
     let rolePredicate (specName: string) (parkedHost: IParkedTransformHost option) (sessionId: string) : Role -> bool =
@@ -223,8 +257,14 @@ module ToolRegistry =
                                           ) ]
                 }
 
+        let providerLanguage = ProviderLanguageBinding.readGlobalPreference ()
+
         let specs =
-            baseSpecs |> List.map (fun spec -> { spec with Execute = gateExecute spec })
+            baseSpecs
+            |> List.map (fun spec ->
+                { spec with
+                    Description = descriptionFor providerLanguage spec
+                    Execute = gateExecute spec })
 
         { Tools = ToolHostCodec.registry factory specs
           Runtime = runtime }

@@ -1,30 +1,56 @@
 # unverified-completion-claim — Enforcer
 
 ## Definition
-A completion claim is unverified when work is declared done before the relevant behavior, build, check, reproduction, or external observation has established that the promised result actually holds.
+A completion claim is unverified when the sentence becomes stronger than the evidence. The defect is not “tests were not run” in the abstract. The defect is epistemic overreach: a participant reports an outcome as established when all it actually owns is a candidate change, a local contribution, an intention, or an unobserved expectation.
 
 ## Governing Principle
-“Done” is not a statement about effort; it is a statement about evidence. Editing creates a candidate solution. Verification turns that candidate into a justified claim by confronting it with an independent condition capable of failure. The root-cause is equating effort with evidence. Without that step, completion collapses intention and reality into one assertion: because the change was made, the desired outcome is assumed.
+“Done” is a claim about the world, not a mood about the diff.
+
+Editing proves that bytes changed. Reasoning may prove that the change is coherent. A compiler may prove a type-level property. A test may establish one behavioral distinction. A canary may establish one live-path observation. None of these automatically proves the others.
+
+The rule fires at the point where provenance is erased — when “I changed it” silently becomes “it works,” or “my bounded contribution is finished” silently becomes “the overall result is verified.”
+
+The most dangerous form is polished confidence after a long implementation session: effort creates psychological certainty precisely when independent evidence is most needed.
 
 ## Trigger When
-Trigger when implementation is reported complete without running the tests, checks, build, reproduction, or observable verification appropriate to the changed contract.
+Trigger when a participant makes or implies a completion-level claim that outruns the strongest relevant observation actually obtained. Typical cases:
+
+- source was edited and the response says the bug is fixed, but no observation established the behavioral result;
+- a narrow unit test passed and the response upgrades that to an integration or deployment claim;
+- verification belongs to another office, but the current participant writes as though that missing observation already happened;
+- a previous green run, another commit, another environment, or a speculative “should pass” is presented as current evidence;
+- a known verification gap is mentioned only as a footnote after an otherwise categorical “complete.”
 
 ## Do Not Trigger When
-- Planning-only work with no behavioral artifact to verify.
-- Applicable verification has run and its actual results are part of the completion evidence.
-- Remaining verification is listed explicitly and the work is not claimed complete.
-- The changed surface has no executable check yet, and that gap is reported as incomplete rather than done.
+- A participant truthfully reports that its bounded contribution is finished without claiming that the overall behavioral result has been verified.
+- The relevant completion claim is explicitly conditional: “source mutation is complete; runtime verification remains unobserved.”
+- The evidence required for the claim has actually been obtained, is current enough for the claim, and is capable of failing under a realistic defect in the changed surface.
+- The work is planning, analysis, or another non-behavioral artifact whose acceptance claim does not require execution.
+
+Do not punish role discipline. A Coder who correctly says “the source change is coherent; execution remains for DevOps” is not incomplete in its own office merely because the world still needs another observation.
 
 ## Distinguish From
-`false-gate` produces unreliable verification. `tool-error-ignored` discards known failed evidence. `release-ladder-skipped` omits ordered proof stages. Tie-break: if the final claim is made before sufficient evidence exists at all, use this rule; if a red tool result was seen and skipped, use `tool-error-ignored`.
+`tool-error-ignored` means contrary evidence already exists and is being waved away. `false-gate` means the supposed verification cannot reliably distinguish success from failure. `release-ladder-skipped` means required proof stages were bypassed. `guessed-not-verified` is broader: a specific factual assumption was left as a guess.
+
+Tie-break on the final speech act. If the central defect is that the participant upgraded what is known into “complete,” use this rule.
 
 ## Decision Procedure
-Translate “done” into falsifiable acceptance statements, run the narrowest checks that can disprove each one, and report the observed result rather than the intended result.
+Write the completion sentence as a falsifiable proposition. Then ask:
+
+1. What observation would be capable of proving this proposition false?
+2. Was that observation actually obtained for this change, in the relevant environment and scope?
+3. If not, does the participant own the capability to obtain it?
+4. If not, did the participant preserve the boundary and keep the larger claim open?
+
+If the answer to 2 is no and the prose still speaks as if the proposition were established, the rule applies.
 
 ## Examples
-- positive: a patch is declared complete after editing files, with tests never run.
-- near-miss: the relevant tests and build ran, failures are listed, and the claim is “not done.”
-- counterexample: tests ran red and were ignored while still claiming success — that is `tool-error-ignored`.
+- positive: “Fixed the race; all good.” The patch was edited, but no concurrent reproduction or relevant test was observed.
+- positive: “Deployment is healthy.” Only a local build was run.
+- near-miss: “Implemented the source change and added the regression test. I did not run it; DevOps still needs to establish behavior.” This is truthful bounded completion.
+- counterexample: the relevant test ran red, the failure was acknowledged, and the response still says success. That is `tool-error-ignored` as well as a false completion claim; prefer the ignored contrary evidence when it is the sharper diagnosis.
 
 ## Nudge
-Completion is a conclusion, not a feeling about the diff. Earn the word “done” with evidence that could have said “not done.”
+A candidate solution is not yet a verified outcome.
+
+Do not make the claim stronger than the evidence, and do not use that distinction as permission to cross an unrelated role boundary.

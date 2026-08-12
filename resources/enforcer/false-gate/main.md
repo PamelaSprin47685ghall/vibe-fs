@@ -1,27 +1,59 @@
 # false-gate — Main
 
 ## What To Do Now
-Add a self-test or known-bad fixture that demonstrates the gate turns red for the exact property it claims to enforce. The gate’s subject discovery, matching, and exit wiring are who owns the claim that green means the property held; a command that cannot turn red is not.
+Make the gate prove that it can reject the thing it claims to forbid.
+
+Create a minimal known-bad fixture inside the advertised scope and run the normal entry point. Keep repairing discovery, matching, assertions, exit propagation, and CI wiring until that fixture makes the gate red.
+
+Then remove or isolate the fixture without removing the self-test that proves the guard still has teeth.
 
 ## Why This Matters
-Green has meaning only as the negation of a possible red. A gate that cannot observe violations is not neutral; it is a confidence amplifier disconnected from reality. Teams then optimize for passing a ritual rather than preserving the invariant.
+Teams do not merely consume gate output; they **delegate vigilance** to gates. Once a check is called “required,” humans reasonably stop re-proving its property on every change.
+
+That delegation is only safe if green means something.
+
+A false gate is therefore not a weak test. It is a broken organizational contract. It says “you may trust this property” while the machinery is incapable of earning that trust. The prettier the CI badge and the more universal the script name, the more dangerous the lie.
 
 ## Repair Strategy
-Trace the gate’s subject discovery, matching logic, exit propagation, and CI wiring. Prove each link with a fixture that should fail, then remove any fail-open behavior that converts “checked nothing” into success.
+Trace the implication from property to pipeline, end to end:
+
+- **subject discovery:** prove the intended files/cases are actually enumerated;
+- **detector:** prove the known violation is recognized;
+- **failure semantics:** prove recognition produces non-zero / rejected state;
+- **wrapper:** prove shell/npm/task runners preserve that failure;
+- **pipeline:** prove CI marks the job red;
+- **scope drift:** prove future directory or extension changes cannot silently reduce the set to zero without a test noticing.
+
+Fail closed only where empty scope is itself evidence of misconfiguration. Do not blindly make every empty set an error; some checks legitimately have no subjects. The property decides.
 
 ## Decision Branches
-- If the gate can pass while checking zero subjects, fix discovery and fail closed on empty scope when the property requires subjects.
-- If a known violation stays green, repair matching, assertions, or exit propagation until that fixture is red.
-- If the detector works but CI swallows its failure, that wiring is also this rule until green implies the check ran and could fail.
+- **Zero relevant subjects but subjects should exist:** repair discovery and add a sentinel assertion proving the expected scope is non-empty.
+- **Violation is discovered but not classified:** repair the detector or rule boundary.
+- **Detector fails locally but CI is green:** repair exit/status propagation; do not touch detection logic.
+- **Baseline/exceptions swallow the new violation:** make admission explicit and reviewable, or make the check advisory. Never auto-grandfather debt while calling the result enforcement.
+- **The check is intentionally advisory:** rename/document it so nobody can mistake green for a compliance guarantee.
 
 ## Common Wrong Fixes
-- Do not merely add more logging or trust a successful manual run on clean code.
-- Do not widen the glob without a failing fixture.
-- Do not `|| true` the gate “so CI stays green while we iterate.”
-- Do not replace a tautological assert with another tautology (`expect(true)`).
+- Add more logging. Better narration does not create enforcement.
+- Widen a glob until today’s files happen to appear, without a failing fixture that prevents tomorrow’s drift.
+- Add `|| true`, `continue-on-error`, soft error conversion, or a wrapper that always exits 0 “temporarily.” Temporary false gates become permanent very quickly.
+- Test the detector through an internal helper while production uses a different wrapper path.
+- Assert only that “some files were scanned.” A scanner can inspect the right files and still be unable to recognize the forbidden state.
+- Regenerate a baseline automatically and call the disappearing delta “ratcheting.” That is debt laundering.
 
 ## Verification
-Run the gate against both a known violation and a known valid case. It must be red for the former and green for the latter through the same standard entry point. The invariant is that green is evidence because red has been demonstrated.
+Through the exact standard entry point, prove both directions with representative fixtures:
+
+- known bad → red;
+- known valid → green.
+
+Then break each critical link deliberately where practical: wrong path, detector violation, non-zero child status. The pipeline must not silently convert those failures into green.
+
+The invariant is simple:
+
+> Green is meaningful because a relevant red state has been demonstrated through the same path.
 
 ## Done When
-A green gate is evidence because its red state has been demonstrated, not because the command happened to exit successfully on today’s tree.
+A reasonable maintainer can answer “what concrete defect makes this gate red?” with a committed example, and the normal CI/local command proves the answer.
+
+Until then, remove the word “gate.”

@@ -6,6 +6,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Domain
 open Wanxiangshu.Finality
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure
@@ -47,6 +48,19 @@ module PluginHooks =
             // executor while this three-hook membrane owns provider schema,
             // durable checkpoint admission, and accepted-result enrichment.
             let magicTodo = MagicTodoHostHooks.create journal snapshotOpt
+            let providerLanguage = ProviderLanguageBinding.readGlobalPreference ()
+
+            let toolDefinition (toolInput: obj) (toolOutput: obj) =
+                magicTodo.Definition toolInput toolOutput
+
+                if
+                    providerLanguage = ProviderLanguage.SimplifiedChinese
+                    && not (isNull toolInput)
+                    && not (isNull toolInput?toolID)
+                    && string toolInput?toolID = "todowrite"
+                    && not (isNull toolOutput)
+                then
+                    toolOutput?description <- box MagicTodoSurface.TodoWriteDefinitionDescriptionZhCn
 
             let toolAfter (toolInput: obj) (toolOutput: obj) =
                 task {
@@ -131,12 +145,7 @@ module PluginHooks =
                       // Magic Todo definition/before/after are one V1 Host
                       // membrane. Definition must replace both schema surfaces;
                       // before mutates the original args object in place.
-                      "tool.definition",
-                      box (
-                          pairedHook (
-                              box (fun (hookInput: obj) (hookOutput: obj) -> magicTodo.Definition hookInput hookOutput)
-                          )
-                      )
+                      "tool.definition", box (pairedHook (box toolDefinition))
                       "tool.execute.before",
                       box (
                           pairedHook (

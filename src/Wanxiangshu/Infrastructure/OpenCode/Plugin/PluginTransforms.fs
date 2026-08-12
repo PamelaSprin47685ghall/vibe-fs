@@ -268,8 +268,9 @@ module PluginTransforms =
                     let guideline =
                         match projectionSessionIdOpt with
                         | Some sessionId ->
-                            ProviderLanguageBinding.ensureRoot (SessionId.create sessionId)
-                            |> ProjectionConstants.pairProgrammingGuidelineTextFor
+                            match ProviderLanguageBinding.ensureRoot (SessionId.create sessionId) with
+                            | ProviderLanguage.English -> ProjectionConstants.PairProgrammingGuidelineText
+                            | ProviderLanguage.SimplifiedChinese -> ProjectionConstants.PairProgrammingGuidelineTextZhCn
                         | None -> ProjectionConstants.PairProgrammingGuidelineText
 
                     let markerText =
