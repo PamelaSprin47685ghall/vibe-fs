@@ -1,33 +1,42 @@
 # blob-after-event — Enforcer
 
-## Definition
-A reference event is invalidly ordered when it becomes durable before the content it names is itself durably retrievable. The root-cause is that a durable event is appended before its named blob is itself durably retrievable, so replay can observe a committed reference to missing content.
+`blob-after-event` is a temporal referential-integrity failure: durable history names content before that content has crossed its own durability boundary.
 
-## Governing Principle
-A durable event is a promise to every future replay: “this fact existed.” If the event points to a blob that can still disappear, the log has recorded a world that never became reconstructible. Referential integrity is therefore temporal, not merely structural: the referent must become durable before the reference may become history.
+A reference is not just an identifier. Once a journal/event/manifest commits `blob = H`, it has made a promise to every future replay:
 
-## Trigger When
-Trigger when a journal, event store, manifest, or index appends a durable reference to large content before the blob write has completed and been verified according to the storage contract.
+> The content identified by H exists as part of this history and can be recovered under the storage contract.
 
-## Do Not Trigger When
-- The blob and reference are committed atomically by one storage transaction.
-- The reference deliberately denotes a content address already guaranteed durable.
-- The event stores the content inline and does not name an external blob.
-- A provisional local cache entry is not yet published as durable history.
+If the blob upload/write is still pending, only buffered in memory, only present in a temp path, or can still fail independently after the event becomes durable, the history has committed a statement it cannot yet prove.
 
-## Distinguish From
-`memory-before-disk` orders volatile state against durable facts. `partial-write-assumption` invents storage states. This rule concerns durable references whose targets may not yet exist durably. Tie-break: if a committed history record can name missing content, this rule owns the case.
+That creates dangling history rather than merely a missing cache entry.
 
-## Decision Procedure
-1. Identify the durable reference.
-2. Identify the storage guarantee for its target.
-3. Ask whether replay can observe the reference before the target is guaranteed readable.
-4. If yes, reverse the order or make the commit atomic.
+Fire this rule when:
 
-## Examples
-- positive: append an event with a blob id, then start the blob upload; a crash leaves a committed name with no bytes.
-- near-miss: one storage transaction writes blob and reference together, so replay never sees a dangling name.
-- counterexample: persist and verify the blob, then append the event that makes that content part of history.
+- an event/journal row containing a blob/content reference commits before the blob store confirms durable availability;
+- a manifest/index is published first and “large payload upload” follows asynchronously;
+- a content hash is computed from in-memory bytes, referenced durably, then the actual bytes are written later;
+- a blob write returns from a local buffer/temporary location while recovery requires a stronger remote/fsync/quorum durability boundary;
+- cleanup can remove a temp blob after its durable reference already exists;
+- replay has a normal branch for “event exists but blob missing” even though the domain never intended dangling references as a legal state.
 
-## Nudge
-Durability must flow from referent to reference. Persist and verify the blob first; only then append the event that makes its existence part of history.
+Do not fire when blob and reference commit atomically under one real transaction whose recovery guarantee covers both. Do not fire when the reference points to content already durably present under content-addressed semantics. Inline content also has no separate referent ordering problem.
+
+The relevant distinction from `memory-before-disk` is that both sides here may be durable artifacts. The defect is **ordering between durable referent and durable reference**, not volatile memory outrunning persistence.
+
+`partial-write-assumption` asks whether recovery invented an unsupported storage state. `blob-after-event` is different: a perfectly valid event can become a real committed dangling pointer because application ordering allowed it.
+
+A useful crash table:
+
+```text
+before blob durable               → no event reference may exist
+blob durable, before event append → orphan blob is acceptable/collectable
+after event append                → blob must be readable forever per retention policy
+```
+
+Notice the asymmetry. An unreferenced durable blob is usually recoverable garbage; a referenced missing blob is a contradiction in history. Therefore referent-first ordering deliberately prefers harmless orphan possibility over unrecoverable dangling reference.
+
+The repair must use the **actual durability success condition** of the blob store. “Upload request returned” is not enough if the storage API only guarantees availability after commit/quorum/finalize. Verify the boundary the replay path relies on.
+
+For content-addressed stores, also verify hash identity from the bytes actually persisted, not only from the caller's pre-upload buffer. The durable reference should identify what recovery will read.
+
+> Make the content real before making its name historical.

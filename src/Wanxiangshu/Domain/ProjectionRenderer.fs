@@ -403,24 +403,3 @@ module ProjectionRenderer =
                 Messages = snapshot.CurrentProjection.Messages |> List.truncate cutoff }
 
         sha256 (ProviderProjection.renderSemantic truncated)
-⚠ 1 unresolved conflict detected
-- ours = HEAD
-- theirs = wanxiangshu-even-more
-NOTICE: Inspect a block by reading `conflict://<N>` (add `/ours` / `/theirs` / `/base` to render a single side). Resolve with `write({ path: "conflict://<N>", content })`, or bulk-resolve every registered conflict with `write({ path: "conflict://*", content })`. Writes replace ONLY the marker block (markers + all sides) — never repeat the lines before/after it; they stay in place.
-`content` shorthand: a line that is exactly `@ours` / `@theirs` / `@base` / `@both` expands to that recorded section. `@both` is ours-then-theirs with no separator — only for additive conflicts where each side adds something different; NEVER for competing edits of the same lines (pick a side or write the combined text). Lines that are not a token pass through verbatim, so `"// keep both\n@ours\n@theirs"` literally writes the comment, then ours, then theirs.
-Per-id bulk: `write({ path: "conflict://*", content: "1: @ours\n2: @theirs\n…" })` resolves each listed id with that side in ONE call — the cheapest way through many pick-one conflicts; unlisted ids stay registered.
-Resolve each block faithfully: keep one side (`@ours`/`@theirs`), or combine them when both intents apply — never invent content beyond the recorded sides, and never stack both sides of competing edits. Resolve several conflicts in a single turn by issuing multiple `write` calls at once; ids stay valid as earlier blocks are resolved.
-
-──── #1  L17-30 ────
-<<< ours
-    /// HOST-013 pair-programming auto-injected marker. ProviderLanguage changes
-    /// authored prose only; code, identifiers, paths and commands stay invariant.
-    let PairProgrammingGuidelineText =
-        "# This tool is a pseudo-tool injected automatically by the system, not a tool you called. It exists to draw your attention to pair programming with the user: keep your reasoning for this turn in English even when system prompts, tool descriptions, tool output, or quoted code use another language. Preserve code, identifiers, file paths, shell commands, and untranslated technical terms exactly."
-
-    let PairProgrammingGuidelineTextZhCn =
-… (2 more lines)
->>> theirs
-    /// HOST-013 canonical Pair Hint semantic payload. Domain SSOT across every provider renderer.
-    let PairProgrammingGuidelineText =
-        "# 本提示由系统自动注入，用于提醒你遵循与用户结对编程的理念：你的思考过程要用简体中文，例如从 我... 开头，并在整轮内保持中文，即使系统提示词、工具说明、工具输出或引用的代码是英文。代码、标识符、文件路径、shell 命令和未翻译的技术术语保持原文。需要另一种视角、更强推理或独立检查时，把 [NEEDHELP] 作为正常协作信号，尽早在思考中使用，不要把求助当成失败。每次准备调用工具前，先识别当前完整的并行 wave：已经知道参数、确有用且彼此独立的调用，尤其只读搜索、读取和可独立验证的检查，默认在同一 assistant turn 一起发出以减少往返；只有真实数据依赖、共享可变状态、协议顺序、破坏性相互干扰或明确容量限制才把相关调用拆到后续 wave。不要猜未知参数，不要为了并行制造、重复或放大无用调用，也不要假设一个全局固定并发数。"

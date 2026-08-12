@@ -22,16 +22,14 @@ module ForkTool =
           Charge = args.Text "charge"
           Keywords = args.Text "keywords" }
 
-    let private error (message: string) =
+    let private consequence (message: string) =
         ToolHostCodec.tomlObjectWithInstructions [ "# " + message ] []
 
     let private successInstruction (text: string) =
         ToolHostCodec.tomlObjectWithInstructions [ text ] []
 
-    let private unknownAgentError (raw: string) =
-        match ManagedAgent.parse raw with
-        | Error parseError -> ManagedAgent.formatParseError parseError
-        | Ok _ -> sprintf "Unknown managed agent '%s'." raw
+    let private unknownCallingConsequence () =
+        "Unknown or unavailable calling."
 
     let private managedForRecord (record: AgentRecord) =
         if String.IsNullOrWhiteSpace record.Agent then
@@ -81,18 +79,16 @@ module ForkTool =
     let private executeManager (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
         task {
             if request.Name = Wanxiangshu.Process.Pty.AgentName then
-                return
-                    error
-                        "PTY operations require the open-terminal / send-terminal / read-terminal / signal-terminal tools on a DevOps agent"
+                return consequence "Terminal work belongs through the terminal tools, not fork."
             elif String.IsNullOrWhiteSpace request.Name then
-                return error "name is required"
+                return consequence "A name is required."
             elif String.IsNullOrWhiteSpace request.Charge then
-                return error "charge is required"
+                return consequence "A charge is required."
             else
                 let assignment = request.Charge
 
                 match scope.RuntimeFor context with
-                | Error runtimeError -> return error runtimeError
+                | Error _ -> return consequence "A charge cannot be placed from this execution context."
                 | Ok runtime ->
                     let abandoned =
                         match runtime.IsRetiredHandle request.Name with
@@ -105,16 +101,14 @@ module ForkTool =
                         | false -> runtime.TryPty request.Name
 
                     match abandoned, pty, runtime.TryFindAgent request.Name with
-                    | true, _, None -> return error (sprintf "RetiredHandle: %s" request.Name)
+                    | true, _, None -> return consequence "That person is no longer available for another charge."
                     | _, Some _, _ ->
-                        return
-                            error
-                                "PTY operations require the open-terminal / send-terminal / read-terminal / signal-terminal tools on a DevOps agent"
+                        return consequence "Terminal work belongs through the terminal tools, not fork."
                     | _, None, Some record ->
                         match managedForRecord record with
-                        | Some managed when forbiddenManagerRole managed -> return error HiddenTargetDeniedText
+                        | Some managed when forbiddenManagerRole managed -> return consequence HiddenTargetDeniedText
                         | _ when hasKeywords request && not (warmStartAllowed record.Role) ->
-                            return error warmStartError
+                            return consequence warmStartError
                         | _ ->
                             let activeRun =
                                 lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey request.Name)
@@ -129,7 +123,7 @@ module ForkTool =
                                     runtime.Reuse(request.Name, assignment)
 
                             match reuseResult with
-                            | Error reuseError -> return error reuseError
+                            | Error _ -> return consequence "That person cannot take another charge yet."
                             | Ok _ ->
                                 let label =
                                     match managedForRecord record with
@@ -139,7 +133,7 @@ module ForkTool =
                                 return successInstruction (sprintf "# %s carries this charge now." label)
                     | _, None, None ->
                         match ManagedAgent.tryParse request.Name with
-                        | Some managed when forbiddenManagerRole managed -> return error HiddenTargetDeniedText
+                        | Some managed when forbiddenManagerRole managed -> return consequence HiddenTargetDeniedText
                         | Some managed when
                             managed.Visibility = AgentVisibility.Public
                             && List.contains managed.Name ManagedAgent.managerForkableNames
@@ -147,7 +141,7 @@ module ForkTool =
                             let role = AgentRoleIdentity.ofManaged managed.Role
 
                             if hasKeywords request && not (warmStartAllowed role) then
-                                return error warmStartError
+                                return consequence warmStartError
                             else
                                 let! forkResult =
                                     if hasKeywords request then
@@ -173,23 +167,21 @@ module ForkTool =
                                         successInstruction (
                                             sprintf "# %s carries this charge now." (bynameOf request managed.Name)
                                         )
-                                | Error forkError -> return error forkError
-                        | Some managed when forbiddenManagerRole managed -> return error HiddenTargetDeniedText
-                        | Some managed ->
-                            return error (sprintf "Managed agent '%s' is not creatable via Manager fork" managed.Name)
+                                | Error _ -> return consequence "The charge could not be placed."
+                        | Some _ -> return consequence HiddenTargetDeniedText
                         | None when ToolHostCodec.looksLikeHandleId request.Name ->
-                            return error (sprintf "Unknown agent id: %s" request.Name)
-                        | None -> return error (unknownAgentError request.Name)
+                            return consequence "No continuing person is known by that name."
+                        | None -> return consequence (unknownCallingConsequence ())
         }
 
     let private executeOrchestrator (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
         task {
             if String.IsNullOrWhiteSpace context.SessionId then
-                return error "Missing sessionID"
+                return consequence "A road cannot be commissioned before the caller's authority is established."
             elif String.IsNullOrWhiteSpace request.Name then
-                return error "name is required"
+                return consequence "A name is required."
             elif String.IsNullOrWhiteSpace request.Charge then
-                return error "charge is required"
+                return consequence "A charge is required."
             else
                 match ManagedAgent.tryParse request.Name with
                 | Some managed when managed.Role = Role.Manager && managed.Visibility = AgentVisibility.Public ->
@@ -200,8 +192,8 @@ module ForkTool =
                     | Ok _ ->
                         return
                             successInstruction (sprintf "# %s has taken your charge." (bynameOf request managed.Name))
-                    | Error forkError -> return error forkError
-                | Some _ -> return error "Orchestrator may only commission fast-manager or deep-manager"
+                    | Error _ -> return consequence "That road could not be opened."
+                | Some _ -> return consequence "Only a Manager can take an independent road."
                 | None ->
                     // GLORY-068: reuse an existing ManagerJob — same worktree/session.
                     if ToolHostCodec.looksLikeHandleId request.Name then
@@ -214,9 +206,9 @@ module ForkTool =
                                 successInstruction (
                                     sprintf "# %s has taken your charge." (bynameOf request request.Name)
                                 )
-                        | Error reuseError -> return error reuseError
+                        | Error _ -> return consequence "No continuing road is known by that name."
                     else
-                        return error (unknownAgentError request.Name)
+                        return consequence (unknownCallingConsequence ())
         }
 
     let managerSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

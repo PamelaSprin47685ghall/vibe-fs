@@ -1,30 +1,38 @@
 # recovery-by-filesystem-state — Enforcer
 
-## Definition
-Recovery by filesystem state infers workflow progress from incidental files, directories, temp names, or working-tree shape instead of from durable lifecycle facts explicitly written for recovery. The root-cause is that incidental path presence is treated as lifecycle authority, so accidents of execution order become the recovery protocol.
+Recovery by filesystem state happens when restart logic infers **business/lifecycle progress** from incidental path residue rather than from a durable record designed to carry that fact.
 
-## Governing Principle
-Filesystem residue records implementation side effects, not necessarily business commitments. A temp file may survive a crash before completion; a directory may exist because creation preceded validation; cleanup may lag success. Inferring lifecycle from shape promotes accidents of execution order into protocol states and makes refactoring filenames/layout equivalent to changing recovery semantics.
+The filesystem is not automatically the problem. A file can absolutely be the authoritative durable store. The defect is more specific: **presence, absence, filename, directory shape, temp residue, or worktree layout is being asked to mean more than the storage protocol actually commits.**
 
-## Trigger When
-Trigger when restart logic decides what work happened by checking existence, path names, temp artifacts, branch/worktree shape, or directory contents that were not designed as versioned durable facts.
+A temp directory may exist before validation. A lock file may survive a crash. A worktree may remain after a failed integration. A renamed file may indicate either success or interrupted cleanup depending on where the process died. Those artifacts record pieces of execution topology, not necessarily semantic milestones.
 
-## Do Not Trigger When
-- The filesystem artifact is itself the explicit durable store and recovery reads schema-backed contents with defined commit semantics rather than incidental presence.
-- Existence checks are only used to locate a file whose contents are then parsed as the versioned record.
-- The path is a cache that is discarded and rebuilt from an independent durable log on mismatch.
-- A test fixture inspects files as an observation of a documented store, not as the recovery protocol.
+Fire this rule when recovery says things like:
 
-## Distinguish From
-log-as-recovery-protocol elevates diagnostics. snapshot-as-truth elevates a projection. This rule elevates incidental filesystem topology into lifecycle authority. Tie-break: fire here when presence/shape of paths decides progress; fire log-as-recovery-protocol when log lines become the protocol; fire snapshot-as-truth when a derived checkpoint outranks source facts.
+- “directory exists, therefore job was created/committed”;
+- “temp file is gone, therefore publish completed”;
+- “worktree branch exists, therefore integration succeeded”;
+- “`.done` file exists, therefore external effect happened”;
+- “lock file remains, therefore owner is still alive”;
+- “filename starts with `failed-`, so the workflow is failed”;
+- “there are N files, so phase N completed.”
 
-## Decision Procedure
-For each recovery decision, ask which durable fact proves it. If the answer is “because this file/directory happens to exist,” record the lifecycle fact explicitly instead.
+The common failure is **accidental commit points**. An implementation detail happens to be created near a semantic transition, then recovery promotes that coincidence into protocol. Later a refactor changes creation/cleanup order and silently changes recovery semantics without changing any domain code.
 
-## Examples
-- positive: restart treats `tmp/job.lock` existing as “job committed” even though the lock is created before validation.
-- near-miss: recovery opens `state.json` and reads a versioned schema with an atomic rename commit; the file is the store, not residue.
-- counterexample: a build cache directory is deleted and rebuilt from the event log whenever its digest disagrees.
+Do not fire when the filesystem artifact is itself the explicitly designed store. A `state.json` written by atomic rename, with version/schema/checksum and documented commit semantics, can own lifecycle truth. A SQLite file is still “filesystem state” physically, but its transaction contract is not incidental directory residue. The distinction is whether the contents/commit protocol are authoritative by design.
 
-## Nudge
-Filesystem residue is evidence of execution, not proof of business progress. Recover from explicit durable lifecycle facts and treat incidental paths as disposable implementation detail.
+Also do not fire when path existence is merely discovery: code locates a file, then parses its versioned durable record and bases decisions on that record.
+
+Nearby rules:
+
+- `log-as-recovery-protocol` — diagnostic prose is promoted into restart authority;
+- `snapshot-as-truth` — derived projection outranks source facts;
+- `leftover-scaffolding` — stale files remain, but recovery may not depend on them;
+- `resource-not-scoped` — resource lifetime leaks and leaves residue.
+
+Use this rule when the sharp claim is: **incidental artifact topology is deciding what the workflow believes happened.**
+
+The decisive crash exercise is to stop the program just before and just after every artifact creation/removal. If the same path shape can correspond to two different semantic realities, that shape cannot safely be the recovery fact.
+
+A robust recovery protocol names milestones directly: `JobAccepted`, `PublishCommitted`, `IntegrationCompleted`, `OwnerLeaseExpiresAt`, versioned state row, journal event, transaction status. Artifacts may be referenced by those facts, but should not substitute for them.
+
+> A path can prove that a path exists. It cannot prove a business transition unless the protocol explicitly made that existence the commit.
