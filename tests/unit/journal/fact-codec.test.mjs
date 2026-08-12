@@ -217,6 +217,7 @@ test('MIGRATION_handle_linked_without_ownership_defaults_to_durable_parent', () 
     ChildSessionId: sessionId('ses_hl_child'),
     Handle: handleId.agent('h-hl'),
     TargetAgent: 'fast-reviewer',
+    Byname: 'Rhea',
     CanonicalRole: roles.of('Reviewer'),
     Ownership: handleOwnership.durableParentHandle(),
   })
@@ -231,6 +232,27 @@ test('MIGRATION_handle_linked_without_ownership_defaults_to_durable_parent', () 
   // The injected default must be the pre-change meaning: every legacy handle
   // was parent-visible (GLORY-002 / SURFACE-006).
   assert.equal(journal.serializeFact(decoded.value), line)
+})
+
+test('MIGRATION_handle_linked_without_byname_replays_with_machine_name_fallback_marker', () => {
+  const modern = fact('HandleLinked', {
+    ParentSessionId: sessionId('ses_hl_legacy'),
+    ChildSessionId: sessionId('ses_hl_legacy_child'),
+    Handle: handleId.agent('h-hl-legacy'),
+    TargetAgent: 'fast-coder',
+    Byname: 'Ada',
+    CanonicalRole: roles.of('Coder'),
+    Ownership: handleOwnership.durableParentHandle(),
+  })
+  const line = journal.serializeFact(modern)
+  const stripped = line.replace(/"Byname":"Ada",?/, '')
+  assert.equal(stripped.includes('"Byname"'), false)
+
+  const decoded = journal.deserializeFact(stripped)
+  assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
+  const migrated = journal.serializeFact(decoded.value)
+  assert.match(migrated, /"Byname":""/)
+  assert.match(migrated, /"TargetAgent":"fast-coder"/)
 })
 
 test('PERSIST_005_unparseable_json_is_a_decode_error_not_a_throw', () => {

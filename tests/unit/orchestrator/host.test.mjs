@@ -29,14 +29,18 @@ import {
   worktreePath,
 } from '../support/domain.mjs'
 
+const hostModule = await import('../../../dist/Infrastructure/OpenCode/Orchestration/Host.js')
 const {
   OrchestratorHost,
-  OrchestratorHost__ForkManagerJob_76F94770: rawForkManagerJob,
   OrchestratorHost__ContinueManagerJob_Z3E358215: rawContinueManagerJob,
   OrchestratorHost__JoinPublished: hostJoinPublished,
   OrchestratorHost__JoinPublishedAvailable_Z2FFF68F8: rawJoinPublishedAvailable,
   OrchestratorHost__Cancel: hostCancel,
-} = await import('../../../dist/Infrastructure/OpenCode/Orchestration/Host.js')
+} = hostModule
+const rawForkManagerJob = Object.entries(hostModule).find(
+  ([name, value]) => name.includes('OrchestratorHost__ForkManagerJob_') && typeof value === 'function',
+)?.[1]
+assert.equal(typeof rawForkManagerJob, 'function', 'ForkManagerJob export must be discoverable without pinning Fable hash')
 const { OrchestratorHostDeps } = await import('../../../dist/Infrastructure/OpenCode/Orchestration/Types.js')
 const { Orchestrator_$ctor_2E3EDB2: createOrchestrator } = await import(
   '../../../dist/Application/Orchestration/Runtime.js'

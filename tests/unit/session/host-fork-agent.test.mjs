@@ -13,7 +13,10 @@ import { agentJournal, caseOf, listItems, sessionId, toList, utcOffset } from '.
 
 const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
 const hostForkAgentModule = await import('../../../dist/Session/HostForkAgent.js')
-const { Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_Fork_Z7B3EB305: fork } = hostForkAgentModule
+const fork = Object.entries(hostForkAgentModule).find(
+  ([name, value]) => name.includes('_HostForkRuntime_Fork_') && typeof value === 'function',
+)?.[1]
+assert.equal(typeof fork, 'function', 'HostForkRuntime Fork export must be discoverable without pinning Fable hash')
 const reuse = Object.entries(hostForkAgentModule).find(
   ([name, value]) => name.includes('_HostForkRuntime_Reuse_') && typeof value === 'function',
 )?.[1]

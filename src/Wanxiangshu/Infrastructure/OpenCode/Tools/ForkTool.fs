@@ -31,8 +31,7 @@ module ForkTool =
     let private successInstruction (text: string) =
         ToolHostCodec.tomlObjectWithInstructions [ text ] []
 
-    let private unknownCallingConsequence () =
-        "Unknown or unavailable calling."
+    let private unknownCallingConsequence () = "Unknown or unavailable calling."
 
     let private managedForRecord (record: AgentRecord) =
         if String.IsNullOrWhiteSpace record.Agent then
@@ -55,7 +54,8 @@ module ForkTool =
         | _ -> false
 
     let private personaBinding (role: Role) (tier: AgentTier) =
-        PersonaCatalog.persona role tier |> fun value -> value.ToLowerInvariant(), ManagedAgent.make tier role
+        PersonaCatalog.persona role tier
+        |> fun value -> value.ToLowerInvariant(), ManagedAgent.make tier role
 
     let private managerCallingBindings =
         [ for role in ManagedAgentCatalog.managerForkableRoles do
@@ -73,9 +73,12 @@ module ForkTool =
             None
         else
             let wanted = raw.Trim().ToLowerInvariant()
-            bindings |> List.tryPick (fun (name, managed) -> if name = wanted then Some managed else None)
 
-    let private hasCalling (request: Request) = not (String.IsNullOrWhiteSpace request.Calling)
+            bindings
+            |> List.tryPick (fun (name, managed) -> if name = wanted then Some managed else None)
+
+    let private hasCalling (request: Request) =
+        not (String.IsNullOrWhiteSpace request.Calling)
 
     let private hasKeywords (request: Request) =
         not (String.IsNullOrWhiteSpace request.Keywords)
@@ -164,7 +167,10 @@ module ForkTool =
 
                                     match forkResult with
                                     | Ok _ ->
-                                        return successInstruction (sprintf "%s carries this charge now." (request.Name.Trim()))
+                                        return
+                                            successInstruction (
+                                                sprintf "%s carries this charge now." (request.Name.Trim())
+                                            )
                                     | Error _ -> return consequence "The charge could not be placed."
                     else
                         match existingByname with
@@ -176,7 +182,8 @@ module ForkTool =
                                 let agentId = AgentHandleId.value handleId
 
                                 match runtime.TryFindAgent agentId with
-                                | None -> return consequence "That person is not presently available for another charge."
+                                | None ->
+                                    return consequence "That person is not presently available for another charge."
                                 | Some record when hasKeywords request && not (warmStartAllowed record.Role) ->
                                     return consequence warmStartError
                                 | Some record ->
@@ -187,7 +194,9 @@ module ForkTool =
                                         if hasKeywords request && not activeRun then
                                             task {
                                                 let! rendered = prepareForkPrompt scope runtime record.Role request
-                                                return! runtime.Reuse(agentId, request.Charge, renderedPrompt = rendered)
+
+                                                return!
+                                                    runtime.Reuse(agentId, request.Charge, renderedPrompt = rendered)
                                             }
                                         else
                                             runtime.Reuse(agentId, request.Charge)
@@ -195,7 +204,10 @@ module ForkTool =
                                     match reuseResult with
                                     | Error _ -> return consequence "That person cannot take another charge yet."
                                     | Ok _ ->
-                                        return successInstruction (sprintf "%s carries this charge now." (request.Name.Trim()))
+                                        return
+                                            successInstruction (
+                                                sprintf "%s carries this charge now." (request.Name.Trim())
+                                            )
         }
 
     let private executeOrchestrator (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
@@ -224,12 +236,7 @@ module ForkTool =
                             let host = scope.OrchestratorHostFor context.SessionId
 
                             match!
-                                host.ForkManagerJob(
-                                    managerId,
-                                    managed.Name,
-                                    request.Charge,
-                                    byname = request.Name
-                                )
+                                host.ForkManagerJob(managerId, managed.Name, request.Charge, byname = request.Name)
                             with
                             | Ok _ ->
                                 return successInstruction (sprintf "%s has taken your charge." (request.Name.Trim()))
@@ -241,8 +248,7 @@ module ForkTool =
                         let host = scope.OrchestratorHostFor context.SessionId
 
                         match! host.ContinueManagerJob(job.ManagerJobId, request.Charge) with
-                        | Ok _ ->
-                            return successInstruction (sprintf "%s has taken your charge." (request.Name.Trim()))
+                        | Ok _ -> return successInstruction (sprintf "%s has taken your charge." (request.Name.Trim()))
                         | Error _ -> return consequence "That road cannot take another charge."
         }
 
