@@ -74,6 +74,7 @@
     <Compile Include="Domain/MagicTodoLegacySeed.fs"/>
     <Compile Include="Domain/MagicTodoFinalityCohort.fs"/>
     <Compile Include="Domain/SyntheticToml.fs"/>
+    <Compile Include="Domain/RepositoryWarmStartPrompt.fs"/>
     <Compile Include="Domain/ManagerNarrative.fs"/>
     <Compile Include="Domain/ManagerLifecyclePrompt.fs"/>
     <Compile Include="Domain/FinalityPrompt.fs"/>
@@ -264,6 +265,10 @@
     <Compile Include="Infrastructure/OpenCode/Host/PersonaBinding.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Sessions.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostMessageProjection.fs"/>
+    <Compile Include="Infrastructure/SembleSearchCodec.fs"/>
+    <Compile Include="Infrastructure/SembleMcpStdio.fs"/>
+    <Compile Include="Infrastructure/SembleMcpClient.fs"/>
+    <Compile Include="Infrastructure/RepositoryWarmStart.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/StrengthReplay.fs"/>
     <Compile Include="Session/SatelliteRuntime.fs"/>
     <Compile Include="Application/Prompting/PromptDispatcher.fs"/>
@@ -422,9 +427,6 @@
     <Compile Include="Infrastructure/OpenCode/Host/WorkspaceEventStore.fs"/>
     <Compile Include="Infrastructure/CasebookBookkeeper.fs"/>
     <Compile Include="Infrastructure/CasebookLifecycle.fs"/>
-    <Compile Include="Infrastructure/SembleSearchCodec.fs"/>
-    <Compile Include="Infrastructure/SembleMcpStdio.fs"/>
-    <Compile Include="Infrastructure/SembleMcpClient.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FetchTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/CasebookTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginHost.fs"/>

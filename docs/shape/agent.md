@@ -137,5 +137,11 @@ Bookkeeper Persona（Clerk/Curator）同表，仍为 InternalLeaf（AGENT-002/00
 | MCP payload → Hit | `SembleSearchCodec` | spawn |
 | stdio JSON-RPC `tools/call` | `SembleMcpStdio` | Host mcp、MCP SDK |
 | search 编排 | `SembleMcpClient` | `StrengthSpeculate`、`ManagedAgentConfig` |
+| bounded multi-query / merge / DTO mapping | `Infrastructure/RepositoryWarmStart.fs` | provider prompt rendering、Casebook |
+| provider low-trust TOML | `Domain/RepositoryWarmStartPrompt.fs` | Semble process/env/filesystem |
+
+`RepositoryWarmStartDirect = { Coder, Inspector, DevOps }` 是 direct-consumer capability gate；caller 能否携带 keywords 仍由既有 invocation DAG/tool surface 决定，二者不得合并成一张“允许角色”表。`RepositoryWarmStart` DTO 只含 neutral search/hint fields，不泄漏 `SembleMcp.Hit` infrastructure type 到 Domain。
+
+NEEDHELP ownership 与 Semble 正交：reasoning event decode/sensor 属 Host；fast→deep/advice continuation 属 Prompt/Application；deep consultation child 属 Session/Agent orchestration。不得把任何一层塞进 Strength runtime 或 Fallback ledger。
 
 禁止第二处 spawn。禁止 Host config hook 写入 semble。禁止把 Semble 编入 AGENT-006 / permission schema / ToolRegistry / `js-*`。

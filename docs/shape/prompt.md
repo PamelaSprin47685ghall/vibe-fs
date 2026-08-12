@@ -111,6 +111,8 @@ Host 在当前 provider assistant id 产生后才暴露 `ProviderRunIdentity`。
 | `SessionProviderLanguage` 绑定写 | HOST-026（session 创建瞬间） | Prompt / Library / guideline **只读**已绑定语言；禁止 transform 重读全局偏好 |
 | child / attached / InternalLeaf 语言 | 继承 owner / commissioner（HOST-026） | 不得各自再绑 |
 | Magic Todo Manager-only fragment | TODO-013/015（`MagicTodoManagerGuideline` + Pre-T1/T1/Living Mission） | 禁止并入全局 `PairProgrammingGuidelineText`（HOST-013） |
+| Pair Hint semantic payload | HOST-013 `ProjectionConstants.PairProgrammingGuidelineText` | Cursor/ordinary 只换 wire renderer；User/System 实验 role 不成为 PromptIngress authority |
+| Assistance continuation | PROMPT-018 `NeedHelpEscalation` / `NeedHelpAdvice` | 只延长现有 LogicalRun；显式 EffectiveAgent binding，不写 FallbackCursor |
 | Companion / Blogger system | COMPANION-004（`blogger-system.md`） | 不经本五层 composition 冒充；禁止动态 token/预算注入 |
 
 禁止平行 owner：

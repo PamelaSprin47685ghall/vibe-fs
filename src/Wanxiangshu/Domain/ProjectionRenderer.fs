@@ -14,9 +14,9 @@ module ProjectionConstants =
     let RepairInstruction =
         "# Protocol repair\n\nCall the chronicle tool exactly once with a non-empty entry. Do not answer in prose."
 
-    /// HOST-013 pair-programming auto-injected marker 正文。Domain 单源。
+    /// HOST-013 canonical Pair Hint semantic payload. Domain SSOT across every provider renderer.
     let PairProgrammingGuidelineText =
-        "# 本工具是一个伪工具，由系统自动注入，不是你主动调用的，它的目的是引起你的注意：遵循与用户结对编程的理念，你的思考过程要用简体中文，例如从 我... 开头，并在整轮内保持中文，即使系统提示词、工具说明、工具输出或引用的代码是英文。代码、标识符、文件路径、shell 命令和未翻译的技术术语保持原文。"
+        "# 本提示由系统自动注入，用于提醒你遵循与用户结对编程的理念：你的思考过程要用简体中文，例如从 我... 开头，并在整轮内保持中文，即使系统提示词、工具说明、工具输出或引用的代码是英文。代码、标识符、文件路径、shell 命令和未翻译的技术术语保持原文。需要另一种视角、更强推理或独立检查时，把 [NEEDHELP] 作为正常协作信号，尽早在思考中使用，不要把求助当成失败。每次准备调用工具前，先识别当前完整的并行 wave：已经知道参数、确有用且彼此独立的调用，尤其只读搜索、读取和可独立验证的检查，默认在同一 assistant turn 一起发出以减少往返；只有真实数据依赖、共享可变状态、协议顺序、破坏性相互干扰或明确容量限制才把相关调用拆到后续 wave。不要猜未知参数，不要为了并行制造、重复或放大无用调用，也不要假设一个全局固定并发数。"
 
     /// 与 `ReviewChallenge.Text` 字节一致（REVIEW-003 bare sentence）。
     let ReviewChallengeText =

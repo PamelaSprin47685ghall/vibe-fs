@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
@@ -14,6 +15,7 @@ module CoderTool =
 
     let private execute
         (roleVerb: string)
+        (scope: ToolRuntimeScope)
         (syncDelegate: SyncDelegateRuntime option)
         (args: HostToolArguments)
         (context: HostToolContext)
@@ -26,11 +28,28 @@ module CoderTool =
                     return tomlObject [ "error", TString "Missing sessionID" ]
                 else
                     let charge = args.Text "charge"
+                    let keywords = args.Text "keywords"
 
                     if String.IsNullOrWhiteSpace charge then
                         return tomlObject [ "error", TString(sprintf "%s charge required" roleVerb) ]
                     else
-                        match! sd.Invoke(context.SessionId, SyncDelegateRole.Coder, charge) with
+                        let prepareProviderPrompt () =
+                            task {
+                                match!
+                                    RepositoryWarmStart.prepare Role.Coder scope.WorkspaceDirectory keywords charge
+                                with
+                                | Ok prompt -> return prompt
+                                | Error _ -> return charge
+                            }
+
+                        match!
+                            sd.InvokePrepared(
+                                context.SessionId,
+                                SyncDelegateRole.Coder,
+                                charge,
+                                prepareProviderPrompt
+                            )
+                        with
                         | Ok workRecord ->
                             let instructions =
                                 if String.IsNullOrWhiteSpace workRecord then
@@ -46,33 +65,38 @@ module CoderTool =
         (name: string)
         (description: string)
         (factory: HostToolFactory)
+        (scope: ToolRuntimeScope)
         (syncDelegate: SyncDelegateRuntime option)
         : ToolSpec =
         { Name = name
           Description = description
-          Arguments = [ "charge", ToolHostCodec.stringSchema factory ]
-          Execute = execute name syncDelegate }
+          Arguments =
+            [ "charge", ToolHostCodec.stringSchema factory
+              "keywords", ToolHostCodec.optionalStringSchema factory ]
+          Execute = execute name scope syncDelegate }
 
     let establishSpec
         (factory: HostToolFactory)
-        (_scope: ToolRuntimeScope)
+        (scope: ToolRuntimeScope)
         (syncDelegate: SyncDelegateRuntime option)
         : ToolSpec =
         behaviorSpec
             "establish-behavior"
             "Ask a Coder to establish a failing behavior test. Returns a bounded WorkRecord after ordinary completion."
             factory
+            scope
             syncDelegate
 
     let repairSpec
         (factory: HostToolFactory)
-        (_scope: ToolRuntimeScope)
+        (scope: ToolRuntimeScope)
         (syncDelegate: SyncDelegateRuntime option)
         : ToolSpec =
         behaviorSpec
             "repair-behavior"
             "Ask a Coder to implement the smallest production change that makes an established behavior test pass. Returns a bounded WorkRecord after ordinary completion."
             factory
+            scope
             syncDelegate
 
     /// Back-compat alias used by older call sites that registered a single coder tool.

@@ -72,7 +72,7 @@ type SyncDelegateRuntime
               Directory = childDirectory }
         )
 
-    let sendDelegatePrompt (call: SyncDelegateCall) (message: string) =
+    let sendDelegatePrompt (call: SyncDelegateCall) (request: SyncDelegatePromptRequest) =
         task {
             let tools = toolMap (canonicalRole call.Role)
 
@@ -80,7 +80,7 @@ type SyncDelegateRuntime
                 dispatcher.SendAgentOwnerRootWithTools
                     sessions
                     call.Delegate
-                    message
+                    request.ProviderPrompt
                     call.Agent
                     directory
                     PromptDispatcher.AwaitMode.Detached
@@ -103,9 +103,9 @@ type SyncDelegateRuntime
           CleanupInspectorDraft = cleanupInspectorDraft
           Directory = directory
           SendPrompt =
-            fun call message ->
+            fun call request ->
                 task {
-                    let! result = sendDelegatePrompt call message
+                    let! result = sendDelegatePrompt call request
                     return result |> Result.map ignore
                 }
           DescribeWait = SyncDelegateWait.describe }
@@ -145,8 +145,20 @@ type SyncDelegateRuntime
             true
         | _ -> false
 
-    member _.Invoke(ownerSessionKey: string, role: SyncDelegateRole, message: string) : Task<Result<string, string>> =
-        SyncDelegateWorkflow.invoke store deps ownerSessionKey role message
+    member _.Invoke(ownerSessionKey: string, role: SyncDelegateRole, charge: string) : Task<Result<string, string>> =
+        SyncDelegateWorkflow.invoke store deps ownerSessionKey role charge (fun () -> Task.FromResult charge)
+
+    /// EXEC-032 composition seam: caller supplies a low-trust provider prompt
+    /// producer; workflow invokes it only after single-flight admission.
+    member _.InvokePrepared
+        (
+            ownerSessionKey: string,
+            role: SyncDelegateRole,
+            charge: string,
+            prepareProviderPrompt: unit -> Task<string>
+        )
+        : Task<Result<string, string>> =
+        SyncDelegateWorkflow.invoke store deps ownerSessionKey role charge prepareProviderPrompt
 
     member _.HandleTurn(turn: ReconciledTurn, permit: QuiescencePermit option) : Task<bool> =
         task {

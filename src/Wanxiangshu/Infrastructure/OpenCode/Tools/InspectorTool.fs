@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
@@ -12,6 +13,7 @@ open ToolHostCodec
 module InspectorTool =
 
     let private execute
+        (scope: ToolRuntimeScope)
         (syncDelegate: SyncDelegateRuntime option)
         (args: HostToolArguments)
         (context: HostToolContext)
@@ -24,11 +26,32 @@ module InspectorTool =
                     return tomlObject [ "error", TString "Missing sessionID" ]
                 else
                     let charge = args.Text "charge"
+                    let keywords = args.Text "keywords"
 
                     if String.IsNullOrWhiteSpace charge then
                         return tomlObject [ "error", TString "inspect charge required" ]
                     else
-                        match! sd.Invoke(context.SessionId, SyncDelegateRole.Inspector, charge) with
+                        let prepareProviderPrompt () =
+                            task {
+                                match!
+                                    RepositoryWarmStart.prepare
+                                        Role.Inspector
+                                        scope.WorkspaceDirectory
+                                        keywords
+                                        charge
+                                with
+                                | Ok prompt -> return prompt
+                                | Error _ -> return charge
+                            }
+
+                        match!
+                            sd.InvokePrepared(
+                                context.SessionId,
+                                SyncDelegateRole.Inspector,
+                                charge,
+                                prepareProviderPrompt
+                            )
+                        with
                         | Ok workRecord ->
                             let instructions =
                                 if String.IsNullOrWhiteSpace workRecord then
@@ -42,11 +65,13 @@ module InspectorTool =
 
     let spec
         (factory: HostToolFactory)
-        (_scope: ToolRuntimeScope)
+        (scope: ToolRuntimeScope)
         (syncDelegate: SyncDelegateRuntime option)
         : ToolSpec =
         { Name = "inspect"
           Description =
             "Ask an Inspector to establish a repository fact. Returns a bounded WorkRecord after ordinary completion."
-          Arguments = [ "charge", ToolHostCodec.stringSchema factory ]
-          Execute = execute syncDelegate }
+          Arguments =
+            [ "charge", ToolHostCodec.stringSchema factory
+              "keywords", ToolHostCodec.optionalStringSchema factory ]
+          Execute = execute scope syncDelegate }

@@ -26,6 +26,10 @@ module PromptAuthority =
         | ReviewConfirmation
         | BusyAgentNudge
         | ProviderRetryAttempt
+        /// AGENT-031/PROMPT-018: same-run collaboration, never fallback retry.
+        | NeedHelpEscalation
+        /// AGENT-031/PROMPT-018: independent consultation returned to requester.
+        | NeedHelpAdvice
         /// GLORY-020: the Host asks the Manager to carry out the plan it just
         /// described. Sent exactly once after a legal planning terminal.
         | ManagerWorkActivation
@@ -197,6 +201,8 @@ module PromptAuthority =
         | Continuation ReviewConfirmation -> "ReviewConfirmation"
         | Continuation BusyAgentNudge -> "BusyAgentNudge"
         | Continuation ProviderRetryAttempt -> "ProviderRetryAttempt"
+        | Continuation NeedHelpEscalation -> "NeedHelpEscalation"
+        | Continuation NeedHelpAdvice -> "NeedHelpAdvice"
         | Continuation ManagerWorkActivation -> "ManagerWorkActivation"
         | Continuation ManagerIdleEncouragement -> "ManagerIdleEncouragement"
         | Continuation FinalityRejected -> "FinalityRejected"
@@ -213,6 +219,8 @@ module PromptAuthority =
         | "ReviewConfirmation" -> Some ReviewConfirmation
         | "BusyAgentNudge" -> Some BusyAgentNudge
         | "ProviderRetryAttempt" -> Some ProviderRetryAttempt
+        | "NeedHelpEscalation" -> Some NeedHelpEscalation
+        | "NeedHelpAdvice" -> Some NeedHelpAdvice
         | "ManagerWorkActivation" -> Some ManagerWorkActivation
         | "ManagerIdleEncouragement" -> Some ManagerIdleEncouragement
         | "FinalityRejected" -> Some FinalityRejected

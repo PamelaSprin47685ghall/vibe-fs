@@ -66,6 +66,12 @@ Continuation 只延续已有 Logical Run：
 
 `JoinGuard` 语义见 EXEC-016。
 
+## PROMPT-018：Assistance continuation 不改变 authority
+
+`NeedHelpEscalation` 与 `NeedHelpAdvice` 是 typed ContinuationKind。二者延长当前 LogicalRun，必须复用现有 AuthorityRoot、CanonicalRole、Persona、system prompt 与 ToolCapabilitySet；不得建立 HumanRoot、不得 reset FallbackCursor、不得记作 ProviderRetryAttempt。
+
+`NeedHelpEscalation` 唯一允许的 binding 变化是 fast owner 请求对应 deep peer；`NeedHelpAdvice` 必须绑定触发 consultation 的原 deep agent。synthetic Cursor Pair Hint 即使使用 provider `role=user|system` 的测试 encoder，也仍是 HOST-013 provider projection，不参与 PromptIngress/AuthorityRoot/OpeningMaterial；生产 Cursor 固定 assistant encoder。
+
 ## PROMPT-004：来源类型
 
 ```fsharp
