@@ -1,5 +1,6 @@
 namespace Wanxiangshu.OpenCode
 
+open System
 open System.Threading.Tasks
 open Wanxiangshu.Kernel
 open Wanxiangshu.Domain
@@ -193,6 +194,8 @@ module MagicTodoLocality =
             && (localized.InputCanonical = "{}"
                 || String.IsNullOrWhiteSpace localized.InputCanonical)
         then
-            Ok { localized with InputCanonical = expectedInputCanonical }
+            Ok
+                { localized with
+                    InputCanonical = expectedInputCanonical }
         else
             Error InputMaterializationRejection.InputMismatch
