@@ -187,6 +187,8 @@ type InjectedSessionPort
                     match res with
                     | Ok childId ->
                         registerChild rootId childId
+                        // HOST-026: inherit owner/commissioner language (parentId), not family root.
+                        ProviderLanguageBinding.ensureInherited parentId childId |> ignore
                         return Ok childId
                     | Error err -> return Error err
                 | None ->

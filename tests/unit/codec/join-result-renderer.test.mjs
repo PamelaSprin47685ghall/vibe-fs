@@ -1,14 +1,14 @@
-// JoinResultRenderer uncovered branches: production renderJoinItemBatch over
-// JoinItem DUs (abandoned / failed / pty aborted), renderForkError code paths,
-// agentName ManagedAgent resolution, completed-batch AgentName paths.
+// JoinResultRenderer — natural language + WorkRecord; no legacy DTO plane.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { parse as parseToml } from 'smol-toml'
 
 const {
   renderJoinItemBatch,
   renderCompletedBatch,
   renderForkError,
+  renderInterrupted,
 } = await import('../../../dist/Infrastructure/OpenCode/Codec/JoinResultRenderer.js')
 
 const {
@@ -25,9 +25,12 @@ const {
 } = await import('../../../dist/Session/AgentCompletion.js')
 
 const { ForkError } = await import('../../../dist/Session/ForkTypes.js')
+const { JoinInterruptReason } = await import('../../../dist/Session/CompletionMailbox.js')
 const { NonEmptyBatch_ofHeadTail: batchOf } = await import('../../../dist/Session/CompletionMailbox.js')
 const { Role } = await import('../../../dist/Kernel/Roles.js')
 const { toList } = await import('../support/domain.mjs')
+
+const LEGACY_DTO = /\b(status|count|ordinal|kind|agent|code|message)\s*=|\[\[result\]\]|\[error\]/
 
 const completedPayload = (over = {}) =>
   new AgentCompletionPayload('a1', undefined, 'run-1', Role.Coder, undefined, undefined, over.workRecord ?? '', undefined)
@@ -37,121 +40,117 @@ const failedPayload = (over = {}) =>
 const agentItem = (item) => new JoinItem(0, [item])
 const ptyItem = (item) => new JoinItem(1, [item])
 
-test('MISC_join_render_batch_agent_completed_resolves_name_and_work_record', () => {
+test('MISC_join_render_batch_agent_completed_natural_language_and_work_record', () => {
   const batch = batchOf(agentItem(new AgentJoinItem(0, [completedPayload({ workRecord: 'did the thing' })])), toList([]))
   const wire = renderJoinItemBatch(() => 'fast-coder', batch)
-  assert.match(wire, /status = "completed"/)
-  assert.match(wire, /count = 1/)
-  assert.match(wire, /kind = "agent"/)
-  assert.match(wire, /agent = "fast-coder"/)
+  assert.match(wire, /# fast-coder has returned\./)
   assert.match(wire, /# did the thing/)
-  assert.match(wire, /\[\[result\]\]/)
+  assert.ok(!LEGACY_DTO.test(wire))
   assert.ok(!wire.includes('work_record ='))
 })
 
-test('MISC_join_render_batch_agent_failed_flat_code_message', () => {
-  const batch = batchOf(agentItem(new AgentJoinItem(1, [failedPayload({ code: 'ERR_X', message: 'no' })])), toList([]))
-  const wire = renderJoinItemBatch(() => '', batch)
-  assert.match(wire, /kind = "agent"/)
-  assert.match(wire, /status = "failed"/)
-  assert.match(wire, /agent = "a1"/, 'empty resolve falls back to agent id')
-  assert.match(wire, /code = "ERR_X"/)
-  assert.match(wire, /message = "no"/)
+test('MISC_join_render_batch_agent_failed_natural_language_consequence', () => {
+  const batch = batchOf(agentItem(new AgentJoinItem(1, [failedPayload({ message: 'no' })])), toList([]))
+  const wire = renderJoinItemBatch(() => 'deep-reviewer', batch)
+  assert.match(wire, /# deep-reviewer could not complete the charge\./)
+  assert.match(wire, /# no/)
+  assert.ok(!LEGACY_DTO.test(wire))
 })
 
-test('MISC_join_render_batch_agent_abandoned_uses_resolved_name', () => {
+test('MISC_join_render_batch_agent_abandoned_natural_language', () => {
   const batch = batchOf(agentItem(new AgentJoinItem(2, ['a1', 'operator abort'])), toList([]))
   const wire = renderJoinItemBatch(() => 'deep-reviewer', batch)
-  assert.match(wire, /status = "abandoned"/)
-  assert.match(wire, /agent = "deep-reviewer"/)
-  assert.match(wire, /reason = "operator abort"/)
+  assert.match(wire, /# deep-reviewer did not return from this charge\./)
+  assert.ok(!LEGACY_DTO.test(wire))
 })
 
 test('MISC_join_render_batch_pty_exited_failed_aborted', () => {
-  const exited = renderJoinItemBatch(() => '', batchOf(ptyItem(new PtyJoinItem(0, [new PtyExit('pty-1', 'exit 0', true)])), toList([])))
-  assert.match(exited, /kind = "pty"/)
-  assert.match(exited, /status = "completed"/)
-  assert.match(exited, /outcome = "exit 0"/)
-  assert.match(exited, /closed = true/)
-  assert.match(exited, /pty_id = "pty-1"/)
+  const terminal = (ptyId) => (id) => (id === ptyId ? 'npm test' : 'Terminal')
 
-  const failed = renderJoinItemBatch(() => '', batchOf(ptyItem(new PtyJoinItem(1, [new PtyFailure('pty-2', 'crash', false, 'RC', 'kaboom')])), toList([])))
-  assert.match(failed, /status = "failed"/)
-  assert.match(failed, /code = "RC"/)
-  assert.match(failed, /message = "kaboom"/)
+  const exited = renderJoinItemBatch(() => '', batchOf(ptyItem(new PtyJoinItem(0, [new PtyExit('pty-1', 'exit 0', true)])), toList([])), terminal('pty-1'))
+  assert.match(exited, /# npm test has ended\./)
+  assert.match(exited, /exit_code = 0/)
+  assert.ok(!exited.includes('pty_id'))
 
-  const aborted = renderJoinItemBatch(() => '', batchOf(ptyItem(new PtyJoinItem(2, [new PtyAbort('pty-3', 'interrupted', false, 'AB', 'esc')])), toList([])))
-  assert.match(aborted, /status = "aborted"/)
-  assert.match(aborted, /outcome = "interrupted"/)
-  assert.match(aborted, /closed = false/)
-  assert.match(aborted, /pty_id = "pty-3"/)
+  const failed = renderJoinItemBatch(() => '', batchOf(ptyItem(new PtyJoinItem(1, [new PtyFailure('pty-2', 'crash', false, 'RC', 'kaboom')])), toList([])), terminal('pty-2'))
+  assert.match(failed, /# npm test has ended\./)
+  assert.match(failed, /output = "kaboom"/)
+  assert.ok(!failed.includes('code ='))
+
+  const aborted = renderJoinItemBatch(() => '', batchOf(ptyItem(new PtyJoinItem(2, [new PtyAbort('pty-3', 'interrupted', false, 'AB', 'esc')])), toList([])), terminal('pty-3'))
+  assert.match(aborted, /# npm test was interrupted\./)
+  assert.match(aborted, /output = "esc"/)
+  assert.ok(!aborted.includes('pty_id'))
 })
 
-test('MISC_join_render_batch_multiple_items_ordinal_stable', () => {
+test('MISC_join_render_batch_multiple_items_stable_order', () => {
   const batch = batchOf(agentItem(new AgentJoinItem(1, [failedPayload()])), toList([
     ptyItem(new PtyJoinItem(2, [new PtyAbort('p', 'x', false, 'C', 'm')])),
     agentItem(new AgentJoinItem(0, [completedPayload()])),
   ]))
-  const wire = renderJoinItemBatch(() => 'coder', batch)
-  assert.match(wire, /count = 3/)
-  const ordinals = [...wire.matchAll(/ordinal = (\d)/g)].map((m) => m[1])
-  assert.deepEqual(ordinals, ['1', '2', '3'])
-  assert.equal([...wire.matchAll(/\[\[result\]\]/g)].length, 3)
+  const wire = renderJoinItemBatch(() => 'coder', batch, () => 'Terminal')
+  assert.equal([...wire.matchAll(/could not complete/g)].length, 1)
+  assert.equal([...wire.matchAll(/has returned\./g)].length, 1)
+  assert.equal([...wire.matchAll(/was interrupted\./g)].length, 1)
+  assert.ok(!LEGACY_DTO.test(wire))
 })
 
 test('MISC_join_render_batch_empty_work_record_no_comment', () => {
   const batch = batchOf(agentItem(new AgentJoinItem(0, [completedPayload({ workRecord: '' })])), toList([]))
   const wire = renderJoinItemBatch(() => 'x', batch)
-  assert.ok(!wire.includes('# '))
+  assert.match(wire, /# x has returned\./)
+  assert.equal(wire.trim().split('\n').length, 1)
 })
 
-// ── renderForkError ──────────────────────────────────────────────────────────
+test('MISC_join_render_interrupted_natural_language', () => {
+  const operatorWire = renderInterrupted(JoinInterruptReason.OperatorAbort)
+  assert.match(operatorWire, /# Your waiting was interrupted\./)
+  assert.ok(!LEGACY_DTO.test(operatorWire))
 
-test('MISC_join_render_fork_error_all_codes', () => {
+  const userWire = renderInterrupted(JoinInterruptReason.UserMessageArrived)
+  assert.match(userWire, /# Something nearer has arrived\./)
+  assert.ok(!LEGACY_DTO.test(userWire))
+
+  const deadlineWire = renderInterrupted(JoinInterruptReason.DeadlineExpired)
+  assert.match(deadlineWire, /# No return reached you before your waiting ended\./)
+  assert.ok(!LEGACY_DTO.test(deadlineWire))
+})
+
+test('MISC_join_render_fork_error_natural_language', () => {
   const cases = [
-    [new ForkError(0, []), 'EMPTY', undefined],
-    [new ForkError(1, []), 'NOTHING_TO_JOIN', undefined],
-    [new ForkError(2, []), 'CANCELLED', undefined],
-    [new ForkError(3, []), 'JOIN_IN_PROGRESS', undefined],
-    [new ForkError(4, ['h1', 'gave up']), 'ABANDONED:h1:gave up', 'h1'],
-    [new ForkError(5, ['h2']), 'NOT_FOUND:h2', 'h2'],
-    [new ForkError(6, []), 'TIMED_OUT', undefined],
-    [new ForkError(7, ['h3']), 'TERMINAL_MATERIALIZATION_FAILED:h3', 'h3'],
+    [new ForkError(0, []), /nothing away to receive/],
+    [new ForkError(1, []), /nothing away to receive/],
+    [new ForkError(2, []), /wait was cancelled/],
+    [new ForkError(3, []), /already in progress/],
+    [new ForkError(4, ['h1', 'gave up']), /did not return from this charge/],
+    [new ForkError(5, ['h2']), /No one by that name is away/],
+    [new ForkError(6, []), /waiting ended/],
+    [new ForkError(7, ['h3']), /return could not be gathered/],
   ]
-  for (const [error, code, agent] of cases) {
-    const wire = renderForkError(error)
-    assert.match(wire, /status = "failed"/, code)
-    assert.match(wire, new RegExp(`code = "${code}"`), code)
-    assert.match(wire, /\[error\]/, code)
-    if (agent) {
-      assert.match(wire, new RegExp(`agent = "${agent}"`), code)
-    } else {
-      assert.ok(!/^agent =/m.test(wire), `${code} must not carry an agent field`)
-    }
+  for (const [error, pattern] of cases) {
+    const wire = renderForkError(error, () => 'deep-reviewer')
+    assert.match(wire, pattern, String(error))
+    assert.ok(!LEGACY_DTO.test(wire), String(error))
+    assert.equal(parseToml(wire).status, undefined, String(error))
   }
 })
-
-// ── renderCompletedBatch AgentName / resolve paths ───────────────────────────
 
 test('MISC_join_render_completed_managed_agent_name_and_raw_resolve', () => {
   const completion = (agentName) =>
     new RunCompletion('run-1', 'a1', agentName, Role.Coder, new AgentCompletionOutcome(0, [completedPayload()]), new Date())
   const viaName = renderCompletedBatch(() => false, () => '', batchOf(completion('fast-coder'), toList([])))
-  assert.match(viaName, /agent = "fast-coder"/)
+  assert.match(viaName, /# fast-coder has returned\./)
 
   const viaResolve = renderCompletedBatch(() => false, () => 'deep-inspector', batchOf(completion(''), toList([])))
-  assert.match(viaResolve, /agent = "deep-inspector"/)
+  assert.match(viaResolve, /# deep-inspector has returned\./)
 
   const rawResolve = renderCompletedBatch(() => false, () => 'weird raw name', batchOf(completion(''), toList([])))
-  assert.match(rawResolve, /agent = "weird raw name"/)
+  assert.match(rawResolve, /# weird raw name has returned\./)
 })
 
 test('MISC_join_render_completed_pty_aborted_round_trip', () => {
-  // Pty join items never round-trip through RunCompletion in the production
-  // batch path; renderCompletedBatch with a pty run id uses PtyJoinItem.
   const run = new RunCompletion('pty-9', 'pty-9', '', Role.Coder, new AgentCompletionOutcome(0, [completedPayload()]), new Date())
-  const wire = renderCompletedBatch((runId) => runId === 'pty-9', () => '', batchOf(run, toList([])))
-  assert.match(wire, /kind = "pty"/)
-  assert.match(wire, /status = "completed"/)
-  assert.match(wire, /pty_id = "pty-9"/)
+  const wire = renderCompletedBatch((runId) => runId === 'pty-9', () => '', batchOf(run, toList([])), (id) => (id === 'pty-9' ? 'shell' : 'Terminal'))
+  assert.match(wire, /# shell has ended\./)
+  assert.ok(!wire.includes('pty_id'))
 })

@@ -101,10 +101,10 @@ test('COMPANION_001_every_work_session_may_have_a_Y_regardless_of_role', () => {
     'coder',
     'inspector',
     'browser',
-    'meditator',
+    'inquiry',
     'reviewer',
     'devops',
-    'executor',
+    'distiller',
   ]
 
   const state = linked(roles.map((role) => ({ main: `ses_${role}`, blogger: `ses_${role}_y` })))
@@ -114,9 +114,9 @@ test('COMPANION_001_every_work_session_may_have_a_Y_regardless_of_role', () => {
     assert.equal(assoc.isCompanion(`ses_${role}_y`, state), true)
   }
 
-  // Inspector, Browser and Executor in particular: the whitelist marked these three
+  // Inspector, Browser and Distiller in particular: the whitelist marked these three
   // as having no Companion, so three of the ten silently never got one.
-  for (const role of ['inspector', 'browser', 'executor']) {
+  for (const role of ['inspector', 'browser', 'distiller']) {
     assert.equal(assoc.bloggerOf(`ses_${role}`, state), `ses_${role}_y`)
   }
 })

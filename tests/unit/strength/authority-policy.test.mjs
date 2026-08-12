@@ -16,13 +16,13 @@ const permissionNames = (set) => [...set].map(caseName).sort()
 
 const exactReadonly = ['Glob', 'Grep', 'Read']
 
-for (const role of [Role.Coder, Role.Inspector, Role.DevOps, Role.Meditator]) {
+for (const role of [Role.Coder, Role.Inspector, Role.DevOps, Role.Inquiry]) {
   test(`STRENGTH_004_${caseName(role)}_replica_has_exact_readonly_capabilities`, () => {
     assert.deepEqual(permissionNames(toolCapabilitiesFor(role, ProviderRequestKind.StrengthReplica)), exactReadonly)
   })
 }
 
-for (const role of [Role.Manager, Role.Orchestrator, Role.Browser, Role.Reviewer, Role.Executor, Role.Blogger]) {
+for (const role of [Role.Manager, Role.Orchestrator, Role.Browser, Role.Reviewer, Role.Distiller, Role.Blogger]) {
   test(`STRENGTH_004_${caseName(role)}_replica_is_fail_closed`, () => {
     assert.deepEqual(permissionNames(toolCapabilitiesFor(role, ProviderRequestKind.StrengthReplica)), [])
   })

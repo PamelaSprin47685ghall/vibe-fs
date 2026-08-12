@@ -43,7 +43,7 @@ module EnforcerRepair =
                 elif not (isNull part?name) then unbox<string> part?name
                 else ""
 
-            kind = "tool" && name = "blog"
+            kind = "tool" && name = "chronicle"
 
     let private blogPartStatus (part: obj) : string option =
         if isNull part || isNull part?state then

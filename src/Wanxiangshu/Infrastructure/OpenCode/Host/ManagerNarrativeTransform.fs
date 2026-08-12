@@ -79,6 +79,7 @@ module ManagerNarrativeTransform =
                 text.Contains("Your final words have been received")
                 || text.Contains("Your ending has not accepted you")
                 || text.Contains("Your ending has accepted you")
+                || text.Contains("Rest in peace")
                 || text.Contains("rest in peace")
 
             rawMessages

@@ -2,9 +2,9 @@
 
 ## Implements
 
-行为：`what/todo.md`（TODO-001..014）。边界：`shape/todo.md`。证明：`proof/todo.md`。
+行为：`what/todo.md`（TODO-001..015）。边界：`shape/todo.md`。证明：`proof/todo.md`。
 
-本文件只写 before/after/recovery、同 snapshot 结论、V1 bridge、PrefixEpoch seal、sink reconciliation、reviewer/finality、migration **算法**；语义以 TODO 条款为准，不平行定义（TODO-014）。
+本文件只写 BlindPlan T1、obligations wire、before/after/recovery、同 snapshot 结论、V1 bridge、PrefixEpoch seal、sink reconciliation、reviewer/finality、migration **算法**；语义以 TODO 条款为准，不平行定义（TODO-014）。
 
 程序形态：facts 上的 CE / 递归等待（Journal 变化 → 同 snapshot 重读）。禁止一阶 `WaitingReview|Settling|Submitting|StartingReview|WaitingRebase` 大状态机与 wall-clock poll（TODO-012）。
 
@@ -18,11 +18,12 @@
 
 ```text
 Tk = TodoWriteAccepted(k)     // 先有 Prepared
-Ck = settled canonical at Tk start
-Pk = normalized proposed at Tk
+Ck = settled CurrentObligations at Tk start   // [{name, work}]
+Pk = normalized proposed obligations at Tk
 Rk = process-review obligation of Tk
 Mk = semanticMerge(Ck, Pk)    // 单一 merge owner（TODO-005）
 ConsumableReview(k) ≡ TodoReviewConcluded(k)   // TODO-006
+T1 = first TodoWriteAccepted on this Life     // BlindPlan commitment（TODO-015）
 ```
 
 结算（TODO-005）：
@@ -31,6 +32,30 @@ ConsumableReview(k) ≡ TodoReviewConcluded(k)   // TODO-006
 settle(Ck, Pk, PERFECT) = Pk
 settle(Ck, Pk, REVISE)  = semanticMerge(Ck, Pk)
 ```
+
+---
+
+## BlindPlan T1（TODO-001/015）
+
+Manager OpeningPolicy = BlindPlan（GLORY-074）。算法：
+
+```text
+LifeOpened
+  → BlindPlan Opening（Planning Table；Pre-T1 guidance）
+  → todowrite(T1) = first accepted on this Life
+  → validate obligations wire（TODO-002/003）
+  → durably TodoWriteAccepted(T1)
+  → render canonical T1 result containing entrustment revelation
+  → persist exact provider-visible result
+  → return（conversation tool result only）
+  → Opening closes；WorkRecordStart = OpeningBoundary
+  → Living Mission guidance（Post-T1）
+```
+
+T1 call + canonical accepted result ∈ constitutive OpeningMaterial（COMPANION-014）。  
+交托 **禁止** system prompt / Persona / Role Law 切换（PROMPT-014；GLORY-075）。  
+每个新 Life（含 Reawakening）重新进入 BlindPlan Opening。  
+T1 无 prior lag-1 replacement（desiredCutoff(T1) 无 prior）。
 
 ---
 
@@ -45,8 +70,8 @@ todoCheckpointBefore:
        - 同 assistant message >1 不同 ToolCallId todowrite → 全部拒绝，无 ordinal winner（TODO-004）
        - 同 Life 同时最多一个新 admission
   3. same ToolCallId replay：
-       - 已有 Prepared/Accepted → 校验 input/Life/BaseTodo/ordinal digest
-       - 一致 → 同一 TodoWriteId / 不新增 checkpoint
+       - 已有 Prepared/Accepted → 校验 input/Life/BaseObligations/ordinal digest
+       - 一致 → 同一 TodoWriteId / 同一 obligation account / 不新增 checkpoint
        - 冲突 → identity corruption fail closed
   4. settlePreviousCheckpointIfAny：
        - 若存在 Accepted(k-1) 且尚无 TodoReviewConcluded(k-1)
@@ -54,18 +79,22 @@ todoCheckpointBefore:
        - 仅 VerdictKnown 不足
        - Ck = settle(C(k-1), P(k-1), verdict)（TODO-005）
        - 若 REVISE 改变 canonical → Host TodoTable sink reconciliation（§下方；TODO-007）
-  5. 读 provider V2 input → decode tagged kind existing|new（TODO-002）
-  6. allocateNewIds（仅 kind:new）→ unique ids → existing∈Ck → transitions（TODO-003 completed 门禁）
+  5. 读 provider input → decode obligations: [{ name, work }]（TODO-002）
+       - duplicate name → fail closed；禁止靠 work 文本猜 identity（TODO-003）
+       - 禁止 kind/id/status/priority/reviewing 回流 provider 真值
+  6. Pk = normalized proposed obligations；existing names ∈ Ck 可续存
   7. preview = semanticMerge(Ck, Pk)（不写入 canonical）
   8. append TodoWritePrepared
-       - 冻结 tagged provider arguments 的 canonical `ProviderInputDigest` 与 BaseTodo/Proposed digests
+       - 冻结 tagged provider arguments 的 canonical `ProviderInputDigest`
+         与 BaseObligations / Proposed digests
        - 返回真实 Journal `EventId`；after/recovery 仅以它填 `TodoWriteAccepted.PreparedFactRef`
        - ReviewFrontier = 本 tool-call 前 exclusive cursor（绑 ManagerLifeId）
   9. install ephemeral bridge（process-local Map + hidden Symbol；非 durable）
- 10. mutateArgsInPlace → V1 compatibility list（剥 kind/id；reviewing sink 策略见 HOST canary）
+ 10. mutateArgsInPlace → Host TodoTable V1 compatibility sink only
+       （content/status/priority 投影；canonical 仍是 obligations；reviewing sink 策略见 HOST canary）
 ```
 
-`Prepared` ≠ checkpoint；不派生 Rk。
+`Prepared` ≠ checkpoint；不派生 Rk。provider-visible 真值 = obligations，不是 sink 枚举。
 
 ---
 
@@ -114,8 +143,10 @@ recovery path = 完整 SDK snapshot 中该 call ToolPart completed
        → 提交/续跑 process reviewer
      ManagerCheckpointLWR 允许 RawGap；不得等 Manager Y 追平（TODO-008）
 5. desired lag-1 cutoff 由 Accepted 链纯推导；此处不 commit PrefixEpoch（TODO-009）
-6. render enriched tool result（上一 ConsumableReview 的 ProcessReviewLWR；
-   当前 REVISE preview / PERFECT「preview 不生效」提示）（TODO-005/013）
+6. render enriched tool result：
+     - 若 Tk = T1 → canonical entrustment revelation（TODO-015；conversation only；system 字节不变）
+     - 上一 ConsumableReview 的 ProcessReviewLWR
+     - 当前 REVISE preview / PERFECT「preview 不生效」提示（TODO-005/013）
 7. cleanup bridge → return
 ```
 
@@ -152,7 +183,7 @@ awaitConsumableReview(checkpoint):
   | None →
        evidence = lifecycleWorkRecordRange(
             ManagerSessionId,
-            LifeOpeningCursor,             // OpeningRaw 另附；LWR includeOpening=false
+            LifeOpeningCursor,             // OpeningMaterial 另附；LWR includeOpening=false
             ReviewFrontier(k)              // never crosses frozen frontier
           )                                // RecordCoverage；RawGap 允许
        ensureReviewerPrompt(checkpoint, evidence)
@@ -171,7 +202,7 @@ awaitConsumableReview(checkpoint):
 Process Rk 输入（TODO-008）：
 
 ```text
-OpeningRaw
+OpeningMaterial
 + ManagerCheckpointLWR(k)  // through ReviewFrontier(k); includeOpening=false; RecordCoverage
 + Ck + Pk
 ```
@@ -340,16 +371,16 @@ open Life 尚未 WorkActivated
   → 禁止再发 Activation continuation
 
 正常新 Life
-  → canonical = []
+  → CurrentObligations = []
   → 禁止从 Host TodoTable adopt
 
 升级瞬间已存在的 legacy open Life（一次性）
   → 首次 Magic provider request 之前：
        Host old table 作 seed
-       分配新 Magic ids
+       投影为 obligations `{name, work}`
        append LegacyTodoSeedAdopted
-       带 ID current list 注入 Manager provider-visible context
-  → 之后只认 Magic ids；kind:existing 可回传
+       带 current account 注入 Manager provider-visible context
+  → 之后只认 obligations account；name 稳定续存
   → 同 session 后续新 Life 不得再次 adopt
 ```
 
@@ -358,10 +389,10 @@ open Life 尚未 WorkActivated
 ## 端到端节拍（对照）
 
 ```text
-LifeOpened → WorkRecordStart（TODO-001）
-→ 立即真实工作（无 Activation）
-→ T1 Prepared/Accepted → ensureReview(R1) → desired cutoff 可推导
-→ Manager 工作 ∥ D reviews R1（TODO-006/008）
+LifeOpened → BlindPlan Opening（Planning Table）
+→ T1 Prepared/Accepted → entrustment revelation（conversation）→ WorkRecordStart
+→ ensureReview(R1) → desired cutoff 可推导（T1 无 prior replacement）
+→ Manager 工作 ∥ D reviews R1（TODO-006/008）；system prompt 字节不变
 → T2 before 等 TodoReviewConcluded(R1) → settle → sink reconcile?
 → Accepted T2 → R2 → 下一 attempt seal 前 PrefixEpoch(TodoCheckpoint)（TODO-009）
 → …

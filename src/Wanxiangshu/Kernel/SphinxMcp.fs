@@ -2,7 +2,7 @@ namespace Wanxiangshu.Kernel
 
 open System
 
-/// AGENT-028: Sphinx MCP identity and local launch command.
+/// AGENT-030: Sphinx MCP identity and local launch command.
 /// No env, no Host objects.
 module SphinxMcp =
 

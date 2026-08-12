@@ -14,7 +14,7 @@
 | VERIFY-002 | 晋级阶梯，禁止跨级；禁止语义分支直跳 E2E |
 | VERIFY-003 | Canary mock 剧本：键、匹配、幂等、故障轴、冷边界 |
 | VERIFY-004 | 因果推进门禁、One Physical World 与**禁止退化清单**（机器解析锚点） |
-| VERIFY-005 | Architecture gates / 单一写入口 / Host 边界 |
+| VERIFY-005 | Architecture gates / 单一写入口 / Host 边界 / Gates A–D |
 | VERIFY-006 | No-Go 发布否决 |
 | VERIFY-007 | Wire / Semantic / BloggerDelta 三种投影 |
 | VERIFY-008 | 测试语言边界（`.fs` 生产 / `.mjs` 契约面） |
@@ -159,13 +159,15 @@ provider 失败、SSE 中断、超时、畸形参数属于传输层故障，不�
 
 ```text
 COMPANION-009  Epoch 切换：新 SealRoot，允许一次显式 prefix rebase
-FALLBACK-004   Fallback 换边：只改 EffectiveAgent，system prompt 因此可变
+FALLBACK-014   Fallback 换边：只改 EffectiveAgent；SessionPersona / SessionProviderLanguage / system prompt 字节不变（Gate D）
 ```
 
 历史第三例外 `StudentLearn → StudentCompile`（AGENT-020 / PROMPT-012）：**G3 已删除（absent）**，
 不得再作冷边界或 scenario 声明位。
 
 上述两处必须由 scenario 显式声明发生位置。禁止由 mock 嗅探请求形状推断（例如「tools 与 system 未变即视为 epoch 切换」）——那会放过在不该切换处发生的切换。
+
+禁止把 Fallback 冷边界写成「system prompt 因此可变」——那与 FALLBACK-014 / ARCH-016 Gate D 直接冲突。
 
 未声明处任何前缀断裂 fail closed。
 
@@ -502,7 +504,45 @@ Review confirmed                           → 只能派生，不能赋值
 | `scripts/checks/unified-store-gate.mjs` | Playbook §24.1/24.2 Storage：feature-owned `refs/wanxiang/*`、Casebook custom ref、legacy Journal/Blob reader、dual-write、student-qa revival |
 | `scripts/checks/js-surface-gate.mjs` | G3 rebase：无 js-student/js-teacher、无手写 per-role js-* |
 | `scripts/checks/enforcer-rulebook-gate.mjs` | mechanical A37/A38（`check.mjs` 以 `--require-headings --strict` 接线）= G7 machine Exit；HUMAN_ONLY（paired-history 120 / A39 / A40）为目录质量过程，不伪造、不阻断 Gate |
+| `scripts/checks/tool-referential-integrity.mjs` | **Gate A**（ARCH-016）：same tool name → 唯一 schema + 唯一 semantic contract；pin `tests/unit/verify/tool-referential-integrity.test.mjs`（code phase 新建） |
+| `scripts/checks/provider-leak-gate.mjs` | **Gate B**（ARCH-016）：provider 输出禁 leak vocabulary；pin `tests/unit/verify/provider-leak-gate.test.mjs`（code phase 新建） |
+| `scripts/checks/language-parity-gate.mjs` | **Gate C**（ARCH-016 / HOST-026）：∀ provider semantic resource EN + zh-CN；pin `tests/unit/verify/language-parity-gate.test.mjs`（code phase 新建） |
+| `tests/unit/invariants/prompt-stability.test.mjs` | **Gate D**（ARCH-016 / FALLBACK-014）：同 session fallback/T1/review/reanchor/Strength → system prompt 字节相同（无静态宿主；code phase 新建） |
 | `tests/unit/**` | Fallback/Prompt/PTY/Review 的可达构造、唯一入口与完整行为 |
+
+### Gate B leak vocabulary（权威禁令表）
+
+provider 输出 / schema / fixed prose **不得**含：
+
+```text
+SessionId / AgentId / ManagerJobId / PtyId / FissionGroupId
+lane_index / worktree / fallback offset
+fast- / deep- binding 冒充身份 / spool path
+status / code / error 泛型 DTO（Join/horizon）
+agent_id / pty_id / session_id（horizon 字段）
+```
+
+技术标识（tool 名、argument、wire field、enum、path、command、`exit_code`）在 EN/ZH **同形**（Gate C）；localizable 散文才翻译。
+
+### 旧 substring inventory — 删除
+
+下列以源码/fixture **子串匹配**锁旧 provider ontology 的证明形态 **作废**，不得再作门禁权威（Phase 19 / §17）：
+
+```text
+tdd="red"|"green" / TddPhase
+list() DTO / agent_id / fork-manager / verdict（工具名）/ blog（工具名）
+Opening task / Work log / Uncompressed tail / Final output
+parent_work_record / original_user_requirement
+edit-qa / Meditator / Role.Executor 作为现行表面
+```
+
+代表删除/改写目标（code phase；本文件不声称已绿）：
+`tests/unit/execution/tdd-phase.test.mjs`、
+`tests/unit/verify/fork-child-payload-tdd-contract.test.mjs`、
+`tests/unit/verify/orchestrator-reuse-contract.test.mjs`、
+以及 `manager-tool-contract` / `*-tool` / LWR heading substring 套件。
+
+替代：上表 Gate A–D + `tests/unit/invariants/*` 语义不变量。禁止用新的宽松 substring 清单假装覆盖。
 
 `npm run lint` 绿色只证明上述静态覆盖，不得宣称已经证明跨文件语义一致、所有 `Result` 穷尽处理或所有算法 owner 唯一。新增静态门禁必须有故意破坏后变红的 fixture；新增行为门禁必须走发布产物测试。
 
@@ -527,8 +567,11 @@ Cursor pattern 在固定失败次数上判死（FALLBACK-005：Offset 循环无�
 成功时重置 Offset（FALLBACK-004：成功只清零 ConsecutiveFailureCount）
 把 HostSignal.ProviderRetry.Attempt 当作 ConsecutiveFailureCount（FALLBACK-010）
 超过 AutoRecoveryBudget 后仍继续自动请求（FALLBACK-005）
-Blogger 或 Executor 名称进入 LLM tool schema
+Blogger 或 Distiller 名称进入 LLM tool schema（工具须为动词：chronicle / run …）
+旧工具名 alias（fork-manager / list / verdict / blog / edit-qa / executor / return / tdd）仍可调用
 Blogger 不是从 fast-blogger 开始
+Fallback / Strength 改变 SessionPersona 或 system prompt 字节（FALLBACK-014 / Gate D）
+provider 输出泄漏 Gate B vocabulary
 重启后 fallback cursor 丢失
 重启后 journal 旧 model 覆盖新 opencode.json
 拼错 Agent 被静默当作新 handle

@@ -78,9 +78,9 @@ const prompts = [
   'inspector',
   'reviewer',
   'browser',
-  'meditator',
+  'inquiry',
   'orchestrator',
-  'executor',
+  'distiller',
   'blogger',
 ]
 for (const name of prompts) {

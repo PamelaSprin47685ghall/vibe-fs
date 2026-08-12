@@ -18,10 +18,10 @@ open Wanxiangshu.Kernel.Identity
 /// same way `XWire.readFrames` resolves `BlogFrame.TextRef`.
 type XTraceProjectionState =
     {
-        /// The opening task, inline: it is the first task prompt, bounded and
-        /// human-sized, and the fold must be able to materialise the LWR's
-        /// opening section without a second read step.
-        Opening: OpeningPromptRaw option
+        /// OpeningMaterial InitialCharge, inline: first task prompt, bounded and
+        /// human-sized; fold materialises the LWR Opening section without a
+        /// second read. BlindPlan interval end = WorkRecordStart (COMPANION-014).
+        Opening: OpeningMaterial option
         /// Semantic parts, strictly ordered by cursor. `Kind` is one of
         /// text / reasoning / tool_call / tool_result / media.
         Parts: XTracePartRef list
@@ -138,7 +138,7 @@ module XTraceProjection =
     /// COMPANION-003 / EXEC-009: capture the terminal output reference.
     /// Idempotent replay (same ref+digest) is a no-op; a different ref
     /// overwrites — subagent reuse produces a new terminal per work unit
-    /// on the same child session, and the LWR's Final output segment must
+    /// on the same child session, and the LWR's Closing report segment must
     /// reflect the latest terminal, not the first.
     let applyTerminal
         (textRef: BlobRef)

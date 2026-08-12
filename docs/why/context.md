@@ -26,3 +26,9 @@ X probe 失败不写事实：未提交的候选从未成为世界的一部分，
 **PrefixCoverage-only Y vs RecordCoverage/LWR。** 拒用 LWR RawGap 冒充可替换前缀：过程评审要看 frontier 上的完整证据（可含 gap）；Manager lag-1 前缀只许 proven complete-turn Y。二者不得互推（CTX-015；coverage TODO-008；rebase TODO-009）。
 
 **Opening floor = WorkRecordStart，不是 Activation。** 拒把 Opening 保护绑回 `WorkActivated`/planning floor：删除两阶段后仍须 byte-stable Opening；Blogger/Y 的结构性起点是 Opening exclusive end（CTX-016；TODO-001）。
+
+## Strength 与前缀世界（理由）
+
+**Replica 继承 owner 的 Persona / language。** Strength 是同一人的廉价只读分身，不是新办公室。若 Replica 自造 Persona 或另绑 `ProviderLanguage`，投机轨迹进入的「自我模型 / 世界语」与 primary 不同质，Promotion 后会把异质前缀补丁进主历史。继承 owner → 投机与主链共享身份与语言常量；只换 fast 模型绑定。
+
+**未 Promote 的 Candidate ≠ 历史。** 与 X probe 失败不写事实同构：未提交候选从未成为世界一部分。提前写入 XTrace / Companion / provider-visible 历史，等于用未发生的干预污染后续请求；primary 消费并 Promote 之后才是真实因果。拒把 source label（「来自 Strength」）写进 Main reasoning——那是机器溯源，不是经验层该看见的状态机。

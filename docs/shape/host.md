@@ -213,9 +213,34 @@ idle-derived continuation（missing-final-report、interaction-repair、ManagerI
 | `assistant` | 无 `tool_calls` / tool part，且 text part / content 为空 | 提取 reasoning/thinking 文本填充为 text part；无 reasoning 则填充 `"..."` |
 | `user` | text part / content 为空 | 填充 `"#"` text part |
 
+## SessionProviderLanguage 绑定写（HOST-026）
+
+行为：`what/host.md` HOST-026；类型与可译边界：`PROMPT-017`。  
+本节只定 **谁写 / 谁读**。
+
+| 关注点 | 唯一 writer | 读者 / 禁止 |
+|------|------|------|
+| 全局语言偏好 → `SessionProviderLanguage` | **session 创建瞬间**唯一绑定写（Host session 装配路径） | 创建后不可变；Fallback / Strength / restart / reanchor / BlindPlan T1 **不得**改写 |
+| child / attached / InternalLeaf（Companion、SyncDelegate、Bookkeeper、StrengthReplica） | **继承** owner 或 commissioner 的已绑语言 | 禁止各自再读全局偏好 |
+| HOST-013 marker 正文语言 | 只读 `SessionProviderLanguage` 选 EN/ZH guideline + Nudge | 禁止 transform 现场读全局；历史 marker 永不因语言偏好变更重算 |
+| Opening / Office Library / tool consequence / WorkRecord headings | 各文本 owner 按已绑语言取 localized representation（PROMPT-016/017） | Host 不拥有文案 SSOT；只保证绑定字节连续 |
+| protocol identifiers | — | tool 名 / argument / wire field / enum / path / command / `exit_code` **永不翻译**（ARCH-016 Gate C） |
+
+```text
+global preference
+    ↓ 仅 session create
+SessionProviderLanguage (immutable)
+    ↓
+provider-facing localizable prose
+```
+
+用户事后改全局偏好 → 只影响**此后新建** session。已开 Life 的世界语保持前缀连续。
+
+与 Persona：`SessionPersona` 绑定属 AGENT-028（创建一次）；`SessionProviderLanguage` 绑定属本条；二者同为 session 创建冻结，Host 不得在运行中重写任一。
+
 ## Magic Todo V1 membrane 所有权边界（归属 HOST-017..025）
 
-可观察总行为与 canary 合同见 `what/host.md` HOST-017（及 HOST-018..025）；本节只定实现层所有权与挂载边界，不重复定义条款。
+可观察总行为与 canary 合同见 `what/host.md` HOST-017（及 HOST-018..025）；义务协议见 `TODO-*`。本节只定实现层所有权与挂载边界，不重复定义条款。
 
 ### 分层所有权
 
@@ -225,8 +250,8 @@ OpenCode Host
   = V1 hook 挂载面（definition / before / after）
 
 Wanxiangshu Domain + Journal
-  = Magic Todo protocol owner（TODO-001..014）
-  = canonical list、checkpoint、review obligation、settlement、rebase evidence
+  = Magic Todo protocol owner（TODO-001..015）
+  = CurrentObligations、checkpoint、BlindPlan T1、review obligation、settlement、rebase evidence
 ```
 
 禁止 Host core 修改；禁止 plugin 同名 tool 覆盖 builtin `todowrite`（会夺取 executor 与 store 契约）。Membrane 只叠加钩子，把原 executor **降级**为 compatibility sink（TODO-007）。
@@ -235,9 +260,9 @@ Wanxiangshu Domain + Journal
 
 | 面 | 可见身份 | 可变合同 |
 |----|----------|----------|
-| `tool.definition` | tool 名 / schema | 同时写 `parameters`+`jsonSchema`+`description`；V2 广告唯一 owner（TODO-002） |
+| `tool.definition` | tool 名 / schema | 同时写 `parameters`+`jsonSchema`+`description`；provider-visible **obligations** schema 唯一广告点（TODO-002） |
 | `tool.execute.before` | `sessionID`+`callID` only | 原地 mutation `args` 字段；async 可等待 ConsumableReview（TODO-006） |
-| `tool.execute.after` | `sessionID`+`callID` only | 改写模型可见 `output`；ensure Accepted（HOST-022） |
+| `tool.execute.after` | `sessionID`+`callID` only | 改写模型可见 `output`；ensure Accepted（HOST-022）；T1 revelation 字节属 TODO-015 |
 | executor `ToolContext` | message id + call id | 跑原 V1 decoder；只见 compatibility 投影 |
 
 before/after **不得**猜配 messageID。定位 ToolPart/assistant/run/ordinal/XTrace range 必须经完整 SDK snapshot 唯一成立（HOST-025）；否则 fail closed，不得上线。
@@ -245,7 +270,7 @@ before/after **不得**猜配 messageID。定位 ToolPart/assistant/run/ordinal/
 ### 非别名边界（HOST-019）
 
 ```text
-durable ToolPart.input  （pre-before 历史）
+durable ToolPart.input  （pre-before 历史；provider obligations 原样）
         ≠
 before 本地 args 对象   （可原地改为 V1 sink 形状）
         →
@@ -274,11 +299,11 @@ Durable 只在 AgentJournal（TODO-012）。bridge 丢失 ⇒ 从 Prepared + phy
 
 ```text
 Host TodoTable     = optimistic compatibility projection（无 stable id）
-MagicTodoProjection = canonical semantic truth（TODO-007）
+MagicTodoProjection = canonical obligations truth（TODO-007）
 ```
 
-- `reviewing`：canary 决定 passthrough 或 sink→`in_progress`；canonical 不变（TODO-003）。
-- REVISE 消费后 settlement 改变 ⇒ 幂等 reconcile sink 到 settled current；**不**产生 checkpoint/review（TODO-005/007）。
+- sink 字段策略不得把 `kind`/`id`/`status`/`priority`/`reviewing` 回写成 provider 冷状态（TODO-002/003）。
+- REVISE 消费后 CurrentObligations 未升格 ⇒ 幂等 reconcile sink 到 settled current；**不**产生 checkpoint/review（TODO-005/007）。
 - sink 永不拥有 recovery 权；后续新 Life 不得把同 session TodoTable 再当 canonical seed（TODO-011）。
 
 ### V2 runner 边界（HOST-024）
@@ -291,6 +316,8 @@ MagicTodo Manager Attempt
 
 不得静默裸 `SessionTodo.update`。解除限制前必须重跑 HOST-019..025 全套 canary。
 
-### 与 HOST-013 的交界
+### 与 HOST-013 / BlindPlan 的交界
 
-HOST-013 pair-programming 仍是 **Work session 通用** marker，不专属 Manager。Manager-only 持续 todowrite 文案是 TODO-013 表面片段，在 role=Manager 且 `todowrite` provider-visible 时叠加；禁止把 Magic Todo 正文并入全局 `PairProgrammingGuidelineText`。
+HOST-013 pair-programming 仍是 **Work session 通用** marker，不专属 Manager；正文语言读 `SessionProviderLanguage`（HOST-026）。  
+Manager-only 持续 todowrite / BlindPlan 文案是 TODO-013/015 表面片段，在 role=Manager 且 `todowrite` provider-visible 时叠加；禁止并入全局 `PairProgrammingGuidelineText`。  
+Host membrane **不**拥有 OpeningPolicy / OpeningMaterial；T1 关闭 Opening 属 TODO-015 / COMPANION-014。

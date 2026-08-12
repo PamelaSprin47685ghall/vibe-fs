@@ -87,6 +87,8 @@
     <Compile Include="Domain/ReviewWitness.fs"/>
     <Compile Include="Domain/ReviewChallenge.fs"/>
     <Compile Include="Domain/ManagedAgentCatalog.fs"/>
+    <Compile Include="Domain/PersonaCatalog.fs"/>
+    <Compile Include="Domain/ProviderLanguage.fs"/>
     <Compile Include="Domain/SyncDelegatePrompt.fs"/>
     <Compile Include="Domain/PromptAuthority.fs"/>
     <Compile Include="Domain/PromptAuthorityRun.fs"/>
@@ -197,6 +199,7 @@
     <Compile Include="Application/Orchestration/Types.fs"/>
     <Compile Include="Infrastructure/Resources/PackageResources.fs"/>
     <Compile Include="Infrastructure/Resources/PromptResources.fs"/>
+    <Compile Include="Infrastructure/Resources/ProviderResources.fs"/>
     <Compile Include="Infrastructure/Resources/EnforcerCatalogResource.fs"/>
     <Compile Include="Infrastructure/Resources/RuntimeResources.fs"/>
     <Compile Include="Infrastructure/Git/IntegrationGate.fs"/>
@@ -240,6 +243,8 @@
     <Compile Include="Application/Strength/StrengthTraceRecovery.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SessionSnapshotPort.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/OpenCodePort.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/ProviderLanguageBinding.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/PersonaBinding.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Sessions.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostMessageProjection.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/StrengthReplay.fs"/>
@@ -350,8 +355,8 @@
     <Compile Include="Infrastructure/OpenCode/Host/HostCompactionObserver.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostSessionDeletion.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostSignalBootstrap.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Tools/ExecutorSummarizeRuntime.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Tools/ExecutorSummarize.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Tools/DistillationRuntime.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Tools/Distillation.fs"/>
     <Compile Include="Infrastructure/OpenCode/Orchestration/GitAdapter.fs"/>
     <Compile Include="Infrastructure/OpenCode/Orchestration/WorktreeCleanup.fs"/>
     <Compile Include="Infrastructure/OpenCode/Orchestration/Types.fs"/>

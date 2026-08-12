@@ -184,3 +184,26 @@ canRunSquash = armedByFailure && primed && hasMaterial
 3. **`hasMaterial: bool`**：检查当前是否有未压缩的 Blog frames / delta 待合并。
 
 不变量保证：任意两次 squash 之间必须至少存在一次真实的物理 attempt 失败。
+
+---
+
+## Persona / language / system 跨 cursor 不变（FALLBACK-014）
+
+推进算法**只**改写 `AttemptExecutionProfile.EffectiveAgent`（及对应模型绑定）。
+
+同一 session / Life 内下列字节与身份**不得**因 Offset / SideA·B / Peer 切换而改变：
+
+```text
+SessionPersona
+SessionProviderLanguage
+system prompt（office + Role Law + Common Law composition）
+CanonicalRole / SelectedAgent / PeerAgent / Authority 身份
+```
+
+```text
+recordConfirmedFailure → advance Offset → EffectiveAgent := side(Offset) 映射的 Selected|Peer
+→ 下一物理 attempt 仍用同一 Persona / ProviderLanguage / system 字节
+→ 禁止重装 PersonaCatalog、禁止重写 Role Law、禁止把 cursor/Offset/count 投影进 provider horizon
+```
+
+换 Peer = 换执行者 ≠ 换人 ≠ 换世界语。T1 / review / reanchor / Strength 同守（ARCH-016 Gate D）。

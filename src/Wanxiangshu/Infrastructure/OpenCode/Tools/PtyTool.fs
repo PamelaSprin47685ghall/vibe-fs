@@ -5,83 +5,171 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Process
 open Wanxiangshu.Session
 
-/// DevOps-only PTY creation and operations. PTY completion still originates
-/// exclusively from the backend onExit callback owned by HostForkRuntime.
+/// DevOps terminal verbs — open / send / read / signal (AGENT-006).
 module PtyTool =
 
-    type Request =
-        { Agent: string
-          Prompt: string
-          Signal: string option }
-
-    let private decode (args: HostToolArguments) =
-        { Agent = args.Text "agent"
-          Prompt = args.Text "prompt"
-          Signal = args.OptionalText "signal" }
-
     let private tString = ToolHostCodec.TString
-    let private tBool = ToolHostCodec.TBool
 
     let private error (message: string) =
         ToolHostCodec.tomlObject [ "error", tString message ]
 
-    let private success (id: string) (output: string) (closed: bool) =
-        ToolHostCodec.tomlObject [ "pty_id", tString id; "output", tString output; "closed", tBool closed ]
+    let private instruction (text: string) =
+        ToolHostCodec.tomlObjectWithInstructions [ text ] []
 
-    let private execute (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
+    let private requireDevOps (scope: ToolRuntimeScope) (context: HostToolContext) =
+        if not (scope.IsRole(context, Role.DevOps)) then
+            Error "Only DevOps may use terminal tools"
+        else
+            Ok()
+
+    let private openExecute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {
-            if not (scope.IsRole(context, Role.DevOps)) then
-                return error "Only DevOps may use fork-pty"
-            else
-                match scope.RuntimeFor context with
-                | Error runtimeError -> return error runtimeError
-                | Ok runtime ->
-                    let signal =
-                        match request.Signal with
-                        | None -> Ok None
-                        | Some raw -> PtySignal.tryParse raw |> Result.map Some
+            match requireDevOps scope context with
+            | Error msg -> return error msg
+            | Ok() ->
+                let name = args.Text "name"
+                let command = args.Text "command"
 
-                    match signal with
-                    | Error signalError -> return error signalError
-                    | Ok signalValue ->
-                        match runtime.TryPty request.Agent with
-                        | Some ptyId ->
-                            match! runtime.SendPty(ptyId, request.Prompt, signalValue) with
-                            | Ok read -> return success read.Id.Value read.Output read.Closed
-                            | Error sendError -> return error sendError
-                        | None when request.Agent = Pty.AgentName ->
-                            match signalValue, scope.ManagedAgentFor context with
-                            | Some _, _ -> return error "PTY creation does not accept signal"
-                            // PROMPT-008 fail closed: without a durable Authority Root
-                            // there is no managed agent to attribute the PTY to, and
-                            // inventing one is what made every PTY report
-                            // `fast-executor`.
-                            | None, None -> return error "fork-pty requires an accepted Authority Root for this session"
-                            | None, Some agent ->
+                if String.IsNullOrWhiteSpace name then
+                    return error "name is required"
+                elif String.IsNullOrWhiteSpace command then
+                    return error "command is required"
+                else
+                    match scope.RuntimeFor context with
+                    | Error runtimeError -> return error runtimeError
+                    | Ok runtime ->
+                        match scope.ManagedAgentFor context with
+                        | None -> return error "open-terminal requires an accepted Authority Root for this session"
+                        | Some agent ->
+                            match runtime.TryPtyByName name with
+                            | Some _ -> return error (sprintf "Terminal name '%s' is already in use" (name.Trim()))
+                            | None ->
                                 let directory =
                                     scope.DirectoryFor context.SessionId |> Option.orElse scope.WorkspaceDirectory
 
-                                match! runtime.ForkPty(request.Prompt, agent, ?cwd = directory) with
-                                | Ok id -> return success id.Value "" false
+                                match! runtime.ForkPty(command, agent, ?cwd = directory) with
                                 | Error forkError -> return error forkError
-                        | None -> return error "fork-pty only accepts agent=pty or an existing PTY id"
+                                | Ok id ->
+                                    match runtime.TryBindTerminalName(name, id) with
+                                    | Error bindError ->
+                                        runtime.UntrackPtyRun id.Value
+                                        return error bindError
+                                    | Ok() -> return instruction (sprintf "# %s is open." (name.Trim()))
         }
 
-    let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
-        { Name = "fork-pty"
-          Description =
-            "Create, write, read, or signal a PTY. When writing a prompt to an existing PTY, a trailing newline is appended automatically if missing."
+    let private sendExecute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
+        task {
+            match requireDevOps scope context with
+            | Error msg -> return error msg
+            | Ok() ->
+                let name = args.Text "name"
+                let input = args.Text "input"
+
+                match scope.RuntimeFor context with
+                | Error runtimeError -> return error runtimeError
+                | Ok runtime ->
+                    match runtime.TryPtyByName name with
+                    | None -> return error (sprintf "Unknown terminal '%s'" (name.Trim()))
+                    | Some ptyId ->
+                        match! runtime.SendPty(ptyId, input, None) with
+                        | Ok _ -> return instruction "# Input sent."
+                        | Error sendError -> return error sendError
+        }
+
+    let private readExecute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
+        task {
+            match requireDevOps scope context with
+            | Error msg -> return error msg
+            | Ok() ->
+                let name = args.Text "name"
+
+                match scope.RuntimeFor context with
+                | Error runtimeError -> return error runtimeError
+                | Ok runtime ->
+                    match runtime.TryPtyByName name with
+                    | None -> return error (sprintf "Unknown terminal '%s'" (name.Trim()))
+                    | Some ptyId ->
+                        match! runtime.SendPty(ptyId, "", None) with
+                        | Error readError -> return error readError
+                        | Ok read when String.IsNullOrWhiteSpace read.Output ->
+                            return instruction (sprintf "# Nothing new has appeared in %s." (name.Trim()))
+                        | Ok read -> return ToolHostCodec.tomlObject [ "output", tString read.Output ]
+        }
+
+    let private signalExecute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
+        task {
+            match requireDevOps scope context with
+            | Error msg -> return error msg
+            | Ok() ->
+                let name = args.Text "name"
+                let signalRaw = args.Text "signal"
+
+                match PtySignal.tryParse signalRaw with
+                | Error signalError -> return error signalError
+                | Ok signalValue ->
+                    match scope.RuntimeFor context with
+                    | Error runtimeError -> return error runtimeError
+                    | Ok runtime ->
+                        match runtime.TryPtyByName name with
+                        | None -> return error (sprintf "Unknown terminal '%s'" (name.Trim()))
+                        | Some ptyId ->
+                            match! runtime.SendPty(ptyId, "", Some signalValue) with
+                            | Ok _ ->
+                                return
+                                    instruction (
+                                        sprintf
+                                            "# %s was sent to %s."
+                                            (signalRaw.Trim().ToUpperInvariant())
+                                            (name.Trim())
+                                    )
+                            | Error sendError -> return error sendError
+        }
+
+    let private signalValues =
+        [ PtySignal.TermName
+          PtySignal.KillName
+          PtySignal.IntName
+          PtySignal.HupName
+          PtySignal.QuitName
+          PtySignal.User1Name
+          PtySignal.User2Name ]
+
+    let openSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
+        { Name = "open-terminal"
+          Description = "Open a named interactive terminal with a command."
           Arguments =
-            [ "agent", ToolHostCodec.stringSchema factory
-              "prompt", ToolHostCodec.optionalStringSchema factory
-              "signal",
-              ToolHostCodec.optionalEnumSchema
-                  [ PtySignal.TermName
-                    PtySignal.KillName
-                    PtySignal.IntName
-                    PtySignal.HupName
-                    PtySignal.QuitName
-                    PtySignal.User1Name
-                    PtySignal.User2Name ]
-                  factory ]
-          Execute = fun args context -> execute scope (decode args) context }
+            [ "name", ToolHostCodec.stringSchema factory
+              "command", ToolHostCodec.stringSchema factory ]
+          Execute = openExecute scope }
+
+    let sendSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
+        { Name = "send-terminal"
+          Description = "Send input to a named terminal. A trailing newline is appended when missing."
+          Arguments =
+            [ "name", ToolHostCodec.stringSchema factory
+              "input", ToolHostCodec.stringSchema factory ]
+          Execute = sendExecute scope }
+
+    let readSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
+        { Name = "read-terminal"
+          Description = "Read unread output from a named terminal."
+          Arguments = [ "name", ToolHostCodec.stringSchema factory ]
+          Execute = readExecute scope }
+
+    let signalSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
+        { Name = "signal-terminal"
+          Description = "Send a structured signal to a named terminal."
+          Arguments =
+            [ "name", ToolHostCodec.stringSchema factory
+              "signal", ToolHostCodec.enumSchema signalValues factory ]
+          Execute = signalExecute scope }
+
+    /// All four terminal verb specs.
+    let specs (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec list =
+        [ openSpec factory scope
+          sendSpec factory scope
+          readSpec factory scope
+          signalSpec factory scope ]
+
+    /// Legacy single-spec entry — prefer `specs`.
+    let spec factory scope = openSpec factory scope

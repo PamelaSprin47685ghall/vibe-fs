@@ -6,32 +6,20 @@ open System.Threading.Tasks
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 
-/// In-flight sync delegate answer (Returned → Completion).
-type internal SyncDelegateAnswer =
-    { Answer: string
-      ToolRun: ProviderRunIdentity }
-
+/// In-flight sync delegate answer (ordinary completion → WorkRecord).
 type internal SyncDelegateCall =
     { Owner: SessionId
       OwnerScope: ReuseScopeId
       Role: SyncDelegateRole
       Delegate: SessionId
       Agent: string
-      Returned: TaskCompletionSource<Result<SyncDelegateAnswer, string>>
-      Completion: TaskCompletionSource<Result<unit, string>>
-      Nudges: int }
+      Answer: TaskCompletionSource<Result<string, string>> }
 
-/// TextComplete rewrite arm only — presence must not select HandleTurn branches.
-type internal PendingSyncCompletionText =
-    { Text: string
-      ToolRun: ProviderRunIdentity }
-
-/// EXEC-026/028: process-local SyncDelegateRuntime state. Gate-locked.
+/// EXEC-026/031: process-local SyncDelegateRuntime state. Gate-locked.
 type internal SyncDelegateCallStore() as this =
     let gate = obj ()
     let callsByOwnerScope = Dictionary<string, SyncDelegateCall>()
     let callsByDelegate = Dictionary<string, SyncDelegateCall>()
-    let pendingCompletionTexts = Dictionary<string, PendingSyncCompletionText>()
     // Retired Inspector ids staged between child and owner SessionDeleted.
     let deletedInspectorsByOwnerScope = Dictionary<string, SessionId>()
     let inFlightScopes = HashSet<string>()
@@ -51,40 +39,13 @@ type internal SyncDelegateCallStore() as this =
             | true, call -> Some call
             | false, _ -> None)
 
-    member _.TryPendingText(sessionId: SessionId) : PendingSyncCompletionText option =
-        lock gate (fun () ->
-            match pendingCompletionTexts.TryGetValue(sessionKey sessionId) with
-            | true, pending -> Some pending
-            | false, _ -> None)
-
-    member _.ArmPendingText(sessionId: SessionId, pending: PendingSyncCompletionText) =
-        lock gate (fun () -> pendingCompletionTexts.[sessionKey sessionId] <- pending)
-
-    member _.ClearPendingText(sessionId: SessionId) =
-        lock gate (fun () -> pendingCompletionTexts.Remove(sessionKey sessionId) |> ignore)
-
     member _.FailCall(call: SyncDelegateCall, error: string) =
-        AsyncSupport.trySetResult call.Returned (Error error) |> ignore
-        AsyncSupport.trySetResult call.Completion (Error error) |> ignore
+        AsyncSupport.trySetResult call.Answer (Error error) |> ignore
 
     member _.RemoveCall(call: SyncDelegateCall) =
         lock gate (fun () ->
             callsByOwnerScope.Remove(scopeKey call.OwnerScope) |> ignore
             callsByDelegate.Remove(sessionKey call.Delegate) |> ignore)
-
-    member _.UpdateCall
-        (ownerScope: ReuseScopeId, update: SyncDelegateCall -> SyncDelegateCall)
-        : SyncDelegateCall option =
-        lock gate (fun () ->
-            let key = scopeKey ownerScope
-
-            match callsByOwnerScope.TryGetValue key with
-            | true, current ->
-                let next = update current
-                callsByOwnerScope.[key] <- next
-                callsByDelegate.[sessionKey next.Delegate] <- next
-                Some next
-            | false, _ -> None)
 
     member _.TryAcquireFlight(scope: ReuseScopeId) : bool =
         lock gate (fun () ->
@@ -103,11 +64,8 @@ type internal SyncDelegateCallStore() as this =
         (owner: SessionId, ownerScope: ReuseScopeId, role: SyncDelegateRole, delegateSession: SessionId, agent: string) : SyncDelegateCall *
                                                                                                                           IDisposable
         =
-        let returned =
-            TaskCompletionSource<Result<SyncDelegateAnswer, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-        let completion =
-            TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
+        let answer =
+            TaskCompletionSource<Result<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
         let call =
             { Owner = owner
@@ -115,9 +73,7 @@ type internal SyncDelegateCallStore() as this =
               Role = role
               Delegate = delegateSession
               Agent = agent
-              Returned = returned
-              Completion = completion
-              Nudges = 0 }
+              Answer = answer }
 
         let ownerKey = scopeKey ownerScope
         let delegateKey = sessionKey delegateSession
@@ -132,7 +88,7 @@ type internal SyncDelegateCallStore() as this =
                     let stillOwned =
                         lock gate (fun () ->
                             match callsByOwnerScope.TryGetValue ownerKey with
-                            | true, current when Object.ReferenceEquals(current.Returned, call.Returned) ->
+                            | true, current when Object.ReferenceEquals(current.Answer, call.Answer) ->
                                 callsByOwnerScope.Remove ownerKey |> ignore
                                 callsByDelegate.Remove delegateKey |> ignore
                                 true
@@ -192,7 +148,6 @@ type internal SyncDelegateCallStore() as this =
 
             callsByOwnerScope.Clear()
             callsByDelegate.Clear()
-            pendingCompletionTexts.Clear()
             deletedInspectorsByOwnerScope.Clear()
             inFlightScopes.Clear()
             retiredInspectors)

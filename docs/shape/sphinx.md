@@ -1,6 +1,6 @@
 # Sphinx — 所有权与边界
 
-行为：`what/sphinx.md`。Host 注入：AGENT-028。本页只规定 writer 与依赖方向。
+行为：`what/sphinx.md`。Host 注入：AGENT-030。本页只规定 writer 与依赖方向。
 
 ## 模块边界
 
@@ -10,7 +10,7 @@ src/sphinx/                 ← 正交产品：纯 JS 内核 + MCP stdio server
   MCP Server                ← start / resume + handle Map
 Wanxiangshu Kernel          ← SphinxMcp identity / tool prefix only
 Wanxiangshu Host            ← SphinxMcpConfig → config.mcp.sphinx
-Roles / StaticTools         ← ToolPermission.Sphinx → Meditator allow sphinx_*
+Roles / StaticTools         ← ToolPermission.Sphinx → Inquiry allow sphinx_*
 ```
 
 ## 所有权表
@@ -27,7 +27,7 @@ Roles / StaticTools         ← ToolPermission.Sphinx → Meditator allow sphinx
 ## 控制权不变量
 
 1. continuation 唯一属于 Kernel；LLM 只回 structured observation。  
-2. handle 是 inquiry 唯一钥匙；Host / Meditator 不得另造并行会话表。  
+2. handle 是 inquiry 唯一钥匙；Host / Inquiry 不得另造并行会话表。  
 3. Canonical Answer 只由 Kernel 在 fixed point + Stop 最优时写出。  
 4. 万象术只注入与锁权限；不得复制闭包算法。
 

@@ -1,5 +1,5 @@
-// tests/unit/Execution/executor-summarize.test.mjs — EXECUTOR-001 prompt composers
-// + EXEC-023/024 targeted AwaitAgentWithPermit contract for summarizeSpool.
+// tests/unit/Execution/executor-summarize.test.mjs — Distillation prompt constants
+// + EXEC-023/024 targeted AwaitAgentWithPermit contract for distillSpool.
 //
 // The prompt is the plain intent only; the chunk/combined content is carried
 // by the fork envelope's `content` field (FORK_CHILD_PAYLOAD_payload_renders_as_content).
@@ -18,9 +18,9 @@ import test from 'node:test'
 import { ForkError } from '../../../dist/Session/ForkTypes.js'
 import {
   agentCompletion,
+  distillation,
+  distillationRuntime,
   errorResult,
-  executorSummarize,
-  executorSummarizeRuntime,
   okResult,
 } from '../support/domain.mjs'
 
@@ -45,37 +45,34 @@ function completedOk(agentId) {
   )
 }
 
-test('EXECUTOR_SUMMARIZE_summarize_chunk_prompt_is_plain_intent', () => {
+test('DISTILLATION_distill_fragment_prompt_is_plain_intent', () => {
   assert.equal(
-    executorSummarize.summarizeChunkPrompt(1),
-    'Summarize command output chunk 1. Preserve errors, decisions, paths, and exact numbers; omit raw code.',
+    distillation.distillFragmentPrompt(),
+    'Distill this fragment of command output. Preserve errors, decisions, paths, and exact numbers; omit raw code.',
   )
 })
 
-test('EXECUTOR_SUMMARIZE_reduce_batch_prompt_is_plain_intent', () => {
+test('DISTILLATION_merge_distillations_prompt_is_plain_intent', () => {
   assert.equal(
-    executorSummarize.reduceBatchPrompt(2),
-    'Reduce level-2 command-output summaries into one dense report. Preserve failures and exact facts; do not include raw code.',
+    distillation.mergeDistillationsPrompt(),
+    'Merge these command-output distillations into one dense account. Preserve failures and exact facts; do not include raw code.',
   )
 })
 
-test('EXECUTOR_SUMMARIZE_index_varies_in_chunk_prompt', () => {
-  assert.ok(executorSummarize.summarizeChunkPrompt(7).startsWith('Summarize command output chunk 7.'))
+test('DISTILLATION_prompts_carry_no_chunk_index_or_level', () => {
+  assert.ok(!/\bchunk\b/i.test(distillation.distillFragmentPrompt()))
+  assert.ok(!/\blevel-\d/i.test(distillation.mergeDistillationsPrompt()))
 })
 
-test('EXECUTOR_SUMMARIZE_level_varies_in_reduce_prompt', () => {
-  assert.ok(executorSummarize.reduceBatchPrompt(5).startsWith('Reduce level-5 command-output summaries into one dense report.'))
-})
-
-test('EXEC_summarize_spool_targeted_await_one_call_per_agent_no_stash', async () => {
+test('EXEC_distill_spool_targeted_await_one_call_per_agent_no_stash', async () => {
   const { dir, spoolPath } = writeSpoolWithChunks(3)
   const forked = []
   const awaitCalls = []
 
-  const { runtime } = executorSummarizeRuntime.fake({
+  const { runtime } = distillationRuntime.fake({
     fork: (agentId) => {
       forked.push(agentId)
-      return executorSummarizeRuntime.forkOk(agentId)
+      return distillationRuntime.forkOk(agentId)
     },
     awaitAgent: (agentId, timeoutMs) => {
       awaitCalls.push({ agentId, timeoutMs })
@@ -83,7 +80,7 @@ test('EXEC_summarize_spool_targeted_await_one_call_per_agent_no_stash', async ()
     },
   })
 
-  const summary = await executorSummarizeRuntime.summarizeSpool(runtime, spoolPath)
+  const summary = await distillationRuntime.distillSpool(runtime, spoolPath)
 
   assert.ok(typeof summary === 'string' && summary.length > 0)
   assert.ok(forked.length >= 3, `expected ≥3 forks (3 map ± reduce), got ${forked.length}`)
@@ -100,16 +97,16 @@ test('EXEC_summarize_spool_targeted_await_one_call_per_agent_no_stash', async ()
   rmSync(dir, { recursive: true, force: true })
 })
 
-test('EXEC_summarize_spool_targeted_await_out_of_order_returns_own_agent', async () => {
+test('EXEC_distill_spool_targeted_await_out_of_order_returns_own_agent', async () => {
   const { dir, spoolPath } = writeSpoolWithChunks(3)
   const forked = []
   const awaitCalls = []
   let mapSeq = 0
 
-  const { runtime } = executorSummarizeRuntime.fake({
+  const { runtime } = distillationRuntime.fake({
     fork: (agentId) => {
       forked.push(agentId)
-      return executorSummarizeRuntime.forkOk(agentId)
+      return distillationRuntime.forkOk(agentId)
     },
     awaitAgent: (agentId, timeoutMs) => {
       const seq = mapSeq++
@@ -122,10 +119,10 @@ test('EXEC_summarize_spool_targeted_await_out_of_order_returns_own_agent', async
     },
   })
 
-  const summary = await executorSummarizeRuntime.summarizeSpool(runtime, spoolPath)
+  const summary = await distillationRuntime.distillSpool(runtime, spoolPath)
 
   assert.ok(typeof summary === 'string' && summary.length > 0)
-  assert.ok(!/partial|raw tail/i.test(summary), 'out-of-order success must not degrade to partial')
+  assert.ok(!/Condensation incomplete|Most recent raw output/i.test(summary), 'out-of-order success must not degrade to partial')
   assert.ok(forked.length >= 3)
   assert.equal(awaitCalls.length, forked.length, 'each fork awaited once under out-of-order resolve')
 
@@ -137,7 +134,7 @@ test('EXEC_summarize_spool_targeted_await_out_of_order_returns_own_agent', async
   rmSync(dir, { recursive: true, force: true })
 })
 
-test('EXEC_summarize_spool_await_timeout_fails_chunk_cancels_owned_siblings_still_await', async () => {
+test('EXEC_distill_spool_await_timeout_fails_chunk_cancels_owned_siblings_still_await', async () => {
   const { dir, spoolPath } = writeSpoolWithChunks(3)
   const forked = []
   const awaitCalls = []
@@ -145,27 +142,27 @@ test('EXEC_summarize_spool_await_timeout_fails_chunk_cancels_owned_siblings_stil
   /** Fail the second map agent only (index 1). */
   let failAgentId = null
 
-  const { runtime, cancelled } = executorSummarizeRuntime.fake({
+  const { runtime, cancelled } = distillationRuntime.fake({
     fork: (agentId) => {
       if (mapForkIndex < 3) {
         if (mapForkIndex === 1) failAgentId = agentId
         mapForkIndex += 1
       }
       forked.push(agentId)
-      return executorSummarizeRuntime.forkOk(agentId)
+      return distillationRuntime.forkOk(agentId)
     },
     awaitAgent: (agentId, timeoutMs) => {
       awaitCalls.push({ agentId, timeoutMs })
       // Real join timeout / hard fail → NotFound (not TimedOut/Waiting retry).
-      if (agentId === failAgentId) return executorSummarizeRuntime.notFound(agentId)
+      if (agentId === failAgentId) return distillationRuntime.notFound(agentId)
       return completedOk(agentId)
     },
   })
 
-  const summary = await executorSummarizeRuntime.summarizeSpool(runtime, spoolPath)
+  const summary = await distillationRuntime.distillSpool(runtime, spoolPath)
 
   assert.ok(typeof summary === 'string')
-  assert.match(summary, /partial|raw tail/i, 'map failure yields partial summary, not throw')
+  assert.match(summary, /Condensation incomplete|Most recent raw output/i, 'map failure yields partial account, not throw')
 
   const mapAgentIds = forked.slice(0, 3)
   assert.equal(mapAgentIds.length, 3)
@@ -183,17 +180,17 @@ test('EXEC_summarize_spool_await_timeout_fails_chunk_cancels_owned_siblings_stil
   rmSync(dir, { recursive: true, force: true })
 })
 
-test('EXEC_summarize_spool_await_not_found_hard_fail_collects_failure', async () => {
+test('EXEC_distill_spool_await_not_found_hard_fail_collects_failure', async () => {
   const { dir, spoolPath } = writeSpoolWithChunks(2)
   const forked = []
   const awaitCalls = []
   let firstMapId = null
 
-  const { runtime, cancelled } = executorSummarizeRuntime.fake({
+  const { runtime, cancelled } = distillationRuntime.fake({
     fork: (agentId) => {
       if (firstMapId === null) firstMapId = agentId
       forked.push(agentId)
-      return executorSummarizeRuntime.forkOk(agentId)
+      return distillationRuntime.forkOk(agentId)
     },
     awaitAgent: (agentId, timeoutMs) => {
       awaitCalls.push({ agentId, timeoutMs })
@@ -203,10 +200,10 @@ test('EXEC_summarize_spool_await_not_found_hard_fail_collects_failure', async ()
     },
   })
 
-  const summary = await executorSummarizeRuntime.summarizeSpool(runtime, spoolPath)
+  const summary = await distillationRuntime.distillSpool(runtime, spoolPath)
 
   assert.ok(typeof summary === 'string')
-  assert.match(summary, /partial|raw tail/i, 'NotFound hard fail collects failure, no throw-out')
+  assert.match(summary, /Condensation incomplete|Most recent raw output/i, 'NotFound hard fail collects failure, no throw-out')
   assert.equal(
     awaitCalls.filter((c) => c.agentId === firstMapId).length,
     1,
@@ -217,24 +214,24 @@ test('EXEC_summarize_spool_await_not_found_hard_fail_collects_failure', async ()
   rmSync(dir, { recursive: true, force: true })
 })
 
-test('EXEC_summarize_spool_family_waiting_waits_for_readiness_before_one_fresh_permit_check', async () => {
+test('EXEC_distill_spool_family_waiting_waits_for_readiness_before_one_fresh_permit_check', async () => {
   const { dir, spoolPath } = writeSpoolWithChunks(1)
   const awaitCalls = []
   const callOrder = []
   const attemptsByAgent = new Map()
   const readinessSignals = []
 
-  const { runtime } = executorSummarizeRuntime.fake({
-    fork: (agentId) => executorSummarizeRuntime.forkOk(agentId),
+  const { runtime } = distillationRuntime.fake({
+    fork: (agentId) => distillationRuntime.forkOk(agentId),
     awaitAgent: (agentId, timeoutMs) => {
       callOrder.push(`permit:${agentId}`)
       awaitCalls.push({ agentId, timeoutMs })
       const n = (attemptsByAgent.get(agentId) ?? 0) + 1
       attemptsByAgent.set(agentId, n)
-      if (n === 1) return executorSummarizeRuntime.timedOut()
+      if (n === 1) return distillationRuntime.timedOut()
       return completedOk(agentId)
     },
-    // Contract required from IExecutorRuntime: this resolves only when the
+    // Contract required from IDistillationRuntime: this resolves only when the
     // recovery owner publishes a readiness signal for the waiting family.
     awaitRecoveryReadiness: (agentId) => {
       callOrder.push(`readiness:${agentId}`)
@@ -242,16 +239,16 @@ test('EXEC_summarize_spool_family_waiting_waits_for_readiness_before_one_fresh_p
     },
   })
 
-  const summary = await executorSummarizeRuntime.summarizeSpool(runtime, spoolPath)
+  const summary = await distillationRuntime.distillSpool(runtime, spoolPath)
 
   assert.ok(typeof summary === 'string' && summary.length > 0)
   assert.ok(
-    !/partial|raw tail|unavailable/i.test(summary),
-    'FamilyWaiting→Ready must yield full summary, not partial',
+    !/Condensation incomplete|Most recent raw output|unavailable/i.test(summary),
+    'FamilyWaiting→Ready must yield full account, not partial',
   )
   assert.ok(
     summary.includes('summary-for-'),
-    'Ready completion work record must appear in full summary',
+    'Ready completion work record must appear in full account',
   )
   const targetId = awaitCalls[0]?.agentId
   assert.ok(targetId, 'map agent id recorded')
@@ -269,12 +266,12 @@ test('EXEC_summarize_spool_family_waiting_waits_for_readiness_before_one_fresh_p
   rmSync(dir, { recursive: true, force: true })
 })
 
-test('EXEC_summarize_spool_family_waiting_timed_out_not_reported_as_success', async () => {
+test('EXEC_distill_spool_family_waiting_timed_out_not_reported_as_success', async () => {
   const { dir, spoolPath } = writeSpoolWithChunks(2)
   const awaitCalls = []
 
-  const { runtime, cancelled } = executorSummarizeRuntime.fake({
-    fork: (agentId) => executorSummarizeRuntime.forkOk(agentId),
+  const { runtime, cancelled } = distillationRuntime.fake({
+    fork: (agentId) => distillationRuntime.forkOk(agentId),
     // FamilyBlocked hard fail → ForkError.NotFound (requirePermit path).
     // Instant fail → partial + cancelOwned. Must not hang on Waiting retry budget
     // (always-TimedOut would spin until AwaitAgentTimeoutMs once Waiting retries).
@@ -284,12 +281,12 @@ test('EXEC_summarize_spool_family_waiting_timed_out_not_reported_as_success', as
     },
   })
 
-  const summary = await executorSummarizeRuntime.summarizeSpool(runtime, spoolPath)
+  const summary = await distillationRuntime.distillSpool(runtime, spoolPath)
 
   assert.ok(typeof summary === 'string')
   assert.match(
     summary,
-    /partial|raw tail|unavailable/i,
+    /Condensation incomplete|Most recent raw output|unavailable/i,
     'FamilyBlocked (NotFound) hard fail must not report full success',
   )
   assert.ok(!summary.includes('summary-for-'), 'no fabricated success work records')

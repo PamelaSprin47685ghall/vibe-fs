@@ -8,7 +8,7 @@ Strength 只优化 eligible deep Work provider request 前的机械只读调查�
 
 ## STRENGTH-002：Eligible opportunity
 
-实际 speculation 仅允许同时满足：Root `SessionExecutionClass.Work`；`ProviderRequestKind.WorkMain`；CanonicalRole ∈ {Coder, Inspector, DevOps, Meditator}；Authority 选择 Deep 且 `EffectiveAgent = SelectedAgent`；不是 fallback B-side、InteractionRepair、prefix probe、Reviewer/finality、Attached 或 InternalLeaf；owner 未取消；可唯一绑定即将消费输入的 `TargetProviderRun`；存在 same-role fast peer且 fast/deep model binding 不同；EventStore、Host canary 与显式成本模型均健康可用。任一事实未知或不满足 → K0。Browser、Manager、Orchestrator、Reviewer 第一版不 eligible。
+实际 speculation 仅允许同时满足：Root `SessionExecutionClass.Work`；`ProviderRequestKind.WorkMain`；CanonicalRole ∈ {Coder, Inspector, DevOps, Inquiry}；Authority 选择 Deep 且 `EffectiveAgent = SelectedAgent`；不是 fallback B-side、InteractionRepair、prefix probe、Reviewer/finality、Attached 或 InternalLeaf；owner 未取消；可唯一绑定即将消费输入的 `TargetProviderRun`；存在 same-role fast peer且 fast/deep model binding 不同；EventStore、Host canary 与显式成本模型均健康可用。任一事实未知或不满足 → K0。Browser、Manager、Orchestrator、Reviewer 第一版不 eligible。
 
 ## STRENGTH-003：预算单位
 
@@ -16,15 +16,19 @@ Strength 只优化 eligible deep Work provider request 前的机械只读调查�
 
 ## STRENGTH-004：Replica authority
 
-Replica = `InternalLeaf × Attached(owner, StrengthReplica)`，使用 `fast-<owner-role>`；不新增 CanonicalRole/Agent/system prompt。每个 Strength decision 使用短生命周期 leaf，完成即 retire，不跨 decision 复用 transcript。Replica 无 Companion、SyncDelegate、嵌套 StrengthReplica、fork/list/join、deep fallback 或用户权限交互。provider-visible schema 与 execution gate 必须同源且恰好允许 `read/glob/grep`；任何其它工具 fail closed。Replica 成败不推进 owner FallbackCursor，不清零 owner failure count，不触发 owner InteractionRepair。
+Replica = `InternalLeaf × Attached(owner, StrengthReplica)`，使用 `fast-<owner-role>`；不新增 CanonicalRole/Agent/system prompt。  
+Replica **继承** owner 的 `SessionPersona` 与 `SessionProviderLanguage`（AGENT-028/029、HOST-026）；只换 ExecutionBinding（fast 模型），不换人、不换世界语。  
+每个 Strength decision 使用短生命周期 leaf，完成即 retire，不跨 decision 复用 transcript。Replica 无 Companion、SyncDelegate、嵌套 StrengthReplica、fork/horizon/join、deep fallback 或用户权限交互。provider-visible schema 与 execution gate 必须同源且恰好允许 `read/glob/grep`；任何其它工具 fail closed。Replica 成败不推进 owner FallbackCursor，不清零 owner failure count，不触发 owner InteractionRepair。
 
 ## STRENGTH-005：Candidate frame
 
 Strength 只保留真实 Host 工具交换，不复制 Replica prose/reasoning。每个 frame bundle 保留 provider request batch 边界、稳定 provider 顺序、canonical arguments、真实 canonical result、内容 digest 与 byte length；call/result 必须一一配对且工具只能是 `read/glob/grep`。跨 Session semantic bundle 不携带 Replica tool call id；owner wire id 由 owner session、DecisionId、request/exchange ordinal 与 semantic digest 确定性派生，禁止随机数、时间戳或 GUID。超过硬字节上限的 speculation 整体丢弃为 K0。
 
-## STRENGTH-006：Prepared 不是历史
+## STRENGTH-006：Prepared / unpromoted ≠ 历史
 
-可用 frame bundle 在 primary 真正看见前必须先 append durable `StrengthCandidatePrepared`，绑定唯一 `OwnerSessionId + DecisionId + TargetProviderRun + ReplicaSessionId + Budget + AnchorDigest + FrameDigest + ByteLength`。大 material 只通过该 EventStore envelope 的 `payload_refs: PayloadRef list` 引用；不得存在 Strength-owned NDJSON、RuntimePath blob、`FrameBundleRef`/`PredictorSnapshotRef` storage 类型。Prepared Candidate 不得进入 XTrace、Companion、LWR、PrefixSnapshot 或未来 durable provider history，只能注入它绑定的 TargetProviderRun。
+可用 frame bundle 在 primary 真正看见前必须先 append durable `StrengthCandidatePrepared`，绑定唯一 `OwnerSessionId + DecisionId + TargetProviderRun + ReplicaSessionId + Budget + AnchorDigest + FrameDigest + ByteLength`。大 material 只通过该 EventStore envelope 的 `payload_refs: PayloadRef list` 引用；不得存在 Strength-owned NDJSON、RuntimePath blob、`FrameBundleRef`/`PredictorSnapshotRef` storage 类型。
+
+**Unpromoted Candidate ≠ 历史。** Prepared / 未 Promote 的 Candidate 不得进入 XTrace、Companion、LWR、PrefixSnapshot 或未来 durable provider history，只能注入它绑定的 TargetProviderRun。source label（strength / replica / prefetch）不得进入 Main reasoning（STRENGTH-012）。
 
 Prepared append 明确失败可 fail open 为 K0。提交结局 CommitUnknown 必须重读 Strength projection：证明同一 Candidate 已提交则以同一 digest/payload refs 注入；证明不存在则 K0；仍无法证明则禁止 target request 外发。
 

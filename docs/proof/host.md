@@ -36,6 +36,19 @@
 | 空 Content 预防 | assistant/user 消息空 content 兜底；reasoning 填充或非空 text | HOST-016 |
 | G2 PREFIX LAW ModelId bind：`ChatParamsHook` 留 `Model=None`；Inspector Q1–Q3 `SendPrompt` 必须带同一 `OpencodeModel`（`SyncDelegateRuntime` optional `promptModel`；G6 不得当己有字段删除）。**G2 Product Exit DONE** | HOST-008；PREFIX LAW 权威：`why/host.md` §13 / HOST-013 `ProviderProjection.isAppendOnlyPrefix` → tests/unit/session/g2-inspector-provider-wire-prefix.test.mjs（`G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix`）；Host：tests/e2e/support/long-stroke-oracles.mjs `assertG2InspectorPrefixLaw`（same model；经 `tests/e2e/entry.test.mjs`）。2026-08-12 Amendment：mock LLM + 本机 OpenCode = 正确 Host |
 
+## SessionProviderLanguage 证明（HOST-026；EN/zh-CN）
+
+| 证明 | 期望 | 条款 |
+|------|------|------|
+| 创建绑定 | session 创建瞬间读全局偏好 → 不可变 `SessionProviderLanguage`；禁 ambient 再读 | HOST-026、PROMPT-017 |
+| child 继承 | Companion / SyncDelegate / Bookkeeper / StrengthReplica / Attached 继承 owner\|commissioner；不得各自绑全局 | HOST-026 |
+| 事件不改语 | Fallback / Strength / restart / reanchor / BlindPlan T1 **不**改写已绑语言 | HOST-026、ARCH-016 D |
+| 全局后改 | 只影响此后新建 session；已开 Life Opening / Library / consequence / HOST-013 marker 字节连续 | HOST-026 |
+| 翻译边界 | localizable = system / Role Law / Common Law / Library / tool prose / WorkRecord headings；invariant = tool 名 / argument / wire / enum / path / command / `exit_code` | HOST-026、ARCH-016 C |
+| EN/ZH 资源 | 每份 provider semantic resource EN + zh-CN 成对；缺语言 fail（Gate C） | HOST-026、ARCH-016 C |
+
+Gate C 跨域门禁见 `proof/architecture.md`；Prompt 侧冻结见 `proof/prompt.md` Gate D / PROMPT-017。
+
 代表：`tests/unit/host/pair-thought-transform.test.mjs`、`tests/integration/plugin/manager-tool-contract.test.mjs`（`HOST_013_*`）、`tests/unit/enforcer/latest-tip-nudge.test.mjs`、HOST-013 replay property / restart / fail-closed 单测、Quiescence gate 单测（`tests/unit/host/`）。
 
 ## Session 关联

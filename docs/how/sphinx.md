@@ -1,6 +1,6 @@
 # Sphinx — 目标算法与协议
 
-实现 SPHINX-001..005；Host 装配见 AGENT-028。
+实现 SPHINX-001..005；Host 装配见 AGENT-030。
 
 ## Inquiry 主环
 

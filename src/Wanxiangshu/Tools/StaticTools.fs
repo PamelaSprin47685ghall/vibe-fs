@@ -35,30 +35,36 @@ module StaticTools =
 
     open Wanxiangshu.Kernel
 
-    let toolName (p: ToolPermission) =
+    /// One permission may expand to several provider verb names (Pty, Behavior, Exec).
+    let toolNames (p: ToolPermission) : string list =
         match p with
-        | ToolPermission.Fork -> "fork"
-        | ToolPermission.Join -> "join"
-        | ToolPermission.List -> "list"
-        | ToolPermission.Read -> "read"
-        | ToolPermission.Write -> "write"
-        | ToolPermission.Edit -> "edit"
-        | ToolPermission.Glob -> "glob"
-        | ToolPermission.Grep -> "grep"
-        | ToolPermission.Move -> "mv"
-        | ToolPermission.Remove -> "rm"
-        | ToolPermission.BashHoneypot -> "bash-honeypot"
-        | ToolPermission.Inspector -> "inspector"
-        | ToolPermission.Coder -> "coder"
-        | ToolPermission.Exec -> "executor"
-        | ToolPermission.Pty -> "fork-pty"
-        | ToolPermission.Network -> StealthBrowserMcp.permissionKey
-        | ToolPermission.Sphinx -> SphinxMcp.permissionKey
-        | ToolPermission.Verdict -> "verdict"
-        | ToolPermission.Blog -> "blog"
-        | ToolPermission.Return -> "return"
-        | ToolPermission.Fetch -> "fetch"
-        | ToolPermission.Finality -> "suicide"
+        | ToolPermission.Fork -> [ "fork" ]
+        | ToolPermission.Join -> [ "join" ]
+        | ToolPermission.Horizon -> [ "horizon" ]
+        | ToolPermission.Read -> [ "read" ]
+        | ToolPermission.Write -> [ "write" ]
+        | ToolPermission.Edit -> [ "edit" ]
+        | ToolPermission.Glob -> [ "glob" ]
+        | ToolPermission.Grep -> [ "grep" ]
+        | ToolPermission.Move -> [ "mv" ]
+        | ToolPermission.Remove -> [ "rm" ]
+        | ToolPermission.BashHoneypot -> [ "bash-honeypot" ]
+        | ToolPermission.Inspect -> [ "inspect" ]
+        | ToolPermission.Behavior -> [ "establish-behavior"; "repair-behavior" ]
+        | ToolPermission.Exec -> [ "run"; "query-shell" ]
+        | ToolPermission.Pty -> [ "open-terminal"; "send-terminal"; "read-terminal"; "signal-terminal" ]
+        | ToolPermission.Network -> [ StealthBrowserMcp.permissionKey ]
+        | ToolPermission.Sphinx -> [ SphinxMcp.permissionKey ]
+        | ToolPermission.Judge -> [ "judge" ]
+        | ToolPermission.Chronicle -> [ "chronicle" ]
+        | ToolPermission.Fetch -> [ "fetch" ]
+        | ToolPermission.Finality -> [ "suicide" ]
+
+    /// Primary name for permissions with a single verb (tests / simple maps).
+    let toolName (p: ToolPermission) =
+        match toolNames p with
+        | name :: _ -> name
+        | [] -> invalidOp "ToolPermission must expand to at least one provider name"
 
     /// JS-001: the generated js-ROLE tool name for a role.
     let jsToolName (role: Role) : string =
@@ -82,10 +88,13 @@ module StaticTools =
     /// filters and contract tests see concrete denies (not only "*").
     let knownToolNames =
         [ "fork"
-          "fork-manager"
-          "fork-pty"
+          "commission"
+          "open-terminal"
+          "send-terminal"
+          "read-terminal"
+          "signal-terminal"
           "join"
-          "list"
+          "horizon"
           "read"
           "write"
           "edit"
@@ -94,14 +103,15 @@ module StaticTools =
           "mv"
           "rm"
           "bash-honeypot"
-          "inspector"
-          "coder"
-          "executor"
+          "inspect"
+          "establish-behavior"
+          "repair-behavior"
+          "run"
+          "query-shell"
           StealthBrowserMcp.permissionKey
           SphinxMcp.permissionKey
-          "verdict"
-          "blog"
-          "return"
+          "judge"
+          "chronicle"
           "fetch"
           "suicide"
           "js-manager"
@@ -109,22 +119,26 @@ module StaticTools =
           "js-coder"
           "js-inspector"
           "js-browser"
-          "js-meditator"
+          "js-inquiry"
           "js-reviewer"
           "js-devops"
-          "js-executor"
-          "js-blogger" ]
+          "js-distiller"
+          "js-blogger"
+          "js-bookkeeper" ]
+
+    let private namesForPermissions (allowed: Set<ToolPermission>) : Set<string> =
+        allowed |> Set.toList |> List.collect toolNames |> Set.ofList
 
     /// PROMPT-012: an explicit complete allow/deny map for PromptInput.tools.
     let requestToolMap (allowed: Set<ToolPermission>) : Map<string, bool> =
-        let allowedNames = allowed |> Set.map toolName
+        let allowedNames = namesForPermissions allowed
 
         knownToolNames
         |> List.map (fun name -> name, Set.contains name allowedNames)
         |> Map.ofList
 
     let permissionObj (role: Role) : obj =
-        let allowed = Roles.permissions role |> Set.map toolName
+        let allowed = Roles.permissions role |> namesForPermissions
 
         // Host defaults set external_directory:* = ask (agent.ts). Rulesets merge by
         // flat concat + findLast, so this trailing allow cancels the Host ask and
@@ -134,19 +148,28 @@ module StaticTools =
               yield "external_directory", box "allow"
               for name in knownToolNames do
                   match name, role with
-                  // Manager owns "fork"; must not see Orchestrator's narrow tool.
-                  | "fork-manager", Role.Manager -> yield name, box "deny"
+                  // Manager owns fork; Orchestrator owns commission (both from Fork).
+                  | "commission", Role.Manager -> yield name, box "deny"
                   | "fork", Role.Orchestrator -> yield name, box "deny"
-                  // Orchestrator owns "fork-manager" (maps from ToolPermission.Fork).
-                  | "fork-manager", Role.Orchestrator -> yield name, box "allow"
-                  // DevOps owns "fork-pty"; Manager/others never see PTY through fork.
-                  | "fork-pty", Role.DevOps -> yield name, box "allow"
+                  | "commission", Role.Orchestrator -> yield name, box "allow"
+                  // DevOps owns terminal verbs; never fork through Pty.
+                  | "open-terminal", Role.DevOps
+                  | "send-terminal", Role.DevOps
+                  | "read-terminal", Role.DevOps
+                  | "signal-terminal", Role.DevOps -> yield name, box "allow"
                   | "fork", Role.DevOps -> yield name, box "deny"
-                  // DevOps may inspect and delegate edits, never write/edit directly.
+                  // Exec verb split: Inspector = query-shell; DevOps = run.
+                  | "query-shell", Role.Inspector -> yield name, box "allow"
+                  | "run", Role.Inspector -> yield name, box "deny"
+                  | "run", Role.DevOps -> yield name, box "allow"
+                  | "query-shell", Role.DevOps -> yield name, box "deny"
+                  // DevOps may inspect and delegate behavior, never write/edit directly.
                   | "write", Role.DevOps
                   | "edit", Role.DevOps -> yield name, box "deny"
                   // JS-001: the generated js-* tool is allowed iff this role has
                   // a filesystem capability and the name is this role's own.
+                  // js-bookkeeper is Bookkeeper-attachment only (gated at registry).
+                  | "js-bookkeeper", _ -> yield name, box "deny"
                   | name, _ when name.StartsWith "js-" ->
                       yield
                           name,
@@ -175,7 +198,7 @@ module StaticTools =
               "permission", permissionObj role
               "prompt", box systemPrompt ]
 
-    /// The only values accepted by the OpenCode reviewer tool.  Keep this
+    /// The only values accepted by the OpenCode judge tool.  Keep this
     /// parser deliberately independent of assistant text: a verdict is a tool
     /// argument, never something inferred from a transcript.
     let reviewerVerdictOfString (value: string) : Result<ReviewGuardVerdict, string> =
@@ -195,15 +218,23 @@ module StaticTools =
 
     let reviewerAgentConfig (prompt: string option) : obj = primaryAgent Role.Reviewer prompt
 
-    /// Companion Session Y: tool set is exactly { blog } (ENFORCER-010).
-    /// System prompt for B-record distillation with blog tool protocol.
+    /// Companion Session Y: tool set is exactly { chronicle } (ENFORCER-010).
+    /// System prompt for B-record distillation with chronicle tool protocol.
     let bloggerAgentConfig (prompt: string) : obj = hiddenAgent Role.Blogger prompt
 
-    /// Role.Executor: no tools; system prompt for map/reduce output summarization.
-    /// Distinct from Tool.executor (OS command tool used by Inspector/DevOps).
-    let executorAgentConfig (prompt: string) : obj = hiddenAgent Role.Executor prompt
+    /// Role.Distiller: no tools; system prompt for map/reduce output summarization.
+    /// Distinct from Tool.run (OS command tool used by DevOps).
+    let distillerAgentConfig (prompt: string) : obj = hiddenAgent Role.Distiller prompt
 
-    let meditatorAgentConfig (prompt: string option) : obj = primaryAgent Role.Meditator prompt
+    let inquiryAgentConfig (prompt: string option) : obj = primaryAgent Role.Inquiry prompt
+
+    /// InternalLeaf Bookkeeper Host stub (AGENT-002): hidden; ToolRegistry gates js-bookkeeper by attachment.
+    let bookkeeperAgentConfig (prompt: string) : obj =
+        createObj
+            [ "mode", box "primary"
+              "hidden", box true
+              "permission", permissionObj Role.Distiller
+              "prompt", box prompt ]
 
     let browserAgentConfig (prompt: string option) : obj = primaryAgent Role.Browser prompt
 

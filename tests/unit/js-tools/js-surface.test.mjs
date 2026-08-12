@@ -25,9 +25,9 @@ const surface = (role, permissionNames) => generate(role, caps(...permsOf(permis
 const memberNames = (s) => listItems(s.Members).map((fragment) => fragment.MemberName)
 
 const PERMISSION_NAMES = [
-  'Fork', 'Join', 'List', 'Read', 'Write', 'Edit', 'Fetch', 'Glob', 'Grep', 'Move',
-  'Remove', 'Inspector', 'Coder', 'Exec', 'Pty', 'Network', 'Verdict', 'Blog',
-  'Return', 'Finality', 'BashHoneypot', 'Fetch',
+  'Fork', 'Join', 'Horizon', 'Read', 'Write', 'Edit', 'Fetch', 'Glob', 'Grep', 'Move',
+  'Remove', 'Inspect', 'Behavior', 'Exec', 'Pty', 'Network', 'Judge', 'Chronicle',
+  'Finality', 'BashHoneypot',
 ]
 const toolPermissionByName = Object.fromEntries(PERMISSION_NAMES.map((n) => [n, ToolPermission[n]]))
 const permsOf = (names) => names.map((n) => toolPermissionByName[n])
@@ -56,7 +56,7 @@ const layersOf = (s) =>
   )
 
 test('JS001_generate_none_when_no_filesystem_capability', () => {
-  for (const role of ['Manager', 'Orchestrator', 'Meditator', 'Executor', 'Blogger']) {
+  for (const role of ['Manager', 'Orchestrator', 'Inquiry', 'Distiller', 'Blogger']) {
     const perms = caps(...permsOf(roles.permissions(roles.of(role))))
     assert.equal(isNone(surface(role, roles.permissions(roles.of(role)))), true, `${role} must get no js-* surface`)
     assert.equal(isGeneratedToolName(role, perms, `js-${role.toLowerCase()}`), false)
@@ -64,7 +64,7 @@ test('JS001_generate_none_when_no_filesystem_capability', () => {
 })
 
 test('JS001_role_projection_is_exactly_roles_permissions_intersection', () => {
-  for (const role of ['Manager', 'Orchestrator', 'Coder', 'Inspector', 'Browser', 'Meditator', 'Reviewer', 'DevOps', 'Executor', 'Blogger']) {
+  for (const role of ['Manager', 'Orchestrator', 'Coder', 'Inspector', 'Browser', 'Inquiry', 'Reviewer', 'DevOps', 'Distiller', 'Blogger']) {
     const fsPerms = fsPermissionsOf(role)
     const result = surface(role, roles.permissions(roles.of(role)))
     if (fsPerms.length === 0) {
@@ -134,7 +134,7 @@ test('JS004_member_gate_binds_present_members_only', () => {
   assert.equal(memberBinding('Inspector', perms, 'grep'), 'js.grep')
   assert.equal(memberBinding('Inspector', perms, 'rewrite'), undefined)
   assert.equal(memberBinding('Inspector', perms, 'write'), undefined)
-  assert.equal(memberBinding('Meditator', caps(ToolPermission.Inspector), 'file'), undefined)
+  assert.equal(memberBinding('Inquiry', caps(ToolPermission.Inspect), 'file'), undefined)
 })
 
 test('JS002_same_capabilities_same_surface_across_roles', () => {

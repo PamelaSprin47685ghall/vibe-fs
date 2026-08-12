@@ -85,28 +85,27 @@ const scopeFor = ({ engineTask, mailbox }) => {
   return scope
 }
 
-const run = async (scope, session = 'ses_join') => parseToml(await spec(scope).Execute({}, context(session)))
+const run = async (scope, session = 'ses_join') => {
+  const wire = await spec(scope).Execute({}, context(session))
+  return { wire, parsed: parseToml(wire) }
+}
 
 test('JOINFAM_orchestrator_drains_published_verdicts', async () => {
   const mailbox = verdictMailbox()
   publish(mailbox, OrchestratorVerdict.Empty)
   const scope = scopeFor({ mailbox })
-  const result = await run(scope)
-  assert.equal(result.status, 'completed')
-  assert.equal(result.count, 1)
-  assert.equal(result.result[0].outcome, 'Empty')
+  const { wire } = await run(scope)
+  assert.match(wire, /There is nothing away to receive/i)
 })
 
 test('JOINFAM_orchestrator_empty_mailbox_still_reports_completed', async () => {
   const scope = scopeFor({ mailbox: verdictMailbox() })
-  const result = await run(scope)
-  assert.equal(result.status, 'completed')
-  assert.equal(result.count, 1)
-  assert.equal(result.result[0].outcome, 'Empty')
+  const { wire } = await run(scope)
+  assert.match(wire, /There is nothing away to receive/i)
 })
 
 test('JOINFAM_orchestrator_engine_failure_is_surfaced', async () => {
   const scope = scopeFor({ engineTask: Promise.resolve({ tag: 1, fields: ['engine exploded'] }) })
-  const result = await run(scope)
-  assert.equal(result.error, 'Orchestrator init failed: engine exploded')
+  const { parsed } = await run(scope)
+  assert.equal(parsed.error, 'Orchestrator init failed: engine exploded')
 })

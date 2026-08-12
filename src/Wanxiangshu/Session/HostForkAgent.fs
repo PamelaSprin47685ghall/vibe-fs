@@ -250,10 +250,10 @@ module HostForkAgent =
                                     this.MarkReady(run)
 
                                     // COMPANION-003 / EXEC-006: the child's
-                                    // OpeningPromptRaw is the ORIGINAL fork
+                                    // OpeningMaterial is the ORIGINAL fork
                                     // assignment and authoritative requirements,
                                     // NOT the rendered envelope (which carries
-                                    // parent_work_record and would nest the
+                                    // commissioner_record and would nest the
                                     // parent LWR recursively). Captured before
                                     // the first prompt is sent; idempotent.
                                     if isFirstPrompt then

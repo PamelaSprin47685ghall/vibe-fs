@@ -62,24 +62,15 @@ module ProcessEstimate =
     /// from an unbounded one, which is exactly what "hard limit 必须有限" rules out.
     let DefaultHardLimit = TimeSpan.FromHours 1.0
 
-    /// EXEC-011: `min(3 × estimated_running_secs, configured hard limit)`.
-    ///
-    /// The LLM's estimate may not exceed the administrator's ceiling, so this is a
-    /// `min` and not a `max`. Non-finite and negative estimates collapse to the
-    /// ceiling rather than being rejected here: the estimate is model-supplied, and
-    /// `validateEstimate` owns refusing a malformed one.
+    /// EXEC-011 / GrandRewrite: `min(deadline_seconds, configured hard limit)`.
+    /// Provider willingness is applied at face value — no ×3 inflation.
     let effectiveDeadline (RuntimeSeconds seconds) (hardLimit: TimeSpan) =
         let modelBudget =
-            let total = 3.0 * seconds
-
-            if Double.IsNaN total || Double.IsInfinity total || total <= 0.0 then
+            if Double.IsNaN seconds || Double.IsInfinity seconds || seconds <= 0.0 then
                 hardLimit
             else
-                TimeSpan.FromSeconds total
+                TimeSpan.FromSeconds seconds
 
         min modelBudget hardLimit
 
-    let outputThreshold (OutputBytes bytes) =
-        if bytes <= 0L then 0L
-        elif bytes > Int64.MaxValue / 3L then Int64.MaxValue
-        else bytes * 3L
+    let outputThreshold (OutputBytes bytes) = if bytes <= 0L then 0L else bytes

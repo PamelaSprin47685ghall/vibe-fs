@@ -47,19 +47,22 @@ const scope = () =>
     undefined,
   )
 
-const run = async (runtimeScope, session = 'ses_join') => parseToml(await spec(runtimeScope).Execute({}, context(session)))
+const run = async (runtimeScope, session = 'ses_join') => {
+  const wire = await spec(runtimeScope).Execute({}, context(session))
+  return { wire, parsed: parseToml(wire) }
+}
 
 test('JOIN_blank_session_is_refused_before_recovery', async () => {
-  const result = await run(scope(), '')
+  const { parsed } = await run(scope(), '')
 
-  assert.equal(result.error, 'Missing sessionID')
+  assert.equal(parsed.error, 'Missing sessionID')
 })
 
 test('JOIN_without_a_recovery_permit_is_blocked', async () => {
-  const result = await run(scope())
+  const { parsed } = await run(scope())
 
-  assert.equal(result.error.code, 'RECOVERY_BLOCKED')
-  assert.match(result.error.message, /coordinator unavailable for ses_join/)
+  assert.equal(parsed.error.code, 'RECOVERY_BLOCKED')
+  assert.match(parsed.error.message, /coordinator unavailable for ses_join/)
 })
 
 test('JOIN_waiting_recovery_is_retryable', async () => {
@@ -68,10 +71,10 @@ test('JOIN_waiting_recovery_is_retryable', async () => {
     new FamilyRecovery(1, [nonEmptyOne(new RecoveryBlock(1, [sessionId('ses_join')]))]),
   )
 
-  const result = await run(runtimeScope)
+  const { parsed } = await run(runtimeScope)
 
-  assert.equal(result.error.code, 'RECOVERY_WAITING')
-  assert.match(result.error.message, /FamilyReady/)
+  assert.equal(parsed.error.code, 'RECOVERY_WAITING')
+  assert.match(parsed.error.message, /FamilyReady/)
 })
 
 test('JOIN_ready_permit_maps_empty_join_to_failure', async () => {
@@ -95,10 +98,10 @@ test('JOIN_ready_permit_maps_empty_join_to_failure', async () => {
     async () => new FamilyRecovery(0, [new FamilyRecoveryPermit(sessionId('ses_join'), sequence, closure.Digest)]),
   )
 
-  const result = await run(runtimeScope)
+  const { wire, parsed } = await run(runtimeScope)
 
-  assert.equal(result.status, 'failed')
-  assert.equal(result.error.code, 'NOTHING_TO_JOIN')
+  assert.match(wire, /nothing away to receive/i)
+  assert.equal(parsed.status, undefined)
 
   opened.dispose()
   rmSync(directory, { recursive: true, force: true })
@@ -119,10 +122,10 @@ test('JOIN_ready_invalid_permit_surfaces_not_found', async () => {
     async () => new FamilyRecovery(0, [new FamilyRecoveryPermit(sessionId('other_session'), 0n, '')]),
   )
 
-  const result = await run(runtimeScope)
+  const { wire, parsed } = await run(runtimeScope)
 
-  assert.equal(result.status, 'failed')
-  assert.match(result.error.code, /^NOT_FOUND:/)
+  assert.match(wire, /No one by that name is away/i)
+  assert.equal(parsed.status, undefined)
 
   opened.dispose()
   rmSync(directory, { recursive: true, force: true })

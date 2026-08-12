@@ -1,4 +1,4 @@
-// tests/unit/tools/verdict-tool.test.mjs — VERIFY-008/009: reviewer verdict tool contract.
+// tests/unit/tools/verdict-tool.test.mjs — VERIFY-008/009: reviewer judge tool contract.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -57,37 +57,37 @@ const parseToml = (text) =>
       }),
   )
 
-test('VERDICT_spec_exposes_the_verdict_input_and_public_tool_identity', () => {
+test('JUDGE_spec_exposes_the_verdict_input_and_public_tool_identity', () => {
   const tool = spec(factory, emptyScope())
 
-  assert.equal(tool.Name, 'verdict')
-  assert.equal(tool.Description, 'Submit the review verdict')
+  assert.equal(tool.Name, 'judge')
+  assert.equal(tool.Description, 'Speak your review judgment')
   const args = listItems(tool.Arguments)
   assert.deepEqual(args[0][0], 'verdict')
   assert.deepEqual(payloadOf(args[0][1]).values, ['PERFECT', 'REVISE'])
 })
 
-test('VERDICT_invalid_input_is_rejected_as_a_public_error_result', async () => {
+test('JUDGE_invalid_input_is_rejected_as_a_public_error_result', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
 
-    const result = parseToml(await hooks.tool.verdict.execute({ verdict: 'APPROVE' }, hostContext()))
+    const result = parseToml(await hooks.tool.judge.execute({ verdict: 'APPROVE' }, hostContext()))
 
-    assert.equal(result.error, 'Verdict rejected: verdict must be exactly PERFECT or REVISE.')
+    assert.equal(result.error, 'Judgment rejected: verdict must be exactly PERFECT or REVISE.')
   })
 })
 
-test('VERDICT_missing_input_is_rejected_as_a_public_error_result', async () => {
+test('JUDGE_missing_input_is_rejected_as_a_public_error_result', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
 
-    const result = parseToml(await hooks.tool.verdict.execute({}, hostContext()))
+    const result = parseToml(await hooks.tool.judge.execute({}, hostContext()))
 
-    assert.equal(result.error, 'Verdict rejected: verdict must be exactly PERFECT or REVISE.')
+    assert.equal(result.error, 'Judgment rejected: verdict must be exactly PERFECT or REVISE.')
   })
 })
 
-test('VERDICT_is_unavailable_to_non_reviewer_sessions', async () => {
+test('JUDGE_is_unavailable_to_non_reviewer_sessions', async () => {
   const result = parseToml(
     await spec(factory, emptyScope()).Execute(
       makeArgs({ verdict: 'REVISE' }),
@@ -95,31 +95,29 @@ test('VERDICT_is_unavailable_to_non_reviewer_sessions', async () => {
     ),
   )
 
-  assert.equal(result.error, 'Verdict rejected: the verdict tool is available only to reviewer sessions.')
+  assert.equal(result.error, 'Judgment rejected: the judge tool is available only to reviewer sessions.')
 })
 
-test('VERDICT_empty_session_is_rejected_before_role_resolution', async () => {
+test('JUDGE_empty_session_is_rejected_before_role_resolution', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
 
     const result = parseToml(
-      await hooks.tool.verdict.execute({ verdict: 'REVISE' }, hostContext({ sessionId: '' })),
+      await hooks.tool.judge.execute({ verdict: 'REVISE' }, hostContext({ sessionId: '' })),
     )
 
-    // The registry's role gate fires before the tool runs: an empty session has no
-    // role, so the denial is the fail-closed registry message, not the tool's own.
-    assert.equal(result.error, "Tool 'verdict' rejected: no Authority Root fixes this session's role")
+    assert.equal(result.error, "Tool 'judge' rejected: no Authority Root fixes this session's role")
   })
 })
 
-test('VERDICT_reviewer_requires_a_tool_call_id_before_review_submission', async () => {
+test('JUDGE_reviewer_requires_a_tool_call_id_before_review_submission', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
 
     const result = parseToml(
-      await hooks.tool.verdict.execute({ verdict: 'REVISE' }, hostContext({ providerRunId: 'run-1' })),
+      await hooks.tool.judge.execute({ verdict: 'REVISE' }, hostContext({ providerRunId: 'run-1' })),
     )
 
-    assert.equal(result.error, 'Verdict rejected: missing tool call id.')
+    assert.equal(result.error, 'Judgment rejected: missing tool call id.')
   })
 })

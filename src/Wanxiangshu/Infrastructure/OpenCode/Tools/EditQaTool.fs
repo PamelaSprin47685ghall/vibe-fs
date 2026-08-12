@@ -6,8 +6,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.OpenCode
 
-/// Dedicated Bookkeeper tool: unique replacement in staged Q.md / A.md.
-/// No filesystem path; missing or ambiguous old_text is a tool failure.
+/// Bookkeeper provider verb `js-bookkeeper(program)`.
+/// Minimal bridge: program may still carry document/old_text/new_text fields for
+/// staged Q/A replacement until the full program SDK lands.
 module EditQaTool =
 
     [<Fable.Core.Emit("$0 === undefined || $0 === null")>]
@@ -36,6 +37,7 @@ module EditQaTool =
             let document = argText args "document"
             let oldText = argText args "old_text"
             let newText = argText args "new_text"
+            let program = argText args "program"
 
             let txId =
                 match BookkeeperRuntime.tryTxId context.SessionId with
@@ -44,20 +46,24 @@ module EditQaTool =
 
             if String.IsNullOrWhiteSpace txId then
                 return
-                    ToolHostCodec.tomlObject [ "error", tString "edit-qa: no Bookkeeper transaction for this session" ]
+                    ToolHostCodec.tomlObject
+                        [ "error", tString "js-bookkeeper: no Bookkeeper transaction for this session" ]
+            elif not (String.IsNullOrWhiteSpace program) && String.IsNullOrWhiteSpace document then
+                // Full program SDK is Phase later; empty mutation is legal.
+                return ToolHostCodec.tomlObjectWithInstructions [ "# Staged case accepted." ] []
             else
                 match BookkeeperStaging.replace txId document oldText newText with
                 | Error err -> return ToolHostCodec.tomlObject [ "error", tString err ]
-                | Ok() -> return ToolHostCodec.tomlObject [ "status", tString "replaced"; "document", tString document ]
+                | Ok() -> return ToolHostCodec.tomlObjectWithInstructions [ "# Staged case rewritten." ] []
         }
 
     let spec (factory: HostToolFactory) : ToolSpec =
-        { Name = "edit-qa"
+        { Name = "js-bookkeeper"
           Description =
-            "Replace unique old_text with new_text in the current Bookkeeper staged document. "
-            + "document is Q.md or A.md. Missing or ambiguous old_text fails. No filesystem path."
+            "Program the next form of a staged case. Prefer program=; document/old_text/new_text remain for unique staged replacement."
           Arguments =
-            [ "document", ToolHostCodec.enumSchema [ "Q.md"; "A.md" ] factory
-              "old_text", ToolHostCodec.stringSchema factory
-              "new_text", ToolHostCodec.stringSchema factory ]
+            [ "program", ToolHostCodec.optionalStringSchema factory
+              "document", ToolHostCodec.optionalEnumSchema [ "Q.md"; "A.md" ] factory
+              "old_text", ToolHostCodec.optionalStringSchema factory
+              "new_text", ToolHostCodec.optionalStringSchema factory ]
           Execute = execute }

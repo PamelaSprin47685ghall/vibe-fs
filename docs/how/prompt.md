@@ -99,3 +99,53 @@ PromptKey = digest(
 `ClaimSequence`：同一 `(SessionId, LogicalRunId, Origin, PayloadDigest)` 下由 journal fold 派生的单调序号——使「同一 Guard 连续发两次」成为两个 key。
 
 ID 的类型边界见 `shape/prompt.md`。
+
+---
+
+## Composition · 稳定字节 · ProviderLanguage（PROMPT-014..017）
+
+所有权见 `shape/prompt.md`；语义见 `what/prompt.md`。本节只写装配算法。
+
+### Composition 装配
+
+```text
+assembleOfficeSystemPrompt(session):
+  lang    = SessionProviderLanguage(session)     // 只读已绑；禁读全局偏好
+  common  = loadLocalized(CommonLaw, lang)
+  role    = loadLocalized(RoleLaw(CanonicalRole), lang)
+  library = loadLocalized(OfficeLibrary(CanonicalRole), lang)  // PROMPT-016；知识≠权威
+  return concat(Common Law → Role Law → Office Library)
+```
+
+Tools surface **不**并入 system 串；capability 变化不改人格（PROMPT-015）。  
+Lifecycle orient（Activation / Reawakening / Continuation / Handoff / Fission / Departure）只注入 conversation/runtime，不替换 system 字节。  
+generic Activation ≠ Manager BlindPlan；不得触发 system prompt 切换（TODO-015）。
+
+### 同一 Life 内 system 字节冻结（PROMPT-014 / GLORY-075）
+
+```text
+onSessionCreate:
+  bind SessionPersona once（AGENT-028）
+  bind SessionProviderLanguage once（HOST-026）
+  materialize office system prompt bytes
+  freeze for Life duration
+
+onBlindPlanT1 / onPeerFallback / onStrength / onProcessReview / onFinality
+/ onCompaction / onReanchor / onRecovery:
+  → conversation tool result / ExecutionBinding / runtime injection only
+  → never rewrite system prompt bytes
+  → never rebind Persona / SessionProviderLanguage
+```
+
+`The system prompt names the office. The conversation tells you which road is yours.`  
+T1 entrustment revelation 只走 conversation tool result（TODO-015）。
+
+### ProviderLanguage 读取（PROMPT-017）
+
+| 路径 | 规则 |
+|------|------|
+| localizable | 按 `SessionProviderLanguage` 取 EN / ZH representation |
+| invariant | tool 名 / argument / wire field / enum / path / command / `exit_code` **原样** |
+| child / attached / InternalLeaf | 继承 owner/commissioner 已绑语言；不得各自再绑 |
+
+MagicTodoManagerGuideline = HOST-013 通用 guideline **加法片段**（PROMPT-013）；禁止并入 `PairProgrammingGuidelineText`。

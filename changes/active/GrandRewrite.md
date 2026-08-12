@@ -5695,3 +5695,93 @@ Manager **不**拥有 `inspect`（已冻结）：Manager 永远不能亲手触�
 > 本文件是当前 Provider World 的权威规范，不是可被旧 `docs/` 或旧 `completed/` 变更反噬的普通 proposal。启用后，一切与之相悖的老规范、老测试、老 prompt、老工具契约均视为失效，直到完成 clean break 迁移。
 
 （若按仓库 Change 生命周期流转，本文件从 `proposed/` 启动时保留此声明；进入 `completed/` 后它仍是历史记录，但本段效力声明在 clean break 完成前持续指导。）
+---
+
+# Active work
+
+> 本文件是变更工作记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准；本 Active 只限定已批准范围与关闭条件。
+
+## Specification impact
+
+- Provider-visible language surface clean break：Role/Persona/Execution Binding 三层分离；工具名引用完整性；Horizon 无状态机；System Prompt 永不切换；Universal Work Record；BlindPlan Opening；角色语言重写；EN/zh-CN i18n；Office Library；Persona Registry。
+- 覆盖 `docs/{why,what,shape,how,proof}` 中与本 Proposal 冲突的旧 provider ontology（尤其 agent / prompt / projection / companion / glory / host / js-tools / fallback / strength）。
+- 机器内部精度（typed state、journal、CAS、fallback cursor、review barrier）保留；仅重构 provider experience。
+
+## Implementation decisions (OPEN resolved for this Active)
+
+- `todowrite` wire：`obligations: [{ name: string, work: string }]`。
+- Bookkeeper machine identity：引入 `fast-bookkeeper` / `deep-bookkeeper`；Persona = Clerk / Curator；model binding 可复用 inspector 模型配置。
+- `query-shell`：保留现有静态取证能力语义；provider 名与结果按 Horizon 法则去状态机化（无 status/error DTO）。
+- `fission` wire：一行一个 present 的单字符串（Proposal 已冻结）。
+
+## Remaining work
+
+1. 正式规范：按 why→what→shape→how→proof 写入 Provider World 新条款并清除冲突旧义。
+2. Phase 1–20 实现与删 legacy（见 §16）。
+3. Semantic invariant tests + Gate A–D（见 §17）。
+4. Acceptance Criteria §19 全部可观察关闭。
+
+## Completion criteria
+
+- §19 Acceptance Criteria 1–30 全部满足。
+- §20 Non-Goals 未实现项不得伪装已交付。
+- proof / architecture gates 绿；无 legacy alias。
+- Final outcome 已追加；文件可移入 `completed/`。
+
+## Blockers
+
+（无）
+
+
+---
+
+# Final outcome
+
+> 本文件是历史变更记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
+
+## Outcome
+
+Provider World clean break 已落地：正式 `docs/` 五层重写；实现侧完成 Role/Persona/Language、工具合同、LWR/BlindPlan/Finality、Join/Horizon 语义渲染、Distillation、角色 Role Law prompts、Gate A–C 静态门禁；单元与集成 prompts 契约全绿。§20 非目标（Sphinx、Steward、完整 zh-CN 文案迁移）未交付。
+
+## Final specification
+
+权威语义见 `docs/{why,what,shape,how,proof}` 与词汇表 `docs/what/glossary.md`。关键新增/重写条款含 AGENT-028/029、EXEC-029..031、COMPANION-014/015、GLORY-074..076、PROMPT-014..017、ARCH-014..016、HOST-026、FALLBACK-014、TODO-015。
+
+## Implementation result
+
+| Phase | 状态 |
+|-------|------|
+| 1–3 Vocabulary / PersonaCatalog / Roles permissions-only | ✓ |
+| 2 ProviderLanguage bind + inherit | ✓（文案迁移留 Phase 17） |
+| 4 Tool contracts + SyncDelegate 无 return | ✓ |
+| 5 OpeningMaterial + LWR 四标题 + OpeningPolicy stub | ✓ |
+| 7 Join/Horizon 去 DTO | ✓ |
+| 8 Distillation | ✓ |
+| 9–11 Role prompts + BlindPlan hook + Finality 三经验 | ✓ |
+| 16 Persona/language 跨 Fallback/Replica | ✓ |
+| 17 i18n | 基建 only；`resources/provider/{en,zh-CN}` 布局 + Gate C |
+| 19–20 Tests + gates | ✓ 2343 unit pass；删 tdd/orchestrator-reuse 等作废套件；Gate A–C 绿 |
+
+遗留（非 alias）：部分 F# 模块文件名仍叫 `BlogTool.fs`/`VerdictTool.fs`/`ListTool.fs` 等，对外 `Name` 已是新合同；`TddPhase.fs` 若仍被内部引用则未删文件。
+
+## Verification
+
+```text
+dotnet build src/Wanxiangshu/Wanxiangshu.fsproj  → 0 error
+npm run lint                                      → pass（kolmogorov ratchet 已对齐）
+npm test                                          → 2343 passed / 0 failed
+node --test tests/integration/resources/prompts.test.mjs → pass
+Gate A tool-referential-integrity                 → OK
+Gate B provider-leak-gate (+ baseline)            → OK
+Gate C language-parity-gate                       → OK
+```
+
+Gate D（prompt-stability 字节相等）见 `tests/unit/invariants/prompt-stability.test.mjs`（含 runtime 义务；部分为 `test.todo` 待 e2e 硬化）。
+
+## References
+
+- `changes/active/GrandRewrite.md`（本文件 Original proposal + Active work）
+- `docs/` 全量 GrandRewrite 对齐 diff
+- `scripts/checks/{tool-referential-integrity,provider-leak-gate,language-parity-gate}.mjs`

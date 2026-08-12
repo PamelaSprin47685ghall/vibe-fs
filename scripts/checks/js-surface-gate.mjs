@@ -37,7 +37,7 @@ export const HANDWRITTEN_ROLE_TOOL_TOKENS = [
   'js-reviewer',
   'js-devops',
   'js-browser',
-  'js-meditator',
+  'js-inquiry',
 ]
 
 /** Files where the static enumeration is legitimate (permission matrix only). */

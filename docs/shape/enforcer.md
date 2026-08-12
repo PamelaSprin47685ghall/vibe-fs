@@ -14,9 +14,11 @@
 | durable lifecycle seal | Journal projection |
 | reactivation window | `DrainWindow = Closed | Open of DrainPermit` |
 | protocol recovery | durable claim + provider-visible evidence → `BloggerToolRecovery` |
-| Main tip Full/Identity | `TipDeliveryProjection`（fold `TipGuidanceDelivered`） |
+| Main tip TipDeliveryFrontier | `TipDeliveryProjection`（fold `TipGuidanceDelivered`；occurrence 单调；reanchor **不**重置） |
+| Main tip TipSemanticCoverage | 同投影 / horizon-relative TipName 覆盖（reanchor 可清空；≠ Frontier） |
 | Observation tip 侧 | `EnforcementProjection.RecentTips`（fold `BlogEntryCommitted` + squash co-truncate） |
 | Observation frame 侧 | Blog frames（fold `BlogEntryCommitted` / `BlogSquashCommitted`） |
+| chronicle 工具合同 | Infrastructure tool surface（`entry`+`tip`；无 `evidence`；旧名 `blog` 非法） |
 
 Material routing 是一个纯决策：
 
@@ -31,7 +33,7 @@ otherwise            → Start
 | 组件 | 职责 |
 |------|------|
 | BloggerCoordinator | 主会话 material 唯一入口 `onMainMaterial` |
-| EnforcerHost | continuation / catch-up / repair；`resolveTipGuidance` Full/Identity；cycle validate/commit |
+| EnforcerHost | continuation / catch-up / repair；`resolveTipGuidance`（只读 Frontier+Coverage）；cycle validate/commit |
 | BloggerRuntimeHost | seal / blocks / reactivate 侧效 |
 | BloggerRuntime | 纯 `decideMaterial`：从 `HasFlight` / `HasParked` / ctx 等物理事实派生决策；不是长期 State DU / cell 转移程序计数器 |
 | EnforcerCatalog（Domain） | folder 规则校验；TipName→Rule；`pairTipsAndFrames` / Observation 纯函数 |
@@ -49,13 +51,14 @@ otherwise            → Start
 
 ```text
 enforcer.md  → 仅 Blogger effective system（检测/边界）
-main.md      → 仅 Main TipGuidance（Full 首次 / Identity 重复）
+main.md      → 仅 Main TipGuidance（Full / IdentityOnly；Identity 须 Coverage 可恢复）
 previous_enforcer_tip → 仅 Y 低信任 history（不得进 Main Authority）
 TipGuidanceDelivered  → 仅 Main session stream（不得当 Blog frame）
 BlogEntryCommitted    → Blog frame + Enforcement tip 同原子；不写 TipDelivery
+chronicle(entry, tip) → 唯一 Blogger 记账动词；无 evidence 字段；旧名 blog 无 alias
 ```
 
-禁止：把 main.md 拼进 Blogger system；把 enforcer.md 当 Main overlay；用进程内存代替 TipDelivery/Enforcement 投影；AgentJournal 与 IEventStore 双写同一逻辑事实。
+禁止：把 main.md 拼进 Blogger system；把 enforcer.md 当 Main overlay；用进程内存代替 TipDelivery/Enforcement 投影；把 TipDeliveryFrontier 与 TipSemanticCoverage 压成单一 durable bool；AgentJournal 与 IEventStore 双写同一逻辑事实。
 
 ## ENFORCER-041：身份
 
@@ -63,11 +66,11 @@ BlogEntryCommitted    → Blog frame + Enforcement tip 同原子；不写 TipDel
 
 ## ENFORCER-043：Cycle 有效性
 
-Cycle 有效：可证明 ProviderRunIdentity、至少一个成功 blog、规范化 text 非空、tip→RuleId（= TipName）、ToolCallId 唯一。
+Cycle 有效：可证明 ProviderRunIdentity、至少一个成功 chronicle、规范化 entry 非空、tip→RuleId（= TipName）、ToolCallId 唯一。
 
 ## ENFORCER-044：提交边界
 
-`blog.execute` 不直接拆多 BlogFrame 乱序提交。
+`chronicle.execute` 不直接拆多 BlogFrame 乱序提交。
 
 ## ENFORCER-045：BlogEntryCommitted 原子 cycle 事实
 
@@ -98,7 +101,8 @@ type BloggerToolRecovery =
 | tip（RecentTips） | EnforcementProjection via BlogEntryCommitted；squash co-truncate via BlogSquashCommitted | Companion 不得私造 tip 账；物理 Y transcript 不是 tip 源 |
 | frame | BlogProjection | Enforcement 不得写 frame |
 | 配对视图 | 纯函数 `pairTipsAndFrames` / Companion zip（只读两侧投影） | 不得持久化第二套 Observation 事件流（除非未来显式 EventStore 词汇表变更） |
-| Main Full 集合 | TipDeliveryProjection via TipGuidanceDelivered；reanchor 清空 | 不得用文件 ledger 或 process Set |
+| TipDeliveryFrontier | TipDeliveryProjection via TipGuidanceDelivered；occurrence 单调；reanchor **不**重置 | 不得用文件 ledger / process Set；不得与 Coverage 合并 |
+| TipSemanticCoverage | 同投影 horizon-relative；`ContextReanchored` 可清空 | IdentityOnly 不得冒充「全文永久可恢复」durable bool |
 
 `ObservationUnit` 是 domain 视图名，不是平行 EventStore 事件爆炸要求；物理事实仍是 BlogEntry / BlogSquash /（Main）TipGuidanceDelivered。
 
@@ -109,7 +113,7 @@ type BloggerToolRecovery =
 ## ENFORCER-161：不同 Session 独立
 
 不同 Session 的悬挂 transform 与 recovery 状态独立。  
-TipDelivery Full 集合按 **Main** session 隔离；Blogger satellite 经 association 解析到 owner Main。
+TipDeliveryFrontier / TipSemanticCoverage 按 **Main** session 隔离；Blogger satellite 经 association 解析到 owner Main。
 
 ## ENFORCER-162：取消
 

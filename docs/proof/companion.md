@@ -10,6 +10,21 @@
 | Y 不递归 | COMPANION-002 |
 | 无 eligibility 白名单 | COMPANION-001 |
 
+## OpeningMaterial / WorkRecord（COMPANION-003/014/015）
+
+| 证明 | 期望 | 条款 |
+|------|------|------|
+| OpeningMaterial = preserved 区间 | 恰为 XTrace `[work start, OpeningBoundary)`；禁 `OpeningPromptRaw` / Assignment 拼接重建 | COMPANION-014 |
+| OpeningBoundary | = WorkRecordStart；BlindPlan 下含 T1 call + canonical accepted result | COMPANION-014、TODO-001/015 |
+| 四段标题 | 仅 `Opening` / `Chronicle` / `Recent work` / `Closing report`；旧四标题 **absent**、无 alias | COMPANION-003、COMPANION-015 |
+| T1 constitutive | BlindPlan T1 call/result 留在 Opening；不得当 incidental tool 滤入 Recent work | COMPANION-014 ⑨、TODO-015 |
+| Opening 永 raw | 永不进 Y / 永不 prefix-replace；survives compaction / reanchor / recovery | COMPANION-014、TODO-001 |
+| includeOpening | 父→子 true；子→父 / process / Finality / SyncDelegate false | COMPANION-015 ⑦、TODO-008 |
+| Closing report | prose claim；禁固定字段 schema | COMPANION-015、ARCH-015 |
+| LWR 无 raw tool | 禁 call/result linkage（T1 Opening 材料除外） | COMPANION-003 |
+
+§17.1 / §19：`WorkRecord has only 4 sections`；`Manager BlindPlan Opening never compressed`；`T1 commitment in Opening`。
+
 ## Coverage / Epoch
 
 | 证明 | 条款 |

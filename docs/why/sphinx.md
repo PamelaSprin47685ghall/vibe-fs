@@ -20,7 +20,7 @@
 
 ## 为何正交 SDK 产品
 
-Sphinx 内核是独立认识机，不应绑进万象术 domain 生命周期。`src/sphinx` + MCP stdio 使闭包可单测；万象术只做 identity / launch / Meditator 权限。允许 `@modelcontextprotocol/sdk`：Sphinx 是真 Host MCP 服务器，SDK 是标准货币。AGENT-027 仍禁止 Semble 路径引 MCP SDK——Semble 是进程内搜索 client，不是 Host MCP 面（SPHINX-005）。
+Sphinx 内核是独立认识机，不应绑进万象术 domain 生命周期。`src/sphinx` + MCP stdio 使闭包可单测；万象术只做 identity / launch / Inquiry 权限。允许 `@modelcontextprotocol/sdk`：Sphinx 是真 Host MCP 服务器，SDK 是标准货币。AGENT-027 仍禁止 Semble 路径引 MCP SDK——Semble 是进程内搜索 client，不是 Host MCP 面（SPHINX-005）。
 
 ## 备选与被拒
 

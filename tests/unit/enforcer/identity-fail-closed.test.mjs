@@ -180,7 +180,7 @@ const withHarness = async (fn, { messageId = 'asst-identity' } = {}) => {
 /** A single completed blog tool part (tip = a real packaged catalog field). */
 const blogCall = (callId, input) => ({
   type: 'tool',
-  tool: 'blog',
+  tool: 'chronicle',
   callID: callId,
   state: { status: 'completed', input: { tip: 'primitive-obsession', ...input } },
 })

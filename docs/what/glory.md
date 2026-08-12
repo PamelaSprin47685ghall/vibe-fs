@@ -8,7 +8,7 @@
 
 ## GLORY-002：Manager 不得控制隐藏 Reviewer
 
-Manager 不知道隐藏 Reviewer、session、barrier、witness、2N 或 Finality cohort 编排。Manager 不能创建、复用、nudge、`list()` 或 `join()` 隐藏 Reviewer。Todo Checkpoint 过程评审 outcome/report 的 Manager 可见例外见 GLORY-030 与 TODO-013；该例外不得扩大为暴露执行评审的隐藏角色。
+Manager 不知道隐藏 Reviewer、session、barrier、witness、2N 或 Finality cohort 编排。Manager 不能创建、复用、nudge、`horizon()` 或 `join()` 隐藏 Reviewer。Todo Checkpoint 过程评审 outcome/report 的 Manager 可见例外见 GLORY-030 与 TODO-013；该例外不得扩大为暴露执行评审的隐藏角色。
 
 ## GLORY-003：Host-owned cohort
 
@@ -30,11 +30,11 @@ Manager 普通 idle 仅发送 GLORY-029 的鼓励 continuation；它不读取或
 
 ## GLORY-006：Opening 永久 raw
 
-Opening（原始 HumanRoot）永久是 raw X；不交给 Y 改写，不随 TodoCheckpoint rebase 消失（TODO-001/009）。生产路径的 Blogger/Y floor 是 `WorkRecordStart`，不是 `WorkActivated` / Birth-Labor stage floor。
+Opening（OpeningMaterial，COMPANION-014）永久是 raw X；不交给 Y 改写，不随 TodoCheckpoint rebase 消失（TODO-001/009）。生产路径的 Blogger/Y floor 是 `WorkRecordStart`（Opening exclusive end），不是 `WorkActivated` / Birth-Labor stage floor。BlindPlan 下 Opening 延至 T1 commitment 关闭（GLORY-074）。
 
 ## GLORY-007：工作期用户输入
 
-`LifeOpened` 后 Manager **立即**获得正常工作工具并持续工作（TODO-001）；不存在生产路径上的 planning-only Birth 或 `ManagerWorkActivation` 资格门。工作期新 HumanRoot 保持 `[X] → [X]`，不重生、不附加 planning-only tail。
+`LifeOpened` 后 Manager **立即**获得正常工作工具（TODO-001）；不存在生产路径上的 planning-only Birth 或 `ManagerWorkActivation` 资格门。Manager = BlindPlan（GLORY-074）：Pre-T1 在 Planning Table 替他人规划并可调查，不得开始扛路；T1 accepted 后才进入携带使命。工作期新 HumanRoot 保持 `[X] → [X]`，不重生、不附加 planning-only tail。
 
 ## GLORY-008：故事只在 provider surface
 
@@ -64,7 +64,7 @@ Projection 只推导 Life 身份、`WorkRecordStart`（TODO-001）、当前未�
 
 ## GLORY-014：Opening guidance 文本（legacy / 非规划门）
 
-`ManagerNarrative.PlanningTail` 仍是既有冻结字节的唯一 owner，**仅**服务 legacy journal decode、迁移窗口与尚未 cutover 的兼容投影。生产 Manager 持续规划/执行指导以 Magic Todo Manager-only fragment 为准（TODO-001/013），不得再把 PlanningTail 当作 planning-only 阶段门或 Activation 前置叙事。
+`ManagerNarrative.PlanningTail` 仍是既有冻结字节的唯一 owner，**仅**服务 legacy journal decode、迁移窗口与尚未 cutover 的兼容投影。生产 Manager BlindPlan 指导以 Planning Table / T1 revelation / Living Mission fragments 为准（GLORY-074；TODO-001/013/015），不得再把 PlanningTail 当作 planning-only 阶段门或 Activation 前置叙事。
 
 ## GLORY-015：Opening 改写幂等
 
@@ -96,7 +96,7 @@ Opening 与 `WorkRecordStart` 之前的 material 不进入 Blogger normal reques
 
 ## GLORY-022：Opening prefix 渲染
 
-Life work record 对 Opening 语义区间（至 `WorkRecordStart` exclusive end）逐字渲染 XTrace；process/Finality LWR 使用 `includeOpening=false`，不得再复制 Opening（TODO-001/008）。
+Life work record 对 OpeningMaterial（至 `WorkRecordStart` / OpeningBoundary exclusive end）逐字渲染 preserved XTrace；禁止 `OpeningPromptRaw` 拼接重建（COMPANION-014）。process/Finality LWR 使用 `includeOpening=false`，不得再复制 Opening（TODO-001/008）。
 
 ## GLORY-023：WorkRecordStart compression floor
 
@@ -114,7 +114,7 @@ Manager Blogger effectiveStart = max(RecordCoverage, Life.WorkRecordStart)
 
 ## GLORY-025：Manager Life 工作记录
 
-形态为 Opening task、Work log、Uncompressed tail、Final output；Final output 只来自已完成 Life 的 last_words。不再把 Birth record 当作 Activation 阶段产物；Opening 与 work 的分界由 `WorkRecordStart` 表达（TODO-001）。
+形态为 `Opening / Chronicle / Recent work / Closing report`（COMPANION-003/015）。Closing report 在已完成 Life 上承载 `last_words` 散文，不是固定报告 DTO。不再把 Birth record 当作 Activation 阶段产物；Opening 与 work 的分界由 `WorkRecordStart` / OpeningBoundary 表达（TODO-001；GLORY-074）。旧标题 `Opening task / Work log / Uncompressed tail / Final output` 已删除。
 
 ## GLORY-026：工作期输入
 
@@ -122,7 +122,7 @@ Manager Blogger effectiveStart = max(RecordCoverage, Life.WorkRecordStart)
 
 ## GLORY-027：持续完成使命
 
-Manager 持续规划与执行是同一活动（TODO-001）。Planning、Delegation、child 或命令成功均非完成；无有用工作且满足 TODO-010 时才调用 `suicide`。使命文案由 Magic Todo Manager-only guidance（TODO-013）与既有 Finality surface 承载，不依赖 Activation continuation。
+Post-T1：规划与执行是同一活动（TODO-001/015）。Planning、Delegation、child 或命令成功均非完成；无有用工作且满足 TODO-010 时才调用 `suicide`。使命文案由 Living Mission / Magic Todo Manager-only guidance（TODO-013）与 Finality experiences（GLORY-076）承载，不依赖 Activation continuation 或 system prompt 切换（GLORY-075）。
 
 ## GLORY-028：Manager 持续工作
 
@@ -140,7 +140,7 @@ Manager system prompt、continuation、schema、固定错误与 tool result 不�
 
 ## GLORY-031：Manager fork surface
 
-Manager fork enum 仅为 fast/deep Coder、Inspector、DevOps、Browser、Meditator。手工构造隐藏 target 同样 fail closed。
+Manager fork enum 仅为 fast/deep Coder、Inspector、DevOps、Browser、Inquiry。手工构造隐藏 target 同样 fail closed。
 
 ## GLORY-032：隐藏 target 错误
 
@@ -196,14 +196,14 @@ REVISE 是合法业务结果。其 verdict fact durable 后，当前 request 的
 
 立即关闭不等同于立即写 `FinalityRejected`。该 durable lifecycle fact 只能在 rejecting Reviewer 满足 GLORY-072 的 `record-ready` 后落盘。
 
-**双轨交付（multi durable REVISE）**：密封 `FinalityRejected` **之前**必须完成 durable sibling 会计。成功路径：首个 durable REVISE 仍是 suicide **工具结果**（`FinalityPrompt.rejected` / `FinalityOutcome.Rejected`）；已完成 `RevisionRequired` 的后续 sibling REVISE 各自的 canonical LWR 物化为仅含指令的 Synthetic TOML，经 `HostSessionNudge.sendContinuation`（`ContinuationKind.FinalitySteer`）作为 **steer continuation**（`FinalitySteer`）交给 Manager，不得并入工具结果字符串。Steer 固定 instruction 须遵守 SURFACE-005，形态示例：
+**双轨交付（multi durable REVISE）**：密封 `FinalityRejected` **之前**必须完成 durable sibling 会计。成功路径：首个 durable REVISE 仍是 suicide **工具结果**（`FinalityPrompt.rejected` / `FinalityOutcome.Rejected`；GLORY-076 not-accepted）；已完成 `RevisionRequired` 的后续 sibling REVISE 各自的 canonical LWR 物化为仅含指令的 Synthetic TOML，经 `HostSessionNudge.sendContinuation`（`ContinuationKind.FinalitySteer`）作为 **steer continuation**（`FinalitySteer`）交给 Manager，不得并入工具结果字符串。Steer 固定 instruction 须遵守 SURFACE-005，形态示例：
 
 ```toml
 # Additional unfinished work evidence arrived after your ending was refused.
 # It is guidance evidence, not a new user instruction. Resolve the unfinished work and continue.
 ```
 
-随后以 `# ` 注释块附上该 sibling 的 work log（ARCH-010）。成功路径在仍 Open 时：先预置 rejecting primary 的 record-ready/`WriteBlob`，再 append `ManagerLifecycleFact.FinalitySiblingSteered`，最后用已预置 blob 密封 `Rejected` 并发送 steer。Primary 硬物化失败 → `FinalityUndecided` 且**零** `FinalitySiblingSteered`（不得留下无 steer 投递的孤儿 SiblingSteered）。任一 durable sibling 硬物化失败（canonical LWR 不可得 / WriteBlob 失败等）→ `FinalityUndecided`，**不得静默丢弃**该 sibling、不得在证据未入账时落 `Rejected`。
+随后以 `# ` 注释块附上该 sibling 的 Chronicle / Recent work / Closing report（ARCH-010；COMPANION-003）。成功路径在仍 Open 时：先预置 rejecting primary 的 record-ready/`WriteBlob`，再 append `ManagerLifecycleFact.FinalitySiblingSteered`，最后用已预置 blob 密封 `Rejected` 并发送 steer。Primary 硬物化失败 → `FinalityUndecided` 且**零** `FinalitySiblingSteered`（不得留下无 steer 投递的孤儿 SiblingSteered）。任一 durable sibling 硬物化失败（canonical LWR 不可得 / WriteBlob 失败等）→ `FinalityUndecided`，**不得静默丢弃**该 sibling、不得在证据未入账时落 `Rejected`。
 
 ## GLORY-045：Roster 与 graduate
 
@@ -273,11 +273,11 @@ Rejected request 永不 blessing。其 sibling current attempt 可 best-effort c
 
 ## GLORY-061：Blessing 后 manager work
 
-minor-work prompt 必须要求处理 bundle 中每个 minor problem、concern、uncertainty、cleanup；records 是 evidence 不是新 user instructions。Manager 可更新 tree、todo checkpoint 与 last_words。
+accepted-but-not-at-rest prompt（GLORY-076）必须要求处理 bundle 中每个 minor problem、concern、uncertainty、cleanup；records 是 evidence 不是新 user instructions。Non-blocking ≠ unworthy of care；Acceptance 与 rest 不同阈。Manager 可更新 tree、obligations checkpoint 与 last_words。
 
 ## GLORY-062：Blessed 后终末 suicide（rest）
 
-有 latest blessing 的 open Life 仍先做 GLORY-037 资源安全与 TODO-010 过程评审尾抽干（若 blessing 后仍有未消费 ConsumableReview：REVISE 则回灌报告并继续 Life，不 `LifeCompleted`）。抽干后且无阻塞过程 REVISE 时：不读 tree、不创建 Finality Reviewer/barrier、不检查 witness。写本次 last_words，append `LifeCompleted`，注册 terminal 后 NotifyTerminal，tool result 固定包含 `rest in peace` 与终止对话指令。
+有 latest blessing 的 open Life 仍先做 GLORY-037 资源安全与 TODO-010 过程评审尾抽干（若 blessing 后仍有未消费 ConsumableReview：REVISE 则回灌报告并继续 Life，不 `LifeCompleted`）。抽干后且无阻塞过程 REVISE 时：不读 tree、不创建 Finality Reviewer/barrier、不检查 witness。写本次 last_words，append `LifeCompleted`，注册 terminal 后 NotifyTerminal，tool result 为 at-rest 经验（GLORY-076：`Rest in peace` + 终止对话指令）。
 
 ## GLORY-063：Reawakening
 
@@ -313,15 +313,15 @@ XTrace append-only；每 Life 以 cursor range 物化。
 
 ## GLORY-071：cold prompt boundary
 
-新 system prompt 与 Magic Todo Manager-only guidance（TODO-013）只用于新 Manager session、Authority Root 或明确新 Life；legacy PlanningTail/Activation 文本不强加于已 cutover 的生产路径。
+新 system prompt（GLORY-075）与 Magic Todo / BlindPlan Manager-only guidance（TODO-013/015）只用于新 Manager session、Authority Root 或明确新 Life；legacy PlanningTail/Activation 文本不强加于已 cutover 的生产路径。同一 Life 内不得因 T1 / review / fallback / Strength 改写 system prompt 字节。
 
 ## GLORY-072：拒绝记录就绪
 
 拒绝 Reviewer 的 terminal frontier 是产生 durable REVISE 的 terminal evidence 所界定的 XTrace 边界；该边界必须能从 durable journal evidence 在恢复时重建，禁止以后来的 XTrace head 替换。
 
-`record-ready` 当且仅当**同一 journal snapshot**以全量 origin coverage 物化含 `Work log` 的 canonical LWR（request-range bounded，`includeOpening=false`；raw 段标题为纯文本，`# ` 仅由 `SyntheticToml.comment` 在 wire 注入）。就绪判定是「能否物化有效工作日志」，不是 `coverage >= frontier.Sequence`——frontier 为排他（lastPart+1），真实 Blogger coverage 上限只达 lastPart，旧 coverage 门禁会在 `coverageCanAdvance` 恒真时永远悬挂（GLORY-073 off-by-one 死锁）。
+`record-ready` 当且仅当**同一 journal snapshot**以全量 origin coverage 物化含 `Chronicle`（及必要 Recent work / Closing report）的 canonical LWR（request-range bounded，`includeOpening=false`；raw 段标题为纯文本 `Opening`/`Chronicle`/`Recent work`/`Closing report`，`# ` 仅由 `SyntheticToml.comment` 在 wire 注入）。就绪判定是「能否物化有效工作记录」，不是 `coverage >= frontier.Sequence`——frontier 为排他（lastPart+1），真实 Blogger coverage 上限只达 lastPart，旧 coverage 门禁会在 `coverageCanAdvance` 恒真时永远悬挂（GLORY-073 off-by-one 死锁）。
 
-coverage 与 materialization 不同 revision 即不成立。只有 `record-ready` 的 LWR 可写 blob 并形成 `FinalityRejected.WorkRecordRef/Digest`；不得用缓存、较早/较晚 snapshot、raw tail 或摘要替代。已覆盖的 frame 未渲染为 `Work log` 时是物化不一致，fail closed，不得写 rejection。
+coverage 与 materialization 不同 revision 即不成立。只有 `record-ready` 的 LWR 可写 blob 并形成 `FinalityRejected.WorkRecordRef/Digest`；不得用缓存、较早/较晚 snapshot、raw tail 或摘要替代。已覆盖的 frame 未渲染为 `Chronicle` 时是物化不一致，fail closed，不得写 rejection。
 
 Process-review 的 `TodoReviewConcluded` / ConsumableReview 同等要求 verdict frontier 的 record-ready LWR（TODO-006），等待方式复用本条与 GLORY-073。
 
@@ -332,6 +332,72 @@ record-ready 是 Journal B 类事件等待：读取 snapshot 与 revision；未�
 本地 waiter 的取消、dispose 或进程崩溃不是 durable abandonment，且不得写 lifecycle 终态。恢复从 durable REVISE 与同一 terminal frontier 重建等待，Reviewer continuation/cohort 保持关闭，不重发 challenge、不建新 cohort。
 
 `BloggerRequestAbandoned` 只废弃该次 Blogger request，不证明 record-ready，也不得触发 `FinalityRejected`。恢复须为同一 frontier 重新建立可证明的记录机会；无法从 durable evidence 证明 frontier 或 canonical LWR 时，按 GLORY-056/057 `FinalityUndecided` fail closed，绝不写部分或替代 record。
+
+## GLORY-074：OpeningPolicy 与 Manager BlindPlan
+
+```text
+type OpeningPolicy =
+    | Immediate
+    | BlindPlan of CommitmentContract
+```
+
+| Role | OpeningPolicy | Commitment |
+|------|---------------|------------|
+| Manager | BlindPlan | first accepted `todowrite`（T1） |
+| 其他（当前） | Immediate | initial charge |
+| Coder（未来可选） | BlindPlan | first accepted implementation account；V1 不启用 |
+
+Opening = 工作被交托的语义区间，**不**必然等于第一条消息（COMPANION-014）。关闭于 role-defined commitment boundary；一旦关闭永不移动。
+
+Manager BlindPlan：
+
+```text
+Pre-T1  Planning Table：替将要扛路的另一 Manager 写诚实义务账
+        可调查；不得开始执行所规划之路
+T1      todowrite → validate → durable TodoWriteAccepted
+        → canonical provider-visible result 含 entrustment revelation
+        → Opening 关闭；WorkRecordStart = OpeningBoundary
+Post-T1 Living Mission：路是你的；持续用 todowrite 保持 obligations 真实
+```
+
+T1 call/result 属 constitutive Opening material。交托发生在 conversation + tool result，**不**发生在 system identity / prompt 切换（GLORY-075）。每个新 Life 重新进入 BlindPlan Opening（Reawakening 后亦然）。细节与冻结文案 owner 见 TODO-015。
+
+## GLORY-075：System prompt 稳定性
+
+同一 Life / session 内，office system prompt **byte-identical**：
+
+```text
+T1 commitment / revelation
+Peer Fallback / Strength ExecutionBinding 变化
+process review / Finality
+Host compaction / reanchor / recovery
+```
+
+均不得改写 system prompt 字节。  
+`The system prompt names the office. The conversation tells you which road is yours.`
+
+Persona 在 session 创建时一次绑定，不可变（AGENT-028/029；PROMPT-014）。Fallback / Strength 只改 ExecutionBinding，不换 Persona，不换 system 身份字节。  
+禁止 Planning→Working 或 T1 触发第二份 Role Law / Activation-style prompt 替换。
+
+## GLORY-076：Finality 三种经验
+
+Provider 可见 Finality 只有三种经验；删除 `status="already_completed"/"already_received"` 与 `Work log N` ordinal：
+
+```text
+not accepted
+    → rejection evidence + anti-defeatism + continue
+    （Your ending has not accepted you.）
+
+accepted but not at rest
+    → acceptance guarantee + minor work guidance + WorkRecords
+    （Your ending has accepted you. / You are not yet at rest.）
+
+at rest
+    → Rest in peace + terminal instruction
+```
+
+法则：Non-blocking 不阻断 acceptance，≠ 不必做；Acceptance 与 rest 不同阈；Acceptance 保护工作，Finishing 保护名字；已知 non-blocking findings 不得仅因选择完成而事后升格为 blocker——新 material evidence 是另一事实。  
+`You have done well` 是制度性 anti-defeatism，保留。idempotent replay 重放原 result，不发明新 status 枚举。
 
 ---
 
@@ -359,4 +425,4 @@ record-ready 是 Journal B 类事件等待：读取 snapshot 与 revision；未�
 
 ## SURFACE-006：surface proof
 
-静态 gate 覆盖 Manager tools、schema、固定 prompts/errors/results；runtime proof 覆盖 hidden reviewer 不进 durable handles、list、join、JoinGuard；checkpoint 可见面不得越权暴露隐藏角色（TODO-013）。
+静态 gate 覆盖 Manager tools、schema、固定 prompts/errors/results；runtime proof 覆盖 hidden reviewer 不进 durable handles、horizon、join、JoinGuard；checkpoint 可见面不得越权暴露隐藏角色（TODO-013）。

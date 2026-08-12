@@ -47,6 +47,45 @@ Session / Process   运行时 cell、fallback、review、PTY 所有权
 
 `PrefixRebaseCommitted.EvidenceKind = TodoCheckpoint` 是 ARCH-004 既有冷边界的合法新 evidence，不是新的 epoch 状态机；desired cutoff 由 Accepted 链推导，committed epoch 仅在下一 provider attempt seal 前原子提交（TODO-009）。
 
+## 命名与工具名所有权（ARCH-006 / ARCH-007）
+
+| 不变量 | Owner | 禁止 |
+|--------|-------|------|
+| 人=名词（Role/Persona/office）；工具=动词 | 全库 provider surface | Role 与 Tool 同名承载不同语义（已删 Executor/`executor`） |
+| 不同硬语义 → 不同名 | 各 tool schema owner | `commission` 冒充 `fork`；`judge` 冒充 `verdict` 工具名 |
+| same tool name → 唯一 schema + 唯一 semantic contract | Gate A（ARCH-016） | 仅 schema 相同却生命周期/失败语义分叉 |
+
+`join` / `horizon` 可跨 Role 共享，当且仅当合同完全同一。
+
+## Provider Horizon 所有权（ARCH-014）
+
+> Horizon 无状态机、无 UUID。
+
+| 层 | 拥有 | 不拥有 / 禁止泄漏 |
+|----|------|-------------------|
+| 墙内机械 | Journal、CAS、cursor、SessionId、AgentId、JobId、PtyId、spool、fallback offset、`fast-`/`deep-` binding | 不得投影进 provider tool result / schema / fixed prose |
+| Provider Horizon | 「发生了什么 + 下一步可做什么」；measurement / consequence | `status`/`code`/`error` DTO；回声已证事实；逼模型解码 DU |
+| 各域 tool renderer | 本域后果叙述（服从 decision filter） | 私造第二套机器态暴露面 |
+
+Horizon 法则正文见 `what/architecture.md` ARCH-014；本条只钉所有权：机器可尽知，参与者只见 horizon。
+
+## Closing report 边界（ARCH-015）
+
+Closing report = prose，不是 schema（what ARCH-015）。  
+machine-semantic 结构只留协议真需处（如 `exit_code`、`verdict` 参数、`root_requirement`）。  
+禁止 per-role fixed report DTO；WorkRecord 四标题所有权见 companion/glory。
+
+## Gates A–D 所有权（ARCH-016）
+
+| Gate | 守什么 | 失败面 |
+|------|--------|--------|
+| A Tool Referential Integrity | 同名工具唯一 schema+semantic owner（ARCH-007） | proof / 静态扫描 |
+| B Provider Leak | SessionId/AgentId/JobId/PtyId/Fission/lane/worktree/offset/`fast-`·`deep-`/spool 不得出 horizon | provider 输出契约测试 |
+| C Language Parity | 每个 provider semantic resource：EN + zh-CN（HOST-026） | 资源装载 / 缺语言 fail |
+| D Prompt Stability | 同 session：fallback / T1 / review / reanchor / Strength → system prompt 字节相同（AGENT-029、FALLBACK-014） | Persona/prompt 回归 |
+
+Gate 是可失败门禁锚点，不是业务状态机字段。实现与 proof 拥有可红证据；各域不得以「局部方便」绕过。
+
 ## ARCH-009：有界并发
 
 业务层扇出**唯一**原语：

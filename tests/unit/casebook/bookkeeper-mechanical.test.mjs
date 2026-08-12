@@ -60,7 +60,7 @@ test('CASE006_synthesis_refresh_publishes_refreshed_with_revised_a', async () =>
     assert.equal(refreshed.ok, true, `refreshStale ok, got ${JSON.stringify(refreshed.error)}`)
     assert.equal(refreshed.value, true, 'bookkeeper refresh must publish')
     assert.equal(createCalls.length, 1)
-    assert.equal(editQaCalls.length >= 2, true, 'edit-qa must be invoked')
+    assert.equal(editQaCalls.length >= 2, true, 'js-bookkeeper must be invoked')
 
     const fetched = resultOf(fetchCase(store, raw, 10, 's-mech-1'))
     assert.equal(fetched.ok, true)

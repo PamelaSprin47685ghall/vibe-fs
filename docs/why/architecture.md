@@ -12,6 +12,8 @@
 
 **状态先于表示（ARCH-011）。** 字符串反推控制流是主动丢弃类型。表示层只投影，不证明身份。
 
+**Provider Horizon。** Horizon 无状态机、无 UUID。机器可持有全部相关态；参与者只需「发生了什么 + 下一步可做什么」。把 `status/code/error` DTO、AgentId/SessionId/RunId、cursor/offset、spool 元数据塞进 tool surface，等于逼模型解码 discriminated union 与相关 ID，而不是生活在后果里。错误属于机器；后果属于经验。已删文件的 `spool_path` 是虚假 affordance——路径指向不存在之物，却假装可再打开。
+
 ## 备选与被拒
 
 **程序表达：结构化程序 vs 状态机字段。** 拒 `Stage/Phase/Lease` 当程序计数器：那是运行时职责；固化后恢复=恢复协程、测试=断言枚举序数，复杂度以假领域概念增殖（ARCH-001）。这字段描述的若是「程序下一步去哪」而非物理世界真实事物，必删。
@@ -21,3 +23,5 @@
 **Host 约束：只改 hook vs 改本体。** 拒改本体：升级断裂与维护分叉（ARCH-003）。能力不足先读源码证明缺口，不依赖未公开 API。
 
 **前缀：失败驱动冷边界 vs 估算压缩。** 拒估算：吞 KV-cache 收益且违背 CTX（ARCH-004）。边界由已提交事实驱动（epoch/probe/reanchor）。
+
+**Provider surface：状态机/UUID/DTO vs 后果叙述。** 拒把内部拓扑投影成 `status/code/message/error` 或 UUID 相关字段：LLM 被迫当 union decoder，下一步行动不因字段取值改变时仍在烧注意力。拒 `spool_path` 指向已删 spool：不可达路径不是测量，是谎言。选「已发生的事实 + 可行动后果」；机器态、相关 ID、dedup 标志、cursor 全部 behind horizon。

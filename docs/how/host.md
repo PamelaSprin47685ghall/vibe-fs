@@ -289,7 +289,22 @@ Start 组（ordinal 升序）
   新 pair 的 gap 必须落在本次追加区；旧「pair 总在最后一条 user 任意位置之前」在 continuation transcript 上会中途插入新 pair 破坏 prefix，已废弃。
   查同一 placement identity（SessionId + CallGap + ResultGap）是否已存在：存在 → 只 replay 既有 pair，不 append 新 fact；不存在 → 走上述 commit 顺序。
 - 一个 pair 的 wire：assistant `tool-call`（工具名 `auto-injected`、输入 `{}`）与对应 `tool-result`（同一 `callID`、`status = completed`、输出 `markerText`）。有同批 tool 时 call / result 分别挂 call 批末 / result 批末；无同批 tool 时二者同 gap 相邻。
-- `markerText` 只对本次新 pair 读取当时的 prior tip；历史 pair 保留其原始正文。有 prior tip 时为英文 Nudge、空行、中文正文；无 prior tip 时仅为中文正文。中文正文由 `ProjectionConstants.PairProgrammingGuidelineText` 定义。prior tip 由 owner 的 RecentTips 解析（主 session），不是 Blogger 自身 tip 注入。
+- `markerText` 只对**本次新** pair 构造一次并 durable 冻结；历史 pair **只重放**已存 `MarkerText`，永不因 replay / compaction / reanchor / 语言偏好变更重算：
+
+```text
+lang = SessionProviderLanguage(session)   // HOST-026；禁读全局
+guideline = loadLocalized(PairProgrammingGuidelineText, lang)
+nudge     = if priorTip then loadLocalized(TipNudge(priorTip), lang) else None
+elapsed   = humanScale(SessionStartedAt → now via IClockPort)
+            // EN: "N minutes M seconds"；ZH: "N 分 M 秒"
+wallClock = loadLocalized(WallClockOpportunityCostBlock(elapsed), lang)
+markerText = concat(optional nudge, wallClock, guideline)
+→ append PairProgrammingGuidelineAnchored { MarkerText = markerText, ... }
+```
+
+  `SessionStartedAt` 在 session 创建时绑定一次并 durable；restart / fallback / Strength **不得**改写。  
+  prior tip 由 owner RecentTips 解析（主 session），不是 Blogger 自身 tip。  
+  MagicTodoManagerGuideline **不**写入 `PairProgrammingGuidelineText`（TODO-013）。
 - pair 的 synthetic side-channel 标识为 `source = "pair-programming-auto-injected"`；两侧均按 source 排除于 XTrace 等非 provider 投影，禁止按正文识别或过滤。
 - `CallId = digest(transcript identity + source + Ordinal)`；禁止随机、时间、anchor 或 tip 文本参与身份。正文与 source 单点定义。
 - 不变量校验至少：全部历史 anchor 已解析、无重复 placement、call/result 同 callID、synthetic 字节确定（同输入同输出）、当前 placement 与决策算法一致。
@@ -298,6 +313,31 @@ Start 组（ordinal 升序）
 - tip nudge 查找：`latestTipNudge` 仅在非 Companion 路径调用；不得以当前 session 是 Blogger 为由把 tip 写进 Blogger transcript。
 - 实现点：`SpikePlugin` transform 在 `PairProgrammingThoughtTransform.tryInject` 之前用 association 门禁短路。
 - 注入旁路：`WANXIANGSHU_SKIP_AUTO_INJECTED=1` 或 transcript provider 为 `cursor` 时，`tryInject` 仍 strip + replay 历史 pair，但跳过「本轮 placement 尚不存在 → append 新 fact」分支（`PairProgrammingThoughtTransform.skipAutoInjectedRequested`；provider 由 `providerIdFromMessages` 读取）。
+
+---
+
+## SessionProviderLanguage 绑定（归属 HOST-026）
+
+```text
+onSessionCreate(root):
+  SessionProviderLanguage := readGlobalPreferenceOnce()   // English | SimplifiedChinese
+  SessionStartedAt := IClockPort.now()                    // durable；禁 ambient UtcNow
+  // 与 SessionPersona 同为创建冻结（AGENT-028）；此后不可变
+
+onCreateChild / Attached / InternalLeaf:
+  SessionProviderLanguage := inherit(owner | commissioner)
+  // 禁止各自再读全局
+
+onPeerFallback / Strength / restart / reanchor / BlindPlanT1:
+  → 不得改写 SessionProviderLanguage
+  → 不得改写 SessionStartedAt
+
+onGlobalPreferenceChange:
+  → only future new sessions
+```
+
+localizable prose（Opening / Office Library / tool consequence / WorkRecord headings / HOST-013 marker）只读已绑语言。  
+invariant identifiers（tool 名 / argument / wire field / enum / path / command / `exit_code`）永不翻译（PROMPT-017；ARCH-016 Gate C）。
 
 ## 空 Content 预防（归属 HOST-016）
 
@@ -336,7 +376,7 @@ jsonSchema
 description
 ```
 
-description 覆盖 Manager 可见纪律（TODO-002/003/004/006/013）；禁止 TODO-013 隐藏编排词。只改一处 → 视为 HostContractUnsupported，不得上线 membrane。
+schema 锚 = `todowrite(obligations: [{ name, work }])`（TODO-002）；description 覆盖 Manager 可见纪律（TODO-002/003/004/006/013/015）；禁止 TODO-013 隐藏编排词。只改一处 → 视为 HostContractUnsupported，不得上线 membrane。
 
 ### 2. before（HOST-019/020/025 / TODO-004/006/007）
 
@@ -350,11 +390,11 @@ description 覆盖 Manager 可见纪律（TODO-002/003/004/006/013）；禁止 T
    同 message 多不同 ToolCallId → 全部拒绝；
    同 ToolCallId replay → 校验 digest，不新开）
 3. await ConsumableReview(k-1) 若存在未消费义务（TODO-006）
-4. decodeTaggedTodos + allocateNewIds + validate（TODO-002/003）
-5. append TodoWritePrepared（冻结 BaseTodo / Proposed / ReviewFrontier）
+4. decodeObligations([{name, work}]) + validate（TODO-002/003；duplicate name fail closed）
+5. append TodoWritePrepared（冻结 BaseObligations / Proposed / ReviewFrontier）
 6. installEphemeralBridge(sessionID, callID, payload)   // HOST-021
-7. 原地 mutate args.todos → V1 {content,status,priority}
-   剥离 kind/id；reviewing 按 HOST-023 sink 策略投影
+7. 原地 mutate args → V1 Host TodoTable sink 投影
+   （content/status/priority；canonical 仍是 obligations；reviewing 按 HOST-023）
 8. return（不启动 reviewer；不写 Accepted）
 ```
 
@@ -388,8 +428,9 @@ after 成功或 tool/turn failure cleanup：`bridges.delete(key)`。
      （不必“已跑完 reviewer”才算 after 成功）
 6. desired lag-1 cutoff 由 Accepted 链纯推导（TODO-009；此处不 commit PrefixEpoch）
 7. 富化 output.output：
-     上次 ConsumableReview 的 ProcessReviewLWR
-     + settled current
+     若 Tk = T1 → canonical entrustment revelation（TODO-015；system 字节不变）
+     + 上次 ConsumableReview 的 ProcessReviewLWR
+     + settled CurrentObligations
      + REVISE merge preview（若适用）
      + PERFECT 时 preview 不生效提示（TODO-005/013）
 8. bridges.delete(key)；return
@@ -417,7 +458,7 @@ if consumers tolerate status="reviewing"
   → sink passthrough
 else
   → sink "in_progress"（仅 compatibility）
-canonical status 永远不变（TODO-003）
+canonical = obligations [{name, work}]；永不把 status 枚举写成 provider 真值（TODO-003）
 ```
 
 **Reconciliation 触发**（幂等，无 checkpoint）：
@@ -444,6 +485,8 @@ derive assistant message / provider run / ordinal / XTrace range
 
 0 或 ≥2 → fail closed。不读 HOST-011 之外的伪造字段（如不存在的 `userMessageID`）。
 
-### 8. 与 HOST-013 / transform 的相对顺序
+### 8. 与 HOST-013 / BlindPlan / transform 的相对顺序
 
-membrane 挂在 tool hooks，**不**插入 messages.transform 链。Manager-only guideline 片段（TODO-013）在 projection/prompt 层叠加，与 HOST-013 pair replay 正交：HOST-013 仍按 Work session 通用规则注入；Magic 文案不得写入 `PairProgrammingGuidelineText`。
+membrane 挂在 tool hooks，**不**插入 messages.transform 链。  
+Manager-only guideline / BlindPlan 文案（TODO-013/015）在 projection/prompt 层叠加，与 HOST-013 pair replay 正交：HOST-013 仍按 Work session 通用规则、按 `SessionProviderLanguage` 注入双语 + wall-clock；Magic / BlindPlan 文案不得写入 `PairProgrammingGuidelineText`。  
+T1 关闭 Opening 属 TODO-015 / COMPANION-014；Host membrane **不**拥有 OpeningPolicy / OpeningMaterial。

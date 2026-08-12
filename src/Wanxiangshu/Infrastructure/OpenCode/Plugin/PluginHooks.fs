@@ -99,14 +99,6 @@ module PluginHooks =
                       // unanswered relies on an upstream default staying harmless.
                       "experimental.compaction.autocontinue",
                       box (pairedHook (box HostCompactionGate.onCompactionAutoContinue))
-                      "experimental.text.complete",
-                      box (
-                          pairedHook (
-                              box (fun (textInput: obj) (textOutput: obj) ->
-                                  scope.SyncDelegateRuntime
-                                  |> Option.iter (fun runtime -> runtime.TextComplete(textInput, textOutput)))
-                          )
-                      )
                       // CASE-003: typed observation capture at the tool
                       // execution boundary (read/glob/grep). Best-effort —
                       // unparseable executions are skipped, capture never

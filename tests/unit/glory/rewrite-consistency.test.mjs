@@ -48,7 +48,7 @@ test('GLORY_015_opening_rewrite_is_byte_identical_across_requests', async () => 
 
     const firstRewritten = textOf(out1.messages, 'msg-open-1')
     assert.ok(firstRewritten.startsWith('Start manager work.'), `opening must keep the raw text: ${firstRewritten}`)
-    assert.ok(firstRewritten.includes('If I want to complete the request above'), 'planning tail must be attached')
+    assert.ok(firstRewritten.includes('The Planning Table'), 'Planning Table must be attached')
 
     // Request 2: the Activation request. The Host reads the PERSISTED (raw)
     // conversation, appends the Activation continuation, and transforms again.
@@ -103,7 +103,7 @@ test('GLORY_012_host_title_request_never_opens_a_life', async () => {
     const outPlan = { messages: [userMessage('msg-open-1', 'Start manager work.')] }
     await hooks['experimental.chat.messages.transform']({ sessionID: SESSION }, outPlan)
     assert.ok(
-      textOf(outPlan.messages, 'msg-open-1').includes('If I want to complete the request above'),
+      textOf(outPlan.messages, 'msg-open-1').includes('The Planning Table'),
       'the real HumanRoot must still be Birthed',
     )
   })

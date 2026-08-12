@@ -167,11 +167,11 @@ const bareScope = ({ sessions = fakeSessions() } = {}) =>
   )
 
 const SAMPLE_LWR = [
-  'Work log',
+  'Chronicle',
   'historic frame content',
-  'Uncompressed tail',
+  'Recent work',
   'gap content',
-  'Final output',
+  'Closing report',
   'terminal body',
 ].join('\n')
 
@@ -228,6 +228,7 @@ test('ONESHOT_success_reports_outcome_and_disposes_the_child', async () => {
     // EXEC-028: WorkRecord is the child LWR (includeOpening=false path).
     assert.equal(outcome.WorkRecord, SAMPLE_LWR)
     assert.doesNotMatch(outcome.WorkRecord, /Opening task/)
+    assert.doesNotMatch(outcome.WorkRecord, /^Opening\n/m)
     assert.equal(sessions.calls.abort, 1, 'the child is physically aborted after the terminal')
     // PromptDispatcher installs and disposes its own NoOp terminal listener per
     // send, so the count covers both the tool's subscription and the dispatcher's.
@@ -277,9 +278,10 @@ test('ONESHOT_completed_materializes_lifecycle_work_record_from_real_journal', a
     const outcome = settled.value
     assert.equal(outcome.Output, 'the formal report')
     assert.ok(outcome.WorkRecord, 'LWR must materialize from the journal')
-    assert.match(outcome.WorkRecord, /Final output|Work log/)
+    assert.match(outcome.WorkRecord, /Closing report|Chronicle/)
     assert.doesNotMatch(outcome.WorkRecord, /# # /)
     assert.doesNotMatch(outcome.WorkRecord, /Opening task/)
+    assert.doesNotMatch(outcome.WorkRecord, /Work log|Uncompressed tail|Final output/)
   } finally {
     live.cleanup()
   }

@@ -63,7 +63,8 @@ const scope = (calls = []) => {
 
 const parkedHost = (hasFlight = false) => ({ HasFlight: (sid) => hasFlight })
 
-const run = async (tool, args, ctx) => parseToml(await tool.Execute(makeArgs(args), ctx))
+const run = async (tool, args, ctx) => tool.Execute(makeArgs(args), ctx)
+const runParsed = async (tool, args, ctx) => parseToml(await run(tool, args, ctx))
 
 // ── pure gates ──────────────────────────────────────────────────────────────
 
@@ -74,11 +75,11 @@ test('BLOG_canonical_text_trims_and_rejects_empty', () => {
 
   const empty = tryCanonicalText('   ')
   assert.equal(empty.tag, 1)
-  assert.equal(empty.fields[0], 'blog text is empty after canonicalisation (ENFORCER-061)')
+  assert.equal(empty.fields[0], 'chronicle entry is empty after canonicalisation (ENFORCER-061)')
 
   const nil = tryCanonicalText(undefined)
   assert.equal(nil.tag, 1)
-  assert.equal(nil.fields[0], 'blog text is empty after canonicalisation (ENFORCER-061)')
+  assert.equal(nil.fields[0], 'chronicle entry is empty after canonicalisation (ENFORCER-061)')
 })
 
 test('BLOG_live_cycle_requires_a_host_with_a_flight', () => {
@@ -96,9 +97,9 @@ test('BLOG_tip_enum_equals_catalog_field_names', () => {
 
 test('BLOG_spec_exposes_identity_and_argument_surface', () => {
   const tool = spec(factory, scope().scope, undefined)
-  assert.equal(tool.Name, 'blog')
+  assert.equal(tool.Name, 'chronicle')
   const args = listItems(tool.Arguments)
-  assert.deepEqual(args.map(([n]) => n), ['text', 'tip', 'evidence'])
+  assert.deepEqual(args.map(([n]) => n), ['entry', 'tip'])
   const v = args[1][1]
   assert.equal(v.fields[0].values.length, 120)
 })
@@ -108,8 +109,8 @@ test('BLOG_spec_exposes_identity_and_argument_surface', () => {
 test('BLOG_no_live_cycle_rejects_and_aborts_the_session', async () => {
   const { scope: s, calls } = scope()
   const tool = spec(factory, s, undefined)
-  await assert.rejects(() => run(tool, { text: 'x', tip: 'primitive-obsession' }, context()), {
-    message: 'blog rejected: no live CurrentRequest (Blogger cycle not InFlight)',
+  await assert.rejects(() => run(tool, { entry: 'x', tip: 'primitive-obsession' }, context()), {
+    message: 'chronicle rejected: no live CurrentRequest (Blogger cycle not InFlight)',
   })
   assert.deepEqual(calls, [['AbortSession', sessionId('ses-blog')]], 'the doomed blogger session must be aborted')
 })
@@ -117,42 +118,45 @@ test('BLOG_no_live_cycle_rejects_and_aborts_the_session', async () => {
 test('BLOG_no_live_cycle_does_not_abort_a_blank_session', async () => {
   const { scope: s, calls } = scope()
   const tool = spec(factory, s, undefined)
-  await assert.rejects(() => run(tool, { text: 'x', tip: 'primitive-obsession' }, context({ sessionId: '' })), {
-    message: 'blog rejected: no live CurrentRequest (Blogger cycle not InFlight)',
+  await assert.rejects(() => run(tool, { entry: 'x', tip: 'primitive-obsession' }, context({ sessionId: '' })), (error) => {
+    assert.match(error?.message ?? String(error), /chronicle rejected: no live CurrentRequest/)
+    return true
   })
   assert.deepEqual(calls, [], 'blank session must not be aborted')
 })
 
 test('BLOG_empty_canonical_text_returns_public_error', async () => {
   const tool = spec(factory, scope().scope, parkedHost(true))
-  const result = await run(tool, { text: '   ', tip: 'primitive-obsession' }, context())
-  assert.equal(result.error, 'blog text is empty after canonicalisation (ENFORCER-061)')
+  const text = await run(tool, { entry: '   ', tip: 'primitive-obsession' }, context())
+  assert.match(text, /no occurrence here to remember/)
 })
 
 test('BLOG_missing_tip_returns_codec_error', async () => {
   const tool = spec(factory, scope().scope, parkedHost(true))
-  const result = await run(tool, { text: 'entry' }, context())
-  assert.equal(result.error, 'missing required argument: tip')
+  const text = await run(tool, { entry: 'entry' }, context())
+  assert.match(text, /Rulebook|missing required argument: tip/i)
 })
 
 test('BLOG_unknown_tip_is_rejected_at_runtime', async () => {
   const tool = spec(factory, scope().scope, parkedHost(true))
-  const result = await run(tool, { text: 'entry', tip: 'not-a-field' }, context())
-  assert.match(result.error, /UnknownTip not-a-field/)
+  const text = await run(tool, { entry: 'entry', tip: 'not-a-field' }, context())
+  assert.match(text, /not in the Rulebook/)
 })
 
 test('BLOG_valid_entry_with_identity_returns_fixed_ok', async () => {
   const tool = spec(factory, scope().scope, parkedHost(true))
-  const result = await run(
+  const text = await run(
     tool,
-    { text: '  entry  ', tip: 'primitive-obsession' },
+    { entry: '  entry  ', tip: 'primitive-obsession' },
     context({ providerRunId: 'run-1', toolCallId: 'call-1' }),
   )
-  assert.equal(result.result, 'OK')
+  assert.match(text, /The Chronicle remembers this\./)
 })
 
 test('BLOG_valid_entry_without_tool_identity_still_returns_ok', async () => {
   const tool = spec(factory, scope().scope, parkedHost(true))
-  const result = await run(tool, { text: 'entry', tip: 'primitive-obsession' }, context())
-  assert.equal(result.result, 'OK')
+  assert.match(
+    await run(tool, { entry: 'entry', tip: 'primitive-obsession' }, context()),
+    /The Chronicle remembers this\./,
+  )
 })

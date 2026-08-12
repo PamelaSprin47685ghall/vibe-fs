@@ -21,10 +21,10 @@ const ROLES = [
   'Coder',
   'Inspector',
   'Browser',
-  'Meditator',
+  'Inquiry',
   'Reviewer',
   'DevOps',
-  'Executor',
+  'Distiller',
   'Blogger',
 ]
 const TIERS = ['fast', 'deep']
@@ -42,6 +42,7 @@ const buildConfig = ({ duplicateBrowserModel = false } = {}) => {
             : `${tier}-${role.toLowerCase()}-model`,
       }
     }
+    agent[`${tier}-bookkeeper`] = { model: `${tier}-bookkeeper-model` }
   }
   return { agent }
 }
@@ -94,22 +95,64 @@ const mergedRules = (config, name) => [...hostDefaults(), ...rulesOf(config.agen
 
 const allowList = (config, name) => {
   const rules = mergedRules(config, name)
-  const tools = ['bash', 'bash-honeypot', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'inspector', 'executor', 'coder', 'fork', 'fork-manager', 'fork-pty', 'join', 'list', 'stealth-browser-mcp_*', 'verdict', 'blog', 'return', 'fetch', 'suicide']
+  const tools = [
+    'bash',
+    'bash-honeypot',
+    'read',
+    'write',
+    'edit',
+    'glob',
+    'grep',
+    'mv',
+    'rm',
+    'inspect',
+    'run',
+    'query-shell',
+    'establish-behavior',
+    'repair-behavior',
+    'fork',
+    'commission',
+    'open-terminal',
+    'send-terminal',
+    'read-terminal',
+    'signal-terminal',
+    'join',
+    'horizon',
+    'stealth-browser-mcp_*',
+    'judge',
+    'chronicle',
+    'fetch',
+    'suicide',
+  ]
   return tools.filter((tool) => evaluate(rules, tool, '*').action === 'allow')
 }
 
 // AGENT-006 matrix (tool names as they reach the Host permission schema).
 const ROLE_ALLOW = {
-  Manager: ['fork', 'join', 'list', 'suicide'],
-  Orchestrator: ['fork-manager', 'join'],
-  Coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspector', 'mv', 'rm', 'bash-honeypot', 'fetch'],
-  Inspector: ['read', 'glob', 'grep', 'executor', 'fetch'],
+  Manager: ['fork', 'join', 'horizon', 'suicide'],
+  Orchestrator: ['commission', 'join', 'horizon'],
+  Coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspect', 'mv', 'rm', 'bash-honeypot', 'fetch'],
+  Inspector: ['read', 'glob', 'grep', 'query-shell', 'fetch'],
   Browser: ['read', 'glob', 'grep', 'stealth-browser-mcp_*'],
-  Meditator: ['inspector'],
-  Reviewer: ['read', 'glob', 'grep', 'verdict'],
-  DevOps: ['read', 'glob', 'grep', 'inspector', 'executor', 'coder', 'join', 'list', 'fork-pty'],
-  Executor: [],
-  Blogger: ['blog'],
+  Inquiry: ['inspect'],
+  Reviewer: ['read', 'glob', 'grep', 'judge'],
+  DevOps: [
+    'read',
+    'glob',
+    'grep',
+    'inspect',
+    'run',
+    'establish-behavior',
+    'repair-behavior',
+    'join',
+    'horizon',
+    'open-terminal',
+    'send-terminal',
+    'read-terminal',
+    'signal-terminal',
+  ],
+  Distiller: [],
+  Blogger: ['chronicle'],
 }
 
 test.before(() => {
@@ -212,10 +255,13 @@ test('roles.permissions_agree_with_the_host_schema_matrix', () => {
   const permissionOf = (toolName) =>
     ({
       fork: 'Fork',
-      'fork-manager': 'Fork',
-      'fork-pty': 'Pty',
+      commission: 'Fork',
+      'open-terminal': 'Pty',
+      'send-terminal': 'Pty',
+      'read-terminal': 'Pty',
+      'signal-terminal': 'Pty',
       join: 'Join',
-      list: 'List',
+      horizon: 'Horizon',
       read: 'Read',
       write: 'Write',
       edit: 'Edit',
@@ -224,13 +270,14 @@ test('roles.permissions_agree_with_the_host_schema_matrix', () => {
       mv: 'Move',
       rm: 'Remove',
       'bash-honeypot': 'BashHoneypot',
-      inspector: 'Inspector',
-      executor: 'Exec',
-      coder: 'Coder',
+      inspect: 'Inspect',
+      run: 'Exec',
+      'query-shell': 'Exec',
+      'establish-behavior': 'Behavior',
+      'repair-behavior': 'Behavior',
       'stealth-browser-mcp_*': 'Network',
-      verdict: 'Verdict',
-      blog: 'Blog',
-      return: 'Return',
+      judge: 'Judge',
+      chronicle: 'Chronicle',
       fetch: 'Fetch',
       suicide: 'Finality',
     })[toolName]
@@ -238,8 +285,9 @@ test('roles.permissions_agree_with_the_host_schema_matrix', () => {
     const fromRoles = roles.permissions(roles.of(role))
     const config = buildConfig()
     managedAgentConfig.configure(config)
-    const fromSchema = allowList(config, agentName('fast', role)).map(permissionOf).sort()
-    assert.deepEqual(fromSchema, fromRoles, `${role}: domain permissions must equal the Host schema allow list`)  }
+    const fromSchema = [...new Set(allowList(config, agentName('fast', role)).map(permissionOf))].sort()
+    assert.deepEqual(fromSchema, fromRoles, `${role}: domain permissions must equal the Host schema allow list`)
+  }
 })
 
 test('AGENT_019_external_directory_overrides_host_default_ask', () => {

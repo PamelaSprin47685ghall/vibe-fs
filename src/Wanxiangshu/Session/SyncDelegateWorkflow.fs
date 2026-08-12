@@ -20,9 +20,8 @@ type Dependencies =
       SendPrompt: SyncDelegateCall -> string -> Task<Result<unit, string>>
       DescribeWait: SyncDelegateWait -> DiagnosticWait }
 
-/// EXEC-026 / EXEC-028: reusable SyncDelegate CE (Acquire → GetOrCreate → Send →
-/// await Returned → await Completion). Dual-await path for dedicated
-/// Inspector/Coder (Work+Attached); not SatelliteRuntime / SatelliteKind.
+/// EXEC-026 / EXEC-031: reusable SyncDelegate CE (Acquire → GetOrCreate → Send →
+/// await ordinary Completion / bounded WorkRecord). No return tool / dual-await.
 let invoke
     (store: SyncDelegateCallStore)
     (deps: Dependencies)
@@ -81,28 +80,14 @@ let invoke
                             if role = SyncDelegateRole.Inspector then
                                 deps.NoteInspectorPrompt (SessionId.value delegateSession) message
 
-                            let! returned =
+                            let! answered =
                                 CausalAwait.awaitTask
                                     CausalWaitHub.observer
-                                    (deps.DescribeWait(ReturnFromDelegate(owner, delegateSession, role)))
-                                    call.Returned.Task
+                                    (deps.DescribeWait(DelegateCompletion(owner, delegateSession, role)))
+                                    call.Answer.Task
 
-                            match returned with
-                            | Error error ->
-                                store.ReleaseFlight ownerScope
-                                return Error error
-                            | Ok answer ->
-                                let! confirmed =
-                                    CausalAwait.awaitTask
-                                        CausalWaitHub.observer
-                                        (deps.DescribeWait(
-                                            DelegateCompletionTerminal(owner, delegateSession, role, answer.ToolRun)
-                                        ))
-                                        call.Completion.Task
-
-                                store.ReleaseFlight ownerScope
-
-                                return confirmed |> Result.map (fun () -> answer.Answer)
+                            store.ReleaseFlight ownerScope
+                            return answered
                 with ex ->
                     store.ReleaseFlight ownerScope
                     return Error ex.Message

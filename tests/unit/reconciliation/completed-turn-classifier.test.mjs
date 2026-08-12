@@ -193,7 +193,7 @@ test('RECON_needs_interactionRepair_role_by_outcome_table', () => {
   const failed = classifyOutcome(false, 'error', 'boom', [])
   const unknown = classifyOutcome(false, undefined, undefined, [])
 
-  for (const role of ['Manager', 'Orchestrator', 'Coder', 'Reviewer', 'Inspector', 'DevOps', 'Browser', 'Meditator']) {
+  for (const role of ['Manager', 'Orchestrator', 'Coder', 'Reviewer', 'Inspector', 'DevOps', 'Browser', 'Inquiry']) {
     assert.equal(needsInteractionRepair(roles.of(role), inProgress, []), true, `${role} InProgress without a real tool part repairs`)
     assert.equal(
       needsInteractionRepair(roles.of(role), inProgressWithRealTool, [toolCall('c-live', 'write', '{}')]),
@@ -206,7 +206,7 @@ test('RECON_needs_interactionRepair_role_by_outcome_table', () => {
     }
   }
 
-  for (const role of ['Executor', 'Blogger']) {
+  for (const role of ['Distiller', 'Blogger']) {
     assert.equal(needsInteractionRepair(roles.of(role), inProgress, []), false, `${role} has no interaction repair`)
   }
   assert.equal(needsInteractionRepair(undefined, inProgress, []), false, 'no role → no repair')

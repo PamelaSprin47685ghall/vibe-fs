@@ -89,12 +89,12 @@ test('PTY_TYPES_pty_command_cases_carry_their_fields', () => {
 })
 
 test('PTY_TYPES_pty_handle_and_read_records_expose_fields', () => {
-  const agent = { Name: 'fast-executor' }
+  const agent = { Name: 'fast-distiller' }
   const id = PtyId_Create_Z721C83C5('pty-1')
   const handle = new PtyHandle(id, 'sleep 1', new Date(), agent)
   assert.equal(handle.Command, 'sleep 1')
   assert.equal(PtyId__get_Value(handle.Id), 'pty-1')
-  assert.equal(handle.Agent.Name, 'fast-executor')
+  assert.equal(handle.Agent.Name, 'fast-distiller')
 
   const read = new PtyRead(id, 'partial output', true)
   assert.equal(read.Output, 'partial output')

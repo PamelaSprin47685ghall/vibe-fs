@@ -17,10 +17,12 @@ Inspector 调用（复用或非复用 scope）
 → 对当前 worktree replay observations（只读，不写）
 → no-delta → 返回 exact A（freshness hint，非正确性证明）
 → delta → 旧 A stale；启动 Bookkeeper CaseRefresh
-→ Bookkeeper edit-qa*（0..N，一个 provider transaction）→ stability verify
+→ Bookkeeper js-bookkeeper*（0..N，一个 provider transaction）→ stability verify
 → Append InspectorCaseRefreshed → 返回新 A
 → 失败 → 保留旧 Case，返回旧 A
 ```
+
+旧名 `edit-qa` 非法、无 alias。provider index / fetch 后果不得泄漏 session/status/freshness 机器字段（ARCH-014）。
 
 ## CasebookProjection fold
 
@@ -37,7 +39,7 @@ Inspector 调用（复用或非复用 scope）
 - normalize：路径按 repository containment 规范；同路径同内容观察去重（ObservationIdentity）。
 - replay：对当前 worktree 重新执行捕获时的 typed 读取（文件存在性 + 内容 + glob/grep 结果集合）。
 - classifyReplay：全部一致 → Fresh；任一缺失/变化 → Stale（含文件 create/delete/rename 导致的 glob/grep 变化）。
-- 捕获不完整（executor 无法识别）→ 该 observation 不参与 replay（少一次变化检测机会，不阻止归档）。
+- 捕获不完整（命令无法识别）→ 该 observation 不参与 replay（少一次变化检测机会，不阻止归档）。
 
 ## LRU prune
 
@@ -55,10 +57,21 @@ Inspector 调用（复用或非复用 scope）
 
 ## Bookkeeper 生命周期
 
-- CaseRefresh：changed evidence → Bookkeeper（InternalLeaf + Attached）→ edit-qa* → stability verify（replay 再次 Fresh）→ Refreshed。
+```text
+机器身份：fast-bookkeeper / deep-bookkeeper（强制内部 pair）
+Persona：Clerk / Curator（session 创建冻结；不复用 Scout/Investigator self-model）
+模型绑定：可复用 inspector model config；不复用 Inspector Role Law / 工具矩阵
+唯一工具：js-bookkeeper(program)
+  → 一次程序 = 一次原子 staged 变换
+  → setQuestion / setAnswer 各至多一次；zero mutation 合法
+  → 无 filesystem capability；不得写第三文件
+```
+
+- CaseRefresh：changed evidence → Bookkeeper（InternalLeaf + Attached）→ `js-bookkeeper`* → stability verify（replay 再次 Fresh）→ Refreshed。
 - CaseFinalize：ReuseScope close → freeze draft → 一个 finalize 事务 → Captured → retire/release。
 - 失败路径：maintenance failure ≠ fetch failure；返回旧 A。
 - unexpected SessionDeleted：仅 cleanup，不 reconstruct。
+- Fallback/Strength 若触及 Bookkeeper：只换 EffectiveAgent，不换 Persona / language（FALLBACK-014）。
 
 ## 并发
 

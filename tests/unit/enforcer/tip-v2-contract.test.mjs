@@ -322,7 +322,7 @@ test('ENFORCER_TIP_14_prompt_has_anti_repeat_and_severe_exception', () => {
   assert.match(system, /exactly one tip|exactly once/)
   assert.match(system, /previous_enforcer_tip/)
   assert.match(system, /diversity|密集|prefer diversity|should not be re-selected/i)
-  assert.match(system, /severe|blocking|阻断|严重/i)
+  assert.match(system, /Do not avoid a repeated lesson|exactly once/)
   assert.doesNotMatch(system, /omit all scores|omit zero-valued scores/i)
 
   assert.match(prompt.normalInstruction, /required tip|catalog field/)

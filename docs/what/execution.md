@@ -4,81 +4,76 @@
 Handle / PTY / Mailbox 所有权见 `shape/execution.md`。  
 Join 批次、blob、进程预算见 `how/execution.md`。
 
-## EXEC-001：Fork/Join/List
+## EXEC-001：Fork/Join/Horizon
 
 | 角色 | 工具 |
 |------|------|
-| Manager | `fork-agent` / `join` / `list` |
-| Orchestrator | `fork-manager` / `join` |
-| DevOps | 另有 `fork-pty` |
+| Manager | `fork` / `join` / `horizon` |
+| Orchestrator | `commission` / `join` / `horizon` |
+| DevOps | `open-terminal` / `send-terminal` / `read-terminal` / `signal-terminal`，以及 `join` / `horizon` |
 
-## EXEC-002：Fork-agent 语义
+## EXEC-002：Fork 语义
 
-- 新建：准确角色名 + 非空 prompt。  
-- 已有 AgentId + prompt：nudge/continue，fire-and-forget。  
-- Busy existing：不新 RunId、不新 listener、不新 completion；nudge 归属当前 active Run。
+- 新建：`calling`（Persona 名）+ `name`（Byname）+ 非空 `charge`。  
+- 续做：省略 `calling`，按 `name` + 当前 `charge` 识别既有 person；不暴露 AgentId，不用 `reuse` flag。  
+- Busy existing：不新 RunId、不新 listener、不新 completion；nudge 归属当前 active Run。  
+- 成功：仅 Byname 承接 charge 的自然语言后果；不返回 agent_id / role / tier / fallback_peer / worktree。
 
-## EXEC-003：Fork-pty 语义
+## EXEC-003：终端动词语义
 
-- 新 PTY / 已有 id + 非空 prompt = write  
-- id + 空 prompt = read  
-- id + signal = 发信号  
+四个不同动词、四个不同 contract（删除 `fork-pty`）：
+
+- `open-terminal(name, command)`：打开  
+- `send-terminal(name, input)`：写入  
+- `read-terminal(name)`：读取增量  
+- `signal-terminal(name, signal)`：发信号  
+
+不向 provider 返回 `pty_id` / `closed` / `status`。
 
 ## EXEC-004：Join 语义
 
-Join 消费当前 owner 可用 completion，有界批次 wire（status/count/`[[result]]`）；agent 完成项 entry-local LWR 注释（`includeOpening=false`），禁止字段式 `work_record`。  
-DevOps 角色的 `join` 在无完成项时包含 10s 超时预算（`DevOpsJoinTimeoutMs = 10_000`）；若 10s 内无 completion，返回超时错误 `ForkError.TimedOut`（`status="failed"`, `code="TIMED_OUT"`）。Orchestrator 与 Manager 角色的 `join` 维持无 10s 超时规则。  
-工具调用中止（operator abort）→ `status=interrupted, reason=operator_abort`；外部用户入站 → `status=interrupted, reason=user_message`；均非 error（EXEC-017）。
+Join 消费当前 owner 可用 completion，有界批次；agent 完成项为 entry-local WorkRecord / LWR（`includeOpening=false`），禁止字段式 `work_record` DTO。  
+**禁止**向 provider 投影 `status` / `count` / `ordinal` / `kind` / `agent` / `code` / `message` 等通用 DTO。后果用自然语言 + WorkRecord（或 terminal 的 `exit_code` + 相关输出）。  
+
+DevOps 角色的 `join` 在无完成项时包含 10s 等待预算（`DevOpsJoinTimeoutMs = 10_000`）；若 10s 内无 completion，结束本次等待并以自然语言告知等待结束（Host 事实 `DeadlineExpired`）；**不**暴露 `TIMED_OUT` / `status="failed"` / `code=...`。Orchestrator 与 Manager 的 `join` 无此 10s 预算。  
+
+工具调用中止（operator abort）与外部用户入站均为中断后果（自然语言），非 error（EXEC-017）。
 
 ## EXEC-028：同步返回语义（OneShot vs SyncDelegate）
 
 同步 agent 工具有两条互斥生命周期路径。**不得**混用：OneShot 的 dispose-after 不得套在 dedicated
-SyncDelegate Session 上；SyncDelegate 的双 await 不得退化成单次 terminal 即放行。
+SyncDelegate Session 上；SyncDelegate 不得退化成 OneShot dispose-after。
 
 ### A. Residual OneShot（dispose-after）
 
 仍用于**非 dedicated SyncDelegate** 的 residual one-shot callers（若有）：每次调用新建 child Session，
 成功完成后 abort/dispose child，不跨调用复用。
 
-成功完成时：entry-local LWR 注释（`includeOpening=false`）+ 末条 TurnFormalText 报告；禁止字段式
-`work_record`。LWR 物化与子→父方向同 COMPANION-003（与 EXEC-004 共用物化器，非 Join 批次 wire）。
+成功完成时：entry-local LWR / WorkRecord（`includeOpening=false`）+ 末条 TurnFormalText 报告；禁止字段式
+`work_record` DTO。LWR 物化与子→父方向同 COMPANION-003（与 EXEC-004 共用物化器，非 Join 批次 wire）。
 Opening 从原始 assignment 捕获（对齐 fork），以便 COMPANION-003 物化可运行；返回的 LWR 仍为
-`includeOpening=false`。若 Completed 无法物化出非空 child LWR，则 fail-closed：返回工具级 `error=`
-（显式失败），绝不静默退回仅 formal report 的 soft success。
+`includeOpening=false`。若 Completed 无法物化出非空 child LWR，则 fail-closed：显式工具失败，
+绝不静默退回仅 formal report 的 soft success。
 
-### B. Reusable SyncDelegate（Returned → Completion）
+### B. Reusable SyncDelegate（ordinary completion → bounded WorkRecord）
 
-Meditator / Coder / DevOps 的 dedicated `inspector` / `coder`（及同类 SyncDelegate）走本路径：
+Inquiry / Coder / DevOps 的 dedicated `inspect` / `establish-behavior` / `repair-behavior`
+（及同类 SyncDelegate）走本路径。**删除**独立 `return` 通道与 `Returned → Completion` 双 await。
 
-```text
-callee return(message)
-→ resolve Returned only（答案已定，caller 仍阻塞）
-
-同 Host loop 继续固定 terminal assistant completion
-→ reconciler 证明 TurnCompleted
-→ resolve Completion
-
-caller 取得 tool result = message
-（须 Returned 与 Completion 均完成）
-```
-
-不变量：
-
-- `return` **只** resolve `Returned`；不得因 `return` 单独放行 caller 或 retire dedicated Session。
-- `Completion` 仅在 `TurnCompleted` 证明后 resolve；成功路径无 abort / interrupted。
-- caller 阻塞到 **Returned 且 Completion** 都完成，保证下一同步调用不与上一 turn 尾部重叠。
-- Session 按 `(OwnerReuseScopeId, role)` 复用（EXEC-026）；wire 仍可带 entry-local LWR 注释 + formal
-  report，但生命周期以双 await 为准，不以 OneShot dispose-after 为准。
+语义由 EXEC-031 规定：callee 普通 Assistant completion → Host 物化该次 invocation 的 bounded WorkRecord
+（`includeOpening=false`）→ 投影给 caller。
 
 ### Serialization 与 tier（行为面）
 
 - Serialization key = **immediate caller ReuseScope**（非 family root）。嵌套
   `DevOps → Coder → Inspector` 合法；同 caller ReuseScope 禁止并发两个 active sync delegate calls。
 - Owner effective tier → deterministic delegate tier（`fast→fast`，`deep→deep`）；不可每轮选 Agent。
+- Session 按 `(OwnerReuseScopeId, role)` 复用（EXEC-026）；不以 OneShot dispose-after 为准。
 
-## EXEC-005：List 语义
+## EXEC-005：Horizon 语义
 
-List 列当前 running handle，不是可创建 Agent 菜单。
+`horizon()` 朝向当前在场名册（Byname / TerminalName 等）：谁还在远方、谁已归来、终端是否仍开。  
+不是可创建 Agent 菜单。无 `status` / `id` / `kind` / `ordinal` 等状态机词汇。
 
 ## EXEC-006：Child Run 生命周期
 
@@ -106,9 +101,9 @@ join 等待直至：completion 可用 / 本地 operator abort / external-user in
 
 External-user ingress 只打断**当前** wait：不 cancel mailbox/runtime/session/child，也不本身授予 Prompt authority。每个 `join` 入口先建立一个 `JoinAttempt`；消息只 fan-out 给该 Session 当时 active 的 attempt。无 active attempt 的消息仍进入正常 Host 队列，但作为 join wake 丢弃，绝不 latched 给 future join。任意 race 唤醒后，已可用的 completion 先 drain，再才发出 interrupt 结果。
 
-operator abort 先打断当前 `JoinAttempt`，使 join 返回 `reason=operator_abort`；同一次 Esc 随后终止父 provider attempt，`TurnAborted` cleanup 必须取消该父全部仍在运行的 sub-session。已经完成并进入 `CompletedAwaitingJoin` 的结果仍可消费。与之相对，external-user ingress 不产生 `TurnAborted`，不得取消任何 sub-session。
+operator abort 先打断当前 `JoinAttempt`，使 join 返回 operator-abort 自然语言后果；同一次 Esc 随后终止父 provider attempt，`TurnAborted` cleanup 必须取消该父全部仍在运行的 sub-session。已经完成并进入 `CompletedAwaitingJoin` 的结果仍可消费。与之相对，external-user ingress 不产生 `TurnAborted`，不得取消任何 sub-session。
 
-wire：operator abort → `status=interrupted, reason=operator_abort`；user message → `status=interrupted, reason=user_message`；DevOps 超时 → `ForkError.TimedOut`（`status="failed", code="TIMED_OUT"`，EXEC-004）。tool abort ≠ runtime.Cancel。中途用户消息可唤醒 join，不经 AcceptHumanRoot、不重置 LogicalRun、不新建 Manager Life（PROMPT-004 不变，fail-closed）。
+provider wire：**禁止** `status` / `code` / `message` DTO。operator abort / user message / DevOps deadline 均以自然语言后果表达（EXEC-004）。tool abort ≠ runtime.Cancel。中途用户消息可唤醒 join，不经 AcceptHumanRoot、不重置 LogicalRun、不新建 Manager Life（PROMPT-004 不变，fail-closed）。
 
 ## EXEC-020：Agent 终态代数（无 ABORTED）
 
@@ -135,5 +130,48 @@ schemaVersion=2；finality 仅 `completed|failed`。
 `StudentCompile`→SKILL/`return` 程序，以及 Teacher/Compile idle nudge 与 `StudentQaStore`。
 无 alias、无 deprecated 执行路径。
 
-后继：SyncDelegate Returned→Completion（EXEC-026/028）；idle 为 `SyncDelegateIdleNudge`
-（PROMPT-003；`shape/host.md` quiescence gate）。`return` **仅** SyncDelegate。
+后继：SyncDelegate ordinary completion → bounded WorkRecord（EXEC-028/031）；idle 为
+`SyncDelegateIdleNudge`（PROMPT-003；`shape/host.md` quiescence gate）。**无**独立 `return` 工具。
+
+## EXEC-029：Commission 语义
+
+Orchestrator 专用：`commission(calling?, name, charge)` 委托独立集成之路给 Manager
+（`fast-manager` / `deep-manager` 新路，或按 Byname 续做既有路；同 job / worktree / session 续做属墙内事实，见 AGENT-015、GLORY-068）。
+
+- 与 Manager `fork` **不同 contract**（commission = independent road；fork = witness within mission），故不同名。  
+- `calling` 在场 → 新路；缺省 → 续做既有路。  
+- 成功：仅 `# <Byname> has taken your charge.`（或等价自然语言）。  
+- **禁止**向 provider 返回 `job_id` / worktree / `reused` / agent / role / tier / fallback_peer。
+
+## EXEC-030：Provider leak 禁令
+
+provider 输出与工具后果**不得**包含下列机器拓扑（Host/Journal 墙内可保留精度）：
+
+```text
+SessionId / AgentId / ManagerJobId / PtyId / FissionGroupId
+lane_index / worktree path / fallback offset / fast-|deep- binding 自称 / spool path
+status / code / message 通用 DTO（Join/horizon 等）
+```
+
+例外仅限语义驱动的精确观测字段（例如 terminal/`run` 的 `exit_code`、非空 stdout/stderr）。  
+机器态可存在；穿过 horizon 的只能是后果与 WorkRecord。
+
+## EXEC-031：SyncDelegate 无 return / bounded WorkRecord
+
+Dedicated SyncDelegate（`inspect` / `establish-behavior` / `repair-behavior`）：
+
+```text
+caller 发起同步委派
+→ specialist 按普通 Work Session 工作
+→ ordinary Assistant completion 结束本次 invocation
+→ Host 物化 bounded WorkRecord（InvocationStartCursor .. InvocationEndCursor，includeOpening=false）
+→ caller 收到该 WorkRecord 投影
+```
+
+不变量：
+
+- **删除** `return(message)` 工具与 `Returned → Completion` 双 await。  
+- **删除** `completion_text` magic literal。  
+- Reusable session 记忆可跨调用保留；每次 caller **只**看见当前 invocation range。  
+- 不暴露 `inspector_id` / `coder_id` / `agent` / `tdd`。  
+- 答案在 WorkRecord 的 Closing report，不是额外 `answer` 字段。

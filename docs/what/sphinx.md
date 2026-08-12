@@ -1,6 +1,6 @@
 # Sphinx — 可观察行为
 
-条款前缀：`SPHINX-`。万象术 Host 注入与 Meditator 权限见 AGENT-028。
+条款前缀：`SPHINX-`。万象术 Host 注入与 Inquiry 权限见 AGENT-030。
 
 ## SPHINX-001：生成式认识状态求解器
 
@@ -34,7 +34,7 @@ V1 不跨进程持久化。进程退出 → handle 失效。
 
 ## SPHINX-003：MCP 工具面 start / resume
 
-Sphinx 暴露为 Host MCP；服务器内工具名 `start` / `resume`。Host 把每个工具暴露为 `sphinx_<name>`（AGENT-028）。
+Sphinx 暴露为 Host MCP；服务器内工具名 `start` / `resume`。Host 把每个工具暴露为 `sphinx_<name>`（AGENT-030）。
 
 `start(question: string)` → JSON：
 
@@ -94,8 +94,8 @@ Sphinx 不得 import 万象术 domain / Kernel / Host 业务模块
 万象术不得内嵌 Sphinx 闭包 / EpistemicState / Canonical Answer 逻辑
 ```
 
-万象术只拥有：MCP identity、launch 配置、`ToolPermission.Sphinx` → schema 键 `sphinx_*`、Meditator allow（AGENT-028）。
+万象术只拥有：MCP identity、launch 配置、`ToolPermission.Sphinx` → schema 键 `sphinx_*`、Inquiry allow（AGENT-030）。
 
 Sphinx 路径允许 `@modelcontextprotocol/sdk`（及 zod）。AGENT-027「Semble 不引入 MCP SDK」仍只约束 Semble 路径。
 
-禁止：把 Sphinx 编进 ToolRegistry / `js-*`；依赖用户手写 `opencode.json` 配置该 MCP；把 Sphinx 能力漏给非 Meditator managed role。
+禁止：把 Sphinx 编进 ToolRegistry / `js-*`；依赖用户手写 `opencode.json` 配置该 MCP；把 Sphinx 能力漏给非 Inquiry managed role。

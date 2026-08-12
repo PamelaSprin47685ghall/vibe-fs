@@ -51,26 +51,18 @@ const text = (value) => new TextEncoder().encode(value)
 
 // ── EXEC-011: estimate math ──────────────────────────────────────────────────
 
-test('EXEC_011_output_threshold_scales_by_three', () => {
+test('EXEC_011_output_threshold_uses_provider_willingness_at_face_value', () => {
   assert.equal(ProcessEstimateModule_outputThreshold(output(0n)), 0n)
   assert.equal(ProcessEstimateModule_outputThreshold(output(-5n)), 0n)
-  assert.equal(ProcessEstimateModule_outputThreshold(output(10n)), 30n)
+  assert.equal(ProcessEstimateModule_outputThreshold(output(10n)), 10n)
 })
 
-test('EXEC_011_output_threshold_caps_at_int64_max', () => {
-  const max = 9223372036854775807n
-  const third = 3074457345618258602n
-  assert.equal(ProcessEstimateModule_outputThreshold(output(third + 1n)), max)
-})
-
-test('EXEC_011_effective_deadline_is_min_of_triple_and_hard_limit', () => {
+test('EXEC_011_effective_deadline_is_min_of_estimate_and_hard_limit', () => {
   const oneHour = fromHours(1)
-  // 10s × 3 = 30s < 1h → the model budget wins.
-  assert.equal(compare(ProcessEstimateModule_effectiveDeadline(runtime(10), oneHour), fromSeconds(30)), 0)
-  // 100s × 3 = 300s < 1h → still the model budget (min, not the ceiling).
-  assert.equal(compare(ProcessEstimateModule_effectiveDeadline(runtime(100), oneHour), fromSeconds(300)), 0)
-  // 2000s × 3 = 6000s > 1h → the administrator ceiling wins.
-  assert.equal(compare(ProcessEstimateModule_effectiveDeadline(runtime(2000), oneHour), oneHour), 0)
+  assert.equal(compare(ProcessEstimateModule_effectiveDeadline(runtime(10), oneHour), fromSeconds(10)), 0)
+  assert.equal(compare(ProcessEstimateModule_effectiveDeadline(runtime(100), oneHour), fromSeconds(100)), 0)
+  assert.equal(compare(ProcessEstimateModule_effectiveDeadline(runtime(2000), oneHour), fromSeconds(2000)), 0)
+  assert.equal(compare(ProcessEstimateModule_effectiveDeadline(runtime(5000), oneHour), oneHour), 0)
 })
 
 test('EXEC_011_nonfinite_or_nonpositive_estimate_collapses_to_hard_limit', () => {

@@ -234,9 +234,9 @@ const NEGATIVES = [
   },
   {
     id: 'tools-no-bare-runtime-join',
-    file: 'ExecutorSummarize.fs',
+    file: 'Distillation.fs',
     source: [
-      'module ExecutorSummarize',
+      'module Distillation',
       'let awaitAgent runtime agentId stash =',
       '    let! joined = runtime.Join(Some remainingMs)',
     ].join('\n'),
@@ -254,10 +254,10 @@ const NEGATIVES = [
   },
   {
     id: 'tools-no-bare-runtime-join',
-    variant: 'executor-summarize-runtime',
-    file: 'ExecutorSummarizeRuntime.fs',
+    variant: 'distillation-runtime',
+    file: 'DistillationRuntime.fs',
     source: [
-      'module ExecutorSummarizeRuntime',
+      'module DistillationRuntime',
       'member _.Join(timeoutMs) =',
       '    match timeoutMs with',
       '    | Some ms -> runtime.Join(timeoutMs = ms)',
@@ -299,8 +299,8 @@ test('P0_RECOVERY_JOIN_GATE_exports_rule_ids', () => {
   assert.ok(RULE_IDS.includes('join-tool-join-program'))
   assert.ok(RULE_IDS.includes('tools-no-bare-runtime-join'))
   assert.ok(RULE_IDS.includes('executor-tool-require-permit'))
-  assert.ok(RULE_IDS.includes('executor-summarize-join-with-permit'))
-  assert.ok(RULE_IDS.includes('executor-runtime-join-with-permit'))
+  assert.ok(RULE_IDS.includes('distillation-join-with-permit'))
+  assert.ok(RULE_IDS.includes('distillation-runtime-join-with-permit'))
   assert.ok(RULE_IDS.includes('join-with-permit-closure-digest'))
   assert.ok(RULE_IDS.includes('lifecycle-aborted-completion'))
   assert.ok(RULE_IDS.includes('record-completion-single-owner'))
@@ -458,18 +458,18 @@ test('P0_RECOVERY_JOIN_GATE_executor_permit_path_stays_green', () => {
     '            | FamilyReady permit -> return Ok permit',
     '        }',
     '    let! summary =',
-    '        ExecutorSummarize.summarizeSpool',
-    '            (ExecutorSummarize.asExecutorRuntime runtime requirePermit)',
+    '        Distillation.distillSpool',
+    '            (Distillation.asDistillationRuntime runtime requirePermit)',
     '            spoolPath',
   ].join('\n')
   const summarize = [
-    'module ExecutorSummarize',
+    'module Distillation',
     'let awaitAgentWithPermit runtime agentId =',
     '    let! joined = runtime.AwaitAgentWithPermit(agentId, Some AwaitAgentTimeoutMs)',
   ].join('\n')
   const wrap = [
-    'module ExecutorSummarizeRuntime',
-    'let asExecutorRuntime runtime requirePermit =',
+    'module DistillationRuntime',
+    'let asDistillationRuntime runtime requirePermit =',
     '    member _.JoinWithPermit(timeoutMs) =',
     '        match! requirePermit () with',
     '        | Ok permit -> runtime.JoinWithPermit(permit)',
@@ -484,10 +484,10 @@ test('P0_RECOVERY_JOIN_GATE_executor_permit_path_stays_green', () => {
   assert.ok(!scanText(tool, 'ExecutorTool.fs').some((h) => h.id === 'executor-tool-empty-session-fail-closed'))
   assert.ok(!scanText(tool, 'ExecutorTool.fs').some((h) => h.id === 'executor-tool-require-permit'))
   assert.ok(!scanText(tool, 'ExecutorTool.fs').some((h) => h.id === 'tools-no-bare-runtime-join'))
-  assert.ok(!scanText(summarize, 'ExecutorSummarize.fs').some((h) => h.id === 'executor-summarize-join-with-permit'))
-  assert.ok(!scanText(summarize, 'ExecutorSummarize.fs').some((h) => h.id === 'tools-no-bare-runtime-join'))
-  assert.ok(!scanText(wrap, 'ExecutorSummarizeRuntime.fs').some((h) => h.id === 'executor-runtime-join-with-permit'))
-  assert.ok(!scanText(wrap, 'ExecutorSummarizeRuntime.fs').some((h) => h.id === 'tools-no-bare-runtime-join'))
+  assert.ok(!scanText(summarize, 'Distillation.fs').some((h) => h.id === 'distillation-join-with-permit'))
+  assert.ok(!scanText(summarize, 'Distillation.fs').some((h) => h.id === 'tools-no-bare-runtime-join'))
+  assert.ok(!scanText(wrap, 'DistillationRuntime.fs').some((h) => h.id === 'distillation-runtime-join-with-permit'))
+  assert.ok(!scanText(wrap, 'DistillationRuntime.fs').some((h) => h.id === 'tools-no-bare-runtime-join'))
   assert.ok(!scanText(host, 'HostForkRuntime.fs').some((h) => h.id === 'join-with-permit-closure-digest'))
 })
 
@@ -514,8 +514,8 @@ test('P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
     'src/Wanxiangshu/Infrastructure/OpenCode/Plugin/SpikePlugin.fs',
     'src/Wanxiangshu/Infrastructure/OpenCode/Tools/JoinTool.fs',
     'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ExecutorTool.fs',
-    'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ExecutorSummarize.fs',
-    'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ExecutorSummarizeRuntime.fs',
+    'src/Wanxiangshu/Infrastructure/OpenCode/Tools/Distillation.fs',
+    'src/Wanxiangshu/Infrastructure/OpenCode/Tools/DistillationRuntime.fs',
     'src/Wanxiangshu/Infrastructure/OpenCode/Codec/JoinResultRenderer.fs',
   ]
   const entries = files.map((rel) => ({

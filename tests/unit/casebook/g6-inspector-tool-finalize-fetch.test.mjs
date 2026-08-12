@@ -20,7 +20,6 @@ import {
 } from '../../../dist/Session/AttachedSessionRuntime.js'
 import {
   SyncDelegateRuntime,
-  SyncDelegateRuntime__Return_Z65460A0C as returnAnswer,
   SyncDelegateRuntime__HandleTurn_Z7791586C as handleTurn,
   SyncDelegateRuntime__Dispose as disposeRuntime,
   SyncDelegateRuntime__TryFind_636E3F87 as tryFind,
@@ -121,11 +120,25 @@ const completionTurn = (delegateKey, role) =>
     undefined,
   )
 
-const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId) => {
-  const returned = resultOf(await returnAnswer(runtime, delegateKey, providerRun(runId), answer))
-  assert.equal(returned.ok, true, returned.ok ? '' : returned.error)
-
-  const handled = await handleTurn(runtime, completionTurn(delegateKey, role), undefined)
+const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = 'asst_turn') => {
+  const handled = await handleTurn(
+    runtime,
+    new ReconciledTurn(
+      sessionId(delegateKey),
+      physicalUser('msg_phys_turn'),
+      authorityRoot('msg_root_turn'),
+      providerRun(runId),
+      role,
+      undefined,
+      [reconcileSupervisor.textPart(answer)],
+      'stop',
+      undefined,
+      undefined,
+      TurnOutcome.TurnCompleted,
+      undefined,
+    ),
+    undefined,
+  )
   assert.equal(handled, true)
 }
 
@@ -175,13 +188,13 @@ const scriptedBookkeeperPort = () => {
         makeArgs({ document: 'Q.md', old_text: stagedQ, new_text: CANONICAL_Q }),
         context(sid),
       )
-      assert.equal(String(qOut).includes('replaced'), true, qOut)
+      assert.equal(String(qOut).includes('rewritten'), true, qOut)
       editQaCalls.push('Q.md')
       const aOut = await execute(
         makeArgs({ document: 'A.md', old_text: stagedA, new_text: CANONICAL_A }),
         context(sid),
       )
-      assert.equal(String(aOut).includes('replaced'), true, aOut)
+      assert.equal(String(aOut).includes('rewritten'), true, aOut)
       editQaCalls.push('A.md')
       for (const callback of terminals) callback(childSession, completedTerminal(childSession))
       return { tag: 0, fields: [] }
@@ -288,7 +301,7 @@ test('G6_inspector_tool_sync_delegate_lifecycle_bookkeeper_fetch', async () => {
 
     for (let i = 0; i < QUESTIONS.length; i += 1) {
       const [q, a] = QUESTIONS[i]
-      const pending = tool.Execute(makeArgs({ prompt: q }), context(owner))
+      const pending = tool.Execute(makeArgs({ charge: q }), context(owner))
 
       await waitFor(
         () => prompts.length === i + 1 && createCalls.length === 1,
@@ -309,10 +322,8 @@ test('G6_inspector_tool_sync_delegate_lifecycle_bookkeeper_fetch', async () => {
       assert.equal(prompts[i].text, q)
       await settlePendingInvoke(runtime, delegateId, inspectorRole, a, `asst_q${i + 1}`)
       const text = await pending
-      const parsed = parseToml(text)
-      assert.equal(parsed.error, undefined)
-      assert.equal(parsed.inspector_id, delegateId)
       assert.match(text, new RegExp(a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+      assert.equal(parseToml(text).error, undefined)
     }
 
     assert.equal(createCalls.length, 1, 'Inspector CreateChildSession once across Q1/Q2/Q3')
@@ -324,7 +335,7 @@ test('G6_inspector_tool_sync_delegate_lifecycle_bookkeeper_fetch', async () => {
     const first = resultOf(await tryFinalizeInspector(dir, delegateId))
     assert.equal(first.ok, true, `tryFinalizeInspector ok: ${JSON.stringify(first.error)}`)
     assert.equal(bookkeeper.createCalls.length, 1, 'Bookkeeper CreateChildSession once')
-    assert.equal(bookkeeper.editQaCalls.length >= 2, true, 'edit-qa must write Q and A')
+    assert.equal(bookkeeper.editQaCalls.length >= 2, true, 'js-bookkeeper must write Q and A')
     assert.equal(bookkeeper.prompts.some((text) => String(text).includes('CaseFinalize')), true)
     assert.equal(bookkeeper.prompts.some((text) => String(text).includes('Q1')), true)
     assert.equal(bookkeeper.prompts.some((text) => String(text).includes('Q3')), true)

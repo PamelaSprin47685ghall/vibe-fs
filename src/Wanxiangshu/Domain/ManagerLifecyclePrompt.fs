@@ -2,13 +2,10 @@ namespace Wanxiangshu.Domain
 
 open Wanxiangshu.Kernel
 
-/// GLORY-019/029 + SURFACE-004: the Manager continuation prompt owner.
-/// Activation, ordinary idle encouragement, and the infrastructure-failure
-/// notice all live here; the Finality rejection prompt has its own owner
-/// (`FinalityPrompt`) because it renders a dynamic work record.
+/// GLORY-019/029 + SURFACE-004: Manager continuation prompt owner.
 module ManagerLifecyclePrompt =
 
-    /// GLORY-019 / A.5.1: Activation as instruction-only synthetic surface.
+    /// GLORY-019 / legacy only: production path must not send (GLORY-018).
     let WorkActivation =
         SyntheticToml.document
             [ "Now complete it yourself."
@@ -23,17 +20,13 @@ module ManagerLifecyclePrompt =
               "As long as any useful action remains, continue." ]
             []
 
-    /// GLORY-029 / A.5.2: ordinary idle encouragement as instruction-only synthetic surface.
-    let IdleEncouragement =
-        SyntheticToml.document
-            [ "You are doing well."
-              "You have plenty of time."
-              "You can continue."
-              "When nothing useful remains, call suicide." ]
-            []
+    /// GLORY-029 / §7.4.6: Pre-T1 idle encouragement.
+    let IdleEncouragementPreT1 = ManagerNarrative.preT1IdleDocument
 
-    /// GLORY-057 / A.5.4: the infrastructure-failure notice. No fabricated work
-    /// record may ever be attached (GLORY-056).
+    /// GLORY-029 / §7.4.6: Post-T1 idle encouragement.
+    let IdleEncouragementPostT1 = ManagerNarrative.postT1IdleDocument
+
+    /// GLORY-057 / A.5.4: infrastructure-failure notice.
     let FinalityUndecidable =
         SyntheticToml.document
             [ "Your ending could not be decided."

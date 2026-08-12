@@ -40,8 +40,8 @@ type RecordReadiness =
 /// Canonical reviewer work-record materialization and journal-driven readiness.
 module RecordWorkflow =
 
-    let private hasRenderedWorkLog (record: string) =
-        let marker = "Work log\n"
+    let private hasRenderedChronicle (record: string) =
+        let marker = "Chronicle\n"
         let start = record.IndexOf(marker, StringComparison.Ordinal)
 
         start >= 0
@@ -52,7 +52,7 @@ module RecordWorkflow =
         (snapshot: ProjectionSet)
         (reviewerSessionId: SessionId)
         (terminalFrontier: ReviewTerminalFrontier option)
-        (requiresWorkLog: bool)
+        (requiresChronicle: bool)
         =
         let terminalOverride =
             terminalFrontier
@@ -71,10 +71,10 @@ module RecordWorkflow =
         with
         | Some record when
             not (String.IsNullOrWhiteSpace record)
-            && (not requiresWorkLog || hasRenderedWorkLog record)
+            && (not requiresChronicle || hasRenderedChronicle record)
             ->
             RecordReadiness.Ready record
-        | Some _ -> RecordReadiness.Unavailable "canonical LWR has no rendered work log"
+        | Some _ -> RecordReadiness.Unavailable "canonical LWR has no rendered Chronicle"
         | None -> RecordReadiness.Unavailable "canonical LWR is unavailable"
 
     let private coverageCanAdvance (snapshot: ProjectionSet) (reviewerSessionId: SessionId) =
@@ -166,7 +166,7 @@ module RecordWorkflow =
                                      Some("reviewer", SessionId.value memberInfo.ReviewerSessionId)
                                  else
                                      None))
-                            (ExternalProducer("journal-work-log", []))
+                            (ExternalProducer("journal-chronicle", []))
                             [ WaitEscape.ProcessLifetime; WaitEscape.OpenEndedExternal ]
                             "RecordWorkflow.awaitCanonicalCohortRecords"
 

@@ -95,7 +95,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let awaitPendingSource (agentId: string) (source: Task<AgentCompletionOutcome>) =
         task {
             let! completedFirst =
-                Wanxiangshu.Process.PtyTiming.raceExit (source :> Task) ExecutorSummarize.AwaitAgentTimeoutMs
+                Wanxiangshu.Process.PtyTiming.raceExit (source :> Task) Distillation.AwaitAgentTimeoutMs
 
             if not completedFirst then
                 return Error(sprintf "await agent timed out: %s" agentId)
@@ -115,7 +115,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
     let awaitCurrentPendingRun (agentId: string) =
         task {
             let deadline =
-                DateTimeOffset.UtcNow.AddMilliseconds(float ExecutorSummarize.AwaitAgentTimeoutMs)
+                DateTimeOffset.UtcNow.AddMilliseconds(float Distillation.AwaitAgentTimeoutMs)
             // Brief window for sendToExistingChild to installRun after Fork returns.
             let appearDeadline = DateTimeOffset.UtcNow.AddMilliseconds(2000.0)
 
@@ -163,7 +163,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             with
             | Some source -> return! awaitPendingSource agentId source
             | None ->
-                match! HostForkJoin.awaitAgent runtime agentId (Some ExecutorSummarize.AwaitAgentTimeoutMs) with
+                match! HostForkJoin.awaitAgent runtime agentId (Some Distillation.AwaitAgentTimeoutMs) with
                 | Error error -> return Error error
                 | Ok run -> return outcomeOf run
         }
@@ -189,7 +189,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     [ "job", ManagerJobId.value jobId; "manager_agent", agentId ]
                     (WorkflowProducer(CausalOwner.create "ManagerWorkflow" [ "agent", agentId ]))
                     [ WaitEscape.DeadlineAt(
-                          DateTimeOffset.UtcNow.AddMilliseconds(float ExecutorSummarize.AwaitAgentTimeoutMs)
+                          DateTimeOffset.UtcNow.AddMilliseconds(float Distillation.AwaitAgentTimeoutMs)
                       )
                       WaitEscape.ProcessLifetime ]
                     "OrchestratorHost.awaitManager"
@@ -258,7 +258,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     awaitCurrentPendingRun agentId |> ignore
 
                     let resolutionDeadline =
-                        DateTimeOffset.UtcNow.AddMilliseconds(float ExecutorSummarize.AwaitAgentTimeoutMs)
+                        DateTimeOffset.UtcNow.AddMilliseconds(float Distillation.AwaitAgentTimeoutMs)
 
                     // Gate on disk content only. Unmerged index entries clear only
                     // after `git add`; that belongs to finalizeWorktree. Waiting for
@@ -460,12 +460,12 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         task {
             let descriptor =
                 DiagnosticWait.create
-                    "fork-manager-job"
+                    "commission-manager-job"
                     (CausalOwner.create "OrchestratorWorkflow" [ "session", SessionId.value orchestratorId ])
                     [ "job", ManagerJobId.value jobId; "manager_agent", managerAgent ]
                     (ExternalProducer("orchestrator-engine", [ "job", ManagerJobId.value jobId ]))
                     [ WaitEscape.ProcessLifetime; WaitEscape.SessionLifetime ]
-                    "OrchestratorHost.ForkManagerJob"
+                    "OrchestratorHost.CommissionManagerJob"
 
             let pending =
                 task {
@@ -480,7 +480,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             return! CausalAwait.awaitTask CausalWaitHub.observer descriptor pending
         }
 
-    /// GLORY-068: `fork-manager(existing_job_id, prompt)` — continue the SAME
+    /// GLORY-068: `commission(existing_job_id, charge)` — continue the SAME
     /// Manager job (same worktree, same session) with an appended requirement.
     member _.ContinueManagerJob(jobId: ManagerJobId, prompt: string) : Task<Result<string, string>> =
         task {

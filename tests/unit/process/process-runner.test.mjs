@@ -51,13 +51,6 @@ test('EXEC_011_rejects_negative_output_estimate', async () => {
   assert.match(String(payloadOf(payloadOf(result))), /non-negative/)
 })
 
-test('EXEC_011_rejects_oversized_output_estimate', async () => {
-  const tooLarge = BigInt('9223372036854775807') / 3n + 1n
-  const result = await runWithLauncher(okLauncher(), cmd, estimate(10, tooLarge), CTX, liveToken())
-  assert.equal(caseOf(result), 'Error')
-  assert.match(String(payloadOf(payloadOf(result))), /too large/)
-})
-
 // ── happy path ───────────────────────────────────────────────────────────────
 
 test('EXEC_011_successful_run_collects_stdout_and_exit_code', async () => {

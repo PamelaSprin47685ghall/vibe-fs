@@ -13,7 +13,10 @@
 | Adoption gate | 将动态材料投影为 instruction 的 surface 须由 production owner 登记 inventory/golden；内容句法或英文语气不得自动提升 |
 | 权限/Transport | system prompt 未误迁；human raw 未包装；provider/tool 原生 binding 未改 |
 | Blogger | data-only body 与 optional header 分离；chunk 字节合同；join LWR wire 形状 |
-| Tool result bound | pass-through 与 marker+tail 均满足 2000 行 / 51200 UTF-8 bytes；不切断 surrogate pair（ARCH-012） |
+| Join / fork / commission | `commissioner_record`（旧 `parent_work_record` 非法）；`root_requirement`（旧 `original_user_requirement` 非法）；无 status/count/ordinal/kind/agent DTO plane |
+| WorkRecord 标题 | Opening / Chronicle / Recent work / Closing report；旧四标题非法 |
+| Tool result bound | pass-through 与 marker+tail 均满足 2000 行 / 51200 UTF-8 bytes；不切断 surrogate pair（ARCH-012）；`js-bookkeeper` 等同服从 Horizon |
+| DevOps budget 字段 | provider 面 `deadline_seconds` / `output_budget_bytes`；旧 `estimated_running_secs`×3 / `estimated_output_bytes`×3 / `estimated_mem_usage` 非法 |
 
 ## 测试落点
 
@@ -21,7 +24,8 @@
 - tool bound：`tests/unit/context/tool-result-bound.test.mjs`
 - integration harness：`arch010-cases` 等 inventory / golden  
 - e2e：依赖 synthetic 外壳的 canary 不得退回裸英语 synthetic  
+- Gate B：`scripts/checks/provider-leak-gate.mjs`（字段 rename + DTO 禁令与 leak vocabulary 同门）
 
 ## 完成判据（发布侧）
 
-纳入范围的 surface 无「为省事保留的裸英语 synthetic」；fixtures/canary 与生产 renderer 同源规则；门禁能在破坏任一不变量时变红。
+纳入范围的 surface 无「为省事保留的裸英语 synthetic」；fixtures/canary 与生产 renderer 同源规则；门禁能在破坏任一不变量时变红；旧字段名 / Join DTO plane 复活即红。

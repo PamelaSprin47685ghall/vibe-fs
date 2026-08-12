@@ -2,24 +2,42 @@ namespace Wanxiangshu.Domain
 
 open Wanxiangshu.Domain.ProviderProjection
 
-/// COMPANION-003: Session 首条任务 prompt 原文。永不送 Y 压缩。
+/// COMPANION-014 / GLORY-074: when Opening closes for a role.
+/// BlindPlan wiring (T1 todowrite) is Phase 10; Manager default is BlindPlan stub.
+type CommitmentContract =
+    /// Manager T1: first accepted `todowrite` on this Life (TODO-015).
+    | FirstAcceptedTodoWrite
+
+type OpeningPolicy =
+    | Immediate
+    | BlindPlan of CommitmentContract
+
+[<RequireQualifiedAccess>]
+module OpeningPolicy =
+
+    /// Manager OpeningPolicy = BlindPlan (GLORY-074).
+    let forManager = BlindPlan FirstAcceptedTodoWrite
+
+    /// Non-Manager roles close Opening at InitialCharge (Immediate).
+    let immediate = Immediate
+
+/// COMPANION-003/014: OpeningMaterial for LWR Opening section.
 ///
-/// - 根 Human Session：被 Host 接受的第一条 HumanRoot prompt 文本。
-/// - fork child：fork 原始 assignment 与权威 requirements。
-/// - 不 Trim 正文、不重排、不摘要、不修正语法、不 TOML round-trip。
-/// - 不包含 system prompt、transport instruction、`parent_work_record`、run ID、
-///   directory 等注入内容（否则多代 fork 递归嵌套、指数膨胀，EXEC-006）。
-type OpeningPromptRaw =
+/// Canonical truth = preserved XTrace `[work start, OpeningBoundary)` (COMPANION-014).
+/// Capture still lands InitialCharge as assignment (+ fork requirements) via journal
+/// `OpeningPromptCaptured`; render must not invent a second reconstruction path.
+/// BlindPlan constitutive interval (T1 call/result) is Phase 10 / XTrace.forOpening.
+type OpeningMaterial =
     { AssignmentText: string
       AuthoritativeRequirements: string list }
 
 /// COMPANION-003: LWR 的唯一物化规则。
 ///
 /// ```text
-/// LWR(X) = OpeningPromptRaw?          // includeOpening 控制是否渲染
-///        + CompressedMiddleFromY
-///        + RawGapFromX（经 forWorkRecord）
-///        + TerminalOutputRaw
+/// LWR(X) = OpeningMaterial?          // includeOpening 控制是否渲染
+///        + Chronicle（Y frames）
+///        + Recent work（RawGapFromX，经 forWorkRecord）
+///        + Closing report（TerminalOutputRaw）
 /// ```
 ///
 /// 跨 Session 方向不同（EXEC-006 / EXEC-008）：
@@ -27,9 +45,9 @@ type OpeningPromptRaw =
 /// - 子 → 父：`includeOpening = false`（布置者已知任务，勿回传 Opening）
 ///
 /// Opening 仍必须 captured（锚点/gap 起点）；本标志只影响渲染段。
-/// tool call/result 不得作为 raw 进入 LWR。
+/// tool call/result 不得作为 raw 进入 LWR（T1 constitutive material 属 Opening，非 Recent）。
 type LifecycleWorkRecord =
-    { Opening: OpeningPromptRaw
+    { Opening: OpeningMaterial
       Frames: string list
       Gap: XTraceItem list
       Terminal: string option }
@@ -44,9 +62,9 @@ module LifecycleWorkRecord =
             heading + "\n" + body
 
     /// 稳定 Markdown 渲染。空段整段省略。
-    /// 段标题为纯文本（Opening task / Work log / …）；`# ` 仅由
-    /// `SyntheticToml.comment` 在 wire 注入，避免 `# # Work log`。
-    /// `includeOpening=false` 时省略 Opening task（子→父）。
+    /// 段标题为纯文本（Opening / Chronicle / Recent work / Closing report）；`# `
+    /// 仅由 `SyntheticToml.comment` 在 wire 注入，避免 `# # Chronicle`。
+    /// `includeOpening=false` 时省略 Opening（子→父）。
     /// `Gap` 须已 `forWorkRecord`；render 再次过滤 fail-closed。
     let render (includeOpening: bool) (record: LifecycleWorkRecord) : string =
         let openingBody =
@@ -77,10 +95,10 @@ module LifecycleWorkRecord =
         let gapText = record.Gap |> XTrace.forWorkRecord |> XTrace.render
 
         let sections =
-            [ section "Opening task" openingBody
-              section "Work log" framesText
-              section "Uncompressed tail" gapText
-              section "Final output" (record.Terminal |> Option.defaultValue "") ]
+            [ section "Opening" openingBody
+              section "Chronicle" framesText
+              section "Recent work" gapText
+              section "Closing report" (record.Terminal |> Option.defaultValue "") ]
             |> List.filter (fun text -> text <> "")
 
         String.concat "\n\n" sections
@@ -88,7 +106,7 @@ module LifecycleWorkRecord =
     /// 确定性物化。gap/terminal 经 `forWorkRecord`。
     /// `includeOpening`：父→子 true，子→父 false（EXEC-006）。
     let materialize
-        (opening: OpeningPromptRaw)
+        (opening: OpeningMaterial)
         (frames: string list)
         (trace: XTraceItem list)
         (coverage: RecordCoverage)

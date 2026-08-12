@@ -105,9 +105,7 @@ module ManagedAgentConfig =
 
                     for name in ManagedAgent.requiredNames do
                         if firstError.IsNone then
-                            match ManagedAgent.tryParse name with
-                            | None -> firstError <- Some(InvalidManagedAgent(name, "failed to parse required name"))
-                            | Some managed ->
+                            if ManagedAgentCatalog.isBookkeeperName name then
                                 match agentEntry agents name with
                                 | None -> firstError <- Some(MissingManagedAgent name)
                                 | Some entry ->
@@ -115,13 +113,25 @@ module ManagedAgentConfig =
                                     | None -> firstError <- Some(MissingModel name)
                                     | Some model when String.IsNullOrWhiteSpace model ->
                                         firstError <- Some(EmptyModel name)
-                                    | Some model ->
-                                        bindings <-
-                                            Map.add
-                                                name
-                                                { Agent = managed
-                                                  Model = model.Trim() }
-                                                bindings
+                                    | Some _ -> ()
+                            else
+                                match ManagedAgent.tryParse name with
+                                | None -> firstError <- Some(InvalidManagedAgent(name, "failed to parse required name"))
+                                | Some managed ->
+                                    match agentEntry agents name with
+                                    | None -> firstError <- Some(MissingManagedAgent name)
+                                    | Some entry ->
+                                        match readModel entry with
+                                        | None -> firstError <- Some(MissingModel name)
+                                        | Some model when String.IsNullOrWhiteSpace model ->
+                                            firstError <- Some(EmptyModel name)
+                                        | Some model ->
+                                            bindings <-
+                                                Map.add
+                                                    name
+                                                    { Agent = managed
+                                                      Model = model.Trim() }
+                                                    bindings
 
                     match firstError with
                     | Some err -> Error(formatError err)
@@ -139,13 +149,29 @@ module ManagedAgentConfig =
                                     pairError <- Some(DuplicatePairModel(fastName, deepName, fast.Model))
                                 | _ -> ()
 
+                        if pairError.IsNone then
+                            let fastBk = ManagedAgentCatalog.bookkeeperNameOf AgentTier.Fast
+                            let deepBk = ManagedAgentCatalog.bookkeeperNameOf AgentTier.Deep
+
+                            match agentEntry agents fastBk, agentEntry agents deepBk with
+                            | Some fastEntry, Some deepEntry ->
+                                match readModel fastEntry, readModel deepEntry with
+                                | Some fastModel, Some deepModel when
+                                    not (String.IsNullOrWhiteSpace fastModel)
+                                    && not (String.IsNullOrWhiteSpace deepModel)
+                                    && fastModel.Trim() = deepModel.Trim()
+                                    ->
+                                    pairError <- Some(DuplicatePairModel(fastBk, deepBk, fastModel.Trim()))
+                                | _ -> ()
+                            | _ -> ()
+
                         match pairError with
                         | Some err -> Error(formatError err)
                         | None -> Ok { Bindings = bindings }
 
     /// Apply Wanxiangshu-owned non-model fields onto Host agent entries.
     /// Never creates missing agents, never writes/overwrites model.
-    /// Walks the full required 20-name inventory (not just validated bindings):
+    /// Walks the full required 22-name inventory (not just validated bindings):
     /// AGENT-007's first layer is fail-closed, so a validation failure elsewhere
     /// in the config must not silently drop every permission write. Missing
     /// agents stay untouched (no invented agents).
@@ -165,12 +191,24 @@ module ManagedAgentConfig =
 
                 for name in ManagedAgent.requiredNames do
                     if Array.contains name keys then
-                        match Map.tryFind name inventory.Bindings with
+                        match agentEntry agents name with
                         | None -> ()
-                        | Some binding ->
-                            match agentEntry agents name with
+                        | Some entry when ManagedAgentCatalog.isBookkeeperName name ->
+                            let owned =
+                                StaticTools.bookkeeperAgentConfig (PromptResources.loadBookkeeperSystem ())
+
+                            entry?mode <- owned?mode
+                            entry?permission <- owned?permission
+
+                            if not (isNull owned?hidden) then
+                                entry?hidden <- owned?hidden
+
+                            if not (isNull owned?prompt) then
+                                entry?prompt <- owned?prompt
+                        | Some entry ->
+                            match Map.tryFind name inventory.Bindings with
                             | None -> ()
-                            | Some entry ->
+                            | Some binding ->
                                 let role = binding.Agent.Role
                                 let prompts = RuntimeResources.current().Prompts
 
@@ -184,12 +222,11 @@ module ManagedAgentConfig =
                                         StaticTools.inspectorAgentConfig (Some prompts.InspectorSystemPrompt)
                                     | Role.DevOps -> StaticTools.devopsAgentConfig (Some prompts.DevopsSystemPrompt)
                                     | Role.Browser -> StaticTools.browserAgentConfig (Some prompts.BrowserSystemPrompt)
-                                    | Role.Meditator ->
-                                        StaticTools.meditatorAgentConfig (Some prompts.MeditatorSystemPrompt)
+                                    | Role.Inquiry -> StaticTools.inquiryAgentConfig (Some prompts.InquirySystemPrompt)
                                     | Role.Reviewer ->
                                         StaticTools.reviewerAgentConfig (Some prompts.ReviewerSystemPrompt)
                                     | Role.Blogger -> StaticTools.bloggerAgentConfig prompts.BloggerSystemPrompt
-                                    | Role.Executor -> StaticTools.executorAgentConfig prompts.ExecutorSystemPrompt
+                                    | Role.Distiller -> StaticTools.distillerAgentConfig prompts.DistillerSystemPrompt
 
                                 entry?mode <- owned?mode
                                 entry?permission <- owned?permission

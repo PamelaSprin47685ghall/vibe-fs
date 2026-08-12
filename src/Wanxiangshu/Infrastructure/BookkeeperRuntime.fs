@@ -17,7 +17,7 @@ type BookkeeperRequest =
     | CaseRefresh
     | CaseFinalize
 
-/// Physical Bookkeeper leaf: one CreateChildSession per transaction, edit-qa
+/// Physical Bookkeeper leaf: one CreateChildSession per transaction, js-bookkeeper
 /// against process-local staging, then AbortSession.
 module BookkeeperRuntime =
 
@@ -72,7 +72,7 @@ module BookkeeperRuntime =
         try
             PromptResources.loadBookkeeperSystem ()
         with _ ->
-            "Maintain staged Q/A via edit-qa only. Idle is allowed when evidence does not change the answer."
+            "Maintain staged Q/A via js-bookkeeper only. Idle is allowed when evidence does not change the answer."
 
     let private table (name: string) (fields: string list) : string =
         String.concat "\n" (("[" + name + "]") :: fields)
@@ -167,7 +167,7 @@ module BookkeeperRuntime =
           Agent = Some "fast-inspector"
           Directory = None
           Metadata = None
-          Tools = Some(Map.ofList [ "*", false; "edit-qa", true ]) }
+          Tools = Some(Map.ofList [ "*", false; "js-bookkeeper", true ]) }
 
     let private retire (sessions: ISessionHostPort) (childId: SessionId) : Task<unit> =
         task {

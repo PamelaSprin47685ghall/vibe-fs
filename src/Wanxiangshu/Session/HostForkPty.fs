@@ -11,9 +11,7 @@ open Wanxiangshu.Kernel.Identity
 module HostForkRuntimePty =
     type HostForkRuntime with
         member this.TrackPtyRun(id: PtyId) =
-            lock this.Gate (fun () ->
-                this.PtyRuns.Add id.Value |> ignore
-                this.LastPtyId <- Some id.Value)
+            lock this.Gate (fun () -> this.PtyRuns.Add id.Value |> ignore)
 
         member this.RegisterPtySnapshot (id: PtyId) (command: string) =
             this.Runtime.RegisterPty
@@ -23,7 +21,18 @@ module HostForkRuntimePty =
                   StartedAt = this.Now() }
 
         member this.UntrackPtyRun(id: string) =
-            lock this.Gate (fun () -> this.PtyRuns.Remove id |> ignore)
+            lock this.Gate (fun () ->
+                this.PtyRuns.Remove id |> ignore
+
+                let stale =
+                    this.TerminalByName
+                    |> Seq.filter (fun kv -> kv.Value = id)
+                    |> Seq.map (fun kv -> kv.Key)
+                    |> Seq.toList
+
+                for name in stale do
+                    this.TerminalByName.Remove name |> ignore)
+
             this.Runtime.UnregisterPty id
 
         member this.OwnsPty(id: PtyId) =
@@ -31,6 +40,28 @@ module HostForkRuntimePty =
 
         member this.IsPtyCompletion(runId: string) =
             lock this.Gate (fun () -> this.PtyRuns.Contains runId)
+
+        member this.TryBindTerminalName(name: string, id: PtyId) : Result<unit, string> =
+            if String.IsNullOrWhiteSpace name then
+                Error "Terminal name is required"
+            else
+                lock this.Gate (fun () ->
+                    match this.TerminalByName.TryGetValue(name.Trim()) with
+                    | true, existing when existing <> id.Value ->
+                        Error(sprintf "Terminal name '%s' is already in use" (name.Trim()))
+                    | _ ->
+                        this.TerminalByName.[name.Trim()] <- id.Value
+                        Ok())
+
+        member this.TryPtyByName(name: string) : PtyId option =
+            if String.IsNullOrWhiteSpace name then
+                None
+            else
+                lock this.Gate (fun () ->
+                    match this.TerminalByName.TryGetValue(name.Trim()) with
+                    | true, id when this.PtyRuns.Contains id && this.PtyPort.Known(PtyId.Create id) ->
+                        Some(PtyId.Create id)
+                    | _ -> None)
 
         member this.ForkPty(command: string, agent: ManagedAgent, ?cwd: string) : Task<Result<PtyId, string>> =
             task {
@@ -51,12 +82,7 @@ module HostForkRuntimePty =
 
         member this.TryPty(id: string) =
             if String.IsNullOrWhiteSpace id then
-                // 无 agent：作用于最近创建的 PTY（pty-stress 剧本的写/读/signal 语义）。
-                // `OwnsPty` 再查一次，防止 lastPtyId 指向已被 join 清掉的 PTY。
-                match this.LastPtyId with
-                | Some last when this.OwnsPty(PtyId.Create last) && this.PtyPort.Known(PtyId.Create last) ->
-                    Some(PtyId.Create last)
-                | _ -> None
+                None
             else
                 let candidate = PtyId.Create id
 

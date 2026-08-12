@@ -8,7 +8,7 @@ import {
   TddPhaseModule,
   BloggerTomlModule,
   BloggerDeltaModule,
-  ExecutorSummarize,
+  Distillation,
   TerminalValidity,
   ProcessRequest,
   FlowModule,
@@ -48,7 +48,7 @@ import { syntheticToml } from './context.mjs'
 export const forkChildPayload = (() => {
   const m = bind(ForkChildPayloadModule, 'ForkChildPayload', [
     'BaseInstructions',
-    'ParentWorkRecordInstruction',
+    'CommissionerRecordInstruction',
     'RequirementsInstruction',
     'render',
     'relay',
@@ -56,22 +56,23 @@ export const forkChildPayload = (() => {
 
   return {
     baseInstructions: listItems(m.BaseInstructions),
-    parentWorkRecordInstruction: m.ParentWorkRecordInstruction,
+    commissionerRecordInstruction: m.CommissionerRecordInstruction,
+    /** @deprecated use commissionerRecordInstruction */
+    parentWorkRecordInstruction: m.CommissionerRecordInstruction,
     requirementsInstruction: m.RequirementsInstruction,
 
-    render: ({ assignment, parentWorkRecord, originalUserRequirements = [], payload, tdd }) =>
+    render: ({ assignment, commissionerRecord, parentWorkRecord, originalUserRequirements = [], rootRequirements, payload }) =>
       m.render(
         new ForkChildPayloadModule.ForkChildAssignment(
           assignment,
-          parentWorkRecord,
-          toList(originalUserRequirements),
+          commissionerRecord ?? parentWorkRecord ?? undefined,
+          toList(rootRequirements ?? originalUserRequirements),
           payload,
-          tdd === undefined ? undefined : tddPhase.parse(tdd).value,
         ),
       ),
 
-    relay: (assignment, parentWorkRecord, requirements = [], payload) =>
-      m.relay(assignment, parentWorkRecord, toList(requirements), payload),
+    relay: (assignment, commissionerRecord, requirements = [], payload) =>
+      m.relay(assignment, commissionerRecord, toList(requirements), payload),
   }
 })()
 
@@ -101,21 +102,17 @@ export const tddPhase = (() => {
 })()
 
 /**
- * EXECUTOR-001: the plain-intent prompt composers for the Executor map/reduce path.
- *
- * `summarizeChunkPrompt` and `reduceBatchPrompt` are pure string → string functions: they
- * take an index/level and a content body and return the intent instruction only. The
- * actual chunk/combined content is carried by the fork envelope's `content` field.
+ * Distillation map/reduce: natural-language assignment prompts (no chunk index in wire).
  */
-export const executorSummarize = (() => {
-  const m = bind(ExecutorSummarize, 'ExecutorSummarize', [
-    'summarizeChunkPrompt',
-    'reduceBatchPrompt',
+export const distillation = (() => {
+  const m = bind(Distillation, 'Distillation', [
+    'distillFragmentPrompt',
+    'mergeDistillationsPrompt',
   ])
 
   return {
-    summarizeChunkPrompt: (index) => m.summarizeChunkPrompt(index),
-    reduceBatchPrompt: (level) => m.reduceBatchPrompt(level),
+    distillFragmentPrompt: () => m.distillFragmentPrompt(),
+    mergeDistillationsPrompt: () => m.mergeDistillationsPrompt(),
   }
 })()
 
@@ -273,12 +270,12 @@ export const forkRuntime = (() => {
 })()
 
 /**
- * ExecutorSummarize map/reduce: summarizeSpool cancels owned children on failure.
- * Fake IExecutorRuntime: Fork / JoinWithPermit / AwaitAgentWithPermit / CancelAgent.
+ * Distillation map/reduce: distillSpool cancels owned children on failure.
+ * Fake IDistillationRuntime: Fork / JoinWithPermit / AwaitAgentWithPermit / CancelAgent.
  * Permit-gated in production (requirePermit → HostForkRuntime).
  */
-export const executorSummarizeRuntime = (() => {
-  const summarizeSpool = member(ExecutorSummarize, 'ExecutorSummarize', 'summarizeSpool')
+export const distillationRuntime = (() => {
+  const distillSpool = member(Distillation, 'Distillation', 'distillSpool')
   const ForkResult = ForkTypesModule.ForkResult
   const ForkError = ForkTypesModule.ForkError
   if (ForkResult === undefined || ForkError === undefined) {
@@ -286,14 +283,14 @@ export const executorSummarizeRuntime = (() => {
   }
 
   return {
-    summarizeSpool: (runtime, spoolPath) => summarizeSpool(runtime, spoolPath),
+    distillSpool: (runtime, spoolPath) => distillSpool(runtime, spoolPath),
     /** Ok(ForkResult.Created agentId) */
     forkOk: (agentId) => okResult(new ForkResult(0, [agentId])),
     timedOut: () => errorResult(ForkError.TimedOut),
     /** Hard fail: FamilyBlocked / real join timeout → ForkError.NotFound (no Waiting retry). */
     notFound: (agentId = 'missing') => errorResult(new ForkError(4, [agentId])),
     /**
-     * Fake IExecutorRuntime. JoinWithPermit / AwaitAgentWithPermit return Promise of Result.
+     * Fake IDistillationRuntime. JoinWithPermit / AwaitAgentWithPermit return Promise of Result.
      * Default → TimedOut so await fails after fork.
      */
     fake: ({ fork, join, awaitAgent, awaitRecoveryReadiness, cancel } = {}) => {

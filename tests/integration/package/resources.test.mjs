@@ -15,10 +15,10 @@ const PROMPT_FILES = [
   'browser-system.md',
   'coder-system.md',
   'devops-system.md',
-  'executor-system.md',
+  'distiller-system.md',
   'inspector-system.md',
   'manager-system.md',
-  'meditator-system.md',
+  'inquiry-system.md',
   'orchestrator-system.md',
   'reviewer-system.md',
 ]

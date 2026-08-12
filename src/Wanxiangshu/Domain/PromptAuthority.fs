@@ -486,7 +486,7 @@ module PromptAuthority =
     let systemPromptIdFor (role: Role) : SystemPromptId = SystemPromptId.create (roleLabel role)
 
     /// STRENGTH-004 / PROMPT-008: the request-specific authority is exact, not
-    /// inferred by intersecting the ordinary role surface. Meditator is eligible
+    /// inferred by intersecting the ordinary role surface. Inquiry is eligible
     /// even though its ordinary WorkMain surface delegates reads through Inspector;
     /// Browser/Reviewer are intentionally ineligible despite having readonly tools.
     let private strengthReplicaReadonly =
@@ -497,12 +497,12 @@ module PromptAuthority =
         | Role.Coder
         | Role.Inspector
         | Role.DevOps
-        | Role.Meditator -> true
+        | Role.Inquiry -> true
         | Role.Manager
         | Role.Orchestrator
         | Role.Browser
         | Role.Reviewer
-        | Role.Executor
+        | Role.Distiller
         | Role.Blogger -> false
 
     /// AGENT-007: ordinary requests use role permissions; StrengthReplica uses
@@ -526,6 +526,10 @@ module PromptAuthority =
     /// that selects a side. Nothing is passed in that could be derived, so a
     /// caller cannot supply a CanonicalRole that disagrees with the agent name,
     /// or a tool set that disagrees with the role.
+    ///
+    /// FALLBACK-014 / AGENT-029: `EffectiveAgent` may move to PeerAgent on B-side;
+    /// `SystemPromptId`, SessionPersona and SessionProviderLanguage stay on
+    /// CanonicalRole + session bind-once — never on EffectiveAgent tier/name.
     ///
     /// That is the whole clause. The previous code assembled these fields from a
     /// mutable session cache, the last user message, a Role map and the fallback

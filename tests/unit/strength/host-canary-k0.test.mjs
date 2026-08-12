@@ -16,10 +16,11 @@ import * as Runtime from '../../../dist/Session/StrengthRuntime.js'
 import * as Association from '../../../dist/Journal/SessionAssociation.js'
 import { SatelliteKind } from '../../../dist/Journal/SessionAssociation.js'
 import { AttachmentKind, SessionExecutionClass } from '../../../dist/Kernel/SessionOwnership.js'
-import { AgentTier, Role, RoleDefinitions_promptFor, ToolPermission } from '../../../dist/Kernel/Roles.js'
+import { AgentTier, Role, ToolPermission } from '../../../dist/Kernel/Roles.js'
 import { SystemPromptIdModule_value as promptIdValue } from '../../../dist/Kernel/Identity.js'
 import * as Id from '../../../dist/Kernel/Identity.js'
 import { toArray as mapEntries } from '../../../dist/fable_modules/fable-library-js.5.13.0/Map.js'
+import { promptResources } from '../support/domain/prompt.mjs'
 
 const caseOf = (value) => value.cases()[value.tag]
 const permissionNames = (set) => [...set].map(caseOf).sort()
@@ -153,7 +154,7 @@ test('STRENGTH_004_005_policy_execution_gate_denies_write_edit_executor_fork_joi
     ToolPermission.Exec,
     ToolPermission.Fork,
     ToolPermission.Join,
-    ToolPermission.List,
+    ToolPermission.Horizon,
     ToolPermission.Network,
     ToolPermission.Pty,
   ]
@@ -161,7 +162,7 @@ test('STRENGTH_004_005_policy_execution_gate_denies_write_edit_executor_fork_joi
     assert.equal(allowed.has(caseOf(permission)), false, caseOf(permission))
   }
 
-  for (const tool of ['write', 'edit', 'executor', 'fork', 'join', 'network', 'bash']) {
+  for (const tool of ['write', 'edit', 'run', 'fork', 'join', 'network', 'bash', 'horizon']) {
     assert.equal(Frame.StrengthFrame_isAllowedTool(tool), false, tool)
   }
   assert.equal(Frame.StrengthFrame_isAllowedTool('read'), true)
@@ -186,7 +187,7 @@ test('STRENGTH_004_007_policy_same_role_prompt_has_no_replica_identity', () => {
   assert.equal(coderId, promptIdValue(systemPromptIdFor(Role.Coder)))
   assert.doesNotMatch(coderId, /strength|replica|prefetch/i)
 
-  const prompt = RoleDefinitions_promptFor(Role.Coder)
+  const prompt = promptResources.load().CoderSystemPrompt
   assert.doesNotMatch(prompt, /strength|replica|prefetch/i)
   assert.match(prompt, /Coder/)
 })

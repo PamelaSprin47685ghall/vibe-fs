@@ -1,15 +1,9 @@
-// tests/unit/tools/list-tool.test.mjs — ListTool: durable handle view joined with physical PTY records.
-//
-// Only the journal persistence plumbing is faked: `handleProjection` reads
-// `snapshot(journal).AgentProjections`, so the fake journal serves a projection
-// whose Handles cell is built with the REAL HandleProjection algebra. The
-// tool's own execute/agentEntry/ptyEntry code is production.
+// tests/unit/tools/list-tool.test.mjs — horizon(): natural-language roster, no id/status DTO.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { parse as parseToml } from 'smol-toml'
 
-import { completionKind, handleId, handleOwnership, handleProjection, roles, sessionId, toList } from '../support/domain.mjs'
+import { completionKind, handleId, handleProjection, roles, sessionId, toList } from '../support/domain.mjs'
 
 const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
 const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/ListTool.js')
@@ -24,6 +18,8 @@ const sessionMap = (entries) => mapOfList(entries, { Compare: compare })
 const context = (session = 'ses_list') => new HostToolContext(session, undefined, undefined, undefined, undefined, () => () => {})
 
 const PARENT = sessionId('ses_list')
+
+const FORBIDDEN = /\b(agent_id|session_id|pty_id|child_session_id|status|kind|ordinal|has_pending_completion|current_run_id|fallback_peer|tier|role)\s*=/
 
 const fakeJournal = (handles) => ({
   gate: { Enter: () => ({ Exit: () => {} }) },
@@ -53,7 +49,6 @@ const ptyRecord = (ptyId, command = 'ls -la') => ({
   StartedAt: new Date('2026-08-08T10:00:00.000Z'),
 })
 
-/** Fake ChildRun: ForkRuntime.List folds it through the REAL toRecord/status. */
 const runRecord = (agentId, overrides = {}) => ({
   AgentId: agentId,
   RunId: undefined,
@@ -96,7 +91,6 @@ const scopeFor = (journal, runtime) => {
   return scope
 }
 
-/** Real HostForkRuntime seeded with physical agents/ptys (List folds them). */
 const liveRuntime = ({ agents = [], ptys = [] } = {}) => {
   const runtime = new HostForkRuntime(
     sessionId('ses_list'),
@@ -122,23 +116,22 @@ const liveRuntime = ({ agents = [], ptys = [] } = {}) => {
   return runtime
 }
 
-const run = async (runtimeScope, session = 'ses_list') =>
-  parseToml(await spec(runtimeScope).Execute({}, context(session)))
+const run = async (runtimeScope, session = 'ses_list') => spec(runtimeScope).Execute({}, context(session))
 
-test('LIST_no_journal_reports_projection_unavailable', async () => {
+test('HORIZON_no_journal_reports_projection_unavailable', async () => {
   const scope = scopeFor(undefined, liveRuntime())
-  const result = await run(scope)
-  assert.equal(result.error, 'HandleProjection unavailable: durable journal is not configured')
+  const text = await run(scope)
+  assert.match(text, /HandleProjection unavailable/)
 })
 
-test('LIST_runtime_error_is_surfaced', async () => {
+test('HORIZON_runtime_error_is_surfaced', async () => {
   const scope = scopeFor(fakeJournal(handleProjection.empty), liveRuntime())
   scope.disposed = true
-  const result = await run(scope)
-  assert.equal(result.error, 'Tool runtime scope is disposed')
+  const text = await run(scope)
+  assert.match(text, /Tool runtime scope is disposed/)
 })
 
-test('LIST_lists_active_agent_with_runtime_join', async () => {
+test('HORIZON_lists_active_agent_and_open_terminals_in_natural_language', async () => {
   const handles = linked(handleId.agent('ag-1'), sessionId('child-1'), 'fast-coder', 'Coder')
   const scope = scopeFor(
     fakeJournal(handles),
@@ -147,66 +140,47 @@ test('LIST_lists_active_agent_with_runtime_join', async () => {
       ptys: [ptyRecord('pty-2', 'npm test'), ptyRecord('pty-1', 'tail -f')],
     }),
   )
-  const result = await run(scope)
-  const items = result.item ?? []
-  const agent = items.find((i) => i.kind === 'agent')
-  const ptys = items.filter((i) => i.kind === 'pty')
+  const text = await run(scope)
 
-  assert.equal(agent.agent_id, 'ag-1')
-  assert.equal(agent.child_session_id, 'child-1')
-  assert.equal(agent.status, 'busy')
-  assert.equal(agent.has_pending_completion, false)
-  assert.equal(agent.current_run_id, 'run-77')
-  assert.equal(agent.last_completion_status, undefined)
-  assert.equal(agent.agent, 'fast-coder')
-  assert.equal(agent.role, 'coder')
-  assert.equal(agent.tier, 'fast')
-  assert.equal(agent.fallback_peer, 'deep-coder')
-
-  assert.equal(ptys.length, 2, 'both ptys listed')
-  assert.equal(ptys[0].pty_id, 'pty-1', 'ptys sorted by id')
-  assert.equal(ptys[1].pty_id, 'pty-2')
-  assert.equal(ptys[0].command, 'tail -f')
-  const started = new Date('2026-08-08T10:00:00.000Z')
-  const offset = -started.getTimezoneOffset()
-  const pad = (n) => String(n).padStart(2, '0')
-  const expectedO = `${started.getFullYear()}-${pad(started.getMonth() + 1)}-${pad(started.getDate())}T${pad(started.getHours())}:${pad(started.getMinutes())}:${pad(started.getSeconds())}.${String(started.getMilliseconds()).padStart(3, '0')}${offset >= 0 ? '+' : '-'}${pad(Math.floor(Math.abs(offset) / 60))}:${pad(Math.abs(offset) % 60)}`
-  assert.equal(ptys[0].started_at, expectedO)
+  assert.match(text, /# fast-coder is still away\./)
+  assert.match(text, /# tail -f remains open\./)
+  assert.match(text, /# npm test remains open\./)
+  assert.ok(!FORBIDDEN.test(text))
 })
 
-test('LIST_completed_awaiting_join_handle_reports_status_and_pending', async () => {
+test('HORIZON_completed_awaiting_join_reports_returned', async () => {
   const handles = completed(linked(handleId.agent('ag-1'), sessionId('child-1'), 'fast-coder', 'Coder'), handleId.agent('ag-1'))
   const scope = scopeFor(fakeJournal(handles), liveRuntime())
-  const result = await run(scope)
-  const agent = result.item.find((i) => i.kind === 'agent')
-
-  assert.equal(agent.status, 'completed-awaiting-join')
-  assert.equal(agent.has_pending_completion, true)
+  const text = await run(scope)
+  assert.match(text, /# fast-coder has returned\./)
+  assert.ok(!FORBIDDEN.test(text))
 })
 
-test('LIST_active_agent_without_runtime_defaults_to_running', async () => {
+test('HORIZON_active_agent_without_runtime_defaults_to_still_away', async () => {
   const handles = linked(handleId.agent('ag-2'), sessionId('child-2'), 'fast-coder', 'Coder')
   const scope = scopeFor(fakeJournal(handles), liveRuntime())
-  const result = await run(scope)
-  const agent = result.item.find((i) => i.kind === 'agent')
-  assert.equal(agent.agent_id, 'ag-2')
-  assert.equal(agent.status, 'running')
-  assert.equal(agent.has_pending_completion, false)
+  const text = await run(scope)
+  assert.match(text, /# fast-coder is still away\./)
+  assert.ok(!FORBIDDEN.test(text))
 })
 
-test('LIST_unmanaged_target_agent_renders_bare_identity', async () => {
+test('HORIZON_unmanaged_target_agent_renders_bare_identity', async () => {
   const handles = linked(handleId.agent('ag-3'), sessionId('child-3'), 'some-raw-agent', 'DevOps')
   const scope = scopeFor(fakeJournal(handles), liveRuntime())
-  const result = await run(scope)
-  const agent = result.item.find((i) => i.kind === 'agent')
-  assert.equal(agent.agent, 'some-raw-agent')
-  assert.equal(agent.role, 'devops')
-  assert.equal(agent.tier, undefined)
+  const text = await run(scope)
+  assert.match(text, /# some-raw-agent is still away\./)
+  assert.ok(!FORBIDDEN.test(text))
 })
 
-test('LIST_empty_journal_lists_only_ptys', async () => {
-  const scope = scopeFor(fakeJournal(handleProjection.empty), liveRuntime({ ptys: [ptyRecord('pty-9')] }))
-  const result = await run(scope)
-  assert.equal(result.item.length, 1)
-  assert.equal(result.item[0].kind, 'pty')
+test('HORIZON_empty_journal_lists_only_ptys', async () => {
+  const scope = scopeFor(fakeJournal(handleProjection.empty), liveRuntime({ ptys: [ptyRecord('pty-9', 'watch logs')] }))
+  const text = await run(scope)
+  assert.match(text, /# watch logs remains open\./)
+  assert.ok(!text.includes('fast-coder'))
+})
+
+test('HORIZON_empty_roster_has_quiet_instruction', async () => {
+  const scope = scopeFor(fakeJournal(handleProjection.empty), liveRuntime())
+  const text = await run(scope)
+  assert.match(text, /Nothing beyond your immediate sight/)
 })

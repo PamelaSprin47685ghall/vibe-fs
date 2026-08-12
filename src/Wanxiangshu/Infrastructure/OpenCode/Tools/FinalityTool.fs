@@ -21,12 +21,8 @@ open Wanxiangshu.Tools
 /// (GLORY-038/039).
 module FinalityTool =
 
-    /// GLORY-062 + SURFACE-004: the frozen second-suicide tool result. The
-    /// Manager's next accepted ending is final.
-    let RestInPeaceInstructions =
-        [ "rest in peace"
-          "Terminate the conversation now."
-          "Do not call any more tools or continue working." ]
+    /// GLORY-062/076 + §9.2.4: at-rest second-suicide tool result owner.
+    let RestInPeaceInstructions = FinalityPrompt.restInstructions
 
     let private tString = ToolHostCodec.TString
 
@@ -64,7 +60,7 @@ module FinalityTool =
         FinalityHostPort.create
             scope
             sessionId
-            (defaultArg scope.FinalityReviewerTimeoutMs ExecutorSummarize.AwaitAgentTimeoutMs)
+            (defaultArg scope.FinalityReviewerTimeoutMs Distillation.AwaitAgentTimeoutMs)
 
     let private treeOf (scope: ToolRuntimeScope) (sessionId: string) =
         match scope.TreePortFor sessionId with

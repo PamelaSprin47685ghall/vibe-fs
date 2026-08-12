@@ -50,24 +50,28 @@ Seal 类型与绑定流程见 `how/review.md`。
 
 ## REVIEW-012：Reviewer 提示词资源权威来源
 
-Reviewer 角色的系统提示词由 `resources/prompts/reviewer-system.md` 静态资源权威承载，在 Session 加载时作为 Reviewer 系统的 System Prompt，负责向模型灌输 REVIEW-011 的 8 大代码质量支柱与工具规范。
+Reviewer 角色的系统提示词由 `resources/prompts/reviewer-system.md` 静态资源权威承载，在 Session 加载时作为 Reviewer 系统的 System Prompt，负责向模型灌输 REVIEW-011 Examiner's Ledger 判断方向与工具规范。  
+Persona（Examiner/Auditor）session 创建一次绑定（AGENT-028）；本域不因 Fallback/Strength 重写。
 
-双 PERFECT 流程不得写入 Reviewer 提示词（REVIEW-003）：屏障由 Host 侧执行，Reviewer 只需针对当前 tree 给出独立 verdict；提前告知流程会诱导模型自行扮演确认方。
+双 PERFECT 流程不得写入 Reviewer 提示词（REVIEW-003）：屏障由 Host 侧执行，Reviewer 只需针对当前 tree 给出独立判断；提前告知流程会诱导模型自行扮演确认方。  
+禁止 formal report schema / 固定八段标题 / Pass 表（REVIEW-011）。
 
-TodoProcessReview 的 assignment instruction 由 Host 按 RequestKind 注入（过程一次 verdict、有界 LWR 输入、old/proposed todo）；不得把 Finality challenge/2N/cohort 编排写入过程 prompt，也不得要求 Reviewer 描述隐藏 session / barrier / 消费方（REVIEW-013，TODO-013）。
+TodoProcessReview 的 assignment instruction 由 Host 按 RequestKind 注入（过程一次判断、有界 LWR 输入、old/proposed todo）；不得把 Finality challenge/2N/cohort 编排写入过程 prompt，也不得要求 Reviewer 描述隐藏 session / barrier / 消费方（REVIEW-013，TODO-013）。
 
 ## 模块所有权（过程 / 终末）
 
 | 职责 | Owner | 边界 |
 |------|-------|------|
-| Verdict 工具与 Reviewer 域 durable verdict | 既有 Reviewer / Journal | `VerdictKnown` 复用此域；不另造 Magic Todo Stage（REVIEW-014，TODO-012） |
+| `judge` 工具（旧名 `verdict` 非法） | Reviewer tool surface | 参数字段 `verdict` 保留；成功回执不 echo；描述归 prose / WorkRecord |
+| Reviewer 域 durable verdict | 既有 Reviewer / Journal | `VerdictKnown` 复用此域；不另造 Magic Todo Stage（REVIEW-014，TODO-012） |
 | `TodoProcessReviewAssigned` / `TodoReviewConcluded` | Magic Todo journal facts（TODO-006） | Concluded 仅 record-ready 后 append |
 | Dedicated enlist / replace | Host-owned hidden runtime + durable facts | Manager handle 面不可见（REVIEW-015/019，TODO-008/013，GLORY-002） |
 | Process ensureReview / assignment | Host process-review orchestrator | 幂等重入；与 FinalityController 分型 |
 | Finality cohort / dual-PERFECT / Rejected | `FinalityController` + REVIEW-003/006 | process PERFECT 不入 witness（TODO-010，GLORY-058） |
 | Canonical LWR materialize | 既有 LWR planner（可 `range` 扩展） | 禁止第二 renderer（REVIEW-016，TODO-008/012） |
 | Safety seal（Manager-facing LWR） | 与 Finality 相同 seal 路径 | 不清洗；不能证明安全则 fail closed（TODO-013） |
-| Manager 可见过程报告 | todowrite tool result / suicide 返回 | 仅 verdict + WorkRecordRef 内容；无内部 id（TODO-013） |
+| Manager 可见过程报告 | todowrite tool result / suicide 返回 | 仅 PERFECT/REVISE + WorkRecordRef 内容；无内部 id（TODO-013） |
+| `HostReviewGuard` | Reviewer 面 transport（openBarrier/read/`judge`） | Manager 面已删（GLORY-070）；不得再写 `verdict` 工具名 |
 | Prefix rebase | context / todo（TODO-009） | 本域不拥有 epoch commit |
 
 ## RequestKind 与 controller 边界

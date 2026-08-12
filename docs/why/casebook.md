@@ -4,7 +4,9 @@ Inspector 的一次调用天然形成知识单元（Question → 调查 → Answ
 
 fetch 不直接信任旧答案：observation replay 只是 freshness hint，任何 merge 标量或 EventStore 物理顺序都不证明答案正确（no-delta 只是 hint）。检测到变化时启动私有 Bookkeeper Agent 修订 Q/A；失败保留旧 Case 返回旧 A——允许过时是预期产品语义。
 
-Casebook 不拥有独立 durable store：Case 事实以 InspectorCase* events 表达，Q/A/snapshot 大正文经 PayloadRef 进入统一 payloads；物理耐久与同步落在统一 EventStore（Persist/GitGateway）。replica 收敛 = EventStore 集合并；同 Case 合法并发 fork 由投影表达为 DomainConflict——禁止 (revision, wall_clock) LWW。
+Bookkeeper 的工作是重塑已供给证据上的一个 staged Case，不是再进仓库取证。Provider 工具是 `js-bookkeeper(program)`：一次程序原子变换 Case（`setQuestion`/`setAnswer` 各至多一次，zero mutation 合法），拒 `edit-qa(document, old_text, new_text)` 把 Case 拆成两份文档竞态改字符串。Persona = Clerk/Curator；机器强度 id 为 `fast-bookkeeper`/`deep-bookkeeper`（可复用 inspector 模型绑定，不复用 Inspector self-model）。拒借用 Scout/Investigator 自我模型——那会诱导 Bookkeeper 假装拥有调查权。
+
+Casebook 不拥有独立 durable store：Case 事实以 InspectorCase* events 表达，Q/A/snapshot 大正文经 PayloadRef 进入统一 payloads；物理耐久与同步落在统一 EventStore（Persist/GitGateway）。replica 收敛 = EventStore 集合并；同 Case 合法并发 fork 由投影表达为 DomainConflict——禁止 (revision, wall_clock) LWW。Provider 可见 index 只暴露 shelfmark + canonical Q，不泄漏 session/status/freshness 机器字段。
 
 ## 备选与被拒
 
@@ -19,3 +21,7 @@ Casebook 不拥有独立 durable store：Case 事实以 InspectorCase* events �
 **full knowledge base vs best-effort cache。** 拒前者：Casebook 不保证历史 Q/A 可追溯为产品 API，不建立 commit history，不改变 subject worktree（CASE-001/002）。
 
 **无 marker 也运行 vs 完全 opt-in。** 拒 opt-out：未启用 repository 的行为必须与现状逐字节一致；marker 缺失时工具 schema、执行 registry、archive 全部静默消失（CASE-009）。
+
+**Case 编辑：`edit-qa` 双文档字符串替换 vs `js-bookkeeper` 单程序。** 拒前者：Q/A 分文件竞态、多次短语编辑无法保证 Case 仍描述同一世界。选一次 JS 程序原子重塑；Bookkeeper 先作语义判断，程序只执行一致变换。
+
+**Persona：借用 Inspector self-model vs Clerk/Curator。** 拒借用：调查自我模型暗示可回世界取证，破坏「证据已供给」边界。选独立 Clerk/Curator；机器 id `fast-bookkeeper`/`deep-bookkeeper`（OPEN frozen），模型绑定可复用、自我模型不可复用。

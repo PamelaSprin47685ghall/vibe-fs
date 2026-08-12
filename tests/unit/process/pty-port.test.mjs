@@ -33,7 +33,7 @@ const { PtyId_Create_Z721C83C5, PtyId__get_Value, PtyCommand, PtySignal } = awai
 )
 
 const id = (v) => PtyId_Create_Z721C83C5(v)
-const agent = { Name: 'fast-executor' }
+const agent = { Name: 'fast-distiller' }
 const bytes = new TextEncoder().encode('hi')
 const write = new PtyCommand(1, [bytes])
 const signalOf = (s) => new PtyCommand(3, [s])

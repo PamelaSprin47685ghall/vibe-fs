@@ -9,13 +9,13 @@ open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Process
 open Wanxiangshu.Session
 
-/// Private mailbox surface: fork Executor + permit-gated Join. Never Manager Join.
-module ExecutorSummarizeRuntime =
+/// Private mailbox surface: fork Distiller + permit-gated Join. Never Manager Join.
+module DistillationRuntime =
 
     /// Fresh FamilyRecoveryPermit per join (map/reduce mutates family → digest).
     type RequirePermit = unit -> Task<Result<FamilyRecoveryPermit, string>>
 
-    type IExecutorRuntime =
+    type IDistillationRuntime =
         abstract Fork: string * Role * string * string option -> Task<Result<ForkResult, string>>
         /// Agent join: require fresh permit → HostForkRuntime.JoinWithPermit. No bare Join.
         abstract JoinWithPermit: timeoutMs: int option -> Task<Result<RunCompletion, ForkError>>
@@ -28,19 +28,19 @@ module ExecutorSummarizeRuntime =
         /// Cancel one owned map/reduce agent without tearing down the runtime.
         abstract CancelAgent: agentId: string -> unit
 
-    /// AGENT-008: the Executor is internal, so its managed name is fixed here
+    /// AGENT-008: the Distiller is internal, so its managed name is fixed here
     /// rather than chosen by a caller. This is the one legitimate place a name is
     /// derived from a role — the role is a constant, not an inference.
-    let private executorAgent = ManagedAgent.nameOf AgentTier.Fast Role.Executor
+    let private distillerAgent = ManagedAgent.nameOf AgentTier.Fast Role.Distiller
 
-    let asExecutorRuntime
+    let asDistillationRuntime
         (runtime: HostForkRuntime)
         (journal: AgentJournal)
         (requirePermit: RequirePermit)
-        : IExecutorRuntime =
-        { new IExecutorRuntime with
+        : IDistillationRuntime =
+        { new IDistillationRuntime with
             member _.Fork(agentId, role, prompt, payload) =
-                runtime.Fork(agentId, role, executorAgent, prompt, payload)
+                runtime.Fork(agentId, role, distillerAgent, prompt, payload)
 
             member _.JoinWithPermit(timeoutMs) =
                 task {
@@ -60,7 +60,7 @@ module ExecutorSummarizeRuntime =
                 task {
                     match! requirePermit () with
                     | Error msg when msg.StartsWith("RECOVERY_WAITING:", System.StringComparison.Ordinal) ->
-                        // FamilyWaiting → TimedOut. ExecutorSummarize.awaitAgentWithPermit
+                        // FamilyWaiting → TimedOut. Distillation.awaitAgentWithPermit
                         // throttle-retries within AwaitAgentTimeoutMs; NotFound is hard fail.
                         return Error ForkError.TimedOut
                     | Error msg -> return Error(ForkError.NotFound msg)
@@ -80,8 +80,8 @@ module ExecutorSummarizeRuntime =
 
     /// Pure ForkRuntime has no journal → cannot hold FamilyRecoveryPermit.
     /// Fail closed; do not mint a synthetic permit for mailbox-only join.
-    let ofForkRuntime (_runtime: ForkRuntime) : IExecutorRuntime =
-        { new IExecutorRuntime with
+    let ofForkRuntime (_runtime: ForkRuntime) : IDistillationRuntime =
+        { new IDistillationRuntime with
             member _.Fork(_agentId, _role, _prompt, _payload) =
                 task {
                     return

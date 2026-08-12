@@ -5,7 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 
-/// AGENT-028: env → launch decision → Host `config.mcp.sphinx`.
+/// AGENT-030: env → launch decision → Host `config.mcp.sphinx`.
 module SphinxMcpConfig =
 
     /// Sphinx-only launch (local node entry). Not shared McpLaunch — avoids uvx case pollution.

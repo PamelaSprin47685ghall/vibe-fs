@@ -31,11 +31,12 @@ const ROLES = [
   'Coder',
   'Inspector',
   'Browser',
-  'Meditator',
+  'Inquiry',
   'Reviewer',
   'DevOps',
-  'Executor',
+  'Distiller',
   'Blogger',
+  'Bookkeeper',
 ]
 const TIERS = ['fast', 'deep']
 const agentName = (tier, role) => `${tier}-${role.toLowerCase()}`

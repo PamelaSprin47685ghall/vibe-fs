@@ -25,7 +25,6 @@ import {
 import {
   SyncDelegateRuntime,
   SyncDelegateRuntime__Invoke_1B1DD6DD as invoke,
-  SyncDelegateRuntime__Return_Z65460A0C as returnAnswer,
   SyncDelegateRuntime__HandleTurn_Z7791586C as handleTurn,
   SyncDelegateRuntime__Dispose as disposeRuntime,
 } from '../../../dist/Session/SyncDelegateRuntime.js'
@@ -201,11 +200,25 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
 }
 
 const settlePendingInvoke = async (runtime, { appendAssistantFromReturn }, delegateKey, role, answer, runId) => {
-  const returned = resultOf(await returnAnswer(runtime, delegateKey, providerRun(runId), answer))
-  assert.equal(returned.ok, true, returned.ok ? '' : returned.error)
   appendAssistantFromReturn(delegateKey, answer)
-
-  const handled = await handleTurn(runtime, completionTurn(delegateKey, role), undefined)
+  const handled = await handleTurn(
+    runtime,
+    new ReconciledTurn(
+      sessionId(delegateKey),
+      physicalUser('msg_phys_turn'),
+      authorityRoot('msg_root_turn'),
+      providerRun(runId),
+      role,
+      undefined,
+      [reconcileSupervisor.textPart(answer)],
+      'stop',
+      undefined,
+      undefined,
+      TurnOutcome.TurnCompleted,
+      undefined,
+    ),
+    undefined,
+  )
   assert.equal(handled, true)
 }
 
@@ -257,17 +270,9 @@ test('G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix', async () => {
     assert.equal(captures[1].modelId, INSPECTOR_MODEL_ID)
 
     let q2Settled = false
-    let q2Result
-    q2.then((value) => {
+    q2.then(() => {
       q2Settled = true
-      q2Result = value
     })
-
-    const returned = resultOf(await returnAnswer(runtime, delegateId, providerRun('asst_q2'), answers[1]))
-    assert.equal(returned.ok, true, returned.ok ? '' : returned.error)
-    await new Promise((resolve) => setImmediate(resolve))
-    await new Promise((resolve) => setImmediate(resolve))
-    assert.equal(q2Settled, false, 'reuse dual-await: Return must not settle Invoke before TurnCompleted')
 
     const earlyQ3 = resultOf(await invoke(runtime, owner, SyncDelegateRole.Inspector, questions[2]))
     assert.equal(earlyQ3.ok, false)
@@ -275,11 +280,9 @@ test('G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix', async () => {
     assert.equal(createCalls.length, 1)
     assert.equal(captures.length, 2)
 
-    harness.appendAssistantFromReturn(delegateId, answers[1])
-    const handled = await handleTurn(runtime, completionTurn(delegateId, inspector), undefined)
-    assert.equal(handled, true)
+    await settlePendingInvoke(runtime, harness, delegateId, inspector, answers[1], 'asst_q2')
     await waitFor(() => q2Settled, 'Q2 Invoke did not complete after TurnCompleted')
-    const q2Done = resultOf(q2Result)
+    const q2Done = resultOf(await q2)
     assert.equal(q2Done.ok, true)
     assert.equal(q2Done.value, answers[1])
 

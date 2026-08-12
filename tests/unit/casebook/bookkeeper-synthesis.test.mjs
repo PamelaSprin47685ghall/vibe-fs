@@ -120,7 +120,7 @@ test('CASE006_synthesizer_runs_once_per_stale_refresh', async () => {
     assert.equal(refreshed.ok, true)
     assert.equal(refreshed.value, true)
     assert.equal(createCalls.length, 1, 'exactly one child session per refresh')
-    assert.equal(editQaCalls.length >= 2, true, 'edit-qa invoked')
+    assert.equal(editQaCalls.length >= 2, true, 'js-bookkeeper invoked')
   } finally {
     resetSessionPort()
     rmSync(dir, { recursive: true, force: true })
@@ -190,7 +190,7 @@ test('CASE010_cleanup_never_synthesizes', async () => {
     cleanupInspector(sessionIdKey)
 
     assert.equal(createCalls.length, 0, 'unexpected cleanup must not CreateChildSession')
-    assert.equal(editQaCalls.length, 0, 'unexpected cleanup must not run edit-qa')
+    assert.equal(editQaCalls.length, 0, 'unexpected cleanup must not run js-bookkeeper')
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)

@@ -392,19 +392,16 @@ test('EXEC_004_a_retirement_without_a_completion_stops_the_replay', () => {
   assert.notEqual(folded.error.Reason, foldFacts([handleFact.completed]).error.Reason)
 })
 
-// ── EXEC-011: the deadline is min(3 × estimate, administrator ceiling) ───────
+// ── EXEC-011: the deadline is min(estimate, administrator ceiling) ───────────
 
-test('EXEC_011_the_model_estimate_is_tripled_and_capped_by_the_hard_limit', () => {
+test('EXEC_011_the_model_estimate_is_capped_by_the_hard_limit', () => {
   const hourMs = processEstimate.defaultHardLimitMs
   assert.equal(hourMs, 3_600_000, 'the default ceiling is one hour')
 
-  // Under the ceiling: three times the estimate.
-  assert.equal(processEstimate.effectiveDeadlineMs(10, hourMs), 30_000)
-  assert.equal(processEstimate.effectiveDeadlineMs(600, hourMs), 1_800_000)
-
-  // Over it: the administrator wins. An LLM estimate may not breach the ceiling.
+  assert.equal(processEstimate.effectiveDeadlineMs(10, hourMs), 10_000)
+  assert.equal(processEstimate.effectiveDeadlineMs(600, hourMs), 600_000)
   assert.equal(processEstimate.effectiveDeadlineMs(3_600, hourMs), hourMs)
-  assert.equal(processEstimate.effectiveDeadlineMs(10, 15_000), 15_000)
+  assert.equal(processEstimate.effectiveDeadlineMs(10, 15_000), 10_000)
 })
 
 test('EXEC_011_a_nonsense_estimate_falls_back_to_the_hard_limit', () => {
@@ -502,13 +499,10 @@ test('ENFORCER_stopPhysicalRun_argument_order_is_messages_then_fallback', () => 
   )
 })
 
-test('EXEC_012_the_output_threshold_is_tripled_and_saturates_instead_of_overflowing', () => {
-  assert.equal(processEstimate.outputThreshold(1_000), 3_000n)
+test('EXEC_012_the_output_threshold_uses_provider_willingness_at_face_value', () => {
+  assert.equal(processEstimate.outputThreshold(1_000), 1_000n)
   assert.equal(processEstimate.outputThreshold(0), 0n)
-
-  // A hostile or absurd estimate must not wrap around into a small threshold.
-  const int64Max = 9_223_372_036_854_775_807n
-  assert.equal(processEstimate.outputThreshold(int64Max / 2n), int64Max)
+  assert.equal(processEstimate.outputThreshold(9_223_372_036_854_775_807n), 9_223_372_036_854_775_807n)
 })
 
 test('EXEC_011_a_deadline_is_a_point_in_time_not_a_remaining_duration', () => {
@@ -596,14 +590,14 @@ test('EXEC_008_child_background_uses_latest_durable_snapshot', () => {
   const lwrSnapshot = 'LWR snapshot at turn 9'
   const rendered = forkChildPayload.render({
     assignment: 'Summarize the output',
-    parentWorkRecord: lwrSnapshot,
-    originalUserRequirements: [],
+    commissionerRecord: lwrSnapshot,
+    rootRequirements: [],
     payload: undefined,
   })
 
   assert.equal(rendered.includes(lwrSnapshot), true)
-  assert.equal(rendered.includes(forkChildPayload.parentWorkRecordInstruction), true)
-  assert.equal(rendered.includes('parent_work_record'), true)
+  assert.equal(rendered.includes(forkChildPayload.commissionerRecordInstruction), true)
+  assert.equal(rendered.includes('parent_work_record'), false)
 })
 
 // ── EXEC-009: durable completion payload on the lifecycle ────────────────────

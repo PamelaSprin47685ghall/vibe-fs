@@ -1,6 +1,6 @@
 # Sphinx — 证明
 
-行为：`what/sphinx.md`。边界：`shape/sphinx.md`。算法：`how/sphinx.md`。Host：AGENT-028。
+行为：`what/sphinx.md`。边界：`shape/sphinx.md`。算法：`how/sphinx.md`。Host：AGENT-030。
 
 ## Phase 0 内核
 
@@ -20,14 +20,14 @@
 | 证明 | 期望 | 条款 |
 |------|------|------|
 | Sphinx 不依赖万象术 domain | `src/sphinx` 无万象术 domain import | SPHINX-005 |
-| 万象术不内嵌闭包 | Host/Kernel 无 EpistemicState Closure 副本 | SPHINX-005、AGENT-028 |
-| config 注入 | `configureFromHostConfig` 写入 `mcp.sphinx`；不删其它 MCP | AGENT-028 |
-| 启动判定 | disabled / fixture / test / 生产 node 入口四分支确定性 | AGENT-028 |
-| Meditator allow | Meditator allow `sphinx_*`；其它 managed role deny | AGENT-006、028 |
-| 不进 ToolRegistry / js-* | plugin tool 注册表无 sphinx 名 | AGENT-028、SPHINX-005 |
+| 万象术不内嵌闭包 | Host/Kernel 无 EpistemicState Closure 副本 | SPHINX-005、AGENT-030 |
+| config 注入 | `configureFromHostConfig` 写入 `mcp.sphinx`；不删其它 MCP | AGENT-030 |
+| 启动判定 | disabled / fixture / test / 生产 node 入口四分支确定性 | AGENT-030 |
+| Inquiry allow | Inquiry allow `sphinx_*`；其它 managed role deny | AGENT-006、030 |
+| 不进 ToolRegistry / js-* | plugin tool 注册表无 sphinx 名 | AGENT-030、SPHINX-005 |
 | AGENT-027 不变 | Semble 路径仍禁止新增 MCP SDK；Sphinx 路径可用 | AGENT-027、SPHINX-005 |
 
 代表测试（落地后）：`tests/unit/sphinx/*.test.mjs`（闭包、handle、start→resume→answer）、
-`tests/unit/agent/sphinx-mcp.test.mjs`（注入 / disabled / fixture / Meditator allow）；
+`tests/unit/agent/sphinx-mcp.test.mjs`（注入 / disabled / fixture / Inquiry allow）；
 可选 fixture：`tests/unit/support/sphinx-mcp-fixture.js`。
 门禁：`node scripts/checks/spec.mjs` 识别 `SPHINX-`。

@@ -23,7 +23,7 @@ Host 上的 `role=user` 只是运输格式。下列内容都不是 Authority 身
 Authority Root 独有权限：
 
 1. 创建新的 Logical Run  
-2. 选择或改变 SelectedAgent（并确定 PeerAgent / CanonicalRole / SelectedTier）  
+2. 选择或改变 SelectedAgent（并确定 PeerAgent / CanonicalRole / SelectedTier / ExecutionBinding）  
 3. 成为新的 Fallback root  
 4. 重置 Interaction Repair 预算  
 5. 成为后续缺省 SelectedAgent 的延续来源  
@@ -31,7 +31,10 @@ Authority Root 独有权限：
 Authority Root **不得**：
 
 - 改变 Companion 关联（COMPANION-002：Session 结构事实）  
-- 选择或覆盖 model ID（发送时始终 `Model = None`）
+- 选择或覆盖 model ID（发送时始终 `Model = None`）  
+- 重绑或改写 SessionPersona（AGENT-028/029；PROMPT-014：Persona 在 session 创建时一次冻结）
+
+SelectedAgent / ExecutionBinding 的变化（含 Peer Fallback、Strength）**只**改执行绑定；Persona 与 system prompt 身份字节不变。
 
 ## PROMPT-003：Continuation 的禁区
 
@@ -157,19 +160,23 @@ then MagicTodoManagerGuideline
 
 禁止把 Magic Todo 文案并入 `ProjectionConstants.PairProgrammingGuidelineText` 或对其它角色投影。
 
-`MagicTodoManagerGuideline` 冻结语义（全文 owner 见 TODO-013；协议本体见 TODO-001）：
+`MagicTodoManagerGuideline` 冻结语义（全文 owner 见 TODO-013/015；协议本体见 TODO-001/002）：
 
 ```text
-Keep the todo list continuously accurate with todowrite.
-Planning and execution are one continuous activity.
-Do not stop for a separate planning-only phase.
+Keep the mission's living obligations truthful with todowrite.
+Planning and execution are one continuous activity after entrustment.
+Do not stop for a separate Activation / system-prompt phase.
 Update todowrite when truthful decomposition / discovered work / progress changes.
-kind:"existing" reuses exact id; kind:"new" omits id.
-A todo must pass through reviewing before completed.
+obligations: [{ name, work }]; name stable while same obligation.
+Do not remove an obligation merely to make the road look shorter.
+Do not preserve an obligation after the work has genuinely discharged it.
 Continue independent next-stage work while prior checkpoint is reviewed.
 Each accepted todowrite consumes the preceding checkpoint review and starts the next.
 Do not emit multiple todowrite calls in the same assistant message.
+BlindPlan T1 = first accepted todowrite; revelation is conversation tool result only.
 ```
+
+Pre-T1 Planning Table / T1 revelation / Living Mission 分属 TODO-015；不得经 Prompt 路径伪造 Activation。
 
 ### 可见 / 禁止 surface（与 GLORY-030 窄例外对齐）
 
@@ -193,3 +200,113 @@ GLORY-030 / SURFACE-005 以本条 + TODO-013 为唯一允许的 PERFECT/REVISE/r
 
 V2 `todowrite` schema / description owner 见 TODO-002；admission 与 V2 hook 门禁见 TODO-004。  
 不得经 Prompt 路径伪造 checkpoint、ConsumableReview 或 PrefixEpoch。
+
+## PROMPT-014：System prompt 稳定性与 Persona 冻结
+
+```text
+SessionPersona          session 创建一次绑定，不可变（AGENT-028）
+office system prompt    同一 Life 内 byte-identical（GLORY-075）
+SessionProviderLanguage session 创建绑定，不可变（PROMPT-017）
+ExecutionBinding        可随 Peer Fallback / Strength 变化
+```
+
+禁止因下列事件改写 system prompt 字节或重绑 Persona：
+
+```text
+BlindPlan T1 / entrustment revelation
+Planning → Working（已删除）
+Peer Fallback / Strength replica
+process review / Finality
+Host compaction / reanchor / recovery
+```
+
+`The system prompt names the office. The conversation tells you which road is yours.`  
+T1 revelation 只走 conversation tool result（TODO-015）。  
+SelectedAgent / Binding 变化 ≠ 换人；不得把 Binding 名冒充 Persona 自称（AGENT-029）。
+
+## PROMPT-015：Prompt Composition Protocol
+
+万象术没有单一 system prompt；每个 provider-facing 自然语言材料恰属一个主权威：
+
+```text
+World    what is universally true here          → Common Law + shared mythology
+Role     who you are and what belongs to you    → Role Law（fast/deep 共享）
+Library  inherited technical knowledge          → Office Library（PROMPT-016）
+Runtime  what is true about this invocation now
+Mission  what must become true in this assignment
+```
+
+Canonical composition（概念顺序 ≠ wire）：
+
+```text
+SYSTEM: Common Law → Role Law → Office Library
+TOOLS:  current generated tool surface
+RUNTIME / CONVERSATION: lifecycle and event-driven injections
+USER / ASSIGNMENT: current mission
+```
+
+层可互相告知，不得互相冒充。冲突按语义所有权边界裁决，**不**设「更靠近 system 者胜」全序。  
+Tools 不是 Role Prompt 章节：capability 变化不改人格；拥有 tool ≠ 获 authority。
+
+六种生命周期文本只 orient，不 educate，不叠第二套 envelope：
+
+```text
+Activation / Reawakening / Continuation / Handoff / Fission / Departure
+```
+
+generic Activation ≠ Manager BlindPlan phase；不得触发 system prompt 替换（TODO-015）。  
+语言资产须有稳定 semantic identity；文件名只存 localized authored representation。
+
+## PROMPT-016：Office Library
+
+Office Library = 角色继承的技术书籍集合。保存职位历代 craft；**不是** Common Law，不定义角色 authority。
+
+```text
+Law tells you what must remain true.
+Role tells you what is yours to decide.
+Books teach you how predecessors learned to do it well.
+The assignment tells you what must become true now.
+```
+
+`Information may cross authority boundaries. Authority does not travel with it.`
+
+三条独立轴：Normative Class × Delivery Mode × Audience。  
+Class：Rulebook / Handbook / Ledger / Atlas / Field Notes。  
+Delivery：Inherited Volume / Triggered Folio / Request-Bound Volume。  
+Audience 绑 semantic role 或 request contract，不绑 model strength；fast/deep 不造第二套思想传统。
+
+禁止：书扩大 Role 权；universal bible 灌每个 persona；同 role 的 fast/deep 异书；把隐藏编排写入 Reviewer 书；复制已有 canonical 成第二真源。若他处已有 SSOT，Library 组合引用。
+
+初始 canonical volumes（正文另属资源）：Kolmogorov Book（Handbook）、The Rulebook、The Examiner's Ledger、The Book of Scarcity——分发矩阵见 GrandRewrite / shape，本条只定知识≠权威合同。
+
+## PROMPT-017：ProviderLanguage
+
+```fsharp
+type ProviderLanguage =
+    | English
+    | SimplifiedChinese
+```
+
+第一版 EN / zh-CN 双语同时上线。
+
+```text
+global preference
+    ↓ at session creation
+SessionProviderLanguage (immutable)
+
+child / attached / internal
+    inherits owner/commissioner language
+
+用户后续切全局语言
+    → only future sessions
+```
+
+| Localizable | Invariant（永不翻译） |
+|-------------|----------------------|
+| system prompts / Role Law / Common Law / Office Library | tool names / argument names |
+| tool descriptions / runtime instructions / consequences | wire field names / enum literals |
+| Finality / T1 / hints / WorkRecord headings | paths / source identifiers / commands |
+| Blogger/Bookkeeper/Distiller assignments | |
+
+`A translation changes the language of the world, not the identifiers of its machinery.`  
+Synthetic TOML：Comments ≈ instruction；Fields ≈ operands；每个 provider text owner 独立负责 EN + ZH（SURFACE-004）。

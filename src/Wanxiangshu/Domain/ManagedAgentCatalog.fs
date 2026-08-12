@@ -16,9 +16,9 @@ module ManagedAgentCatalog =
         | Role.Inspector -> "inspector"
         | Role.DevOps -> "devops"
         | Role.Browser -> "browser"
-        | Role.Meditator -> "meditator"
+        | Role.Inquiry -> "inquiry"
         | Role.Reviewer -> "reviewer"
-        | Role.Executor -> "executor"
+        | Role.Distiller -> "distiller"
         | Role.Blogger -> "blogger"
 
     let tryParseRole (value: string) : Role option =
@@ -29,9 +29,9 @@ module ManagedAgentCatalog =
         | "inspector" -> Some Role.Inspector
         | "devops" -> Some Role.DevOps
         | "browser" -> Some Role.Browser
-        | "meditator" -> Some Role.Meditator
+        | "inquiry" -> Some Role.Inquiry
         | "reviewer" -> Some Role.Reviewer
-        | "executor" -> Some Role.Executor
+        | "distiller" -> Some Role.Distiller
         | "blogger" -> Some Role.Blogger
         | _ -> None
 
@@ -70,25 +70,46 @@ module ManagedAgentCatalog =
           Role.Inspector
           Role.DevOps
           Role.Browser
-          Role.Meditator
+          Role.Inquiry
           Role.Reviewer ]
 
-    let allInternalRoles: Role list = [ Role.Blogger; Role.Executor ]
+    let allInternalRoles: Role list = [ Role.Blogger; Role.Distiller ]
 
     let allRoles: Role list = allPublicRoles @ allInternalRoles
 
     /// Manager fork-agent enum (AGENT-009 / GLORY-031): the Reviewer is
     /// Host-owned and does not exist on the Manager's surface. No
-    /// orchestrator/manager/blogger/executor either.
+    /// orchestrator/manager/blogger/distiller either.
     let managerForkableRoles: Role list =
-        [ Role.Coder; Role.Inspector; Role.DevOps; Role.Browser; Role.Meditator ]
+        [ Role.Coder; Role.Inspector; Role.DevOps; Role.Browser; Role.Inquiry ]
 
     let private namesFor (roles: Role list) : string list =
         roles
         |> List.collect (fun role -> [ nameOf AgentTier.Fast role; nameOf AgentTier.Deep role ])
 
-    /// AGENT-002: the required 20 managed agent names.
-    let requiredNames: string list = namesFor allRoles
+    /// AGENT-002: InternalLeaf Bookkeeper pair — not a public Role.
+    let bookkeeperNames: string list = [ "fast-bookkeeper"; "deep-bookkeeper" ]
+
+    let isBookkeeperName (name: string) : bool =
+        let lower = name.ToLowerInvariant()
+        lower = "fast-bookkeeper" || lower = "deep-bookkeeper"
+
+    let tryParseBookkeeperTier (name: string) : AgentTier option =
+        match name.ToLowerInvariant() with
+        | "fast-bookkeeper" -> Some AgentTier.Fast
+        | "deep-bookkeeper" -> Some AgentTier.Deep
+        | _ -> None
+
+    let bookkeeperNameOf (tier: AgentTier) : string =
+        sprintf "%s-bookkeeper" (wireTierLabel tier)
+
+    let bookkeeperPeerName (name: string) : string option =
+        match tryParseBookkeeperTier name with
+        | Some tier -> Some(bookkeeperNameOf (peerTier tier))
+        | None -> None
+
+    /// AGENT-002: the required 22 managed agent names (20 Role × tier + Bookkeeper pair).
+    let requiredNames: string list = namesFor allRoles @ bookkeeperNames
 
     let managerForkableNames: string list = namesFor managerForkableRoles
 
@@ -114,11 +135,14 @@ module ManagedAgentCatalog =
               "devops"
               "browser"
               "meditator"
+              "inquiry"
               "reviewer"
               "student"
               "teacher"
               "blogger"
               "executor"
+              "distiller"
+              "bookkeeper"
               "fast"
               "deep" ]
 

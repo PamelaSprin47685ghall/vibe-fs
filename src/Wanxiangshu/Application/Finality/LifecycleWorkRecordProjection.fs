@@ -105,7 +105,7 @@ module LifecycleWorkRecordProjection =
 
                 // Terminal lives outside the trace parts; a head cursor keeps
                 // materialize's terminal-exclusion filter from touching any gap
-                // item while still carrying the text into the Final output
+                // item while still carrying the text into the Closing report
                 // section.
                 let terminalItems =
                     terminal

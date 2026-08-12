@@ -1,6 +1,6 @@
-// tests/unit/agent/sphinx-mcp.test.mjs — AGENT-028
+// tests/unit/agent/sphinx-mcp.test.mjs — AGENT-030
 //
-// Kernel identity + Host mcp.sphinx injection + Meditator-only schema wildcard.
+// Kernel identity + Host mcp.sphinx injection + Inquiry-only schema wildcard.
 // Requires: npm run build (dist/Kernel/SphinxMcp.js + SphinxMcpConfig.js).
 
 import assert from 'node:assert/strict'
@@ -32,11 +32,12 @@ const ROLES = [
   'Coder',
   'Inspector',
   'Browser',
-  'Meditator',
+  'Inquiry',
   'Reviewer',
   'DevOps',
-  'Executor',
+  'Distiller',
   'Blogger',
+  'Bookkeeper',
 ]
 const TIERS = ['fast', 'deep']
 const agentName = (tier, role) => `${tier}-${role.toLowerCase()}`
@@ -80,19 +81,19 @@ test.before(() => {
   runtimeResources.installFromPackage()
 })
 
-test('AGENT_028_kernel_identity_and_commands', () => {
+test('AGENT_030_kernel_identity_and_commands', () => {
   assert.equal(serverName, 'sphinx')
   assert.equal(permissionKey, 'sphinx_*')
   assert.equal(relativeServerEntry, 'dist/sphinx/mcp-server.js')
   assert.equal(isTool('sphinx_start'), true)
   assert.equal(isTool('sphinx_resume'), true)
   assert.equal(isTool('stealth-browser-mcp_get_debug_view'), false)
-  assert.equal(isTool('inspector'), false)
+  assert.equal(isTool('inspect'), false)
   assert.deepEqual(localCommand('/tmp/entry.js'), ['node', '/tmp/entry.js'])
   assert.deepEqual(fixtureCommand('/tmp/sphinx-fixture.js'), ['node', '/tmp/sphinx-fixture.js'])
 })
 
-test('AGENT_028_launch_disabled_fixture_test_local', () => {
+test('AGENT_030_launch_disabled_fixture_test_local', () => {
   const entry = defaultServerEntry()
   assert.ok(entry.endsWith(join('dist', 'sphinx', 'mcp-server.js')))
 
@@ -117,27 +118,27 @@ test('AGENT_028_launch_disabled_fixture_test_local', () => {
   assert.deepEqual(local.command, localCommand(entry))
 })
 
-test('AGENT_028_apply_preserves_other_mcp_servers', () => {
+test('AGENT_030_apply_preserves_other_mcp_servers', () => {
   const config = { mcp: { other: { type: 'remote', url: 'https://example.test' } } }
   applyMcp(config, launchFromVars({}))
   assert.equal(config.mcp.other.url, 'https://example.test')
   assert.equal(config.mcp[serverName].type, 'local')
 })
 
-test('AGENT_028_configure_injects_mcp_on_ok_and_error', () => {
+test('AGENT_030_configure_injects_mcp_on_ok_and_error', () => {
   const okConfig = buildConfig()
   assert.equal(managedAgentConfig.configure(okConfig).ok, true)
   assert.equal(okConfig.mcp[serverName].type, 'local')
   assert.equal(typeof okConfig.mcp[serverName].enabled, 'boolean')
 
   const bad = buildConfig()
-  bad.agent['fast-meditator'].model = 'shared'
-  bad.agent['deep-meditator'].model = 'shared'
+  bad.agent['fast-inquiry'].model = 'shared'
+  bad.agent['deep-inquiry'].model = 'shared'
   assert.equal(managedAgentConfig.configure(bad).ok, false)
   assert.equal(bad.mcp[serverName].type, 'local')
 })
 
-test('AGENT_028_meditator_only_wildcard_permission', () => {
+test('AGENT_030_inquiry_only_wildcard_permission', () => {
   const config = buildConfig()
   assert.equal(managedAgentConfig.configure(config).ok, true)
 
@@ -147,11 +148,11 @@ test('AGENT_028_meditator_only_wildcard_permission', () => {
       const permission = config.agent[name].permission
       assert.equal(
         permission[permissionKey],
-        role === 'Meditator' ? 'allow' : 'deny',
+        role === 'Inquiry' ? 'allow' : 'deny',
         `${name} sphinx_*`,
       )
       const concrete = evaluate(permission, 'sphinx_start').action
-      assert.equal(concrete, role === 'Meditator' ? 'allow' : 'deny', `${name} concrete MCP tool`)
+      assert.equal(concrete, role === 'Inquiry' ? 'allow' : 'deny', `${name} concrete MCP tool`)
     }
   }
 })

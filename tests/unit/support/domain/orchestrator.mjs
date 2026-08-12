@@ -812,7 +812,7 @@ export const joinResultRenderer = (() => {
   return {
     /** @param reason JoinInterruptReason (default OperatorAbort for legacy callers). */
     renderInterrupted: (reason = JoinInterruptReason.OperatorAbort) => renderInterruptedFn(reason),
-    renderCompletedBatch: (runtime, batch) => {
+    renderCompletedBatch: (runtime, batch, resolveTerminalLabel) => {
       const isPty = (runId) =>
         typeof runtime?.IsPtyCompletion === 'function' ? !!runtime.IsPtyCompletion(runId) : false
       const resolve = (agentId) => {
@@ -821,10 +821,13 @@ export const joinResultRenderer = (() => {
         if (!rec) return ''
         return rec.Agent ?? rec.agent ?? ''
       }
-      return renderCompletedBatchFn(isPty, resolve, batch)
+      if (typeof resolveTerminalLabel === 'function') {
+        return renderCompletedBatchFn(isPty, resolve, batch, resolveTerminalLabel)
+      }
+      return renderCompletedBatchFn(isPty, resolve, batch, () => 'Terminal')
     },
     /** Production JoinTool path: NonEmptyBatch<JoinItem> with PtyAborted intact. */
-    renderJoinItemBatch: (resolveAgentName, batch) => {
+    renderJoinItemBatch: (resolveAgentName, batch, resolveTerminalLabel = () => 'Terminal') => {
       const resolve =
         typeof resolveAgentName === 'function'
           ? resolveAgentName
@@ -834,10 +837,10 @@ export const joinResultRenderer = (() => {
               if (!rec) return ''
               return rec.Agent ?? rec.agent ?? ''
             }
-      return renderJoinItemBatchFn(resolve, batch)
+      return renderJoinItemBatchFn(resolve, batch, resolveTerminalLabel)
     },
     renderOrchestratorBatch: (batch) => renderOrchestratorBatchFn(batch),
-    renderForkError: (error) => renderForkErrorFn(error),
+    renderForkError: (error, resolveAgentName = () => '') => renderForkErrorFn(error, resolveAgentName),
     stubRuntime,
   }
 })()

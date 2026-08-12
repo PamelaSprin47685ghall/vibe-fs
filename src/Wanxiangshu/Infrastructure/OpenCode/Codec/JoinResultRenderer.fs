@@ -6,148 +6,161 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Orchestrator
 open Wanxiangshu.Session
 
-/// EXEC-004 rev.2 / docs/how/synthetic-toml.md ### Join / fork: LLM-facing join wire only.
-/// work_record is entry-local comment (SyntheticToml.comment), never a TOML field.
-/// Internal journal / HandleCompletionCodec work_record is unchanged.
-///
-/// Does not use SyntheticToml.document for batches: document partitions bare vs table by
-/// first line, so a comment-prefixed [[result]] would be reordered relative to plain
-/// [[result]] (pty / failed items). Assembly is ordinal-stable concatenation.
+/// EXEC-004 / EXEC-017 / EXEC-030: LLM-facing join wire — natural language + WorkRecord only.
+/// No status / count / ordinal / kind / agent / code / message DTO plane.
 module JoinResultRenderer =
 
-    let private field name value = SyntheticToml.field name value
-    let private str value = SyntheticToml.renderString value
+    let private ensureInstruction (text: string) = text.Trim()
+
+    let private renderEntry (instructions: string list) (body: string list) : string =
+        SyntheticToml.document (instructions |> List.map ensureInstruction) body
 
     let private joinBlocks (blocks: string list) : string =
-        (String.concat "\n" (blocks |> List.filter (fun s -> s <> ""))) + "\n"
+        (String.concat "\n\n" (blocks |> List.filter (fun s -> s <> ""))) + "\n"
 
-    /// Top-level fields, then one blank line, then ordinal-stable result blocks (docs/how/synthetic-toml.md ### Join / fork layout).
-    let private completedDocument (headerFields: string list) (entries: string list) : string =
-        String.concat "\n" headerFields + "\n\n" + String.concat "\n" entries + "\n"
-
-    /// EXEC-017: local join interrupt wire. `interrupted` is not
-    /// ForkError / failed / aborted. OperatorAbort keeps the existing message;
-    /// UserMessageArrived omits user text copy. DeadlineExpired is TIMED_OUT
-    /// (renderForkError), not this path.
-    let renderInterrupted (reason: JoinInterruptReason) : string =
-        match reason with
-        | JoinInterruptReason.OperatorAbort ->
-            joinBlocks
-                [ field "status" (str "interrupted")
-                  field "reason" (str "operator_abort")
-                  field "message" (str "join interrupted") ]
-        | JoinInterruptReason.UserMessageArrived ->
-            joinBlocks [ field "status" (str "interrupted"); field "reason" (str "user_message") ]
-        | JoinInterruptReason.DeadlineExpired ->
-            // Defensive: production JoinTool maps DeadlineExpired to TIMED_OUT.
-            joinBlocks
-                [ field "status" (str "interrupted")
-                  field "reason" (str "operator_abort")
-                  field "message" (str "join interrupted") ]
-
-    /// One [[result]] block; optional leading LWR comment lines (agent completed only).
-    let private resultEntry
-        (ordinal: int)
-        (kind: string)
-        (status: string)
-        (extraFields: string list)
-        (workRecordComment: string option)
-        : string =
-        let fields =
-            [ field "ordinal" (string ordinal)
-              field "kind" (str kind)
-              field "status" (str status) ]
-            @ extraFields
-
-        let table = SyntheticToml.tableArrayEntry "result" fields
-
-        match workRecordComment with
-        | Some wr when not (String.IsNullOrEmpty wr) -> SyntheticToml.comment wr + "\n" + table
-        | _ -> table
-
-    /// resolveAgentName: empty string = unknown agent; non-empty is ManagedAgent raw or name.
-    let private agentName (resolveAgentName: string -> string) (completion: RunCompletion) : string =
-        if not (String.IsNullOrWhiteSpace completion.AgentName) then
-            match ManagedAgent.tryParse completion.AgentName with
+    let private byname (resolveAgentName: string -> string) (agentId: string) (agentNameRaw: string) : string =
+        if not (String.IsNullOrWhiteSpace agentNameRaw) then
+            match ManagedAgent.tryParse agentNameRaw with
             | Some agent -> agent.Name
-            | None -> completion.AgentName
+            | None -> agentNameRaw
         else
-            let raw = resolveAgentName completion.AgentId
+            let raw = resolveAgentName agentId
 
             if String.IsNullOrWhiteSpace raw then
-                completion.AgentId
+                agentId
             else
                 match ManagedAgent.tryParse raw with
                 | Some agent -> agent.Name
                 | None -> raw
 
+    let private tryParseExitCode (outcome: string) : int option =
+        let trimmed = outcome.Trim()
+
+        if String.IsNullOrWhiteSpace trimmed then
+            None
+        elif trimmed.StartsWith("exit ", StringComparison.OrdinalIgnoreCase) then
+            let rest = trimmed.Substring(5).Trim()
+
+            match Int32.TryParse rest with
+            | true, code -> Some code
+            | false, _ -> None
+        else
+            match Int32.TryParse trimmed with
+            | true, code -> Some code
+            | false, _ -> None
+
+    let private terminalBody (outcome: string) (detail: string option) : string list =
+        let fields =
+            match tryParseExitCode outcome with
+            | Some code -> [ SyntheticToml.field "exit_code" (string code) ]
+            | None -> []
+
+        let outputText =
+            match detail with
+            | Some text when not (String.IsNullOrWhiteSpace text) -> text
+            | _ ->
+                match tryParseExitCode outcome with
+                | Some _ -> ""
+                | None -> outcome
+
+        if String.IsNullOrWhiteSpace outputText then
+            fields
+        else
+            fields
+            @ [ SyntheticToml.field "output" (SyntheticToml.renderString outputText) ]
+
+    /// EXEC-017: interrupt consequences are natural language, not error DTO.
+    let renderInterrupted (reason: JoinInterruptReason) : string =
+        let line =
+            match reason with
+            | JoinInterruptReason.OperatorAbort -> "Your waiting was interrupted."
+            | JoinInterruptReason.UserMessageArrived -> "Something nearer has arrived."
+            | JoinInterruptReason.DeadlineExpired -> "No return reached you before your waiting ended."
+
+        renderEntry [ line ] []
+
+    let private renderAgentCompleted
+        (resolveAgentName: string -> string)
+        (completion: RunCompletion)
+        (payload: AgentCompletionPayload)
+        : string =
+        let name = byname resolveAgentName completion.AgentId completion.AgentName
+        let instructions = [ sprintf "%s has returned." name ]
+
+        let body =
+            if String.IsNullOrWhiteSpace payload.WorkRecord then
+                []
+            else
+                [ SyntheticToml.comment payload.WorkRecord ]
+
+        renderEntry instructions body
+
+    let private renderAgentFailed
+        (resolveAgentName: string -> string)
+        (completion: RunCompletion)
+        (payload: AgentFailurePayload)
+        : string =
+        let name = byname resolveAgentName completion.AgentId completion.AgentName
+        let instructions = [ sprintf "%s could not complete the charge." name ]
+
+        let body =
+            if String.IsNullOrWhiteSpace payload.Message then
+                []
+            else
+                [ SyntheticToml.comment payload.Message ]
+
+        renderEntry instructions body
+
+    let private renderAgentAbandoned
+        (resolveAgentName: string -> string)
+        (agentId: string)
+        (agentNameRaw: string)
+        : string =
+        let name = byname resolveAgentName agentId agentNameRaw
+        renderEntry [ sprintf "%s did not return from this charge." name ] []
+
+    let private renderPtyEnded
+        (resolveTerminalLabel: string -> string)
+        (labelPrefix: string)
+        (ptyId: string)
+        (outcome: string)
+        (detail: string option)
+        : string =
+        let label =
+            resolveTerminalLabel ptyId
+            |> fun name ->
+                if String.IsNullOrWhiteSpace name then
+                    "Terminal"
+                else
+                    name.Trim()
+
+        renderEntry [ sprintf "%s %s." label labelPrefix ] (terminalBody outcome detail)
+
     let private renderAgentJoinItem
         (resolveAgentName: string -> string)
-        (ordinal: int)
         (completion: RunCompletion)
         (item: AgentJoinItem)
         : string =
-        let name = agentName resolveAgentName completion
-
         match item with
-        | AgentCompletedItem payload ->
-            resultEntry ordinal "agent" "completed" [ field "agent" (str name) ] (Some payload.WorkRecord)
-        | AgentFailedItem payload ->
-            resultEntry
-                ordinal
-                "agent"
-                "failed"
-                [ field "agent" (str name)
-                  field "code" (str payload.Code)
-                  field "message" (str payload.Message) ]
-                None
-        | AgentAbandonedItem(agentId, reason) ->
-            let display =
-                if not (String.IsNullOrWhiteSpace name) then
-                    name
-                else
-                    agentId
+        | AgentCompletedItem payload -> renderAgentCompleted resolveAgentName completion payload
+        | AgentFailedItem payload -> renderAgentFailed resolveAgentName completion payload
+        | AgentAbandonedItem(agentId, _) -> renderAgentAbandoned resolveAgentName agentId completion.AgentName
 
-            resultEntry ordinal "agent" "abandoned" [ field "agent" (str display); field "reason" (str reason) ] None
-
-    let private renderPtyJoinItem (ordinal: int) (item: PtyJoinItem) : string =
+    let private renderPtyJoinItem (resolveTerminalLabel: string -> string) (item: PtyJoinItem) : string =
         match item with
-        | PtyExited payload ->
-            resultEntry
-                ordinal
-                "pty"
-                "completed"
-                [ field "outcome" (str payload.Outcome)
-                  field "closed" (if payload.Closed then "true" else "false")
-                  field "pty_id" (str payload.PtyId) ]
-                None
+        | PtyExited payload -> renderPtyEnded resolveTerminalLabel "has ended" payload.PtyId payload.Outcome None
         | PtyFailed payload ->
-            resultEntry
-                ordinal
-                "pty"
-                "failed"
-                [ field "outcome" (str payload.Outcome)
-                  field "closed" (if payload.Closed then "true" else "false")
-                  field "pty_id" (str payload.PtyId)
-                  field "code" (str payload.Code)
-                  field "message" (str payload.Message) ]
-                None
+            renderPtyEnded resolveTerminalLabel "has ended" payload.PtyId payload.Outcome (Some payload.Message)
         | PtyAborted payload ->
-            resultEntry
-                ordinal
-                "pty"
-                "aborted"
-                [ field "outcome" (str payload.Outcome)
-                  field "closed" (if payload.Closed then "true" else "false")
-                  field "pty_id" (str payload.PtyId)
-                  field "code" (str payload.Code)
-                  field "message" (str payload.Message) ]
-                None
+            renderPtyEnded resolveTerminalLabel "was interrupted" payload.PtyId payload.Outcome (Some payload.Message)
 
-    let private renderJoinItem (resolveAgentName: string -> string) (ordinal: int) (item: JoinItem) : string =
+    let private renderJoinItem
+        (resolveAgentName: string -> string)
+        (resolveTerminalLabel: string -> string)
+        (item: JoinItem)
+        : string =
         match item with
         | AgentItem agentItem ->
-            // JoinItem payload carries no AgentName; empty stub forces resolveAgentName(AgentId).
             let nameStub =
                 match agentItem with
                 | AgentCompletedItem p ->
@@ -161,106 +174,78 @@ module JoinResultRenderer =
                     { RunId = p.RunId
                       AgentId = p.AgentId
                       AgentName = ""
-                      Role = defaultArg p.Role Role.Executor
+                      Role = defaultArg p.Role Role.Distiller
                       Outcome = AgentFailed p
                       CompletedAt = DateTimeOffset.UtcNow }
                 | AgentAbandonedItem(agentId, reason) ->
                     { RunId = "abandoned-" + agentId
                       AgentId = agentId
                       AgentName = ""
-                      Role = Role.Executor
+                      Role = Role.Distiller
                       Outcome = AgentAbandoned(agentId, reason)
                       CompletedAt = DateTimeOffset.UtcNow }
 
-            renderAgentJoinItem resolveAgentName ordinal nameStub agentItem
-        | PtyItem ptyItem -> renderPtyJoinItem ordinal ptyItem
+            renderAgentJoinItem resolveAgentName nameStub agentItem
+        | PtyItem ptyItem -> renderPtyJoinItem resolveTerminalLabel ptyItem
 
     let private renderCompletionItem
         (isPtyRun: string -> bool)
         (resolveAgentName: string -> string)
-        (ordinal: int)
+        (resolveTerminalLabel: string -> string)
         (completion: RunCompletion)
         : string =
-        let item = JoinItem.ofRunCompletion (isPtyRun completion.RunId) completion
-
-        match item with
-        | AgentItem agentItem -> renderAgentJoinItem resolveAgentName ordinal completion agentItem
-        | PtyItem ptyItem -> renderPtyJoinItem ordinal ptyItem
+        match JoinItem.ofRunCompletion (isPtyRun completion.RunId) completion with
+        | AgentItem agentItem -> renderAgentJoinItem resolveAgentName completion agentItem
+        | PtyItem ptyItem -> renderPtyJoinItem resolveTerminalLabel ptyItem
 
     /// EXEC-004 / EXEC-018 / EXEC-020: JoinItem batch (production JoinTool path).
-    /// PtyAborted → kind=pty,status=aborted without RunCompletion round-trip.
-    let renderJoinItemBatch (resolveAgentName: string -> string) (batch: NonEmptyBatch<JoinItem>) : string =
-        let items = NonEmptyBatch.toList batch
-        let count = List.length items
+    let renderJoinItemBatch
+        (resolveAgentName: string -> string)
+        (batch: NonEmptyBatch<JoinItem>)
+        (resolveTerminalLabel: string -> string)
+        : string =
+        NonEmptyBatch.toList batch
+        |> List.map (renderJoinItem resolveAgentName resolveTerminalLabel)
+        |> joinBlocks
 
-        let header = [ field "status" (str "completed"); field "count" (string count) ]
-
-        let entries =
-            items |> List.mapi (fun i item -> renderJoinItem resolveAgentName (i + 1) item)
-
-        completedDocument header entries
-
-    /// EXEC-004 / EXEC-018: status=completed + count + [[result]] (single item also uses [[result]]).
-    /// Compat surface for tests / ofRunCompletion path. Production JoinTool uses renderJoinItemBatch.
-    /// Pure: no HostForkRuntime — caller supplies isPtyRun / resolveAgentName (empty = unknown).
+    /// EXEC-004 / EXEC-018: compat surface for tests / ofRunCompletion path.
     let renderCompletedBatch
         (isPtyRun: string -> bool)
         (resolveAgentName: string -> string)
         (batch: NonEmptyBatch<RunCompletion>)
+        (resolveTerminalLabel: string -> string)
         : string =
-        let items = NonEmptyBatch.toList batch
-        let count = List.length items
+        NonEmptyBatch.toList batch
+        |> List.map (renderCompletionItem isPtyRun resolveAgentName resolveTerminalLabel)
+        |> joinBlocks
 
-        let header = [ field "status" (str "completed"); field "count" (string count) ]
-
-        let entries =
-            items
-            |> List.mapi (fun i c -> renderCompletionItem isPtyRun resolveAgentName (i + 1) c)
-
-        completedDocument header entries
+    let private orchestratorLine (verdict: OrchestratorVerdict) : string =
+        match verdict with
+        | OrchestratorVerdict.Published _ -> "The charge was integrated."
+        | OrchestratorVerdict.RejectedDirty _ -> "The tree was not clean enough to integrate."
+        | OrchestratorVerdict.NeedsReview _ -> "The charge needs further review."
+        | OrchestratorVerdict.IntegrationFailed _ -> "Integration did not succeed."
+        | OrchestratorVerdict.Empty -> "There is nothing away to receive."
 
     /// EXEC-019: orchestrator verdict batch (FIFO; caller already capped at MaxJoinBatch).
     let renderOrchestratorBatch (verdicts: NonEmptyBatch<OrchestratorVerdict>) : string =
-        let items = NonEmptyBatch.toList verdicts
-        let count = List.length items
+        NonEmptyBatch.toList verdicts
+        |> List.map (fun verdict -> renderEntry [ orchestratorLine verdict ] [])
+        |> joinBlocks
 
-        let header = [ field "status" (str "completed"); field "count" (string count) ]
-
-        let entries =
-            items
-            |> List.mapi (fun i verdict ->
-                resultEntry (i + 1) "orchestrator" "completed" [ field "outcome" (str (sprintf "%A" verdict)) ] None)
-
-        completedDocument header entries
-
-    /// True ForkError path (NothingToJoin / Cancelled / …) — not user interrupt.
-    /// EXEC-009 Abandoned is a [[result]] batch item (renderCompletedBatch), not
-    /// a top-level failed withhold. ForkError.Abandoned remains for legacy callers;
-    /// wire still includes agent so the failure surface names the handle.
-    let renderForkError (error: ForkError) : string =
-        let code, agentOpt =
+    /// True ForkError path — natural language only (not user interrupt).
+    let renderForkError (error: ForkError) (resolveAgentName: string -> string) : string =
+        let line =
             match error with
-            | ForkError.NothingToJoin -> "NOTHING_TO_JOIN", None
-            | ForkError.Cancelled -> "CANCELLED", None
-            | ForkError.Empty -> "EMPTY", None
-            | ForkError.JoinInProgress -> "JOIN_IN_PROGRESS", None
-            | ForkError.Abandoned(id, reason) -> "ABANDONED:" + id + ":" + reason, Some id
-            | ForkError.NotFound id -> "NOT_FOUND:" + id, Some id
-            | ForkError.TimedOut -> "TIMED_OUT", None
-            | ForkError.TerminalMaterializationFailed id -> "TERMINAL_MATERIALIZATION_FAILED:" + id, Some id
+            | ForkError.NothingToJoin
+            | ForkError.Empty -> "There is nothing away to receive."
+            | ForkError.Cancelled -> "The wait was cancelled."
+            | ForkError.JoinInProgress -> "Another join is already in progress."
+            | ForkError.Abandoned(id, _) ->
+                let name = byname resolveAgentName id ""
+                sprintf "%s did not return from this charge." name
+            | ForkError.NotFound _ -> "No one by that name is away."
+            | ForkError.TimedOut -> "No return reached you before your waiting ended."
+            | ForkError.TerminalMaterializationFailed _ -> "A return could not be gathered."
 
-        let header =
-            match agentOpt with
-            | Some agentId ->
-                [ field "status" (str "failed")
-                  field "agent" (str agentId)
-                  "[error]"
-                  field "code" (str code)
-                  field "message" (str (error.ToString())) ]
-            | None ->
-                [ field "status" (str "failed")
-                  "[error]"
-                  field "code" (str code)
-                  field "message" (str (error.ToString())) ]
-
-        joinBlocks header
+        renderEntry [ line ] []
