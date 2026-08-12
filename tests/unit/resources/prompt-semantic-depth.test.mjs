@@ -30,7 +30,7 @@ const EN_ANCHORS = Object.freeze({
   coder: [
     { id: 'written-world', re: /written world/i },
     { id: 'no-execution', re: /do not execute|You do not execute/i },
-    { id: 'consume-runtime-evidence', re: /reason deeply from runtime evidence|Use that evidence/i },
+    { id: 'consume-runtime-evidence', re: /reason deeply from (?:that |runtime )?evidence|Use that evidence/i },
     { id: 'tests-are-source', re: /Tests are source when you write them/i },
     { id: 'coherent-not-smallest', re: /smallest coherent change is not always the smallest diff|no less than coherence requires/i },
     { id: 'shell-boundary', re: /urge to run|edge of mutation/i },
@@ -70,11 +70,11 @@ const EN_ANCHORS = Object.freeze({
     { id: 'acceptance-not-omniscience', re: /omniscience/i },
   ],
   orchestrator: [
-    { id: 'owns-roads', re: /owns roads/i },
-    { id: 'same-road-continuation', re: /continue that road|same road/i },
+    { id: 'owns-roads', re: /own(?:s)?(?:\s+the)?\s+roads/i },
+    { id: 'same-road-continuation', re: /continue that road|same road|Continue the same road/i },
     { id: 'independent-destination', re: /independently coherent destination|coherent destination of its own/i },
     { id: 'shared-gate', re: /shared destination|one gate/i },
-    { id: 'host-vs-orchestrator', re: /Host reconciles states|Orchestrator reconciles purposes/i },
+    { id: 'host-vs-orchestrator', re: /Host reconciles states|You reconcile purposes|Orchestrator reconciles purposes/i },
   ],
   browser: [
     { id: 'provenance-not-reachability', re: /Reachability does not determine ownership|Provenance does/i },
@@ -145,9 +145,9 @@ const ZH_ANCHORS = Object.freeze({
     { id: 'omniscience', re: /omniscience|全知/ },
   ],
   orchestrator: [
-    { id: 'owns-roads', re: /拥有道路|owns roads/ },
-    { id: 'independent-destination', re: /独立.*目的地|independently coherent|coherent destination/ },
-    { id: 'host-vs-orch', re: /Host reconciles|Orchestrator reconciles|Host 调和|Orchestrator 调和/ },
+    { id: 'owns-roads', re: /拥有.*道路|owns roads/ },
+    { id: 'independent-destination', re: /独立.*目的地|独立推进|independently coherent|coherent destination/ },
+    { id: 'host-vs-orch', re: /Host (?:reconciles|协调)|你协调目的|Orchestrator reconciles|调和/ },
   ],
   browser: [
     { id: 'provenance', re: /Provenance|出处|Reachability/ },

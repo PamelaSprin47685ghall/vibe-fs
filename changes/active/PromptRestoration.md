@@ -94,10 +94,10 @@ Bound session：missing localization → fail closed；禁止 silent English fal
 
 ## Remaining work
 
-1. **Gate 0**：正式条款 + `provider-prose-ownership` 门禁接入 `npm run check` + inventory
+1. **Gate 0**：正式条款 + Gate E 门禁 + check 接线 — **已落**（PROMPT-019 / ARCH-016 E；baseline 490 hits；unit 7/7）。**待**：inventory 纳入 Active 证据；`npm run check` 全量一次。
 2. Batch 1–5：按上表迁移；每 owner EN+ZH+删硬编码+parity
 3. Role Law semantic-depth / tool-contract semantic parity
-4. 零散落 prose 完成标准：生产 F# provider-facing 无 semantic prose literal
+4. 零散落 prose 完成标准：生产 F# provider-facing 无 semantic prose literal；Gate E baseline → 0
 
 ## Completion criteria
 
@@ -108,4 +108,6 @@ Bound session：missing localization → fail closed；禁止 silent English fal
 
 ## Blockers
 
-无。本 wave 交付 Gate 0。
+无阻塞 Gate 0 立法/门禁。已知债（Batch 后续）：
+
+- `resources/prompts/*-system.md` 仍被 packaging / 部分 proof·how 引用；生产装载已走 `resources/provider/`。迁文时须统一权威路径并清 legacy 包面。

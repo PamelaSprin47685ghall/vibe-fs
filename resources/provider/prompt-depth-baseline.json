@@ -1,0 +1,139 @@
+{
+  "version": 1,
+  "shrinkLimit": 0.2,
+  "note": "Anti-accidental-amputation alarm for Prompt Restoration. Update deliberately when removing cognitive obligations.",
+  "roles": {
+    "manager": {
+      "en.md": {
+        "normalizedBytes": 8180,
+        "paragraphCount": 47,
+        "headingCount": 9
+      },
+      "zh-CN.md": {
+        "normalizedBytes": 7961,
+        "paragraphCount": 47,
+        "headingCount": 9
+      }
+    },
+    "coder": {
+      "en.md": {
+        "normalizedBytes": 7348,
+        "paragraphCount": 55,
+        "headingCount": 9
+      },
+      "zh-CN.md": {
+        "normalizedBytes": 7189,
+        "paragraphCount": 55,
+        "headingCount": 9
+      }
+    },
+    "inspector": {
+      "en.md": {
+        "normalizedBytes": 6199,
+        "paragraphCount": 46,
+        "headingCount": 7
+      },
+      "zh-CN.md": {
+        "normalizedBytes": 5871,
+        "paragraphCount": 46,
+        "headingCount": 7
+      }
+    },
+    "devops": {
+      "en.md": {
+        "normalizedBytes": 7341,
+        "paragraphCount": 61,
+        "headingCount": 9
+      },
+      "zh-CN.md": {
+        "normalizedBytes": 7104,
+        "paragraphCount": 61,
+        "headingCount": 9
+      }
+    },
+    "inquiry": {
+      "en.md": {
+        "normalizedBytes": 5266,
+        "paragraphCount": 42,
+        "headingCount": 10
+      },
+      "zh-CN.md": {
+        "normalizedBytes": 5165,
+        "paragraphCount": 42,
+        "headingCount": 10
+      }
+    },
+    "reviewer": {
+      "en.md": {
+        "normalizedBytes": 5667,
+        "paragraphCount": 41,
+        "headingCount": 6
+      },
+      "zh-CN.md": {
+        "normalizedBytes": 5640,
+        "paragraphCount": 41,
+        "headingCount": 6
+      }
+    },
+    "orchestrator": {
+      "en.md": {
+        "normalizedBytes": 5546,
+        "paragraphCount": 21,
+        "headingCount": 1
+      },
+      "zh-CN.md": {
+        "normalizedBytes": 5613,
+        "paragraphCount": 21,
+        "headingCount": 1
+      }
+    },
+    "browser": {
+      "en.md": {
+        "normalizedBytes": 6115,
+        "paragraphCount": 39,
+        "headingCount": 7
+      },
+      "zh-CN.md": {
+        "normalizedBytes": 5943,
+        "paragraphCount": 39,
+        "headingCount": 7
+      }
+    },
+    "blogger": {
+      "en.md": {
+        "normalizedBytes": 3753,
+        "paragraphCount": 27,
+        "headingCount": 1
+      },
+      "zh-CN.md": {
+        "normalizedBytes": 3909,
+        "paragraphCount": 27,
+        "headingCount": 1
+      }
+    },
+    "distiller": {
+      "en.md": {
+        "normalizedBytes": 2898,
+        "paragraphCount": 20,
+        "headingCount": 1
+      },
+      "zh-CN.md": {
+        "normalizedBytes": 2918,
+        "paragraphCount": 20,
+        "headingCount": 1
+      }
+    },
+    "bookkeeper": {
+      "en.md": {
+        "normalizedBytes": 3276,
+        "paragraphCount": 22,
+        "headingCount": 1
+      },
+      "zh-CN.md": {
+        "normalizedBytes": 3345,
+        "paragraphCount": 22,
+        "headingCount": 1
+      }
+    }
+  }
+}
