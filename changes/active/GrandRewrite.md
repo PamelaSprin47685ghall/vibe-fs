@@ -5805,7 +5805,7 @@ Provider World clean break 已落地：正式 `docs/` 五层重写；实现侧�
 | 9–11 Role prompts + BlindPlan hook + Finality 三经验 | ✓ |
 | 16 Persona/language 跨 Fallback/Replica | ✓ |
 | 17 i18n | 基建 only；`resources/provider/{en,zh-CN}` 布局 + Gate C |
-| 19–20 Tests + gates | ✓ 2343 unit pass；删 tdd/orchestrator-reuse 等作废套件；Gate A–C 绿 |
+| 19–20 Tests + gates | ✓ 2383 unit pass；integration 全绿；harness 273/273；Gate A–C 绿；Long Stroke Published |
 
 遗留（非 alias）：部分 F# 模块文件名仍叫 `BlogTool.fs`/`VerdictTool.fs`/`ListTool.fs` 等，对外 `Name` 已是新合同；`TddPhase.fs` 若仍被内部引用则未删文件。
 
@@ -5814,8 +5814,9 @@ Provider World clean break 已落地：正式 `docs/` 五层重写；实现侧�
 ```text
 dotnet build src/Wanxiangshu/Wanxiangshu.fsproj  → 0 error
 npm run lint                                      → pass（Kolmogorov size 仅 advisory，不作硬门）
-npm test                                          → 2343 passed / 0 failed
-node --test tests/integration/resources/prompts.test.mjs → pass
+npm test                                          → 2383 passed / 0 failed
+npm run test:integration                           → pass（harness 273/273）
+npm run test:e2e                                   → pass（Long Stroke 59 steps；journal 532/545；SSE 2544/2600；Published）
 Gate A tool-referential-integrity                 → OK
 Gate B provider-leak-gate (+ baseline)            → OK
 Gate C language-parity-gate                       → OK

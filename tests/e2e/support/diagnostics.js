@@ -1,8 +1,8 @@
 /**
  * diagnostics.js — Public surface for E2E failure diagnostics.
  *
- * Implementation split into two modules to honor the 200-line
- * Kolmogorov line budget:
+ * Implementation split into two modules to stay near the 200-line
+ * Kolmogorov advisory target:
  *   - diagnostics-collect.js: gatherDiagnostics() walks the scenario
  *     and produces a structured diagnostic record.
  *   - diagnostics-format.js: formatDiagnostics() renders the record

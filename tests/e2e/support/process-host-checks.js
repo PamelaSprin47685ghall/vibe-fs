@@ -1,7 +1,7 @@
 /**
  * process-host-checks.js — Resource leak checks: socket, PID, process tree.
  * Pure side-effect-free checkers; main class file imports these so it
- * stays within the 200-line Kolmogorov line budget.
+ * stays near the 200-line Kolmogorov advisory target.
  */
 
 import net from 'node:net';

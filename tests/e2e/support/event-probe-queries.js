@@ -1,7 +1,7 @@
 /**
  * event-probe-queries.js — Public read-only queries on EventProbe state.
  * Attached to the EventProbe prototype via mixin so the main class file
- * stays within the 200-line Kolmogorov line budget.
+ * stays near the 200-line Kolmogorov advisory target.
  */
 
 export function attachEventProbeQueries(proto) {
