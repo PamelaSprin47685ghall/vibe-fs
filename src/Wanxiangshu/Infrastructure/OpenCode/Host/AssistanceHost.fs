@@ -518,6 +518,13 @@ type AssistanceHost
             | Some _ ->
                 match turn.Outcome with
                 | ReconcileProgram.TurnCompleted ->
+                    // Assistance owns this hidden child terminal and HostTurnObserver
+                    // returns immediately after Handled, so ordinary TerminalReporter
+                    // will not capture it. Persist the exact reconciled terminal first;
+                    // the canonical child→parent LWR below must include the advice the
+                    // consultation actually produced, not only its opening Chronicle.
+                    XTraceCapture.captureTerminal journal turn
+
                     let body =
                         childRecordText turn.SessionId
                         |> Option.filter (String.IsNullOrWhiteSpace >> not)

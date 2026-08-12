@@ -165,7 +165,11 @@ export function assertNeedHelpAssistance(scenario) {
   );
   assert.equal(advice.length, 1, 'NEEDHELP: child→parent advice request must occur exactly once');
   const adviceText = lastUserText(advice[0]);
-  assert.match(adviceText, /Independent NEEDHELP perspective/, 'NEEDHELP: advice must carry canonical child work evidence');
+  assert.match(
+    adviceText,
+    /Independent NEEDHELP perspective/,
+    `NEEDHELP: advice must carry canonical child work evidence; actual=${JSON.stringify(adviceText)}`,
+  );
   assert.doesNotMatch(
     adviceText,
     /如何解决这个 agent 的当前困难？/,

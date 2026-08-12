@@ -365,7 +365,7 @@ user = "CaseFinalize"
 [[turn]]
 id = "g6-bookkeeper-finalize"
 internal = true
-user = "# # System Prompt: Casebook Bookkeeper"
+user = ["# # Common Law", "CaseFinalize"]
 tools = ["js-bookkeeper"]
 forbiddenTools = ["inspect", "write", "edit", "bash-honeypot"]
 

@@ -1,29 +1,29 @@
-# clone-and-mutate-derived — Main
+# clone-and-mutate-derived — Main 中文版
 
-让 derived value 由**正面列出的语义事实**构造，而不是由 prototype 当前 shape 决定。
+## 现在该做什么
+先写清 source 与 derived value 的 semantic relation，然后用 constructor/record transformation 显式表达哪些 facts 保留、哪些重算、哪些丢弃。不要让 source 的完整 future shape 自动成为继承政策。
 
-先给 source→derived 的关系起名字：状态 transition、projection、redaction、copy-with-change、new command、new snapshot。然后明确哪些 facts：
+## 为什么这很重要
+Clone-by-default 把未来字段默认为“应该传播”。这会让新增字段绕过 review：security token、lifecycle marker、ownership metadata、cache state 都可能无声进入一个从未打算拥有它的 derived concept。
 
-- 必须保留；
-- 必须重算；
-- 必须删除；
-- 必须由 caller 新提供。
+显式 construction 则反过来：新字段出现时，compiler 或 constructor 会迫使作者做决定。
 
-如果 source/derived 真的是同一个 immutable value 的 ordinary update，可以使用 constructor-safe record copy；这时“其余字段全部保留”就是明确语义。若关系更复杂，就写显式 constructor/mapper，让 source type 新增字段时 compile/review 强迫做决定。
+## 修复策略
+- 区分“同一 value 的 immutable update”与“新 semantic value 的 derivation”；
+- 后者列出 preserved facts；
+- state-specific data 由 target constructor 拥有；
+- local mutation 若用于性能，封闭在 constructor 内；
+- source 新增字段时要求 explicit keep/drop/recompute decision。
 
-常见假修复：
+## 常见假修复
+- 换更安全的 deep clone library。
+- clone 后 `Object.freeze`；accidental inheritance 已经发生。
+- 写 comment 列“这些字段应该一样”。
+- 封装成 `withChanges()` helper，内部仍全量复制。
+- 为所有 immutable record copy 都建笨重 builder，误杀简单同值更新。
 
-- deep clone 替 shallow clone；继承问题一点没变；
-- clone 后 `freeze()`，只是把 accidental inheritance 冻住；
-- 把 clone 包进名为 `withFoo()` 的 helper，内部仍 copy-all-by-default；
-- 注释列“这些字段应该保持”，constructor 却仍自动复制未来字段；
-- 用 allowlist 做 runtime delete，但 type 新增字段仍可能在遗漏时泄漏；
-- 为减少 boilerplate 退回 generic `patch(Object)`，重新让 semantic relation 消失。
+## 验证
+给 source model 增加一个有语义的新字段。真正 derived constructors 应出现明确决策点，而不是测试仍全绿、字段悄悄传播。
 
-验证应做 evolution test：在 source 添加一个字段，所有语义 derivation 必须出现明确 compile/test/review 决策，而不是静默传播。特别检查 authorization、owner、version、secret、lifecycle、durable identity 这类不能默认继承的字段。
-
-同时不要把 ordinary immutable update 写得异常繁琐。如果所有 fields 除一个外确实应该保持，record-copy 就是最清楚的表达。RuleBook 反对 accidental inheritance，不反对语言原生的 immutable update。
-
-完成时，从 constructor/mapper 本身就能解释 derived value 为什么拥有每个重要 fact；未来 source 扩展不会自动扩大 derived authority。
-
-> 新值应继承语义，不应继承 prototype 的偶然形状。
+## 完成条件
+每个 derived value 的内容都能由 target concept 的 constructor/relation 解释；没有字段仅因为“prototype 当时有它”而进入新值。

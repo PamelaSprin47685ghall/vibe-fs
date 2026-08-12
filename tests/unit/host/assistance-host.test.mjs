@@ -14,6 +14,7 @@ import {
   physicalUser,
   promptDispatcher,
   providerRun,
+  reconcileSupervisor,
   roles,
   sessionId,
   toList,
@@ -25,7 +26,7 @@ import {
   ReconciledTurnDelivery,
 } from '../../../dist/Application/Reconciliation/ReconciledTurn.js'
 import { forJournal, Runtime__AcceptHumanRoot } from '../../../dist/Application/Prompting/PromptDispatcher.js'
-import { captureOpening, captureTerminalText } from '../../../dist/Application/Reconciliation/XTraceCapture.js'
+import { captureOpening } from '../../../dist/Application/Reconciliation/XTraceCapture.js'
 import * as NeedHelpSensorModule from '../../../dist/Infrastructure/OpenCode/Host/NeedHelpSensor.js'
 import * as AssistanceHostModule from '../../../dist/Infrastructure/OpenCode/Host/AssistanceHost.js'
 import * as QuiescenceModule from '../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js'
@@ -93,7 +94,7 @@ const abortedTurn = (session, root, run, role) =>
     undefined,
   )
 
-const completedTurn = (session, root, run, role) =>
+const completedTurn = (session, root, run, role, text = 'independent perspective') =>
   new ReconciledTurn(
     sessionId(session),
     physicalUser(root),
@@ -101,7 +102,7 @@ const completedTurn = (session, root, run, role) =>
     providerRun(run),
     roles.of(role),
     undefined,
-    [],
+    [reconcileSupervisor.textPart(text)],
     'stop',
     undefined,
     undefined,
@@ -257,9 +258,6 @@ test('AGENT_031_deep_needhelp_uses_one_real_inquiry_consultation_parent_and_chil
     assert.match(sends[0].text, /如何解决这个 agent 的当前困难？/)
     assert.match(sends[0].text, /original deep-coder charge/, 'Commissioner LWR must carry parent opening')
 
-    const childSession = sessionId('ses_consult_1')
-    captureTerminalText(journal, childSession, 'independent perspective', providerRun('asst_consult_done'))
-
     const childDone = completedTurn('ses_consult_1', 'msg_assistance_1', 'asst_consult_done', 'Inquiry')
     const returned = await handleTurn(host, childDone)
     assert.equal(outcomeName(returned), 'Handled')
@@ -307,8 +305,10 @@ test('AGENT_031_owner_drop_abandons_active_consultation_and_late_child_terminal_
     assert.equal(sends.length, 1)
 
     dropSession(host, sessionId(owner))
-    captureTerminalText(journal, sessionId('ses_consult_1'), 'late advice', providerRun('asst_late'))
-    const late = await handleTurn(host, completedTurn('ses_consult_1', 'msg_assistance_1', 'asst_late', 'Inquiry'))
+    const late = await handleTurn(
+      host,
+      completedTurn('ses_consult_1', 'msg_assistance_1', 'asst_late', 'Inquiry', 'late advice'),
+    )
     assert.notEqual(outcomeName(late), 'NotAssistance')
     assert.equal(sends.length, 1, 'late consultation result must not send anything back to dropped owner')
   })

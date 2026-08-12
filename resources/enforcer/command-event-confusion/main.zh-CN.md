@@ -1,38 +1,32 @@
-# command-event-confusion — Main
+# command-event-confusion — Main 中文版
 
-把 request 与 occurrence 拆成不同类型、不同 owner、不同 handler。
+## 现在该做什么
+把 request 与 occurrence 分成不同类型、不同 handler、不同 durability meaning。Command 在当前 state/policy 下被 validate；只有成功后，才 append 描述真实发生结果的 event。Replay 只应用 event，不重新谈判过去。
 
-Command 进入 current policy：校验 identity/authorization/current state，可能返回 typed rejection；只有成功决定后，才 append 描述**真正发生了什么**的 event。Event apply/replay 只负责 deterministic reconstruction，不再调用今天的 permission/business decision。
+## 为什么这很重要
+如果未来 policy 能否决过去 event，历史会随代码升级而改变；如果未验证 command 直接成为 event，系统又会把“想做”伪造成“已做”。两种错误都破坏 replay 的可信度。
 
-健康形状：
+清晰分离后，current authority 与 historical authority 各归其位：policy 决定现在允许什么，event log 记录已经发生什么。
 
-```text
-PlaceOrder command
-      ↓ current policy
-Rejected | [OrderPlaced event]
-                    ↓
-              durable history
-                    ↓ replay
-              reconstructed state
-```
+## 修复策略
+- commands/events 使用不同命名与类型；
+- command handler 返回 typed rejection 或 emitted events；
+- event apply 保持 deterministic、policy-free；
+- durable command inbox 若需要，明确其 lifecycle，不把 command payload 当 outcome；
+- replay 只检查 integrity/version compatibility，不重新 authorization；
+- 过去需要 correction 时 append compensation/supersession event。
 
-如果 command 本身需要 durable queue/inbox，明确它仍是 pending intention；处理完成后记录 accepted/rejected/outcome。不要因为“已经写磁盘”就把 request 叫 event。
+## 常见假修复
+- 一个 message 加 `isValidated` flag。
+- command/event 共用 DTO，仅靠 topic name 猜语义。
+- replay 时 catch “现在 policy 不允许”然后 skip old event。
+- 为少建一个 type，把 command payload 原样存成 event。
+- 认为“写入队列”就等于业务 effect 成功。
 
-常见假修复：
+## 验证
+改变当前 authorization/business policy，再 replay 同一 historical event stream：历史 state 应保持不变。
 
-- 一个 shared message 加 `validated=true` flag；
-- replay failure 后 catch 并 skip 旧 event；
-- event apply 里重新查 today authorization；
-- policy 变化后 migration 直接删除“现在看来不合法”的历史 event；
-- command payload 与 event payload 完全复用，导致 event 没有 actual generated identity/time/result；
-- projection 失败就认为 event 本身需要再次审批。
+同时构造 invalid command：它应在 emit fact 前被拒绝，event log 不应出现“其实没发生”的 occurrence。
 
-验证必须做 policy-change replay：先用 policy V1 产生 event stream，再切到 V2。重放历史得到的 past state 应由 events 决定，不因今天 policy 改变而改写。V2 只影响**新的 commands**能否产生新的 events。
-
-再测试 invalid command：它必须在 event emission 前失败，history 里不能出现一个“后来才被判 invalid”的 occurrence。
-
-如果历史确实需要 reinterpretation（例如正式 semantic migration），应通过新 version/migration/correction protocol 明确发生，而不是让普通 replay 偷偷重新判案。
-
-完成时 type/name/API 就能区分两类东西：一个是现在仍可拒绝的意图，一个是未来必须承认的事实；两边不会因“字段长得一样”共享 epistemic status。
-
-> Command asks the world to change. Event testifies that it changed. 把请求写成证词，或把证词重新当请求，都会让历史失去可信度。
+## 完成条件
+每个 durable record 的 epistemic status 清楚：request 可以被拒绝；event 一旦 committed 就作为发生过的事实被重放。
