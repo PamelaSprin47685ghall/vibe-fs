@@ -444,7 +444,7 @@ tools = ["fork", "join", "horizon", "suicide"]
 [[turn]]
 id = "continue"
 internal = true
-user = "# Continue after provider failure."
+user = "# The previous attempt did not complete."
 
   [[turn.step]]
   respond = { type = "text", text = "long-stroke fallback continuation completed." }

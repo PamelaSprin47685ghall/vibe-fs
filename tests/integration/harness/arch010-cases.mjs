@@ -414,7 +414,15 @@ export const arch010Cases = [
       // The regression this pairs with: production's own instructions talk about fields, delimiters
       // and TOML. If any rule above were written as a naive token scan, ForkChildPayload's real header
       // would fail — and the fix would be to soften the header rather than the rule.
-      assertEq(forkBaseInstructions.length, 1, 'the base header is the single report-format instruction');
+      const baseText = forkBaseInstructions.join('\n');
+      assertTrue(
+        !/exactly these fields/.test(baseText),
+        'the base header is prose testimony guidance, never a fixed report field list',
+      );
+      assertTrue(
+        /closing report/.test(baseText),
+        'the base header still teaches every child how to close',
+      );
 
       accepts(
         forkPayload({ assignment: 'Do X.', parentWorkRecord: 'B.', originalUserRequirements: ['Ship it.'] }),

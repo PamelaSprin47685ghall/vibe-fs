@@ -220,7 +220,7 @@ test('LOOP_006_continuation_text_is_the_english_loop_nudge', () => {
   ])
   assert.notEqual(runtimeNudge.loopContinue, runtimeNudge.providerRetry)
   assert.match(runtimeNudge.loopContinue, /Continue from the interruption/)
-  assert.match(runtimeNudge.providerRetry, /Continue after provider failure/)
+  assert.match(runtimeNudge.providerRetry, /The previous attempt did not complete/)
 })
 
 test('LOOP_006_armed_abort_bridges_to_fallback_advance_once', () => {

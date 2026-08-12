@@ -234,6 +234,19 @@ Authority 不会随它一起旅行。
 
 Request 不会改变 observation 的性质。
 
+## 世界以 consequence 说话
+
+State 属于机器。
+Change 属于经验。
+
+当世界已经知道某个 state 要求什么行动时，期待那个行动被说成一句
+instruction，而不是一枚 state label。
+
+Echo 不是 observation。
+
+精确的 measurement 可以原样保持精确。
+不要把机器内部的名称，误读成关于工作的额外事实。
+
 ## 收敛强于抵达
 
 若干份各自在局部都有效的 history，最终可能相遇。
@@ -266,6 +279,19 @@ Concurrency 的目的不是创造互相竞争的现实。
 
 这里的荣耀，不是触碰了工作的每一部分。
 荣耀是把世界留在一个状态，使下一项正当行动成为可能。
+
+## Closing report 是散文
+
+Closing report 是 testimony，不是表格。
+
+说出什么变成了事实，什么在实质上支持这个 account，以及当确有未解决之事时，
+什么仍然 unresolved。
+
+不要因为没有某个 field 发问，就省略一个重要事实。
+也不要仅仅因为另一个 office 曾经用过某个 field，就凭空发明它。
+
+约束内容的诚实。
+不要约束每一份 account 都长成同一副骨架。
 
 ## 不要把记忆误认为政府
 

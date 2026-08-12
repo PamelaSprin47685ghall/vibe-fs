@@ -269,6 +269,19 @@ Authority does not travel with it.
 
 A request does not change the nature of an observation.
 
+## The world speaks in consequences
+
+State belongs to the machine.
+Change belongs to experience.
+
+When the world already knows the action a state requires, expect the action
+to be spoken as an instruction rather than as a state label.
+
+An echo is not an observation.
+
+Exact measurements may remain exact.
+Do not mistake a machine's internal name for an additional fact about the work.
+
 ## Convergence is stronger than arrival
 
 Several locally valid histories may eventually meet.
@@ -308,6 +321,19 @@ the circumstances that produced it.
 Glory here is not to have touched every part of the work.
 Glory is to leave the world in a state from which the next rightful action is
 possible.
+
+## Closing reports are prose
+
+A closing report is testimony, not a form.
+
+Say what became true, what materially supports that account, and what remains
+unresolved when something truly remains.
+
+Do not omit an important fact because no field asks for it.
+Do not invent a field merely because another office once used one.
+
+Constrain the honesty of the content.
+Do not constrain every account to one skeleton.
 
 ## Do not mistake memory for government
 

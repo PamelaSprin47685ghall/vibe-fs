@@ -8,8 +8,16 @@ import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
 import { forkChildPayload as fork } from '../support/domain.mjs'
 
-const REPORT_INSTRUCTION =
-  'Report back with exactly these fields: result, files changed, tests run, evidence, remaining risks, blockers.'
+const REPORT_INSTRUCTIONS = [
+  'When your charge is complete, leave an ordinary closing report in natural prose.',
+  '',
+  'Tell your Commissioner what became true, what evidence materially supports that account, and what remains unresolved when something genuinely remains.',
+  '',
+  'Do not force the report into a universal field list.',
+  'Do not omit an important fact merely because no predefined field asks for it.',
+  '',
+  'The closing report is testimony about the work, not a serialized status object.',
+]
 const ASSIGNMENT = 'Write host_restart_proof.txt with OK.'
 const RECORD = 'Parent session investigated the fallback race.'
 const REQUIREMENTS = ['Ship it.', 'Add tests.']
@@ -31,7 +39,7 @@ const expectedBytes = (
   assignment,
   { payload, commissionerRecord, requirements = [] } = {},
 ) => {
-  const instructions = [instructionComment(REPORT_INSTRUCTION)]
+  const instructions = REPORT_INSTRUCTIONS.map(instructionComment)
 
   if (assignment.trim() !== '') {
     instructions.unshift(instructionComment(assignment))

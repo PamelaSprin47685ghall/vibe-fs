@@ -274,7 +274,7 @@ test('H13_05_missing_anchor_pair_is_omitted_not_relocated', () => {
       info: { id: 'synth-prefix-frozen', role: 'user' },
       parts: [{ type: 'text', text: '# Opening\ncovered work' }],
     }
-    const cont = userMsg('u-continue', '# Continue after provider failure.')
+    const cont = userMsg('u-continue', '# The previous attempt did not complete.')
     const result = resultOf(tryInject(opened.journal, session, text, toList([synthPrefix, cont])))
     assert.equal(result.ok, true, `missing-anchor pair must omit, not fail: ${result.error ?? ''}`)
     const wire = listItems(result.value)
@@ -310,7 +310,7 @@ test('H13_05b_xwire_drop_leading_continue_still_commits', () => {
     const session = 'h13-05b'
     const user1 = userMsg('u1', 'X-B round 1')
     const failAsst = { info: { id: 'a1', role: 'assistant' }, parts: [] }
-    const cont = userMsg('u2', '# Continue after provider failure.')
+    const cont = userMsg('u2', '# The previous attempt did not complete.')
     const synthPrefix = {
       info: { id: 'synth-prefix-frozen', role: 'user' },
       parts: [{ type: 'text', text: '# Opening\nX-B round 1\n\n# Chronicle\nframe' }],

@@ -22,9 +22,21 @@ type ForkChildAssignment =
 [<RequireQualifiedAccess>]
 module ForkChildPayload =
 
-    /// The one unconditional instruction every forked child receives: the report shape.
+    /// The one unconditional instruction every forked child receives: how to close.
+    ///
+    /// GrandRewrite §3.2.2 — constrain the honesty of the content, not the skeleton of the
+    /// account. The closing report is prose testimony, never a universal field list; the
+    /// retired form (`result, files changed, tests run, evidence, remaining risks, blockers`)
+    /// made every child fill a status DTO instead of testifying about its own work.
     let BaseInstructions =
-        [ "Report back with exactly these fields: result, files changed, tests run, evidence, remaining risks, blockers." ]
+        [ "When your charge is complete, leave an ordinary closing report in natural prose."
+          ""
+          "Tell your Commissioner what became true, what evidence materially supports that account, and what remains unresolved when something genuinely remains."
+          ""
+          "Do not force the report into a universal field list."
+          "Do not omit an important fact merely because no predefined field asks for it."
+          ""
+          "The closing report is testimony about the work, not a serialized status object." ]
 
     /// Emitted only alongside a commissioner record field.
     let CommissionerRecordInstruction =

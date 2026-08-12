@@ -72,12 +72,17 @@ test('EXEC_016_join_guard_continuation_kind_is_parseable', () => {
 
 test('EXEC_016_join_guard_text_demands_join_before_finish', () => {
   assert.deepEqual(runtimeNudge.backgroundJoinGuardInstructions, [
-    'Background work is still outstanding.',
-    'Call join to collect completed results before finishing.',
-    'Use list when you need the current resource view.',
+    'Background work remains away.',
+    '',
+    'Receive the consequences that have become available before you finish.',
+    '',
+    'If useful independent work remains, continue it instead of waiting merely because something else is still away.',
+    '',
+    'Use horizon when orientation would change what you should do next.',
+    'Use join when receiving an arrived consequence is now useful.',
   ])
-  assert.match(runtimeNudge.backgroundJoinGuard, /Background work is still outstanding/)
-  assert.match(runtimeNudge.backgroundJoinGuard, /Call join/)
+  assert.match(runtimeNudge.backgroundJoinGuard, /Background work remains away/)
+  assert.match(runtimeNudge.backgroundJoinGuard, /Use join/)
 })
 
 test('EXEC_016_listable_handles_are_outstanding_for_manager', () => {

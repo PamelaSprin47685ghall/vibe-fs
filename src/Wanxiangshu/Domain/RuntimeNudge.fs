@@ -32,9 +32,15 @@ module RuntimeNudge =
 
     /// FALLBACK: the continuation issued after a provider failure inside one Logical Run.
     ///
-    /// Not a new task and not fallback bookkeeping — the run continues, and the model needs to know
-    /// only that it should carry on.
-    let ProviderRetryInstructions = [ "Continue after provider failure." ]
+    /// Not a new task and not fallback bookkeeping — the run continues. The calibration the
+    /// model most needs here: a physical execution failure is not evidence about the task,
+    /// so the failed attempt must not quietly reprice the work.
+    let ProviderRetryInstructions =
+        [ "The previous attempt did not complete."
+          ""
+          "Continue the same work from the evidence already before you."
+          ""
+          "Do not treat the failed attempt itself as evidence about the task." ]
 
     /// LOOP-006: continuation after a LOOP kill was bridged into the same AABB path.
     ///
@@ -47,10 +53,19 @@ module RuntimeNudge =
     let loopContinue = SyntheticToml.document LoopContinueInstructions []
 
     /// EXEC-016: join-capable role tried to finish while resources remain unjoined.
+    ///
+    /// The guard names the two verbs by their current contracts (`horizon` / `join`) and
+    /// restores the anti-idleness calibration: something still being away is not, by itself,
+    /// a reason to stop doing useful independent work.
     let BackgroundJoinGuardInstructions =
-        [ "Background work is still outstanding."
-          "Call join to collect completed results before finishing."
-          "Use list when you need the current resource view." ]
+        [ "Background work remains away."
+          ""
+          "Receive the consequences that have become available before you finish."
+          ""
+          "If useful independent work remains, continue it instead of waiting merely because something else is still away."
+          ""
+          "Use horizon when orientation would change what you should do next."
+          "Use join when receiving an arrived consequence is now useful." ]
 
     /// REVIEW-003: the Reviewer produced prose where a structured verdict was required.
     let ReviewerVerdictGuardInstructions =
@@ -59,11 +74,16 @@ module RuntimeNudge =
 
     /// Interaction repair after tool work with no final report.
     ///
-    /// Bare `#` only. The model already knows the report shape
-    /// (`ForkChildPayload.BaseInstructions`); this is just the poke that the turn is unfinished.
-    /// `SyntheticToml.comment ""` renders as `#`.
-    // ponytail: one-byte nudge; expand only if bare `#` stops eliciting the report.
-    let MissingFinalReportInstructions = [ "" ]
+    /// Short because the semantics are simple, not because brevity is a virtue: the turn is
+    /// unfinished until an ordinary closing report exists, and the report is natural prose —
+    /// not a shape to fill, and not a reason to invent unrelated work.
+    let MissingFinalReportInstructions =
+        [ "Your work has not yet left an ordinary closing report."
+          ""
+          "Finish the current charge in natural prose."
+          "Say what materially became true and what, if anything, remains unresolved."
+          ""
+          "Do not begin unrelated work merely to fill a report shape." ]
 
     /// Interaction repair that continues an in-progress turn (finish=tool-calls with no
     /// tool part, or a reasoning-only stop). ARCH-011: the typed `repairKind` is the
