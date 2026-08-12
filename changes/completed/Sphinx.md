@@ -1299,12 +1299,14 @@ Phase 0 Sphinx 已落地：正交 Node MCP（handle 有状态 co-yield）+ 万�
 **Semantic corrections**
 
 - 删除 `evidenceMass` 伪置信度；SemanticAssessment / Candidates / Synthesis 不再增加世界证据。
-- Candidate 恢复为“待调查认知动作”，必须经 Kernel 选择并 `InvestigateRequest` 后才能产生 Finding/Evidence。
+- Candidate 恢复为“待调查认知动作”，必须经 Kernel 选择并 `InvestigateRequest` 后才能产生 Finding/Evidence；同 semantic+dependency 的多方法命中合并 provenance，不再丢来源。
 - QuestionForm 保留概率分布；RootContract 不再靠 primary argmax 偷换不确定性。
-- Evidence 强制 Source + DependencyKey；同依赖组不按独立因子重复计数。
+- Evidence 强制 Source + DependencyKey；内部 identity = semantic+dependency，同 semantic 的独立来源可并存；同依赖组不按独立因子重复计数。
 - Bayesian posterior 仅接受完整、有限 `[0,1]` likelihood 且 `numericQualified=true` 的 Evidence；否则无数值 posterior。
 - root-relative policy 纳入 GatewayGain；Stop 与 Investigate/Synthesis 位于同一 utility 比较空间。
-- 表示约简只接受显式 EquivalenceKey 或 semantic+dependency 同一；独立来源的同问题不得误判重；类内保留真实 Pareto frontier。
+- QuestionForm 恢复为可随 co-yield 更新的 `Q_t(Form)`：Investigation 可带 control-only semanticAssessment，重算 RootContract 但不增加 Evidence。
+- 方法生成恢复递归：每次 Investigation 后 `NeedsGeneration=true`，下一次裁决前重新激活 generator，而不是只在开局生成一次候选。
+- 表示约简只接受 Kernel-owned EquivalenceKey 或 semantic+dependency 同一；wire `equivalenceKey` 不具判重权；独立来源的同问题不得误判重；类内保留真实 Pareto frontier。
 - A* 改为标准 `g+h + bestG + reopen`；MCTS 改为 selection/expansion/rollout/backup + semantic transposition；两者均是 solver embedding，不是 ontology。
 
 **Implementation correction**

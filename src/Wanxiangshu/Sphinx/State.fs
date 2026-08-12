@@ -76,7 +76,7 @@ module State =
           MonteCarlo = Map.empty
           Representation = emptyRepresentation
           SolverMode = SolverMode.Bellman
-          GenerationRounds = 0
+          NeedsGeneration = false
           Revision = 0 }
 
     let withYield (request: Request) (state: EpistemicState) =
@@ -87,6 +87,10 @@ module State =
                     UsedYields = state.Budget.UsedYields + 1 } }
 
     let clearPending state = { state with PendingRequest = None }
+
+    let hasEvidenceSemanticKey semanticKey (state: EpistemicState) =
+        state.Evidence
+        |> Map.exists (fun _ evidence -> evidence.SemanticKey = semanticKey)
 
     let remainingYieldBudget state =
         state.Budget.MaxYields - state.Budget.UsedYields

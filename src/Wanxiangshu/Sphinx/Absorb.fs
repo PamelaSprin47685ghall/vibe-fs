@@ -14,7 +14,7 @@ module Absorb =
           Method = proposal.Method
           Question = proposal.Question
           SemanticKey = normalizeKey proposal.SemanticKey
-          EquivalenceKey = proposal.EquivalenceKey |> Option.map normalizeKey
+          EquivalenceKey = None
           DependencyKey = proposal.DependencyKey |> Option.map normalizeKey
           ExpectedRootGain = max 0.0 proposal.ExpectedRootGain
           GatewayGain = max 0.0 proposal.GatewayGain
@@ -26,7 +26,10 @@ module Absorb =
     let private betterCandidate (left: CognitiveAction) (right: CognitiveAction) =
         let leftScore = left.ExpectedRootGain + 0.65 * left.GatewayGain - left.Cost
         let rightScore = right.ExpectedRootGain + 0.65 * right.GatewayGain - right.Cost
-        if rightScore > leftScore then right else left
+        let selected = if rightScore > leftScore then right else left
+
+        { selected with
+            Provenance = List.distinct (left.Provenance @ right.Provenance) }
 
     let private addCandidate proposal (state: EpistemicState) =
         let action = actionFromProposal proposal
@@ -65,21 +68,29 @@ module Absorb =
         { state with Findings = findings }
 
     let private addEvidence (evidence: Evidence) (state: EpistemicState) =
-        let key = normalizeKey evidence.SemanticKey
+        let semanticKey = normalizeKey evidence.SemanticKey
         let dependency = normalizeKey evidence.DependencyKey
+        let storageKey = semanticKey + "|dependency:" + dependency
 
         let normalized =
             { evidence with
-                SemanticKey = key
+                SemanticKey = semanticKey
                 DependencyKey = dependency
                 Provenance = evidence.Provenance |> List.distinct }
 
-        if Map.containsKey key state.Evidence then
-            state
-        else
+        match Map.tryFind storageKey state.Evidence with
+        | Some existing ->
             { state with
-                Evidence = state.Evidence |> Map.add key normalized
-                Dependencies = State.addDependency dependency key state.Dependencies }
+                Evidence =
+                    state.Evidence
+                    |> Map.add
+                        storageKey
+                        { existing with
+                            Provenance = List.distinct (existing.Provenance @ normalized.Provenance) } }
+        | None ->
+            { state with
+                Evidence = state.Evidence |> Map.add storageKey normalized
+                Dependencies = State.addDependency dependency storageKey state.Dependencies }
 
     let private addHypothesis (hypothesis: Hypothesis) (state: EpistemicState) =
         let key = normalizeKey hypothesis.SemanticKey
@@ -109,20 +120,28 @@ module Absorb =
         match observation with
         | SemanticAssessmentObservation assessment ->
             { baseState with
-                RootContract = Some(State.deriveRootContract assessment) }
+                RootContract = Some(State.deriveRootContract assessment)
+                NeedsGeneration = true }
         | CandidatesObservation proposals ->
             proposals
             |> List.fold
                 (fun current proposal -> addCandidate proposal current)
                 { baseState with
-                    GenerationRounds = baseState.GenerationRounds + 1 }
+                    NeedsGeneration = false }
         | InvestigationObservation result ->
             let resolved =
                 State.markActionResolved (normalizeKey result.ActionKey) { baseState with Synthesis = None }
 
+            let semanticallyUpdated =
+                match result.SemanticAssessment with
+                | None -> resolved
+                | Some assessment ->
+                    { resolved with
+                        RootContract = Some(State.deriveRootContract assessment) }
+
             let findings =
                 result.Findings
-                |> List.fold (fun current item -> addFinding item current) resolved
+                |> List.fold (fun current item -> addFinding item current) semanticallyUpdated
 
             let evidence =
                 result.Evidence
@@ -133,7 +152,10 @@ module Absorb =
                 |> List.fold (fun current item -> addHypothesis item current) evidence
 
             result.Candidates
-            |> List.fold (fun current proposal -> addCandidate proposal current) hypotheses
+            |> List.fold
+                (fun current proposal -> addCandidate proposal current)
+                { hypotheses with
+                    NeedsGeneration = true }
         | SynthesisObservation synthesis ->
             let state' =
                 { baseState with

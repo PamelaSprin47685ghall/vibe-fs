@@ -51,7 +51,7 @@ test('qualified_independent_evidence_updates_posterior', () => {
   const store = createStore()
   const { handle, actionKey } = preparePolarInvestigation(store)
 
-  const answered = resume(store, handle, {
+  const next = resume(store, handle, {
     type: 'Investigation',
     actionKey,
     findings: [
@@ -77,9 +77,11 @@ test('qualified_independent_evidence_updates_posterior', () => {
     ],
   })
 
-  assert.equal(answered.status, 'answered')
-  assert.ok(Math.abs(answered.answer.bayesian.posterior.up - 0.7) < 1e-12)
-  assert.ok(Math.abs(answered.answer.bayesian.posterior.down - 0.3) < 1e-12)
+  assert.equal(next.status, 'yield')
+  assert.equal(next.request.type, 'GenerateCandidatesRequest')
+  const posterior = Object.fromEntries(state(store, handle).Bayesian.Posterior)
+  assert.ok(Math.abs(posterior.up - 0.7) < 1e-12)
+  assert.ok(Math.abs(posterior.down - 0.3) < 1e-12)
 })
 
 test('unqualified_item_cannot_mask_qualified_evidence_from_same_dependency_group', () => {
@@ -116,6 +118,44 @@ test('unqualified_item_cannot_mask_qualified_evidence_from_same_dependency_group
   const posterior = Object.fromEntries(state(store, handle).Bayesian.Posterior)
   assert.ok(Math.abs(posterior.up - 0.9) < 1e-12)
   assert.ok(Math.abs(posterior.down - 0.1) < 1e-12)
+})
+
+test('same_semantic_evidence_from_independent_dependency_groups_is_preserved_twice', () => {
+  const store = createStore()
+  const { handle, actionKey } = preparePolarInvestigation(store)
+
+  resume(store, handle, {
+    type: 'Investigation',
+    actionKey,
+    hypotheses: [
+      { semanticKey: 'up', label: '上涨', prior: 0.5 },
+      { semanticKey: 'down', label: '不涨', prior: 0.5 },
+    ],
+    evidence: [
+      {
+        semanticKey: 'evidence:same-proposition',
+        proposition: '独立来源 A 支持上涨。',
+        source: { id: 'source-a', kind: 'dataset' },
+        dependencyKey: 'source-a',
+        likelihoods: { up: 0.8, down: 0.2 },
+        numericQualified: true,
+      },
+      {
+        semanticKey: 'evidence:same-proposition',
+        proposition: '独立来源 B 支持上涨。',
+        source: { id: 'source-b', kind: 'dataset' },
+        dependencyKey: 'source-b',
+        likelihoods: { up: 0.75, down: 0.25 },
+        numericQualified: true,
+      },
+    ],
+  })
+
+  const current = state(store, handle)
+  const posterior = Object.fromEntries(current.Bayesian.Posterior)
+  assert.equal(current.Evidence.size, 2)
+  assert.ok(Math.abs(posterior.up - 12 / 13) < 1e-12)
+  assert.ok(Math.abs(posterior.down - 1 / 13) < 1e-12)
 })
 
 test('same_dependency_group_is_not_counted_as_independent_evidence_twice', () => {

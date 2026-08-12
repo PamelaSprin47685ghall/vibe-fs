@@ -13,6 +13,8 @@
 | pending request gate | 错 Observation type / action id → error；Revision 不变 | SPHINX-003 |
 | fixed point | `close(close(S)) = close(S)` | SPHINX-004 |
 | gateway value | low immediate gain + high GatewayGain 仍可被选中 | SPHINX-007 |
+| control belief 可更新 | Investigation semanticAssessment 改 RootContract，同时 Evidence/Findings 仍不凭空增长 | SPHINX-006、007 |
+| generator 再生长 | Investigation 后先重新 `GenerateCandidatesRequest`，不是直接把开局 frontier 当完整搜索空间 | SPHINX-001、010 |
 | synthesis 守恒 | Synthesis 前后 Evidence.Count 不变 | SPHINX-006 |
 | ungrounded finding | 保留 claim，但 answer 显式 `ungrounded-finding:<key>`；wire confidence 不进入权威状态 | SPHINX-004、006 |
 
@@ -37,6 +39,7 @@
 | qualification gate | `numericQualified=false` 即使带 likelihood 也不产生 Bayesian | SPHINX-008 |
 | qualified posterior | 0.5/0.5 prior × 0.7/0.3 likelihood → 0.7/0.3 posterior | SPHINX-008、009 |
 | dependency conservation | 同 DependencyKey 两条 likelihood 不重复相乘 | SPHINX-006、008 |
+| independent same-semantic evidence | 同 semantic key、不同 dependency group 的 Evidence 同时保留并可独立更新 posterior | SPHINX-006、008 |
 | qualification before grouping | 同依赖组不合格记录不得遮住后续合格 likelihood | SPHINX-008 |
 
 代表测试：`tests/unit/sphinx/bayes.test.mjs`。
@@ -65,7 +68,9 @@
 
 | 证明 | 期望 | 条款 |
 |---|---|---|
-| dominance | 显式同 EquivalenceKey 且一方逐维支配 → 淘汰弱代表 | SPHINX-010 |
+| wire 无等价权 | Candidate 发送 `equivalenceKey` 不能触发 merge；CognitiveAction 内部 EquivalenceKey 仍为空 | SPHINX-010 |
+| kernel dominance | Kernel 已确定同一等价类后，一方逐维支配 → 淘汰弱代表 | SPHINX-010 |
+| provenance conservation | 同 semantic+dependency Candidate 多方法命中 → 一个动作，但 provenance 并集保留 | SPHINX-010 |
 | dependency separation | 同 semantic question + 不同 dependency → 两动作均保留 | SPHINX-010 |
 | Pareto frontier | 高收益高成本 vs 低收益低成本不可比较 → 两者均保留 | SPHINX-010 |
 

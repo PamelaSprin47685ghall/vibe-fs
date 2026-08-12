@@ -58,7 +58,7 @@ type EpistemicState =
       MonteCarlo: Map<string, MonteCarloNode>
       Representation: RepresentationState
       SolverMode: SolverMode
-      GenerationRounds: int
+      NeedsGeneration: bool
       Revision: int }
 
 type CanonicalAnswer =

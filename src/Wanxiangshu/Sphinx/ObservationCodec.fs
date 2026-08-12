@@ -6,7 +6,7 @@ module ObservationCodec =
 
     open DecodePrimitives
 
-    let private decodeSemanticAssessment raw =
+    let private decodeAssessment raw =
         result {
             let! forms = required "forms" formMap raw
             let! facets = optional "facets" stringMap Map.empty raw
@@ -14,19 +14,20 @@ module ObservationCodec =
             let! intents = optional "intents" stringList [] raw
 
             return
-                SemanticAssessmentObservation
-                    { Forms = forms
-                      Facets = facets
-                      Targets = targets
-                      Intents = intents }
+                { Forms = forms
+                  Facets = facets
+                  Targets = targets
+                  Intents = intents }
         }
+
+    let private decodeSemanticAssessment raw =
+        decodeAssessment raw |> Result.map SemanticAssessmentObservation
 
     let private decodeCandidate raw =
         result {
             let! methodName = required "method" asString raw
             let! question = required "question" asString raw
             let! semanticKey = required "semanticKey" asString raw
-            let! equivalenceKey = optional "equivalenceKey" asString "" raw
             let! dependencyKey = optional "dependencyKey" asString "" raw
             let! rootGain = optional "expectedRootGain" asFloat 0.0 raw
             let! gatewayGain = optional "gatewayGain" asFloat 0.0 raw
@@ -37,11 +38,6 @@ module ObservationCodec =
                 { Method = methodName
                   Question = question
                   SemanticKey = semanticKey
-                  EquivalenceKey =
-                    if String.IsNullOrWhiteSpace equivalenceKey then
-                        None
-                    else
-                        Some equivalenceKey
                   DependencyKey =
                     if String.IsNullOrWhiteSpace dependencyKey then
                         None
@@ -128,6 +124,7 @@ module ObservationCodec =
     let private decodeInvestigation raw =
         result {
             let! actionKey = required "actionKey" asString raw
+            let! semanticAssessment = optional "semanticAssessment" (decodeAssessment >> Result.map Some) None raw
             let! findings = optional "findings" (asArray decodeFinding) [] raw
             let! evidence = optional "evidence" (asArray decodeEvidence) [] raw
             let! hypotheses = optional "hypotheses" (asArray decodeHypothesis) [] raw
@@ -136,6 +133,7 @@ module ObservationCodec =
             return
                 InvestigationObservation
                     { ActionKey = actionKey
+                      SemanticAssessment = semanticAssessment
                       Findings = findings
                       Evidence = evidence
                       Hypotheses = hypotheses

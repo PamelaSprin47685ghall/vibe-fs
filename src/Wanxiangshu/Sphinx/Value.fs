@@ -8,7 +8,7 @@ module Value =
         |> Seq.map snd
         |> Seq.filter (fun finding ->
             finding.EvidenceKeys
-            |> List.exists (fun key -> Map.containsKey key state.Evidence))
+            |> List.exists (fun key -> State.hasEvidenceSemanticKey key state))
         |> Seq.length
 
     let currentAnswerLoss (state: EpistemicState) =

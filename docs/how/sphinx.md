@@ -44,7 +44,7 @@ Polar → Judgment
 Other → Credence
 ```
 
-因此 `Why=.55, How=.35, Polar=.10` 同时保留 Explanation / Plan / Judgment 质量；后续方法选择读取完整分布与 Facets。
+因此 `Why=.55, How=.35, Polar=.10` 同时保留 Explanation / Plan / Judgment 质量；后续方法选择读取完整分布与 Facets。RootContract 不是 bind-once：Investigation 可返回可选 `semanticAssessment`，Absorb 只更新控制层 RootContract，并把 `NeedsGeneration` 置真；Evidence / posterior 不因此增加。
 
 ## 3. 方法生成
 
@@ -59,9 +59,9 @@ MethodUtility
 − .08 × base cost
 ```
 
-阈值只决定哪些 generator 激活。Kernel 随后发 `GenerateCandidatesRequest(methods, root)`；LLM 只生成具体 CandidateProposal：question、semantic key、可选 equivalence/dependency、ExpectedRootGain、GatewayGain、Cost、provenance。
+阈值只决定哪些 generator 激活。Kernel 随后发 `GenerateCandidatesRequest(methods, root)`；LLM 只生成具体 CandidateProposal：question、semantic key、可选 dependency、ExpectedRootGain、GatewayGain、Cost、provenance。wire 不接受可支配 Kernel 判重的 equivalence assertion。
 
-CandidateProposal 进入 `Actions`，不进入 Findings/Evidence/Hypotheses。
+CandidateProposal 进入 `Actions`，不进入 Findings/Evidence/Hypotheses。SemanticAssessment 吸收后 `NeedsGeneration=true`；Candidates 吸收后清为 false；任何 Investigation 吸收新认识后再次置 true。因此下一次动作裁决前会重新运行 generator，而不是只在 inquiry 开局生成一次。
 
 ## 4. Pending Request 契约
 
@@ -90,16 +90,17 @@ Value 初始为 0
 Status = Open
 ```
 
-同 id 重复时仅保留控制价值更高的候选；仍不写 Evidence / Dependencies。
+同 id 重复时保留控制价值更高的候选代表，但 `Provenance = distinct(old @ new)`；仍不写 Evidence / Dependencies。
 
 ### Investigation
 
 1. 将 selected action 标为 Resolved，并扣实际 action cost。
-2. Findings 以 semantic key 合并 supports/refutes/evidenceKeys/provenance；wire `confidence` 一律丢弃，不把 LLM 自报数值写入对象层 belief。
-3. Evidence 必须携 Source + DependencyKey；同 semantic key 重复不重复插入。
-4. Hypotheses 以 semantic key 去重。
-5. 新 CandidateProposal 递归回到同一 action pool。
-6. 若已有 Synthesis，任何新 Investigation 都使它失效；Closure 可重新生成 Synthesis action。
+2. 可选 `semanticAssessment` 只重算 RootContract；它是控制层观测，不是世界证据。
+3. Findings 以 semantic key 合并 supports/refutes/evidenceKeys/provenance；wire `confidence` 一律丢弃，不把 LLM 自报数值写入对象层 belief。
+4. Evidence 必须携 Source + DependencyKey；内部 storage key = normalized semantic key + dependency key。同 semantic+dependency 的重复 observation 只合并 provenance；同 semantic、不同 dependency 的独立证据并存。
+5. Hypotheses 以 semantic key 去重。
+6. 新 CandidateProposal 递归回到同一 action pool；整个 Investigation 结束时 `NeedsGeneration=true`，强制 Kernel 重新激活方法。
+7. 若已有 Synthesis，任何新 Investigation 都使它失效；Closure 可重新生成 Synthesis action。
 
 ### Synthesis
 
@@ -189,13 +190,13 @@ DependencyKey 已有真实事实时，相同依赖动作折损；候选本身不
 class key：
 
 ```text
-EquivalenceKey present
+Kernel-owned EquivalenceKey present
 → eq:<key>
 else
 → semantic:<SemanticKey>|dependency:<DependencyKey-or-independent>
 ```
 
-因此跨独立 dependency 的同文本问题不合并。
+`CandidateProposal` 没有 EquivalenceKey 字段；wire 即使发送 `equivalenceKey` 也被 codec 忽略。只有 Kernel 内部 canonicalization/rewrite 才能写 `CognitiveAction.EquivalenceKey`。因此跨独立 dependency 的同文本问题不合并，LLM 也不能靠声明等价来触发剪枝。
 
 等价类内逐维 dominance：ExpectedRootGain、GatewayGain、Value、provenance strength 均 ≥，Cost ≤，且至少一项严格。不可比较候选进入 Pareto frontier；RepresentationState 记录 classes / frontiers / representative / estimated future cost。
 

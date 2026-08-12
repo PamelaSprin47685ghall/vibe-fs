@@ -106,11 +106,13 @@ Sphinx 内核模块不得依赖 `Wanxiangshu.Domain`、Agent、Session、OpenCod
 
 SemanticAssessment、候选问题、方法建议、价值估计、Synthesis 文案都是 proposal / computation，不是世界证据。LLM 重述、递归、自我论证、重复采样不得增加 Evidence 或把相关信息伪装成独立来源。
 
+Evidence 的内部 identity 至少包含 normalized semantic key + dependency key：同命题来自两个独立 dependency group 必须能同时存在；同 semantic+dependency 的重复 observation 不增加证据维度，只合并 provenance。Finding 仍按 semantic key 引用 Evidence，因此“同命题多独立来源”不会要求 Finding 复制文本 identity。
+
 Finding 可无 Evidence，但 Canonical Answer 必把这类 claim 标记为 uncertainty；它不能因“模型说得更完整”升级成证据。Finding 自带的 LLM `confidence` 也不具数值资格，Kernel 吸收时丢弃；对象层数值置信只来自 SPHINX-008 的合格概率模型。
 
 ## SPHINX-007：RootContract 保留分布；动作价值相对根问题
 
-`QuestionForm` 不做 argmax 硬分类。Kernel 保留完整 form belief，并线性派生 AnswerContract belief；Facets 独立多标签参与方法适用度。
+`QuestionForm` 不做 argmax 硬分类。Kernel 保留完整 form belief，并线性派生 AnswerContract belief；Facets 独立多标签参与方法适用度。该 belief 是 `Q_t(Form)` 而不是开局常量：后续 Investigation 可携带 control-only `semanticAssessment`，Kernel 重算 RootContract 并重新激活 generator；这类控制更新仍不得新增 Evidence 或改变 posterior。
 
 认知动作的比较量必须相对根问题。当前实现的控制近似：
 
@@ -150,9 +152,9 @@ Sphinx ontology 不等于 A* / Bayes / MCTS；但约束收紧时必须能得到�
 
 动作只有两种情况允许进入同一表示等价类：
 
-1. 上游显式给出 `EquivalenceKey`；或
+1. Kernel 的确定性 canonicalization / representation rewrite 明确写入内部 `EquivalenceKey`；或
 2. semantic key 与 dependency key 同时相同。
 
-相同问题若来自不同独立 dependency group，不得判重。等价类内仅当候选在 ExpectedRootGain、GatewayGain、value、provenance 均不差且 cost 不高，并至少一维严格更优时才支配另一候选；不可比较者保留 Pareto frontier。
+LLM/wire Candidate 的 `equivalenceKey` 不具判重权，当前 codec 直接忽略；无法由 Kernel 证明等价时宁可多保留，也不误合并。相同 semantic+dependency 的 Candidate 是同一 Kernel identity：重复命中时可保留控制价值更好的代表，但必须合并 provenance，不能把“另一个方法也命中”这条来源信息抹掉。相同问题若来自不同独立 dependency group，不得判重。等价类内仅当候选在 ExpectedRootGain、GatewayGain、value、provenance 均不差且 cost 不高，并至少一维严格更优时才支配另一候选；不可比较者保留 Pareto frontier。
 
-方法库是 generator library，不是流水线：Kernel 根据完整 QuestionForm belief + Facets 激活多个方法，再 yield 让语义 oracle 生成具体候选问题。核心五方法仍为 Multidisciplinary / Abduction / Analogy / Counterexample / Synthesis；扩展库包含 CausalMechanism、BaseRate、Dialectic、Falsification、BoundarySearch、SourceTriangulation、MeasurementCritique、OntologyRepair、UnknownExpansion、ScaleShift、ExperimentDesign。新增方法不得获得调度权。
+方法库是 generator library，不是流水线：Kernel 根据完整 QuestionForm belief + Facets 激活多个方法，再 yield 让语义 oracle 生成具体候选问题。任何 Investigation 吸收新认识后，Kernel 都先把 `NeedsGeneration` 置真；在下一次动作裁决前重新发 `GenerateCandidatesRequest`，Candidates 只负责填充候选并清除此标志。因此方法库会随状态递归生长，而不是开局只跑一次。核心五方法仍为 Multidisciplinary / Abduction / Analogy / Counterexample / Synthesis；扩展库包含 CausalMechanism、BaseRate、Dialectic、Falsification、BoundarySearch、SourceTriangulation、MeasurementCritique、OntologyRepair、UnknownExpansion、ScaleShift、ExperimentDesign。新增方法不得获得调度权。

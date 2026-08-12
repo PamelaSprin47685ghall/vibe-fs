@@ -10,9 +10,9 @@
 
 LLM 能生成解释、候选、价值估计、综合文案，但这些能力本质是计算与提案。若 Candidates / Synthesis 能直接增加 evidence mass，递归十轮就能把同一批信息“说成”更高置信度；系统会奖励自我说服。Finding / Evidence 分槽 + explicit Source / DependencyKey 把 No Free Information 变成类型与状态规则，而不是 prompt 自觉（SPHINX-006）。
 
-## 为什么 QuestionForm 不能 argmax
+## 为什么 QuestionForm 不能 argmax，也不能 bind-once
 
-“为什么程序卡住”可能同时包含 Explanation 与 Plan；“白银会涨吗”也可能同时要求 Judgment 与 Credence。硬标签会让 0.51/0.49 与 0.99/0.01 变成同一个控制状态。保留分布后，方法激活与答案契约能随后续语义观测平滑变化（SPHINX-007）。
+“为什么程序卡住”可能同时包含 Explanation 与 Plan；“白银会涨吗”也可能同时要求 Judgment 与 Credence。硬标签会让 0.51/0.49 与 0.99/0.01 变成同一个控制状态；开局绑定一次也会把后续“原来用户真正想修复”的语义证据丢掉。保留 `Q_t(Form)` 分布，并允许 Investigation 返回 control-only semanticAssessment 后，方法激活与答案契约能随后续语义观测平滑变化；这种变化仍不增加世界 Evidence（SPHINX-007）。
 
 ## 为什么 gateway value 必须进入动作价值
 
@@ -30,7 +30,7 @@ LLM 说“我觉得 0.8”不是 likelihood model。正式 posterior 只接受�
 
 ## 为什么等价必须显式且 dependency-aware
 
-文本相同不代表未来决策等价。“同一个问题分别问两个独立来源”价值恰恰来自独立性。只按 semantic key 判重会把 source triangulation 自己删掉。因此默认 identity 包含 dependency；只有显式 EquivalenceKey 或 semantic+dependency 同时相同才进入同一类。类内再做逐维 Pareto dominance，不拿单一净分数吞掉信息/成本 trade-off（SPHINX-010）。
+文本相同不代表未来决策等价。“同一个问题分别问两个独立来源”价值恰恰来自独立性。只按 semantic key 判重会把 source triangulation 自己删掉；反过来，让 LLM 自报 `equivalenceKey` 又会把 ontology 权交回语义 oracle。因此默认 identity 包含 dependency；只有 Kernel 自己的 canonicalization/rewrite 写入内部 EquivalenceKey，或 semantic+dependency 同时相同，才进入同一类。类内再做逐维 Pareto dominance，不拿单一净分数吞掉信息/成本 trade-off（SPHINX-010）。
 
 ## 为什么 continuation 只属于 Kernel
 

@@ -1,3 +1,4 @@
+import { ofArray as listOfArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
 import {
   SessionStore_$ctor,
   SessionStore__Resume_433E080,
@@ -10,6 +11,7 @@ export const start = (store, question) => SessionStore__Start_Z721C83C5(store, q
 export const resume = (store, handle, observation) =>
   SessionStore__Resume_433E080(store, handle, observation)
 export const state = (store, handle) => SessionStore__TryState_Z721C83C5(store, handle)
+export const fsharpList = (items) => listOfArray(items)
 
 export const assessWhy = (store, handle) =>
   resume(store, handle, {

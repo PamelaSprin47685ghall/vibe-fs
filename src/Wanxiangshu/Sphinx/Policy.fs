@@ -49,7 +49,7 @@ module Policy =
                 |> List.choose (fun (key, finding) ->
                     if
                         finding.EvidenceKeys
-                        |> List.exists (fun evidenceKey -> Map.containsKey evidenceKey state.Evidence)
+                        |> List.exists (fun evidenceKey -> State.hasEvidenceSemanticKey evidenceKey state)
                     then
                         None
                     else
@@ -96,7 +96,7 @@ module Policy =
         else
             match state.RootContract with
             | None -> yieldRequest (SemanticAssessmentRequest state.RootQuestion) state
-            | Some root when state.GenerationRounds = 0 ->
+            | Some root when state.NeedsGeneration ->
                 yieldRequest (GenerateCandidatesRequest(Methodology.generationMethods state, root)) state
             | Some _ ->
                 match Value.bestOpenAction state with

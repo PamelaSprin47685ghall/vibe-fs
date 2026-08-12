@@ -63,7 +63,14 @@ test('full_co_yield_path_preserves_kernel_continuation_and_grounded_basis', () =
     ],
   })
   assert.equal(investigated.status, 'yield')
-  assert.equal(investigated.request.type, 'SynthesizeRequest')
+  assert.equal(investigated.request.type, 'GenerateCandidatesRequest')
+
+  const regenerated = resume(store, handle, {
+    type: 'Candidates',
+    items: [],
+  })
+  assert.equal(regenerated.status, 'yield')
+  assert.equal(regenerated.request.type, 'SynthesizeRequest')
 
   const answered = resume(store, handle, {
     type: 'Synthesis',

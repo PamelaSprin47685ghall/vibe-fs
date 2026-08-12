@@ -93,7 +93,6 @@ type CandidateProposal =
     { Method: string
       Question: string
       SemanticKey: string
-      EquivalenceKey: string option
       DependencyKey: string option
       ExpectedRootGain: float
       GatewayGain: float
@@ -117,6 +116,7 @@ type CognitiveAction =
 
 type InvestigationResult =
     { ActionKey: string
+      SemanticAssessment: SemanticAssessment option
       Findings: Finding list
       Evidence: Evidence list
       Hypotheses: Hypothesis list
