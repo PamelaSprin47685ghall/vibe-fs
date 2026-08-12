@@ -99,7 +99,7 @@
 | bounded parallel search | 独立 queries 同一 wave；每 query top_k=4；失败独立 fail-open；merge 恢复 keyword ordinal/local rank → `tests/unit/agent/repository-warm-start.test.mjs` | AGENT-032 |
 | prompt safety/bounds | ≤24 unique hints；≤64KiB；只删完整 entry；hostile strings 仍解析为 data；zero-keyword byte-exact Charge → `tests/unit/agent/repository-warm-start.test.mjs` | AGENT-032 |
 | role gate | snippets 只到 Coder/Inspector/DevOps；其它 role 非空 keywords fail；commission 无 keywords → warm-start + `tests/unit/tools/fork-tool.test.mjs` | AGENT-032 |
-| NEEDHELP collaboration | exact Host run binding；fast→deep 同 Life；deep→真实 `deep-inquiry` consultation child；finite/single-flight/no-recursion/cancel-no-resurrection → `tests/unit/host/needhelp-sensor.test.mjs` + `tests/unit/host/assistance-host.test.mjs` | AGENT-031 |
+| NEEDHELP collaboration | exact Host run binding；fast→deep 同 Life；deep AbortWake=0 child，fresh IdleRevisit 才创建真实 `deep-inquiry` consultation；child TurnCompleted 先 canonical terminal capture 再进 child LWR；finite/single-flight/no-recursion/cancel-no-resurrection；唯一 Long Stroke 真 Host 路径继续穿过原 adversity spine → `tests/unit/host/needhelp-sensor.test.mjs` + `tests/unit/host/assistance-host.test.mjs` + `tests/e2e/entry.test.mjs` | AGENT-031 |
 
 代表测试：`tests/unit/agent/catalog.test.mjs`、`tests/unit/plugin/agent-permission-gate.test.mjs`、
 `tests/unit/agent/stealth-browser-mcp.test.mjs`、`tests/unit/agent/semble-mcp.test.mjs`、

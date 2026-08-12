@@ -504,7 +504,10 @@ message.part.delta(reasoning|thinking)
 → assistance owner consumes arm BEFORE loop/fallback/ordinary abort
 → Host snapshot 精确找 assistant.id = ProviderRun，并读取 message.Agent
 → fast: explicit deep NeedHelpEscalation continuation
-→ deep: one hidden durable consultation handle → real deep-inquiry child → NeedHelpAdvice to exact original deep binding
+→ deep AbortWake: claim assistance owner only; create no child
+→ fresh SessionIdle → IdleRevisit transport fence
+→ one hidden durable consultation handle → real deep-inquiry child
+→ child TurnCompleted: canonical XTrace terminal capture → child LWR → NeedHelpAdvice to exact original deep binding
 ```
 
-Sensor 不读 visible text；rolling suffix 最长只需 sentinel 长度减一。Streaming callback 不直接 SendPrompt/CreateChild。reconcile 消费 arm 后立即清理 attempt state；若 LoopKill 也曾 arm，则 assistance claim 同步清除 LoopKillArmed。session drop/cancel 同样清理。StrengthReplica / Companion / InternalLeaf 不进入 sensor admission。Assistance continuation 使用 PromptDispatcher typed claim，但绕过 `agentForActiveCursor`，由触发 ProviderRun 的 Host `SessionMessage.Agent` 冻结 explicit binding 决定。XTrace capture 对 reasoning 做 exact sentinel strip，控制字节不进入 Chronicle/LWR；provider transcript 本身不据此重写。
+Sensor 不读 visible text；rolling suffix 最长只需 sentinel 长度减一。Streaming callback 不直接 SendPrompt/CreateChild。fast reconcile 在发送 deep continuation 前消费 arm；deep reconcile 则先保留该 owner attempt 的 assistance claim，直到 fresh `IdleRevisit` 才消费 arm 并创建 child。这里 `QuiescencePermit` 的**存在**只证明 transport 已进入 fresh SessionIdle；不调用 `TryConsume`，因为 HOST-004 对 operator abort 已 revoke 当前 idle-derived continuation capability。若 LoopKill 也曾 arm，则 assistance claim 同步清除 LoopKillArmed。session drop/cancel 同样清理。StrengthReplica / Companion / InternalLeaf 不进入 sensor admission。Assistance continuation 使用 PromptDispatcher typed claim，但绕过 `agentForActiveCursor`，由触发 ProviderRun 的 Host `SessionMessage.Agent` 冻结 explicit binding 决定。XTrace capture 对 reasoning 做 exact sentinel strip，控制字节不进入 Chronicle/LWR；provider transcript 本身不据此重写。consultation child completion 因被 assistance owner 抢先路由，必须显式复用 `XTraceCapture.captureTerminal` 完成标准 terminal materialization 后再物化 child LWR。

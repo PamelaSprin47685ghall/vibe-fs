@@ -11,6 +11,7 @@ open Wanxiangshu.Process
 /// staged question/answer Case. The sandbox has no filesystem capability.
 module JsBookkeeperTool =
 
+    /// DSL-state-combination: physical — one js-bookkeeper invocation's ephemeral staged mutation buffer; it is committed atomically only after the program succeeds.
     type private StagedMutation =
         { mutable Question: string option
           mutable Answer: string option
