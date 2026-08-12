@@ -108,6 +108,47 @@ module HostSessionNudge =
             PromptDispatcher.AwaitMode.Detached
             None
 
+    /// PROMPT-018: assistance continuation with an explicit execution binding.
+    /// This bypasses fallback cursor selection but not PromptAuthority. The target
+    /// must be one of the Authority Root's immutable same-role pair.
+    let sendContinuationToAgentResult
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (kind: PromptAuthority.ContinuationKind)
+        (effectiveAgent: string)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (awaitMode: PromptDispatcher.AwaitMode)
+        : Task<Result<PromptKey, string>> =
+        task {
+            match journal, tryActiveProfile journal sessionId with
+            | None, _ -> return Error "No journal: an assistance continuation cannot be claimed"
+            | Some _, None -> return Error "No active authority profile"
+            | Some durable, Some profile ->
+                if effectiveAgent <> profile.SelectedAgent && effectiveAgent <> profile.PeerAgent then
+                    return Error "Assistance target is outside the active Authority Root agent pair"
+                else
+                    match PromptAuthority.parseAgentName effectiveAgent with
+                    | Error error -> return Error error
+                    | Ok(_, role, _, _) when role <> profile.CanonicalRole ->
+                        return Error "Assistance target role differs from the active Authority Root"
+                    | Ok _ ->
+                        let rt = PromptDispatcher.forJournal durable
+
+                        return!
+                            rt.SendContinuation
+                                sessionPort
+                                sessionId
+                                prompt
+                                kind
+                                profile
+                                effectiveAgent
+                                (liveDirectory directory)
+                                awaitMode
+                                None
+        }
+
     /// FALLBACK-008: an empty / XML-only terminal earns at most one repair.
     ///
     /// `terminalProviderRun` is the provider run that produced the unusable

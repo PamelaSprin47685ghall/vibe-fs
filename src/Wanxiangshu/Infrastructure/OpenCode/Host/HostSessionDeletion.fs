@@ -21,6 +21,7 @@ module HostSessionDeletion =
         (parentSessionIdOpt: SessionId option)
         : Task =
         scope.LoopSensor.DropSession sessionId
+        scope.DropAssistanceSession sessionId
 
         // STRENGTH-004/011: owner deletion cancels the decision-local
         // InternalLeaf immediately. CancelOwner completes the waiting

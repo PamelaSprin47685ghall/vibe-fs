@@ -283,7 +283,7 @@ module HostForkAgent =
                                             return Error err
             }
 
-        member this.Reuse(agentId: string, prompt: string) : Task<Result<ForkResult, string>> =
+        member this.Reuse(agentId: string, prompt: string, ?renderedPrompt: string) : Task<Result<ForkResult, string>> =
             task {
                 // GREEN-4: recovery ownership is SessionRecoveryWorkflow only.
                 // After join retires the prior work unit, reuse of the same
@@ -351,7 +351,16 @@ module HostForkAgent =
                                 if activeRun then
                                     None
                                 else
-                                    Some(ForkChildPayload.relay prompt (this.ParentWorkRecordOf this.ParentId) [] None)
+                                    match renderedPrompt with
+                                    | Some rendered -> Some rendered
+                                    | None ->
+                                        Some(
+                                            ForkChildPayload.relay
+                                                prompt
+                                                (this.ParentWorkRecordOf this.ParentId)
+                                                []
+                                                None
+                                        )
 
                             return!
                                 HostForkChildDispatch.sendToExistingChild

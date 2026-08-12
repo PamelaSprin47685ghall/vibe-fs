@@ -12,10 +12,12 @@ import test from 'node:test'
 import { agentJournal, caseOf, listItems, sessionId, toList, utcOffset } from '../support/domain.mjs'
 
 const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
-const {
-  Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_Fork_Z7B3EB305: fork,
-  Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_Reuse_Z384F8060: reuse,
-} = await import('../../../dist/Session/HostForkAgent.js')
+const hostForkAgentModule = await import('../../../dist/Session/HostForkAgent.js')
+const { Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_Fork_Z7B3EB305: fork } = hostForkAgentModule
+const reuse = Object.entries(hostForkAgentModule).find(
+  ([name, value]) => name.includes('_HostForkRuntime_Reuse_') && typeof value === 'function',
+)?.[1]
+assert.equal(typeof reuse, 'function', 'HostForkRuntime Reuse export must be discoverable without pinning Fable hash')
 const {
   HostForkRuntime__get_PendingRunCount: pendingRunCount,
   HostForkRuntime__get_PendingRuns: pendingRunsOf,

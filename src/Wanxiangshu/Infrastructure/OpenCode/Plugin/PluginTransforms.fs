@@ -65,7 +65,22 @@ module PluginTransforms =
                 match projectionSessionIdOpt with
                 | Some sessionId ->
                     let rawMessages = unbox<obj array> outObj?messages |> Array.toList
-                    let capturedMessages = ProviderWireCapture.decodeCapturedMessageView rawMessages
+
+                    let capturedMessages =
+                        ProviderWireCapture.decodeCapturedMessageView rawMessages
+                        |> List.map (fun message ->
+                            { message with
+                                Parts =
+                                    message.Parts
+                                    |> List.map (fun part ->
+                                        match part.WirePart with
+                                        | WireReasoning text ->
+                                            { part with
+                                                WirePart = WireReasoning(AssistancePrompt.stripSentinel text) }
+                                        | WireText _
+                                        | WireToolCall _
+                                        | WireToolResult _
+                                        | WireMedia _ -> part) })
 
                     let semantic =
                         ProviderWireCapture.wireMessageView capturedMessages

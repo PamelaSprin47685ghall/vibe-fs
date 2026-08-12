@@ -18,6 +18,7 @@ import {
 import {
   SyncDelegateRuntime,
   SyncDelegateRuntime__HandleTurn_Z7791586C as handleTurn,
+  SyncDelegateRuntime__InvokePrepared_525D15CD as invokePrepared,
   SyncDelegateRuntime__Dispose as disposeRuntime,
   SyncDelegateRuntime__TryFind_636E3F87 as tryFind,
 } from '../../../dist/Session/SyncDelegateRuntime.js'
@@ -124,6 +125,7 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
   const dispatcher = promptDispatcher.forJournal(opened.journal)
   const createCalls = []
   const prompts = []
+  const inspectorPrompts = []
   let physicalSeq = 0
 
   const sessions = {
@@ -159,6 +161,7 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
     () => {},
     createQuiescenceGate(),
     undefined,
+    (_session, charge) => inspectorPrompts.push(charge),
   )
 
   const scope = new ToolRuntimeScope(
@@ -178,7 +181,7 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
   )
 
   try {
-    await fn({ runtime, createCalls, prompts, scope })
+    await fn({ runtime, createCalls, prompts, inspectorPrompts, scope })
   } finally {
     disposeRuntime(runtime)
     opened.dispose()
@@ -186,20 +189,20 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
   }
 }
 
-test('INSPECT_spec_exposes_charge_only_no_agent', () => {
+test('INSPECT_spec_exposes_charge_plus_optional_keywords_no_agent', () => {
   const tool = inspectSpec(factory, bareScope(), undefined)
   assert.equal(tool.Name, 'inspect')
   assert.match(tool.Description, /WorkRecord/)
-  assert.deepEqual(argNames(tool), ['charge'])
+  assert.deepEqual(argNames(tool), ['charge', 'keywords'])
 })
 
-test('ESTABLISH_AND_REPAIR_specs_expose_charge_only', () => {
+test('ESTABLISH_AND_REPAIR_specs_expose_charge_plus_optional_keywords', () => {
   const establish = establishSpec(factory, bareScope(), undefined)
   const repair = repairSpec(factory, bareScope(), undefined)
   assert.equal(establish.Name, 'establish-behavior')
   assert.equal(repair.Name, 'repair-behavior')
-  assert.deepEqual(argNames(establish), ['charge'])
-  assert.deepEqual(argNames(repair), ['charge'])
+  assert.deepEqual(argNames(establish), ['charge', 'keywords'])
+  assert.deepEqual(argNames(repair), ['charge', 'keywords'])
 })
 
 test('INSPECT_missing_sync_delegate_runtime_errors', async () => {
@@ -233,6 +236,29 @@ test('INSPECT_blank_charge_is_refused', async () => {
 test('ESTABLISH_missing_charge_is_refused', async () => {
   const { fields } = await runToml(establishSpec(factory, bareScope(), sentinelRuntime), {}, context())
   assert.equal(fields.error, 'establish-behavior charge required')
+})
+
+test('EXEC_032_prepared_provider_prompt_does_not_replace_semantic_inspector_charge', async () => {
+  await withHarness(async ({ runtime, createCalls, prompts, inspectorPrompts }) => {
+    const owner = 'ses_owner_prepared'
+    const charge = 'raw semantic question'
+    const providerPrompt = '# enriched provider envelope\n\n[[repository_hint]]\nfile_path = "src/a.fs"\n'
+    const pending = invokePrepared(
+      runtime,
+      owner,
+      SyncDelegateRole.Inspector,
+      charge,
+      async () => providerPrompt,
+    )
+
+    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'prepared Inspector Invoke did not send')
+    assert.equal(prompts[0].text, providerPrompt, 'provider must receive prepared bytes')
+    assert.deepEqual(inspectorPrompts, [charge], 'Casebook Q hook must receive raw semantic Charge')
+
+    await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), 'bounded answer', 'asst_prepared')
+    const result = resultOf(await pending)
+    assert.equal(result.ok, true, result.error)
+  })
 })
 
 test('INSPECT_happy_path_invokes_inspector_and_returns_work_record', async () => {

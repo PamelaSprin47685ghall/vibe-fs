@@ -68,11 +68,15 @@ pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fal
 #                      the legal transport lifetime to an observed upper bound of 2560.
 #                      Both are fail-closed runaway ceilings, not wall-clock budgets.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
-setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-owner", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 545, maxSseEvents = 2600, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", ".wanxiang/casebook/.keep" = "" } } }
+setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-owner", "needhelp-owner-title", "needhelp-owner-fast", "needhelp-owner-deep", "needhelp-consult-title", "needhelp-consult", "needhelp-owner-advice", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 620, maxSseEvents = 2900, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", ".wanxiang/casebook/.keep" = "" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 
 must = [
+  "needhelp-owner-fast.0",
+  "needhelp-owner-deep.0",
+  "needhelp-consult.0",
+  "needhelp-owner-advice.0",
   "g2-inspector-owner.0",
   "g2-inspector-q1.0",
   "g2-inspector-q2.0",
@@ -104,6 +108,10 @@ flow = [
   { assertDeliveries = { id = "strength-canary-replica.0", eq = 1 } },
   { assertDeliveries = { id = "strength-canary-replica.1", eq = 1 } },
   { assertDeliveries = { id = "strength-canary-owner.0", eq = 1 } },
+  { assertDeliveries = { id = "needhelp-owner-fast.0", eq = 1 } },
+  { assertDeliveries = { id = "needhelp-owner-deep.0", eq = 1 } },
+  { assertDeliveries = { id = "needhelp-consult.0", eq = 1 } },
+  { assertDeliveries = { id = "needhelp-owner-advice.0", eq = 1 } },
   { assertDeliveries = { id = "g2-inspector-q1.0", eq = 1 } },
   { assertDeliveries = { id = "g2-inspector-q2.0", eq = 1 } },
   { assertDeliveries = { id = "g2-inspector-q3.0", eq = 1 } },
@@ -229,6 +237,56 @@ user = "STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica 
   [[turn.step]]
   runtimeStep = 2
   respond = { type = "text", text = "Strength dry-run canary owner completed." }
+
+[[turn]]
+id = "needhelp-owner-title"
+lane = "needhelp-owner"
+kind = "title"
+user = "NEEDHELP_LONG_STROKE_CANARY: ask for help as fast, then deep, then finish after advice."
+
+  [[turn.step]]
+  respond = { type = "title", text = "NEEDHELP Long Stroke Canary" }
+
+[[turn]]
+id = "needhelp-owner-fast"
+lane = "needhelp-owner"
+user = "NEEDHELP_LONG_STROKE_CANARY: ask for help as fast, then deep, then finish after advice."
+
+  [[turn.step]]
+  respond = { type = "text", reasoningOnly = "[NEEDHELP]" }
+
+[[turn]]
+id = "needhelp-owner-deep"
+lane = "needhelp-owner"
+user = "# 你刚刚主动请求了协作。现在以同一角色的更强推理继续原来的 charge。"
+
+  [[turn.step]]
+  respond = { type = "text", reasoningOnly = "[NEEDHELP]" }
+
+[[turn]]
+id = "needhelp-consult-title"
+internal = true
+kind = "title"
+user = "# 如何解决这个 agent 的当前困难？"
+
+  [[turn.step]]
+  respond = { type = "title", text = "NEEDHELP Consultation" }
+
+[[turn]]
+id = "needhelp-consult"
+internal = true
+user = "# 如何解决这个 agent 的当前困难？"
+
+  [[turn.step]]
+  respond = { type = "text", text = "Independent NEEDHELP perspective: preserve the original charge, verify the strongest assumption, then continue." }
+
+[[turn]]
+id = "needhelp-owner-advice"
+lane = "needhelp-owner"
+user = "# 下面是一次独立 consultation 的 canonical child→parent LifecycleWorkRecord。"
+
+  [[turn.step]]
+  respond = { type = "text", text = "NEEDHELP Long Stroke canary resumed on the original deep binding and completed." }
 
 [[turn]]
 id = "g2-inspector-title"

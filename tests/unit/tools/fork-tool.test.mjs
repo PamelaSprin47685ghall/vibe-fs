@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { agentJournal, sessionId, toList } from '../support/domain.mjs'
+import { agentJournal, listItems, sessionId, toList } from '../support/domain.mjs'
 
 const {
   HostToolArguments_$ctor_4E60E31B: makeArgs,
@@ -446,7 +446,22 @@ test('FORK_orchestrator_dirty_repo_rejects_the_fork', async () => {
   live.cleanup()
 })
 
-test('FORK_specs_expose_expected_names', () => {
-  assert.equal(managerSpec(factory, bareScope()).Name, 'fork')
-  assert.equal(orchestratorSpec(factory, bareScope({ orchestratorHost: {} })).Name, 'commission')
+test('FORK_specs_expose_expected_names_and_only_manager_fork_carries_keywords', () => {
+  const fork = managerSpec(factory, bareScope())
+  const commission = orchestratorSpec(factory, bareScope({ orchestratorHost: {} }))
+  assert.equal(fork.Name, 'fork')
+  assert.equal(commission.Name, 'commission')
+  assert.deepEqual(listItems(fork.Arguments).map(([name]) => name), ['name', 'charge', 'keywords'])
+  assert.deepEqual(listItems(commission.Arguments).map(([name]) => name), ['name', 'charge'])
+})
+
+test('FORK_non_repository_target_rejects_nonempty_warm_start_keywords_before_creation', async () => {
+  const live = liveScope()
+  const spec = managerSpec(factory, live.scope)
+  const result = parseToml(
+    await spec.Execute(makeArgs({ name: 'fast-browser', charge: 'browse', keywords: 'repository clue' }), context()),
+  )
+  assert.match(result.error, /only available when fork targets Coder, Inspector, or DevOps/)
+  assert.equal(listItems(listRuntimeAgents(live.runtime)[0]).length, 0)
+  live.cleanup()
 })

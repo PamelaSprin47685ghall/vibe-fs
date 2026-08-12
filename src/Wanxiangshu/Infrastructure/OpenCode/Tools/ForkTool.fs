@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
@@ -11,11 +12,15 @@ open Wanxiangshu.Session
 /// request and schema; PTY is intentionally absent.
 module ForkTool =
 
-    type Request = { Name: string; Charge: string }
+    type Request =
+        { Name: string
+          Charge: string
+          Keywords: string }
 
     let private decode (args: HostToolArguments) =
         { Name = args.Text "name"
-          Charge = args.Text "charge" }
+          Charge = args.Text "charge"
+          Keywords = args.Text "keywords" }
 
     let private error (message: string) =
         ToolHostCodec.tomlObjectWithInstructions [ "# " + message ] []
@@ -47,6 +52,25 @@ module ForkTool =
         | Role.Manager
         | Role.Reviewer -> true
         | _ -> false
+
+    let private hasKeywords (request: Request) =
+        not (String.IsNullOrWhiteSpace request.Keywords)
+
+    let private warmStartAllowed role =
+        RepositoryWarmStartPrompt.isDirectConsumer role
+
+    let private warmStartError =
+        "repository warm-start keywords are only available when fork targets Coder, Inspector, or DevOps"
+
+    let private prepareForkPrompt (scope: ToolRuntimeScope) (runtime: HostForkRuntime) (role: Role) (request: Request) =
+        task {
+            let basePrompt =
+                ForkChildPayload.relay request.Charge (runtime.ParentWorkRecordOf runtime.ParentId) [] None
+
+            match! RepositoryWarmStart.appendToBase role scope.WorkspaceDirectory request.Keywords basePrompt with
+            | Ok prompt -> return prompt
+            | Error _ -> return basePrompt
+        }
 
     let private bynameOf (request: Request) (fallback: string) =
         if String.IsNullOrWhiteSpace request.Name then
@@ -89,8 +113,22 @@ module ForkTool =
                     | _, None, Some record ->
                         match managedForRecord record with
                         | Some managed when forbiddenManagerRole managed -> return error HiddenTargetDeniedText
+                        | _ when hasKeywords request && not (warmStartAllowed record.Role) ->
+                            return error warmStartError
                         | _ ->
-                            match! runtime.Reuse(request.Name, assignment) with
+                            let activeRun =
+                                lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey request.Name)
+
+                            let! reuseResult =
+                                if hasKeywords request && not activeRun then
+                                    task {
+                                        let! rendered = prepareForkPrompt scope runtime record.Role request
+                                        return! runtime.Reuse(request.Name, assignment, renderedPrompt = rendered)
+                                    }
+                                else
+                                    runtime.Reuse(request.Name, assignment)
+
+                            match reuseResult with
                             | Error reuseError -> return error reuseError
                             | Ok _ ->
                                 let label =
@@ -108,13 +146,34 @@ module ForkTool =
                             ->
                             let role = AgentRoleIdentity.ofManaged managed.Role
 
-                            match! runtime.Fork(ToolHostCodec.newHandleId (), role, managed.Name, assignment, None) with
-                            | Ok _ ->
-                                return
-                                    successInstruction (
-                                        sprintf "# %s carries this charge now." (bynameOf request managed.Name)
-                                    )
-                            | Error forkError -> return error forkError
+                            if hasKeywords request && not (warmStartAllowed role) then
+                                return error warmStartError
+                            else
+                                let! forkResult =
+                                    if hasKeywords request then
+                                        task {
+                                            let! rendered = prepareForkPrompt scope runtime role request
+
+                                            return!
+                                                runtime.Fork(
+                                                    ToolHostCodec.newHandleId (),
+                                                    role,
+                                                    managed.Name,
+                                                    assignment,
+                                                    None,
+                                                    renderedPrompt = rendered
+                                                )
+                                        }
+                                    else
+                                        runtime.Fork(ToolHostCodec.newHandleId (), role, managed.Name, assignment, None)
+
+                                match forkResult with
+                                | Ok _ ->
+                                    return
+                                        successInstruction (
+                                            sprintf "# %s carries this charge now." (bynameOf request managed.Name)
+                                        )
+                                | Error forkError -> return error forkError
                         | Some managed when forbiddenManagerRole managed -> return error HiddenTargetDeniedText
                         | Some managed ->
                             return error (sprintf "Managed agent '%s' is not creatable via Manager fork" managed.Name)
@@ -166,7 +225,8 @@ module ForkTool =
             "Commission another witness within a mission. Pass name + charge; reuse by the same name when the existing sub-session has compatible context."
           Arguments =
             [ "name", ToolHostCodec.managedOrHandleSchema ManagedAgent.managerForkableNames factory
-              "charge", ToolHostCodec.optionalStringSchema factory ]
+              "charge", ToolHostCodec.optionalStringSchema factory
+              "keywords", ToolHostCodec.optionalStringSchema factory ]
           Execute = fun args context -> executeManager scope (decode args) context }
 
     let orchestratorSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

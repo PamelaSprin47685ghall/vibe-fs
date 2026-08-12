@@ -74,6 +74,8 @@
     <Compile Include="Domain/MagicTodoLegacySeed.fs"/>
     <Compile Include="Domain/MagicTodoFinalityCohort.fs"/>
     <Compile Include="Domain/SyntheticToml.fs"/>
+    <Compile Include="Domain/AssistancePrompt.fs"/>
+    <Compile Include="Domain/RepositoryWarmStartPrompt.fs"/>
     <Compile Include="Domain/ManagerNarrative.fs"/>
     <Compile Include="Domain/ManagerLifecyclePrompt.fs"/>
     <Compile Include="Domain/FinalityPrompt.fs"/>
@@ -250,6 +252,8 @@
     <Compile Include="Infrastructure/OpenCode/Signals/HostSignal.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/HostEventCodec.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/LoopEventCodec.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Codec/NeedHelpEventCodec.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/NeedHelpSensor.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/HostMessageCodec.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/MagicTodoHostCodec.fs"/>
     <Compile Include="Infrastructure/OpenCode/Signals/HostSignalAdapter.fs"/>
@@ -264,6 +268,10 @@
     <Compile Include="Infrastructure/OpenCode/Host/PersonaBinding.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Sessions.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostMessageProjection.fs"/>
+    <Compile Include="Infrastructure/SembleSearchCodec.fs"/>
+    <Compile Include="Infrastructure/SembleMcpStdio.fs"/>
+    <Compile Include="Infrastructure/SembleMcpClient.fs"/>
+    <Compile Include="Infrastructure/RepositoryWarmStart.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/StrengthReplay.fs"/>
     <Compile Include="Session/SatelliteRuntime.fs"/>
     <Compile Include="Application/Prompting/PromptDispatcher.fs"/>
@@ -358,6 +366,7 @@
     <Compile Include="Application/Finality/Types.fs"/>
     <Compile Include="Application/Finality/Ports.fs"/>
     <Compile Include="Application/Finality/LifecycleWorkRecordProjection.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/AssistanceHost.fs"/>
     <Compile Include="Application/Finality/RecordWorkflow.fs"/>
     <Compile Include="Application/Finality/CohortWorkflow.fs"/>
     <Compile Include="Application/Finality/RevisionWorkflow.fs"/>
@@ -422,9 +431,6 @@
     <Compile Include="Infrastructure/OpenCode/Host/WorkspaceEventStore.fs"/>
     <Compile Include="Infrastructure/CasebookBookkeeper.fs"/>
     <Compile Include="Infrastructure/CasebookLifecycle.fs"/>
-    <Compile Include="Infrastructure/SembleSearchCodec.fs"/>
-    <Compile Include="Infrastructure/SembleMcpStdio.fs"/>
-    <Compile Include="Infrastructure/SembleMcpClient.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FetchTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/CasebookTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginHost.fs"/>

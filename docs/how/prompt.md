@@ -149,3 +149,7 @@ T1 entrustment revelation 只走 conversation tool result（TODO-015）。
 | child / attached / InternalLeaf | 继承 owner/commissioner 已绑语言；不得各自再绑 |
 
 MagicTodoManagerGuideline = HOST-013 通用 guideline **加法片段**（PROMPT-013）；禁止并入 `PairProgrammingGuidelineText`。
+
+### Assistance continuation（PROMPT-018）
+
+`PromptAuthority.ContinuationKind` 增加 `NeedHelpEscalation | NeedHelpAdvice`，codec/label/fold 与其它 continuation 一样 durable。发送入口必须接受 explicit EffectiveAgent 并验证它属于 Authority profile 的同 CanonicalRole fast/deep pair；不得通过 fallback cursor 再解析目标。`NeedHelpEscalation` 只允许 fast→deep；`NeedHelpAdvice` 只允许 occasion 冻结的原 deep binding。两者 system prompt bytes 与 SessionPersona 在前后必须 byte-identical。

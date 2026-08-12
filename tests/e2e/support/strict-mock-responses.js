@@ -20,6 +20,9 @@ async function respondStream(res, chunks, exp) {
   }
 
   for (let index = 0; index < chunks.length; index++) {
+    if (index === 0 && exp.respond.waitFirstTokenUntil != null) {
+      await exp.respond.waitFirstTokenUntil;
+    }
     if (index === 0 && exp.respond.delayFirstToken > 0) {
       await new Promise((resolve) => setTimeout(resolve, exp.respond.delayFirstToken));
     }
@@ -28,6 +31,12 @@ async function respondStream(res, chunks, exp) {
       return;
     }
     res.write(`data: ${JSON.stringify(chunks[index])}\n\n`);
+    // Causal stream hold for Long Stroke control-sentinel canaries: the first
+    // reasoning delta is physically visible, then the stream stays open until
+    // the next Host-owned request proves AbortSession/reconcile progressed.
+    if (index === 0 && exp.respond.waitAfterFirstTokenUntil != null) {
+      await exp.respond.waitAfterFirstTokenUntil;
+    }
   }
 
   if (exp.respond.neverEnd) return;

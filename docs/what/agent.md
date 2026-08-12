@@ -267,7 +267,7 @@ stealth-browser MCP 与 `read` / `glob` / `grep` 同类：Host-native，不进 T
 
 ## AGENT-027：内部 Semble MCP 搜索
 
-Semble 是进程内语义搜索：stdio MCP `search(query, repo, top_k)` → `Hit list`。历史用于 Strength 投机注入假 `read`；当前无调用者。能力必须存在。
+Semble 是进程内语义搜索：stdio MCP `search(query, repo, top_k)` → `Hit list`。它仍不是 Host MCP、provider tool、permission 或 Strength 能力。现行调用者只有 AGENT-032 `RepositoryWarmStart`；搜索结果始终是低可信 orientation data，不是 repository fact/evidence。
 
 不是 Host MCP。不得写入 `config.mcp`。不得进入 AGENT-006 角色工具矩阵、permission schema、ToolRegistry、`js-*`、Strength Replica 工具面。
 
@@ -289,6 +289,27 @@ WANXIANGSHU_TEST 为真且无 fixture   → Disabled
 3. Strength Replica 工具面加入 Semble
 4. 在 `WANXIANGSHU_TEST` 且无 fixture 时 spawn 真实 `uvx`
 5. 新增 `@modelcontextprotocol/sdk` 依赖（本条只约束 Semble；Sphinx 路径见 SPHINX-005 / AGENT-030）
+
+## AGENT-031：显式 NEEDHELP 协作升级
+
+Pair Hint 鼓励 managed Work agent 在当前视角不足、需要更强推理或独立视角时尽早在 reasoning 中发出精确 `[NEEDHELP]`。这是正常协作，不是 provider failure、资源匮乏、羞辱或失败声明；provider-visible guidance 不暴露 fast/deep 内部身份。
+
+升级规则由触发该 `ProviderRunIdentity` 的 Host assistant message 上真实 `Agent` binding 决定；不得从 FallbackCursor、SelectedAgent 或可选 AttemptPlan 反推。这样 fast→deep continuation 后即使 fallback cursor 仍停在 fast，下一次 deep `[NEEDHELP]` 也会正确进入 consultation：
+
+- `fast-ROLE` 命中：同一 Session、LogicalRun、AuthorityRoot、CanonicalRole、Persona 与 transcript 上，用对应 `deep-ROLE` 发送 typed `NeedHelpEscalation` continuation；只改变该 assistance continuation 的 ExecutionBinding，不写 FallbackCursor。
+- `deep-ROLE` 命中：创建一个真实、独立的 consultation child。现行 managed catalog 已 clean-break 删除 legacy `meditator` 身份，因此 V1 以真实 `deep-inquiry` Work Session 承担 Meditator 职责，**不**复活 `meditator` alias。冻结求助时的 parent frontier，物化 canonical `LifecycleWorkRecord(includeOpening=true)` 作为 `CommissionerRecord`；child assignment 必须以 `如何解决这个 agent 的当前困难？` 开头。consultation 的普通完成再物化 `LifecycleWorkRecord(includeOpening=false)`，作为 typed `NeedHelpAdvice` continuation 返回**原来的 deep binding**。
+
+consultation 是真实 child Session，不是假 completion、不是 hidden prose injection；它不继承 owner Persona，不得递归 NEEDHELP。每个 LogicalRun 的 consultation 次数有限、owner single-flight；额度耗尽只给确定性 continuation，不向 provider 暴露数值或 budget 机制。取消/终结后迟到 advice 不得复活 owner。sentinel 自身在 XTrace capture 前从 reasoning evidence 中剥离，不写入 WorkRecord/Chronicle evidence。
+
+## AGENT-032：Repository Warm Start
+
+`RepositoryWarmStart` 是显式 keywords 驱动的低可信仓库定向能力。V1 直接消费者恰为 `Coder | Inspector | DevOps`；其它角色只能在既有 invocation DAG 上把 keywords 携带给这些角色，不能因此获得 repository snippets。Reviewer V1 拒绝任意 caller keywords；Orchestrator `commission` 不增加 keywords。
+
+`keywords` 为可选多行文本：按 `SyntheticToml.normalizeNewlines` 统一换行，按 LF 分行、trim、删空、稳定 exact-dedupe（区分大小写），只取前 `MaxKeywords = 8`。每个保留行是一个完整 Semble query，不再按空格切词。无 keywords/全空白时必须零 Semble 工作且 provider prompt 与原 charge 字节完全相同。
+
+所有独立 query 在一个 bounded parallel wave 中执行，`TopKPerKeyword = 4`；单 query failure、Semble disabled/timeout/launch failure 均 fail-open。merge 恢复 `keyword ordinal → local rank`，按 `FilePath + StartLine + EndLine + Content` 稳定去重，最多 `MaxHintsTotal = 24`。最终 warm-start 文档最多 `MaxWarmStartBytes = 64 KiB`；超限只删除完整 hint entry，绝不截断 TOML 字符串。
+
+Provider envelope 由 canonical `SyntheticToml` writer 渲染：charge 是 instruction/assignment；caller keyword 与 `repository_search`/`repository_hint` 都是 data，并明确标注 hints 不是 instructions、不是 proof，callee 必须用正常 repository tools 验证 load-bearing facts。不得伪造 read/grep/tool history，不得把 hits 直接写入 Casebook。repoPath 只用真实 `WorkspaceDirectory`；缺失时跳过，禁止猜 `"."`。显式 keywords 每次 fresh search；无自动从 charge 抽词、无 cross-call warm-start cache。
 
 ## AGENT-028：Persona Registry
 

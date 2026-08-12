@@ -162,6 +162,8 @@ Dedicated SyncDelegate（`inspect` / `establish-behavior` / `repair-behavior`）
 
 ```text
 caller 发起同步委派
+→ admission / single-flight 成功
+→ 构造 typed SyncDelegatePromptRequest { Charge; ProviderPrompt }
 → specialist 按普通 Work Session 工作
 → ordinary Assistant completion 结束本次 invocation
 → Host 物化 bounded WorkRecord（InvocationStartCursor .. InvocationEndCursor，includeOpening=false）
@@ -173,5 +175,12 @@ caller 发起同步委派
 - **删除** `return(message)` 工具与 `Returned → Completion` 双 await。  
 - **删除** `completion_text` magic literal。  
 - Reusable session 记忆可跨调用保留；每次 caller **只**看见当前 invocation range。  
+- `Charge` 是 semantic assignment、Opening/Casebook Q；`ProviderPrompt` 是实际发给 provider 的字节。没有 warm-start 时两者字节相同；有 AGENT-032 keywords 时只 enrich `ProviderPrompt`。禁止解析 rendered TOML 反推出 Charge。  
 - 不暴露 `inspector_id` / `coder_id` / `agent` / `tdd`。  
 - 答案在 WorkRecord 的 Closing report，不是额外 `answer` 字段。
+
+## EXEC-032：RepositoryWarmStart invocation timing
+
+Warm-start 搜索属于 invocation admission 后、首个 provider send 前的 prompt preparation。SyncDelegate 必须先取得 ReuseScope single-flight，再调用注入的 `PrepareProviderPrompt`；通用 workflow 不依赖 Semble。搜索完成前不得发送 callee 首 prompt；搜索完成后也不得另发第二条“late hints” synthetic user message。
+
+Fork 的新 work unit 同样保留原 `charge` 作为 child Opening，只把 warm-start envelope 作为该 work unit 的 provider prompt。reuse 时只有在确实开启一个新 work unit 时才能 enrich；对 active/busy reuse 不得先支付 Semble 成本后丢弃，也不得用 warm-start 改写既有 Opening。

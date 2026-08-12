@@ -72,7 +72,11 @@ Host compaction **不得删除** XTrace：否则 Y 落后补缺口与 LWR 自包
 
 ## HOST-013：结对编程 marker（行为）
 
-对**非 Companion / 非 Blogger** 的 provider transcript，每个尚未存在 HOST-013 synthetic bracket 的真实 provider/tool exchange（placement occasion）恰好产生一组 synthetic `auto-injected` pair：assistant tool-call + 使用同一 `callID` 的 completed tool-result。tool-call 输入为 `{}`。
+对**非 Companion / 非 Blogger** 的 provider transcript，每个尚未存在 HOST-013 occurrence 的真实 provider/tool exchange（placement occasion）恰好产生一个 durable `PairProgrammingGuideline` occurrence。Occurrence 的语义正文、稳定 `callID`、`CallGap` 与 `ResultGap` 与 provider 无关；provider renderer 只决定同一 occurrence 在 wire 上采用何种合法形状。
+
+普通 provider 仍把 occurrence 渲染为 synthetic `auto-injected` pair：assistant tool-call + 使用同一 `callID` 的 completed tool-result，tool-call 输入为 `{}`。Cursor **不得**发送 fake tool；同一 occurrence 改为在 `ResultGap` 渲染一条 synthetic text message。生产 Cursor renderer 固定为 assistant-role text；user/system 两种同正文 encoder 只保留在受控比较测试中，不作为用户设置或第二语义源。普通→Cursor→普通 provider transition 必须重用同一 durable occurrence：Cursor 不删除 `CallGap`，反向投影仍可恢复原 fake-tool pair。
+
+Pair Hint 正文是一个 canonical semantic payload，至少同时要求：简体中文思考纪律；把 `[NEEDHELP]` 视为正常、可早用的协作请求；以及在每次工具 turn 前寻找完整 parallel wave——当前已知、确有用且彼此独立的调用默认在同一 assistant turn 一起发出，以最小化 provider↔tool RTT。仅真实数据依赖、共享可变 owner、协议顺序、破坏性干扰或明确有限容量可以序列化相应边；不得猜未知参数、制造/重复无用调用，也不得写死全局并发数字。此语义不按 provider 复制。
 
 tool-result 正文语言由不可变 `SessionProviderLanguage`（HOST-026）决定：English 或 SimplifiedChinese 各有一份 guideline 资源；有最近 prior tip 时在 guideline 前附加同语言 Nudge。  
 `SessionStartedAt` 在 session 创建时绑定一次并 durable；restart / fallback / Strength 不得改写；经 `IClockPort` 计量，不碰 ambient `UtcNow`。  
@@ -130,10 +134,7 @@ provider-facing 历史。判断依据是 durable SessionAssociation（`Ownership
 `isCompanion`），禁止按 agent 名字猜测。`SessionExecutionClass.Work`（含 Attached SyncInspector/SyncCoder）
 仍进入 HOST-013；InternalLeaf Bookkeeper 同 Companion 排除。
 
-**注入旁路**：下列任一成立时，非 Companion session 也不再追加新的 auto-injected pair；已落盘的历史 pair 仍按 durable gap anchor replay，以保持 append-only prefix：
-- 进程环境 `WANXIANGSHU_SKIP_AUTO_INJECTED=1`；
-- 当前 transcript 的 provider 为 `cursor`（取自消息 `info.providerID` 或 `info.model.providerID` 的最近一条）。
-未命中旁路时行为不变。
+**注入旁路**：仅当进程环境 `WANXIANGSHU_SKIP_AUTO_INJECTED=1` 时，非 Companion session 不再追加新的 occurrence；已落盘历史仍按当前 provider 的 renderer replay，以保持可逆历史。Cursor 不是旁路：Cursor 仍创建/恢复同一 durable occurrence，只使用 strict-validator 可接受的 text projection。
 
 行为约束：
 
@@ -146,6 +147,12 @@ provider-facing 历史。判断依据是 durable SessionAssociation（`Ownership
 7. legacy 无 anchor 的 `PairProgrammingGuidelineAppended` 存在时该 session 不允许继续 HOST-013 replay，fail closed（incompatible journal）；禁止把旧 ordinal 近似为第 N 个 tool batch 的启发式迁移。
 
 构造与链序见 `how/host.md`。
+
+## HOST-027：`[NEEDHELP]` reasoning assistance sensor
+
+Host 只从 managed Work provider attempt 的 reasoning/thinking delta 识别精确 sentinel `[NEEDHELP]`。检测器必须能跨 delta 边界拼出 sentinel，但只保留有限 rolling suffix；visible text、tool output、synthetic Pair Hint 与历史 transcript 中的同字节不得触发。每个 `(SessionId, ProviderRunIdentity)` 最多触发一次。
+
+命中后 Host 原子 arm assistance occasion 并中止当前物理 attempt，让既有 reconciliation 观察 Abort。该 Abort 的 owner 是 assistance：**不得**进入 ProviderFailure/LoopKill、不得推进 FallbackCursor、不得增加 consecutive failure 或 retry budget。普通用户/cleanup abort 与 loop abort 的语义保持不变。Host event 若无法证明 reasoning delta 字段，则不得把 visible-text 扫描伪装成等价实现；降级只能显式、可观测并由 proof 标明。
 
 ## HOST-014：（空缺）Student / Teacher Host 行为 — G3 已删除
 

@@ -85,3 +85,24 @@
 2. 不装配 LearningState / QA / Compile / MeditatorLearn|Compile / Student 式 final `return`。
 3. 事实调查只经 SyncDelegate `inspect` 工具路径；不给 Inquiry 直读仓库工具。
 4. 不得把 `meditator` alias 回 Inquiry；终端就是普通 Assistant completion。
+
+---
+
+## Repository Warm Start（AGENT-027 / AGENT-032 / EXEC-032）
+
+```text
+keywords raw
+→ normalizeNewlines → split LF → trim → drop blank → stable exact dedupe → take 8
+→ if no keywords or no WorkspaceDirectory: ProviderPrompt = Charge
+→ else mapIndexed keyword { search Semble(keyword, repo, 4) } in one Parallel wave
+→ restore keyword ordinal + local rank
+→ stable hit dedupe
+→ take at most 24
+→ Domain renderer emits low-trust SyntheticToml
+→ drop whole hint entries from tail until byteCount <= 64 KiB
+→ send once as ProviderPrompt
+```
+
+Search adapter catches each query failure independently and returns `[]` for that query. `repository_search` records normalized query ordinal; `repository_hint` records source ordinal/rank/path/lines/content/score/total_lines. Renderer escapes every caller/search string with `SyntheticToml.renderString` and states in instruction comments that hints are orientation only and must be verified with ordinary tools.
+
+Tool gating：`inspect` / `establish-behavior` / `repair-behavior` accept optional `keywords`; Manager `fork` accepts optional `keywords` only when a new/reused work unit targets Coder/Inspector/DevOps. Nonblank keywords with other targets fail before search. `commission` schema unchanged。

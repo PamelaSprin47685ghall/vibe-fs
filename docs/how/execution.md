@@ -148,6 +148,7 @@ Completion，防止与 terminal 尾部重叠。
 - Gate key = immediate caller ReuseScope（**禁止** family-root gate）。嵌套
   `DevOps waits Coder` / `Coder waits Inspector` 各持本层 scope lease，可并行完成而无 deadlock。
 - `GetOrCreate` 绑定 owner effective tier → 固定 delegate Agent（fast/deep）；调用参数不得覆盖 tier。
+- single-flight admission 成功后才执行 `PrepareProviderPrompt : unit -> Task<string>`；结果与 raw `Charge` 合成 `SyncDelegatePromptRequest`，`SendPrompt` 只见 `ProviderPrompt`，`NoteInspectorPrompt` 只见 `Charge`。prepare 失败必须 fail-open 为 raw Charge；不得在 admission 前 spawn Semble。
 - 不暴露 `inspector_id` / `coder_id` / `agent` / `tdd`。
 
 ---

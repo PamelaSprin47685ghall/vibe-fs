@@ -39,6 +39,9 @@ const REVIEWER_OPENING = '# Review the current worktree against all authoritativ
 /** Digest that never matches production lastUser — retires a finality cohort turn. */
 const REVIEWER_RETIRED = '__reviewer-turn-retired-never-match__';
 
+export const NEEDHELP_CANARY_PROMPT =
+  'NEEDHELP_LONG_STROKE_CANARY: ask for help as fast, then deep, then finish after advice.';
+
 const contentText = (content) =>
   Array.isArray(content)
     ? content.map((part) => part?.text ?? '').join('')
@@ -67,6 +70,115 @@ export function publicToolResults(requests, expectedName) {
     }
   }
   return [...results.values()];
+}
+
+/**
+ * NEEDHELP Long Stroke causal stream holds. No fixed sleep: each reasoning-only
+ * response exposes its first sentinel-bearing chunk, then stays physically open
+ * until the next Host-owned assistance request proves AbortSession + reconcile
+ * progressed. The final advice response is held before its first token so the
+ * entry can arm a turn-scoped terminal oracle without racing a fast mock.
+ */
+export function armNeedHelpCausalHolds(scenario) {
+  const runtime = scenario.provider?._scenario;
+  assert.ok(runtime?.scenario?.entries, 'NEEDHELP: strict scenario entries required for causal stream holds');
+
+  const deferred = () => {
+    let resolve = null;
+    const promise = new Promise((done) => { resolve = done; });
+    return { promise, release: () => resolve?.() };
+  };
+
+  const fast = deferred();
+  const deep = deferred();
+  const final = deferred();
+  const held = new Set();
+
+  for (const entry of runtime.scenario.entries) {
+    if (entry.id === 'needhelp-owner-fast.0') {
+      entry.respond = { ...entry.respond, waitAfterFirstTokenUntil: fast.promise };
+      held.add(entry.id);
+    }
+    if (entry.id === 'needhelp-owner-deep.0') {
+      entry.respond = { ...entry.respond, waitAfterFirstTokenUntil: deep.promise };
+      held.add(entry.id);
+    }
+    if (entry.id === 'needhelp-owner-advice.0') {
+      entry.respond = { ...entry.respond, waitFirstTokenUntil: final.promise };
+      held.add(entry.id);
+    }
+  }
+
+  assert.deepEqual(
+    [...held].sort(),
+    ['needhelp-owner-advice.0', 'needhelp-owner-deep.0', 'needhelp-owner-fast.0'],
+    'NEEDHELP: all three causal hold points must exist in the sole Long Stroke scenario',
+  );
+
+  scenario.provider.afterExpectation('needhelp-owner-deep.0', fast.release);
+  scenario.provider.afterExpectation('needhelp-consult.0', deep.release);
+  return { releaseFinal: final.release };
+}
+
+/** Product oracle for the NEEDHELP phase embedded in the sole Long Stroke. */
+export function assertNeedHelpAssistance(scenario) {
+  const workDir = scenario.host.workDir;
+  for (const id of [
+    'needhelp-owner-fast.0',
+    'needhelp-owner-deep.0',
+    'needhelp-consult.0',
+    'needhelp-owner-advice.0',
+  ]) {
+    assert.equal(scenario.provider.matchCount(id), 1, `NEEDHELP: ${id} must be delivered exactly once`);
+  }
+
+  assert.equal(
+    countFactCase(workDir, 'FallbackCursorAdvanced'),
+    0,
+    'NEEDHELP: collaboration must not advance fallback before the later adversity phase',
+  );
+
+  const assistanceClaims = factPayloads(workDir, 'PluginPromptClaimed')
+    .filter((payload) => payload?.ContinuationKind === 'NeedHelpEscalation' || payload?.ContinuationKind === 'NeedHelpAdvice');
+  assert.equal(
+    assistanceClaims.filter((payload) => payload?.ContinuationKind === 'NeedHelpEscalation').length,
+    1,
+    'NEEDHELP: fast request must create exactly one NeedHelpEscalation claim',
+  );
+  assert.equal(
+    assistanceClaims.filter((payload) => payload?.ContinuationKind === 'NeedHelpAdvice').length,
+    1,
+    'NEEDHELP: consultation must return exactly one NeedHelpAdvice claim',
+  );
+  assert.ok(
+    assistanceClaims.every((payload) => payload?.EffectiveAgent === 'deep-coder'),
+    `NEEDHELP: escalation/advice must both target the original deep Coder binding: ${JSON.stringify(assistanceClaims)}`,
+  );
+
+  const hiddenInquiryLinks = factPayloads(workDir, 'HandleLinked')
+    .filter((payload) => payload?.TargetAgent === 'deep-inquiry' && payload?.Ownership === 'HostOwnedHidden');
+  assert.equal(hiddenInquiryLinks.length, 1, 'NEEDHELP: deep request must create exactly one hidden deep-inquiry consultation');
+
+  const requests = scenario.provider.requests ?? [];
+  const consultation = requests.filter((request) => lastUserText(request).startsWith('# 如何解决这个 agent 的当前困难？'));
+  assert.equal(consultation.length, 1, 'NEEDHELP: consultation provider request must occur exactly once');
+  assert.match(
+    lastUserText(consultation[0]),
+    /NEEDHELP_LONG_STROKE_CANARY/,
+    'NEEDHELP: parent→child CommissionerRecord must carry the owner opening charge',
+  );
+
+  const advice = requests.filter((request) =>
+    lastUserText(request).startsWith('# 下面是一次独立 consultation 的 canonical child→parent LifecycleWorkRecord。'),
+  );
+  assert.equal(advice.length, 1, 'NEEDHELP: child→parent advice request must occur exactly once');
+  const adviceText = lastUserText(advice[0]);
+  assert.match(adviceText, /Independent NEEDHELP perspective/, 'NEEDHELP: advice must carry canonical child work evidence');
+  assert.doesNotMatch(
+    adviceText,
+    /如何解决这个 agent 的当前困难？/,
+    'NEEDHELP: child→parent LifecycleWorkRecord must exclude the consultation child Opening',
+  );
 }
 
 /**

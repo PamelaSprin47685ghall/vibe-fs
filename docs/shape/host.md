@@ -154,7 +154,7 @@ type PairProgrammingGuideline =
       ResultGap: TranscriptGap }
 ```
 
-`Ordinal` 严格递增；`CallId` 在该 transcript 内唯一；`CallGap` / `ResultGap` 是 pair 两个 half 各自的 transcript gap anchor。记录一经追加不可修改、删除或换位。每条记录渲染为 assistant `auto-injected` tool-call 与对应 completed tool-result，两侧共享 `CallId`，均标记 `source = "pair-programming-auto-injected"` 与 `synthetic = true`。
+`Ordinal` 严格递增；`CallId` 在该 transcript 内唯一；`CallGap` / `ResultGap` 是 provider-independent occurrence 的两个 transcript gap anchor。记录一经追加不可修改、删除或换位。普通 provider 把每条记录渲染为 assistant `auto-injected` tool-call 与对应 completed tool-result；Cursor 把同一记录渲染为 `ResultGap` 上的一条 synthetic assistant text。所有投影都共享 canonical `MarkerText`，并用 `source = "pair-programming-auto-injected"` + stable synthetic id 做 identity；不得按正文过滤。
 
 `TranscriptMessageAddress` 是 Host transcript message address（raw message 的 `info.id` / `id`，与 Session snapshot 以 message `Id` 寻址一致）的窄类型 codec；禁止偷换成 `PhysicalUserMessageId`、`AuthorityRootUserMessageId`、`ProviderRunIdentity` 或 `ToolCallId`，除非该值在具体位置上确实就是 transcript message address。
 
@@ -321,3 +321,9 @@ MagicTodo Manager Attempt
 HOST-013 pair-programming 仍是 **Work session 通用** marker，不专属 Manager；正文语言读 `SessionProviderLanguage`（HOST-026）。  
 Manager-only 持续 todowrite / BlindPlan 文案是 TODO-013/015 表面片段，在 role=Manager 且 `todowrite` provider-visible 时叠加；禁止并入全局 `PairProgrammingGuidelineText`。  
 Host membrane **不**拥有 OpeningPolicy / OpeningMaterial；T1 关闭 Opening 属 TODO-015 / COMPANION-014。
+
+## NEEDHELP Host shape（HOST-027）
+
+`NeedHelpEventCodec` 只负责把 Host raw event 适配成 `{ SessionId; ProviderRun; PartId?; Field; Delta }` reasoning delta；`NeedHelpSensor` 保存每个 live attempt 的有限 rolling suffix 与 armed identity。Attempt identity 必须来自当前 provider run，不能退化成 session-wide boolean。Sensor 只请求 `AbortSession`；实际 fast/deep/consultation 决策在 reconciled turn 上完成，且请求者 binding 从同一 Host snapshot 中 `Id = ProviderRunIdentity` 的 assistant `SessionMessage.Agent` 精确读取，禁止从 fallback cursor / SelectedAgent 猜。
+
+LoopDetector/LoopSensor 状态、LoopKillArmed 与 NeedHelpArmed 分离。若物理 abort settle 前两者都已 arm，显式 NEEDHELP assistance 在 reconcile 有确定性优先级，并立即清除 LoopKillArmed；一个 abort 只消费一个 typed cause，竞争 cause 不得泄漏到下一 attempt。StrengthReplica、Companion/InternalLeaf 不进入 NEEDHELP raw sensor admission。
