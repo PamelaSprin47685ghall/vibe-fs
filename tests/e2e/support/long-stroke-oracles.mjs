@@ -75,8 +75,8 @@ export function publicToolResults(requests, expectedName) {
 /**
  * NEEDHELP Long Stroke causal stream holds. No fixed sleep: each reasoning-only
  * response exposes its first sentinel-bearing chunk, then stays physically open
- * until the next Host-owned assistance request proves AbortSession + reconcile
- * progressed. The final advice response is held before its first token so the
+ * until OpenCode closes that provider response because AbortSession cancelled the
+ * exact attempt. The final advice response is held before its first token so the
  * entry can arm a turn-scoped terminal oracle without racing a fast mock.
  */
 export function armNeedHelpCausalHolds(scenario) {
@@ -89,18 +89,12 @@ export function armNeedHelpCausalHolds(scenario) {
     return { promise, release: () => resolve?.() };
   };
 
-  const fast = deferred();
-  const deep = deferred();
   const final = deferred();
   const held = new Set();
 
   for (const entry of runtime.scenario.entries) {
-    if (entry.id === 'needhelp-owner-fast.0') {
-      entry.respond = { ...entry.respond, waitAfterFirstTokenUntil: fast.promise };
-      held.add(entry.id);
-    }
-    if (entry.id === 'needhelp-owner-deep.0') {
-      entry.respond = { ...entry.respond, waitAfterFirstTokenUntil: deep.promise };
+    if (entry.id === 'needhelp-owner-fast.0' || entry.id === 'needhelp-owner-deep.0') {
+      entry.respond = { ...entry.respond, waitForAbortAfterFirstToken: true };
       held.add(entry.id);
     }
     if (entry.id === 'needhelp-owner-advice.0') {
@@ -115,8 +109,6 @@ export function armNeedHelpCausalHolds(scenario) {
     'NEEDHELP: all three causal hold points must exist in the sole Long Stroke scenario',
   );
 
-  scenario.provider.afterExpectation('needhelp-owner-deep.0', fast.release);
-  scenario.provider.afterExpectation('needhelp-consult.0', deep.release);
   return { releaseFinal: final.release };
 }
 

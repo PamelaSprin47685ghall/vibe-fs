@@ -71,7 +71,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     // DSL-MUTABLE: resource — assistance workflow callbacks attach after
     // LifecycleWorkRecord composition, without reversing compile-layer ownership.
     // DSL-MUTABLE: resource — assistance reconciled-turn handler attachment slot
-    let mutable assistanceTurnHandler: (ReconciledTurn -> Task<AssistanceTurnDisposition>) option =
+    let mutable assistanceTurnHandler: (ReconciledTurnContext -> Task<AssistanceTurnDisposition>) option =
         None
 
     // DSL-MUTABLE: resource — assistance session-drop handler attachment slot
@@ -104,14 +104,14 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member _.SyncDelegateRuntime = syncDelegateRuntime
 
     member _.AttachAssistance
-        (handleTurn: ReconciledTurn -> Task<AssistanceTurnDisposition>, dropSession: SessionId -> unit)
+        (handleTurn: ReconciledTurnContext -> Task<AssistanceTurnDisposition>, dropSession: SessionId -> unit)
         =
         assistanceTurnHandler <- Some handleTurn
         assistanceDropSession <- Some dropSession
 
-    member _.HandleAssistanceTurn(turn: ReconciledTurn) =
+    member _.HandleAssistanceTurn(context: ReconciledTurnContext) =
         match assistanceTurnHandler with
-        | Some handle -> handle turn
+        | Some handle -> handle context
         | None -> Task.FromResult AssistanceTurnDisposition.NotAssistance
 
     member _.DropAssistanceSession(sessionId: SessionId) =

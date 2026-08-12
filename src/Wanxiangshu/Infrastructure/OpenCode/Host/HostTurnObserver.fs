@@ -32,7 +32,7 @@ module HostTurnObserver =
             // HOST-027: assistance is classified from the exact armed ProviderRun
             // before Strength, family recovery, SyncDelegate, fallback, or ordinary
             // abort handling can interpret the physical abort as business failure.
-            match! scope.HandleAssistanceTurn turn with
+            match! scope.HandleAssistanceTurn context with
             | AssistanceTurnDisposition.Handled ->
                 // HOST-027: if LoopSensor also armed before the physical abort
                 // settled, the explicit collaboration request owns this abort.

@@ -12,6 +12,15 @@ const SSE_HEADERS = {
   'Connection': 'keep-alive',
 };
 
+const awaitResponseClose = (res) =>
+  new Promise((resolve) => {
+    if (res.destroyed || res.writableEnded) {
+      resolve();
+      return;
+    }
+    res.once('close', resolve);
+  });
+
 async function respondStream(res, chunks, exp) {
   res.writeHead(200, { ...SSE_HEADERS, 'X-Accel-Buffering': 'no' });
 
@@ -31,11 +40,17 @@ async function respondStream(res, chunks, exp) {
       return;
     }
     res.write(`data: ${JSON.stringify(chunks[index])}\n\n`);
-    // Causal stream hold for Long Stroke control-sentinel canaries: the first
-    // reasoning delta is physically visible, then the stream stays open until
-    // the next Host-owned request proves AbortSession/reconcile progressed.
+    // Causal stream hold for Long Stroke control-sentinel canaries. The first
+    // reasoning delta is physically visible; the only success-path release is
+    // the provider HTTP response closing because OpenCode cancelled that attempt.
+    // No fixed sleep and no dependency on a later consultation request.
+    if (index === 0 && exp.respond.waitForAbortAfterFirstToken === true) {
+      await awaitResponseClose(res);
+      return;
+    }
     if (index === 0 && exp.respond.waitAfterFirstTokenUntil != null) {
-      await exp.respond.waitAfterFirstTokenUntil;
+      await Promise.race([exp.respond.waitAfterFirstTokenUntil, awaitResponseClose(res)]);
+      if (res.destroyed || res.writableEnded) return;
     }
   }
 
