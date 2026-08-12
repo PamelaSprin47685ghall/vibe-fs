@@ -25,13 +25,13 @@ module JoinTool =
 
     let private recoveryBlocked (_blocks: NonEmpty<RecoveryBlock>) =
         consequence
-            [ "# The family cannot advance because recovery is blocked."
-              "# Resolve the recovery obstruction before joining again." ]
+            [ "The family cannot advance because recovery is blocked."
+              "Resolve the recovery obstruction before joining again." ]
 
     let private execute (scope: ToolRuntimeScope) (_args: HostToolArguments) (context: HostToolContext) =
         task {
             if String.IsNullOrWhiteSpace context.SessionId then
-                return consequence [ "# Join is unavailable until the caller's authority is established." ]
+                return consequence [ "Join is unavailable until the caller's authority is established." ]
             else
                 let sessionId = SessionId.create context.SessionId
 
@@ -60,8 +60,8 @@ module JoinTool =
                     // or Blocked. Align ExecutorTool FamilyWaiting → RECOVERY_WAITING.
                     return
                         consequence
-                            [ "# Recovery is still in progress."
-                              "# Join again after the family becomes ready." ]
+                            [ "Recovery is still in progress."
+                              "Join again after the family becomes ready." ]
                 | FamilyRecovery.FamilyReady permit ->
                     // NEVER Cancel mailbox/runtime on user wake (EXEC-017); the attempt's
                     // Wait is the only interrupt channel. Completion still beats interrupt.
@@ -88,13 +88,13 @@ module JoinTool =
 
                         match outcome with
                         | Error _ ->
-                            return consequence [ "# The orchestrator is not ready to join yet." ]
+                            return consequence [ "The orchestrator is not ready to join yet." ]
                         | Ok(Interrupted reason) -> return JoinResultRenderer.renderInterrupted reason
                         | Ok(ResultsAvailable batch) -> return JoinResultRenderer.renderOrchestratorBatch batch
                     else
                         match scope.RuntimeFor context with
                         | Error _ ->
-                            return consequence [ "# Join is unavailable from this execution context." ]
+                            return consequence [ "Join is unavailable from this execution context." ]
                         | Ok runtime ->
                             let isDevOps = scope.IsRole(context, Role.DevOps)
 

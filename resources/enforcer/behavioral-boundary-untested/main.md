@@ -1,27 +1,33 @@
 # behavioral-boundary-untested — Main
 
-## What To Do Now
-Add a behavioral test that enters through the same public surface production callers use and asserts the outcome they are promised. The module’s supported public entry point is who owns the caller-visible promise and therefore who owns the test that must cross that boundary.
+Add one test through the supported entrance that owns the promise.
 
-## Why This Matters
-Implementation tests establish facts about today’s decomposition. They do not establish that the system exposes the intended behavior. The distance between helper and boundary contains wiring, normalization, authorization, defaults, effect sequencing, and serialization—the exact places where integration defects hide.
+Start from the caller's sentence, not from the helper you want to cover:
 
-## Repair Strategy
-Start from the public promise, not from the internal function you want to cover. Construct the smallest realistic input at the supported entry point, observe the supported result, and keep private tests only where they sharpen diagnosis.
+```text
+When caller supplies X through supported boundary B,
+caller may observe Y and must not observe Z.
+```
 
-## Decision Branches
-- If no test crosses the owning public entry, add that test before adding more helper coverage.
-- If helper tests already exist, keep them only as diagnostic complements after the boundary proof is in place.
-- If the “public” method is a test-only export, stop using it; test the real supported surface instead.
+Then build the smallest fixture that crosses B using production decoding/wiring/permission/default logic relevant to that promise. Assert the caller-visible result, durable state, or external effect — not private helper choreography.
 
-## Common Wrong Fixes
-- Do not invoke private members through reflection to raise coverage.
-- Do not export internals only so tests can reach them.
-- Do not duplicate the public path inside the fixture while still calling helpers directly.
-- Do not treat a green helper suite as proof that wiring, defaults, or identity at the boundary work.
+Keep lower-level tests when they buy diagnosis or exhaust a pure law. They are useful once the boundary theorem exists. The repair is not “delete unit tests”; it is “stop asking unit tests to certify integration they never exercise.”
 
-## Verification
-Temporarily imagine the internal helper remains perfect but the boundary wiring is broken. The new test must fail under that defect. The invariant is that every promised behavior has at least one proof that would turn red if the owning public entrance were miswired.
+Common fake repairs:
 
-## Done When
-The promised behavior has at least one proof that crosses its owning public boundary, so a caller-visible regression cannot hide behind green helper tests.
+- exporting a private helper solely so the test can call it;
+- reproducing the production wiring inside the test fixture, thereby allowing both fixture and production to be wrong differently;
+- constructing post-decoder objects directly when the bug could live in decoding/defaults;
+- mocking the permission/identity layer away when that layer is part of the public behavior;
+- adding a giant full-stack E2E when a narrow real boundary test would be faster and more precise;
+- asserting only “request did not throw,” while wrong result/default/identity would still pass.
+
+Verification should prove the test owns a real boundary risk. Deliberately introduce one plausible composition defect — swap a field, remove a default, bypass an adapter, miswire a dependency, change an ID — while leaving internal helpers correct. The test must fail.
+
+Also perform a semantics-preserving internal refactor. The boundary test should remain green. If it breaks because helper names/call order changed, it has drifted into `test-implementation-coupled` territory.
+
+Do not overgeneralize the rule into “everything needs end-to-end.” A private arithmetic function whose public owner already has boundary proof may need only focused unit/property tests for new arithmetic cases. Evidence should be placed where the claim lives.
+
+You are done when a caller-visible regression cannot hide behind green helper tests, and internal decomposition can still evolve without rewriting the boundary proof.
+
+> A supported entrance is where implementation becomes a promise. Put at least one witness there.
