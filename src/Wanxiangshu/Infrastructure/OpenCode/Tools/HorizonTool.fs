@@ -19,13 +19,13 @@ module HorizonTool =
                 | None -> "someone"
 
         match handle.Lifecycle with
-        | HandleLifecycle.CompletedAwaitingJoin _ -> sprintf "# %s has returned." label
+        | HandleLifecycle.CompletedAwaitingJoin _ -> sprintf "%s has returned." label
         | HandleLifecycle.Active ->
             match runtimeRecord with
-            | Some record when record.CompletionCellSettled -> sprintf "# %s has returned." label
-            | _ -> sprintf "# %s is still away." label
+            | Some record when record.CompletionCellSettled -> sprintf "%s has returned." label
+            | _ -> sprintf "%s is still away." label
         | HandleLifecycle.Abandoned _
-        | HandleLifecycle.Retired -> sprintf "# %s did not return from this charge." label
+        | HandleLifecycle.Retired -> sprintf "%s did not return from this charge." label
 
     let private lineForPty (record: PtyRecord) : string =
         let label =
@@ -34,10 +34,10 @@ module HorizonTool =
             else
                 record.Command.Trim()
 
-        sprintf "# %s remains open." label
+        sprintf "%s remains open." label
 
     let private unavailable message =
-        ToolHostCodec.tomlObjectWithInstructions [ "# " + message ] []
+        ToolHostCodec.tomlObjectWithInstructions [ message ] []
 
     let private execute (scope: ToolRuntimeScope) (_args: HostToolArguments) context =
         task {
@@ -71,7 +71,7 @@ module HorizonTool =
 
                     let instructions =
                         if List.isEmpty lines then
-                            [ "# Nothing beyond your immediate sight presently asks for your attention." ]
+                            [ "Nothing beyond your immediate sight presently asks for your attention." ]
                         else
                             lines
 
