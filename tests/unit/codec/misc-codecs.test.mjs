@@ -156,6 +156,48 @@ test('MISC_host_message_tool_call_variants', () => {
   assert.equal(decodePart({ type: 'tool-call', args: {} }), undefined)
 })
 
+test('MISC_host_message_session_tool_state_controls_call_vs_result', () => {
+  const pending = decodePart({
+    type: 'tool',
+    id: 'part-pending',
+    callID: 'c-pending',
+    tool: 'read',
+    state: { status: 'pending', input: { filePath: 'a.txt' } },
+  })
+  assert.equal(caseOf(pending), 'ToolCall')
+  assert.deepEqual(payloadOf(pending), ['c-pending', 'read', '{"filePath":"a.txt"}'])
+
+  const running = decodePart({
+    type: 'tool',
+    id: 'part-running',
+    callID: 'c-running',
+    tool: 'grep',
+    state: { status: 'running', input: { pattern: 'needle' } },
+  })
+  assert.equal(caseOf(running), 'ToolCall')
+  assert.deepEqual(payloadOf(running), ['c-running', 'grep', '{"pattern":"needle"}'])
+
+  const completed = decodePart({
+    type: 'tool',
+    id: 'part-completed',
+    callID: 'c-completed',
+    tool: 'read',
+    state: { status: 'completed', input: { filePath: 'a.txt' }, output: 'done' },
+  })
+  assert.equal(caseOf(completed), 'ToolResult')
+  assert.deepEqual(payloadOf(completed), ['c-completed', 'done'])
+
+  const failed = decodePart({
+    type: 'tool',
+    id: 'part-error',
+    callID: 'c-error',
+    tool: 'read',
+    state: { status: 'error', input: { filePath: 'a.txt' }, error: 'native failure' },
+  })
+  assert.equal(caseOf(failed), 'ToolResult')
+  assert.deepEqual(payloadOf(failed), ['c-error', 'native failure'])
+})
+
 test('MISC_host_message_tool_result_variants', () => {
   const r = decodePart({ type: 'tool_result', callID: 'c1', result: { ok: true } })
   assert.equal(caseOf(r), 'ToolResult')

@@ -468,6 +468,69 @@ export async function bindFinalityReviseThenPerfect(scenario) {
   };
 }
 
+export function assertNativeReadProbeTimeline(scenario) {
+  const probeUpdates = (scenario.events?.allEvents ?? []).filter((event) => {
+    const part = event?.properties?.part;
+    return event?.type === 'message.part.updated'
+      && part?.type === 'tool'
+      && part?.tool === 'read'
+      && part?.state?.input?.filePath === 'read_probe.txt';
+  });
+  assert.ok(probeUpdates.length >= 1, 'long-stroke read probe: message.part.updated missing');
+
+  const probePart = probeUpdates[0].properties.part;
+  const callID = probePart.callID ?? probePart.callId;
+  const partID = probePart.id;
+  const sessionID = probePart.sessionID ?? probePart.sessionId ?? probeUpdates[0].sessionID;
+  assert.ok(callID, 'long-stroke read probe: callID missing');
+  assert.ok(partID, 'long-stroke read probe: partID missing');
+  assert.ok(sessionID, 'long-stroke read probe: sessionID missing');
+
+  const samePartUpdates = (scenario.events?.allEvents ?? []).filter((event) =>
+    event?.type === 'message.part.updated'
+    && event?.properties?.part?.id === partID,
+  );
+  const terminal = samePartUpdates.find((event) =>
+    ['completed', 'error'].includes(event?.properties?.part?.state?.status),
+  );
+  assert.ok(terminal, 'long-stroke read probe: no completed/error ToolPart state observed');
+
+  const start = samePartUpdates[0]?.time ?? terminal.time;
+  const timeline = samePartUpdates.map((event) => {
+    const state = event.properties.part.state ?? {};
+    return {
+      dtMs: event.time - start,
+      seq: event.seq,
+      status: state.status ?? null,
+      error: state.error ?? state.errorText ?? null,
+      interrupted: state.metadata?.interrupted ?? null,
+    };
+  });
+  const nativeToolTerminals = (scenario.events?.allEvents ?? [])
+    .filter((event) => {
+      const part = event?.properties?.part;
+      return event?.type === 'message.part.updated'
+        && ['read', 'glob', 'grep'].includes(part?.tool)
+        && ['completed', 'error'].includes(part?.state?.status);
+    })
+    .map((event) => {
+      const part = event.properties.part;
+      return {
+        seq: event.seq,
+        sessionID: part.sessionID ?? part.sessionId ?? event.sessionID,
+        tool: part.tool,
+        callID: part.callID ?? part.callId,
+        status: part.state.status,
+        error: part.state.error ?? part.state.errorText ?? null,
+        interrupted: part.state.metadata?.interrupted ?? null,
+      };
+    });
+  console.log(
+    `[read-probe] session=${sessionID} call=${callID} part=${partID} timeline=${JSON.stringify(timeline)} nativeTerminals=${JSON.stringify(nativeToolTerminals)}`,
+  );
+  return { sessionID, callID, partID, timeline, nativeToolTerminals };
+}
+
 /**
  * Composite oracle for flow `{ custom = "oracleLongStroke" }`.
  * Asserts every §21 adversity class the lean orch-shell flow barriers on.
@@ -484,6 +547,7 @@ export async function oracleLongStroke(scenario, _ctx) {
   assertLaterSuccessfulFinality(workDir);
   assertPublishConflict(workDir);
   assertSuccessfulReconciliation(workDir);
+  assertNativeReadProbeTimeline(scenario);
 
   assert.ok(
     journalEventLines(workDir).length >= 1,

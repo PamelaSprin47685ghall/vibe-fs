@@ -65,6 +65,8 @@ type ReconciledTurn =
 
 行为不变（语义分层后）：`IdleWake` 下因果重读耗尽仍为 `TurnUnknown` → `Publish` 稳定观测交接（禁止静默 StopPass）；业务侧 TurnWorkflow / InteractionRepair 在有 quiescence 时才发 missing-final-report。无 idle 权限的 `Retry` / `Failure` / `Abort` wake 只 StopPass，等待下一真实信号。`publishDecision` 不得接收 `TurnUnknown` 作为 Outcome（类型上已不可达）；Unknown 交接用 placeholder Outcome 做 provisional seal / dedupe。
 
+Snapshot projection 必须保持单一物理事实的状态语义一致：session-shaped `type="tool"` part 只有 `state.status=pending|running` 才进入 `SessionMessage.Parts` 的 `MessagePart.ToolCall`；`state.status=completed|error` 必须进入 `MessagePart.ToolResult`。同一 raw part 的 `SessionMessage.ToolParts` 分别对应 `Pending` / `Completed` / `Failed`，禁止出现 `ToolParts=Failed` 而 `Parts=ToolCall` 的投影分叉。否则 `hasToolCallPart` 会把已失败 execution 重新表示成 in-flight，并错误抑制 interaction repair。
+
 Host 的 `MessageAbortedError` / `finish=aborted` 先被 Reconciler 分类为 `TurnAborted`。`TurnCompletionProgram` 再消费这个控制面结局：
 
 ```text

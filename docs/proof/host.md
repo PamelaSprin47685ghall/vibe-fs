@@ -13,6 +13,7 @@
 | provider `TurnAborted` 保留到消费边界；无 Armed 不产生 Agent completion | HOST-004、LOOP-006、EXEC-020 |
 | Reconciler 无新信号时不产生 setTimeout/GetMessages（仅 ≤3 次因果重读） | HOST-004、A 类有界 |
 | 重复 snapshot 稳定只证明观测稳定；`TurnUnknown` 为私有 `SnapshotObservation`（非 `TurnOutcome`）；无 `IdleWake` 不产生 idle-derived continuation | HOST-004 |
+| session-shaped tool part 状态投影同义：pending/running→`Parts=ToolCall`+`ToolParts=Pending`；completed/error→`Parts=ToolResult`+`ToolParts=Completed/Failed`，禁止 failed→in-flight | `tests/unit/codec/misc-codecs.test.mjs`、`tests/unit/host/session-snapshot-locality.test.mjs`（HOST-004） |
 | 发送瞬间 fresh permit：stale permit → zero physical prompt + zero `PluginPromptClaimed`；`TryConsume` 与 dispatcher send 间无 await | HOST-004 |
 
 ## Compaction

@@ -41,6 +41,16 @@ module HostMessageCodec =
         else
             CanonicalJson.canonicalJson value
 
+    let private firstCanonical (value: obj) (fields: string list) =
+        fields
+        |> List.tryPick (fun field ->
+            let candidate = readField value field
+
+            if isNull candidate then
+                None
+            else
+                Some(canonicalArgs candidate))
+
     let decodePart (raw: obj) : MessagePart option =
         if isNull raw then
             None
@@ -72,18 +82,34 @@ module HostMessageCodec =
                     |> Option.orElse (readString raw "name")
                     |> Option.defaultValue ""
 
-                let args =
-                    let direct = readField raw "args"
-                    let alternate = readField raw "arguments"
+                let state = readField raw "state"
 
-                    if not (isNull direct) then canonicalArgs direct
-                    elif not (isNull alternate) then canonicalArgs alternate
-                    else "{}"
+                let status =
+                    readString state "status" |> Option.map (fun value -> value.ToLowerInvariant())
 
-                if String.IsNullOrWhiteSpace name && String.IsNullOrWhiteSpace callId then
-                    None
-                else
-                    Some(MessagePart.ToolCall(callId, name, args))
+                match status with
+                | Some "completed" when not (String.IsNullOrWhiteSpace callId) ->
+                    let result =
+                        firstCanonical state [ "output"; "result"; "content" ]
+                        |> Option.defaultValue "null"
+
+                    Some(MessagePart.ToolResult(callId, result))
+                | Some "error" when not (String.IsNullOrWhiteSpace callId) ->
+                    let result =
+                        firstCanonical state [ "error"; "errorText"; "output" ]
+                        |> Option.defaultValue "null"
+
+                    Some(MessagePart.ToolResult(callId, result))
+                | _ ->
+                    let args =
+                        firstCanonical state [ "input" ]
+                        |> Option.orElse (firstCanonical raw [ "args"; "arguments" ])
+                        |> Option.defaultValue "{}"
+
+                    if String.IsNullOrWhiteSpace name && String.IsNullOrWhiteSpace callId then
+                        None
+                    else
+                        Some(MessagePart.ToolCall(callId, name, args))
             | "tool-result"
             | "tool_result" ->
                 let callId =
@@ -93,10 +119,7 @@ module HostMessageCodec =
                     |> Option.defaultValue ""
 
                 let result =
-                    [ "result"; "output"; "content" ]
-                    |> List.tryPick (fun field ->
-                        let value = readField raw field
-                        if isNull value then None else Some(canonicalArgs value))
+                    firstCanonical raw [ "result"; "output"; "content" ]
                     |> Option.defaultValue "null"
 
                 Some(MessagePart.ToolResult(callId, result))

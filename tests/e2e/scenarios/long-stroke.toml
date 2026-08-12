@@ -68,7 +68,7 @@ pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fal
 #                      the legal transport lifetime to an observed upper bound of 2560.
 #                      Both are fail-closed runaway ceilings, not wall-clock budgets.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
-setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-owner", "needhelp-owner-title", "needhelp-owner-fast", "needhelp-owner-deep", "needhelp-consult-title", "needhelp-consult", "needhelp-owner-advice", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 620, maxSseEvents = 2900, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", ".wanxiang/casebook/.keep" = "" } } }
+setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-owner", "needhelp-owner-title", "needhelp-owner-fast", "needhelp-owner-deep", "needhelp-consult-title", "needhelp-consult", "needhelp-owner-advice", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 620, maxSseEvents = 2900, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", "read_probe.txt" = "long-stroke-read-probe\n", ".wanxiang/casebook/.keep" = "" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 
@@ -88,6 +88,7 @@ must = [
   "mgr-labor.0",
   "coder.0",
   "coder.1",
+  "coder.2",
   "continue.0",
   "manager-idle.0",
   "manager-idle.1",
@@ -492,7 +493,7 @@ reason = "prefix-probe"
 id = "coder"
 lane = "fast-coder"
 user = "# Write publish_proof.txt."
-tools = ["write"]
+tools = ["write", "read"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "write", args = { filePath = "publish_proof.txt", content = "Published by long-stroke canary\n" } }
@@ -502,6 +503,11 @@ tools = ["write"]
   # session after CaseFinalize and therefore proves the same persisted read path.
   [[turn.step]]
   respond = { type = "tool-call", tool = "fetch", args = { shelfmark = "$inspector-case" } }
+
+  # Native-read failure probe: ordinary Coder mainline, not Strength Replica.
+  # Unique path makes message.part.updated correlation unambiguous in the real Host SSE stream.
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "read", args = { filePath = "read_probe.txt" } }
 
   [[turn.step]]
   respond = { type = "text", text = "Coder finished." }

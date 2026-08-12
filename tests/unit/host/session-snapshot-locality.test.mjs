@@ -33,6 +33,34 @@ test('TODO-004 resolves a tool callback through its persisted assistant run and 
   assert.equal(located.value.InputCanonical, '{"todos":[{"content":"Ship locality","priority":"high","status":"in_progress"}]}')
 })
 
+test('HOST-004 keeps failed session tool state consistent across Parts and ToolParts', () => {
+  const messages = sessionSnapshot.projectMessages([
+    {
+      info: { id: 'asst_failed', role: 'assistant', finish: 'tool-calls' },
+      parts: [
+        {
+          id: 'part_failed',
+          type: 'tool',
+          tool: 'read',
+          callID: 'call_failed',
+          state: {
+            status: 'error',
+            input: { filePath: 'read_probe.txt' },
+            error: 'Tool execution aborted',
+            metadata: { interrupted: true },
+          },
+        },
+      ],
+    },
+  ])
+
+  assert.equal(messages.length, 1)
+  assert.equal(messages[0].Parts.length, 1)
+  assert.equal(caseOf(messages[0].Parts[0]), 'ToolResult', 'failed physical tool must not reappear as in-flight ToolCall')
+  assert.equal(messages[0].ToolParts.length, 1)
+  assert.equal(caseOf(messages[0].ToolParts[0].State), 'Failed')
+})
+
 test('TODO-004 rejects a call id observed in more than one persisted ToolPart', () => {
   const messages = sessionSnapshot.projectMessages([
     assistantToolMessage({ messageID: 'asst_1', partID: 'part_1' }),
