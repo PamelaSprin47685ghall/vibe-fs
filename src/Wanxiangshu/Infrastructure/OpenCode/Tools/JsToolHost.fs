@@ -23,8 +23,7 @@ module BuiltinToolDescriptionHook =
     /// No provider annotation: primitive fallbacks are not deprecated.
     let hookSuffix (_jsRoleToolName: string) : string = ""
 
-    let annotate (_builtinName: string) (description: string) (_jsRoleToolName: string) : string =
-        description
+    let annotate (_builtinName: string) (description: string) (_jsRoleToolName: string) : string = description
 
     /// JS-003: the hook must not recommend a tool the provider cannot see.
     /// `visibleToolNames` is the current Attempt's tool set; a recommendation

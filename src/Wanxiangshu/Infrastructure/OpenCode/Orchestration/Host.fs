@@ -464,6 +464,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 match byname with
                 | Some value when not (String.IsNullOrWhiteSpace value) -> value.Trim()
                 | _ -> managerAgent
+
             let descriptor =
                 DiagnosticWait.create
                     "commission-manager-job"

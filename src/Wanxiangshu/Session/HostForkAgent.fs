@@ -127,6 +127,7 @@ module HostForkAgent =
                 ?byname: string
             ) : Task<Result<ForkResult, string>> =
             let agentName = agent.Trim()
+
             let providerByname =
                 match byname with
                 | Some value when not (String.IsNullOrWhiteSpace value) -> value.Trim()
