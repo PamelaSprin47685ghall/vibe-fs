@@ -89,25 +89,26 @@ Bound session：missing localization → fail closed；禁止 silent English fal
 
 - PROMPT-019：Provider-visible prose ownership
 - ARCH-016：Gates A–D → A–E（Gate E = prose ownership ratchet）
-- PROMPT-017 / Gate C：交叉引用；后续 batch 加 structural/semantic parity
+- PROMPT-017 / Gate C：交叉引用；`{{placeholder}}` 结构 parity 已现行；semantic-anchor 仍后续
 - GrandRewrite Phase 17 完整文案迁移义务移交本 Change；GrandRewrite 保留 AC15/AC16 关闭路径
 
 ## Remaining work
 
 1. ~~**Gate 0**~~：**已闭合**
 2. ~~**Batch 1**~~：**已闭合** — Runtime / ForkChild / Sync / Companion / HostReview / WarmStart → Gate E 0
-3. ~~**Batch 2**~~：**已闭合** — ManagerNarrative / Lifecycle / FinalityPrompt / MagicTodoSurface → Gate E 0（FinalityTool 拒词 17 ∈ Batch 3）
+3. ~~**Batch 2**~~：**已闭合** — ManagerNarrative / Lifecycle / FinalityPrompt / MagicTodoSurface → Gate E 0
 4. ~~**Batch 4**~~：**已闭合** — Assistance → 0；PromptResources / Bookkeeper bound fail-closed
-5. **Batch 3** Tool surfaces：剩余 **400 hits / 19 files**（JsDescription 170；ToolRegistry / Fork / Join / Horizon / …）
-6. ~~**Batch 5** Role Law 厚度~~：**正文已恢复**；语言世界闭合仍依赖 Batch 3
-7. ~~legacy `resources/prompts/`~~：**已清**；Gate E baseline → 0 仍待 Batch 3
+5. ~~**Batch 3**~~：**已闭合** — tool surfaces + ToolRegistry overlay 删除；Gate E **0**
+6. ~~**Batch 5** Role Law 厚度~~：**正文已恢复**；语言世界随 Batch 3 闭合
+7. ~~legacy `resources/prompts/`~~：**已清**；Gate E baseline → **0**
 
 ## Done this integration
 
 - Spec：PROMPT-019 + ARCH-016 E；`ProviderProse`（`{{name}}` + `languageOf`）
 - Role Law restore + depth ratchet；legacy prompts 包面清除
-- Batch 1/2/4 迁文完成；测试 facade 对齐（runtimeNudge / forkChild / glory / production.js）
-- Gate E：**580 → 400**；language-parity **63** pairs；build ok；相关单测 45/45
+- Batch 1/2/3/4 迁文完成；ToolRegistry `match lang` overlay 删除
+- Gate C：`{{placeholder}}` 结构 parity 现行
+- Gate E：**580 → 0**
 
 ## Completion criteria
 
@@ -118,4 +119,4 @@ Bound session：missing localization → fail closed；禁止 silent English fal
 
 ## Blockers
 
-无。下一批 = Batch 3 tool surfaces。
+`npm run check` 待跑。Gate E 静态面已 0。

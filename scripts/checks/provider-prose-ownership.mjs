@@ -47,6 +47,7 @@ export const PROVIDER_PROSE_SCAN_ROOTS = Object.freeze([
   'src/Wanxiangshu/Infrastructure/OpenCode/Tools/BashHoneypotTool.fs',
   'src/Wanxiangshu/Infrastructure/OpenCode/Tools/CasebookTools.fs',
   'src/Wanxiangshu/Infrastructure/OpenCode/Tools/FissionTool.fs',
+  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/JsToolHost.fs',
   'src/Wanxiangshu/Infrastructure/OpenCode/Codec/JoinResultRenderer.fs',
 ])
 

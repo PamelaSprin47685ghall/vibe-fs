@@ -117,9 +117,8 @@ module PromptResources =
     let load () : PromptCatalog =
         loadForLanguage ProviderLanguage.English
 
-    /// Bound → bound language. Unbound → English only for a truly unbound
-    /// read-only internal catalog boundary (HOST-026). Bound Agent surfaces
-    /// must prefer `ProviderProse.languageOf` (PROMPT-019 fail closed).
+    /// Bound → bound language. Unbound → English (HOST-026). Same rule as
+    /// `ProviderProse.languageOf`. Bound + missing resource still fail closed.
     let languageForSession (sessionId: SessionId) : ProviderLanguage =
         match SessionProviderLanguage.tryGet sessionId with
         | Some lang -> lang

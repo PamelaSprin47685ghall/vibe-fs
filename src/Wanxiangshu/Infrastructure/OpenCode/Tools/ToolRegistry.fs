@@ -175,15 +175,22 @@ module ToolRegistry =
         let gateExecute (spec: ToolSpec) =
             let original = spec.Execute
 
-            let denied message =
-                ToolHostCodec.tomlObjectWithInstructions [ message ] []
+            let denied (ctx: HostToolContext) path (subs: Map<string, string>) =
+                ToolHostCodec.tomlObjectWithInstructions [ ProviderProse.render (lang ctx) path subs ] []
 
-            let denyRole (role: Role) =
-                denied (sprintf "%s is not available to %A." spec.Name role)
+            let denyRole (ctx: HostToolContext) (role: Role) =
+                denied
+                    ctx
+                    Path.DeniedRole
+                    (Map
+                        [ "tool", spec.Name
+                          "role", sprintf "%A" role ])
 
             let stopChronicleNoLiveCycle (ctx: HostToolContext) =
                 task {
-                    Diagnostic.emit "chronicle-gate" [ "session_id", ctx.SessionId; "result", "no live CurrentRequest" ]
+                    Diagnostic.emit
+                        "chronicle-gate"
+                        [ "session_id", ctx.SessionId; "result", ChronicleTool.NoLiveCycleError ]
 
                     if not (String.IsNullOrWhiteSpace ctx.SessionId) then
                         let! _ = runtime.Sessions.AbortSession(SessionId.create ctx.SessionId)
@@ -210,39 +217,36 @@ module ToolRegistry =
                         // STRENGTH-004: Host-native read/glob/grep are the entire
                         // replica tool surface. Every plugin-registered tool is
                         // therefore a forged/hidden path and fails closed here.
-                        return denied "This tool is not available in this execution context."
+                        return denied ctx Path.DeniedStrength Map.empty
                     elif isBookkeeper then
                         // Bookkeeper may run js-bookkeeper only. No Role.Bookkeeper.
                         if spec.Name = "js-bookkeeper" then
                             return! original args ctx
                         else
-                            return denied "Only js-bookkeeper is available while reshaping a staged Case."
+                            return denied ctx Path.DeniedBookkeeperOnly Map.empty
                     elif spec.Name = "js-bookkeeper" then
-                        return denied "There is no staged Case to reshape in this execution context."
+                        return denied ctx Path.DeniedNoStagedCase Map.empty
                     else
                         match runtime.RoleFor ctx with
                         | Some role when allowed role -> return! original args ctx
                         | Some role when spec.Name = "chronicle" && role = Role.Blogger ->
                             return! stopChronicleNoLiveCycle ctx
-                        | Some role -> return denyRole role
+                        | Some role -> return denyRole ctx role
                         | None ->
                             match! runtime.EnsureRoleFor ctx with
                             | Some role when allowed role -> return! original args ctx
                             | Some role when spec.Name = "chronicle" && role = Role.Blogger ->
                                 return! stopChronicleNoLiveCycle ctx
-                            | Some role -> return denyRole role
+                            | Some role -> return denyRole ctx role
                             | None ->
                                 // AGENT-007: an unresolved Role means an empty tool set.
                                 // Executing under an unknown role is unauthorised.
-                                return denied "This tool is unavailable until the caller's authority is established."
+                                return denied ctx Path.DeniedUnestablished Map.empty
                 }
 
         let specs =
             baseSpecs
-            |> List.map (fun spec ->
-                { spec with
-                    Description = descriptionFor providerLanguage spec
-                    Execute = gateExecute spec })
+            |> List.map (fun spec -> { spec with Execute = gateExecute spec })
 
         { Tools = ToolHostCodec.registry factory specs
           Runtime = runtime }

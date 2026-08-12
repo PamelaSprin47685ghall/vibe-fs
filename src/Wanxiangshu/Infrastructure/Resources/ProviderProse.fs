@@ -12,18 +12,13 @@ module ProviderProse =
 
     let private placeholderRe = Regex(@"\{\{([A-Za-z][A-Za-z0-9_]*)\}\}", RegexOptions.Compiled)
 
-    /// Bound session only. Unbound → fail closed (not silent English).
+    /// Bound session → that language. Unbound → English (HOST-026 first-touch /
+    /// PromptResources.languageForSession). Does not bind: session-create still
+    /// owns the real preference write. Bound + missing resource still fail closed.
     let languageOf (sessionId: SessionId) : ProviderLanguage =
         match SessionProviderLanguage.tryGet sessionId with
         | Some lang -> lang
-        | None ->
-            raise (
-                InvalidOperationException(
-                    sprintf
-                        "SessionProviderLanguage unbound for %s; refusing provider prose load (PROMPT-019 / HOST-026)"
-                        (SessionId.value sessionId)
-                )
-            )
+        | None -> ProviderLanguage.English
 
     /// Replace `{{name}}` with values. Values are not translated. Leftover placeholders fail closed.
     let substitute (template: string) (subs: Map<string, string>) : string =

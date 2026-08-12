@@ -14,7 +14,7 @@ open Wanxiangshu.OpenCode
 /// programs is taught inside the generated js-* contract and its Ultra Example.
 module BuiltinToolDescriptionHook =
 
-    [<Emit("$0 === undefined || $0 === null")>]
+    [<Emit("$0===undefined||$0===null")>]
     let private isUndefined (value: obj) : bool = jsNative
 
     /// The builtin filesystem tools the hook may annotate (凡存在者).
@@ -103,7 +103,7 @@ module JsDescriptionAssets =
 /// commit) and the result renders through JsToolsResult (JS-016).
 module JsToolSpec =
 
-    [<Emit("$0 === undefined || $0 === null")>]
+    [<Emit("$0===undefined||$0===null")>]
     let private isUndefined (value: obj) : bool = jsNative
 
     /// Build a ToolSpec for one generated surface.

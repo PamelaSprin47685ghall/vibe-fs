@@ -69,7 +69,6 @@ module BookkeeperRuntime =
     let private currentPort () : ISessionHostPort option = lock gate (fun () -> sessionPort)
 
     let private systemPrompt (ownerSessionId: string) =
-        // PROMPT-019: bound owner fails closed via languageOf; no English prose swallow.
         PromptResources.loadBookkeeperSystemFor (ProviderProse.languageOf (SessionId.create ownerSessionId))
 
     let private table (name: string) (fields: string list) : string =

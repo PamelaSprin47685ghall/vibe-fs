@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
 
-import { listItems, resultOf, roles, toList } from '../support/domain.mjs'
+import { BUILD_ROOT, listItems, resultOf, roles, sessionId, toList } from '../support/domain.mjs'
 import {
   RepositoryWarmStartHint,
   RepositoryWarmStartSearch,
@@ -27,6 +27,23 @@ const hint = (ordinal, rank, file, content, score = 0.9) =>
   new RepositoryWarmStartHint(ordinal, rank, file, rank, rank + 2, content, score, 100)
 
 const search = (ordinal, query, hints) => new RepositoryWarmStartSearch(ordinal, query, toList(hints))
+
+const providerRoot = join(BUILD_ROOT, '..', 'resources/provider')
+const readLines = (semanticPath, replacements = {}) => {
+  let text = readFileSync(join(providerRoot, semanticPath, 'en.md'), 'utf8')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .trimEnd()
+  for (const [key, value] of Object.entries(replacements)) {
+    text = text.replaceAll(`{{${key}}}`, value)
+  }
+  return text.split('\n')
+}
+const renderCharge = (charge, searches) =>
+  render(toList(readLines('lifecycle/warm-start/charge-envelope', { charge })), charge, searches)
+const appendAppendix = (base, searches) =>
+  appendToProviderPrompt(toList(readLines('lifecycle/warm-start/appendix')), base, searches)
+const sid = () => sessionId('ses_warm_start')
 
 const waitFor = async (predicate, message, ms = 1500) => {
   const deadline = Date.now() + ms
@@ -50,7 +67,7 @@ test('AGENT_032_renderer_keeps_hostile_hint_bytes_as_toml_data_and_dedupes_stabl
     search(2, 'second', [duplicate, hint(2, 2, 'src/b.fs', 'safe')]),
   ])
 
-  const rendered = render('authoritative charge', searches)
+  const rendered = renderCharge('authoritative charge', searches)
   const parsed = parseToml(rendered)
 
   assert.equal(parsed.evil, undefined, 'hostile snippet must not escape its string value')
@@ -69,7 +86,7 @@ test('AGENT_032_renderer_enforces_24_hint_and_64KiB_bounds_by_whole_entries', ()
   assert.equal(MaxWarmStartBytes, 64 * 1024)
 
   const huge = Array.from({ length: 32 }, (_, i) => hint(1, i + 1, `src/${i}.fs`, `${i}:` + '界'.repeat(5000)))
-  const rendered = render('charge', toList([search(1, 'wide', huge)]))
+  const rendered = renderCharge('charge', toList([search(1, 'wide', huge)]))
   const parsed = parseToml(rendered)
   const bytes = Buffer.byteLength(rendered, 'utf8')
 
@@ -80,7 +97,7 @@ test('AGENT_032_renderer_enforces_24_hint_and_64KiB_bounds_by_whole_entries', ()
 
 test('AGENT_032_append_preserves_authoritative_base_prompt_and_only_adds_appendix', () => {
   const base = '# authoritative assignment\ncontent = "keep-me"\n'
-  const rendered = appendToProviderPrompt(base, toList([search(1, 'q', [hint(1, 1, 'src/a.fs', 'orientation')])]))
+  const rendered = appendAppendix(base, toList([search(1, 'q', [hint(1, 1, 'src/a.fs', 'orientation')])]))
 
   assert.ok(rendered.startsWith(base.trimEnd()))
   const parsed = parseToml(rendered)
@@ -106,6 +123,7 @@ test('AGENT_032_searches_all_independent_keywords_in_one_parallel_wave_and_resto
   try {
     const pending = prepareWithSearch(
       searchFn,
+      sid(),
       roles.of('Inspector'),
       root,
       'slow\nbroken\nfast',
@@ -137,16 +155,16 @@ test('AGENT_032_zero_keywords_is_byte_exact_zero_work_and_nonconsumer_nonempty_k
   }
 
   try {
-    const zero = resultOf(await prepareWithSearch(searchFn, roles.of('Browser'), root, ' \r\n ', 'raw charge'))
+    const zero = resultOf(await prepareWithSearch(searchFn, sid(), roles.of('Browser'), root, ' \r\n ', 'raw charge'))
     assert.deepEqual(zero, { ok: true, value: 'raw charge' })
     assert.equal(calls, 0)
 
-    const denied = resultOf(await prepareWithSearch(searchFn, roles.of('Browser'), root, 'repo', 'raw charge'))
+    const denied = resultOf(await prepareWithSearch(searchFn, sid(), roles.of('Browser'), root, 'repo', 'raw charge'))
     assert.equal(denied.ok, false)
     assert.match(denied.error, /only available to Coder, Inspector, or DevOps/)
     assert.equal(calls, 0)
 
-    const noWorkspace = resultOf(await appendToBaseWithSearch(searchFn, roles.of('Coder'), undefined, 'repo', 'base'))
+    const noWorkspace = resultOf(await appendToBaseWithSearch(searchFn, sid(), roles.of('Coder'), undefined, 'repo', 'base'))
     assert.deepEqual(noWorkspace, { ok: true, value: 'base' })
     assert.equal(calls, 0)
   } finally {

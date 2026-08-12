@@ -38,6 +38,7 @@ test('gate_e_scan_roots_cover_gate0_owners', () => {
   assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('MagicTodoSurface.fs')))
   assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('ToolRegistry.fs')))
   assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('FileMutationTools.fs')))
+  assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('JsToolHost.fs')))
 })
 
 test('gate_e_green_fixture_is_zero_hits', () => {
@@ -72,7 +73,12 @@ test('gate_e_repo_scan_with_generated_baseline_is_green', () => {
   const baseline = generateBaseline(process.cwd())
   const result = scanRepo(process.cwd(), { baseline })
   assert.equal(result.ok, true, JSON.stringify(result.hits, null, 2))
-  assert.ok(Object.keys(baseline).length > 0)
+})
+
+test('gate_e_zero_hits_is_closed', () => {
+  const result = scanRepo(process.cwd())
+  assert.equal(result.ok, true, JSON.stringify(result.hits, null, 2))
+  assert.deepEqual(result.counts, {})
 })
 
 test('gate_e_committed_baseline_matches_repo', () => {
