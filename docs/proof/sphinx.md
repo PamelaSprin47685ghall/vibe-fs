@@ -15,6 +15,19 @@
 | 方法库 V1 | 仅 Multidisciplinary/Abduction/Analogy/Counterexample/Synthesis | SPHINX-004 |
 | 无 A*/Bayes/MCTS 本体 | Phase 0 路径不依赖完整搜索/概率图/MCTS 模块 | SPHINX-004 |
 
+## Phase 1 搜索
+
+| 证明 | 期望 | 模块 |
+|------|------|------|
+| PriorityQueue | max/min 堆按 comparator 稳定出队 | `search.js` |
+| bestG + reopen | 更优 path cost 重开 closed 节点 | `search.js` |
+| belief reopen | evidenceMass 跳变 > ε 清空 closed | `closure.js` |
+| graph A* 退化 | `graphAstarExpandOrder` 按 g+h 展开 | `search.js` |
+| anytime answer | yield 含 `bestAnswer`（stopReason=anytime） | `inquire.js` / `answer.js` |
+| ExpandFrontierRequest | explore budget 内定向展开 frontier head | `inquire.js` |
+
+代表测试：`tests/unit/sphinx/search.test.mjs`。
+
 ## 正交与 Host
 
 | 证明 | 期望 | 条款 |

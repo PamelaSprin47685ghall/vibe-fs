@@ -113,7 +113,7 @@
 | 术语 | 指向 |
 |------|------|
 | IngestCursor | CTX-011：Y 实际已消化到哪个 part（RecordCoverage.IngestedThrough） |
-| Inquiry | AGENT-001 / AGENT-025：inspect-only 认识角色；旧 Role `Meditator` 非法，无 alias |
+| Inquiry | AGENT-001 / AGENT-025 / AGENT-030：`inspect` + Sphinx MCP 认识角色；旧 Role `Meditator` 非法，无 alias |
 | `inspect` | AGENT-006 / EXEC-031：同步委派 Inspector → bounded WorkRecord；旧工具名 `inspector` 非法 |
 | InsertStrengthFrames | STRENGTH-009/016 / PROJ-005：Candidate / Promoted / Replica-local frame insertion intent |
 | Integration Gate | ORCH-005：短 CAS，只保护 ref mutation |

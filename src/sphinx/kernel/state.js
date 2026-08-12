@@ -15,12 +15,20 @@ export function createEpistemicState(question) {
     A: [],
     C: {
       maxYields: MAX_YIELDS,
+      maxExploreSteps: 4,
       yieldsUsed: 0,
       step: 0,
     },
     activatedMethods: [],
     synthesis: null,
     lastRequestType: null,
+    search: {
+      bestG: {},
+      closed: {},
+      frontier: [],
+      reopenCount: 0,
+      exploreSteps: 0,
+    },
   }
 }
 

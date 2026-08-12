@@ -1,7 +1,8 @@
 import { createEpistemicState } from './state.js'
 import { closure } from './closure.js'
 import { stopValue, bestActionValue } from './value.js'
-import { canonicalAnswer } from './answer.js'
+import { canonicalAnswer, anytimeAnswer } from './answer.js'
+import { orderActionsByFrontier, topFrontierAction, markExplored } from './search.js'
 
 function observationType(observation) {
   if (!observation || typeof observation !== 'object') return null
@@ -9,6 +10,7 @@ function observationType(observation) {
 }
 
 function yieldResult(state, request) {
+  const bestAnswer = anytimeAnswer(state)
   return {
     state: {
       ...state,
@@ -18,6 +20,7 @@ function yieldResult(state, request) {
     result: {
       status: 'yield',
       request,
+      ...(bestAnswer ? { bestAnswer } : {}),
     },
   }
 }
@@ -44,16 +47,34 @@ function generateCandidatesRequest(state) {
 }
 
 function estimateValueRequest(state) {
-  return {
-    type: 'EstimateValueRequest',
-    question: state.rootQuestion,
-    actions: state.A.map((a) => ({
+  const actions = orderActionsByFrontier(
+    state,
+    state.A.map((a) => ({
       id: a.id,
       method: a.method,
       kind: a.kind,
       label: a.label,
       semanticKey: a.semanticKey,
     })),
+  )
+  return {
+    type: 'EstimateValueRequest',
+    question: state.rootQuestion,
+    actions,
+    frontierHead: topFrontierAction(state),
+  }
+}
+
+function expandFrontierRequest(state, head) {
+  return {
+    type: 'ExpandFrontierRequest',
+    question: state.rootQuestion,
+    method: head.method,
+    semanticKey: head.key,
+    contract: state.R,
+    priority: head.f,
+    pathCost: head.g,
+    rootGain: head.rootGain,
   }
 }
 
@@ -94,6 +115,32 @@ function decide(state) {
     return yieldResult(state, estimateValueRequest(state))
   }
 
+  const allCandidatesValued = state.A.filter((action) => action.kind === 'candidate').every(
+    (action) => typeof action.llmValue === 'number',
+  )
+  if (!hasSynthesis && state.activatedMethods.includes('Synthesis') && allCandidatesValued) {
+    return yieldResult(state, synthesizeRequest(state))
+  }
+
+  const exploreCap = state.C.maxExploreSteps ?? 4
+  const head = topFrontierAction(state)
+  if (
+    head &&
+    (state.search?.exploreSteps ?? 0) < exploreCap &&
+    !hasSynthesis &&
+    !state.search?.closed?.[head.key] &&
+    head.f > stopValue(state)
+  ) {
+    return yieldResult(markExplored(state, head.key), expandFrontierRequest(state, head))
+  }
+
+  const unvaluedCandidates = state.A.filter(
+    (action) => action.kind === 'candidate' && typeof action.llmValue !== 'number',
+  )
+  if (unvaluedCandidates.length > 0) {
+    return yieldResult(state, estimateValueRequest(state))
+  }
+
   if (!hasSynthesis && state.activatedMethods.includes('Synthesis')) {
     return yieldResult(state, synthesizeRequest(state))
   }
@@ -103,6 +150,10 @@ function decide(state) {
   }
 
   return answeredResult(state, 'policy-exhausted')
+}
+
+export function continueInquiry(state) {
+  return decide(state)
 }
 
 export function startInquiry(question) {

@@ -87,4 +87,22 @@ observation 在边界收敛为强类型 / 结构化对象后再入 Kernel；禁�
 
 ## Phase 0 明确不做
 
-完整 A* / best-first 搜索器、通用 Bayesian Network、MCTS、跨进程 durable journal、高级方法库扩张。
+完整 A* / 通用 Bayesian Network、MCTS、跨进程 durable journal、高级方法库扩张。
+
+## Phase 1 — 搜索增强
+
+Kernel `search.js`：
+
+```text
+PriorityQueue           → graph best-first 队列
+syncSearchFrontier      → semantic-key 判重 + bestG + closed + reopenCount
+reopenOnBeliefShift     → evidenceMass 变化 > ε 时清空 closed（incremental reopen）
+orderActionsByFrontier  → EstimateValueRequest 按 f 降序
+ExpandFrontierRequest   → exploreSteps < maxExploreSteps 时定向展开 frontier head
+anytimeAnswer           → yield 附带当前 bestAnswer 投影
+graphAstarExpandOrder   → g+h 排序；可构造严格 graph A* 退化 case
+```
+
+`f(action) = V(a) − 0.1 × cost`；`rootInformationGain` 来自 `value.js` 启发式。
+
+Phase 1 验收：`tests/unit/sphinx/search.test.mjs`（priority queue / bestG / reopen / graph A* / anytime yield）。

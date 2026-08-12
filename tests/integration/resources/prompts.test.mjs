@@ -124,11 +124,13 @@ test('PROMPT_inspector_evidence_funnel_and_query_shell', () => {
   assertNoLegacyToolVocabulary(text, 'Inspector')
 })
 
-test('PROMPT_inquiry_inspect_only_v1', () => {
+test('PROMPT_inquiry_inspect_and_sphinx_v1', () => {
   const text = promptResources.load().InquirySystemPrompt
   assert.match(text, /Inquiry|inquiry/i)
   assert.match(text, /\binspect\b/)
-  assert.doesNotMatch(text, /Sphinx Kernel|Sphinx contribution|semantic contribution protocol/i)
+  assert.match(text, /sphinx_start|sphinx_resume/)
+  assert.match(text, /handle/i)
+  assert.doesNotMatch(text, /Sphinx contribution protocol|semantic contribution protocol/i)
   assertNoLegacyToolVocabulary(text, 'Inquiry')
 })
 

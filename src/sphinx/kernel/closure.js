@@ -1,6 +1,7 @@
 import { deriveRootContract } from './state.js'
 import { generateFromRules } from './rules.js'
 import { revalueActions } from './value.js'
+import { syncSearchFrontier, reopenOnBeliefShift } from './search.js'
 
 function observationType(observation) {
   if (!observation || typeof observation !== 'object') return null
@@ -266,7 +267,11 @@ function propagate(state) {
 }
 
 export function closure(state, observation = null, { exogenous = false } = {}) {
+  const previousMass = state.B.evidenceMass
   let current = absorb(state, observation, exogenous)
+  if (exogenous && observation) {
+    current = reopenOnBeliefShift(current, previousMass)
+  }
   let guard = 0
   while (guard++ < 24) {
     const before = fingerprint(current)
@@ -274,6 +279,7 @@ export function closure(state, observation = null, { exogenous = false } = {}) {
     current = propagate(current)
     current = reduce(current)
     current = revalueActions(current)
+    current = syncSearchFrontier(current)
     if (fingerprint(current) === before) break
   }
   return current

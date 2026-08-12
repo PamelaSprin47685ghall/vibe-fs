@@ -1,8 +1,4 @@
-export function actionValue(action, state) {
-  if (state.synthesis && action.kind === 'synthesize') return -1
-  if (typeof action.llmValue === 'number') {
-    return state.synthesis ? Math.min(action.llmValue, 0.35) : action.llmValue
-  }
+export function rootInformationGain(action, state) {
   const mass = state.B.evidenceMass
   const form = state.R?.primaryForm ?? 'Other'
   const methodBias = {
@@ -14,7 +10,15 @@ export function actionValue(action, state) {
   }
   const bias = methodBias[action.method] ?? 0.4
   const novelty = action.novelty == null ? 1 : action.novelty
-  const rootGain = bias * novelty * (0.4 + 0.6 * (1 - Math.min(1, mass)))
+  return bias * novelty * (0.4 + 0.6 * (1 - Math.min(1, mass)))
+}
+
+export function actionValue(action, state) {
+  if (state.synthesis && action.kind === 'synthesize') return -1
+  if (typeof action.llmValue === 'number') {
+    return state.synthesis ? Math.min(action.llmValue, 0.35) : action.llmValue
+  }
+  const rootGain = rootInformationGain(action, state)
   if (action.kind === 'synthesize') {
     const strands = state.A.filter((a) => a.kind === 'candidate').length
     return strands >= 1 ? rootGain + 0.2 * Math.min(3, strands) - (action.cost ?? 1) * 0.2 : -0.2

@@ -20,5 +20,20 @@ export function canonicalAnswer(state, stopReason) {
     evidence,
     stopReason,
     yieldsUsed: state.C.yieldsUsed,
+    search: state.search
+      ? {
+          frontierSize: state.search.frontier?.length ?? 0,
+          reopenCount: state.search.reopenCount ?? 0,
+          exploreSteps: state.search.exploreSteps ?? 0,
+        }
+      : null,
   }
+}
+
+export function anytimeAnswer(state) {
+  if (!state?.R) return null
+  const hasContent =
+    Boolean(state.synthesis) || state.A.some((action) => action.kind === 'candidate')
+  if (!hasContent) return null
+  return canonicalAnswer(state, 'anytime')
 }
