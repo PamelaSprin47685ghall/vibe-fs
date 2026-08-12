@@ -25,13 +25,18 @@ module EnforcerTipGuidance =
 
     let private tipIdentityText (tipName: string) : string = sprintf "tip: %s" tipName
 
-    let private tipFullText (tipName: string) (mainText: string) : string =
+    let private tipFullText (lang: ProviderLanguage) (tipName: string) (mainText: string) : string =
         let body = if isNull mainText then "" else mainText.Trim()
 
         if body.Length = 0 then
             tipIdentityText tipName
         else
-            sprintf "# Enforcer Tip\ntip = \"%s\"\n\n%s" tipName body
+            let heading =
+                match lang with
+                | ProviderLanguage.English -> "# Enforcer Tip"
+                | ProviderLanguage.SimplifiedChinese -> "# Enforcer Tip（规则提示）"
+
+            sprintf "%s\ntip = \"%s\"\n\n%s" heading tipName body
 
     let private tryOwnerMainSession (journal: AgentJournal) (mainOrBloggerSession: SessionId) : SessionId option =
         let associations = (AgentJournal.snapshot journal).AgentProjections.Associations
@@ -103,7 +108,11 @@ module EnforcerTipGuidance =
             match latestOwnerTipField journal mainSessionId with
             | None -> None
             | Some field ->
-                match EnforcerCatalog.tryFindByField field (RuntimeResources.current().EnforcerRules) with
+                let lang =
+                    SessionProviderLanguage.tryGet mainSessionId
+                    |> Option.defaultValue ProviderLanguage.English
+
+                match EnforcerCatalog.tryFindByField field (RuntimeResources.enforcerRulesFor lang) with
                 | None -> None
                 | Some rule ->
                     let tipName =
@@ -120,7 +129,7 @@ module EnforcerTipGuidance =
                               Presentation = TipPresentation.IdentityOnly
                               Text = tipIdentityText tipName }
                     else
-                        let text = tipFullText tipName rule.MainText
+                        let text = tipFullText lang tipName rule.MainText
                         recordFullTipDelivered journal mainSessionId tipName
 
                         Some

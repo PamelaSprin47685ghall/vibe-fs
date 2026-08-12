@@ -7,7 +7,10 @@ open Wanxiangshu.Domain
 type RuntimeResources =
     {
         Prompts: PromptCatalog
+        /// Rulebook selected for this RuntimeResources view (legacy/internal callers).
         EnforcerRules: EnforcerRule list
+        EnglishEnforcerRules: EnforcerRule list
+        SimplifiedChineseEnforcerRules: EnforcerRule list
         /// Phase 2: bilingual provider tree roots present (`resources/provider/{en,zh-CN}`).
         ProviderLanguageRootsReady: bool
     }
@@ -18,17 +21,27 @@ module RuntimeResources =
     let mutable private installed: RuntimeResources option = None
 
     let loadFor (lang: ProviderLanguage) : RuntimeResources =
-        let rules = EnforcerCatalogResource.load ()
+        // PROMPT-017: preload both complete Rulebook locales once. Runtime session
+        // projection can then select by immutable ProviderLanguage without request-time I/O.
+        let englishRules = EnforcerCatalogResource.loadFor ProviderLanguage.English
+        let simplifiedChineseRules = EnforcerCatalogResource.loadFor ProviderLanguage.SimplifiedChinese
+
+        let rules =
+            match lang with
+            | ProviderLanguage.English -> englishRules
+            | ProviderLanguage.SimplifiedChinese -> simplifiedChineseRules
+
         let prompts = PromptResources.loadForLanguage lang
-        // Rulebook v2 Slice C: effective blogger system = base + all enforcer.md texts.
-        // Derived only — never written back to resources/.
+
         let promptsWithRulebook =
             { prompts with
                 BloggerSystemPrompt =
-                    EnforcerCatalogResource.composeBloggerSystemPrompt prompts.BloggerSystemPrompt rules }
+                    EnforcerCatalogResource.composeBloggerSystemPromptFor lang prompts.BloggerSystemPrompt rules }
 
         { Prompts = promptsWithRulebook
           EnforcerRules = rules
+          EnglishEnforcerRules = englishRules
+          SimplifiedChineseEnforcerRules = simplifiedChineseRules
           ProviderLanguageRootsReady = ProviderResources.languageRootsPresent () }
 
     let load () : RuntimeResources = loadFor ProviderLanguage.English
@@ -45,3 +58,10 @@ module RuntimeResources =
                     "RuntimeResources not installed; call RuntimeResources.install (RuntimeResources.load ()) at plugin init"
                 )
             )
+
+    let enforcerRulesFor (lang: ProviderLanguage) : EnforcerRule list =
+        let resources = current ()
+
+        match lang with
+        | ProviderLanguage.English -> resources.EnglishEnforcerRules
+        | ProviderLanguage.SimplifiedChinese -> resources.SimplifiedChineseEnforcerRules

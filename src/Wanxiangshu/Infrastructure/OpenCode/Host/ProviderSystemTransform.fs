@@ -41,7 +41,7 @@ module ProviderSystemTransform =
 
         match role with
         | Role.Blogger ->
-            EnforcerCatalogResource.composeBloggerSystemPrompt basePrompt (RuntimeResources.current().EnforcerRules)
+            EnforcerCatalogResource.composeBloggerSystemPromptFor lang basePrompt (RuntimeResources.enforcerRulesFor lang)
         | _ -> basePrompt
 
     let private replaceOwnedSegment (oldPrompt: string) (nextPrompt: string) (system: string array) =

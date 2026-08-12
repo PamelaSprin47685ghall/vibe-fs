@@ -4,10 +4,11 @@ open System
 open System.Text.RegularExpressions
 open Wanxiangshu.Domain
 
-/// Loads the Enforcer Rulebook from `resources/enforcer/<tip>/enforcer.md` + `main.md`.
-/// Directory basename = TipName = provider enum = durable RuleId.
-/// Missing / empty / invalid → throw (fail-fast). Module import does not read files.
-/// `catalog.json` is not read and must not be required at runtime.
+/// Loads the localized Enforcer Rulebook from `resources/enforcer/<tip>/`.
+/// English leaves are `enforcer.md` + `main.md`; zh-CN leaves are
+/// `enforcer.zh-CN.md` + `main.zh-CN.md`. Directory basename = TipName =
+/// provider enum = durable RuleId. Missing / empty / invalid → throw
+/// (fail-fast); there is no locale fallback. `catalog.json` is not runtime SSOT.
 module EnforcerCatalogResource =
 
     let private kebabNamePattern =
@@ -15,9 +16,18 @@ module EnforcerCatalogResource =
 
     let private isKebab (name: string) = kebabNamePattern.IsMatch name
 
-    /// Effective Blogger system prompt: base blogger-system.md + full enforcer.md set.
+    let private localizedFiles =
+        function
+        | ProviderLanguage.English -> "enforcer.md", "main.md"
+        | ProviderLanguage.SimplifiedChinese -> "enforcer.zh-CN.md", "main.zh-CN.md"
+
+    /// Effective Blogger system prompt: localized base + localized detection folios.
     /// Deterministic projection only — never written back to the repository.
-    let composeBloggerSystemPrompt (basePrompt: string) (rules: EnforcerRule list) : string =
+    let composeBloggerSystemPromptFor
+        (lang: ProviderLanguage)
+        (basePrompt: string)
+        (rules: EnforcerRule list)
+        : string =
         let ordered = rules |> List.sortBy (fun r -> r.LexicalOrder)
         let parts = ResizeArray<string>()
 
@@ -26,7 +36,11 @@ module EnforcerCatalogResource =
         if baseText.Length > 0 then
             parts.Add(baseText)
 
-        parts.Add("# Enforcer Rulebook")
+        parts.Add(
+            match lang with
+            | ProviderLanguage.English -> "# Enforcer Rulebook"
+            | ProviderLanguage.SimplifiedChinese -> "# Enforcer RuleBook（规则书）"
+        )
 
         for rule in ordered do
             parts.Add(sprintf "## %s" rule.Name)
@@ -34,8 +48,12 @@ module EnforcerCatalogResource =
 
         String.concat "\n\n" (parts.ToArray()) + "\n"
 
-    let load () : EnforcerRule list =
+    let composeBloggerSystemPrompt (basePrompt: string) (rules: EnforcerRule list) : string =
+        composeBloggerSystemPromptFor ProviderLanguage.English basePrompt rules
+
+    let loadFor (lang: ProviderLanguage) : EnforcerRule list =
         let rootRel = "enforcer"
+        let enforcerFile, mainFile = localizedFiles lang
         let names = PackageResources.listChildDirectoryNames rootRel
 
         if List.isEmpty names then
@@ -55,8 +73,8 @@ module EnforcerCatalogResource =
                         )
                     )
 
-                let enforcerRel = sprintf "%s/%s/enforcer.md" rootRel name
-                let mainRel = sprintf "%s/%s/main.md" rootRel name
+                let enforcerRel = sprintf "%s/%s/%s" rootRel name enforcerFile
+                let mainRel = sprintf "%s/%s/%s" rootRel name mainFile
 
                 if not (PackageResources.exists enforcerRel) then
                     raise (InvalidOperationException(sprintf "package resource missing: resources/%s" enforcerRel))
@@ -68,10 +86,10 @@ module EnforcerCatalogResource =
                 let mainText = PackageResources.readText(mainRel).Trim()
 
                 if enforcerText.Length = 0 then
-                    raise (InvalidOperationException(sprintf "enforcer.md empty for rule %s" name))
+                    raise (InvalidOperationException(sprintf "%s empty for rule %s" enforcerFile name))
 
                 if mainText.Length = 0 then
-                    raise (InvalidOperationException(sprintf "main.md empty for rule %s" name))
+                    raise (InvalidOperationException(sprintf "%s empty for rule %s" mainFile name))
 
                 let order = index + 1
 
@@ -86,3 +104,5 @@ module EnforcerCatalogResource =
         | Error err ->
             raise (InvalidOperationException(sprintf "enforcer rulebook invalid under resources/%s: %s" rootRel err))
         | Ok validated -> validated
+
+    let load () : EnforcerRule list = loadFor ProviderLanguage.English
