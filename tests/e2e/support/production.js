@@ -77,17 +77,32 @@ export const syntheticDocument = (instructions, body) =>
 /** The instruction lines every forked child receives, as a JS array. */
 export const forkBaseInstructions = [...ForkModule.ForkChildPayload_BaseInstructions];
 
-export const forkParentWorkRecordInstruction = ForkModule.ForkChildPayload_ParentWorkRecordInstruction;
+export const forkCommissionerRecordInstruction = ForkModule.ForkChildPayload_CommissionerRecordInstruction;
 export const forkRequirementsInstruction = ForkModule.ForkChildPayload_RequirementsInstruction;
+/** @deprecated use forkCommissionerRecordInstruction */
+export const forkParentWorkRecordInstruction = forkCommissionerRecordInstruction;
 
 /** Render a forked child's first prompt by field name. */
-export const forkPayload = ({ assignment, parentWorkRecord, originalUserRequirements = [] }) =>
-  ForkModule.ForkChildPayload_render(
-    new ForkModule.ForkChildAssignment(assignment, parentWorkRecord, toList(originalUserRequirements)),
+export const forkPayload = ({
+  assignment,
+  parentWorkRecord,
+  commissionerRecord,
+  originalUserRequirements = [],
+  payload,
+}) => {
+  const record = commissionerRecord ?? parentWorkRecord
+  return ForkModule.ForkChildPayload_render(
+    new ForkModule.ForkChildAssignment(
+      assignment,
+      record ?? undefined,
+      toList(originalUserRequirements),
+      payload ?? undefined,
+    ),
   );
+};
 
-export const forkRelay = (assignment, parentWorkRecord, requirements = []) =>
-  ForkModule.ForkChildPayload_relay(assignment, parentWorkRecord, toList(requirements));
+export const forkRelay = (assignment, commissionerRecord, requirements = [], payload) =>
+  ForkModule.ForkChildPayload_relay(assignment, commissionerRecord ?? undefined, toList(requirements), payload ?? undefined);
 
 /** The anchor a scenario declaration uses: the first base instruction, as it appears rendered. */
 export const forkAnchor = () => comment(forkBaseInstructions[0]);

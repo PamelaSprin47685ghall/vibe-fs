@@ -3,8 +3,7 @@ namespace Wanxiangshu.Infrastructure.Resources
 open System
 open Wanxiangshu.Domain
 
-/// Bilingual provider assets under `resources/provider/{en,zh-CN}/…` (PROMPT-017).
-/// Phase 2 = layout + load hooks; Phase 17 migrates prose into this tree.
+/// Bilingual provider assets: `resources/provider/<semantic>/<en.md|zh-CN.md>` (PROMPT-017 §4.7.8).
 [<RequireQualifiedAccess>]
 module ProviderResources =
 
@@ -15,7 +14,7 @@ module ProviderResources =
             else
                 semanticPath.Trim().TrimStart('/').TrimStart('\\')
 
-        sprintf "provider/%s/%s" (ProviderLanguage.resourceDirectory lang) trimmed
+        sprintf "provider/%s/%s" trimmed (ProviderLanguage.resourceFileName lang)
 
     let exists (lang: ProviderLanguage) (semanticPath: string) : bool =
         PackageResources.exists (relativePath lang semanticPath)
@@ -29,7 +28,7 @@ module ProviderResources =
         else
             None
 
-    /// ARCH-016 Gate C hook: both EN and zh-CN representations must exist.
+    /// ARCH-016 Gate C hook: both locale leaves must exist for a semantic path.
     let requireLanguagePair (semanticPath: string) : unit =
         for lang in [ ProviderLanguage.English; ProviderLanguage.SimplifiedChinese ] do
             if not (exists lang semanticPath) then
@@ -42,7 +41,5 @@ module ProviderResources =
                     )
                 )
 
-    /// Layout smoke: language roots present (Phase 2 placeholder dirs).
-    let languageRootsPresent () : bool =
-        PackageResources.exists "provider/en"
-        && PackageResources.exists "provider/zh-CN"
+    /// Layout smoke: provider tree root present.
+    let languageRootsPresent () : bool = PackageResources.exists "provider"

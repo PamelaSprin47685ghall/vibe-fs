@@ -5,7 +5,6 @@
 
 import {
   ForkChildPayloadModule,
-  TddPhaseModule,
   BloggerTomlModule,
   BloggerDeltaModule,
   Distillation,
@@ -73,31 +72,6 @@ export const forkChildPayload = (() => {
 
     relay: (assignment, commissionerRecord, requirements = [], payload) =>
       m.relay(assignment, commissionerRecord, toList(requirements), payload),
-  }
-})()
-
-/**
- * Coder TDD phase (closed Red | Green). Wire codec + child assignment text.
- * Used by named `coder` (required tdd) and Manager `fork` (optional tdd).
- * Obtain DU values via `parse("red"|"green")` — no ordinal construction.
- */
-export const tddPhase = (() => {
-  const m = bind(TddPhaseModule, 'TddPhase', [
-    'wireName',
-    'parseTddPhase',
-    'RedAssignment',
-    'GreenAssignment',
-    'assignmentText',
-    'composeAssignment',
-  ])
-
-  return {
-    wireName: (phase) => m.wireName(phase),
-    parse: (raw) => resultOf(m.parseTddPhase(raw)),
-    redAssignment: m.RedAssignment,
-    greenAssignment: m.GreenAssignment,
-    assignmentText: (phase) => m.assignmentText(phase),
-    composeAssignment: (phase, prompt) => m.composeAssignment(phase, prompt),
   }
 })()
 

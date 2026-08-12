@@ -22,7 +22,7 @@ import { existsSync } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
-import { roles, enforcer } from '../../unit/support/domain.mjs'
+import { agentJournal, handleId, handleProjection, idValue, roles, sessionId } from '../../unit/support/domain.mjs'
 import {
   withPlugin,
   withExecutablePlugin,
@@ -114,13 +114,13 @@ const EXPECTED_AGENT_ENUMS = {
     'deep-browser',
     'deep-coder',
     'deep-devops',
-    'deep-inspector',
     'deep-inquiry',
+    'deep-inspector',
     'fast-browser',
     'fast-coder',
     'fast-devops',
-    'fast-inspector',
     'fast-inquiry',
+    'fast-inspector',
   ],
   commission: ['deep-manager', 'fast-manager'],
 }
@@ -176,6 +176,7 @@ const KNOWN_TOOL_KEYS = [
   'repair-behavior',
   'run',
   'query-shell',
+  'sphinx_*',
   'stealth-browser-mcp_*',
   'judge',
   'chronicle',
@@ -216,7 +217,7 @@ const ALLOWED_TOOLS = {
     'run',
   ],
   browser: ['read', 'glob', 'grep', 'stealth-browser-mcp_*'],
-  inquiry: ['inspect'],
+  inquiry: ['inspect', 'sphinx_*'],
   reviewer: ['read', 'glob', 'grep', 'judge'],
   // ENFORCER-010: Blogger's tool set is exactly { chronicle }.
   blogger: ['chronicle'],
@@ -278,6 +279,70 @@ const FACADE_ROLE_CASES = {
   distiller: 'Distiller',
 }
 
+/** StaticTools.toolNames expansion with role-specific Exec / Fork splits. */
+const toolKeysForPermission = (role, permission) => {
+  switch (permission) {
+    case 'Fork':
+      return role === 'orchestrator' ? ['commission'] : ['fork']
+    case 'Join':
+      return ['join']
+    case 'Horizon':
+      return ['horizon']
+    case 'Read':
+      return ['read']
+    case 'Write':
+      return ['write']
+    case 'Edit':
+      return ['edit']
+    case 'Glob':
+      return ['glob']
+    case 'Grep':
+      return ['grep']
+    case 'Move':
+      return ['mv']
+    case 'Remove':
+      return ['rm']
+    case 'BashHoneypot':
+      return ['bash-honeypot']
+    case 'Inspect':
+      return ['inspect']
+    case 'Behavior':
+      return ['establish-behavior', 'repair-behavior']
+    case 'Exec':
+      if (role === 'inspector') return ['query-shell']
+      if (role === 'devops') return ['run']
+      return ['run', 'query-shell']
+    case 'Pty':
+      return ['open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal']
+    case 'Network':
+      return ['stealth-browser-mcp_*']
+    case 'Judge':
+      return ['judge']
+    case 'Chronicle':
+      return ['chronicle']
+    case 'Fetch':
+      return ['fetch']
+    case 'Sphinx':
+      return ['sphinx_*']
+    case 'Finality':
+      return ['suicide']
+    default:
+      return []
+  }
+}
+
+const facadeToolKeyCount = (role) =>
+  roles.permissions(roles.of(FACADE_ROLE_CASES[role])).flatMap((permission) => toolKeysForPermission(role, permission)).length
+
+const agentHandleForChild = (runtime, parentSessionId, childSessionId) => {
+  const projection = agentJournal.handleProjection(runtime.journal, sessionId(parentSessionId))
+  const record = handleProjection.tryFindByChildSession(sessionId(childSessionId), projection)
+  assert.ok(record, `HandleLinked missing for child ${childSessionId}`)
+  const raw = handleId.tryAgent(record.Handle)
+  assert.ok(raw, 'expected agent handle')
+  return idValue.agentHandle(raw)
+}
+
 // ── the prompt clauses ───────────────────────────────────────────────────────
 
 /**
@@ -314,28 +379,26 @@ const PROMPT_CLAUSES = {
 
   'fast-coder': {
     required: [
-      /Coder edits/,
-      /Surgical Precision/,
-      /Use Inspector only for a genuinely necessary static investigation|call `inspect`/i,
-      /Editing Is the Completion Boundary/,
-      /Do not check whether the code compiles or works/,
-      /inspect` as an opaque witness/i,
-      /Never ask Inspector to run, reproduce, check, or diagnose compilation, builds, typechecks, linters, tests, programs, or runtime behavior/,
-      /After the final required file edit, stop working/,
+      /Mutation|modify files in this codebase/i,
+      /Surgical precision/i,
+      /Your responsibility ends when the entrusted source edits are complete/,
+      /Do not propose verification commands|claim that edited code compiles/i,
+      /Treat `inspect` as an opaque witness/i,
+      /not about compilation, tests, execution, reproduction, or diagnosis/i,
+      /Never weaken, skip, or delete evidence/i,
       /establish behavior|repair behavior/i,
-      /Do not delete, skip, loosen, or rewrite/,
+      /bash-honeypot/i,
     ],
     forbidden: [/executor/i],
   },
 
   'fast-devops': {
     required: [
-      /DevOps executes/,
-      /open-terminal/,
-      /No Direct File Modification/,
-      /Mechanical Repair Autonomy/,
-      /Do not ask Manager for permission to make an obvious mechanical repair/,
-      /operational closure/,
+      /Engine Room|Commands run here/i,
+      /You do not directly `write` or `edit` files/,
+      /Mechanical repair through Coder|Mechanical Repair Discipline/i,
+      /Do not ask permission for an obvious mechanical correction/i,
+      /operational closure/i,
       /establish-behavior/,
       /repair-behavior/,
       /horizon/,
@@ -345,21 +408,20 @@ const PROMPT_CLAUSES = {
 
   'fast-inspector': {
     required: [
-      /Investigative Inspector|read-only instruments/i,
+      /witness of the local world|read-only instruments/i,
       /`read`, `glob`, `grep`, `query-shell`/,
-      /Absolute Codebase Read-Only Invariant|read-only/i,
+      /read-only|Observe without changing/i,
       /query-shell/,
-      /No Project Workloads or Verification/,
-      /Never invoke a compiler, build system, typechecker, linter, formatter, test runner/,
-      /DO NOT compile, build, typecheck, lint, format, test, benchmark, run repository programs/,
-      /structured summary only|only a structured summary/i,
+      /Forbidden patterns include compilation, build, typecheck, lint, test/i,
+      /Do not compile, test, run, benchmark, migrate, generate/i,
+      /structured summary|Compression without erasure/i,
     ],
     forbidden: [],
   },
 
   'fast-reviewer': {
     required: [
-      /Uncompromising Reviewer|Quality Gatekeeper/i,
+      /Judge the work that exists|Examiner's Ledger/i,
       /judge\("PERFECT"\)/,
       /judge\("REVISE"\)/,
     ],
@@ -368,11 +430,11 @@ const PROMPT_CLAUSES = {
 
   'fast-browser': {
     required: [
-      /Information Navigator/,
+      /The Far Shore|far shore/i,
       /stealth-browser-mcp/,
-      /do \*\*not\*\* have/i,
-      /Browser-only web access/i,
-      /MUST NOT use [`']read[`'], [`']glob[`'], or [`']grep[`'] to read or search local workspace or repository files/i,
+      /You do not edit workspace files|do not edit workspace files/i,
+      /External provenance, not local repository evidence/i,
+      /not authorization to inventory|Do not use local paths as a substitute/i,
     ],
     forbidden: [],
   },
@@ -387,18 +449,18 @@ const PROMPT_CLAUSES = {
 
   'fast-orchestrator': {
     required: [
-      /Multi-Worktree Director|commission/i,
-      /Host-owned Dual PERFECT/,
+      /Commission roads|Roads/i,
+      /machinery behind your horizon|Only the machinery behind your horizon/i,
       /fast-manager|deep-manager/,
-      /originating Manager|existing Manager|Continue the existing Manager/i,
-      /truly independent|真正并行|parallel independent/i,
+      /originating Manager|existing Manager|Continue the existing Manager|continue one already underway/i,
+      /independent roads may mature in parallel|Commission a separate road when/i,
       /`commission`, `horizon`, and `join`/,
     ],
     forbidden: [],
   },
 
   'fast-distiller': {
-    required: [/Command Output Summarizer/, /AgentRole.Distiller/, /Tool Capability: \[\] \(NONE\)/],
+    required: [/Distillation|preserve what remains worth seeing/i, /You do not execute commands|change the world/],
     forbidden: [],
   },
 
@@ -506,10 +568,7 @@ test('AGENT_004_006_010_config_gains_a_prompt_and_the_whole_permission_matrix', 
           permissions[`fast-${role}`][key] === 'allow',
       ).length,
     ])
-    const facadeCount = ROLE_NAMES.map((role) => [
-      role,
-      roles.permissions(roles.of(FACADE_ROLE_CASES[role])).length,
-    ])
+    const facadeCount = ROLE_NAMES.map((role) => [role, facadeToolKeyCount(role)])
     assert.deepEqual(allowedCount, facadeCount, 'an allow appearing without a ToolPermission behind it')
 
     // AGENT-004/005: every managed agent receives a prompt, and the clauses that
@@ -886,7 +945,7 @@ test('EXEC_002_EXEC_004_fork_join_and_horizon_carry_natural_language_identity', 
     assert.match(forkText, /# fast-coder carries this charge now\./)
     assert.equal(parseToml(forkText).error, undefined)
 
-    runtime.recordFork('manager-contract', 'ag-1', createdIds[0])
+    runtime.recordFork('manager-contract', agentHandleForChild(runtime, 'manager-contract', createdIds[0]), createdIds[0])
 
     const joinResultP = hooks.tool.join.execute({}, context)
     notifyCompleted(runtime, createdIds[0], 'forked coder session-wide A', 'forked coder turn formal report')
@@ -909,10 +968,11 @@ test('EXEC_017_blocked_join_wakes_on_user_message_from_chat_message', async () =
     acceptAuthorityRoot(runtime, 'manager-user-wake', 'fast-manager')
     const context = { sessionID: 'manager-user-wake', agent: 'fast-manager' }
 
-    const fork = parseToml(await hooks.tool.fork.execute({ name: 'fast-coder', charge: 'work' }, context))
-    assert.equal(fork.error, undefined, `fork failed: ${fork.error}`)
-    // Join blocks waiting only when an active handle is recorded.
-    runtime.recordFork('manager-user-wake', fork.agent_id, createdIds[0])
+    const forkText = await hooks.tool.fork.execute({ name: 'fast-coder', charge: 'work' }, context)
+    assert.match(forkText, /# fast-coder carries this charge now\./)
+    assert.equal(parseToml(forkText).error, undefined, `fork failed: ${forkText}`)
+    const agentId = agentHandleForChild(runtime, 'manager-user-wake', createdIds[0])
+    runtime.recordFork('manager-user-wake', agentId, createdIds[0])
 
     // No AttachAbort / abort controller — join waits on child + registry wake.
     const joinP = hooks.tool.join.execute({}, context)
@@ -939,12 +999,10 @@ test('EXEC_017_blocked_join_wakes_on_user_message_from_chat_message', async () =
         ),
       ),
     ])
-    const wire = parseToml(text)
-    assert.equal(wire.status, 'interrupted')
-    assert.equal(wire.reason, 'user_message')
-    assert.notEqual(wire.reason, 'operator_abort')
+    assert.match(text, /# Something nearer has arrived\./)
+    assert.ok(!/\b(status|count|ordinal|kind|agent_id|reason)\s*=/.test(text))
     assert.ok(!text.includes('operator_abort'), 'user_message path must not emit operator_abort')
-    assert.equal(wire.message, undefined, 'user_message wire omits operator join-interrupted message')
+    assert.equal(parseToml(text).error, undefined)
 
     // Negative shape: PromptKey continuation is not the external-human signal path
     // (HostSignalBootstrap only SignalUserMessage when PromptKey is absent). Do not
@@ -972,27 +1030,22 @@ test('EXEC_017_blocked_join_wakes_on_user_message_from_chat_message', async () =
     // Late terminal still claims the completion cell for a subsequent join.
     notifyCompleted(runtime, createdIds[0], 'late session-wide A', 'late turn formal report')
     const join2Text = await hooks.tool.join.execute({}, context)
-    const join2 = parseToml(join2Text)
-    assert.equal(join2.status, 'completed', `late join after user_message must harvest child: ${join2Text}`)
-    assert.equal(join2.count, 1)
-    assert.equal(join2.result?.[0]?.status, 'completed')
-    assert.equal(join2.result?.[0]?.agent, 'fast-coder')
+    assert.match(join2Text, /# fast-coder has returned\./, `late join after user_message must harvest child: ${join2Text}`)
+    assert.ok(!/\b(status|count|ordinal|kind|agent_id)\s*=/.test(join2Text))
     assert.equal(runtime.abortedIds.includes(createdIds[0]), false, 'user_message must not abort the child session')
   })
 })
 
-test('EXEC_002_fork_existing_agent_id_reuses_child_without_new_session', async () => {
+test('EXEC_002_fork_reuse_by_handle_and_create_by_managed_name', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'manager-reuse', 'fast-manager')
     const context = { sessionID: 'manager-reuse', agent: 'fast-manager' }
 
-    const created = parseToml(
-      await hooks.tool.fork.execute({ agent: 'fast-coder', prompt: 'first assignment' }, context),
-    )
-    assert.equal(created.error, undefined, `create fork failed: ${created.error}`)
-    assert.equal(created.agent, 'fast-coder')
+    const createdText = await hooks.tool.fork.execute({ name: 'fast-coder', charge: 'first assignment' }, context)
+    assert.match(createdText, /# fast-coder carries this charge now\./)
+    assert.equal(parseToml(createdText).error, undefined, `create fork failed: ${createdText}`)
     assert.equal(createdIds.length, 1, 'managed name creates exactly one child session')
-    const agentId = created.agent_id
+    const agentId = agentHandleForChild(runtime, 'manager-reuse', createdIds[0])
     assert.match(agentId, /^[a-z0-9]{6}$/)
     const promptsAfterCreate = runtime.prompts.length
     assert.ok(promptsAfterCreate >= 1, 'create path must send a child prompt')
@@ -1002,7 +1055,6 @@ test('EXEC_002_fork_existing_agent_id_reuses_child_without_new_session', async (
     // BusyAgentNudge requires one (HostForkBusyNudge.fs:37). Accept the pending
     // AgentOwnerRoot claim on the child before the busy reuse below.
     const childSessionId = createdIds[0]
-    // PromptKey is on the last SendPrompt metadata for that child (PROMPT-011).
     const childPrompt = [...runtime.prompts].reverse().find((p) => {
       const id = p?.path?.id ?? p?.sessionID ?? p?.sessionId
       return id === childSessionId
@@ -1014,14 +1066,10 @@ test('EXEC_002_fork_existing_agent_id_reuses_child_without_new_session', async (
     assert.equal(typeof promptKey, 'string', 'child prompt must carry PromptKey metadata')
     acceptChildAgentOwnerRoot(runtime, childSessionId, promptKey)
 
-    // Busy reuse: child still active (no terminal yet). ForkTool TryFindAgent → Reuse →
-    // sendToExistingChild active-run branch → BusyAgentNudge. No session.create.
-    const nudged = parseToml(
-      await hooks.tool.fork.execute({ agent: agentId, prompt: 'nudge: add one constraint' }, context),
-    )
-    assert.equal(nudged.error, undefined, `reuse/nudge failed: ${nudged.error}`)
-    assert.equal(nudged.agent_id, agentId, 'reuse returns the same agent_id')
-    assert.equal(nudged.agent, 'fast-coder')
+    // Busy reuse: pass handle as name. No session.create.
+    const nudgedText = await hooks.tool.fork.execute({ name: agentId, charge: 'nudge: add one constraint' }, context)
+    assert.match(nudgedText, /carries this charge now\./)
+    assert.equal(parseToml(nudgedText).error, undefined, `reuse/nudge failed: ${nudgedText}`)
     assert.equal(createdIds.length, 1, 'reuse must not create a second child session')
     assert.ok(
       runtime.prompts.length > promptsAfterCreate,
@@ -1029,101 +1077,15 @@ test('EXEC_002_fork_existing_agent_id_reuses_child_without_new_session', async (
     )
 
     // Managed name again is always create — not silent reuse of the first child.
-    const twin = parseToml(
-      await hooks.tool.fork.execute({ agent: 'fast-coder', prompt: 'parallel twin work' }, context),
-    )
-    assert.equal(twin.error, undefined, `second create failed: ${twin.error}`)
-    assert.notEqual(twin.agent_id, agentId, 'managed name creates a distinct handle')
+    const twinText = await hooks.tool.fork.execute({ name: 'fast-coder', charge: 'parallel twin work' }, context)
+    assert.match(twinText, /# fast-coder carries this charge now\./)
+    assert.equal(parseToml(twinText).error, undefined, `second create failed: ${twinText}`)
     assert.equal(createdIds.length, 2, 'managed name create adds a second child record')
-  })
-})
-
-test('EXEC_002_fork_optional_tdd_injects_phase_or_fail_closed', async () => {
-  await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
-    acceptAuthorityRoot(runtime, 'manager-fork-tdd', 'fast-manager')
-    const context = { sessionID: 'manager-fork-tdd', agent: 'fast-manager' }
-
-    const promptTextFor = (sessionId) => {
-      const entry = [...runtime.prompts].reverse().find((p) => (p?.path?.id ?? p?.sessionID) === sessionId)
-      assert.ok(entry, `fork child ${sessionId} must receive a prompt`)
-      return entry.body.parts[0].text
-    }
-
-    // tdd=red → RED constraint composed into child assignment.
-    const red = parseToml(
-      await hooks.tool.fork.execute(
-        { agent: 'fast-coder', tdd: 'red', prompt: 'failing test for missing index' },
-        context,
-      ),
+    assert.notEqual(
+      agentHandleForChild(runtime, 'manager-reuse', createdIds[1]),
+      agentId,
+      'managed name creates a distinct handle',
     )
-    assert.equal(red.error, undefined, `fork tdd=red failed: ${red.error}`)
-    const redBody = promptTextFor(createdIds[0])
-    assert.match(redBody, /TDD phase: RED/)
-    assert.match(redBody, /Do not implement the production fix/)
-    assert.match(redBody, /failing test for missing index/)
-
-    // tdd=green → GREEN constraint.
-    const green = parseToml(
-      await hooks.tool.fork.execute(
-        { agent: 'deep-coder', tdd: 'green', prompt: 'minimal production fix only' },
-        context,
-      ),
-    )
-    assert.equal(green.error, undefined, `fork tdd=green failed: ${green.error}`)
-    const greenBody = promptTextFor(createdIds[1])
-    assert.match(greenBody, /TDD phase: GREEN/)
-    assert.match(greenBody, /Do not delete, skip, loosen, or rewrite the test/)
-    assert.match(greenBody, /minimal production fix only/)
-
-    // No tdd → behavior unchanged (no phase injection).
-    const plain = parseToml(
-      await hooks.tool.fork.execute({ agent: 'fast-inspector', prompt: 'static fact only' }, context),
-    )
-    assert.equal(plain.error, undefined, `fork without tdd failed: ${plain.error}`)
-    const plainBody = promptTextFor(createdIds[2])
-    assert.doesNotMatch(plainBody, /TDD phase:/)
-    assert.match(plainBody, /static fact only/)
-
-    // Illegal tdd → fail-closed (same wire parse as coder tool).
-    // Empty / omitted is optional-absent (OptionalText), not illegal.
-    for (const bad of ['RED', 'test', 'refactor', 'blue']) {
-      const illegal = parseToml(
-        await hooks.tool.fork.execute({ agent: 'fast-coder', tdd: bad, prompt: 'x' }, context),
-      )
-      assert.ok(illegal.error, `fork tdd=${JSON.stringify(bad)} must fail`)
-      assert.match(illegal.error, /UnknownTddPhase/)
-    }
-
-    // Busy reuse + tdd: compose into nudge prompt text.
-    const reuseCreate = parseToml(
-      await hooks.tool.fork.execute(
-        { agent: 'fast-coder', tdd: 'red', prompt: 'open red assignment' },
-        context,
-      ),
-    )
-    assert.equal(reuseCreate.error, undefined)
-    const reuseChildSessionId = createdIds[createdIds.length - 1]
-    const reusePrompt = [...runtime.prompts].reverse().find((p) => {
-      const id = p?.path?.id ?? p?.sessionID ?? p?.sessionId
-      return id === reuseChildSessionId
-    })
-    const reuseKey =
-      reusePrompt?.body?.metadata?.wanxiangshu_prompt_key ??
-      reusePrompt?.body?.parts?.find((part) => part?.type === 'text')?.metadata?.wanxiangshu_prompt_key
-    acceptChildAgentOwnerRoot(runtime, reuseChildSessionId, reuseKey)
-    const promptsBeforeNudge = runtime.prompts.length
-    const reuseNudge = parseToml(
-      await hooks.tool.fork.execute(
-        { agent: reuseCreate.agent_id, tdd: 'green', prompt: 'switch to green constraint' },
-        context,
-      ),
-    )
-    assert.equal(reuseNudge.error, undefined, `reuse/nudge with tdd failed: ${reuseNudge.error}`)
-    assert.equal(reuseNudge.agent_id, reuseCreate.agent_id)
-    assert.ok(runtime.prompts.length > promptsBeforeNudge, 'nudge must deliver a prompt')
-    const nudgeBody = promptTextFor(reuseChildSessionId)
-    assert.match(nudgeBody, /TDD phase: GREEN/)
-    assert.match(nudgeBody, /switch to green constraint/)
   })
 })
 
@@ -1131,10 +1093,10 @@ test('EXEC_002_fork_tool_description_states_create_or_reuse_by_name', async () =
   await withPlugin(async (hooks) => {
     const description = hooks.tool.fork?.description
     assert.equal(typeof description, 'string', 'fork tool must expose description')
-    assert.match(description, /name \+ charge|compatible context/i)
+    assert.match(description, /Commission another witness|name \+ charge|reuse by the same name/i)
     const commission = hooks.tool.commission?.description
     assert.equal(typeof commission, 'string')
-    assert.match(commission, /witness within a mission|reuse by the same name/i)
+    assert.match(commission, /Entrust an independent road|reuse an existing road|handle as name/i)
   })
 })
 
@@ -1188,7 +1150,7 @@ test('GLORY_038_suicide_with_outstanding_child_prompts_to_join', async () => {
     await hooks.tool.fork.execute({ name: 'fast-coder', charge: 'Do work' }, context)
 
     const resultText = await hooks.tool.suicide.execute({ last_words: 'Finished.' }, context)
-    assert.match(resultText, /# Continue working and seek your end again when you are ready\./)
+    assert.match(resultText, /# Call join before seeking your end\./)
     assert.doesNotMatch(resultText, /^error\s*=/m)
     assert.equal(parseToml(resultText).error, undefined)
   })

@@ -402,7 +402,7 @@ const resolveReference = (entries, reference) => {
  * Two ways in, and they are the only two the wire supports:
  *
  *   a `flow.prompt` sends the turn's user text
- *   an earlier step's tool call carries it as `args.prompt`
+ *   an earlier step's tool call carries it as `args.charge` (or legacy `args.prompt`)
  *
  * The second is how child turns exist at all — `fork(agent, prompt)` is what creates
  * the session that will receive them. Both are prefix comparisons because a scenario
@@ -459,7 +459,7 @@ export function reachableTurnIds(turns, entries, { flow, prompt, setup } = {}) {
 
     const toolPrompts = entries
       .filter((entry) => [...reachableTurns].some((turn) => turn.id === entry.turnId))
-      .map((entry) => entry.respond?.args?.prompt)
+      .flatMap((entry) => [entry.respond?.args?.charge, entry.respond?.args?.prompt])
       .filter((text) => typeof text === 'string');
 
     for (const turn of turns) {

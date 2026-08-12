@@ -26,7 +26,7 @@ const memberNames = (s) => listItems(s.Members).map((fragment) => fragment.Membe
 
 const PERMISSION_NAMES = [
   'Fork', 'Join', 'Horizon', 'Read', 'Write', 'Edit', 'Fetch', 'Glob', 'Grep', 'Move',
-  'Remove', 'Inspect', 'Behavior', 'Exec', 'Pty', 'Network', 'Judge', 'Chronicle',
+  'Remove', 'Inspect', 'Sphinx', 'Behavior', 'Exec', 'Pty', 'Network', 'Judge', 'Chronicle',
   'Finality', 'BashHoneypot',
 ]
 const toolPermissionByName = Object.fromEntries(PERMISSION_NAMES.map((n) => [n, ToolPermission[n]]))

@@ -68,9 +68,13 @@ module BookkeeperRuntime =
 
     let private currentPort () : ISessionHostPort option = lock gate (fun () -> sessionPort)
 
-    let private systemPrompt () =
+    let private systemPrompt (ownerSessionId: string) =
+        let lang =
+            SessionProviderLanguage.tryGet (SessionId.create ownerSessionId)
+            |> Option.defaultValue ProviderLanguage.English
+
         try
-            PromptResources.loadBookkeeperSystem ()
+            PromptResources.loadBookkeeperSystemFor lang
         with _ ->
             "Maintain staged Q/A via js-bookkeeper only. Idle is allowed when evidence does not change the answer."
 
@@ -146,7 +150,7 @@ module BookkeeperRuntime =
             | _ -> []
 
         SyntheticToml.document
-            [ systemPrompt () ]
+            [ systemPrompt ownerSessionId ]
             ([ table "request" [ SyntheticToml.field "kind" (SyntheticToml.renderString kindLabel) ]
                table "case" [ SyntheticToml.field "session_id" (SyntheticToml.renderString ownerSessionId) ]
                table "question" [ SyntheticToml.field "content" (SyntheticToml.renderString q) ]

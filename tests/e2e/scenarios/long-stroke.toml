@@ -5,14 +5,14 @@
 # facts + public results only — no internal program-counter choreography (§7).
 # Wall clock must stay short (§16).
 #
-# Outer shell = fast-orchestrator (fork-manager → join). Inner Manager walks the
+# Outer shell = fast-orchestrator (commission → join). Inner Manager walks the
 # adversity spine; publish conflict resumes the SAME Manager (ORCH-007).
 #
 # ── natural story (compressed from orch-unhappy + manager-unhappy + fallback) ─
 #
 #   Birth (Orchestrator)
 #     ↓
-#   fork-manager / ManagerJobCreated (AgentOwnerRoot; WorkActivated at first suicide)
+#   commission / ManagerJobCreated (AgentOwnerRoot; WorkActivated at first suicide)
 #     ↓
 #   Manager forks coder; join blocked; child held incomplete
 #     ↓
@@ -326,14 +326,14 @@ user = "CaseFinalize"
 id = "g6-bookkeeper-finalize"
 internal = true
 user = "# # System Prompt: Casebook Bookkeeper"
-tools = ["edit-qa"]
+tools = ["js-bookkeeper"]
 forbiddenTools = ["inspector", "write", "edit", "bash-honeypot"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "edit-qa", args = { document = "Q.md", old_text = "G2Q3: when does CaseFinalize run?", new_text = "What is the Inspector reuse contract?" } }
+  respond = { type = "tool-call", tool = "js-bookkeeper", args = { document = "Q.md", old_text = "G2Q3: when does CaseFinalize run?", new_text = "What is the Inspector reuse contract?" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "edit-qa", args = { document = "A.md", old_text = "G2A3: On owner ReuseScope close.", new_text = "One Inspector child, serial Q/A, finalize on owner close." } }
+  respond = { type = "tool-call", tool = "js-bookkeeper", args = { document = "A.md", old_text = "G2A3: On owner ReuseScope close.", new_text = "One Inspector child, serial Q/A, finalize on owner close." } }
 
   [[turn.step]]
   respond = { type = "text", text = "Bookkeeper CaseFinalize idle." }
@@ -351,10 +351,10 @@ user = "Ship publish_proof.txt to the target branch through the long stroke."
 id = "orch"
 lane = "fast-orchestrator"
 user = "Ship publish_proof.txt to the target branch through the long stroke."
-tools = ["fork-manager", "join"]
+tools = ["commission", "join"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork-manager", args = { agent = "fast-manager", prompt = "Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept REVISE then reach a blessed ending so publish can reconcile." } }
+  respond = { type = "tool-call", tool = "commission", args = { name = "fast-manager", charge = "Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept REVISE then reach a blessed ending so publish can reconcile." } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
@@ -370,10 +370,10 @@ tools = ["fork-manager", "join"]
 id = "manager"
 lane = "fast-manager"
 user = "# Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept REVISE then reach a blessed ending so publish can reconcile."
-tools = ["fork", "join", "list", "suicide"]
+tools = ["fork", "join", "horizon", "suicide"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Write publish_proof.txt." } }
+  respond = { type = "tool-call", tool = "fork", args = { name = "fast-coder", charge = "Write publish_proof.txt." } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
@@ -382,7 +382,7 @@ tools = ["fork", "join", "list", "suicide"]
 id = "mgr-labor"
 lane = "fast-manager"
 user = "Also make sure publish_proof.txt has exactly the content 'Published by long-stroke canary' before the end."
-tools = ["fork", "join", "list", "suicide"]
+tools = ["fork", "join", "horizon", "suicide"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "suicide", args = { last_words = "premature" } }
@@ -421,7 +421,7 @@ tools = ["fork", "join", "horizon", "fission", "todowrite", "suicide"]
   respond = { type = "tool-call", tool = "suicide", args = { last_words = "first ending" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Ensure publish_proof.txt contains exactly: Published by long-stroke canary" } }
+  respond = { type = "tool-call", tool = "fork", args = { name = "fast-coder", charge = "Ensure publish_proof.txt contains exactly: Published by long-stroke canary" } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join", args = {} }
@@ -443,10 +443,7 @@ reason = "prefix-probe"
 [[turn]]
 id = "coder"
 lane = "fast-coder"
-user = [
-  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
-  "# Write publish_proof.txt.",
-]
+user = "# Write publish_proof.txt."
 tools = ["write"]
 
   [[turn.step]]
@@ -464,10 +461,7 @@ tools = ["write"]
 [[turn]]
 id = "coder-fix"
 lane = "fast-coder"
-user = [
-  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
-  "# Ensure publish_proof.txt contains exactly: Published by long-stroke canary",
-]
+user = "# Ensure publish_proof.txt contains exactly: Published by long-stroke canary"
 tools = ["write"]
 
   [[turn.step]]
@@ -482,10 +476,10 @@ tools = ["write"]
 id = "manager-finality-revise"
 internal = true
 user = "# Review the current worktree against all authoritative user requirements."
-tools = ["verdict"]
+tools = ["judge"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "REVISE" } }
+  respond = { type = "tool-call", tool = "judge", args = { verdict = "REVISE" } }
 
   [[turn.step]]
   respond = { type = "text", text = "Finality reviewer rejects the ending." }
@@ -494,13 +488,13 @@ tools = ["verdict"]
 id = "manager-finality-reviewer"
 internal = true
 user = "# Review RETIRED long-stroke finality — inactive until revise cohort ends."
-tools = ["verdict"]
+tools = ["judge"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+  respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+  respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
 
   [[turn.step]]
   respond = { type = "text", text = "Manager finality reviewer confirmed." }
@@ -510,10 +504,10 @@ tools = ["verdict"]
 id = "conflict-resume"
 internal = true
 user = "[CONFLICT RESUMPTION] An in-progress rebase hit conflicts. Conflicted files:"
-tools = ["fork", "join", "list", "suicide"]
+tools = ["fork", "join", "horizon", "suicide"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { agent = "fast-coder", tdd = "green", prompt = "Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary" } }
+  respond = { type = "tool-call", tool = "fork", args = { name = "fast-coder", charge = "Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary" } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
@@ -524,10 +518,7 @@ tools = ["fork", "join", "list", "suicide"]
 [[turn]]
 id = "coder-resolve"
 lane = "fast-coder"
-user = [
-  "# TDD phase: GREEN. Implement the smallest production change that makes the previously established failing test pass. Do not delete, skip, loosen, or rewrite the test merely to obtain green. Do not add unrelated behavior.",
-  "# Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary",
-]
+user = "# Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary"
 tools = ["write"]
 
   [[turn.step]]
@@ -540,13 +531,13 @@ tools = ["write"]
 id = "barrier-reviewer"
 internal = true
 user = "# Review the current worktree for correctness. Submit your verdict with the verdict tool."
-tools = ["glob", "grep", "read", "verdict"]
+tools = ["glob", "grep", "read", "judge"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+  respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+  respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
 
   [[turn.step]]
   respond = { type = "text", text = "Barrier reviewer completed the double PERFECT." }
@@ -555,10 +546,10 @@ tools = ["glob", "grep", "read", "verdict"]
 id = "reviewer-confirm"
 internal = true
 user = "# Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
-tools = ["verdict"]
+tools = ["judge"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "verdict", args = { verdict = "PERFECT" } }
+  respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
 
   [[turn.step]]
   respond = { type = "text", text = "Reviewer confirmed the tree." }

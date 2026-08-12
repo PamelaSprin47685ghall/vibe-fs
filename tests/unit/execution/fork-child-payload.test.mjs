@@ -39,6 +39,9 @@ const expectedBytes = (
 
   if (commissionerRecord !== undefined && commissionerRecord.trim() !== '') {
     instructions.push(instructionComment(fork.commissionerRecordInstruction))
+    for (const line of commissionerRecord.trim().split('\n')) {
+      instructions.push(instructionComment(line))
+    }
   }
 
   if (requirements.length > 0) {
@@ -50,10 +53,6 @@ const expectedBytes = (
 
   if (payload !== undefined && payload.trim() !== '') {
     body.push(`content = ${basicString(payload)}`)
-  }
-
-  if (commissionerRecord !== undefined && commissionerRecord.trim() !== '') {
-    body.push(commissionerRecord.trim())
   }
 
   for (let i = 0; i < requirements.length; i += 1) {
@@ -193,7 +192,7 @@ test('FORK_CHILD_PAYLOAD_full_shape_orders_content_before_record_before_requirem
   const contentIndex = document.indexOf('content =')
   const recordIndex = document.indexOf(RECORD)
   const reqIndex = document.indexOf('[[root_requirement]]')
-  assert.ok(contentIndex < recordIndex && recordIndex < reqIndex)
+  assert.ok(recordIndex < contentIndex && contentIndex < reqIndex)
   assert.ok(!document.includes('\n\n\n'), 'no double blank lines in the body')
 })
 
