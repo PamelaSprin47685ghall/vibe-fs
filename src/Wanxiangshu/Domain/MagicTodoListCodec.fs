@@ -15,7 +15,8 @@ module MagicTodoObligationCodec =
             { Name = get.Required.Field "name" Decode.string
               Work = get.Required.Field "work" Decode.string })
 
-    let encode (items: ObligationList) : string = MagicTodo.canonicalObligationListWire items
+    let encode (items: ObligationList) : string =
+        MagicTodo.canonicalObligationListWire items
 
     let tryDecode (json: string) : Result<ObligationList, string> =
         try

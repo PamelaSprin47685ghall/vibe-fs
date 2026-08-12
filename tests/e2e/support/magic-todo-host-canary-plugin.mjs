@@ -3,10 +3,10 @@
  *
  * Mirrors receipt-acceptance-gate-plugin.mjs: one outer plugin path that loads
  * the production plugin, then overlays observation hooks. Used by Long Stroke
- * Phase 0 canaries A/E/G/H (real Host lifetime; no production membrane).
+ * A/E/G/H canaries (real Host lifetime; production membrane observed in place).
  *
  * Evidence files land in WANXIANGSHU_E2E_MAGIC_TODO_HOST_CANARY_DIR:
- *   definition.json  — tool.definition observation (todowrite V2 ad surface)
+ *   definition.json  — production tool.definition obligation surface
  *   before.json      — pre/post before args + SDK localization (A/H)
  *   after.json       — after enrichment + ToolPart status during after (E/G/H)
  *   after-settled.json — post-return durable ToolPart (best-effort E)
@@ -18,63 +18,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const magicTodoHostCanaryPluginPath = fileURLToPath(import.meta.url);
 
-/** In-place mutation marker; must NOT appear on durable pre-before ToolPart.input (A). */
-export const MAGIC_TODO_HOST_CANARY_MUTATION = '__magic_todo_host_canary_mut__';
-/** after rewrite bytes; must reach model-visible + durable history (E). */
-export const MAGIC_TODO_HOST_CANARY_ENRICHED = 'MAGIC_TODO_HOST_CANARY_ENRICHED_RESULT_V1';
-
-/** V2 provider-facing advertisement installed via tool.definition (Phase 0 observe). */
-export const MAGIC_TODO_HOST_CANARY_V2_ADVERTISEMENT = Object.freeze({
-  description:
-    'Magic Todo V2 host-canary: tagged id/kind rows and reviewing status. Host sink remains V1.',
-  parameters: {
-    type: 'object',
-    properties: {
-      todos: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            content: { type: 'string' },
-            status: {
-              type: 'string',
-              enum: ['pending', 'in_progress', 'reviewing', 'completed', 'cancelled'],
-            },
-            priority: { type: 'string', enum: ['high', 'medium', 'low'] },
-            id: { type: 'string' },
-            kind: { type: 'string', enum: ['existing', 'new'] },
-          },
-          required: ['content', 'status', 'priority', 'id', 'kind'],
-        },
-      },
-    },
-    required: ['todos'],
-  },
-  jsonSchema: {
-    $schema: 'https://json-schema.org/draft/2020-12/schema',
-    type: 'object',
-    properties: {
-      todos: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            content: { type: 'string' },
-            status: {
-              type: 'string',
-              enum: ['pending', 'in_progress', 'reviewing', 'completed', 'cancelled'],
-            },
-            priority: { type: 'string', enum: ['high', 'medium', 'low'] },
-            id: { type: 'string' },
-            kind: { type: 'string', enum: ['existing', 'new'] },
-          },
-          required: ['content', 'status', 'priority', 'id', 'kind'],
-        },
-      },
-    },
-    required: ['todos'],
-  },
-});
 
 // Env is required only when OpenCode loads this file as the outer plugin.
 // Harness imports (path + assert helpers) must succeed without these vars.
@@ -121,28 +64,30 @@ const deepStable = (value) => JSON.stringify(value ?? null);
 
 const hasOwn = (obj, key) => obj != null && Object.prototype.hasOwnProperty.call(obj, key);
 
-/** Strip V2 identity fields in place so executor sees V1 compatibility rows (A/C). */
-export const stripV2TodoIdentityFieldsInPlace = (args) => {
-  if (!args || typeof args !== 'object' || !Array.isArray(args.todos)) return args;
-  const next = args.todos.map((row) => {
-    if (!row || typeof row !== 'object') return row;
-    const { id: _id, kind: _kind, ...v1 } = row;
-    return v1;
-  });
-  args.todos = next;
-  return args;
-};
+const legacyProviderFields = ['id', 'kind', 'status', 'priority', 'content'];
 
-const rowHasV2Identity = (row) =>
-  row != null && typeof row === 'object' && (hasOwn(row, 'id') || hasOwn(row, 'kind'));
-
-const argsCarryV2Identity = (args) =>
-  Array.isArray(args?.todos) && args.todos.some(rowHasV2Identity);
+const argsCarryObligations = (args) =>
+  Array.isArray(args?.obligations)
+  && args.obligations.length > 0
+  && args.obligations.every((row) =>
+    row
+    && typeof row === 'object'
+    && typeof row.name === 'string'
+    && typeof row.work === 'string'
+    && legacyProviderFields.every((field) => !hasOwn(row, field)));
 
 const argsAreV1Compatibility = (args) =>
-  Array.isArray(args?.todos)
+  !hasOwn(args, 'obligations')
+  && Array.isArray(args?.todos)
   && args.todos.length > 0
-  && args.todos.every((row) => row && typeof row === 'object' && !rowHasV2Identity(row));
+  && args.todos.every((row) =>
+    row
+    && typeof row === 'object'
+    && typeof row.content === 'string'
+    && typeof row.status === 'string'
+    && typeof row.priority === 'string'
+    && !hasOwn(row, 'id')
+    && !hasOwn(row, 'kind'));
 
 const taggedValue = (value) =>
   Array.isArray(value) && value.length >= 2 ? value.at(-1) : value;
@@ -419,12 +364,9 @@ const extractToolNamesFromRequest = (request) => {
 };
 
 /**
- * Assert Phase 0 real-host canaries A / E / G / H from wrapper artifacts.
- * When Manager provider wire never advertises `todowrite`, return a precise
- * fail-closed canary result (not a hang / missing-artifact mystery).
- *
- * Throws AssertionError-style Error with a canary-prefixed message on failure
- * that is NOT the documented V2-unavailable Host path.
+ * Assert real-host canaries A / E / G / H from pure-observer wrapper artifacts.
+ * Manager must advertise the production `todowrite` membrane; missing surface,
+ * legacy provider fields, alias drift, or incomplete carrier evidence fail closed.
  *
  * @param {string} dir
  * @param {{ managerProviderWire?: ReturnType<typeof collectManagerProviderToolEvidence> | null, xTraceParts?: object[] }} [opts]
@@ -434,10 +376,15 @@ export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
   if (!managerProviderWire || managerProviderWire.requestCount === 0) {
     throw new Error('HOST_CANARY_MANAGER: missing Manager provider-wire evidence');
   }
-  if (managerProviderWire.todowriteAdvertised) {
+  if (!managerProviderWire.todowriteAdvertised) {
     throw new Error(
-      `HOST_CANARY_MANAGER: todowrite unexpectedly advertised before the safe membrane: ${JSON.stringify(managerProviderWire)}`,
+      `HOST_CANARY_MANAGER: Manager provider wire must advertise the production todowrite membrane: ${JSON.stringify(managerProviderWire)}`,
     );
+  }
+  for (const required of ['fork', 'horizon', 'join', 'fission', 'todowrite', 'suicide']) {
+    if (!managerProviderWire.unionTools.includes(required)) {
+      throw new Error(`HOST_CANARY_MANAGER: missing Manager tool ${required}`);
+    }
   }
 
   const failures = listHostCanaryFailures(dir);
@@ -452,73 +399,56 @@ export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
   const settled = readHostCanaryArtifact(dir, 'after-settled');
   const definition = readHostCanaryArtifact(dir, 'definition');
 
+  if (!definition) throw new Error('HOST_CANARY_B: missing definition.json (todowrite definition never observed)');
   if (!before) throw new Error('HOST_CANARY_A/H: missing before.json (todowrite before never observed)');
   if (!after) throw new Error('HOST_CANARY_E/G/H: missing after.json (todowrite after never observed)');
+  if (definition.advertisesObligations !== true || definition.leaksLegacyProviderFields === true) {
+    throw new Error(`HOST_CANARY_B: production definition must expose obligations{name,work} only: ${JSON.stringify(definition)}`);
+  }
 
-  // ── A: durable V2 input vs executor V1 args ──────────────────────────────
+  // ── A: durable provider obligations vs executor compatibility args ────────
   if (before.snapshotError) {
     throw new Error(`HOST_CANARY_A: before snapshot error: ${before.snapshotError}`);
   }
   if (before.argsIdentityUnchanged !== true) {
-    throw new Error('HOST_CANARY_A: before must mutate the original args object in place');
+    throw new Error('HOST_CANARY_A: production before must mutate the original args object in place');
   }
-  if (!argsCarryV2Identity(before.preBeforeArgs)) {
-    throw new Error('HOST_CANARY_A: pre-before args must carry provider V2 id/kind');
+  if (!argsCarryObligations(before.preBeforeArgs)) {
+    throw new Error('HOST_CANARY_A: pre-before args must carry only provider obligations{name,work}');
   }
   if (!argsAreV1Compatibility(before.postBeforeArgs)) {
-    throw new Error('HOST_CANARY_A: post-before args must be V1 compatibility (id/kind stripped)');
+    throw new Error('HOST_CANARY_A: post-before args must be the Host V1 compatibility sink');
   }
   if (!argsAreV1Compatibility(after.executorArgs)) {
-    throw new Error('HOST_CANARY_A: executor args (after hookInput.args) must be V1 compatibility');
+    throw new Error('HOST_CANARY_A: executor args must stay on the V1 compatibility sink');
   }
   if (before.durableInput == null) {
     throw new Error('HOST_CANARY_A: durable ToolPart.input missing during before');
   }
   if (before.durableInputEqualsPreBefore !== true) {
-    throw new Error(
-      'HOST_CANARY_A: durable ToolPart.input must remain pre-before V2 bytes (alias freeze)',
-    );
-  }
-  if (before.durableInputShowsMutation === true) {
-    throw new Error(
-      'HOST_CANARY_A: durable ToolPart.input must NOT show in-place before mutation',
-    );
-  }
-  if (deepStable(before.durableInput).includes(MAGIC_TODO_HOST_CANARY_MUTATION)) {
-    throw new Error('HOST_CANARY_A: mutation marker leaked into durable ToolPart.input');
-  }
-  if (!deepStable(before.postBeforeArgs).includes(MAGIC_TODO_HOST_CANARY_MUTATION)) {
-    throw new Error('HOST_CANARY_A: in-place mutation marker missing from post-before args');
-  }
-  if (!deepStable(after.executorArgs).includes(MAGIC_TODO_HOST_CANARY_MUTATION)) {
-    throw new Error('HOST_CANARY_A: in-place mutation did not reach executor args');
+    throw new Error('HOST_CANARY_A: durable ToolPart.input must remain the pre-before obligation account');
   }
 
-  // ── E: after enrichment durable + model-visible ──────────────────────────
-  if (after.enrichedOutput !== MAGIC_TODO_HOST_CANARY_ENRICHED) {
-    throw new Error(
-      `HOST_CANARY_E: after must set output to enriched bytes, got ${JSON.stringify(after.enrichedOutput)}`,
-    );
+  // ── E: production after enrichment durable + model-visible ───────────────
+  if (typeof after.enrichedOutput !== 'string' || after.enrichedOutput.length === 0) {
+    throw new Error('HOST_CANARY_E: production after must expose a non-empty provider result');
+  }
+  if (after.enrichedOutput === after.originalOutput) {
+    throw new Error('HOST_CANARY_E: production after did not enrich the builtin todowrite result');
+  }
+  if (!after.enrichedOutput.includes('Current obligations:')) {
+    throw new Error(`HOST_CANARY_E: enriched result lacks the canonical obligation account: ${JSON.stringify(after.enrichedOutput)}`);
   }
   // Settled snapshot is best-effort; when present it must show the same enriched bytes.
-  if (settled?.locate?.match) {
-    const durableOut = settled.locate.match.output;
-    if (durableOut !== MAGIC_TODO_HOST_CANARY_ENRICHED) {
-      throw new Error(
-        `HOST_CANARY_E: durable ToolPart.output after settle must equal enriched bytes, got ${JSON.stringify(durableOut)}`,
-      );
-    }
+  if (settled?.locate?.match?.output != null && settled.locate.match.output !== after.enrichedOutput) {
+    throw new Error(
+      `HOST_CANARY_E: durable ToolPart.output after settle must equal production enriched bytes, got ${JSON.stringify(settled.locate.match.output)}`,
+    );
   }
-  // Model-visible path: during-after / settle locate is the Host history surface
-  // the next provider turn reads. Freeze that the enriched marker is the after output.
   if (after.locateDuringAfter?.match?.status === 'completed') {
     const duringOut = after.locateDuringAfter.match.output;
-    if (duringOut != null && duringOut !== MAGIC_TODO_HOST_CANARY_ENRICHED && duringOut !== after.originalOutput) {
-      // completed-during-after may still hold pre-enrichment bytes (order freeze is G);
-      // only fail if some third value appears.
-      throw new Error(
-        `HOST_CANARY_E: unexpected ToolPart.output during after: ${JSON.stringify(duringOut)}`,
-      );
+    if (duringOut != null && duringOut !== after.enrichedOutput && duringOut !== after.originalOutput) {
+      throw new Error(`HOST_CANARY_E: unexpected ToolPart.output during after: ${JSON.stringify(duringOut)}`);
     }
   }
 
@@ -578,7 +508,7 @@ export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
       A: {
         durableInputEqualsPreBefore: before.durableInputEqualsPreBefore,
         executorV1: argsAreV1Compatibility(after.executorArgs),
-        preBeforeV2: argsCarryV2Identity(before.preBeforeArgs),
+        preBeforeObligations: argsCarryObligations(before.preBeforeArgs),
       },
       E: {
         enrichedOutput: after.enrichedOutput,
@@ -625,21 +555,21 @@ export default {
         await productionDefinition?.(hookInput, hookOutput);
         if (hookInput?.toolID !== 'todowrite') return;
         try {
-          // Advertise V2 surface (observation + future membrane shape). Host execute
-          // decoder remains the original V1 parameters bound at tool init.
-          if (hookOutput && typeof hookOutput === 'object') {
-            hookOutput.description = MAGIC_TODO_HOST_CANARY_V2_ADVERTISEMENT.description;
-            hookOutput.parameters = MAGIC_TODO_HOST_CANARY_V2_ADVERTISEMENT.parameters;
-            hookOutput.jsonSchema = MAGIC_TODO_HOST_CANARY_V2_ADVERTISEMENT.jsonSchema;
-          }
+          const item = hookOutput?.parameters?.properties?.obligations?.items ?? null;
+          const properties = item?.properties ?? {};
           writeJson('definition', {
             toolID: hookInput.toolID,
             description: hookOutput?.description ?? null,
             hasParameters: hookOutput?.parameters != null,
             hasJsonSchema: hookOutput?.jsonSchema != null,
-            advertisesV2:
-              hookOutput?.parameters?.properties?.todos?.items?.properties?.id != null
-              && hookOutput?.parameters?.properties?.todos?.items?.properties?.kind != null,
+            advertisesObligations:
+              Array.isArray(hookOutput?.parameters?.required)
+              && hookOutput.parameters.required.includes('obligations')
+              && Array.isArray(item?.required)
+              && item.required.includes('name')
+              && item.required.includes('work'),
+            leaksLegacyProviderFields:
+              ['id', 'kind', 'status', 'priority', 'content'].some((field) => hasOwn(properties, field)),
             observedAt: Date.now(),
           });
         } catch (error) {
@@ -668,16 +598,9 @@ export default {
           snapshotError = String(error?.stack ?? error);
         }
 
-        // Host honors only in-place field mutation on the original args object.
-        // Compatibility projection: strip V2 id/kind → V1 rows, plus mutation marker.
-        if (args && typeof args === 'object') {
-          stripV2TodoIdentityFieldsInPlace(args);
-          if (Array.isArray(args.todos) && args.todos[0] && typeof args.todos[0] === 'object') {
-            const first = args.todos[0];
-            first.content = `${first.content ?? ''}${MAGIC_TODO_HOST_CANARY_MUTATION}`;
-          }
-          args[MAGIC_TODO_HOST_CANARY_MUTATION] = true;
-        }
+        // Pure observer: production owns the in-place obligations → V1 sink
+        // mutation. The wrapper records the alias boundary but never changes it.
+        await productionBefore?.(hookInput, hookOutput);
 
         try {
           const snapPost = await fetchMessages(client, sessionID);
@@ -697,11 +620,7 @@ export default {
           locatePost,
           durableInput,
           durableInputEqualsPreBefore: deepStable(durableInput) === deepStable(preBeforeArgs),
-          durableInputShowsMutation:
-            typeof durableInput === 'object' && durableInput !== null
-              ? deepStable(durableInput).includes(MAGIC_TODO_HOST_CANARY_MUTATION)
-              : false,
-          preBeforeCarriesV2: argsCarryV2Identity(preBeforeArgs),
+          preBeforeCarriesObligations: argsCarryObligations(preBeforeArgs),
           postBeforeIsV1: argsAreV1Compatibility(args),
           snapshotError,
           observedAt: Date.now(),
@@ -712,8 +631,6 @@ export default {
         } catch (error) {
           writeFailure('before-write', error, { sessionID, callID });
         }
-
-        return productionBefore?.(hookInput, hookOutput);
       },
 
       'tool.execute.after': async (hookInput, hookOutput) => {
@@ -735,13 +652,8 @@ export default {
           snapshotError = String(error?.stack ?? error);
         }
 
-        // Production after first (casebook observation); then freeze enrichment last.
+        // Pure observer: production owns result enrichment.
         await productionAfter?.(hookInput, hookOutput);
-
-        if (hookOutput && typeof hookOutput === 'object') {
-          hookOutput.output = MAGIC_TODO_HOST_CANARY_ENRICHED;
-          if (!hookOutput.title) hookOutput.title = 'magic-todo-host-canary';
-        }
 
         const evidence = {
           sessionID,
@@ -776,9 +688,9 @@ export default {
                 sessionID,
                 callID,
                 locate,
-                enrichedOutput: MAGIC_TODO_HOST_CANARY_ENRICHED,
+                enrichedOutput: hookOutput?.output ?? null,
                 durableOutput: locate?.match?.output ?? null,
-                durableOutputEqualsEnriched: locate?.match?.output === MAGIC_TODO_HOST_CANARY_ENRICHED,
+                durableOutputEqualsEnriched: locate?.match?.output === hookOutput?.output,
                 observedAt: Date.now(),
               });
             } catch (error) {

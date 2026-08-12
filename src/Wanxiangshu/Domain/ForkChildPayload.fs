@@ -56,9 +56,7 @@ module ForkChildPayload =
                  [ assignmentText ])
             @ BaseInstructions
             @ (match commissionerRecord with
-               | Some record ->
-                   [ CommissionerRecordInstruction ]
-                   @ (record.Split('\n') |> Array.toList)
+               | Some record -> [ CommissionerRecordInstruction ] @ (record.Split('\n') |> Array.toList)
                | None -> [])
             @ (if List.isEmpty requirements then
                    []

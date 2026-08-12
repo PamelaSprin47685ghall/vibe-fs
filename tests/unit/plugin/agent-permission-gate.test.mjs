@@ -118,6 +118,8 @@ const allowList = (config, name) => {
     'signal-terminal',
     'join',
     'horizon',
+    'todowrite',
+    'fission',
     'stealth-browser-mcp_*',
     'sphinx_*',
     'judge',
@@ -130,7 +132,7 @@ const allowList = (config, name) => {
 
 // AGENT-006 matrix (tool names as they reach the Host permission schema).
 const ROLE_ALLOW = {
-  Manager: ['fork', 'join', 'horizon', 'suicide'],
+  Manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'suicide'],
   Orchestrator: ['commission', 'join', 'horizon'],
   Coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspect', 'mv', 'rm', 'bash-honeypot', 'fetch'],
   Inspector: ['read', 'glob', 'grep', 'query-shell', 'fetch'],
@@ -263,6 +265,8 @@ test('roles.permissions_agree_with_the_host_schema_matrix', () => {
       'signal-terminal': 'Pty',
       join: 'Join',
       horizon: 'Horizon',
+      todowrite: 'TodoWrite',
+      fission: 'Fission',
       read: 'Read',
       write: 'Write',
       edit: 'Edit',

@@ -127,9 +127,17 @@ module PluginHooks =
                       // membrane. Definition must replace both schema surfaces;
                       // before mutates the original args object in place.
                       "tool.definition",
-                      box (pairedHook (box (fun (hookInput: obj) (hookOutput: obj) -> magicTodo.Definition hookInput hookOutput)))
+                      box (
+                          pairedHook (
+                              box (fun (hookInput: obj) (hookOutput: obj) -> magicTodo.Definition hookInput hookOutput)
+                          )
+                      )
                       "tool.execute.before",
-                      box (pairedHook (box (fun (hookInput: obj) (hookOutput: obj) -> magicTodo.Before hookInput hookOutput)))
+                      box (
+                          pairedHook (
+                              box (fun (hookInput: obj) (hookOutput: obj) -> magicTodo.Before hookInput hookOutput)
+                          )
+                      )
                       // CASE-003 shares the single after hook key with Magic Todo.
                       // The checkpoint result is enriched first; observation then
                       // sees the exact provider-visible result bytes.

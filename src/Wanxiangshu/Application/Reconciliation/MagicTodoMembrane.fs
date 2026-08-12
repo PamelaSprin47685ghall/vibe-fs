@@ -75,7 +75,9 @@ module MagicTodoMembrane =
         | Error reason -> Error(PrepareRejection.BlobRead reason)
         | Ok body when HostDigest.sha256Hex body <> BlobDigest.value expectedDigest ->
             Error(PrepareRejection.BlobDigestMismatch label)
-        | Ok body -> MagicTodoObligationCodec.tryDecode body |> Result.mapError PrepareRejection.BlobDecode
+        | Ok body ->
+            MagicTodoObligationCodec.tryDecode body
+            |> Result.mapError PrepareRejection.BlobDecode
 
     let private writeList
         (journal: AgentJournal)
@@ -350,12 +352,17 @@ module MagicTodoHostHooks =
         value
 
     let private isTodoTool (input: obj) (field: string) =
-        not (isNull input) && not (isNull input?(field)) && string input?(field) = "todowrite"
+        not (isNull input)
+        && not (isNull input?(field))
+        && string input?(field) = "todowrite"
 
     let private bridgeKey sessionId callId = sessionId + ":" + callId
 
     let private outputCanonical (output: obj) =
-        if isNull output || isNull output?output then "" else CanonicalJson.canonicalJson output?output
+        if isNull output || isNull output?output then
+            ""
+        else
+            CanonicalJson.canonicalJson output?output
 
     let create (journal: AgentJournal option) (snapshot: ISessionSnapshotPort option) : HookSet =
         let bridges = Dictionary<string, MagicTodoMembrane.PreparedBridge>()
@@ -396,18 +403,15 @@ module MagicTodoHostHooks =
                             | Error reason -> invalidOp ("Magic Todo snapshot unavailable: " + reason)
 
                         let locality =
-                            match MagicTodoLocality.resolve sessionId messages (AgentJournal.snapshot durable) callId with
+                            match
+                                MagicTodoLocality.resolve sessionId messages (AgentJournal.snapshot durable) callId
+                            with
                             | Ok value -> value
                             | Error reason -> invalidOp (sprintf "Magic Todo locality failed: %A" reason)
 
                         let prepared =
                             match
-                                MagicTodoMembrane.prepare
-                                    durable
-                                    sessionId
-                                    locality
-                                    providerInputDigest
-                                    obligations
+                                MagicTodoMembrane.prepare durable sessionId locality providerInputDigest obligations
                             with
                             | Ok value -> value
                             | Error reason -> invalidOp (sprintf "Magic Todo prepare failed: %A" reason)

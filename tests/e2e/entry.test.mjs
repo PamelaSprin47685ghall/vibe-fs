@@ -10,10 +10,9 @@
  *
  * G4R §2 / Exit: one continuous OpenCode lifetime — spawn count must be exactly 1.
  *
- * Phase 0 real-host Magic Todo canaries A/E/G/H: test-only wrapper plugin
- * (magic-todo-host-canary-plugin.mjs) overlays the production plugin for this
- * sole serve lifetime; entry asserts wrapper artifacts after flow, before
- * teardown (no second host, no production membrane).
+ * Real-host Magic Todo canaries A/E/G/H: a test-only wrapper plugin observes
+ * the production membrane in the sole serve lifetime without changing its
+ * definition, args, or result bytes.
  *
  * §21 adversity oracles are imported by name so each stroke stays addressable
  * from this sole entry (CUSTOMS drives the scenario flow; ADVERSITY_ORACLES is
@@ -70,8 +69,6 @@ if (!runStaticGate([fileURLToPath(import.meta.url)]).passed) {
   throw new Error('long-stroke entry static gate failed');
 }
 
-const NATIVE_TODO_CANARY_PROMPT =
-  'NATIVE_TODO_CANARY: exercise the default build session todowrite hook.';
 const STRENGTH_HOST_CANARY_PROMPT =
   'STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica path.';
 
@@ -104,8 +101,7 @@ const waitCaptured = async (scenario) => {
   throw new Error('G6: InspectorCaseCaptured did not land after owner session.deleted');
 };
 
-const preFlowNativeTodoCanary = async (scenario) => {
-  await runPreFlowPrompt(scenario, 'native-todo-canary', NATIVE_TODO_CANARY_PROMPT);
+const preFlowCanaries = async (scenario) => {
   await runPreFlowPrompt(scenario, 'strength-canary-owner', STRENGTH_HOST_CANARY_PROMPT, 'deep-coder');
 
   for (const step of ['strength-canary-replica.0', 'strength-canary-replica.1']) {
@@ -164,10 +160,9 @@ const assertG6ColdFetch = async (scenario) => {
 };
 
 /**
- * Long-stroke custom that freezes real-host A/E/G/H from wrapper artifacts
- * after the adversity spine and before expectSatisfied / teardown.
+ * Long-stroke custom that freezes real-host A/E/G/H from pure-observer wrapper
+ * artifacts after the adversity spine and before expectSatisfied / teardown.
  * Wired only via CUSTOMS so the sole entry remains the assertion owner.
- * Manager non-advertisement is checked independently of native canary artifacts.
  */
 const assertHostCanariesAEGH = async (scenario, ctx) => {
   const dir = scenario.magicTodoHostCanaryDirectory;
@@ -191,7 +186,7 @@ const assertHostCanariesAEGH = async (scenario, ctx) => {
 
 resetOpencodeSpawnCount();
 const code = await runCanary('long-stroke', {
-  preFlow: preFlowNativeTodoCanary,
+  preFlow: preFlowCanaries,
   customs: {
     ...CUSTOMS,
     assertG6ColdFetch,

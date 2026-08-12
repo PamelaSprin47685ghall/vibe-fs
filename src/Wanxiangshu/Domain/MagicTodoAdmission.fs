@@ -134,8 +134,7 @@ module MagicTodoAdmission =
                 match MagicTodo.checkPreparedReplay existing.Identity observed with
                 | Error e -> ObligationAdmissionOutcome.Rejected e
                 | Ok() -> ObligationAdmissionOutcome.IdempotentReplay writeId
-            | Some _ ->
-                ObligationAdmissionOutcome.Rejected(MagicTodoReject.IdentityCorruption "TodoWriteId")
+            | Some _ -> ObligationAdmissionOutcome.Rejected(MagicTodoReject.IdentityCorruption "TodoWriteId")
             | None ->
                 match mayProceedPastLag1 with
                 | Error e -> ObligationAdmissionOutcome.Rejected e

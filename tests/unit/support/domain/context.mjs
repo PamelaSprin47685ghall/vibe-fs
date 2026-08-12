@@ -1293,11 +1293,10 @@ export const magicTodoMembrane = (() => {
   const m = bind(MagicTodoMembraneModule, 'MagicTodoMembrane', ['prepare', 'accept'])
 
   return {
-    prepare: (journal, sessionIdValue, locality, inputCanonical, inputDigest, rawInputs) =>
-      resultOf(m.prepare(journal, sessionIdValue, locality, inputCanonical, inputDigest, toList(rawInputs))),
+    prepare: (journal, sessionIdValue, locality, inputDigest, obligations) =>
+      resultOf(m.prepare(journal, sessionIdValue, locality, inputDigest, toList(obligations))),
     accept: (journal, bridge, physicalEvidence, inputDigest, outputDigest) =>
       resultOf(m.accept(journal, bridge, physicalEvidence, inputDigest, outputDigest)),
-    PreparedBridge: MagicTodoMembraneModule.PreparedBridge,
   }
 })()
 

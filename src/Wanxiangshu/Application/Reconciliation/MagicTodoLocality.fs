@@ -73,8 +73,7 @@ module MagicTodoLocality =
 
                         let messageMatches =
                             messages
-                            |> List.filter (fun message ->
-                                message.Role = "assistant" && message.Id = providerRunText)
+                            |> List.filter (fun message -> message.Role = "assistant" && message.Id = providerRunText)
 
                         match messageMatches with
                         | [ message ] ->
@@ -87,8 +86,7 @@ module MagicTodoLocality =
 
                             match Array.toList partMatches with
                             | [ (index, _) ] ->
-                                let frontier =
-                                    { Sequence = XTraceProjection.headSequence trace + 1L }
+                                let frontier = { Sequence = XTraceProjection.headSequence trace + 1L }
 
                                 let todowriteCallIds =
                                     message.ToolParts

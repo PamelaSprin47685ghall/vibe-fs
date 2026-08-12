@@ -112,9 +112,7 @@ module MagicTodo =
     /// cross the provider horizon for a new Magic Todo checkpoint (TODO-002).
     /// The older TodoItem/status representation remains an internal recovery /
     /// compatibility shape only and is never decoded from new provider input.
-    type Obligation =
-        { Name: string
-          Work: string }
+    type Obligation = { Name: string; Work: string }
 
     type ObligationList = Obligation list
 
@@ -248,8 +246,7 @@ module MagicTodo =
             | [] -> Ok items
             | head :: tail when String.IsNullOrWhiteSpace head.Name ->
                 Error(MagicTodoReject.EmptyObligationName ordinal)
-            | head :: _ when Set.contains head.Name seen ->
-                Error(MagicTodoReject.DuplicateObligationName head.Name)
+            | head :: _ when Set.contains head.Name seen -> Error(MagicTodoReject.DuplicateObligationName head.Name)
             | head :: tail -> loop (ordinal + 1) (Set.add head.Name seen) tail
 
         loop 0 Set.empty items

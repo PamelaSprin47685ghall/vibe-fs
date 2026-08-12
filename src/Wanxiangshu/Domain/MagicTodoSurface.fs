@@ -117,8 +117,7 @@ module MagicTodoSurface =
         { Name = defaultArg raw.Name ""
           Work = defaultArg raw.Work "" }
 
-    let decodeObligations (rows: RawObligationFields list) : ObligationList =
-        rows |> List.map decodeObligation
+    let decodeObligations (rows: RawObligationFields list) : ObligationList = rows |> List.map decodeObligation
 
     // ── Tagged input decode — historical recovery compatibility only ──────
 
@@ -195,7 +194,9 @@ module MagicTodoSurface =
         match view.Previous with
         | None -> sb.AppendLine("None — this is the first checkpoint.") |> ignore
         | Some prev ->
-            sb.Append("Verdict: ").AppendLine(ProcessReviewVerdict.wire prev.Verdict) |> ignore
+            sb.Append("Verdict: ").AppendLine(ProcessReviewVerdict.wire prev.Verdict)
+            |> ignore
+
             sb.AppendLine() |> ignore
             sb.AppendLine("Report:") |> ignore
             sb.AppendLine(prev.ReportText) |> ignore
@@ -209,8 +210,12 @@ module MagicTodoSurface =
 
         if view.Accepted then
             sb.AppendLine() |> ignore
-            sb.AppendLine("This obligation checkpoint was accepted and is now under process review.") |> ignore
-            sb.AppendLine("Continue useful independent work; the next todowrite will synchronize the preceding review.") |> ignore
+
+            sb.AppendLine("This obligation checkpoint was accepted and is now under process review.")
+            |> ignore
+
+            sb.AppendLine("Continue useful independent work; the next todowrite will synchronize the preceding review.")
+            |> ignore
 
         sb.ToString()
 

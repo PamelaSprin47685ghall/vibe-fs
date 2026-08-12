@@ -10,7 +10,10 @@ open Wanxiangshu.Kernel.Identity
 module ProviderLanguageBinding =
 
     let readGlobalPreference () : ProviderLanguage =
-        match Environment.GetEnvironmentVariable "WANXIANGSHU_PROVIDER_LANGUAGE" |> Option.ofObj with
+        match
+            Environment.GetEnvironmentVariable "WANXIANGSHU_PROVIDER_LANGUAGE"
+            |> Option.ofObj
+        with
         | None -> ProviderLanguage.English
         | Some raw when String.IsNullOrWhiteSpace raw -> ProviderLanguage.English
         | Some raw ->

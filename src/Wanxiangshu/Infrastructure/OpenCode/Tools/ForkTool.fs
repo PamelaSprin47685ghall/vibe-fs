@@ -98,10 +98,7 @@ module ForkTool =
                                     | Some managed -> managed.Name
                                     | None -> record.Agent
 
-                                return
-                                    successInstruction (
-                                        sprintf "# %s carries this charge now." label
-                                    )
+                                return successInstruction (sprintf "# %s carries this charge now." label)
                     | _, None, None ->
                         match ManagedAgent.tryParse request.Name with
                         | Some managed when forbiddenManagerRole managed -> return error HiddenTargetDeniedText

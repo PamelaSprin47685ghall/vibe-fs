@@ -190,25 +190,21 @@ export async function assertJoinWakePath(workDir, label = 'long-stroke') {
 }
 
 /**
- * §21: interrupted/aborted child or session — public join tool result.
- * Manager-unhappy stroke 3 shape: status=interrupted, reason=user_message
- * (external prompt wake; Esc/operator_abort stays unit-tested elsewhere).
+ * §21 / GrandRewrite §6.1: a nearer user message interrupts the blocked join.
+ * Provider-visible join consequences are natural language only; internal
+ * status/reason enums must stay behind the horizon.
  */
 export function assertInterruptedJoin(scenario, label = 'long-stroke') {
   const results = publicToolResults(scenario.provider?.requests, 'join');
-  const interrupted = results.filter((text) => text.includes('status = "interrupted"'));
+  const interrupted = results.filter((text) => text.includes('# Something nearer has arrived.'));
   assert.ok(
     interrupted.length >= 1,
-    `${label}: interrupted join must reach Manager conversation (public tool result)`,
-  );
-  assert.ok(
-    interrupted.some((text) => text.includes('reason = "user_message"')),
-    `${label}: join tool result must be status=interrupted, reason=user_message`,
+    `${label}: interrupted join must reach Manager conversation as the public nearer-arrival result`,
   );
   assert.equal(
-    interrupted.filter((text) => text.includes('reason = "operator_abort"')).length,
-    0,
-    `${label}: Long Stroke interrupt axis must not use operator_abort`,
+    interrupted.some((text) => /status\s*=|reason\s*=|operator_abort|user_message/.test(text)),
+    false,
+    `${label}: interrupted join must not leak internal status/reason vocabulary`,
   );
 }
 
@@ -559,7 +555,7 @@ export function extractInspectorIdFromOwnerRequests(requests) {
   const chats = chatRequests(requests ?? []);
   for (const body of chats) {
     const text = lastUserText(body);
-    if (text.includes(G2_Q1) || text.includes(G2_Q2) || text.includes(G2_Q3)) {
+    if (text.startsWith(G2_Q1) || text.startsWith(G2_Q2) || text.startsWith(G2_Q3)) {
       const sid = body.sessionID;
       if (typeof sid === 'string' && sid.length > 0) return sid;
     }
