@@ -5726,6 +5726,7 @@ Manager **不**拥有 `inspect`（已冻结）：Manager 永远不能亲手触�
 2. **§19 WEAK — AC1 / AC20**：Gate D 目前钉 fallback/Strength；未穷尽 T1/review/reanchor 字节相等。Gate C 成对资源，无「技术标识双语同形」扫描。关闭前补齐或用户书面接受 WEAK。
 3. **§20 Non-Goals 诚实声明**：Steward / 完整 Sphinx Kernel / Fission V2 / 其他 locale / Coder BlindPlan **不得**写入 Final outcome 为已交付。
 4. **移入 `completed/`**：仅在 AC15/16 闭环（及 AC1/20 处理）后追加正式 `Final outcome`；**本 session 不移入**。
+5. **Phase 17 完整 provider-prose 迁移**：移交独立 Active Change `changes/active/PromptRestoration.md`（Gate 0 prose-ownership + Batch 1–5）。本 Change 不再以「半 i18n / 仅 Role+Library」宣称 Phase 17 收口。
 
 ## Done since Amendment（2026-08-12 → 08-13 续作）
 
@@ -5770,6 +5771,13 @@ Gate D prompt-stability                            → OK（2/2；0 todo）
 ## Blockers
 
 无运行时红点。关闭语义 blocker = **AC15/AC16 WorkRecordStart / BlindPlan Opening 生产接线缺口**（docs 已定，实现仍走 `ProtectedPrefixEnd`）。
+
+## Amendment — 2026-08-12（Prompt Restoration 移交）
+
+- **Recorded by**：Agent（用户指令：Provider-visible prose ownership sweep 并入 Prompt Restoration 为 Gate 0）
+- **Change**：Phase 17 完整文案/工具面/runtime prose 迁移义务移交 `changes/active/PromptRestoration.md`；本文件 Remaining 增第 5 条指针。
+- **Reason**：避免「主 prompt 双语、tool/runtime/finality 仍英语」的半 i18n 被误认为 Phase 17 完成。
+- **关闭状态**：保持 `active/`；AC15/AC16 仍为本 Change 关闭前提。
 
 ## Amendment — 2026-08-13（Phase 17/20 收口 + §19 终审）
 

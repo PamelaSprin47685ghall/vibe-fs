@@ -75,14 +75,15 @@ Closing report = prose，不是 schema（what ARCH-015）。
 machine-semantic 结构只留协议真需处（如 `exit_code`、`verdict` 参数、`root_requirement`）。  
 禁止 per-role fixed report DTO；WorkRecord 四标题所有权见 companion/glory。
 
-## Gates A–D 所有权（ARCH-016）
+## Gates A–E 所有权（ARCH-016）
 
 | Gate | 守什么 | 失败面 |
 |------|--------|--------|
 | A Tool Referential Integrity | 同名工具唯一 schema+semantic owner（ARCH-007） | proof / 静态扫描 |
 | B Provider Leak | SessionId/AgentId/JobId/PtyId/Fission/lane/worktree/offset/`fast-`·`deep-`/spool 不得出 horizon | provider 输出契约测试 |
-| C Language Parity | 每个 provider semantic resource：EN + zh-CN（HOST-026） | 资源装载 / 缺语言 fail |
+| C Language Parity | 每个 provider semantic resource：EN + zh-CN（HOST-026）；叶对现行；placeholder/semantic-anchor parity 后续（PROMPT-019） | 资源装载 / 缺语言 fail |
 | D Prompt Stability | 同 session：fallback / T1 / review / reanchor / Strength → system prompt 字节相同（AGENT-029、FALLBACK-014） | Persona/prompt 回归 |
+| E Provider Prose Ownership | 已知 provider-surface owner 禁新增 NL literal；baseline 只减不增（PROMPT-019） | `provider-prose-ownership` 扫描红 / per-file 计数回归 |
 
 Gate 是可失败门禁锚点，不是业务状态机字段。实现与 proof 拥有可红证据；各域不得以「局部方便」绕过。
 

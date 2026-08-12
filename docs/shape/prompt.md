@@ -94,7 +94,7 @@ Host 在当前 provider assistant id 产生后才暴露 `ProviderRunIdentity`。
 
 ## Prompt composition · Persona · Library · Language 所有权
 
-行为：`what/prompt.md` PROMPT-014..017；Persona 矩阵：`AGENT-028/029`；语言绑定写：`HOST-026`。  
+行为：`what/prompt.md` PROMPT-014..019；Persona 矩阵：`AGENT-028/029`；语言绑定写：`HOST-026`。  
 本节只划唯一 owner；不复述层文案。
 
 | 关注点 | 唯一 owner | 边界 / 禁止 |
@@ -108,12 +108,16 @@ Host 在当前 provider assistant id 产生后才暴露 `ProviderRunIdentity`。
 | Tools surface | 当前 generated tool schema（Attempt profile） | Tools **不是** Role Prompt 章节；capability 变化不改人格 |
 | Lifecycle orient 文本 | Activation / Reawakening / Continuation / Handoff / Fission / Departure 各 owner | 只 orient；generic Activation ≠ Manager BlindPlan；不得触发 system prompt 替换（TODO-015） |
 | `ProviderLanguage` 类型 | PROMPT-017（`English` \| `SimplifiedChinese`） | protocol id / tool 名 / wire field / enum / path / command **永不翻译** |
+| Provider-visible prose（Class A） | 各 semantic owner + `ProviderResources`（PROMPT-019） | 禁巨型 `TranslationRegistry`；禁 feature `match lang` prose；bound 缺 locale → fail closed |
+| `SyntheticToml` | layout / escaping only（PROMPT-019） | **不**拥有 prose 语义；只渲染已本地化串 |
+| `ToolHostCodec` | wire 编解码（PROMPT-019） | 接收 already-localized Description；**不**拥有 / 不翻译 tool prose |
 | `SessionProviderLanguage` 绑定写 | HOST-026（session 创建瞬间） | Prompt / Library / guideline **只读**已绑定语言；禁止 transform 重读全局偏好 |
 | child / attached / InternalLeaf 语言 | 继承 owner / commissioner（HOST-026） | 不得各自再绑 |
 | Magic Todo Manager-only fragment | TODO-013/015（`MagicTodoManagerGuideline` + Pre-T1/T1/Living Mission） | 禁止并入全局 `PairProgrammingGuidelineText`（HOST-013） |
 | Pair Hint semantic payload | HOST-013 `ProjectionConstants.PairProgrammingGuidelineText` | Cursor/ordinary 只换 wire renderer；User/System 实验 role 不成为 PromptIngress authority |
 | Assistance continuation | PROMPT-018 `NeedHelpEscalation` / `NeedHelpAdvice` | 只延长现有 LogicalRun；显式 EffectiveAgent binding，不写 FallbackCursor |
 | Companion / Blogger system | COMPANION-004（`blogger-system.md`） | 不经本五层 composition 冒充；禁止动态 token/预算注入 |
+| Provider prose ownership ratchet | ARCH-016 Gate E | 已知 provider-surface owner 禁新增 NL literal；baseline 只减不增 |
 
 禁止平行 owner：
 
@@ -122,4 +126,5 @@ OpeningPromptRaw / AssignmentText 拼接冒充 Mission 或 Opening
 Sphinx Kernel / MCP observation 假装 Prompt composition 层；Sphinx 是独立认识状态 owner（SPHINX-005）
 把 ExecutionBinding 变化写成 Persona / system prompt 换人
 把 Office Library 写成 Role Law 或 universal bible
+SyntheticToml / ToolHostCodec / TranslationRegistry 冒充 prose semantic owner
 ```

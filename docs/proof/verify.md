@@ -14,7 +14,7 @@
 | VERIFY-002 | 晋级阶梯，禁止跨级；禁止语义分支直跳 E2E |
 | VERIFY-003 | Canary mock 剧本：键、匹配、幂等、故障轴、冷边界 |
 | VERIFY-004 | 因果推进门禁、One Physical World 与**禁止退化清单**（机器解析锚点） |
-| VERIFY-005 | Architecture gates / 单一写入口 / Host 边界 / Gates A–D |
+| VERIFY-005 | Architecture gates / 单一写入口 / Host 边界 / Gates A–E |
 | VERIFY-006 | No-Go 发布否决 |
 | VERIFY-007 | Wire / Semantic / BloggerDelta 三种投影 |
 | VERIFY-008 | 测试语言边界（`.fs` 生产 / `.mjs` 契约面） |
@@ -509,6 +509,7 @@ Review confirmed                           → 只能派生，不能赋值
 | `scripts/checks/provider-leak-gate.mjs` | **Gate B**（ARCH-016）：provider 输出禁 leak vocabulary；pin `tests/unit/verify/provider-leak-gate.test.mjs`（code phase 新建） |
 | `scripts/checks/language-parity-gate.mjs` | **Gate C**（ARCH-016 / HOST-026）：∀ provider semantic resource EN + zh-CN；pin `tests/unit/verify/language-parity-gate.test.mjs`（code phase 新建） |
 | `tests/unit/invariants/prompt-stability.test.mjs` | **Gate D**（ARCH-016 / FALLBACK-014）：同 session fallback/T1/review/reanchor/Strength → system prompt 字节相同（无静态宿主；code phase 新建） |
+| `scripts/checks/provider-prose-ownership.mjs` | **Gate E**（ARCH-016 / PROMPT-019）：已知 provider-surface owner 禁新增 NL literal；baseline ratchet 只减不增；pin `tests/unit/verify/provider-prose-ownership.test.mjs`（code phase 新建） |
 | `tests/unit/**` | Fallback/Prompt/PTY/Review 的可达构造、唯一入口与完整行为 |
 
 ### Gate B leak vocabulary（权威禁令表）
@@ -543,7 +544,7 @@ edit-qa / Meditator / Role.Executor 作为现行表面
 `tests/unit/verify/orchestrator-reuse-contract.test.mjs`、
 以及 `manager-tool-contract` / `*-tool` / LWR heading substring 套件。
 
-替代：上表 Gate A–D + `tests/unit/invariants/*` 语义不变量。禁止用新的宽松 substring 清单假装覆盖。
+替代：上表 Gate A–E + `tests/unit/invariants/*` 语义不变量。禁止用新的宽松 substring 清单假装覆盖。
 
 `npm run lint` 绿色只证明上述静态覆盖，不得宣称已经证明跨文件语义一致、所有 `Result` 穷尽处理或所有算法 owner 唯一。新增静态门禁必须有故意破坏后变红的 fixture；新增行为门禁必须走发布产物测试。
 

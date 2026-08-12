@@ -87,10 +87,13 @@ module RuntimeNudge =
 
     /// Interaction repair that continues an in-progress turn (finish=tool-calls with no
     /// tool part, or a reasoning-only stop). ARCH-011: the typed `repairKind` is the
-    /// identity; this text only asks the model to continue. Rendered as a comment per
-    /// ARCH-010, and non-whitespace to every validator (the `"\u200B"` predecessor was
-    /// rejected as whitespace-only by Anthropic).
-    let InteractionRepairContinueInstructions = [ "Continue." ]
+    /// identity. The calibration is that the turn paused before an ordinary completion —
+    /// not that the charge changed, and not that a new task arrived.
+    let InteractionRepairContinueInstructions =
+        [ "The previous turn paused before an ordinary completion."
+          ""
+          "Continue the same charge from where you stopped."
+          "Do not treat the pause itself as a change in the work." ]
 
     let interactionRepairContinue =
         SyntheticToml.document InteractionRepairContinueInstructions []

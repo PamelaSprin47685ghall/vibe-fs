@@ -64,7 +64,7 @@ Does the participant need the value itself
 
 ---
 
-## Gates A–D 检查算法（ARCH-016）
+## Gates A–E 检查算法（ARCH-016）
 
 静态/契约门禁（可失败；不是业务状态机字段）：
 
@@ -72,8 +72,31 @@ Does the participant need the value itself
 |------|----------|
 | A Tool Referential Integrity | 同名工具 → 唯一 schema owner + 唯一 semantic contract；不同硬语义不得同名（`commission`≠`fork`；`judge`≠旧 `verdict` 工具名） |
 | B Provider Leak | 扫描 provider 输出 / schema / fixed prose：禁 SessionId/AgentId/ManagerJobId/PtyId/Fission/lane/worktree/offset/`fast-`·`deep-`/spool |
-| C Language Parity | 每个 provider semantic resource：EN 与 zh-CN 皆存在（HOST-026）；缺语言 fail |
+| C Language Parity | 每个 provider semantic resource：EN 与 zh-CN 皆存在（HOST-026）；缺语言 fail。现行：叶对成对。后续（PROMPT-019）：structural placeholder parity + semantic-anchor parity |
 | D Prompt Stability | 同 session 上 Fallback / T1 / review / reanchor / Strength 后 system prompt 字节相同；只允许改 EffectiveAgent |
+| E Provider Prose Ownership | 见下节算法 |
+
+### Gate E — Provider Prose Ownership（PROMPT-019）
+
+```text
+scan allowlisted production modules:
+  Domain/*Prompt.fs
+  Domain/*Narrative.fs
+  Domain/RuntimeNudge.fs   （及同命名族）
+  Domain/JsDescription.fs  （及同命名族）
+  Infrastructure/OpenCode/Tools/*   （provider-facing）
+
+detect natural-language string literals
+
+allow (do not count as prose debt):
+  resource paths / technical ids（Class B）
+  {{placeholders}}
+  explicitly annotated diagnostics（Class C）
+
+compare per-file NL literal counts → baseline
+  count > baseline[file]  → fail（regression）
+  count ≤ baseline[file]  → ok；baseline 只许收缩，不许膨胀
+```
 
 证明面见 `proof/` 与 Proposal §17；各域不得以局部方便绕过。
 

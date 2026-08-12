@@ -96,7 +96,7 @@
 
 | 术语 | 指向 |
 |------|------|
-| Gates A–D | ARCH-016：Tool Referential Integrity / Provider Leak / Language Parity / Prompt Stability |
+| Gates A–E | ARCH-016：Tool Referential Integrity / Provider Leak / Language Parity / Prompt Stability / Provider Prose Ownership |
 
 ## H
 
@@ -198,6 +198,8 @@
 | Provider Horizon | ARCH-014：provider 可见面决策滤镜；无状态机 / UUID / 机器 DTO |
 | Provider leak | EXEC-030 / ARCH-016 Gate B：SessionId/AgentId/PtyId/worktree/fallback offset 等不得穿 horizon |
 | ProviderLanguage | PROMPT-017：`English` \| `SimplifiedChinese`；见 SessionProviderLanguage |
+| Provider prose | PROMPT-019 Class A：进入 participant horizon 的自然语言；须经 ProviderResources |
+| ProviderLanguage ownership | PROMPT-019：Language=session；Meaning=semantic owner；Rendering=machinery；Gate E 守散落 |
 | ProviderRequestKind | PROMPT-008：WorkMain / BloggerMain / BloggerSquash / InteractionRepair / StrengthReplica |
 | Provider-visible projection | COMPANION-012：正进入模型的字段排除非模型 metadata |
 | ParentJoinCorrectionRequested | EXEC-022：已退休假 abort 的确定性 replacement 后通知父侧作废 |

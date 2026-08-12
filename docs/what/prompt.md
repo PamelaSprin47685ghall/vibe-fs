@@ -72,6 +72,43 @@ Continuation 只延续已有 Logical Run：
 
 `NeedHelpEscalation` 唯一允许的 binding 变化是 fast owner 请求对应 deep peer；`NeedHelpAdvice` 必须绑定触发 consultation 的原 deep agent。synthetic Cursor Pair Hint 即使使用 provider `role=user|system` 的测试 encoder，也仍是 HOST-013 provider projection，不参与 PromptIngress/AuthorityRoot/OpeningMaterial；生产 Cursor 固定 assistant encoder。
 
+## PROMPT-019：Provider-visible prose ownership
+
+凡进入 participant horizon 的自然语言，全部受 ProviderLanguage 管辖（PROMPT-017）。
+
+```text
+Meaning belongs to its semantic owner.
+Language belongs to the session.
+Rendering belongs to machinery.
+```
+
+That cognitive environment has one language at a time. No feature may quietly speak another.
+
+Language 集中为律；Meaning 仍按 semantic owner 分布。禁止巨型 `TranslationRegistry`。禁止业务代码 `match lang` / `if lang then …` 散落自然语言句子。
+
+| Class | 规则 |
+|-------|------|
+| A Provider prose | 必须 i18n（system / Role / Library / runtime / finality / tool desc+consequence / assistance / …） |
+| B Technical literals | 永不翻译（tool names / args / wire / enum / path / command） |
+| C Internal diagnostics | 不进 horizon → 不属 Provider i18n |
+
+```text
+semantic owner
+  → resources/provider/<path>/{en,zh-CN}.md
+ProviderResources
+  → already-localized string
+SyntheticToml / ToolHostCodec
+  → layout / escaping only；接收已本地化串
+```
+
+`SyntheticToml` 只拥有布局与转义，不拥有 prose 语义。`ToolHostCodec` 接收已按 `SessionProviderLanguage` 本地化的 Description；工具合同跨语言同形（PROMPT-017 invariant 面）。
+
+参数化散文：资源模板用 `{{name}}`；填入值不翻译。
+
+Bound session：缺 localization ≠ 许可换语言；fail closed（禁 silent English fallback）。
+
+Gate 0 / Batch 迁文属 Change 工作；本条立法，不定批次日程。装载见 `how/prompt.md`；所有权门禁见 ARCH-016 Gate E；成对资源与后续 parity 见 ARCH-016 Gate C。
+
 ## PROMPT-004：来源类型
 
 ```fsharp
@@ -315,4 +352,5 @@ child / attached / internal
 | Blogger/Bookkeeper/Distiller assignments | |
 
 `A translation changes the language of the world, not the identifiers of its machinery.`  
-Synthetic TOML：Comments ≈ instruction；Fields ≈ operands；每个 provider text owner 独立负责 EN + ZH（SURFACE-004）。
+Synthetic TOML：Comments ≈ instruction；Fields ≈ operands；每个 provider text owner 独立负责 EN + ZH（SURFACE-004）。  
+进入 horizon 的 prose 所有权、三类字符串与装载路径见 PROMPT-019；本条只定 `ProviderLanguage` 类型与 session 绑定。

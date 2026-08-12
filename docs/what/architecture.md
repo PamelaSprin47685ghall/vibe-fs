@@ -194,7 +194,7 @@ Closing report 如实陈述什么重要；**无** universal 固定字段义务�
 machine-semantic 结构只留在协议真需处（如 `exit_code`、`verdict`、`root_requirement`）。  
 禁止再造 per-role fixed report DTO（`### Summary` / `### Files Changed` / …）。
 
-## ARCH-016：静态架构 Gates A–D
+## ARCH-016：静态架构 Gates A–E
 
 可观察门禁锚点（实现与 proof 须能失败）：
 
@@ -202,5 +202,6 @@ machine-semantic 结构只留在协议真需处（如 `exit_code`、`verdict`、
 |------|--------|
 | A Tool Referential Integrity | same tool name → 唯一 schema owner + 唯一 semantic contract owner（ARCH-007） |
 | B Provider Leak | provider 输出不得含 SessionId / AgentId / ManagerJobId / PtyId / FissionGroupId / lane_index / worktree / fallback offset / `fast-`·`deep-` binding / spool path |
-| C Language Parity | 每个 provider semantic resource：EN 与 zh-CN 皆存在（HOST-026） |
+| C Language Parity | 每个 provider semantic resource：EN 与 zh-CN 皆存在（HOST-026）。叶对成对为现行义务；structural placeholder parity + semantic-anchor parity 为后续义务（PROMPT-019） |
 | D Prompt Stability | 同 session：fallback / T1 / review / reanchor / Strength → system prompt 字节相同（AGENT-029、FALLBACK-014） |
+| E Provider Prose Ownership | 已知 provider-surface owner 不得新增自然语言字面量；baseline ratchet 只减不增（PROMPT-019） |

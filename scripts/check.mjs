@@ -24,6 +24,8 @@ const checks = [
   join(root, 'checks/tool-referential-integrity.mjs'),
   join(root, 'checks/provider-leak-gate.mjs'),
   join(root, 'checks/language-parity-gate.mjs'),
+  join(root, 'checks/prompt-depth-ratchet.mjs'),
+  join(root, 'checks/provider-prose-ownership.mjs'),
   join(root, 'checks/g4r-freeze.mjs'),
   join(root, 'checks/g4r-ce-vocabulary.mjs'),
   join(root, 'checks/test-boundary.mjs'),
@@ -51,6 +53,10 @@ for (const script of checks) {
   // ARCH-016 Gate B: grandfathered Join/horizon migration debt — counts must only shrink.
   if (script.endsWith('provider-leak-gate.mjs')) {
     args.push(`--baseline=${join(root, 'checks/provider-leak-gate-baseline.json')}`)
+  }
+  // ARCH-016 Gate E: provider-visible prose ownership — counts must only shrink.
+  if (script.endsWith('provider-prose-ownership.mjs')) {
+    args.push(`--baseline=${join(root, 'checks/provider-prose-ownership-baseline.json')}`)
   }
   const result = spawnSync(process.execPath, args, { stdio: 'inherit' })
   if (result.status !== 0) process.exit(result.status ?? 1)

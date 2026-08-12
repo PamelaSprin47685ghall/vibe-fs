@@ -51,7 +51,20 @@
 | localizable vs invariant | prose 按已绑语言；tool 名 / argument / wire / enum / path / command / `exit_code` **原样** | PROMPT-017 |
 | child 继承 | attached / InternalLeaf 继承 owner/commissioner；不得再读全局 | PROMPT-017、HOST-026 |
 
-Gate C 静态门与跨域清单见 `proof/architecture.md` ARCH-016；Host 绑定算法见 `proof/host.md` HOST-026。
+Gate C 静态门与跨域清单见 `proof/architecture.md` ARCH-016；Host 绑定算法见 `proof/host.md` HOST-026。  
+Gate C 后续义务（占位符结构 parity + semantic-anchor parity）见 ARCH-016 C 注；本层不另立门。
+
+## Provider-visible prose ownership（PROMPT-019；Gate E 指针）
+
+| 证明 | 期望 | 条款 |
+|------|------|------|
+| prose 所有权 | Class A 只经 semantic owner → ProviderResources；禁 TranslationRegistry / feature `match lang` prose | PROMPT-019 |
+| 机械层 | SyntheticToml / ToolHostCodec 只 layout/escaping；收 already-localized Description | PROMPT-019 |
+| bound fail-closed | 已绑 session 缺目标 locale → 失败；禁 silent English fallback | PROMPT-019、HOST-026 |
+| 工具合同同形 | tool 名 / args / wire 跨语言不变；`{{name}}` 模板值不翻译 | PROMPT-019、PROMPT-017 |
+| Gate E ratchet | 已知 provider-surface owner 禁新增 NL literal；per-file baseline 只减不增 | ARCH-016 E |
+
+Gate E 静态门与扫描算法见 `proof/architecture.md` / `how/architecture.md` ARCH-016。
 
 ## 恢复
 

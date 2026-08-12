@@ -102,7 +102,7 @@ ID 的类型边界见 `shape/prompt.md`。
 
 ---
 
-## Composition · 稳定字节 · ProviderLanguage（PROMPT-014..017）
+## Composition · 稳定字节 · ProviderLanguage（PROMPT-014..017、PROMPT-019）
 
 所有权见 `shape/prompt.md`；语义见 `what/prompt.md`。本节只写装配算法。
 
@@ -120,6 +120,20 @@ assembleOfficeSystemPrompt(session):
 Tools surface **不**并入 system 串；capability 变化不改人格（PROMPT-015）。  
 Lifecycle orient（Activation / Reawakening / Continuation / Handoff / Fission / Departure）只注入 conversation/runtime，不替换 system 字节。  
 generic Activation ≠ Manager BlindPlan；不得触发 system prompt 切换（TODO-015）。
+
+### Provider-visible prose 装载（PROMPT-019）
+
+```text
+semantic owner (Domain text owner)
+  → ProviderResources.load(path, SessionProviderLanguage)
+  → already-localized string
+  → SyntheticToml / ToolHostCodec（layout / escaping only）
+```
+
+禁止巨型 `TranslationRegistry`。禁止 feature 代码 `match lang` 挑选 prose。  
+Bound session：目标 locale 缺资源 → fail closed；不得 silent 回落另一语言。  
+Class B 技术标识与 Class C 内部 diagnostics 不经此 i18n 路径（见 what PROMPT-019）。  
+参数化：资源内 `{{name}}` 模板；运行时填值不翻译。
 
 ### 同一 Life 内 system 字节冻结（PROMPT-014 / GLORY-075）
 
@@ -140,13 +154,15 @@ onBlindPlanT1 / onPeerFallback / onStrength / onProcessReview / onFinality
 `The system prompt names the office. The conversation tells you which road is yours.`  
 T1 entrustment revelation 只走 conversation tool result（TODO-015）。
 
-### ProviderLanguage 读取（PROMPT-017）
+### ProviderLanguage 读取（PROMPT-017 / PROMPT-019）
 
 | 路径 | 规则 |
 |------|------|
-| localizable | 按 `SessionProviderLanguage` 取 EN / ZH representation |
-| invariant | tool 名 / argument / wire field / enum / path / command / `exit_code` **原样** |
+| localizable（Class A） | 按 `SessionProviderLanguage` 经 ProviderResources 取 EN / ZH；缺则 fail closed |
+| invariant（Class B） | tool 名 / argument / wire field / enum / path / command / `exit_code` **原样** |
+| diagnostics（Class C） | 不进 horizon；不属 Provider i18n |
 | child / attached / InternalLeaf | 继承 owner/commissioner 已绑语言；不得各自再绑 |
+| SyntheticToml / ToolHostCodec | 只收 already-localized 串；不拥有 prose、不读语言偏好 |
 
 MagicTodoManagerGuideline = HOST-013 通用 guideline **加法片段**（PROMPT-013）；禁止并入 `PairProgrammingGuidelineText`。
 
