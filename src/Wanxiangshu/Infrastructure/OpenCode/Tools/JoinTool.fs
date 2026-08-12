@@ -6,6 +6,7 @@ open Fable.Core.JsInterop
 
 open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Infrastructure.Resources
+open Wanxiangshu.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity

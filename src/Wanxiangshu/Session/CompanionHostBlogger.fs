@@ -15,6 +15,7 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure.Resources
+open Wanxiangshu.Resources
 
 module internal CompanionHostBlogger =
 

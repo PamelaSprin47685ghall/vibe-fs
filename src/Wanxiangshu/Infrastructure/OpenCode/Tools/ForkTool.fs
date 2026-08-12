@@ -4,6 +4,7 @@ open System
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure
 open Wanxiangshu.Infrastructure.Resources
+open Wanxiangshu.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel

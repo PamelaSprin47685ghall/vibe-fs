@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Resources
+open Wanxiangshu.Resources
 
 /// The only raw Host boundary for the GrandRewrite Magic Todo account.
 /// Provider input is `{ obligations: [{ name, work }] }`; the built-in Host

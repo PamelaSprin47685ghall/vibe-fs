@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Resources
+open Wanxiangshu.Resources
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Process

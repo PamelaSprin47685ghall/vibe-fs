@@ -1,8 +1,9 @@
-namespace Wanxiangshu.Infrastructure.Resources
+namespace Wanxiangshu.Resources
 
 open System
 open System.Text.RegularExpressions
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Kernel.Identity
 
 /// PROMPT-019: load + substitute provider prose. Layout stays in SyntheticToml.

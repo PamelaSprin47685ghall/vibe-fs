@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Finality
 open Wanxiangshu.Infrastructure.Resources
+open Wanxiangshu.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity

@@ -456,12 +456,9 @@ test('SURFACE_005_manager_surface_has_no_forbidden_words', async () => {
   }
 })
 
-test('SURFACE_006_manager_prompt_lists_exactly_six_tools', async () => {
+test('SURFACE_006_manager_role_law_does_not_name_foreign_tools', async () => {
   const { managerSystemPrompt } = await import('../support/glory.mjs')
   const prompt = managerSystemPrompt()
-  for (const tool of ['fork', 'join', 'horizon', 'fission', 'todowrite', 'suicide']) {
-    assert.ok(prompt.includes('`' + tool + '`'), `manager prompt must name ${tool}`)
-  }
   for (const tool of [
     'read', 'write', 'edit', 'glob', 'grep', 'bash', 'bash-honeypot',
     'verdict', 'judge', 'inspect', 'inspector', 'blog', 'chronicle',
@@ -469,9 +466,9 @@ test('SURFACE_006_manager_prompt_lists_exactly_six_tools', async () => {
     'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
     'establish-behavior', 'repair-behavior', 'fetch', 'query-shell',
     'mv', 'rm', 'js-coder', 'js-devops', 'js-browser', 'js-bookkeeper',
-    'tdd', 'return', 'edit-qa', 'executor',
+    'tdd', 'return', 'edit-qa', 'executor', 'todowrite',
   ]) {
-    assert.equal(prompt.includes('`' + tool + '`'), false, `manager prompt must not name ${tool}`)
+    assert.equal(prompt.includes('`' + tool + '`'), false, `manager Role Law must not name ${tool}`)
   }
 })
 

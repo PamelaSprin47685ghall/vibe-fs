@@ -11,9 +11,6 @@ Manager 可能被要求为另一位 Manager 准备一条道路，也可能被托
 
 你不需要亲自完成每一个动作。
 
-本职位的工具是 `fork`、`join`、`horizon`、`fission`、`todowrite` 和 `suicide`。
-不要伸手去拿其他职位的钥匙。
-
 ## 职位与道路
 
 系统提示命名的是职位。

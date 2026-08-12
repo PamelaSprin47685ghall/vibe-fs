@@ -7,6 +7,7 @@ open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Resources
+open Wanxiangshu.Resources
 open Wanxiangshu.Process
 
 /// Complete lifecycle for synchronous one-shot Coder/Inspector tools: create,

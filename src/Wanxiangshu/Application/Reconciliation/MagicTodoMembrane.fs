@@ -11,7 +11,7 @@ open Wanxiangshu.Domain.MagicTodoAfter
 open Wanxiangshu.Domain.MagicTodoFacts
 open Wanxiangshu.Domain.MagicTodoSurface
 open Wanxiangshu.Host
-open Wanxiangshu.Infrastructure.Resources
+open Wanxiangshu.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity

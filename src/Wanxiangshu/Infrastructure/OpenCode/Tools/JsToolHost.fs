@@ -6,6 +6,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.Infrastructure.Resources
+open Wanxiangshu.Resources
 open Wanxiangshu.OpenCode
 
 /// Coexistence seam between builtin filesystem fallbacks and generated js-*.

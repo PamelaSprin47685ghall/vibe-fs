@@ -2,7 +2,7 @@ namespace Wanxiangshu.Finality
 
 open System.Threading.Tasks
 open Wanxiangshu.Domain
-open Wanxiangshu.Infrastructure.Resources
+open Wanxiangshu.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
