@@ -1,30 +1,46 @@
 # failure-path-untested — Enforcer
 
-## Definition
-A failure path is untested when newly introduced error handling, cancellation, rollback, retry, malformed-input, or recovery logic has never been forced to execute under test. The root-cause is that newly written failure, cancel, rollback, or retry logic is assumed correct because the happy path is green, so the branch that matters most has never been forced to execute.
+A failure path is untested when the code contains policy for what happens under failure, cancellation, rollback, malformed input, conflict, timeout, retry, or recovery — but no test has ever forced the condition that gives that policy meaning.
 
-## Governing Principle
-Failure code is usually least exercised in production until the moment correctness depends on it most. Its plausibility is therefore dangerous: branches that “obviously” release, rollback, or retry can remain dead assumptions for months. A failure path has no evidence merely because the happy path survives; it must be driven by the condition that gives it meaning.
+The dangerous illusion is readability. Failure code often *looks* obviously correct:
 
-## Trigger When
-Trigger when code adds or changes a failure/recovery branch and no test creates the actual precondition that selects that branch and observes its externally relevant result.
+```text
+catch
+  release permit
+  rollback reservation
+  return error
+```
 
-## Do Not Trigger When
-- An existing test already forces the exact failure mode through the same ownership boundary and protects its observable semantics.
-- The change does not add or alter failure/recovery semantics (pure happy-path refactor with unchanged error contract).
-- Exhaustive property coverage already includes the failure as a generated case with assertions on cleanup/state.
-- The branch is unreachable production dead code; delete it rather than invent a test for abandoned handling.
+But these branches are where ownership, partial effects, cleanup ordering, idempotency, stale state, and secondary failure interact. They are often the least exercised code in production until the moment correctness matters most.
 
-## Distinguish From
-`missing-regression-test` concerns a known defect. `coverage-theater` concerns weak assertions. This rule is specifically about unexecuted newly significant failure semantics. Tie-break: if the new rollback/retry/cancel path has never been forced, this rule owns the case even when line coverage is high.
+Fire this rule when a change adds or materially changes failure semantics and no test deliberately produces the real precondition. Examples:
 
-## Decision Procedure
-Name the failure, how it is induced, what cleanup/state/result must follow, and what must not happen. If no test demonstrates those four facts, the path is unproven.
+- new rollback branch never runs under test;
+- cancellation cleanup is asserted only by code inspection;
+- retry logic is tested by calling the retry helper directly, not by causing the owning operation to fail;
+- malformed provider/wire input has a decoder branch but no malformed fixture reaches it;
+- resource cleanup after partial initialization is never exercised;
+- conflict/CAS rejection path exists but all tests serialize writers;
+- recovery branch is “covered” only by manually constructing post-failure internal state;
+- error mapping is tested without the external/inner failure that production maps.
 
-## Examples
-- positive: a new catch block “rolls back the reservation,” but every test only exercises successful checkout.
-- near-miss: a test injects the reservation failure at the owning boundary and asserts rollback plus no charge.
-- counterexample: add a test that induces the real failure and asserts result, cleanup, and forbidden side effects.
+Do not fire when an existing test already induces the exact failure through the same owning boundary and observes the same externally relevant semantics. Do not demand a bespoke test for unreachable dead code; delete the dead branch. Property/exhaustive tests may already provide sufficient failure evidence if they genuinely generate the condition and assert cleanup/state, not merely lines executed.
 
-## Nudge
-Failure handling is executable policy, not insurance prose. Force the real failure and prove its result, cleanup, and forbidden side effects.
+This differs from `missing-regression-test`: that rule starts from a **known defect that already escaped or was observed** and asks whether the repository preserved executable memory of it. `failure-path-untested` applies even before any incident: newly important failure policy has never been exercised.
+
+It also differs from `coverage-theater`. A failure line can show as covered because a broad test passed through it, yet the test may never assert the guarantee that matters. The question is not “did the branch execute?” but:
+
+> Did a test deliberately create this failure and prove the required result, cleanup, state preservation, and forbidden side effects?
+
+A useful failure-test specification has four parts:
+
+```text
+induce: what exactly fails?
+observe: what result/state must follow?
+cleanup: what owned resources/effects must be discharged?
+forbid: what must not happen despite the failure?
+```
+
+The “forbid” column is often where the real contract lives: no duplicate charge, no stale publish, no leaked permit, no state advance, no second retry, no swallowed error.
+
+> Failure handling is executable policy. Code that has never been forced to fail is not yet evidence that failure is handled.
