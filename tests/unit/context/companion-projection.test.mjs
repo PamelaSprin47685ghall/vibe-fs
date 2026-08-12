@@ -32,7 +32,7 @@ test('COMPANION_004_request_instructions_require_exactly_one_blog_call', () => {
   assert.match(prompt.normalInstruction, /exactly once/)
   assert.match(prompt.squashInstruction, /# Rewrite the preceding assistant work-log frames now/)
   assert.match(prompt.squashInstruction, /exactly once/)
-  assert.equal(prompt.system, undefined, 'System is owned by blogger-system.md, not CompanionPrompt')
+  assert.equal(prompt.system, undefined, 'System is owned by PromptResources Blogger Role Law, not CompanionPrompt')
 })
 
 test('CTX_001_no_prompt_carries_a_token_count_or_output_budget', () => {

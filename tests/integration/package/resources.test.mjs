@@ -10,31 +10,45 @@ import { fileURLToPath } from 'node:url'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 
-const PROMPT_FILES = [
-  'blogger-system.md',
-  'browser-system.md',
-  'coder-system.md',
-  'devops-system.md',
-  'distiller-system.md',
-  'inspector-system.md',
-  'manager-system.md',
-  'inquiry-system.md',
-  'orchestrator-system.md',
-  'reviewer-system.md',
+const PROVIDER_ROLES = [
+  'blogger',
+  'bookkeeper',
+  'browser',
+  'coder',
+  'devops',
+  'distiller',
+  'inquiry',
+  'inspector',
+  'manager',
+  'orchestrator',
+  'reviewer',
 ]
 
-test('PACKAGE_resources_all_prompts_and_rulebook_present_after_install', () => {
-  const promptsDir = path.join(repoRoot, 'resources', 'prompts')
+test('PACKAGE_resources_provider_role_laws_and_rulebook_present_after_install', () => {
+  const providerDir = path.join(repoRoot, 'resources', 'provider')
   const enforcerDir = path.join(repoRoot, 'resources', 'enforcer')
 
-  assert.ok(fs.existsSync(promptsDir), 'resources/prompts must exist')
-  for (const name of PROMPT_FILES) {
-    const full = path.join(promptsDir, name)
-    assert.ok(fs.existsSync(full), `missing prompt ${name}`)
-    const text = fs.readFileSync(full, 'utf8')
-    assert.ok(text.trim().length > 0, `prompt ${name} must be non-empty`)
+  assert.ok(fs.existsSync(providerDir), 'resources/provider must exist')
+  assert.equal(
+    fs.existsSync(path.join(repoRoot, 'resources', 'prompts')),
+    false,
+    'legacy resources/prompts must be gone after Prompt Restoration cutover',
+  )
+
+  for (const role of PROVIDER_ROLES) {
+    for (const locale of ['en.md', 'zh-CN.md']) {
+      const full = path.join(providerDir, 'role', role, locale)
+      assert.ok(fs.existsSync(full), `missing Role Law ${role}/${locale}`)
+      const text = fs.readFileSync(full, 'utf8')
+      assert.ok(text.trim().length > 0, `Role Law ${role}/${locale} must be non-empty`)
+    }
   }
-  assert.equal(PROMPT_FILES.length, 10)
+  assert.equal(PROVIDER_ROLES.length, 11)
+
+  for (const leaf of ['world/common-law/en.md', 'world/common-law/zh-CN.md']) {
+    const full = path.join(providerDir, leaf)
+    assert.ok(fs.existsSync(full), `missing provider asset ${leaf}`)
+  }
 
   assert.ok(fs.existsSync(enforcerDir), 'resources/enforcer must exist')
   assert.equal(
@@ -74,5 +88,5 @@ test('PACKAGE_resources_fixed_relative_path_from_PackageResources_module', () =>
     'PackageResources ../../../resources must resolve to package resources/',
   )
   assert.ok(fs.existsSync(path.join(fromModule, 'enforcer', 'primitive-obsession', 'enforcer.md')))
-  assert.ok(fs.existsSync(path.join(fromModule, 'prompts', 'manager-system.md')))
+  assert.ok(fs.existsSync(path.join(fromModule, 'provider', 'role', 'manager', 'en.md')))
 })

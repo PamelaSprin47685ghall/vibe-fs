@@ -3,7 +3,7 @@
  *
  * Pins scripts/checks/student-teacher-absence.mjs: FORBIDDEN_TOKENS + scanEntries.
  * Import-safe (CLI main guard). Full production scan of src/Wanxiangshu +
- * resources/prompts is run by `node scripts/checks/student-teacher-absence.mjs`
+ * resources/provider is run by `node scripts/checks/student-teacher-absence.mjs`
  * via scripts/check.mjs — this unit nails the token set and scanEntries
  * red/green, then samples src/Wanxiangshu.
  */

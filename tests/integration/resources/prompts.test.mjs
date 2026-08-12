@@ -45,7 +45,9 @@ const SHARED_PATHS = [
   'library/scarcity', 'library/reviewer/quality-ledger',
 ]
 
-const forbiddenRoleToolInventory = /\b(?:todowrite|fission|open-terminal|send-terminal|read-terminal|signal-terminal|query-shell|sphinx_start|sphinx_resume|js-[a-z-]+)\b/i
+// Tool-shaped inventory remains forbidden. Conceptual words such as Fission
+// (one life, several presents) are Role Law craft and must stay teachable.
+const forbiddenRoleToolInventory = /\b(?:todowrite|open-terminal|send-terminal|read-terminal|signal-terminal|query-shell|sphinx_start|sphinx_resume|js-[a-z-]+)\b/i
 
 const hanRatio = (text) => {
   const han = (text.match(/[\u3400-\u9fff]/g) ?? []).length

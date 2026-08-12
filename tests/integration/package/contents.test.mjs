@@ -11,17 +11,18 @@ import { fileURLToPath } from 'node:url'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 
-const PROMPT_FILES = [
-  'blogger-system.md',
-  'browser-system.md',
-  'coder-system.md',
-  'devops-system.md',
-  'distiller-system.md',
-  'inspector-system.md',
-  'manager-system.md',
-  'inquiry-system.md',
-  'orchestrator-system.md',
-  'reviewer-system.md',
+const PROVIDER_ROLES = [
+  'blogger',
+  'bookkeeper',
+  'browser',
+  'coder',
+  'devops',
+  'distiller',
+  'inquiry',
+  'inspector',
+  'manager',
+  'orchestrator',
+  'reviewer',
 ]
 
 const exists = (rel) => fs.existsSync(path.join(repoRoot, rel))
@@ -39,6 +40,8 @@ test('PACKAGE_contents_tarball_includes_manifest_dist_resources', () => {
     'dist/Infrastructure/OpenCode/Plugin/Plugin.js',
     'resources/enforcer/primitive-obsession/enforcer.md',
     'resources/enforcer/primitive-obsession/main.md',
+    'resources/provider/world/common-law/en.md',
+    'resources/provider/world/common-law/zh-CN.md',
   ]) {
     assert.ok(exists(required), `package must include ${required}`)
   }
@@ -48,9 +51,18 @@ test('PACKAGE_contents_tarball_includes_manifest_dist_resources', () => {
     false,
     'catalog.json must not ship after rulebook folder cutover',
   )
+  assert.equal(
+    exists('resources/prompts'),
+    false,
+    'legacy resources/prompts must not ship after Prompt Restoration cutover',
+  )
 
-  for (const name of PROMPT_FILES) {
-    assert.ok(exists(`resources/prompts/${name}`), `package must include resources/prompts/${name}`)
+  for (const role of PROVIDER_ROLES) {
+    assert.ok(exists(`resources/provider/role/${role}/en.md`), `package must include Role Law ${role}/en.md`)
+    assert.ok(
+      exists(`resources/provider/role/${role}/zh-CN.md`),
+      `package must include Role Law ${role}/zh-CN.md`,
+    )
   }
 })
 

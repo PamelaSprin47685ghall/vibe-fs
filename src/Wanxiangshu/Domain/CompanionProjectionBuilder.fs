@@ -17,7 +17,7 @@ type CompanionProjectedMessage =
       IsPhysical: bool }
 
 /// COMPANION-005: message list for one Companion request.
-/// System is NOT here — managed-agent config owns blogger-system.md (ENFORCER-030).
+/// System is NOT here — managed-agent config owns PromptResources Blogger Role Law (ENFORCER-030).
 type CompanionProjectionPlan =
     { Messages: CompanionProjectedMessage list }
 

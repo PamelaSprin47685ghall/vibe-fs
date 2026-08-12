@@ -94,20 +94,32 @@ Bound session：missing localization → fail closed；禁止 silent English fal
 
 ## Remaining work
 
-1. **Gate 0**：正式条款 + Gate E 门禁 + check 接线 — **已落**（PROMPT-019 / ARCH-016 E；baseline 490 hits；unit 7/7）。**待**：inventory 纳入 Active 证据；`npm run check` 全量一次。
-2. Batch 1–5：按上表迁移；每 owner EN+ZH+删硬编码+parity
-3. Role Law semantic-depth / tool-contract semantic parity
-4. 零散落 prose 完成标准：生产 F# provider-facing 无 semantic prose literal；Gate E baseline → 0
+1. ~~**Gate 0**~~：**已闭合** — PROMPT-019 / ARCH-016 Gate E；扩根后 baseline **580 hits / 30 files**；`prompt-depth-ratchet`；semantic-depth；盘点见 agent-tools `provider-prose-inventory.md`。
+2. **Batch 1** Runtime：RuntimeNudge / Companion / WarmStart / HostReview / SyncDelegate / ForkChildPayload
+3. **Batch 2** Manager lifecycle：ManagerNarrative / Finality* / ManagerLifecycle / **MagicTodoSurface**
+4. **Batch 3** Tool surfaces：JsDescription 为首；补扫 **ToolRegistry / FileMutation / Distillation / Casebook / Fission / BashHoneypot**
+5. **Batch 4** Assistance（含硬编码中文）+ Strength/Recovery + **silent English fallback** 清扫
+6. **Batch 5** Role Law 厚度：**正文已恢复**。语言世界闭合仍依赖 Batch 1–4
+7. Gate E baseline → 0；清 `resources/prompts/*-system.md` legacy 包面
+
+## Done this integration
+
+- Spec：PROMPT-019 + ARCH-016 E 五层
+- Gate E / depth ratchet 接入 `scripts/check.mjs`
+- Role Law restore + semantic-depth / prompts 契约对齐（含 Fission 概念词 ≠ tool inventory）
+- shape：权威路径 `resources/provider/`；legacy prompts 标明非 SSOT
+- GrandRewrite Remaining #5 移交指针
 
 ## Completion criteria
 
 - PROMPT-019 / ARCH-016 E 五层 docs 对齐且 proof 可红
 - Gate E baseline → 0（或显式 legacy/non-production 标注资产）
-- Batch 1–5 全部闭合；`npm run check` 绿
+- Batch 1–4 迁完且 Batch 5 语言世界无泄漏；`npm run check` 绿
 - Final outcome 追加后移入 `completed/`
 
 ## Blockers
 
-无阻塞 Gate 0 立法/门禁。已知债（Batch 后续）：
+无阻塞已集成部分。已知债（Batch 后续）：
 
-- `resources/prompts/*-system.md` 仍被 packaging / 部分 proof·how 引用；生产装载已走 `resources/provider/`。迁文时须统一权威路径并清 legacy 包面。
+- `resources/prompts/*-system.md` 仍被 packaging / 部分 proof·how 引用；生产装载已走 `resources/provider/`。
+- silent English fallback（Bookkeeper / PromptResources / ToolRegistry）违反 PROMPT-019 bound fail-closed。

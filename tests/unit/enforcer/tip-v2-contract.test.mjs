@@ -30,7 +30,7 @@ import {
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const rulebookRoot = join(ROOT, 'resources/enforcer')
-const bloggerSystemPath = join(ROOT, 'resources/prompts/blogger-system.md')
+const bloggerRoleLawPath = join(ROOT, 'resources/provider/role/blogger/en.md')
 
 const packageTipNames = () =>
   readdirSync(rulebookRoot, { withFileTypes: true })
@@ -318,17 +318,21 @@ test('ENFORCER_TIP_13_work_record_contains_previous_enforcer_tip_blocks', () => 
 // ── 14. prompt anti-repeat + severe exception ───────────────────────────────
 
 test('ENFORCER_TIP_14_prompt_has_anti_repeat_and_severe_exception', () => {
-  const system = readFileSync(bloggerSystemPath, 'utf8')
-  assert.match(system, /exactly one tip|exactly once/)
-  assert.match(system, /previous_enforcer_tip/)
-  assert.match(system, /diversity|密集|prefer diversity|should not be re-selected/i)
-  assert.match(system, /Do not avoid a repeated lesson|exactly once/)
-  assert.doesNotMatch(system, /omit all scores|omit zero-valued scores/i)
+  const roleLaw = readFileSync(bloggerRoleLawPath, 'utf8')
+  assert.match(roleLaw, /One observation[\s\S]*One lesson[\s\S]*One listener/)
+  assert.match(roleLaw, /Do not avoid a repeated lesson/)
+  assert.match(roleLaw, /Repetition is legal|Diversity is not a goal/i)
+  assert.doesNotMatch(roleLaw, /omit all scores|omit zero-valued scores/i)
 
+  assert.match(prompt.normalInstruction, /exactly once/)
   assert.match(prompt.normalInstruction, /required tip|catalog field/)
   assert.match(prompt.squashInstruction, /required tip|catalog field/)
+  assert.match(prompt.squashInstruction, /exactly once/)
   assert.doesNotMatch(prompt.squashInstruction, /omit all scores/)
   assert.doesNotMatch(prompt.normalInstruction, /omit.*scores/i)
+
+  const tipMessage = prompt.previousTipMessage('primitive-obsession', 'cycle-1')
+  assert.match(tipMessage, /previous_enforcer_tip/)
 })
 
 // ── 15. multi-call canonical tip by PartOrdinal ─────────────────────────────

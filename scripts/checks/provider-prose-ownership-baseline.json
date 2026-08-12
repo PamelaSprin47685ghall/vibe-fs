@@ -9,6 +9,8 @@
   "src/Wanxiangshu/Domain/HostReviewPrompt.fs": 4,
   "src/Wanxiangshu/Domain/JsDescription.fs": 170,
   "src/Wanxiangshu/Domain/RepositoryWarmStartPrompt.fs": 5,
+  "src/Wanxiangshu/Domain/MagicTodoSurface.fs": 19,
+  "src/Wanxiangshu/Domain/ForkChildPayload.fs": 10,
   "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ForkTool.fs": 25,
   "src/Wanxiangshu/Infrastructure/OpenCode/Tools/JoinTool.fs": 10,
   "src/Wanxiangshu/Infrastructure/OpenCode/Tools/HorizonTool.fs": 9,
@@ -21,5 +23,10 @@
   "src/Wanxiangshu/Infrastructure/OpenCode/Tools/PtyTool.fs": 14,
   "src/Wanxiangshu/Infrastructure/OpenCode/Tools/JsBookkeeperTool.fs": 20,
   "src/Wanxiangshu/Infrastructure/OpenCode/Tools/FinalityTool.fs": 17,
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/FileMutationTools.fs": 11,
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/ToolRegistry.fs": 28,
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/Distillation.fs": 10,
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/BashHoneypotTool.fs": 9,
+  "src/Wanxiangshu/Infrastructure/OpenCode/Tools/FissionTool.fs": 3,
   "src/Wanxiangshu/Infrastructure/OpenCode/Codec/JoinResultRenderer.fs": 19
 }

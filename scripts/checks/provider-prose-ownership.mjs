@@ -27,6 +27,8 @@ export const PROVIDER_PROSE_SCAN_ROOTS = Object.freeze([
   'src/Wanxiangshu/Domain/HostReviewPrompt.fs',
   'src/Wanxiangshu/Domain/JsDescription.fs',
   'src/Wanxiangshu/Domain/RepositoryWarmStartPrompt.fs',
+  'src/Wanxiangshu/Domain/MagicTodoSurface.fs',
+  'src/Wanxiangshu/Domain/ForkChildPayload.fs',
   'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ForkTool.fs',
   'src/Wanxiangshu/Infrastructure/OpenCode/Tools/JoinTool.fs',
   'src/Wanxiangshu/Infrastructure/OpenCode/Tools/HorizonTool.fs',
@@ -39,6 +41,12 @@ export const PROVIDER_PROSE_SCAN_ROOTS = Object.freeze([
   'src/Wanxiangshu/Infrastructure/OpenCode/Tools/PtyTool.fs',
   'src/Wanxiangshu/Infrastructure/OpenCode/Tools/JsBookkeeperTool.fs',
   'src/Wanxiangshu/Infrastructure/OpenCode/Tools/FinalityTool.fs',
+  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/FileMutationTools.fs',
+  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/ToolRegistry.fs',
+  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/Distillation.fs',
+  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/BashHoneypotTool.fs',
+  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/CasebookTools.fs',
+  'src/Wanxiangshu/Infrastructure/OpenCode/Tools/FissionTool.fs',
   'src/Wanxiangshu/Infrastructure/OpenCode/Codec/JoinResultRenderer.fs',
 ])
 

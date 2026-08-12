@@ -71,7 +71,7 @@ for (const name of ['primitive-obsession', ruleDirs[0]]) {
   if (!fs.existsSync(mainMd)) fail(`missing rulebook file: ${mainMd}`)
 }
 
-const prompts = [
+const providerRoles = [
   'manager',
   'coder',
   'devops',
@@ -82,10 +82,19 @@ const prompts = [
   'orchestrator',
   'distiller',
   'blogger',
+  'bookkeeper',
 ]
-for (const name of prompts) {
-  const promptPath = path.join(root, 'resources/prompts', `${name}-system.md`)
-  if (!fs.existsSync(promptPath)) fail(`missing prompt: ${promptPath}`)
+for (const name of providerRoles) {
+  for (const locale of ['en.md', 'zh-CN.md']) {
+    const rolePath = path.join(root, 'resources/provider/role', name, locale)
+    if (!fs.existsSync(rolePath)) fail(`missing Role Law: ${rolePath}`)
+  }
+}
+for (const leaf of ['world/common-law', 'library/ingress', 'library/closing']) {
+  for (const locale of ['en.md', 'zh-CN.md']) {
+    const asset = path.join(root, 'resources/provider', leaf, locale)
+    if (!fs.existsSync(asset)) fail(`missing provider asset: ${asset}`)
+  }
 }
 
 const sphinxEntry = path.join(dist, 'Sphinx', 'McpServer.js')

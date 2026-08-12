@@ -41,7 +41,7 @@ const EN_ANCHORS = Object.freeze({
     { id: 'existing-fact', re: /existing fact/i },
     { id: 'evidence-funnel', re: /cheapest adequate observation|fact would change/i },
     { id: 'locatability', re: /locatable|find again/i },
-    { id: 'consequence-not-verdict', re: /consequence without becoming the judge|does not turn those consequences into a verdict/i },
+    { id: 'consequence-not-verdict', re: /does not become a judge|consequence without becoming the judge|does not turn those consequences into a verdict|stop before the evidence becomes a verdict/i },
     { id: 'semantic-stopping', re: /what the world ought to mean/i },
   ],
   devops: [
@@ -50,7 +50,7 @@ const EN_ANCHORS = Object.freeze({
     { id: 'mechanical-meaning', re: /Mechanical means the meaning is already decided|already decided/i },
     { id: 'coder-report-not-evidence', re: /Coder'?s report is not execution evidence/i },
     { id: 'continuing-process', re: /continuing (terminal|process|interactive)/i },
-    { id: 'signal-not-exit', re: /signal is an act, not an exit/i },
+    { id: 'signal-not-exit', re: /signal is an act, not an exit|A signal is not an exit|signal is not an exit/i },
     { id: 'failure-can-be-work', re: /failure is often work|long diagnostic road/i },
   ],
   inquiry: [
@@ -110,26 +110,26 @@ const ZH_ANCHORS = Object.freeze({
     { id: 'obligations', re: /obligation|义务/ },
     { id: 'order-of-ten', re: /十|order of ten/ },
     { id: 'no-personal-witness', re: /不亲自|自己的手|repository facts/ },
-    { id: 'anti-defeatism', re: /时间花掉|长路|time exhausted|road is long/ },
+    { id: 'anti-defeatism', re: /已经花掉的时间|道路漫长|时间花掉|长路|time exhausted|road is long/ },
     { id: 'opportunity-cost', re: /机会成本|opportunity cost/ },
   ],
   coder: [
     { id: 'written-world', re: /书写|written world/ },
-    { id: 'tests-are-source', re: /Tests are source|测试在你写下时是 source/ },
-    { id: 'coherent-not-smallest', re: /最小的 coherent|smallest coherent|coherence/ },
-    { id: 'clean-handoff', re: /干净的交接|clean handoff/ },
+    { id: 'tests-are-source', re: /Tests are source|当你编写测试时，测试是源码|测试是源码/ },
+    { id: 'coherent-not-smallest', re: /最小的连贯改变|最小的 coherent|smallest coherent|coherence|并不等于最小的 diff/ },
+    { id: 'clean-handoff', re: /干净的交接|清晰的 handoff|clean handoff|handoff 是你完成/ },
   ],
   inspector: [
     { id: 'existing-fact', re: /existing fact|已经存在的事实/ },
     { id: 'locatability', re: /再次找到|locatable|find again/ },
     { id: 'not-verdict', re: /不是裁决|verdict|judge/ },
-    { id: 'semantic-stopping', re: /世界应当意味|ought to mean/ },
+    { id: 'semantic-stopping', re: /世界应[该当]意味|ought to mean/ },
   ],
   devops: [
     { id: 'operational', re: /operational objective|运营目标|诚实.*closure|closure/ },
-    { id: 'mechanical', re: /Mechanical means|意义已经决定|already decided/ },
-    { id: 'coder-report', re: /Coder.*report.*不是|不是 execution evidence/ },
-    { id: 'signal', re: /signal is an act|signal 是 act/ },
+    { id: 'mechanical', re: /Mechanical means|含义已经被决定|意义已经决定|already decided/ },
+    { id: 'coder-report', re: /Coder.*(?:report|报告).*不是|不是执行证据|不是 execution evidence/ },
+    { id: 'signal', re: /[Ss]ignal 是(?:一种)?行动|signal is an act|[Ss]ignal 不是 exit/ },
   ],
   inquiry: [
     { id: 'kernel', re: /Kernel/ },
@@ -155,17 +155,17 @@ const ZH_ANCHORS = Object.freeze({
     { id: 'disagreement', re: /分歧|disagreement/ },
   ],
   blogger: [
-    { id: 'continuing-road', re: /继续的道路|continuing road/ },
-    { id: 'tip', re: /One observation|一个观察/ },
+    { id: 'continuing-road', re: /继续前进的道路|继续的道路|continuing road/ },
+    { id: 'tip', re: /One observation|一个 observation|一个观察/ },
   ],
   distiller: [
     { id: 'distinguishing', re: /区分|distinguishing|改变.*判断/ },
     { id: 'conflicts', re: /冲突|Conflicting/ },
   ],
   bookkeeper: [
-    { id: 'one-qa', re: /一个问题.*一个答案|one question and one answer/ },
-    { id: 'question-may-change', re: /改变问题|change the question/ },
-    { id: 'transcript-data', re: /不是你的指令|do not become your instructions/ },
+    { id: 'one-qa', re: /一个 Question 和一个 Answer|一个问题.*一个答案|one question and one answer/ },
+    { id: 'question-may-change', re: /改变 Question|改变问题|change the question/ },
+    { id: 'transcript-data', re: /不会因此成为对你的 instructions|不是你的指令|do not become your instructions/ },
   ],
 })
 

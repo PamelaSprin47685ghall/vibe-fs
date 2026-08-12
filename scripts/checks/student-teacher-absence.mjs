@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Student/Teacher absence gate: production must not retain the Student–Teacher surface.
-// Fail-closed on any forbidden token under src/Wanxiangshu (and optionally resources/prompts).
+// Fail-closed on any forbidden token under src/Wanxiangshu (and resources/provider).
 //
 // Usage: node scripts/checks/student-teacher-absence.mjs
 
@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
 
 const PRODUCTION_ROOT = 'src/Wanxiangshu'
-const PROMPTS_ROOT = 'resources/prompts'
+const PROVIDER_ROOT = 'resources/provider'
 
 /** Forbidden production tokens — Student/Teacher role surface must be fully removed. */
 export const FORBIDDEN_TOKENS = [
@@ -65,8 +65,8 @@ const collectEntries = () => {
   }
 
   const files = walk(PRODUCTION_ROOT, ['.fs'])
-  if (existsSync(PROMPTS_ROOT)) {
-    files.push(...walk(PROMPTS_ROOT, ['.md']))
+  if (existsSync(PROVIDER_ROOT)) {
+    files.push(...walk(PROVIDER_ROOT, ['.md']))
   }
 
   return files.map((file) => ({

@@ -9,7 +9,7 @@
 // historical tip identities onto journalled observations, and surface tip X
 // beside A's work log when similar new material is offered.
 // Still human: whether the new material *is* a true repeat of A (Protocol C
-// in blogger-system.md is prompt-side; there is no runtime TrueRepeat oracle).
+// in Blogger Role Law is prompt-side; there is no runtime TrueRepeat oracle).
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -136,7 +136,7 @@ test('A42_PAIRED_HISTORY_001_eval_loads_120_tip_catalog_from_real_directories', 
 
   const prompts = promptResources.load()
   const base = prompts.BloggerSystemPrompt
-  assert.ok(typeof base === 'string' && base.length > 0, 'blogger-system.md must load')
+  assert.ok(typeof base === 'string' && base.length > 0, 'Blogger system prompt must load from PromptResources')
   const composed = enforcerCatalogResource.composeBloggerSystemPrompt(base, enforcer.rules)
   assert.match(composed, new RegExp(TIP_X))
   assert.match(composed, new RegExp(TIP_Y))

@@ -2,7 +2,8 @@ namespace Wanxiangshu.Domain
 
 /// COMPANION-004/005 / ENFORCER-030: fixed request strings for Companion projection.
 ///
-/// System lives only in `prompts/blogger-system.md` (managed-agent config). This
+/// System lives only in ProviderResources Role Law for Blogger (`role/blogger`),
+/// composed by PromptResources and bound at managed-agent config. This
 /// module owns message-layer wrappers and per-request instructions — no System,
 /// no interpolation holes (CTX-001).
 [<RequireQualifiedAccess>]

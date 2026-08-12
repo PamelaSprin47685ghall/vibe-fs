@@ -143,7 +143,7 @@ module Identity =
 
     /// Which system prompt a provider request carried (PROMPT-008).
     ///
-    /// An id, not the text. The prompt body lives in `prompts/*.md` and is
+    /// An id, not the text. The prompt body lives under `resources/provider/` and is
     /// loaded at the Host boundary; carrying it in the profile would put a
     /// multi-kilobyte string into every diagnostic and every journal line that
     /// mentions an attempt.

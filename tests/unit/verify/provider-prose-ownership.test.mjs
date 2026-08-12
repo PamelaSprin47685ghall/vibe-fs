@@ -35,6 +35,9 @@ test('gate_e_scan_roots_cover_gate0_owners', () => {
   assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('RuntimeNudge.fs')))
   assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('HorizonTool.fs')))
   assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('JoinResultRenderer.fs')))
+  assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('MagicTodoSurface.fs')))
+  assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('ToolRegistry.fs')))
+  assert.ok(PROVIDER_PROSE_SCAN_ROOTS.some((p) => p.endsWith('FileMutationTools.fs')))
 })
 
 test('gate_e_green_fixture_is_zero_hits', () => {
