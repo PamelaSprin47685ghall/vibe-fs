@@ -299,6 +299,7 @@ module FactCodec =
                         let insert = "\"Byname\":\"\""
                         let before = json.Substring(0, close)
                         let after = json.Substring(close)
+
                         let needsComma =
                             let trimmed = before.TrimEnd()
 
@@ -353,6 +354,7 @@ module FactCodec =
                         let insert = "\"Byname\":\"\""
                         let before = json.Substring(0, close)
                         let after = json.Substring(close)
+
                         let needsComma =
                             let trimmed = before.TrimEnd()
 

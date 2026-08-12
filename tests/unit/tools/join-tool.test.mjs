@@ -24,6 +24,12 @@ const { AgentJournalModule_revision, AgentJournalModule_snapshot } =
 const { JournalRevisionModule_value } = await import('../../../dist/Kernel/Identity.js')
 const { discover } = await import('../../../dist/Journal/RecoveryClosureProjection.js')
 const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
+const { PtyPort, PtyPort__Complete_3BA7AC67: completePty } = await import('../../../dist/Process/Pty.js')
+const {
+  Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_ForkPty_Z27B191B4: forkPty,
+  Wanxiangshu_Session_HostForkRuntime__HostForkRuntime_TryBindTerminalName_Z79AB0CF6: bindTerminalName,
+} = await import('../../../dist/Session/HostForkPty.js')
+const { PtyId__get_Value: ptyIdValue } = await import('../../../dist/Process/PtyTypes.js')
 
 const context = (session = 'ses_join') =>
   new HostToolContext(session, undefined, undefined, undefined, undefined, () => () => {})
@@ -104,6 +110,51 @@ test('JOIN_ready_permit_maps_empty_join_to_failure', async () => {
 
   assert.match(wire, /nothing away to receive/i)
   assert.equal(parsed.status, undefined)
+
+  opened.dispose()
+  rmSync(directory, { recursive: true, force: true })
+})
+
+test('JOIN_terminal_name_remains_occupied_until_its_closure_is_delivered', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-jointool-pty-name-'))
+  const opened = agentJournal.create({ directory })
+  assert.equal(opened.ok, true, 'journal must open')
+
+  const ptyPort = new PtyPort(undefined, () => Promise.resolve({ tag: 0, fields: [] }), undefined)
+  const runtime = new HostForkRuntime(sessionId('ses_join'), {}, opened.journal, undefined, undefined, ptyPort)
+  const firstResult = await forkPty(runtime, 'first command', { Value: 'pty-agent' })
+  const secondResult = await forkPty(runtime, 'second command', { Value: 'pty-agent' })
+  assert.equal(firstResult.tag, 0)
+  assert.equal(secondResult.tag, 0)
+  const first = firstResult.fields[0]
+  const second = secondResult.fields[0]
+
+  assert.equal(bindTerminalName(runtime, 'Watch', first).tag, 0)
+  completePty(ptyPort, first, { tag: 0, fields: ['0'] })
+
+  const beforeJoin = bindTerminalName(runtime, 'Watch', second)
+  assert.equal(beforeJoin.tag, 1, 'closed-but-unheard terminal name remains occupied')
+  assert.match(beforeJoin.fields[0], /already in use/)
+
+  const runtimeScope = scope()
+  runtimeScope.runtimes.set('ses_join', runtime)
+  const sequence = JournalRevisionModule_value(AgentJournalModule_revision(opened.journal))
+  const closure = discover(
+    sessionId('ses_join'),
+    AgentJournalModule_snapshot(opened.journal).AgentProjections,
+    sequence,
+  )
+  attachFamilyRecovery(
+    runtimeScope,
+    async () => new FamilyRecovery(0, [new FamilyRecoveryPermit(sessionId('ses_join'), sequence, closure.Digest)]),
+  )
+
+  const { wire } = await run(runtimeScope)
+  assert.match(wire, /# Watch has ended\./)
+  assert.doesNotMatch(wire, new RegExp(ptyIdValue(first)))
+
+  const afterJoin = bindTerminalName(runtime, 'Watch', second)
+  assert.equal(afterJoin.tag, 0, 'name is reusable immediately after closure delivery')
 
   opened.dispose()
   rmSync(directory, { recursive: true, force: true })

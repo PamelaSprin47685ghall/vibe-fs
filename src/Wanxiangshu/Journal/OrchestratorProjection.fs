@@ -265,7 +265,10 @@ module OrchestratorProjection =
                           ManagerSessionId = job.ManagerSessionId
                           ManagerAgent = job.ManagerAgent
                           Byname =
-                            if System.String.IsNullOrWhiteSpace job.Byname then job.ManagerAgent else job.Byname
+                            if System.String.IsNullOrWhiteSpace job.Byname then
+                                job.ManagerAgent
+                            else
+                                job.Byname
                           WorktreeIdentity = job.WorktreeIdentity
                           WorktreePath = job.WorktreePath
                           TargetRef = job.TargetRef
