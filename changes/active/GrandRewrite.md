@@ -5717,11 +5717,12 @@ Manager **不**拥有 `inspect`（已冻结）：Manager 永远不能亲手触�
 
 ## Remaining work
 
-1. **Phase 17 i18n（续）**：Role Law 已迁至 `resources/provider/role/<name>/{en.md,zh-CN.md}` + Gate C 绿；仍缺 `world.*` / `library.*` 分层拆分、tool description / HOST-013 marker 双语、zh-CN 译文质量（非英中混杂）。
+1. **Phase 17 i18n 收口验证**：World / Role / Office Library 已拆成 semantic resources；EN/zh-CN Role Law 已完成；HOST-013 / session system prompt / tool-description language 边界已接线；Enforcer RuleBook 已完成 **120/120** TipIdentity 的 EN + zh-CN detection/remediation 四叶真正文。当前未提交 runtime 接线使 RuleBook Blogger detection 与 Main triggered remediation 按 `ProviderLanguage` 选择、且禁止 silent English fallback；**尚需先修 `RuntimeResources.fs` Fantomas，再对这 6 个未提交文件跑完整 `npm run check` + Long Stroke**。
 2. **Phase 20 物理文件名**：`BlogTool.fs`/`VerdictTool.fs`/`ListTool.fs`/`EditQaTool.fs` 已为合法 migration tombstone（零 runtime 所有权；Gate A 绿），**物理文件名**仍待重命名或 fsproj 条目删除（workspace 无 delete API 时保留 tombstone 为预期态）。
 3. **Gate B baseline ratchet**：当前 `provider-leak-gate-baseline.json` 绿；后续 leak 修复应继续只减不增。
-4. **§20 Non-Goals**：Steward 仍不得伪装已交付；Sphinx MCP 已 merge（Inquiry `sphinx_*` 权限），Inquiry **prompt 层** Sphinx 工具说明是否写入 Role Law 仍属非目标/后续 polish（不阻塞当前验证链）。
-5. **移入 `completed/`**：须满足 Completion criteria 全项；此前 premature close 已撤回，**本 session 仍不移入**。
+4. **Fission**：按用户决定仅交付 MVP surface + fail-closed 语义；完整 lane/fission engine 是大工程，**明确延期，当前 Change 不以完整 Fission 为关闭前提**。
+5. **§20 Non-Goals**：Steward 仍不得伪装已交付；Sphinx MCP 已 merge（Inquiry `sphinx_*` 权限），完整 Sphinx Kernel 后续演进不阻塞当前验证链。
+6. **移入 `completed/`**：须满足 Completion criteria 全项；此前 premature close 已撤回，**本 session 仍不移入**。
 
 ## Done since Amendment（2026-08-12）
 
@@ -5766,7 +5767,7 @@ js-tools unit                                      → 66/66
 
 ## Blockers
 
-**（无 — 2026-08-12 下午）** 此前 `mgr-labor.2` e2e watchdog 与 integration 失败已在本 session 闭环。Long Stroke 含 join-wake、provider-fallback、REVISE→FinalityRejected→Blessed→LifeCompleted、gitConflictProof→Published。
+**收工态（2026-08-12 晚）**：没有已知 runtime 语义 blocker；当前唯一已观测静态红点为 `npm run format:check` 报 `src/Wanxiangshu/Infrastructure/Resources/RuntimeResources.fs needs formatting`。另外，最新 RuleBook locale runtime 接线的 6 个未提交文件尚未跑完整 `npm run check` / Long Stroke，因此当前工作树**不得标记为全栈绿**。明日第一步：Fantomas 等价收口 → targeted RuleBook/i18n tests → `npm run check` → Long Stroke。
 
 ## Amendment — 2026-08-12（下午 — 全栈验证后状态写入）
 
@@ -5774,11 +5775,23 @@ js-tools unit                                      → 66/66
 - **Change**：更新 `Remaining work` / `Done since Amendment` / `Verification snapshot`；清空 Blockers；**不**移入 `completed/`（Phase 17 i18n、Phase 20 物理文件名、§20 Non-Goals 仍开放）。
 - **Reason**：GrandRewrite 功能与验证链已绿，但 Completion criteria 仍含 i18n 续作与 legacy 文件名清理；避免 premature close。
 
-## Amendment — 2026-08-12（session 收工）
+## Amendment — 2026-08-12（RuleBook / i18n 收工交接）
+
+- **Recorded by**：Agent（用户指令「读取/写入当前进度，今日收工」）
+- **HEAD 状态**：`a07348c0 feat: Enhance bilingual support for Enforcer Rulebook and tips`。RuleBook 资源本体已达到 **120/120 TipIdentity × EN/zh-CN × detection/remediation**；不存在缺叶。
+- **本轮内容质量方向**：RuleBook 保持 free-form text，不再有 heading/关键词/rubric 文本 gate；规则正文按 root cause / near-miss / false fix / real remediation 的标准直接写，Kolmogorov 行数仅 advisory，不作 hard gate。
+- **已验证**：RuleBook catalog/history 产品契约 **27/27**；i18n targeted（resource loader + PromptResources + Main tip delivery）**21/21**；`npm run build` 在一次并行 dist clean/write race 后重跑成功。
+- **未提交文件（6）**：`ProviderSystemTransform.fs`、`RuntimeResources.fs`、`tests/integration/resources/enforcer-rulebook.test.mjs`、`tests/unit/enforcer/tip-guidance-delivery.test.mjs`、`tests/unit/support/domain/enforcer.mjs`、`tests/unit/support/domain/host.mjs`。
+- **当前红点**：`npm run format:check` 仅报 `RuntimeResources.fs needs formatting`。最新 6 文件尚未重新跑全量 `npm run check` 与 Long Stroke；此前的全栈绿 snapshot 只能证明较早工作树，不能证明当前未提交态。
+- **Fission 决定**：用户明确要求先 MVP；现有 `fission` surface + fail-closed 行为视为本期范围，完整 fission lane engine 延期。
+- **明日恢复点**：只从 `RuntimeResources.fs` Fantomas 开始，之后 targeted i18n tests → `npm run check` → Long Stroke → Phase 20 / Completion criteria 审计；不要重复已完成的 120 条 RuleBook 文案工作。
+- **关闭状态**：保持 `changes/active/GrandRewrite.md`，**不移入 `completed/`**。
+
+## Amendment — 2026-08-12（较早 session 收工，已被上方交接取代）
 
 - **Recorded by**：Agent（用户指令「写入当前状态，并下班了」）
-- **Change**：Verification snapshot + Blockers 落盘；**不**移入 `completed/`（e2e 与 integration prompts 未绿）。
-- **Reason**：收工交接；避免 premature close 重演。
+- **Change**：Verification snapshot + Blockers 落盘；**不**移入 `completed/`（当时 e2e 与 integration prompts 未绿）。
+- **Reason**：历史收工交接；当前恢复状态以上方「RuleBook / i18n 收工交接」为准。
 
 ## Amendment — 2026-08-12
 

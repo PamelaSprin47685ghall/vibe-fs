@@ -10,6 +10,7 @@ import {
   agentJournal,
   caseOf,
   runtimeResources,
+  providerLanguage,
   sessionId,
   stream,
   bloggerRequestId,
@@ -33,6 +34,10 @@ const {
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const MAIN_MD = readFileSync(
   join(ROOT, 'resources/enforcer/primitive-obsession/main.md'),
+  'utf8',
+).trim()
+const MAIN_ZH_CN_MD = readFileSync(
+  join(ROOT, 'resources/enforcer/primitive-obsession/main.zh-CN.md'),
   'utf8',
 ).trim()
 
@@ -186,6 +191,26 @@ test('ENFORCER_TIP_DELIVERY_005_missing_tip_returns_none', () => {
     assert.equal(resolveTipGuidance(journal, main), undefined)
     assert.equal(latestTipGuidance(journal, main), undefined)
   })
+})
+
+test('ENFORCER_PROMPT_017_full_tip_guidance_uses_owner_session_zh_cn_rulebook', () => {
+  providerLanguage.clearAllForTests()
+  try {
+    const bound = providerLanguage.bindOnce(main, providerLanguage.simplifiedChinese)
+    assert.equal(bound.ok, true)
+    withJournal((journal) => {
+      seedOwnerWithTip(journal, { runSuffix: '7' })
+      const guidance = resolveTipGuidance(journal, main)
+      assert.equal(presentationOf(guidance), 'Full')
+      const text = textOf(guidance)
+      assert.match(text, /# Enforcer Tip（规则提示）/)
+      assert.ok(text.includes(MAIN_ZH_CN_MD), 'Full zh-CN guidance must include main.zh-CN.md body')
+      assert.match(text, /[\u3400-\u9fff]/)
+      assert.ok(!text.includes(MAIN_MD), 'zh-CN guidance must not silently fall back to English main.md')
+    })
+  } finally {
+    providerLanguage.clearAllForTests()
+  }
 })
 
 test('ENFORCER_TIP_DELIVERY_006_context_reanchor_clears_full_so_next_is_full_again', () => {

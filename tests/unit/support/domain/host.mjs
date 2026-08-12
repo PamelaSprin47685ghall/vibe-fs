@@ -811,13 +811,21 @@ export const fallbackController = (() => {
 
 /** Process-local holder: same contract as SpikePlugin init (RuntimeResources.install load). */
 export const runtimeResources = (() => {
-  const api = bind(RuntimeResourcesModule, 'RuntimeResources', ['load', 'install', 'current'])
+  const api = bind(RuntimeResourcesModule, 'RuntimeResources', [
+    'load',
+    'loadFor',
+    'install',
+    'current',
+    'enforcerRulesFor',
+  ])
   return {
     load: () => api.load(),
+    loadFor: (lang) => api.loadFor(lang),
     install: (resources) => api.install(resources),
     /** Plugin-init equivalent for unit tests that drive EnforcerHost without SpikePlugin. */
     installFromPackage: () => api.install(api.load()),
     current: () => api.current(),
+    enforcerRulesFor: (lang) => listItems(api.enforcerRulesFor(lang)),
   }
 })()
 

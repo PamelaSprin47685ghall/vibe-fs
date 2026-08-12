@@ -277,12 +277,17 @@ export const continuationKind = {
 export const enforcerCatalogResource = (() => {
   const api = bind(EnforcerCatalogResourceModule, 'EnforcerCatalogResource', [
     'load',
+    'loadFor',
     'composeBloggerSystemPrompt',
+    'composeBloggerSystemPromptFor',
   ])
   return {
     load: () => listItems(api.load()),
+    loadFor: (lang) => listItems(api.loadFor(lang)),
     composeBloggerSystemPrompt: (basePrompt, rules) =>
       api.composeBloggerSystemPrompt(basePrompt, toList(rules)),
+    composeBloggerSystemPromptFor: (lang, basePrompt, rules) =>
+      api.composeBloggerSystemPromptFor(lang, basePrompt, toList(rules)),
   }
 })()
 

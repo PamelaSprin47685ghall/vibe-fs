@@ -17,6 +17,8 @@ import {
   packageResources,
   enforcerCatalog,
   promptResources,
+  providerLanguage,
+  runtimeResources,
 } from '../../unit/support/domain.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -66,6 +68,53 @@ test('ENFORCER_resource_folder_rulebook_loads_with_contiguous_ordinals', () => {
     rules.map((r) => r.Name),
     dirs,
   )
+})
+
+test('ENFORCER_PROMPT_017_rulebook_loads_authored_zh_cn_without_fallback', () => {
+  const en = enforcerCatalogResource.loadFor(providerLanguage.english)
+  const zh = enforcerCatalogResource.loadFor(providerLanguage.simplifiedChinese)
+  assert.equal(en.length, 120)
+  assert.equal(zh.length, 120)
+  assert.deepEqual(zh.map((rule) => rule.Name), en.map((rule) => rule.Name))
+
+  for (let index = 0; index < zh.length; index += 1) {
+    const zhRule = zh[index]
+    const enRule = en[index]
+    assert.notEqual(zhRule.EnforcerText, enRule.EnforcerText, `${zhRule.Name}: detection locale`)
+    assert.notEqual(zhRule.MainText, enRule.MainText, `${zhRule.Name}: remediation locale`)
+    assert.match(zhRule.EnforcerText, /[\u3400-\u9fff]/, `${zhRule.Name}: detection Chinese`)
+    assert.match(zhRule.MainText, /[\u3400-\u9fff]/, `${zhRule.Name}: remediation Chinese`)
+    assert.equal(
+      zhRule.EnforcerText.trim(),
+      fs.readFileSync(path.join(enforcerRoot, zhRule.Name, 'enforcer.zh-CN.md'), 'utf8').trim(),
+    )
+    assert.equal(
+      zhRule.MainText.trim(),
+      fs.readFileSync(path.join(enforcerRoot, zhRule.Name, 'main.zh-CN.md'), 'utf8').trim(),
+    )
+  }
+
+  const zhBase = promptResources.loadForLanguage(providerLanguage.simplifiedChinese).BloggerSystemPrompt
+  const composed = enforcerCatalogResource.composeBloggerSystemPromptFor(
+    providerLanguage.simplifiedChinese,
+    zhBase,
+    zh,
+  )
+  assert.match(composed, /# Enforcer RuleBook（规则书）/)
+  assert.match(composed, /[\u3400-\u9fff]/)
+  assert.ok(composed.includes(zh[0].EnforcerText.trim()))
+})
+
+test('ENFORCER_PROMPT_017_runtime_preloads_both_rulebook_locales', () => {
+  const resources = runtimeResources.loadFor(providerLanguage.simplifiedChinese)
+  runtimeResources.install(resources)
+  const en = runtimeResources.enforcerRulesFor(providerLanguage.english)
+  const zh = runtimeResources.enforcerRulesFor(providerLanguage.simplifiedChinese)
+  assert.equal(en.length, 120)
+  assert.equal(zh.length, 120)
+  assert.doesNotMatch(en[0].EnforcerText, /中文版/)
+  assert.match(zh[0].EnforcerText, /[\u3400-\u9fff]/)
+  assert.match(resources.Prompts.BloggerSystemPrompt, /# Enforcer RuleBook（规则书）/)
 })
 
 test('ENFORCER_resource_catalog_json_is_not_runtime_ssot', () => {
