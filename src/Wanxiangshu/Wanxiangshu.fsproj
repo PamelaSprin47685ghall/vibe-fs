@@ -433,6 +433,7 @@
     <Compile Include="Infrastructure/OpenCode/Host/ManagerConfig.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/ChatParamsHook.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginHostInterop.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/ProviderSystemTransform.fs"/>
     <Compile Include="Infrastructure/OpenCode/Plugin/PluginBoot.fs"/>
     <Compile Include="Infrastructure/OpenCode/Plugin/PluginHostWiring.fs"/>
     <Compile Include="Infrastructure/OpenCode/Plugin/PluginSessionWiring.fs"/>

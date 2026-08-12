@@ -265,14 +265,21 @@ module PluginTransforms =
                 if not skipGuideline then
                     let messages = unbox<obj array> outObj?messages |> Array.toList
 
+                    let guideline =
+                        match projectionSessionIdOpt with
+                        | Some sessionId ->
+                            ProviderLanguageBinding.ensureRoot (SessionId.create sessionId)
+                            |> ProjectionConstants.pairProgrammingGuidelineTextFor
+                        | None -> ProjectionConstants.PairProgrammingGuidelineText
+
                     let markerText =
                         match journal, projectionSessionIdOpt with
                         | Some durable, Some sessionId ->
                             // Main session id: resolveTipGuidance maps owner via association.
                             match EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId) with
-                            | Some guidance -> guidance + "\n\n" + ProjectionConstants.PairProgrammingGuidelineText
-                            | None -> ProjectionConstants.PairProgrammingGuidelineText
-                        | _ -> ProjectionConstants.PairProgrammingGuidelineText
+                            | Some guidance -> guidance + "\n\n" + guideline
+                            | None -> guideline
+                        | _ -> guideline
 
                     match
                         PairProgrammingThoughtTransform.tryInject journal projectionSessionIdOpt markerText messages

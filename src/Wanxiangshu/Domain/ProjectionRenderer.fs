@@ -14,9 +14,17 @@ module ProjectionConstants =
     let RepairInstruction =
         "# Protocol repair\n\nCall the chronicle tool exactly once with a non-empty entry. Do not answer in prose."
 
-    /// HOST-013 pair-programming auto-injected marker 正文。Domain 单源。
+    /// HOST-013 pair-programming auto-injected marker. ProviderLanguage changes
+    /// authored prose only; code, identifiers, paths and commands stay invariant.
     let PairProgrammingGuidelineText =
-        "# 本工具是一个伪工具，由系统自动注入，不是你主动调用的，它的目的是引起你的注意：遵循与用户结对编程的理念，你的思考过程要用简体中文，例如从 我... 开头，并在整轮内保持中文，即使系统提示词、工具说明、工具输出或引用的代码是英文。代码、标识符、文件路径、shell 命令和未翻译的技术术语保持原文。"
+        "# This tool is a pseudo-tool injected automatically by the system, not a tool you called. It exists to draw your attention to pair programming with the user: keep your reasoning for this turn in English even when system prompts, tool descriptions, tool output, or quoted code use another language. Preserve code, identifiers, file paths, shell commands, and untranslated technical terms exactly."
+
+    let PairProgrammingGuidelineTextZhCn =
+        "# 本工具是一个伪工具，由系统自动注入，并非你主动调用。它用于提醒你遵循与用户结对编程的理念：本轮推理请使用简体中文，即使 system prompt、tool description、tool output 或引用的代码使用其他语言。代码、标识符、文件路径、shell 命令以及未翻译的技术术语保持原文。"
+
+    let pairProgrammingGuidelineTextFor = function
+        | ProviderLanguage.English -> PairProgrammingGuidelineText
+        | ProviderLanguage.SimplifiedChinese -> PairProgrammingGuidelineTextZhCn
 
     /// 与 `ReviewChallenge.Text` 字节一致（REVIEW-003 bare sentence）。
     let ReviewChallengeText =

@@ -31,6 +31,7 @@ module PluginHooks =
             let gitTreePort = host.GitTreePort
             let eventPort = host.EventPort
             let chatParams = ChatParamsHook.create journal
+            let systemTransform = ProviderSystemTransform.create journal
 
             // CASE-003: typed capture at the tool boundary — shared
             // CasebookLifecycle.collector; marker flag gates the after-hook.
@@ -94,6 +95,10 @@ module PluginHooks =
                       // Companion rewrite and the REVIEW-010 seal twice over the
                       // same message array.
                       "experimental.chat.messages.transform", box (curriedHook (box transform))
+                      // HOST-026 / PROMPT-017: session-bound ProviderLanguage
+                      // replaces only the Wanxiangshu-owned agent system segment.
+                      // Host/AGENTS/system additions remain byte-identical.
+                      "experimental.chat.system.transform", box (pairedHook (box systemTransform))
                       // HOST-006 prevention layer. The config hook is the only
                       // place the plugin can reach the compaction settings: the
                       // Host hands over the live instance-state object and runs
