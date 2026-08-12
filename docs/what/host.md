@@ -129,7 +129,7 @@ real history → synthetic call → synthetic result
 它**是**会影响 prompt bytes、Prefix Cache、ReviewSeal 的合成历史；**不是**私有思维、容量估算或通用恢复信号。
 
 **范围排除**：`AttachmentKind.Companion`（Blogger）的 transform **禁止**注入、恢复或追加任何
-auto-injected pair。Blogger 只消费 `blogger-system.md` + 工作日志 TOML；结对编程思考约束不得进入其
+auto-injected pair。Blogger 只消费 Blogger Role Law（PromptResources 组合）+ 工作日志 TOML；结对编程思考约束不得进入其
 provider-facing 历史。判断依据是 durable SessionAssociation（`Ownership = Attached(_, Companion)` /
 `isCompanion`），禁止按 agent 名字猜测。`SessionExecutionClass.Work`（含 Attached SyncInspector/SyncCoder）
 仍进入 HOST-013；InternalLeaf Bookkeeper 同 Companion 排除。

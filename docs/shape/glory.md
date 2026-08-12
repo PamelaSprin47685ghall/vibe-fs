@@ -18,7 +18,7 @@
 | 自动评审 | `Infrastructure/OpenCode/Orchestration/HostReviewProgram.fs` | 从 `OrchestratorHostReview` 提炼的通用 reverify（GLORY-042）；process-review 与 Finality 共用 LWR 物化，不另造 renderer（TODO-008） |
 | 拒绝记录就绪 | `Infrastructure/OpenCode/Tools/FinalityController.fs` | 关闭 Reviewer cohort 后只等待 durable journal evidence；不写 `BlogEntryCommitted`，只在 GLORY-072 成立时写 `FinalityRejected` |
 | 反馈渲染 | `Domain/FinalityPrompt.fs` | `SyntheticToml` 唯一渲染路径（GLORY-052，SURFACE-004）；wire 标题同 LWR 四段 |
-| 冻结文本 | 各 Domain owner + `resources/prompts/*.md` | 每个固定文本恰好一个 owner（SURFACE-004）；MagicTodoManagerGuideline / BlindPlan T1 见 TODO-013/015 |
+| 冻结文本 | 各 Domain owner + `resources/provider/**` | 每个固定文本恰好一个 owner（SURFACE-004）；MagicTodoManagerGuideline / BlindPlan T1 见 TODO-013/015 |
 
 ## 数据流（成功路径）
 

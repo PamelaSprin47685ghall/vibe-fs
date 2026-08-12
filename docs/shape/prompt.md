@@ -103,7 +103,7 @@ Host 在当前 provider assistant id 产生后才暴露 `ProviderRunIdentity`。
 | `SessionPersona` 绑定写 | session 创建路径（一次） | 创建后不可重绑；Fallback / Strength / BlindPlan T1 / review 不得改写（PROMPT-014） |
 | System prompt 身份字节（同一 Life） | Prompt composition 装配（PROMPT-014/015） | byte-identical；不得因 T1 / Peer Fallback / Strength / compaction / reanchor 替换 |
 | Composition 层权威 | PROMPT-015 五层：World / Role / Library / Runtime / Mission | 层可互告知，不得互冒充；冲突按语义所有权裁决，**不**设「更靠近 system 者胜」全序 |
-| Common Law / Role Law 资源 | `resources/provider/<semantic>/{en,zh-CN}.md`（SURFACE-004；PROMPT-017/019） | 文件名只存 localized representation；semantic identity 稳定；`resources/prompts/*-system.md` 为 legacy 包面，非 prose SSOT |
+| Common Law / Role Law 资源 | `resources/provider/<semantic>/{en,zh-CN}.md`（SURFACE-004；PROMPT-017/019） | 文件名只存 localized representation；semantic identity 稳定；旧 `resources/prompts/*-system.md` 已删除 |
 | Office Library | PROMPT-016 + canonical volumes | 知识≠权威；不扩 Role 权；fast/deep 同书；他处已有 SSOT 则组合引用，不造第二真源 |
 | Tools surface | 当前 generated tool schema（Attempt profile） | Tools **不是** Role Prompt 章节；capability 变化不改人格 |
 | Lifecycle orient 文本 | Activation / Reawakening / Continuation / Handoff / Fission / Departure 各 owner | 只 orient；generic Activation ≠ Manager BlindPlan；不得触发 system prompt 替换（TODO-015） |
@@ -116,7 +116,7 @@ Host 在当前 provider assistant id 产生后才暴露 `ProviderRunIdentity`。
 | Magic Todo Manager-only fragment | TODO-013/015（`MagicTodoManagerGuideline` + Pre-T1/T1/Living Mission） | 禁止并入全局 `PairProgrammingGuidelineText`（HOST-013） |
 | Pair Hint semantic payload | HOST-013 `ProjectionConstants.PairProgrammingGuidelineText` | Cursor/ordinary 只换 wire renderer；User/System 实验 role 不成为 PromptIngress authority |
 | Assistance continuation | PROMPT-018 `NeedHelpEscalation` / `NeedHelpAdvice` | 只延长现有 LogicalRun；显式 EffectiveAgent binding，不写 FallbackCursor |
-| Companion / Blogger system | COMPANION-004（`blogger-system.md`） | 不经本五层 composition 冒充；禁止动态 token/预算注入 |
+| Companion / Blogger system | COMPANION-004（`resources/provider/role/blogger` via PromptResources） | 不经本五层 composition 冒充；禁止动态 token/预算注入 |
 | Provider prose ownership ratchet | ARCH-016 Gate E | 已知 provider-surface owner 禁新增 NL literal；baseline 只减不增 |
 
 禁止平行 owner：

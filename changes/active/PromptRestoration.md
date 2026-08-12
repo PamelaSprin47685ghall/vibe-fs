@@ -100,7 +100,7 @@ Bound session：missing localization → fail closed；禁止 silent English fal
 4. **Batch 3** Tool surfaces：JsDescription 为首；补扫 **ToolRegistry / FileMutation / Distillation / Casebook / Fission / BashHoneypot**
 5. **Batch 4** Assistance（含硬编码中文）+ Strength/Recovery + **silent English fallback** 清扫
 6. **Batch 5** Role Law 厚度：**正文已恢复**。语言世界闭合仍依赖 Batch 1–4
-7. Gate E baseline → 0；清 `resources/prompts/*-system.md` legacy 包面
+7. ~~Gate E baseline → 0；清 `resources/prompts/*-system.md` legacy 包面~~：**包面已清** — `resources/prompts/` 已删除；packaging / build / tip-v2 / docs 已改指 `resources/provider/`。Gate E baseline → 0 仍属后续 Batch 债。
 
 ## Done this integration
 
@@ -109,6 +109,7 @@ Bound session：missing localization → fail closed；禁止 silent English fal
 - Role Law restore + semantic-depth / prompts 契约对齐（含 Fission 概念词 ≠ tool inventory）
 - shape：权威路径 `resources/provider/`；legacy prompts 标明非 SSOT
 - GrandRewrite Remaining #5 移交指针
+- **Wave Batch1/2/4（进行中）**：`ProviderProse.fs` 已落地（`{{name}}` + bound fail-closed）；三专责并行迁 Runtime / Manager·Finality·MagicTodo / Assistance+PromptResources
 
 ## Completion criteria
 
@@ -121,5 +122,5 @@ Bound session：missing localization → fail closed；禁止 silent English fal
 
 无阻塞已集成部分。已知债（Batch 后续）：
 
-- `resources/prompts/*-system.md` 仍被 packaging / 部分 proof·how 引用；生产装载已走 `resources/provider/`。
+- Gate E baseline 仍有 grandfathered hits；Batch 1–4 迁完后应收至 0。
 - silent English fallback（Bookkeeper / PromptResources / ToolRegistry）违反 PROMPT-019 bound fail-closed。

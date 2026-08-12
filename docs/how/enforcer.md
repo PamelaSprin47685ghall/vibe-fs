@@ -25,7 +25,7 @@ lexical CatalogOrdinal / LexicalOrder 只描述装载与 enum 顺序（`1..N`）
 Blogger effective system：
 
 ```text
-resources/prompts/blogger-system.md
+resources/provider/role/blogger/{en,zh-CN}.md   # via PromptResources composition
   + 全部 tip 的 enforcer.md 全文（按 lexical 顺序拼入）
 ```
 

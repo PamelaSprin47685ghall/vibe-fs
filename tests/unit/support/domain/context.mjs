@@ -498,7 +498,402 @@ export const companionPrompt = {
  */
 export const companionIdentity = {
   sealRoot: (sha256, { session, epoch, cutoff, prefixDigest, frozenDigest }) =>
-[…396ln elided…]
+    CompanionIdentityModule.sealRoot(
+      sha256,
+      sessionId(session),
+      prefixEpochId(epoch),
+      cutoff,
+      prefixDigest,
+      blobDigest(frozenDigest),
+    ),
+
+  companionMemoryMessageId: (sha256, seal) => CompanionIdentityModule.companionMemoryMessageId(sha256, seal),
+
+  frameMessageId: (sha256, { blogger, epoch, ordinal, digest }) =>
+    CompanionIdentityModule.frameMessageId(sha256, sessionId(blogger), frameEpochId(epoch), ordinal, blobDigest(digest)),
+
+  instructionMessageId: (sha256, { blogger, epoch, kind }) =>
+    CompanionIdentityModule.instructionMessageId(sha256, sessionId(blogger), frameEpochId(epoch), kind),
+
+  /** ENFORCER-071: stable id for one previous_enforcer_tip message. */
+  previousTipMessageId: (sha256, { blogger, cycleId }) =>
+    CompanionIdentityModule.previousTipMessageId(sha256, sessionId(blogger), cycleId),
+}
+
+/** COMPANION-005 / CTX-012: the Companion's provider-visible message list. */
+export const companionProjection = (() => {
+  const m = bind(CompanionBuilderModule, 'CompanionProjectionBuilder', ['build', 'isFirstTurnShape'])
+  const buildKind = unionCase(CompanionBuilderModule.CompanionRequestKind, 'CompanionRequestKind')
+
+  return {
+    normal: buildKind('Normal', []),
+    squash: (frameCount) => buildKind('Squash', [frameCount]),
+
+    /**
+     * `frames` is `[{ digest, body }]`; `delta` is `{ messageId, toml }` or omitted.
+     * `previousTips` is `[{ field, cycleId }]` (oldest → newest); default empty.
+     *
+     * The tuple lists are converted here: an F# tuple is a JS array, and a `list` of
+     * them still needs `toList` or it folds as empty.
+     */
+    build: (sha256, { blogger, epoch, kind, frames, delta, previousTips = [] }) => {
+      const plan = m.build(
+        sha256,
+        sessionId(blogger),
+        frameEpochId(epoch),
+        kind,
+        toList(frames.map((f) => [blobDigest(f.digest), f.body])),
+        delta === undefined ? undefined : [delta.messageId, delta.toml],
+        toList(previousTips.map((t) => [t.field, t.cycleId])),
+      )
+
+      const messages = listItems(plan.Messages).map((msg) => ({
+        id: msg.MessageId,
+        role: msg.Role,
+        text: msg.Text,
+        physical: msg.IsPhysical,
+      }))
+
+      return {
+        // Plan no longer carries System (ENFORCER-030 / COMPANION-004).
+        system: plan.System,
+        messages,
+        roles: messages.map((msg) => msg.role),
+        texts: messages.map((msg) => msg.text),
+        physicalFlags: messages.map((msg) => msg.physical),
+        isFirstTurnShape: m.isFirstTurnShape(plan),
+      }
+    },
+  }
+})()
+
+/**
+ * FALLBACK-012 / CTX-006 / CTX-007: the recovery slot's control flow.
+ *
+ * `arming` is exposed only through the three named constructors. There is
+ * deliberately no `armingOf(offset)` here, mirroring the production module: the
+ * question "is offset N armed" has no answer, and offering one would let a test
+ * assert the parked-cursor bug as correct behaviour.
+ */
+export const recoverySlot = (() => {
+  const m = bind(RecoverySlotModule, 'RecoverySlot', [
+    'beginSequence',
+    'afterFailureAdvance',
+    'afterRestart',
+    'isArmed',
+    'mayRecover',
+    'onSquashOutcome',
+    'onMainOutcome',
+    'advancesCursor',
+    'nextArming',
+  ])
+  const buildOutcome = unionCase(RecoverySlotModule.AttemptOutcome, 'AttemptOutcome')
+
+  /**
+   * Wrap a decision so its name is readable AND the value stays usable.
+   *
+   * The value is carried through rather than rebuilt from the name: reconstructing a
+   * `SlotDecision` from a string would mean re-supplying `CommitMain`'s payload here,
+   * so the facade would be guessing what production returned instead of reporting it.
+   *
+   * `nextArming` is the union VALUE and `nextArmingName` is the string. Both exist
+   * because they serve opposite needs: a trace threads the value into the next
+   * `mayRecover` call, while an assertion reads the name. Exposing only the name
+   * makes the accessor lossy — the caller cannot feed it back — and exposing only the
+   * value makes every assertion write `caseOf` itself.
+   */
+  const decisionOf = (decision) => ({
+    name: caseOf(decision),
+    clearsFailureCount: caseOf(decision) === 'CommitMain' ? payloadOf(decision) : undefined,
+    advancesCursor: m.advancesCursor(decision),
+    nextArming: m.nextArming(decision),
+    nextArmingName: caseOf(m.nextArming(decision)),
+  })
+
+  return {
+    beginSequence: m.beginSequence,
+    afterFailureAdvance: m.afterFailureAdvance,
+    afterRestart: m.afterRestart,
+
+    armingName: (arming) => caseOf(arming),
+    isArmed: (arming) => m.isArmed(arming),
+
+    /** CTX-006: arming AND an odd (primed) offset AND material to work with. */
+    mayRecover: (arming, offset, hasMaterial) => m.mayRecover(arming, offsetOf(offset), hasMaterial),
+
+    /** `{ name, clearsFailureCount, advancesCursor, nextArming }`. */
+    onSquash: (outcome) => decisionOf(m.onSquashOutcome(buildOutcome(outcome, []))),
+
+    onMain: ({ kind, aabbConsumed = false, outcome }) =>
+      decisionOf(m.onMainOutcome(kind, aabbConsumed, buildOutcome(outcome, []))),
+  }
+})()
+
+/**
+ * HOST-008 / COMPANION-002: the Work ↔ Companion relation.
+ *
+ * This is what replaced Companion eligibility. There is no `hasCompanion(role)` here
+ * and there must never be one: the question is "is this session itself a Companion",
+ * not "does this role deserve one".
+ */
+export const sessionAssociation = (() => {
+  const m = bind(AssociationProj, 'SessionAssociationProjection', [
+    'empty',
+    'tryFind',
+    'isCompanion',
+    'isSatellite',
+    'tryMainSessionOf',
+    'tryBloggerOf',
+    'link',
+    'unlink',
+    'describe',
+  ])
+
+  return {
+    empty: m.empty,
+
+    isCompanion: (id, current) => m.isCompanion(sessionId(id), current),
+    isSatellite: (id, current) => m.isSatellite(sessionId(id), current),
+
+    mainSessionOf: (id, current) => {
+      const main = unwrapOption(m.tryMainSessionOf(sessionId(id), current))
+      return isNone(main) ? undefined : idValue.session(main)
+    },
+
+    bloggerOf: (id, current) => {
+      const blogger = unwrapOption(m.tryBloggerOf(sessionId(id), current))
+      return isNone(blogger) ? undefined : idValue.session(blogger)
+    },
+
+    /** `{ kind, blogger, parent }`, or undefined when there is no record. */
+    entry: (id, current) => {
+      const found = unwrapOption(m.tryFind(sessionId(id), current))
+      if (isNone(found)) return undefined
+
+      const kind = caseOf(found.Kind)
+
+      return {
+        kind,
+        mainSessionId: kind === 'SatelliteSession' ? idValue.session(found.Kind.fields[0]) : undefined,
+        satelliteKind: kind === 'SatelliteSession' ? caseOf(found.Kind.fields[1]) : undefined,
+        blogger: isNone(found.BloggerSessionId) ? undefined : idValue.session(found.BloggerSessionId),
+        parent: isNone(found.ParentSessionId) ? undefined : idValue.session(found.ParentSessionId),
+      }
+    },
+
+    /** All session ids in the map, sorted, so a test can assert the whole shape. */
+    ids: (current) => mapEntries(current).map(([id]) => idValue.session(id)).sort(),
+
+    link: ({ main, blogger, parent }, current) => {
+      const result = resultOf(
+        m.link(sessionId(main), sessionId(blogger), parent === undefined ? undefined : sessionId(parent), current),
+      )
+      return result.ok ? result : { ok: false, error: caseOf(result.error), message: m.describe(result.error) }
+    },
+
+    unlink: (main, current) => m.unlink(sessionId(main), current),
+  }
+})()
+
+/**
+ * HOST-006: the prevention layer's required settings and the containment decision.
+ *
+ * The verdicts carry payloads, so `verdictOf` reports the case name alongside the
+ * rendered message — a test asserting only the name would pass while the operator
+ * message said nothing useful, and asserting only the message would break on wording.
+ */
+export const hostCompaction = (() => {
+  const m = bind(CompactionPolicyModule, 'HostCompactionPolicy', [
+    'requiredSettings',
+    'autoContinueEnabled',
+    'isContainableCompaction',
+    'nextReanchor',
+    'judgeFirstTurn',
+    'describeVerdict',
+  ])
+
+  const settings = listItems(m.requiredSettings).map((setting) => ({
+    path: listItems(setting.Path).join('.'),
+    required: setting.Required,
+    clause: setting.Clause,
+    reason: setting.Reason,
+    value: setting,
+  }))
+
+  const verdictOf = (verdict) => ({
+    name: caseOf(verdict),
+    message: m.describeVerdict(verdict),
+  })
+
+  return {
+    settings,
+    settingPaths: settings.map((s) => s.path),
+    autoContinueEnabled: m.autoContinueEnabled,
+
+    isContainableCompaction: (isCompaction) => m.isContainableCompaction(isCompaction),
+
+    /**
+     * `undefined` when every observed compaction has already been reanchored.
+     *
+     * `alreadyReanchored` is a list of id strings here and becomes the predicate the
+     * production signature takes. Production asks a keyed question because the caller
+     * holds an indexed projection (PERSIST-008); a test has a handful of ids, so the
+     * conversion belongs at this boundary rather than in every test.
+     */
+    nextReanchor: (observed, alreadyReanchored = []) => {
+      const handled = new Set(alreadyReanchored)
+      const next = unwrapOption(
+        m.nextReanchor(toList(observed.map(providerRun)), (run) => handled.has(idValue.providerRun(run))),
+      )
+      return isNone(next) ? undefined : idValue.providerRun(next)
+    },
+
+    judgeFirstTurn: ({ unavailable, session, pseudoRuns }) =>
+      verdictOf(
+        m.judgeFirstTurn(
+          unavailable === undefined ? undefined : settings.find((s) => s.path === unavailable).value,
+          sessionId(session),
+          pseudoRuns,
+        ),
+      ),
+  }
+})()
+
+/**
+ * CTX-011: candidate selection for one recovery slot.
+ *
+ * `recomputeDigest` is supplied by the test as a plain function, which is the point of
+ * the signature: the cutoff proof compares the Companion's recorded digest against a
+ * fresh hash of X's CURRENT prefix, so a test can make them agree or disagree without
+ * building a transcript.
+ */
+export const probeSelection = (() => {
+  const m = bind(ProbeSelectionModule, 'PrefixProbeSelection', ['select', 'describeNoCandidate'])
+
+  return {
+    /**
+     * `{ ok: true, probe }` or `{ ok: false, error, message }`.
+     *
+     * The reason NAME is what a test asserts; `message` is carried so a diagnostic
+     * regression is visible too — a refusal whose text says nothing useful is a
+     * refusal an operator cannot act on.
+     */
+    select: ({
+      session = 'ses_x',
+      committedEpoch,
+      committedSnapshot,
+      coverableCutoff,
+      coveredDigest,
+      requestStartCutoff,
+      frozenRef = 'blob-frozen',
+      frozenDigest = 'frozen-digest',
+      recomputeDigest,
+      sha256 = (input) => `«${input}»`,
+    }) => {
+      const result = resultOf(
+        m.select(
+          sha256,
+          sessionId(session),
+          prefixEpochId(committedEpoch),
+          committedSnapshot,
+          coverableCutoff,
+          coveredDigest,
+          requestStartCutoff,
+          blobRef(frozenRef),
+          blobDigest(frozenDigest),
+          recomputeDigest,
+        ),
+      )
+
+      if (!result.ok) {
+        return { ok: false, error: caseOf(result.error), message: m.describeNoCandidate(result.error) }
+      }
+
+      const probe = result.value
+
+      return {
+        ok: true,
+        probeId: probe.ProbeId,
+        basedOnEpoch: idValue.prefixEpoch(probe.BasedOnEpochId),
+        candidate: probe.Candidate,
+        cutoff: probe.Candidate.CutoffExclusive,
+        sealRoot: probe.Candidate.SealRoot,
+        syntheticId: probe.Candidate.SyntheticMessageId,
+      }
+    },
+  }
+})()
+
+/** AGENT-001: the ten canonical roles and two tiers, by case name. */
+export const roles = (() => {
+  const buildRole = unionCase(RolesModule.Role, 'Role')
+  const buildTier = unionCase(RolesModule.AgentTier, 'AgentTier')
+
+  return {
+    of: (name) => buildRole(name, []),
+    tier: (name) => buildTier(name, []),
+    nameOf: (role) => caseOf(role),
+    permissions: (role) => [...RolesModule.Roles_permissions(role)].map(caseOf).sort(),
+  }
+})()
+
+/**
+ * AGENT-001…004 (C5): the sole managed-agent identity directory.
+ *
+ * `nameOf`/`peerNameOf` take Role/AgentTier VALUES; build them with `roles.of`
+ * and `roles.tier` above (same union construction). List/set members are read
+ * fresh per call so a renamed Fable member fails loudly at load time instead
+ * of reading `undefined` (VERIFY-008).
+ */
+export const managedAgentCatalog = (() => {
+  const m = bind(ManagedAgentCatalogModule, 'ManagedAgentCatalog', [
+    'roleLabel',
+    'tryParseRole',
+    'tierLabel',
+    'wireTierLabel',
+    'tryParseTier',
+    'peerTier',
+    'nameOf',
+    'peerNameOf',
+    'allPublicRoles',
+    'allInternalRoles',
+    'allRoles',
+    'managerForkableRoles',
+    'managerForkableNames',
+    'requiredNames',
+    'orchestratorForkableNames',
+    'inspectorToolNames',
+    'coderToolNames',
+    'legacyAgentNames',
+    'isLegacyAgentName',
+    'formatLegacyNameNotSupported',
+    'formatLegacyNameInConfig',
+    'bookkeeperNames',
+    'isBookkeeperName',
+    'tryParseBookkeeperTier',
+    'bookkeeperNameOf',
+    'bookkeeperPeerName',
+  ])
+
+  return {
+    /** AGENT-001: canonical role → lowercase label. */
+    roleLabel: (role) => m.roleLabel(role),
+    /** AGENT-001: label → Role, or undefined. */
+    tryParseRole: (name) => unwrapOption(m.tryParseRole(name)),
+    /** AGENT-001: journal spelling Fast / Deep. */
+    tierLabel: (tier) => m.tierLabel(tier),
+    /** AGENT-001: wire spelling fast / deep. */
+    wireTierLabel: (tier) => m.wireTierLabel(tier),
+    /** AGENT-001: wire label → AgentTier, or undefined. */
+    tryParseTier: (name) => unwrapOption(m.tryParseTier(name)),
+    /** AGENT-003: Fast ⇄ Deep. */
+    peerTier: (tier) => m.peerTier(tier),
+    /** AGENT-002: `nameOf(Fast, Coder)` = 'fast-coder'. */
+    nameOf: (tier, role) => m.nameOf(tier, role),
+    /** AGENT-003: same role, opposite tier. */
+    peerNameOf: (tier, role) => m.peerNameOf(tier, role),
+    allPublicRoles: () => listItems(m.allPublicRoles).map(caseOf),
+    allInternalRoles: () => listItems(m.allInternalRoles).map(caseOf),
     allRoles: () => listItems(m.allRoles).map(caseOf),
     managerForkableRoles: () => listItems(m.managerForkableRoles).map(caseOf),
     managerForkableNames: () => listItems(m.managerForkableNames),
@@ -987,5 +1382,3 @@ export const toolHostCodec = (() => {
     },
   }
 })()
-
-[Showing lines 1-494 and 891-1384 of 1384; 396 middle lines (13.9KB) elided. Read artifact://124 for full output]

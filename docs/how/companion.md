@@ -22,7 +22,7 @@ type BlogFrame = { Kind: BlogFrameKind; Digest: string; TextRef: BlobRef }  // B
 ### 正常请求形状
 
 ```text
-[system: blogger-system.md]
+[system: PromptResources Blogger composition]
 [assistant: historic_frame × N]     // 有 frames 时
 [user: instruction header + blank + [[new_work_to_record]] data]  // 必须最后
 >>> assistant: blog 恰好一次
@@ -46,7 +46,7 @@ system + 前 k 个 historic_frame + squash instruction（最后 user）
 3. 最后一条 user 供 HOST-010 绑定 parentID。  
 4. B 可见正文 = blog `text`，不含 Y 的 user/reasoning。
 
-System 唯一加载：`resources/prompts/blogger-system.md`（managed-agent config）。
+System 唯一加载：`PromptResources.systemForRole` 的 Blogger 组合（Common Law → `resources/provider/role/blogger` → 继承 Library；managed-agent config）。
 
 ---
 

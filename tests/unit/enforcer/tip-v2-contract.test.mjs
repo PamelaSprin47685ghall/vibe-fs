@@ -331,7 +331,7 @@ test('ENFORCER_TIP_14_prompt_has_anti_repeat_and_severe_exception', () => {
   assert.doesNotMatch(prompt.squashInstruction, /omit all scores/)
   assert.doesNotMatch(prompt.normalInstruction, /omit.*scores/i)
 
-  const tipMessage = prompt.previousTipMessage('primitive-obsession', 'cycle-1')
+  const tipMessage = prompt.previousTip('primitive-obsession', 'cycle-1')
   assert.match(tipMessage, /previous_enforcer_tip/)
 })
 

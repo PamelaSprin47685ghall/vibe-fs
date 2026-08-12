@@ -56,7 +56,7 @@ Transform input 为空对象是 Host 能力现实；绑定必须用「已创建�
 - **选择方案**：本次 pair 的 gap 由当前真实消息末端结构决定：有同轮 tool batch 时 `call` 挂 call 批末、`result` 挂 result 批末（bracket 语义：`real calls → synthetic call → real results → synthetic result`）；无 tool 时二者同 gap 相邻并紧挨 user 前；空历史用 `Start`；无 trailing user 时挂末尾。
 
 ### 11. HOST-013 范围：全 session 注入 vs 排除 Blogger
-- **被拒方案**：对全部 provider transcript（含 Companion Blogger）注入结对编程 auto-injected。Blogger 的唯一任务是把 TOML delta 压成 `blog` 工作日志；中文「以“我”开头」的思考约束与 tip nudge 会污染其 system/tool 合同，导致偏离 `blogger-system.md` 与 ENFORCER 工具纪律。
+- **被拒方案**：对全部 provider transcript（含 Companion Blogger）注入结对编程 auto-injected。Blogger 的唯一任务是把 TOML delta 压成 `blog` 工作日志；中文「以“我”开头」的思考约束与 tip nudge 会污染其 system/tool 合同，导致偏离 Blogger Role Law 与 ENFORCER 工具纪律。
 - **选择方案**：HOST-013 仅作用于非 Companion session。Blogger 身份以 durable `SessionAssociationProjection.isCompanion` 判定，transform 短路跳过 pair 注入与 durable append。
 
 ### 12. HOST-013 幂等：placement identity vs 每次 transform 无条件新增

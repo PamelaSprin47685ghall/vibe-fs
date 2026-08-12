@@ -28,7 +28,7 @@
 
 ### 第 2 层（资源契约，`tests/integration/`）
 
-- `resources/prompts/manager-system.md` 与 `reviewer-system.md` 与 golden fixtures 字节一致。
+- `resources/provider/role/manager/{en,zh-CN}.md` 与 `reviewer/{en,zh-CN}.md` 与当前 Role Law depth / semantic-anchor gates 一致。
 - Manager 工具 schema 含 `fork/join/horizon/todowrite/fission/suicide` 与 Magic Todo 协议面（`todowrite` 见 Host/todo proof）；Reviewer 精确四工具（read/glob/grep/judge）。
 - 生产路径无 `ManagerWorkActivation` continuation 发送；MagicTodoManagerGuideline 仅 Manager + todowrite 可见时注入（TODO-013）。
 - Gate A：工具名引用完整——`fork`≠`commission`；旧名 `list`/`verdict`/`blog`/`fork-manager` 缺席。

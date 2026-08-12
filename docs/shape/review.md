@@ -50,7 +50,7 @@ Seal 类型与绑定流程见 `how/review.md`。
 
 ## REVIEW-012：Reviewer 提示词资源权威来源
 
-Reviewer 角色的系统提示词由 `resources/prompts/reviewer-system.md` 静态资源权威承载，在 Session 加载时作为 Reviewer 系统的 System Prompt，负责向模型灌输 REVIEW-011 Examiner's Ledger 判断方向与工具规范。  
+Reviewer 角色的系统提示词由 `resources/provider/role/reviewer/{en,zh-CN}.md`（经 PromptResources：Common Law → Role Law → Examiner's Ledger）权威承载，在 Session 加载时作为 Reviewer 系统的 System Prompt，负责向模型灌输 REVIEW-011 Examiner's Ledger 判断方向与工具规范。  
 Persona（Examiner/Auditor）session 创建一次绑定（AGENT-028）；本域不因 Fallback/Strength 重写。
 
 双 PERFECT 流程不得写入 Reviewer 提示词（REVIEW-003）：屏障由 Host 侧执行，Reviewer 只需针对当前 tree 给出独立判断；提前告知流程会诱导模型自行扮演确认方。  

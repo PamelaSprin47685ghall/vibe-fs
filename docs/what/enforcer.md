@@ -10,7 +10,7 @@ Cycle 写入口与恢复证据边界见 `shape/enforcer.md`。
 Blogger 以 `chronicle` 工具提交稠密工作日志；`tip` 绑定目录 TipName；一次有效 cycle 原子提交 Blog frame 与 RecordCoverage。  
 同一 tip 目录对双消费者各交付一份正文：
 
-- **Blogger（Y）**：装载 `enforcer.md` 全文进 effective system（与 `blogger-system.md` 合成），约束 tip 选择与检测边界。
+- **Blogger（Y）**：装载 `enforcer.md` 全文进 effective system（与 Blogger Role Law 合成），约束 tip 选择与检测边界。
 - **Main（X）**：经 `TipGuidanceDelivered` 投影，按 Full / IdentityOnly 交付 `main.md`（见 ENFORCER-071 与 how 交付算法），不改写 Main Authority。
 
 ## ENFORCER-002：非目标
@@ -68,7 +68,7 @@ Blogger 工具权限仅 `chronicle`。
 
 ## ENFORCER-030：统一 System Prompt
 
-fast/deep blogger 共用 authoritative system（`resources/prompts/blogger-system.md`），并与 folder SSOT 各 tip 的 **enforcer.md** 全文合成 effective system；工具合同在 system 中固定「恰好调用一次 chronicle」。  
+fast/deep blogger 共用 authoritative system（`resources/provider/role/blogger/{en,zh-CN}.md`，经 PromptResources 组合），并与 folder SSOT 各 tip 的 **enforcer.md** 全文合成 effective system；工具合同在 system 中固定「恰好调用一次 chronicle」。  
 `main.md` **不**进入 Blogger system——它只服务 Main Full/Identity 交付。
 
 ## ENFORCER-040：工具立即返回

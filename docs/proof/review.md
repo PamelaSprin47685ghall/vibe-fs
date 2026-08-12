@@ -20,7 +20,7 @@
 | REVISE | 立即清未完成 PERFECT/关闭 cohort；延迟 `BlogEntryCommitted` 前不得写 `FinalityRejected`；不得在 `judge` 时抢先落盘 | REVIEW-002、GLORY-044/072 |
 | tree 变化 | pending 拒绝；confirmed 对 Guard 无效 | REVIEW-008 |
 | Examiner's Ledger / PERFECT+minor | 只在值得说处说话；PERFECT 可与 minor 共存；无固定 report DTO | REVIEW-011 |
-| Reviewer 提示词权威资源 | `resources/prompts/reviewer-system.md` 承载判断方向与工具规范，且不含双 PERFECT 流程 | REVIEW-012 |
+| Reviewer 提示词权威资源 | `resources/provider/role/reviewer/{en,zh-CN}.md` 承载判断方向；不含双 PERFECT 流程 | REVIEW-012 |
 
 
 ## Seal / Witness

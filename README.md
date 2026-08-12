@@ -97,7 +97,7 @@ Executor、Blogger 等由编排路径调用，不作为单独“安装角色”�
 ### 运行时数据
 
 - 领域事实写入 Git common directory 下插件私有 runtimes 路径中的 journal（按 runtime 的 NDJSON），不在业务 workspace 强制创建插件私有目录。
-- 随包资源：`resources/prompts/*-system.md`（manager / coder / devops / inspector / reviewer / browser / meditator / orchestrator / executor / blogger 十个 system prompt）；`resources/enforcer/catalog.json`。
+- 随包资源：`resources/provider/`（Common Law / Role Law / Office Library；EN + zh-CN）；`resources/enforcer/<TipName>/{enforcer.md,main.md}`。**无** `resources/prompts/*`；**无** `catalog.json` SSOT。
 - journal 与事实名默认冻结；升级前阅读 [CHANGELOG](CHANGELOG.md)。
 
 ### 升级与兼容性
@@ -114,7 +114,7 @@ Executor、Blogger 等由编排路径调用，不作为单独“安装角色”�
 | 现象 | 处理方向 |
 |------|----------|
 | 插件无法加载 / import 失败 | 确认 `dist/.../Plugin.js` 存在；tarball 须含 `dist/` 与 `resources/` |
-| 启动即失败（资源） | 检查十个 prompt 与 `enforcer/catalog.json` 完整合法 |
+| 启动即失败（资源） | 检查 `resources/provider/` 语言对与 `resources/enforcer/<tip>/` 完整合法 |
 | peer 依赖报错 | 安装与 Host 匹配的 `@opencode-ai/plugin` |
 | 行为与预期不符 | 对照 CHANGELOG 与 [docs/README.md](docs/README.md)；商业支持见下节 |
 
@@ -210,15 +210,15 @@ npm run check:release
 ### 运行时资源
 
 ```text
-resources/prompts/
-  manager-system.md  coder-system.md  devops-system.md
-  inspector-system.md  reviewer-system.md  browser-system.md
-  meditator-system.md  orchestrator-system.md
-  executor-system.md  blogger-system.md
-resources/enforcer/catalog.json
+resources/provider/
+  world/common-law/{en,zh-CN}.md
+  role/<role>/{en,zh-CN}.md
+  library/...
+resources/enforcer/<TipName>/{enforcer.md,main.md}
 ```
 
-加载：`Infrastructure/Resources/`（`PackageResources`、`PromptResources`、`EnforcerCatalogResource`、`RuntimeResources`）；插件初始化 load/install 一次。
+加载：`Infrastructure/Resources/`（`PackageResources`、`ProviderResources`、`PromptResources`、`EnforcerCatalogResource`、`RuntimeResources`）；插件初始化 load/install 一次。
+旧 `resources/prompts/*-system.md` 已删除；生产 system 仅由 Common Law → Role Law → Office Library 组成。
 
 ### 构建与打包
 

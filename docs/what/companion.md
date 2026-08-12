@@ -80,7 +80,7 @@ Canonical record 保留 Opening，即使投影省略。
 
 ## COMPANION-004：Y 的 system
 
-唯一来源：`resources/prompts/blogger-system.md`。  
+唯一来源：`PromptResources` 组合的 Blogger Role Law（`resources/provider/role/blogger/{en,zh-CN}.md`，经 Common Law → Role Law → Office Library）。  
 fast/deep blogger 同 prompt、同 `{chronicle}` 工具面，只模型绑定不同。  
 禁止在 prompt 插入动态 token/预算/窗口信息（CTX-001）。
 

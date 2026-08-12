@@ -219,6 +219,7 @@
     <Compile Include="Application/Orchestration/Types.fs"/>
     <Compile Include="Infrastructure/Resources/PackageResources.fs"/>
     <Compile Include="Infrastructure/Resources/ProviderResources.fs"/>
+    <Compile Include="Infrastructure/Resources/ProviderProse.fs"/>
     <Compile Include="Infrastructure/Resources/PromptResources.fs"/>
     <Compile Include="Infrastructure/Resources/EnforcerCatalogResource.fs"/>
     <Compile Include="Infrastructure/Resources/RuntimeResources.fs"/>

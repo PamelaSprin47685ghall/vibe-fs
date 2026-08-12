@@ -32,7 +32,7 @@
 1. 平常只增 Y frames；X active prefix 字节不变。  
 2. PrefixEpoch 切换只绑 probe 提升 / ContextReanchored；BlogSquash 只推进 FrameEpoch。
 3. 入口 `dist/Infrastructure/OpenCode/Plugin/Plugin.js`。  
-4. 资源：`resources/prompts/*`、`resources/enforcer/<TipName>/{enforcer.md,main.md}`；加载仅 `Infrastructure/Resources/`，fail fast。**无** `catalog.json` SSOT。
+4. 资源：`resources/provider/`（Common Law / Role Law / Library）、`resources/enforcer/<TipName>/{enforcer.md,main.md}`；加载仅 `Infrastructure/Resources/`，fail fast。**无** `catalog.json` SSOT；**无** `resources/prompts/*`。
 
 ---
 
