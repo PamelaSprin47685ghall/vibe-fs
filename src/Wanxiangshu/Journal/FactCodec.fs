@@ -254,6 +254,61 @@ module FactCodec =
                         let piece = if needsComma then "," + insert else insert
                         before + piece + after
 
+    /// EXEC-002: `HandleLinked` gained a provider presentation identity (`Byname`)
+    /// distinct from the Host machine binding (`TargetAgent`). Historical facts
+    /// predate that distinction, so an empty Byname asks the fold to fall back to
+    /// TargetAgent without fabricating a new logical identity during replay.
+    let private migrateHandleByname (json: string) : string =
+        if json.IndexOf("\"HandleLinked\"", StringComparison.Ordinal) < 0 then
+            json
+        elif json.IndexOf("\"Byname\"", StringComparison.Ordinal) >= 0 then
+            json
+        else
+            let marker = "\"HandleLinked\""
+            let start = json.IndexOf(marker, StringComparison.Ordinal)
+
+            if start < 0 then
+                json
+            else
+                let brace = json.IndexOf('{', start)
+
+                if brace < 0 then
+                    json
+                else
+                    let rec findClose (i: int) (depth: int) =
+                        if i >= json.Length then
+                            -1
+                        else
+                            match json.[i] with
+                            | '{' -> findClose (i + 1) (depth + 1)
+                            | '}' when depth = 1 -> i
+                            | '}' -> findClose (i + 1) (depth - 1)
+                            | '"' ->
+                                let rec skipString j =
+                                    if j >= json.Length then j
+                                    elif json.[j] = '\\' then skipString (j + 2)
+                                    elif json.[j] = '"' then j + 1
+                                    else skipString (j + 1)
+
+                                findClose (skipString (i + 1)) depth
+                            | _ -> findClose (i + 1) depth
+
+                    match findClose (brace + 1) 1 with
+                    | -1 -> json
+                    | close ->
+                        let insert = "\"Byname\":\"\""
+                        let before = json.Substring(0, close)
+                        let after = json.Substring(close)
+                        let needsComma =
+                            let trimmed = before.TrimEnd()
+
+                            trimmed.Length > 0
+                            && trimmed.[trimmed.Length - 1] <> '{'
+                            && trimmed.[trimmed.Length - 1] <> ','
+
+                        let piece = if needsComma then "," + insert else insert
+                        before + piece + after
+
     let deserializeFact (json: string) : Result<Fact, string> =
         if containsLegacyFallbackFields json then
             Error pre050MigrationMessage
@@ -266,6 +321,7 @@ module FactCodec =
                 json
                 |> migrateHandleCompleted
                 |> migrateHandleOwnership
+                |> migrateHandleByname
                 |> rewriteLegacyObservationTags,
                 extra = extra
             )

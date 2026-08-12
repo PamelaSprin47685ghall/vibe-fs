@@ -123,9 +123,15 @@ module HostForkAgent =
                 ?firstPrompt: bool,
                 ?renderedPrompt: string,
                 ?ownership: Fact.HandleOwnership,
-                ?deferSend: bool
+                ?deferSend: bool,
+                ?byname: string
             ) : Task<Result<ForkResult, string>> =
             let agentName = agent.Trim()
+            let providerByname =
+                match byname with
+                | Some value when not (String.IsNullOrWhiteSpace value) -> value.Trim()
+                | _ -> agentName
+
             let isFirstPrompt = defaultArg firstPrompt true
             let deferSend = defaultArg deferSend false
             let handleOwnership = defaultArg ownership this.HandleOwnership
@@ -213,12 +219,13 @@ module HostForkAgent =
                         | Error err -> return Error err
                         | Ok childId ->
                             let linkageResult =
-                                HandleController.link
+                                HandleController.linkNamed
                                     this.Journal
                                     this.ParentId
                                     agentId
                                     childId
                                     agentName
+                                    providerByname
                                     role
                                     handleOwnership
                                 |> Result.mapError (sprintf "Failed to persist HandleLinked: %s")
@@ -322,15 +329,25 @@ module HostForkAgent =
                         let role = record.Role
                         let agentName = record.Agent
 
+                        let providerByname =
+                            this.Journal
+                            |> Option.bind (fun durable ->
+                                AgentJournal.handleProjection durable this.ParentId
+                                |> HandleProjection.tryFind (HandleController.agentHandle agentId))
+                            |> Option.map (fun handle -> handle.Byname)
+                            |> Option.filter (String.IsNullOrWhiteSpace >> not)
+                            |> Option.defaultValue agentName
+
                         // Re-open a joined (Retired) handle before the new send so
                         // the next completion has an Active cell to claim.
                         match
-                            HandleController.link
+                            HandleController.linkNamed
                                 this.Journal
                                 this.ParentId
                                 agentId
                                 childId
                                 agentName
+                                providerByname
                                 role
                                 this.HandleOwnership
                         with

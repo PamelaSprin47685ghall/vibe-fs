@@ -140,6 +140,7 @@ module JoinDrain =
                                ChildSessionId = record.ChildSessionId
                                Handle = replacement
                                TargetAgent = record.TargetAgent
+                               Byname = record.Byname
                                CanonicalRole = record.CanonicalRole
                                Ownership = record.Ownership |}))
                 |> Result.bind (fun () ->

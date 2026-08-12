@@ -11,12 +11,14 @@ module HorizonTool =
 
     let private lineForHandle (handle: HandleRecord) (runtimeRecord: AgentRecord option) : string =
         let label =
-            if not (String.IsNullOrWhiteSpace handle.TargetAgent) then
-                handle.TargetAgent
-            else
+            if not (String.IsNullOrWhiteSpace handle.Byname) then
+                handle.Byname.Trim()
+            elif not (String.IsNullOrWhiteSpace handle.TargetAgent) then
                 match ManagedAgent.tryParse handle.TargetAgent with
                 | Some managed -> managed.Name
-                | None -> "someone"
+                | None -> handle.TargetAgent.Trim()
+            else
+                "someone"
 
         match handle.Lifecycle with
         | HandleLifecycle.CompletedAwaitingJoin _ -> sprintf "%s has returned." label

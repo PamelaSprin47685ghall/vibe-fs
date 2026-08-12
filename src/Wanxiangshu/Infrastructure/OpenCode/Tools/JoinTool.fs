@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 
 open Wanxiangshu.Domain.SessionRecovery
+open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Process
@@ -128,9 +129,20 @@ module JoinTool =
                                     (Join.joinAvailable runtime permit JoinBatch.Max waitTask)
 
                             let resolveAgentName agentId =
-                                match runtime.TryFindAgent agentId with
-                                | Some record -> record.Agent
-                                | None -> ""
+                                let durableByname =
+                                    scope.Journal
+                                    |> Option.bind (fun journal ->
+                                        AgentJournal.handleProjection journal sessionId
+                                        |> HandleProjection.tryFind (HandleController.agentHandle agentId))
+                                    |> Option.map (fun handle -> handle.Byname)
+                                    |> Option.filter (String.IsNullOrWhiteSpace >> not)
+
+                                match durableByname with
+                                | Some byname -> byname.Trim()
+                                | None ->
+                                    match runtime.TryFindAgent agentId with
+                                    | Some record -> record.Agent
+                                    | None -> ""
 
                             let resolveTerminalLabel ptyId =
                                 let _, ptys = runtime.List()

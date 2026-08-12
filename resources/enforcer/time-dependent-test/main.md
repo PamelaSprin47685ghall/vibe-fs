@@ -1,25 +1,45 @@
 # time-dependent-test — Main
 
-## What To Do Now
-Inject a controllable clock or explicit instant/time zone into the scenario and replace real waits with deterministic clock advancement or causal synchronization. The test fixture is who owns the temporal facts; the host clock must not supply the premises of the verdict.
+Make time an explicit test input.
 
-## Why This Matters
-A test that depends on the current clock has moving premises. It may cross midnight, DST, timeout thresholds, or scheduling delays differently on every machine. Failures then mix domain defects with facts about when and where CI happened to run.
+Identify the temporal facts the scenario actually needs — instant, date, zone, duration, deadline, monotonic elapsed value — and provide them directly or through a scoped/manual clock controlled by the fixture.
 
-## Repair Strategy
-Fix instants and zones in test data, use a manual clock for deadlines and expiration, and reserve real-time integration only for proving the adapter that reads the system clock.
+For expiration/deadline logic, prefer:
 
-## Decision Branches
-If the scenario needs a temporal fact (instant, duration, zone, deadline), supply it explicitly via a fake/manual clock.
-If the test’s purpose is only to prove clock wiring, keep a narrow non-semantic smoke and do not use it as a domain verdict.
+```text
+clock = ManualClock(t0)
+run scenario
+clock.advance(delta)
+assert result
+```
 
-## Common Wrong Fixes
-- Widen timing tolerances until the test usually passes.
-- Sleep longer to outrun scheduler noise while still using wall time as the premise.
-- Globally mock `Date.now` in one test file while other tests still read ambient time.
+rather than sleeping until real time crosses the threshold.
 
-## Verification
-Invariant: the test’s meaning and verdict must be independent of the host’s real clock. Run it at arbitrary real times and zones; results must stay identical because all relevant temporal facts are explicit.
+For calendar logic, use explicit zones and named edge instants: DST start/end, month boundary, leap day, midnight. The test should communicate *which temporal law is being examined* instead of hoping CI eventually runs near the interesting moment.
 
-## Done When
-Temporal behavior is tested as data and policy, while wall-clock timing no longer participates accidentally in the test’s premises.
+For timeout/cancellation logic, separate two concerns:
+
+- domain/policy deadline → controlled clock or explicit deadline input;
+- synchronization safety timeout in the test runner → real timeout may remain as a guard against hangs, but it must not define success semantics.
+
+Common fake repairs:
+
+- widen `within 100ms` to `within 5s`;
+- sleep longer so a deadline is “surely crossed”;
+- set CI timezone globally and assume local machines match;
+- globally monkeypatch `Date.now` without restoring/scoping it, creating cross-test leakage;
+- use frozen time for one layer while another dependency still reads the real clock;
+- assert formatted date strings without fixing locale/zone;
+- replace wall time with scheduler ordering and still assume elapsed duration.
+
+Verification should intentionally move the real environment. Run under different host time zones, arbitrary wall-clock times, and slower scheduling where practical. The functional verdict must remain identical because all semantic temporal facts come from the fixture.
+
+Then vary the **controlled** time inputs deliberately. The test should change only when the domain law says it should: just before/at/after expiry, DST transition, boundary instant, etc.
+
+If production code itself reaches ambient `now()` deep inside policy, the test difficulty may be evidence for `time-source-in-logic`. Fixing the production seam can make both product design and test determinism better.
+
+Keep one narrow integration smoke for the real clock adapter if needed. Its claim should be modest: “the adapter reads a plausible system time,” not “the billing/expiry domain is correct.”
+
+You are done when the same scenario has the same meaning regardless of when/where CI happens to execute, and temporal behavior changes only when the test explicitly changes temporal data.
+
+> A deterministic test does not remove time. It makes time part of the story instead of part of the weather.

@@ -264,6 +264,25 @@ module HandleProjection =
         | Fact.HandleOwnership.DurableParentHandle -> true
         | Fact.HandleOwnership.HostOwnedHidden -> false
 
+    /// EXEC-002: provider continuation lookup is by stable Byname, never by
+    /// AgentHandleId. Retired records remain searchable so a name cannot be
+    /// silently recycled for a different logical person later in the same life.
+    let tryFindByByname (byname: string) (current: AgentLinkageProjection) =
+        if System.String.IsNullOrWhiteSpace byname then
+            None
+        else
+            let wanted = byname.Trim()
+
+            current.Handles
+            |> Map.tryPick (fun _ record ->
+                if
+                    parentVisible record
+                    && System.String.Equals(record.Byname, wanted, System.StringComparison.OrdinalIgnoreCase)
+                then
+                    Some record
+                else
+                    None)
+
     /// EXEC-005: `list` shows running, busy and completed-awaiting-join, never
     /// retired or abandoned.
     let listable (current: AgentLinkageProjection) =

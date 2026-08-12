@@ -19,19 +19,16 @@ module JoinResultRenderer =
         (String.concat "\n\n" (blocks |> List.filter (fun s -> s <> ""))) + "\n"
 
     let private byname (resolveAgentName: string -> string) (agentId: string) (agentNameRaw: string) : string =
-        if not (String.IsNullOrWhiteSpace agentNameRaw) then
+        let presented = resolveAgentName agentId
+
+        if not (String.IsNullOrWhiteSpace presented) then
+            presented.Trim()
+        elif not (String.IsNullOrWhiteSpace agentNameRaw) then
             match ManagedAgent.tryParse agentNameRaw with
             | Some agent -> agent.Name
             | None -> agentNameRaw
         else
-            let raw = resolveAgentName agentId
-
-            if String.IsNullOrWhiteSpace raw then
-                agentId
-            else
-                match ManagedAgent.tryParse raw with
-                | Some agent -> agent.Name
-                | None -> raw
+            agentId
 
     let private tryParseExitCode (outcome: string) : int option =
         let trimmed = outcome.Trim()

@@ -44,6 +44,12 @@ module ExecutionFactFold =
         // ── execution handles ───────────────────────────────────────────────
         match fact with
         | ExecutionFactCases.HandleLinked payload ->
+            let byname =
+                if System.String.IsNullOrWhiteSpace payload.Byname then
+                    payload.TargetAgent
+                else
+                    payload.Byname
+
             AgentProjection.tryUpdate
                 payload.ParentSessionId
                 (fun session ->
@@ -51,7 +57,7 @@ module ExecutionFactFold =
                         payload.Handle
                         payload.ChildSessionId
                         payload.TargetAgent
-                        payload.Byname
+                        byname
                         payload.CanonicalRole
                         payload.Ownership
                         (Option.defaultValue HandleProjection.empty session.Handles)

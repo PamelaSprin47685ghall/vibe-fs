@@ -1,29 +1,53 @@
 # order-dependent-test — Enforcer
 
-## Definition
-A test is order-dependent when its verdict depends on which other tests ran before it rather than solely on its own explicit setup and inputs. The root-cause is that suite history supplies invisible premises, so a case's proposition is not local and the verdict changes when neighbors or order change.
+An order-dependent test has hidden premises supplied by **what the suite happened to run before it**.
 
-## Governing Principle
-A test case should be a proposition with local premises. Shared residue adds invisible premises supplied by suite history, so the proposition changes when ordering changes. The suite then stops being a set of independent proofs and becomes one giant stateful scenario whose correctness cannot be localized.
+A test case should be a proposition with local premises:
 
-## Trigger When
-Trigger when a test passes only after another test, fails in isolation, depends on global/static state, reused databases/files, environment mutation, or cleanup performed elsewhere.
+```text
+given this setup
+when this action occurs
+then this observable must hold
+```
 
-## Do Not Trigger When
-- The steps are an intentionally ordered end-to-end scenario modeled and executed as one test with one explicit lifecycle.
-- Shared fixtures are immutable and each case still creates its own premises.
-- Dependence is only on process-wide constants that tests never mutate.
+Order dependence quietly changes that proposition into:
 
-## Distinguish From
-mock-hidden-state hides mutable state inside fixtures. flaky-test-tolerated accepts nondeterminism broadly. Tie-break: if the defect is causal dependence across tests, this rule; if a single mock hides a cursor, mock-hidden-state; if the suite accepts unstable verdicts in general, flaky-test-tolerated.
+```text
+given this setup
+plus whatever globals/files/rows/env/caches/ports/mocks the previous tests left behind
+when this action occurs
+then maybe this observable holds
+```
 
-## Decision Procedure
-Run the test alone and under reordered neighbors. Any required state must be created in its own setup and disposed within its own scope, or the scenario should be modeled as a single explicit test.
+At that point the suite is no longer a set of independent proofs. It is one giant undocumented state machine whose transition order happens to be the test runner's schedule.
 
-## Examples
-- positive: `test_update` passes only after `test_insert` because both share one database row.
-- near-miss: A single `it("creates then updates")` owns the whole lifecycle explicitly.
-- counterexample: Each test opens a fresh temp directory and unique ids; order does not change verdicts.
+Fire this rule when:
 
-## Nudge
-Each test must carry its own premises. Eliminate suite-history dependencies so test order is irrelevant to meaning.
+- a test passes in the full suite but fails alone;
+- a test fails first but passes after another case warms cache or creates data;
+- cases share mutable database rows, temp directories, process-wide registries, singleton state, mock cursors, clocks, environment variables, current working directory, ports, or files;
+- cleanup for test A is actually performed by test B or a later global teardown;
+- `beforeAll` creates mutable state that individual tests consume/modify in sequence;
+- the runner must be forced into a fixed order to keep verdicts stable;
+- parallelization reveals failures because supposedly independent cases are really sharing premises;
+- a test relies on an ID counter / random seed / global provider preference already advanced by neighboring tests.
+
+Do not fire when the order is the **scenario itself**. “Create order, approve it, then ship it” is a legitimate lifecycle if those steps are modeled as one explicit test/scenario with one owner and one setup/teardown. The smell appears when those steps masquerade as independent tests whose names and runner order secretly provide the lifecycle.
+
+Shared fixtures are not automatically wrong either. Immutable package data, read-only constants, expensive process-wide services with isolated per-test namespaces, or a database fixture that gives each case a fresh transaction/schema can be shared without sharing semantic premises.
+
+Distinguish from `flaky-test-tolerated`: order dependence is one concrete source of nondeterminism; `flaky-test-tolerated` is the policy failure of accepting unstable verdicts. `mock-hidden-state` is more specific when the invisible premise lives inside a stateful mock. `resource-not-scoped` may explain why residue survives, but this rule is about residue changing another test's truth value.
+
+The decisive experiment is not “shuffle a few times and see.” Run the case:
+
+- alone;
+- first;
+- last;
+- after each plausible contaminating neighbor;
+- under parallel/randomized order where supported.
+
+If its verdict changes while its own explicit inputs do not, suite history is an undeclared input.
+
+The repair is either to make the test own every mutable premise and discharge it locally, or to admit the operations form one lifecycle and combine them into one explicit scenario. Do not encode hidden causality as filename order, numeric test prefixes, `--runInBand`, or “please don't parallelize this folder.”
+
+> A test should remember only what its scenario explicitly gives it. Suite history is not a legitimate fixture.

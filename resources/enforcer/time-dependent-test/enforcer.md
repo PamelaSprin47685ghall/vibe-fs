@@ -1,30 +1,36 @@
 # time-dependent-test — Enforcer
 
-## Definition
-A test is time-dependent when its verdict depends on the real clock, elapsed wall time, time zone, or scheduler timing rather than on explicit temporal facts under test control. The root-cause is that the host clock is an undeclared input to the verdict, so premises move while the scenario is supposed to be fixed.
+A test is time-dependent when the host clock contributes an undeclared premise to the verdict.
 
-## Governing Principle
-Time is an input even when an API hides it. Real clocks make test premises move while the test is running: midnight, DST, machine load, and scheduling alter the scenario without changing source. Deterministic temporal tests freeze the relevant instant or advance a controlled clock, separating domain rules about time from accidents of when the suite happened to execute.
+The source may be `Date.now()`, `UtcNow`, local timezone, DST rules, elapsed wall time, scheduler delay, current date, or a real deadline. The common defect is that the scenario is supposed to be fixed, but part of its input keeps moving because the test discovers time from the machine instead of choosing time explicitly.
 
-## Trigger When
-Trigger when tests call the real current time, wait for wall-clock duration, rely on local timezone defaults, or assert completion within fragile timing windows.
+This creates failures that are not really “flaky timing” in one generic sense. They may depend on:
 
-## Do Not Trigger When
-- A deliberately narrow real-clock integration smoke whose purpose is to verify clock wiring itself and whose tolerance is stable and non-semantic.
-- Tests that inject a frozen instant or manual clock even when production later reads a real clock at the adapter.
-- Performance or load benchmarks whose purpose is wall-time measurement, not a functional pass/fail of domain rules.
-- Causal waits on an explicit readiness signal (not elapsed milliseconds) used only as synchronization.
+- crossing midnight during the test;
+- month/year boundary;
+- daylight-saving transition;
+- CI running in a different zone/locale;
+- leap-day/calendar edge;
+- scheduler pause moving an operation past a deadline;
+- slow machine changing whether “within N ms” passes;
+- test order changing how much real time elapsed before the assertion.
 
-## Distinguish From
-`time-source-in-logic` is production policy reading ambient time. `sleep-based-synchronization` uses delay as a causal signal. Tie-break: if production core reads `now()` as undeclared policy input, use `time-source-in-logic`; if a test’s verdict depends on the real clock, use this rule.
+Fire this rule when functional/domain verdicts depend on ambient clock or wall-time windows that are not themselves the feature under test.
 
-## Decision Procedure
-Name the temporal facts the scenario requires—instant, duration, zone, deadline—and supply them explicitly through a fake/manual clock or fixed values.
+Do not fire for a deliberately narrow clock-adapter smoke whose purpose is to prove that production can read the system clock. Do not fire for performance/load benchmarks whose output is explicitly wall time. Do not confuse causal synchronization with time dependence: awaiting a real completion signal under a timeout can be deterministic in meaning if timeout only bounds failure.
 
-## Examples
-- positive: a billing test calls `Date.now()` and fails or passes depending on midnight and the runner’s zone.
-- near-miss: a one-line smoke that the process can read the system clock, with a generous non-semantic timeout.
-- counterexample: domain code calling `now()` internally to decide expiry is `time-source-in-logic`.
+Also distinguish from `time-source-in-logic`: that rule attacks production policy that reads ambient time instead of receiving temporal facts explicitly. This rule attacks **test premises**. They often point to the same design seam, but either can exist alone.
 
-## Nudge
-Tests should choose time, not discover it. Inject or control the relevant temporal facts so the same scenario means the same thing whenever it runs.
+A decisive question is:
+
+> If this exact test started one hour later, in another time zone, on a slower machine, would it still represent the same scenario?
+
+If not, time is an undeclared input.
+
+The repair is to make temporal facts ordinary data: fixed instant, explicit zone, duration, deadline, monotonic tick, manually advanced clock. The test should own these values.
+
+Real time may still appear at one thin adapter boundary. Test that adapter separately with a tolerant smoke if needed, then feed deterministic values inward.
+
+Do not replace one ambient source with another global monkeypatch and call it solved. A process-wide mocked clock can itself create order dependence if tests mutate it without scope.
+
+> Tests should choose the time of the story. They should not ask the machine what time it happened to be when the story was read.
