@@ -16,6 +16,8 @@
     <Compile Include="Host/HostDigest.fs"/>
     <Compile Include="Kernel/Identity.fs"/>
     <Compile Include="Kernel/Roles.fs"/>
+    <Compile Include="Kernel/StealthBrowserMcp.fs"/>
+    <Compile Include="Kernel/SembleMcp.fs"/>
     <Compile Include="Kernel/Parallel.fs"/>
     <Compile Include="Kernel/DomainFlow.fs"/>
     <Compile Include="Kernel/AsyncSupport.fs"/>
@@ -211,6 +213,7 @@
     <Compile Include="Tools/StaticTools.fs"/>
     <Compile Include="Tools/FileTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/OpencodeTypes.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/StealthBrowserMcpConfig.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/ManagedAgentConfig.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/CanonicalJson.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/PromptMetadataCodec.fs"/>
@@ -387,6 +390,9 @@
     <Compile Include="Infrastructure/OpenCode/Host/WorkspaceEventStore.fs"/>
     <Compile Include="Infrastructure/CasebookBookkeeper.fs"/>
     <Compile Include="Infrastructure/CasebookLifecycle.fs"/>
+    <Compile Include="Infrastructure/SembleSearchCodec.fs"/>
+    <Compile Include="Infrastructure/SembleMcpStdio.fs"/>
+    <Compile Include="Infrastructure/SembleMcpClient.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FetchTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/CasebookTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PluginHost.fs"/>

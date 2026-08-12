@@ -34,3 +34,9 @@ Catalog / Role DU 基线 20；旧名 fail closed、无 alias。不得再写「pe
 **Student 价值迁移：epistemic style → Meditator prompt vs 整套 Learn/Compile/QA/return 改名留存。** 拒改名留存：那只是换皮的 Student 状态机；G3 删除 workflow、保留认知纪律（AGENT-020 空缺 → AGENT-025）。
 
 **Student/Teacher 兼容 alias vs clean-break。** 拒 alias：`student`→Meditator / `teacher`→Inspector 会永久污染身份边界（AGENT-004）。
+
+**Browser 网络面：stealth-browser MCP vs 插件 `network` 工具 vs Host webfetch/websearch。**  
+拒插件 `network`：没有真实 executor，schema 撒谎。拒全局 webfetch/websearch：那是 Host 通用网关，不是 Browser 专用隐身浏览面，且会漏给其它角色。选 OpenCode MCP `stealth-browser-mcp`：工具由 MCP 服务器定义，Host 负责 spawn/schema，Wanxiangshu 只注入服务器并按角色锁 `stealth-browser-mcp_*`。测试默认 disabled，避免 `uvx` 打真实 git。
+
+**内部 Semble：能力保留 vs Host 接线 / Strength 注入。**  
+拒 Host mcp：语义搜索会漏进所有角色 schema。拒 Strength 注入：STRENGTH-004 Replica 只允许真实 `read/glob/grep`；假 read 污染 primary 可见历史。选进程内 stdio client：调用方显式 `search`，当前无调用者。测试默认 Disabled，避免 `uvx` 打真实 git。不引入 MCP SDK。

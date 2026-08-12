@@ -30,7 +30,26 @@
 5. `InvocationMode = SynchronousDelegate` 时在基线工具集上投影 `return`（profile，非 PC）；普通
    WorkMain 调用不得因此常驻 `return`。
 6. Meditator 工具集仅为 `{ inspector }`（AGENT-025）。装配不得把 `read`/`glob`/`grep` 或其它
-   filesystem / executor / fork 面写回 Meditator。
+   filesystem / executor / fork / stealth-browser MCP 面写回 Meditator。
+7. `ToolPermission.Network` → Host schema 键 `stealth-browser-mcp_*`（AGENT-026）。仅 Browser allow。
+
+---
+
+## stealth-browser MCP 装配（AGENT-026）
+
+1. `applyOwnedFields` 入口调用 `StealthBrowserMcpConfig.apply`。Ok / Error 都走该函数，fail-closed。
+2. 启动判定纯函数：`DISABLED` → disabled；`FIXTURE` 非空 → `node <fixture>`；`WANXIANGSHU_TEST` → disabled；否则 `uvx … @{ref}`。
+3. 只覆盖 `config.mcp.stealth-browser-mcp`；其它 MCP 条目不动。
+4. 不注册 ToolRegistry spec，不生成 `js-*` 成员。
+
+---
+
+## 内部 Semble MCP（AGENT-027）
+
+1. Kernel 纯函数：`uvxCommand` / `fixtureCommand` / `Launch` / `launchFrom`。
+2. Client：Disabled → `[]`；Fixture / Uvx → stdio `initialize` + `tools/call search` → `parseToolResult`。
+3. 不调用 `StealthBrowserMcpConfig` / `applyOwnedFields` / `StrengthSpeculate`。
+4. 不注册 ToolRegistry spec，不生成 `js-*` 成员，不写 `config.mcp.semble`。
 
 ---
 

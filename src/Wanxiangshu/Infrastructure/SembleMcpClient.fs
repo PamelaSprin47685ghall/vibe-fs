@@ -1,0 +1,64 @@
+namespace Wanxiangshu.Infrastructure
+
+open System
+open System.Threading.Tasks
+open Fable.Core.JsInterop
+open Wanxiangshu.Kernel
+
+/// AGENT-027: internal Semble search. Not Host mcp. Not Strength.
+module SembleMcpClient =
+
+    let launchFromVars (vars: obj) : SembleMcp.Launch =
+        SembleMcp.launchFrom (fun name ->
+            if isNull vars then
+                None
+            else
+                let value = vars?(name)
+
+                if isNull value then
+                    None
+                else
+                    let text = string value
+                    if String.IsNullOrWhiteSpace text then None else Some text)
+
+    let launchFromEnvironment () : SembleMcp.Launch =
+        SembleMcp.launchFrom (fun name ->
+            match Environment.GetEnvironmentVariable name with
+            | null
+            | "" -> None
+            | value -> Some value)
+
+    let private invocation (launch: SembleMcp.Launch) : (string * string array) option =
+        match launch with
+        | SembleMcp.Launch.Disabled -> None
+        | SembleMcp.Launch.Fixture path ->
+            let cmd = SembleMcp.fixtureCommand path
+            Some(cmd.[0], cmd.[1..])
+        | SembleMcp.Launch.Uvx gitRef ->
+            let cmd = SembleMcp.uvxCommand gitRef
+            Some(cmd.[0], cmd.[1..])
+
+    let search (launch: SembleMcp.Launch) (query: string) (repoPath: string) (topK: int) : Task<SembleMcp.Hit list> =
+        task {
+            match invocation launch with
+            | None -> return []
+            | Some(command, args) ->
+                if String.IsNullOrWhiteSpace query || String.IsNullOrWhiteSpace repoPath then
+                    return []
+                else
+                    let k = if topK < 1 then 1 else topK
+
+                    let toolArgs =
+                        createObj
+                            [ "query" ==> query
+                              "repo" ==> repoPath
+                              "top_k" ==> k
+                              "max_snippet_lines" ==> SembleMcp.maxSnippetLines ]
+
+                    match! SembleMcpStdio.callTool command args SembleMcp.toolName toolArgs 15000 with
+                    | None -> return []
+                    | Some raw -> return SembleSearchCodec.parseToolResult raw
+        }
+
+    let searchFromEnvironment (query: string) (repoPath: string) (topK: int) =
+        search (launchFromEnvironment ()) query repoPath topK

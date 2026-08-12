@@ -176,8 +176,10 @@
 | Seal Barrier | COMPANION-009：provider-visible bytes 一旦发出永久 sealed |
 | SealRoot | COMPANION-013：probe 生成后由 committed epoch 原样继承 |
 | SelectedAgent | PROMPT-002：由 Authority Root 冻结、Fallback 不得改写的 Agent |
+| Semble MCP | AGENT-027：内部 stdio 语义搜索；非 Host MCP；Strength 当前不消费 |
 | SessionExecutionClass | HOST-008：Work / InternalLeaf |
 | SessionOwnership | HOST-008：Root / Attached(ownerSessionId, AttachmentKind) |
+| stealth-browser MCP | AGENT-026：Browser 专用 Host MCP；schema 键 `stealth-browser-mcp_*`；域能力 `ToolPermission.Network` |
 | StrengthCandidate | STRENGTH-006：已 durable 准备且仅绑定一个 TargetProviderRun、尚未成为语义历史的只读 frame bundle |
 | StrengthCandidatePrepared | STRENGTH-006/017：Candidate 已 commit 到 EventStore 并绑定 TargetProviderRun 的 durable 事实 |
 | StrengthCandidatePromoted | STRENGTH-007：TargetProviderRun 已产生消费证据后的不可删除语义历史 |

@@ -70,7 +70,28 @@ SyncDelegate 工具（`inspector` / `coder` 作为 dedicated callee）的 Sessio
 Meditator 正式工具面只有 SyncDelegate `inspector`。所有权边界：
 
 1. Host-final permission 与 ToolRegistry 两层都必须拒绝 Meditator 的 `read` / `glob` / `grep` /
-   write/edit/executor/coder/fork/join/list/PTY/network（与 AGENT-006/025 同集）。
+   write/edit/executor/coder/fork/join/list/PTY/`stealth-browser-mcp_*`（与 AGENT-006/025 同集）。
 2. Epistemic style 只属于 Meditator system prompt / prompt ownership，**不是** LearningState、QA、
    Compile、RequestKind 或 final `return` 协议；禁止为 Meditator 新造 Student 式双门 profile。
 3. 不得把 `student`/`teacher` 旧名 alias 到 Meditator（AGENT-004）。
+
+## stealth-browser MCP 所有权（见 AGENT-026）
+
+| 面 | writer | 不可写 |
+|----|--------|--------|
+| 服务器名 / 工具前缀 / uvx command / `isTool` | `Kernel/StealthBrowserMcp.fs` | env、Host 对象 |
+| 启动判定（disabled / fixture / uvx）+ `config.mcp` 写入 | `StealthBrowserMcpConfig` ← `ManagedAgentConfig.applyOwnedFields` | agent permission 矩阵 |
+| Host schema `stealth-browser-mcp_*` allow/deny | `StaticTools.permissionObj` ← `ToolPermission.Network` | 第二套 role→MCP 表 |
+
+禁止第二处注入 `mcp.stealth-browser-mcp`。禁止把 MCP 工具名写进 `Roles.permissions` 字符串集；域能力只留 `ToolPermission.Network`。
+
+## Semble MCP 所有权（见 AGENT-027）
+
+| 面 | writer | 不可写 |
+|----|--------|--------|
+| 服务器名 / uvx / fixture / Launch / `launchFrom` / Hit | `Kernel/SembleMcp.fs` | env I/O、Host 对象 |
+| MCP payload → Hit | `SembleSearchCodec` | spawn |
+| stdio JSON-RPC `tools/call` | `SembleMcpStdio` | Host mcp、MCP SDK |
+| search 编排 | `SembleMcpClient` | `StrengthSpeculate`、`ManagedAgentConfig` |
+
+禁止第二处 spawn。禁止 Host config hook 写入 semble。禁止把 Semble 编入 AGENT-006 / permission schema / ToolRegistry / `js-*`。

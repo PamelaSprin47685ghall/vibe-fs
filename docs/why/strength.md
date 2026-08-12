@@ -22,6 +22,10 @@ Strength 需要的是与 primary 相同的 CanonicalRole 语境、不同的较�
 
 Replica 自己产生的 readonly 请求是策略干预，不是“没有 Strength 时 primary 本来会做什么”的观测。把 intervention 当 label 会形成自我强化闭环。deterministic control holdout 保留无干预 primary 轨迹，使 readonly 命中率、成本与质量差异可识别、可重启重现。
 
+## 为什么 Strength 不消费 Semble
+
+历史曾用 Semble 命中伪造 Inspector/Reviewer `read`。那把未发生的调查写成 primary 可见工具交换，破坏 STRENGTH-004/005「只保留真实 Host 工具」。Semble 能力见 AGENT-027；Strength 不调用。
+
 ## 为什么默认 K0
 
 Strength 是优化，不是正确性前提。成本关系、目标 ProviderRun、Host canary、durability 或 eligibility 任一无法证明时，最安全的选择是 K0；但已经 Promoted 的历史属于真实因果事实，即使新 speculation 熔断也必须继续恢复与 replay。

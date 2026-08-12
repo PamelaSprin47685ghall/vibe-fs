@@ -76,7 +76,7 @@ fast, deep, reviewer-fast, fast_reviewer
 | Coder | `read`, `write`, `edit`, `glob`, `grep`, `inspector`, `mv`, `rm`, `bash-honeypot` |
 | Inspector | `read`, `glob`, `grep`, `executor` |
 | DevOps | `fork-pty`, `executor`, `read`, `glob`, `grep`, `inspector`, `coder`, `join`, `list` |
-| Browser | `read`, `glob`, `grep`, network tools |
+| Browser | `read`, `glob`, `grep`, stealth-browser MCP（AGENT-026） |
 | Meditator | `inspector` only（见 AGENT-025） |
 | Reviewer | `read`, `glob`, `grep`, `verdict` |
 | Blogger | `blog` |
@@ -185,7 +185,7 @@ Meditator → { inspector }
 ```
 
 禁止再持有：`read` / `glob` / `grep` / `write` / `edit` / `executor` / `coder` /
-`fork-agent` / `fork-manager` / `fork-pty` / `join` / `list` / network，以及任何 filesystem 直读面。
+`fork-agent` / `fork-manager` / `fork-pty` / `join` / `list` / stealth-browser MCP，以及任何 filesystem 直读面。
 
 职责只有：reason / question / compare / challenge / synthesize。分层固定为
 `Meditator = reasoning`，`Inspector = evidence acquisition`（AGENT-024 边 `Meditator → Inspector`）。
@@ -204,3 +204,71 @@ Prompt discipline 吸收原 Student **epistemic style**（不是 workflow protoc
 作为 Meditator 业务阶段或 RequestKind。终端就是普通 Assistant completion。
 
 Student/Teacher 角色已删除（AGENT-020 空缺）；不得 alias 回本角色。
+
+## AGENT-026：Browser stealth-browser MCP
+
+Browser 的 network tools = Host MCP `stealth-browser-mcp` 的工具面。不是插件 ToolRegistry 工具，不是虚构 `network` 工具。
+
+Host-final `opencode.json` 必须由 config hook 注入：
+
+```text
+mcp.stealth-browser-mcp = {
+  type = "local"
+  command = uvx --python 3.13 --from git+https://github.com/vibheksoni/stealth-browser-mcp.git@{ref} python -m server
+  enabled = true
+}
+```
+
+`ref` 默认 `master`。`STEALTH_BROWSER_MCP_REF` 非空则覆盖。
+
+测试启动：
+
+```text
+STEALTH_BROWSER_MCP_DISABLED 为真            → enabled = false，不 spawn
+STEALTH_BROWSER_MCP_FIXTURE 非空             → command = node <fixture>，enabled = true
+WANXIANGSHU_TEST 为真且无 fixture            → enabled = false
+```
+
+权限（AGENT-007 第一层；fast/deep 相同，AGENT-010）：
+
+```text
+CanonicalRole.Browser → allow  stealth-browser-mcp_*
+其它 managed role     → deny   stealth-browser-mcp_*
+```
+
+域能力仍是 `ToolPermission.Network`。Host schema 键是 `stealth-browser-mcp_*`。OpenCode 把该 MCP 的每个工具暴露为 `stealth-browser-mcp_<tool>`。
+
+stealth-browser MCP 与 `read` / `glob` / `grep` 同类：Host-native，不进 ToolRegistry，不进 `js-*` 投影。第二层 execution gate 不适用于本 MCP 面。
+
+禁止：
+
+1. 把 stealth-browser MCP 编入 ToolRegistry / `js-*`
+2. 给非 Browser 角色 allow `stealth-browser-mcp_*`
+3. 用虚构 `network` 工具名冒充 MCP 面
+4. 依赖用户手工在 `opencode.json` 配置该 MCP
+5. 在 `WANXIANGSHU_TEST` 且无 fixture 时 spawn 真实 `uvx`
+
+## AGENT-027：内部 Semble MCP 搜索
+
+Semble 是进程内语义搜索：stdio MCP `search(query, repo, top_k)` → `Hit list`。历史用于 Strength 投机注入假 `read`；当前无调用者。能力必须存在。
+
+不是 Host MCP。不得写入 `config.mcp`。不得进入 AGENT-006 角色工具矩阵、permission schema、ToolRegistry、`js-*`、Strength Replica 工具面。
+
+启动判定与 stealth 同形，环境前缀 `SEMBLE_MCP_*`：
+
+```text
+SEMBLE_MCP_DISABLED 为真            → Disabled，search 返回 []
+SEMBLE_MCP_FIXTURE 非空             → command = node <fixture>
+WANXIANGSHU_TEST 为真且无 fixture   → Disabled
+否则 uvx --from "semble[mcp] @ git+https://github.com/MinishLab/semble.git@{ref}" semble
+```
+
+`ref` 默认 `main`。`SEMBLE_MCP_REF` 非空则覆盖。
+
+禁止：
+
+1. 注入 Host `config.mcp.semble` 或任何 role schema 键
+2. 把 search 结果伪装成 provider-visible `read`（历史 injection 已废止）
+3. Strength Replica 工具面加入 Semble
+4. 在 `WANXIANGSHU_TEST` 且无 fixture 时 spawn 真实 `uvx`
+5. 新增 `@modelcontextprotocol/sdk` 依赖

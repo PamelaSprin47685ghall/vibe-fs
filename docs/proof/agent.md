@@ -27,7 +27,7 @@
 
 | 证明 | 落点 / 形态 | 条款 |
 |------|-------------|------|
-| 工具面仅 `inspector` | Host schema + ToolRegistry 均无 read/glob/grep/write/edit/executor/coder/fork/join/list/PTY/network | AGENT-006、AGENT-025 |
+| 工具面仅 `inspector` | Host schema + ToolRegistry 均无 read/glob/grep/write/edit/executor/coder/fork/join/list/PTY/`stealth-browser-mcp_*` | AGENT-006、AGENT-025 |
 | SyncDelegate 边 | 仅 `Meditator → Inspector`；无反向 | AGENT-024 |
 | Epistemic style 在 prompt | meditator system prompt 含形成理解 / 反例 / 证据vs推论 / 综合 Inspector；无 LearningState/QA/Compile/return 协议 | AGENT-025 |
 | 无 Student workflow 移植 | 无 MeditatorLearn/Compile RequestKind；终端为普通 Assistant completion | AGENT-025 |
@@ -41,7 +41,31 @@
 | bash-honeypot 仅 Coder；调用不跑 shell | AGENT-023 |
 | DevOps 独占 PTY；Reviewer 只读 | AGENT-013、AGENT-014 |
 | Meditator inspector-only | AGENT-025 |
+| Browser stealth-browser MCP | AGENT-026 |
+| 内部 Semble MCP | AGENT-027 |
+
+## stealth-browser MCP
+
+| 证明 | 期望 | 条款 |
+|------|------|------|
+| Host schema 键 | Browser allow `stealth-browser-mcp_*`；其它 role deny；无虚构 `network` | AGENT-006、AGENT-026 |
+| wildcard 求值 | Browser 对 `stealth-browser-mcp_get_debug_view` = allow；Coder/Meditator = deny | AGENT-007、AGENT-026 |
+| config 注入 | `configureFromHostConfig` 写入 `mcp.stealth-browser-mcp`；不删其它 MCP | AGENT-026 |
+| 启动判定 | disabled / fixture / test / uvx ref 四分支确定性 | AGENT-026 |
+| 不进 ToolRegistry / js-* | plugin `tool` 注册表无 stealth-browser 名；js-browser 仍仅 fs 投影 | AGENT-026、JS-001 |
+
+## 内部 Semble MCP
+
+| 证明 | 期望 | 条款 |
+|------|------|------|
+| command / launch | `uvx --from "semble[mcp] @ git+…@{ref}" semble`；disabled / fixture / test / uvx 四分支 | AGENT-027 |
+| parse | MCP text JSON → Hit list；缺 `file_path` skip；非法 JSON → `[]` | AGENT-027 |
+| Disabled search | 不 spawn，返回 `[]` | AGENT-027 |
+| Fixture search | stdio roundtrip 命中确定性 Hit，转发 query/repo/`top_k`/`max_snippet_lines` | AGENT-027 |
+| 不进 Host mcp | `configureFromHostConfig` 后 `config.mcp.semble` 不存在；stealth 仍注入 | AGENT-027 |
+| 不进 Strength / AGENT-006 | permission 无 `semble` / `semble_*` 键 | AGENT-027、STRENGTH-004 |
 
 代表测试：`tests/unit/agent/catalog.test.mjs`、`tests/unit/plugin/agent-permission-gate.test.mjs`、
+`tests/unit/agent/stealth-browser-mcp.test.mjs`、`tests/unit/agent/semble-mcp.test.mjs`、
 `tests/integration/plugin/manager-tool-contract.test.mjs`、`file-mutation-tools.test.mjs`；
 Meditator inspector-only / Student-Teacher absence ratchet 随 G3 落地。

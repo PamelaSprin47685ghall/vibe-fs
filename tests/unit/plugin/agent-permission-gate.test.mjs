@@ -94,7 +94,7 @@ const mergedRules = (config, name) => [...hostDefaults(), ...rulesOf(config.agen
 
 const allowList = (config, name) => {
   const rules = mergedRules(config, name)
-  const tools = ['bash', 'bash-honeypot', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'inspector', 'executor', 'coder', 'fork', 'fork-manager', 'fork-pty', 'join', 'list', 'network', 'verdict', 'blog', 'return', 'fetch', 'suicide']
+  const tools = ['bash', 'bash-honeypot', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'inspector', 'executor', 'coder', 'fork', 'fork-manager', 'fork-pty', 'join', 'list', 'stealth-browser-mcp_*', 'verdict', 'blog', 'return', 'fetch', 'suicide']
   return tools.filter((tool) => evaluate(rules, tool, '*').action === 'allow')
 }
 
@@ -104,7 +104,7 @@ const ROLE_ALLOW = {
   Orchestrator: ['fork-manager', 'join'],
   Coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspector', 'mv', 'rm', 'bash-honeypot', 'fetch'],
   Inspector: ['read', 'glob', 'grep', 'executor', 'fetch'],
-  Browser: ['read', 'glob', 'grep', 'network'],
+  Browser: ['read', 'glob', 'grep', 'stealth-browser-mcp_*'],
   Meditator: ['inspector'],
   Reviewer: ['read', 'glob', 'grep', 'verdict'],
   DevOps: ['read', 'glob', 'grep', 'inspector', 'executor', 'coder', 'join', 'list', 'fork-pty'],
@@ -227,7 +227,7 @@ test('roles.permissions_agree_with_the_host_schema_matrix', () => {
       inspector: 'Inspector',
       executor: 'Exec',
       coder: 'Coder',
-      network: 'Network',
+      'stealth-browser-mcp_*': 'Network',
       verdict: 'Verdict',
       blog: 'Blog',
       return: 'Return',

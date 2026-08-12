@@ -165,7 +165,7 @@ const KNOWN_TOOL_KEYS = [
   'inspector',
   'coder',
   'executor',
-  'network',
+  'stealth-browser-mcp_*',
   'verdict',
   'blog',
   'return',
@@ -190,7 +190,7 @@ const ALLOWED_TOOLS = {
   coder: ['read', 'write', 'edit', 'glob', 'grep', 'inspector', 'fetch', 'mv', 'rm', 'bash-honeypot'],
   inspector: ['read', 'glob', 'grep', 'executor', 'fetch'],
   devops: ['fork-pty', 'join', 'list', 'read', 'glob', 'grep', 'inspector', 'coder', 'executor'],
-  browser: ['read', 'glob', 'grep', 'network'],
+  browser: ['read', 'glob', 'grep', 'stealth-browser-mcp_*'],
   meditator: ['inspector'],
   reviewer: ['read', 'glob', 'grep', 'verdict'],
   // ENFORCER-010: Blogger's tool set is exactly { blog }.
@@ -365,7 +365,7 @@ const PROMPT_CLAUSES = {
   'fast-browser': {
     required: [
       /Information Navigator/,
-      /`network`/,
+      /stealth-browser-mcp/,
       /do \*\*not\*\* have/i,
       /Browser-only web access/i,
       /MUST NOT use [`']read[`'], [`']glob[`'], or [`']grep[`'] to read or search local workspace or repository files/i,

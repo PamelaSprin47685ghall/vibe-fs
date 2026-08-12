@@ -109,6 +109,7 @@ test('MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model', () => {
   applyOwnedFields(cfg, inventory)
 
   assert.equal(cfg.compaction.auto, false, 'compaction.auto must be forced false')
+  assert.equal(cfg.mcp['stealth-browser-mcp'].type, 'local')
   for (const name of NAMES) {
     const entry = cfg.agent[name]
     assert.ok(entry.mode !== undefined, `${name} must receive owned mode`)

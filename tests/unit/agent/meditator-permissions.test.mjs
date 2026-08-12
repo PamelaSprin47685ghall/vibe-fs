@@ -101,5 +101,6 @@ test('G3_Meditator_host_schema_allow_list_is_inspector_only', () => {
     for (const tool of READ_TOOLS) {
       assert.notEqual(permission[tool], 'allow', `${name} must not allow ${tool}`)
     }
+    assert.notEqual(permission['stealth-browser-mcp_*'], 'allow', `${name} must not allow stealth-browser MCP`)
   }
 })

@@ -52,7 +52,7 @@ module StaticTools =
         | ToolPermission.Coder -> "coder"
         | ToolPermission.Exec -> "executor"
         | ToolPermission.Pty -> "fork-pty"
-        | ToolPermission.Network -> "network"
+        | ToolPermission.Network -> StealthBrowserMcp.permissionKey
         | ToolPermission.Verdict -> "verdict"
         | ToolPermission.Blog -> "blog"
         | ToolPermission.Return -> "return"
@@ -96,7 +96,7 @@ module StaticTools =
           "inspector"
           "coder"
           "executor"
-          "network"
+          StealthBrowserMcp.permissionKey
           "verdict"
           "blog"
           "return"

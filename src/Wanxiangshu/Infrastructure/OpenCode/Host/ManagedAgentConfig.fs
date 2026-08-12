@@ -145,12 +145,13 @@ module ManagedAgentConfig =
 
     /// Apply Wanxiangshu-owned non-model fields onto Host agent entries.
     /// Never creates missing agents, never writes/overwrites model.
-    ///
     /// Walks the full required 20-name inventory (not just validated bindings):
     /// AGENT-007's first layer is fail-closed, so a validation failure elsewhere
     /// in the config must not silently drop every permission write. Missing
     /// agents stay untouched (no invented agents).
     let applyOwnedFields (config: obj) (inventory: ManagedAgentInventory) : unit =
+        StealthBrowserMcpConfig.apply config (StealthBrowserMcpConfig.launchFromEnvironment ())
+
         if isNull config then
             ()
         else
@@ -189,7 +190,6 @@ module ManagedAgentConfig =
                                     | Role.Blogger -> StaticTools.bloggerAgentConfig prompts.BloggerSystemPrompt
                                     | Role.Executor -> StaticTools.executorAgentConfig prompts.ExecutorSystemPrompt
 
-                                // Copy Wanxiangshu-owned keys without touching model.
                                 entry?mode <- owned?mode
                                 entry?permission <- owned?permission
 
