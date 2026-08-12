@@ -20,15 +20,6 @@ module Codec =
 
     let inquiryResultObject (handle: string option) (inquiryResult: InquiryResult) =
         match inquiryResult with
-        | InquiryResult.Yield request ->
-            envelope
-                handle
-                [ "status" ==> "yield"
-                  "request" ==> requestObject request ]
-        | InquiryResult.Answered answer ->
-            envelope
-                handle
-                [ "status" ==> "answered"
-                  "answer" ==> answerObject answer ]
-        | InquiryResult.Error error ->
-            envelope handle [ "status" ==> "error"; "error" ==> error ]
+        | InquiryResult.Yield request -> envelope handle [ "status" ==> "yield"; "request" ==> requestObject request ]
+        | InquiryResult.Answered answer -> envelope handle [ "status" ==> "answered"; "answer" ==> answerObject answer ]
+        | InquiryResult.Error error -> envelope handle [ "status" ==> "error"; "error" ==> error ]

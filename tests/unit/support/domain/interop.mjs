@@ -49,12 +49,13 @@ export const fableLibraryDir = (() => {
 export const lib = (name) => import(join(fableLibraryDir, name))
 export const prod = (name) => import(join(BUILD_ROOT, `${name}.js`))
 
-export const [DateOffset, FsMap, FsList, FsResult, FsSet, AsyncBuilder] = await Promise.all([
+export const [DateOffset, FsMap, FsList, FsResult, FsSet, FsUtil, AsyncBuilder] = await Promise.all([
   lib('DateOffset.js'),
   lib('Map.js'),
   lib('List.js'),
   lib('Result.js'),
   lib('Set.js'),
+  lib('Util.js'),
   lib('AsyncBuilder.js'),
 ])
 
@@ -406,6 +407,12 @@ export const mapTryFind = (key, map) => unwrapOption(FsMap.tryFind(key, map))
 /** Plain object → FSharpMap (for string-keyed maps). */
 export const mapOf = (obj) =>
   FsMap.ofArray(Object.entries(obj).map(([k, v]) => [k, v]), ordinalComparer)
+
+/** Fable structural comparer, kept behind the test anti-corruption boundary. */
+export const structuralComparer = { Compare: (left, right) => FsUtil.compare(left, right) }
+
+/** [key,value][] → FSharpMap without exposing compiler-runtime imports to tests. */
+export const mapOfEntries = (entries, comparer = ordinalComparer) => FsMap.ofArray(entries, comparer)
 
 /** FSharpList → array. */
 export const listItems = (list) => FsList.toArray(list)
