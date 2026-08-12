@@ -117,7 +117,7 @@ Host 在当前 provider assistant id 产生后才暴露 `ProviderRunIdentity`。
 
 ```text
 OpeningPromptRaw / AssignmentText 拼接冒充 Mission 或 Opening
-Sphinx Kernel / semantic contribution 假装现行 Prompt 层（V1 absent）
+Sphinx Kernel / MCP observation 假装 Prompt composition 层；Sphinx 是独立认识状态 owner（SPHINX-005）
 把 ExecutionBinding 变化写成 Persona / system prompt 换人
 把 Office Library 写成 Role Law 或 universal bible
 ```

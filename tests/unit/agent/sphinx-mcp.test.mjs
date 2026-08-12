@@ -84,7 +84,7 @@ test.before(() => {
 test('AGENT_030_kernel_identity_and_commands', () => {
   assert.equal(serverName, 'sphinx')
   assert.equal(permissionKey, 'sphinx_*')
-  assert.equal(relativeServerEntry, 'dist/sphinx/mcp-server.js')
+  assert.equal(relativeServerEntry, 'dist/Sphinx/McpServer.js')
   assert.equal(isTool('sphinx_start'), true)
   assert.equal(isTool('sphinx_resume'), true)
   assert.equal(isTool('stealth-browser-mcp_get_debug_view'), false)
@@ -95,7 +95,7 @@ test('AGENT_030_kernel_identity_and_commands', () => {
 
 test('AGENT_030_launch_disabled_fixture_test_local', () => {
   const entry = defaultServerEntry()
-  assert.ok(entry.endsWith(join('dist', 'sphinx', 'mcp-server.js')))
+  assert.ok(entry.endsWith(join('dist', 'Sphinx', 'McpServer.js')))
 
   const disabled = injected({ SPHINX_MCP_DISABLED: '1' })
   assert.equal(disabled.enabled, false)

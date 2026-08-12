@@ -1,193 +1,121 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import {
-  activateMethods,
-  canonicalAnswer,
-  closure,
-  createEpistemicState,
-  deriveRootContract,
-  evidenceMassWithoutExogenous,
-  METHODS,
-  resumeInquiry,
-  semanticKeyOf,
-  startInquiry,
-  stopValue,
-  bestActionValue,
-} from '../../../src/sphinx/kernel/index.js'
+
+import { close } from '../../../dist/Sphinx/Closure.js'
+import { createStore, start, resume, state, assessWhy } from './support.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '../../..')
 
-test('kernel_has_no_wanxiangshu_imports', async () => {
-  const { readdir, readFile } = await import('node:fs/promises')
-  async function walk(dir) {
-    const entries = await readdir(dir, { withFileTypes: true })
-    const files = []
-    for (const entry of entries) {
-      const full = join(dir, entry.name)
-      if (entry.isDirectory()) files.push(...(await walk(full)))
-      else if (entry.name.endsWith('.js')) files.push(full)
-    }
-    return files
-  }
-  const files = await walk(join(root, 'src/sphinx'))
-  assert.ok(files.length > 0)
-  for (const file of files) {
-    const source = await readFile(file, 'utf8')
-    assert.equal(/Wanxiangshu|wanxiangshu\//i.test(source), false, file)
-  }
+test('start_yields_semantic_assessment_and_contract_keeps_distribution', () => {
+  const store = createStore()
+  const started = start(store, '花儿为什么这样红？')
+  assert.equal(started.status, 'yield')
+  assert.equal(started.request.type, 'SemanticAssessmentRequest')
+
+  const assessed = assessWhy(store, started.handle)
+  assert.equal(assessed.status, 'yield')
+  assert.equal(assessed.request.type, 'GenerateCandidatesRequest')
+  assert.equal(assessed.request.contract.formBelief.Why, 0.8)
+  assert.equal(assessed.request.contract.formBelief.How, 0.2)
+  assert.equal(assessed.request.contract.contractBelief.Explanation, 0.8)
+  assert.equal(assessed.request.contract.contractBelief.Plan, 0.2)
 })
 
-test('semantic_assessment_derives_root_contract_and_activates_methods', () => {
-  let { state, result } = startInquiry('花儿为什么这样红？')
-  assert.equal(result.status, 'yield')
-  assert.equal(result.request.type, 'SemanticAssessmentRequest')
+test('semantic_assessment_and_candidates_are_control_observations_not_world_evidence', () => {
+  const store = createStore()
+  const started = start(store, '为什么天空是蓝色？')
+  assessWhy(store, started.handle)
 
-  ;({ state, result } = resumeInquiry(state, {
-    type: 'SemanticAssessment',
-    forms: { Why: 0.75, How: 0.18, Other: 0.07 },
-    facets: { causal: 0.84, explanatory: 0.91, predictive: 0.06 },
-  }))
+  let current = state(store, started.handle)
+  assert.equal(current.Evidence.size, 0)
+  assert.equal(current.Findings.size, 0)
 
-  assert.equal(result.status, 'yield')
-  assert.equal(result.request.type, 'GenerateCandidatesRequest')
-  assert.equal(state.R.primaryForm, 'Why')
-  assert.equal(state.R.primaryContract, 'Explanation')
-  assert.ok(state.activatedMethods.includes('Multidisciplinary'))
-  assert.ok(state.activatedMethods.includes('Abduction'))
-  assert.ok(state.activatedMethods.includes('Synthesis'))
-  assert.ok(state.A.length >= 1)
-  assert.ok(state.B.evidenceMass > 0)
-})
-
-test('closure_dedups_by_semantic_key_and_prunes_zero_novelty', () => {
-  let state = createEpistemicState('why is the sky blue?')
-  state = closure(
-    state,
-    {
-      type: 'SemanticAssessment',
-      forms: { Why: 1 },
-      facets: { explanatory: 1, causal: 0.8 },
-    },
-    { exogenous: true },
-  )
-  state = closure(
-    state,
-    {
-      type: 'Candidates',
-      items: [
-        { method: 'Abduction', text: 'Rayleigh scattering', semanticKey: 'abduction:rayleigh' },
-        { method: 'Abduction', text: 'Rayleigh scattering', semanticKey: 'abduction:rayleigh' },
-        { method: 'Analogy', text: 'sunset red contrast', semanticKey: 'analogy:sunset' },
-      ],
-    },
-    { exogenous: true },
-  )
-
-  const keys = state.A.map((a) => a.semanticKey)
-  assert.equal(keys.filter((k) => k === 'abduction:rayleigh').length, 1)
-  assert.ok(keys.includes('analogy:sunset'))
-
-  const massAfterFirst = state.B.evidenceMass
-  const again = closure(
-    state,
-    {
-      type: 'Candidates',
-      items: [
-        { method: 'Abduction', text: 'Rayleigh scattering', semanticKey: 'abduction:rayleigh' },
-      ],
-    },
-    { exogenous: true },
-  )
-  assert.equal(again.B.evidenceMass, massAfterFirst)
-  assert.equal(
-    again.B.hypotheses.filter((h) => h.semanticKey === 'abduction:rayleigh').length,
-    state.B.hypotheses.filter((h) => h.semanticKey === 'abduction:rayleigh').length,
-  )
-})
-
-test('no_free_information_without_exogenous_observation', () => {
-  let state = createEpistemicState('will silver rise tomorrow?')
-  state = closure(
-    state,
-    {
-      type: 'SemanticAssessment',
-      forms: { Polar: 0.9, Other: 0.1 },
-      facets: { predictive: 0.8, comparative: 0.5 },
-    },
-    { exogenous: true },
-  )
-  const mass = state.B.evidenceMass
-  assert.ok(mass > 0)
-  assert.equal(evidenceMassWithoutExogenous(state), mass)
-  const replay = closure(state, null, { exogenous: false })
-  assert.equal(replay.B.evidenceMass, mass)
-})
-
-test('stop_dominates_when_synthesis_present', () => {
-  let state = createEpistemicState('花儿为什么这样红？')
-  state = closure(
-    state,
-    {
-      type: 'SemanticAssessment',
-      forms: { Why: 0.8, How: 0.2 },
-      facets: { explanatory: 0.9, causal: 0.7 },
-    },
-    { exogenous: true },
-  )
-  state = closure(
-    state,
-    {
-      type: 'Candidates',
-      items: [
-        { method: 'Multidisciplinary', text: 'anthocyanin chemistry', semanticKey: 'multi:anthocyanin' },
-        { method: 'Abduction', text: 'pollinator signaling', semanticKey: 'abd:pollinator' },
-      ],
-    },
-    { exogenous: true },
-  )
-  state = closure(
-    state,
-    {
-      type: 'Synthesis',
-      text: 'Chemistry and ecology jointly explain the redness.',
-      strands: ['anthocyanin', 'pollinator'],
-    },
-    { exogenous: true },
-  )
-  assert.ok(stopValue(state) >= bestActionValue(state))
-  const answer = canonicalAnswer(state, 'stop-dominates')
-  assert.equal(answer.question, '花儿为什么这样红？')
-  assert.match(answer.synthesis.text, /Chemistry/)
-  assert.ok(answer.strands.length >= 1)
-  assert.equal(answer.stopReason, 'stop-dominates')
-})
-
-test('method_library_phase0_is_fixed', () => {
-  assert.deepEqual(METHODS, [
-    'Multidisciplinary',
-    'Abduction',
-    'Analogy',
-    'Counterexample',
-    'Synthesis',
-  ])
-  const contract = deriveRootContract({ Why: 0.7, How: 0.3 }, { explanatory: 1 })
-  const blank = createEpistemicState('q')
-  const state = {
-    ...blank,
-    R: contract,
-    B: { ...blank.B, formBelief: contract.formBelief, facets: contract.facets },
-  }
-  const activated = activateMethods(state, 0)
-  assert.ok(activated.includes('Multidisciplinary'))
-})
-
-test('semantic_key_helper_is_stable', () => {
-  const key = semanticKeyOf({
-    type: 'Synthesis',
-    text: '  Hello   World ',
+  const next = resume(store, started.handle, {
+    type: 'Candidates',
+    items: [
+      {
+        method: 'Abduction',
+        question: '瑞利散射是否足以解释蓝色？',
+        semanticKey: 'question:rayleigh',
+        expectedRootGain: 0.95,
+        cost: 0.2,
+      },
+    ],
   })
-  assert.equal(key, 'synthesis:hello world')
+  assert.equal(next.request.type, 'InvestigateRequest')
+
+  current = state(store, started.handle)
+  assert.equal(current.Evidence.size, 0)
+  assert.equal(current.Findings.size, 0)
+})
+
+test('candidate_question_must_be_investigated_before_it_can_affect_answer', () => {
+  const store = createStore()
+  const started = start(store, '花儿为什么这样红？')
+  assessWhy(store, started.handle)
+
+  const candidate = resume(store, started.handle, {
+    type: 'Candidates',
+    items: [
+      {
+        method: 'CausalMechanism',
+        question: '花青素合成链如何产生红色？',
+        semanticKey: 'question:anthocyanin-chain',
+        expectedRootGain: 0.9,
+        gatewayGain: 0.2,
+        cost: 0.2,
+      },
+    ],
+  })
+
+  assert.equal(candidate.status, 'yield')
+  assert.equal(candidate.request.type, 'InvestigateRequest')
+  assert.equal(candidate.request.action.semanticKey, 'question:anthocyanin-chain')
+})
+
+test('resume_rejects_observation_that_does_not_match_pending_kernel_request', () => {
+  const store = createStore()
+  const started = start(store, '为什么程序卡住？')
+  const before = state(store, started.handle).Revision
+
+  const wrong = resume(store, started.handle, {
+    type: 'Synthesis',
+    text: '跳过调查直接作答',
+  })
+
+  assert.equal(wrong.status, 'error')
+  assert.match(wrong.error, /expected SemanticAssessment/)
+  assert.equal(state(store, started.handle).Revision, before)
+})
+
+test('closure_is_idempotent_at_fixed_point', () => {
+  const store = createStore()
+  const started = start(store, '花儿为什么这样红？')
+  assessWhy(store, started.handle)
+  const current = state(store, started.handle)
+  assert.deepEqual(close(current), current)
+})
+
+test('fsharp_kernel_has_no_agent_host_domain_dependency_and_sdk_stays_at_mcp_edge', () => {
+  const sourceDir = join(root, 'src/Wanxiangshu/Sphinx')
+  const files = readdirSync(sourceDir).filter((name) => name.endsWith('.fs')).sort()
+  assert.ok(files.length >= 10)
+
+  for (const name of files) {
+    const source = readFileSync(join(sourceDir, name), 'utf8')
+    assert.doesNotMatch(source, /open Wanxiangshu\.(Domain|OpenCode|Journal|Session|Agent|Application)/)
+    if (name !== 'McpServer.fs') assert.doesNotMatch(source, /@modelcontextprotocol\/sdk|\bzod\b/)
+  }
+
+  const project = readFileSync(join(root, 'src/Wanxiangshu/Wanxiangshu.fsproj'), 'utf8')
+  assert.match(project, /Sphinx\/Types\.fs/)
+  assert.match(project, /Sphinx\/McpServer\.fs/)
+
+  const build = readFileSync(join(root, 'scripts/build.mjs'), 'utf8')
+  assert.doesNotMatch(build, /fs\.cpSync\([^\n]*sphinx/i)
+  assert.match(build, /dist[^\n]*Sphinx[^\n]*McpServer\.js/)
 })

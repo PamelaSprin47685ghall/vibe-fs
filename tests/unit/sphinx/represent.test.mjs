@@ -1,42 +1,98 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  contractRepresentation,
-  optimizeRepresentation,
-  paretoRepresentative,
-  createEpistemicState,
-  closure,
-} from '../../../src/sphinx/kernel/index.js'
 
-test('pareto_representative_keeps_non_dominated_action', () => {
-  const rep = paretoRepresentative([
-    { id: 'a', semanticKey: 'eq:1', value: 0.4, cost: 2 },
-    { id: 'b', semanticKey: 'eq:2', value: 0.8, cost: 1 },
-  ])
-  assert.equal(rep.id, 'b')
+import { createStore, start, resume, state, assessWhy } from './support.mjs'
+
+test('explicit_equivalence_allows_dominated_representative_to_be_removed', () => {
+  const store = createStore()
+  const started = start(store, '为什么会这样？')
+  assessWhy(store, started.handle)
+
+  resume(store, started.handle, {
+    type: 'Candidates',
+    items: [
+      {
+        method: 'Abduction',
+        question: '较贵表示',
+        semanticKey: 'candidate:expensive',
+        equivalenceKey: 'same-future-decision',
+        expectedRootGain: 0.9,
+        cost: 0.4,
+        provenance: ['generator:a'],
+      },
+      {
+        method: 'Abduction',
+        question: '较便宜表示',
+        semanticKey: 'candidate:cheap',
+        equivalenceKey: 'same-future-decision',
+        expectedRootGain: 0.9,
+        cost: 0.2,
+        provenance: ['generator:b'],
+      },
+    ],
+  })
+
+  const current = state(store, started.handle)
+  assert.equal(current.Actions.size, 1)
+  assert.equal([...current.Actions][0][1].SemanticKey, 'candidate:cheap')
 })
 
-test('contract_representation_merges_equivalence_class', () => {
-  const { compressed, classes } = contractRepresentation([
-    { id: 'a', semanticKey: 'same', equivalenceClass: 'class:1', value: 0.3, cost: 1 },
-    { id: 'b', semanticKey: 'same-2', equivalenceClass: 'class:1', value: 0.9, cost: 1 },
-  ])
-  assert.equal(compressed.length, 1)
-  assert.equal(classes['class:1'].length, 2)
-  assert.equal(compressed[0].id, 'b')
+test('same_question_from_independent_dependency_groups_is_not_false_deduplicated', () => {
+  const store = createStore()
+  const started = start(store, '为什么会这样？')
+  assessWhy(store, started.handle)
+
+  resume(store, started.handle, {
+    type: 'Candidates',
+    items: [
+      {
+        method: 'SourceTriangulation',
+        question: '独立来源是否支持该命题？',
+        semanticKey: 'question:triangulate',
+        dependencyKey: 'source:a',
+        expectedRootGain: 0.8,
+        cost: 0.2,
+      },
+      {
+        method: 'SourceTriangulation',
+        question: '独立来源是否支持该命题？',
+        semanticKey: 'question:triangulate',
+        dependencyKey: 'source:b',
+        expectedRootGain: 0.8,
+        cost: 0.2,
+      },
+    ],
+  })
+
+  assert.equal(state(store, started.handle).Actions.size, 2)
 })
 
-test('optimize_representation_runs_in_closure', () => {
-  let state = createEpistemicState('represent?')
-  state = closure(
-    state,
-    {
-      type: 'SemanticAssessment',
-      forms: { Why: 1 },
-      facets: { explanatory: 1 },
-    },
-    { exogenous: true },
-  )
-  assert.ok(state.represent)
-  assert.ok(Array.isArray(state.represent.pivots))
+test('pareto_incomparable_equivalent_representations_both_survive', () => {
+  const store = createStore()
+  const started = start(store, '为什么会这样？')
+  assessWhy(store, started.handle)
+
+  resume(store, started.handle, {
+    type: 'Candidates',
+    items: [
+      {
+        method: 'Abduction',
+        question: '高收益高成本',
+        semanticKey: 'candidate:high',
+        equivalenceKey: 'pareto-class',
+        expectedRootGain: 1,
+        cost: 0.4,
+      },
+      {
+        method: 'Abduction',
+        question: '低收益低成本',
+        semanticKey: 'candidate:low',
+        equivalenceKey: 'pareto-class',
+        expectedRootGain: 0.7,
+        cost: 0.1,
+      },
+    ],
+  })
+
+  assert.equal(state(store, started.handle).Actions.size, 2)
 })

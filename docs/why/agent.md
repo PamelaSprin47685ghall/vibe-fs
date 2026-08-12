@@ -55,7 +55,7 @@ Catalog / Role DU 基线随 GrandRewrite 重命名后对齐；旧名 fail closed
 拒插件 `network`：没有真实 executor，schema 撒谎。拒全局 webfetch/websearch：那是 Host 通用网关，不是 Browser 专用隐身浏览面，且会漏给其它角色。选 OpenCode MCP `stealth-browser-mcp`：工具由 MCP 服务器定义，Host 负责 spawn/schema，Wanxiangshu 只注入服务器并按角色锁 `stealth-browser-mcp_*`。测试默认 disabled，避免 `uvx` 打真实 git。
 
 **Sphinx 认识面：正交 Host MCP vs 内嵌万象术闭包 vs 无状态单次工具。**  
-拒内嵌：闭包与 Agent domain 缠死，无法独立证明 Phase 0。拒无状态：无法表达 yield/resume 与 handle 会话。选 `src/sphinx` + `mcp.sphinx` 自动注入；仅 Inquiry allow `sphinx_*`；测试默认 disabled / fixture（AGENT-030、SPHINX-005）。Sphinx 允许 `@modelcontextprotocol/sdk`；Semble 仍禁止（AGENT-027）。
+拒内嵌：闭包与 Agent domain 缠死，认识内核无法独立证明。拒无状态：无法表达 yield/resume 与 handle 会话。选 `src/Wanxiangshu/Sphinx` F# Kernel + `mcp.sphinx` 自动注入；仅 Inquiry allow `sphinx_*`；测试默认 disabled / fixture（AGENT-030、SPHINX-005）。Sphinx 仅在 `McpServer.fs` wire 边界允许 `@modelcontextprotocol/sdk` / zod；Semble 仍禁止（AGENT-027）。
 
 **内部 Semble：能力保留 vs Host 接线 / Strength 注入。**  
 拒 Host mcp：语义搜索会漏进所有角色 schema。拒 Strength 注入：STRENGTH-004 Replica 只允许真实 `read/glob/grep`；假 read 污染 primary 可见历史。选进程内 stdio client：调用方显式 `search`，当前无调用者。测试默认 Disabled，避免 `uvx` 打真实 git。不引入 MCP SDK。

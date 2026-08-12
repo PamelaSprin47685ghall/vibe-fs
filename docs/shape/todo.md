@@ -74,7 +74,7 @@ PrefixCoverage + ActivePrefixEpoch(TodoCheckpoint) → lag-1 Y 替换（TODO-009
 | ephemeral JS bridge 作 durable truth | Journal Prepared/Accepted only（TODO-004/012） |
 | ordinal winner 仲裁同 message 多 todowrite | 全部 fail closed（TODO-004） |
 | process PERFECT 计入 terminal dual-PERFECT | 分型保留；enlist 后 fresh 2N（TODO-010） |
-| Sphinx Kernel / semantic contribution 假装 Magic Todo 层 | V1 absent；不得写入现行 owner 表 |
+| Sphinx Kernel / MCP observation 假装 Magic Todo 层 | Sphinx 独立认识状态 owner；不得写入 Todo owner 表（SPHINX-005） |
 
 ## 数据流边界（成功路径）
 

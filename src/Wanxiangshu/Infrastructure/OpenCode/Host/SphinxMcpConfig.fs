@@ -33,7 +33,7 @@ module SphinxMcpConfig =
         pathJoin (pathJoin (pathJoin (pathJoin (here, ".."), ".."), ".."), "..")
 
     let defaultServerEntry () : string =
-        pathJoin (pathJoin (pathJoin (packageRoot (), "dist"), "sphinx"), "mcp-server.js")
+        pathJoin (pathJoin (pathJoin (packageRoot (), "dist"), "Sphinx"), "McpServer.js")
 
     let private envValue (read: string -> string option) (name: string) =
         match read name with

@@ -1,125 +1,106 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createSessionStore } from '../../../src/sphinx/session.js'
-import { createSphinxMcpServer } from '../../../src/sphinx/mcp-server.js'
 
-test('start_returns_opaque_handle_and_semantic_request', () => {
-  const store = createSessionStore()
-  const out = store.start('花儿为什么这样红？')
-  assert.equal(out.status, 'yield')
-  assert.equal(typeof out.handle, 'string')
-  assert.match(out.handle, /^[0-9a-f-]{36}$/i)
-  assert.equal(out.request.type, 'SemanticAssessmentRequest')
-  assert.equal(out.request.question, '花儿为什么这样红？')
+import { create } from '../../../dist/Sphinx/McpServer.js'
+import { createStore, start, resume, assessWhy } from './support.mjs'
+
+test('handle_is_opaque_process_local_session_key', () => {
+  const store = createStore()
+  const started = start(store, '花儿为什么这样红？')
+  assert.equal(typeof started.handle, 'string')
+  assert.match(started.handle, /^[0-9a-f-]{36}$/i)
+
+  assert.equal(resume(store, '', { type: 'SemanticAssessment', forms: { Why: 1 } }).error, 'missing handle')
+  assert.equal(
+    resume(store, '00000000-0000-4000-8000-000000000000', {
+      type: 'SemanticAssessment',
+      forms: { Why: 1 },
+    }).error,
+    'unknown handle',
+  )
 })
 
-test('resume_missing_or_unknown_handle_fails', () => {
-  const store = createSessionStore()
-  assert.deepEqual(store.resume('', { type: 'SemanticAssessment', forms: { Why: 1 } }), {
-    status: 'error',
-    error: 'missing handle',
-  })
-  assert.deepEqual(store.resume(null, { type: 'SemanticAssessment', forms: { Why: 1 } }), {
-    status: 'error',
-    error: 'missing handle',
-  })
-  const bad = store.resume('00000000-0000-4000-8000-000000000000', {
-    type: 'SemanticAssessment',
-    forms: { Why: 1 },
-  })
-  assert.equal(bad.status, 'error')
-  assert.equal(bad.error, 'unknown handle')
-})
-
-test('full_start_resume_path_reaches_answered', () => {
-  const store = createSessionStore()
-  const started = store.start('花儿为什么这样红？')
-  assert.equal(started.status, 'yield')
+test('full_co_yield_path_preserves_kernel_continuation_and_grounded_basis', () => {
+  const store = createStore()
+  const started = start(store, '花儿为什么这样红？')
   const handle = started.handle
+  assessWhy(store, handle)
 
-  const assessed = store.resume(handle, {
-    type: 'SemanticAssessment',
-    forms: { Why: 0.75, How: 0.18, Other: 0.07 },
-    facets: { causal: 0.84, explanatory: 0.91, predictive: 0.06 },
-  })
-  assert.equal(assessed.status, 'yield')
-  assert.equal(assessed.handle, handle)
-  assert.equal(assessed.request.type, 'GenerateCandidatesRequest')
-  assert.ok(assessed.request.methods.includes('Multidisciplinary'))
-
-  const candidated = store.resume(handle, {
+  const candidate = resume(store, handle, {
     type: 'Candidates',
     items: [
       {
-        method: 'Multidisciplinary',
-        text: 'Anthocyanin pigment chemistry',
-        semanticKey: 'multi:anthocyanin',
-      },
-      {
-        method: 'Abduction',
-        text: 'Pollinator attraction hypothesis',
-        semanticKey: 'abd:pollinator',
-      },
-      {
-        method: 'Counterexample',
-        text: 'White cultivars under same genes',
-        semanticKey: 'cex:white',
+        method: 'CausalMechanism',
+        question: '花青素合成及其光谱吸收是否解释红色？',
+        semanticKey: 'question:anthocyanin',
+        dependencyKey: 'source:pigment-study',
+        expectedRootGain: 0.95,
+        cost: 0.2,
       },
     ],
   })
-  assert.equal(candidated.status, 'yield')
-  assert.equal(candidated.request.type, 'EstimateValueRequest')
-  assert.ok(candidated.request.actions.length >= 1)
+  assert.equal(candidate.request.type, 'InvestigateRequest')
 
-  const estimates = candidated.request.actions.map((action, index) => ({
-    actionId: action.id,
-    rootRelativeValue: 0.9 - index * 0.05,
-  }))
-  const valued = store.resume(handle, {
-    type: 'ValueEstimates',
-    estimates,
+  const investigated = resume(store, handle, {
+    type: 'Investigation',
+    actionKey: candidate.request.action.id,
+    findings: [
+      {
+        semanticKey: 'finding:anthocyanin',
+        text: '花青素的吸收谱与组织酸碱环境共同决定可见红色。',
+        evidenceKeys: ['evidence:pigment-study'],
+        provenance: ['investigation:pigment'],
+      },
+    ],
+    evidence: [
+      {
+        semanticKey: 'evidence:pigment-study',
+        proposition: '独立色素研究支持花青素机制。',
+        source: { id: 'pigment-study', kind: 'document' },
+        dependencyKey: 'pigment-study',
+        provenance: ['document:pigment-study'],
+      },
+    ],
   })
-  assert.equal(valued.status, 'yield')
-  assert.equal(valued.request.type, 'SynthesizeRequest')
-  assert.ok(valued.request.strands.length >= 1)
+  assert.equal(investigated.status, 'yield')
+  assert.equal(investigated.request.type, 'SynthesizeRequest')
 
-  const answered = store.resume(handle, {
+  const answered = resume(store, handle, {
     type: 'Synthesis',
-    text: 'Redness is jointly explained by pigment chemistry and ecological signaling; white cultivars mark boundary conditions.',
-    strands: valued.request.strands.map((s) => s.semanticKey),
+    text: '现有证据支持以花青素机制解释红色，同时保留环境条件作为边界。',
+    findingKeys: ['finding:anthocyanin'],
+    uncertainties: [],
   })
+
   assert.equal(answered.status, 'answered')
   assert.equal(answered.handle, handle)
-  assert.equal(answered.answer.question, '花儿为什么这样红？')
-  assert.equal(answered.answer.contract.primaryForm, 'Why')
-  assert.match(answered.answer.synthesis.text, /pigment/)
-  assert.ok(answered.answer.evidenceMass > 0)
-  assert.ok(['stop-dominates', 'assembled'].includes(answered.answer.stopReason))
+  assert.equal(answered.answer.epistemicBasis.evidence.length, 1)
+  assert.equal(answered.answer.epistemicBasis.findings.length, 1)
+  assert.equal(answered.answer.synthesis.findingKeys[0], 'finding:anthocyanin')
 })
 
-test('mcp_server_registers_start_and_resume_tools', async () => {
-  const store = createSessionStore()
-  const server = createSphinxMcpServer(store)
-  const tools = Object.keys(server._registeredTools).sort()
-  assert.deepEqual(tools, ['resume', 'start'])
-  assert.equal(server._registeredTools.start.inputSchema.type, 'object')
-  assert.equal(server._registeredTools.resume.inputSchema.type, 'object')
+test('mcp_server_surface_is_exactly_start_and_resume', async () => {
+  const server = create(createStore())
+  assert.deepEqual(Object.keys(server._registeredTools).sort(), ['resume', 'start'])
 
   const started = JSON.parse(
     (await server._registeredTools.start.handler({ question: '明天白银会涨吗？' })).content[0].text,
   )
   assert.equal(started.status, 'yield')
-  assert.equal(typeof started.handle, 'string')
   assert.equal(started.request.type, 'SemanticAssessmentRequest')
 
   const resumed = JSON.parse(
     (
       await server._registeredTools.resume.handler({
         handle: started.handle,
-        observation: { type: 'SemanticAssessment', forms: { Polar: 0.9 }, facets: { predictive: 0.8 } },
+        observation: {
+          type: 'SemanticAssessment',
+          forms: { Polar: 0.9, Other: 0.1 },
+          facets: { predictive: 1 },
+        },
       })
     ).content[0].text,
   )
   assert.equal(resumed.handle, started.handle)
-  assert.equal(resumed.status, 'yield')
+  assert.equal(resumed.request.type, 'GenerateCandidatesRequest')
 })

@@ -326,14 +326,14 @@ Fallback 或 Strength 只改 ExecutionBinding：Persona 不变，system prompt �
 
 ## AGENT-030：Host Sphinx MCP 自动注入
 
-Inquiry 的认识求解面 = Host MCP `sphinx` 的工具面。不是插件 ToolRegistry 工具，不是虚构 `sphinx` 业务工具名。内核行为见 SPHINX-001..005。
+Inquiry 的认识求解面 = Host MCP `sphinx` 的工具面。不是插件 ToolRegistry 工具，不是虚构 `sphinx` 业务工具名。内核行为见 SPHINX-001..010。
 
 Host-final `opencode.json` 必须由 config hook 注入：
 
 ```text
 mcp.sphinx = {
   type = "local"
-  command = node <packageRoot>/dist/sphinx/mcp-server.js
+  command = node <packageRoot>/dist/Sphinx/McpServer.js
   enabled = true
 }
 ```
@@ -344,7 +344,7 @@ mcp.sphinx = {
 SPHINX_MCP_DISABLED 为真            → enabled = false，不 spawn
 SPHINX_MCP_FIXTURE 非空             → command = node <fixture>，enabled = true
 WANXIANGSHU_TEST 为真且无 fixture   → enabled = false
-否则                                → command = node <packageRoot>/dist/sphinx/mcp-server.js，enabled = true
+否则                                → command = node <packageRoot>/dist/Sphinx/McpServer.js，enabled = true
 ```
 
 权限（AGENT-007 第一层；fast/deep 相同，AGENT-010）：
@@ -365,5 +365,5 @@ Sphinx 服务器实现允许 `@modelcontextprotocol/sdk`（及 zod）。AGENT-02
 1. 把 Sphinx MCP 编入 ToolRegistry / `js-*`
 2. 给非 Inquiry 角色 allow `sphinx_*`
 3. 依赖用户手工在 `opencode.json` 配置该 MCP
-4. 在 `WANXIANGSHU_TEST` 且无 fixture 时 spawn 生产 `mcp-server.js`
+4. 在 `WANXIANGSHU_TEST` 且无 fixture 时 spawn 生产 `dist/Sphinx/McpServer.js`
 5. 万象术内嵌 Sphinx Closure / EpistemicState / Canonical Answer 逻辑

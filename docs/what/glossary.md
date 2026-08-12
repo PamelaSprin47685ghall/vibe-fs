@@ -33,7 +33,7 @@
 | 术语 | 指向 |
 |------|------|
 | Canonical Projection | COMPANION-007：Semantic 投影是 canonical digest 的唯一来源 |
-| Canonical Answer | SPHINX-001/004：Kernel 写出的终局答案；非 LLM 自由文 |
+| Canonical Answer | SPHINX-001/004/006：Kernel 组装的终局结构；认识基底分列 Findings/Evidence/Hypotheses，Synthesis 仅为投影 |
 | Canonical Role | AGENT-001：不变角色，与 fast/deep 无关，不决定 Companion |
 | Chronicle | COMPANION-003：WorkRecord 段；Y 已沉淀的工作叙事 |
 | Circuit Breaker | FALLBACK-005：达到有限正整数自动恢复预算时熔断；默认预算 12 |
@@ -68,7 +68,7 @@
 | 术语 | 指向 |
 |------|------|
 | EffectiveAgent | FALLBACK-002：由 Fallback cursor 决定的当前 Agent |
-| EpistemicState | SPHINX-004：`S=(R,B,E,D,A,C)`；handle 绑定的认识状态充分统计量 |
+| EpistemicState | SPHINX-004：handle 绑定的认识充分状态；RootContract + Findings/Evidence/Hypotheses + Dependencies + Actions + Budget + solver projections |
 | Epoch | COMPANION-009：PrefixEpoch 内 append-only |
 | `edit-qa` | （历史）非法旧名，无 alias；现行 `js-bookkeeper`（AGENT-006） |
 | `establish-behavior` | AGENT-006 / EXEC-031：DevOps→Coder SyncDelegate；旧 TDD red 面非法 |
