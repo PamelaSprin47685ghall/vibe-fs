@@ -20,12 +20,6 @@ module SembleMcp =
           Score: float
           TotalLines: int }
 
-    [<RequireQualifiedAccess>]
-    type Launch =
-        | Disabled
-        | Fixture of path: string
-        | Uvx of gitRef: string
-
     let uvxCommand (gitRef: string) : string array =
         let refValue =
             if String.IsNullOrWhiteSpace gitRef then
@@ -49,13 +43,17 @@ module SembleMcp =
         | "yes" -> true
         | _ -> false
 
-    let launchFrom (read: string -> string option) : Launch =
+    let launchFrom (read: string -> string option) : McpLaunch =
         let disabled = envValue read "SEMBLE_MCP_DISABLED"
         let fixture = envValue read "SEMBLE_MCP_FIXTURE"
         let testMode = envValue read "WANXIANGSHU_TEST"
         let gitRef = envValue read "SEMBLE_MCP_REF"
 
-        if isTruthy disabled then Launch.Disabled
-        elif fixture <> "" then Launch.Fixture fixture
-        elif isTruthy testMode then Launch.Disabled
-        else Launch.Uvx(if gitRef = "" then defaultRef else gitRef)
+        if isTruthy disabled then
+            McpLaunch.Disabled
+        elif fixture <> "" then
+            McpLaunch.Fixture fixture
+        elif isTruthy testMode then
+            McpLaunch.Disabled
+        else
+            McpLaunch.Uvx(if gitRef = "" then defaultRef else gitRef)

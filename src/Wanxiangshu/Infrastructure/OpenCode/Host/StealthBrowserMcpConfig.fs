@@ -7,12 +7,6 @@ open Wanxiangshu.Kernel
 /// AGENT-026: env → launch decision → Host `config.mcp.stealth-browser-mcp`.
 module StealthBrowserMcpConfig =
 
-    [<RequireQualifiedAccess>]
-    type Launch =
-        | Disabled
-        | Fixture of path: string
-        | Uvx of gitRef: string
-
     let private envValue (read: string -> string option) (name: string) =
         match read name with
         | Some value -> value.Trim()
@@ -25,22 +19,22 @@ module StealthBrowserMcpConfig =
         | "yes" -> true
         | _ -> false
 
-    let launchFrom (read: string -> string option) : Launch =
+    let launchFrom (read: string -> string option) : McpLaunch =
         let disabled = envValue read "STEALTH_BROWSER_MCP_DISABLED"
         let fixture = envValue read "STEALTH_BROWSER_MCP_FIXTURE"
         let testMode = envValue read "WANXIANGSHU_TEST"
         let gitRef = envValue read "STEALTH_BROWSER_MCP_REF"
 
         if isTruthy disabled then
-            Launch.Disabled
+            McpLaunch.Disabled
         elif fixture <> "" then
-            Launch.Fixture fixture
+            McpLaunch.Fixture fixture
         elif isTruthy testMode then
-            Launch.Disabled
+            McpLaunch.Disabled
         else
-            Launch.Uvx(if gitRef = "" then StealthBrowserMcp.defaultRef else gitRef)
+            McpLaunch.Uvx(if gitRef = "" then StealthBrowserMcp.defaultRef else gitRef)
 
-    let launchFromVars (vars: obj) : Launch =
+    let launchFromVars (vars: obj) : McpLaunch =
         launchFrom (fun name ->
             if isNull vars then
                 None
@@ -53,14 +47,14 @@ module StealthBrowserMcpConfig =
                     let text = string value
                     if String.IsNullOrWhiteSpace text then None else Some text)
 
-    let launchFromEnvironment () : Launch =
+    let launchFromEnvironment () : McpLaunch =
         launchFrom (fun name ->
             match Environment.GetEnvironmentVariable name with
             | null
             | "" -> None
             | value -> Some value)
 
-    let apply (config: obj) (launch: Launch) : unit =
+    let apply (config: obj) (launch: McpLaunch) : unit =
         if isNull config then
             ()
         else
@@ -77,6 +71,6 @@ module StealthBrowserMcpConfig =
                     createObj [ "type" ==> "local"; "command" ==> command; "enabled" ==> enabled ]
 
             match launch with
-            | Launch.Disabled -> write (StealthBrowserMcp.uvxCommand StealthBrowserMcp.defaultRef) false
-            | Launch.Fixture path -> write (StealthBrowserMcp.fixtureCommand path) true
-            | Launch.Uvx gitRef -> write (StealthBrowserMcp.uvxCommand gitRef) true
+            | McpLaunch.Disabled -> write (StealthBrowserMcp.uvxCommand StealthBrowserMcp.defaultRef) false
+            | McpLaunch.Fixture path -> write (StealthBrowserMcp.fixtureCommand path) true
+            | McpLaunch.Uvx gitRef -> write (StealthBrowserMcp.uvxCommand gitRef) true

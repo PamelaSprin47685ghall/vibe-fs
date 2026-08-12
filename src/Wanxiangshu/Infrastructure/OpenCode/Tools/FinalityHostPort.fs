@@ -32,7 +32,8 @@ module FinalityHostPort =
                         |> Option.iter (fun path -> scope.RegisterDirectory(SessionId.value childId, path))),
                 directoryFor = (fun _ -> scope.DirectoryFor(SessionId.value managerSessionId)),
                 onRunStarted = scope.RunStarted,
-                parentWorkRecordFor = (fun _ -> XTraceCapture.lifecycleWorkRecord scope.Journal managerSessionId true),
+                parentWorkRecordFor =
+                    (fun _ -> LifecycleWorkRecordProjection.lifecycleWorkRecord scope.Journal managerSessionId true),
                 childWorkRecordFor = (fun _ -> None),
                 ?sessionSnapshot = scope.Snapshot,
                 managerOpensReviewBarrier = false,

@@ -6,6 +6,7 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Finality
 open Wanxiangshu.Host
 open Wanxiangshu.Infrastructure
 open Wanxiangshu.Journal
@@ -29,7 +30,6 @@ module PluginHooks =
             let snapshotOpt = host.SnapshotOpt
             let gitTreePort = host.GitTreePort
             let eventPort = host.EventPort
-
             let chatParams = ChatParamsHook.create journal
 
             // CASE-003: typed capture at the tool boundary — shared
@@ -149,15 +149,15 @@ module PluginHooks =
                     let onRunStarted =
                         Some(fun sessionId role directory -> wired.BindActiveRun sessionId role directory)
 
-                    // EXEC-006 / EXEC-008: same LWR materialiser, direction-dependent Opening.
-                    // parent → child: includeOpening=true；child → parent: false.
-                    let parentWorkRecordFor =
+                    // EXEC-006/008: LWR; parent→child Opening on, join off.
+                    let workRecord includeOpening =
                         Some(fun sessionId ->
-                            XTraceCapture.lifecycleWorkRecord journal (SessionId.create sessionId) true)
+                            LifecycleWorkRecordProjection.lifecycleWorkRecord
+                                journal
+                                (SessionId.create sessionId)
+                                includeOpening)
 
-                    let childWorkRecordFor =
-                        Some(fun sessionId ->
-                            XTraceCapture.lifecycleWorkRecord journal (SessionId.create sessionId) false)
+                    let parentWorkRecordFor, childWorkRecordFor = workRecord true, workRecord false
 
                     let finalityReviewerTimeoutMs =
                         let configured: obj = input?finalityReviewerTimeoutMs

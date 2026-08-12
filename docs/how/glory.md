@@ -8,13 +8,14 @@
 
 ## Slice A：Lifecycle 与 Opening
 
-1. `ManagerNarrativeTransform` 挂在 SpikePlugin transform 链的 `XTraceCapture.captureProjection` 之后、`ReviewSeal` 之前（GLORY-013 顺序）。它读取最后一条 user 消息：
+1. `ManagerNarrativeTransform` 挂在 SpikePlugin transform 链的 `XTraceCapture` 之后、`ReviewSeal` 之前（GLORY-013 顺序）。它只拥有 wire 门控与 provider-facing Birth / Reawakening rewrite；durable Life 过渡归 `ManagerLifeWorkflow`：
    - 若该消息是合法 HumanRoot（无 PromptKey、非 compaction、非 retry，GLORY-012）且 session 是 Manager（从 journal Authority Root 的 CanonicalRole 判定）；
-   - 且当前无未完成 Life（`ManagerLife` 投影为 None）或上一 Life 已 `LifeCompleted` → 打开新 Life：
-     - 写 Opening blob（用户原始文本）→ append `LifeOpened`（openingCursor = 该消息在 XTrace 中的首个 part cursor）；
+   - 且当前无未完成 Life（`ManagerLife` 投影为 None）或上一 Life 已 `LifeCompleted` → Transform 判定后调用 `ManagerLifeWorkflow.ensureOpening`：
+     - WriteBlob（用户原始文本）→ append `LifeOpened`（openingCursor = 该消息在 XTrace 中的首个 part cursor）；
      - `WorkRecordStart` = Opening semantic exclusive end（TODO-001）；
      - 生产路径：**不**注入 planning-only Activation 资格叙事；Manager-only 持续规划/执行指导由 MagicTodoManagerGuideline 投影（TODO-013）；legacy `PlanningTail` / ReawakeningPrefix 字节仅用于 decode 或明确兼容窗口（GLORY-014/064）；
      - 幂等：改写 identity 记录在内存 `Dictionary<(sessionId, lifeId, messageId), source>`，重复 transform 不重复注入（GLORY-015）。
+   - HumanRoot upgrade（已有 XTrace history、无 CurrentLife）→ `ManagerLifeWorkflow.ensureMigrated`（LifeOpened + WorkActivated）；Activation 落地 → `ManagerLifeWorkflow.acceptActivation`。
 2. durable Opening 永远是原始 HumanRoot/`[X]`：captureProjection 先于任何 provider-facing 改写运行，XTrace 在 rewrite 之前落盘（GLORY-013）。
 3. `LifeOpened` 后 Manager **立即**获得正常工作工具（含 `todowrite` 协议面）；无 Activation 前置（TODO-001；GLORY-016）。
 
@@ -30,7 +31,7 @@ effectiveStartSeq = max(blog.Coverage.IngestedThroughSequence, life.WorkRecordSt
 禁止使用 `WorkActivated.ProtectedPrefixEnd` 作为生产 floor。`CompanionTransform.hasMaterial` 预过滤同步。
 
 3. lag-1 Manager prefix rebase 由 Magic Todo Accepted 链推导 desired cutoff，并在下一 provider attempt seal 前提交 `PrefixRebaseCommitted(EvidenceKind=TodoCheckpoint)`（TODO-009）；GLORY 不实现第二套 PrefixEpoch。
-4. `XTraceCapture.lifecycleWorkRecord` Manager 变体：按纯文本段标题 `Opening task / Work log / Uncompressed tail / Final output` 渲染（GLORY-025；`# ` 仅由 `SyntheticToml.comment` 在 wire 注入）。process/Finality 调用一律 `includeOpening=false`、request-range bounded（TODO-008）。
+4. `LifecycleWorkRecordProjection.lifecycleWorkRecord`：从 durable Blog/XTrace/terminal 物化跨 Session 工作记录；按纯文本段标题 `Opening task / Work log / Uncompressed tail / Final output` 渲染（GLORY-025；`# ` 仅由 `SyntheticToml.comment` 在 wire 注入）。process/Finality 调用一律 `includeOpening=false`、request-range bounded（TODO-008）。`XTraceCapture` 只拥有 semantic capture，不物化 LWR。
 
 ## Slice C：工具与角色边界
 

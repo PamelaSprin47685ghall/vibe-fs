@@ -7,7 +7,6 @@ open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Session
 
 module FinalityJournal =
@@ -62,7 +61,7 @@ module RecordWorkflow =
         let fullCanonicalCoverage = Some { IngestedThrough = XTrace.originCursor }
 
         match
-            XTraceCapture.lifecycleWorkRecordFromSnapshotWithTerminal
+            LifecycleWorkRecordProjection.lifecycleWorkRecordFromSnapshotWithTerminal
                 journal
                 snapshot
                 reviewerSessionId

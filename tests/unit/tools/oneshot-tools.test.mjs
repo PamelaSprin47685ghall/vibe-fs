@@ -18,7 +18,7 @@ import {
   agentJournal,
   resultOf,
   sessionId,
-  xTraceCapture,
+  lifecycleWorkRecordProjection,
 } from '../support/domain.mjs'
 
 const { HostToolContext, ToolHostCodec_digest: digest } = await import(
@@ -263,7 +263,7 @@ test('ONESHOT_completed_materializes_lifecycle_work_record_from_real_journal', a
   let journal
   const live = liveScope({
     sessions,
-    childWorkRecord: (sid) => xTraceCapture.lifecycleWorkRecord(journal, sessionId(sid), false),
+    childWorkRecord: (sid) => lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, sessionId(sid), false),
   })
   journal = live.journal
 

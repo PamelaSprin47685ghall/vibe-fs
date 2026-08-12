@@ -5,13 +5,9 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
-open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Host
 open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
-open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Journal
 open Wanxiangshu.Process
 open Wanxiangshu.Session
@@ -84,168 +80,17 @@ module HostSignalBootstrap =
 
             let binding = TurnBinding.Store()
 
-            let onTurn (context: ReconciledTurnContext) : Task =
-                task {
-                    let turn = context.Turn
+            let onTurn =
+                HostTurnObserver.observe
+                    recoveryTimerPort
+                    sessionPort
+                    eventPort
+                    journal
+                    strengthDurability
+                    scope
+                    reviewerContinuationPort
 
-                    let strengthHandled =
-                        scope.Strength.StrengthReplicaRuntime
-                        |> Option.exists (fun runtime -> runtime.HandleTurn turn)
-
-                    if strengthHandled then
-                        // STRENGTH-004/011: Replica observations are leaf-local. They
-                        // only reconcile the request plan for cleanup; family recovery,
-                        // owner fallback, Companion, Review and ordinary TurnWorkflow
-                        // must never observe them.
-                        XWire.reconcileAttempt journal scope turn
-                        return ()
-                    else
-                        // STRENGTH-010: only primary (non-Replica) turns feed the
-                        // counterfactual predictor. Pending shadow/control labels
-                        // are target-bound inside the scope.
-                        scope.Strength.ObserveStrengthPrimary(
-                            turn.SessionId,
-                            turn.ProviderRun,
-                            StrengthTurnEvidence.primarySymbol turn.Parts
-                        )
-
-                        // STRENGTH-007: consumption proof closes before any later
-                        // continuation can be admitted. This writer is independent
-                        // of rollout/fuse state because a provider may already have
-                        // consumed a durable Candidate.
-                        match strengthDurability with
-                        | None -> ()
-                        | Some durability ->
-                            match durability.LoadProjection() with
-                            | Error error ->
-                                let reason = "Strength promotion projection failed: " + error
-                                scope.Strength.TripStrengthFuse reason
-                                raise (InvalidOperationException reason)
-                            | Ok projection ->
-                                match StrengthLifecycle.reconcileEvent projection turn with
-                                | None -> ()
-                                | Some event ->
-                                    match durability.Append event with
-                                    | Ok() -> ()
-                                    | Error error ->
-                                        let reason = "Strength promotion commit failed closed: " + error
-                                        scope.Strength.TripStrengthFuse reason
-                                        raise (InvalidOperationException reason)
-
-                        // RECOVERY-FAMILY: family recovery before business effects of a turn.
-                        let! recovery = scope.EnsureRecoveryDone turn.SessionId
-
-                        match recovery with
-                        | FamilyRecovery.FamilyBlocked _ ->
-                            // Fail closed: definitive block → no business effects.
-                            ()
-                        | FamilyRecovery.FamilyWaiting _
-                        | FamilyRecovery.FamilyReady _ ->
-                            // Ready = permit-eligible; Waiting = incomplete (no permit) but not hard
-                            // block. Bounded-context workflows still observe the terminal.
-
-                            match turn.Outcome with
-                            | ReconcileProgram.TurnFailed _
-                            | ReconcileProgram.TurnAborted _ ->
-                                scope.ArmRecovery turn.SessionId
-
-                                // CTX-006 step 1 (Y half): a failed Blogger turn opens a one-shot
-                                // recovery opportunity on the Companion that owns it. Opportunity
-                                // = pending material waiter Task; material Offer consumes it once.
-                                for KeyValue(_, companion) in scope.Sessions.Companions do
-                                    match companion.BloggerSession with
-                                    | Some bloggerId when bloggerId = turn.SessionId ->
-                                        companion.StartRecoveryOpportunity() |> ignore
-                                    | _ -> ()
-                            | ReconcileProgram.TurnCompleted
-                            | ReconcileProgram.TurnNeedsContinuation _
-                            | ReconcileProgram.TurnInProgress -> ()
-
-
-                            XWire.reconcileAttempt journal scope turn
-                            TurnRuntimePreparation.prepare scope.DisposeExecutorRuntime turn
-
-                            // Sole Application turn entry (rabbit §6.5 / §18): Host no longer
-                            // multiplexes SyncDelegate / Reviewer / Manager handled-bools.
-                            do!
-                                TurnWorkflow.observe
-                                    recoveryTimerPort
-                                    Pty.abortParent
-                                    sessionPort
-                                    eventPort
-                                    journal
-                                    scope.SyncDelegateRuntime
-                                    reviewerContinuationPort
-                                    scope.Sessions.NudgeSent
-                                    scope.Sessions.JoinGuardNudges
-                                    scope.HasLivePty
-                                    scope.Sessions.AbortedSessions
-                                    (Some scope.LoopSensor)
-                                    scope.Sessions.Quiescence
-                                    context
-                }
-
-            /// HOST-006 containment: observe every reconciled snapshot for compaction
-            /// pseudo-runs and reanchor at most one per pass.
-            ///
-            /// Wired here rather than inside `onTurn` because a compaction pseudo-run
-            /// belongs to no Logical Run of ours — a manual `/compact` produces one with no
-            /// active root at all — so a turn-shaped callback would never see it.
-            ///
-            /// No journal means no durable epoch and nothing to reanchor. Silent rather
-            /// than an error: a journal-less run has no PrefixEpoch to retire, so there is
-            /// no state that could drift.
-            let onSnapshot (sessionId: SessionId) (messages: SessionMessage list) : Task =
-                task {
-                    // RECOVERY-FAMILY: family recovery before compaction probe effects.
-                    let! recovery = scope.EnsureRecoveryDone sessionId
-
-                    match recovery with
-                    | FamilyRecovery.FamilyBlocked _ -> return ()
-                    | FamilyRecovery.FamilyWaiting _
-                    | FamilyRecovery.FamilyReady _ -> ()
-
-                    // HOST-006 prevention layer's second half: the runtime probe.
-                    //
-                    // Judged before containment, and once per plugin instance. If the Host
-                    // compacts outside the configuration the plugin can reach, the correct
-                    // response is to refuse to run — not to reanchor and carry on, which would
-                    // hide the condition behind behaviour that looks correct.
-                    if scope.IsStartupProbeOpen then
-                        match HostCompactionGate.judgeStartup scope.CompactionSettingGap sessionId messages with
-                        | None -> () // Not a completed first turn yet; the probe stays armed.
-                        | Some verdict ->
-                            if scope.TryClaimStartupProbe() then
-                                match verdict with
-                                | CompactionGateVerdict.Satisfied -> ()
-                                | failed ->
-                                    raise (InvalidOperationException(HostCompactionPolicy.describeVerdict failed))
-
-                    match journal with
-                    | None -> ()
-                    | Some durable ->
-                        let observed =
-                            messages
-                            |> List.filter (fun message ->
-                                HostCompactionPolicy.isContainableCompaction message.IsCompaction)
-                            |> List.map (fun message -> ProviderRunIdentity.create message.Id)
-
-                        if List.isEmpty observed then
-                            ()
-                        else
-                            match HostCompactionGate.reanchorObserved durable sessionId observed with
-                            | Ok None
-                            | Ok(Some _) -> ()
-                            // A failed append here is not fatal to the turn that just
-                            // completed. PERSIST-003's fail-closed path already owns a poisoned
-                            // journal; what this must not do is throw inside the reconcile loop
-                            // and leave `Running` set, which would stop every later pass for
-                            // this session.
-                            | Error reason ->
-                                HostCompactionGate.logReanchorFailure sessionId reason
-                                ()
-
-                }
+            let onSnapshot = HostCompactionObserver.observe scope journal
 
             let reconciler =
                 Reconciler.Scheduler(
@@ -288,53 +133,17 @@ module HostSignalBootstrap =
 
                     reconciler.Signal signal
                 | SessionDeleted(sessionId, parentSessionIdOpt) ->
-                    scope.LoopSensor.DropSession sessionId
-
-                    // STRENGTH-004/011: owner deletion cancels the decision-local
-                    // InternalLeaf immediately. CancelOwner completes the waiting
-                    // decision before its best-effort physical abort, so no deleted
-                    // owner can keep a Replica eligible for later collection.
-                    scope.Strength.StrengthReplicaRuntime
-                    |> Option.iter (fun runtime -> runtime.CancelOwner sessionId |> ignore)
-
-                    // OpenCode recursively emits child SessionDeleted before the owner
-                    // SessionDeleted. An attached Inspector child must retire its live
-                    // binding without clearing the Casebook draft; the later owner
-                    // event is the graceful ReuseScope-close signal that finalizes it.
-                    // A continued owner Invoke consumes the staged child as unexpected
-                    // deletion and cleans its draft instead of reusing the dead child.
-                    let finished =
-                        task {
-                            let stagedInspector =
-                                match scope.SyncDelegateRuntime, parentSessionIdOpt with
-                                | Some runtime, Some parentSessionId ->
-                                    runtime.StageDeletedInspector(parentSessionId, sessionId)
-                                | _ -> false
-
-                            if not stagedInspector then
-                                match scope.SyncDelegateRuntime with
-                                | Some runtime ->
-                                    match runtime.TryFindForScopeClose(sessionId, SyncDelegateRole.Inspector) with
-                                    | Some inspectorId ->
-                                        match workspaceDirectory with
-                                        | Some root ->
-                                            let! _ = finalizeInspector root (SessionId.value inspectorId)
-                                            ()
-                                        | None -> ()
-                                    | None -> ()
-
-                                    runtime.CancelSession sessionId
-                                | None -> ()
-
-                                // Residual draft if the deleted id itself held Inspector Q/A.
-                                cleanupInspectorDraft (SessionId.value sessionId)
-
-                            scope.Sessions.Quiescence.DropSession sessionId
-                            scope.DisposeSession(SessionId.value sessionId)
-                            reconciler.Signal signal
-                        }
-
-                    (emitJsExpr finished "$0": unit)
+                    (emitJsExpr
+                        (HostSessionDeletion.handle
+                            scope
+                            workspaceDirectory
+                            finalizeInspector
+                            cleanupInspectorDraft
+                            reconciler.Signal
+                            sessionId
+                            parentSessionIdOpt)
+                        "$0"
+                    : unit)
 
             // LOOP-002/006: edge sensor shares the same event subscription, aborts via
             // the session port, and leaves AABB to OrdinaryTurnWorkflow on TurnAborted.

@@ -16,6 +16,7 @@
     <Compile Include="Host/HostDigest.fs"/>
     <Compile Include="Kernel/Identity.fs"/>
     <Compile Include="Kernel/Roles.fs"/>
+    <Compile Include="Kernel/McpLaunch.fs"/>
     <Compile Include="Kernel/StealthBrowserMcp.fs"/>
     <Compile Include="Kernel/SembleMcp.fs"/>
     <Compile Include="Kernel/Parallel.fs"/>
@@ -221,7 +222,6 @@
     <Compile Include="Infrastructure/OpenCode/Codec/ProviderWireCapture.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/ProjectionMessageEdit.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Host/ManagerNarrativeTransform.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Diagnostic.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Events.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/SharedTerminalBus.fs"/>
@@ -240,6 +240,7 @@
     <Compile Include="Infrastructure/OpenCode/Host/OpenCodePort.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/Sessions.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostMessageProjection.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/StrengthReplay.fs"/>
     <Compile Include="Session/SatelliteRuntime.fs"/>
     <Compile Include="Application/Prompting/PromptDispatcher.fs"/>
     <Compile Include="Application/Prompting/PromptDispatcherSend.fs"/>
@@ -308,6 +309,7 @@
     <Compile Include="Infrastructure/OpenCode/Host/HostReviewGuard.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostJoinGuard.fs"/>
     <Compile Include="Application/Reconciliation/TurnReconcile.fs"/>
+    <Compile Include="Application/Reconciliation/ReconcilePass.fs"/>
     <Compile Include="Application/Reconciliation/Reconciler.fs"/>
     <Compile Include="Application/Reconciliation/ReconcileSupervisor.fs"/>
     <Compile Include="Application/Review/VerdictWorkflow.fs"/>
@@ -328,8 +330,10 @@
     <Compile Include="Application/Manager/ManagerLifeWorkflow.fs"/>
     <Compile Include="Application/Manager/ManagerFinality.fs"/>
     <Compile Include="Application/Manager/ManagerWorkflow.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/ManagerNarrativeTransform.fs"/>
     <Compile Include="Application/Finality/Types.fs"/>
     <Compile Include="Application/Finality/Ports.fs"/>
+    <Compile Include="Application/Finality/LifecycleWorkRecordProjection.fs"/>
     <Compile Include="Application/Finality/RecordWorkflow.fs"/>
     <Compile Include="Application/Finality/CohortWorkflow.fs"/>
     <Compile Include="Application/Finality/RevisionWorkflow.fs"/>
@@ -340,6 +344,9 @@
     <Compile Include="Infrastructure/OpenCode/Host/HostCompactionGate.fs"/>
     <Compile Include="Application/Reconciliation/XWire.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/TurnRuntimePreparation.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/HostTurnObserver.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/HostCompactionObserver.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/HostSessionDeletion.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/HostSignalBootstrap.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ExecutorSummarizeRuntime.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ExecutorSummarize.fs"/>

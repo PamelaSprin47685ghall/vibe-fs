@@ -8,7 +8,7 @@ open Wanxiangshu.Kernel
 /// AGENT-027: internal Semble search. Not Host mcp. Not Strength.
 module SembleMcpClient =
 
-    let launchFromVars (vars: obj) : SembleMcp.Launch =
+    let launchFromVars (vars: obj) : McpLaunch =
         SembleMcp.launchFrom (fun name ->
             if isNull vars then
                 None
@@ -21,24 +21,24 @@ module SembleMcpClient =
                     let text = string value
                     if String.IsNullOrWhiteSpace text then None else Some text)
 
-    let launchFromEnvironment () : SembleMcp.Launch =
+    let launchFromEnvironment () : McpLaunch =
         SembleMcp.launchFrom (fun name ->
             match Environment.GetEnvironmentVariable name with
             | null
             | "" -> None
             | value -> Some value)
 
-    let private invocation (launch: SembleMcp.Launch) : (string * string array) option =
+    let private invocation (launch: McpLaunch) : (string * string array) option =
         match launch with
-        | SembleMcp.Launch.Disabled -> None
-        | SembleMcp.Launch.Fixture path ->
+        | McpLaunch.Disabled -> None
+        | McpLaunch.Fixture path ->
             let cmd = SembleMcp.fixtureCommand path
             Some(cmd.[0], cmd.[1..])
-        | SembleMcp.Launch.Uvx gitRef ->
+        | McpLaunch.Uvx gitRef ->
             let cmd = SembleMcp.uvxCommand gitRef
             Some(cmd.[0], cmd.[1..])
 
-    let search (launch: SembleMcp.Launch) (query: string) (repoPath: string) (topK: int) : Task<SembleMcp.Hit list> =
+    let search (launch: McpLaunch) (query: string) (repoPath: string) (topK: int) : Task<SembleMcp.Hit list> =
         task {
             match invocation launch with
             | None -> return []

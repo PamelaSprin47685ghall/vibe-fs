@@ -26,7 +26,7 @@
 | V1 membrane 执行路径 | Host tool hooks（definition / before / after）；细节 HOST-* | V2 runner 无 hook parity → Attempt fail closed（TODO-004） |
 | Legacy seed | 一次性 `LegacyTodoSeedAdopted`（仅升级瞬间 legacy open Life） | 正常新 Life canonical 空；禁止同 session 后续 Life 再 adopt Host table（TODO-011） |
 | Todo-list / checkpoint settlement projection | Domain checkpoint projection module（路径随仓库；建议名 `TodoCheckpointProjection`） | **只** todo-list / settlement；**不是**工作记录 renderer（TODO-007/008） |
-| Process-review / Finality 证据物化 | 既有 `lifecycleWorkRecord` range API | 禁止在 Todo 树新增平行 work-record module（TODO-008） |
+| Process-review / Finality 证据物化 | `LifecycleWorkRecordProjection`（既有 `lifecycleWorkRecord` range API） | 禁止在 Todo 树新增平行 work-record module（TODO-008） |
 | Journal durable facts | 既有 EventStore / fact owner | 禁止另造 JSON 状态文件或 ephemeral 当 durable（TODO-004/012） |
 
 ## 建议模块落点（ownership 不变）

@@ -20,9 +20,9 @@ open PluginHostInterop
 
 module PluginTransforms =
 
-    /// The provider-facing transform pipeline: Strength replay, XTrace,
-    /// Manager narrative, Companion rewrite, Enforcer continuation, Pair
-    /// guideline, sanitize, REVIEW-010 seal — plus the replica fast path.
+    /// Provider-facing transform composition: order only.
+    /// Strength replay/trace → StrengthReplay; speculation → StrengthSpeculate;
+    /// narrative → ManagerNarrativeTransform; seal → ReviewSeal; replica fast path unchanged.
     let create (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : obj -> obj -> Task<unit> =
         let scope = boot.Scope
         let journal = boot.Journal
@@ -47,71 +47,11 @@ module PluginTransforms =
                 |> Option.iter (fun sessionId ->
                     scope.Sessions.Quiescence.BeginProviderAttempt(SessionId.create sessionId))
 
-                // DSL-MUTABLE: algorithm-scratch — replay plans shared with the immediate XTrace capture step
-                let mutable strengthReplayPlans: StrengthReplayPlan list = []
-
-                // STRENGTH-008: replay durable Promoted frames before XTrace.
-                // Candidate material is never read here. Existing Host rows
-                // are preserved object-for-object; only algebra-owned
-                // synthetic rows are inserted at the target assistant anchor.
-                match projectionSessionIdOpt, strengthDurability with
-                | Some sessionId, Some durability ->
-                    let owner = SessionId.create sessionId
-                    let rawMessages = unbox<obj array> outObj?messages |> Array.toList
-
-                    let coveredThroughSequence =
-                        journal
-                        |> Option.bind (fun durable ->
-                            AgentProjection.tryFind owner (AgentJournal.snapshot durable).AgentProjections
-                            |> Option.bind (fun state -> state.Blog)
-                            |> Option.map (fun blog -> blog.Coverage.IngestedThroughSequence))
-
-                    match durability.LoadProjection() with
-                    | Error error -> strengthFailClosed ("Strength replay projection failed: " + error)
-                    | Ok strengthProjection ->
-                        match
-                            StrengthLifecycle.replayPlans
-                                owner
-                                ProviderWireDecode.hostMessageId
-                                rawMessages
-                                durability.LoadFrameBundle
-                                strengthProjection
-                        with
-                        | Error error -> strengthFailClosed error
-                        | Ok plans ->
-                            let plans =
-                                plans |> List.filter (StrengthLifecycle.needsRawReplay coveredThroughSequence)
-
-                            match plans with
-                            | [] -> ()
-                            | _ ->
-                                strengthReplayPlans <- plans
-                                let wire = ProviderWireCapture.decodeMessageView rawMessages
-
-                                let snapshot =
-                                    { CurrentProjection = ProviderProjection.toSemantic wire
-                                      CommittedPrefix = None
-                                      BlogFrames = []
-                                      TransportMessages = Set.empty
-                                      HostReanchor = None }
-
-                                let rendered =
-                                    ProjectionRenderer.renderMessagesWithHostIds
-                                        HostDigest.sha256Hex
-                                        snapshot
-                                        wire.Messages
-                                        (StrengthLifecycle.replayIntents plans)
-
-                                match
-                                    ProjectionMessageEdit.tryApplyRenderedInsertionsPreservingBase
-                                        sessionId
-                                        HostDigest.sha256Hex
-                                        rawMessages
-                                        rendered
-                                with
-                                | Error error -> strengthFailClosed ("Strength replay render failed: " + error)
-                                | Ok replayed -> HostMessageProjection.replaceMessagesInPlace outObj replayed
-                | _ -> ()
+                let strengthReplayPlans =
+                    match projectionSessionIdOpt with
+                    | Some sessionId ->
+                        StrengthReplay.applyBeforeXTrace journal strengthDurability strengthFailClosed sessionId outObj
+                    | None -> []
 
                 // COMPANION-003/007: keep the XTrace in step with the
                 // provider-visible semantic projection at the transform
@@ -155,106 +95,12 @@ module PluginTransforms =
                             | Error error -> strengthFailClosed error
                         | _ -> XTraceCapture.captureMessageView journal sessionIdentity capturedMessages
 
-                    // STRENGTH-008: close Promoted -> Traced after capture.
-                    // Stable synthetic Host ids recover the exact range even
-                    // after a crash between XTrace append and this EventStore
-                    // append. Legacy positional traces fall back to a unique
-                    // canonical frame match; ambiguity is fail closed.
-                    match journal, strengthDurability, traceState with
-                    | Some durable, Some durability, Some updated ->
-                        let rec resolveObserved (remaining: XTracePartRef list) (acc: StrengthTraceObservedPart list) =
-                            match remaining with
-                            | [] -> Ok(List.rev acc)
-                            | part :: tail ->
-                                match durable.Writer.BlobWriter.Read part.TextRef with
-                                | Error error -> Error error
-                                | Ok body ->
-                                    resolveObserved
-                                        tail
-                                        ({ CursorSequence = part.Cursor.Sequence
-                                           Kind = part.Kind
-                                           ToolName = part.ToolName
-                                           Body = body }
-                                         :: acc)
-
-                        for plan in strengthReplayPlans do
-                            if plan.ExistingTraceRange.IsNone then
-                                let expectedIds =
-                                    plan.Bundle.Batches
-                                    |> List.collect (fun batch ->
-                                        [ StrengthFrame.hostMessageId
-                                              HostDigest.sha256Hex
-                                              plan.Prepared.OwnerSessionId
-                                              plan.Prepared.DecisionId
-                                              batch.RequestOrdinal
-                                              "call"
-                                              plan.Bundle.Digest
-                                          StrengthFrame.hostMessageId
-                                              HostDigest.sha256Hex
-                                              plan.Prepared.OwnerSessionId
-                                              plan.Prepared.DecisionId
-                                              batch.RequestOrdinal
-                                              "result"
-                                              plan.Bundle.Digest ])
-
-                                let byStableId =
-                                    updated.Parts
-                                    |> List.filter (fun part ->
-                                        expectedIds
-                                        |> List.exists (fun id ->
-                                            part.Provenance.Contains(
-                                                "/msg:" + id + "/part:",
-                                                StringComparison.Ordinal
-                                            )))
-
-                                let expectedCount = StrengthLifecycle.framePartCount plan.Bundle
-
-                                let stableRange =
-                                    if List.length byStableId = expectedCount && expectedCount > 0 then
-                                        let sequences = byStableId |> List.map (fun part -> part.Cursor.Sequence)
-
-                                        let first = List.head sequences
-                                        let last = List.last sequences
-
-                                        let contiguous =
-                                            sequences
-                                            |> List.mapi (fun index value -> value = first + int64 index)
-                                            |> List.forall id
-
-                                        if contiguous then
-                                            Some
-                                                { StartInclusive = first
-                                                  EndExclusive = last + 1L }
-                                        else
-                                            None
-                                    else
-                                        None
-
-                                let range =
-                                    match stableRange with
-                                    | Some value -> Ok(Some value)
-                                    | None ->
-                                        resolveObserved updated.Parts []
-                                        |> Result.bind (StrengthTraceRecovery.recoverRange plan.Bundle)
-
-                                match range with
-                                | Error error -> strengthFailClosed ("Strength Traced recovery failed: " + error)
-                                | Ok None ->
-                                    strengthFailClosed
-                                        "Strength Promoted frame is absent from XTrace after replay capture"
-                                | Ok(Some traced) ->
-                                    match
-                                        durability.Append(
-                                            StrengthEvents.traced
-                                                plan.Prepared.DecisionId
-                                                traced.StartInclusive
-                                                traced.EndExclusive
-                                        )
-                                    with
-                                    | Ok() -> ()
-                                    | Error error ->
-                                        strengthFailClosed ("Strength Traced commit failed closed: " + error)
-                    | _ -> ()
+                    StrengthReplay.commitTracedAfterCapture
+                        journal
+                        strengthDurability
+                        strengthFailClosed
+                        traceState
+                        strengthReplayPlans
 
                     traceState
                     |> Option.iter (fun updated ->

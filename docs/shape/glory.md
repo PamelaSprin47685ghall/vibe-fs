@@ -7,7 +7,9 @@
 | 关注点 | 拥有者 | 边界 |
 |------|------|------|
 | Life 事实与投影 | `Domain/ManagerLifecycle.fs` + `Journal/ManagerLifecycleProjection.fs` | 纯逻辑；事实经 `Fact.ManagerLifecycle` case 进入 journal（GLORY-010）；`WorkRecordStart` 由 Life/XTrace Opening 纯推导（TODO-001） |
-| Opening / Reawakening 改写 | `Infrastructure/OpenCode/Host/ManagerNarrativeTransform.fs` | 只在 provider-facing transcript 生效；durable X 保持原始（GLORY-013/064）；生产路径无 planning-only Activation 改写义务（TODO-001） |
+| Durable Life open / migrate / activate | `Application/Manager/ManagerLifeWorkflow.fs` | `ensureOpening` / `ensureMigrated` / `acceptActivation`（及既有 `ensureMigrationLife` / `completeBlessedLife`）；不读 Host wire |
+| Opening / Reawakening 改写 | `Infrastructure/OpenCode/Host/ManagerNarrativeTransform.fs` | 只在 provider-facing transcript 生效；wire 门控 + rewrite；durable 写委托 `ManagerLifeWorkflow`；durable X 保持原始（GLORY-013/064）；生产路径无 planning-only Activation 改写义务（TODO-001） |
+| LWR journal 物化 | `Application/Finality/LifecycleWorkRecordProjection.fs` | Blog/XTrace/terminal → opaque work record；与 `XTraceCapture` 分居（COMPANION-003；TODO-008） |
 | Magic Todo checkpoint | todo 域模块（见 shape/todo） | `todowrite` membrane、canonical projection、process-review obligation（TODO-001..014）；GLORY 不拥有其代数 |
 | 终结工具 | `Infrastructure/OpenCode/Tools/FinalityTool.fs` | `suicide` 唯一写入口：受理顺序见 GLORY-040；尾抽干/零 checkpoint 门禁 TODO-010 |
 | Manager terminal sequencing | `Application/Manager/ManagerWorkflow.fs` | 唯一判定 JoinGuard、Finality defer、Orchestrator handoff 与 idle encouragement；**不**再判定生产 Activation（GLORY-018/070）；`TurnCompletionProgram` 只做普通 terminal plumbing（GLORY-029） |

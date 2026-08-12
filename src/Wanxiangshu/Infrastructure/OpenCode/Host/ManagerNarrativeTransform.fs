@@ -12,13 +12,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 
-/// GLORY-013/014/015/063/064: the provider-facing Birth / Reawakening rewrite.
-///
-/// Runs at the transform boundary AFTER `XTraceCapture.captureProjection`
-/// (durable X keeps the raw HumanRoot) and BEFORE `ReviewSeal` (the seal
-/// digests the bytes the provider actually receives). Only a Manager session
-/// with a legal new HumanRoot is rewritten; every other message passes through
-/// untouched (GLORY-007/026).
+/// Provider-facing Birth/Reawakening rewrite from durable Life projection + raw messages.
 module ManagerNarrativeTransform =
 
     /// GLORY-012: only a HumanRoot-managed Manager opens Lives. An
@@ -324,55 +318,17 @@ module ManagerNarrativeTransform =
                                     | Some opening, true when List.isEmpty lifecycle.CompletedLives ->
                                         let lifeId = ManagerLifeId.create (Guid.NewGuid().ToString("N"))
 
-                                        match durable.WriteBlob opening.AssignmentText with
-                                        | Error error ->
-                                            raise (
-                                                InvalidOperationException(
-                                                    sprintf "Life migration blob write failed: %s" error
-                                                )
-                                            )
-                                        | Ok blob ->
-                                            AgentJournal.appendManagerLifecycle
-                                                (StreamId.Session sid)
-                                                (ManagerLifecycleFact.LifeOpened
-                                                    {| SessionId = sid
-                                                       LifeId = lifeId
-                                                       OpeningUserMessageId = messageIdValue
-                                                       OpeningTextRef = blob.BlobRef
-                                                       OpeningTextDigest = blob.BlobDigest
-                                                       OpeningCursorSequence = 0L |})
+                                        match
+                                            ManagerLifeWorkflow.ensureMigrated
                                                 durable
-                                            |> Result.mapError (fun failure ->
-                                                raise (
-                                                    InvalidOperationException(
-                                                        sprintf
-                                                            "Life migration append failed: %s"
-                                                            (JournalAppendFailure.describe failure)
-                                                    )
-                                                ))
-                                            |> ignore
-
-                                            // GLORY-069: migration Life is already
-                                            // activated; the protected prefix covers
-                                            // the pre-migration history.
-                                            AgentJournal.appendManagerLifecycle
-                                                (StreamId.Session sid)
-                                                (ManagerLifecycleFact.WorkActivated
-                                                    {| SessionId = sid
-                                                       LifeId = lifeId
-                                                       ActivationPromptKey = PromptKey.create ""
-                                                       ProtectedPrefixEndSequence =
-                                                        XTraceProjection.headSequence state + 1L |})
-                                                durable
-                                            |> Result.mapError (fun failure ->
-                                                raise (
-                                                    InvalidOperationException(
-                                                        sprintf
-                                                            "Life migration activation failed: %s"
-                                                            (JournalAppendFailure.describe failure)
-                                                    )
-                                                ))
-                                            |> ignore
+                                                sid
+                                                lifeId
+                                                messageIdValue
+                                                opening.AssignmentText
+                                                (XTraceProjection.headSequence state + 1L)
+                                        with
+                                        | Error error -> raise (InvalidOperationException error)
+                                        | Ok() -> ()
 
                                         true
                                     | _ -> false
@@ -405,44 +361,25 @@ module ManagerNarrativeTransform =
 
                                     let lifeId = ManagerLifeId.create (Guid.NewGuid().ToString("N"))
 
-                                    let openLife () =
-                                        match durable.WriteBlob rawText with
-                                        | Error error ->
-                                            raise (
-                                                InvalidOperationException(
-                                                    sprintf "Life opening blob write failed: %s" error
-                                                )
-                                            )
-                                        | Ok blob ->
-                                            let cursor =
-                                                openingCursorOf traceState messageIndex
-                                                |> Option.defaultValue (
-                                                    traceState
-                                                    |> Option.map XTraceProjection.headSequence
-                                                    |> Option.defaultValue 0L
-                                                )
+                                    let cursor =
+                                        openingCursorOf traceState messageIndex
+                                        |> Option.defaultValue (
+                                            traceState
+                                            |> Option.map XTraceProjection.headSequence
+                                            |> Option.defaultValue 0L
+                                        )
 
-                                            AgentJournal.appendManagerLifecycle
-                                                (StreamId.Session sid)
-                                                (ManagerLifecycleFact.LifeOpened
-                                                    {| SessionId = sid
-                                                       LifeId = lifeId
-                                                       OpeningUserMessageId = messageIdValue
-                                                       OpeningTextRef = blob.BlobRef
-                                                       OpeningTextDigest = blob.BlobDigest
-                                                       OpeningCursorSequence = cursor |})
-                                                durable
-                                            |> Result.mapError (fun failure ->
-                                                raise (
-                                                    InvalidOperationException(
-                                                        sprintf
-                                                            "Life opening append failed: %s"
-                                                            (JournalAppendFailure.describe failure)
-                                                    )
-                                                ))
-                                            |> ignore
-
-                                    openLife ()
+                                    match
+                                        ManagerLifeWorkflow.ensureOpening
+                                            durable
+                                            sid
+                                            lifeId
+                                            messageIdValue
+                                            rawText
+                                            cursor
+                                    with
+                                    | Error error -> raise (InvalidOperationException error)
+                                    | Ok() -> ()
 
                                     Some(rewriteMessage rawMessages messageIndex narrative)
 
@@ -509,47 +446,21 @@ module ManagerNarrativeTransform =
                 match activationMessage with
                 | None -> ()
                 | Some raw ->
-                    match promptKeyOfMessage raw with
-                    | Some promptKey ->
-                        let protectedPrefixEnd = XTraceProjection.headSequence state + 1L
+                    let protectedPrefixEnd = XTraceProjection.headSequence state + 1L
 
-                        AgentJournal.appendManagerLifecycle
-                            (StreamId.Session sid)
-                            (ManagerLifecycleFact.WorkActivated
-                                {| SessionId = sid
-                                   LifeId = life.LifeId
-                                   ActivationPromptKey = promptKey
-                                   ProtectedPrefixEndSequence = protectedPrefixEnd |})
-                            durable
-                        |> Result.mapError (fun failure ->
-                            raise (
-                                InvalidOperationException(
-                                    sprintf "WorkActivated append failed: %s" (JournalAppendFailure.describe failure)
-                                )
-                            ))
-                        |> ignore
-                    | None ->
-                        // GLORY-021: the compression floor must be fixed once
-                        // the Activation landed, even when the Host did not
-                        // preserve the PROMPT-011 metadata on the persisted
-                        // message (the key is audit-only; the floor is the
-                        // contract). A later transform re-checks and is
-                        // idempotent either way.
-                        let protectedPrefixEnd = XTraceProjection.headSequence state + 1L
+                    let promptKey =
+                        match promptKeyOfMessage raw with
+                        | Some key -> key
+                        | None ->
+                            // GLORY-021: the compression floor must be fixed once
+                            // the Activation landed, even when the Host did not
+                            // preserve the PROMPT-011 metadata on the persisted
+                            // message (the key is audit-only; the floor is the
+                            // contract). A later transform re-checks and is
+                            // idempotent either way.
+                            PromptKey.create ""
 
-                        AgentJournal.appendManagerLifecycle
-                            (StreamId.Session sid)
-                            (ManagerLifecycleFact.WorkActivated
-                                {| SessionId = sid
-                                   LifeId = life.LifeId
-                                   ActivationPromptKey = PromptKey.create ""
-                                   ProtectedPrefixEndSequence = protectedPrefixEnd |})
-                            durable
-                        |> Result.mapError (fun failure ->
-                            raise (
-                                InvalidOperationException(
-                                    sprintf "WorkActivated append failed: %s" (JournalAppendFailure.describe failure)
-                                )
-                            ))
-                        |> ignore
+                    match ManagerLifeWorkflow.acceptActivation durable sid life.LifeId promptKey protectedPrefixEnd with
+                    | Error error -> raise (InvalidOperationException error)
+                    | Ok() -> ()
             | _ -> ()

@@ -18,6 +18,7 @@ import {
   ToolHostCodecModule,
   XTraceModule,
   XTraceCaptureModule,
+  LifecycleWorkRecordProjectionModule,
   LifecycleWorkRecordModule,
   CompanionPromptModule,
   CompanionIdentityModule,
@@ -316,7 +317,7 @@ export const toolResultBound = (() => {
  * MessagePart → SemanticPart。Activity 是 transport bookkeeping，被丢弃。
  */
 export const xTraceCapture = (() => {
-  const m = bind(XTraceCaptureModule, 'XTraceCapture', ['semanticPart', 'captureProjection', 'captureMessageView', 'captureOpening', 'lifecycleWorkRecord'])
+  const m = bind(XTraceCaptureModule, 'XTraceCapture', ['semanticPart', 'captureProjection', 'captureMessageView', 'captureOpening'])
   const semanticPart = unionCase(ProviderProj.SemanticPart, 'SemanticPart')
   const messagePart = unionCase(HostMessageCodecModule.MessagePart, 'MessagePart')
 
@@ -373,11 +374,13 @@ export const xTraceCapture = (() => {
     /** COMPANION-003: capture the opening; requirements are a JS array. */
     captureOpening: (journal, sessionIdValue, text, requirements = []) =>
       m.captureOpening(journal, sessionIdValue, text, toList(requirements)),
+  }
+})()
 
-    /**
-     * COMPANION-003 / EXEC-006: LifecycleWorkRecord as opaque text.
-     * `includeOpening` default true (parent→child). Join path passes false.
-     */
+/** Journal-backed LWR projection (COMPANION-003 / EXEC-006). Not domain materialize. */
+export const lifecycleWorkRecordProjection = (() => {
+  const m = bind(LifecycleWorkRecordProjectionModule, 'LifecycleWorkRecordProjection', ['lifecycleWorkRecord'])
+  return {
     lifecycleWorkRecord: (journal, sessionIdValue, includeOpening = true) => {
       const result = m.lifecycleWorkRecord(journal, sessionIdValue, includeOpening)
       return isNone(result) ? undefined : result

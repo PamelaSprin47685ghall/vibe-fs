@@ -20,6 +20,82 @@ module ManagerLifeWorkflow =
         |> Result.map (fun _ -> ())
         |> Result.mapError JournalAppendFailure.describe
 
+    /// HumanRoot Birth / Reawakening: WriteBlob → LifeOpened.
+    let ensureOpening
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (openingUserMessageId: PhysicalUserMessageId)
+        (rawText: string)
+        (openingCursorSequence: int64)
+        : Result<unit, string> =
+        match journal.WriteBlob rawText with
+        | Error error -> Error(sprintf "Life opening blob write failed: %s" error)
+        | Ok blob ->
+            appendLifecycle
+                journal
+                sessionId
+                (ManagerLifecycleFact.LifeOpened
+                    {| SessionId = sessionId
+                       LifeId = lifeId
+                       OpeningUserMessageId = openingUserMessageId
+                       OpeningTextRef = blob.BlobRef
+                       OpeningTextDigest = blob.BlobDigest
+                       OpeningCursorSequence = openingCursorSequence |})
+            |> Result.mapError (fun failure -> sprintf "Life opening append failed: %s" failure)
+
+    /// GLORY-069 HumanRoot upgrade: WriteBlob → LifeOpened → WorkActivated.
+    let ensureMigrated
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (openingUserMessageId: PhysicalUserMessageId)
+        (assignmentText: string)
+        (protectedPrefixEndSequence: int64)
+        : Result<unit, string> =
+        match journal.WriteBlob assignmentText with
+        | Error error -> Error(sprintf "Life migration blob write failed: %s" error)
+        | Ok blob ->
+            appendLifecycle
+                journal
+                sessionId
+                (ManagerLifecycleFact.LifeOpened
+                    {| SessionId = sessionId
+                       LifeId = lifeId
+                       OpeningUserMessageId = openingUserMessageId
+                       OpeningTextRef = blob.BlobRef
+                       OpeningTextDigest = blob.BlobDigest
+                       OpeningCursorSequence = 0L |})
+            |> Result.mapError (fun failure -> sprintf "Life migration append failed: %s" failure)
+            |> Result.bind (fun () ->
+                appendLifecycle
+                    journal
+                    sessionId
+                    (ManagerLifecycleFact.WorkActivated
+                        {| SessionId = sessionId
+                           LifeId = lifeId
+                           ActivationPromptKey = PromptKey.create ""
+                           ProtectedPrefixEndSequence = protectedPrefixEndSequence |})
+                |> Result.mapError (fun failure -> sprintf "Life migration activation failed: %s" failure))
+
+    /// GLORY-021: WorkActivated after Activation acceptance.
+    let acceptActivation
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (activationPromptKey: PromptKey)
+        (protectedPrefixEndSequence: int64)
+        : Result<unit, string> =
+        appendLifecycle
+            journal
+            sessionId
+            (ManagerLifecycleFact.WorkActivated
+                {| SessionId = sessionId
+                   LifeId = lifeId
+                   ActivationPromptKey = activationPromptKey
+                   ProtectedPrefixEndSequence = protectedPrefixEndSequence |})
+        |> Result.mapError (fun failure -> sprintf "WorkActivated append failed: %s" failure)
+
     /// GLORY-068/069: AgentOwnerRoot Managers have no HumanRoot-created Life.
     /// On first ending, materialize the migration Life from durable XTrace.
     /// Idempotent: an existing current Life is returned unchanged.

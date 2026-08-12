@@ -14,6 +14,19 @@ type HostSignal =
 
 `ProviderRetry.Attempt` 只用于诊断与唤醒，不是 Fallback 领域计数（FALLBACK-010）。
 
+## Host signal / transform 合成边界
+
+| 关注点 | 拥有者 | 边界 |
+|------|------|------|
+| Host signal 订阅与路由 | `HostSignalBootstrap` | 只回答怎样订阅、哪个 signal 交给哪个 owner；`WiredSignals` 合成根 |
+| Turn 观测政策 | `HostTurnObserver` | Strength promotion、FamilyRecovery、Blogger recovery opportunity、`TurnWorkflow.observe` |
+| Compaction 观测 | `HostCompactionObserver` | HOST-006 startup gate + reanchor |
+| SessionDeleted teardown | `HostSessionDeletion` | LoopSensor / Strength cancel / SyncDelegate finalize / Quiescence Drop / Dispose；不拥有 Scheduler |
+| Reconcile coalesce / drain | `Reconciler.Scheduler` | 同 session 信号合并、generation 隔离、最多一个 drain；外部 API 不变 |
+| Reconcile causal pass | `ReconcilePass` | snapshot → evidence → reread/publish；不拥有锁与 generation dictionary |
+| Provider transform 顺序 | `PluginTransforms` | 只保留 hook 顺序；禁止吸收各阶段算法 |
+| Strength replay / traced | `StrengthReplay` | Promoted replay before XTrace；Traced close after capture |
+
 ## HOST-008：Session 关联所有权
 
 长期所有权由两个正交维度决定，**不再**以 `SatelliteKind` 单轴（历史曾含 Teacher）为唯一模型：
