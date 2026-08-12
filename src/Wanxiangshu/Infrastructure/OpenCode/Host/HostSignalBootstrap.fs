@@ -190,7 +190,6 @@ module HostSignalBootstrap =
                     journal,
                     needHelpSensor,
                     snapshot,
-                    scope.Sessions.Quiescence,
                     (fun childId -> scope.Sessions.OwnedSessions.Add(SessionId.value childId) |> ignore)
                 )
 
