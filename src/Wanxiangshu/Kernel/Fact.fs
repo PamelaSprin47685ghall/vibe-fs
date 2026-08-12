@@ -357,6 +357,7 @@ module Fact =
             {| ManagerJobId: ManagerJobId
                ManagerSessionId: SessionId
                ManagerAgent: string
+               Byname: string
                WorktreeIdentity: WorktreeIdentity
                WorktreePath: WorktreePath
                TargetRef: TargetRef

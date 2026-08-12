@@ -883,11 +883,11 @@ test('AGENT_007_unresolved_role_denies_all_tools', async () => {
     for (const [toolName, args] of [
       ['horizon', {}],
       ['inspect', { charge: 'git status' }],
-      ['fork', { name: 'fast-coder', charge: 'work' }],
+      ['fork', { calling: 'coder', name: 'Ada', charge: 'work' }],
     ]) {
-      const result = parseToml(await hooks.tool[toolName].execute(args, context))
-      assert.deepEqual(Object.keys(result), ['error'], `${toolName} must reject, not run`)
-      assert.match(result.error, /no Authority Root fixes this session's role/)
+      const result = await hooks.tool[toolName].execute(args, context)
+      assert.doesNotMatch(result, /^error\s*=/m, `${toolName} must reject without generic DTO`)
+      assert.match(result, /no Authority Root fixes this session's role/)
     }
   })
 })
@@ -901,15 +901,16 @@ test('EXEC_002_sync_delegate_inspector_coder_refuse_invalid_args_via_plugin', as
     const devops = { sessionID: 'devops-contract', agent: 'fast-devops' }
 
     for (const args of [{}, { charge: '   ' }]) {
-      const refused = parseToml(await hooks.tool.inspect.execute(args, inquiry))
-      assert.equal(refused.error, 'inspect charge required')
+      const refused = await hooks.tool.inspect.execute(args, inquiry)
+      assert.match(refused, /inspect charge required/)
+      assert.doesNotMatch(refused, /^error\s*=/m)
     }
 
-    const missingCharge = parseToml(await hooks.tool['establish-behavior'].execute({}, devops))
-    assert.equal(missingCharge.error, 'establish-behavior charge required')
+    const missingCharge = await hooks.tool['establish-behavior'].execute({}, devops)
+    assert.match(missingCharge, /establish-behavior charge required/)
 
-    const repairMissing = parseToml(await hooks.tool['repair-behavior'].execute({}, devops))
-    assert.equal(repairMissing.error, 'repair-behavior charge required')
+    const repairMissing = await hooks.tool['repair-behavior'].execute({}, devops)
+    assert.match(repairMissing, /repair-behavior charge required/)
   })
 })
 test('GLORY_031_manager_fork_of_a_reviewer_is_denied_role_based', async () => {

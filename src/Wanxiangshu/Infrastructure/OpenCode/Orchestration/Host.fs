@@ -456,8 +456,14 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     engineTask <- Some task
                     task)
 
-    member _.ForkManagerJob(jobId: ManagerJobId, managerAgent: string, prompt: string) : Task<Result<string, string>> =
+    member _.ForkManagerJob
+        (jobId: ManagerJobId, managerAgent: string, prompt: string, ?byname: string)
+        : Task<Result<string, string>> =
         task {
+            let providerByname =
+                match byname with
+                | Some value when not (String.IsNullOrWhiteSpace value) -> value.Trim()
+                | _ -> managerAgent
             let descriptor =
                 DiagnosticWait.create
                     "commission-manager-job"
@@ -472,7 +478,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     match! engine () with
                     | Error reason -> return Error reason
                     | Ok engine ->
-                        match! engine.ForkManager(jobId, managerAgent, prompt) with
+                        match! engine.ForkManager(jobId, managerAgent, prompt, byname = providerByname) with
                         | Error verdict -> return Error(sprintf "%A" verdict)
                         | Ok handle -> return Ok(WorktreePath.value handle.WorktreePath)
                 }

@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure
+open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
@@ -13,12 +14,14 @@ open Wanxiangshu.Session
 module ForkTool =
 
     type Request =
-        { Name: string
+        { Calling: string
+          Name: string
           Charge: string
           Keywords: string }
 
     let private decode (args: HostToolArguments) =
-        { Name = args.Text "name"
+        { Calling = args.Text "calling"
+          Name = args.Text "name"
           Charge = args.Text "charge"
           Keywords = args.Text "keywords" }
 
@@ -51,6 +54,29 @@ module ForkTool =
         | Role.Reviewer -> true
         | _ -> false
 
+    let private personaBinding (role: Role) (tier: AgentTier) =
+        PersonaCatalog.persona role tier |> fun value -> value.ToLowerInvariant(), ManagedAgent.make tier role
+
+    let private managerCallingBindings =
+        [ for role in ManagedAgentCatalog.managerForkableRoles do
+              yield personaBinding role AgentTier.Fast
+              yield personaBinding role AgentTier.Deep ]
+
+    let private orchestratorCallingBindings =
+        [ personaBinding Role.Manager AgentTier.Fast
+          personaBinding Role.Manager AgentTier.Deep ]
+
+    let private callingNames bindings = bindings |> List.map fst
+
+    let private tryCalling bindings (raw: string) =
+        if String.IsNullOrWhiteSpace raw then
+            None
+        else
+            let wanted = raw.Trim().ToLowerInvariant()
+            bindings |> List.tryPick (fun (name, managed) -> if name = wanted then Some managed else None)
+
+    let private hasCalling (request: Request) = not (String.IsNullOrWhiteSpace request.Calling)
+
     let private hasKeywords (request: Request) =
         not (String.IsNullOrWhiteSpace request.Keywords)
 
@@ -78,100 +104,98 @@ module ForkTool =
 
     let private executeManager (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
         task {
-            if request.Name = Wanxiangshu.Process.Pty.AgentName then
-                return consequence "Terminal work belongs through the terminal tools, not fork."
-            elif String.IsNullOrWhiteSpace request.Name then
+            if String.IsNullOrWhiteSpace request.Name then
                 return consequence "A name is required."
             elif String.IsNullOrWhiteSpace request.Charge then
                 return consequence "A charge is required."
             else
-                let assignment = request.Charge
-
                 match scope.RuntimeFor context with
                 | Error _ -> return consequence "A charge cannot be placed from this execution context."
                 | Ok runtime ->
-                    let abandoned =
-                        match runtime.IsRetiredHandle request.Name with
-                        | Some true -> true
-                        | _ -> false
+                    let handles =
+                        match scope.Journal with
+                        | Some journal when not (String.IsNullOrWhiteSpace context.SessionId) ->
+                            Some(AgentJournal.handleProjection journal (SessionId.create context.SessionId))
+                        | _ -> None
 
-                    let pty =
-                        match abandoned with
-                        | true -> None
-                        | false -> runtime.TryPty request.Name
+                    let existingByname =
+                        handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
 
-                    match abandoned, pty, runtime.TryFindAgent request.Name with
-                    | true, _, None -> return consequence "That person is no longer available for another charge."
-                    | _, Some _, _ ->
-                        return consequence "Terminal work belongs through the terminal tools, not fork."
-                    | _, None, Some record ->
-                        match managedForRecord record with
-                        | Some managed when forbiddenManagerRole managed -> return consequence HiddenTargetDeniedText
-                        | _ when hasKeywords request && not (warmStartAllowed record.Role) ->
-                            return consequence warmStartError
-                        | _ ->
-                            let activeRun =
-                                lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey request.Name)
+                    if hasCalling request then
+                        match existingByname with
+                        | Some _ ->
+                            return consequence "That name already belongs to someone in this continuing history."
+                        | None ->
+                            match tryCalling managerCallingBindings request.Calling with
+                            | None -> return consequence (unknownCallingConsequence ())
+                            | Some managed ->
+                                let role = AgentRoleIdentity.ofManaged managed.Role
 
-                            let! reuseResult =
-                                if hasKeywords request && not activeRun then
-                                    task {
-                                        let! rendered = prepareForkPrompt scope runtime record.Role request
-                                        return! runtime.Reuse(request.Name, assignment, renderedPrompt = rendered)
-                                    }
+                                if hasKeywords request && not (warmStartAllowed role) then
+                                    return consequence warmStartError
                                 else
-                                    runtime.Reuse(request.Name, assignment)
+                                    let handleId = ToolHostCodec.newHandleId ()
 
-                            match reuseResult with
-                            | Error _ -> return consequence "That person cannot take another charge yet."
-                            | Ok _ ->
-                                let label =
-                                    match managedForRecord record with
-                                    | Some managed -> managed.Name
-                                    | None -> record.Agent
+                                    let! forkResult =
+                                        if hasKeywords request then
+                                            task {
+                                                let! rendered = prepareForkPrompt scope runtime role request
 
-                                return successInstruction (sprintf "%s carries this charge now." label)
-                    | _, None, None ->
-                        match ManagedAgent.tryParse request.Name with
-                        | Some managed when forbiddenManagerRole managed -> return consequence HiddenTargetDeniedText
-                        | Some managed when
-                            managed.Visibility = AgentVisibility.Public
-                            && List.contains managed.Name ManagedAgent.managerForkableNames
-                            ->
-                            let role = AgentRoleIdentity.ofManaged managed.Role
+                                                return!
+                                                    runtime.Fork(
+                                                        handleId,
+                                                        role,
+                                                        managed.Name,
+                                                        request.Charge,
+                                                        None,
+                                                        renderedPrompt = rendered,
+                                                        byname = request.Name
+                                                    )
+                                            }
+                                        else
+                                            runtime.Fork(
+                                                handleId,
+                                                role,
+                                                managed.Name,
+                                                request.Charge,
+                                                None,
+                                                byname = request.Name
+                                            )
 
-                            if hasKeywords request && not (warmStartAllowed role) then
-                                return consequence warmStartError
-                            else
-                                let! forkResult =
-                                    if hasKeywords request then
-                                        task {
-                                            let! rendered = prepareForkPrompt scope runtime role request
+                                    match forkResult with
+                                    | Ok _ ->
+                                        return successInstruction (sprintf "%s carries this charge now." (request.Name.Trim()))
+                                    | Error _ -> return consequence "The charge could not be placed."
+                    else
+                        match existingByname with
+                        | None -> return consequence "No continuing person is known by that name."
+                        | Some handle ->
+                            match HandleId.tryAgent handle.Handle with
+                            | None -> return consequence "No continuing person is known by that name."
+                            | Some handleId ->
+                                let agentId = AgentHandleId.value handleId
 
-                                            return!
-                                                runtime.Fork(
-                                                    ToolHostCodec.newHandleId (),
-                                                    role,
-                                                    managed.Name,
-                                                    assignment,
-                                                    None,
-                                                    renderedPrompt = rendered
-                                                )
-                                        }
-                                    else
-                                        runtime.Fork(ToolHostCodec.newHandleId (), role, managed.Name, assignment, None)
+                                match runtime.TryFindAgent agentId with
+                                | None -> return consequence "That person is not presently available for another charge."
+                                | Some record when hasKeywords request && not (warmStartAllowed record.Role) ->
+                                    return consequence warmStartError
+                                | Some record ->
+                                    let activeRun =
+                                        lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
 
-                                match forkResult with
-                                | Ok _ ->
-                                    return
-                                        successInstruction (
-                                            sprintf "%s carries this charge now." (bynameOf request managed.Name)
-                                        )
-                                | Error _ -> return consequence "The charge could not be placed."
-                        | Some _ -> return consequence HiddenTargetDeniedText
-                        | None when ToolHostCodec.looksLikeHandleId request.Name ->
-                            return consequence "No continuing person is known by that name."
-                        | None -> return consequence (unknownCallingConsequence ())
+                                    let! reuseResult =
+                                        if hasKeywords request && not activeRun then
+                                            task {
+                                                let! rendered = prepareForkPrompt scope runtime record.Role request
+                                                return! runtime.Reuse(agentId, request.Charge, renderedPrompt = rendered)
+                                            }
+                                        else
+                                            runtime.Reuse(agentId, request.Charge)
+
+                                    match reuseResult with
+                                    | Error _ -> return consequence "That person cannot take another charge yet."
+                                    | Ok _ ->
+                                        return successInstruction (sprintf "%s carries this charge now." (request.Name.Trim()))
         }
 
     let private executeOrchestrator (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
@@ -183,49 +207,62 @@ module ForkTool =
             elif String.IsNullOrWhiteSpace request.Charge then
                 return consequence "A charge is required."
             else
-                match ManagedAgent.tryParse request.Name with
-                | Some managed when managed.Role = Role.Manager && managed.Visibility = AgentVisibility.Public ->
-                    let managerId = ManagerJobId.create (ToolHostCodec.newHandleId ())
-                    let host = scope.OrchestratorHostFor context.SessionId
+                let existingByname =
+                    scope.Journal
+                    |> Option.bind (fun journal ->
+                        (AgentJournal.snapshot journal).AgentProjections.Orchestrator
+                        |> OrchestratorProjection.tryFindByByname request.Name)
 
-                    match! host.ForkManagerJob(managerId, managed.Name, request.Charge) with
-                    | Ok _ ->
-                        return
-                            successInstruction (sprintf "%s has taken your charge." (bynameOf request managed.Name))
-                    | Error _ -> return consequence "That road could not be opened."
-                | Some _ -> return consequence "Only a Manager can take an independent road."
-                | None ->
-                    // GLORY-068: reuse an existing ManagerJob — same worktree/session.
-                    if ToolHostCodec.looksLikeHandleId request.Name then
-                        let host = scope.OrchestratorHostFor context.SessionId
-                        let jobId = ManagerJobId.create request.Name
+                if hasCalling request then
+                    match existingByname with
+                    | Some _ -> return consequence "That name already belongs to a road in this continuing history."
+                    | None ->
+                        match tryCalling orchestratorCallingBindings request.Calling with
+                        | None -> return consequence (unknownCallingConsequence ())
+                        | Some managed ->
+                            let managerId = ManagerJobId.create (ToolHostCodec.newHandleId ())
+                            let host = scope.OrchestratorHostFor context.SessionId
 
-                        match! host.ContinueManagerJob(jobId, request.Charge) with
-                        | Ok _ ->
-                            return
-                                successInstruction (
-                                    sprintf "%s has taken your charge." (bynameOf request request.Name)
+                            match!
+                                host.ForkManagerJob(
+                                    managerId,
+                                    managed.Name,
+                                    request.Charge,
+                                    byname = request.Name
                                 )
-                        | Error _ -> return consequence "No continuing road is known by that name."
-                    else
-                        return consequence (unknownCallingConsequence ())
+                            with
+                            | Ok _ ->
+                                return successInstruction (sprintf "%s has taken your charge." (request.Name.Trim()))
+                            | Error _ -> return consequence "That road could not be opened."
+                else
+                    match existingByname with
+                    | None -> return consequence "No continuing road is known by that name."
+                    | Some job ->
+                        let host = scope.OrchestratorHostFor context.SessionId
+
+                        match! host.ContinueManagerJob(job.ManagerJobId, request.Charge) with
+                        | Ok _ ->
+                            return successInstruction (sprintf "%s has taken your charge." (request.Name.Trim()))
+                        | Error _ -> return consequence "That road cannot take another charge."
         }
 
     let managerSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "fork"
           Description =
-            "Commission another witness within a mission. Pass name + charge; reuse by the same name when the existing sub-session has compatible context."
+            "Commission another witness within a mission. For a new person pass calling + name + charge; to continue someone already known here, omit calling and use the same name."
           Arguments =
-            [ "name", ToolHostCodec.managedOrHandleSchema ManagedAgent.managerForkableNames factory
-              "charge", ToolHostCodec.optionalStringSchema factory
+            [ "calling", ToolHostCodec.optionalEnumSchema (callingNames managerCallingBindings) factory
+              "name", ToolHostCodec.stringSchema factory
+              "charge", ToolHostCodec.stringSchema factory
               "keywords", ToolHostCodec.optionalStringSchema factory ]
           Execute = fun args context -> executeManager scope (decode args) context }
 
     let orchestratorSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "commission"
           Description =
-            "Entrust an independent road to a Manager. Pass name + charge; reuse an existing road by passing its handle as name."
+            "Entrust an independent road to a Manager. For a new road pass calling + name + charge; to continue a known road, omit calling and use the same name."
           Arguments =
-            [ "name", ToolHostCodec.managedOrHandleSchema ManagedAgent.orchestratorForkableNames factory
+            [ "calling", ToolHostCodec.optionalEnumSchema (callingNames orchestratorCallingBindings) factory
+              "name", ToolHostCodec.stringSchema factory
               "charge", ToolHostCodec.stringSchema factory ]
           Execute = fun args context -> executeOrchestrator scope (decode args) context }

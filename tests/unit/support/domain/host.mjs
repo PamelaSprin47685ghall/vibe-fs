@@ -87,6 +87,7 @@ export const handleProjection = (() => {
   const m = bind(LinkageProj, 'HandleProjection', [
     'empty',
     'link',
+    'linkNamed',
     'complete',
     'abandon',
     'retire',
@@ -98,6 +99,7 @@ export const handleProjection = (() => {
     'reportableAbandoned',
     'activeHandles',
     'tryFindByChildSession',
+    'tryFindByByname',
     'linkedChildren',
     'lifecycleSealsBlogger',
     'recordSealsBlogger',
@@ -127,6 +129,8 @@ export const handleProjection = (() => {
     empty: m.empty,
     link: (handle, child, targetAgent, role, current, ownership = handleOwnership.durableParentHandle()) =>
       decided(m.link(handle, child, targetAgent, role, ownership, current)),
+    linkNamed: (handle, child, targetAgent, byname, role, current, ownership = handleOwnership.durableParentHandle()) =>
+      decided(m.linkNamed(handle, child, targetAgent, byname, role, ownership, current)),
     complete: (handle, completion, current) =>
       decided(m.complete(handle, typeof completion === 'string' ? completionOf(completion) : completion, current)),
     completionOf,
@@ -141,6 +145,7 @@ export const handleProjection = (() => {
     reportableAbandoned: (current) => listItems(m.reportableAbandoned(current)),
     activeHandles: (current) => listItems(m.activeHandles(current)),
     tryFindByChildSession: (child, current) => unwrapOption(m.tryFindByChildSession(child, current)),
+    tryFindByByname: (byname, current) => unwrapOption(m.tryFindByByname(byname, current)),
     linkedChildren: (current) => listItems(m.linkedChildren(current)),
     lifecycleOf: (record) => caseOf(record.Lifecycle),
     lifecycleSealsBlogger: (lifecycle) => m.lifecycleSealsBlogger(lifecycle),

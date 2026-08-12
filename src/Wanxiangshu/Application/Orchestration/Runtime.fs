@@ -74,6 +74,7 @@ type Orchestrator
     let forkManagerCore
         (jobId: ManagerJobId)
         (managerAgent: string)
+        (byname: string)
         (prompt: string)
         (worktreePath: WorktreePath option)
         : Task<Result<OrchestratorHandle, OrchestratorVerdict>> =
@@ -158,6 +159,7 @@ type Orchestrator
                                         {| ManagerJobId = jobId
                                            ManagerSessionId = managerSessionId
                                            ManagerAgent = managerAgent
+                                           Byname = byname
                                            WorktreeIdentity = worktree.Identity
                                            WorktreePath = path
                                            TargetRef = targetRef
@@ -189,8 +191,15 @@ type Orchestrator
                                     return Ok job.Handle
         }
 
-    member _.ForkManager(jobId: ManagerJobId, managerAgent: string, prompt: string, ?worktreePath: WorktreePath) =
-        forkManagerCore jobId managerAgent prompt worktreePath
+    member _.ForkManager
+        (jobId: ManagerJobId, managerAgent: string, prompt: string, ?worktreePath: WorktreePath, ?byname: string)
+        =
+        let providerByname =
+            match byname with
+            | Some value when not (System.String.IsNullOrWhiteSpace value) -> value.Trim()
+            | _ -> managerAgent
+
+        forkManagerCore jobId managerAgent providerByname prompt worktreePath
 
     /// ORCH-007: resume a persisted job. The worktree is adopted by its durable
     /// identity, never recreated, and the Manager is the one the fact names.

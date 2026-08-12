@@ -30,8 +30,8 @@ const fakeJournal = (handles) => ({
   },
 })
 
-const linked = (handle, child, target, role) => {
-  const applied = handleProjection.link(handle, child, target, roles.of(role), handleProjection.empty)
+const linked = (handle, child, target, role, byname = target) => {
+  const applied = handleProjection.linkNamed(handle, child, target, byname, roles.of(role), handleProjection.empty)
   assert.equal(applied.ok, true, applied.ok ? '' : applied.error)
   return applied.value
 }
@@ -133,8 +133,8 @@ test('HORIZON_runtime_error_is_surfaced', async () => {
   assert.ok(!/\berror\s*=/.test(text))
 })
 
-test('HORIZON_lists_active_agent_and_open_terminals_in_natural_language', async () => {
-  const handles = linked(handleId.agent('ag-1'), sessionId('child-1'), 'fast-coder', 'Coder')
+test('HORIZON_lists_active_agent_by_byname_and_open_terminals_in_natural_language', async () => {
+  const handles = linked(handleId.agent('ag-1'), sessionId('child-1'), 'fast-coder', 'Coder', 'Ada')
   const scope = scopeFor(
     fakeJournal(handles),
     liveRuntime({
@@ -144,7 +144,8 @@ test('HORIZON_lists_active_agent_and_open_terminals_in_natural_language', async 
   )
   const text = await run(scope)
 
-  assert.match(text, /# fast-coder is still away\./)
+  assert.match(text, /# Ada is still away\./)
+  assert.doesNotMatch(text, /fast-coder/)
   assert.match(text, /# tail -f remains open\./)
   assert.match(text, /# npm test remains open\./)
   assert.ok(!FORBIDDEN.test(text))

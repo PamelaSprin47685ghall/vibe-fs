@@ -151,10 +151,10 @@ const liveScope = (behaviour = {}) => {
 }
 
 /** A scope with no runtime seeded; an orchestrator host can still be pre-seeded. */
-const bareScope = ({ orchestratorHost, sessions } = {}) => {
+const bareScope = ({ orchestratorHost, sessions, journal } = {}) => {
   const scope = new ToolRuntimeScope(
     sessions,
-    undefined,
+    journal,
     undefined,
     undefined,
     new Map(),
@@ -183,122 +183,99 @@ test('FORK_blank_name_is_refused_without_error_dto', async () => {
   assert.match(result, /A name is required/)
 })
 
-test('FORK_terminal_identity_is_refused_on_the_manager_tool', async () => {
+test('FORK_name_without_calling_is_continuation_only', async () => {
   const spec = managerSpec(factory, bareScope())
-  const result = await runManager(spec, 'pty', 'do work')
-  assert.match(result, /Terminal work belongs through the terminal tools/)
+  const result = await runManager(spec, 'Ada', 'do work')
+  assert.match(result, /No continuing person is known by that name/)
+  assert.doesNotMatch(result, /fast-|deep-|agent id/i)
 })
 
 test('FORK_disposed_scope_surfaces_natural_execution_consequence', async () => {
   const live = liveScope()
   live.scope.disposed = true
   const spec = managerSpec(factory, live.scope)
-  const result = await runManager(spec, 'fast-coder', 'do work')
+  const result = await runManager(spec, 'Ada', 'do work', { calling: 'coder' })
   assert.doesNotMatch(result, /disposed|\berror\s*=/i)
   assert.match(result, /cannot be placed from this execution context/i)
   live.cleanup()
 })
 
-test('FORK_hidden_role_by_name_is_denied_generically', async () => {
+test('FORK_unavailable_calling_is_denied_generically', async () => {
   const spec = managerSpec(factory, bareScope())
-  const result = await runManager(spec, 'fast-reviewer', 'review this')
-  assert.match(result, /Unknown or unavailable managed agent/)
-  assert.doesNotMatch(result, /Reviewer|\berror\s*=/)
+  const result = await runManager(spec, 'Rhea', 'review this', { calling: 'examiner' })
+  assert.match(result, /Unknown or unavailable calling/)
+  assert.doesNotMatch(result, /Reviewer|fast-|deep-|\berror\s*=/i)
 })
 
 test('FORK_unknown_calling_is_generic_and_does_not_dump_machine_bindings', async () => {
   const spec = managerSpec(factory, bareScope())
-  const result = await runManager(spec, 'not-an-agent-name!', 'do work')
+  const result = await runManager(spec, 'Ada', 'do work', { calling: 'wizard' })
   assert.match(result, /Unknown or unavailable calling/)
   assert.doesNotMatch(result, /fast-|deep-|\berror\s*=/i)
 })
 
 // ── fresh fork path (real runtime + journal) ─────────────────────────────────
 
-test('FORK_public_forkable_agent_creates_a_child', async () => {
+test('FORK_calling_creates_machine_agent_but_returns_only_byname', async () => {
   const live = liveScope()
   const spec = managerSpec(factory, live.scope)
-  const text = await runManager(spec, 'fast-coder', 'implement the feature')
-  const result = parseToml(text)
+  const text = await runManager(spec, 'Ada', 'implement the feature', { calling: 'coder' })
 
-  assert.equal(result.error, undefined)
-  assert.match(text, /carries this charge now/)
+  assert.match(text, /Ada carries this charge now/)
+  assert.doesNotMatch(text, /fast-coder|agent_id|\berror\s*=/)
 
   const created = live.sessions.calls.filter(([name]) => name === 'CreateChildSession')
   assert.equal(created.length, 1, 'exactly one child session')
+  assert.equal(created[0][1].Agent, 'fast-coder', 'calling resolves to Host machine binding')
   live.cleanup()
 })
 
 test('FORK_create_session_failure_surfaces_only_public_consequence', async () => {
   const live = liveScope({ createError: 'host refused the fork' })
   const spec = managerSpec(factory, live.scope)
-  const result = await runManager(spec, 'fast-coder', 'implement the feature')
+  const result = await runManager(spec, 'Ada', 'implement the feature', { calling: 'coder' })
   assert.match(result, /The charge could not be placed/)
   assert.doesNotMatch(result, /host refused|\berror\s*=/i)
   live.cleanup()
 })
 
-test('FORK_unknown_continuation_handle_does_not_echo_internal_identity', async () => {
+test('FORK_unknown_byname_does_not_echo_internal_identity', async () => {
   const live = liveScope()
   const spec = managerSpec(factory, live.scope)
-  const result = await runManager(spec, 'zz9900', 'do work')
+  const result = await runManager(spec, 'Nobody Here', 'do work')
   assert.match(result, /No continuing person is known by that name/)
-  assert.doesNotMatch(result, /agent id|\berror\s*=/i)
+  assert.doesNotMatch(result, /agent id|fast-|deep-|\berror\s*=/i)
   live.cleanup()
 })
 
-// ── reuse path: fork once, then nudge by agent_id ────────────────────────────
+// ── reuse path: create by calling, continue by Byname ───────────────────────
 
-test('FORK_existing_agent_busy_reuse_without_active_run_fails_closed', async () => {
+test('FORK_existing_person_is_resolved_by_byname_not_agent_id', async () => {
   const live = liveScope()
   const spec = managerSpec(factory, live.scope)
 
-  const forked = await forkRuntime(
-    live.runtime,
-    'ag0001',
-    Role.Coder,
-    'fast-coder',
-    'implement the feature',
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-  )
-  assert.equal(forked.tag, 0, forked.tag === 1 ? forked.fields[0] : '')
+  const createdText = await runManager(spec, 'Ada', 'implement the feature', { calling: 'coder' })
+  assert.match(createdText, /Ada carries this charge now/)
 
-  const reused = await runManager(spec, 'ag0001', 'continue the work')
-  assert.match(reused, /That person cannot take another charge yet/)
-  assert.doesNotMatch(reused, /ActiveLogicalRun|child session|\berror\s*=/i)
+  const reused = await runManager(spec, 'Ada', 'continue the work')
+  assert.doesNotMatch(reused, /No continuing person|fast-coder|agent id/i)
 
   const created = live.sessions.calls.filter(([name]) => name === 'CreateChildSession')
-  assert.equal(created.length, 1, 'reuse must not spawn a second session')
+  assert.equal(created.length, 1, 'Byname continuation must not spawn a second session')
   live.cleanup()
 })
 
-test('FORK_reuse_of_hidden_role_is_denied_generically', async () => {
+test('FORK_same_byname_cannot_be_reborn_with_a_new_calling', async () => {
   const live = liveScope()
   const spec = managerSpec(factory, live.scope)
 
-  // Plant a reviewer child directly through the runtime (bypassing the tool's
-  // own creation gate), then try to nudge it by agent id.
-  const forked = await forkRuntime(
-    live.runtime,
-    'rw0001',
-    Role.Reviewer,
-    'fast-reviewer',
-    'review the diff',
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-    undefined,
-  )
-  assert.equal(forked.tag, 0, forked.tag === 1 ? forked.fields[0] : '')
+  assert.match(await runManager(spec, 'Ada', 'first charge', { calling: 'coder' }), /Ada carries/)
+  const denied = await runManager(spec, 'Ada', 'different person', { calling: 'engineer' })
+  assert.match(denied, /name already belongs to someone/i)
+  assert.doesNotMatch(denied, /fast-|deep-|agent id/i)
 
-  const denied = await runManager(spec, 'rw0001', 'nudge the reviewer')
-  assert.match(denied, /Unknown or unavailable managed agent/)
-  assert.doesNotMatch(denied, /Reviewer|\berror\s*=/)
+  const created = live.sessions.calls.filter(([name]) => name === 'CreateChildSession')
+  assert.equal(created.length, 1, 'Byname is not reusable for a different logical person')
   live.cleanup()
 })
 
@@ -380,7 +357,7 @@ const liveOrchestrator = () => {
   const host = new OrchestratorHost(deps, makeSessionId('ses_fork'))
   host.engineInstance = engine
 
-  const scope = bareScope({ orchestratorHost: host, sessions })
+  const scope = bareScope({ orchestratorHost: host, sessions, journal: opened.journal })
   return {
     scope,
     host,
@@ -396,44 +373,49 @@ const liveOrchestrator = () => {
   }
 }
 
-test('FORK_orchestrator_forks_a_public_manager_job', async () => {
+test('FORK_orchestrator_calling_opens_machine_manager_but_returns_only_road_byname', async () => {
   const live = liveOrchestrator()
   const spec = orchestratorSpec(factory, live.scope)
 
-  const text = await spec.Execute(makeArgs({ name: 'fast-manager', charge: 'build the thing' }), context())
-  const result = parseToml(text)
+  const text = await spec.Execute(
+    makeArgs({ calling: 'coordinator', name: 'North Road', charge: 'build the thing' }),
+    context(),
+  )
 
-  assert.equal(result.error, undefined)
-  assert.match(text, /has taken your charge/)
-  assert.equal(live.managerCalls.filter(([name]) => name === 'StartManager').length, 1)
+  assert.match(text, /North Road has taken your charge/)
+  assert.doesNotMatch(text, /fast-manager|job_id|worktree|\berror\s*=/i)
+  const starts = live.managerCalls.filter(([name]) => name === 'StartManager')
+  assert.equal(starts.length, 1)
+  assert.equal(starts[0][1].ManagerAgent, 'fast-manager')
   live.cleanup()
 })
 
-test('FORK_orchestrator_rejects_non_manager_callings_without_binding_names', async () => {
+test('FORK_orchestrator_rejects_unknown_calling_without_binding_names', async () => {
   const spec = orchestratorSpec(factory, bareScope({ orchestratorHost: {} }))
-  const result = await spec.Execute(makeArgs({ name: 'fast-coder', charge: 'x' }), context())
-  assert.match(result, /Only a Manager can take an independent road/)
+  const result = await spec.Execute(makeArgs({ calling: 'coder', name: 'Road', charge: 'x' }), context())
+  assert.match(result, /Unknown or unavailable calling/)
   assert.doesNotMatch(result, /fast-manager|deep-manager|\berror\s*=/i)
 })
 
-test('FORK_orchestrator_reuses_existing_job_by_handle_id', async () => {
+test('FORK_orchestrator_resolves_continuation_by_road_byname', async () => {
   const live = liveOrchestrator()
   const spec = orchestratorSpec(factory, live.scope)
 
-  // Fork a job first so the projection has an active record, then continue it.
-  const forkedText = await spec.Execute(makeArgs({ name: 'fast-manager', charge: 'build the thing' }), context())
-  assert.equal(parseToml(forkedText).error, undefined)
-  assert.match(forkedText, /has taken your charge/)
+  const forkedText = await spec.Execute(
+    makeArgs({ calling: 'coordinator', name: 'North Road', charge: 'build the thing' }),
+    context(),
+  )
+  assert.match(forkedText, /North Road has taken your charge/)
 
-  // Provider surface no longer returns job id; reuse by handle is wall-internal.
-  // Continue-unknown remains the observable failure contract below.
+  const continued = await spec.Execute(makeArgs({ name: 'North Road', charge: 'keep going' }), context())
+  assert.doesNotMatch(continued, /No continuing road|manager job|fast-manager|job_id/i)
   live.cleanup()
 })
 
 test('FORK_orchestrator_unknown_continuation_is_a_natural_consequence', async () => {
   const live = liveOrchestrator()
   const spec = orchestratorSpec(factory, live.scope)
-  const result = await spec.Execute(makeArgs({ name: 'mj9999', charge: 'nobody home' }), context())
+  const result = await spec.Execute(makeArgs({ name: 'Unknown Road', charge: 'nobody home' }), context())
   assert.match(result, /No continuing road is known by that name/)
   assert.doesNotMatch(result, /manager job|\berror\s*=/i)
   live.cleanup()
@@ -442,7 +424,10 @@ test('FORK_orchestrator_unknown_continuation_is_a_natural_consequence', async ()
 test('FORK_orchestrator_missing_authority_is_refused_without_session_identity', async () => {
   const spec = orchestratorSpec(factory, bareScope({ orchestratorHost: {} }))
   const emptyContext = new HostToolContext('', undefined, undefined, undefined, undefined, () => () => {})
-  const result = await spec.Execute(makeArgs({ name: 'fast-manager', charge: 'x' }), emptyContext)
+  const result = await spec.Execute(
+    makeArgs({ calling: 'coordinator', name: 'North Road', charge: 'x' }),
+    emptyContext,
+  )
   assert.match(result, /caller's authority is established/)
   assert.doesNotMatch(result, /sessionID|\berror\s*=/i)
 })
@@ -451,7 +436,10 @@ test('FORK_orchestrator_dirty_repo_rejects_the_road_without_internal_detail', as
   const live = liveOrchestrator()
   live.engine.git.IsDirty = async () => true
   const spec = orchestratorSpec(factory, live.scope)
-  const result = await spec.Execute(makeArgs({ name: 'fast-manager', charge: 'x' }), context())
+  const result = await spec.Execute(
+    makeArgs({ calling: 'coordinator', name: 'North Road', charge: 'x' }),
+    context(),
+  )
   assert.match(result, /That road could not be opened/)
   assert.doesNotMatch(result, /dirty|worktree|\berror\s*=/i)
   live.cleanup()
@@ -462,14 +450,14 @@ test('FORK_specs_expose_expected_names_and_only_manager_fork_carries_keywords', 
   const commission = orchestratorSpec(factory, bareScope({ orchestratorHost: {} }))
   assert.equal(fork.Name, 'fork')
   assert.equal(commission.Name, 'commission')
-  assert.deepEqual(listItems(fork.Arguments).map(([name]) => name), ['name', 'charge', 'keywords'])
-  assert.deepEqual(listItems(commission.Arguments).map(([name]) => name), ['name', 'charge'])
+  assert.deepEqual(listItems(fork.Arguments).map(([name]) => name), ['calling', 'name', 'charge', 'keywords'])
+  assert.deepEqual(listItems(commission.Arguments).map(([name]) => name), ['calling', 'name', 'charge'])
 })
 
 test('FORK_non_repository_target_rejects_nonempty_warm_start_keywords_before_creation', async () => {
   const live = liveScope()
   const spec = managerSpec(factory, live.scope)
-  const result = await runManager(spec, 'fast-browser', 'browse', { keywords: 'repository clue' })
+  const result = await runManager(spec, 'Web Road', 'browse', { calling: 'navigator', keywords: 'repository clue' })
   assert.match(result, /only available when fork targets Coder, Inspector, or DevOps/)
   assert.doesNotMatch(result, /\berror\s*=/i)
   assert.equal(listItems(listRuntimeAgents(live.runtime)[0]).length, 0)

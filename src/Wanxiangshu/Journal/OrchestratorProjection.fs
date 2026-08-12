@@ -67,6 +67,9 @@ type ManagerJobProjection =
         /// ORCH-003: persisted so recovery restores `fast-manager` or
         /// `deep-manager` rather than degrading to a bare role.
         ManagerAgent: string
+        /// EXEC-029: provider-facing stable road name. ManagerAgent remains the
+        /// Host machine binding used for recovery and execution.
+        Byname: string
         /// ORCH-006: recovery locates the worktree by identity. The path is
         /// diagnostic — it is mutable state, and a moved worktree must not orphan
         /// a job.
@@ -136,6 +139,19 @@ module OrchestratorProjection =
           WorktreeEffects = Map.empty }
 
     let tryFind (jobId: ManagerJobId) (projection: OrchestratorProjection) = Map.tryFind jobId projection.Jobs
+
+    let tryFindByByname (byname: string) (projection: OrchestratorProjection) =
+        if System.String.IsNullOrWhiteSpace byname then
+            None
+        else
+            let wanted = byname.Trim()
+
+            projection.Jobs
+            |> Map.tryPick (fun _ job ->
+                if System.String.Equals(job.Byname, wanted, System.StringComparison.OrdinalIgnoreCase) then
+                    Some job
+                else
+                    None)
 
     let tryWorktreeEffect (identity: WorktreeIdentity) (projection: OrchestratorProjection) =
         Map.tryFind identity projection.WorktreeEffects
@@ -231,6 +247,7 @@ module OrchestratorProjection =
             {| ManagerJobId: ManagerJobId
                ManagerSessionId: SessionId
                ManagerAgent: string
+               Byname: string
                WorktreeIdentity: WorktreeIdentity
                WorktreePath: WorktreePath
                TargetRef: TargetRef
@@ -247,6 +264,8 @@ module OrchestratorProjection =
                         { ManagerJobId = job.ManagerJobId
                           ManagerSessionId = job.ManagerSessionId
                           ManagerAgent = job.ManagerAgent
+                          Byname =
+                            if System.String.IsNullOrWhiteSpace job.Byname then job.ManagerAgent else job.Byname
                           WorktreeIdentity = job.WorktreeIdentity
                           WorktreePath = job.WorktreePath
                           TargetRef = job.TargetRef

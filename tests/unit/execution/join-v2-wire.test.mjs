@@ -35,6 +35,17 @@ test('EXEC_004_single_completion_is_natural_language_plus_work_record', () => {
   assert.equal(parseToml(wire).status, undefined)
 })
 
+test('EXEC_004_join_prefers_durable_byname_over_machine_agent_name', () => {
+  const bynameRuntime = joinResultRenderer.stubRuntime({
+    agents: new Map([['a1', { Agent: 'Ada' }]]),
+  })
+  const batch = nonEmptyBatch.ofHeadTail(agentRun('a1', 'fast-coder', 'done foo'))
+  const wire = joinResultRenderer.renderCompletedBatch(bynameRuntime, batch)
+
+  assert.match(wire, /# Ada has returned\./)
+  assert.doesNotMatch(wire, /fast-coder/)
+})
+
 test('EXEC_018_batch_of_two_returns_two_natural_language_blocks', () => {
   const batch = nonEmptyBatch.ofHeadTail(agentRun('a1', 'fast-coder', 'foo'), [
     agentRun('a2', 'deep-reviewer', 'bar'),
