@@ -268,6 +268,8 @@ export async function setupScenarioParallel(opts, tmpDir) {
         console.error(`session=${fatal.sessionId} lastUser=${JSON.stringify(fatal.lastUser)}`);
         console.error(`candidates=${JSON.stringify(fatal.candidates)}`);
         console.error(`── event tail ──\n${events.dump(20)}`);
+        console.error(`── Host stderr tail ──\n${host.stderrLog.split('\n').slice(-30).join('\n')}`);
+        console.error(`── Journal fact tail ──\n${journalFactTail(host.workDir, 30).join('\n')}`);
         for (const expectation of provider.blockedExpectations) {
           console.error(`  pending ${expectation.blocking ? 'blocking' : 'background'} ${expectation.id} ${expectation.lane}`);
         }
