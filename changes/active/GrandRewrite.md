@@ -5717,44 +5717,46 @@ Manager **不**拥有 `inspect`（已冻结）：Manager 永远不能亲手触�
 
 ## Remaining work
 
-1. **Phase 17 i18n 收口验证**：World / Role / Office Library 已拆成 semantic resources；EN/zh-CN Role Law 已完成；HOST-013 / session system prompt / tool-description language 边界已接线；Enforcer RuleBook 已完成 **120/120** TipIdentity 的 EN + zh-CN detection/remediation 四叶真正文。当前未提交 runtime 接线使 RuleBook Blogger detection 与 Main triggered remediation 按 `ProviderLanguage` 选择、且禁止 silent English fallback；**尚需先修 `RuntimeResources.fs` Fantomas，再对这 6 个未提交文件跑完整 `npm run check` + Long Stroke**。
-2. **Phase 20 物理文件名**：`BlogTool.fs`/`VerdictTool.fs`/`ListTool.fs`/`EditQaTool.fs` 已为合法 migration tombstone（零 runtime 所有权；Gate A 绿），**物理文件名**仍待重命名或 fsproj 条目删除（workspace 无 delete API 时保留 tombstone 为预期态）。
-3. **Gate B baseline ratchet**：当前 `provider-leak-gate-baseline.json` 绿；后续 leak 修复应继续只减不增。
-4. **Fission**：按用户决定仅交付 MVP surface + fail-closed 语义；完整 lane/fission engine 是大工程，**明确延期，当前 Change 不以完整 Fission 为关闭前提**。
-5. **§20 Non-Goals**：Steward 仍不得伪装已交付；Sphinx MCP 已 merge（Inquiry `sphinx_*` 权限），完整 Sphinx Kernel 后续演进不阻塞当前验证链。
-6. **移入 `completed/`**：须满足 Completion criteria 全项；此前 premature close 已撤回，**本 session 仍不移入**。
+1. **§19 FAIL — AC15 / AC16（BlindPlan Opening / WorkRecordStart）**：正式 `docs/how/glory.md` 要求生产 Blogger floor = `max(coverage, WorkRecordStart)`，且 `WorkActivated`/`ProtectedPrefixEnd` 仅 inert legacy；T1 call/result ∈ OpeningMaterial。当前实现仍：
+   - `BloggerCoordinator` / `CompanionTransform` 用 `life.ProtectedPrefixEnd` 作 floor；
+   - `LifeProjection` **无** `WorkRecordStart` 字段（仅 `OpeningCursor` + `ProtectedPrefixEnd`）；
+   - `LifecycleWorkRecord.fs` 仍标 Phase 10 stub；`OpeningMaterial` 仅 AssignmentText+Requirements；
+   - `workRecordStart` / `bloggerEffectiveStart` 纯函数存在但无生产接线。
+   → **关闭前提**：完成 WorkRecordStart 推导接线 + Opening 永不进 Y 的可观察测试 + T1 ∈ Opening 证据。
+2. **§19 WEAK — AC1 / AC20**：Gate D 目前钉 fallback/Strength；未穷尽 T1/review/reanchor 字节相等。Gate C 成对资源，无「技术标识双语同形」扫描。关闭前补齐或用户书面接受 WEAK。
+3. **§20 Non-Goals 诚实声明**：Steward / 完整 Sphinx Kernel / Fission V2 / 其他 locale / Coder BlindPlan **不得**写入 Final outcome 为已交付。
+4. **移入 `completed/`**：仅在 AC15/16 闭环（及 AC1/20 处理）后追加正式 `Final outcome`；**本 session 不移入**。
 
-## Done since Amendment（2026-08-12）
+## Done since Amendment（2026-08-12 → 08-13 续作）
 
 - `manager-tool-contract` 22/22；Gate D 实装；`TddPhase` 删除。
 - i18n 目录纠正为 semantic path + `en.md`/`zh-CN.md` 叶子（§4.7.8）。
 - **ARCH-010 / ForkChildPayload**：commissioner 历史移入 instruction 注释区；`arch010-cases` injection 期望对齐 basic-string 语义。
 - **HOST-026**：`ProviderLanguageBinding.readGlobalPreference` 用 `Option.ofObj` 处理 Fable `undefined`；e2e `isolated-env.js` 显式 `WANXIANGSHU_PROVIDER_LANGUAGE=en`。
-- **long-stroke e2e 全链路**：`blog`→`chronicle`、`inspector`→`inspect`、SyncDelegate 删 `return`；`protocol-repair` / `manager-blind-plan` / G6 bookkeeper finalize / NEEDHELP deep consultation 路径；**63 steps / ~11.4s，spawn=1**。
+- **long-stroke e2e 全链路**：`blog`→`chronicle`、`inspector`→`inspect`、SyncDelegate 删 `return`；`protocol-repair` / `manager-blind-plan` / G6 bookkeeper finalize / NEEDHELP deep consultation 路径。
 - **js-bookkeeper Case SDK**：`question`/`answer`/`setQuestion`/`setAnswer`/`run` 原子 Case 变换；无 filesystem capability；每角色恰好一个 Ultra Example。
 - **Casebook**：provider 动词 `shelfmark`；fork/commission **calling + Byname** clean break；Horizon/Join 全链路 Byname；TerminalName 在 Join 交付 closure 前保持占用。
 - **NEEDHELP 因果修复**：typed NEEDHELP-owned abort 保留随后 idle permit（`NeedHelpSensor.HasArmedSession` + `AssistanceHost`）；consultation child terminal 先 `XTraceCapture.captureTerminal` 再 materialize LWR。
-- **四个旧 tool owner**：`ListTool`/`BlogTool`/`VerdictTool`/`EditQaTool` 退为 migration tombstone（无 module alias / runtime owner）；Gate A + tool-referential-integrity 绿。
-- **Gate B**：Provider Leak baseline ratchet **0 violations**（扫描绿）。
-- **测试卫生**：移除 `long-stroke.toml`、`assistance-host.test.mjs`、`entry.test.mjs` 尾部误写入的 merge conflict 元数据（TOML/JS 解析失败根因）。
-- **格式**：`NeedHelpSensor.fs`、`JsBookkeeperTool.fs` Fantomas 对齐。
+- **Phase 17 i18n runtime**：`RuntimeResources` 预载 EN+zh-CN RuleBook；`enforcerRulesFor(lang)` / Blogger compose / Main tip guidance 按 `ProviderLanguage` 选择；targeted 禁止 silent English fallback。
+- **Phase 20**：`BlogTool.fs` / `VerdictTool.fs` / `ListTool.fs` / `EditQaTool.fs` tombstone **物理删除**；fsproj 条目与 kolmogorov baseline 同步移除；Gate A 仍绿。
+- **Gate B**：Provider Leak baseline ratchet **0 violations**。
+- **格式**：`RuntimeResources.fs` Fantomas 收口；`format:check` 绿。
+- **§19 终审（只读）**：PASS 26 / FAIL 2（AC15、AC16）/ WEAK 2（AC1、AC20）→ **§19 未全部满足**。
 
-## Verification snapshot（2026-08-12 下午 — 全栈绿）
+## Verification snapshot（2026-08-13 — Phase 17/20 收口后全栈绿）
 
 ```text
-npm run format:check                               → ok（440 files）
-npm run lint                                       → ok（spec + architecture + dsl-ownership + 全部 static gates）
-npm run build                                      → ok
-npm test                                           → 2385 passed / 0 failed
-npm run test:integration                           → 275 passed / 0 failed
-npm run test:e2e                                   → ok（Long Stroke 63 steps / ~11.4s；journal 581/620；SSE 2715/2900；spawn=1）
+npm run format:check                               → ok
+npm run check（lint + build + unit + integration） → ok
+npm test                                           → 2386 passed / 0 failed
+npm run test:integration                           → all suites passed（含 harness 275）
+npm run test:e2e                                   → ok（Long Stroke 63 steps / ~9.7s；journal 581/620；SSE 2717/2900；Published）
+targeted RuleBook/i18n                             → 18/18
 Gate A tool-referential-integrity                  → OK
-Gate B provider-leak-gate (+ baseline ratchet)     → OK
-Gate C language-parity-gate                        → OK
-Gate D prompt-stability                            → OK（prompt-stability.test.mjs）
-js-surface / capability-isomorphism / unified-store / G4R / DSL ownership → OK
-Casebook unit                                      → 71/71
-js-tools unit                                      → 66/66
+Gate B provider-leak-gate (+ baseline ratchet)     → OK（0 violations）
+Gate C language-parity-gate                        → OK（17 semantic × en.md+zh-CN.md）
+Gate D prompt-stability                            → OK（2/2；0 todo）
+§19 Acceptance Criteria                            → PASS 26 / FAIL 2 / WEAK 2（见 Remaining）
 ```
 
 ## Completion criteria
@@ -5767,7 +5769,15 @@ js-tools unit                                      → 66/66
 
 ## Blockers
 
-**收工态（2026-08-12 晚）**：没有已知 runtime 语义 blocker；当前唯一已观测静态红点为 `npm run format:check` 报 `src/Wanxiangshu/Infrastructure/Resources/RuntimeResources.fs needs formatting`。另外，最新 RuleBook locale runtime 接线的 6 个未提交文件尚未跑完整 `npm run check` / Long Stroke，因此当前工作树**不得标记为全栈绿**。明日第一步：Fantomas 等价收口 → targeted RuleBook/i18n tests → `npm run check` → Long Stroke。
+无运行时红点。关闭语义 blocker = **AC15/AC16 WorkRecordStart / BlindPlan Opening 生产接线缺口**（docs 已定，实现仍走 `ProtectedPrefixEnd`）。
+
+## Amendment — 2026-08-13（Phase 17/20 收口 + §19 终审）
+
+- **Recorded by**：Agent（用户指令「继续工作」）
+- **Change**：Fantomas；targeted 18/18；`npm run check`；Long Stroke 63；删四 tombstone；§19 只读终审写入 Remaining。
+- **未提交工作树**：`RuntimeResources.fs`、`Wanxiangshu.fsproj`、四 tombstone 删除、`kolmogorov-size-baseline.json`、本 Active。
+- **下一步**：接 `WorkRecordStart` 生产 floor（替换 `ProtectedPrefixEnd`），并补 Opening 永不进 Y + T1 ∈ Opening 回归；再处理 AC1/AC20 WEAK。
+- **关闭状态**：保持 `active/`，**不移入 `completed/`**。
 
 ## Amendment — 2026-08-12（下午 — 全栈验证后状态写入）
 

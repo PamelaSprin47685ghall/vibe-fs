@@ -398,14 +398,11 @@
     <Compile Include="Infrastructure/OpenCode/Tools/ForkTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/PtyTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/JoinTool.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Tools/ListTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/HorizonTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ExecutorTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/InspectorTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/CoderTool.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Tools/BlogTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ChronicleTool.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Tools/VerdictTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/JudgeTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FinalityTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FileMutationTools.fs"/>
@@ -428,7 +425,6 @@
     <Compile Include="Infrastructure/JsToolsBindings.fs"/>
     <Compile Include="Infrastructure/JsToolsTransactionStore.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/JsToolWorkflow.fs"/>
-    <Compile Include="Infrastructure/OpenCode/Tools/EditQaTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/JsBookkeeperTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/JsToolHost.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ToolRegistry.fs"/>

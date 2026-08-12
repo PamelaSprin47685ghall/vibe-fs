@@ -5,13 +5,15 @@ open Wanxiangshu.Domain
 
 /// Bundle of package runtime data loaded once at plugin init.
 type RuntimeResources =
-    { Prompts: PromptCatalog
-      /// Rulebook selected for this RuntimeResources view (legacy/internal callers).
-      EnforcerRules: EnforcerRule list
-      EnglishEnforcerRules: EnforcerRule list
-      SimplifiedChineseEnforcerRules: EnforcerRule list
-      /// Phase 2: bilingual provider tree roots present (`resources/provider/{en,zh-CN}`).
-      ProviderLanguageRootsReady: bool }
+    {
+        Prompts: PromptCatalog
+        /// Rulebook selected for this RuntimeResources view (legacy/internal callers).
+        EnforcerRules: EnforcerRule list
+        EnglishEnforcerRules: EnforcerRule list
+        SimplifiedChineseEnforcerRules: EnforcerRule list
+        /// Phase 2: bilingual provider tree roots present (`resources/provider/{en,zh-CN}`).
+        ProviderLanguageRootsReady: bool
+    }
 
 module RuntimeResources =
 
@@ -22,6 +24,7 @@ module RuntimeResources =
         // PROMPT-017: preload both complete Rulebook locales once. Runtime session
         // projection can then select by immutable ProviderLanguage without request-time I/O.
         let englishRules = EnforcerCatalogResource.loadFor ProviderLanguage.English
+
         let simplifiedChineseRules =
             EnforcerCatalogResource.loadFor ProviderLanguage.SimplifiedChinese
 
