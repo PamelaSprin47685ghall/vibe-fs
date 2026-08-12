@@ -176,38 +176,41 @@ const runManager = (spec, name, charge, extra = {}) =>
 
 // ── request validation (refused before the runtime) ─────────────────────────
 
-test('FORK_blank_agent_is_refused', async () => {
+test('FORK_blank_name_is_refused_without_error_dto', async () => {
   const spec = managerSpec(factory, bareScope())
-  const result = parseToml(await runManager(spec, '', 'do work'))
-  assert.match(result.error, /name is required/)
+  const result = await runManager(spec, '', 'do work')
+  assert.doesNotMatch(result, /\berror\s*=/)
+  assert.match(result, /A name is required/)
 })
 
-test('FORK_pty_name_is_refused_on_the_manager_tool', async () => {
+test('FORK_terminal_identity_is_refused_on_the_manager_tool', async () => {
   const spec = managerSpec(factory, bareScope())
-  const result = parseToml(await runManager(spec, 'pty', 'do work'))
-  assert.match(result.error, /open-terminal|terminal/)
+  const result = await runManager(spec, 'pty', 'do work')
+  assert.match(result, /Terminal work belongs through the terminal tools/)
 })
 
-test('FORK_disposed_scope_surfaces_runtime_error', async () => {
+test('FORK_disposed_scope_surfaces_natural_execution_consequence', async () => {
   const live = liveScope()
   live.scope.disposed = true
   const spec = managerSpec(factory, live.scope)
-  const result = parseToml(await runManager(spec, 'fast-coder', 'do work'))
-  assert.match(result.error, /disposed/)
+  const result = await runManager(spec, 'fast-coder', 'do work')
+  assert.doesNotMatch(result, /disposed|\berror\s*=/i)
+  assert.match(result, /cannot be placed from this execution context/i)
   live.cleanup()
 })
 
 test('FORK_hidden_role_by_name_is_denied_generically', async () => {
   const spec = managerSpec(factory, bareScope())
-  const result = parseToml(await runManager(spec, 'fast-reviewer', 'review this'))
-  assert.equal(result.error, 'Unknown or unavailable managed agent.')
+  const result = await runManager(spec, 'fast-reviewer', 'review this')
+  assert.match(result, /Unknown or unavailable managed agent/)
+  assert.doesNotMatch(result, /Reviewer|\berror\s*=/)
 })
 
-test('FORK_garbage_agent_name_reports_parse_error', async () => {
+test('FORK_unknown_calling_is_generic_and_does_not_dump_machine_bindings', async () => {
   const spec = managerSpec(factory, bareScope())
-  const result = parseToml(await runManager(spec, 'not-an-agent-name!', 'do work'))
-  assert.ok(result.error, 'an error must be returned')
-  assert.match(result.error, /managed agent|fast-|deep-/i)
+  const result = await runManager(spec, 'not-an-agent-name!', 'do work')
+  assert.match(result, /Unknown or unavailable calling/)
+  assert.doesNotMatch(result, /fast-|deep-|\berror\s*=/i)
 })
 
 // ── fresh fork path (real runtime + journal) ─────────────────────────────────
@@ -226,19 +229,21 @@ test('FORK_public_forkable_agent_creates_a_child', async () => {
   live.cleanup()
 })
 
-test('FORK_create_session_failure_surfaces_host_error', async () => {
+test('FORK_create_session_failure_surfaces_only_public_consequence', async () => {
   const live = liveScope({ createError: 'host refused the fork' })
   const spec = managerSpec(factory, live.scope)
-  const result = parseToml(await runManager(spec, 'fast-coder', 'implement the feature'))
-  assert.equal(result.error, 'host refused the fork')
+  const result = await runManager(spec, 'fast-coder', 'implement the feature')
+  assert.match(result, /The charge could not be placed/)
+  assert.doesNotMatch(result, /host refused|\berror\s*=/i)
   live.cleanup()
 })
 
-test('FORK_handle_shaped_unknown_agent_reports_id', async () => {
+test('FORK_unknown_continuation_handle_does_not_echo_internal_identity', async () => {
   const live = liveScope()
   const spec = managerSpec(factory, live.scope)
-  const result = parseToml(await runManager(spec, 'zz9900', 'do work'))
-  assert.match(result.error, /Unknown agent id: zz9900/)
+  const result = await runManager(spec, 'zz9900', 'do work')
+  assert.match(result, /No continuing person is known by that name/)
+  assert.doesNotMatch(result, /agent id|\berror\s*=/i)
   live.cleanup()
 })
 
@@ -262,8 +267,9 @@ test('FORK_existing_agent_busy_reuse_without_active_run_fails_closed', async () 
   )
   assert.equal(forked.tag, 0, forked.tag === 1 ? forked.fields[0] : '')
 
-  const reused = parseToml(await runManager(spec, 'ag0001', 'continue the work'))
-  assert.match(reused.error, /Busy nudge requires ActiveLogicalRun on child session/)
+  const reused = await runManager(spec, 'ag0001', 'continue the work')
+  assert.match(reused, /That person cannot take another charge yet/)
+  assert.doesNotMatch(reused, /ActiveLogicalRun|child session|\berror\s*=/i)
 
   const created = live.sessions.calls.filter(([name]) => name === 'CreateChildSession')
   assert.equal(created.length, 1, 'reuse must not spawn a second session')
@@ -290,8 +296,9 @@ test('FORK_reuse_of_hidden_role_is_denied_generically', async () => {
   )
   assert.equal(forked.tag, 0, forked.tag === 1 ? forked.fields[0] : '')
 
-  const denied = parseToml(await runManager(spec, 'rw0001', 'nudge the reviewer'))
-  assert.equal(denied.error, 'Unknown or unavailable managed agent.')
+  const denied = await runManager(spec, 'rw0001', 'nudge the reviewer')
+  assert.match(denied, /Unknown or unavailable managed agent/)
+  assert.doesNotMatch(denied, /Reviewer|\berror\s*=/)
   live.cleanup()
 })
 
@@ -402,10 +409,11 @@ test('FORK_orchestrator_forks_a_public_manager_job', async () => {
   live.cleanup()
 })
 
-test('FORK_orchestrator_rejects_non_manager_agents', async () => {
+test('FORK_orchestrator_rejects_non_manager_callings_without_binding_names', async () => {
   const spec = orchestratorSpec(factory, bareScope({ orchestratorHost: {} }))
-  const result = parseToml(await spec.Execute(makeArgs({ name: 'fast-coder', charge: 'x' }), context()))
-  assert.match(result.error, /only commission fast-manager or deep-manager/)
+  const result = await spec.Execute(makeArgs({ name: 'fast-coder', charge: 'x' }), context())
+  assert.match(result, /Only a Manager can take an independent road/)
+  assert.doesNotMatch(result, /fast-manager|deep-manager|\berror\s*=/i)
 })
 
 test('FORK_orchestrator_reuses_existing_job_by_handle_id', async () => {
@@ -422,27 +430,30 @@ test('FORK_orchestrator_reuses_existing_job_by_handle_id', async () => {
   live.cleanup()
 })
 
-test('FORK_orchestrator_continue_unknown_job_is_an_error', async () => {
+test('FORK_orchestrator_unknown_continuation_is_a_natural_consequence', async () => {
   const live = liveOrchestrator()
   const spec = orchestratorSpec(factory, live.scope)
-  const result = parseToml(await spec.Execute(makeArgs({ name: 'mj9999', charge: 'nobody home' }), context()))
-  assert.match(result.error, /Unknown manager job: mj9999/)
+  const result = await spec.Execute(makeArgs({ name: 'mj9999', charge: 'nobody home' }), context())
+  assert.match(result, /No continuing road is known by that name/)
+  assert.doesNotMatch(result, /manager job|\berror\s*=/i)
   live.cleanup()
 })
 
-test('FORK_orchestrator_missing_session_is_refused', async () => {
+test('FORK_orchestrator_missing_authority_is_refused_without_session_identity', async () => {
   const spec = orchestratorSpec(factory, bareScope({ orchestratorHost: {} }))
   const emptyContext = new HostToolContext('', undefined, undefined, undefined, undefined, () => () => {})
-  const result = parseToml(await spec.Execute(makeArgs({ name: 'fast-manager', charge: 'x' }), emptyContext))
-  assert.match(result.error, /Missing sessionID/)
+  const result = await spec.Execute(makeArgs({ name: 'fast-manager', charge: 'x' }), emptyContext)
+  assert.match(result, /caller's authority is established/)
+  assert.doesNotMatch(result, /sessionID|\berror\s*=/i)
 })
 
-test('FORK_orchestrator_dirty_repo_rejects_the_fork', async () => {
+test('FORK_orchestrator_dirty_repo_rejects_the_road_without_internal_detail', async () => {
   const live = liveOrchestrator()
   live.engine.git.IsDirty = async () => true
   const spec = orchestratorSpec(factory, live.scope)
-  const result = parseToml(await spec.Execute(makeArgs({ name: 'fast-manager', charge: 'x' }), context()))
-  assert.ok(result.error, 'a dirty repo must reject the fork')
+  const result = await spec.Execute(makeArgs({ name: 'fast-manager', charge: 'x' }), context())
+  assert.match(result, /That road could not be opened/)
+  assert.doesNotMatch(result, /dirty|worktree|\berror\s*=/i)
   live.cleanup()
 })
 

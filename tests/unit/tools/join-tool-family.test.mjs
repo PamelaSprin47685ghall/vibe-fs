@@ -6,7 +6,6 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { parse as parseToml } from 'smol-toml'
 
 import { sessionId } from '../support/domain.mjs'
 
@@ -85,27 +84,25 @@ const scopeFor = ({ engineTask, mailbox }) => {
   return scope
 }
 
-const run = async (scope, session = 'ses_join') => {
-  const wire = await spec(scope).Execute({}, context(session))
-  return { wire, parsed: parseToml(wire) }
-}
+const run = async (scope, session = 'ses_join') => spec(scope).Execute({}, context(session))
 
 test('JOINFAM_orchestrator_drains_published_verdicts', async () => {
   const mailbox = verdictMailbox()
   publish(mailbox, OrchestratorVerdict.Empty)
   const scope = scopeFor({ mailbox })
-  const { wire } = await run(scope)
+  const wire = await run(scope)
   assert.match(wire, /There is nothing away to receive/i)
 })
 
 test('JOINFAM_orchestrator_empty_mailbox_still_reports_completed', async () => {
   const scope = scopeFor({ mailbox: verdictMailbox() })
-  const { wire } = await run(scope)
+  const wire = await run(scope)
   assert.match(wire, /There is nothing away to receive/i)
 })
 
-test('JOINFAM_orchestrator_engine_failure_is_surfaced', async () => {
+test('JOINFAM_orchestrator_engine_failure_is_a_natural_consequence', async () => {
   const scope = scopeFor({ engineTask: Promise.resolve({ tag: 1, fields: ['engine exploded'] }) })
-  const { parsed } = await run(scope)
-  assert.equal(parsed.error, 'Orchestrator init failed: engine exploded')
+  const wire = await run(scope)
+  assert.match(wire, /orchestrator is not ready to join yet/i)
+  assert.doesNotMatch(wire, /engine exploded|\berror\s*=/i)
 })

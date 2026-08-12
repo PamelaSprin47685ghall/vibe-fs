@@ -1,27 +1,56 @@
 # blob-after-event — Main
 
-## What To Do Now
-Write the blob to its durable store, verify the store’s success condition, then append the event or manifest entry that references it. The publisher of the history record is who owns the ordering invariant that the blob must be durable before the reference becomes history.
+Reverse the publication order or make it truly atomic.
 
-## Why This Matters
-A history that names missing content is not merely incomplete; it is self-contradictory. Replay trusts committed events as facts. Once such a reference is admitted, every recovery path must either lie about the past or invent exceptional repair semantics for a state that correct ordering could have made impossible.
+If blob and reference are separate commits, persist the blob first, wait for the blob store's **recovery-grade durability guarantee**, verify identity as required, and only then append the event/manifest/index record that makes the reference part of history.
 
-## Repair Strategy
-Make blob durability the precondition of reference publication. Prefer content-addressed identity where appropriate, and treat a failed blob write as “the event did not happen.” If atomic multi-object commit exists, use its actual guarantee rather than simulating one in memory.
+The desired invariant is:
 
-## Decision Branches
-- If the store offers a true atomic commit of blob plus reference, use that guarantee and do not simulate it in memory.
-- If commits are separate, persist and verify the blob first; append the reference only after that success condition.
-- If the blob write fails, do not append; the event did not happen.
+> **Every committed reference resolves to a durably readable referent under the same recovery contract.**
 
-## Common Wrong Fixes
-- Do not append first and “fill the blob soon after.”
-- Do not tolerate missing blobs during replay as a normal path.
-- Do not retry uploads under a new identity after the old identity was already referenced.
-- Do not treat an in-memory write as durability for a history event.
+A safe two-step protocol therefore looks like:
 
-## Verification
-Crash the reasoning at every boundary: before blob commit, after blob commit but before event append, and after event append. Every surviving durable state must be replayable. The invariant is that no committed reference exists without a durably readable referent.
+```text
+prepare content
+persist blob H
+verify durable/committed H
+append history reference H
+publish consequences
+```
 
-## Done When
-No committed reference can exist without a durably readable referent, and recovery never needs to guess whether referenced content once existed.
+If the process dies after blob commit but before event append, you may leave an orphan blob. That is usually acceptable: garbage collection can later remove unreferenced content according to a retention policy.
+
+If the process dies after event append, replay must be able to read H. There should be no normal semantic branch for “history says content existed, but maybe upload had not finished.” Correct ordering removes that world.
+
+If the underlying store offers a real atomic transaction spanning blob and reference, use it — but verify the guarantee instead of simulating atomicity by issuing two async writes close together.
+
+For content-addressed storage:
+
+- compute/verify identity from the exact bytes accepted by the store;
+- ensure replay validates digest if corruption/substitution matters;
+- retries must reuse the same content identity rather than publishing a new reference before the old one is resolved;
+- garbage collection must never delete blobs still reachable from retained history.
+
+Common fake repairs:
+
+- append event first and queue blob upload “immediately after”;
+- tolerate missing blob on replay and retry forever, turning corruption into normal control flow;
+- write to a temp file, publish the reference, then rename/finalize later without an atomic rename contract that recovery trusts;
+- trust an SDK callback that means “buffered locally” while recovery requires remote replication;
+- publish a hash from pre-upload memory and never verify persisted bytes;
+- catch blob upload failure after the event is already committed and emit another “blob missing” event — history is still internally contradictory at the earlier point;
+- make the event mutable so the blob reference can be filled in later.
+
+Verification should inject crashes at each boundary:
+
+1. before blob durability — no committed reference;
+2. after blob durability, before event — orphan content only;
+3. after event — reference resolves;
+4. during replay — digest/identity checks behave according to contract;
+5. during garbage collection — reachable content survives.
+
+Also test blob-store acknowledgement loss if relevant. Unknown blob outcome should be resolved by content identity/status before deciding whether the reference may publish.
+
+You are done when a replay engine can treat every committed reference as a fact rather than as a request to participate in storage archaeology.
+
+> Orphan bytes are cheaper than orphaned truth. Prefer durable content waiting for a reference over durable history waiting for content.

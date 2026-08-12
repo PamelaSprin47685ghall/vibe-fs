@@ -52,29 +52,31 @@ const run = async (runtimeScope, session = 'ses_join') => {
   return { wire, parsed: parseToml(wire) }
 }
 
-test('JOIN_blank_session_is_refused_before_recovery', async () => {
-  const { parsed } = await run(scope(), '')
+test('JOIN_blank_caller_is_refused_before_recovery_without_identity_leak', async () => {
+  const { wire } = await run(scope(), '')
 
-  assert.equal(parsed.error, 'Missing sessionID')
+  assert.doesNotMatch(wire, /sessionID|\berror\s*=/i)
+  assert.match(wire, /authority is established/i)
 })
 
-test('JOIN_without_a_recovery_permit_is_blocked', async () => {
-  const { parsed } = await run(scope())
+test('JOIN_without_a_recovery_permit_is_blocked_by_natural_consequence', async () => {
+  const { wire } = await run(scope())
 
-  assert.equal(parsed.error.code, 'RECOVERY_BLOCKED')
-  assert.match(parsed.error.message, /coordinator unavailable for ses_join/)
+  assert.doesNotMatch(wire, /RECOVERY_BLOCKED|ses_join|\berror\s*=/)
+  assert.match(wire, /recovery is blocked/i)
 })
 
-test('JOIN_waiting_recovery_is_retryable', async () => {
+test('JOIN_waiting_recovery_is_retryable_without_machine_state', async () => {
   const runtimeScope = scope()
   attachFamilyRecovery(runtimeScope, async () =>
     new FamilyRecovery(1, [nonEmptyOne(new RecoveryBlock(1, [sessionId('ses_join')]))]),
   )
 
-  const { parsed } = await run(runtimeScope)
+  const { wire } = await run(runtimeScope)
 
-  assert.equal(parsed.error.code, 'RECOVERY_WAITING')
-  assert.match(parsed.error.message, /FamilyReady/)
+  assert.doesNotMatch(wire, /RECOVERY_WAITING|FamilyReady|\berror\s*=/)
+  assert.match(wire, /Recovery is still in progress/)
+  assert.match(wire, /Join again after the family becomes ready/)
 })
 
 test('JOIN_ready_permit_maps_empty_join_to_failure', async () => {
