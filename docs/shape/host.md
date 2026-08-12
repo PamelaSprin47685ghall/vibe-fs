@@ -267,17 +267,20 @@ Wanxiangshu Domain + Journal
 
 before/after **不得**猜配 messageID。定位 ToolPart/assistant/run/ordinal/XTrace range 必须经完整 SDK snapshot 唯一成立（HOST-025）；否则 fail closed，不得上线。
 
-### 非别名边界（HOST-019）
+### deferred materialization barrier + 非别名边界（HOST-019）
 
 ```text
-durable ToolPart.input  （pre-before 历史；provider obligations 原样）
-        ≠
-before 本地 args 对象   （可原地改为 V1 sink 形状）
-        →
-executor 观察的 args
+before live args → 纯内存 V1 sink 投影 → executor
+        ↘ captured canonical
+           deferred prepare:
+           snapshot {} → wait/reread same physical carrier
+           materialized ToolPart.input = captured canonical
+           → digest / admission
+
+after → await deferred prepare → Accepted
 ```
 
-三槽不得因共享引用塌缩。mutation 污染 historical input → membrane 禁止上线；不得 after 回写补救。
+`{}` 只表示 Host 尚未完成 tool-call input materialization，不能进入 admission。ProviderInputDigest 归 materialized ToolPart.input；carrier 变化或 canonical 不等立即 fail closed。before 不等待磁盘/轮询；after 不得绕过 deferred prepare。compatibility mutation 不得污染 historical input。
 
 ### Ephemeral bridge 边界（HOST-021 载体）
 

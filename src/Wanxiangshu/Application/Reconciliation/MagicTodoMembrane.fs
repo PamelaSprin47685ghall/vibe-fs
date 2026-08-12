@@ -379,7 +379,8 @@ module MagicTodoHostHooks =
             CanonicalJson.canonicalJson output?output
 
     let create (journal: AgentJournal option) (snapshot: ISessionSnapshotPort option) : HookSet =
-        let bridges = Dictionary<string, MagicTodoMembrane.PreparedBridge>()
+        let bridges =
+            Dictionary<string, Task<Result<MagicTodoMembrane.PreparedBridge, string>>>()
 
         let definition (input: obj) (output: obj) =
             if isTodoTool input "toolID" then
@@ -424,30 +425,51 @@ module MagicTodoHostHooks =
                     | Error reason -> invalidOp reason
                     | Ok obligations ->
                         let providerInputCanonical = MagicTodoHostCodec.canonicalInput args
-                        let providerInputDigest = HostDigest.sha256Hex providerInputCanonical
-                        let! messagesResult = snapshots.GetMessages sessionId
-
-                        let messages =
-                            match messagesResult with
-                            | Ok value -> value
-                            | Error reason -> invalidOp ("Magic Todo snapshot unavailable: " + reason)
-
-                        let locality =
-                            match
-                                MagicTodoLocality.resolve sessionId messages (AgentJournal.snapshot durable) callId
-                            with
-                            | Ok value -> value
-                            | Error reason -> invalidOp (sprintf "Magic Todo locality failed: %A" reason)
+                        MagicTodoHostCodec.replaceCompatibilityArgs output (obligationsToCompatibilityRows obligations)
 
                         let prepared =
-                            match
-                                MagicTodoMembrane.prepare durable sessionId locality providerInputDigest obligations
-                            with
-                            | Ok value -> value
-                            | Error reason -> invalidOp (sprintf "Magic Todo prepare failed: %A" reason)
+                            task {
+                                let! messagesResult = snapshots.GetMessages sessionId
+
+                                match messagesResult with
+                                | Error reason -> return Error("snapshot unavailable: " + reason)
+                                | Ok messages ->
+                                    match
+                                        MagicTodoLocality.resolve
+                                            sessionId
+                                            messages
+                                            (AgentJournal.snapshot durable)
+                                            callId
+                                    with
+                                    | Error reason -> return Error(sprintf "locality failed: %A" reason)
+                                    | Ok initialLocality ->
+                                        let! materializedResult =
+                                            MagicTodoLocality.awaitMaterializedInput
+                                                snapshots
+                                                sessionId
+                                                initialLocality
+                                                providerInputCanonical
+
+                                        match materializedResult with
+                                        | Error reason ->
+                                            return Error(sprintf "input materialization failed: %A" reason)
+                                        | Ok locality ->
+                                            let providerInputDigest = HostDigest.sha256Hex locality.InputCanonical
+
+                                            return
+                                                match
+                                                    MagicTodoMembrane.prepare
+                                                        durable
+                                                        sessionId
+                                                        locality
+                                                        providerInputDigest
+                                                        obligations
+                                                with
+                                                | Ok value -> Ok value
+                                                | Error reason -> Error(sprintf "prepare failed: %A" reason)
+                            }
 
                         bridges[bridgeKey sessionText callText] <- prepared
-                        MagicTodoHostCodec.replaceCompatibilityArgs output prepared.CompatibilityRows
             }
 
         let after (input: obj) (output: obj) : Task<unit> =
@@ -463,9 +485,16 @@ module MagicTodoHostHooks =
                     let key = bridgeKey sessionText callText
 
                     match bridges.TryGetValue key with
-                    | false, _ -> invalidOp "Magic Todo after hook has no prepared bridge"
-                    | true, prepared ->
+                    | false, _ -> invalidOp "Magic Todo after hook has no deferred prepare"
+                    | true, preparedTask ->
                         try
+                            let! preparedResult = preparedTask
+
+                            let prepared =
+                                match preparedResult with
+                                | Ok value -> value
+                                | Error reason -> invalidOp ("Magic Todo deferred prepare failed: " + reason)
+
                             let outputDigest = outputCanonical output |> HostDigest.sha256Hex
 
                             match

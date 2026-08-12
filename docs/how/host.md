@@ -386,10 +386,14 @@ schema 锚 = `todowrite(obligations: [{ name, work }])`（TODO-002）；descript
 输入：`{ tool, sessionID, callID }` + `{ args }`。executor 只读**原地** `args` 字段；禁止 `output.args = newArgs` 重绑。
 
 ```text
-1. sessionID+callID → 完整 SDK snapshot 唯一定位
-   ToolPart / assistant / provider run / ordinal / XTrace range
-   （不能唯一 → fail closed；HOST-025）
-2. admitSingleCheckpoint（TODO-004：
+1. 同步 before：decode live `output.args` obligations；保存其 canonical；原地投影 compatibility rows；启动 per-call deferred prepare 后立即返回，让 builtin executor 不被 snapshot/Journal IO 阻塞。
+2. deferred prepare（HOST-019/025）：
+   - sessionID+callID → 完整 SDK snapshot 唯一定位 ToolPart / assistant / provider run / ordinal / XTrace range；
+   - snapshot `state=pending,input={}` → 异步等待并重读同一 callID，直到 materialize；
+   - canonical(materialized input) = captured live canonical → 继续；
+   - carrier/provider run/part 变化、snapshot 失败、materialized canonical 不等 → deferred prepare 失败；
+   - `ProviderInputDigest := sha256(materialized ToolPart.input canonical)`，禁止用 `{}` 或未证明的 live-only 参数代替。
+3. deferred prepare 内执行 admitSingleCheckpoint（TODO-004：
    同 message 多不同 ToolCallId → 全部拒绝；
    同 ToolCallId replay → 校验 digest，不新开）
 3. await ConsumableReview(k-1) 若存在未消费义务（TODO-006）
@@ -401,7 +405,7 @@ schema 锚 = `todowrite(obligations: [{ name, work }])`（TODO-002）；descript
 8. return（不启动 reviewer；不写 Accepted）
 ```
 
-**Alias 不变量（HOST-019）**：步骤 7 不得改写 pre-before 已持久化的 `ToolPart.input`。实现前 canary 必须绿；红则停止 membrane。
+**Alias / latency 不变量（HOST-019）**：compatibility mutation 是同步纯内存路径；snapshot materialization + Journal admission 在 deferred prepare 中，不得阻塞 builtin executor。`pending + {}` 必须异步等，不能降级受理；after 必须 await deferred prepare 才能 Accepted。compatibility mutation 不得污染 durable provider `ToolPart.input`。canary 红则停止 membrane。
 
 ### 3. Ephemeral bridge（HOST-021 / TODO-012）
 
@@ -410,16 +414,16 @@ const MagicTodoBridge = Symbol("wanxiangshu.magic-todo.bridge")
 const bridges = new Map() // key = sessionID + ":" + callID
 ```
 
-before：`bridges.set(key, carrier)`，carrier 上 non-enumerable Symbol 挂 settledOld / proposal / preview / previousReview / compatibilityProjection。  
-after 成功或 tool/turn failure cleanup：`bridges.delete(key)`。  
-崩溃恢复**忽略** Map；只从 Journal Prepared + physical evidence 重建。bridge 不得表示 checkpoint / review obligation。
+before：`bridges.set(key, deferredPrepareTask)`；Task 在后台等待 input materialize，并完成 settledOld / proposal / Prepared 等 durable prepare 语义。  
+after：先 await `deferredPrepareTask`；失败则 tool call fail closed，成功才可进入 Accepted。after 成功或 tool/turn failure cleanup 后 `bridges.delete(key)`。  
+崩溃恢复**忽略** Map；只从 Journal Prepared + physical evidence 重建。bridge/Task 不得表示 checkpoint / review obligation。
 
 ### 4. after（HOST-021/022 / TODO-005/006/007/008/009）
 
 仅 live path：原 executor 成功返回后进入。execute throw → after 不保证运行（canary F 冻结行为；协议不依赖）。
 
 ```text
-1. bridge = bridges.get(key) 或 rebuild(Prepared, physical)
+1. deferred = bridges.get(key)；await deferred prepare，得到 PreparedBridge；失败则本次 tool call fail closed
 2. prove physical success（HOST-022）：
      live AfterSuccess  ∨  recovery completed ToolPart
      且 TodoWriteId+input digest+output digest 与 Prepared 对齐

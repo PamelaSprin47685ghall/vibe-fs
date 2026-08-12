@@ -191,7 +191,7 @@ SyncDelegate 关联 / StrengthReplica attachment）与 HOST-008 的 `SessionOwne
 
 ```text
 tool.definition   → provider-visible V2 schema（TODO-002）
-tool.execute.before → admission + Prepared + 原地 compatibility 投影（TODO-004/007）
+tool.execute.before → 捕获 live args + 原地 compatibility 投影 + 启动 deferred prepare（TODO-004/007）
 tool.execute.after  → physical-success Accepted + ensureReview + 富化 result（TODO-006/012）
 ```
 
@@ -224,22 +224,24 @@ description **禁止**泄露隐藏编排（TODO-013）：dedicated reviewer、hi
 
 definition 改的是广告 schema，**不**自动替换原 executor decode schema；故 before 必须剥离 `kind`/`id` 后再交 sink（HOST-020）。
 
-## HOST-019：pre-before historical input 非别名（blocking canary）
+## HOST-019：pending materialization barrier + input 非别名（blocking canary）
 
-Host 顺序合同：
+OpenCode 会先创建 `state=pending,input={}` 的 ToolPart；`tool-call` stream event 再写最终 provider input。`tool.execute.before` 可落在两者之间，因此 **pre-before snapshot 不保证已 materialize 最终 input**。
 
-```text
-provider args → ToolPart.input 持久化 → before → executor
-```
-
-before 原地 mutation **必须**到达 executor，且 **不得**改写已持久化的 pre-before `ToolPart.input`（历史/provider call 身份）。
+Magic Todo 不允许把 `{}` 降级当输入，但也不让 snapshot/Journal IO 阻塞 builtin executor。before 同步阶段只做 provider args decode + 纯内存 compatibility projection，并启动 per-call **deferred prepare** 后立即返回：
 
 ```text
-provider 发送 V2 tagged list
-before args.todos := V1 compatibility projection
-executor 看见 compatibility list
-durable ToolPart.input 仍为原始 V2 list
+before live args → decode obligations → compatibility projection → executor
+                  ↘ deferred prepare:
+                     pending + {} → wait + reread same callID
+                     materialized canonical == captured live canonical → durable prepare/admit
+                     materialized canonical != captured live canonical → fail closed
+                     carrier/provider run/part 变化 → fail closed
+
+after → await deferred prepare → physical-success Accepted / enrichment
 ```
+
+`TodoWritePrepared.ProviderInputDigest` 只从 materialized `ToolPart.input` 计算。executor 可以先完成 compatibility sink；若 deferred prepare 最终拒绝，after 必须失败，不能产生 `TodoWriteAccepted`。Host historical provider input 不得被 compatibility mutation 污染。
 
 任一不成立 → **membrane 禁止上线**（HOST-019 FAIL）。禁止用 after「改回」历史 input 补救。本 canary 是 P0 blocker。
 

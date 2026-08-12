@@ -81,7 +81,8 @@ PrefixCoverage + ActivePrefixEpoch(TodoCheckpoint) → lag-1 Y 替换（TODO-009
 ```text
 provider todowrite(obligations)
 → definition（schema owner，TODO-002）
-→ before：admission + settle R(k-1) + Prepared + bridge + V1 sink 投影
+→ before：捕获 live obligations + V1 sink 投影 + 启动 deferred prepare
+→ deferred prepare：materialize input → admission + settle R(k-1) + Prepared + bridge
 → Host executor（compatibility sink，TODO-007）
 → after / recovery：Accepted → ensure Dedicated → ensureReview(Rk)
 → T1：canonical revelation result → Opening closes（TODO-015）

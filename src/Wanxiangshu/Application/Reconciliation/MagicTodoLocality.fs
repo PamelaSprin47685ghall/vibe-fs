@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open System.Threading.Tasks
+open Wanxiangshu.Kernel
 open Wanxiangshu.Domain
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel.Identity
@@ -35,6 +37,13 @@ module MagicTodoLocality =
         | XTraceUnavailable
         | XTraceMissing of providerRun: ProviderRunIdentity * toolCallId: ToolCallId * hostToolPartId: HostToolPartId
         | XTraceAmbiguous of providerRun: ProviderRunIdentity * toolCallId: ToolCallId * hostToolPartId: HostToolPartId
+
+    [<RequireQualifiedAccess>]
+    type InputMaterializationRejection =
+        | SnapshotUnavailable of reason: string
+        | Snapshot of SessionSnapshotPort.ToolCallLocationError
+        | CarrierChanged
+        | InputMismatch
 
     let resolve
         (sessionId: SessionId)
@@ -172,3 +181,50 @@ module MagicTodoLocality =
                             located.HostToolPartId
                         )
                     )
+
+    let rec awaitMaterializedInput
+        (snapshot: ISessionSnapshotPort)
+        (sessionId: SessionId)
+        (localized: LocalizedToolCall)
+        (expectedInputCanonical: string)
+        : Task<Result<LocalizedToolCall, InputMaterializationRejection>> =
+        task {
+            if localized.InputCanonical = expectedInputCanonical then
+                return Ok localized
+            elif
+                localized.State <> SnapshotToolPartState.Pending
+                || localized.InputCanonical <> "{}"
+            then
+                return Error InputMaterializationRejection.InputMismatch
+            else
+                let! messagesResult = snapshot.GetMessages sessionId
+
+                match messagesResult with
+                | Error reason -> return Error(InputMaterializationRejection.SnapshotUnavailable reason)
+                | Ok messages ->
+                    match SessionSnapshotPort.locateToolCall localized.ToolCallId messages with
+                    | Error reason -> return Error(InputMaterializationRejection.Snapshot reason)
+                    | Ok located ->
+                        if
+                            located.ProviderRun <> localized.ProviderRun
+                            || located.HostToolPartId <> localized.HostToolPartId
+                            || located.ToolName <> localized.ToolName
+                        then
+                            return Error InputMaterializationRejection.CarrierChanged
+                        else
+                            let refreshed =
+                                { localized with
+                                    InputCanonical = located.InputCanonical
+                                    State = located.State }
+
+                            if refreshed.InputCanonical = expectedInputCanonical then
+                                return Ok refreshed
+                            elif
+                                refreshed.State = SnapshotToolPartState.Pending
+                                && refreshed.InputCanonical = "{}"
+                            then
+                                do! AsyncSupport.sleep 10
+                                return! awaitMaterializedInput snapshot sessionId refreshed expectedInputCanonical
+                            else
+                                return Error InputMaterializationRejection.InputMismatch
+        }

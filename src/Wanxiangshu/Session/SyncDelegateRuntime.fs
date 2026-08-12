@@ -125,12 +125,14 @@ type SyncDelegateRuntime
     member _.StageDeletedInspector(ownerSessionId: SessionId, inspectorSessionId: SessionId) : bool =
         match attached.TryFind(ownerSessionId, SyncDelegateRole.Inspector) with
         | Some bound when bound = inspectorSessionId ->
-            match store.TryCallByDelegate inspectorSessionId with
-            | Some call ->
-                store.RemoveCall call
-                store.FailCall(call, "Sync delegate Inspector session was deleted")
-                store.ReleaseFlight call.OwnerScope
-            | None -> ()
+            let rec popAll () =
+                match store.TryPopCallByDelegate inspectorSessionId with
+                | Some call ->
+                    store.FailCall(call, "Sync delegate Inspector session was deleted")
+                    popAll ()
+                | None -> ()
+
+            popAll ()
 
             attached.Remove(ownerSessionId, SyncDelegateRole.Inspector) |> ignore
 
@@ -162,49 +164,48 @@ type SyncDelegateRuntime
 
     member _.HandleTurn(turn: ReconciledTurn, permit: QuiescencePermit option) : Task<bool> =
         task {
-            match turn.Role, store.TryCallByDelegate turn.SessionId with
-            | Some(Role.Inspector | Role.Coder), Some call ->
-                match turn.Outcome with
-                | ReconcileProgram.TurnCompleted ->
-                    let payload = normalizePayload (CompletedTurnClassifier.partsText turn.Parts)
-                    let workRecord = materializeWorkRecord turn.SessionId payload
+            match turn.Role with
+            | Some(Role.Inspector | Role.Coder) ->
+                match store.TryPopCallByDelegate turn.SessionId with
+                | Some call ->
+                    match turn.Outcome with
+                    | ReconcileProgram.TurnCompleted ->
+                        let payload = normalizePayload (CompletedTurnClassifier.partsText turn.Parts)
+                        let workRecord = materializeWorkRecord turn.SessionId payload
 
-                    if call.Role = SyncDelegateRole.Inspector then
-                        noteInspectorAnswer (sessionKey turn.SessionId) workRecord
+                        if call.Role = SyncDelegateRole.Inspector then
+                            noteInspectorAnswer (sessionKey turn.SessionId) workRecord
 
-                    store.RemoveCall call
-                    AsyncSupport.trySetResult call.Answer (Ok workRecord) |> ignore
-                    return true
-                | ReconcileProgram.TurnFailed error
-                | ReconcileProgram.TurnAborted error ->
-                    store.RemoveCall call
-                    store.FailCall(call, (sprintf "SyncDelegate run failed: %s" error))
-                    return true
-                | _ -> return true
+                        AsyncSupport.trySetResult call.Answer (Ok workRecord) |> ignore
+                        for inv in call.Invocations do
+                            AsyncSupport.trySetResult inv.Completion (Ok workRecord) |> ignore
+                        return true
+                    | ReconcileProgram.TurnFailed error
+                    | ReconcileProgram.TurnAborted error ->
+                        store.FailCall(call, (sprintf "SyncDelegate run failed: %s" error))
+                        return true
+                    | _ -> return true
+                | None -> return false
             | _ -> return false
         }
 
     member _.CancelSession(sessionId: SessionId) : unit =
         let asOwnerScope = ReuseScope.ofSession sessionId
 
-        let call =
-            store.TryCallByOwnerScope asOwnerScope
-            |> Option.orElseWith (fun () -> store.TryCallByDelegate sessionId)
+        store.CancelScope asOwnerScope
+
+        let rec popAll () =
+            match store.TryPopCallByDelegate sessionId with
+            | Some call ->
+                store.FailCall(call, "Sync delegate call was cancelled")
+                popAll ()
+            | None -> ()
+
+        popAll ()
 
         let inspectorOwned = attached.TryFind(sessionId, SyncDelegateRole.Inspector)
 
         let stagedInspectorOwned = store.ClearDeletedInspector asOwnerScope
-
-        let inspectorAsDelegate =
-            match call with
-            | Some c when c.Role = SyncDelegateRole.Inspector -> Some c.Delegate
-            | _ -> None
-
-        call
-        |> Option.iter (fun scope ->
-            store.RemoveCall scope
-            store.FailCall(scope, "Sync delegate call was cancelled")
-            store.ReleaseFlight scope.OwnerScope)
 
         attached.RemoveByDelegateSession sessionId |> ignore
 
@@ -214,9 +215,6 @@ type SyncDelegateRuntime
         inspectorOwned |> Option.iter (fun id -> cleanupInspectorDraft (sessionKey id))
 
         stagedInspectorOwned
-        |> Option.iter (fun id -> cleanupInspectorDraft (sessionKey id))
-
-        inspectorAsDelegate
         |> Option.iter (fun id -> cleanupInspectorDraft (sessionKey id))
 
         cleanupInspectorDraft (sessionKey sessionId)

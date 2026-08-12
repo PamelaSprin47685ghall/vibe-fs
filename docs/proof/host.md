@@ -86,7 +86,7 @@ G2 PREFIX LAW / `promptModel` 证据见下表与上节「绑定与身份」。**
 
 | ID | 证明 | 期望 | 条款 | 级别 |
 |----|------|------|------|------|
-| A | before 原地 mutation 达 executor | durable pre-before `ToolPart.input` **仍为** provider V2 原字节；executor 见 V1 compatibility list | HOST-019 | **blocking** |
+| A | deferred materialization + before 原地 mutation 达 executor | before 不等待 snapshot/Journal IO；`pending + {}` 在 deferred prepare 中等待，同一 physical ToolPart materialize 后 canonical input == captured live args，digest 取 materialized input；executor 见 V1 compatibility list；after 必须 await prepare 才可 Accepted | HOST-019 | **blocking** |
 | B | 同时替换 parameters + jsonSchema | provider 见 V2；原 executor 仍跑 V1 decoder | HOST-018 | blocking |
 | C | before 剥 kind/id | 原 decoder 接受 unknown 扩展字段剥离后的 V1 list | HOST-020 | blocking |
 | D | `status="reviewing"` 经 TodoTable → todo.updated → API → TUI | 全容忍 → passthrough；否则冻结 sink→`in_progress` | HOST-023、TODO-003 | blocking（策略冻结） |
@@ -110,8 +110,11 @@ G2 PREFIX LAW / `promptModel` 证据见下表与上节「绑定与身份」。**
 ### 反例（必须红）
 
 ```text
-before mutation 改写 historical ToolPart.input          → A 红 → 停
-after 回写“修复”被污染的历史 input                      → 仍停（不可补救）
+before 等待 snapshot/Journal 导致 executor 被 IO 阻塞        → A 红
+pending `{}` 被降级受理或用于 ProviderInputDigest            → A 红
+before mutation 改写最终 historical ToolPart.input           → A 红 → 停
+after 不 await deferred prepare 就 Accepted                  → A/J 红
+after 回写“修复”被污染的历史 input                           → 仍停（不可补救）
 V2 settle 静默写 TodoTable                              → N 红
 REVISE settlement 后 sink 永久留否决 Pk                 → M 红
 bridge / Host TodoTable 当 canonical 恢复源             → P/L 红

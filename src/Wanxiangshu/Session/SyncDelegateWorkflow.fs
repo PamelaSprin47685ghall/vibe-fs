@@ -21,8 +21,7 @@ type Dependencies =
       SendPrompt: SyncDelegateCall -> SyncDelegatePromptRequest -> Task<Result<unit, string>>
       DescribeWait: SyncDelegateWait -> DiagnosticWait }
 
-/// EXEC-026 / EXEC-031: reusable SyncDelegate CE (Acquire → GetOrCreate → Send →
-/// await ordinary Completion / bounded WorkRecord). No return tool / dual-await.
+/// EXEC-026 / EXEC-031: reusable SyncDelegate CE with concurrent batch coalescing and direct in-flight dispatch.
 let invoke
     (store: SyncDelegateCallStore)
     (deps: Dependencies)
@@ -34,79 +33,119 @@ let invoke
     task {
         let owner = SessionId.create ownerSessionKey
         let ownerScope = ReuseScope.ofSession owner
+        let completion =
+            TaskCompletionSource<Result<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-        if role = SyncDelegateRole.Inspector then
-            let staleDeletedInspector = store.TryTakeDeletedInspector ownerScope
+        let invocation: SyncDelegateInvocation =
+            { Owner = owner
+              OwnerScope = ownerScope
+              Role = role
+              Charge = charge
+              PrepareProviderPrompt = prepareProviderPrompt
+              Completion = completion }
 
-            staleDeletedInspector
-            |> Option.iter (fun sessionId -> deps.CleanupInspectorDraft(SessionId.value sessionId))
+        let isLeader = store.EnqueueForBatch invocation
 
-        match deps.ResolveOwnerTier owner with
-        | None -> return Error "sync delegate rejected: owner tier unknown"
-        | Some ownerTier ->
-            let claimed = store.TryAcquireFlight ownerScope
+        if isLeader then
+            let initialBatch = store.DrainBatch(ownerScope, role)
 
-            if not claimed then
-                return Error "sync delegate rejected: another sync delegate call is in flight"
+            if List.isEmpty initialBatch then
+                store.CompleteBatchPreparation(ownerScope, role)
             else
-                let tier = SyncDelegate.tierForOwner ownerTier
-                let agentName = SyncDelegate.agentNameFor role tier
+                let first = List.head initialBatch
+                let batchOwner = first.Owner
 
-                try
-                    match!
-                        deps.Attached.GetOrCreate(
-                            owner,
-                            role,
-                            agentName,
-                            deps.Directory,
-                            deps.CreateChild,
-                            deps.OnDelegateReady
-                        )
-                    with
-                    | Error error ->
-                        store.ReleaseFlight ownerScope
-                        return Error error
-                    | Ok delegateSession ->
-                        let call, registration =
-                            store.BeginCall(owner, ownerScope, role, delegateSession, agentName)
+                if role = SyncDelegateRole.Inspector then
+                    let staleDeletedInspector = store.TryTakeDeletedInspector ownerScope
 
-                        use _registration = registration
+                    staleDeletedInspector
+                    |> Option.iter (fun sessionId -> deps.CleanupInspectorDraft(SessionId.value sessionId))
 
-                        // EXEC-032: search/prompt preparation starts only after the
-                        // one-in-flight admission and child ownership are secured.
-                        let! providerPrompt =
-                            task {
-                                try
-                                    return! prepareProviderPrompt ()
-                                with _ ->
-                                    // Warm-start optimization is fail-open; authority
-                                    // text itself is never discarded.
-                                    return charge
-                            }
+                match deps.ResolveOwnerTier batchOwner with
+                | None ->
+                    store.CompleteBatchPreparation(ownerScope, role)
+                    for item in initialBatch do
+                        AsyncSupport.trySetResult item.Completion (Error "sync delegate rejected: owner tier unknown")
+                        |> ignore
+                | Some ownerTier ->
+                    let tier = SyncDelegate.tierForOwner ownerTier
+                    let agentName = SyncDelegate.agentNameFor role tier
 
-                        let request = SyncDelegatePrompt.withProviderPrompt charge providerPrompt
-
-                        match! deps.SendPrompt call request with
+                    try
+                        match!
+                            deps.Attached.GetOrCreate(
+                                batchOwner,
+                                role,
+                                agentName,
+                                deps.Directory,
+                                deps.CreateChild,
+                                deps.OnDelegateReady
+                            )
+                        with
                         | Error error ->
-                            store.FailCall(call, error)
-                            store.RemoveCall call
-                            store.ReleaseFlight ownerScope
-                            return Error error
-                        | Ok _ ->
-                            if role = SyncDelegateRole.Inspector then
-                                // Casebook Q remains the semantic assignment, never
-                                // the rendered warm-start TOML envelope.
-                                deps.NoteInspectorPrompt (SessionId.value delegateSession) request.Charge
+                            store.CompleteBatchPreparation(ownerScope, role)
+                            for item in initialBatch do
+                                AsyncSupport.trySetResult item.Completion (Error error) |> ignore
+                        | Ok delegateSession ->
+                            let extraBatch = store.DrainBatch(ownerScope, role)
+                            let batch = initialBatch @ extraBatch
 
-                            let! answered =
-                                CausalAwait.awaitTask
-                                    CausalWaitHub.observer
-                                    (deps.DescribeWait(DelegateCompletion(owner, delegateSession, role)))
-                                    call.Answer.Task
+                            let! preparedPrompts =
+                                batch
+                                |> List.map (fun item ->
+                                    task {
+                                        try
+                                            return! item.PrepareProviderPrompt ()
+                                        with _ ->
+                                            return item.Charge
+                                    })
+                                |> Task.WhenAll
 
-                            store.ReleaseFlight ownerScope
-                            return answered
-                with ex ->
-                    store.ReleaseFlight ownerScope
-                    return Error ex.Message
+                            let extraBatch2 = store.DrainBatch(ownerScope, role)
+                            let fullBatch = batch @ extraBatch2
+
+                            let fullPrompts =
+                                (preparedPrompts |> Array.toList)
+                                @ (extraBatch2 |> List.map (fun i -> i.Charge))
+
+                            let combinedCharge =
+                                fullBatch
+                                |> List.map (fun i -> i.Charge)
+                                |> String.concat "\n\n"
+
+                            let combinedProviderPrompt =
+                                fullPrompts
+                                |> String.concat "\n\n"
+
+                            let call, registration =
+                                store.BeginCall(batchOwner, ownerScope, role, delegateSession, agentName, fullBatch)
+
+                            use _registration = registration
+
+                            store.CompleteBatchPreparation(ownerScope, role)
+
+                            let request =
+                                SyncDelegatePrompt.withProviderPrompt combinedCharge combinedProviderPrompt
+
+                            match! deps.SendPrompt call request with
+                            | Error error ->
+                                store.FailCall(call, error)
+                            | Ok _ ->
+                                if role = SyncDelegateRole.Inspector then
+                                    deps.NoteInspectorPrompt (SessionId.value delegateSession) request.Charge
+
+                                let! answered =
+                                    CausalAwait.awaitTask
+                                        CausalWaitHub.observer
+                                        (deps.DescribeWait(DelegateCompletion(batchOwner, delegateSession, role)))
+                                        call.Answer.Task
+
+                                for item in fullBatch do
+                                    AsyncSupport.trySetResult item.Completion answered |> ignore
+                    with ex ->
+                        store.CompleteBatchPreparation(ownerScope, role)
+                        for item in initialBatch do
+                            AsyncSupport.trySetResult item.Completion (Error ex.Message) |> ignore
+
+        return! completion.Task
     }

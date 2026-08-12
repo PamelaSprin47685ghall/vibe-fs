@@ -21,8 +21,6 @@ module AsyncSupport =
     /// A function rather than a value: a module-level `let` becomes a single
     /// module-init promise in Fable, and any later change that made this awaited
     /// once-per-call would then share state across callers.
-    let completedTask () : Task = Task.FromResult(()) :> Task
-
     let trySetResult (tcs: TaskCompletionSource<'T>) (value: 'T) : bool =
         try
             tcs.SetResult(value)
@@ -36,3 +34,14 @@ module AsyncSupport =
             true
         with _ ->
             false
+
+    let completedTask () : Task = Task.FromResult(()) :> Task
+
+    let sleep (ms: int) : Task =
+        let tcs =
+            TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+        Fable.Core.JsInterop.emitJsExpr (ms, (fun () -> trySetResult tcs () |> ignore)) "setTimeout($1, $0)"
+        |> ignore
+
+        tcs.Task :> Task
