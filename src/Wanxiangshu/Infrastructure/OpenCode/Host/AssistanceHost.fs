@@ -521,10 +521,13 @@ type AssistanceHost
             | Some _ ->
                 match turn.Outcome with
                 | ReconcileProgram.TurnCompleted ->
-                    // Assistance consumes the hidden child before ordinary
-                    // TurnWorkflow reaches TerminalReporter. Materialize the same
-                    // canonical terminal segment first so the child LWR includes
-                    // this completed turn rather than only older XTrace material.
+                    // Assistance consumes this hidden child before ordinary
+                    // TurnWorkflow reaches TerminalReporter; HostTurnObserver
+                    // returns immediately after Handled, so the reconciled
+                    // terminal must be materialized here. Persist the exact
+                    // terminal segment first so the child LWR includes this
+                    // completed turn's advice, not only its opening Chronicle
+                    // or older XTrace material.
                     XTraceCapture.captureTerminal journal turn
 
                     let body =

@@ -1,29 +1,36 @@
-# missing-rule-combinator — Enforcer
+# missing-rule-combinator — Enforcer 中文版
 
-Missing rule combinator 的问题，不是“还没有函数式抽象”，而是多个 named rules 已经拥有**相同 semantic shape**，callers 却在不同地方反复手写同一套 sequencing、short-circuit、accumulation、mapping law。
+## 定义
+当多条规则已经拥有相同的输入/输出 algebra，却在多个 caller 反复手写“遇错返回、累计错误、map 成下一值”等控制流时，缺的不是 helper，而是**composition law 的 owner**。
 
-当几条 rule 都像：
+例如若多条规则都是 `A -> Result<A,E>`，那么顺序 short-circuit 已经是一种稳定语义；继续在每个 caller 写 `if error return`，等于让每个 caller 都重新解释一次这套 algebra。
 
-```text
-A -> Result<A, E>
-```
+## 何时触发
+- 三处以上手写同一种 validator chaining；
+- 同形 rules 在多个地方重复 accumulate / short-circuit / map；
+- 改变 error composition semantics 时需要修改多个 caller；
+- 临时变量和 nested result handling 占据了比 rule 本身更多的代码。
 
-那么“成功继续、失败停止”本身已经是一条可命名 composition law。若每个 caller 都重新写 `match/if err return`，重复的不只是 syntax，而是“这些 failure 应如何组合”的 policy。
+## 不要误判
+- 只有一两处、形状尚未稳定，不要预抽象；
+- 签名相似但 failure meaning 不同，不要硬共用 combinator；
+- policy 本身被复制，应先处理 policy owner，不是抽 composition helper；
+- 简单函数调用已经足够清楚时，不需要创造 DSL。
 
-以下情形触发：
+## 刀口
+问：**caller 反复写的到底是业务规则，还是“这些规则应该怎样组合”的同一条 meta-rule？**
 
-- 三处以上手写同一 validation short-circuit；
-- 一组 independent rules 到处自己 accumulate error；
-- rule pipeline 每个 caller 都维护自己的 loop/result plumbing；
-- 同一 rule set 在不同入口因手写 composition 漂出不同 failure behavior；
-- composition mechanics 比每条具体 rule 还长。
+若后者已经稳定重复，meta-rule 应该有名字、有测试、有单一 owner。
 
-不要看到两个相似函数就抽 combinator。只有一两处 isolated rule、signature 看似相同但 failure semantics 不同、或者 domain shape 仍在变化时，抽象可能只是 `premature-unification`。
+## 与近邻区分
+`rule-spaghetti` 是 propositions 尚未清晰；`wrong-rule-composition` 是已有/拟有 combinator 选择了错误的 logical law。
 
-也不要为了“有 algebra”造 rules engine。需要的通常只是少量 named operators：`andThen`、`all`、`map`、`collectIndependent`。Combinator 应比手写 control flow 更少知道 domain，而不是变成新的 god framework。
+这里的前提是：规则已经有共同形状，缺的是 composition vocabulary。
 
-与 `rule-spaghetti` 区分：那里 policy 自己还没被清楚命名；本规则假设 rules 已经干净，只缺稳定 composition vocabulary。与 `wrong-rule-composition` 区分：combinator 存在但选错 logical law，用后者。
+## 例子
+- 正例：五个 `Input -> Result<Input,Error>` validators 在三个 endpoint 各写一套 nested match。
+- 近邻：两个 checks 一个是 prerequisite、一个是 advisory，签名像但语义不共用。
+- 反例：`andThen` 与 `collectAll` 分别表达 dependent 与 independent laws，并有 law tests。
 
-判定问题：**如果修改“rule failure 如何组合”的语义，需要同步改多少 caller？** 若多处都要改，composition 已经成为独立知识，却还没有 owner。
-
-> 当 rules 已经共享形状，组合方式本身就成了知识。把它命名一次，不要让每个 caller 重写一遍小型解释器。
+## 提醒
+当重复的是**组合语义**，抽象才有价值；不要为了少几行代码发明 rules framework。

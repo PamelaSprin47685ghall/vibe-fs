@@ -48,6 +48,14 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
     member _.IsArmed(sessionId: SessionId, providerRun: ProviderRunIdentity) =
         lock gate (fun () -> armed.Contains(attemptKey sessionId providerRun))
 
+    /// HOST-027: coarse abort ownership is decided by the exact typed armed
+    /// attempt, not by the generic MessageAborted transport signal. This query
+    /// exists only so HostSignalBootstrap can avoid revoking the idle right of
+    /// an abort that this sensor itself requested.
+    member _.HasArmedSession(sessionId: SessionId) =
+        let prefix = sessionPrefix sessionId
+        lock gate (fun () -> armed |> Seq.exists (fun key -> key.StartsWith(prefix, StringComparison.Ordinal)))
+
     member _.TryArm(sessionId: SessionId, providerRun: ProviderRunIdentity) =
         lock gate (fun () -> armed.Add(attemptKey sessionId providerRun))
 

@@ -1,24 +1,37 @@
-# context-model-leak — Enforcer
+# context-model-leak — Enforcer 中文版
 
-Context-model leak 的病，是因为两个 context 的 data **长得像**，就让它们共享同一个 master type，结果 shape similarity 被误当 semantic identity。
+## 定义
+Context model leak 不是“共享类型不好”。真正的问题是：一个 master model 被多个 bounded context 复用，而这些 context 对同一字段赋予不同意义、invariant、lifetime 或 authority。
 
-Authentication 里的 User、Billing 里的 AccountHolder、Session 里的 Participant 可能都有 `id/name/email`，但它们回答的问题、invariant、authority、lifetime 完全不同。一个通用 `User` 一旦横跨所有 context，某个地方为了 billing 加的字段，其他 context 立刻也“看得见”，于是看起来仿佛有资格依赖。
+Shape 一样不代表 concept 一样。Auth 的 User、Billing 的 Account Holder、Session 的 Participant 都可能有 `id/name`，但它们回答的问题不同。共用 mega-model 会让某个 context 为自己新增的字段，自动变成所有 context 都“看得见且似乎有意义”的事实。
 
-最后 master model 往往长成 optional-field 集合：`billingBalance?`, `authClaims?`, `theme?`, `sessionRole?`。大量 `null` 不是灵活性，而是在告诉你：这些字段在大多数 context 根本没有语义。
+## 何时触发
+- 一个 `User` 同时携带 credential、balance、session state、UI preference；
+- 很多字段在某些 context 中只能 nullable，因为“这里用不到”；
+- 一个 context 修改字段，另一个 context 被迫重编译/迁移，却没有业务原因；
+- authorization/lifecycle rule 开始根据“当前是哪种使用场景”解释同一对象；
+- context boundary 只传整个 master object，而不是所需 facts。
 
-以下情形触发：
+## 不要误判
+- `Money`、opaque ID 等 tiny value object 在各处语义完全相同，可以共享；
+- context 之间传同一 identity，不代表传同一 model；
+- persistence DTO 在一个 context 内映射成本地 model，不是 leak；
+- 不要为了“bounded context”把真正同一概念复制出不同空壳类型。
 
-- auth/billing/UI/session/reporting 共用一个 “User/Context/Request” 巨型 model；
-- 加一个 context-local field 导致多个 unrelated package 跟着变；
-- caller 频繁判断“这个字段在我这里有没有意义”；
-- authorization/lifecycle rule 因共享 model 开始混用 foreign fields；
-- persistence row 被一路传进 domain/UI，而不是在 owning context 映射；
-- 为避免 split type，不断新增 nullable field/context flag。
+## 刀口
+问每个字段：**这个 context 为什么有权知道它？它在这里有什么 invariant？**
 
-不要误杀真正 stable value object。`Money`, `EmailAddress`, opaque `UserId` 如果在各 context 中意义与 invariant 真正一致，可以共享。共享一个小事实，不等于共享整个 context model。
+若答案是“因为 master model 里本来就有”，边界已经失去语义选择。
 
-与 `boundary-collapse` 区分：boundary collapse 更广，state/lifecycle/authority 都可能越界；本规则只打**一个 representation 冒充多个 domain concept**。与 `primitive-obsession` 不同：这里不是 string 太弱，而是 type 太“通用”。
+## 与近邻区分
+`boundary-collapse` 更广，任何 internals 越界都算；这里专门指**同一 representation 被迫扮演多个 context 的概念**。
 
-判定问题：对每个 context 问“这个 model 必须回答哪些问题？”如果答案明显不同，就不该由同一个 type 假装统一。
+`primitive-obsession` 是概念身份太弱；这里常常恰好相反：一个“很强的大类型”强到吞掉多个概念。
 
-> 同样字段不代表同样概念。Model 应服务于一个 context 的问题，而不是服务于数据库里恰好有这些列。
+## 例子
+- 正例：全系统共享一个 `User`，含 password hash、credit limit、theme、activeSessionId。
+- 近邻：各 context 共享 `UserId`，然后各自加载自己的 model。
+- 反例：Auth 输出 `AuthenticatedSubject` contract，Billing 显式翻译成自己需要的 customer identity。
+
+## 提醒
+共享字段并不等于共享含义。Model 应属于提出问题的 context，而不是属于数据库里恰好有多少列。

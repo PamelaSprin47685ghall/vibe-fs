@@ -14,6 +14,7 @@ import {
   physicalUser,
   promptDispatcher,
   providerRun,
+  reconcileSupervisor,
   roles,
   sessionId,
   toList,
@@ -26,7 +27,7 @@ import {
 } from '../../../dist/Application/Reconciliation/ReconciledTurn.js'
 import { forJournal, Runtime__AcceptHumanRoot } from '../../../dist/Application/Prompting/PromptDispatcher.js'
 import { captureOpening } from '../../../dist/Application/Reconciliation/XTraceCapture.js'
-import { MessagePart } from '../../../dist/Infrastructure/OpenCode/Codec/HostMessageCodec.js'
+
 import * as NeedHelpSensorModule from '../../../dist/Infrastructure/OpenCode/Host/NeedHelpSensor.js'
 import * as AssistanceHostModule from '../../../dist/Infrastructure/OpenCode/Host/AssistanceHost.js'
 import * as QuiescenceModule from '../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js'
@@ -56,15 +57,20 @@ const beginAttempt = quiescenceMethod('BeginProviderAttempt')
 const observeIdle = quiescenceMethod('ObserveIdle')
 const quiescenceByHost = new WeakMap()
 const handleTurn = async (host, turn) => {
+  const gate = quiescenceByHost.get(host)
+  assert.ok(gate, 'assistance harness must own the quiescence gate')
+
+  if (turn.Outcome.tag === 3) beginAttempt(gate, turn.SessionId)
+
   const observed = await rawHandleTurn(
     host,
     new ReconciledTurnContext(turn, undefined, ReconciledTurnDelivery.Observation),
   )
   if (turn.Outcome.tag !== 3) return observed
 
-  const gate = quiescenceByHost.get(host)
-  assert.ok(gate, 'assistance harness must own the quiescence gate')
-  beginAttempt(gate, turn.SessionId)
+  // Production NEEDHELP owns its typed abort, so HostSignalBootstrap does not
+  // revoke this attempt. The real SessionIdle then mints the permit used by the
+  // IdleRevisit; no synthetic new provider attempt occurs between abort and idle.
   const permit = observeIdle(gate, turn.SessionId)
   return rawHandleTurn(host, new ReconciledTurnContext(turn, permit, ReconciledTurnDelivery.IdleRevisit))
 }
@@ -89,7 +95,7 @@ const abortedTurn = (session, root, run, role) =>
     undefined,
   )
 
-const completedTurn = (session, root, run, role, text = '') =>
+const completedTurn = (session, root, run, role, text = 'independent perspective') =>
   new ReconciledTurn(
     sessionId(session),
     physicalUser(root),
@@ -97,7 +103,7 @@ const completedTurn = (session, root, run, role, text = '') =>
     providerRun(run),
     roles.of(role),
     undefined,
-    text ? [new MessagePart(0, [text])] : [],
+    [reconcileSupervisor.textPart(text)],
     'stop',
     undefined,
     undefined,
@@ -252,13 +258,7 @@ test('AGENT_031_deep_needhelp_uses_one_real_inquiry_consultation_parent_and_chil
     assert.match(sends[0].text, /如何解决这个 agent 的当前困难？/)
     assert.match(sends[0].text, /original deep-coder charge/, 'Commissioner LWR must carry parent opening')
 
-    const childDone = completedTurn(
-      'ses_consult_1',
-      'msg_assistance_1',
-      'asst_consult_done',
-      'Inquiry',
-      'independent perspective',
-    )
+    const childDone = completedTurn('ses_consult_1', 'msg_assistance_1', 'asst_consult_done', 'Inquiry')
     const returned = await handleTurn(host, childDone)
     assert.equal(outcomeName(returned), 'Handled')
     assert.equal(sends.length, 2)
@@ -313,3 +313,22 @@ test('AGENT_031_owner_drop_abandons_active_consultation_and_late_child_terminal_
     assert.equal(sends.length, 1, 'late consultation result must not send anything back to dropped owner')
   })
 })
+⚠ 2 unresolved conflicts detected
+- ours = HEAD
+- theirs = master
+NOTICE: Inspect a block by reading `conflict://<N>` (add `/ours` / `/theirs` / `/base` to render a single side). Resolve with `write({ path: "conflict://<N>", content })`, or bulk-resolve every registered conflict with `write({ path: "conflict://*", content })`. Writes replace ONLY the marker block (markers + all sides) — never repeat the lines before/after it; they stay in place.
+`content` shorthand: a line that is exactly `@ours` / `@theirs` / `@base` / `@both` expands to that recorded section. `@both` is ours-then-theirs with no separator — only for additive conflicts where each side adds something different; NEVER for competing edits of the same lines (pick a side or write the combined text). Lines that are not a token pass through verbatim, so `"// keep both\n@ours\n@theirs"` literally writes the comment, then ours, then theirs.
+Per-id bulk: `write({ path: "conflict://*", content: "1: @ours\n2: @theirs\n…" })` resolves each listed id with that side in ONE call — the cheapest way through many pick-one conflicts; unlisted ids stay registered.
+Resolve each block faithfully: keep one side (`@ours`/`@theirs`), or combine them when both intents apply — never invent content beyond the recorded sides, and never stack both sides of competing edits. Resolve several conflicts in a single turn by issuing multiple `write` calls at once; ids stay valid as earlier blocks are resolved.
+
+──── #9  L98-102 ────
+<<< ours
+const completedTurn = (session, root, run, role, text = '') =>
+>>> theirs
+const completedTurn = (session, root, run, role, text = 'independent perspective') =>
+
+──── #10  L110-114 ────
+<<< ours
+    text ? [new MessagePart(0, [text])] : [],
+>>> theirs
+    [reconcileSupervisor.textPart(text)],
