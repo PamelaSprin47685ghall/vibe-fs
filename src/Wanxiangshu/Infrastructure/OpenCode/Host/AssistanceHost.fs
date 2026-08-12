@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ChildRecovery
@@ -26,6 +27,7 @@ type AssistanceHost
         journal: AgentJournal option,
         sensor: NeedHelpSensor,
         snapshotPort: ISessionSnapshotPort,
+        quiescence: SessionQuiescenceGate,
         onChildOwned: SessionId -> unit,
         ?clock: IClockPort
     ) =
@@ -35,6 +37,36 @@ type AssistanceHost
 
     let clockPort = defaultArg clock (PtyTiming.nodeClockPort ())
     let consultationAgent = ManagedAgentCatalog.nameOf AgentTier.Deep Role.Inquiry
+    let claimGate = obj ()
+    let claimedOwnerAttempts = HashSet<string>()
+
+    let ownerAttemptKey (turn: ReconciledTurn) =
+        SessionId.value turn.SessionId + "\u001f" + ProviderRunIdentity.value turn.ProviderRun
+
+    let sessionClaimPrefix (sessionId: SessionId) = SessionId.value sessionId + "\u001f"
+
+    let markOwnerClaim (turn: ReconciledTurn) =
+        lock claimGate (fun () ->
+            let prefix = sessionClaimPrefix turn.SessionId
+
+            claimedOwnerAttempts
+            |> Seq.filter (fun key -> key.StartsWith(prefix, StringComparison.Ordinal))
+            |> Seq.toArray
+            |> Array.iter (fun key -> claimedOwnerAttempts.Remove key |> ignore)
+
+            claimedOwnerAttempts.Add(ownerAttemptKey turn) |> ignore)
+
+    let isClaimedOwnerAttempt (turn: ReconciledTurn) =
+        lock claimGate (fun () -> claimedOwnerAttempts.Contains(ownerAttemptKey turn))
+
+    let dropOwnerClaims (sessionId: SessionId) =
+        lock claimGate (fun () ->
+            let prefix = sessionClaimPrefix sessionId
+
+            claimedOwnerAttempts
+            |> Seq.filter (fun key -> key.StartsWith(prefix, StringComparison.Ordinal))
+            |> Seq.toArray
+            |> Array.iter (fun key -> claimedOwnerAttempts.Remove key |> ignore))
 
     let currentProjection () =
         journal |> Option.map AgentJournal.snapshot
@@ -409,8 +441,10 @@ type AssistanceHost
                 | None -> return Error "requesting provider run is absent from reconciled Host snapshot"
         }
 
-    let handleOwnerRequest (turn: ReconciledTurn) =
+    let handleOwnerRequest (context: ReconciledTurnContext) =
         task {
+            let turn = context.Turn
+
             match activeProfile turn.SessionId with
             | None -> return AssistanceTurnDisposition.ClaimedButUnresolved
             | Some profile when profile.AuthorityRootUserMessageId <> turn.AuthorityRootUserMessageId ->
@@ -424,28 +458,48 @@ type AssistanceHost
                     | Ok(requester, role, _, _) when role <> profile.CanonicalRole ->
                         return AssistanceTurnDisposition.ClaimedButUnresolved
                     | Ok(_, role, AgentTier.Fast, _) ->
-                        let deep = ManagedAgentCatalog.nameOf AgentTier.Deep role
+                        markOwnerClaim turn
 
-                        match!
-                            sendContinuation
-                                turn.SessionId
-                                profile.LogicalRunId
-                                deep
-                                PromptAuthority.ContinuationKind.NeedHelpEscalation
-                                AssistancePrompt.escalation
-                                turn.Directory
-                        with
-                        | Ok _ -> return AssistanceTurnDisposition.Handled
-                        | Error error ->
-                            Diagnostic.emit
-                                "needhelp"
-                                [ "session_id", SessionId.value turn.SessionId
-                                  "result", "escalation-send-failed"
-                                  "provider_error", error ]
+                        if not (sensor.TryTake(turn.SessionId, turn.ProviderRun)) then
+                            return AssistanceTurnDisposition.Handled
+                        else
+                            let deep = ManagedAgentCatalog.nameOf AgentTier.Deep role
 
-                            return AssistanceTurnDisposition.ClaimedButUnresolved
+                            match!
+                                sendContinuation
+                                    turn.SessionId
+                                    profile.LogicalRunId
+                                    deep
+                                    PromptAuthority.ContinuationKind.NeedHelpEscalation
+                                    AssistancePrompt.escalation
+                                    turn.Directory
+                            with
+                            | Ok _ -> return AssistanceTurnDisposition.Handled
+                            | Error error ->
+                                Diagnostic.emit
+                                    "needhelp"
+                                    [ "session_id", SessionId.value turn.SessionId
+                                      "result", "escalation-send-failed"
+                                      "provider_error", error ]
+
+                                return AssistanceTurnDisposition.ClaimedButUnresolved
                     | Ok(requester, _, AgentTier.Deep, _) ->
-                        return! beginConsultation turn.SessionId profile.LogicalRunId requester turn.Directory
+                        // OpenCode may still be completing the physical parent-abort
+                        // descendant sweep when AbortWake reconciles. Claim ownership
+                        // now, but do not parent a fresh consultation under that session
+                        // until a fresh SessionIdle permit proves the abort is quiescent.
+                        markOwnerClaim turn
+
+                        match context.Quiescence with
+                        | None -> return AssistanceTurnDisposition.Handled
+                        | Some permit when not (quiescence.TryConsume permit) ->
+                            return AssistanceTurnDisposition.Handled
+                        | Some _ ->
+                            if not (sensor.TryTake(turn.SessionId, turn.ProviderRun)) then
+                                return AssistanceTurnDisposition.Handled
+                            else
+                                return!
+                                    beginConsultation turn.SessionId profile.LogicalRunId requester turn.Directory
         }
 
     let handleConsultationTurn
@@ -540,14 +594,18 @@ type AssistanceHost
         }
 
     /// Reconcile one stable turn before fallback/recovery ownership.
-    member _.HandleTurn(turn: ReconciledTurn) : Task<AssistanceTurnDisposition> =
+    member _.HandleTurn(context: ReconciledTurnContext) : Task<AssistanceTurnDisposition> =
         task {
+            let turn = context.Turn
+
             match childRecord turn.SessionId with
             | Some(record, decoded) -> return! handleConsultationTurn turn record decoded
             | None ->
                 match turn.Outcome with
-                | ReconcileProgram.TurnAborted _ when sensor.TryTake(turn.SessionId, turn.ProviderRun) ->
-                    return! handleOwnerRequest turn
+                | ReconcileProgram.TurnAborted _ when sensor.IsArmed(turn.SessionId, turn.ProviderRun) ->
+                    return! handleOwnerRequest context
+                | ReconcileProgram.TurnAborted _ when isClaimedOwnerAttempt turn ->
+                    return AssistanceTurnDisposition.Handled
                 | _ -> return AssistanceTurnDisposition.NotAssistance
         }
 
@@ -598,6 +656,7 @@ type AssistanceHost
     /// alone only removes stream state; the durable handle remains the recovery truth.
     member _.DropSession(sessionId: SessionId) =
         sensor.DropSession sessionId
+        dropOwnerClaims sessionId
 
         match currentProjection () with
         | None -> ()
