@@ -1,27 +1,39 @@
 # property-test-missing — Main
 
-## What To Do Now
-Express the general invariant as a property and test it over generated inputs with useful shrinking and explicit validity constraints. The algebraic law over the generated space is who owns the correctness claim; a handful of fixtures is not who owns that quantifier.
+Write the law before writing the generator.
 
-## Why This Matters
-A few examples can establish familiarity but not a universal law. When the code claims behavior over a combinatorial space, property testing lets the machine search for the smallest counterexample to the actual invariant rather than to cases humans happened to foresee.
+A useful property test begins with a semantic statement independent of implementation:
 
-## Repair Strategy
-Write the law first, choose generators that reflect the true domain, avoid filtering so heavily that difficult cases disappear, and preserve found counterexamples as regressions when they reveal meaningful defects.
+```text
+for every valid x, P(x)
+for every valid x,y, relation R(f(x,y), x, y) holds
+for every permutation p, result(p(inputs)) = canonicalResult
+```
 
-## Decision Branches
-- If a stable “for all valid x…” law exists and tests only sample it, add a generative property with shrinking and keep examples as illustrations.
-- If the relevant space is finite and already enumerated, keep exhaustive examples and do not invent a generator.
-- If no general law exists, stop; do not add random inputs without a property.
+Only then choose generators that explore the real domain rather than merely producing easy values.
 
-## Common Wrong Fixes
-- Generate random inputs without a stable property; randomness alone is not deeper testing.
-- Assert only “does not throw” over generated values.
-- Filter generators so heavily that the difficult region of the space never appears.
-- Replace all examples with properties so the law is no longer readable as a human fixture.
+Good generators should deliberately reach boundaries the implementation is tempted to mishandle: empty and singleton collections, duplicates, maximal/minimal values, recursive depth, unusual Unicode, equivalent representations, stale/current versions, conflicting cases, permutations, malformed-but-parseable boundaries where relevant.
 
-## Verification
-Deliberately break the law in a plausible way and confirm generation finds a counterexample with a useful minimized case. The invariant under test must be the stated algebraic law, not “the suite stayed green.”
+Avoid excessive filtering. If 99% of generated values are discarded because they are “invalid,” the generator probably does not understand the domain. Prefer construction that produces valid cases directly, plus separate generators for intentionally invalid inputs when rejection is part of the law.
 
-## Done When
-General behavior is guarded by general evidence, while examples remain only as readable illustrations of the same law.
+Shrinking is part of the evidence. A failing case like “347 nested randomly generated objects” teaches less than a minimized counterexample showing exactly which combination violates the invariant. Configure custom shrinkers when default shrinking destroys the domain condition or hides the failure.
+
+Common fake repairs:
+
+- generate random values but assert only `doesNotThrow` when correctness requires more;
+- seed randomness without preserving the failing seed/counterexample;
+- filter until only happy inputs survive;
+- make generators call the same production normalization/constructor logic whose behavior the property is meant to challenge;
+- replace all readable examples with opaque generative tests;
+- use property testing on a four-case finite enum instead of simply enumerating all four cases;
+- run thousands of cases with a weak property and call volume rigor.
+
+When a property finds a real defect, keep the minimized counterexample as a regression example when it carries explanatory value, and keep the property so nearby unseen cases remain protected.
+
+Verification should mutate the law in plausible ways: break round-trip identity for one field, make normalization non-idempotent, make merge order-sensitive, drop a transition invariant. The property should discover a small counterexample rather than merely pass enormous random traffic.
+
+Keep examples. They document intent, named edge cases, and historical bugs. Property tests do not replace examples; they extend evidence from selected points to a quantified space.
+
+You are done when a general claim is guarded by general evidence, the generator genuinely reaches difficult parts of the domain, and failures shrink to explanations rather than noise.
+
+> Property testing is not randomness. It is executable mathematics with a search strategy.

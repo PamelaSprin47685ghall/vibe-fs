@@ -1,30 +1,53 @@
 # property-test-missing — Enforcer
 
-## Definition
-A property test is missing when code implements a general law over a large input space but verification consists only of a few hand-picked examples. The root-cause is that a known universal law is evidenced only by curated anecdotes, so the quantifier over the input space remains untested.
+A property test is missing when the implementation claims a **general law over a space of inputs**, while the test suite offers only a few curated anecdotes.
 
-## Governing Principle
-Examples prove points; laws describe spaces. For parsers, serializers, normalization, folds, merges, and state machines, correctness often has algebraic form: round trips preserve values, normalization is idempotent, merges are associative/commutative under stated conditions, transitions preserve invariants. Testing only examples leaves most of the law’s quantifier unchecked.
+The trigger is the quantifier, not the sophistication of the code.
 
-## Trigger When
-Trigger when a stable general invariant exists over many generated inputs and current tests exercise only a small curated sample.
+Examples prove points:
 
-## Do Not Trigger When
-- One-off glue or orchestration has no meaningful general law to quantify over.
-- Exhaustive finite enumeration already covers the full relevant input space.
-- Existing tests already encode the law as a generative property with shrinking, even if a few examples remain as illustrations.
-- The change is a single documented fixture whose acceptance criterion is that exact example, not a universal claim.
+```text
+f(a) = b
+f(c) = d
+```
 
-## Distinguish From
-coverage-theater lacks meaningful assertions. failure-path-untested misses negative cases. This rule concerns a known universal property whose quantifier deserves generative evidence. Tie-break: fire here when the law is already known and examples merely sample it; fire coverage-theater when volume of tests hides empty assertions; fire failure-path-untested when the missing evidence is a specific negative path, not a quantified space.
+Properties claim spaces:
 
-## Decision Procedure
-State the invariant with “for all valid x…” or a relation among generated values. If meaningful, encode generators and shrinkable property checks around that law.
+```text
+for every valid x, decode(encode(x)) = x
+for every x, normalize(normalize(x)) = normalize(x)
+for every permitted a,b, merge(a,b) preserves invariant I
+for every reachable transition, invariant P remains true
+```
 
-## Examples
-- positive: a serializer claims round-trip identity for every valid document, yet tests assert only three hand-written fixtures.
-- near-miss: a finite enum of four protocol versions is exhaustively table-tested; no generator is needed because the space is already fully covered.
-- counterexample: glue code maps one config flag to one CLI argument with no algebraic law; example tests are the right evidence.
+If correctness is naturally expressed with “for all,” a handful of hand-picked fixtures usually leaves most of the claim unexamined.
 
-## Nudge
-When correctness is a law, test the law—not a handful of anecdotes. Generate the input space and let counterexamples discover cases humans did not imagine.
+Fire this rule when code owns stable laws such as:
+
+- serialization/codec round trips;
+- normalization/canonicalization idempotency;
+- parser/printer correspondence;
+- algebraic merge/fold properties;
+- ordering/permutation invariance;
+- state-machine invariant preservation;
+- encode/decode identity under generated valid structures;
+- monotonicity or boundedness over broad numeric/state spaces;
+- deterministic equivalence between two representations.
+
+Do **not** fire merely because “property testing is powerful.” Many behaviors have no useful generative law. One-off orchestration, specific product copy, a fixed migration fixture, or a four-case closed enum already exhaustively table-tested may be better served by examples.
+
+Random input without a law is not property testing. `forAll(randomBytes, x => doesNotThrow(x))` proves only non-crash tolerance if that is genuinely the contract; otherwise it is noise with impressive volume.
+
+The quality of the generator matters as much as the assertion. A generator that filters away difficult states, never creates empty/maximal/duplicate/recursive combinations, or mirrors implementation constructors too faithfully can leave the dangerous region untouched.
+
+This rule differs from `coverage-theater`: a property suite can still be theater if its assertion is meaningless. It differs from `failure-path-untested`: that rule may concern one specific negative branch, while this rule concerns a known universal relationship. `missing-regression-test` preserves a concrete discovered counterexample; property tests protect the wider law around it.
+
+The decisive question is:
+
+> Can the correctness claim be stated honestly as “for all valid X...” or as an algebraic relation among generated values?
+
+If yes, examples are illustrations, not sufficient evidence by themselves.
+
+A strong property should have useful shrinking. When it fails, the framework should search toward a minimal counterexample humans can understand and preserve.
+
+> When the code promises a law, test the law. Do not confuse three memorable examples with evidence about an input universe.

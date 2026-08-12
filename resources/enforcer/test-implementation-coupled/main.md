@@ -1,25 +1,46 @@
 # test-implementation-coupled — Main
 
-## What To Do Now
-Rewrite the test around supported inputs, observable outputs, durable state, and contractual external interactions; remove assertions on private decomposition. The supported public contract is who owns the testable invariant; private decomposition is not a promise the suite may freeze.
+Move assertions outward until they land on a promise.
 
-## Why This Matters
-A good test permits internal evolution while forbidding behavioral regression. Implementation-coupled tests do the reverse: they punish refactoring and reward imitation of the old algorithm even when a simpler equivalent design exists.
+For every private/internal assertion, ask what real behavior it was trying to protect. Rewrite the test in terms of supported input, observable result, durable state, or truly contractual external interaction.
 
-## Repair Strategy
-Identify the public promise behind each private assertion and observe that promise through the supported boundary. Keep interaction assertions only where count/order itself is part of the contract.
+Examples:
 
-## Decision Branches
-If the asserted detail is part of the supported contract, keep observing it at the public boundary.
-If a conforming alternative implementation could violate it, drop or rewrite the assertion onto observable behavior.
+```text
+"helper X called twice"
+    ↓
+"one logical publication occurs exactly once"
 
-## Common Wrong Fixes
-- Expose private members solely to keep existing tests convenient.
-- Replace private assertions with equally incidental snapshots of internal JSON.
-- Delete the coupled test entirely instead of moving it to the observable contract.
+"private field status = ready"
+    ↓
+"supported API now admits the operation"
 
-## Verification
-Invariant: the suite must stay green under a semantics-preserving internal refactor and turn red when promised behavior changes. Perform that refactor in thought or practice; only contract-level changes should fail the test.
+"method A runs before B"
+    ↓
+"durable commit precedes provider-visible success"
+```
 
-## Done When
-The suite constrains what users and neighboring components may rely on while leaving implementation details free to change without test surgery.
+The replacement may still observe interactions, but only where interaction itself is the contract: no network call under rejection, exactly-once effect, ordering required for durability, stable idempotency identity, protocol handshake, etc.
+
+Common fake repairs:
+
+- delete all white-box tests without adding behavioral evidence;
+- replace private field assertions with giant snapshots of equally private object graphs;
+- expose internals permanently because old tests are inconvenient to rewrite;
+- mock fewer helpers but still assert call choreography that callers never see;
+- keep exact call counts where batching/caching would be a legal optimization;
+- claim “this sequence is important” without identifying which public/durable invariant makes it important.
+
+Verification has two sides.
+
+First, perform a semantics-preserving refactor: rename/inlining helpers, change internal data structure, batch independent calls, reorder pure calculations. Tests guarding real promises should stay green.
+
+Second, break the promise while keeping much of the old internal choreography intact: return wrong identity, publish twice, skip authorization, expose stale state. The rewritten tests must turn red.
+
+This two-sided check prevents the easy mistake of merely weakening tests. A good suite becomes **less sensitive to irrelevant implementation change and more sensitive to meaningful behavioral change**.
+
+Keep diagnostic unit tests where they protect real local laws. A pure parser function can have direct tests because that function's result is itself its supported contract. The smell is not proximity to implementation; it is asserting details no conforming consumer is entitled to rely on.
+
+You are done when the suite allows multiple correct implementations of the same promise and rejects incorrect ones, instead of demanding imitation of yesterday's decomposition.
+
+> The test should be loyal to the contract, not to the shape of the code that happened to satisfy it first.

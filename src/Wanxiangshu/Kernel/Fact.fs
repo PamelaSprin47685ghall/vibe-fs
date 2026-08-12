@@ -281,6 +281,7 @@ module Fact =
                ChildSessionId: SessionId
                Handle: HandleId
                TargetAgent: string
+               Byname: string
                CanonicalRole: Role
                Ownership: HandleOwnership |}
 

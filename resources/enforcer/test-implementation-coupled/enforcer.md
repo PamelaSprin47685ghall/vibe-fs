@@ -1,30 +1,34 @@
 # test-implementation-coupled — Enforcer
 
-## Definition
-A test is implementation-coupled when its verdict depends on private structure, helper calls, incidental ordering, internal fields, or algorithm choices that are not part of the supported behavior. The root-cause is that the test freezes private choreography instead of a caller-visible promise, becoming a second implementation rather than an independent specification.
+A test is implementation-coupled when it punishes a correct refactor because it froze **how the code currently works** instead of **what the supported contract requires**.
 
-## Governing Principle
-A test should constrain what must remain true while leaving implementations free to change what the contract does not promise. Assertions on private structure invert that relation: refactoring correct code becomes expensive while behaviorally wrong code can still pass if it preserves the expected choreography. The test has become a second implementation rather than an independent specification.
+The central diagnostic is substitutability:
 
-## Trigger When
-Trigger when tests assert private methods, exact helper call counts, internal object layout, intermediate variables, or incidental algorithm sequence without a caller-visible guarantee requiring them.
+> Could a different implementation satisfy every real caller-visible promise and still fail this test?
 
-## Do Not Trigger When
-- The interaction itself is contractual—exactly-once publication, no external call under rejection, or a required transaction boundary—and the test double observes that public effect.
-- Assertions target a documented public API or wire contract, including required ordering of that public surface.
-- Characterization of a frozen third-party protocol adapter where the protocol sequence is the supported contract.
-- White-box tests used only to pin a known-unsafe internal invariant that the public API cannot yet express, and that limitation is recorded.
+If yes, the test may be protecting private choreography rather than behavior.
 
-## Distinguish From
-`coverage-theater` asserts too little meaning. `weakened-test-to-pass` deliberately dilutes expectations. Tie-break: if a valid behavioral claim was relaxed to go green, use `weakened-test-to-pass`; if the test freezes private choreography that was never a promise, use this rule.
+Common coupling targets include:
 
-## Decision Procedure
-For each assertion ask whether a conforming alternative implementation may legitimately violate it. If yes, move the assertion outward to the observable contract.
+- exact private helper call counts;
+- internal method names or object layout;
+- intermediate field values never exposed as contract;
+- incidental sequence of pure computations;
+- mocks asserting which helper called which helper;
+- snapshots of internal JSON/state whose exact shape is not public;
+- tests reaching private members through reflection/test-only exports;
+- algorithm-specific steps where several equivalent algorithms are valid.
 
-## Examples
-- positive: a unit test asserts private helper call counts and intermediate field values for a refactor-safe algorithm.
-- near-miss: a test asserts that a rejected command emits zero side-effecting publish calls, which is the public effect.
-- counterexample: deleting an edge-case assertion solely because production fails it is `weakened-test-to-pass`.
+Why this is costly: such tests make the old implementation an unofficial second specification. A simpler algorithm, changed decomposition, removed helper, batched call, or equivalent data structure causes red even though users would observe no regression. Teams then stop refactoring because the suite charges a tax for changing details nobody promised.
 
-## Nudge
-Tests should freeze promises, not implementations. Assert the behavior or durable interaction the caller owns and leave private decomposition available to refactor.
+Worse, implementation-coupled tests can still miss real bugs. Code may reproduce the expected helper choreography while returning the wrong public result. The suite has frozen motion, not meaning.
+
+Do not overcorrect. Some interactions **are** contractual. Exactly-once publication, “zero external calls on rejection,” transaction boundaries, durable ordering, idempotency-key reuse, provider call sequence required by a real protocol — these can legitimately be observed. The criterion is whether a conforming implementation is allowed to vary the detail.
+
+This differs from `weakened-test-to-pass`: that rule deletes or loosens a valid behavioral expectation because production fails it. Here the expectation was never a legitimate promise in the first place. Removing private choreography can strengthen the suite if the replacement assertion moves outward to the real contract.
+
+`behavioral-boundary-untested` often coexists with this smell: the suite has hundreds of internal assertions yet no proof through the supported entrance.
+
+A useful thought experiment is a semantics-preserving rewrite: replace a helper chain with one pure function, change a list to a map, batch two internal calls, inline/remove a private method, reorder independent calculations. If the test fails and nobody can name a contract violation, it is coupled.
+
+> Tests should make wrong behavior expensive and correct refactoring cheap. If the reverse is true, the suite is guarding implementation nostalgia.

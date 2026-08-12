@@ -48,12 +48,13 @@ module HandleController =
     /// `childSessionId` is recorded because only the Host can issue it: a recovered
     /// handle with no session points at nothing, and deriving one from the handle id
     /// would fabricate an identity every later operation silently no-ops against.
-    let link
+    let linkNamed
         (journal: AgentJournal option)
         (parentId: SessionId)
         (agentId: string)
         (childSessionId: SessionId)
         (targetAgent: string)
+        (byname: string)
         (role: Role)
         (ownership: Fact.HandleOwnership)
         : Result<unit, string> =
@@ -68,8 +69,22 @@ module HandleController =
                        ChildSessionId = childSessionId
                        Handle = agentHandle agentId
                        TargetAgent = targetAgent
+                       Byname = byname
                        CanonicalRole = AgentRoleIdentity.toRole role
                        Ownership = ownership |})
+
+    /// Internal compatibility: when no distinct provider presentation identity
+    /// exists, use the Host target name as the byname too.
+    let link
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (agentId: string)
+        (childSessionId: SessionId)
+        (targetAgent: string)
+        (role: Role)
+        (ownership: Fact.HandleOwnership)
+        : Result<unit, string> =
+        linkNamed journal parentId agentId childSessionId targetAgent targetAgent role ownership
 
     /// EXEC-004 / P0-RECOVERY-JOIN-001: claim the single-assignment completion cell
     /// only with a proven `JoinableCompletion` (Succeeded | Failed finality).

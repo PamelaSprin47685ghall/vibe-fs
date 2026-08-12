@@ -47,10 +47,11 @@ module ExecutionFactFold =
             AgentProjection.tryUpdate
                 payload.ParentSessionId
                 (fun session ->
-                    HandleProjection.link
+                    HandleProjection.linkNamed
                         payload.Handle
                         payload.ChildSessionId
                         payload.TargetAgent
+                        payload.Byname
                         payload.CanonicalRole
                         payload.Ownership
                         (Option.defaultValue HandleProjection.empty session.Handles)

@@ -1,30 +1,34 @@
 # missing-regression-test — Enforcer
 
-## Definition
-A regression test is missing when a defect is corrected without preserving an executable example that fails under the old behavior and passes under the repaired behavior. The root-cause is that the defect's reachable failure is repaired in implementation without becoming executable memory, so future refactors may recreate the same region of state space unnoticed.
+A missing regression test means the team paid to discover a real defect, fixed the code, and then failed to preserve the **new knowledge about reachable bad behavior**.
 
-## Governing Principle
-A bug report is new knowledge about the system's reachable state space. Fixing the implementation removes the symptom; a regression test preserves the knowledge that this region of state space is dangerous. Without it, the team pays for the discovery once and then permits future refactors to forget it completely.
+A bug report is not merely a request to change lines. It is evidence that the system's state space contains a counterexample nobody expected or nobody had encoded. The implementation fix removes today's symptom. A regression test turns the discovery into repository memory.
 
-## Trigger When
-Trigger when a concrete defect is fixed and no test reproduces the original failure through the relevant behavioral boundary.
+Fire this rule when:
 
-## Do Not Trigger When
-- An existing test already fails on the buggy behavior and was the evidence that drove the repair.
-- The change is a pure refactor with no observed defect and no new reachable failure.
-- The incident was an operational misconfiguration outside the product's behavioral contract.
-- The repair is a documentation-only correction with no reachable product behavior to reproduce.
+- a concrete production/test/user-reported defect is fixed but no executable scenario reproduces it;
+- the new test exercises the repaired code but would also have passed under the old buggy behavior;
+- the test asserts an implementation detail introduced by the fix instead of the externally meaningful failure;
+- the bug depended on a boundary case (timezone, stale version, cancellation race, malformed input, duplicate delivery, migration state) and that exact boundary case remains absent from the suite;
+- an incident postmortem describes the failure, but no test/property/canary prevents the same mechanism from returning;
+- a one-off manual reproduction was used to verify the fix and then discarded.
 
-## Distinguish From
-`ignored-tdd` concerns going red first for all behavior changes. `failure-path-untested` concerns failure branches never exercised. Tie-break: if a known defect was fixed without an executable memory of that defect, this rule; if new behavior was written without going red first, `ignored-tdd`; if a failure branch has never been covered, `failure-path-untested`.
+Do not fire when an existing test already caught the defect and remains in the suite. That test is already the regression memory. Do not demand a regression test for documentation-only errors or operational mistakes outside the product's behavioral contract unless product behavior is changed to prevent recurrence.
 
-## Decision Procedure
-Reproduce the bug in the smallest behavioral test before or alongside the fix. Confirm the old implementation fails for the reported reason, then require the corrected implementation to pass.
+The important distinction from `failure-path-untested` is provenance: this rule starts from **a known concrete defect**. `failure-path-untested` can fire before any incident because a failure policy has never been exercised. A known bug deserves a test even if its path was nominally “covered” before — because coverage clearly failed to distinguish the actual defect.
 
-## Examples
-- positive: A timezone bug is patched in parsing, but no test encodes the reported input that used to fail.
-- near-miss: The failing property test already reproduced the bug and stayed in the suite after the fix.
-- counterexample: Adding a feature with a new unit test is ordinary TDD, not a missing regression for a known defect.
+A strong regression test has three properties:
 
-## Nudge
-A bug that taught the project nothing can return unchanged. Preserve the failure as a regression test so the repository remembers what humans had to discover.
+1. it reproduces the original failure through the owning behavioral boundary;
+2. it fails against the old mechanism for the same material reason users observed;
+3. it stays meaningful after internal refactors because it protects the promise, not the patch shape.
+
+The best regression is often smaller than the original incident. Strip incidental environment until only the causal ingredients remain, but do not simplify away the condition that made the bug possible.
+
+For concurrency/nondeterministic incidents, preserve the causal schedule deterministically with barriers/fake clocks/controlled ordering instead of writing a flaky “run 1000 times” test and hoping the race appears.
+
+For property bugs, a found minimal counterexample may belong both as a fixed example and as evidence strengthening the general generator/property.
+
+A decisive check is to temporarily restore or simulate the old defect. If the new test remains green, it is not regression memory; it is ceremony added after the fact.
+
+> A bug that changed code but did not change the repository's executable knowledge is only waiting to become expensive twice.

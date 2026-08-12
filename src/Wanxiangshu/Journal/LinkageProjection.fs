@@ -43,6 +43,9 @@ type HandleRecord =
         /// same handle id to the same session, and only the Host can issue that id.
         ChildSessionId: SessionId
         TargetAgent: string
+        /// Provider-facing stable name for this logical person. TargetAgent remains
+        /// the Host machine binding used for restart and session execution.
+        Byname: string
         CanonicalRole: Role
         /// Who owns this handle (Fact.HandleOwnership). HostOwnedHidden handles
         /// are excluded from every parent-visible surface and from parent
@@ -91,10 +94,11 @@ module HandleProjection =
         { Handles = Map.empty
           NextCreationOrder = 0 }
 
-    let link
+    let linkNamed
         (handle: HandleId)
         (childSessionId: SessionId)
         (targetAgent: string)
+        (byname: string)
         (role: Role)
         (ownership: Fact.HandleOwnership)
         (current: AgentLinkageProjection)
@@ -110,6 +114,7 @@ module HandleProjection =
                         { Handle = handle
                           ChildSessionId = childSessionId
                           TargetAgent = targetAgent
+                          Byname = byname
                           CanonicalRole = role
                           Ownership = ownership
                           Lifecycle = Active
@@ -129,12 +134,25 @@ module HandleProjection =
                             { existing with
                                 ChildSessionId = childSessionId
                                 TargetAgent = targetAgent
+                                Byname = byname
                                 CanonicalRole = role
                                 Ownership = ownership
                                 Lifecycle = Active }
                             current.Handles
                       NextCreationOrder = current.NextCreationOrder }
             | Abandoned _ -> Error AlreadyAbandoned
+
+    /// Compatibility for internal callers that do not need a separate
+    /// presentation identity. Provider-facing fork/commission use linkNamed.
+    let link
+        (handle: HandleId)
+        (childSessionId: SessionId)
+        (targetAgent: string)
+        (role: Role)
+        (ownership: Fact.HandleOwnership)
+        (current: AgentLinkageProjection)
+        : Result<AgentLinkageProjection, HandleTransitionRejection> =
+        linkNamed handle childSessionId targetAgent targetAgent role ownership current
 
     /// EXEC-004: terminal, send-failure and cancel race for one cell. Whoever
     /// arrives first wins; later arrivals are refused, not overwritten.
