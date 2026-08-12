@@ -5717,32 +5717,43 @@ Manager **不**拥有 `inspect`（已冻结）：Manager 永远不能亲手触�
 
 ## Remaining work
 
-1. **e2e**：`long-stroke.toml` 已部分迁移新 wire；preflow 已过，主流程卡在 `mgr-labor.2` watchdog（见 Blockers）。需 `npm run test:e2e` 全绿。
-2. **integration prompts**：`tests/integration/resources/prompts.test.mjs` 1 败（Inquiry system prompt 未含 `sphinx_start|sphinx_resume` 子串——Sphinx merge 后 prompt 与契约未对齐）。
-3. **Phase 17 i18n（续）**：Role Law 已迁至 `resources/provider/role/<name>/{en.md,zh-CN.md}` + Gate C 绿；仍缺 `world.*` / `library.*` 分层拆分、tool description / HOST-013 marker 双语、zh-CN 译文质量（非英中混杂）。
-4. **Phase 20 删 legacy 符号**：`TddPhase.fs` 已删；`BlogTool.fs`/`VerdictTool.fs`/`ListTool.fs`/`EditQaTool.fs` 等模块文件名仍待重命名。
-5. **Gate B baseline**：Join 迁移债务 ratchet 应随 leak 修复逐步清零。
-6. **§19 Acceptance**：逐项可观察关闭（尤其 Byname/calling wire、js-bookkeeper 完整 program SDK、TerminalName closure 占用）。
-7. **§20 Non-Goals**：Steward 仍不得伪装已交付；Sphinx MCP 已 merge（Inquiry `sphinx_*` 权限），Inquiry **prompt 层** Sphinx 工具说明未写入 Role Law（与 integration prompts 败一致）。
+1. **Phase 17 i18n（续）**：Role Law 已迁至 `resources/provider/role/<name>/{en.md,zh-CN.md}` + Gate C 绿；仍缺 `world.*` / `library.*` 分层拆分、tool description / HOST-013 marker 双语、zh-CN 译文质量（非英中混杂）。
+2. **Phase 20 物理文件名**：`BlogTool.fs`/`VerdictTool.fs`/`ListTool.fs`/`EditQaTool.fs` 已为合法 migration tombstone（零 runtime 所有权；Gate A 绿），**物理文件名**仍待重命名或 fsproj 条目删除（workspace 无 delete API 时保留 tombstone 为预期态）。
+3. **Gate B baseline ratchet**：当前 `provider-leak-gate-baseline.json` 绿；后续 leak 修复应继续只减不增。
+4. **§20 Non-Goals**：Steward 仍不得伪装已交付；Sphinx MCP 已 merge（Inquiry `sphinx_*` 权限），Inquiry **prompt 层** Sphinx 工具说明是否写入 Role Law 仍属非目标/后续 polish（不阻塞当前验证链）。
+5. **移入 `completed/`**：须满足 Completion criteria 全项；此前 premature close 已撤回，**本 session 仍不移入**。
 
 ## Done since Amendment（2026-08-12）
 
 - `manager-tool-contract` 22/22；Gate D 实装；`TddPhase` 删除。
 - i18n 目录纠正为 semantic path + `en.md`/`zh-CN.md` 叶子（§4.7.8）。
-- **ARCH-010 / ForkChildPayload**：commissioner 历史移入 instruction 注释区；`arch010-cases` injection 期望对齐 basic-string 语义；integration harness **273/273**。
-- **HOST-026**：`ProviderLanguageBinding.readGlobalPreference` 用 `Option.ofObj` 处理 Fable `undefined`；e2e `isolated-env.js` 显式 `WANXIANGSHU_PROVIDER_LANGUAGE=en`；单元 `HOST_026_readGlobalPreference_defaults_when_env_unset`。
-- **long-stroke e2e 迁移（未全绿）**：`blog`→`chronicle`、`inspector`→`inspect`、SyncDelegate 子会话删 `return`；新增 `protocol-repair`、`manager-blind-plan` internal turn；Strength K2 owner `runtimeStep=2`；G2 oracle `startsWith` + 无 `return` 过滤。
-- **Sphinx merge 后**：`agent-permission-gate` / `js-surface` 对齐 `sphinx_*`。
-- `npm test` **2379/2379**（2026-08-12 收工时点）。
+- **ARCH-010 / ForkChildPayload**：commissioner 历史移入 instruction 注释区；`arch010-cases` injection 期望对齐 basic-string 语义。
+- **HOST-026**：`ProviderLanguageBinding.readGlobalPreference` 用 `Option.ofObj` 处理 Fable `undefined`；e2e `isolated-env.js` 显式 `WANXIANGSHU_PROVIDER_LANGUAGE=en`。
+- **long-stroke e2e 全链路**：`blog`→`chronicle`、`inspector`→`inspect`、SyncDelegate 删 `return`；`protocol-repair` / `manager-blind-plan` / G6 bookkeeper finalize / NEEDHELP deep consultation 路径；**63 steps / ~11.4s，spawn=1**。
+- **js-bookkeeper Case SDK**：`question`/`answer`/`setQuestion`/`setAnswer`/`run` 原子 Case 变换；无 filesystem capability；每角色恰好一个 Ultra Example。
+- **Casebook**：provider 动词 `shelfmark`；fork/commission **calling + Byname** clean break；Horizon/Join 全链路 Byname；TerminalName 在 Join 交付 closure 前保持占用。
+- **NEEDHELP 因果修复**：typed NEEDHELP-owned abort 保留随后 idle permit（`NeedHelpSensor.HasArmedSession` + `AssistanceHost`）；consultation child terminal 先 `XTraceCapture.captureTerminal` 再 materialize LWR。
+- **四个旧 tool owner**：`ListTool`/`BlogTool`/`VerdictTool`/`EditQaTool` 退为 migration tombstone（无 module alias / runtime owner）；Gate A + tool-referential-integrity 绿。
+- **Gate B**：Provider Leak baseline ratchet **0 violations**（扫描绿）。
+- **测试卫生**：移除 `long-stroke.toml`、`assistance-host.test.mjs`、`entry.test.mjs` 尾部误写入的 merge conflict 元数据（TOML/JS 解析失败根因）。
+- **格式**：`NeedHelpSensor.fs`、`JsBookkeeperTool.fs` Fantomas 对齐。
 
-## Verification snapshot（2026-08-12 收工）
+## Verification snapshot（2026-08-12 下午 — 全栈绿）
 
 ```text
+npm run format:check                               → ok（440 files）
+npm run lint                                       → ok（spec + architecture + dsl-ownership + 全部 static gates）
 npm run build                                      → ok
-npm test                                           → 2379 passed / 0 failed
-npm run test:integration                           → harness 273/273；suite 含 prompts.test.mjs 1 failed（见 Remaining #2）
-npm run test:e2e                                   → 未绿；preflow 绿；主流程 ~100+ mock 请求后 mgr-labor.2 watchdog
-Gate A–D                                           → 绿（Gate D 见 prompt-stability.test.mjs）
+npm test                                           → 2385 passed / 0 failed
+npm run test:integration                           → 275 passed / 0 failed
+npm run test:e2e                                   → ok（Long Stroke 63 steps / ~11.4s；journal 581/620；SSE 2715/2900；spawn=1）
+Gate A tool-referential-integrity                  → OK
+Gate B provider-leak-gate (+ baseline ratchet)     → OK
+Gate C language-parity-gate                        → OK
+Gate D prompt-stability                            → OK（prompt-stability.test.mjs）
+js-surface / capability-isomorphism / unified-store / G4R / DSL ownership → OK
+Casebook unit                                      → 71/71
+js-tools unit                                      → 66/66
 ```
 
 ## Completion criteria
@@ -5755,16 +5766,13 @@ Gate A–D                                           → 绿（Gate D 见 prompt
 
 ## Blockers
 
-### e2e — `mgr-labor.2`（2026-08-12）
+**（无 — 2026-08-12 下午）** 此前 `mgr-labor.2` e2e watchdog 与 integration 失败已在本 session 闭环。Long Stroke 含 join-wake、provider-fallback、REVISE→FinalityRejected→Blessed→LifeCompleted、gitConflictProof→Published。
 
-- **症状**：`npm run test:e2e` 在 `mgr-labor.2` 处 watchdog 静默（~5s）；`expectation=none`。
-- **已越过**：preflow（native-todo、Strength K2 dry-run、G2 PREFIX LAW、G6 bookkeeper finalize）；主流程至 manager blind-plan、manager fork/join、mgr-labor.0–1。
-- **因果诊断（watchdog dump）**：`BrokenCausalEdge` — `OrchestratorJob:{job=…}` 等 `ManagerWorkflow:agent=…` 的 `manager-job-completion`，但 producer 无 active wait。
-- **下一手**：对齐 `mgr-labor` TOML mock 步序与 hold-child / join-harvest 链；核对 `long-stroke-oracles.mjs` `holdChildC1UntilLabor` 与 flow `wait` 声明是否仍匹配 GrandRewrite join/horizon wire。
+## Amendment — 2026-08-12（下午 — 全栈验证后状态写入）
 
-### integration — Inquiry prompt vs Sphinx（2026-08-12）
-
-- `tests/integration/resources/prompts.test.mjs`：Inquiry `en` system prompt 不含 `sphinx_start|sphinx_resume`（权限已 merge，Role Law 文案未更新）。
+- **Recorded by**：Agent（用户指令「写入状态至 changes/」）
+- **Change**：更新 `Remaining work` / `Done since Amendment` / `Verification snapshot`；清空 Blockers；**不**移入 `completed/`（Phase 17 i18n、Phase 20 物理文件名、§20 Non-Goals 仍开放）。
+- **Reason**：GrandRewrite 功能与验证链已绿，但 Completion criteria 仍含 i18n 续作与 legacy 文件名清理；避免 premature close。
 
 ## Amendment — 2026-08-12（session 收工）
 
