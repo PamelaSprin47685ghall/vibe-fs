@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { AStarProblem, GraphEdge, solveGraph } from '../../../dist/Sphinx/Search.js'
 import { mapOfEntries, toList } from '../support/domain.mjs'
+import { AStarProblem, GraphEdge, solveGraph } from '../../../dist/Sphinx/Search.js'
 
 const map = (entries) => mapOfEntries(entries)
 const edges = (rows) => toList(rows.map(([from, to, cost]) => new GraphEdge(from, to, cost)))

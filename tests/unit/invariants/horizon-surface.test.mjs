@@ -3,7 +3,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { completionKind, handleId, handleProjection, mapOfEntries, roles, sessionId, structuralComparer, toList } from '../support/domain.mjs'
+import {
+  completionKind,
+  handleId,
+  handleProjection,
+  mapOfEntries,
+  roles,
+  sessionId,
+  structuralComparer,
+  toList,
+} from '../support/domain.mjs'
 
 const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
 const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/ListTool.js')
@@ -77,22 +86,19 @@ const runtimeWithAgent = () => {
     undefined,
     undefined,
   )
-  runtime.runtime.agents = mapOfEntries(
+  runtime.runtime.agents = mapOfEntries([
     [
-      [
-        'ag-1',
-        {
-          AgentId: 'ag-1',
-          AgentName: 'fast-coder',
-          Prompt: 'work',
-          Completion: completionCell(),
-          Cancellation: { IsCancellationRequested: () => false },
-          CreatedAt: new Date(),
-        },
-      ],
+      'ag-1',
+      {
+        AgentId: 'ag-1',
+        AgentName: 'fast-coder',
+        Prompt: 'work',
+        Completion: completionCell(),
+        Cancellation: { IsCancellationRequested: () => false },
+        CreatedAt: new Date(),
+      },
     ],
-    structuralComparer,
-  )
+  ])
   return runtime
 }
 

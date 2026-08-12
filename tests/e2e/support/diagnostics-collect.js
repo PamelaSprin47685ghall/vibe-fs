@@ -1,7 +1,7 @@
 /**
  * diagnostics-collect.js — Gather diagnostic data from a Scenario on
  * test failure. Kept in its own module so diagnostics.js stays under
- * the 200-line Kolmogorov line budget.
+ * the 200-line Kolmogorov advisory target.
  */
 
 import fs from 'node:fs';

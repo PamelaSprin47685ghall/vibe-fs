@@ -168,7 +168,7 @@ export const magicTodoAdmission = (() => {
     LocalizedToolCall: MagicTodoAdmissionModule.LocalizedToolCall,
     ExistingPrepared: MagicTodoAdmissionModule.ExistingPrepared,
     PrepareSuccess: MagicTodoAdmissionModule.PrepareSuccess,
-    AdmissionOutcome: MagicTodoAdmissionModule.AdmissionOutcome$1 ?? MagicTodoAdmissionModule.AdmissionOutcome,
+
   }
 })()
 
