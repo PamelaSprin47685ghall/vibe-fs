@@ -27,7 +27,6 @@ type AssistanceHost
         journal: AgentJournal option,
         sensor: NeedHelpSensor,
         snapshotPort: ISessionSnapshotPort,
-        quiescence: SessionQuiescenceGate,
         onChildOwned: SessionId -> unit,
         ?clock: IClockPort
     ) =
@@ -492,9 +491,13 @@ type AssistanceHost
 
                         match context.Quiescence with
                         | None -> return AssistanceTurnDisposition.Handled
-                        | Some permit when not (quiescence.TryConsume permit) ->
-                            return AssistanceTurnDisposition.Handled
                         | Some _ ->
+                            // The permit itself remains revoked by HOST-004 after an
+                            // operator abort and is intentionally not consumed here.
+                            // Its presence proves this delivery came from a fresh
+                            // SessionIdle wake, which is the transport fence needed
+                            // before parenting a new physical child under the aborted
+                            // owner session.
                             if not (sensor.TryTake(turn.SessionId, turn.ProviderRun)) then
                                 return AssistanceTurnDisposition.Handled
                             else
@@ -518,6 +521,12 @@ type AssistanceHost
             | Some _ ->
                 match turn.Outcome with
                 | ReconcileProgram.TurnCompleted ->
+                    // Assistance consumes the hidden child before ordinary
+                    // TurnWorkflow reaches TerminalReporter. Materialize the same
+                    // canonical terminal segment first so the child LWR includes
+                    // this completed turn rather than only older XTrace material.
+                    XTraceCapture.captureTerminal journal turn
+
                     let body =
                         childRecordText turn.SessionId
                         |> Option.filter (String.IsNullOrWhiteSpace >> not)

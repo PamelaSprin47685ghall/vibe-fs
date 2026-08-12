@@ -1,1 +1,3 @@
-// Migration tombstone. The provider tool is owned by JudgeTool.fs.
+namespace Wanxiangshu.OpenCode.MigrationTombstones
+
+// Empty source-graph tombstone. Runtime ownership lives in JudgeTool.fs.

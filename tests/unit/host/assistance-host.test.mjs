@@ -19,9 +19,14 @@ import {
   toList,
 } from '../support/domain.mjs'
 import { TurnOutcome } from '../../../dist/Domain/ReconcileProgram.js'
-import { ReconciledTurn } from '../../../dist/Application/Reconciliation/ReconciledTurn.js'
+import {
+  ReconciledTurn,
+  ReconciledTurnContext,
+  ReconciledTurnDelivery,
+} from '../../../dist/Application/Reconciliation/ReconciledTurn.js'
 import { forJournal, Runtime__AcceptHumanRoot } from '../../../dist/Application/Prompting/PromptDispatcher.js'
-import { captureOpening, captureTerminalText } from '../../../dist/Application/Reconciliation/XTraceCapture.js'
+import { captureOpening } from '../../../dist/Application/Reconciliation/XTraceCapture.js'
+import { MessagePart } from '../../../dist/Infrastructure/OpenCode/Codec/HostMessageCodec.js'
 import * as NeedHelpSensorModule from '../../../dist/Infrastructure/OpenCode/Host/NeedHelpSensor.js'
 import * as AssistanceHostModule from '../../../dist/Infrastructure/OpenCode/Host/AssistanceHost.js'
 
@@ -61,7 +66,7 @@ const abortedTurn = (session, root, run, role) =>
     undefined,
   )
 
-const completedTurn = (session, root, run, role) =>
+const completedTurn = (session, root, run, role, text = '') =>
   new ReconciledTurn(
     sessionId(session),
     physicalUser(root),
@@ -69,13 +74,16 @@ const completedTurn = (session, root, run, role) =>
     providerRun(run),
     roles.of(role),
     undefined,
-    [],
+    text ? [new MessagePart(0, [text])] : [],
     'stop',
     undefined,
     undefined,
     TurnOutcome.TurnCompleted,
     undefined,
   )
+
+const observed = (turn) => new ReconciledTurnContext(turn, undefined, ReconciledTurnDelivery.Observation)
+const idleRevisit = (turn) => new ReconciledTurnContext(turn, {}, ReconciledTurnDelivery.IdleRevisit)
 
 const fallbackState = (journal, session) => {
   const snapshot = promptDispatcher.journalSnapshot(journal)
@@ -161,7 +169,7 @@ test('AGENT_031_fast_needhelp_continues_same_session_as_deep_peer_without_moving
     assert.equal(arm(sensor, sessionId(owner), providerRun(run)), true)
     const before = fallbackState(journal, owner)
 
-    const disposition = await handleTurn(host, abortedTurn(owner, root, run, 'Coder'))
+    const disposition = await handleTurn(host, observed(abortedTurn(owner, root, run, 'Coder')))
     assert.equal(outcomeName(disposition), 'Handled')
     assert.equal(creates.length, 0)
     assert.equal(sends.length, 1)
@@ -187,15 +195,18 @@ test('AGENT_031_snapshot_agent_binding_turns_fast_escalation_into_deep_consultat
     const firstRun = 'asst_fast_first'
     bindRun(firstRun, 'fast-coder')
     assert.equal(arm(sensor, sessionId(owner), providerRun(firstRun)), true)
-    assert.equal(outcomeName(await handleTurn(host, abortedTurn(owner, root, firstRun, 'Coder'))), 'Handled')
+    assert.equal(outcomeName(await handleTurn(host, observed(abortedTurn(owner, root, firstRun, 'Coder')))), 'Handled')
     assert.equal(sends.at(-1).agent, 'deep-coder')
     assert.equal(creates.length, 0)
 
     const secondRun = 'asst_now_deep'
     bindRun(secondRun, 'deep-coder')
     assert.equal(arm(sensor, sessionId(owner), providerRun(secondRun)), true)
-    assert.equal(outcomeName(await handleTurn(host, abortedTurn(owner, root, secondRun, 'Coder'))), 'Handled')
-    assert.equal(creates.length, 1, 'deep binding must consult instead of escalating from fallback cursor')
+    const secondTurn = abortedTurn(owner, root, secondRun, 'Coder')
+    assert.equal(outcomeName(await handleTurn(host, observed(secondTurn))), 'Handled')
+    assert.equal(creates.length, 0, 'deep consultation must wait until the aborted owner is physically idle')
+    assert.equal(outcomeName(await handleTurn(host, idleRevisit(secondTurn))), 'Handled')
+    assert.equal(creates.length, 1, 'fresh idle must create exactly one deep consultation')
     assert.equal(sends.at(-1).agent, 'deep-inquiry')
 
     const state = fallbackState(journal, owner)
@@ -210,8 +221,14 @@ test('AGENT_031_deep_needhelp_uses_one_real_inquiry_consultation_parent_and_chil
     assert.equal(arm(sensor, sessionId(owner), providerRun(run)), true)
     const before = fallbackState(journal, owner)
 
-    const first = await handleTurn(host, abortedTurn(owner, root, run, 'Coder'))
+    const deepTurn = abortedTurn(owner, root, run, 'Coder')
+    const first = await handleTurn(host, observed(deepTurn))
     assert.equal(outcomeName(first), 'Handled')
+    assert.equal(creates.length, 0, 'AbortWake must not parent a child inside the Host abort sweep')
+    assert.equal(sends.length, 0)
+
+    const idle = await handleTurn(host, idleRevisit(deepTurn))
+    assert.equal(outcomeName(idle), 'Handled')
     assert.equal(creates.length, 1)
     assert.equal(creates[0].parent, owner)
     assert.equal(creates[0].options.Agent, 'deep-inquiry')
@@ -222,11 +239,14 @@ test('AGENT_031_deep_needhelp_uses_one_real_inquiry_consultation_parent_and_chil
     assert.match(sends[0].text, /如何解决这个 agent 的当前困难？/)
     assert.match(sends[0].text, /original deep-coder charge/, 'Commissioner LWR must carry parent opening')
 
-    const childSession = sessionId('ses_consult_1')
-    captureTerminalText(journal, childSession, 'independent perspective', providerRun('asst_consult_done'))
-
-    const childDone = completedTurn('ses_consult_1', 'msg_assistance_1', 'asst_consult_done', 'Inquiry')
-    const returned = await handleTurn(host, childDone)
+    const childDone = completedTurn(
+      'ses_consult_1',
+      'msg_assistance_1',
+      'asst_consult_done',
+      'Inquiry',
+      'independent perspective',
+    )
+    const returned = await handleTurn(host, observed(childDone))
     assert.equal(outcomeName(returned), 'Handled')
     assert.equal(sends.length, 2)
     assert.equal(sends[1].session, owner)
@@ -241,7 +261,7 @@ test('AGENT_031_deep_needhelp_uses_one_real_inquiry_consultation_parent_and_chil
       { offset: before.offset, failures: before.failures, exhausted: before.exhausted },
     )
 
-    const repeated = await handleTurn(host, childDone)
+    const repeated = await handleTurn(host, observed(childDone))
     assert.equal(outcomeName(repeated), 'Handled')
     assert.equal(sends.length, 2, 'same consultation completion must not deliver advice twice')
     assert.equal(creates.length, 1, 'same help occasion must never create a second consultation')
@@ -253,7 +273,11 @@ test('AGENT_031_deep_needhelp_uses_one_real_inquiry_consultation_parent_and_chil
     const secondHelp = 'asst_deep_help_again'
     bindRun(secondHelp, 'deep-coder')
     assert.equal(arm(sensor, sessionId(owner), providerRun(secondHelp)), true)
-    assert.equal(outcomeName(await handleTurn(host, abortedTurn(owner, root, secondHelp, 'Coder'))), 'Handled')
+    const secondHelpTurn = abortedTurn(owner, root, secondHelp, 'Coder')
+    assert.equal(outcomeName(await handleTurn(host, observed(secondHelpTurn))), 'Handled')
+    assert.equal(creates.length, 1, 'second deep help also waits for fresh idle')
+    assert.equal(sends.length, 2)
+    assert.equal(outcomeName(await handleTurn(host, idleRevisit(secondHelpTurn))), 'Handled')
     assert.equal(creates.length, 1, 'finite per-run guard must not mint a second consultation')
     assert.equal(sends.length, 3, 'spent allowance still needs one deterministic owner continuation')
     assert.equal(sends[2].agent, 'deep-coder')
@@ -267,13 +291,18 @@ test('AGENT_031_owner_drop_abandons_active_consultation_and_late_child_terminal_
     const run = 'asst_cancel_help'
     bindRun(run, 'deep-coder')
     assert.equal(arm(sensor, sessionId(owner), providerRun(run)), true)
-    assert.equal(outcomeName(await handleTurn(host, abortedTurn(owner, root, run, 'Coder'))), 'Handled')
+    const deepTurn = abortedTurn(owner, root, run, 'Coder')
+    assert.equal(outcomeName(await handleTurn(host, observed(deepTurn))), 'Handled')
+    assert.equal(creates.length, 0)
+    assert.equal(outcomeName(await handleTurn(host, idleRevisit(deepTurn))), 'Handled')
     assert.equal(creates.length, 1)
     assert.equal(sends.length, 1)
 
     dropSession(host, sessionId(owner))
-    captureTerminalText(journal, sessionId('ses_consult_1'), 'late advice', providerRun('asst_late'))
-    const late = await handleTurn(host, completedTurn('ses_consult_1', 'msg_assistance_1', 'asst_late', 'Inquiry'))
+    const late = await handleTurn(
+      host,
+      observed(completedTurn('ses_consult_1', 'msg_assistance_1', 'asst_late', 'Inquiry', 'late advice')),
+    )
     assert.notEqual(outcomeName(late), 'NotAssistance')
     assert.equal(sends.length, 1, 'late consultation result must not send anything back to dropped owner')
   })
