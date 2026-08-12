@@ -36,12 +36,3 @@ module AsyncSupport =
             false
 
     let completedTask () : Task = Task.FromResult(()) :> Task
-
-    let sleep (ms: int) : Task =
-        let tcs =
-            TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-        Fable.Core.JsInterop.emitJsExpr (ms, (fun () -> trySetResult tcs () |> ignore)) "setTimeout($1, $0)"
-        |> ignore
-
-        tcs.Task :> Task

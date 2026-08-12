@@ -223,7 +223,7 @@ module MagicTodoLocality =
                                 refreshed.State = SnapshotToolPartState.Pending
                                 && refreshed.InputCanonical = "{}"
                             then
-                                do! AsyncSupport.sleep 10
+                                do! Wanxiangshu.Process.PtyTiming.timerTask 10
                                 return! awaitMaterializedInput snapshot sessionId refreshed expectedInputCanonical
                             else
                                 return Error InputMaterializationRejection.InputMismatch
