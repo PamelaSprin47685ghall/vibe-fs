@@ -28,6 +28,45 @@
 
 代表测试：`tests/unit/sphinx/search.test.mjs`。
 
+## Phase 2 概率
+
+| 证明 | 期望 | 模块 |
+|------|------|------|
+| posterior 更新 | supports/refutes 后 posterior 归一 | `bayes.js` |
+| frozen Bayes | `frozenBayesianInference` 纯推断退化 | `bayes.js` |
+| Closure 集成 | `syncBayesianBelief` 写入 `B.belief` | `closure.js` |
+| EVI | `expectedValueOfInformation` 影响 `actionValue` | `value.js` |
+
+代表测试：`tests/unit/sphinx/bayes.test.mjs`。
+
+## Phase 3 MCTS
+
+| 证明 | 期望 | 模块 |
+|------|------|------|
+| UCT 退化 | 高 reward 节点最终被选中 | `mcts.js` |
+| visit backup | `backupMctsValue` 累积 visits/valueSum | `mcts.js` |
+| transposition | Closure 后 `mcts.transpositions >= 1` | `mcts.js` |
+
+代表测试：`tests/unit/sphinx/mcts.test.mjs`。
+
+## Phase 4 表示优化
+
+| 证明 | 期望 | 模块 |
+|------|------|------|
+| Pareto 代表 | 等价类内保留非支配代表元 | `represent.js` |
+| pivot | `optimizeRepresentation` 写 `represent.pivots` | `represent.js` |
+
+代表测试：`tests/unit/sphinx/represent.test.mjs`。
+
+## Phase 5 方法库
+
+| 证明 | 期望 | 模块 |
+|------|------|------|
+| V1 不变 | `METHODS` 仍恰好五方法 | `rules.js` |
+| V2 扩展 | `EXTENDED_METHODS` 生成候选 | `rules.js` |
+
+代表测试：`tests/unit/sphinx/methodology.test.mjs`。
+
 ## 正交与 Host
 
 | 证明 | 期望 | 条款 |

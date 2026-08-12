@@ -1,3 +1,5 @@
+import { expectedValueOfInformation } from './bayes.js'
+
 export function rootInformationGain(action, state) {
   const mass = state.B.evidenceMass
   const form = state.R?.primaryForm ?? 'Other'
@@ -24,7 +26,9 @@ export function actionValue(action, state) {
     return strands >= 1 ? rootGain + 0.2 * Math.min(3, strands) - (action.cost ?? 1) * 0.2 : -0.2
   }
   const explored = rootGain - (action.cost ?? 1) * 0.2
-  return state.synthesis ? Math.min(explored, 0.35) : explored
+  const evi = expectedValueOfInformation(state, action)
+  const adjusted = explored + 0.2 * evi
+  return state.synthesis ? Math.min(adjusted, 0.35) : adjusted
 }
 
 export function stopValue(state) {

@@ -6,12 +6,29 @@ export const METHODS = [
   'Synthesis',
 ]
 
+export const EXTENDED_METHODS = [
+  'CausalMechanism',
+  'BaseRate',
+  'Dialectic',
+  'Falsification',
+  'BoundarySearch',
+]
+
+export function allMethods() {
+  return [...METHODS, ...EXTENDED_METHODS]
+}
+
 const FORM_APPLICABILITY = {
   Multidisciplinary: { Why: 0.95, How: 0.7, What: 0.35, Polar: 0.25, Other: 0.3 },
   Abduction: { Why: 0.9, How: 0.55, Polar: 0.45, What: 0.3, Other: 0.35 },
   Analogy: { Polar: 0.85, Why: 0.45, How: 0.5, Which: 0.55, Other: 0.4 },
   Counterexample: { Polar: 0.8, Why: 0.55, Which: 0.5, How: 0.35, Other: 0.3 },
   Synthesis: { Why: 0.85, How: 0.8, What: 0.4, Polar: 0.5, Other: 0.45 },
+  CausalMechanism: { Why: 0.92, How: 0.65, Polar: 0.35, Other: 0.3 },
+  BaseRate: { Polar: 0.9, Which: 0.7, What: 0.45, Other: 0.35 },
+  Dialectic: { Why: 0.7, Polar: 0.75, How: 0.55, Other: 0.4 },
+  Falsification: { Polar: 0.88, Why: 0.6, Which: 0.55, Other: 0.35 },
+  BoundarySearch: { Which: 0.82, Polar: 0.7, How: 0.5, Other: 0.35 },
 }
 
 const FACET_APPLICABILITY = {
@@ -20,6 +37,11 @@ const FACET_APPLICABILITY = {
   Analogy: { predictive: 0.85, comparative: 0.9, explanatory: 0.35 },
   Counterexample: { predictive: 0.55, comparative: 0.6, causal: 0.45 },
   Synthesis: { explanatory: 0.85, causal: 0.6, predictive: 0.4 },
+  CausalMechanism: { causal: 0.95, explanatory: 0.8, predictive: 0.25 },
+  BaseRate: { predictive: 0.9, comparative: 0.75, explanatory: 0.2 },
+  Dialectic: { explanatory: 0.75, comparative: 0.7, causal: 0.45 },
+  Falsification: { predictive: 0.7, comparative: 0.65, causal: 0.5 },
+  BoundarySearch: { comparative: 0.85, predictive: 0.55, explanatory: 0.35 },
 }
 
 const METHOD_COST = {
@@ -28,6 +50,11 @@ const METHOD_COST = {
   Analogy: 0.9,
   Counterexample: 0.85,
   Synthesis: 1.2,
+  CausalMechanism: 1.05,
+  BaseRate: 0.95,
+  Dialectic: 1.0,
+  Falsification: 0.9,
+  BoundarySearch: 1.0,
 }
 
 function formScore(method, formBelief) {
@@ -68,15 +95,15 @@ export function methodUtility(method, state) {
   return expectedGain + synthesisBonus - candidatePenalty - 0.15 * (METHOD_COST[method] ?? 1)
 }
 
-export function scoreMethods(state) {
-  return METHODS.map((method) => ({
+export function scoreMethods(state, methods = allMethods()) {
+  return methods.map((method) => ({
     method,
     utility: methodUtility(method, state),
   })).sort((a, b) => b.utility - a.utility)
 }
 
-export function activateMethods(state, threshold = 0.22) {
-  const scored = scoreMethods(state)
+export function activateMethods(state, threshold = 0.22, methods = allMethods()) {
+  const scored = scoreMethods(state, methods)
   const activated = scored.filter((row) => row.utility >= threshold).map((row) => row.method)
   if (activated.length === 0 && scored[0]) activated.push(scored[0].method)
   return activated
@@ -106,6 +133,11 @@ export function structuralCandidates(method, state) {
       `boundary failure for: ${q}`,
     ],
     Synthesis: [`compose strands for: ${q}`],
+    CausalMechanism: [`causal chain for: ${q}`, `mechanism decomposition for: ${q}`],
+    BaseRate: [`reference class for: ${q}`, `base-rate anchor for: ${q}`],
+    Dialectic: [`thesis/antithesis for: ${q}`, `dialectic tension for: ${q}`],
+    Falsification: [`decisive falsifier for: ${q}`, `crucial test for: ${q}`],
+    BoundarySearch: [`boundary case for: ${q}`, `limit condition for: ${q}`],
   }
   const labels = templates[method] ?? [`explore: ${q}`]
   return labels.map((label, index) => ({

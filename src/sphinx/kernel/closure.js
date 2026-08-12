@@ -2,6 +2,9 @@ import { deriveRootContract } from './state.js'
 import { generateFromRules } from './rules.js'
 import { revalueActions } from './value.js'
 import { syncSearchFrontier, reopenOnBeliefShift } from './search.js'
+import { syncBayesianBelief } from './bayes.js'
+import { syncMcts } from './mcts.js'
+import { optimizeRepresentation } from './represent.js'
 
 function observationType(observation) {
   if (!observation || typeof observation !== 'object') return null
@@ -30,6 +33,9 @@ export function semanticKeyOf(observation, fallback = '') {
   }
   if (type === 'Synthesis') {
     return `synthesis:${normalizeText(observation.text ?? observation.content ?? '')}`
+  }
+  if (type === 'Evidence') {
+    return `evidence:${JSON.stringify({ supports: observation.supports ?? [], refutes: observation.refutes ?? [] })}`
   }
   return normalizeText(fallback || JSON.stringify(observation ?? {}))
 }
@@ -117,6 +123,10 @@ function absorb(state, observation, exogenous) {
         llmValue: typeof item.value === 'number' ? item.value : null,
         cost: item.cost ?? 1,
         novelty: novel ? 1 : 0,
+        prior: typeof item.prior === 'number' ? item.prior : null,
+        likelihood: typeof item.likelihood === 'number' ? item.likelihood : null,
+        posterior: typeof item.posterior === 'number' ? item.posterior : null,
+        dependencies: Array.isArray(item.dependencies) ? item.dependencies : [],
       })
     }
     const massGain = exogenous ? Math.min(0.25, 0.08 * novelCount) : 0
@@ -155,6 +165,13 @@ function absorb(state, observation, exogenous) {
         semanticKey: key,
       },
       B: { ...next.B, evidenceMass },
+    }
+  }
+
+  if (type === 'Evidence') {
+    return {
+      ...next,
+      B: { ...next.B, evidenceMass: Math.min(1, evidenceMass + 0.1) },
     }
   }
 
@@ -278,8 +295,11 @@ export function closure(state, observation = null, { exogenous = false } = {}) {
     current = infer(current)
     current = propagate(current)
     current = reduce(current)
+    current = optimizeRepresentation(current)
+    current = syncBayesianBelief(current)
     current = revalueActions(current)
     current = syncSearchFrontier(current)
+    current = syncMcts(current)
     if (fingerprint(current) === before) break
   }
   return current

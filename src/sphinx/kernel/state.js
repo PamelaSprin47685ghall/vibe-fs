@@ -9,6 +9,7 @@ export function createEpistemicState(question) {
       facets: null,
       hypotheses: [],
       evidenceMass: 0,
+      belief: null,
     },
     E: [],
     D: [],
@@ -28,6 +29,16 @@ export function createEpistemicState(question) {
       frontier: [],
       reopenCount: 0,
       exploreSteps: 0,
+    },
+    mcts: {
+      nodes: {},
+      rollouts: 0,
+      transpositions: 0,
+    },
+    represent: {
+      classes: {},
+      pivots: [],
+      factors: [],
     },
   }
 }
