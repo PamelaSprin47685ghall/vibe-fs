@@ -14,14 +14,17 @@ import {
   JsToolGenerator_isGeneratedToolName as isGeneratedToolName,
   JsToolGenerator_memberBinding as memberBinding,
 } from '../../../dist/Domain/JsSurface.js'
+import { JsDescriptionAssets_load as loadJsProse } from '../../../dist/Infrastructure/OpenCode/Tools/JsToolHost.js'
+import { ProviderLanguage } from '../../../dist/Domain/ProviderLanguage.js'
 import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Set.js'
 import { isNone, isSome, listItems, roles } from '../support/domain.mjs'
 
 const permissionComparer = { Compare: (a, b) => a.CompareTo(b) }
 const caps = (...permissions) => ofArray(permissions, permissionComparer)
+const jsProse = () => loadJsProse(ProviderLanguage.English)
 // surface(role, permissionNameArray) — names only; conversion happens here so
 // call sites can never drift from the ToolPermission vocabulary.
-const surface = (role, permissionNames) => generate(role, caps(...permsOf(permissionNames)))
+const surface = (role, permissionNames) => generate(role, caps(...permsOf(permissionNames)), jsProse())
 const memberNames = (s) => listItems(s.Members).map((fragment) => fragment.MemberName)
 
 const PERMISSION_NAMES = [
@@ -79,8 +82,8 @@ test('JS001_role_projection_is_exactly_roles_permissions_intersection', () => {
 
 test('JS002_generation_is_deterministic_and_names_js_role', () => {
   const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep, ToolPermission.Edit, ToolPermission.Write)
-  const a = generate('Coder', perms)
-  const b = generate('Coder', perms)
+  const a = generate('Coder', perms, jsProse())
+  const b = generate('Coder', perms, jsProse())
   assert.equal(isSome(a) && isSome(b), true)
   assert.equal(a.ToolName, 'js-coder')
   assert.equal(a.Description, b.Description)
@@ -140,8 +143,8 @@ test('JS004_member_gate_binds_present_members_only', () => {
 
 test('JS002_same_capabilities_share_mechanics_but_role_shapes_the_ultra_example', () => {
   const shared = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
-  const inspector = generate('Inspector', shared)
-  const reviewer = generate('Reviewer', shared)
+  const inspector = generate('Inspector', shared, jsProse())
+  const reviewer = generate('Reviewer', shared, jsProse())
   assert.equal(inspector.BaseClassSource, reviewer.BaseClassSource)
   assert.deepEqual(memberNames(inspector), memberNames(reviewer))
   assert.notEqual(inspector.Description, reviewer.Description)
@@ -151,7 +154,7 @@ test('JS002_same_capabilities_share_mechanics_but_role_shapes_the_ultra_example'
 
 test('JS001_non_fs_permissions_never_produce_members', () => {
   for (const name of PERMISSION_NAMES.filter((n) => !['Read', 'Write', 'Edit', 'Glob', 'Grep'].includes(n))) {
-    const result = generate('Coder', caps(toolPermissionByName[name]))
+    const result = generate('Coder', caps(toolPermissionByName[name]), jsProse())
     assert.equal(isNone(result), true, `${name} alone must not generate a surface`)
   }
 })
@@ -159,8 +162,8 @@ test('JS001_non_fs_permissions_never_produce_members', () => {
 test('JS004_fast_deep_profiles_generate_identical_surfaces', () => {
   // Tier never reaches the generator: capability is role-only (AGENT-001).
   // The same capability set from a deep Coder yields byte-identical output.
-  const fast = generate('Coder', caps(ToolPermission.Read, ToolPermission.Glob))
-  const deep = generate('Coder', caps(ToolPermission.Read, ToolPermission.Glob))
+  const fast = generate('Coder', caps(ToolPermission.Read, ToolPermission.Glob), jsProse())
+  const deep = generate('Coder', caps(ToolPermission.Read, ToolPermission.Glob), jsProse())
   assert.equal(fast.BaseClassSource, deep.BaseClassSource)
   assert.equal(fast.Description, deep.Description)
 })
@@ -228,7 +231,7 @@ test('JS004_lying_generator_counterexample_is_rejected', () => {
   assert.equal(memberBinding('Inspector', perms, 'file'), 'js.read')
   // a lying description would name methods the surface lacks; the generator
   // never does — prove the surface itself contains no unbounded members
-  const result = generate('Inspector', perms)
+  const result = generate('Inspector', perms, jsProse())
   const names = listItems(result.Members).map((f) => f.MemberName)
   for (const name of names) {
     assert.notEqual(memberBinding('Inspector', perms, name), undefined, `${name} must resolve`)

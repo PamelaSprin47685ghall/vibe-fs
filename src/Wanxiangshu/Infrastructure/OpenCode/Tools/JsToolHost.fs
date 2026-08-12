@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Persist
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.OpenCode
 
 /// Coexistence seam between builtin filesystem fallbacks and generated js-*.
@@ -32,7 +33,69 @@ module BuiltinToolDescriptionHook =
         if Set.contains jsRoleToolName visibleToolNames then
             Ok()
         else
-            Error(sprintf "hook recommends '%s' which is not provider-visible" jsRoleToolName)
+            Error(
+                ProviderProse.render
+                    (ProviderLanguageBinding.readGlobalPreference ())
+                    JsCanonicalDescription.Path.HookNotVisible
+                    (Map [ "tool", jsRoleToolName ])
+            )
+
+/// PROMPT-019: load already-localized js-program prose. Domain assembles;
+/// this module binds language.
+module JsDescriptionAssets =
+
+    let private text (lang: ProviderLanguage) (path: string) =
+        ProviderProse.render lang path Map.empty
+
+    let private template (lang: ProviderLanguage) (path: string) =
+        ProviderResources.requireLanguagePair path
+        ProviderResources.readText lang path
+
+    let load (lang: ProviderLanguage) : JsCanonicalDescription.Prose =
+        { Header = text lang JsCanonicalDescription.Path.Header
+          Footer = text lang JsCanonicalDescription.Path.Footer
+          Contract = template lang JsCanonicalDescription.Path.Contract
+          ContractParallelEdits = template lang JsCanonicalDescription.Path.ContractParallelEdits
+          ContractParallelReads = template lang JsCanonicalDescription.Path.ContractParallelReads
+          VerbRead = text lang JsCanonicalDescription.Path.VerbRead
+          VerbSearch = text lang JsCanonicalDescription.Path.VerbSearch
+          VerbTransform = text lang JsCanonicalDescription.Path.VerbTransform
+          VerbRewrite = text lang JsCanonicalDescription.Path.VerbRewrite
+          VerbCreate = text lang JsCanonicalDescription.Path.VerbCreate
+          ReadRules = text lang JsCanonicalDescription.Path.ReadRules
+          GlobRules = text lang JsCanonicalDescription.Path.GlobRules
+          GrepRules = text lang JsCanonicalDescription.Path.GrepRules
+          EditRules = text lang JsCanonicalDescription.Path.EditRules
+          WriteRules = text lang JsCanonicalDescription.Path.WriteRules
+          MutationRules = text lang JsCanonicalDescription.Path.MutationRules
+          UltraFraming = text lang JsCanonicalDescription.Path.UltraFraming
+          UltraUnavailable = text lang JsCanonicalDescription.Path.UltraUnavailable
+          MechanicalSemantic = text lang JsCanonicalDescription.Path.MechanicalSemantic
+          CommentAnchorOwnSearch = text lang JsCanonicalDescription.Path.CommentAnchorOwnSearch
+          CommentIgnoreGy = text lang JsCanonicalDescription.Path.CommentIgnoreGy
+          CommentHostCapability = text lang JsCanonicalDescription.Path.CommentHostCapability
+          ReasonEmptyStringPattern = text lang JsCanonicalDescription.Path.ReasonEmptyStringPattern
+          ReasonInvalidRegexp = text lang JsCanonicalDescription.Path.ReasonInvalidRegexp
+          ReasonPatternType = text lang JsCanonicalDescription.Path.ReasonPatternType
+          ReasonAnchorEmptyNames = text lang JsCanonicalDescription.Path.ReasonAnchorEmptyNames
+          ReasonAnchorReserved = text lang JsCanonicalDescription.Path.ReasonAnchorReserved
+          ReasonAnchorNamesDiffer = text lang JsCanonicalDescription.Path.ReasonAnchorNamesDiffer
+          ReasonAnchorNamesUnique = text lang JsCanonicalDescription.Path.ReasonAnchorNamesUnique
+          ReasonAnchorNotFound = text lang JsCanonicalDescription.Path.ReasonAnchorNotFound
+          ReasonUnknownAnchor = text lang JsCanonicalDescription.Path.ReasonUnknownAnchor
+          ReasonInvalidSlice = text lang JsCanonicalDescription.Path.ReasonInvalidSlice
+          ReasonFileReadFailed = text lang JsCanonicalDescription.Path.ReasonFileReadFailed
+          ReasonRunUnimplemented = text lang JsCanonicalDescription.Path.ReasonRunUnimplemented
+          UltraCoderTruncated = text lang JsCanonicalDescription.Path.UltraCoderTruncated
+          UltraInspectorTruncated = text lang JsCanonicalDescription.Path.UltraInspectorTruncated
+          UltraReviewerTruncated = text lang JsCanonicalDescription.Path.UltraReviewerTruncated
+          UltraBrowserTruncated = text lang JsCanonicalDescription.Path.UltraBrowserTruncated }
+
+    let argProgram (lang: ProviderLanguage) =
+        text lang JsCanonicalDescription.Path.ArgProgram
+
+    let missingProgram (lang: ProviderLanguage) =
+        text lang JsCanonicalDescription.Path.MissingProgram
 
 /// JS-073/JS-074: a generated js-* tool spec — the dynamic counterpart of the
 /// static baseSpecs. Built from a generated surface (JS-002); execution goes
@@ -62,14 +125,21 @@ module JsToolSpec =
           Arguments =
             [ "program",
               ToolHostCodec.stringSchemaDescribed
-                  "Exactly one class named Js that extends the generated JsProgram in this tool description and implements async run()."
+                  (JsDescriptionAssets.argProgram (ProviderLanguageBinding.readGlobalPreference ()))
                   factory ]
           Execute =
             fun args _ ->
                 task {
                     match readProgram args with
                     | None ->
-                        return ToolHostCodec.tomlObject [ "error", ToolHostCodec.TString "missing 'program' argument" ]
+                        return
+                            ToolHostCodec.tomlObject
+                                [ "error",
+                                  ToolHostCodec.TString(
+                                      JsDescriptionAssets.missingProgram (
+                                          ProviderLanguageBinding.readGlobalPreference ()
+                                      )
+                                  ) ]
                     | Some programSource ->
                         // 10 s sandbox deadline; 1 MiB output bound (JS-054).
                         let! outcome =

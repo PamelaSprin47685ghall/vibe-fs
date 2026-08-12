@@ -768,15 +768,16 @@ export const runtimeNudge = (() => {
     'MissingClosingReport',
     'InteractionContinue',
   ])
+  const providerRoot = join(BUILD_ROOT, '..', 'resources/provider')
   const readDoc = (semanticPath) => {
-    const raw = readFileSync(join(repoRoot, 'resources/provider', semanticPath, 'en.md'), 'utf8')
+    const raw = readFileSync(join(providerRoot, semanticPath, 'en.md'), 'utf8')
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n')
       .trimEnd()
     return raw.split('\n').map((line) => `# ${line}`).join('\n') + '\n'
   }
   const readLines = (semanticPath) =>
-    readFileSync(join(repoRoot, 'resources/provider', semanticPath, 'en.md'), 'utf8')
+    readFileSync(join(providerRoot, semanticPath, 'en.md'), 'utf8')
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n')
       .trimEnd()

@@ -1,6 +1,8 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open Wanxiangshu.Infrastructure.Resources
+open Wanxiangshu.Kernel.Identity
 open ToolHostCodec
 
 /// Fission MVP.
@@ -12,13 +14,26 @@ open ToolHostCodec
 /// without pretending the deferred Fission engine already exists.
 module FissionTool =
 
-    let private TooFew = "Fission needs at least two independent charges."
+    [<RequireQualifiedAccess>]
+    module Path =
+        [<Literal>]
+        let Description = "tool/fission/description"
 
-    let private Capacity =
-        "The world cannot hold all of these presents at once. No fission occurred."
+        [<Literal>]
+        let TooFew = "tool/fission/too-few"
 
-    let private execute (args: HostToolArguments) (_context: HostToolContext) =
+        [<Literal>]
+        let Capacity = "tool/fission/capacity"
+
+    let private languageOf (ctx: HostToolContext) =
+        if String.IsNullOrWhiteSpace ctx.SessionId then
+            ProviderLanguageBinding.readGlobalPreference ()
+        else
+            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+
+    let private execute (args: HostToolArguments) (ctx: HostToolContext) =
         task {
+            let lang = languageOf ctx
             let prompts = args.Text "prompts"
 
             let charges =
@@ -31,17 +46,17 @@ module FissionTool =
                     |> Array.toList
 
             if List.length charges < 2 then
-                return tomlObjectWithInstructions [ TooFew ] []
+                return tomlObjectWithInstructions (ProviderProse.instructionLines lang Path.TooFew Map.empty) []
             else
                 // MVP boundary: no partial allocation and no synthetic lane
                 // identities. Until the lane engine exists, every admissible
                 // request is a truthful all-or-none capacity refusal.
-                return tomlObjectWithInstructions [ Capacity ] []
+                return tomlObjectWithInstructions (ProviderProse.instructionLines lang Path.Capacity Map.empty) []
         }
 
     let spec (factory: HostToolFactory) : ToolSpec =
         { Name = "fission"
           Description =
-            "Temporarily divide one Manager life into independent presents. Pass one charge per line in prompts. MVP currently fails closed without allocating lanes."
+            ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments = [ "prompts", ToolHostCodec.stringSchema factory ]
           Execute = execute }

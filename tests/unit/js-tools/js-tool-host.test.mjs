@@ -12,8 +12,10 @@ import {
   BuiltinToolDescriptionHook_annotate as annotate,
   BuiltinToolDescriptionHook_validateRecommendation as validateRecommendation,
   BuiltinToolDescriptionHook_BuiltinFilesystemTools as builtinTools,
+  JsDescriptionAssets_load as loadJsProse,
 } from '../../../dist/Infrastructure/OpenCode/Tools/JsToolHost.js'
 import { JsToolGenerator_generate as generate } from '../../../dist/Domain/JsSurface.js'
+import { ProviderLanguage } from '../../../dist/Domain/ProviderLanguage.js'
 import { ToolPermission } from '../../../dist/Kernel/Roles.js'
 import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Set.js'
 import { resultOf, stringSet } from '../support/domain.mjs'
@@ -24,6 +26,7 @@ const sandbox = () => {
 }
 
 const permissionComparer = { Compare: (a, b) => a.CompareTo(b) }
+const jsProse = () => loadJsProse(ProviderLanguage.English)
 const coderCaps = ofArray(
   [ToolPermission.Read, ToolPermission.Write, ToolPermission.Edit, ToolPermission.Glob, ToolPermission.Grep],
   permissionComparer,
@@ -51,7 +54,7 @@ test('JS073_spec_executes_program_and_renders_result', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
-    const surface = generate('Coder', coderCaps)
+    const surface = generate('Coder', coderCaps, jsProse())
     // Build the spec with the real Host tool factory, like ToolRegistry does.
     const codec = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
     const tool = (definition) => definition

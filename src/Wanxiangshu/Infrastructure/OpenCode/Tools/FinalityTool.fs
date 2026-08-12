@@ -22,6 +22,41 @@ open Wanxiangshu.Tools
 /// (GLORY-038/039).
 module FinalityTool =
 
+    [<RequireQualifiedAccess>]
+    module Path =
+        [<Literal>]
+        let Description = "tool/suicide/description"
+
+        [<Literal>]
+        let TryAgainLater = "tool/suicide/try-again-later"
+
+        [<Literal>]
+        let ContinueWorking = "tool/suicide/continue-working"
+
+        [<Literal>]
+        let CallAgainWithLastWords = "tool/suicide/call-again-with-last-words"
+
+        [<Literal>]
+        let CallJoinBeforeEnd = "tool/suicide/call-join-before-end"
+
+        [<Literal>]
+        let SeekEndWhenReady = "tool/suicide/seek-end-when-ready"
+
+        [<Literal>]
+        let WaitForCurrentEnding = "tool/suicide/wait-for-current-ending"
+
+        [<Literal>]
+        let WrongRole = "tool/suicide/wrong-role"
+
+    let private lang (ctx: HostToolContext) =
+        if String.IsNullOrWhiteSpace ctx.SessionId then
+            ProviderLanguageBinding.readGlobalPreference ()
+        else
+            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+
+    let private refuse (ctx: HostToolContext) path =
+        ToolHostCodec.tomlObjectWithInstructions (ProviderProse.instructionLines (lang ctx) path Map.empty) []
+
     /// GLORY-062/076 + §9.2.4: at-rest second-suicide tool result (session language).
     let private restInPeaceInstructions (sessionId: SessionId) =
         ProviderProse.instructionLines (ProviderProse.languageOf sessionId) FinalityPrompt.Path.Rest Map.empty
@@ -108,7 +143,7 @@ module FinalityTool =
             let providerRun = context.ProviderRunId.Value
 
             match ManagerLifeWorkflow.completeBlessedLife journal sid life blessing lastWords providerRun with
-            | Error _ -> return ToolHostCodec.tomlObjectWithInstructions [ "Continue working and try again later." ] []
+            | Error _ -> return refuse context Path.TryAgainLater
             | Ok BlessedLifeCompletion.AlreadyCompleted ->
                 return ToolHostCodec.tomlObjectWithInstructions (restInPeaceInstructions sid) []
             | Ok(BlessedLifeCompletion.Completed authorityRoot) ->
@@ -137,14 +172,14 @@ module FinalityTool =
             match scope.RoleFor context with
             | Some Role.Manager ->
                 if String.IsNullOrWhiteSpace context.SessionId then
-                    return ToolHostCodec.tomlObjectWithInstructions [ "Continue working and try again later." ] []
+                    return refuse context Path.TryAgainLater
                 else
                     let sessionId = context.SessionId
                     let sid = SessionId.create sessionId
 
                     match scope.Journal with
                     | None ->
-                        return ToolHostCodec.tomlObjectWithInstructions [ "Continue working and try again later." ] []
+                        return refuse context Path.TryAgainLater
                     | Some journal ->
                         let snapshot = AgentJournal.snapshot journal
 
@@ -191,7 +226,7 @@ module FinalityTool =
 
                                 match ManagerFinality.classifyEnding context.ToolCallId life hasTodoWriteAccepted with
                                 | ManagerFinality.EndingDisposition.ContinuePlanning ->
-                                    return ToolHostCodec.tomlObjectWithInstructions [ "Continue working." ] []
+                                    return refuse context Path.ContinueWorking
 
                                 | ManagerFinality.EndingDisposition.AlreadyCompleted ->
                                     return ToolHostCodec.tomlObject [ "status", tString "already_completed" ]
@@ -235,61 +270,34 @@ module FinalityTool =
                                     return renderOutcome outcome
 
                                 | ManagerFinality.EndingDisposition.WaitForCurrentRequest ->
-                                    return
-                                        ToolHostCodec.tomlObjectWithInstructions
-                                            [ "Wait for the current ending to resolve." ]
-                                            []
+                                    return refuse context Path.WaitForCurrentEnding
 
                                 // Split arms (no `(A|B) as disposition`) — Fable FS0038 double-bind.
                                 | ManagerFinality.EndingDisposition.CompleteBlessedLife blessing ->
                                     if String.IsNullOrWhiteSpace lastWords then
-                                        return
-                                            ToolHostCodec.tomlObjectWithInstructions
-                                                [ "Call suicide again with non-empty last_words." ]
-                                                []
+                                        return refuse context Path.CallAgainWithLastWords
                                     elif context.ToolCallId.IsNone || context.ProviderRunId.IsNone then
-                                        return
-                                            ToolHostCodec.tomlObjectWithInstructions
-                                                [ "Continue working and try again later." ]
-                                                []
+                                        return refuse context Path.TryAgainLater
                                     elif outstandingWork scope context then
-                                        return
-                                            ToolHostCodec.tomlObjectWithInstructions
-                                                [ "Call join before seeking your end." ]
-                                                []
+                                        return refuse context Path.CallJoinBeforeEnd
                                     else
                                         return! completeBlessedLife scope journal context sid life blessing lastWords
 
                                 | ManagerFinality.EndingDisposition.BeginFinality ->
                                     if String.IsNullOrWhiteSpace lastWords then
-                                        return
-                                            ToolHostCodec.tomlObjectWithInstructions
-                                                [ "Call suicide again with non-empty last_words." ]
-                                                []
+                                        return refuse context Path.CallAgainWithLastWords
                                     elif context.ToolCallId.IsNone || context.ProviderRunId.IsNone then
-                                        return
-                                            ToolHostCodec.tomlObjectWithInstructions
-                                                [ "Continue working and try again later." ]
-                                                []
+                                        return refuse context Path.TryAgainLater
                                     elif outstandingWork scope context then
-                                        return
-                                            ToolHostCodec.tomlObjectWithInstructions
-                                                [ "Call join before seeking your end." ]
-                                                []
+                                        return refuse context Path.CallJoinBeforeEnd
                                     else
                                         match treeOf scope sessionId with
                                         | None ->
-                                            return
-                                                ToolHostCodec.tomlObjectWithInstructions
-                                                    [ "Continue working and seek your end again when you are ready." ]
-                                                    []
+                                            return refuse context Path.SeekEndWhenReady
                                         | Some tree ->
                                             match journal.WriteBlob lastWords with
                                             | Error _ ->
-                                                return
-                                                    ToolHostCodec.tomlObjectWithInstructions
-                                                        [ "Continue working and seek your end again when you are ready." ]
-                                                        []
+                                                return refuse context Path.SeekEndWhenReady
                                             | Ok blob ->
                                                 let requestId = FinalityRequestId.create (Guid.NewGuid().ToString("N"))
 
@@ -318,14 +326,15 @@ module FinalityTool =
                             }
 
                         match effectiveLife with
-                        | None -> return ToolHostCodec.tomlObjectWithInstructions [ "Continue working." ] []
+                        | None -> return refuse context Path.ContinueWorking
                         | Some life -> return! acceptSuicide life
-            | Some _ -> return ToolHostCodec.tomlObjectWithInstructions [ "Do not call suicide from this role." ] []
-            | None -> return ToolHostCodec.tomlObjectWithInstructions [ "Continue working and try again later." ] []
+            | Some _ -> return refuse context Path.WrongRole
+            | None -> return refuse context Path.TryAgainLater
         }
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "suicide"
-          Description = "End your life when your task is complete."
+          Description =
+            ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments = [ "last_words", ToolHostCodec.stringSchema factory ]
           Execute = execute scope }

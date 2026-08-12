@@ -72,11 +72,11 @@ test('CHRONICLE_canonical_text_trims_and_rejects_empty', () => {
 
   const empty = tryCanonicalText('   ')
   assert.equal(empty.tag, 1)
-  assert.equal(empty.fields[0], 'chronicle entry is empty after canonicalisation (ENFORCER-061)')
+  assert.equal(empty.fields[0], 'CHRONICLE_EMPTY_ENFORCER_061')
 
   const nil = tryCanonicalText(undefined)
   assert.equal(nil.tag, 1)
-  assert.equal(nil.fields[0], 'chronicle entry is empty after canonicalisation (ENFORCER-061)')
+  assert.equal(nil.fields[0], 'CHRONICLE_EMPTY_ENFORCER_061')
 })
 
 test('CHRONICLE_live_cycle_requires_a_host_with_a_flight', () => {
@@ -107,7 +107,7 @@ test('CHRONICLE_no_live_cycle_rejects_and_aborts_the_session', async () => {
   const { scope: s, calls } = scope()
   const tool = spec(factory, s, undefined)
   await assert.rejects(() => run(tool, { entry: 'x', tip: 'primitive-obsession' }, context()), {
-    message: 'chronicle rejected: no live CurrentRequest (Blogger cycle not InFlight)',
+    message: 'CHRONICLE_NO_LIVE_CYCLE',
   })
   assert.deepEqual(calls, [['AbortSession', sessionId('ses-blog')]], 'the doomed blogger session must be aborted')
 })
@@ -116,7 +116,7 @@ test('CHRONICLE_no_live_cycle_does_not_abort_a_blank_session', async () => {
   const { scope: s, calls } = scope()
   const tool = spec(factory, s, undefined)
   await assert.rejects(() => run(tool, { entry: 'x', tip: 'primitive-obsession' }, context({ sessionId: '' })), (error) => {
-    assert.match(error?.message ?? String(error), /chronicle rejected: no live CurrentRequest/)
+    assert.match(error?.message ?? String(error), /CHRONICLE_NO_LIVE_CYCLE/)
     return true
   })
   assert.deepEqual(calls, [], 'blank session must not be aborted')

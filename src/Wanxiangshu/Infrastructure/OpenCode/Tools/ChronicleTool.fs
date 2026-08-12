@@ -11,11 +11,32 @@ open Wanxiangshu.Session
 /// Provider schema: required `entry` + required `tip`; no legacy blog/text alias.
 module ChronicleTool =
 
-    let EmptyTextError =
-        "chronicle entry is empty after canonicalisation (ENFORCER-061)"
+    [<RequireQualifiedAccess>]
+    module Path =
+        [<Literal>]
+        let Description = "tool/chronicle/description"
 
-    let NoLiveCycleError =
-        "chronicle rejected: no live CurrentRequest (Blogger cycle not InFlight)"
+        [<Literal>]
+        let Remembered = "tool/chronicle/remembered"
+
+        [<Literal>]
+        let NothingToRemember = "tool/chronicle/nothing-to-remember"
+
+        [<Literal>]
+        let UnknownTip = "tool/chronicle/unknown-tip"
+
+    let EmptyTextError = "CHRONICLE_EMPTY_ENFORCER_061"
+
+    let NoLiveCycleError = "CHRONICLE_NO_LIVE_CYCLE"
+
+    let private lang (ctx: HostToolContext) =
+        if String.IsNullOrWhiteSpace ctx.SessionId then
+            ProviderLanguageBinding.readGlobalPreference ()
+        else
+            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+
+    let private prose language path =
+        ProviderProse.render language path Map.empty
 
     let tryCanonicalText (rawText: string) : Result<string, string> =
         let trimmed = if isNull rawText then "" else rawText.Trim()
@@ -36,14 +57,14 @@ module ChronicleTool =
     let tipFieldNames () : string list =
         EnforcerCatalog.fieldNames (enforcerRules ())
 
-    let private remembered () =
-        ToolHostCodec.tomlObjectWithInstructions [ "The Chronicle remembers this." ] []
+    let private remembered language =
+        ToolHostCodec.tomlObjectWithInstructions [ prose language Path.Remembered ] []
 
-    let private nothingToRemember () =
-        ToolHostCodec.tomlObjectWithInstructions [ "There is no occurrence here to remember." ] []
+    let private nothingToRemember language =
+        ToolHostCodec.tomlObjectWithInstructions [ prose language Path.NothingToRemember ] []
 
-    let private unknownTip () =
-        ToolHostCodec.tomlObjectWithInstructions [ "That lesson is not in the Rulebook." ] []
+    let private unknownTip language =
+        ToolHostCodec.tomlObjectWithInstructions [ prose language Path.UnknownTip ] []
 
     let spec
         (factory: HostToolFactory)
@@ -54,7 +75,10 @@ module ChronicleTool =
         let ruleCount = List.length fields
 
         let catalogDescription =
-            sprintf "Record one occurrence with required tip (exactly one of %d rulebook TipNames)." ruleCount
+            ProviderProse.render
+                (ProviderLanguageBinding.readGlobalPreference ())
+                Path.Description
+                (Map [ "rule_count", string ruleCount ])
 
         { Name = "chronicle"
           Description = catalogDescription
@@ -64,10 +88,12 @@ module ChronicleTool =
           Execute =
             fun args ctx ->
                 task {
+                    let language = lang ctx
+
                     if not (hasLiveCycle parkedHost ctx.SessionId) then
                         Diagnostic.emit
                             "chronicle-execute"
-                            [ "session_id", ctx.SessionId; "result", "no live CurrentRequest" ]
+                            [ "session_id", ctx.SessionId; "result", NoLiveCycleError ]
 
                         if not (String.IsNullOrWhiteSpace ctx.SessionId) then
                             let! _ = runtime.Sessions.AbortSession(SessionId.create ctx.SessionId)
@@ -76,14 +102,14 @@ module ChronicleTool =
                         return raise (InvalidOperationException(NoLiveCycleError))
                     else
                         match tryCanonicalText (args.Text "entry") with
-                        | Error _ -> return nothingToRemember ()
+                        | Error _ -> return nothingToRemember language
                         | Ok _ ->
                             let tipRaw = args.Text "tip"
 
                             if String.IsNullOrWhiteSpace tipRaw then
-                                return unknownTip ()
+                                return unknownTip language
                             else
                                 match EnforcerCatalog.tryFindByField tipRaw (enforcerRules ()) with
-                                | None -> return unknownTip ()
-                                | Some _ -> return remembered ()
+                                | None -> return unknownTip language
+                                | Some _ -> return remembered language
                 } }

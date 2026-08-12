@@ -29,38 +29,54 @@ module JsToolGenerator =
 
     let toolNameFor (roleName: string) : string = "js-" + roleName.ToLowerInvariant()
 
-    let renderBaseClass (capabilities: Set<JsCapability>) : string =
-        JsCanonicalDescription.runtimeBaseClass capabilities
-
-    let renderPublicBaseClass (capabilities: Set<JsCapability>) : string =
-        JsCanonicalDescription.publicBaseClass capabilities
-
-    let renderDescription (roleName: string) (capabilities: Set<JsCapability>) : string =
-        JsCanonicalDescription.render roleName (toolNameFor roleName) capabilities
-
-    let renderExamples (roleName: string) (capabilities: Set<JsCapability>) : string list =
-        JsCanonicalDescription.ultraExample roleName capabilities
-        |> Option.map (fun example -> [ example.Source ])
-        |> Option.defaultValue []
-
-    /// Deterministic projection: an Attempt profile with no filesystem
-    /// capability gets no js-* surface at all (JS-001/004).
-    let generate (roleName: string) (capabilities: Set<ToolPermission>) : JsSurface option =
+    let private tryProject (roleName: string) (capabilities: Set<ToolPermission>) =
         let jsCapabilities = JsCapability.ofToolCapabilities capabilities
 
         if Set.isEmpty jsCapabilities then
             None
         else
-            let members = membersFor jsCapabilities
+            Some(toolNameFor roleName, jsCapabilities, membersFor jsCapabilities)
 
+    let renderBaseClass (prose: JsCanonicalDescription.Prose) (capabilities: Set<JsCapability>) : string =
+        JsCanonicalDescription.runtimeBaseClass prose capabilities
+
+    let renderPublicBaseClass (prose: JsCanonicalDescription.Prose) (capabilities: Set<JsCapability>) : string =
+        JsCanonicalDescription.publicBaseClass prose capabilities
+
+    let renderDescription
+        (prose: JsCanonicalDescription.Prose)
+        (roleName: string)
+        (capabilities: Set<JsCapability>)
+        : string =
+        JsCanonicalDescription.render prose roleName (toolNameFor roleName) capabilities
+
+    let renderExamples
+        (prose: JsCanonicalDescription.Prose)
+        (roleName: string)
+        (capabilities: Set<JsCapability>)
+        : string list =
+        JsCanonicalDescription.ultraExample prose roleName capabilities
+        |> Option.map (fun example -> [ example.Source ])
+        |> Option.defaultValue []
+
+    /// Deterministic projection: an Attempt profile with no filesystem
+    /// capability gets no js-* surface at all (JS-001/004).
+    let generate
+        (roleName: string)
+        (capabilities: Set<ToolPermission>)
+        (prose: JsCanonicalDescription.Prose)
+        : JsSurface option =
+        match tryProject roleName capabilities with
+        | None -> None
+        | Some(toolName, jsCapabilities, members) ->
             Some
-                { ToolName = toolNameFor roleName
+                { ToolName = toolName
                   RoleName = roleName
                   Capabilities = jsCapabilities
                   Members = members
-                  Description = renderDescription roleName jsCapabilities
-                  BaseClassSource = renderBaseClass jsCapabilities
-                  Examples = renderExamples roleName jsCapabilities
+                  Description = renderDescription prose roleName jsCapabilities
+                  BaseClassSource = renderBaseClass prose jsCapabilities
+                  Examples = renderExamples prose roleName jsCapabilities
                   RuntimeBindings =
                     members
                     |> List.map (fun fragment -> fragment.MemberName, fragment.RuntimeBindingKey)
@@ -69,13 +85,16 @@ module JsToolGenerator =
     /// Generated-name gate: a js-* tool call is accepted iff its name is the
     /// surface this profile generates; any other name fails closed (JS-001).
     let isGeneratedToolName (roleName: string) (capabilities: Set<ToolPermission>) (toolName: string) : bool =
-        generate roleName capabilities
-        |> Option.map (fun surface -> surface.ToolName = toolName)
+        tryProject roleName capabilities
+        |> Option.map (fun (name, _, _) -> name = toolName)
         |> Option.defaultValue false
 
     /// Runtime member gate: a member invocation is accepted iff the member is
     /// present in this profile's surface; the returned binding key names the
     /// exact executor (JS-004 — forged calls have no binding).
     let memberBinding (roleName: string) (capabilities: Set<ToolPermission>) (memberName: string) : string option =
-        generate roleName capabilities
-        |> Option.bind (fun surface -> Map.tryFind memberName surface.RuntimeBindings)
+        tryProject roleName capabilities
+        |> Option.bind (fun (_, _, members) ->
+            members
+            |> List.tryFind (fun fragment -> fragment.MemberName = memberName)
+            |> Option.map (fun fragment -> fragment.RuntimeBindingKey))

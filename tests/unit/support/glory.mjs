@@ -43,7 +43,6 @@ const narrative = await load('Domain/ManagerNarrative.js', [
   'renderText',
 ])
 const finality = await load('Domain/FinalityPrompt.js', ['rejected', 'blessed'])
-const hostReview = await load('Domain/HostReviewPrompt.js', ['OpeningAssignment'])
 
 /** F# list → array (Fable list has head/tail). */
 const listToArray = (list) => {
@@ -99,7 +98,7 @@ export const finalityPrompt = {
 }
 
 export const hostReviewPrompt = {
-  openingAssignment: () => hostReview.OpeningAssignment,
+  openingAssignment: () => readProviderDocument('lifecycle/host-review/opening'),
 }
 
 export const managerSystemPrompt = () =>

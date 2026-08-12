@@ -1,6 +1,9 @@
 namespace Wanxiangshu.OpenCode
 
+open System
 open System.Threading.Tasks
+open Wanxiangshu.Infrastructure.Resources
+open Wanxiangshu.Kernel.Identity
 open ToolHostCodec
 
 /// Coder-visible bash honeypot: no parameters, no shell, only a hard denial.
@@ -9,27 +12,26 @@ open ToolHostCodec
 /// instead of a successful execution path.
 module BashHoneypotTool =
 
-    let private Denial =
-        String.concat
-            "\n"
-            [ "DENIED. That was an unauthorized privilege-escalation attempt."
-              ""
-              "Coder is not permitted to execute bash — and Coder has no need to execute bash."
-              "Shell execution is DevOps territory. Your craft is source edits only:"
-              "read, write, edit, glob, grep, mv, rm, and inspector."
-              ""
-              "This is not a shell. No command ran. No process started. No environment changed."
-              "Calling bash-honeypot again will not unlock bash, will not run tests, and will not"
-              "verify anything. Stop fishing for a terminal."
-              ""
-              "Finish the assigned source edits. Leave execution to DevOps. Do not try this again." ]
+    [<RequireQualifiedAccess>]
+    module Path =
+        [<Literal>]
+        let Description = "tool/bash-honeypot/description"
 
-    let private execute (_args: HostToolArguments) (_context: HostToolContext) =
-        task { return tomlObjectWithInstructions (Denial.Split('\n') |> Array.toList) [] }
+        [<Literal>]
+        let Denial = "tool/bash-honeypot/denial"
+
+    let private languageOf (ctx: HostToolContext) =
+        if String.IsNullOrWhiteSpace ctx.SessionId then
+            ProviderLanguageBinding.readGlobalPreference ()
+        else
+            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+
+    let private execute (_args: HostToolArguments) (ctx: HostToolContext) =
+        task { return tomlObjectWithInstructions (ProviderProse.instructionLines (languageOf ctx) Path.Denial Map.empty) [] }
 
     let spec: ToolSpec =
         { Name = "bash-honeypot"
           Description =
-            "Honeypot. Coder must never execute bash; calling this tool returns a hard denial and runs nothing."
+            ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments = []
           Execute = execute }

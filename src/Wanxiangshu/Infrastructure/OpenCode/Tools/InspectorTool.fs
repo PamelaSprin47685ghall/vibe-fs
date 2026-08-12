@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
@@ -12,8 +13,31 @@ open ToolHostCodec
 /// Ordinary assistant completion → bounded WorkRecord (EXEC-031).
 module InspectorTool =
 
-    let private consequence message =
-        tomlObjectWithInstructions [ message ] []
+    [<RequireQualifiedAccess>]
+    module Path =
+        [<Literal>]
+        let Description = "tool/inspect/description"
+
+        [<Literal>]
+        let Unavailable = "tool/inspect/unavailable"
+
+        [<Literal>]
+        let AuthorityRequired = "tool/inspect/authority-required"
+
+        [<Literal>]
+        let NeedsCharge = "tool/inspect/needs-charge"
+
+        [<Literal>]
+        let Incomplete = "tool/inspect/incomplete"
+
+    let private lang (ctx: HostToolContext) =
+        if String.IsNullOrWhiteSpace ctx.SessionId then
+            ProviderLanguageBinding.readGlobalPreference ()
+        else
+            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+
+    let private consequence ctx path subs =
+        tomlObjectWithInstructions [ ProviderProse.render (lang ctx) path subs ] []
 
     let private execute
         (scope: ToolRuntimeScope)
@@ -23,16 +47,16 @@ module InspectorTool =
         =
         task {
             match syncDelegate with
-            | None -> return consequence "No Inspector is available from this execution context."
+            | None -> return consequence context Path.Unavailable Map.empty
             | Some sd ->
                 if String.IsNullOrWhiteSpace context.SessionId then
-                    return consequence "An Inspector cannot be charged before the caller's authority is established."
+                    return consequence context Path.AuthorityRequired Map.empty
                 else
                     let charge = args.Text "charge"
                     let keywords = args.Text "keywords"
 
                     if String.IsNullOrWhiteSpace charge then
-                        return consequence "inspect needs a charge."
+                        return consequence context Path.NeedsCharge (Map [ "tool", "inspect" ])
                     else
                         let prepareProviderPrompt () =
                             task {
@@ -64,7 +88,7 @@ module InspectorTool =
                                     [ workRecord ]
 
                             return tomlObjectWithInstructions instructions []
-                        | Error _ -> return consequence "The Inspector could not complete this charge."
+                        | Error _ -> return consequence context Path.Incomplete Map.empty
         }
 
     let spec
@@ -74,7 +98,10 @@ module InspectorTool =
         : ToolSpec =
         { Name = "inspect"
           Description =
-            "Ask an Inspector to establish a repository fact. Returns a bounded WorkRecord after ordinary completion."
+            ProviderProse.render
+                (ProviderLanguageBinding.readGlobalPreference ())
+                Path.Description
+                Map.empty
           Arguments =
             [ "charge", ToolHostCodec.stringSchema factory
               "keywords", ToolHostCodec.optionalStringSchema factory ]

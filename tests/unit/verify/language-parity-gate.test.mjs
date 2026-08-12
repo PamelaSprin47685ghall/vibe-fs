@@ -10,10 +10,12 @@ import {
   LOCALE_FILES,
   PROVIDER_ROOT,
   extractCodeSpans,
+  extractPlaceholders,
   extractProtocolIdentifiers,
   listSemanticResourceDirs,
   scanIdentifierParity,
   scanParity,
+  scanPlaceholderParity,
   scanProviderResourcesHook,
   scanRepo,
 } from '../../../scripts/checks/language-parity-gate.mjs'
@@ -149,4 +151,36 @@ test('ac20_extract_protocol_identifiers_unions_sources', () => {
     toolNames: ['open-terminal'],
   })
   assert.deepEqual([...ids].sort(), ['blind-edit', 'exit_code', 'open-terminal'])
+})
+
+test('gate_c_placeholder_parity_equal_sets_pass', () => {
+  const fx = makeProviderFixture()
+  try {
+    fx.writePair('tool/demo', '{{byname}} has returned.', '{{byname}} 已经回来了。')
+    assert.deepEqual(scanPlaceholderParity(['tool/demo'], fx.providerAbs), [])
+  } finally {
+    fx.dispose()
+  }
+})
+
+test('gate_c_placeholder_parity_mismatch_reports_diff', () => {
+  const fx = makeProviderFixture()
+  try {
+    fx.writePair('tool/demo', '{{byname}} carries {{charge}}.', '{{byname}} 承担托付。')
+    const violations = scanPlaceholderParity(['tool/demo'], fx.providerAbs)
+    assert.equal(violations.length, 1)
+    assert.equal(violations[0].code, 'placeholder-parity')
+    assert.equal(violations[0].path, 'resources/provider/tool/demo')
+    assert.match(violations[0].detail ?? '', /only-en: \[charge\]/)
+  } finally {
+    fx.dispose()
+  }
+})
+
+test('gate_c_extract_placeholders', () => {
+  assert.deepEqual([...extractPlaceholders('{{byname}} / {{charge}} / {{byname}}')].sort(), [
+    'byname',
+    'charge',
+  ])
+  assert.deepEqual([...extractPlaceholders('no holes')].sort(), [])
 })

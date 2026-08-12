@@ -81,7 +81,7 @@ machine-semantic 结构只留协议真需处（如 `exit_code`、`verdict` 参�
 |------|--------|--------|
 | A Tool Referential Integrity | 同名工具唯一 schema+semantic owner（ARCH-007） | proof / 静态扫描 |
 | B Provider Leak | SessionId/AgentId/JobId/PtyId/Fission/lane/worktree/offset/`fast-`·`deep-`/spool 不得出 horizon | provider 输出契约测试 |
-| C Language Parity | 每个 provider semantic resource：EN + zh-CN（HOST-026）；叶对现行；placeholder/semantic-anchor parity 后续（PROMPT-019） | 资源装载 / 缺语言 fail |
+| C Language Parity | 每个 provider semantic resource：EN + zh-CN（HOST-026）；叶对 + `{{placeholder}}` 集合一致为现行；semantic-anchor parity 后续（PROMPT-019） | 资源装载 / 缺语言 fail / 占位符集合不一致 |
 | D Prompt Stability | 同 session：fallback / T1 / review / reanchor / Strength → system prompt 字节相同（AGENT-029、FALLBACK-014） | Persona/prompt 回归 |
 | E Provider Prose Ownership | 已知 provider-surface owner 禁新增 NL literal；baseline 只减不增（PROMPT-019） | `provider-prose-ownership` 扫描红 / per-file 计数回归 |
 

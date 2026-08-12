@@ -1,0 +1,1 @@
+Counterexample search was truncated.

@@ -52,7 +52,7 @@
 | child 继承 | attached / InternalLeaf 继承 owner/commissioner；不得再读全局 | PROMPT-017、HOST-026 |
 
 Gate C 静态门与跨域清单见 `proof/architecture.md` ARCH-016；Host 绑定算法见 `proof/host.md` HOST-026。  
-Gate C 后续义务（占位符结构 parity + semantic-anchor parity）见 ARCH-016 C 注；本层不另立门。
+`{{placeholder}}` 集合一致为现行义务；semantic-anchor parity 仍见 ARCH-016 C 注。
 
 ## Provider-visible prose ownership（PROMPT-019；Gate E 指针）
 

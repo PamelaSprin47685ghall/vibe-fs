@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Orchestrator
 open Wanxiangshu.Session
@@ -9,6 +10,74 @@ open Wanxiangshu.Session
 /// EXEC-004 / EXEC-017 / EXEC-030: LLM-facing join wire — natural language + WorkRecord only.
 /// No status / count / ordinal / kind / agent / code / message DTO plane.
 module JoinResultRenderer =
+
+    [<RequireQualifiedAccess>]
+    module Path =
+        [<Literal>]
+        let AgentReturned = "tool/join/agent-returned"
+
+        [<Literal>]
+        let AgentFailed = "tool/join/agent-failed"
+
+        [<Literal>]
+        let AgentDidNotReturn = "tool/join/agent-did-not-return"
+
+        [<Literal>]
+        let PtyEnded = "tool/join/pty-ended"
+
+        [<Literal>]
+        let PtyInterrupted = "tool/join/pty-interrupted"
+
+        [<Literal>]
+        let TerminalLabel = "tool/join/terminal-label"
+
+        [<Literal>]
+        let InterruptOperatorAbort = "tool/join/interrupt-operator-abort"
+
+        [<Literal>]
+        let InterruptUserMessage = "tool/join/interrupt-user-message"
+
+        [<Literal>]
+        let InterruptDeadline = "tool/join/interrupt-deadline"
+
+        [<Literal>]
+        let OrchestratorPublished = "tool/join/orchestrator-published"
+
+        [<Literal>]
+        let OrchestratorRejectedDirty = "tool/join/orchestrator-rejected-dirty"
+
+        [<Literal>]
+        let OrchestratorNeedsReview = "tool/join/orchestrator-needs-review"
+
+        [<Literal>]
+        let OrchestratorIntegrationFailed = "tool/join/orchestrator-integration-failed"
+
+        [<Literal>]
+        let OrchestratorEmpty = "tool/join/orchestrator-empty"
+
+        [<Literal>]
+        let ForkNothingToJoin = "tool/join/fork-nothing-to-join"
+
+        [<Literal>]
+        let ForkCancelled = "tool/join/fork-cancelled"
+
+        [<Literal>]
+        let ForkJoinInProgress = "tool/join/fork-join-in-progress"
+
+        [<Literal>]
+        let ForkNotFound = "tool/join/fork-not-found"
+
+        [<Literal>]
+        let ForkTimedOut = "tool/join/fork-timed-out"
+
+        [<Literal>]
+        let ForkMaterializationFailed = "tool/join/fork-materialization-failed"
+
+    let private prose lang path subs =
+        ProviderProse.render lang path subs
+
+    let private bynameLine lang path name =
+        prose lang path (Map [ "byname", name ])
 
     let private ensureInstruction (text: string) = text.Trim()
 
@@ -66,23 +135,32 @@ module JoinResultRenderer =
             fields
             @ [ SyntheticToml.field "output" (SyntheticToml.renderString outputText) ]
 
-    /// EXEC-017: interrupt consequences are natural language, not error DTO.
-    let renderInterrupted (reason: JoinInterruptReason) : string =
-        let line =
-            match reason with
-            | JoinInterruptReason.OperatorAbort -> "Your waiting was interrupted."
-            | JoinInterruptReason.UserMessageArrived -> "Something nearer has arrived."
-            | JoinInterruptReason.DeadlineExpired -> "No return reached you before your waiting ended."
+    let private terminalLabel lang (resolveTerminalLabel: string -> string) (ptyId: string) =
+        let resolved = resolveTerminalLabel ptyId
 
-        renderEntry [ line ] []
+        if String.IsNullOrWhiteSpace resolved then
+            prose lang Path.TerminalLabel Map.empty
+        else
+            resolved.Trim()
+
+    /// EXEC-017: interrupt consequences are natural language, not error DTO.
+    let renderInterrupted (lang: ProviderLanguage) (reason: JoinInterruptReason) : string =
+        let path =
+            match reason with
+            | JoinInterruptReason.OperatorAbort -> Path.InterruptOperatorAbort
+            | JoinInterruptReason.UserMessageArrived -> Path.InterruptUserMessage
+            | JoinInterruptReason.DeadlineExpired -> Path.InterruptDeadline
+
+        renderEntry [ prose lang path Map.empty ] []
 
     let private renderAgentCompleted
+        (lang: ProviderLanguage)
         (resolveAgentName: string -> string)
         (completion: RunCompletion)
         (payload: AgentCompletionPayload)
         : string =
         let name = byname resolveAgentName completion.AgentId completion.AgentName
-        let instructions = [ sprintf "%s has returned." name ]
+        let instructions = [ bynameLine lang Path.AgentReturned name ]
 
         let body =
             if String.IsNullOrWhiteSpace payload.WorkRecord then
@@ -93,12 +171,13 @@ module JoinResultRenderer =
         renderEntry instructions body
 
     let private renderAgentFailed
+        (lang: ProviderLanguage)
         (resolveAgentName: string -> string)
         (completion: RunCompletion)
         (payload: AgentFailurePayload)
         : string =
         let name = byname resolveAgentName completion.AgentId completion.AgentName
-        let instructions = [ sprintf "%s could not complete the charge." name ]
+        let instructions = [ bynameLine lang Path.AgentFailed name ]
 
         let body =
             if String.IsNullOrWhiteSpace payload.Message then
@@ -109,49 +188,63 @@ module JoinResultRenderer =
         renderEntry instructions body
 
     let private renderAgentAbandoned
+        (lang: ProviderLanguage)
         (resolveAgentName: string -> string)
         (agentId: string)
         (agentNameRaw: string)
         : string =
         let name = byname resolveAgentName agentId agentNameRaw
-        renderEntry [ sprintf "%s did not return from this charge." name ] []
+        renderEntry [ bynameLine lang Path.AgentDidNotReturn name ] []
 
     let private renderPtyEnded
+        (lang: ProviderLanguage)
         (resolveTerminalLabel: string -> string)
-        (labelPrefix: string)
+        (templatePath: string)
         (ptyId: string)
         (outcome: string)
         (detail: string option)
         : string =
-        let label =
-            resolveTerminalLabel ptyId
-            |> fun name ->
-                if String.IsNullOrWhiteSpace name then
-                    "Terminal"
-                else
-                    name.Trim()
-
-        renderEntry [ sprintf "%s %s." label labelPrefix ] (terminalBody outcome detail)
+        let label = terminalLabel lang resolveTerminalLabel ptyId
+        renderEntry [ prose lang templatePath (Map [ "label", label ]) ] (terminalBody outcome detail)
 
     let private renderAgentJoinItem
+        (lang: ProviderLanguage)
         (resolveAgentName: string -> string)
         (completion: RunCompletion)
         (item: AgentJoinItem)
         : string =
         match item with
-        | AgentCompletedItem payload -> renderAgentCompleted resolveAgentName completion payload
-        | AgentFailedItem payload -> renderAgentFailed resolveAgentName completion payload
-        | AgentAbandonedItem(agentId, _) -> renderAgentAbandoned resolveAgentName agentId completion.AgentName
+        | AgentCompletedItem payload -> renderAgentCompleted lang resolveAgentName completion payload
+        | AgentFailedItem payload -> renderAgentFailed lang resolveAgentName completion payload
+        | AgentAbandonedItem(agentId, _) -> renderAgentAbandoned lang resolveAgentName agentId completion.AgentName
 
-    let private renderPtyJoinItem (resolveTerminalLabel: string -> string) (item: PtyJoinItem) : string =
+    let private renderPtyJoinItem
+        (lang: ProviderLanguage)
+        (resolveTerminalLabel: string -> string)
+        (item: PtyJoinItem)
+        : string =
         match item with
-        | PtyExited payload -> renderPtyEnded resolveTerminalLabel "has ended" payload.PtyId payload.Outcome None
+        | PtyExited payload ->
+            renderPtyEnded lang resolveTerminalLabel Path.PtyEnded payload.PtyId payload.Outcome None
         | PtyFailed payload ->
-            renderPtyEnded resolveTerminalLabel "has ended" payload.PtyId payload.Outcome (Some payload.Message)
+            renderPtyEnded
+                lang
+                resolveTerminalLabel
+                Path.PtyEnded
+                payload.PtyId
+                payload.Outcome
+                (Some payload.Message)
         | PtyAborted payload ->
-            renderPtyEnded resolveTerminalLabel "was interrupted" payload.PtyId payload.Outcome (Some payload.Message)
+            renderPtyEnded
+                lang
+                resolveTerminalLabel
+                Path.PtyInterrupted
+                payload.PtyId
+                payload.Outcome
+                (Some payload.Message)
 
     let private renderJoinItem
+        (lang: ProviderLanguage)
         (resolveAgentName: string -> string)
         (resolveTerminalLabel: string -> string)
         (item: JoinItem)
@@ -182,67 +275,73 @@ module JoinResultRenderer =
                       Outcome = AgentAbandoned(agentId, reason)
                       CompletedAt = DateTimeOffset.UtcNow }
 
-            renderAgentJoinItem resolveAgentName nameStub agentItem
-        | PtyItem ptyItem -> renderPtyJoinItem resolveTerminalLabel ptyItem
+            renderAgentJoinItem lang resolveAgentName nameStub agentItem
+        | PtyItem ptyItem -> renderPtyJoinItem lang resolveTerminalLabel ptyItem
 
     let private renderCompletionItem
+        (lang: ProviderLanguage)
         (isPtyRun: string -> bool)
         (resolveAgentName: string -> string)
         (resolveTerminalLabel: string -> string)
         (completion: RunCompletion)
         : string =
         match JoinItem.ofRunCompletion (isPtyRun completion.RunId) completion with
-        | AgentItem agentItem -> renderAgentJoinItem resolveAgentName completion agentItem
-        | PtyItem ptyItem -> renderPtyJoinItem resolveTerminalLabel ptyItem
+        | AgentItem agentItem -> renderAgentJoinItem lang resolveAgentName completion agentItem
+        | PtyItem ptyItem -> renderPtyJoinItem lang resolveTerminalLabel ptyItem
 
     /// EXEC-004 / EXEC-018 / EXEC-020: JoinItem batch (production JoinTool path).
     let renderJoinItemBatch
+        (lang: ProviderLanguage)
         (resolveAgentName: string -> string)
         (batch: NonEmptyBatch<JoinItem>)
         (resolveTerminalLabel: string -> string)
         : string =
         NonEmptyBatch.toList batch
-        |> List.map (renderJoinItem resolveAgentName resolveTerminalLabel)
+        |> List.map (renderJoinItem lang resolveAgentName resolveTerminalLabel)
         |> joinBlocks
 
     /// EXEC-004 / EXEC-018: compat surface for tests / ofRunCompletion path.
     let renderCompletedBatch
+        (lang: ProviderLanguage)
         (isPtyRun: string -> bool)
         (resolveAgentName: string -> string)
         (batch: NonEmptyBatch<RunCompletion>)
         (resolveTerminalLabel: string -> string)
         : string =
         NonEmptyBatch.toList batch
-        |> List.map (renderCompletionItem isPtyRun resolveAgentName resolveTerminalLabel)
+        |> List.map (renderCompletionItem lang isPtyRun resolveAgentName resolveTerminalLabel)
         |> joinBlocks
 
-    let private orchestratorLine (verdict: OrchestratorVerdict) : string =
-        match verdict with
-        | OrchestratorVerdict.Published _ -> "The charge was integrated."
-        | OrchestratorVerdict.RejectedDirty _ -> "The tree was not clean enough to integrate."
-        | OrchestratorVerdict.NeedsReview _ -> "The charge needs further review."
-        | OrchestratorVerdict.IntegrationFailed _ -> "Integration did not succeed."
-        | OrchestratorVerdict.Empty -> "There is nothing away to receive."
+    let private orchestratorLine (lang: ProviderLanguage) (verdict: OrchestratorVerdict) : string =
+        let path =
+            match verdict with
+            | OrchestratorVerdict.Published _ -> Path.OrchestratorPublished
+            | OrchestratorVerdict.RejectedDirty _ -> Path.OrchestratorRejectedDirty
+            | OrchestratorVerdict.NeedsReview _ -> Path.OrchestratorNeedsReview
+            | OrchestratorVerdict.IntegrationFailed _ -> Path.OrchestratorIntegrationFailed
+            | OrchestratorVerdict.Empty -> Path.OrchestratorEmpty
+
+        prose lang path Map.empty
 
     /// EXEC-019: orchestrator verdict batch (FIFO; caller already capped at MaxJoinBatch).
-    let renderOrchestratorBatch (verdicts: NonEmptyBatch<OrchestratorVerdict>) : string =
+    let renderOrchestratorBatch (lang: ProviderLanguage) (verdicts: NonEmptyBatch<OrchestratorVerdict>) : string =
         NonEmptyBatch.toList verdicts
-        |> List.map (fun verdict -> renderEntry [ orchestratorLine verdict ] [])
+        |> List.map (fun verdict -> renderEntry [ orchestratorLine lang verdict ] [])
         |> joinBlocks
 
     /// True ForkError path — natural language only (not user interrupt).
-    let renderForkError (error: ForkError) (resolveAgentName: string -> string) : string =
+    let renderForkError (lang: ProviderLanguage) (error: ForkError) (resolveAgentName: string -> string) : string =
         let line =
             match error with
             | ForkError.NothingToJoin
-            | ForkError.Empty -> "There is nothing away to receive."
-            | ForkError.Cancelled -> "The wait was cancelled."
-            | ForkError.JoinInProgress -> "Another join is already in progress."
+            | ForkError.Empty -> prose lang Path.ForkNothingToJoin Map.empty
+            | ForkError.Cancelled -> prose lang Path.ForkCancelled Map.empty
+            | ForkError.JoinInProgress -> prose lang Path.ForkJoinInProgress Map.empty
             | ForkError.Abandoned(id, _) ->
                 let name = byname resolveAgentName id ""
-                sprintf "%s did not return from this charge." name
-            | ForkError.NotFound _ -> "No one by that name is away."
-            | ForkError.TimedOut -> "No return reached you before your waiting ended."
-            | ForkError.TerminalMaterializationFailed _ -> "A return could not be gathered."
+                bynameLine lang Path.AgentDidNotReturn name
+            | ForkError.NotFound _ -> prose lang Path.ForkNotFound Map.empty
+            | ForkError.TimedOut -> prose lang Path.ForkTimedOut Map.empty
+            | ForkError.TerminalMaterializationFailed _ -> prose lang Path.ForkMaterializationFailed Map.empty
 
         renderEntry [ line ] []

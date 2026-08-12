@@ -1,0 +1,38 @@
+file(path, matches = []) reads this transaction's immutable UTF-8 snapshot,
+optionally resolves ordered anchors, and returns an immutable FileView.
+
+matches is Array<[beginAnchor, endAnchor, pattern]> where pattern is a non-empty
+string or a RegExp. Anchors are position names, not the matched text.
+Every FileView has built-in anchors ^ (file start) and $ (file end). Do not
+declare ^ or $ as custom names.
+
+Ordered matching: each pattern is searched from the current cursor; after a match,
+cursor = match.end. Duplicate source text does not need to be globally unique.
+Caller RegExp g/y flags and lastIndex are ignored; matching uses its own forward
+search. Zero-width RegExp is allowed (begin offset may equal end offset); begin
+and end names must still differ.
+
+Anchor declaration refusals: empty names; reserved ^/$; duplicate names; begin == end
+in one declaration; empty string pattern. Pattern not found in declaration order fails.
+
+file.text(from, to) — default text(from = "^", to = "$") — returns the exact original
+substring between two resolved anchors. String pattern content must be non-empty.
+Reverse slices fail. FileView is immutable: rewrite() does not change a previously
+returned view.
+
+from/to may be a declared name, ^, $, or a temporary shift name+N / name-N
+(example: h1+200, h1-40, $+0). Shifts are not stored. If the full string is a
+declared name, that exact name wins. Otherwise the last [+-]digits is the delta;
+the base name is resolved recursively. The resulting caret is clipped to
+[0, file_len] inclusive, so $+N and ^-N stay at EOF / start.
+
+Recommended workflow:
+1. Declare the minimal begin/end anchors needed to locate spans (read or edit).
+2. Let Host resolve those positions.
+3. Read with text(from, to). Adjacent headers make a body slice:
+   text("h1end", "h2"). A window around a hit is text("h1", "h1+200").
+4. For edits, build the complete resulting file from text(...) slices plus new content.
+5. Use indexOf / replaceAll only when anchor-and-splice is genuinely inconvenient.
+
+Prefer:
+  f.text("^", "begin") + "newString" + f.text("end", "$")

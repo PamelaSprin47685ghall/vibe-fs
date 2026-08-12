@@ -7,6 +7,7 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Host
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Process
@@ -19,22 +20,33 @@ module Distillation =
     [<Literal>]
     let ReduceFanIn = 8
 
+    [<RequireQualifiedAccess>]
+    module Path =
+        [<Literal>]
+        let FragmentPrompt = "tool/distill/fragment-prompt"
+
+        [<Literal>]
+        let MergePrompt = "tool/distill/merge-prompt"
+
+        [<Literal>]
+        let CondensationUnavailable = "tool/distill/condensation-unavailable"
+
+        [<Literal>]
+        let CondensationIncomplete = "tool/distill/condensation-incomplete"
+
+        [<Literal>]
+        let CondensationFailed = "tool/distill/condensation-failed"
+
     type IDistillationRuntime = DistillationRuntime.IDistillationRuntime
 
     let asDistillationRuntime = DistillationRuntime.asDistillationRuntime
     let ofForkRuntime = DistillationRuntime.ofForkRuntime
 
-    [<Literal>]
-    let private DistillFragmentPromptText =
-        "Distill this fragment of command output. Preserve errors, decisions, paths, and exact numbers; omit raw code."
+    let distillFragmentPrompt (lang: ProviderLanguage) =
+        ProviderProse.render lang Path.FragmentPrompt Map.empty
 
-    [<Literal>]
-    let private MergeDistillationsPromptText =
-        "Merge these command-output distillations into one dense account. Preserve failures and exact facts; do not include raw code."
-
-    let distillFragmentPrompt () = DistillFragmentPromptText
-
-    let mergeDistillationsPrompt () = MergeDistillationsPromptText
+    let mergeDistillationsPrompt (lang: ProviderLanguage) =
+        ProviderProse.render lang Path.MergePrompt Map.empty
 
     let private agentId (processId: string) (level: int) (startChunk: int) (endChunk: int) =
         sprintf "exec-%s" (HostDigest.sha256Hex (sprintf "%s|%d|%d|%d" processId level startChunk endChunk))
@@ -42,7 +54,7 @@ module Distillation =
     let private completionText (completion: RunCompletion) =
         match completion.Outcome with
         | AgentCompleted payload when not (String.IsNullOrWhiteSpace payload.WorkRecord) -> payload.WorkRecord
-        | AgentCompleted _ -> raise (InvalidOperationException "completed with empty work record")
+        | AgentCompleted _ -> raise (InvalidOperationException "DISTILL_EMPTY_WORK_RECORD")
         | AgentFailed payload -> raise (InvalidOperationException payload.Message)
         | AgentAbandoned(_, reason) -> raise (InvalidOperationException reason)
 
@@ -54,7 +66,7 @@ module Distillation =
     let private awaitJournalAdvanceOrDeadline (changed: Task<JournalChange>) (remainingMs: int) : Task<bool> =
         emitJsExpr
             (changed, PtyTiming.timerTask remainingMs)
-            "Promise.race([$0.then(function () { return true; }), $1.then(function () { return false; })])"
+            "Promise.race([$0.then(function(){return!0}),$1.then(function(){return!1})])"
 
     /// Permit-gated targeted await (Journal-authoritative via HostForkRuntime).
     /// FamilyWaiting → ForkError.TimedOut: wait for a journal advance within one deadline.
@@ -67,12 +79,7 @@ module Distillation =
                 let remainingMs = int (deadline - DateTimeOffset.UtcNow).TotalMilliseconds
 
                 if remainingMs <= 0 then
-                    return
-                        raise (
-                            InvalidOperationException(
-                                sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
-                            )
-                        )
+                    return raise (InvalidOperationException "DISTILL_AWAIT_TIMEOUT")
                 else
                     let fromRevision = runtime.CurrentJournalRevision()
                     let! joined = runtime.AwaitAgentWithPermit(agentId, Some remainingMs)
@@ -83,12 +90,7 @@ module Distillation =
                         let remainingMs = int (deadline - DateTimeOffset.UtcNow).TotalMilliseconds
 
                         if remainingMs <= 0 then
-                            return
-                                raise (
-                                    InvalidOperationException(
-                                        sprintf "awaitAgent timed out for %s after %d ms" agentId AwaitAgentTimeoutMs
-                                    )
-                                )
+                            return raise (InvalidOperationException "DISTILL_AWAIT_TIMEOUT")
                         else
                             let changed = runtime.AwaitJournalChangeFrom fromRevision
                             let! journalAdvanced = awaitJournalAdvanceOrDeadline changed remainingMs
@@ -96,15 +98,7 @@ module Distillation =
                             if journalAdvanced then
                                 return! loop ()
                             else
-                                return
-                                    raise (
-                                        InvalidOperationException(
-                                            sprintf
-                                                "awaitAgent timed out for %s after %d ms"
-                                                agentId
-                                                AwaitAgentTimeoutMs
-                                        )
-                                    )
+                                return raise (InvalidOperationException "DISTILL_AWAIT_TIMEOUT")
                     | Error error -> return raise (InvalidOperationException(error.ToString()))
             }
 
@@ -139,16 +133,26 @@ module Distillation =
         (spoolPath: string)
         (chunk: byte[])
         (index: int)
+        (lang: ProviderLanguage)
         =
         let content = Encoding.UTF8.GetString chunk
 
         let rootDigest = HostDigest.sha256Hex (sprintf "%s|%d" spoolPath index)
 
-        runDistillerPrompt runtime forkedIds rootDigest 0 index index (distillFragmentPrompt ()) (Some content)
+        runDistillerPrompt
+            runtime
+            forkedIds
+            rootDigest
+            0
+            index
+            index
+            (distillFragmentPrompt lang)
+            (Some content)
 
     let mergeDistillations
         (runtime: IDistillationRuntime)
         (forkedIds: ResizeArray<string>)
+        (lang: ProviderLanguage)
         (level: int)
         (batch: string list)
         =
@@ -163,7 +167,7 @@ module Distillation =
             level
             0
             (List.length batch - 1)
-            (mergeDistillationsPrompt ())
+            (mergeDistillationsPrompt lang)
             (Some combined)
 
     let private rippleInsert
@@ -233,17 +237,20 @@ module Distillation =
         else
             Encoding.UTF8.GetString(snd chunks.[chunks.Count - 1])
 
-    let private partialWithTail (account: string) (rawTail: string) =
+    let private partialWithTail (lang: ProviderLanguage) (account: string) (rawTail: string) =
         if String.IsNullOrWhiteSpace account then
-            sprintf "Condensation unavailable.\n\nMost recent raw output:\n%s" rawTail
+            ProviderProse.render lang Path.CondensationUnavailable (Map [ "raw_tail", rawTail ])
         else
-            sprintf "%s\n\nCondensation incomplete.\n\nMost recent raw output:\n%s" account rawTail
+            ProviderProse.render
+                lang
+                Path.CondensationIncomplete
+                (Map [ "account", account; "raw_tail", rawTail ])
 
     /// Maps bounded spool chunks concurrently (results sorted by chunk index),
     /// then reduces online. Map/reduce failures yield partial account plus the
     /// last 200KB raw tail instead of dropping ProcessResult.
     /// Agent waits go through IDistillationRuntime.AwaitAgentWithPermit (fresh permit each wait).
-    let distillSpool (runtime: IDistillationRuntime) (spoolPath: string) =
+    let distillSpool (runtime: IDistillationRuntime) (spoolPath: string) (lang: ProviderLanguage) =
         task {
             let forkedIds = ResizeArray<string>()
 
@@ -267,7 +274,7 @@ module Distillation =
                 [| for (chunkIndex, chunk) in chunks do
                        task {
                            try
-                               let! summary = distillFragment runtime forkedIds spoolPath chunk chunkIndex
+                               let! summary = distillFragment runtime forkedIds spoolPath chunk chunkIndex lang
                                return Choice1Of2(chunkIndex, summary)
                            with ex ->
                                return Choice2Of2(chunkIndex, chunk, ex.Message)
@@ -297,7 +304,7 @@ module Distillation =
                     | Choice1Of2 _ -> None)
 
             let levels = ResizeArray<ResizeArray<string>>()
-            let merge = mergeDistillations runtime forkedIds
+            let merge = mergeDistillations runtime forkedIds lang
 
             try
                 for _, summary in successes do
@@ -310,8 +317,13 @@ module Distillation =
                     return reduced
                 else
                     cancelOwned ()
-                    return partialWithTail reduced rawTail
+                    return partialWithTail lang reduced rawTail
             with ex ->
                 cancelOwned ()
-                return sprintf "Condensation failed: %s\n\nMost recent raw output:\n%s" ex.Message (rawTailText chunks)
+
+                return
+                    ProviderProse.render
+                        lang
+                        Path.CondensationFailed
+                        (Map [ "error", ex.Message; "raw_tail", rawTailText chunks ])
         }

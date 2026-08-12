@@ -94,33 +94,28 @@ Bound session：missing localization → fail closed；禁止 silent English fal
 
 ## Remaining work
 
-1. ~~**Gate 0**~~：**已闭合** — PROMPT-019 / ARCH-016 Gate E；扩根后 baseline **580 hits / 30 files**；`prompt-depth-ratchet`；semantic-depth；盘点见 agent-tools `provider-prose-inventory.md`。
-2. **Batch 1** Runtime：RuntimeNudge / Companion / WarmStart / HostReview / SyncDelegate / ForkChildPayload
-3. **Batch 2** Manager lifecycle：ManagerNarrative / Finality* / ManagerLifecycle / **MagicTodoSurface**
-4. **Batch 3** Tool surfaces：JsDescription 为首；补扫 **ToolRegistry / FileMutation / Distillation / Casebook / Fission / BashHoneypot**
-5. **Batch 4** Assistance（含硬编码中文）+ Strength/Recovery + **silent English fallback** 清扫
-6. **Batch 5** Role Law 厚度：**正文已恢复**。语言世界闭合仍依赖 Batch 1–4
-7. ~~Gate E baseline → 0；清 `resources/prompts/*-system.md` legacy 包面~~：**包面已清** — `resources/prompts/` 已删除；packaging / build / tip-v2 / docs 已改指 `resources/provider/`。Gate E baseline → 0 仍属后续 Batch 债。
+1. ~~**Gate 0**~~：**已闭合**
+2. ~~**Batch 1**~~：**已闭合** — Runtime / ForkChild / Sync / Companion / HostReview / WarmStart → Gate E 0
+3. ~~**Batch 2**~~：**已闭合** — ManagerNarrative / Lifecycle / FinalityPrompt / MagicTodoSurface → Gate E 0（FinalityTool 拒词 17 ∈ Batch 3）
+4. ~~**Batch 4**~~：**已闭合** — Assistance → 0；PromptResources / Bookkeeper bound fail-closed
+5. **Batch 3** Tool surfaces：剩余 **400 hits / 19 files**（JsDescription 170；ToolRegistry / Fork / Join / Horizon / …）
+6. ~~**Batch 5** Role Law 厚度~~：**正文已恢复**；语言世界闭合仍依赖 Batch 3
+7. ~~legacy `resources/prompts/`~~：**已清**；Gate E baseline → 0 仍待 Batch 3
 
 ## Done this integration
 
-- Spec：PROMPT-019 + ARCH-016 E 五层
-- Gate E / depth ratchet 接入 `scripts/check.mjs`
-- Role Law restore + semantic-depth / prompts 契约对齐（含 Fission 概念词 ≠ tool inventory）
-- shape：权威路径 `resources/provider/`；legacy prompts 标明非 SSOT
-- GrandRewrite Remaining #5 移交指针
-- **Wave Batch1/2/4（进行中）**：`ProviderProse.fs` 已落地（`{{name}}` + bound fail-closed）；三专责并行迁 Runtime / Manager·Finality·MagicTodo / Assistance+PromptResources
+- Spec：PROMPT-019 + ARCH-016 E；`ProviderProse`（`{{name}}` + `languageOf`）
+- Role Law restore + depth ratchet；legacy prompts 包面清除
+- Batch 1/2/4 迁文完成；测试 facade 对齐（runtimeNudge / forkChild / glory / production.js）
+- Gate E：**580 → 400**；language-parity **63** pairs；build ok；相关单测 45/45
 
 ## Completion criteria
 
 - PROMPT-019 / ARCH-016 E 五层 docs 对齐且 proof 可红
-- Gate E baseline → 0（或显式 legacy/non-production 标注资产）
-- Batch 1–4 迁完且 Batch 5 语言世界无泄漏；`npm run check` 绿
+- Gate E baseline → 0
+- Batch 3 迁完；`npm run check` 绿
 - Final outcome 追加后移入 `completed/`
 
 ## Blockers
 
-无阻塞已集成部分。已知债（Batch 后续）：
-
-- Gate E baseline 仍有 grandfathered hits；Batch 1–4 迁完后应收至 0。
-- silent English fallback（Bookkeeper / PromptResources / ToolRegistry）违反 PROMPT-019 bound fail-closed。
+无。下一批 = Batch 3 tool surfaces。

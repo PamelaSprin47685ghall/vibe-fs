@@ -4,12 +4,49 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure.Resources
+open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Process
 
 /// Bookkeeper provider verb: one JavaScript program atomically reshapes the
 /// staged question/answer Case. The sandbox has no filesystem capability.
 module JsBookkeeperTool =
+
+    [<RequireQualifiedAccess>]
+    module Path =
+        [<Literal>]
+        let Description = "tool/js-bookkeeper/description"
+
+        [<Literal>]
+        let UltraFraming = "tool/js-bookkeeper/ultra-framing"
+
+        [<Literal>]
+        let ArgProgram = "tool/js-bookkeeper/arg-program"
+
+        [<Literal>]
+        let Unchanged = "tool/js-bookkeeper/unchanged"
+
+        [<Literal>]
+        let Accepted = "tool/js-bookkeeper/accepted"
+
+        [<Literal>]
+        let NoTransaction = "tool/js-bookkeeper/no-transaction"
+
+        [<Literal>]
+        let ProgramRequired = "tool/js-bookkeeper/program-required"
+
+        [<Literal>]
+        let SetQuestionOnce = "tool/js-bookkeeper/set-question-once"
+
+        [<Literal>]
+        let SetQuestionString = "tool/js-bookkeeper/set-question-string"
+
+        [<Literal>]
+        let SetAnswerOnce = "tool/js-bookkeeper/set-answer-once"
+
+        [<Literal>]
+        let SetAnswerString = "tool/js-bookkeeper/set-answer-string"
 
     /// DSL-state-combination: physical — one js-bookkeeper invocation's ephemeral staged mutation buffer; it is committed atomically only after the program succeeds.
     type private StagedMutation =
@@ -18,20 +55,34 @@ module JsBookkeeperTool =
           mutable QuestionWasSet: bool
           mutable AnswerWasSet: bool }
 
-    [<Emit("typeof $0 === 'string'")>]
+    [<Emit("typeof($0)==='string'")>]
     let private isString (value: obj) : bool = jsNative
+
+    let private lang (ctx: HostToolContext) =
+        if String.IsNullOrWhiteSpace ctx.SessionId then
+            ProviderLanguageBinding.readGlobalPreference ()
+        else
+            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+
+    let private prose language path =
+        ProviderProse.render language path Map.empty
 
     let private failureObject (reason: string) : obj =
         createObj [ "ok" ==> false; "code" ==> "PROGRAM_FAILED"; "reason" ==> reason ]
 
     let private successObject () : obj = createObj [ "ok" ==> true ]
 
-    let private createApi (question: string) (answer: string) (staged: StagedMutation) : obj =
+    let private createApi
+        (language: ProviderLanguage)
+        (question: string)
+        (answer: string)
+        (staged: StagedMutation)
+        : obj =
         let setQuestion (value: obj) =
             if staged.QuestionWasSet then
-                failureObject "setQuestion may be called at most once in one js-bookkeeper program"
+                failureObject (prose language Path.SetQuestionOnce)
             elif not (isString value) then
-                failureObject "setQuestion(newText) requires a string"
+                failureObject (prose language Path.SetQuestionString)
             else
                 staged.QuestionWasSet <- true
                 staged.Question <- Some(string value)
@@ -39,9 +90,9 @@ module JsBookkeeperTool =
 
         let setAnswer (value: obj) =
             if staged.AnswerWasSet then
-                failureObject "setAnswer may be called at most once in one js-bookkeeper program"
+                failureObject (prose language Path.SetAnswerOnce)
             elif not (isString value) then
-                failureObject "setAnswer(newText) requires a string"
+                failureObject (prose language Path.SetAnswerString)
             else
                 staged.AnswerWasSet <- true
                 staged.Answer <- Some(string value)
@@ -151,30 +202,26 @@ module JsBookkeeperTool =
   }
 
   async run() {
-    throw new Error("Js.run() must be implemented.");
+    throw new Error("JS_RUN_NOT_IMPLEMENTED");
   }
 }"""
 
     let private publicBaseClass =
         """class JsProgram {
   question(matches = []) {
-    // Returns an immutable view of the frozen question.
   }
 
   answer(matches = []) {
-    // Returns an immutable view of the frozen answer.
   }
 
   setQuestion(newText) {
-    // Stage the complete next question. May be called at most once.
   }
 
   setAnswer(newText) {
-    // Stage the complete next answer. May be called at most once.
   }
 
   async run() {
-    throw new Error("Js.run() must be implemented.");
+    throw new Error("JS_RUN_NOT_IMPLEMENTED");
   }
 }"""
 
@@ -182,63 +229,61 @@ module JsBookkeeperTool =
         """class Js extends JsProgram {
   async run() {
     const question = this.question([
-      ["constraints", "afterConstraints", "## Constraints"],
+      ['constraints', 'afterConstraints', '## Constraints'],
     ]);
     const answer = this.answer([
-      ["answer", "afterAnswer", "## Answer"],
-      ["evidence", "afterEvidence", "## Evidence"],
+      ['answer', 'afterAnswer', '## Answer'],
+      ['evidence', 'afterEvidence', '## Evidence'],
     ]);
 
     const asksForCompatibility = /backward compatibility/i.test(question.text());
     const claimsCompatibility = /backward compatible|no breaking change/i.test(answer.text());
-    const hasEvidence = /compatibility test|legacy client/i.test(answer.text("evidence", "$"));
+    const hasEvidence = /compatibility test|legacy client/i.test(answer.text('evidence', '$'));
 
     if (!claimsCompatibility || !asksForCompatibility || hasEvidence)
       return { changed: false };
 
     this.setQuestion(
-      question.text("^", "constraints")
-        + "## Constraints\n"
-        + question.text("afterConstraints", "$")
-        + "\n\nClarify whether backward compatibility is required.\n"
+      question.text('^', 'constraints')
+        + '## Constraints\n'
+        + question.text('afterConstraints', '$')
+        + '\n\nClarify whether backward compatibility is required.\n'
     );
     this.setAnswer(
-      "## Answer\nThe implementation result is established, but backward compatibility is not established by the supplied evidence.\n"
-        + answer.text("afterAnswer", "$")
+      '## Answer\nThe implementation result is established, but backward compatibility is not established by the supplied evidence.\n'
+        + answer.text('afterAnswer', '$')
     );
 
     return { changed: true };
   }
 }"""
 
-    let private description =
+    let private assembleDescription (language: ProviderLanguage) =
         String.concat
             "\n\n"
-            [ "Program the next form of the staged Case with one atomic JavaScript transformation."
-              "The Case is already frozen for this transaction. question(matches = []) and answer(matches = []) return immutable text views with ordered anchors. view.text(from = \"^\", to = \"$\") slices exact text; anchor names may use clipped +N/-N shifts."
-              "setQuestion(newText) and setAnswer(newText) each stage the complete next side and may each be called at most once. Zero mutation is legal. A thrown program or invalid mutation changes neither side."
-              "The program has no outside-world capability. Decide what the Case should mean before the call; use this program only to carry out the coherent mechanical reshaping already justified by that decision."
+            [ prose language Path.Description
               "```js\n" + publicBaseClass + "\n```"
-              "Ultra Example — Rewrite the Case, Not Just a String\n\nMechanical branches belong inside the program. Semantic judgment belongs before or between programs.\n\n```js\n"
-              + ultraExample
-              + "\n```" ]
+              prose language Path.UltraFraming
+              "```js\n" + ultraExample + "\n```" ]
 
-    let private failed (reason: string) =
-        ToolHostCodec.tomlObjectWithInstructions [ "The staged case was not changed."; reason ] []
+    let private failed language (reason: string) =
+        ToolHostCodec.tomlObjectWithInstructions [ prose language Path.Unchanged; reason ] []
 
-    let private succeeded (value: SyntheticToml.DataValue) =
-        SyntheticToml.document [ "The staged case accepted this transformation." ] (SyntheticToml.encodeData value)
+    let private succeeded language (value: SyntheticToml.DataValue) =
+        SyntheticToml.document [ prose language Path.Accepted ] (SyntheticToml.encodeData value)
 
     let execute (args: HostToolArguments) (context: HostToolContext) =
         task {
+            let language = lang context
+
             match BookkeeperRuntime.tryTxId context.SessionId with
-            | None -> return failed "There is no Bookkeeper transaction for this session."
+            | None -> return failed language (prose language Path.NoTransaction)
             | Some txId ->
                 match args.OptionalText "program" with
-                | None -> return failed "A js-bookkeeper program is required."
+                | None -> return failed language (prose language Path.ProgramRequired)
                 | Some program ->
                     match BookkeeperStaging.snapshot txId with
-                    | Error reason -> return failed reason
+                    | Error reason -> return failed language reason
                     | Ok(question, answer) ->
                         let staged =
                             { Question = None
@@ -246,7 +291,7 @@ module JsBookkeeperTool =
                               QuestionWasSet = false
                               AnswerWasSet = false }
 
-                        let api = createApi question answer staged
+                        let api = createApi language question answer staged
 
                         let! sandboxResult =
                             JsSandbox.runSurface
@@ -258,22 +303,21 @@ module JsBookkeeperTool =
                                 (1 <<< 20)
 
                         match sandboxResult with
-                        | Error failure -> return failed (JsFailure.reason failure)
+                        | Error failure -> return failed language (JsFailure.reason failure)
                         | Ok json ->
                             match JsToolsData.parse json with
-                            | Error failure -> return failed (JsFailure.reason failure)
+                            | Error failure -> return failed language (JsFailure.reason failure)
                             | Ok value ->
                                 match BookkeeperStaging.apply txId staged.Question staged.Answer with
-                                | Error reason -> return failed reason
-                                | Ok() -> return succeeded value
+                                | Error reason -> return failed language reason
+                                | Ok() -> return succeeded language value
         }
 
     let spec (factory: HostToolFactory) : ToolSpec =
+        let language = ProviderLanguageBinding.readGlobalPreference ()
+
         { Name = "js-bookkeeper"
-          Description = description
+          Description = assembleDescription language
           Arguments =
-            [ "program",
-              ToolHostCodec.stringSchemaDescribed
-                  "Exactly one class named Js that extends JsProgram and implements async run()."
-                  factory ]
+            [ "program", ToolHostCodec.stringSchemaDescribed (prose language Path.ArgProgram) factory ]
           Execute = execute }

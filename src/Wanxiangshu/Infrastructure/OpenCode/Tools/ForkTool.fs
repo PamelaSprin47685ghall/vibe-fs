@@ -14,6 +14,93 @@ open Wanxiangshu.Session
 /// request and schema; PTY is intentionally absent.
 module ForkTool =
 
+    [<RequireQualifiedAccess>]
+    module Path =
+        [<RequireQualifiedAccess>]
+        module Fork =
+            [<Literal>]
+            let Description = "tool/fork/description"
+
+            [<Literal>]
+            let NameRequired = "tool/fork/name-required"
+
+            [<Literal>]
+            let ChargeRequired = "tool/fork/charge-required"
+
+            [<Literal>]
+            let UnknownCalling = "tool/fork/unknown-calling"
+
+            [<Literal>]
+            let HiddenTargetDenied = "tool/fork/hidden-target-denied"
+
+            [<Literal>]
+            let ChargeContextUnavailable = "tool/fork/charge-context-unavailable"
+
+            [<Literal>]
+            let NameAlreadyBelongs = "tool/fork/name-already-belongs"
+
+            [<Literal>]
+            let WarmStartUnavailable = "tool/fork/warm-start-unavailable"
+
+            [<Literal>]
+            let ChargeCarried = "tool/fork/charge-carried"
+
+            [<Literal>]
+            let ChargeNotPlaced = "tool/fork/charge-not-placed"
+
+            [<Literal>]
+            let PersonUnknown = "tool/fork/person-unknown"
+
+            [<Literal>]
+            let PersonUnavailable = "tool/fork/person-unavailable"
+
+            [<Literal>]
+            let PersonCannotTakeCharge = "tool/fork/person-cannot-take-charge"
+
+        [<RequireQualifiedAccess>]
+        module Commission =
+            [<Literal>]
+            let Description = "tool/commission/description"
+
+            [<Literal>]
+            let AuthorityRequired = "tool/commission/authority-required"
+
+            [<Literal>]
+            let NameRequired = "tool/commission/name-required"
+
+            [<Literal>]
+            let ChargeRequired = "tool/commission/charge-required"
+
+            [<Literal>]
+            let UnknownCalling = "tool/commission/unknown-calling"
+
+            [<Literal>]
+            let NameAlreadyBelongs = "tool/commission/name-already-belongs"
+
+            [<Literal>]
+            let ChargeTaken = "tool/commission/charge-taken"
+
+            [<Literal>]
+            let RoadNotOpened = "tool/commission/road-not-opened"
+
+            [<Literal>]
+            let RoadUnknown = "tool/commission/road-unknown"
+
+            [<Literal>]
+            let RoadCannotTakeCharge = "tool/commission/road-cannot-take-charge"
+
+    let private lang (ctx: HostToolContext) =
+        if String.IsNullOrWhiteSpace ctx.SessionId then
+            ProviderLanguageBinding.readGlobalPreference ()
+        else
+            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+
+    let private prose language path =
+        ProviderProse.render language path Map.empty
+
+    let private namedProse language path byname =
+        ProviderProse.render language path (Map [ "name", byname ])
+
     let private forkInstructions (sessionId: SessionId) : ForkChildInstructions =
         let lang = ProviderProse.languageOf sessionId
 
@@ -39,8 +126,6 @@ module ForkTool =
     let private successInstruction (text: string) =
         ToolHostCodec.tomlObjectWithInstructions [ text ] []
 
-    let private unknownCallingConsequence () = "Unknown or unavailable calling."
-
     let private managedForRecord (record: AgentRecord) =
         if String.IsNullOrWhiteSpace record.Agent then
             None
@@ -50,7 +135,8 @@ module ForkTool =
     /// GLORY-032: provider-facing denial for any target the Manager cannot
     /// reach (the Host-owned Reviewer among them). Generic — it must not prove
     /// the hidden target exists.
-    let HiddenTargetDeniedText = "Unknown or unavailable managed agent."
+    let HiddenTargetDeniedText language =
+        prose language Path.Fork.HiddenTargetDenied
 
     let private forbiddenManagerRole (managed: ManagedAgent) =
         match managed.Role with
@@ -94,9 +180,6 @@ module ForkTool =
     let private warmStartAllowed role =
         RepositoryWarmStartPrompt.isDirectConsumer role
 
-    let private warmStartError =
-        "repository warm-start keywords are only available when fork targets Coder, Inspector, or DevOps"
-
     let private prepareForkPrompt (scope: ToolRuntimeScope) (runtime: HostForkRuntime) (role: Role) (request: Request) =
         task {
             let basePrompt =
@@ -127,13 +210,15 @@ module ForkTool =
 
     let private executeManager (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
         task {
+            let language = lang context
+
             if String.IsNullOrWhiteSpace request.Name then
-                return consequence "A name is required."
+                return consequence (prose language Path.Fork.NameRequired)
             elif String.IsNullOrWhiteSpace request.Charge then
-                return consequence "A charge is required."
+                return consequence (prose language Path.Fork.ChargeRequired)
             else
                 match scope.RuntimeFor context with
-                | Error _ -> return consequence "A charge cannot be placed from this execution context."
+                | Error _ -> return consequence (prose language Path.Fork.ChargeContextUnavailable)
                 | Ok runtime ->
                     let handles =
                         match scope.Journal with
@@ -147,15 +232,15 @@ module ForkTool =
                     if hasCalling request then
                         match existingByname with
                         | Some _ ->
-                            return consequence "That name already belongs to someone in this continuing history."
+                            return consequence (prose language Path.Fork.NameAlreadyBelongs)
                         | None ->
                             match tryCalling managerCallingBindings request.Calling with
-                            | None -> return consequence (unknownCallingConsequence ())
+                            | None -> return consequence (prose language Path.Fork.UnknownCalling)
                             | Some managed ->
                                 let role = AgentRoleIdentity.ofManaged managed.Role
 
                                 if hasKeywords request && not (warmStartAllowed role) then
-                                    return consequence warmStartError
+                                    return consequence (prose language Path.Fork.WarmStartUnavailable)
                                 else
                                     let handleId = ToolHostCodec.newHandleId ()
 
@@ -189,23 +274,23 @@ module ForkTool =
                                     | Ok _ ->
                                         return
                                             successInstruction (
-                                                sprintf "%s carries this charge now." (request.Name.Trim())
+                                                namedProse language Path.Fork.ChargeCarried (request.Name.Trim())
                                             )
-                                    | Error _ -> return consequence "The charge could not be placed."
+                                    | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
                     else
                         match existingByname with
-                        | None -> return consequence "No continuing person is known by that name."
+                        | None -> return consequence (prose language Path.Fork.PersonUnknown)
                         | Some handle ->
                             match HandleId.tryAgent handle.Handle with
-                            | None -> return consequence "No continuing person is known by that name."
+                            | None -> return consequence (prose language Path.Fork.PersonUnknown)
                             | Some handleId ->
                                 let agentId = AgentHandleId.value handleId
 
                                 match runtime.TryFindAgent agentId with
                                 | None ->
-                                    return consequence "That person is not presently available for another charge."
+                                    return consequence (prose language Path.Fork.PersonUnavailable)
                                 | Some record when hasKeywords request && not (warmStartAllowed record.Role) ->
-                                    return consequence warmStartError
+                                    return consequence (prose language Path.Fork.WarmStartUnavailable)
                                 | Some record ->
                                     let activeRun =
                                         lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
@@ -222,22 +307,24 @@ module ForkTool =
                                             runtime.Reuse(agentId, request.Charge)
 
                                     match reuseResult with
-                                    | Error _ -> return consequence "That person cannot take another charge yet."
+                                    | Error _ -> return consequence (prose language Path.Fork.PersonCannotTakeCharge)
                                     | Ok _ ->
                                         return
                                             successInstruction (
-                                                sprintf "%s carries this charge now." (request.Name.Trim())
+                                                namedProse language Path.Fork.ChargeCarried (request.Name.Trim())
                                             )
         }
 
     let private executeOrchestrator (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
         task {
+            let language = lang context
+
             if String.IsNullOrWhiteSpace context.SessionId then
-                return consequence "A road cannot be commissioned before the caller's authority is established."
+                return consequence (prose language Path.Commission.AuthorityRequired)
             elif String.IsNullOrWhiteSpace request.Name then
-                return consequence "A name is required."
+                return consequence (prose language Path.Commission.NameRequired)
             elif String.IsNullOrWhiteSpace request.Charge then
-                return consequence "A charge is required."
+                return consequence (prose language Path.Commission.ChargeRequired)
             else
                 let existingByname =
                     scope.Journal
@@ -247,10 +334,10 @@ module ForkTool =
 
                 if hasCalling request then
                     match existingByname with
-                    | Some _ -> return consequence "That name already belongs to a road in this continuing history."
+                    | Some _ -> return consequence (prose language Path.Commission.NameAlreadyBelongs)
                     | None ->
                         match tryCalling orchestratorCallingBindings request.Calling with
-                        | None -> return consequence (unknownCallingConsequence ())
+                        | None -> return consequence (prose language Path.Commission.UnknownCalling)
                         | Some managed ->
                             let managerId = ManagerJobId.create (ToolHostCodec.newHandleId ())
                             let host = scope.OrchestratorHostFor context.SessionId
@@ -259,23 +346,30 @@ module ForkTool =
                                 host.ForkManagerJob(managerId, managed.Name, request.Charge, byname = request.Name)
                             with
                             | Ok _ ->
-                                return successInstruction (sprintf "%s has taken your charge." (request.Name.Trim()))
-                            | Error _ -> return consequence "That road could not be opened."
+                                return
+                                    successInstruction (
+                                        namedProse language Path.Commission.ChargeTaken (request.Name.Trim())
+                                    )
+                            | Error _ -> return consequence (prose language Path.Commission.RoadNotOpened)
                 else
                     match existingByname with
-                    | None -> return consequence "No continuing road is known by that name."
+                    | None -> return consequence (prose language Path.Commission.RoadUnknown)
                     | Some job ->
                         let host = scope.OrchestratorHostFor context.SessionId
 
                         match! host.ContinueManagerJob(job.ManagerJobId, request.Charge) with
-                        | Ok _ -> return successInstruction (sprintf "%s has taken your charge." (request.Name.Trim()))
-                        | Error _ -> return consequence "That road cannot take another charge."
+                        | Ok _ ->
+                            return
+                                successInstruction (
+                                    namedProse language Path.Commission.ChargeTaken (request.Name.Trim())
+                                )
+                        | Error _ -> return consequence (prose language Path.Commission.RoadCannotTakeCharge)
         }
 
     let managerSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "fork"
           Description =
-            "Commission another witness within a mission. For a new person pass calling + name + charge; to continue someone already known here, omit calling and use the same name."
+            ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Fork.Description Map.empty
           Arguments =
             [ "calling", ToolHostCodec.optionalEnumSchema (callingNames managerCallingBindings) factory
               "name", ToolHostCodec.stringSchema factory
@@ -286,7 +380,10 @@ module ForkTool =
     let orchestratorSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "commission"
           Description =
-            "Entrust an independent road to a Manager. For a new road pass calling + name + charge; to continue a known road, omit calling and use the same name."
+            ProviderProse.render
+                (ProviderLanguageBinding.readGlobalPreference ())
+                Path.Commission.Description
+                Map.empty
           Arguments =
             [ "calling", ToolHostCodec.optionalEnumSchema (callingNames orchestratorCallingBindings) factory
               "name", ToolHostCodec.stringSchema factory

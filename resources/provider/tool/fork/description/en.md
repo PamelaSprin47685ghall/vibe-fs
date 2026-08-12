@@ -1,0 +1,1 @@
+Commission another witness within a mission. For a new person pass calling + name + charge; to continue someone already known here, omit calling and use the same name. The result is the fact that the work has been entrusted.

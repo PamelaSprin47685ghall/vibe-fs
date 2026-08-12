@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 
 open Wanxiangshu.Domain.SessionRecovery
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
@@ -21,18 +22,44 @@ module JoinTool =
     [<Literal>]
     let DevOpsJoinTimeoutMs = 10_000
 
+    [<RequireQualifiedAccess>]
+    module Path =
+        [<Literal>]
+        let Description = "tool/join/description"
+
+        [<Literal>]
+        let RecoveryBlocked = "tool/join/recovery-blocked"
+
+        [<Literal>]
+        let RecoveryWaiting = "tool/join/recovery-waiting"
+
+        [<Literal>]
+        let UnavailableUntilAuthority = "tool/join/unavailable-until-authority"
+
+        [<Literal>]
+        let OrchestratorNotReady = "tool/join/orchestrator-not-ready"
+
+        [<Literal>]
+        let UnavailableFromContext = "tool/join/unavailable-from-context"
+
+    let private lang (ctx: HostToolContext) =
+        if String.IsNullOrWhiteSpace ctx.SessionId then
+            ProviderLanguageBinding.readGlobalPreference ()
+        else
+            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+
     let private consequence lines =
         ToolHostCodec.tomlObjectWithInstructions lines []
 
-    let private recoveryBlocked (_blocks: NonEmpty<RecoveryBlock>) =
-        consequence
-            [ "The family cannot advance because recovery is blocked."
-              "Resolve the recovery obstruction before joining again." ]
+    let private recoveryBlocked language (_blocks: NonEmpty<RecoveryBlock>) =
+        consequence (ProviderProse.instructionLines language Path.RecoveryBlocked Map.empty)
 
     let private execute (scope: ToolRuntimeScope) (_args: HostToolArguments) (context: HostToolContext) =
         task {
+            let language = lang context
+
             if String.IsNullOrWhiteSpace context.SessionId then
-                return consequence [ "Join is unavailable until the caller's authority is established." ]
+                return consequence (ProviderProse.instructionLines language Path.UnavailableUntilAuthority Map.empty)
             else
                 let sessionId = SessionId.create context.SessionId
 
@@ -53,16 +80,13 @@ module JoinTool =
                 let! recovery = scope.RequireFamilyRecovery root
 
                 match recovery with
-                | FamilyRecovery.FamilyBlocked blocks -> return recoveryBlocked blocks
+                | FamilyRecovery.FamilyBlocked blocks -> return recoveryBlocked language blocks
                 | FamilyRecovery.FamilyWaiting _ ->
                     // EXEC-023: no permit while waiting — must not drain durable agent
                     // finals via bare JoinAvailable. Surface retryable RECOVERY_WAITING
                     // so Manager re-invokes join after RestoreHandles advances to Ready
                     // or Blocked. Align ExecutorTool FamilyWaiting → RECOVERY_WAITING.
-                    return
-                        consequence
-                            [ "Recovery is still in progress."
-                              "Join again after the family becomes ready." ]
+                    return consequence (ProviderProse.instructionLines language Path.RecoveryWaiting Map.empty)
                 | FamilyRecovery.FamilyReady permit ->
                     // NEVER Cancel mailbox/runtime on user wake (EXEC-017); the attempt's
                     // Wait is the only interrupt channel. Completion still beats interrupt.
@@ -88,12 +112,17 @@ module JoinTool =
                                     .JoinPublishedAvailable(JoinBatch.Max, attempt.Wait))
 
                         match outcome with
-                        | Error _ -> return consequence [ "The orchestrator is not ready to join yet." ]
-                        | Ok(Interrupted reason) -> return JoinResultRenderer.renderInterrupted reason
-                        | Ok(ResultsAvailable batch) -> return JoinResultRenderer.renderOrchestratorBatch batch
+                        | Error _ ->
+                            return consequence (ProviderProse.instructionLines language Path.OrchestratorNotReady Map.empty)
+                        | Ok(Interrupted reason) -> return JoinResultRenderer.renderInterrupted language reason
+                        | Ok(ResultsAvailable batch) -> return JoinResultRenderer.renderOrchestratorBatch language batch
                     else
                         match scope.RuntimeFor context with
-                        | Error _ -> return consequence [ "Join is unavailable from this execution context." ]
+                        | Error _ ->
+                            return
+                                consequence (
+                                    ProviderProse.instructionLines language Path.UnavailableFromContext Map.empty
+                                )
                         | Ok runtime ->
                             let isDevOps = scope.IsRole(context, Role.DevOps)
 
@@ -103,8 +132,8 @@ module JoinTool =
 
                                     emitJsExpr
                                         (attempt.Wait,
-                                         emitJsExpr timerTask "$0.then(function () { return 'DeadlineExpired'; })")
-                                        "Promise.race([$0, $1])"
+                                         emitJsExpr timerTask "$0.then(function(){return'DeadlineExpired';})")
+                                        "Promise.race([$0,$1])"
                                 else
                                     attempt.Wait
 
@@ -153,21 +182,28 @@ module JoinTool =
                                         runtime.TerminalByName
                                         |> Seq.tryPick (fun (KeyValue(name, id)) ->
                                             if id = ptyId then Some name else None))
-                                    |> Option.defaultValue "Terminal"
+                                    |> Option.defaultValue ""
 
                             match joined with
                             | Ok(Interrupted reason) ->
                                 match reason with
                                 | JoinInterruptReason.OperatorAbort
                                 | JoinInterruptReason.UserMessageArrived ->
-                                    return JoinResultRenderer.renderInterrupted reason
+                                    return JoinResultRenderer.renderInterrupted language reason
                                 | JoinInterruptReason.DeadlineExpired ->
-                                    return JoinResultRenderer.renderInterrupted JoinInterruptReason.DeadlineExpired
+                                    return
+                                        JoinResultRenderer.renderInterrupted
+                                            language
+                                            JoinInterruptReason.DeadlineExpired
                             | Ok(ResultsAvailable batch) ->
                                 // Render before releasing names: this Join result is the
                                 // moment the old terminal ending becomes heard.
                                 let rendered =
-                                    JoinResultRenderer.renderJoinItemBatch resolveAgentName batch resolveTerminalLabel
+                                    JoinResultRenderer.renderJoinItemBatch
+                                        language
+                                        resolveAgentName
+                                        batch
+                                        resolveTerminalLabel
 
                                 NonEmptyBatch.toList batch
                                 |> List.iter (function
@@ -175,11 +211,13 @@ module JoinTool =
                                     | JoinItem.AgentItem _ -> ())
 
                                 return rendered
-                            | Error joinError -> return JoinResultRenderer.renderForkError joinError resolveAgentName
+                            | Error joinError ->
+                                return JoinResultRenderer.renderForkError language joinError resolveAgentName
         }
 
     let spec scope =
         { Name = "join"
-          Description = "Wait for any agent or PTY completion"
+          Description =
+            ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments = []
           Execute = execute scope }

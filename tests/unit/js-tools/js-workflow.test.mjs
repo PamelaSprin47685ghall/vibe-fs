@@ -12,6 +12,8 @@ import { join } from 'node:path'
 
 import { JsToolWorkflow_run as workflowRun } from '../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js'
 import { JsToolGenerator_generate as generate } from '../../../dist/Domain/JsSurface.js'
+import { JsDescriptionAssets_load as loadJsProse } from '../../../dist/Infrastructure/OpenCode/Tools/JsToolHost.js'
+import { ProviderLanguage } from '../../../dist/Domain/ProviderLanguage.js'
 import { ToolPermission } from '../../../dist/Kernel/Roles.js'
 import { ofArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Set.js'
 import { parse as parseToml } from 'smol-toml'
@@ -23,13 +25,14 @@ const sandbox = () => {
 }
 
 const permissionComparer = { Compare: (a, b) => a.CompareTo(b) }
+const jsProse = () => loadJsProse(ProviderLanguage.English)
 const coderCaps = ofArray(
   [ToolPermission.Read, ToolPermission.Write, ToolPermission.Edit, ToolPermission.Glob, ToolPermission.Grep],
   permissionComparer,
 )
 
 const runWorkflow = async (dir, program, { deadlineMs = 2000 } = {}) => {
-  const surface = generate('Coder', coderCaps)
+  const surface = generate('Coder', coderCaps, jsProse())
   const outcome = await workflowRun(
     dir,
     surface.BaseClassSource,
@@ -145,7 +148,7 @@ test('JS012_workflow_with_store_persists_prepare_and_commit', async () => {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
     const raw = (await import('../../../dist/Infrastructure/Persist/GitRawStore.js')).GitRawStore_createInMemory()
     const store = (await import('../../../dist/Infrastructure/Persist/EventStore.js')).EventStore_create(raw)
-    const surface = generate('Coder', coderCaps)
+    const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
   async run() {
     const file = await this.file('a.txt', [['begin', 'end', 'hello']]);
@@ -172,7 +175,7 @@ test('JS016_result_renders_stable_toml_shapes', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
-    const surface = generate('Coder', coderCaps)
+    const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
   async run() {
     const file = await this.file('a.txt', [['begin', 'end', 'hello']]);
@@ -212,7 +215,7 @@ test('JS010_016_query_object_has_data_and_no_fs', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
-    const surface = generate('Coder', coderCaps)
+    const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
   async run() {
     return { paths: ['a.txt'], truncated: false }
@@ -234,7 +237,7 @@ test('JS010_016_query_object_has_data_and_no_fs', async () => {
 test('JS010_016_primitive_return_uses_data_field', async () => {
   const { dir, cleanup } = sandbox()
   try {
-    const surface = generate('Coder', coderCaps)
+    const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
   async run() { return 42 }
 }`
@@ -251,7 +254,7 @@ test('JS010_array_null_is_invalid_and_does_not_commit', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'old', 'utf8')
-    const surface = generate('Coder', coderCaps)
+    const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
   async run() {
     this.rewrite('a.txt', 'new')
@@ -272,7 +275,7 @@ test('JS010_array_null_is_invalid_and_does_not_commit', async () => {
 test('JS010_mixed_object_array_is_invalid', async () => {
   const { dir, cleanup } = sandbox()
   try {
-    const surface = generate('Coder', coderCaps)
+    const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
   async run() { return [1, { a: 1 }] }
 }`
@@ -289,7 +292,7 @@ test('JS006_019_missing_anchor_is_typed_and_names_the_pattern', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
-    const surface = generate('Coder', coderCaps)
+    const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
   async run() {
     await this.file('a.txt', [['begin', 'end', '## JS-007 FileView.text()']]);
@@ -312,7 +315,7 @@ test('JS005_offset_anchor_clips_to_closed_file_range', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
-    const surface = generate('Coder', coderCaps)
+    const surface = generate('Coder', coderCaps, jsProse())
     const program = `class Js extends JsProgram {
   async run() {
     const file = await this.file('a.txt', [['h', 'hend', 'hello']]);

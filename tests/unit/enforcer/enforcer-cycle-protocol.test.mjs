@@ -482,7 +482,7 @@ test('ENFORCER_061_blog_tool_rejects_empty_canonical_text', () => {
 test('ENFORCER_blog_tool_without_CurrentRequest_rejects_not_ok', async () => {
   // Request-scoped capability: Role=Blogger alone is insufficient.
   assert.equal(typeof BlogTool.NoLiveCycleError, 'string')
-  assert.match(BlogTool.NoLiveCycleError, /no live CurrentRequest|not InFlight/i)
+  assert.match(BlogTool.NoLiveCycleError, /CHRONICLE_NO_LIVE_CYCLE/)
 
   // Fable option: None ≈ null/undefined; Some host ≈ host reference.
   assert.equal(BlogTool.hasLiveCycle(null, BLOG), false)

@@ -147,6 +147,51 @@ export const setDiff = (a, b) => ({
   onlyB: [...b].filter((x) => !a.has(x)).sort(),
 })
 
+const PLACEHOLDER_RE = /\{\{([A-Za-z][A-Za-z0-9_]*)\}\}/g
+
+/**
+ * Named `{{placeholder}}` operands (PROMPT-019). Values are language-invariant;
+ * the placeholder *set* must be identical across EN / zh-CN.
+ * @param {string} text
+ * @returns {Set<string>}
+ */
+export const extractPlaceholders = (text) => {
+  /** @type {Set<string>} */
+  const names = new Set()
+  PLACEHOLDER_RE.lastIndex = 0
+  let m
+  while ((m = PLACEHOLDER_RE.exec(text)) !== null) names.add(m[1])
+  return names
+}
+
+/**
+ * EN/zh-CN `{{name}}` sets must be equal (PROMPT-019 structural parity).
+ * @param {string[]} semanticDirs
+ * @param {string} providerAbs
+ * @returns {Violation[]}
+ */
+export const scanPlaceholderParity = (semanticDirs, providerAbs) => {
+  /** @type {Violation[]} */
+  const violations = []
+  for (const semantic of semanticDirs) {
+    const enAbs = join(providerAbs, semantic, 'en.md')
+    const zhAbs = join(providerAbs, semantic, 'zh-CN.md')
+    if (!existsSync(enAbs) || !existsSync(zhAbs)) continue
+    const enPh = extractPlaceholders(readFileSync(enAbs, 'utf8'))
+    const zhPh = extractPlaceholders(readFileSync(zhAbs, 'utf8'))
+    const { onlyA: onlyEn, onlyB: onlyZh } = setDiff(enPh, zhPh)
+    if (onlyEn.length === 0 && onlyZh.length === 0) continue
+    violations.push({
+      code: 'placeholder-parity',
+      path: norm(join(PROVIDER_ROOT, semantic)),
+      detail:
+        `placeholders differ — only-en: [${onlyEn.join(', ')}]; ` +
+        `only-zh-CN: [${onlyZh.join(', ')}]`,
+    })
+  }
+  return violations
+}
+
 /**
  * EN/zh-CN protocol identifier sets must be equal (AC20).
  * @param {string[]} semanticDirs
@@ -244,6 +289,7 @@ export const scanRepo = (repoRoot = process.cwd(), catalogOverrides) => {
 
   if (semanticDirs.length > 0) {
     violations.push(...scanIdentifierParity(semanticDirs, providerAbs, { tipIdentities, toolNames }))
+    violations.push(...scanPlaceholderParity(semanticDirs, providerAbs))
   }
 
   const hookAbs = resolve(repoRoot, PROVIDER_RESOURCES_REL)
@@ -267,7 +313,7 @@ const runCli = () => {
     console.log(
       `language-parity-gate: OK — ${result.semanticDirs.length} semantic resource(s); ` +
         'each has en.md + zh-CN.md; protocol identifiers match; ' +
-        'ProviderResources.requireLanguagePair present',
+        'placeholders match; ProviderResources.requireLanguagePair present',
     )
     process.exit(0)
   }

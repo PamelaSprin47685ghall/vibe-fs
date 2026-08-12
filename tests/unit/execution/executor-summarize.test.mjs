@@ -22,6 +22,7 @@ import {
   distillationRuntime,
   errorResult,
   okResult,
+  providerLanguage,
 } from '../support/domain.mjs'
 
 /** Spool.ChunkSizeBytes — multi-chunk files need size > n-1 full chunks. */
@@ -47,21 +48,21 @@ function completedOk(agentId) {
 
 test('DISTILLATION_distill_fragment_prompt_is_plain_intent', () => {
   assert.equal(
-    distillation.distillFragmentPrompt(),
+    distillation.distillFragmentPrompt(providerLanguage.english),
     'Distill this fragment of command output. Preserve errors, decisions, paths, and exact numbers; omit raw code.',
   )
 })
 
 test('DISTILLATION_merge_distillations_prompt_is_plain_intent', () => {
   assert.equal(
-    distillation.mergeDistillationsPrompt(),
+    distillation.mergeDistillationsPrompt(providerLanguage.english),
     'Merge these command-output distillations into one dense account. Preserve failures and exact facts; do not include raw code.',
   )
 })
 
 test('DISTILLATION_prompts_carry_no_chunk_index_or_level', () => {
-  assert.ok(!/\bchunk\b/i.test(distillation.distillFragmentPrompt()))
-  assert.ok(!/\blevel-\d/i.test(distillation.mergeDistillationsPrompt()))
+  assert.ok(!/\bchunk\b/i.test(distillation.distillFragmentPrompt(providerLanguage.english)))
+  assert.ok(!/\blevel-\d/i.test(distillation.mergeDistillationsPrompt(providerLanguage.english)))
 })
 
 test('EXEC_distill_spool_targeted_await_one_call_per_agent_no_stash', async () => {

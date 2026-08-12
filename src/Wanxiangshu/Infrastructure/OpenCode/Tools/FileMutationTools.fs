@@ -4,6 +4,8 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Infrastructure.Resources
+open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Tools
 
 /// mv / rm — Coder-only file mutation tools (AGENT-016/017/018).
@@ -12,6 +14,41 @@ open Wanxiangshu.Tools
 /// cross-platform fs API (renameSync / rmSync), so no shell is involved and
 /// path semantics do not depend on the platform's command line.
 module FileMutationTools =
+
+    [<RequireQualifiedAccess>]
+    module Path =
+        [<Literal>]
+        let MvDescription = "tool/mv/description"
+
+        [<Literal>]
+        let MvMissingSource = "tool/mv/missing-source"
+
+        [<Literal>]
+        let MvMissingDestination = "tool/mv/missing-destination"
+
+        [<Literal>]
+        let MvNoSuchFile = "tool/mv/no-such-file"
+
+        [<Literal>]
+        let MvRequired = "tool/mv/required"
+
+        [<Literal>]
+        let MvFailed = "tool/mv/failed"
+
+        [<Literal>]
+        let RmDescription = "tool/rm/description"
+
+        [<Literal>]
+        let RmMissingPath = "tool/rm/missing-path"
+
+        [<Literal>]
+        let RmNoSuchFile = "tool/rm/no-such-file"
+
+        [<Literal>]
+        let RmDirectoryNotEmpty = "tool/rm/directory-not-empty"
+
+        [<Literal>]
+        let RmRequired = "tool/rm/required"
 
     module private NodeFs =
         [<Import("statSync", "fs")>]
@@ -32,10 +69,22 @@ module FileMutationTools =
         [<Import("existsSync", "fs")>]
         let existsSync (path: string) : bool = jsNative
 
+    let private languageOf (ctx: HostToolContext) =
+        if String.IsNullOrWhiteSpace ctx.SessionId then
+            ProviderLanguageBinding.readGlobalPreference ()
+        else
+            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+
+    let private specDescription path =
+        ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) path Map.empty
+
     let private tString = ToolHostCodec.TString
 
     let private error (message: string) =
         ToolHostCodec.tomlObjectWithInstructions [ message ] []
+
+    let private consequence lang path subs =
+        error (ProviderProse.render lang path subs)
 
     let private isDirectory (path: string) =
         try
@@ -50,12 +99,12 @@ module FileMutationTools =
 
     /// POSIX `rm` minus the recursive form: a file is removed, an EMPTY
     /// directory is removed, a non-empty directory is refused (AGENT-018).
-    let private rm (path: string) =
+    let private rm lang (path: string) =
         task {
             if isNull path || String.IsNullOrWhiteSpace path then
-                return error "rm: missing path"
+                return consequence lang Path.RmMissingPath Map.empty
             elif not (NodeFs.existsSync path) then
-                return error (sprintf "rm: %s: No such file or directory" path)
+                return consequence lang Path.RmNoSuchFile (Map [ "path", path ])
             elif isDirectory path then
                 let entries = NodeFs.readdirSync path
 
@@ -69,7 +118,7 @@ module FileMutationTools =
                     NodeFs.rmSync (path, createObj [ "recursive", box true ])
                     return ToolHostCodec.tomlObject [ "removed", tString path ]
                 else
-                    return error (sprintf "rm: %s: directory not empty" path)
+                    return consequence lang Path.RmDirectoryNotEmpty (Map [ "path", path ])
             else
                 NodeFs.rmSync (path, createObj [ "recursive", box false ])
                 return ToolHostCodec.tomlObject [ "removed", tString path ]
@@ -78,14 +127,14 @@ module FileMutationTools =
     /// POSIX `mv`: move or rename a file or directory (AGENT-017). Node's
     /// renameSync covers the same-device rename; a cross-device move (EXDEV)
     /// falls back to copy + delete.
-    let private mv (source: string) (destination: string) =
+    let private mv lang (source: string) (destination: string) =
         task {
             if isNull source || String.IsNullOrWhiteSpace source then
-                return error "mv: missing source"
+                return consequence lang Path.MvMissingSource Map.empty
             elif isNull destination || String.IsNullOrWhiteSpace destination then
-                return error "mv: missing destination"
+                return consequence lang Path.MvMissingDestination Map.empty
             elif not (NodeFs.existsSync source) then
-                return error (sprintf "mv: %s: No such file or directory" source)
+                return consequence lang Path.MvNoSuchFile (Map [ "path", source ])
             else
                 try
                     NodeFs.renameSync (source, destination)
@@ -112,7 +161,7 @@ module FileMutationTools =
                                 ToolHostCodec.tomlObject [ "moved", tString source; "destination", tString destination ]
                         with copyEx ->
                             // DSL-MUTABLE: algorithm-scratch — copy exception message buffer
-                            let mutable copyMessage = "copy failed"
+                            let mutable copyMessage = "COPY_FAILED"
 
                             try
                                 let value = copyEx?message
@@ -122,10 +171,17 @@ module FileMutationTools =
                             with _ ->
                                 ()
 
-                            return error (sprintf "mv: %s -> %s: %s" source destination copyMessage)
+                            return
+                                consequence
+                                    lang
+                                    Path.MvFailed
+                                    (Map
+                                        [ "source", source
+                                          "destination", destination
+                                          "error", copyMessage ])
                     else
                         // DSL-MUTABLE: algorithm-scratch — rename exception message buffer
-                        let mutable message = "rename failed"
+                        let mutable message = "RENAME_FAILED"
 
                         try
                             let value = ex?message
@@ -135,7 +191,14 @@ module FileMutationTools =
                         with _ ->
                             ()
 
-                        return error (sprintf "mv: %s -> %s: %s" source destination message)
+                        return
+                            consequence
+                                lang
+                                Path.MvFailed
+                                (Map
+                                    [ "source", source
+                                      "destination", destination
+                                      "error", message ])
         }
 
     let private decodeText (name: string) (args: HostToolArguments) =
@@ -148,22 +211,26 @@ module FileMutationTools =
 
     let mvSpec (factory: HostToolFactory) : ToolSpec =
         { Name = "mv"
-          Description = "Move or rename a file or directory (POSIX mv)."
+          Description = specDescription Path.MvDescription
           Arguments =
             [ "source", ToolHostCodec.stringSchema factory
               "destination", ToolHostCodec.stringSchema factory ]
           Execute =
-            fun args _context ->
+            fun args ctx ->
+                let lang = languageOf ctx
+
                 match decodeText "source" args, decodeText "destination" args with
-                | Some source, Some destination -> mv source destination
-                | _ -> task { return error "mv: source and destination are required" } }
+                | Some source, Some destination -> mv lang source destination
+                | _ -> task { return consequence lang Path.MvRequired Map.empty } }
 
     let rmSpec (factory: HostToolFactory) : ToolSpec =
         { Name = "rm"
-          Description = "Remove a file or an empty directory; refuses non-empty directories (POSIX rm, no recursion)."
+          Description = specDescription Path.RmDescription
           Arguments = [ "path", ToolHostCodec.stringSchema factory ]
           Execute =
-            fun args _context ->
+            fun args ctx ->
+                let lang = languageOf ctx
+
                 match decodeText "path" args with
-                | Some path -> rm path
-                | None -> task { return error "rm: path is required" } }
+                | Some path -> rm lang path
+                | None -> task { return consequence lang Path.RmRequired Map.empty } }

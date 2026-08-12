@@ -34,6 +34,7 @@ import {
 } from './interop.mjs'
 import { managerJobId, commitHash, worktreePath, targetRef, idValue } from './identity.mjs'
 import { fold } from './journal.mjs'
+import { providerLanguage } from './prompt.mjs'
 
 /**
  * EXEC-009 + EXEC-018 pure durable join drain (JoinDrain.fs).
@@ -779,6 +780,7 @@ export const agentCompletion = (() => {
  * `runtime` for agent/pty batch is a minimal { IsPtyCompletion, TryFindAgent } surface.
  */
 export const joinResultRenderer = (() => {
+  const english = providerLanguage.english
   const renderInterruptedFn = member(JoinResultRendererModule, 'JoinResultRenderer', 'renderInterrupted')
   const renderCompletedBatchFn = member(JoinResultRendererModule, 'JoinResultRenderer', 'renderCompletedBatch')
   const renderJoinItemBatchFn = member(JoinResultRendererModule, 'JoinResultRenderer', 'renderJoinItemBatch')
@@ -811,7 +813,7 @@ export const joinResultRenderer = (() => {
 
   return {
     /** @param reason JoinInterruptReason (default OperatorAbort for legacy callers). */
-    renderInterrupted: (reason = JoinInterruptReason.OperatorAbort) => renderInterruptedFn(reason),
+    renderInterrupted: (reason = JoinInterruptReason.OperatorAbort) => renderInterruptedFn(english, reason),
     renderCompletedBatch: (runtime, batch, resolveTerminalLabel) => {
       const isPty = (runId) =>
         typeof runtime?.IsPtyCompletion === 'function' ? !!runtime.IsPtyCompletion(runId) : false
@@ -822,9 +824,9 @@ export const joinResultRenderer = (() => {
         return rec.Agent ?? rec.agent ?? ''
       }
       if (typeof resolveTerminalLabel === 'function') {
-        return renderCompletedBatchFn(isPty, resolve, batch, resolveTerminalLabel)
+        return renderCompletedBatchFn(english, isPty, resolve, batch, resolveTerminalLabel)
       }
-      return renderCompletedBatchFn(isPty, resolve, batch, () => 'Terminal')
+      return renderCompletedBatchFn(english, isPty, resolve, batch, () => 'Terminal')
     },
     /** Production JoinTool path: NonEmptyBatch<JoinItem> with PtyAborted intact. */
     renderJoinItemBatch: (resolveAgentName, batch, resolveTerminalLabel = () => 'Terminal') => {
@@ -837,10 +839,10 @@ export const joinResultRenderer = (() => {
               if (!rec) return ''
               return rec.Agent ?? rec.agent ?? ''
             }
-      return renderJoinItemBatchFn(resolve, batch, resolveTerminalLabel)
+      return renderJoinItemBatchFn(english, resolve, batch, resolveTerminalLabel)
     },
-    renderOrchestratorBatch: (batch) => renderOrchestratorBatchFn(batch),
-    renderForkError: (error, resolveAgentName = () => '') => renderForkErrorFn(error, resolveAgentName),
+    renderOrchestratorBatch: (batch) => renderOrchestratorBatchFn(english, batch),
+    renderForkError: (error, resolveAgentName = () => '') => renderForkErrorFn(english, error, resolveAgentName),
     stubRuntime,
   }
 })()

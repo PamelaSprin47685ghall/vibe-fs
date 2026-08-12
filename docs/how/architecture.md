@@ -72,7 +72,7 @@ Does the participant need the value itself
 |------|----------|
 | A Tool Referential Integrity | 同名工具 → 唯一 schema owner + 唯一 semantic contract；不同硬语义不得同名（`commission`≠`fork`；`judge`≠旧 `verdict` 工具名） |
 | B Provider Leak | 扫描 provider 输出 / schema / fixed prose：禁 SessionId/AgentId/ManagerJobId/PtyId/Fission/lane/worktree/offset/`fast-`·`deep-`/spool |
-| C Language Parity | 每个 provider semantic resource：EN 与 zh-CN 皆存在（HOST-026）；缺语言 fail。现行：叶对成对。后续（PROMPT-019）：structural placeholder parity + semantic-anchor parity |
+| C Language Parity | 每个 provider semantic resource：EN 与 zh-CN 皆存在（HOST-026）；缺语言 fail。现行：叶对成对 + `{{placeholder}}` 集合一致。后续（PROMPT-019）：semantic-anchor parity |
 | D Prompt Stability | 同 session 上 Fallback / T1 / review / reanchor / Strength 后 system prompt 字节相同；只允许改 EffectiveAgent |
 | E Provider Prose Ownership | 见下节算法 |
 

@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
@@ -13,11 +14,75 @@ open ToolHostCodec
 /// Ordinary assistant completion → bounded WorkRecord (EXEC-031).
 module CoderTool =
 
-    let private consequence message =
-        tomlObjectWithInstructions [ message ] []
+    [<RequireQualifiedAccess>]
+    module Path =
+        [<RequireQualifiedAccess>]
+        module Establish =
+            [<Literal>]
+            let Description = "tool/establish-behavior/description"
+
+            [<Literal>]
+            let Unavailable = "tool/establish-behavior/unavailable"
+
+            [<Literal>]
+            let AuthorityRequired = "tool/establish-behavior/authority-required"
+
+            [<Literal>]
+            let NeedsCharge = "tool/establish-behavior/needs-charge"
+
+            [<Literal>]
+            let Incomplete = "tool/establish-behavior/incomplete"
+
+        [<RequireQualifiedAccess>]
+        module Repair =
+            [<Literal>]
+            let Description = "tool/repair-behavior/description"
+
+            [<Literal>]
+            let Unavailable = "tool/repair-behavior/unavailable"
+
+            [<Literal>]
+            let AuthorityRequired = "tool/repair-behavior/authority-required"
+
+            [<Literal>]
+            let NeedsCharge = "tool/repair-behavior/needs-charge"
+
+            [<Literal>]
+            let Incomplete = "tool/repair-behavior/incomplete"
+
+    type private Surface =
+        { Description: string
+          Unavailable: string
+          AuthorityRequired: string
+          NeedsCharge: string
+          Incomplete: string }
+
+    let private establishSurface =
+        { Description = Path.Establish.Description
+          Unavailable = Path.Establish.Unavailable
+          AuthorityRequired = Path.Establish.AuthorityRequired
+          NeedsCharge = Path.Establish.NeedsCharge
+          Incomplete = Path.Establish.Incomplete }
+
+    let private repairSurface =
+        { Description = Path.Repair.Description
+          Unavailable = Path.Repair.Unavailable
+          AuthorityRequired = Path.Repair.AuthorityRequired
+          NeedsCharge = Path.Repair.NeedsCharge
+          Incomplete = Path.Repair.Incomplete }
+
+    let private lang (ctx: HostToolContext) =
+        if String.IsNullOrWhiteSpace ctx.SessionId then
+            ProviderLanguageBinding.readGlobalPreference ()
+        else
+            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+
+    let private consequence ctx path subs =
+        tomlObjectWithInstructions [ ProviderProse.render (lang ctx) path subs ] []
 
     let private execute
-        (roleVerb: string)
+        (toolName: string)
+        (surface: Surface)
         (scope: ToolRuntimeScope)
         (syncDelegate: SyncDelegateRuntime option)
         (args: HostToolArguments)
@@ -25,16 +90,16 @@ module CoderTool =
         =
         task {
             match syncDelegate with
-            | None -> return consequence "No Coder is available from this execution context."
+            | None -> return consequence context surface.Unavailable Map.empty
             | Some sd ->
                 if String.IsNullOrWhiteSpace context.SessionId then
-                    return consequence "A Coder cannot be charged before the caller's authority is established."
+                    return consequence context surface.AuthorityRequired Map.empty
                 else
                     let charge = args.Text "charge"
                     let keywords = args.Text "keywords"
 
                     if String.IsNullOrWhiteSpace charge then
-                        return consequence (sprintf "%s needs a charge." roleVerb)
+                        return consequence context surface.NeedsCharge (Map [ "tool", toolName ])
                     else
                         let prepareProviderPrompt () =
                             task {
@@ -61,43 +126,37 @@ module CoderTool =
                                     [ workRecord ]
 
                             return tomlObjectWithInstructions instructions []
-                        | Error _ -> return consequence "The Coder could not complete this charge."
+                        | Error _ -> return consequence context surface.Incomplete Map.empty
         }
 
     let private behaviorSpec
         (name: string)
-        (description: string)
+        (surface: Surface)
         (factory: HostToolFactory)
         (scope: ToolRuntimeScope)
         (syncDelegate: SyncDelegateRuntime option)
         : ToolSpec =
         { Name = name
-          Description = description
+          Description =
+            ProviderProse.render
+                (ProviderLanguageBinding.readGlobalPreference ())
+                surface.Description
+                Map.empty
           Arguments =
             [ "charge", ToolHostCodec.stringSchema factory
               "keywords", ToolHostCodec.optionalStringSchema factory ]
-          Execute = execute name scope syncDelegate }
+          Execute = execute name surface scope syncDelegate }
 
     let establishSpec
         (factory: HostToolFactory)
         (scope: ToolRuntimeScope)
         (syncDelegate: SyncDelegateRuntime option)
         : ToolSpec =
-        behaviorSpec
-            "establish-behavior"
-            "Ask a Coder to establish a failing behavior test. Returns a bounded WorkRecord after ordinary completion."
-            factory
-            scope
-            syncDelegate
+        behaviorSpec "establish-behavior" establishSurface factory scope syncDelegate
 
     let repairSpec
         (factory: HostToolFactory)
         (scope: ToolRuntimeScope)
         (syncDelegate: SyncDelegateRuntime option)
         : ToolSpec =
-        behaviorSpec
-            "repair-behavior"
-            "Ask a Coder to implement the smallest production change that makes an established behavior test pass. Returns a bounded WorkRecord after ordinary completion."
-            factory
-            scope
-            syncDelegate
+        behaviorSpec "repair-behavior" repairSurface factory scope syncDelegate

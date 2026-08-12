@@ -3,6 +3,9 @@
 // terminal validity, process estimate/request, bounded parallelism, causal wait,
 // task/token sources, process wait, fork runtime.
 
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import {
   ForkChildPayloadModule,
   BloggerTomlModule,
@@ -33,35 +36,50 @@ import {
   errorResult,
   fableInstanceMethod,
   prod,
+  BUILD_ROOT,
 } from './interop.mjs'
 import { syntheticToml } from './context.mjs'
+import { providerLanguage } from './prompt.mjs'
 
 // ── failure-driven context recovery (docs/what/context.md) ────────────────────────────────
 
 /**
  * ARCH-010 / REVIEW-002: what a newly forked child is told, as one payload.
- *
- * `render` takes named fields rather than positional arguments: the record's three fields are all
- * strings or string collections, so a positional call cannot be read for correctness.
+ * Class A prose from ProviderResources (PROMPT-019); Domain assembles with ForkChildInstructions.
  */
 export const forkChildPayload = (() => {
   const m = bind(ForkChildPayloadModule, 'ForkChildPayload', [
-    'BaseInstructions',
-    'CommissionerRecordInstruction',
-    'RequirementsInstruction',
+    'BasePath',
+    'CommissionerRecordPath',
+    'RequirementsPath',
     'render',
     'relay',
   ])
+  const providerRoot = join(BUILD_ROOT, '..', 'resources/provider')
+  const readLines = (semanticPath) =>
+    readFileSync(join(providerRoot, semanticPath, 'en.md'), 'utf8')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .trimEnd()
+      .split('\n')
+  const readOne = (semanticPath) => readLines(semanticPath).join('\n')
+  const defaultProse = () =>
+    new ForkChildPayloadModule.ForkChildInstructions(
+      toList(readLines(m.BasePath)),
+      readOne(m.CommissionerRecordPath),
+      readOne(m.RequirementsPath),
+    )
 
   return {
-    baseInstructions: listItems(m.BaseInstructions),
-    commissionerRecordInstruction: m.CommissionerRecordInstruction,
+    baseInstructions: readLines(m.BasePath),
+    commissionerRecordInstruction: readOne(m.CommissionerRecordPath),
     /** @deprecated use commissionerRecordInstruction */
-    parentWorkRecordInstruction: m.CommissionerRecordInstruction,
-    requirementsInstruction: m.RequirementsInstruction,
+    parentWorkRecordInstruction: readOne(m.CommissionerRecordPath),
+    requirementsInstruction: readOne(m.RequirementsPath),
 
     render: ({ assignment, commissionerRecord, parentWorkRecord, originalUserRequirements = [], rootRequirements, payload }) =>
       m.render(
+        defaultProse(),
         new ForkChildPayloadModule.ForkChildAssignment(
           assignment,
           commissionerRecord ?? parentWorkRecord ?? undefined,
@@ -71,7 +89,7 @@ export const forkChildPayload = (() => {
       ),
 
     relay: (assignment, commissionerRecord, requirements = [], payload) =>
-      m.relay(assignment, commissionerRecord, toList(requirements), payload),
+      m.relay(defaultProse(), assignment, commissionerRecord, toList(requirements), payload),
   }
 })()
 
@@ -85,8 +103,8 @@ export const distillation = (() => {
   ])
 
   return {
-    distillFragmentPrompt: () => m.distillFragmentPrompt(),
-    mergeDistillationsPrompt: () => m.mergeDistillationsPrompt(),
+    distillFragmentPrompt: (lang = providerLanguage.english) => m.distillFragmentPrompt(lang),
+    mergeDistillationsPrompt: (lang = providerLanguage.english) => m.mergeDistillationsPrompt(lang),
   }
 })()
 
@@ -257,7 +275,8 @@ export const distillationRuntime = (() => {
   }
 
   return {
-    distillSpool: (runtime, spoolPath) => distillSpool(runtime, spoolPath),
+    distillSpool: (runtime, spoolPath, lang = providerLanguage.english) =>
+      distillSpool(runtime, spoolPath, lang),
     /** Ok(ForkResult.Created agentId) */
     forkOk: (agentId) => okResult(new ForkResult(0, [agentId])),
     timedOut: () => errorResult(ForkError.TimedOut),

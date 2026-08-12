@@ -84,11 +84,29 @@ export const syntheticDocument = (instructions, body) =>
 
 // ── ForkChildPayload: the forked child's first prompt ─────────────────────────
 
-/** The instruction lines every forked child receives, as a JS array. */
-export const forkBaseInstructions = [...ForkModule.ForkChildPayload_BaseInstructions];
+const forkReadLines = (semanticPath) =>
+  readFileSync(join(REPO_ROOT, 'resources', 'provider', semanticPath, 'en.md'), 'utf8')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .trimEnd()
+    .split('\n');
 
-export const forkCommissionerRecordInstruction = ForkModule.ForkChildPayload_CommissionerRecordInstruction;
-export const forkRequirementsInstruction = ForkModule.ForkChildPayload_RequirementsInstruction;
+const forkReadOne = (semanticPath) => forkReadLines(semanticPath).join('\n');
+
+const forkDefaultProse = () =>
+  new ForkModule.ForkChildInstructions(
+    toList(forkReadLines(ForkModule.ForkChildPayload_BasePath)),
+    forkReadOne(ForkModule.ForkChildPayload_CommissionerRecordPath),
+    forkReadOne(ForkModule.ForkChildPayload_RequirementsPath),
+  );
+
+/** The instruction lines every forked child receives, as a JS array. */
+export const forkBaseInstructions = forkReadLines(ForkModule.ForkChildPayload_BasePath);
+
+export const forkCommissionerRecordInstruction = forkReadOne(
+  ForkModule.ForkChildPayload_CommissionerRecordPath,
+);
+export const forkRequirementsInstruction = forkReadOne(ForkModule.ForkChildPayload_RequirementsPath);
 /** @deprecated use forkCommissionerRecordInstruction */
 export const forkParentWorkRecordInstruction = forkCommissionerRecordInstruction;
 
@@ -102,6 +120,7 @@ export const forkPayload = ({
 }) => {
   const record = commissionerRecord ?? parentWorkRecord
   return ForkModule.ForkChildPayload_render(
+    forkDefaultProse(),
     new ForkModule.ForkChildAssignment(
       assignment,
       record ?? undefined,
@@ -112,7 +131,13 @@ export const forkPayload = ({
 };
 
 export const forkRelay = (assignment, commissionerRecord, requirements = [], payload) =>
-  ForkModule.ForkChildPayload_relay(assignment, commissionerRecord ?? undefined, toList(requirements), payload ?? undefined);
+  ForkModule.ForkChildPayload_relay(
+    forkDefaultProse(),
+    assignment,
+    commissionerRecord ?? undefined,
+    toList(requirements),
+    payload ?? undefined,
+  );
 
 /** The anchor a scenario declaration uses: the first base instruction, as it appears rendered. */
 export const forkAnchor = () => comment(forkBaseInstructions[0]);
