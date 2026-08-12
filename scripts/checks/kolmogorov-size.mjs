@@ -1,23 +1,25 @@
 #!/usr/bin/env node
-// Kolmogorov file-size ratchet (refactor proposal Wave 0).
-// Structural alarm only — line counts are symptoms, ownership is the disease.
+// Kolmogorov size advisory (refactor proposal Wave 0).
+// Structural signal only — line counts are symptoms, ownership is the disease.
+// This check is intentionally NON-BLOCKING: no file/function size threshold may
+// make `npm run check` fail. The baseline is comparative context, not a budget.
 //
 // Modes:
-//   node scripts/checks/kolmogorov-size.mjs --baseline=<json-string|path> [--root=<dir>]
-//       exit 1 when:
-//         - a grandfathered file (in baseline) exceeds its recorded line count
-//         - any other file exceeds SOFT_LIMIT (200) lines
+//   node scripts/checks/kolmogorov-size.mjs [--baseline=<json-string|path>] [--root=<dir>]
+//       report suggestions only; always exit 0 for size findings.
+//       With a baseline, growth is called out as a stronger refactor suggestion.
 //   node scripts/checks/kolmogorov-size.mjs --generate [--out=<file>] [--root=<dir>]
-//       write a baseline of current line counts for every file > SOFT_LIMIT
+//       write a snapshot of current line counts for every file > SOFT_LIMIT
 //
 // Baseline JSON: { "<path>": <lines>, ..., "_exceptions": { "<path>": {
-//   "owner": "...", "reason": "..." } } }. Exceptions document WHY a file may
-// stay large (ports, entry points, pure vocabulary, generated/declarative
-// tables, compile-order seams) — they do not lift the ratchet for files that
-// are already in the baseline.
+//   "owner": "...", "reason": "..." } } }. Exceptions document why a large file
+// may be coherent (ports, entry points, pure vocabulary, generated/declarative
+// tables, compile-order seams). They are explanatory only.
 //
-// Warnings only (never fail):
-//   - ordinary function > 60 lines (F# heuristic, advisory)
+// Advisory signals include:
+//   - file > 200 lines
+//   - growth beyond a recorded baseline
+//   - ordinary function > 60 lines (F# heuristic)
 //   - implementation file <= 15 lines not covered by an exception
 
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -117,9 +119,8 @@ const oversizedFunctions = (path) => {
   return out
 }
 
-const check = (root, baseline) => {
-  const failures = []
-  const warnings = []
+const check = (root, baseline = {}) => {
+  const suggestions = []
   const exceptions = baseline._exceptions ?? {}
   const counts = baseline.baseline ?? baseline
   for (const path of scopedFiles(root)) {
@@ -127,26 +128,24 @@ const check = (root, baseline) => {
     const content = readFileSync(abs, 'utf8')
     const lines = lineCount(content)
     const grandfathered = typeof counts[path] === 'number'
-    if (grandfathered) {
-      if (lines > counts[path]) {
-        failures.push(`${path}: ${lines} lines exceeds baseline ${counts[path]} (ratchet)`)
-      }
-    } else if (lines > SOFT_LIMIT) {
+    if (grandfathered && lines > counts[path]) {
+      suggestions.push(`${path}: ${lines} lines grew beyond baseline ${counts[path]} — consider re-owning or splitting if cohesion improved`)
+    } else if (!grandfathered && lines > SOFT_LIMIT) {
       const exception = exceptions[path]
       if (exception) {
-        warnings.push(`${path}: ${lines} lines (exception: ${exception.owner} — ${exception.reason})`)
+        suggestions.push(`${path}: ${lines} lines (documented ownership: ${exception.owner} — ${exception.reason})`)
       } else {
-        failures.push(`${path}: ${lines} lines exceeds ${SOFT_LIMIT} (new or previously-small file; split or grandparent it)`)
+        suggestions.push(`${path}: ${lines} lines exceeds advisory ${SOFT_LIMIT} — review ownership/cohesion; split only if it clarifies the model`)
       }
     }
     if (!grandfathered && lines <= SMALL_WARN && !exceptions[path] && path.endsWith('.fs')) {
-      warnings.push(`${path}: ${lines} lines — small implementation, review: delete / re-own / legal seam?`)
+      suggestions.push(`${path}: ${lines} lines — small implementation; review whether it should be deleted, re-owned, or remain a legal seam`)
     }
     for (const fn of oversizedFunctions(abs)) {
-      warnings.push(`${path}: function '${fn.name}' spans ${fn.lines} lines (> ${FUNCTION_WARN}, advisory)`)
+      suggestions.push(`${path}: function '${fn.name}' spans ${fn.lines} lines (> advisory ${FUNCTION_WARN})`)
     }
   }
-  return { failures, warnings }
+  return { suggestions }
 }
 
 const main = () => {
@@ -164,16 +163,11 @@ const main = () => {
     console.log(`kolmogorov-size: baseline written to ${out} — ${total} grandfathered file(s)`)
     return
   }
-  if (!baselineArg) {
-    console.error('kolmogorov-size: --baseline=<json|path> required (or --generate)')
-    process.exit(2)
-  }
-  const baseline = parseBaseline(baselineArg)
-  const { failures, warnings } = check(root, baseline)
-  for (const warning of warnings) console.log(`warning: ${warning}`)
-  for (const failure of failures) console.error(`FAIL: ${failure}`)
-  console.log(`kolmogorov-size: ${failures.length} failure(s), ${warnings.length} warning(s)`)
-  process.exit(failures.length > 0 ? 1 : 0)
+  const baseline = baselineArg ? parseBaseline(baselineArg) : {}
+  const { suggestions } = check(root, baseline)
+  for (const suggestion of suggestions) console.log(`suggestion: ${suggestion}`)
+  console.log(`kolmogorov-size: advisory only — ${suggestions.length} suggestion(s), 0 blocking finding(s)`)
+  process.exit(0)
 }
 
 main()

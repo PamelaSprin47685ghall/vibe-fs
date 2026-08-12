@@ -308,6 +308,9 @@ export function deriveRequests(scenario) {
           : [systemMessage(), user(text)];
 
     for (const entry of entries) {
+      while (messages.filter((m) => m.role === 'assistant').length < entry.step) {
+        messages.push(assistant(`skipped step before ${entry.step} of ${entry.turnId}`));
+      }
       for (let delivery = 0; delivery < deliveryCount(scenario, entry); delivery += 1) {
         requests.push({
           expectedEntryId: entry.id,
