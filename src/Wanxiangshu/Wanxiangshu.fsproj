@@ -70,7 +70,6 @@
     <Compile Include="Domain/ToolResultBound.fs"/>
     <Compile Include="Domain/RuntimeNudge.fs"/>
     <Compile Include="Session/LoopDetector.fs"/>
-    <Compile Include="Domain/TddPhase.fs"/>
     <Compile Include="Domain/ForkChildPayload.fs"/>
     <Compile Include="Domain/BloggerToml.fs"/>
     <Compile Include="Domain/CompanionPrompt.fs"/>
@@ -198,8 +197,8 @@
     <Compile Include="Process/PtyApi.fs"/>
     <Compile Include="Application/Orchestration/Types.fs"/>
     <Compile Include="Infrastructure/Resources/PackageResources.fs"/>
-    <Compile Include="Infrastructure/Resources/PromptResources.fs"/>
     <Compile Include="Infrastructure/Resources/ProviderResources.fs"/>
+    <Compile Include="Infrastructure/Resources/PromptResources.fs"/>
     <Compile Include="Infrastructure/Resources/EnforcerCatalogResource.fs"/>
     <Compile Include="Infrastructure/Resources/RuntimeResources.fs"/>
     <Compile Include="Infrastructure/Git/IntegrationGate.fs"/>

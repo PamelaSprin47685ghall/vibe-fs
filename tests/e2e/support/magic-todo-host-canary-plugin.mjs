@@ -379,13 +379,13 @@ export const collectManagerProviderToolEvidence = (scenario, opts = {}) => {
       if (!sessionID || !managerSessions.has(sessionID)) continue;
     }
     // Without a bound Manager session, only consider requests that already carry tools
-    // and a manager-shaped tool surface (fork+join+list+suicide) — never invent matches.
+    // and a manager-shaped tool surface (fork+join+horizon+suicide) — never invent matches.
     const tools = extractToolNamesFromRequest(request);
     if (managerSessions.size === 0) {
       const hasManagerSpine =
         tools.includes('fork')
         && tools.includes('join')
-        && tools.includes('list')
+        && tools.includes('horizon')
         && tools.includes('suicide');
       if (!hasManagerSpine) continue;
     }

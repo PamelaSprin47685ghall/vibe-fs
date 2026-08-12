@@ -462,7 +462,15 @@ test('SURFACE_006_manager_prompt_lists_exactly_six_tools', async () => {
   for (const tool of ['fork', 'join', 'horizon', 'fission', 'todowrite', 'suicide']) {
     assert.ok(prompt.includes('`' + tool + '`'), `manager prompt must name ${tool}`)
   }
-  for (const tool of ['read', 'write', 'edit', 'glob', 'grep', 'bash', 'verdict', 'inspector', 'blog', 'fork-manager', 'fork-pty', 'list']) {
+  for (const tool of [
+    'read', 'write', 'edit', 'glob', 'grep', 'bash', 'bash-honeypot',
+    'verdict', 'judge', 'inspect', 'inspector', 'blog', 'chronicle',
+    'fork-manager', 'fork-pty', 'list', 'commission', 'run',
+    'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
+    'establish-behavior', 'repair-behavior', 'fetch', 'query-shell',
+    'mv', 'rm', 'js-coder', 'js-devops', 'js-browser', 'js-bookkeeper',
+    'tdd', 'return', 'edit-qa', 'executor',
+  ]) {
     assert.equal(prompt.includes('`' + tool + '`'), false, `manager prompt must not name ${tool}`)
   }
 })

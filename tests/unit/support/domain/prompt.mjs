@@ -364,9 +364,19 @@ export const promptOrigin = (() => {
 
 /** Explicit prompt catalog load (10 role system prompts). */
 export const promptResources = (() => {
-  const api = bind(PromptResourcesModule, 'PromptResources', ['load'])
+  const api = bind(PromptResourcesModule, 'PromptResources', [
+    'load',
+    'loadForLanguage',
+    'loadForSession',
+    'loadBookkeeperSystem',
+    'loadBookkeeperSystemFor',
+  ])
   return {
     load: () => api.load(),
+    loadForLanguage: (lang) => api.loadForLanguage(lang),
+    loadForSession: (sessionId) => api.loadForSession(sessionId),
+    loadBookkeeperSystem: () => api.loadBookkeeperSystem(),
+    loadBookkeeperSystemFor: (lang) => api.loadBookkeeperSystemFor(lang),
   }
 })()
 /** PROMPT-017 / HOST-026: ProviderLanguage parse + session bind-once inherit. */

@@ -17,9 +17,9 @@ module RuntimeResources =
     // DSL-MUTABLE: resource — process-local installed runtime resources singleton
     let mutable private installed: RuntimeResources option = None
 
-    let load () : RuntimeResources =
+    let loadFor (lang: ProviderLanguage) : RuntimeResources =
         let rules = EnforcerCatalogResource.load ()
-        let prompts = PromptResources.load ()
+        let prompts = PromptResources.loadForLanguage lang
         // Rulebook v2 Slice C: effective blogger system = base + all enforcer.md texts.
         // Derived only — never written back to resources/.
         let promptsWithRulebook =
@@ -30,6 +30,8 @@ module RuntimeResources =
         { Prompts = promptsWithRulebook
           EnforcerRules = rules
           ProviderLanguageRootsReady = ProviderResources.languageRootsPresent () }
+
+    let load () : RuntimeResources = loadFor ProviderLanguage.English
 
     /// Single install site: plugin constructor before any consumer runs.
     let install (resources: RuntimeResources) : unit = installed <- Some resources

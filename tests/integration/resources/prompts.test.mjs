@@ -1,7 +1,8 @@
 // tests/integration/resources/prompts.test.mjs — package prompt load contract.
 //
-// 10 role system prompts under resources/prompts/*-system.md load via
-// PromptResources / RuntimeResources; path is import.meta.url-relative, not cwd.
+// 10 role system prompts load via PromptResources / RuntimeResources from
+// resources/provider/role/<name>/{en.md,zh-CN.md} (legacy resources/prompts/ fallback).
+// Path resolution is import.meta.url-relative, not cwd.
 // G3: Student/Teacher prompts deleted with the roles (AGENT-002 twenty-agent baseline).
 // GrandRewrite: Role Law prompts; no tdd/list/fork-manager/verdict legacy contracts.
 //
@@ -11,7 +12,7 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { promptResources, runtimeResources } from '../../unit/support/domain.mjs'
+import { promptResources, providerLanguage, providerResources, runtimeResources } from '../../unit/support/domain.mjs'
 
 const PROMPT_FIELDS = [
   'ManagerSystemPrompt',
@@ -130,6 +131,36 @@ test('PROMPT_inquiry_inspect_only_v1', () => {
   assert.match(text, /\binspect\b/)
   assert.doesNotMatch(text, /Sphinx Kernel|Sphinx contribution|semantic contribution protocol/i)
   assertNoLegacyToolVocabulary(text, 'Inquiry')
+})
+
+test('PROMPT_017_loadForLanguage_zh_cn_non_empty_and_differs_from_en', () => {
+  const en = promptResources.loadForLanguage(providerLanguage.english)
+  const zh = promptResources.loadForLanguage(providerLanguage.simplifiedChinese)
+  assertTenNonEmpty(zh, 'PromptResources.loadForLanguage(zh-CN)')
+  assert.notEqual(zh.ManagerSystemPrompt, en.ManagerSystemPrompt)
+  assert.match(zh.ManagerSystemPrompt, /\bhorizon\b/)
+  assert.match(zh.ManagerSystemPrompt, /\btodowrite\b/)
+  assert.match(zh.ManagerSystemPrompt, /\bfork\b/)
+})
+
+test('PROMPT_017_provider_tree_has_role_law_parity', () => {
+  for (const semantic of [
+    'role/manager',
+    'role/coder',
+    'role/devops',
+    'role/inspector',
+    'role/reviewer',
+    'role/browser',
+    'role/inquiry',
+    'role/orchestrator',
+    'role/distiller',
+    'role/blogger',
+    'role/bookkeeper',
+  ]) {
+    providerResources.requireLanguagePair(semantic)
+    assert.ok(providerResources.exists(providerLanguage.english, semantic), semantic)
+    assert.ok(providerResources.exists(providerLanguage.simplifiedChinese, semantic), semantic)
+  }
 })
 
 test('PROMPT_blogger_chronicle_occurrence_model', () => {

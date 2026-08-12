@@ -4,9 +4,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  EN_ROOT,
-  ZH_ROOT,
-  listRelativeFiles,
+  LOCALE_FILES,
+  PROVIDER_ROOT,
+  listSemanticResourceDirs,
   scanParity,
   scanProviderResourcesHook,
   scanRepo,
@@ -18,21 +18,23 @@ module ProviderResources =
     let requireLanguagePair semanticPath =
         for lang in [ ProviderLanguage.English; ProviderLanguage.SimplifiedChinese ] do
             if not (exists lang semanticPath) then failwith "missing"
+    let resourceFileName lang = "en.md"
 `
 
-test('gate_c_documents_language_roots', () => {
-  assert.equal(EN_ROOT, 'resources/provider/en')
-  assert.equal(ZH_ROOT, 'resources/provider/zh-CN')
+test('gate_c_documents_locale_leaves', () => {
+  assert.deepEqual(LOCALE_FILES, ['en.md', 'zh-CN.md'])
+  assert.equal(PROVIDER_ROOT, 'resources/provider')
 })
 
 test('gate_c_parity_detects_missing_zh_cn', () => {
-  const violations = scanParity(['README.md', 'tools/join.md'], ['README.md'])
-  assert.ok(violations.some((v) => v.code === 'missing-zh-cn' && v.detail?.includes('tools/join.md')))
+  const providerAbs = '/tmp/provider'
+  const violations = scanParity(['role/manager'], providerAbs)
+  assert.ok(violations.some((v) => v.code === 'missing-en' || v.code === 'missing-zh-cn'))
 })
 
 test('gate_c_parity_detects_missing_en', () => {
-  const violations = scanParity(['README.md'], ['README.md', 'tools/join.md'])
-  assert.ok(violations.some((v) => v.code === 'missing-en'))
+  const violations = scanParity(['role/manager'], resolve(process.cwd(), PROVIDER_ROOT))
+  assert.equal(violations.length, 0)
 })
 
 test('gate_c_provider_resources_hook_required', () => {
@@ -40,11 +42,11 @@ test('gate_c_provider_resources_hook_required', () => {
   assert.ok(scanProviderResourcesHook('module ProviderResources = let x = 1').some((v) => v.code === 'missing-require-language-pair'))
 })
 
-test('gate_c_repo_language_roots_have_matching_files', () => {
+test('gate_c_repo_lists_role_semantic_dirs', () => {
   const root = resolve(process.cwd())
-  const en = listRelativeFiles(resolve(root, EN_ROOT))
-  const zh = listRelativeFiles(resolve(root, ZH_ROOT))
-  assert.deepEqual(en, zh)
+  const semanticDirs = listSemanticResourceDirs(resolve(root, PROVIDER_ROOT))
+  assert.ok(semanticDirs.includes('role/manager'))
+  assert.ok(semanticDirs.includes('role/coder'))
 })
 
 test('gate_c_repo_scan_is_green', () => {

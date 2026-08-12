@@ -1,66 +1,63 @@
 #!/usr/bin/env node
 /**
  * ARCH-016 Gate C — Language Parity (HOST-026 / PROMPT-017).
- * Every provider semantic resource must exist in EN and zh-CN with matching structure.
+ * Every provider semantic directory must contain en.md + zh-CN.md locale leaves.
  *
  * Usage: node scripts/checks/language-parity-gate.mjs
  */
 
 import { existsSync, readFileSync } from 'node:fs'
-import { join, relative, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
 
-export const EN_ROOT = 'resources/provider/en'
-export const ZH_ROOT = 'resources/provider/zh-CN'
+export const PROVIDER_ROOT = 'resources/provider'
+export const LOCALE_FILES = Object.freeze(['en.md', 'zh-CN.md'])
 export const PROVIDER_RESOURCES_REL = 'src/Wanxiangshu/Infrastructure/Resources/ProviderResources.fs'
 
 const norm = (p) => p.replace(/\\/g, '/')
+
+/**
+ * Directories under provider root that host at least one locale leaf.
+ * @param {string} providerAbs
+ * @returns {string[]} semantic paths relative to provider root (e.g. role/manager)
+ */
+export const listSemanticResourceDirs = (providerAbs) => {
+  if (!existsSync(providerAbs)) return []
+  const dirs = new Set()
+  for (const abs of walk(providerAbs)) {
+    const base = abs.replace(/\\/g, '/').split('/').pop() ?? ''
+    if (!LOCALE_FILES.includes(base)) continue
+    dirs.add(norm(relative(providerAbs, dirname(abs))))
+  }
+  return [...dirs].sort()
+}
 
 /**
  * @typedef {{ code: string, path: string, detail?: string }} Violation
  */
 
 /**
- * @param {string} root
- * @returns {string[]}
- */
-export const listRelativeFiles = (root) => {
-  if (!existsSync(root)) return []
-  return walk(root).map((abs) => norm(relative(root, abs))).sort()
-}
-
-/**
- * @param {string[]} enFiles
- * @param {string[]} zhFiles
+ * @param {string[]} semanticDirs paths relative to provider root
+ * @param {string} providerAbs absolute provider root
  * @returns {Violation[]}
  */
-export const scanParity = (enFiles, zhFiles) => {
+export const scanParity = (semanticDirs, providerAbs) => {
   /** @type {Violation[]} */
   const violations = []
-  const enSet = new Set(enFiles)
-  const zhSet = new Set(zhFiles)
-
-  for (const rel of enFiles) {
-    if (!zhSet.has(rel)) {
-      violations.push({
-        code: 'missing-zh-cn',
-        path: join(ZH_ROOT, rel),
-        detail: `zh-CN counterpart missing for en/${rel}`,
-      })
+  for (const semantic of semanticDirs) {
+    for (const locale of LOCALE_FILES) {
+      const rel = join(PROVIDER_ROOT, semantic, locale)
+      const abs = join(providerAbs, semantic, locale)
+      if (!existsSync(abs)) {
+        violations.push({
+          code: locale === 'en.md' ? 'missing-en' : 'missing-zh-cn',
+          path: rel,
+          detail: `locale leaf missing for semantic resource ${semantic}`,
+        })
+      }
     }
   }
-
-  for (const rel of zhFiles) {
-    if (!enSet.has(rel)) {
-      violations.push({
-        code: 'missing-en',
-        path: join(EN_ROOT, rel),
-        detail: `EN counterpart missing for zh-CN/${rel}`,
-      })
-    }
-  }
-
   return violations
 }
 
@@ -85,29 +82,39 @@ export const scanProviderResourcesHook = (text) => {
       detail: 'ProviderResources must check English + SimplifiedChinese',
     })
   }
+  if (!text.includes('resourceFileName')) {
+    violations.push({
+      code: 'missing-resource-file-name',
+      path: PROVIDER_RESOURCES_REL,
+      detail: 'ProviderResources must resolve locale leaf via ProviderLanguage.resourceFileName',
+    })
+  }
   return violations
 }
 
 /**
  * @param {string} [repoRoot]
- * @returns {{ ok: boolean, violations: Violation[] }}
+ * @returns {{ ok: boolean, violations: Violation[], semanticDirs: string[] }}
  */
 export const scanRepo = (repoRoot = process.cwd()) => {
   /** @type {Violation[]} */
   const violations = []
+  const providerAbs = resolve(repoRoot, PROVIDER_ROOT)
 
-  const enAbs = resolve(repoRoot, EN_ROOT)
-  const zhAbs = resolve(repoRoot, ZH_ROOT)
-
-  if (!existsSync(enAbs)) {
-    violations.push({ code: 'missing-en-root', path: EN_ROOT, detail: 'EN provider root missing' })
-  }
-  if (!existsSync(zhAbs)) {
-    violations.push({ code: 'missing-zh-root', path: ZH_ROOT, detail: 'zh-CN provider root missing' })
+  if (!existsSync(providerAbs)) {
+    violations.push({ code: 'missing-provider-root', path: PROVIDER_ROOT, detail: 'provider root missing' })
+    return { ok: false, violations, semanticDirs: [] }
   }
 
-  if (violations.length === 0) {
-    violations.push(...scanParity(listRelativeFiles(enAbs), listRelativeFiles(zhAbs)))
+  const semanticDirs = listSemanticResourceDirs(providerAbs)
+  if (semanticDirs.length === 0) {
+    violations.push({
+      code: 'no-semantic-resources',
+      path: PROVIDER_ROOT,
+      detail: 'no semantic resource directories with locale leaves found',
+    })
+  } else {
+    violations.push(...scanParity(semanticDirs, providerAbs))
   }
 
   const hookAbs = resolve(repoRoot, PROVIDER_RESOURCES_REL)
@@ -117,7 +124,7 @@ export const scanRepo = (repoRoot = process.cwd()) => {
     violations.push(...scanProviderResourcesHook(readFileSync(hookAbs, 'utf8')))
   }
 
-  return { ok: violations.length === 0, violations }
+  return { ok: violations.length === 0, violations, semanticDirs }
 }
 
 const formatViolation = (v) => {
@@ -129,8 +136,8 @@ const runCli = () => {
   const result = scanRepo()
   if (result.ok) {
     console.log(
-      'language-parity-gate: OK — resources/provider/en ↔ zh-CN structure parity; ' +
-        'ProviderResources.requireLanguagePair present',
+      `language-parity-gate: OK — ${result.semanticDirs.length} semantic resource(s); ` +
+        'each has en.md + zh-CN.md; ProviderResources.requireLanguagePair present',
     )
     process.exit(0)
   }

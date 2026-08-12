@@ -13,6 +13,12 @@ type ProviderLanguage =
 [<RequireQualifiedAccess>]
 module ProviderLanguage =
 
+    /// Locale leaf filename under a semantic resource directory (§4.7.8).
+    let resourceFileName =
+        function
+        | ProviderLanguage.English -> "en.md"
+        | ProviderLanguage.SimplifiedChinese -> "zh-CN.md"
+
     let resourceDirectory =
         function
         | ProviderLanguage.English -> "en"

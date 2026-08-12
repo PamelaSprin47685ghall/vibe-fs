@@ -44,13 +44,13 @@ test('HOST_026_SessionProviderLanguage_bind_once_and_inherit', () => {
 test('PROMPT_017_provider_resource_language_roots_present', () => {
   assert.equal(providerResources.languageRootsPresent(), true)
   assert.equal(
-    providerResources.relativePath(providerLanguage.english, 'README.md'),
-    'provider/en/README.md',
+    providerResources.relativePath(providerLanguage.english, 'role/manager'),
+    'provider/role/manager/en.md',
   )
   assert.equal(
-    providerResources.relativePath(providerLanguage.simplifiedChinese, 'README.md'),
-    'provider/zh-CN/README.md',
+    providerResources.relativePath(providerLanguage.simplifiedChinese, 'role/manager'),
+    'provider/role/manager/zh-CN.md',
   )
-  assert.equal(providerResources.exists(providerLanguage.english, 'README.md'), true)
-  assert.equal(providerResources.exists(providerLanguage.simplifiedChinese, 'README.md'), true)
+  assert.equal(providerResources.exists(providerLanguage.english, 'role/manager'), true)
+  assert.equal(providerResources.exists(providerLanguage.simplifiedChinese, 'role/manager'), true)
 })

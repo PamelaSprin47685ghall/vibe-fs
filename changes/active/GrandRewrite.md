@@ -5717,31 +5717,43 @@ Manager **不**拥有 `inspect`（已冻结）：Manager 永远不能亲手触�
 
 ## Remaining work
 
-1. 正式规范：按 why→what→shape→how→proof 写入 Provider World 新条款并清除冲突旧义。
-2. Phase 1–20 实现与删 legacy（见 §16）。
-3. Semantic invariant tests + Gate A–D（见 §17）。
-4. Acceptance Criteria §19 全部可观察关闭。
+1. **e2e**：`long-stroke.toml` 已按新 wire 迁移；需 `npm run test:e2e` 全绿或文档化客观 blocker。
+2. **Phase 17 i18n（续）**：Role Law 已迁至 `resources/provider/role/<name>/{en.md,zh-CN.md}` + Gate C 绿；仍缺 `world.*` / `library.*` 分层拆分、tool description / HOST-013 marker 双语、zh-CN 译文质量（非英中混杂）。
+3. **Phase 20 删 legacy 符号**：`TddPhase.fs` 已删；`BlogTool.fs`/`VerdictTool.fs`/`ListTool.fs`/`EditQaTool.fs` 等模块文件名仍待重命名。
+4. **Gate B baseline**：Join 迁移债务 ratchet 应随 leak 修复逐步清零。
+5. **§19 Acceptance**：逐项可观察关闭（尤其 Byname/calling wire、js-bookkeeper 完整 program SDK、TerminalName closure 占用）。
+6. **§20 Non-Goals**：Steward 仍不得伪装已交付；Sphinx MCP 已 merge（Inquiry `sphinx_*`），非 GrandRewrite V1 Inquiry prompt 层。
+
+## Done since Amendment（2026-08-12）
+
+- `manager-tool-contract` 22/22；Gate D 实装；`TddPhase` 删除；`npm test` 2358/2358。
+- i18n 目录纠正为 semantic path + `en.md`/`zh-CN.md` 叶子（§4.7.8）。
 
 ## Completion criteria
 
-- §19 Acceptance Criteria 1–30 全部满足。
+- §19 Acceptance Criteria 1–30 全部满足（可观察）。
 - §20 Non-Goals 未实现项不得伪装已交付。
-- proof / architecture gates 绿；无 legacy alias。
-- Final outcome 已追加；文件可移入 `completed/`。
+- `npm test` + `npm run test:integration` + `npm run test:e2e` 全绿（或 e2e 有文档化客观 blocker）。
+- proof / Gate A–D 绿；无 legacy alias；Phase 20 文件/符号清单删尽。
+- Final outcome 追加后移入 `completed/`（此前 premature close 已撤回）。
 
 ## Blockers
 
 （无）
 
+## Amendment — 2026-08-12
+
+- **Requested by**：用户
+- **Change**：撤回 premature `Final outcome` 与 `completed/` 关闭；Change 回到 `active/` 直至 Remaining work 全部闭环。
+- **Reason**：只要还有后续没做完就不能交付。
 
 ---
 
-# Final outcome
+# Final outcome（已撤回 — 不得作为关闭依据）
 
-> 本文件是历史变更记录，不是当前产品规范。
-> 当前产品语义仅以 `docs/` 正式层为准。
+> **RETRACTED**（2026-08-12）：下列内容记录的是中途误判的关闭尝试，**不是**完成状态。以 Active work `Remaining work` 为准。
 
-## Outcome
+## Outcome（过时）
 
 Provider World clean break 已落地：正式 `docs/` 五层重写；实现侧完成 Role/Persona/Language、工具合同、LWR/BlindPlan/Finality、Join/Horizon 语义渲染、Distillation、角色 Role Law prompts、Gate A–C 静态门禁；单元与集成 prompts 契约全绿。§20 非目标（Sphinx、Steward、完整 zh-CN 文案迁移）未交付。
 

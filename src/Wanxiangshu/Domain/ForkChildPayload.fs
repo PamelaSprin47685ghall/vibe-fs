@@ -56,7 +56,9 @@ module ForkChildPayload =
                  [ assignmentText ])
             @ BaseInstructions
             @ (match commissionerRecord with
-               | Some _ -> [ CommissionerRecordInstruction ]
+               | Some record ->
+                   [ CommissionerRecordInstruction ]
+                   @ (record.Split('\n') |> Array.toList)
                | None -> [])
             @ (if List.isEmpty requirements then
                    []
@@ -68,11 +70,6 @@ module ForkChildPayload =
              | Some payload when not (System.String.IsNullOrWhiteSpace payload) ->
                  [ SyntheticToml.field "content" (SyntheticToml.renderString payload) ]
              | _ -> [])
-            @ (match commissionerRecord with
-               | Some record ->
-                   // Commissioner history as ordinary WorkRecord prose (not an opaque string field).
-                   [ record ]
-               | None -> [])
             @ (requirements
                |> List.mapi (fun index text ->
                    SyntheticToml.tableArrayEntry

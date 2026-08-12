@@ -462,7 +462,7 @@ export const ADVERSITY_CHECKLIST = Object.freeze([
   {
     id: 'reviewer-revise',
     covered: true,
-    injection: 'manager-finality-revise verdict=REVISE + bindFinalityReviseThenPerfect',
+    injection: 'manager-finality-revise judge(verdict=REVISE) + bindFinalityReviseThenPerfect',
     oracle: 'assertReviewerRevise',
   },
   {
@@ -604,24 +604,24 @@ export function assertG2InspectorPrefixLaw(scenario) {
 }
 
 /**
- * G6 Host path (mock LLM Bookkeeper): CaseFinalize envelope + edit-qa + captured fact.
+ * G6 Host path (mock LLM Bookkeeper): CaseFinalize envelope + js-bookkeeper + captured fact.
  * Fetch is asserted separately once session_id is known.
  */
 export function assertG6BookkeeperFinalize(scenario) {
   const requests = chatRequests(scenario.provider.requests);
   const finalize = requests.filter(
-    (body) => lastUserText(body).includes('CaseFinalize') && requestTools(body).includes('edit-qa'),
+    (body) => lastUserText(body).includes('CaseFinalize') && requestTools(body).includes('js-bookkeeper'),
   );
-  assert.ok(finalize.length >= 1, 'G6: Bookkeeper CaseFinalize provider request with edit-qa missing');
+  assert.ok(finalize.length >= 1, 'G6: Bookkeeper CaseFinalize provider request with js-bookkeeper missing');
   assert.equal(
     scenario.provider.matchCount('g6-bookkeeper-finalize.0') >= 1,
     true,
-    'G6: edit-qa Q.md step must run',
+    'G6: js-bookkeeper Q.md step must run',
   );
   assert.equal(
     scenario.provider.matchCount('g6-bookkeeper-finalize.1') >= 1,
     true,
-    'G6: edit-qa A.md step must run',
+    'G6: js-bookkeeper A.md step must run',
   );
   const captured = countFactCase(scenario.host.workDir, 'InspectorCaseCaptured');
   const named = readJournal(scenario.host.workDir, 'InspectorCaseCaptured').named;

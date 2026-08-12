@@ -100,7 +100,7 @@ module ForkTool =
 
                                 return
                                     successInstruction (
-                                        sprintf "# %s carries this charge now." (bynameOf request label)
+                                        sprintf "# %s carries this charge now." label
                                     )
                     | _, None, None ->
                         match ManagedAgent.tryParse request.Name with
