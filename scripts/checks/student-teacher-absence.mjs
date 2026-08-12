@@ -5,6 +5,8 @@
 // Usage: node scripts/checks/student-teacher-absence.mjs
 
 import { existsSync, readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
 
 const PRODUCTION_ROOT = 'src/Wanxiangshu'
@@ -92,4 +94,9 @@ const runCli = () => {
   process.exit(1)
 }
 
-runCli()
+if (
+  process.argv[1] !== undefined &&
+  resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1])
+) {
+  runCli()
+}

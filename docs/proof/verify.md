@@ -496,6 +496,12 @@ Review confirmed                           → 只能派生，不能赋值
 | `scripts/checks/architecture.mjs` | 源码根、fsproj 完整性、Kernel/Domain 依赖、资源读取、无 `.gen.fs`、旧路径、recovery ownership |
 | `scripts/checks/dsl-ownership.mjs` | 第二运行时、业务 Interpreter、程序计数器模式、mutable 与 infrastructure-open 边界 |
 | `scripts/checks/p0-recovery-join.mjs` | Agent false finality、recovery/join 特定单一 owner 与正负模式 |
+| `scripts/checks/student-teacher-absence.mjs` | Playbook §24.1 Symbol：生产无 Student/Teacher Role、fast/deep-student/teacher、StudentLearn/Compile/QaStore/StudentTeacherRuntime、SatelliteKind.Teacher/Replica；`tests/unit/verify/student-teacher-absence.test.mjs` 钉 token 集与 scanEntries |
+| `scripts/checks/session-ownership-ratchet.mjs` | Playbook §24.4 问卷（Companion / SyncInspector / SyncCoder / Bookkeeper / hidden Reviewer / StrengthReplica / fork agent / Executor child）；G9 ownership Exit |
+| `scripts/checks/capability-isomorphism-gate.mjs` | Playbook §24.3 Agent×RequestKind×AttemptExecutionProfile 五层同构静态门；`tests/unit/verify/capability-isomorphism-gate.test.mjs` |
+| `scripts/checks/unified-store-gate.mjs` | Playbook §24.1/24.2 Storage：feature-owned `refs/wanxiang/*`、Casebook custom ref、legacy Journal/Blob reader、dual-write、student-qa revival |
+| `scripts/checks/js-surface-gate.mjs` | G3 rebase：无 js-student/js-teacher、无手写 per-role js-* |
+| `scripts/checks/enforcer-rulebook-gate.mjs` | mechanical A37/A38（`check.mjs` 以 `--require-headings --strict` 接线）= G7 machine Exit；HUMAN_ONLY（paired-history 120 / A39 / A40）为目录质量过程，不伪造、不阻断 Gate |
 | `tests/unit/**` | Fallback/Prompt/PTY/Review 的可达构造、唯一入口与完整行为 |
 
 `npm run lint` 绿色只证明上述静态覆盖，不得宣称已经证明跨文件语义一致、所有 `Result` 穷尽处理或所有算法 owner 唯一。新增静态门禁必须有故意破坏后变红的 fixture；新增行为门禁必须走发布产物测试。

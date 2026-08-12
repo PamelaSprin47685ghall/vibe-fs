@@ -1,3 +1,6 @@
+> 本文件是历史变更记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
+
 # Wanxiangshu Cross-Proposal Implementation Playbook
 
 ## 多 Proposal 收敛实施顺序与集成手册
@@ -2674,3 +2677,83 @@ zero format-preserving migration debt
 按这个顺序，最终不是把六个 Proposal “都做一遍”。
 
 而是让每一层只被实现一次。
+
+# Active work
+
+> 本文件是变更工作记录，不是当前产品规范；当前产品语义仅以 `docs/` 正式层为准。
+
+## Work origin
+
+用户 2026-08-12 明确启动 `changes/proposed/entry.md`（`/multi-agent-teams`）。
+本文件是 Cross-Proposal Implementation Playbook，不是产品 Change：不定义正式 Clause，不修改已批准产品语义，不取代 universal / perm-inspector / rulebook / strength / storage / js-tools。
+
+2026-08-11 用户裁决仍有效：只有全部 Product Exit Gate 真正满足后才迁 `completed/`。原文（含 §0.1 living status）冻结；本段只记启动后 Remaining / Blockers / Completion，不覆盖后文 Gate 正文。
+
+## Cross-proposal prerequisites
+
+- G0 / G1 / G3 / G3.5 / G4 DONE
+- G5 DONE-with-amendment（C-3）
+- G8 Strength Change 已 `changes/completed/strength.md`（架构/机械 proof 闭环；默认 Shadow/K0；不宣称 cohort；不启用 K1/K2 treatment）
+- magic-todo 已 completed（Playbook 外 Lane）
+- G2 / G6 / G7 / G9 Product Exit：2026-08-12 Amendment 收口（见下）
+
+## Specification impact
+
+不新增 Clause。只在既有 `docs/proof/{execution,host,casebook,architecture,verify}` 引用已落地证据。不得把 observational 快照写成 Exit 覆盖权。不得另开第二条 e2e，不得提升超时。
+
+## Amendment（2026-08-12）
+
+- Requested by：用户
+- Change：唯一 Long Stroke（mock LLM + 本机 OpenCode）**就是** G2/G6 Host 正确证明。其余 Gate 按最佳实践收口：不另开第二条 e2e、不抬超时、不伪造 HUMAN_ONLY 人工赛，也不再用「付费真模型 / Meditator 专名 stroke / 24.4 smoke 标签」阻断 Playbook Product Exit。
+- Reason：用户当场裁决。
+
+## Remaining work
+
+- [x] G2 Exit：unit + 唯一 Long Stroke `assertG2InspectorPrefixLaw`；cancel = unit（不拆唯一 e2e）；CausalAwait = G1 + EXEC-028。Amendment：mock-LLM Long Stroke = 正确 Host。
+- [x] G6-E/F/G Exit：Long Stroke `assertG6BookkeeperFinalize` + cold fetch；CaseRefresh = unit `refreshStale`；SyncDelegate owner 路径 = G6-G（不另开 Meditator 专名 stroke）。digest synthesizer 仍 gone。
+- [x] G7 Exit：mechanical A37/A38 production 120 + `--strict`。HUMAN_ONLY（paired-history 120 / A39 / A40）诚实保留为目录质量过程，不伪造、不阻断 Gate。
+- [x] G9 Exit：§24.1–24.4 四条 ratchet + js-surface 已接线且 `check.mjs` 绿；24.4 问卷八 kind 穷尽 + 无 special pleading = ownership Exit。
+- [x] G8 Strength Change close（`changes/completed/strength.md`；K0/Shadow；无宣称经济 cohort）
+- [x] G2/G6/G9 proof 引用 + `student-teacher-absence` unit 钉
+
+## Completion criteria
+
+Playbook §33 Definition of Done 按 2026-08-12 Amendment 成立；G0–G9 Product Exit 全部满足；`npm run check` 绿。
+
+## Blockers
+
+无。
+
+## Final outcome
+
+### Outcome
+
+Cross-Proposal Implementation Playbook 收口。G0–G9 Product Exit 全部满足。2026-08-12 Amendment：mock-LLM + 本机 OpenCode 的唯一 Long Stroke 即 G2/G6 正确 Host 证明；其余 Gate 按最佳实践闭合。HUMAN_ONLY 不伪造。不另开第二条 e2e、不抬超时。
+
+### Final specification
+
+Playbook 不定义正式 Clause。证明层更新：
+
+- G2 DONE：`docs/proof/execution.md`、`docs/proof/host.md`
+- G6 DONE：`docs/proof/casebook.md`
+- G7 DONE：`docs/proof/enforcer.md` Playbook G7 Exit；HUMAN_ONLY = 目录质量过程
+- G9 DONE：`docs/proof/architecture.md` §24 表、`docs/proof/verify.md` VERIFY-005 覆盖行
+- G8 已于 `changes/completed/strength.md` 闭环（K0/Shadow；无宣称 cohort）
+
+### Implementation result
+
+无新 runtime。补 `student-teacher-absence.mjs` import-safe main guard + `tests/unit/verify/student-teacher-absence.test.mjs`。proof 引用已落地 Long Stroke / ratchet 证据。
+
+### Verification
+
+- `node scripts/checks/spec.mjs` OK（444 条款）
+- `node scripts/check.mjs` GREEN
+- `node --test tests/unit/verify/student-teacher-absence.test.mjs` 4/4
+- `npm run check` GREEN（lint + gates + build + unit + integration）
+
+### References
+
+- `docs/proof/{execution,host,casebook,architecture,verify,enforcer}.md`
+- `tests/e2e/support/long-stroke-oracles.mjs` `assertG2InspectorPrefixLaw` / `assertG6BookkeeperFinalize`
+- `scripts/checks/{student-teacher-absence,session-ownership-ratchet,capability-isomorphism-gate,unified-store-gate,js-surface-gate,enforcer-rulebook-gate}.mjs`
+- `tests/unit/verify/student-teacher-absence.test.mjs`

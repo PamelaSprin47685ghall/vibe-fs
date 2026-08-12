@@ -118,6 +118,11 @@ Main tip 路径 canary：首次 Full main.md、重复 Identity、compaction rean
 Observation 路径 canary：提交 tip 入 RecentTips；squash tip co-move；Companion 配对 unit。  
 与 CTX/HOST 交叉：compaction 后 reanchor 不把 Host 摘要当 BlogFrame；TipDelivery 与 Blog/Prefix 同原子清空 Full 集合。
 
+## Playbook G7 Exit
+
+**G7 Product Exit DONE**（2026-08-12 Amendment）：`enforcer-rulebook-gate --require-headings --strict` mechanical A37/A38 production 120 = machine Exit。  
+`HUMAN_ONLY_RUBRIC_ITEMS`（paired-history 120 / A39 pair review / A40 tournament）诚实保留为目录质量过程：不伪造人工赛，也不再阻断 Playbook Gate。lexical `enforcer-cross-family-collision` ≠ human tournament，仅机械辅助。
+
 ## 发布面
 
 规则正文变更 = 数据变更（`resources/enforcer/<TipName>/{enforcer.md,main.md}`）+ 对应测试；不得只改文档不改目录正文。  

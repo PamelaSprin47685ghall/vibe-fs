@@ -26,6 +26,8 @@
 
 Residual OneShot（dispose-after，`OneShotAgentTool.run`）与 SyncDelegate（Returned→Completion，dedicated reuse）互斥；下表分列，不混用路径。
 
+G2 Universal Runtime 证据见下表 G2 行。**G2 Product Exit DONE**（2026-08-12 Amendment：唯一 Long Stroke = mock LLM + 本机 OpenCode，即正确 Host 证明）。cancel 留在 unit（不拆唯一 e2e）；CausalAwait = G1 + EXEC-028 dual-await。
+
 | 证明 | 条款 |
 |------|------|
 | residual OneShot 返回 = LWR 注释（includeOpening=false）+ 末条 TurnFormalText；无字段式 work_record；dispose-after | EXEC-028（residual OneShot）→ tests/unit/tools/oneshot-tools.test.mjs（`ONESHOT_success_reports_outcome_and_disposes_the_child`、`ONESHOT_parent_work_record_lands_in_the_digest_field`） |
@@ -38,6 +40,11 @@ Residual OneShot（dispose-after，`OneShotAgentTool.run`）与 SyncDelegate（R
 | SyncDelegate：owner tier → deterministic delegate tier（fast→fast，deep→deep）；模型不可同 scope 切换 | EXEC-026 → tests/unit/kernel/sync-delegate.test.mjs（`EXEC_026_tierForOwner_is_identity_for_fast_and_deep`、`EXEC_026_agentNameFor_covers_fast_deep_times_inspector_coder`）；tests/unit/session/sync-delegate-runtime.test.mjs（`EXEC_026_sync_delegate_fast_tier_nails_inspector_and_coder_agent_names`） |
 | SyncDelegate dual-await：`return(A)` 只 resolve Returned；Completion 在 TurnCompleted 后；caller 在两者完成前仍 pending | EXEC-028（SyncDelegate）→ tests/unit/session/sync-delegate-runtime.test.mjs（`EXEC_028_sync_delegate_return_settles_before_completion_keeps_invoke_pending`） |
 | SyncDelegate 工具面：Inspector/Coder 无 `agent` 枚举；Coder 必填 `tdd`；统一 `return` **仅** SyncDelegate，**无** StudentTeacher fallthrough | EXEC-026、EXEC-028 → tests/unit/tools/sync-delegate-tools.test.mjs |
+| G2 Q1–Q3 same SessionId serial reuse：in-flight 第二调用拒绝；Completion 后复用同一 child，不另建 | EXEC-026 → tests/unit/session/sync-delegate-runtime.test.mjs（`G2_inspector_Q1_Q2_Q3_same_session_serial_reuse`）；Host：tests/e2e/support/long-stroke-oracles.mjs `assertG2InspectorPrefixLaw`（经 `tests/e2e/entry.test.mjs`；same SessionId Q1→Q2→Q3） |
+| G2 PREFIX LAW：reused Inspector `ProviderProjection.isAppendOnlyPrefix` + `wireOf`/`sealHolds`（Q1 prefix-of Q2 prefix-of Q3；same model） | ARCH-004、HOST-013 → tests/unit/session/g2-inspector-provider-wire-prefix.test.mjs（`G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix`）；Host：`assertG2InspectorPrefixLaw`。**G2 Product Exit DONE** |
+| G2 cancel：owner CancelSession → pending Invoke fail；不另建 child | EXEC-026、HOST-008 → tests/unit/session/sync-delegate-runtime.test.mjs（`G2_inspector_cancel_owner_fails_pending_invoke_no_extra_child`）。unit 层；不拆唯一 Long Stroke |
+| G2 owner cascade：owner `session.deleted` → Attached Inspector 级联 | HOST-008 → G6 Long Stroke recursive `session.deleted`（`tests/e2e/entry.test.mjs`） |
+| G2 CausalAwait / return→completion | G1 DONE；SyncDelegate dual-await 见上表 EXEC-028（`EXEC_028_sync_delegate_return_settles_before_completion_keeps_invoke_pending`） |
 
 ## Mailbox / 恢复
 

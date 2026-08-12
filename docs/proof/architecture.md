@@ -11,6 +11,22 @@
 | SyncInspector/SyncCoder 只走 Work+Attached 与 EXEC Returned→Completion，不存在 legacy Student/Teacher fallthrough | ARCH-013、HOST-008、EXEC-026/028 |
 | Host 仍只用公开 hook/SDK；Student/Teacher absence 不以 Host patch 或 alias 实现 | ARCH-003、ARCH-013 |
 
+## G9 ratchets（Playbook §24）
+
+Playbook §24 四条 ratchet 由已接线 gate 分别钉死，不是新 ARCH Clause。`scripts/check.mjs` 已纳入下表静态门。**G9 Product Exit DONE**（2026-08-12 Amendment：问卷八 kind 穷尽 + 无 special pleading + 兄弟 ratchet 绿 = ownership Exit；不另造 mega-gate）。
+
+| §24 | 义务 | 现有载体 | 钉死程度 |
+|------|------|----------|----------|
+| 24.1 Symbol | 生产无 Role.Student/Teacher、fast/deep-student/teacher、StudentLearn/Compile/QaStore/StudentTeacherRuntime/Tools/StudentSkill、SatelliteKind.Teacher/Replica | `scripts/checks/student-teacher-absence.mjs` + `tests/unit/verify/student-teacher-absence.test.mjs` | 已钉（token 集 + scanEntries） |
+| 24.1 / 24.2 Storage | 无 feature-owned `refs/wanxiang/*`、无 Casebook custom ref、无 legacy Journal/Blob reader、无 dual-write | `scripts/checks/unified-store-gate.mjs` + `tests/unit/verify/unified-store-gate.test.mjs` | 已钉 |
+| 24.3 Capability | Agent×RequestKind×AttemptExecutionProfile → capability/SDK/description/example/alias/runtime 五层同构 | `scripts/checks/capability-isomorphism-gate.mjs` + `tests/unit/verify/capability-isomorphism-gate.test.mjs` | 静态同构已钉（G9 Exit 载体） |
+| 24.4 Session ownership | Companion / SyncInspector / SyncCoder / Bookkeeper / hidden Reviewer / StrengthReplica / fork agent / Executor child 问卷 | `scripts/checks/session-ownership-ratchet.mjs` + `session-ownership-matrix.json` + `tests/unit/verify/session-ownership-ratchet.test.mjs` | 八 kind 穷尽 + 无 special pleading = G9 ownership Exit |
+| JS surface / G3 rebase | 无 js-student/js-teacher、无手写 per-role js-* | `scripts/checks/js-surface-gate.mjs` | 已钉 |
+
+G5 Amendment C-3：builtin `read`/`edit`/`write`/`glob`/`grep`/`patch` 保留，与 js-ROLE 共存。§24.1「legacy five tool implementation absent」已被 C-3 取代，本证明不要求删除 builtin。
+
+本表各门绿 = G9 Product Exit（2026-08-12 Amendment）。
+
 ## 层 0（无产物即可跑）
 
 | 检查 | 命令 / 位置 | 守住的条款 |

@@ -34,6 +34,7 @@
 | Companion / Blogger 不注入 auto-injected | durable `isCompanion=true` 的 session transform 后 `markerCount=0`、消息字节与注入前相等；不为该 session append `PairProgrammingGuidelineAnchored` | HOST-013 |
 | `WANXIANGSHU_SKIP_AUTO_INJECTED=1` 或 provider=`cursor` | 空 transcript / cursor transcript 不追加 pair；已有 durable history 仍 replay、新 placement 不 append | HOST-013 |
 | 空 Content 预防 | assistant/user 消息空 content 兜底；reasoning 填充或非空 text | HOST-016 |
+| G2 PREFIX LAW ModelId bind：`ChatParamsHook` 留 `Model=None`；Inspector Q1–Q3 `SendPrompt` 必须带同一 `OpencodeModel`（`SyncDelegateRuntime` optional `promptModel`；G6 不得当己有字段删除）。**G2 Product Exit DONE** | HOST-008；PREFIX LAW 权威：`why/host.md` §13 / HOST-013 `ProviderProjection.isAppendOnlyPrefix` → tests/unit/session/g2-inspector-provider-wire-prefix.test.mjs（`G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix`）；Host：tests/e2e/support/long-stroke-oracles.mjs `assertG2InspectorPrefixLaw`（same model；经 `tests/e2e/entry.test.mjs`）。2026-08-12 Amendment：mock LLM + 本机 OpenCode = 正确 Host |
 
 代表：`tests/unit/host/pair-thought-transform.test.mjs`、`tests/integration/plugin/manager-tool-contract.test.mjs`（`HOST_013_*`）、`tests/unit/enforcer/latest-tip-nudge.test.mjs`、HOST-013 replay property / restart / fail-closed 单测、Quiescence gate 单测（`tests/unit/host/`）。
 
@@ -46,6 +47,8 @@ Work↔Companion 深度逻辑 1（InternalLeaf）；Dedicated SyncInspector/Sync
 
 ## Attached 所有权
 
+G2 PREFIX LAW / `promptModel` 证据见下表与上节「绑定与身份」。**G2 Product Exit DONE**（2026-08-12 Amendment：mock LLM + 本机 OpenCode = 正确 Host）。
+
 | 证明 | 期望 | 条款 |
 |------|------|------|
 | 正交投影 | ExecutionClass×Ownership 可 O(1) 分辨 Work/InternalLeaf 与 Root/Attached；AttachmentKind 含 Companion/SyncInspector/SyncCoder/Bookkeeper/StrengthReplica | HOST-008 |
@@ -55,6 +58,7 @@ Work↔Companion 深度逻辑 1（InternalLeaf）；Dedicated SyncInspector/Sync
 | Host children 恢复 | journal id 匹配复用、id 丢失 Replacement、无关联新建不收养、冲突/查询失败 fail closed；物理 parent 恒为 family root | HOST-008、HOST-015 |
 | G3 absence | `scripts/checks/student-teacher-absence.mjs` 与 capability/store ratchet 证明生产 Role、Agent、request kind、tool、QA storage、Satellite kind 均无 Student/Teacher 复活 | HOST-014、AGENT-020、PROMPT-012 |
 | SyncDelegate 非兼容壳 | Inspector/Coder 使用 Work+Attached 与 Returned→Completion；不存在 Student/Teacher fallthrough、alias 或 legacy recovery | HOST-008、EXEC-026/028、HOST-014 |
+| G2 Inspector PREFIX LAW | Q1→Q2→Q3 same SessionId + same model + `ProviderProjection.isAppendOnlyPrefix` / `wireOf`/`sealHolds`；unit + 唯一 Long Stroke（mock LLM + 本机 OpenCode）。**G2 Product Exit DONE** | HOST-008、HOST-013 → tests/unit/session/g2-inspector-provider-wire-prefix.test.mjs（`G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix`）；Host：tests/e2e/support/long-stroke-oracles.mjs `assertG2InspectorPrefixLaw`（经 `tests/e2e/entry.test.mjs`） |
 | Strength leaf 隔离 | StrengthReplica 只走 InternalLeaf+Attached，Session deletion / attempt abort 级联取消；不借 Student/Teacher 身份或 Satellite kind | HOST-008、STRENGTH-004/011/014 |
 
 ## Magic Todo V1 membrane canaries（Phase 0 blocking）
