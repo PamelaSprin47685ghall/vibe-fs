@@ -23,7 +23,7 @@ module ForkTool =
           Keywords = args.Text "keywords" }
 
     let private consequence (message: string) =
-        ToolHostCodec.tomlObjectWithInstructions [ "# " + message ] []
+        ToolHostCodec.tomlObjectWithInstructions [ message ] []
 
     let private successInstruction (text: string) =
         ToolHostCodec.tomlObjectWithInstructions [ text ] []
@@ -130,7 +130,7 @@ module ForkTool =
                                     | Some managed -> managed.Name
                                     | None -> record.Agent
 
-                                return successInstruction (sprintf "# %s carries this charge now." label)
+                                return successInstruction (sprintf "%s carries this charge now." label)
                     | _, None, None ->
                         match ManagedAgent.tryParse request.Name with
                         | Some managed when forbiddenManagerRole managed -> return consequence HiddenTargetDeniedText
@@ -165,7 +165,7 @@ module ForkTool =
                                 | Ok _ ->
                                     return
                                         successInstruction (
-                                            sprintf "# %s carries this charge now." (bynameOf request managed.Name)
+                                            sprintf "%s carries this charge now." (bynameOf request managed.Name)
                                         )
                                 | Error _ -> return consequence "The charge could not be placed."
                         | Some _ -> return consequence HiddenTargetDeniedText
@@ -191,7 +191,7 @@ module ForkTool =
                     match! host.ForkManagerJob(managerId, managed.Name, request.Charge) with
                     | Ok _ ->
                         return
-                            successInstruction (sprintf "# %s has taken your charge." (bynameOf request managed.Name))
+                            successInstruction (sprintf "%s has taken your charge." (bynameOf request managed.Name))
                     | Error _ -> return consequence "That road could not be opened."
                 | Some _ -> return consequence "Only a Manager can take an independent road."
                 | None ->
@@ -204,7 +204,7 @@ module ForkTool =
                         | Ok _ ->
                             return
                                 successInstruction (
-                                    sprintf "# %s has taken your charge." (bynameOf request request.Name)
+                                    sprintf "%s has taken your charge." (bynameOf request request.Name)
                                 )
                         | Error _ -> return consequence "No continuing road is known by that name."
                     else
@@ -229,3 +229,28 @@ module ForkTool =
             [ "name", ToolHostCodec.managedOrHandleSchema ManagedAgent.orchestratorForkableNames factory
               "charge", ToolHostCodec.stringSchema factory ]
           Execute = fun args context -> executeOrchestrator scope (decode args) context }
+⚠ 1 unresolved conflict detected
+- ours = HEAD
+- theirs = master
+NOTICE: Inspect a block by reading `conflict://<N>` (add `/ours` / `/theirs` / `/base` to render a single side). Resolve with `write({ path: "conflict://<N>", content })`, or bulk-resolve every registered conflict with `write({ path: "conflict://*", content })`. Writes replace ONLY the marker block (markers + all sides) — never repeat the lines before/after it; they stay in place.
+`content` shorthand: a line that is exactly `@ours` / `@theirs` / `@base` / `@both` expands to that recorded section. `@both` is ours-then-theirs with no separator — only for additive conflicts where each side adds something different; NEVER for competing edits of the same lines (pick a side or write the combined text). Lines that are not a token pass through verbatim, so `"// keep both\n@ours\n@theirs"` literally writes the comment, then ours, then theirs.
+Per-id bulk: `write({ path: "conflict://*", content: "1: @ours\n2: @theirs\n…" })` resolves each listed id with that side in ONE call — the cheapest way through many pick-one conflicts; unlisted ids stay registered.
+Resolve each block faithfully: keep one side (`@ours`/`@theirs`), or combine them when both intents apply — never invent content beyond the recorded sides, and never stack both sides of competing edits. Resolve several conflicts in a single turn by issuing multiple `write` calls at once; ids stay valid as earlier blocks are resolved.
+
+──── #3  L143-181 ────
+<<< ours
+                            if hasKeywords request && not (warmStartAllowed role) then
+                                return consequence warmStartError
+                            else
+                                let! forkResult =
+                                    if hasKeywords request then
+                                        task {
+… (22 more lines)
+>>> theirs
+                            match! runtime.Fork(ToolHostCodec.newHandleId (), role, managed.Name, assignment, None) with
+                            | Ok _ ->
+                                return
+                                    successInstruction (
+                                        sprintf "%s carries this charge now." (bynameOf request managed.Name)
+                                    )
+… (2 more lines)

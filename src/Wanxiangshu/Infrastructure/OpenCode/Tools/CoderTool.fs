@@ -14,7 +14,7 @@ open ToolHostCodec
 module CoderTool =
 
     let private consequence message =
-        tomlObjectWithInstructions [ "# " + message ] []
+        tomlObjectWithInstructions [ message ] []
 
     let private execute
         (roleVerb: string)

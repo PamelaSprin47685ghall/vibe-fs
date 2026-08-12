@@ -76,7 +76,7 @@ module ExecutorTool =
                   OutputBudgetBytes = 65536L
                   WorldLock = false }
 
-    let private consequence (message: string) = tomlObjectWithInstructions [ "# " + message ] []
+    let private consequence (message: string) = tomlObjectWithInstructions [ message ] []
 
     let private processConsequence (processError: ProcessError) =
         match processError with
