@@ -758,23 +758,36 @@ export const loopSensor = (() => {
 })()
 
 
-/** LOOP-006 continuation text + FALLBACK-003 writer surface for bridge tests. */
+/** LOOP-006 / FALLBACK continuation prose — loaded from ProviderResources (PROMPT-019). */
 export const runtimeNudge = (() => {
   const m = bind(RuntimeNudgeModule, 'RuntimeNudge', [
-    'providerRetry',
-    'loopContinue',
-    'backgroundJoinGuard',
-    'ProviderRetryInstructions',
-    'LoopContinueInstructions',
-    'BackgroundJoinGuardInstructions',
+    'ProviderRetry',
+    'LoopContinue',
+    'BackgroundJoin',
+    'ReviewerVerdictRequired',
+    'MissingClosingReport',
+    'InteractionContinue',
   ])
+  const readDoc = (semanticPath) => {
+    const raw = readFileSync(join(repoRoot, 'resources/provider', semanticPath, 'en.md'), 'utf8')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .trimEnd()
+    return raw.split('\n').map((line) => `# ${line}`).join('\n') + '\n'
+  }
+  const readLines = (semanticPath) =>
+    readFileSync(join(repoRoot, 'resources/provider', semanticPath, 'en.md'), 'utf8')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .trimEnd()
+      .split('\n')
   return {
-    providerRetry: m.providerRetry,
-    loopContinue: m.loopContinue,
-    backgroundJoinGuard: m.backgroundJoinGuard,
-    providerRetryInstructions: listItems(m.ProviderRetryInstructions),
-    loopContinueInstructions: listItems(m.LoopContinueInstructions),
-    backgroundJoinGuardInstructions: listItems(m.BackgroundJoinGuardInstructions),
+    providerRetry: readDoc(m.ProviderRetry),
+    loopContinue: readDoc(m.LoopContinue),
+    backgroundJoinGuard: readDoc(m.BackgroundJoin),
+    providerRetryInstructions: readLines(m.ProviderRetry),
+    loopContinueInstructions: readLines(m.LoopContinue),
+    backgroundJoinGuardInstructions: readLines(m.BackgroundJoin),
   }
 })()
 

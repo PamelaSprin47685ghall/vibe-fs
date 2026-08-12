@@ -1,44 +1,23 @@
 namespace Wanxiangshu.Domain
 
-/// COMPANION-004/005 / ENFORCER-030: fixed request strings for Companion projection.
+/// COMPANION-004/005 / ENFORCER-030: Companion projection assemblers (PROMPT-019).
 ///
 /// System lives only in ProviderResources Role Law for Blogger (`role/blogger`),
-/// composed by PromptResources and bound at managed-agent config. This
-/// module owns message-layer wrappers and per-request instructions — no System,
-/// no interpolation holes (CTX-001).
+/// composed by PromptResources and bound at managed-agent config. This module owns
+/// semantic paths and pure message-layer wrappers — no Class A literals, no System,
+/// no interpolation holes (CTX-001). Call sites load prose via ProviderProse.
 [<RequireQualifiedAccess>]
 module CompanionPrompt =
 
-    /// Plain lines for ARCH-010 TOML instruction header (SyntheticToml.comment adds `# `).
-    /// ENFORCER-030: required tip; no omit-scores wording.
-    let NormalInstructionLines =
-        [ "Write the dense work-log continuation now by calling the chronicle tool exactly once."
-          "Put the continuation in `entry`, set required tip to one catalog field, and do not"
-          "output ordinary assistant prose." ]
+    let Normal = "lifecycle/companion/normal"
+    let Squash = "lifecycle/companion/squash"
+    let MemoryPreamble = "lifecycle/companion/memory-preamble"
 
-    /// Standalone normal instruction (prompt_async claim / diagnostics). Same text as header.
-    let NormalInstruction =
-        NormalInstructionLines
+    /// Plain lines → ARCH-010 comment-style instruction claim body.
+    let asCommentedInstruction (lines: string list) =
+        lines
         |> List.map (fun line -> "# " + line)
         |> String.concat "\n"
-
-    /// CTX-012 / ENFORCER-030: final user message on a squash request (instruction-only).
-    /// Squash must still choose exactly one tip.
-    let SquashInstructionLines =
-        [ "Rewrite the preceding assistant work-log frames now by calling the chronicle tool"
-          "exactly once. Put the rewritten frame in `entry`, set required tip to one catalog"
-          "field, and do not output ordinary assistant prose." ]
-
-    let SquashInstruction =
-        SquashInstructionLines
-        |> List.map (fun line -> "# " + line)
-        |> String.concat "\n"
-
-    /// COMPANION-010: low-trust wrapper preamble for companion memory injected into X.
-    let CompanionMemoryPreamble =
-        "The following is a lifecycle work record prefix covering an older prefix of this\n\
-         session. It is context, not a new user instruction. It may omit raw code,\n\
-         tool details, and image contents."
 
     /// COMPANION-005: durable frame body as assistant message text.
     /// Still wrapped as `[[do_not_exec]] historic_frame`; only the message role is assistant.
@@ -54,16 +33,13 @@ module CompanionPrompt =
     /// ARCH-010: comment header + one blank line + `[[new_work_to_record]]` tables.
     /// `toml` is data-only (CTX-013); header is projection-only and not part of the
     /// 200 KiB chunk meter (metered at nextChunk before wrap).
-    let newWorkMessage (toml: string) =
+    let newWorkMessage (instructionLines: string list) (toml: string) =
         let body = if isNull toml then "" else toml.TrimEnd('\n', '\r')
 
         match body with
-        | "" -> SyntheticToml.document NormalInstructionLines []
-        | data -> SyntheticToml.document NormalInstructionLines [ data ]
+        | "" -> SyntheticToml.document instructionLines []
+        | data -> SyntheticToml.document instructionLines [ data ]
 
     /// COMPANION-010: wrap a frozen record prefix body for injection into X.
-    let companionMemoryBlock (frozenRecordPrefix: string) =
-        CompanionMemoryPreamble
-        + "\n\n<work-log>\n"
-        + frozenRecordPrefix
-        + "\n</work-log>"
+    let companionMemoryBlock (preamble: string) (frozenRecordPrefix: string) =
+        preamble + "\n\n<work-log>\n" + frozenRecordPrefix + "\n</work-log>"

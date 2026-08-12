@@ -3,12 +3,21 @@ namespace Wanxiangshu.Finality
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 
 /// All-confirmed convergence: canonical records + stable tree → blessing.
 module BlessingWorkflow =
+
+    let private undecidedPrompt (managerSessionId: SessionId) =
+        ProviderProse.documentFor managerSessionId ManagerLifecyclePrompt.Path.FinalityUndecidable Map.empty
+
+    let private blessedPrompt (managerSessionId: SessionId) (logs: (int * string) list) =
+        FinalityPrompt.blessedFromLogs
+            (ProviderProse.documentFor managerSessionId FinalityPrompt.Path.Blessed Map.empty)
+            logs
 
     let private treeUnchanged (treePort: FinalityTreePort) (managerSessionId: SessionId) (expected: GitTreeHash) =
         match treePort.ReadManagerTree managerSessionId with
@@ -56,7 +65,7 @@ module BlessingWorkflow =
                     let material = logs |> List.map snd |> String.concat "\n\n"
 
                     match journal.WriteBlob material with
-                    | Error _ -> return FinalityOutcome.Undecided ManagerLifecyclePrompt.FinalityUndecidable
+                    | Error _ -> return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
                     | Ok blob ->
                         FinalityJournal.appendLifecycle
                             journal
@@ -71,5 +80,5 @@ module BlessingWorkflow =
                         members
                         |> List.iter (fun memberInfo -> reviewerPort.AbortReviewer memberInfo.ReviewerSessionId)
 
-                        return FinalityOutcome.Blessed(FinalityPrompt.blessedFromLogs logs)
+                        return FinalityOutcome.Blessed(blessedPrompt managerSessionId logs)
         }

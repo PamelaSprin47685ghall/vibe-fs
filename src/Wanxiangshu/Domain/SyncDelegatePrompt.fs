@@ -9,6 +9,9 @@ type SyncDelegatePromptRequest =
 [<RequireQualifiedAccess>]
 module SyncDelegatePrompt =
 
+    /// Idle nudge when a SyncDelegate turn fails without completing — no return tool.
+    let IdleNudge = "delegation/sync-idle"
+
     let raw (charge: string) =
         { Charge = charge
           ProviderPrompt = charge }
@@ -17,8 +20,5 @@ module SyncDelegatePrompt =
         { Charge = charge
           ProviderPrompt = providerPrompt }
 
-    /// Idle nudge when a SyncDelegate turn fails without completing — no return tool.
-    let idleNudge =
-        SyntheticToml.document
-            [ "The caller is still waiting. Continue the investigation and finish with an ordinary assistant completion when the charge is answered." ]
-            []
+    let idleNudgeDocument (instructionLines: string list) =
+        SyntheticToml.document instructionLines []

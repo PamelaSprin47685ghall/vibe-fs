@@ -72,6 +72,8 @@ module CompanionProjectionBuilder =
         (frameBodies: (BlobDigest * string) list)
         (physicalDelta: (string * string) option)
         (previousTips: (string * string) list)
+        (normalInstructionLines: string list)
+        (squashInstructionLines: string list)
         : CompanionProjectionPlan =
         let selected =
             match kind with
@@ -98,7 +100,7 @@ module CompanionProjectionBuilder =
                 | Some(messageId, toml) ->
                     [ { MessageId = messageId
                         Role = "user"
-                        Text = CompanionPrompt.newWorkMessage toml
+                        Text = CompanionPrompt.newWorkMessage normalInstructionLines toml
                         IsPhysical = true } ]
                 | None -> []
 
@@ -108,15 +110,14 @@ module CompanionProjectionBuilder =
             let instruction =
                 { MessageId = CompanionIdentity.instructionMessageId sha256 bloggerSessionId frameEpoch (kindLabel kind)
                   Role = "user"
-                  Text = CompanionPrompt.SquashInstruction
+                  Text = CompanionPrompt.asCommentedInstruction squashInstructionLines
                   IsPhysical = false }
 
             { Messages = pairedHistory @ [ instruction ] }
 
-    /// First-turn shape: one physical combined delta (instruction header + data), no frames.
+    /// First-turn shape: one physical user message whose body is an ARCH-010 comment header.
+    /// Language-agnostic — do not match English prose (PROMPT-019).
     let isFirstTurnShape (plan: CompanionProjectionPlan) =
         match plan.Messages with
-        | [ delta ] ->
-            delta.IsPhysical
-            && delta.Text.StartsWith("# Write the dense work-log continuation now")
+        | [ delta ] -> delta.IsPhysical && delta.Text.StartsWith("# ")
         | _ -> false

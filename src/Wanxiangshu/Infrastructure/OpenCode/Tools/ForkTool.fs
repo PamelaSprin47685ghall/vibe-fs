@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
@@ -12,6 +13,13 @@ open Wanxiangshu.Session
 /// Manager fork / Orchestrator commission. Each public tool has its own typed
 /// request and schema; PTY is intentionally absent.
 module ForkTool =
+
+    let private forkInstructions (sessionId: SessionId) : ForkChildInstructions =
+        let lang = ProviderProse.languageOf sessionId
+
+        { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
+          CommissionerRecord = ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
+          Requirements = ProviderProse.render lang ForkChildPayload.RequirementsPath Map.empty }
 
     type Request =
         { Calling: string
@@ -92,9 +100,21 @@ module ForkTool =
     let private prepareForkPrompt (scope: ToolRuntimeScope) (runtime: HostForkRuntime) (role: Role) (request: Request) =
         task {
             let basePrompt =
-                ForkChildPayload.relay request.Charge (runtime.ParentWorkRecordOf runtime.ParentId) [] None
+                ForkChildPayload.relay
+                    (forkInstructions runtime.ParentId)
+                    request.Charge
+                    (runtime.ParentWorkRecordOf runtime.ParentId)
+                    []
+                    None
 
-            match! RepositoryWarmStart.appendToBase role scope.WorkspaceDirectory request.Keywords basePrompt with
+            match!
+                RepositoryWarmStart.appendToBase
+                    runtime.ParentId
+                    role
+                    scope.WorkspaceDirectory
+                    request.Keywords
+                    basePrompt
+            with
             | Ok prompt -> return prompt
             | Error _ -> return basePrompt
         }

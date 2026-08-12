@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Host
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
@@ -292,10 +293,17 @@ module XWire =
                                             | Ok body -> body
                                             | Error reason -> raise (InvalidOperationException reason)
 
+                                    let memoryPreamble =
+                                        ProviderProse.render
+                                            (ProviderProse.languageOf sessionId)
+                                            CompanionPrompt.MemoryPreamble
+                                            Map.empty
+
                                     let prefixIntent =
                                         XPrefixProjection.forChoice
                                             plan.Profile.ProjectionChoice
                                             snapshot.CommittedPrefix
+                                            memoryPreamble
                                             frozenRecordPrefixBody
 
                                     // reanchor 后：prefix intent 已是 KeepPhysicalPrefix（Snapshot=None）；

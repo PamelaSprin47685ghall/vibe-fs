@@ -3,12 +3,16 @@ namespace Wanxiangshu.Finality
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 
 /// Manager Finality story: enlist cohort → review → reject+steer OR bless.
 module FinalityWorkflow =
+
+    let private undecidedPrompt (managerSessionId: SessionId) =
+        ProviderProse.documentFor managerSessionId ManagerLifecyclePrompt.Path.FinalityUndecidable Map.empty
 
     let private undecidedMember (managerSessionId: SessionId) (request: FinalityRequestProjection) =
         request.Members
@@ -32,7 +36,7 @@ module FinalityWorkflow =
         : Task<FinalityOutcome> =
         task {
             match journal with
-            | None -> return FinalityOutcome.Undecided ManagerLifecyclePrompt.FinalityUndecidable
+            | None -> return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
             | Some durable ->
                 try
                     let snapshot = AgentJournal.snapshot durable
@@ -145,9 +149,9 @@ module FinalityWorkflow =
                                         requestTree
                                         reviewer
                                         barrier
-                    | _ -> return FinalityOutcome.Undecided ManagerLifecyclePrompt.FinalityUndecidable
+                    | _ -> return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
                 with _ ->
-                    return FinalityOutcome.Undecided ManagerLifecyclePrompt.FinalityUndecidable
+                    return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
         }
 
     let resume

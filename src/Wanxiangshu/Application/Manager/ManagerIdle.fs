@@ -4,6 +4,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
@@ -12,7 +13,7 @@ open Wanxiangshu.Session
 /// GLORY-029: Manager idle → phase-aware encouragement (§7.4.6).
 module ManagerIdle =
 
-    let private idleEncouragement (journal: AgentJournal option) (life: LifeProjection) =
+    let private idleEncouragement (journal: AgentJournal option) (sessionId: SessionId) (life: LifeProjection) =
         let preT1 =
             match journal with
             | None -> true
@@ -23,10 +24,13 @@ module ManagerIdle =
                 |> Option.map (fun todoLife -> List.isEmpty todoLife.AcceptedOrder)
                 |> Option.defaultValue true
 
-        if preT1 then
-            ManagerLifecyclePrompt.IdleEncouragementPreT1
-        else
-            ManagerLifecyclePrompt.IdleEncouragementPostT1
+        let path =
+            if preT1 then
+                ManagerLifecyclePrompt.Path.IdleEncouragementPreT1
+            else
+                ManagerLifecyclePrompt.Path.IdleEncouragementPostT1
+
+        ProviderProse.documentFor sessionId path Map.empty
 
     let encourageLabor
         (sessionPort: ISessionHostPort)
@@ -63,7 +67,7 @@ module ManagerIdle =
                             permit
                             sessionPort
                             turn.SessionId
-                            (idleEncouragement journal life)
+                            (idleEncouragement journal turn.SessionId life)
                             turn.Directory
                             journal
                             life.LifeId

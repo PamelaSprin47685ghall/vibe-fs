@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
@@ -156,4 +157,11 @@ module ProviderRecoveryWorkflow =
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
         : Task =
-        continueAfterConfirmedFailure timerPort sessionPort eventPort journal turn "loop-kill" RuntimeNudge.loopContinue
+        continueAfterConfirmedFailure
+            timerPort
+            sessionPort
+            eventPort
+            journal
+            turn
+            "loop-kill"
+            (ProviderProse.documentFor turn.SessionId RuntimeNudge.LoopContinue Map.empty)

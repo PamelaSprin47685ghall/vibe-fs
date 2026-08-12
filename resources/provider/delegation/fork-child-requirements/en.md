@@ -1,0 +1,1 @@
+The `root_requirement` entries are the authoritative review scope: verified HumanRoot prompts received since the prior review completed its double-PERFECT barrier and reached terminal idle. Verify every applicable requirement. The charge is supplementary and must not narrow or override that scope.

@@ -29,12 +29,23 @@
  * next Fable upgrade — or, worse, on this tree, which is at 5.13.0.
  */
 
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const BUILD_ROOT = fileURLToPath(new URL('../../../dist/', import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const FABLE_MODULES = join(BUILD_ROOT, 'fable_modules');
+
+const syntheticDocument = (body) => {
+  const normalized = String(body).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trimEnd();
+  return normalized.split('\n').map((line) => `# ${line}`).join('\n') + '\n';
+};
+
+const readProviderDocument = (semanticPath) =>
+  syntheticDocument(
+    readFileSync(join(REPO_ROOT, 'resources', 'provider', semanticPath, 'en.md'), 'utf8'),
+  );
 
 const fableLibraryDir = (() => {
   const candidates = readdirSync(FABLE_MODULES).filter((entry) => entry.startsWith('fable-library-js.'));
@@ -50,11 +61,10 @@ const fableLibraryDir = (() => {
 
 const { ofArray } = await import(join(fableLibraryDir, 'List.js'));
 
-const [ForkModule, BloggerModule, SyntheticModule, LifecycleModule] = await Promise.all([
+const [ForkModule, BloggerModule, SyntheticModule] = await Promise.all([
   import(join(BUILD_ROOT, 'Domain/ForkChildPayload.js')),
   import(join(BUILD_ROOT, 'Domain/BloggerToml.js')),
   import(join(BUILD_ROOT, 'Domain/SyntheticToml.js')),
-  import(join(BUILD_ROOT, 'Domain/ManagerLifecyclePrompt.js')),
 ]);
 
 /** An F# list from an array, or an already-converted list left alone. */
@@ -138,8 +148,8 @@ export const bloggerDocumentWith = (instructions, items) =>
 // ── ManagerLifecyclePrompt: GLORY activation / idle / undecidable ─────────────
 // Instruction-only SyntheticToml documents (already comment-prefixed).
 
-export const workActivation = () => LifecycleModule.WorkActivation;
-export const idleEncouragement = () => LifecycleModule.IdleEncouragementPostT1;
-export const idleEncouragementPreT1 = () => LifecycleModule.IdleEncouragementPreT1;
-export const idleEncouragementPostT1 = () => LifecycleModule.IdleEncouragementPostT1;
-export const finalityUndecidable = () => LifecycleModule.FinalityUndecidable;
+export const workActivation = () => readProviderDocument('lifecycle/manager/work-activation');
+export const idleEncouragement = () => readProviderDocument('lifecycle/manager/idle-post-t1');
+export const idleEncouragementPreT1 = () => readProviderDocument('lifecycle/manager/idle-pre-t1');
+export const idleEncouragementPostT1 = () => readProviderDocument('lifecycle/manager/idle-post-t1');
+export const finalityUndecidable = () => readProviderDocument('lifecycle/manager/finality-undecidable');

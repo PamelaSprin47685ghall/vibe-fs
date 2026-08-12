@@ -11,6 +11,7 @@ open Wanxiangshu.Domain.MagicTodoAfter
 open Wanxiangshu.Domain.MagicTodoFacts
 open Wanxiangshu.Domain.MagicTodoSurface
 open Wanxiangshu.Host
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
@@ -303,16 +304,29 @@ module MagicTodoMembrane =
                   PhysicalSuccessEvidence = physical
                   SemanticVersion = bridge.Prepared.SemanticVersion }
 
+            let lang = ProviderProse.languageOf bridge.ManagerSessionId
+
+            let previousBody =
+                ProviderProse.render lang MagicTodoSurface.Path.PreviousNone Map.empty
+
+            let acceptedEpilogue =
+                ProviderProse.render lang MagicTodoSurface.Path.ObligationAcceptedEpilogue Map.empty
+
             let rendered =
-                renderObligationWriteResult
-                    { Previous = None
-                      Current = bridge.NormalizedProposal
-                      Submitted = bridge.NormalizedProposal
-                      Accepted = true }
+                ProviderProse.render
+                    lang
+                    MagicTodoSurface.Path.ObligationWriteResult
+                    (MagicTodoSurface.obligationWriteSubs
+                        previousBody
+                        (MagicTodoSurface.renderObligationListWire bridge.NormalizedProposal)
+                        (MagicTodoSurface.renderObligationListWire bridge.NormalizedProposal)
+                        acceptedEpilogue)
 
             let enrichedResult =
                 if isT1Commitment then
-                    ManagerNarrative.wrapT1AcceptedResult rendered
+                    ManagerNarrative.wrapT1AcceptedResult
+                        (ProviderProse.documentFor bridge.ManagerSessionId ManagerNarrative.Path.T1Revelation Map.empty)
+                        rendered
                 else
                     rendered
 
@@ -369,7 +383,23 @@ module MagicTodoHostHooks =
 
         let definition (input: obj) (output: obj) =
             if isTodoTool input "toolID" then
-                MagicTodoHostCodec.applyDefinition output
+                let sessionText =
+                    if isNull input || isNull input?sessionID then
+                        ""
+                    else
+                        string input?sessionID
+
+                let lang =
+                    if String.IsNullOrWhiteSpace sessionText then
+                        ProviderLanguageBinding.readGlobalPreference ()
+                    else
+                        let sid = SessionId.create sessionText
+
+                        match SessionProviderLanguage.tryGet sid with
+                        | Some value -> value
+                        | None -> ProviderLanguageBinding.readGlobalPreference ()
+
+                MagicTodoHostCodec.applyDefinition lang output
 
         let before (input: obj) (output: obj) : Task<unit> =
             task {

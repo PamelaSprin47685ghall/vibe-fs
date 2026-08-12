@@ -1,8 +1,7 @@
 // tests/unit/support/glory.mjs — GLORY frozen-text facade (SURFACE-004).
 //
-// Tests never copy frozen text; they read the owner modules (Domain owners)
-// and the packaged resources. A renamed Fable export fails loudly at load
-// instead of reading `undefined` (VERIFY-008).
+// Tests never copy frozen text; they read Domain assemblers + provider resources.
+// A renamed Fable export fails loudly at load instead of reading `undefined` (VERIFY-008).
 
 import { readFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -16,7 +15,6 @@ const load = async (rel, names) => {
   const module = await import(dist(rel))
   const out = {}
   for (const name of names) {
-    const value = module[name] ?? module[`${name}`]
     const exported = module[`${name}`] ?? module[Object.keys(module).find((k) => k.endsWith(`_${name}`))]
     if (exported === undefined) throw new Error(`missing export ${name} in ${rel}`)
     out[name] = exported
@@ -24,23 +22,27 @@ const load = async (rel, names) => {
   return out
 }
 
+/** Instruction-only SyntheticToml.document layout (ARCH-010): `# ` per line + trailing LF. */
+const syntheticDocument = (body) => {
+  const normalized = String(body).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trimEnd()
+  return normalized.split('\n').map((line) => `# ${line}`).join('\n') + '\n'
+}
+
+const readProviderRaw = (semanticPath) =>
+  readFileSync(path.join(root, 'resources', 'provider', semanticPath, 'en.md'), 'utf8')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .trim()
+
+const readProviderDocument = (semanticPath) => syntheticDocument(readProviderRaw(semanticPath))
+
 const narrative = await load('Domain/ManagerNarrative.js', [
-  'PlanningTail',
-  'ReawakeningPrefix',
-  'planningTableDocument',
-  't1RevelationDocument',
   'wrapT1AcceptedResult',
   'firstBirth',
   'reawakening',
   'renderText',
 ])
-const lifecycle = await load('Domain/ManagerLifecyclePrompt.js', [
-  'WorkActivation',
-  'IdleEncouragementPreT1',
-  'IdleEncouragementPostT1',
-  'FinalityUndecidable',
-])
-const finality = await load('Domain/FinalityPrompt.js', ['rejected', 'blessed', 'rest'])
+const finality = await load('Domain/FinalityPrompt.js', ['rejected', 'blessed'])
 const hostReview = await load('Domain/HostReviewPrompt.js', ['OpeningAssignment'])
 
 /** F# list → array (Fable list has head/tail). */
@@ -65,35 +67,42 @@ const projectionView = (projection) => {
   }
 }
 
+const planningTable = () => readProviderDocument('lifecycle/manager/planning-table')
+const t1Revelation = () => readProviderDocument('lifecycle/manager/t1-revelation')
+const reawakeningDoc = () => readProviderDocument('lifecycle/manager/reawakening')
+
 export const managerNarrative = {
-  planningTail: () => narrative.PlanningTail,
-  reawakeningPrefix: () => narrative.ReawakeningPrefix,
-  planningTableDocument: () => narrative.planningTableDocument,
-  t1RevelationDocument: () => narrative.t1RevelationDocument,
-  wrapT1AcceptedResult: (body) => narrative.wrapT1AcceptedResult(body),
-  firstBirth: (text) => projectionView(narrative.firstBirth(text)),
-  reawakening: (text) => projectionView(narrative.reawakening(text)),
-  firstBirthText: (text) => narrative.renderText(narrative.firstBirth(text)),
-  reawakeningText: (text) => narrative.renderText(narrative.reawakening(text)),
+  planningTail: () => readProviderRaw('lifecycle/manager/planning-tail'),
+  reawakeningPrefix: () => readProviderRaw('lifecycle/manager/reawakening').split('\n')[0],
+  planningTableDocument: planningTable,
+  t1RevelationDocument: t1Revelation,
+  wrapT1AcceptedResult: (body) => narrative.wrapT1AcceptedResult(t1Revelation(), body),
+  firstBirth: (text) => projectionView(narrative.firstBirth(text, planningTable())),
+  reawakening: (text) => projectionView(narrative.reawakening(text, reawakeningDoc(), planningTable())),
+  firstBirthText: (text) => narrative.renderText(narrative.firstBirth(text, planningTable())),
+  reawakeningText: (text) =>
+    narrative.renderText(narrative.reawakening(text, reawakeningDoc(), planningTable())),
 }
 
 export const managerLifecyclePrompt = {
-  workActivation: () => lifecycle.WorkActivation,
-  idleEncouragementPreT1: () => lifecycle.IdleEncouragementPreT1,
-  idleEncouragementPostT1: () => lifecycle.IdleEncouragementPostT1,
-  finalityUndecidable: () => lifecycle.FinalityUndecidable,
+  workActivation: () => readProviderDocument('lifecycle/manager/work-activation'),
+  idleEncouragementPreT1: () => readProviderDocument('lifecycle/manager/idle-pre-t1'),
+  idleEncouragementPostT1: () => readProviderDocument('lifecycle/manager/idle-post-t1'),
+  finalityUndecidable: () => readProviderDocument('lifecycle/manager/finality-undecidable'),
 }
 
 export const finalityPrompt = {
-  rejected: (record) => finality.rejected(record),
-  blessed: (record) => finality.blessed(record),
-  rest: () => finality.rest,
+  rejected: (record) =>
+    finality.rejected(readProviderDocument('lifecycle/finality/rejected'), record),
+  blessed: (record) => finality.blessed(readProviderDocument('lifecycle/finality/blessed'), record),
+  rest: () => readProviderDocument('lifecycle/finality/rest'),
 }
 
 export const hostReviewPrompt = {
   openingAssignment: () => hostReview.OpeningAssignment,
 }
 
-const resourcesDir = path.join(root, 'resources', 'prompts')
-export const managerSystemPrompt = () => readFileSync(path.join(resourcesDir, 'manager-system.md'), 'utf8')
-export const reviewerSystemPrompt = () => readFileSync(path.join(resourcesDir, 'reviewer-system.md'), 'utf8')
+export const managerSystemPrompt = () =>
+  readFileSync(path.join(root, 'resources', 'provider', 'role', 'manager', 'en.md'), 'utf8')
+export const reviewerSystemPrompt = () =>
+  readFileSync(path.join(root, 'resources', 'provider', 'role', 'reviewer', 'en.md'), 'utf8')

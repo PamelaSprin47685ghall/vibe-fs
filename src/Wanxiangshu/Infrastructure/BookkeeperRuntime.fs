@@ -69,14 +69,8 @@ module BookkeeperRuntime =
     let private currentPort () : ISessionHostPort option = lock gate (fun () -> sessionPort)
 
     let private systemPrompt (ownerSessionId: string) =
-        let lang =
-            SessionProviderLanguage.tryGet (SessionId.create ownerSessionId)
-            |> Option.defaultValue ProviderLanguage.English
-
-        try
-            PromptResources.loadBookkeeperSystemFor lang
-        with _ ->
-            "Maintain staged Q/A via js-bookkeeper only. Idle is allowed when evidence does not change the answer."
+        // PROMPT-019: bound owner fails closed via languageOf; no English prose swallow.
+        PromptResources.loadBookkeeperSystemFor (ProviderProse.languageOf (SessionId.create ownerSessionId))
 
     let private table (name: string) (fields: string list) : string =
         String.concat "\n" (("[" + name + "]") :: fields)

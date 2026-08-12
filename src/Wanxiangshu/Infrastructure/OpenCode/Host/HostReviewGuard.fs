@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.IO
 open System.Threading.Tasks
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel
@@ -166,7 +167,7 @@ module HostReviewGuard =
             sessionId
             (ProviderRunIdentity.value triggerProviderRun)
             "missing-verdict"
-            RuntimeNudge.reviewerVerdictGuard
+            (ProviderProse.documentFor sessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
             "reviewer"
 
     /// REVIEW-003: the first PERFECT is recorded but not confirmed. This nudge only

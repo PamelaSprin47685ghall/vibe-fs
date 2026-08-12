@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
@@ -70,7 +71,7 @@ module HostJoinGuard =
                         HostSessionNudge.sendContinuation
                             sessionPort
                             sessionId
-                            RuntimeNudge.backgroundJoinGuard
+                            (ProviderProse.documentFor sessionId RuntimeNudge.BackgroundJoin Map.empty)
                             PromptAuthority.ContinuationKind.JoinGuard
                             directory
                             (Some durable)

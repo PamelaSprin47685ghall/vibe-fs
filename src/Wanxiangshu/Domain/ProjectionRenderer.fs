@@ -145,6 +145,8 @@ module ProjectionRenderer =
                     frameBodies
                     intent.PhysicalDelta
                     intent.PreviousTips
+                    intent.NormalInstructionLines
+                    intent.SquashInstructionLines
 
             let companionMessages = plan.Messages
 

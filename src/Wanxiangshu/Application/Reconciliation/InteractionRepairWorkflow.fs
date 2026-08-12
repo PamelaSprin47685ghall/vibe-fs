@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
@@ -111,7 +112,10 @@ module InteractionRepairWorkflow =
                 sessionPort
                 eventPort
                 journal
-                RuntimeNudge.missingFinalReport
+                (ProviderProse.documentFor
+                    context.Turn.SessionId
+                    RuntimeNudge.MissingClosingReport
+                    Map.empty)
                 "missing-final-report"
 
     /// Incomplete in-progress interaction: classify then idle-repair, unless a
@@ -134,7 +138,7 @@ module InteractionRepairWorkflow =
                 sessionPort
                 eventPort
                 journal
-                RuntimeNudge.interactionRepairContinue
+                (ProviderProse.documentFor turn.SessionId RuntimeNudge.InteractionContinue Map.empty)
                 "interaction-repair"
         else
             AsyncSupport.completedTask ()

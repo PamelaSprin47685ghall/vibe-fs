@@ -7,8 +7,8 @@ open Wanxiangshu.Kernel.Identity
 ///
 /// `SyntheticMessageId` 复用快照自己的 id（CTX-012：该 id 在候选构建时固定，provider 在本
 /// epoch 已见过；再派生一次就是同一身份的第二个构建点，任何漂移都会让后续每个请求多付一次
-/// 冷边界）。`Memory` 是已解析的 FrozenRecordPrefix 文本经 `CompanionPrompt.companionMemoryBlock`
-/// 包裹后的低信任上下文。`DropLeading` 是被替换的 provider-visible 消息条数（cutoff）。
+/// 冷边界）。`Memory` 是已解析的 FrozenRecordPrefix 经 companion memory preamble 包裹后的
+/// 低信任上下文。`DropLeading` 是被替换的 provider-visible 消息条数（cutoff）。
 type PrefixActivation =
     { SyntheticMessageId: string
       Memory: string
@@ -49,6 +49,9 @@ type BlogFramesIntent =
         PhysicalDelta: (string * string) option
         /// ENFORCER-071：`(tipField, cycleId)`，oldest → newest。
         PreviousTips: (string * string) list
+        /// PROMPT-019：已本地化的 Companion normal / squash 指令行。
+        NormalInstructionLines: string list
+        SquashInstructionLines: string list
     }
 
 /// `InsertRepair` 载荷：InteractionRepair 的幂等键。

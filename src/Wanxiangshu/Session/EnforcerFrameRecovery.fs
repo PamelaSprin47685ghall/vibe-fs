@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Host
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
@@ -112,13 +113,19 @@ module EnforcerFrameRecovery =
                         |> List.map (fun tip -> tip.FieldName, tip.CycleId)
                     | None -> []
 
+                let lang = ProviderProse.languageOf owner
+
                 let blogFramesIntent: BlogFramesIntent =
                     { RequestKind = requestKind
                       SquashFrameCount = squashCount
                       BloggerSessionId = SessionId.value bloggerSessionId
                       FrameEpoch = FrameEpochId.value frameEpoch
                       PhysicalDelta = delta
-                      PreviousTips = previousTips }
+                      PreviousTips = previousTips
+                      NormalInstructionLines =
+                        ProviderProse.instructionLines lang CompanionPrompt.Normal Map.empty
+                      SquashInstructionLines =
+                        ProviderProse.instructionLines lang CompanionPrompt.Squash Map.empty }
 
                 let emptyCurrent: ProviderProjection.ProviderSemanticProjection =
                     { ProviderId = None

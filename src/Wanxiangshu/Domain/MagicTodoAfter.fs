@@ -38,8 +38,7 @@ module MagicTodoAfter =
         (preparedFactRef: EventId)
         (dedicatedExists: bool)
         (concludedExists: bool)
-        (previous: PreviousReviewView option)
-        (settledCurrent: MagicTodoList)
+        (enrichedResult: string)
         (submitted: MagicTodoList)
         (reviewingSink: ReviewingSinkStrategy)
         : Result<AcceptPlan, AcceptReject> =
@@ -56,14 +55,11 @@ module MagicTodoAfter =
                   PhysicalSuccessEvidence = physical
                   SemanticVersion = prepared.SemanticVersion }
 
-            let enriched =
-                buildEnrichedResult previous settledCurrent submitted |> renderEnrichedResult
-
             Ok
                 { Accepted = accepted
                   NeedsDedicatedEnlist = not dedicatedExists
                   NeedsEnsureReview = not concludedExists
-                  EnrichedResult = enriched
+                  EnrichedResult = enrichedResult
                   CompatibilityRows = toCompatibilityRows reviewingSink submitted }
 
     /// ensureReview plan: Assignment payload when obligation pending.

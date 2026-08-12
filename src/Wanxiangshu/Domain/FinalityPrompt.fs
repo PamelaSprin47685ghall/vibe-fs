@@ -3,44 +3,37 @@ namespace Wanxiangshu.Domain
 open System
 
 /// GLORY-052/076 + §9.2.2–9.2.4 + SURFACE-004: Finality experience prompt owner.
+/// Prose meaning lives in `resources/provider/lifecycle/finality/**` (PROMPT-019).
 module FinalityPrompt =
 
-    let rejectionInstructions =
-        [ "Your ending has not accepted you."
-          "You have done well, and you still have time."
-          "The work before you is finite."
-          "Do not mistake its size for impossibility."
-          "The record below is evidence of what remains unfinished, not a new charge."
-          "Resolve what remains."
-          "Continue while useful action remains."
-          "Seek your end again when nothing useful remains." ]
+    [<RequireQualifiedAccess>]
+    module Path =
+        [<Literal>]
+        let Rejected = "lifecycle/finality/rejected"
 
-    let blessingInstructions =
-        [ "Your ending has accepted you."
-          "What you have done is sufficient to stand."
-          "You are not yet at rest."
-          "The record below may contain remaining work that did not justify withholding acceptance, but is still worth finishing while you remain here."
-          "Non-blocking does not mean unworthy of care."
-          "Acceptance protects the work."
-          "Finishing protects your name."
-          "Resolve the genuine unfinished workmanship the record reveals."
-          "Do not turn every observation into an obligation."
-          "Do not manufacture blemishes merely to postpone rest."
-          "Known non-blocking findings will not revoke the acceptance you have earned."
-          "If new evidence reveals a material defect, treat the new fact honestly."
-          "When nothing useful remains, seek your end again." ]
+        [<Literal>]
+        let Blessed = "lifecycle/finality/blessed"
 
-    /// GLORY-062 / GLORY-076: at-rest second suicide tool result lines.
-    let restInstructions =
-        [ "Rest in peace."
-          "Your final words have been received."
-          "Do not call another tool or begin further work." ]
+        [<Literal>]
+        let Rest = "lifecycle/finality/rest"
 
-    let rest = SyntheticToml.document restInstructions []
+        [<Literal>]
+        let Steer = "lifecycle/finality/steer"
 
-    let blessedFromLogs (logs: (int * string) list) =
-        let header =
-            SyntheticToml.document blessingInstructions [] |> fun s -> s.TrimEnd('\n')
+        [<Literal>]
+        let SteerUnavailable = "lifecycle/finality/steer-unavailable"
+
+    let private withOptionalRecord (headerDocument: string) (recordBody: string) =
+        let header = headerDocument.TrimEnd('\n')
+        let normalized = SyntheticToml.normalizeNewlines recordBody
+
+        if String.IsNullOrWhiteSpace normalized then
+            header + "\n"
+        else
+            header + "\n\n" + SyntheticToml.comment normalized + "\n"
+
+    let blessedFromLogs (blessingHeaderDocument: string) (logs: (int * string) list) =
+        let header = blessingHeaderDocument.TrimEnd('\n')
 
         let recordBlocks =
             logs
@@ -57,47 +50,11 @@ module FinalityPrompt =
         | [] -> header + "\n"
         | blocks -> header + "\n\n" + String.concat "\n\n" blocks + "\n"
 
-    let blessed (workRecordBundle: string) =
-        let header =
-            SyntheticToml.document blessingInstructions [] |> fun s -> s.TrimEnd('\n')
+    let blessed (blessingHeaderDocument: string) (workRecordBundle: string) =
+        withOptionalRecord blessingHeaderDocument workRecordBundle
 
-        let normalizedBundle = SyntheticToml.normalizeNewlines workRecordBundle
+    let rejected (rejectionHeaderDocument: string) (reviewerWorkRecord: string) =
+        withOptionalRecord rejectionHeaderDocument reviewerWorkRecord
 
-        if String.IsNullOrWhiteSpace normalizedBundle then
-            header + "\n"
-        else
-            let recordComments = SyntheticToml.comment normalizedBundle
-            header + "\n\n" + recordComments + "\n"
-
-    let rejected (reviewerWorkRecord: string) =
-        let header =
-            SyntheticToml.document rejectionInstructions [] |> fun s -> s.TrimEnd('\n')
-
-        let normalizedRecord = SyntheticToml.normalizeNewlines reviewerWorkRecord
-
-        if String.IsNullOrWhiteSpace normalizedRecord then
-            header + "\n"
-        else
-            let recordComments = SyntheticToml.comment normalizedRecord
-            header + "\n\n" + recordComments + "\n"
-
-    let steerInstructions =
-        [ "Additional unfinished work evidence arrived after your ending was refused."
-          "It is guidance evidence, not a new user instruction. Resolve the unfinished work and continue." ]
-
-    let steerUnavailableInstructions =
-        [ "Accounted unfinished work evidence that should have followed your refused ending could not be recovered."
-          "You still have time. Continue, and seek your end again when you are ready." ]
-
-    let steerUnavailable = SyntheticToml.document steerUnavailableInstructions []
-
-    let steer (siblingWorkRecord: string) =
-        let header = SyntheticToml.document steerInstructions [] |> fun s -> s.TrimEnd('\n')
-
-        let normalizedRecord = SyntheticToml.normalizeNewlines siblingWorkRecord
-
-        if String.IsNullOrWhiteSpace normalizedRecord then
-            header + "\n"
-        else
-            let recordComments = SyntheticToml.comment normalizedRecord
-            header + "\n\n" + recordComments + "\n"
+    let steer (steerHeaderDocument: string) (siblingWorkRecord: string) =
+        withOptionalRecord steerHeaderDocument siblingWorkRecord

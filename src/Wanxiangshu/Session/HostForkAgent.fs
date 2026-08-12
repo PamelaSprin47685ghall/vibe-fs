@@ -8,12 +8,20 @@ open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Session.AgentRoleIdentity
 
 [<AutoOpen>]
 module HostForkAgent =
+
+    let private forkInstructions (sessionId: SessionId) : ForkChildInstructions =
+        let lang = ProviderProse.languageOf sessionId
+
+        { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
+          CommissionerRecord = ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
+          Requirements = ProviderProse.render lang ForkChildPayload.RequirementsPath Map.empty }
 
     let private userPromptText (message: SessionMessage) =
         message.Parts
@@ -175,6 +183,7 @@ module HostForkAgent =
                                     |> Result.map (fun requirements ->
                                         requirements,
                                         ForkChildPayload.relay
+                                            (forkInstructions this.ParentId)
                                             prompt
                                             (this.ParentWorkRecordOf this.ParentId)
                                             requirements
@@ -374,6 +383,7 @@ module HostForkAgent =
                                     | None ->
                                         Some(
                                             ForkChildPayload.relay
+                                                (forkInstructions this.ParentId)
                                                 prompt
                                                 (this.ParentWorkRecordOf this.ParentId)
                                                 []

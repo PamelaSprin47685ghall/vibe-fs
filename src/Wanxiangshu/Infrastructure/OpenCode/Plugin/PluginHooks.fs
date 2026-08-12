@@ -48,19 +48,9 @@ module PluginHooks =
             // executor while this three-hook membrane owns provider schema,
             // durable checkpoint admission, and accepted-result enrichment.
             let magicTodo = MagicTodoHostHooks.create journal snapshotOpt
-            let providerLanguage = ProviderLanguageBinding.readGlobalPreference ()
 
             let toolDefinition (toolInput: obj) (toolOutput: obj) =
                 magicTodo.Definition toolInput toolOutput
-
-                if
-                    providerLanguage = ProviderLanguage.SimplifiedChinese
-                    && not (isNull toolInput)
-                    && not (isNull toolInput?toolID)
-                    && string toolInput?toolID = "todowrite"
-                    && not (isNull toolOutput)
-                then
-                    toolOutput?description <- box MagicTodoSurface.TodoWriteDefinitionDescriptionZhCn
 
             let toolAfter (toolInput: obj) (toolOutput: obj) =
                 task {

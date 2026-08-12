@@ -2,12 +2,29 @@ namespace Wanxiangshu.Finality
 
 open System.Threading.Tasks
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 
 /// Finality rejection, sibling accounting/steering, and durable resume.
 module RevisionWorkflow =
+
+    let private undecidedPrompt (managerSessionId: SessionId) =
+        ProviderProse.documentFor managerSessionId ManagerLifecyclePrompt.Path.FinalityUndecidable Map.empty
+
+    let private rejectedPrompt (managerSessionId: SessionId) (workRecord: string) =
+        FinalityPrompt.rejected
+            (ProviderProse.documentFor managerSessionId FinalityPrompt.Path.Rejected Map.empty)
+            workRecord
+
+    let private steerPrompt (managerSessionId: SessionId) (workRecord: string) =
+        FinalityPrompt.steer
+            (ProviderProse.documentFor managerSessionId FinalityPrompt.Path.Steer Map.empty)
+            workRecord
+
+    let private steerUnavailablePrompt (managerSessionId: SessionId) =
+        ProviderProse.documentFor managerSessionId FinalityPrompt.Path.SteerUnavailable Map.empty
 
     let concludeUndecided
         (journal: AgentJournal)
@@ -29,7 +46,7 @@ module RevisionWorkflow =
                        BarrierId = barrierId
                        GitTreeHash = requestTree |})
 
-            return FinalityOutcome.Undecided ManagerLifecyclePrompt.FinalityUndecidable
+            return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
         }
 
     let private stagePrimaryRejectionRecord
@@ -69,7 +86,7 @@ module RevisionWorkflow =
                    WorkRecordRef = blob.BlobRef
                    WorkRecordDigest = blob.BlobDigest |})
 
-        FinalityOutcome.Rejected(FinalityPrompt.rejected workRecord)
+        FinalityOutcome.Rejected(rejectedPrompt managerSessionId workRecord)
 
     let private awaitDurableSiblingRecords
         (journal: AgentJournal)
@@ -183,7 +200,7 @@ module RevisionWorkflow =
         : Task =
         task {
             for _, workRecord in prepared do
-                let! _ = reviewerPort.SendRevisionSteer managerSessionId (FinalityPrompt.steer workRecord)
+                let! _ = reviewerPort.SendRevisionSteer managerSessionId (steerPrompt managerSessionId workRecord)
                 ()
         }
         :> Task
@@ -270,9 +287,9 @@ module RevisionWorkflow =
                         | _ -> None
 
                 let prompt =
-                    workRecordOpt
-                    |> Option.map FinalityPrompt.steer
-                    |> Option.defaultValue FinalityPrompt.steerUnavailable
+                    match workRecordOpt with
+                    | Some workRecord -> steerPrompt managerSessionId workRecord
+                    | None -> steerUnavailablePrompt managerSessionId
 
                 let! _ = reviewerPort.SendRevisionSteer managerSessionId prompt
                 ()
@@ -380,5 +397,5 @@ module RevisionWorkflow =
 
                     return None
             with _ ->
-                return Some(FinalityOutcome.Undecided ManagerLifecyclePrompt.FinalityUndecidable)
+                return Some(FinalityOutcome.Undecided(undecidedPrompt managerSessionId))
         }

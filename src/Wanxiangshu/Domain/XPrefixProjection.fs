@@ -19,6 +19,8 @@ module XPrefixProjection =
     /// PERSIST-007 keeps large bodies out of the journal line — so resolving it is the
     /// adapter's job and this module takes the result.
     ///
+    /// `memoryPreamble` is already-localized companion memory preamble (PROMPT-019).
+    ///
     /// That is the same split `ResolvedPrefixMemory` makes on the Session side: the
     /// journal records WHERE the body is, and only a resolved copy can be handed to the
     /// transform boundary.
@@ -27,13 +29,17 @@ module XPrefixProjection =
     /// id was fixed when the candidate was built and is what the provider has already
     /// seen for this epoch; deriving it again here would be a second construction site
     /// for one identity, and any drift becomes a cold boundary on every later request.
-    let forSnapshot (snapshot: PrefixSnapshot option) (frozenRecordPrefixBody: string) : ProjectionIntent =
+    let forSnapshot
+        (snapshot: PrefixSnapshot option)
+        (memoryPreamble: string)
+        (frozenRecordPrefixBody: string)
+        : ProjectionIntent =
         match snapshot with
         | None -> ProjectionIntent.KeepPhysicalPrefix
         | Some value ->
             ProjectionIntent.ActivatePrefixEpoch
                 { SyntheticMessageId = value.SyntheticMessageId
-                  Memory = CompanionPrompt.companionMemoryBlock frozenRecordPrefixBody
+                  Memory = CompanionPrompt.companionMemoryBlock memoryPreamble frozenRecordPrefixBody
                   DropLeading = value.CutoffExclusive }
 
     /// CTX-010: the intent this attempt's profile calls for.
@@ -45,11 +51,13 @@ module XPrefixProjection =
     let forChoice
         (choice: XProjectionChoice)
         (committed: PrefixSnapshot option)
+        (memoryPreamble: string)
         (frozenRecordPrefixBody: string)
         : ProjectionIntent =
         match choice with
-        | XProjectionChoice.UseCommittedEpoch -> forSnapshot committed frozenRecordPrefixBody
-        | XProjectionChoice.UsePrefixProbe probe -> forSnapshot (Some probe.Candidate) frozenRecordPrefixBody
+        | XProjectionChoice.UseCommittedEpoch -> forSnapshot committed memoryPreamble frozenRecordPrefixBody
+        | XProjectionChoice.UsePrefixProbe probe ->
+            forSnapshot (Some probe.Candidate) memoryPreamble frozenRecordPrefixBody
 
     /// Which blob this attempt needs read before its plan can be built.
     ///

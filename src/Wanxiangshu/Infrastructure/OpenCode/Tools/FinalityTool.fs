@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Finality
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
@@ -21,8 +22,9 @@ open Wanxiangshu.Tools
 /// (GLORY-038/039).
 module FinalityTool =
 
-    /// GLORY-062/076 + §9.2.4: at-rest second-suicide tool result owner.
-    let RestInPeaceInstructions = FinalityPrompt.restInstructions
+    /// GLORY-062/076 + §9.2.4: at-rest second-suicide tool result (session language).
+    let private restInPeaceInstructions (sessionId: SessionId) =
+        ProviderProse.instructionLines (ProviderProse.languageOf sessionId) FinalityPrompt.Path.Rest Map.empty
 
     let private tString = ToolHostCodec.TString
 
@@ -108,7 +110,7 @@ module FinalityTool =
             match ManagerLifeWorkflow.completeBlessedLife journal sid life blessing lastWords providerRun with
             | Error _ -> return ToolHostCodec.tomlObjectWithInstructions [ "Continue working and try again later." ] []
             | Ok BlessedLifeCompletion.AlreadyCompleted ->
-                return ToolHostCodec.tomlObjectWithInstructions RestInPeaceInstructions []
+                return ToolHostCodec.tomlObjectWithInstructions (restInPeaceInstructions sid) []
             | Ok(BlessedLifeCompletion.Completed authorityRoot) ->
                 match scope.EventPort with
                 | Some eventPort ->
@@ -124,7 +126,7 @@ module FinalityTool =
                     eventPort.NotifyTerminal sid (TerminalOutcome.Completed runResult) |> ignore
                 | None -> ()
 
-                return ToolHostCodec.tomlObjectWithInstructions RestInPeaceInstructions []
+                return ToolHostCodec.tomlObjectWithInstructions (restInPeaceInstructions sid) []
         }
 
 

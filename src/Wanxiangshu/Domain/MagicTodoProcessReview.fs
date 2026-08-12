@@ -28,11 +28,11 @@ module MagicTodoProcessReview =
             ProposedTodo: MagicTodoList
         }
 
-    let renderAssignmentUserMessage (req: ProcessReviewRequest) : string =
-        String.concat
-            "\n\n"
-            [ MagicTodoSurface.ProcessReviewerInstructionPreamble
-              "=== OpeningRaw (task authority) ==="
+    /// `preamble` is already-localized ProcessReviewer prose (PROMPT-019).
+    let renderAssignmentUserMessage (preamble: string) (req: ProcessReviewRequest) : string =
+        MagicTodoSurface.renderAssignmentUserMessage
+            preamble
+            [ "=== OpeningRaw (task authority) ==="
               req.OpeningRaw
               "=== ManagerCheckpointLWR (includeOpening=false; frontier-bounded) ==="
               req.ManagerCheckpointLwr

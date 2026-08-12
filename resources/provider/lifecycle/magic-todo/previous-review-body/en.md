@@ -1,0 +1,4 @@
+Verdict: {{verdict}}
+
+Report:
+{{report}}

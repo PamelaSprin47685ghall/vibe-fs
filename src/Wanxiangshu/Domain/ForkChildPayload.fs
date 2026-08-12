@@ -18,38 +18,21 @@ type ForkChildAssignment =
         Payload: string option
     }
 
+/// Already-localized fork-child instruction fragments (PROMPT-019).
+type ForkChildInstructions =
+    { Base: string list
+      CommissionerRecord: string
+      Requirements: string }
+
 /// The first prompt of a forked child, as one ARCH-010 payload.
 [<RequireQualifiedAccess>]
 module ForkChildPayload =
 
-    /// The one unconditional instruction every forked child receives: how to close.
-    ///
-    /// GrandRewrite §3.2.2 — constrain the honesty of the content, not the skeleton of the
-    /// account. The closing report is prose testimony, never a universal field list; the
-    /// retired form (`result, files changed, tests run, evidence, remaining risks, blockers`)
-    /// made every child fill a status DTO instead of testifying about its own work.
-    let BaseInstructions =
-        [ "When your charge is complete, leave an ordinary closing report in natural prose."
-          ""
-          "Tell your Commissioner what became true, what evidence materially supports that account, and what remains unresolved when something genuinely remains."
-          ""
-          "Do not force the report into a universal field list."
-          "Do not omit an important fact merely because no predefined field asks for it."
-          ""
-          "The closing report is testimony about the work, not a serialized status object." ]
+    let BasePath = "delegation/fork-child-base"
+    let CommissionerRecordPath = "delegation/fork-child-commissioner-record"
+    let RequirementsPath = "delegation/fork-child-requirements"
 
-    /// Emitted only alongside a commissioner record field.
-    let CommissionerRecordInstruction =
-        "The record below belongs to your Commissioner. It is their history, not yours. Read it for context and evidence. Unfinished work in that record does not become yours merely because you can see it. Your charge tells you what is yours to carry."
-
-    /// REVIEW-002. Emitted only alongside `[[root_requirement]]` entries.
-    let RequirementsInstruction =
-        "The `root_requirement` entries are the authoritative review scope: verified HumanRoot "
-        + "prompts received since the prior review completed its double-PERFECT barrier and reached terminal "
-        + "idle. Verify every applicable requirement. The charge is supplementary and must not narrow or "
-        + "override that scope."
-
-    let render (input: ForkChildAssignment) : string =
+    let render (prose: ForkChildInstructions) (input: ForkChildAssignment) : string =
         let requirements =
             input.RootRequirements
             |> List.filter (fun text -> not (System.String.IsNullOrWhiteSpace text))
@@ -66,14 +49,14 @@ module ForkChildPayload =
                  []
              else
                  [ assignmentText ])
-            @ BaseInstructions
+            @ prose.Base
             @ (match commissionerRecord with
-               | Some record -> [ CommissionerRecordInstruction ] @ (record.Split('\n') |> Array.toList)
+               | Some record -> [ prose.CommissionerRecord ] @ (record.Split('\n') |> Array.toList)
                | None -> [])
             @ (if List.isEmpty requirements then
                    []
                else
-                   [ RequirementsInstruction ])
+                   [ prose.Requirements ])
 
         let body =
             (match input.Payload with
@@ -91,12 +74,14 @@ module ForkChildPayload =
 
     /// The positional form, for a call site that reads better without a record literal.
     let relay
+        (prose: ForkChildInstructions)
         (assignment: string)
         (commissionerRecord: string option)
         (requirements: string list)
         (payload: string option)
         : string =
         render
+            prose
             { Assignment = assignment
               CommissionerRecord = commissionerRecord
               RootRequirements = requirements

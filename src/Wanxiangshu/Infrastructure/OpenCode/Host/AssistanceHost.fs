@@ -7,6 +7,7 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ChildRecovery
 open Wanxiangshu.Finality
 open Wanxiangshu.Host
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
@@ -38,6 +39,23 @@ type AssistanceHost
     let consultationAgent = ManagedAgentCatalog.nameOf AgentTier.Deep Role.Inquiry
     let claimGate = obj ()
     let claimedOwnerAttempts = HashSet<string>()
+
+    let assistanceLines (sessionId: SessionId) (path: string) =
+        ProviderProse.instructionLines (ProviderProse.languageOf sessionId) path Map.empty
+
+    let consultationAssignment (sessionId: SessionId) =
+        ProviderProse.render (ProviderProse.languageOf sessionId) AssistancePrompt.ConsultationPath Map.empty
+
+    let escalationPrompt (sessionId: SessionId) =
+        AssistancePrompt.escalation (assistanceLines sessionId AssistancePrompt.EscalationPath)
+
+    let advicePrompt (sessionId: SessionId) (childWorkRecord: string) =
+        AssistancePrompt.advice (assistanceLines sessionId AssistancePrompt.ReturnPath) childWorkRecord
+
+    let consultationFailedPrompt (sessionId: SessionId) (reason: string) =
+        AssistancePrompt.consultationFailed
+            (assistanceLines sessionId AssistancePrompt.ConsultationFailedPath)
+            reason
 
     let ownerAttemptKey (turn: ReconciledTurn) =
         SessionId.value turn.SessionId
@@ -279,10 +297,18 @@ type AssistanceHost
             match parentRecord owner with
             | None -> return Error "canonical parent LifecycleWorkRecord unavailable"
             | Some commissionerRecord ->
-                let assignment = AssistancePrompt.consultationAssignment
+                let assignment = consultationAssignment owner
+
+                let lang = ProviderProse.languageOf owner
+
+                let forkProse: ForkChildInstructions =
+                    { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
+                      CommissionerRecord =
+                        ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
+                      Requirements = ProviderProse.render lang ForkChildPayload.RequirementsPath Map.empty }
 
                 let providerPrompt =
-                    ForkChildPayload.relay assignment (Some commissionerRecord) [] None
+                    ForkChildPayload.relay forkProse assignment (Some commissionerRecord) [] None
 
                 XTraceCapture.captureOpening journal childId assignment []
 
@@ -350,13 +376,14 @@ type AssistanceHost
                                 requester
                                 record.ChildSessionId
                                 record
-                                (AssistancePrompt.advice childWorkRecord)
+                                (advicePrompt owner childWorkRecord)
                                 directory
                     | _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
                 | HandleLifecycle.Retired
                 | HandleLifecycle.Abandoned _ ->
                     let exhausted =
-                        AssistancePrompt.consultationFailed
+                        consultationFailedPrompt
+                            owner
                             "another consultation is unavailable for this run; continue the original charge with the evidence you have"
 
                     match!
@@ -472,7 +499,7 @@ type AssistanceHost
                                     profile.LogicalRunId
                                     deep
                                     PromptAuthority.ContinuationKind.NeedHelpEscalation
-                                    AssistancePrompt.escalation
+                                    (escalationPrompt turn.SessionId)
                                     turn.Directory
                             with
                             | Ok _ -> return AssistanceTurnDisposition.Handled
@@ -538,7 +565,7 @@ type AssistanceHost
                     match body with
                     | None ->
                         let failure =
-                            AssistancePrompt.consultationFailed "canonical child LifecycleWorkRecord unavailable"
+                            consultationFailedPrompt owner "canonical child LifecycleWorkRecord unavailable"
 
                         match recordTerminal owner agentId turn.SessionId record false failure with
                         | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
@@ -562,11 +589,11 @@ type AssistanceHost
                                     requester
                                     turn.SessionId
                                     refreshed
-                                    (AssistancePrompt.advice childWorkRecord)
+                                    (advicePrompt owner childWorkRecord)
                                     turn.Directory
 
                 | ReconcileProgram.TurnFailed error ->
-                    let failure = AssistancePrompt.consultationFailed error
+                    let failure = consultationFailedPrompt owner error
 
                     match recordTerminal owner agentId turn.SessionId record false failure with
                     | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
@@ -590,7 +617,7 @@ type AssistanceHost
                         else
                             "consultation aborted: " + reason
 
-                    let failure = AssistancePrompt.consultationFailed failureReason
+                    let failure = consultationFailedPrompt owner failureReason
 
                     if recursive then
                         match recordTerminal owner agentId turn.SessionId record false failure with
@@ -650,7 +677,7 @@ type AssistanceHost
                                         requester
                                         childId
                                         record
-                                        (AssistancePrompt.advice childWorkRecord)
+                                        (advicePrompt owner childWorkRecord)
                                         None
 
                                 ()

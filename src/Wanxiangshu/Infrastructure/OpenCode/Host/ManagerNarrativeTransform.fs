@@ -7,6 +7,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Host
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
@@ -14,6 +15,40 @@ open Wanxiangshu.Kernel.Identity
 
 /// Provider-facing Birth/Reawakening rewrite from durable Life projection + raw messages.
 module ManagerNarrativeTransform =
+
+    let private planningTableDocument (sessionId: SessionId) =
+        ProviderProse.documentFor sessionId ManagerNarrative.Path.PlanningTable Map.empty
+
+    let private reawakeningDocument (sessionId: SessionId) =
+        ProviderProse.documentFor sessionId ManagerNarrative.Path.Reawakening Map.empty
+
+    let private birthProjection (sessionId: SessionId) (rawText: string) =
+        ManagerNarrative.firstBirth rawText (planningTableDocument sessionId)
+
+    let private reawakeningProjection (sessionId: SessionId) (rawText: string) =
+        ManagerNarrative.reawakening rawText (reawakeningDocument sessionId) (planningTableDocument sessionId)
+
+    /// Ending-evidence anchors from Finality prose in every ProviderLanguage.
+    let private endingEvidenceFragments =
+        lazy (
+            [ ProviderLanguage.English; ProviderLanguage.SimplifiedChinese ]
+            |> List.collect (fun lang ->
+                [ FinalityPrompt.Path.Rest; FinalityPrompt.Path.Rejected; FinalityPrompt.Path.Blessed ]
+                |> List.collect (fun path ->
+                    ProviderProse.instructionLines lang path Map.empty
+                    |> List.filter (fun line -> not (String.IsNullOrWhiteSpace line))))
+            |> List.distinct
+        )
+
+    let private workActivationAnchors =
+        lazy (
+            [ ProviderLanguage.English; ProviderLanguage.SimplifiedChinese ]
+            |> List.collect (fun lang ->
+                ProviderProse.instructionLines lang ManagerLifecyclePrompt.Path.WorkActivation Map.empty
+                |> List.filter (fun line -> not (String.IsNullOrWhiteSpace line))
+                |> List.truncate 1)
+            |> List.distinct
+        )
 
     /// GLORY-012: only a HumanRoot-managed Manager opens Lives. An
     /// AgentOwnerRoot Manager (an Orchestrator's forked ManagerJob) receives
@@ -76,11 +111,8 @@ module ManagerNarrativeTransform =
             // LifeCompleted re-opens a Life on the same HumanRoot (measured:
             // reawakening rewrite on the terminal text step).
             let isEndingEvidence (text: string) =
-                text.Contains("Your final words have been received")
-                || text.Contains("Your ending has not accepted you")
-                || text.Contains("Your ending has accepted you")
-                || text.Contains("Rest in peace")
-                || text.Contains("rest in peace")
+                endingEvidenceFragments.Value
+                |> List.exists (fun fragment -> text.Contains(fragment, StringComparison.OrdinalIgnoreCase))
 
             rawMessages
             |> List.skip (messageIndex + 1)
@@ -199,9 +231,9 @@ module ManagerNarrativeTransform =
                     else
                         let narrative =
                             if List.isEmpty lifecycle.CompletedLives then
-                                ManagerNarrative.firstBirth rawText
+                                birthProjection sid rawText
                             else
-                                ManagerNarrative.reawakening rawText
+                                reawakeningProjection sid rawText
 
                         Some(rewriteMessage rawMessages messageIndex narrative))
             // No open Life: a new HumanRoot opens one (GLORY-012/063).
@@ -291,9 +323,9 @@ module ManagerNarrativeTransform =
                                         // reawakening narrative).
                                         let narrative =
                                             if List.length lifecycle.CompletedLives = 1 then
-                                                ManagerNarrative.firstBirth rawText
+                                                birthProjection sid rawText
                                             else
-                                                ManagerNarrative.reawakening rawText
+                                                reawakeningProjection sid rawText
 
                                         Some(rewriteMessage rawMessages messageIndex narrative))
                         else
@@ -356,9 +388,9 @@ module ManagerNarrativeTransform =
                                 else
                                     let narrative =
                                         if List.isEmpty lifecycle.CompletedLives then
-                                            ManagerNarrative.firstBirth rawText
+                                            birthProjection sid rawText
                                         else
-                                            ManagerNarrative.reawakening rawText
+                                            reawakeningProjection sid rawText
 
                                     let lifeId = ManagerLifeId.create (Guid.NewGuid().ToString("N"))
 
@@ -432,8 +464,9 @@ module ManagerNarrativeTransform =
                             message.Parts
                             |> List.exists (function
                                 | WireText text ->
-                                    // Comment-only activation starts with `# Now complete...`.
-                                    text.Contains("Now complete it yourself.", StringComparison.Ordinal)
+                                    // Comment-only activation matches WorkActivation first line (any locale).
+                                    workActivationAnchors.Value
+                                    |> List.exists (fun anchor -> text.Contains(anchor, StringComparison.Ordinal))
                                 | _ -> false)
                         | _ -> false)
 

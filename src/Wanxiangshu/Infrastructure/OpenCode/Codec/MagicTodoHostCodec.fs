@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure.Resources
 
 /// The only raw Host boundary for the GrandRewrite Magic Todo account.
 /// Provider input is `{ obligations: [{ name, work }] }`; the built-in Host
@@ -84,9 +85,12 @@ module MagicTodoHostCodec =
 
     let replaceEnrichedResult (output: obj) (text: string) = output?output <- box text
 
-    let applyDefinition (output: obj) =
+    let applyDefinition (lang: ProviderLanguage) (output: obj) =
         let parameters = parseJson MagicTodoSurface.todoWriteJsonSchema
         let jsonSchema = parseJson MagicTodoSurface.todoWriteJsonSchema
-        output?description <- box MagicTodoSurface.TodoWriteDefinitionDescription
+
+        output?description <-
+            box (ProviderProse.render lang MagicTodoSurface.Path.TodoWriteDescription Map.empty)
+
         output?parameters <- parameters
         output?jsonSchema <- jsonSchema

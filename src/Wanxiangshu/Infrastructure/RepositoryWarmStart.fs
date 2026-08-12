@@ -5,7 +5,9 @@ open System.IO
 open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Identity
 
 /// AGENT-032: Infrastructure adapter from explicit keywords to neutral warm-start
 /// material. Semble remains internal and fail-open; provider rendering stays Domain.
@@ -80,6 +82,7 @@ module RepositoryWarmStart =
 
     let prepareWithSearch
         (search: Search)
+        (sessionId: SessionId)
         (role: Role)
         (workspaceDirectory: string option)
         (keywordsRaw: string)
@@ -89,13 +92,23 @@ module RepositoryWarmStart =
             match! collectWithSearch search role workspaceDirectory keywordsRaw with
             | Error error -> return Error error
             | Ok None -> return Ok charge
-            | Ok(Some searches) -> return Ok(RepositoryWarmStartPrompt.render charge searches)
+            | Ok(Some searches) ->
+                let lang = ProviderProse.languageOf sessionId
+
+                let instructions =
+                    ProviderProse.instructionLines
+                        lang
+                        RepositoryWarmStartPrompt.ChargeEnvelope
+                        (Map [ "charge", charge ])
+
+                return Ok(RepositoryWarmStartPrompt.render instructions charge searches)
         }
 
     /// Fork path: preserve ForkChildPayload's assignment + commissioner record
     /// and append repository_search/repository_hint tables as low-trust data.
     let appendToBaseWithSearch
         (search: Search)
+        (sessionId: SessionId)
         (role: Role)
         (workspaceDirectory: string option)
         (keywordsRaw: string)
@@ -105,21 +118,42 @@ module RepositoryWarmStart =
             match! collectWithSearch search role workspaceDirectory keywordsRaw with
             | Error error -> return Error error
             | Ok None -> return Ok basePrompt
-            | Ok(Some searches) -> return Ok(RepositoryWarmStartPrompt.appendToProviderPrompt basePrompt searches)
+            | Ok(Some searches) ->
+                let appendix =
+                    ProviderProse.instructionLines
+                        (ProviderProse.languageOf sessionId)
+                        RepositoryWarmStartPrompt.Appendix
+                        Map.empty
+
+                return Ok(RepositoryWarmStartPrompt.appendToProviderPrompt appendix basePrompt searches)
         }
 
     let prepare
+        (sessionId: SessionId)
         (role: Role)
         (workspaceDirectory: string option)
         (keywordsRaw: string)
         (charge: string)
         : Task<Result<string, string>> =
-        prepareWithSearch SembleMcpClient.searchFromEnvironment role workspaceDirectory keywordsRaw charge
+        prepareWithSearch
+            SembleMcpClient.searchFromEnvironment
+            sessionId
+            role
+            workspaceDirectory
+            keywordsRaw
+            charge
 
     let appendToBase
+        (sessionId: SessionId)
         (role: Role)
         (workspaceDirectory: string option)
         (keywordsRaw: string)
         (basePrompt: string)
         : Task<Result<string, string>> =
-        appendToBaseWithSearch SembleMcpClient.searchFromEnvironment role workspaceDirectory keywordsRaw basePrompt
+        appendToBaseWithSearch
+            SembleMcpClient.searchFromEnvironment
+            sessionId
+            role
+            workspaceDirectory
+            keywordsRaw
+            basePrompt

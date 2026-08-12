@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
@@ -97,7 +98,7 @@ module OrdinaryTurnWorkflow =
                     journal
                     turn
                     error
-                    RuntimeNudge.providerRetry
+                    (ProviderProse.documentFor turn.SessionId RuntimeNudge.ProviderRetry Map.empty)
             | ReconcileProgram.TurnCompleted ->
                 let joinOutstanding =
                     TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId

@@ -14,6 +14,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Host
+open Wanxiangshu.Infrastructure.Resources
 
 module internal CompanionHostBlogger =
 
@@ -114,9 +115,23 @@ module internal CompanionHostBlogger =
                 // CurrentRequest / durable materialize; transform rebuilds Working Record +
                 // New Work + instruction. Sending raw Toml as the claim body fails mock
                 // matching after restart when rebuild cannot run yet.
-                return! sendBloggerPrompt deps childId CompanionPrompt.NormalInstruction
+                let prompt =
+                    ProviderProse.instructionLines
+                        (ProviderProse.languageOf deps.PrimaryId)
+                        CompanionPrompt.Normal
+                        Map.empty
+                    |> CompanionPrompt.asCommentedInstruction
+
+                return! sendBloggerPrompt deps childId prompt
             | BloggerRequestContext.Squash _ ->
                 // Physical claim body is the stable squash instruction only.
                 // Frames arrive via rebuildFromContext on the transform (no raw transcript).
-                return! sendBloggerPrompt deps childId CompanionPrompt.SquashInstruction
+                let prompt =
+                    ProviderProse.instructionLines
+                        (ProviderProse.languageOf deps.PrimaryId)
+                        CompanionPrompt.Squash
+                        Map.empty
+                    |> CompanionPrompt.asCommentedInstruction
+
+                return! sendBloggerPrompt deps childId prompt
         }

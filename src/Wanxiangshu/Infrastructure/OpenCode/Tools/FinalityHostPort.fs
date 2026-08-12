@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Finality
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
@@ -46,6 +47,9 @@ module FinalityHostPort =
             |> Option.defaultValue AgentTier.Deep
             |> fun tier -> ManagedAgent.nameOf tier Role.Reviewer
 
+        let openingAssignment () =
+            ProviderProse.render (ProviderProse.languageOf managerSessionId) HostReviewPrompt.Opening Map.empty
+
         let prepareSession (request: FinalityReviewerRequest) =
             task {
                 match request.ReviewerSessionId with
@@ -62,7 +66,7 @@ module FinalityHostPort =
                             request.AgentId,
                             Role.Reviewer,
                             reviewerAgentName,
-                            HostReviewPrompt.OpeningAssignment,
+                            openingAssignment (),
                             None,
                             ownership = HandleOwnership.HostOwnedHidden,
                             deferSend = true
@@ -89,7 +93,7 @@ module FinalityHostPort =
                             memberInfo.AgentId,
                             Role.Reviewer,
                             reviewerAgentName,
-                            HostReviewPrompt.OpeningAssignment,
+                            openingAssignment (),
                             None
                         )
                     with

@@ -6,11 +6,19 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure.Resources
 open Wanxiangshu.Process
 
 /// Complete lifecycle for synchronous one-shot Coder/Inspector tools: create,
 /// subscribe-before-send, await one terminal, then physically abort/dispose.
 module OneShotAgentTool =
+
+    let private forkInstructions (sessionId: SessionId) : ForkChildInstructions =
+        let lang = ProviderProse.languageOf sessionId
+
+        { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
+          CommissionerRecord = ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
+          Requirements = ProviderProse.render lang ForkChildPayload.RequirementsPath Map.empty }
 
     type Request = { Agent: string; Prompt: string }
 
@@ -92,7 +100,13 @@ module OneShotAgentTool =
                     // EXEC-006: parent → child keeps Opening.
                     let parentWorkRecord = scope.ParentWorkRecordFor context.SessionId
 
-                    let fullPrompt = ForkChildPayload.relay request.Prompt parentWorkRecord [] None
+                    let fullPrompt =
+                        ForkChildPayload.relay
+                            (forkInstructions parentId)
+                            request.Prompt
+                            parentWorkRecord
+                            []
+                            None
 
                     match!
                         scope.Sessions.CreateChildSession(

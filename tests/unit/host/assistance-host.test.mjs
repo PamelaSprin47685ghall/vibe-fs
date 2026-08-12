@@ -13,6 +13,7 @@ import {
   okResult,
   physicalUser,
   promptDispatcher,
+  providerLanguage,
   providerRun,
   reconcileSupervisor,
   roles,
@@ -124,6 +125,8 @@ const withHarness = async (selectedAgent, fn) => {
   const dispatcher = forJournal(journal)
   const owner = `ses_${selectedAgent.replaceAll('-', '_')}`
   const root = 'msg_root'
+  providerLanguage.clearAllForTests()
+  assert.equal(providerLanguage.bindOnce(sessionId(owner), providerLanguage.simplifiedChinese).ok, true)
   const accepted = Runtime__AcceptHumanRoot(dispatcher, sessionId(owner), physicalUser(root), selectedAgent)
   assert.equal(accepted.tag, 0, accepted.fields?.[0])
 
@@ -147,6 +150,8 @@ const withHarness = async (selectedAgent, fn) => {
     },
     CreateChildSession: async (parent, options) => {
       const child = sessionId(`ses_consult_${creates.length + 1}`)
+      const inherited = providerLanguage.inheritFromOwner(providerLanguage.simplifiedChinese, child)
+      assert.equal(inherited.ok, true, inherited.error)
       creates.push({ parent: idValue.session(parent), child: idValue.session(child), options })
       return okResult(child)
     },
@@ -185,6 +190,7 @@ const withHarness = async (selectedAgent, fn) => {
   try {
     await fn({ journal, dispatcher, owner, root, sends, creates, ownedChildren, sensor, host, bindRun })
   } finally {
+    providerLanguage.clearAllForTests()
     opened.dispose()
     rmSync(directory, { recursive: true, force: true })
   }
