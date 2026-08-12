@@ -11,7 +11,7 @@ module PtyTool =
     let private tString = ToolHostCodec.TString
 
     let private error (message: string) =
-        ToolHostCodec.tomlObjectWithInstructions [ "# " + message ] []
+        ToolHostCodec.tomlObjectWithInstructions [ message ] []
 
     let private instruction (text: string) =
         ToolHostCodec.tomlObjectWithInstructions [ text ] []
@@ -54,7 +54,7 @@ module PtyTool =
                                     | Error bindError ->
                                         runtime.UntrackPtyRun id.Value
                                         return error bindError
-                                    | Ok() -> return instruction (sprintf "# %s is open." (name.Trim()))
+                                    | Ok() -> return instruction (sprintf "%s is open." (name.Trim()))
         }
 
     let private sendExecute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
@@ -72,7 +72,7 @@ module PtyTool =
                     | None -> return error (sprintf "Unknown terminal '%s'" (name.Trim()))
                     | Some ptyId ->
                         match! runtime.SendPty(ptyId, input, None) with
-                        | Ok _ -> return instruction "# Input sent."
+                        | Ok _ -> return instruction "Input sent."
                         | Error sendError -> return error sendError
         }
 
@@ -92,7 +92,7 @@ module PtyTool =
                         match! runtime.SendPty(ptyId, "", None) with
                         | Error readError -> return error readError
                         | Ok read when String.IsNullOrWhiteSpace read.Output ->
-                            return instruction (sprintf "# Nothing new has appeared in %s." (name.Trim()))
+                            return instruction (sprintf "Nothing new has appeared in %s." (name.Trim()))
                         | Ok read -> return ToolHostCodec.tomlObject [ "output", tString read.Output ]
         }
 
@@ -118,7 +118,7 @@ module PtyTool =
                                 return
                                     instruction (
                                         sprintf
-                                            "# %s was sent to %s."
+                                            "%s was sent to %s."
                                             (signalRaw.Trim().ToUpperInvariant())
                                             (name.Trim())
                                     )
