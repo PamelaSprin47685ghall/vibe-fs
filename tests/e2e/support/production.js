@@ -37,13 +37,13 @@ const BUILD_ROOT = fileURLToPath(new URL('../../../dist/', import.meta.url));
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const FABLE_MODULES = join(BUILD_ROOT, 'fable_modules');
 
-const syntheticDocument = (body) => {
+const asInstructionDocument = (body) => {
   const normalized = String(body).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trimEnd();
   return normalized.split('\n').map((line) => (line === '' ? '#' : `# ${line}`)).join('\n') + '\n';
 };
 
 const readProviderDocument = (semanticPath) =>
-  syntheticDocument(
+  asInstructionDocument(
     readFileSync(join(REPO_ROOT, 'resources', 'provider', semanticPath, 'en.md'), 'utf8'),
   );
 

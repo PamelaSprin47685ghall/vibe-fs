@@ -43,7 +43,7 @@ const { AgentJournalModule_runtimeId, AgentJournalModule_createFromProjection } 
 const { forJournal, Runtime__AcceptHumanRoot, Runtime__AcceptAgentOwnerRoot } = await import(
   '../../../dist/Application/Prompting/PromptDispatcher.js'
 )
-const { SessionIdModule_create, PhysicalUserMessageIdModule_create, PromptKeyModule_create, ManagerLifeIdModule_create, BlobDigestModule_create, BlobRefModule_create } = await import(
+const { SessionIdModule_create, PhysicalUserMessageIdModule_create, PromptKeyModule_create, ManagerLifeIdModule_create, BlobDigestModule_create, BlobRefModule_create, ToolCallIdModule_create } = await import(
   '../../../dist/Kernel/Identity.js'
 )
 const { TerminalOutcome } = await import('../../../dist/Infrastructure/OpenCode/Host/Events.js')
@@ -55,7 +55,15 @@ const {
 const ChildRecovery = await import('../../../dist/Domain/ChildRecovery.js')
 const { ManagerLifecycleFact } = await import('../../../dist/Kernel/Fact.js')
 const { StreamId } = await import('../../../dist/Journal/Envelope.js')
-const { AgentJournalModule_appendManagerLifecycle } = await import('../../../dist/Journal/AgentJournal.js')
+const {
+  MagicTodoFact,
+  PhysicalSuccessEvidence,
+  TodoWriteAccepted,
+  TodoWritePrepared,
+} = await import('../../../dist/Domain/MagicTodoFacts.js')
+const { TodoWriteIdModule_create } = await import('../../../dist/Domain/MagicTodo.js')
+const { XTraceCursor } = await import('../../../dist/Domain/XTrace.js')
+const { AgentJournalModule_appendManagerLifecycle, AgentJournalModule_appendMagicTodo } = await import('../../../dist/Journal/AgentJournal.js')
 const terminalEvidenceCompleted =
   ChildRecovery.TerminalEvidenceModule_completed ?? ChildRecovery.TerminalEvidence_completed
 const terminalEvidenceFailed =
@@ -437,6 +445,61 @@ export const activateLife = (runtime, sessionId) => {
     }]),
     runtime.journal,
   )
+}
+
+/**
+ * GLORY-037 / TODO-010: first unblessed suicide requires ≥1 TodoWriteAccepted.
+ * `activateLife` only opens the Life; T1 is a separate Magic Todo fact pair.
+ */
+export const acceptFirstTodoWrite = (runtime, sessionId) => {
+  const sid = SessionIdModule_create(sessionId)
+  const lifeId = ManagerLifeIdModule_create(`life-${sessionId}`)
+  const stream = new StreamId(1, [sid])
+  const call = ToolCallIdModule_create(`todo-t1-${sessionId}`)
+  const write = TodoWriteIdModule_create(`todo-write-t1-${sessionId}`)
+  const digest = 'digest:t1-input'
+  const prepared = new TodoWritePrepared(
+    sid,
+    lifeId,
+    write,
+    call,
+    0,
+    BlobRefModule_create('blob-todo-base'),
+    BlobDigestModule_create('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'),
+    BlobRefModule_create('blob-todo-proposed'),
+    BlobDigestModule_create('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'),
+    digest,
+    new XTraceCursor(0n),
+    'magic-todo.v1',
+  )
+  const preparedResult = AgentJournalModule_appendMagicTodo(
+    stream,
+    undefined,
+    new MagicTodoFact(0, [prepared]),
+    runtime.journal,
+  )
+  if (preparedResult.tag !== 0) {
+    throw new Error(`TodoWritePrepared(${sessionId}) rejected: ${JSON.stringify(preparedResult.fields?.[0])}`)
+  }
+  const accepted = new TodoWriteAccepted(
+    lifeId,
+    write,
+    call,
+    preparedResult.fields[0].EventId,
+    digest,
+    'digest:t1-output',
+    PhysicalSuccessEvidence.LiveAfterSuccess,
+    'magic-todo.v1',
+  )
+  const acceptedResult = AgentJournalModule_appendMagicTodo(
+    stream,
+    undefined,
+    new MagicTodoFact(1, [accepted]),
+    runtime.journal,
+  )
+  if (acceptedResult.tag !== 0) {
+    throw new Error(`TodoWriteAccepted(${sessionId}) rejected: ${JSON.stringify(acceptedResult.fields?.[0])}`)
+  }
 }
 
 /**

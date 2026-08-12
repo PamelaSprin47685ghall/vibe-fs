@@ -31,6 +31,7 @@ import {
   acceptChildAgentOwnerRoot,
   notifyCompleted,
   activateLife,
+  acceptFirstTodoWrite,
 } from '../../unit/plugin/plugin-fixture.mjs'
 
 /** AGENT-002: Role-backed managed agents (Bookkeeper pair added in hostFinalConfig). */
@@ -1039,6 +1040,7 @@ test('GLORY_038_suicide_with_outstanding_child_prompts_to_join', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'manager-suicide-outstanding', 'fast-manager')
     activateLife(runtime, 'manager-suicide-outstanding')
+    acceptFirstTodoWrite(runtime, 'manager-suicide-outstanding')
     const context = { sessionID: 'manager-suicide-outstanding', agent: 'fast-manager', callID: 'call_suicide_1', messageID: 'msg_1' }
 
     // Fork a child agent so there is an active child handle.
@@ -1067,6 +1069,7 @@ test('GLORY_057_suicide_returns_undecided_when_hidden_reviewer_times_out', async
 
     acceptAuthorityRoot(runtime, 'manager-finality-no-terminal', 'fast-manager')
     activateLife(runtime, 'manager-finality-no-terminal')
+    acceptFirstTodoWrite(runtime, 'manager-finality-no-terminal')
     const context = {
       sessionID: 'manager-finality-no-terminal',
       agent: 'fast-manager',
