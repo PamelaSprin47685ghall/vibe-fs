@@ -7,14 +7,10 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Persist
 open Wanxiangshu.OpenCode
 
-/// JS-003/JS-072/JS-074: the coexistence seam between builtin filesystem
-/// tools and the generated js-* surface.
-///
-/// Builtin read/edit/write/glob/grep/patch keep their original schemas and
-/// executors; the hook only rewrites their visible descriptions to deprecate
-/// them in favour of the current js-ROLE. The hook is not a security scope:
-/// it never changes builtin executability, and the js-* name it recommends
-/// must be provider-visible at the same time (JS-003).
+/// Coexistence seam between builtin filesystem fallbacks and generated js-*.
+/// GrandRewrite keeps read/edit/write/glob/grep as normal primitive fallback:
+/// their Host descriptions are left untouched. Preference for intent-level
+/// programs is taught inside the generated js-* contract and its Ultra Example.
 module BuiltinToolDescriptionHook =
 
     [<Emit("$0 === undefined || $0 === null")>]
@@ -24,25 +20,11 @@ module BuiltinToolDescriptionHook =
     let BuiltinFilesystemTools =
         set [ "read"; "edit"; "write"; "glob"; "grep"; "patch" ]
 
-    /// Hook text appended to a builtin tool's description.
-    ///
-    /// Canonical shape (JS-003): DEPRECATED marker, the preferred js-* tool
-    /// name, and a one-line push toward complex programs / parallel calls.
-    let hookSuffix (jsRoleToolName: string) : string =
-        "DEPRECATED — prefer "
-        + jsRoleToolName
-        + " for filesystem work: one capability-projected JS program per task, "
-        + "parallel calls are safe."
+    /// No provider annotation: primitive fallbacks are not deprecated.
+    let hookSuffix (_jsRoleToolName: string) : string = ""
 
-    /// Apply the hook to a builtin description (idempotent: a description
-    /// already carrying the DEPRECATED marker is not annotated twice).
-    let annotate (builtinName: string) (description: string) (jsRoleToolName: string) : string =
-        if not (Set.contains builtinName BuiltinFilesystemTools) then
-            description
-        elif description.Contains "DEPRECATED" then
-            description
-        else
-            description + "\n\n" + hookSuffix jsRoleToolName
+    let annotate (_builtinName: string) (description: string) (_jsRoleToolName: string) : string =
+        description
 
     /// JS-003: the hook must not recommend a tool the provider cannot see.
     /// `visibleToolNames` is the current Attempt's tool set; a recommendation

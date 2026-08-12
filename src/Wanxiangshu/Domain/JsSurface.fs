@@ -12,7 +12,7 @@ type JsSurface =
         Members: JsCapabilityFragment list
         Description: string
         BaseClassSource: string
-        /// Canonical examples, one per present member, in member order.
+        /// GrandRewrite §6.10: exactly one responsibility-shaped Ultra Example.
         Examples: string list
         /// member name → runtime binding key; the runtime gate checks the
         /// invoked member against this exact map (JS-004).
@@ -36,11 +36,12 @@ module JsToolGenerator =
         JsCanonicalDescription.publicBaseClass capabilities
 
     let renderDescription (roleName: string) (capabilities: Set<JsCapability>) : string =
-        JsCanonicalDescription.render (toolNameFor roleName) capabilities
+        JsCanonicalDescription.render roleName (toolNameFor roleName) capabilities
 
-    let renderExamples (capabilities: Set<JsCapability>) : string list =
-        JsCanonicalDescription.filteredExamples capabilities
-        |> List.map (fun example -> example.Source)
+    let renderExamples (roleName: string) (capabilities: Set<JsCapability>) : string list =
+        JsCanonicalDescription.ultraExample roleName capabilities
+        |> Option.map (fun example -> [ example.Source ])
+        |> Option.defaultValue []
 
     /// Deterministic projection: an Attempt profile with no filesystem
     /// capability gets no js-* surface at all (JS-001/004).
@@ -59,7 +60,7 @@ module JsToolGenerator =
                   Members = members
                   Description = renderDescription roleName jsCapabilities
                   BaseClassSource = renderBaseClass jsCapabilities
-                  Examples = renderExamples jsCapabilities
+                  Examples = renderExamples roleName jsCapabilities
                   RuntimeBindings =
                     members
                     |> List.map (fun fragment -> fragment.MemberName, fragment.RuntimeBindingKey)

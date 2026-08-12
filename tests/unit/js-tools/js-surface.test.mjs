@@ -37,9 +37,9 @@ const fsPermissionsOf = (role) =>
 const MEMBER_BY_PERMISSION = { Read: 'file', Glob: 'glob', Grep: 'grep', Edit: 'rewrite', Write: 'write' }
 const BINDING_BY_MEMBER = { file: 'js.read', glob: 'js.glob', grep: 'js.grep', rewrite: 'js.edit', write: 'js.write' }
 
-// The four layers a capability must light up: member, description, example,
-// runtime binding, base class. A member missing from any layer is exactly a
-// lying generator (JS-004).
+// Capability exactness is structural: member, generated API description,
+// runtime binding, base class. GrandRewrite §6.10 intentionally decouples the
+// one responsibility-shaped Ultra Example from per-member syntax coverage.
 const layersOf = (s) =>
   Object.fromEntries(
     listItems(s.Members).map((fragment) => [
@@ -89,7 +89,7 @@ test('JS002_generation_is_deterministic_and_names_js_role', () => {
   assert.equal(a.Capabilities.size, 5)
 })
 
-test('JS004_four_layer_exactness_coder', () => {
+test('JS004_capability_exactness_plus_one_ultra_example_coder', () => {
   const result = surface('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
   assert.equal(isSome(result), true)
   const layers = layersOf(result)
@@ -97,14 +97,15 @@ test('JS004_four_layer_exactness_coder', () => {
   for (const [member, layer] of Object.entries(layers)) {
     assert.equal(layer.inBaseClass, true, `${member} in base class`)
     assert.equal(layer.inDescription, true, `${member} in description`)
-    assert.equal(layer.inExamples, true, `${member} in examples`)
     assert.equal(layer.binding, BINDING_BY_MEMBER[member], `${member} binding`)
   }
   assert.equal(result.Description.includes('HOST_READ_IMMUTABLE_UTF8_SNAPSHOT'), true)
-  assert.equal(result.Description.includes('h1+200'), true)
-  assert.equal(result.Description.includes('text("h1", "h2")'), true)
+  assert.match(result.Description, /name\+N \/ name-N/)
+  assert.match(result.Description, /text\(from = "\^", to = "\$"\)/)
   assert.equal(result.Description.includes('_api'), false)
   assert.equal(result.Description.includes('__jsFailure'), false)
+  assert.equal(listItems(result.Examples).length, 1, 'one responsibility-shaped Ultra Example')
+  assert.match(listItems(result.Examples)[0], /oldApi → newApi/)
 })
 
 test('JS004_absent_capability_is_absent_in_all_four_layers', () => {
@@ -137,16 +138,15 @@ test('JS004_member_gate_binds_present_members_only', () => {
   assert.equal(memberBinding('Inquiry', caps(ToolPermission.Inspect), 'file'), undefined)
 })
 
-test('JS002_same_capabilities_same_surface_across_roles', () => {
-  // Every role surface is a pure projection: same capabilities → same members,
-  // base class, and bindings regardless of role name (only tool name differs).
-  const a = generate('Coder', caps(ToolPermission.Read))
-  const b = generate('Reviewer', caps(ToolPermission.Read))
-  assert.equal(a.BaseClassSource, b.BaseClassSource)
-  assert.equal(a.ToolName, 'js-coder')
-  assert.equal(b.ToolName, 'js-reviewer')
-  assert.equal(a.Description.includes('js-coder'), true)
-  assert.equal(b.Description.includes('js-reviewer'), true)
+test('JS002_same_capabilities_share_mechanics_but_role_shapes_the_ultra_example', () => {
+  const shared = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
+  const inspector = generate('Inspector', shared)
+  const reviewer = generate('Reviewer', shared)
+  assert.equal(inspector.BaseClassSource, reviewer.BaseClassSource)
+  assert.deepEqual(memberNames(inspector), memberNames(reviewer))
+  assert.notEqual(inspector.Description, reviewer.Description)
+  assert.match(inspector.Description, /RetryPolicy/)
+  assert.match(reviewer.Description, /staleReferences/)
 })
 
 test('JS001_non_fs_permissions_never_produce_members', () => {
@@ -165,7 +165,7 @@ test('JS004_fast_deep_profiles_generate_identical_surfaces', () => {
   assert.equal(fast.Description, deep.Description)
 })
 
-test('JS002_description_embeds_spec_base_class_rules_and_examples', () => {
+test('JS002_description_embeds_spec_base_class_rules_and_one_ultra_example', () => {
   const coder = surface('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
   for (const token of [
     'class JsProgram',
@@ -176,9 +176,11 @@ test('JS002_description_embeds_spec_base_class_rules_and_examples', () => {
     'begin',
     'end',
     'complete resulting file',
-    'oldString',
     'Anchors locate',
     'Define exactly one class named Js',
+    'Ultra Example',
+    'oldApi → newApi',
+    'Mechanical branches belong inside the program',
   ]) {
     assert.equal(coder.Description.includes(token), true, `coder description missing: ${token}`)
   }
@@ -186,8 +188,31 @@ test('JS002_description_embeds_spec_base_class_rules_and_examples', () => {
   assert.equal(coder.Description.includes('js.read'), false)
   const inspector = surface('Inspector', ['Read', 'Glob', 'Grep'])
   assert.equal(inspector.Description.includes('HOST_READ_IMMUTABLE_UTF8_SNAPSHOT'), true)
-  assert.equal(inspector.Description.includes('matchAll'), true)
+  assert.equal(inspector.Description.includes('RetryPolicy'), true)
   assert.equal(inspector.Description.includes('this.rewrite'), false)
+})
+
+test('JS010_each_filesystem_role_gets_exactly_one_distinct_ultra_example', () => {
+  const markers = {
+    Coder: /oldApi → newApi/,
+    Inspector: /RetryPolicy/,
+    Reviewer: /staleReferences/,
+    DevOps: /candidateTests/,
+    Browser: /WidgetOptions/,
+  }
+
+  for (const [role, marker] of Object.entries(markers)) {
+    const result = surface(role, roles.permissions(roles.of(role)))
+    const examples = listItems(result.Examples)
+    assert.equal(examples.length, 1, `${role} gets exactly one Ultra Example`)
+    assert.match(examples[0], marker, `${role} gets its responsibility-shaped lesson`)
+    const classes = result.Description.match(/class Js extends JsProgram/g) ?? []
+    assert.equal(classes.length, 1, `${role} description must not dilute the Ultra Example with toy examples`)
+    assert.match(result.Description, /Semantic branches belong between programs/)
+  }
+
+  const reviewer = surface('Reviewer', roles.permissions(roles.of('Reviewer')))
+  assert.doesNotMatch(listItems(reviewer.Examples)[0], /verdict\s*:/i, 'reviewer example gathers evidence, never authors judgment')
 })
 
 test('JS004_lying_generator_counterexample_is_rejected', () => {

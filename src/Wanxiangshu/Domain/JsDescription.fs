@@ -577,15 +577,156 @@ module JsCanonicalDescription =
               + "  }\n"
               + "}" } ]
 
+    // GrandRewrite §6.10: method descriptions teach syntax; exactly one Ultra
+    // Example teaches how this responsibility should think with the projected
+    // SDK. The program stops when the next step needs semantic judgment.
+    let private coderUltra =
+        """class Js extends JsProgram {
+  async run() {
+    const refs = await this.grep(/\boldApi\b/, "{src,tests}/**/*.{js,ts}");
+    if (refs.truncated) throw new Error("Migration frontier was truncated.");
+    const paths = [...new Set(refs.matches.map(x => x.path))];
+    const core = await this.file("src/api.js", [
+      ["definition", "afterDefinition", "const oldApi = buildApi();"],
+      ["export", "afterExport", "export { oldApi };"],
+      ["registration", "afterRegistration", 'registry.register("oldApi", oldApi);'],
+    ]);
+    const consumers = await Promise.all(
+      paths.filter(path => path !== "src/api.js").map(async path => [path, await this.file(path)])
+    );
+    this.rewrite(
+      "src/api.js",
+      core.text("^", "definition") + "const newApi = buildApi();"
+        + core.text("afterDefinition", "export") + 'registry.register("newApi", newApi);'
+        + core.text("afterExport", "registration") + "export { newApi };"
+        + core.text("afterRegistration", "$")
+    );
+    for (const [path, file] of consumers) {
+      const before = file.text();
+      const after = before.replace(/\boldApi\b/g, "newApi");
+      if (after !== before) this.rewrite(path, after);
+    }
+    return { migrated: "oldApi → newApi", referencesObserved: refs.matches.length };
+  }
+}"""
+
+    let private inspectorUltra =
+        """class Js extends JsProgram {
+  async run() {
+    const declarations = await this.grep(/\b(?:type|module)\s+RetryPolicy\b/, "src/**/*.fs");
+    if (declarations.truncated) return { incomplete: true, reason: "Declaration discovery was truncated." };
+    const paths = [...new Set(declarations.matches.map(x => x.path))];
+    if (paths.length === 0) {
+      const usages = await this.grep(/\bRetryPolicy\b/, "{src,tests}/**/*.fs");
+      return { declarations: [], usages: usages.matches, truncated: usages.truncated };
+    }
+    const evidence = await Promise.all(paths.map(async path => {
+      try {
+        const file = await this.file(path, [["hit", "afterHit", /\b(?:type|module)\s+RetryPolicy\b/]]);
+        return { path, excerpt: file.text("hit-220", "hit+900"), anchorMatched: true };
+      } catch {
+        const file = await this.file(path);
+        return { path, excerpt: file.text("^", "^+1100"), anchorMatched: false };
+      }
+    }));
+    return { declarations: declarations.matches, evidence };
+  }
+}"""
+
+    let private reviewerUltra =
+        """class Js extends JsProgram {
+  async run() {
+    const stale = await this.grep(/\boldApi\b/, "src/**/*.{js,ts}");
+    if (stale.truncated) return { incomplete: true, reason: "Counterexample search was truncated." };
+    if (stale.matches.length > 0) {
+      const paths = [...new Set(stale.matches.map(x => x.path))].slice(0, 6);
+      const evidence = await Promise.all(paths.map(async path => {
+        const file = await this.file(path);
+        return { path, excerpt: file.text("^", "^+900") };
+      }));
+      return { staleReferences: stale.matches, evidence };
+    }
+    const migrated = await this.grep(/\bnewApi\b/, "src/**/*.{js,ts}");
+    return { staleReferences: [], migratedReferences: migrated.matches, truncated: migrated.truncated };
+  }
+}"""
+
+    let private devOpsUltra =
+        """class Js extends JsProgram {
+  async run() {
+    const manifests = await this.glob("package.json");
+    if (!manifests.paths.includes("package.json")) return { rootPackage: null };
+    const pkg = JSON.parse((await this.file("package.json")).text());
+    const testScript = pkg.scripts?.test ?? null;
+    if (!testScript) return { rootPackage: "package.json", testScript: null, scripts: Object.keys(pkg.scripts || {}) };
+    const tests = await this.glob("tests/**/*recovery*.{test,spec}.{js,ts,mjs}");
+    if (tests.truncated) return { testScript, incomplete: true };
+    if (tests.paths.length === 0) {
+      const hits = await this.grep(/RecoveryClosure|recovery/i, "tests/**/*.{js,ts,mjs}");
+      return { testScript, candidateTests: [...new Set(hits.matches.map(x => x.path))], truncated: hits.truncated };
+    }
+    return {
+      packageManager: typeof pkg.packageManager === "string" ? pkg.packageManager : null,
+      testScript,
+      candidateTests: tests.paths,
+    };
+  }
+}"""
+
+    let private browserUltra =
+        """class Js extends JsProgram {
+  async run() {
+    const hits = await this.grep(/\bWidgetOptions\b/, "artifacts/web/**/*.md");
+    if (hits.truncated) return { incomplete: true, reason: "Captured-source search was truncated." };
+    if (hits.matches.length === 0) {
+      const indirect = await this.grep(/widget options|configuration object|deprecated/i, "artifacts/web/**/*.md");
+      return { exact: [], indirect: indirect.matches, truncated: indirect.truncated };
+    }
+    const paths = [...new Set(hits.matches.map(x => x.path))];
+    const sources = await Promise.all(paths.map(async path => {
+      const file = await this.file(path);
+      const text = file.text();
+      const at = text.search(/\bWidgetOptions\b/);
+      return {
+        path,
+        url: /^URL:\s*(.+)$/m.exec(text)?.[1]?.trim() ?? null,
+        version: /^Version:\s*(.+)$/m.exec(text)?.[1]?.trim() ?? null,
+        excerpt: text.slice(Math.max(0, at - 250), at + 1000),
+      };
+    }));
+    return { sources };
+  }
+}"""
+
+    let ultraExample (roleName: string) (capabilities: Set<JsCapability>) : JsExample option =
+        let candidate =
+            match roleName.Trim().ToLowerInvariant() with
+            | "coder" -> Some(set [ JsCapability.Read; JsCapability.Grep; JsCapability.Edit ], coderUltra)
+            | "inspector" -> Some(set [ JsCapability.Read; JsCapability.Grep ], inspectorUltra)
+            | "reviewer" -> Some(set [ JsCapability.Read; JsCapability.Grep ], reviewerUltra)
+            | "devops" -> Some(set [ JsCapability.Read; JsCapability.Glob; JsCapability.Grep ], devOpsUltra)
+            | "browser" -> Some(set [ JsCapability.Read; JsCapability.Grep ], browserUltra)
+            | _ -> None
+
+        candidate
+        |> Option.bind (fun (requires, source) ->
+            if Set.isSubset requires capabilities then
+                Some { Requires = requires; Source = source }
+            else
+                None)
+
     let filteredExamples (capabilities: Set<JsCapability>) : JsExample list =
         examples
         |> List.filter (fun example -> Set.isSubset example.Requires capabilities)
 
-    let render (toolName: string) (capabilities: Set<JsCapability>) : string =
-        let exampleBlocks =
-            filteredExamples capabilities
-            |> List.map (fun example -> "```js\n" + example.Source + "\n```")
-            |> String.concat "\n\n"
+    let render (roleName: string) (toolName: string) (capabilities: Set<JsCapability>) : string =
+        let ultraBlock =
+            match ultraExample roleName capabilities with
+            | Some example ->
+                "Ultra Example — responsibility-shaped, not a toy syntax sample:\n\n```js\n"
+                + example.Source
+                + "\n```"
+            | None -> "Ultra Example unavailable for this capability projection."
 
         String.concat
             "\n\n"
@@ -593,5 +734,6 @@ module JsCanonicalDescription =
               contract toolName capabilities
               "```js\n" + publicBaseClass capabilities + "\n```"
               rules capabilities
-              "Examples:\n\n" + exampleBlocks
+              "Mechanical branches belong inside the program. Semantic branches belong between programs. A program may know how to continue without pretending to know what the evidence will mean."
+              ultraBlock
               footer ]

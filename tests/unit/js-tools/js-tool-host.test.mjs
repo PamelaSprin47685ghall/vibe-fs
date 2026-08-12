@@ -1,9 +1,6 @@
-// tests/unit/js-tools/js-tool-host.test.mjs — G5 Phase C: builtin coexistence
-// hook (JS-003) + generated js-* tool spec (JS-073/074).
-//
-// The hook only rewrites descriptions (never schema/executor), is idempotent,
-// and must not recommend a tool the provider cannot see. The spec executes a
-// model program through the workflow and renders a stable TOML result.
+// tests/unit/js-tools/js-tool-host.test.mjs — builtin coexistence + generated
+// js-* tool spec. Primitive filesystem tools remain normal fallbacks: no
+// DEPRECATED annotation. Intent-level preference lives in the js-* description.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -32,16 +29,14 @@ const coderCaps = ofArray(
   permissionComparer,
 )
 
-test('JS003_hook_annotates_builtin_descriptions_idempotently', () => {
+test('JS003_builtin_fallback_descriptions_are_left_untouched', () => {
   assert.deepEqual([...builtinTools].sort(), ['edit', 'glob', 'grep', 'patch', 'read', 'write'])
-  const annotated = annotate('read', 'Read a file', 'js-coder')
-  assert.equal(annotated.includes('DEPRECATED'), true)
-  assert.equal(annotated.includes('js-coder'), true)
-  assert.equal(annotated.includes('parallel calls are safe'), true)
-  // idempotent: already-deprecated descriptions are not re-annotated
-  const again = annotate('read', annotated, 'js-coder')
-  assert.equal(again, annotated)
-  // non-builtin tools are untouched
+  for (const name of builtinTools) {
+    const original = `${name} primitive fallback`
+    const visible = annotate(name, original, 'js-coder')
+    assert.equal(visible, original)
+    assert.doesNotMatch(visible, /DEPRECATED|js-coder/i)
+  }
   assert.equal(annotate('join', 'Join a session', 'js-coder'), 'Join a session')
 })
 
