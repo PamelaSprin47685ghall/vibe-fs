@@ -101,12 +101,7 @@ module OneShotAgentTool =
                     let parentWorkRecord = scope.ParentWorkRecordFor context.SessionId
 
                     let fullPrompt =
-                        ForkChildPayload.relay
-                            (forkInstructions parentId)
-                            request.Prompt
-                            parentWorkRecord
-                            []
-                            None
+                        ForkChildPayload.relay (forkInstructions parentId) request.Prompt parentWorkRecord [] None
 
                     match!
                         scope.Sessions.CreateChildSession(

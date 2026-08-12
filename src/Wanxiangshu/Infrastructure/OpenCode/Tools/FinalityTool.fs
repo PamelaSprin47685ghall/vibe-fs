@@ -178,8 +178,7 @@ module FinalityTool =
                     let sid = SessionId.create sessionId
 
                     match scope.Journal with
-                    | None ->
-                        return refuse context Path.TryAgainLater
+                    | None -> return refuse context Path.TryAgainLater
                     | Some journal ->
                         let snapshot = AgentJournal.snapshot journal
 
@@ -292,12 +291,10 @@ module FinalityTool =
                                         return refuse context Path.CallJoinBeforeEnd
                                     else
                                         match treeOf scope sessionId with
-                                        | None ->
-                                            return refuse context Path.SeekEndWhenReady
+                                        | None -> return refuse context Path.SeekEndWhenReady
                                         | Some tree ->
                                             match journal.WriteBlob lastWords with
-                                            | Error _ ->
-                                                return refuse context Path.SeekEndWhenReady
+                                            | Error _ -> return refuse context Path.SeekEndWhenReady
                                             | Ok blob ->
                                                 let requestId = FinalityRequestId.create (Guid.NewGuid().ToString("N"))
 

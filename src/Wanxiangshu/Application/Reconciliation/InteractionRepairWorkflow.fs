@@ -112,10 +112,7 @@ module InteractionRepairWorkflow =
                 sessionPort
                 eventPort
                 journal
-                (ProviderProse.documentFor
-                    context.Turn.SessionId
-                    RuntimeNudge.MissingClosingReport
-                    Map.empty)
+                (ProviderProse.documentFor context.Turn.SessionId RuntimeNudge.MissingClosingReport Map.empty)
                 "missing-final-report"
 
     /// Incomplete in-progress interaction: classify then idle-repair, unless a

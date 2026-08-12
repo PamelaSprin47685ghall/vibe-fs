@@ -318,6 +318,5 @@ module JsBookkeeperTool =
 
         { Name = "js-bookkeeper"
           Description = assembleDescription language
-          Arguments =
-            [ "program", ToolHostCodec.stringSchemaDescribed (prose language Path.ArgProgram) factory ]
+          Arguments = [ "program", ToolHostCodec.stringSchemaDescribed (prose language Path.ArgProgram) factory ]
           Execute = execute }

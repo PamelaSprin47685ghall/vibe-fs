@@ -113,7 +113,10 @@ module JoinTool =
 
                         match outcome with
                         | Error _ ->
-                            return consequence (ProviderProse.instructionLines language Path.OrchestratorNotReady Map.empty)
+                            return
+                                consequence (
+                                    ProviderProse.instructionLines language Path.OrchestratorNotReady Map.empty
+                                )
                         | Ok(Interrupted reason) -> return JoinResultRenderer.renderInterrupted language reason
                         | Ok(ResultsAvailable batch) -> return JoinResultRenderer.renderOrchestratorBatch language batch
                     else

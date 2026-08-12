@@ -231,8 +231,7 @@ module ForkTool =
 
                     if hasCalling request then
                         match existingByname with
-                        | Some _ ->
-                            return consequence (prose language Path.Fork.NameAlreadyBelongs)
+                        | Some _ -> return consequence (prose language Path.Fork.NameAlreadyBelongs)
                         | None ->
                             match tryCalling managerCallingBindings request.Calling with
                             | None -> return consequence (prose language Path.Fork.UnknownCalling)
@@ -287,8 +286,7 @@ module ForkTool =
                                 let agentId = AgentHandleId.value handleId
 
                                 match runtime.TryFindAgent agentId with
-                                | None ->
-                                    return consequence (prose language Path.Fork.PersonUnavailable)
+                                | None -> return consequence (prose language Path.Fork.PersonUnavailable)
                                 | Some record when hasKeywords request && not (warmStartAllowed record.Role) ->
                                     return consequence (prose language Path.Fork.WarmStartUnavailable)
                                 | Some record ->
@@ -380,10 +378,7 @@ module ForkTool =
     let orchestratorSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "commission"
           Description =
-            ProviderProse.render
-                (ProviderLanguageBinding.readGlobalPreference ())
-                Path.Commission.Description
-                Map.empty
+            ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Commission.Description Map.empty
           Arguments =
             [ "calling", ToolHostCodec.optionalEnumSchema (callingNames orchestratorCallingBindings) factory
               "name", ToolHostCodec.stringSchema factory

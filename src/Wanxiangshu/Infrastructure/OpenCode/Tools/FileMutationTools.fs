@@ -175,10 +175,7 @@ module FileMutationTools =
                                 consequence
                                     lang
                                     Path.MvFailed
-                                    (Map
-                                        [ "source", source
-                                          "destination", destination
-                                          "error", copyMessage ])
+                                    (Map [ "source", source; "destination", destination; "error", copyMessage ])
                     else
                         // DSL-MUTABLE: algorithm-scratch — rename exception message buffer
                         let mutable message = "RENAME_FAILED"
@@ -195,10 +192,7 @@ module FileMutationTools =
                             consequence
                                 lang
                                 Path.MvFailed
-                                (Map
-                                    [ "source", source
-                                      "destination", destination
-                                      "error", message ])
+                                (Map [ "source", source; "destination", destination; "error", message ])
         }
 
     let private decodeText (name: string) (args: HostToolArguments) =

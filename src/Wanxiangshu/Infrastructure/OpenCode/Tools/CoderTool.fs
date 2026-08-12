@@ -138,10 +138,7 @@ module CoderTool =
         : ToolSpec =
         { Name = name
           Description =
-            ProviderProse.render
-                (ProviderLanguageBinding.readGlobalPreference ())
-                surface.Description
-                Map.empty
+            ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) surface.Description Map.empty
           Arguments =
             [ "charge", ToolHostCodec.stringSchema factory
               "keywords", ToolHostCodec.optionalStringSchema factory ]

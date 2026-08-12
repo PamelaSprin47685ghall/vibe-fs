@@ -10,7 +10,8 @@ open Wanxiangshu.Kernel.Identity
 [<RequireQualifiedAccess>]
 module ProviderProse =
 
-    let private placeholderRe = Regex(@"\{\{([A-Za-z][A-Za-z0-9_]*)\}\}", RegexOptions.Compiled)
+    let private placeholderRe =
+        Regex(@"\{\{([A-Za-z][A-Za-z0-9_]*)\}\}", RegexOptions.Compiled)
 
     /// Bound session → that language. Unbound → English (HOST-026 first-touch /
     /// PromptResources.languageForSession). Does not bind: session-create still

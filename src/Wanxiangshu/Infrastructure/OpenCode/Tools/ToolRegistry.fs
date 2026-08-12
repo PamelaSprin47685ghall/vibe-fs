@@ -179,12 +179,7 @@ module ToolRegistry =
                 ToolHostCodec.tomlObjectWithInstructions [ ProviderProse.render (lang ctx) path subs ] []
 
             let denyRole (ctx: HostToolContext) (role: Role) =
-                denied
-                    ctx
-                    Path.DeniedRole
-                    (Map
-                        [ "tool", spec.Name
-                          "role", sprintf "%A" role ])
+                denied ctx Path.DeniedRole (Map [ "tool", spec.Name; "role", sprintf "%A" role ])
 
             let stopChronicleNoLiveCycle (ctx: HostToolContext) =
                 task {
@@ -245,8 +240,7 @@ module ToolRegistry =
                 }
 
         let specs =
-            baseSpecs
-            |> List.map (fun spec -> { spec with Execute = gateExecute spec })
+            baseSpecs |> List.map (fun spec -> { spec with Execute = gateExecute spec })
 
         { Tools = ToolHostCodec.registry factory specs
           Runtime = runtime }

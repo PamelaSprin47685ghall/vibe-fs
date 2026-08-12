@@ -774,7 +774,7 @@ export const runtimeNudge = (() => {
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n')
       .trimEnd()
-    return raw.split('\n').map((line) => `# ${line}`).join('\n') + '\n'
+    return raw.split('\n').map((line) => (line === '' ? '#' : `# ${line}`)).join('\n') + '\n'
   }
   const readLines = (semanticPath) =>
     readFileSync(join(providerRoot, semanticPath, 'en.md'), 'utf8')

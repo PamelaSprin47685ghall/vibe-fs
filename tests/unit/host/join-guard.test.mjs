@@ -8,13 +8,11 @@ import { join } from 'node:path'
 
 import {
   agentJournal, agentFact, sessionId, logicalRunId, authorityRoot,
-  stream, caseOf, promptDispatcher, transportReceipt,
+  stream, caseOf, promptDispatcher, transportReceipt, runtimeNudge,
 } from '../support/domain.mjs'
 
 const { nudge } = await import('../../../dist/Infrastructure/OpenCode/Host/HostJoinGuard.js')
 const { AgentJournalModule_appendAgent } = await import('../../../dist/Journal/AgentJournal.js')
-
-const NUDGE_TEXT = '# Background work is still outstanding.'
 
 const capturingPort = (captured, behaviour = {}) => ({
   SubscribeTerminal: () => ({ Dispose: () => {} }),
@@ -82,7 +80,10 @@ test('JNGD_nudge_sends_join_guard_continuation_and_claims', async () => {
     assert.equal(outcomeName(outcome), 'Sent', JSON.stringify(outcome.fields?.[0]))
     assert.ok(outcome.fields[0], 'Sent carries a PromptKey')
     assert.equal(captured.length, 1)
-    assert.ok(captured[0].text.startsWith(NUDGE_TEXT), `prompt must be the join-guard nudge: ${captured[0].text}`)
+    assert.ok(
+      captured[0].text.startsWith(runtimeNudge.backgroundJoinGuard),
+      `prompt must be the join-guard nudge: ${captured[0].text}`,
+    )
     assert.equal(captured[0].session, sid)
 
     // The claim is durable: a second nudge is AlreadyOutstanding.

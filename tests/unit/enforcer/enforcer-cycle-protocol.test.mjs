@@ -465,7 +465,7 @@ const isNoRecovery = (journal, messages) =>
 
 test('ENFORCER_061_blog_tool_rejects_empty_canonical_text', () => {
   assert.equal(typeof BlogTool.EmptyTextError, 'string')
-  assert.match(BlogTool.EmptyTextError, /ENFORCER-061/)
+  assert.match(BlogTool.EmptyTextError, /CHRONICLE_EMPTY_ENFORCER_061/)
 
   const blank = BlogTool.tryCanonicalText('   ')
   assert.equal(caseOf(blank), 'Error')

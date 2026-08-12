@@ -138,7 +138,8 @@ module PtyTool =
                                     | Error bindError ->
                                         runtime.UntrackPtyRun id.Value
                                         return error bindError
-                                    | Ok() -> return instruction (namedProse language Path.OpenTerminal.IsOpen (name.Trim()))
+                                    | Ok() ->
+                                        return instruction (namedProse language Path.OpenTerminal.IsOpen (name.Trim()))
         }
 
     let private sendExecute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
@@ -204,9 +205,7 @@ module PtyTool =
                                         ProviderProse.render
                                             language
                                             Path.SignalTerminal.SignalSent
-                                            (Map
-                                                [ "signal", signalRaw.Trim().ToUpperInvariant()
-                                                  "name", name.Trim() ])
+                                            (Map [ "signal", signalRaw.Trim().ToUpperInvariant(); "name", name.Trim() ])
                                     )
                             | Error sendError -> return error sendError
         }

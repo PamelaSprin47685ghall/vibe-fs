@@ -335,7 +335,9 @@ module JsCanonicalDescription =
       },
     });
   }"""
-            (("raise_failure", raiseFailure) :: ("read_source", readSourceLine) :: fileReasons prose)
+            (("raise_failure", raiseFailure)
+             :: ("read_source", readSourceLine)
+             :: fileReasons prose)
 
     let private globStub (prose: Prose) =
         fill

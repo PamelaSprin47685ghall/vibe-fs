@@ -15,9 +15,7 @@ module CompanionPrompt =
 
     /// Plain lines → ARCH-010 comment-style instruction claim body.
     let asCommentedInstruction (lines: string list) =
-        lines
-        |> List.map (fun line -> "# " + line)
-        |> String.concat "\n"
+        lines |> List.map (fun line -> "# " + line) |> String.concat "\n"
 
     /// COMPANION-005: durable frame body as assistant message text.
     /// Still wrapped as `[[do_not_exec]] historic_frame`; only the message role is assistant.

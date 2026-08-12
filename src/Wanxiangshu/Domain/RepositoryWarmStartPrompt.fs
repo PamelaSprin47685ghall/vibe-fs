@@ -114,11 +114,7 @@ module RepositoryWarmStartPrompt =
     /// Render while preserving whole TOML entries. If the authority header alone
     /// exceeds the warm-start byte budget, fail open to the raw charge rather than
     /// truncating authority text.
-    let render
-        (instructions: string list)
-        (charge: string)
-        (searches: RepositoryWarmStartSearch list)
-        : string =
+    let render (instructions: string list) (charge: string) (searches: RepositoryWarmStartSearch list) : string =
         let orderedHints =
             searches
             |> List.collect (fun search -> search.Hints)

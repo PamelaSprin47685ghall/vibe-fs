@@ -38,8 +38,7 @@ module AssistancePrompt =
         else
             text.Replace(Sentinel, "")
 
-    let escalation (instructions: string list) =
-        SyntheticToml.document instructions []
+    let escalation (instructions: string list) = SyntheticToml.document instructions []
 
     let advice (instructions: string list) (childWorkRecord: string) =
         SyntheticToml.document

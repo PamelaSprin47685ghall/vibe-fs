@@ -91,8 +91,7 @@ module JudgeTool =
     let private notReceived ctx reasonPath =
         ToolHostCodec.tomlObjectWithInstructions [ line ctx Path.NotReceived; line ctx reasonPath ] []
 
-    let private challengeUnproven ctx =
-        notReceived ctx Path.ChallengeUnproven
+    let private challengeUnproven ctx = notReceived ctx Path.ChallengeUnproven
 
     let private report ctx (decision: VerdictDecision) =
         match decision with
@@ -164,8 +163,7 @@ module JudgeTool =
                                 providerRunId
                         with
                         | Error ReviewSeal.NoPendingSeal -> return challengeUnproven context
-                        | Error(ReviewSeal.AppendFailed _) ->
-                            return notReceived context Path.ChallengeProofNotRecorded
+                        | Error(ReviewSeal.AppendFailed _) -> return notReceived context Path.ChallengeProofNotRecorded
                         | Ok _ ->
                             match VerdictWorkflow.submit journal HostDigest.sha256Hex submission with
                             | Error _ -> return notReceived context Path.JudgmentCouldNotBeRecorded

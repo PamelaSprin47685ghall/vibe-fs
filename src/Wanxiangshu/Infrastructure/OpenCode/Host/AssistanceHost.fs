@@ -53,9 +53,7 @@ type AssistanceHost
         AssistancePrompt.advice (assistanceLines sessionId AssistancePrompt.ReturnPath) childWorkRecord
 
     let consultationFailedPrompt (sessionId: SessionId) (reason: string) =
-        AssistancePrompt.consultationFailed
-            (assistanceLines sessionId AssistancePrompt.ConsultationFailedPath)
-            reason
+        AssistancePrompt.consultationFailed (assistanceLines sessionId AssistancePrompt.ConsultationFailedPath) reason
 
     let ownerAttemptKey (turn: ReconciledTurn) =
         SessionId.value turn.SessionId
@@ -303,8 +301,7 @@ type AssistanceHost
 
                 let forkProse: ForkChildInstructions =
                     { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
-                      CommissionerRecord =
-                        ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
+                      CommissionerRecord = ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
                       Requirements = ProviderProse.render lang ForkChildPayload.RequirementsPath Map.empty }
 
                 let providerPrompt =

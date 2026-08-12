@@ -139,15 +139,7 @@ module Distillation =
 
         let rootDigest = HostDigest.sha256Hex (sprintf "%s|%d" spoolPath index)
 
-        runDistillerPrompt
-            runtime
-            forkedIds
-            rootDigest
-            0
-            index
-            index
-            (distillFragmentPrompt lang)
-            (Some content)
+        runDistillerPrompt runtime forkedIds rootDigest 0 index index (distillFragmentPrompt lang) (Some content)
 
     let mergeDistillations
         (runtime: IDistillationRuntime)
@@ -241,10 +233,7 @@ module Distillation =
         if String.IsNullOrWhiteSpace account then
             ProviderProse.render lang Path.CondensationUnavailable (Map [ "raw_tail", rawTail ])
         else
-            ProviderProse.render
-                lang
-                Path.CondensationIncomplete
-                (Map [ "account", account; "raw_tail", rawTail ])
+            ProviderProse.render lang Path.CondensationIncomplete (Map [ "account", account; "raw_tail", rawTail ])
 
     /// Maps bounded spool chunks concurrently (results sorted by chunk index),
     /// then reduces online. Map/reduce failures yield partial account plus the

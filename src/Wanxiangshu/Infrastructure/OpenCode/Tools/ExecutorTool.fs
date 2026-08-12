@@ -116,7 +116,9 @@ module ExecutorTool =
             Error(prose language Path.Run.MissingCommand)
         else
             match
-                finitePositive language "deadline_seconds" deadline, finiteOutput language "output_budget_bytes" budget, worldLock
+                finitePositive language "deadline_seconds" deadline,
+                finiteOutput language "output_budget_bytes" budget,
+                worldLock
             with
             | Ok deadlineSeconds, Ok outputBytes, Ok lock ->
                 Ok
@@ -267,10 +269,7 @@ module ExecutorTool =
     let queryShellSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "query-shell"
           Description =
-            ProviderProse.render
-                (ProviderLanguageBinding.readGlobalPreference ())
-                Path.QueryShell.Description
-                Map.empty
+            ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.QueryShell.Description Map.empty
           Arguments = [ "command", ToolHostCodec.stringSchema factory ]
           Execute =
             fun args context ->

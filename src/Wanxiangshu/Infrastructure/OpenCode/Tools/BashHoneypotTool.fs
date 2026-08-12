@@ -27,7 +27,9 @@ module BashHoneypotTool =
             ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
 
     let private execute (_args: HostToolArguments) (ctx: HostToolContext) =
-        task { return tomlObjectWithInstructions (ProviderProse.instructionLines (languageOf ctx) Path.Denial Map.empty) [] }
+        task {
+            return tomlObjectWithInstructions (ProviderProse.instructionLines (languageOf ctx) Path.Denial Map.empty) []
+        }
 
     let spec: ToolSpec =
         { Name = "bash-honeypot"

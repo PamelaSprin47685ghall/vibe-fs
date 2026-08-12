@@ -3,6 +3,9 @@
 // recovery slot, session association, compaction, probe selection, roles/catalog,
 // session ownership, X-prefix projection algebra, prefix probe.
 
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import {
   SyntheticTomlModule,
   MagicTodoModule,
@@ -36,6 +39,7 @@ import {
   ProjectionAlgebraModule,
   PrefixCandidateModule,
   ProviderProj,
+  ProviderLanguageModule,
   HostMessageCodecModule,
   unionCase,
   bind,
@@ -52,6 +56,7 @@ import {
   stringSet,
   offsetOf,
   prod,
+  BUILD_ROOT,
 } from './interop.mjs'
 import {
   sessionId,
@@ -63,6 +68,22 @@ import {
   providerRun,
   toolCallId,
 } from './identity.mjs'
+
+const providerRoot = join(BUILD_ROOT, '..', 'resources/provider')
+const readProviderLines = (semanticPath) =>
+  readFileSync(join(providerRoot, semanticPath, 'en.md'), 'utf8')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .trimEnd()
+    .split('\n')
+const readProviderText = (semanticPath) => readProviderLines(semanticPath).join('\n')
+const companionNormalLines = readProviderLines(CompanionPromptModule.Normal)
+const companionSquashLines = readProviderLines(CompanionPromptModule.Squash)
+const companionMemoryPreamble = readProviderText(CompanionPromptModule.MemoryPreamble)
+const englishProviderLanguage = unionCase(ProviderLanguageModule.ProviderLanguage, 'ProviderLanguage')(
+  'English',
+  [],
+)
 
 /**
  * ARCH-010: the one canonical writer for runtime synthetic TOML.
@@ -240,7 +261,7 @@ export const magicTodoHost = (() => {
     canonicalInputDigest: (sha256, args) => m.canonicalInputDigest(sha256, args),
     replaceCompatibilityArgs: (output, rows) => m.replaceCompatibilityArgs(output, toList(rows)),
     replaceEnrichedResult: (output, text) => m.replaceEnrichedResult(output, text),
-    applyDefinition: (output) => m.applyDefinition(output),
+    applyDefinition: (output, lang = englishProviderLanguage) => m.applyDefinition(lang, output),
   }
 })()
 
@@ -479,14 +500,15 @@ export const lifecycleWorkRecordProjection = (() => {
 
 /** COMPANION-004/005 / ENFORCER-030: request strings; system lives in provider/role/blogger. */
 export const companionPrompt = {
-  normalInstruction: CompanionPromptModule.NormalInstruction,
-  squashInstruction: CompanionPromptModule.SquashInstruction,
-  memoryPreamble: CompanionPromptModule.CompanionMemoryPreamble,
+  normalInstruction: CompanionPromptModule.asCommentedInstruction(toList(companionNormalLines)),
+  squashInstruction: CompanionPromptModule.asCommentedInstruction(toList(companionSquashLines)),
+  memoryPreamble: companionMemoryPreamble,
   workingRecord: (body) => CompanionPromptModule.workingRecordMessage(body),
   /** ENFORCER-071: previous tip as low-trust assistant body. */
   previousTip: (tipField, cycleId) => CompanionPromptModule.previousTipMessage(tipField, cycleId),
-  newWork: (toml) => CompanionPromptModule.newWorkMessage(toml),
-  memoryBlock: (frozenRecordPrefix) => CompanionPromptModule.companionMemoryBlock(frozenRecordPrefix),
+  newWork: (toml) => CompanionPromptModule.newWorkMessage(toList(companionNormalLines), toml),
+  memoryBlock: (frozenRecordPrefix) =>
+    CompanionPromptModule.companionMemoryBlock(companionMemoryPreamble, frozenRecordPrefix),
 }
 
 /**
@@ -545,6 +567,8 @@ export const companionProjection = (() => {
         toList(frames.map((f) => [blobDigest(f.digest), f.body])),
         delta === undefined ? undefined : [delta.messageId, delta.toml],
         toList(previousTips.map((t) => [t.field, t.cycleId])),
+        toList(companionNormalLines),
+        toList(companionSquashLines),
       )
 
       const messages = listItems(plan.Messages).map((msg) => ({
@@ -1021,8 +1045,10 @@ export const xPrefix = (() => {
   }
 
   return {
-    forSnapshot: (snapshot, frozenBBody = '') => intentOf(m.forSnapshot(snapshot, frozenBBody)),
-    forChoice: (choice, committed, frozenBBody = '') => intentOf(m.forChoice(choice, committed, frozenBBody)),
+    forSnapshot: (snapshot, frozenBBody = '') =>
+      intentOf(m.forSnapshot(snapshot, companionMemoryPreamble, frozenBBody)),
+    forChoice: (choice, committed, frozenBBody = '') =>
+      intentOf(m.forChoice(choice, committed, companionMemoryPreamble, frozenBBody)),
 
     /** `undefined` when the plan needs no blob read. */
     requiredBlob: (choice, committed) => {
@@ -1075,6 +1101,8 @@ export const projectionIntent = (() => {
             Array.isArray(t) ? t : [t.field ?? t[0], t.cycleId ?? t[1]],
           ),
         ),
+        NormalInstructionLines: toList(intent.NormalInstructionLines ?? companionNormalLines),
+        SquashInstructionLines: toList(intent.SquashInstructionLines ?? companionSquashLines),
       }
       return build('InsertBlogFrames', [payload])
     },

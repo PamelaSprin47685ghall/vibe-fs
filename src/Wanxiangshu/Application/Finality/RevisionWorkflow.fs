@@ -19,9 +19,7 @@ module RevisionWorkflow =
             workRecord
 
     let private steerPrompt (managerSessionId: SessionId) (workRecord: string) =
-        FinalityPrompt.steer
-            (ProviderProse.documentFor managerSessionId FinalityPrompt.Path.Steer Map.empty)
-            workRecord
+        FinalityPrompt.steer (ProviderProse.documentFor managerSessionId FinalityPrompt.Path.Steer Map.empty) workRecord
 
     let private steerUnavailablePrompt (managerSessionId: SessionId) =
         ProviderProse.documentFor managerSessionId FinalityPrompt.Path.SteerUnavailable Map.empty

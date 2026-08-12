@@ -122,10 +122,8 @@ module EnforcerFrameRecovery =
                       FrameEpoch = FrameEpochId.value frameEpoch
                       PhysicalDelta = delta
                       PreviousTips = previousTips
-                      NormalInstructionLines =
-                        ProviderProse.instructionLines lang CompanionPrompt.Normal Map.empty
-                      SquashInstructionLines =
-                        ProviderProse.instructionLines lang CompanionPrompt.Squash Map.empty }
+                      NormalInstructionLines = ProviderProse.instructionLines lang CompanionPrompt.Normal Map.empty
+                      SquashInstructionLines = ProviderProse.instructionLines lang CompanionPrompt.Squash Map.empty }
 
                 let emptyCurrent: ProviderProjection.ProviderSemanticProjection =
                     { ProviderId = None

@@ -30,25 +30,25 @@ module ManagerNarrativeTransform =
 
     /// Ending-evidence anchors from Finality prose in every ProviderLanguage.
     let private endingEvidenceFragments =
-        lazy (
-            [ ProviderLanguage.English; ProviderLanguage.SimplifiedChinese ]
-            |> List.collect (fun lang ->
-                [ FinalityPrompt.Path.Rest; FinalityPrompt.Path.Rejected; FinalityPrompt.Path.Blessed ]
-                |> List.collect (fun path ->
-                    ProviderProse.instructionLines lang path Map.empty
-                    |> List.filter (fun line -> not (String.IsNullOrWhiteSpace line))))
-            |> List.distinct
-        )
+        lazy
+            ([ ProviderLanguage.English; ProviderLanguage.SimplifiedChinese ]
+             |> List.collect (fun lang ->
+                 [ FinalityPrompt.Path.Rest
+                   FinalityPrompt.Path.Rejected
+                   FinalityPrompt.Path.Blessed ]
+                 |> List.collect (fun path ->
+                     ProviderProse.instructionLines lang path Map.empty
+                     |> List.filter (fun line -> not (String.IsNullOrWhiteSpace line))))
+             |> List.distinct)
 
     let private workActivationAnchors =
-        lazy (
-            [ ProviderLanguage.English; ProviderLanguage.SimplifiedChinese ]
-            |> List.collect (fun lang ->
-                ProviderProse.instructionLines lang ManagerLifecyclePrompt.Path.WorkActivation Map.empty
-                |> List.filter (fun line -> not (String.IsNullOrWhiteSpace line))
-                |> List.truncate 1)
-            |> List.distinct
-        )
+        lazy
+            ([ ProviderLanguage.English; ProviderLanguage.SimplifiedChinese ]
+             |> List.collect (fun lang ->
+                 ProviderProse.instructionLines lang ManagerLifecyclePrompt.Path.WorkActivation Map.empty
+                 |> List.filter (fun line -> not (String.IsNullOrWhiteSpace line))
+                 |> List.truncate 1)
+             |> List.distinct)
 
     /// GLORY-012: only a HumanRoot-managed Manager opens Lives. An
     /// AgentOwnerRoot Manager (an Orchestrator's forked ManagerJob) receives

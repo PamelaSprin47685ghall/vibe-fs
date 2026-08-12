@@ -73,8 +73,7 @@ module JoinResultRenderer =
         [<Literal>]
         let ForkMaterializationFailed = "tool/join/fork-materialization-failed"
 
-    let private prose lang path subs =
-        ProviderProse.render lang path subs
+    let private prose lang path subs = ProviderProse.render lang path subs
 
     let private bynameLine lang path name =
         prose lang path (Map [ "byname", name ])
@@ -224,16 +223,9 @@ module JoinResultRenderer =
         (item: PtyJoinItem)
         : string =
         match item with
-        | PtyExited payload ->
-            renderPtyEnded lang resolveTerminalLabel Path.PtyEnded payload.PtyId payload.Outcome None
+        | PtyExited payload -> renderPtyEnded lang resolveTerminalLabel Path.PtyEnded payload.PtyId payload.Outcome None
         | PtyFailed payload ->
-            renderPtyEnded
-                lang
-                resolveTerminalLabel
-                Path.PtyEnded
-                payload.PtyId
-                payload.Outcome
-                (Some payload.Message)
+            renderPtyEnded lang resolveTerminalLabel Path.PtyEnded payload.PtyId payload.Outcome (Some payload.Message)
         | PtyAborted payload ->
             renderPtyEnded
                 lang

@@ -89,8 +89,7 @@ module MagicTodoHostCodec =
         let parameters = parseJson MagicTodoSurface.todoWriteJsonSchema
         let jsonSchema = parseJson MagicTodoSurface.todoWriteJsonSchema
 
-        output?description <-
-            box (ProviderProse.render lang MagicTodoSurface.Path.TodoWriteDescription Map.empty)
+        output?description <- box (ProviderProse.render lang MagicTodoSurface.Path.TodoWriteDescription Map.empty)
 
         output?parameters <- parameters
         output?jsonSchema <- jsonSchema

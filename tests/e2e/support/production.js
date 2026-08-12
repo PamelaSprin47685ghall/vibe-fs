@@ -39,7 +39,7 @@ const FABLE_MODULES = join(BUILD_ROOT, 'fable_modules');
 
 const syntheticDocument = (body) => {
   const normalized = String(body).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trimEnd();
-  return normalized.split('\n').map((line) => `# ${line}`).join('\n') + '\n';
+  return normalized.split('\n').map((line) => (line === '' ? '#' : `# ${line}`)).join('\n') + '\n';
 };
 
 const readProviderDocument = (semanticPath) =>

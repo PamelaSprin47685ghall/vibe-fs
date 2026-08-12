@@ -91,9 +91,7 @@ module ChronicleTool =
                     let language = lang ctx
 
                     if not (hasLiveCycle parkedHost ctx.SessionId) then
-                        Diagnostic.emit
-                            "chronicle-execute"
-                            [ "session_id", ctx.SessionId; "result", NoLiveCycleError ]
+                        Diagnostic.emit "chronicle-execute" [ "session_id", ctx.SessionId; "result", NoLiveCycleError ]
 
                         if not (String.IsNullOrWhiteSpace ctx.SessionId) then
                             let! _ = runtime.Sessions.AbortSession(SessionId.create ctx.SessionId)

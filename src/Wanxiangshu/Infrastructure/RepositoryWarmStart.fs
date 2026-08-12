@@ -135,13 +135,7 @@ module RepositoryWarmStart =
         (keywordsRaw: string)
         (charge: string)
         : Task<Result<string, string>> =
-        prepareWithSearch
-            SembleMcpClient.searchFromEnvironment
-            sessionId
-            role
-            workspaceDirectory
-            keywordsRaw
-            charge
+        prepareWithSearch SembleMcpClient.searchFromEnvironment sessionId role workspaceDirectory keywordsRaw charge
 
     let appendToBase
         (sessionId: SessionId)

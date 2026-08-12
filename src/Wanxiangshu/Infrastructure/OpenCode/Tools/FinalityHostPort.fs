@@ -89,13 +89,7 @@ module FinalityHostPort =
                     return! runtime.SendDeferredFirstPrompt memberInfo.AgentId
                 else
                     match!
-                        runtime.Fork(
-                            memberInfo.AgentId,
-                            Role.Reviewer,
-                            reviewerAgentName,
-                            openingAssignment (),
-                            None
-                        )
+                        runtime.Fork(memberInfo.AgentId, Role.Reviewer, reviewerAgentName, openingAssignment (), None)
                     with
                     | Error error -> return Error error
                     | Ok _ -> return Ok()

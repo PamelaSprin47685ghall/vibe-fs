@@ -98,10 +98,7 @@ module InspectorTool =
         : ToolSpec =
         { Name = "inspect"
           Description =
-            ProviderProse.render
-                (ProviderLanguageBinding.readGlobalPreference ())
-                Path.Description
-                Map.empty
+            ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments =
             [ "charge", ToolHostCodec.stringSchema factory
               "keywords", ToolHostCodec.optionalStringSchema factory ]
