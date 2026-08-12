@@ -150,10 +150,10 @@ test('RUN_world_lock_is_accepted', async () => {
 const SPOOL_COMMAND = "printf 'abcdefghijklmnopqrstuvwxyz0123456789'"
 const SPOOL_BUDGET = { command: SPOOL_COMMAND, output_budget_bytes: 4 }
 
-test('RUN_spooled_output_without_session_fails_closed_without_identity_leak', async () => {
+test('RUN_spooled_request_without_authority_fails_before_execution_without_identity_leak', async () => {
   const result = await run(scope(), SPOOL_BUDGET, context(''))
   assert.doesNotMatch(result, /sessionID|\berror\s*=/i)
-  assert.match(result, /cannot be condensed until the caller's authority is established/i)
+  assert.match(result, /cannot run from this execution context/i)
 })
 
 test('RUN_spooled_output_family_blocked_surfaces_recovery_consequence', async () => {

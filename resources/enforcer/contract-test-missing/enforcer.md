@@ -1,30 +1,53 @@
 # contract-test-missing — Enforcer
 
-## Definition
-A contract test is missing when a boundary owned by another runtime, process, language, store, provider, or plugin changes without a proof of the observable agreement at that boundary. The root-cause is that each side is proven self-consistent while the intersection of emit and accept is untested, so independent implementations can silently disagree.
+A contract test is missing when two independently implemented sides can each be locally correct and still disagree at the exact place where they meet.
 
-## Governing Principle
-A boundary is where independent implementations meet. Internal tests can prove each side is self-consistent while both sides disagree about bytes, ordering, identity, defaults, failure, or lifetime. The contract is therefore not the code on either side; it is the intersection of what one emits and the other accepts.
+This is the essential boundary problem:
 
-## Trigger When
-Trigger when a Host, provider, storage, process, network, plugin, wire, or language boundary changes and no test exercises the exact supported input/output and failure semantics.
+```text
+producer believes it emitted X
+consumer believes it accepts Y
+X ≠ Y
+```
 
-## Do Not Trigger When
-- An existing contract-level test already covers the changed behavior through the same boundary and would fail on incompatibility.
-- The change is purely internal and cannot alter the observable agreement at that boundary.
-- A consumer-driven contract already asserts the same shape, identity, and failure semantics for this change.
-- Unit tests of domain logic that do not cross an independent implementation are not substitutes, but they are also not this rule’s subject when the boundary did not change.
+Unit tests on both sides can stay perfectly green because each side is proving its own assumptions. The missing proof is the **intersection**: bytes, framing, identity, ordering, defaults, lifecycle, failure semantics, versioning, and capability rules that actually cross the boundary.
 
-## Distinguish From
-`behavioral-boundary-untested` concerns a public boundary within the product. `canary-skipped` concerns undocumented behavior requiring the real environment. This rule concerns a declared inter-system contract. Tie-break: if two independent implementations can silently disagree about a declared agreement, this rule owns the missing proof.
+Fire this rule when a change touches boundaries such as:
 
-## Decision Procedure
-Name the producer, consumer, exchanged representation, identity rules, and failure semantics. Add a test at the narrowest point where both sides’ assumptions become observable.
+- plugin ↔ Host hook objects;
+- F# ↔ generated JS/Fable representation;
+- process ↔ stdout/stdin framing;
+- client ↔ provider HTTP/tool schema;
+- application ↔ database/store transaction semantics;
+- service ↔ queue/message contract;
+- package ↔ consumer import/export surface;
+- CLI ↔ subprocess exit/status/output protocol;
+- network protocol ↔ adapter decoder/encoder.
 
-## Examples
-- positive: change a plugin wire format and only unit-test each side’s internal mapper, never the bytes the other side parses.
-- near-miss: the same boundary already has a contract test that would fail if framing or identity drifted.
-- counterexample: a contract-level test through the changed boundary asserting shape, identity, ordering, and failure semantics.
+A useful trigger is independence. If producer and consumer can change separately, use different languages/runtimes, or are owned by different release cycles, the risk that both sides encode different “obvious” assumptions rises sharply.
 
-## Nudge
-Two correct components can still disagree. Test the agreement itself: exact shape, identity, ordering, and failure semantics at the real contract boundary.
+Do not demand a new contract test for every internal refactor. If the observable agreement is unchanged and an existing boundary test already fails on incompatible representation/identity/failure behavior, add no theater. Contract tests are not a ritual tax on every adapter edit.
+
+Also do not freeze every incidental byte. Exact wire details should be asserted **only where they are contractual**. Otherwise test semantic properties: required field presence, stable identity, accepted alternatives, ordering guarantees, failure category, idempotency key reuse, capability projection, etc. Over-specifying private serialization accidents produces `test-implementation-coupled` at system scale.
+
+Distinguish from `behavioral-boundary-untested`: that rule can apply within one product at a supported public entrance. This rule is specifically about an agreement where independent sides can drift. `canary-skipped` applies when the external side's behavior cannot be faithfully represented locally and the real environment is needed.
+
+The decisive test design question is:
+
+> What is the smallest execution in which **both sides' assumptions are simultaneously present**?
+
+Use the real encoder/parser/adapter where practical. Avoid hand-building a fixture from the same spec interpretation as the production side, because the fixture can share the same mistake.
+
+A strong contract test should fail under realistic incompatibilities:
+
+- renamed/missing field;
+- wrong union/case/tag representation;
+- changed default;
+- wrong status/error mapping;
+- identity regenerated instead of preserved;
+- ordering changed;
+- old/new version mixed;
+- unsupported capability advertised;
+- acknowledgement semantics changed.
+
+> Two correct components can still be incompatible. Test the agreement, not merely the confidence of each side.

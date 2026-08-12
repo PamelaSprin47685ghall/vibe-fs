@@ -184,7 +184,7 @@ module ToolRegistry =
             let original = spec.Execute
 
             let denied message =
-                ToolHostCodec.tomlObjectWithInstructions [ "# " + message ] []
+                ToolHostCodec.tomlObjectWithInstructions [ message ] []
 
             let denyRole (role: Role) =
                 denied (sprintf "%s is not available to %A." spec.Name role)

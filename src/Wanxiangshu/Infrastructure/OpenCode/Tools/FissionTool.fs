@@ -12,10 +12,10 @@ open ToolHostCodec
 /// without pretending the deferred Fission engine already exists.
 module FissionTool =
 
-    let private TooFew = "# Fission needs at least two independent charges."
+    let private TooFew = "Fission needs at least two independent charges."
 
     let private Capacity =
-        "# The world cannot hold all of these presents at once. No fission occurred."
+        "The world cannot hold all of these presents at once. No fission occurred."
 
     let private execute (args: HostToolArguments) (_context: HostToolContext) =
         task {

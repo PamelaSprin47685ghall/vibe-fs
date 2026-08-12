@@ -1,27 +1,46 @@
 # contract-test-missing — Main
 
-## What To Do Now
-Add a contract-level test through the changed boundary and assert the exact representation, identity, ordering, and failure behavior the consumer relies on. The inter-system boundary is who owns the observable agreement; each side’s unit tests are not who owns compatibility between them.
+Add a test at the narrowest point where the independent sides actually meet.
 
-## Why This Matters
-Unit tests prove local intent. A contract test proves compatibility between independent truths. Serialization details, process framing, provider IDs, transaction outcomes, and language conversions are often absent from the domain model yet decisive in production.
+Name the agreement first:
 
-## Repair Strategy
-Keep the fixture minimal and boundary-faithful. Prefer the real parser/serializer or adapter on both sides over hand-built approximations. Assert stable semantic properties and exact wire details only where those details are themselves contractual.
+- producer;
+- consumer;
+- representation crossing the boundary;
+- stable identity rules;
+- allowed versions/alternatives;
+- ordering/lifetime guarantees;
+- failure/unknown semantics;
+- capabilities/permissions if the boundary carries them.
 
-## Decision Branches
-- If an inter-system boundary changed and no test exercises the agreement, add that contract test first.
-- If an equivalent contract test already fails on incompatibility for this behavior, do not add a second theater suite.
-- If only internals changed and the observable agreement is untouched, do not invent a new contract test for the same bytes.
+Then exercise the real boundary machinery on both sides wherever possible. Real serializer into real parser is stronger than two fixtures written from the same English description. Real generated Fable export into the JS facade is stronger than asserting the F# source contains a type with the right name.
 
-## Common Wrong Fixes
-- Do not mock both sides with the same mistaken assumption.
-- Do not test a private helper that bypasses the boundary transformation.
-- Do not assert only that serialization “does not throw.”
-- Do not copy production payloads into snapshots without stating which fields are contractual.
+Keep the test focused. It should not require a full production deployment if one adapter-level interaction exposes the agreement. But do not mock away the exact transformation the test is supposed to prove.
 
-## Verification
-Introduce a realistic incompatible change—wrong field, identity, framing, or error case. The contract test should fail before production can observe it. The invariant is that the changed boundary has an executable agreement that detects either side drifting from what the other consumes.
+Common fake repairs:
 
-## Done When
-The changed boundary has an executable agreement that can detect either side drifting away from the contract the other side actually consumes.
+- unit-test producer encoder and consumer decoder separately with independently invented fixtures;
+- copy a captured payload into a golden snapshot without stating which fields are contractual;
+- assert only “serialization succeeds” or “parser returns something”;
+- mock the external side using the same incorrect schema object production uses;
+- pin incidental key order/whitespace when the protocol does not care;
+- ignore error/failure cases and test only happy representation;
+- test only the newest version while compatibility claims include old versions;
+- run a huge E2E whose failure cannot distinguish contract drift from unrelated infrastructure.
+
+A useful contract test often contains both positive and negative evidence:
+
+```text
+supported producer output → consumer accepts and preserves semantics
+plausible incompatible output → consumer rejects or maps according to contract
+```
+
+For versioned protocols, prove the migration matrix you actually support. For identity-bearing protocols, prove IDs/cursors/idempotency keys survive round trips instead of being regenerated. For capability surfaces, prove advertised capability and execution gate agree.
+
+Verification should mutation-test the agreement. Make one realistic incompatible change on either side — rename a field, change a tag, alter default/error mapping, reorder a causally significant frame, regenerate identity — and confirm the contract test turns red before the other side is changed to match.
+
+If the boundary depends on behavior of a real external service that a local double cannot truthfully reproduce, keep a narrow local contract test for what you own and add/retain a canary against the real environment for the undocumented/unstable piece. Do not make a local mock an oracle for another company's runtime.
+
+You are done when either side can evolve internally, but any drift in the agreement the other side actually consumes becomes an immediate, localizable failure.
+
+> A contract test is executable diplomacy between independent truths.

@@ -223,7 +223,7 @@ module JsBookkeeperTool =
               + "\n```" ]
 
     let private failed (reason: string) =
-        ToolHostCodec.tomlObjectWithInstructions [ "# The staged case was not changed."; "# " + reason ] []
+        ToolHostCodec.tomlObjectWithInstructions [ "The staged case was not changed."; reason ] []
 
     let private succeeded (value: SyntheticToml.DataValue) =
         SyntheticToml.document [ "The staged case accepted this transformation." ] (SyntheticToml.encodeData value)
