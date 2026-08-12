@@ -23,6 +23,7 @@ const method = (name) => {
 
 const observe = method('Observe')
 const isArmed = method('IsArmed')
+const hasArmedSession = method('HasArmedSession')
 const tryTake = method('TryTake')
 const dropAttempt = method('DropAttempt')
 const sentinelOf = method('get_Sentinel')
@@ -115,6 +116,8 @@ test('HOST_027_exact_sentinel_triggers_across_fragmented_real_host_reasoning_tex
   await waitFor(() => aborts.length === 1, 'fragmented sentinel did not abort')
   assert.deepEqual(aborts, ['ses_a'])
   assert.equal(isArmed(sensor, sessionId('ses_a'), providerRun('asst_1')), true)
+  assert.equal(hasArmedSession(sensor, sessionId('ses_a')), true, 'coarse abort routing sees typed NEEDHELP ownership')
+  assert.equal(hasArmedSession(sensor, sessionId('ses_other')), false)
 })
 
 test('HOST_027_case_variants_unowned_and_visible_text_do_not_trigger', async () => {
@@ -152,7 +155,9 @@ test('HOST_027_same_provider_run_aborts_once_but_different_run_is_independent', 
   assert.equal(tryTake(sensor, sessionId('ses_a'), providerRun('asst_1')), true)
   assert.equal(tryTake(sensor, sessionId('ses_a'), providerRun('asst_1')), false)
   assert.equal(isArmed(sensor, sessionId('ses_a'), providerRun('asst_1')), false)
+  assert.equal(hasArmedSession(sensor, sessionId('ses_a')), true, 'second run still owns the session abort')
 
   dropAttempt(sensor, sessionId('ses_a'), providerRun('asst_2'))
   assert.equal(isArmed(sensor, sessionId('ses_a'), providerRun('asst_2')), false)
+  assert.equal(hasArmedSession(sensor, sessionId('ses_a')), false)
 })

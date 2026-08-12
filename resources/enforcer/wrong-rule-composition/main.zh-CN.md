@@ -1,38 +1,35 @@
-# wrong-rule-composition — Main
+# wrong-rule-composition — Main 中文版
 
-先画 premise dependency，再选 combinator。
+## 现在该做什么
+画出 rule prerequisite graph。依赖链用 sequential short-circuit；可在同一输入上独立成立的 constraints 用 accumulation（必要时并行）。不要让一个 generic pipeline 替 domain 决定 logical dependence。
 
-把每条 rule 看成一个 proposition：它需要哪些 facts？成功后又建立哪些新 facts？若 B 的 required fact 只有 A 成功才能提供，那么关系就是 sequential；A fail 后 B 没有资格运行。若多条 rule 都只依赖同一个完整 input，则可以独立 evaluate，并按 caller 需要积累结果。
+## 为什么这很重要
+错误的 composition 会制造两种相反的谎言：
 
-健康例子：
+- cascading nonsense：前提不存在，却继续报告后续“错误”；
+- evidence suppression：多个独立事实都已经成立，却只告诉 caller 第一条。
 
-```text
-parse email
-  → success 后 validate domain       // dependent, short-circuit
+两者都不是 UX 小问题，而是 evaluator 对“哪些 proposition 现在有意义”判断错了。
 
-validate name
-validate age
-validate address                       // independent, accumulate
-```
+## 修复策略
+- 给每条 rule 明确 required facts 与 produced facts；
+- 依赖边形成 `andThen`；
+- 同层独立 constraints 形成 `collectAll`；
+- error algebra 保留 prerequisite failure 与 independent violation 的区别；
+- operational staging（成本/安全）若影响 composition，要明确记录为 policy，而不是偷偷等同逻辑依赖。
 
-常见假修复：
+## 常见假修复
+- 全项目统一 fail-fast。
+- 全项目统一 collect-all。
+- 继续跑所有 rule，最后在 UI 根据 error code 丢掉 cascading errors。
+- 每条 downstream rule 重新检查 prerequisite，复制逻辑。
+- 用 priority numbers 模拟依赖，却没有 produced/required fact 关系。
 
-- 全项目规定“永远 fail fast”；
-- 全项目规定“用户体验必须一次显示所有错误”，于是连 premise 不存在的 error 也硬算；
-- cascading errors 先全部制造，再在 UI 用 regex/filter 去掉；
-- 每条 downstream rule 重复检查自己的 prerequisite，导致 dependency knowledge 又复制；
-- independent rules 为了 accumulation 被强行串行，白付 latency；
-- dependent rules 被 parallelize，结果后者只能处理大量 `None/invalid` 假输入。
+## 验证
+构造两类 fixture：
 
-Composition 应尽量在 type 上体现 premise。Parse 成功后返回更强的 `ParsedEmail`，下一条 rule 接这个类型，比所有 rule 都接原始 string 再自己判断 “能不能运行” 更能表达 dependency。
+1. prerequisite 失败 + downstream 本可报错：只能出现 prerequisite failure；
+2. 多个 independent constraints 同时违反：应得到完整独立 error set。
 
-验证应覆盖两类场景：
-
-1. prerequisite fail + downstream potential errors：只报告仍然有意义的 reachable failure；
-2. 多个 independent violation 同时存在：返回完整的 independent set，且 evaluation order 不应改变集合语义。
-
-如果 caller 只需要 first error（例如 machine protocol 明确 fail-fast），也可以对 independent rules 选择 first，但这是 caller-facing contract，应明确命名，不要混成 domain “只有第一条是真的”。
-
-完成时，每个 error 都能解释自己所需 premise 已经成立；同时 independent facts 不会仅因某个无关 check 先失败就被隐藏。
-
-> Combinator 不是代码风格。它是在回答一个逻辑问题：一个失败发生后，哪些命题仍然有资格被判断？
+## 完成条件
+reported errors 恰好等于当前 facts 下有意义且为真的 violations；evaluation order 来自 dependency，而非编码习惯。

@@ -1,37 +1,28 @@
-# callback-pyramid — Main
+# callback-pyramid — Main 中文版
 
-把 continuation tree 拉平成一个 structured async lifetime。
+## 现在该做什么
+在 adapter edge 适配 callback API，然后把 operation 改成 structured async flow：一个 top-level scope 拥有 sequence、resource lifetime、cancellation 与 error propagation；parallel work 在显式 join point 汇合。
 
-Foreign callback API 先在 adapter edge 转成 Promise/Task/Async；之后让一个 top-level operation 负责 sequence、resource scope、cancellation、error propagation。独立分支用 named join/combinator 汇合，不要继续往更深 closure 里嵌。
+## 为什么这很重要
+Nested callbacks 把 operation 的一个时间故事切成许多局部 closure。每个 closure 都只知道自己的下一步，于是没人拥有完整 lifecycle。维护者最容易在这里漏 cleanup、吞 error、丢 cancellation，或者让 inner work 在 outer scope 已结束后继续跑。
 
-目标形状是能从上到下读：
+## 修复策略
+- foreign callbacks 边界化；
+- sequence 用 async/task/structured concurrency 表达；
+- resources 用 lexical scope；
+- cancellation 从 top-level 向 owned children 传播；
+- parallel branches 使用明确 combinator/join；
+- error mapping 在 effect boundary 做一次，不在每层 closure 重复 catch。
 
-```text
-acquire
-await step A
-await step B
-await parallel join
-commit
-finally release
-```
+## 常见假修复
+- 只把 inner callbacks 抽成命名函数。
+- 从 callbacks 改成十层 `.then()`，仍是 continuation tree。
+- flatten syntax 后忘记 thread cancellation。
+- 为简化 error flow 在 inner callback 吞错。
+- 把所有 callback 变成 global event handlers，进一步隐式化 control flow。
 
-而不是在每个 callback 里再注册下一层 callback，并把 cleanup/error scattered 到叶子。
+## 验证
+从 top-level operation 分别走 success、failure、cancellation、early exit。每条路径都应有明确 cleanup owner；无需跳到另一个 lexical closure 才能解释“谁负责释放/停止”。
 
-常见假修复：
-
-- 只是把 inner callback 抽成 named function，隐藏 nesting 却保留相同 lifetime；
-- `.then(...).then(...)` 看起来横向了，但 error/cancel/resource ownership 仍不清；
-- flatten 后忘记 thread cancellation，结果 syntax 线性、physical child 仍 detached；
-- 所有 error 都 catch 成 `null`，让主流程“更直”；
-- 为避免 callback nesting 改成 event bus，sequence 反而进入 `implicit-control-flow`；
-- 把 shared mutable flags 当 callback 之间的 continuation state。
-
-资源要跟 top-level scope 走。Acquire 后无论哪一步 throw/cancel，release 都由同一结构保证。若某 child 真需要 outlive parent，就做显式 ownership transfer，不要因为 callback 已注册就默认 detach。
-
-验证 success/failure/cancel 三条路径：从一个顶层 operation 能追到每个 child 的结束，并且 cleanup deterministic。故意让中间 step fail、最后 step cancel、parallel branch 一边 fail，一边 slow，确认 owner 的 policy 可读且可执行。
-
-如果 foreign API 会同步调用 callback（re-entrancy）或多次 callback，adapter 还要把这些特殊 semantics 收敛成内部明确 contract，防止 structured async 表面线性、实际仍被外部 callback model 偷袭。
-
-完成时，operation causal order、failure、cancellation、resource lifetime 都能在一个 lexical scope 里理解；callback 只留在真正不可避免的外部 edge。
-
-> Flattening 的意义不是少几个缩进，而是让一段工作的整个生命重新有一个主人。
+## 完成条件
+operation 的 causal order 可以从上到下阅读；failure、cancellation 与 resources 共用同一结构化 lifetime，而不是散落在 indentation 中。

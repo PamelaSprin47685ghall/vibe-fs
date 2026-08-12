@@ -126,7 +126,13 @@ module HostSignalBootstrap =
                 // attempt's idle permits, then routes to the
                 // reconciler. Never ProviderFailure — it does not advance fallback.
                 | AttemptAborted sessionId ->
-                    scope.Sessions.Quiescence.RevokeCurrentAttempt sessionId
+                    // HOST-027: an exact NEEDHELP armed mark means this abort was
+                    // requested by Assistance itself. Do not revoke that attempt's
+                    // idle right: the following SessionIdle is the causal proof that
+                    // permits the deep consultation. Ordinary operator aborts remain
+                    // fail-closed and revoke before reconciliation.
+                    if not (scope.NeedHelpSensor.HasArmedSession sessionId) then
+                        scope.Sessions.Quiescence.RevokeCurrentAttempt sessionId
 
                     scope.Strength.StrengthReplicaRuntime
                     |> Option.iter (fun runtime -> runtime.CancelOwner sessionId |> ignore)

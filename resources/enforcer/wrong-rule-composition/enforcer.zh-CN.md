@@ -1,26 +1,38 @@
-# wrong-rule-composition — Enforcer
+# wrong-rule-composition — Enforcer 中文版
 
-Wrong rule composition 的病，不是“用了错误函数名”，而是**把同一种 evaluation law 套给逻辑关系不同的 rules**。
+## 定义
+Rule composition 选错，发生在系统把一种 evaluation law 当成所有规则的统一教条：要么凡事 fail-fast，要么凡事 collect-all，却不看规则之间是否有逻辑依赖。
 
-Dependent rules 与 independent rules 根本不是同一种东西。
+真正决定 composition 的不是编码风格，而是 premise graph：若 B 只有在 A 成功后才有意义，A 失败后继续执行 B 会制造垃圾错误；若 A/B 独立，第一条失败就停止则会隐藏同一输入已经证明的其它事实。
 
-如果 B 的意义建立在 A 成功产生的 fact 上，那么 A fail 后继续跑 B，只会制造 nonsense：email 都不存在，却继续报 “email domain 不允许”。这里应该 short-circuit，因为 premise 已经不存在。
+## 何时触发
+- parse 失败后仍报告 parsed value 的业务约束错误；
+- authorization 失败后继续执行只有授权主体才有意义的 checks；
+- form 的多个独立 field errors 只返回第一条，caller 明明需要完整集合；
+- 一个 generic validation pipeline 对所有规则固定 short-circuit 或 fixed accumulation；
+- cascading errors 需要 UI 再过滤，因为 evaluator 本身不懂 prerequisite。
 
-如果 A、B、C 都是在同一完整 input 上独立判断，那么第一个 failure 后停止，只是在隐藏其余同样真实的 violation。这里 accumulation 往往更诚实。
+## 不要误判
+- 有 failed premise 时停止是正确的；
+- 安全/成本 policy 可能明确要求 fail-fast，即使理论上可继续，此时是 contract；
+- 有些 independent checks 很昂贵，可有明确 staged policy，但要承认这是 operational choice；
+- 单条 rule 没有 composition 问题。
 
-以下情形触发：
+## 刀口
+对任意两条规则问：**B 的问题在 A 失败时仍然有真值吗？**
 
-- prerequisite fail 后 downstream validation 继续产生 cascading error；
-- form/config 的独立字段 rule 永远只返回第一条 error；
-- 一个 generic pipeline 全项目统一 “fail fast”，不管规则是否 independent；
-- 反过来，所有 rule 都 “collect all”，连 parse/lookup fail 后没有意义的 checks 也继续跑；
-- error filtering 被丢给 UI，因为 backend 先制造了一堆 premise 已失效的错误；
-- rules 被 parallelize，只因为“都是 validation”，却忽略某条 rule 依赖上一条建立的 typed fact。
+没有：顺序、short-circuit。
+有：可以独立判断；若 caller 需要完整 evidence，应 accumulate。
 
-不要把 fail-fast 或 collect-all 当工程价值观。它们都只是 composition law，正确与否由 dependency graph 决定。
+## 与近邻区分
+`missing-rule-combinator` 是 law 没有 owner；这里是 law 选错。
 
-与 `missing-rule-combinator` 区分：那里还没有共享 composition vocabulary；本规则即使已经有漂亮 `andThen/all`，只要选错 operator，semantics 仍然错。与 `rule-spaghetti` 区分：那里 policy 还藏在 imperative maze；这里 rule 已清楚，问题在它们之间的逻辑关系被解释错。
+`rule-spaghetti` 是 propositions/依赖本身埋在 imperative maze 中；先把依赖看清，才能谈正确 composition。
 
-判定时对每一对 rule 问：**B 需要 A 建立的新事实才能说出有意义的话吗？** 需要，就 sequence/short-circuit；不需要，就考虑独立 evaluate/accumulate。不要让 syntax similarity 替 logic 作答。
+## 例子
+- 正例：email 缺失后仍报“email domain 不允许”；或者三个独立 field violations 只回第一个。
+- 近邻：parse 失败后不运行 semantic validation，因为根本没有 parsed object。
+- 反例：dependent chain 用 `andThen`，independent constraints 用 `collectAll`。
 
-> Error behavior 本身就是 policy。失败后哪些问题仍然有意义，应该由 premise 决定，而不是由项目统一的“验证风格”决定。
+## 提醒
+不要选择“fail fast 派”或“collect all 派”。让事实之间的依赖关系决定 evaluator。

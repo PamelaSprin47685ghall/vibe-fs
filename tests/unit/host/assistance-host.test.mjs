@@ -55,15 +55,20 @@ const beginAttempt = quiescenceMethod('BeginProviderAttempt')
 const observeIdle = quiescenceMethod('ObserveIdle')
 const quiescenceByHost = new WeakMap()
 const handleTurn = async (host, turn) => {
+  const gate = quiescenceByHost.get(host)
+  assert.ok(gate, 'assistance harness must own the quiescence gate')
+
+  if (turn.Outcome.tag === 3) beginAttempt(gate, turn.SessionId)
+
   const observed = await rawHandleTurn(
     host,
     new ReconciledTurnContext(turn, undefined, ReconciledTurnDelivery.Observation),
   )
   if (turn.Outcome.tag !== 3) return observed
 
-  const gate = quiescenceByHost.get(host)
-  assert.ok(gate, 'assistance harness must own the quiescence gate')
-  beginAttempt(gate, turn.SessionId)
+  // Production NEEDHELP owns its typed abort, so HostSignalBootstrap does not
+  // revoke this attempt. The real SessionIdle then mints the permit used by the
+  // IdleRevisit; no synthetic new provider attempt occurs between abort and idle.
   const permit = observeIdle(gate, turn.SessionId)
   return rawHandleTurn(host, new ReconciledTurnContext(turn, permit, ReconciledTurnDelivery.IdleRevisit))
 }

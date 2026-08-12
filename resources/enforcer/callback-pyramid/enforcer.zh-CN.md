@@ -1,22 +1,35 @@
-# callback-pyramid — Enforcer
+# callback-pyramid — Enforcer 中文版
 
-Callback pyramid 的病，不是缩进难看，而是 **sequence、resource lifetime、cancellation、failure propagation 被 lexical nesting 共同编码**，导致 operation 没有一个可以从上到下读完的 owner。
+## 定义
+Callback pyramid 的问题不是缩进难看，而是**时间被表示成 lexical topology**：sequence、failure、cancellation、resource lifetime 分散在多层 closure 中，没有一个 scope 能完整说明 operation 的生命期。
 
-`open → read → parse → write → close` 如果分散在四层 callback，读者要同时追两个维度：代码嵌套在哪，运行时什么时候发生。每加一个 error branch，就要重新回答哪个 closure owns cleanup、哪个 cancellation 仍有效、later callback 会不会在 outer operation 已结束后继续。
+当 reader 必须沿着 callback 一层层下钻、再反向寻找 error/cleanup owner，control flow 已经失去结构化因果。
 
-以下情形触发：
+## 何时触发
+- open → read → parse → write 多层 callback 嵌套；
+- cleanup 分散在不同 inner callbacks；
+- error 到底 propagate 到哪里需要追 closure；
+- cancellation token 在某层丢失；
+- parallel branches 与 sequential branches 混在 nesting 中，join point 不清楚。
 
-- 主要 workflow 由多层 callback/`.then` nesting 表达；
-- cleanup/error handling 分散在不同 inner closure；
-- caller cancel 后某个 nested callback 仍可能继续 effect；
-- resource acquisition 在外层，release 只能在多个内层 branch 手工记得；
-- parallel branches 通过互相嵌套 callback 汇合，没有明确 join point；
-- 读者必须来回跳 closure 才能说清 success/failure/cancel path。
+## 不要误判
+- foreign callback API 在 adapter edge 一层包住，很正常；
+- event registration 本身不是 operation sequence；
+- 浅层 continuation 若 lifetime 一目了然，不必为了风格改写；
+- structured async 也可能写得很差，但至少问题不再由 callback nesting 本身造成。
 
-不要误杀 callback API 本身。Foreign library 只有 callback 完全正常；把它在 adapter edge promisify/包装后，内部用 structured async 即可。一个浅 callback、lifetime 一眼可见，也没必要重构。
+## 刀口
+尝试用一段 top-to-bottom 的 causal sentences 复述 operation：获取什么、等什么、何时释放、取消从哪到哪。若代码结构无法直接映射这些句子，而必须跳 closure，pyramid 已经在承载 protocol。
 
-与 `implicit-control-flow` 区分：那里 sequencing 藏在 registration/framework lifecycle；本规则的 sequencing 其实在 source 中，但被**continuation nesting**打碎。与 `resource-not-scoped` 区分：callback pyramid 常导致 lifetime 不清，但即使资源都最终 release，只要 causal path 仍难以整体理解，pyramid 仍存在。
+## 与近邻区分
+`implicit-control-flow` 是时序藏在 framework/registration；这里时序倒是“在代码里”，但被 lexical nesting 撕碎。
 
-诊断方法：先用几行普通句子写 operation causal sequence。如果无法把 source 从上到下映射到这条 sequence，而必须不断“进入这个 callback，再回来，再看另一个 closure”，控制流 representation 已经妨碍推理。
+`resource-not-scoped` 关注具体 resource lifetime；callback pyramid 往往让 lifetime ownership 变模糊，但两者不是同义。
 
-> Nested callback 把时间变成代码拓扑。结构化 async 的价值，是重新让因果、失败、取消与资源拥有同一个可见 scope。
+## 例子
+- 正例：四层 Node-style callbacks，每层都有自己的 `if (err)` 和 cleanup。
+- 近邻：callback API 在边界立刻转成 Task/Promise，内部用一个 async scope。
+- 反例：把 callbacks 抽成五个命名函数，但调用/cleanup 关系仍靠 continuation passing——名字多了，结构没回来。
+
+## 提醒
+目标不是“少缩进”，而是让 causality、cleanup、failure 与 cancellation 回到一个可读 lifetime 中。

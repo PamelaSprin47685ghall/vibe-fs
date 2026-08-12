@@ -1,31 +1,31 @@
-# program-counter-state — Main
+# program-counter-state — Main 中文版
 
-把真实 workflow fact 与 interpreter position 分开。
+## 现在该做什么
+把 durable state 分成两类：外部世界事实保留；纯执行位置移回 structured control flow。Recovery 应从 durable facts 重新推导当前允许的下一动作，而不是跳回历史代码的某个 step。
 
-对每个 persisted `phase/step/nextAction` 问：如果内部实现完全改成另一种 control structure，外部 domain 是否仍然需要知道这个值？
+## 为什么这很重要
+一旦 instruction pointer 进入持久化 schema，实现细节就获得了比代码本身更长的寿命。函数重命名、步骤合并、异步模型改变都可能让旧数据“指向不存在的代码位置”。
 
-- 若需要，它可能是真 domain state：重新命名成业务概念，定义合法 transition 与拥有的数据。
-- 若不需要，就把 sequencing 收回 in-flight structured control，durable store 只保留能够从世界事实重新决定下一步的 information。
+更糟的是 program counter 通常不能证明 side effect 是否已发生：`step=3` 只说明程序认为自己走到这里，不说明 step 2 的远端效果是否 committed。
 
-Recovery 也应从 durable facts **重新推导接下来该做什么**，而不是恢复旧 instruction pointer。这样 refactor workflow 不再要求把所有历史 `step=7` 映射到新代码第几步。
+## 修复策略
+- 找出每个 step 背后真正的 durable fact；
+- 记录 `Requested/Accepted/Committed/Observed/...` 这类现实事实，而非 handler 名；
+- restart 时 fold facts，再由当前代码决定合法 continuation；
+- 对外部 unknown outcome 使用 reconciliation/idempotency，不用 step number 猜测；
+- 只有真正 domain-visible workflow status 才进入 durable model。
 
-常见假修复：
+## 常见假修复
+- 把 `currentStep` 改名 `status`。
+- 存更多 sub-step 以“精确恢复”。
+- 保存 function name / continuation token，强迫未来代码兼容旧 instruction pointer。
+- 把 step 与事实双写，最后再 reconcile 两者。
+- 仅靠 migration 更新 step number，继续保留同一错误模型。
 
-- `currentStep` 改名 `status`，语义完全不变；
-- step enum 越做越细，让每个 await 前后都有一个 durable phase；
-- DB 直接存 function/handler name；
-- 为恢复中间过程，再加入 `subStep`, `resumeToken`, `lastAction`，逐渐把 interpreter 全存下来；
-- 用 workflow engine 把每个 implementation continuation 变成 external schema；
-- 删除 step field，但改从 temp filename / filesystem residue 猜 resume point，转成 `recovery-by-filesystem-state`。
+## 验证
+尝试大幅重排内部 control flow，但不改变 domain facts。旧 durable history 应仍能由新代码重放/恢复，无需理解旧函数编号。
 
-若 operation 本身就是 long-running durable workflow，当然需要持久化 progress，但应持久化**有业务/协议意义的 milestone 与事实**：`PaymentAuthorized`, `ShipmentRequested`, `ApprovalPending`，而不是“下一次调用 handleStep4”。下一步应由当前 facts + policy 推导。
+Crash injection 后，recovery 的判断依据应能指向实际 durable evidence，而不是“我们上次记得自己执行到第几步”。
 
-验证最有力的是 refactor test：概念上把 sequencing 从 A→B→C 改成 batch、不同 helper、不同 function boundaries，只要 domain-visible lifecycle 没变，durable schema/history 不应需要 migration。
-
-Crash/restart 也要测：从每个 durable milestone 重启，系统根据事实重新进入正确行为，而不是依赖 process 当时 local continuation 的残影。
-
-如果某个 technical cursor 真是外部 protocol 必需（例如 stream offset），把它作为该 protocol 的明确 fact 管理，不要混进业务 phase 伪装成“当前步骤”。
-
-完成时 stored state 可以回答“世界已经发生了什么/还欠什么”，而不是“旧程序下一行准备执行什么”。
-
-> Recovery 最稳的方式不是保存解释器，而是保存足够真实的事实，让新的解释器重新知道该做什么。
+## 完成条件
+持久化数据描述世界；structured control flow 描述程序。两者不再互相冒充。

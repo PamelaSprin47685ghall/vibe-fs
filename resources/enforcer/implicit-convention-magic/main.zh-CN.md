@@ -1,28 +1,27 @@
-# implicit-convention-magic — Main
+# implicit-convention-magic — Main 中文版
 
-把 correctness-critical convention 降级成 sugar，把 explicit checked model 升成 authority。
+## 现在该做什么
+把 correctness-critical participation 变成显式 typed registration、generated manifest 或 build/startup completeness contract。Convention 可以留下当 sugar，但 authoritative model 必须可见、可检查、可失败。
 
-先找出 convention 实际编码的关系：谁参与、名字是什么、实现哪个 contract、属于哪类 capability、需要哪些 dependencies。把它做成 typed registry、manifest/schema、code declaration 或 build/startup completeness check。
+## 为什么这很重要
+Convention 用更少语法换取更多组织记忆。规模小时很舒服；规模大后，系统行为取决于一套源码本身不声明的民间仪式。最坏的 failure mode 不是报错，而是**缺席**：某个 handler、migration、test、hook 根本没运行，却没有任何红灯。
 
-Convention 仍可保留用于减少 boilerplate，但它必须**编译/生成/验证到显式 model**，而不是 runtime 唯一真源。
+## 修复策略
+- 找出 convention 实际编码的 relationship；
+- 把 relationship 建成 data/type/manifest；
+- one owner 校验 completeness、uniqueness、compatibility；
+- 让 filename/path/annotation 仅作为生成显式 model 的输入；
+- open-world discovery 需要清晰版本/validation/failure semantics。
 
-常见假修复：
+## 常见假修复
+- 再写一页文档解释命名规则。
+- 加 comment “do not rename”。
+- 扫描更多目录，让 magic “更智能”。
+- 用 runtime warning 代替 startup failure，即使缺 participant 会破坏 correctness。
+- 把 registry 藏进另一个 reflection layer，仍然无法静态/启动时验证。
 
-- 写更多 README 告诉大家 filename 规则；
-- scanner 扫更多目录，让“忘放哪里”概率低一点；
-- violation 时打 warning 但继续启动，feature 仍然静默缺失；
-- 用 annotation 替 filename，却仍没有 completeness owner；
-- 建一份 registry，但 runtime 继续直接 discovery，registry 只是文档；
-- 给 magic convention 加 test fixture，却 production 新 participant 仍可能绕过 test。
+## 验证
+对 fixture 做 rename/move/omit/duplicate：需要参与的对象一旦不满足 contract，构建或启动应明确失败；纯导航上的移动不应改变行为。
 
-验证要主动 rename/move/omit participant。系统应在 build/startup 的明确 boundary fail，并告诉你哪个 contract 不完整，而不是等某个用户发现 route/tool/handler 没出现。
-
-还要测 stale registration：explicit model 声称 participant 存在，但 implementation 被删/改 signature，应机械失败。这样 authority 才真正在 model，而不是又变成一份会漂的名单。
-
-如果 framework 强制 convention-over-configuration，至少在 adapter/startup 建一个 completeness projection，把 framework discovery 结果变成可验证事实，并 fail closed。无法改变 framework 不等于必须把它的隐式规则泄漏到整个 application。
-
-不要把所有 convention 都变成重型 manifest。若编译器/type system 已能直接检查关系，最简单的 explicit declaration 就够了。目标是让 omission 变 visible，不是制造配置文件数量。
-
-完成时，参与关系能被代码/构建工具明确列出和验证；文件名/路径/annotation 最多是方便写法，不再是唯一保存 architecture 的地方。
-
-> 好 convention 让正确事情更省字；坏 convention 让错误事情连错误都不报。
+## 完成条件
+参与关系不再依赖团队记忆；源码或生成物能明确回答“谁注册了、为何有效、违反时哪里失败”。

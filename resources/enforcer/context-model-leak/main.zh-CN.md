@@ -1,26 +1,28 @@
-# context-model-leak — Main
+# context-model-leak — Main 中文版
 
-从每个 bounded context 的问题出发重新建模，不要从 master field list 出发切片。
+## 现在该做什么
+从每个 bounded context 的问题与 invariant 重新定义 local model，只通过明确 boundary contract 传递真正共享的 facts。不要从现有 master object 的字段列表出发拆 DTO。
 
-Auth 需要哪些事实才能判断 identity/permission？Billing 需要哪些事实才能结算？Session 需要哪些事实才能管理 participant？分别建立最小 context-owned type，然后只在 boundary 翻译真正共享的 facts：opaque ID、Money、EmailAddress、明确 event/contract。
+## 为什么这很重要
+Universal model 会制造“semantic coupling disguised as reuse”。一个字段为了 Billing 加入后，Auth/Session/UI 全部开始知道它；很快 nullable、context flags、conditional validation 堆积起来，因为类型已经无法说明哪个解释现在有效。
 
-Translation 不是重复劳动，而是在声明：跨 context 后，**同一段 bytes 现在被赋予什么不同意义**。
+## 修复策略
+- 列出每个 context 要回答的问题；
+- 为每个 context 建最小 model；
+- 共享真正语义稳定的 value objects/IDs；
+- crossing facts 通过 explicit contract 翻译；
+- 删除在某 context 中永远“not applicable”的 foreign fields；
+- persistence schema 不直接决定 domain model 边界。
 
-常见假修复：
+## 常见假修复
+- 把 master model 复制到每个 package，但字段仍一模一样、同步演化。
+- 加 `contextType` 决定哪些字段有效。
+- 给不适用字段全部加 `Option/null`。
+- 用 `authEmail/billingEmail/...` 把多个概念继续塞同一个对象。
+- 为每个 context 再包一层 view，却底下仍暴露完整 master object。
 
-- 把 universal model 复制三份，字段/semantics 仍手工同步；
-- 继续保留 master type，只加 `context=Billing|Auth`；
-- 给所有 foreign field 加 nullable，然后用 runtime check 判断“这里有没有”；
-- namespace field：`authEmail`, `billingEmail` 全塞同一 object；
-- persistence entity 直接当所有 context 的 domain model；
-- 为避免 translation，所有 bounded context 直接依赖 shared package 的 mega DTO。
+## 验证
+一个 context 的核心逻辑应能只依赖自己的 model 与显式 crossing contracts 编译/测试。另一个 context 新增字段，不应让本 context 莫名发生 source change。
 
-验证应做独立演化实验。给 Billing 加一个只属于 billing 的 invariant/field，Auth/Session 应完全不需要改变。反过来，Auth 的 credential/lifecycle 调整不应污染 Reporting model。
-
-Context 间传递时，只允许 explicit boundary contract。可以共享 ID，但 ID 只是 identity，不携带 foreign context 的整套 state。需要更多事实时，通过 query/event/translation 获取，而不是把整个 master object 偷渡过去。
-
-如果两个 context 经过审视后实际上拥有相同 invariants、相同 lifecycle、总是一起变化，可能说明它们本来就不该是两个 bounded context。不要为了“DDD 形式”制造无意义 split。
-
-完成时每个 model 有一个 semantic owner、一个主要 reason to change；foreign context 看不到对自己无意义的字段，也无法因为“类型里有”就误以为可依赖。
-
-> Context boundary 最有价值的能力之一，就是让某些字段彻底不存在。不存在比 nullable 更能阻止错误知识传播。
+## 完成条件
+每个 model 有一个 semantic owner 和一个 reason to change；跨 context 传递的是明确 facts，不是一个无所不知的 master object。
