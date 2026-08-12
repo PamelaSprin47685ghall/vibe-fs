@@ -71,7 +71,7 @@ type ProviderRequestKind =
 
 `AuthorityExecutionProfile` 是原子 profile 内的稳定 Authority 子记录，不是第二个构造来源。下游需要更窄视图时只能从完整 profile 纯投影或直接传所需参数；禁止分别构造多个可矛盾的子记录再拼回 attempt。
 
-`ProjectionChoice = UsePrefixProbe _` 表示本 attempt 使用候选前缀（CTX-010）；`UseCommittedEpoch` 表示明确选择已提交 epoch。二者仅对该 attempt 有效，不构成领域事实。`StrengthReplica` 不得携带 prefix probe，且成功/失败都不作为 owner fallback 证据（STRENGTH-004/015）。
+`ProjectionChoice = UsePrefixProbe _` 表示本 attempt 使用候选前缀（CTX-010）；`UseCommittedEpoch` 表示明确选择已提交 epoch。二者仅对该 attempt 有效，不构成领域事实。`StrengthReplica` 不得携带 prefix probe（`mayCarryProbe=false`），且成功/失败都不作为 owner fallback 证据（`clearsFailureCountOnSuccess=false`；STRENGTH-004/015）。
 
 `toolCapabilitiesFor(CanonicalRole, StrengthReplica)` 仅对 Strength eligible role 返回恰好 `{Read; Glob; Grep}`；其它 role 返回空集。provider schema 与 execution gate 必须读取同一 `ToolCapabilitySet`，禁止 prompt-only readonly 约束。
 

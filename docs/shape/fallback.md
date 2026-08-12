@@ -32,7 +32,8 @@ type FallbackAttemptIdentity =
       ProviderRunIdentity }
 ```
 
-同一 failed attempt 最多推进一次。
+同一 failed attempt 最多推进一次。  
+StrengthReplica attempt outcome 永不进入 FallbackController；不是 owner Logical Run 的 failed attempt（STRENGTH-004/019）。
 
 禁止的第二写入口：
 

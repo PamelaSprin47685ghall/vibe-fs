@@ -15,10 +15,11 @@
 |------|------|
 | Offset mod 4；side A/A/B/B | FALLBACK-002 |
 | 失败 +1 count，成功清零 count 且 Offset 不变 | FALLBACK-004 |
+| StrengthReplica 成败不进 owner FallbackController / 不清零 count | FALLBACK-004、STRENGTH-004/019 |
 | count≥预算 → Exhausted，无自动第 13 次 | FALLBACK-005 |
 | Host Attempt 不写入 count | FALLBACK-010 |
 
-代表：`tests/unit/fallback/*`。
+代表：`tests/unit/fallback/*`、`tests/unit/strength/authority-policy.test.mjs`、`tests/unit/context/attempt-plan.test.mjs`。
 
 ## 槽与 arm
 

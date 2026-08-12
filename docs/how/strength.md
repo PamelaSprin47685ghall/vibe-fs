@@ -110,7 +110,7 @@ V2 = P1*SavedDeep1 + P1*P2*SavedDeep2
      - Fast1 - P1*Fast2 - Byte2 - Delay2 - Risk2
 ```
 
-选最大值后再应用 `K1Margin` / 更高 `K2Margin` 与 K2 evidence floor。没有可靠 fast/deep cost metadata 时 treatment 强制 K0，shadow 仍可记录 prediction。
+选最大值后再应用 `K1Margin` / 更高 `K2Margin` 与 K2 evidence floor。没有可靠 fast/deep cost metadata 时 treatment 强制 K0，shadow 仍可记录 prediction。默认 Host settings = Shadow；仓库不因本程序落地而宣称 K1 正收益 cohort。
 
 ## Crash / fuse
 

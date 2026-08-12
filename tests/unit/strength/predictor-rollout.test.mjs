@@ -10,6 +10,15 @@ import { ofArray as toList } from '../../../dist/fable_modules/fable-library-js.
 
 const S = Predictor.StrengthPrimarySymbol
 
+test('STRENGTH_010_feature_key_has_no_replica_or_score_provenance', () => {
+  const feature = Predictor.StrengthPredictor_feature(Role.Inspector, toList([S.ReadonlyBatch]), 100)
+  assert.equal('ReplicaSessionId' in feature, false)
+  assert.equal('DecisionId' in feature, false)
+  assert.equal('Score' in feature, false)
+  assert.equal('PredictorScore' in feature, false)
+  assert.deepEqual(Object.keys(feature).sort(), ['CanonicalRole', 'RecentPrimary', 'VisibleByteBucket'])
+})
+
 test('STRENGTH_010_predictor_learns_only_explicit_primary_labels_and_keeps_a_bounded_feature_key', () => {
   const feature = Predictor.StrengthPredictor_feature(
     Role.Coder,

@@ -120,6 +120,47 @@ test('STRENGTH_006_008_replay_excludes_Prepared_and_rebuilds_only_Promoted_at_ex
   assert.match(missingAnchor.error, /target anchor is absent/i)
 })
 
+test('STRENGTH_006_008_prepared_candidate_cannot_be_traced_or_raw_replayed', () => {
+  const frame = bundle()
+  const projection = apply(Projection.StrengthProjectionModule_empty, prepared(frame))
+  assert.equal(Projection.StrengthProjectionModule_isPromoted(decision('d1'), projection), false)
+
+  const traced = resultOf(Projection.StrengthProjectionModule_apply(
+    projection,
+    Events.StrengthEvents_traced(decision('d1'), 10n, 14n),
+  ))
+  assert.equal(traced.ok, false)
+
+  const replay = resultOf(Lifecycle.StrengthLifecycle_replayPlans(
+    session('owner'),
+    (message) => message.id,
+    toList([{ id: 'user-1' }, { id: 'run-1' }]),
+    () => ok(frame),
+    projection,
+  ))
+  assert.equal(replay.ok, true)
+  assert.equal(listItems(replay.value).length, 0)
+})
+
+test('STRENGTH_008_compaction_does_not_retire_raw_replay_without_xtrace_coverage', () => {
+  const frame = bundle()
+  let projection = apply(Projection.StrengthProjectionModule_empty, prepared(frame))
+  projection = apply(projection, promoted(frame))
+  projection = apply(projection, Events.StrengthEvents_traced(decision('d1'), 40n, 44n))
+
+  const [plan] = listItems(resultOf(Lifecycle.StrengthLifecycle_replayPlans(
+    session('owner'),
+    (message) => message.id,
+    toList([{ id: 'user-1' }, { id: 'run-1' }]),
+    () => ok(frame),
+    projection,
+  )).value)
+
+  assert.equal(Lifecycle.StrengthLifecycle_needsRawReplay(undefined, plan), true, 'physical cutoff / missing coverage cannot retire replay')
+  assert.equal(Lifecycle.StrengthLifecycle_needsRawReplay(42n, plan), true)
+  assert.equal(Lifecycle.StrengthLifecycle_needsRawReplay(43n, plan), false)
+})
+
 test('STRENGTH_008_trace_recovery_requires_one_exact_contiguous_canonical_match', () => {
   const frame = bundle()
   const expected = listItems(TraceRecovery.StrengthTraceRecovery_expectedParts(frame))

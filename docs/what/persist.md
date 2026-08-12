@@ -128,6 +128,17 @@ Magic Todo 域的 Journal facts（如 `TodoWriteAccepted`、`TodoReviewConcluded
 不得发明 PrefixProbeRolledBack 或「provider 失败回滚 epoch」类事实
 ```
 
+**Durable Strength 事实（合法 vocabulary，不削弱上表 probe/coverage 不变量）**：  
+`StrengthCandidatePrepared` / `StrengthCandidatePromoted` / `StrengthFramesTraced` / `StrengthCandidateAbandoned`（STRENGTH-006/007/008/017）经同一 EventStore 提交；大 material 只经 envelope `payload_refs`。  
+它们：
+
+```text
+不推进 RecordCoverage / PrefixCoverage
+不单独切换 PrefixEpoch
+不得发明 Strength Journal NDJSON / RuntimePath blob / feature-owned ref
+Prepared ≠ XTrace 历史；仅 Promoted 后的 Traced range 关联现有 XTraceCursor
+```
+
 禁止引入：`PrefixProbeRolledBack`、`OverflowDetected`、`ContextNearLimit`、`SquashReason` 等——失败不分类（CTX-005），容量不观察（CTX-001）。  
 失败的 X probe 不产生事实（CTX-010）。  
 Projection 只从 committed events fold 派生 Y 有效 frames，不读物理 Y transcript 当历史源。

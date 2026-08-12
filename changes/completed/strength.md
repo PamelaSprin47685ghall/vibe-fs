@@ -1,3 +1,6 @@
+> 本文件是历史变更记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
+
 # Predict & Reduce Strength — Current-Repo Rebase Proposal
 
 > 本文件位于 `changes/proposed/` 时只是已批准变更的 Proposal 原文，不是当前产品规范。
@@ -2128,11 +2131,7 @@ Strength 仍然值得做，但今天正确的形状已经不是“给旧系统�
 
 ## Remaining work
 
-1. 对齐正式 docs 与 glossary/navigation，消除旧 Phase-0/Student-Teacher/feature-owned storage 语义漂移。
-2. 补齐 §31 最终不变量尚缺的正式 Clause / mechanical proof，特别是 crash/restart/compaction/promotion closure 与 no-reflection 交叉证明。
-3. 完成 shadow/control statistical proof 与显式成本评估：证明至少一个稳定 eligible cohort 的 K1 正净收益，并保持 deterministic control holdout。
-4. 完成 treatment-vs-control quality proof：任务成功率、review/finality、fallback/repair、用户可见错误、tail latency、provider input bytes；K2 独立验收，不能继承 K1。
-5. 清理 Phase-0 stub、旧 Strength 残留与无价值临时脚手架；待标准仓库检查全绿后关闭 Change 并记录 Final outcome。
+无。
 
 ## Completion criteria
 
@@ -2146,3 +2145,41 @@ Strength 仍然值得做，但今天正确的形状已经不是“给旧系统�
 ## Blockers
 
 - 无。
+
+## Final outcome
+
+### Outcome
+
+Strength 架构/语义/机械 proof 闭环。默认 Shadow/K0；不宣称正收益 cohort；不启用 K1/K2 treatment。已 Promoted 历史可 replay。
+
+### Final specification
+
+- `docs/what/strength.md` STRENGTH-001..012（含默认 Shadow、无宣称 cohort、K2 独立门禁）
+- `docs/shape/strength.md` STRENGTH-013..019
+- `docs/how/strength.md`、`docs/proof/strength.md`（§31 → Clause → 测试表）、`docs/why/strength.md`
+- 交叉：HOST-015、FALLBACK-004、COMPANION-003、PERSIST-010、PROMPT-008、PROJ-005/006、词汇表、导航
+
+### Implementation result
+
+- Universal `InternalLeaf × Attached(StrengthReplica)` + `ProviderRequestKind.StrengthReplica` + `{read,glob,grep}`
+- Projection：`UseStrengthMirror` / `InsertStrengthFrames`
+- EventStore：Prepared → Promoted → Traced；material 只经 `payload_refs`
+- Policy：eligibility / control holdout / value / fuse / Host canary fingerprint
+- Replica runtime：decision-local K1/K2 request budget；dry-run 不注入 primary
+
+### Verification
+
+- `node scripts/checks/spec.mjs` OK（444 条款）
+- `npm run lint` / `npm run build` / `npm test` / `npm run test:integration` 绿
+- §31 二十一不变量均有 Clause + 永久测试（`tests/unit/strength/*`、`tests/integration/strength/lifecycle.test.mjs`）
+- Host request-budget dry-run：`tests/e2e/entry.test.mjs` long-stroke `strength-canary-*`（K2 恰好两轮，第 3 轮不外发，`StrengthCandidatePrepared=0`）
+- Treatment 未启用：缺显式成本 / exact canary fingerprint / control / predictor evidence → 新 decision 必 K0
+
+### References
+
+- `src/Wanxiangshu/Domain/Strength*.fs`
+- `src/Wanxiangshu/Application/Strength/`
+- `src/Wanxiangshu/Infrastructure/Persist/Strength*.fs`
+- `src/Wanxiangshu/Infrastructure/OpenCode/Host/Strength*.fs`
+- `tests/unit/strength/`、`tests/integration/strength/lifecycle.test.mjs`
+

@@ -48,7 +48,9 @@ Strength frame 插入必须早于 PairProgrammingThought marker；ReviewSeal 仍
 
 ## STRENGTH-010：Predictor 与 control
 
-Shadow 模式对 eligible opportunity 只预测、始终 K0，并观察后续 primary request。启用后保留 restart-stable deterministic control holdout；control assignment 只由 AuthorityRoot、TargetProviderRun 与 PolicyVersion 等冻结事实决定，不由 predictor score 或运行时 RNG 决定。训练 label 只来自 shadow/control primary request sequence；Replica intervention request 永不成为 counterfactual label。
+第一版默认 Shadow：eligible opportunity 只预测、始终 K0，并观察后续 primary request。仓库不因架构实现完成而宣称正收益 cohort。K1 treatment 只在显式成本、exact Host canary fingerprint、deterministic control 与足够 predictor evidence 同时成立时才可能启用；任一缺失 → K0。K2 必须独立通过更高 margin、evidence floor 与稳定窗口，不继承 K1。
+
+启用 Treatment 后仍保留 restart-stable deterministic control holdout；control assignment 只由 AuthorityRoot、TargetProviderRun 与 PolicyVersion 等冻结事实决定，不由 predictor score 或运行时 RNG 决定。训练 label 只来自 shadow/control primary request sequence；Replica intervention request 永不成为 counterfactual label。
 
 K1/K2 由纯 value policy 比较 `V0=0`、`V1`、`V2`；成本必须来自显式 provider usage/price metadata 或 Host-internal cost class，不能从 Fast/Deep 名字推断。K1 需超过正 margin；K2 需更高 margin、满足最小 evidence floor，且 K2 margin > K1 margin。成本未知 → K0。
 

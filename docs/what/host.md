@@ -151,14 +151,15 @@ Inspector/Coder（HOST-008 / EXEC-026/028）；`return` **仅** SyncDelegate，�
 ## HOST-015：宿主 Session 树扁平，儿子的儿子是儿子
 
 任何 Managed child Session（fork child、one-shot child、Companion Blogger、SyncInspector/SyncCoder、
-Bookkeeper）的 Host 物理 parent 恒为 family root：儿子再创建
+Bookkeeper、StrengthReplica）的 Host 物理 parent 恒为 family root：儿子再创建
 儿子时，新 child 物理重挂到 root 名下。Host 树深度恒为 2（root → child），不存在孙子。
 
 理由：UI 只渲染两层树；孙子在界面上不可见，等于脱管 Session。
 
-归属关系不由物理 parentID 承载：fork↔child、Work↔Companion、Work↔Sync*、Work↔Bookkeeper
+归属关系不由物理 parentID 承载：fork↔child、Work↔Companion、Work↔Sync*、Work↔Bookkeeper、
+Work↔StrengthReplica
 关系只由 durable journal 事实（HandleLinked / CompanionBloggerLinked /
-SyncDelegate 关联）与 HOST-008 的 `SessionOwnership` 证明。历史 `StudentTeacherLinked`：**G3 gone**，
+SyncDelegate 关联 / StrengthReplica attachment）与 HOST-008 的 `SessionOwnership` 证明。历史 `StudentTeacherLinked`：**G3 gone**，
 不得当作现行关联。恢复时按 journal
 关联的 SessionId + agent + title 精确匹配；无 journal 关联则一律新建，不得按物理 parentID 推断
 归属、不得收养同 root 下他人的 child。查询失败、重复候选或归属冲突 → fail closed。

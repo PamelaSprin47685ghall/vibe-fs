@@ -1,12 +1,8 @@
 // tests/unit/strength/host-canary-k0.test.mjs
 //
-// Phase 0 / §二十四 Host canary inventory at the policy/transform API.
-// These are failing-closed unit proofs. They are NOT live Host / LLM canaries:
-// nested provider-loop deadlock, permission popups, ReviewSeal-over-final-bytes,
-// and OpenCode version-upgrade re-runs still require a real Host.
-//
-// Honest status: G8 remains PARTIAL. This file does not enable K1/K2 and does
-// not skip the economic control holdout.
+// Policy/transform fail-closed proofs for STRENGTH-002/004/010/011/014.
+// Live Host request-budget dry-run is `tests/e2e/entry.test.mjs` long-stroke
+// strength-canary. This file does not enable K1/K2 treatment.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -213,10 +209,9 @@ test('STRENGTH_014_policy_strength_replica_is_internal_leaf_attached_not_satelli
   assert.equal(Association.StrengthReplicaAssociationHints_isStrengthReplicaAttachment(AttachmentKind.Companion), false)
 })
 
-test('STRENGTH_001_014_policy_nested_replica_cannot_speculate_this_is_not_the_live_deadlock_canary', () => {
-  // Nested session safety on a live Host (Work transform waiting on the
-  // InternalLeaf provider/tool loop without deadlock) is still blocked.
-  // This only proves the replica surface is ineligible to start another Strength.
+test('STRENGTH_001_014_policy_nested_replica_cannot_speculate', () => {
+  // Nested replica is ineligible. Live Host deadlock absence is the long-stroke
+  // strength-canary dry-run, not this policy gate.
   const nested = decide({
     ...eligibleOpportunity,
     IsRootWork: false,

@@ -98,7 +98,7 @@ test('CTX_010_a_companion_request_never_asks_for_a_probe_even_when_armed', () =>
   // Enforced in the planner, not left to the caller. A Companion request has no prefix
   // to probe — its history is the frame sequence — and a repair reuses whatever the
   // attempt it repairs already sent.
-  for (const kind of [requestKind.bloggerMain, requestKind.bloggerSquash, requestKind.interactionRepair]) {
+  for (const kind of [requestKind.bloggerMain, requestKind.bloggerSquash, requestKind.interactionRepair, requestKind.of('StrengthReplica')]) {
     const plan = planner.plan({ kind, mayRecover: true })
 
     assert.equal(plan.choice, 'UseCommittedEpoch', `${requestKind.label(kind)} must not carry a probe`)

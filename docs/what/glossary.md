@@ -38,6 +38,7 @@
 | Completion | EXEC-004：single-assignment completion cell；join 消费为有界 `[[result]]` 批次 |
 | ChildRecoveryResult | EXEC-023：RecoveredActive\|Terminal\|Abandoned\|RecoveryIncomplete\|RecoveryBlocked |
 | ConsumableReview | TODO-006：≡ `TodoReviewConcluded`；VerdictKnown ∧ record-ready ProcessReviewLWR；下一 checkpoint / suicide 才可消费 |
+| ControlHoldout | STRENGTH-010：restart-stable deterministic K0 bucket；predictor 训练 label 只来自此与 Shadow |
 | Continuation | PROMPT-003：无权改变执行档案 |
 | ContextReanchored | HOST-006：观察到 Host compaction 后退役 epoch 并归零 PrefixCoverage（保留 RecordCoverage/Frames） |
 | CoverableRecordPrefix | COMPANION-003：Opening + 可证明覆盖完整 turn 的 Y frame prefix，probe 唯一合法输入 |
@@ -85,6 +86,7 @@
 | 术语 | 指向 |
 |------|------|
 | IngestCursor | CTX-011：Y 实际已消化到哪个 part（RecordCoverage.IngestedThrough） |
+| InsertStrengthFrames | STRENGTH-009/016 / PROJ-005：Candidate / Promoted / Replica-local frame insertion intent |
 | Integration Gate | ORCH-005：短 CAS，只保护 ref mutation |
 | Inspector | AGENT-006：read/glob/grep/executor 只读角色 |
 | isValidTerminal | CTX-004：非空且非 XML-only，唯一内容级校验 |
@@ -177,7 +179,11 @@
 | SessionExecutionClass | HOST-008：Work / InternalLeaf |
 | SessionOwnership | HOST-008：Root / Attached(ownerSessionId, AttachmentKind) |
 | StrengthCandidate | STRENGTH-006：已 durable 准备且仅绑定一个 TargetProviderRun、尚未成为语义历史的只读 frame bundle |
+| StrengthCandidatePrepared | STRENGTH-006/017：Candidate 已 commit 到 EventStore 并绑定 TargetProviderRun 的 durable 事实 |
+| StrengthCandidatePromoted | STRENGTH-007：TargetProviderRun 已产生消费证据后的不可删除语义历史 |
 | StrengthDecisionId | STRENGTH-005/006：一次 decision 的稳定身份；frame wire identity 与 durable Candidate 的幂等键 |
+| StrengthFramesTraced | STRENGTH-008：Promoted frame 已进入明确 XTrace cursor range |
+| StrengthOpportunity | STRENGTH-002/010：冻结的 eligible evidence；不含 Stage/Phase |
 | StrengthReplica | STRENGTH-004/014：`InternalLeaf × Attached(StrengthReplica)` 的 same-role fast decision-local leaf |
 | StrengthBudget | STRENGTH-003：K0/K1/K2；单位为 Replica provider request |
 | SyncCoder | HOST-008：AttachmentKind；EXEC-026 / EXEC-028：dedicated Coder SyncDelegate |
@@ -189,6 +195,7 @@
 
 | 术语 | 指向 |
 |------|------|
+| TargetProviderRun | STRENGTH-006/007：Candidate 唯一绑定、唯一可 Promotion 的 ProviderRunIdentity |
 | TerminalOutputRaw | COMPANION-003：Session 末次 formal text + host-visible reasoning，LWR 末段；不含 raw tool |
 | TodoCheckpoint | TODO-001 / TODO-004：一次成功受理的 `TodoWriteAccepted`；持续节拍唯一来源 |
 | TodoReviewConcluded | TODO-006：ConsumableReview 的 durable fact；禁止表达「仅有 verdict、尚无 report」 |
@@ -196,6 +203,12 @@
 | TodoWriteAccepted | TODO-004 / TODO-006：checkpoint + 派生 Rk obligation 的 SSOT fact |
 | ToolResultBound | ARCH-012：自定义 tool result 抢先留尾截断；≤2000 行 / ≤51200 字节 |
 | TurnUnknown | HOST-004：reconciliation 私有 `SnapshotObservation`（finish=None），不是 `TurnOutcome` case |
+
+## U
+
+| 术语 | 指向 |
+|------|------|
+| UseStrengthMirror | STRENGTH-009/016 / PROJ-005：StrengthReplica-only base timeline selection |
 
 ## V
 

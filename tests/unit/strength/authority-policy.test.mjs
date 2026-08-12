@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { ProviderRequestKind } from '../../../dist/Domain/PrefixCandidate.js'
+import {
+  ProviderRequestKind,
+  ProviderRequestKindModule_clearsFailureCountOnSuccess as clearsFailureCountOnSuccess,
+  ProviderRequestKindModule_mayCarryProbe as mayCarryProbe,
+} from '../../../dist/Domain/PrefixCandidate.js'
 import * as Cost from '../../../dist/Domain/StrengthCostModel.js'
 import * as Policy from '../../../dist/Domain/StrengthPolicy.js'
 import { toolCapabilitiesFor } from '../../../dist/Domain/PromptAuthority.js'
@@ -23,6 +27,13 @@ for (const role of [Role.Manager, Role.Orchestrator, Role.Browser, Role.Reviewer
     assert.deepEqual(permissionNames(toolCapabilitiesFor(role, ProviderRequestKind.StrengthReplica)), [])
   })
 }
+
+test('STRENGTH_004_019_replica_is_never_owner_fallback_or_prefix_probe_evidence', () => {
+  assert.equal(clearsFailureCountOnSuccess(ProviderRequestKind.StrengthReplica), false)
+  assert.equal(mayCarryProbe(ProviderRequestKind.StrengthReplica), false)
+  assert.equal(clearsFailureCountOnSuccess(ProviderRequestKind.WorkMain), true)
+  assert.equal(mayCarryProbe(ProviderRequestKind.WorkMain), true)
+})
 
 test('STRENGTH_010_value_equations_charge_fast_bytes_delay_and_risk', () => {
   assert.equal(typeof Cost.StrengthCostModel_estimate, 'function')

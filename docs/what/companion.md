@@ -37,7 +37,8 @@ LWR(X) = OpeningPromptRaw?
 
 Opening 永不送 Y 压缩；Terminal 不复经 transform。  
 LWR **硬禁止** raw tool call/result 与 call/result linkage。  
-父 LWR 是 child 输入 context，**不**作 child Seed / Opening 复制。
+父 LWR 是 child 输入 context，**不**作 child Seed / Opening 复制。  
+Strength Candidate 永不进入 XTrace / LWR / PrefixSnapshot；只有 Promoted frame 经 STRENGTH-008 进入 XTrace 后，Companion 才可消化（STRENGTH-006/008）。
 
 两种 coverage 禁止混用（义务与 Magic Todo lag-1 共用，见 TODO-008/009；本条仍是 LWR/Y 分型所有者）：
 

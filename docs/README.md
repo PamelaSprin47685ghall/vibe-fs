@@ -3,8 +3,9 @@
 本页只提供路由和索引，不定义产品行为。文档治理规则见
 [`GOV-`](what/document-governance.md)，术语见[词汇表](what/glossary.md)
 （含 HOST-008 改写后的 `SessionExecutionClass` × `SessionOwnership` / `AttachmentKind`，
-`ReuseScope` / `OwnerReuseScopeId` / `SyncDelegate` / `SyncInspector` / `SyncCoder`，以及
-Magic Todo 导航词 `WorkRecordStart` / `ConsumableReview` / `MagicTodoProjection` 等 → TODO-001..014）。
+`ReuseScope` / `OwnerReuseScopeId` / `SyncDelegate` / `SyncInspector` / `SyncCoder`，
+Strength 导航词 `StrengthReplica` / `StrengthCandidate` / `StrengthBudget` / `TargetProviderRun` → STRENGTH-001..019，
+以及 Magic Todo 导航词 `WorkRecordStart` / `ConsumableReview` / `MagicTodoProjection` 等 → TODO-001..014）。
 
 ## 体系与阅读顺序
 

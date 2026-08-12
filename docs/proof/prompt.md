@@ -19,7 +19,7 @@
 | 发送 `Agent=EffectiveAgent`，`Model=None` | PROMPT-006 |
 | Fire-and-forget 仍完整 claim | PROMPT-007 |
 
-代表：`tests/unit/prompt/*`、`tests/unit/context/attempt-plan.test.mjs`。
+代表：`tests/unit/prompt/*`、`tests/unit/context/attempt-plan.test.mjs`、`tests/unit/strength/authority-policy.test.mjs`。
 
 ## 恢复
 

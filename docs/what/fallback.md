@@ -27,7 +27,8 @@ Fallback 不是 Session 永久状态，也不是「模型槽位」。
 2. Fallback 只允许改写 `AttemptExecutionProfile.EffectiveAgent`。  
 3. Host 仍在自动重试时，插件不得额外发送 continuation。  
 4. 仅当 Host 已停止自动重试时，才允许发送同一 Logical Run 的 continuation。  
-5. continuation 本身不得触发第二次 cursor 推进。
+5. continuation 本身不得触发第二次 cursor 推进。  
+6. StrengthReplica attempt 的成功或失败不进入 owner Logical Run 的 FallbackController，不推进 FallbackCursor，也不清零 ConsecutiveFailureCount（STRENGTH-004/019）。
 
 ## FALLBACK-005：有限自动恢复预算
 
