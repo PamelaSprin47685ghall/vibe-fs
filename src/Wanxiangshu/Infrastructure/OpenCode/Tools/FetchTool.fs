@@ -20,24 +20,24 @@ module FetchTool =
 
     let private fresh workspaceRoot sessionId answer =
         CasebookLifecycle.touchAccess workspaceRoot sessionId
-        answerResult "# No change was found in the evidence this answer depended on." answer
+        answerResult "No change was found in the evidence this answer depended on." answer
 
     let private refreshed workspaceRoot sessionId answer =
         CasebookLifecycle.touchAccess workspaceRoot sessionId
         answerResult
-            "# The evidence this case depended on had changed. The case was revised against the current evidence."
+            "The evidence this case depended on had changed. The case was revised against the current evidence."
             answer
 
     let private stale answer =
         answerResult
-            "# The Casebook could not reconcile the answer with the new evidence. Treat what follows as an older account."
+            "The Casebook could not reconcile the answer with the new evidence. Treat what follows as an older account."
             answer
 
     let private noCase () =
-        ToolHostCodec.tomlObjectWithInstructions [ "# The Casebook contains no entry under that shelfmark." ] []
+        ToolHostCodec.tomlObjectWithInstructions [ "The Casebook contains no entry under that shelfmark." ] []
 
     let private unavailable () =
-        ToolHostCodec.tomlObjectWithInstructions [ "# The Casebook could not be read from this execution context." ] []
+        ToolHostCodec.tomlObjectWithInstructions [ "The Casebook could not be read from this execution context." ] []
 
     let private runFetch
         (workspaceRoot: string)
@@ -88,7 +88,7 @@ module FetchTool =
 
                     if System.String.IsNullOrWhiteSpace shelfmark then
                         return
-                            ToolHostCodec.tomlObjectWithInstructions [ "# A Casebook shelfmark is required." ] []
+                            ToolHostCodec.tomlObjectWithInstructions [ "A Casebook shelfmark is required." ] []
                     else
                         let! result =
                             lock fetchGate (fun () ->

@@ -1,33 +1,26 @@
 # behavioral-boundary-untested — Enforcer
 
-## Definition
-A behavior is unverified when tests exercise the machinery beneath a public contract but never cross the contract itself. Correct helpers do not imply a correct boundary. The root-cause is that helper coverage is treated as proof of the public theorem, so wiring, defaults, and identity at the supported entry can fail while tests stay green.
+A behavioral boundary is untested when the suite proves the pieces behind a supported entry point but never proves the behavior **through the entry point callers actually use**.
 
-## Governing Principle
-A module is known only by what can be observed through its supported surface. Private functions are lemmas; the public entry point is the theorem. A proof that checks only lemmas can coexist with a broken theorem because wiring, translation, defaults, identity, and effect ordering live precisely at the boundary the test avoided.
+The trap is seductive because helper tests often look stronger: they are fast, precise, easy to arrange, and produce excellent coverage. But a public behavior is more than the sum of its helpers. The boundary contains wiring, defaults, identity, authorization, normalization, serialization, effect ordering, error mapping, and dependency composition — exactly the places where individually correct pieces can become collectively wrong.
 
-## Trigger When
-Trigger when a public behavior is covered only through internal helpers, private methods, direct state mutation, or test-only shortcuts while the real caller path remains unexercised.
+Think of internal tests as lemmas and the supported boundary as the theorem. Ten correct lemmas do not prove a theorem whose composition is wrong.
 
-## Do Not Trigger When
-- The relevant public contract is already exercised and lower-level tests merely provide finer localization.
-- The change is confined to a private helper whose public entry point already has a failing-capable behavioral proof of the same promise.
-- The surface under test is itself the supported API for that module, not a bypass of a higher owner.
-- Characterization tests of an isolated pure function are additional diagnostics, not substitutes, beside an existing boundary test.
+Fire this rule when:
 
-## Distinguish From
-`contract-test-missing` concerns an external system boundary. `test-implementation-coupled` concerns assertions tied to internals. This rule concerns the absence of any proof through the supported behavioral entrance. Tie-break: if callers of this module have no test that enters where they enter, this rule owns the case even when helper coverage is high.
+- tests call private/internal helpers directly while the real public method/route/tool/hook remains unexercised;
+- fixtures mutate internal state into the desired setup instead of entering through supported behavior;
+- a test-only export bypasses the production adapter, decoder, permission gate, or workflow owner;
+- helper coverage is cited as evidence that public defaults/wiring work;
+- public identity or failure semantics changed but tests still stop one layer below them;
+- integration wiring can be broken while every unit test stays green.
 
-## Decision Procedure
-1. Name the behavior promised to callers.
-2. Identify the supported entry point that owns that promise.
-3. Trace the existing test path.
-4. If the test bypasses the owning boundary, add a test through it.
+Do not fire when the public behavior already has a strong boundary test and helper tests merely localize failures. Do not demand a huge end-to-end environment for every pure helper change. The question is whether the **caller-visible promise has at least one failing-capable proof at its owning entrance**.
 
-## Examples
-- positive: a service’s public `placeOrder` is untested while private `computeTotals` has full coverage.
-- near-miss: `placeOrder` is already exercised; extra helper tests exist only to localize arithmetic failures.
-- counterexample: a test constructs a realistic caller input at `placeOrder` and asserts the caller-visible outcome.
+This differs from `contract-test-missing`: that rule is for a boundary between independent systems/runtimes whose agreement can drift. This rule also applies inside one product whenever callers depend on a supported behavioral surface. `test-implementation-coupled` is the opposite failure: tests cross too far inward and freeze private choreography.
 
-## Nudge
-Prove the behavior where callers depend on it. Exercise the real public entry point, not only the helpers that happen to implement it today.
+The decisive mutation is simple. Keep every helper correct, but break the boundary wiring: wrong default, swapped field, missing permission, wrong serializer, forgotten adapter, stale route, different ID. Would any test turn red? If not, the public theorem is unproved.
+
+A good boundary test does not need to be broad. It should be the **narrowest test that still enters where the real caller enters** and observes what the caller is entitled to rely on.
+
+> Prove behavior at the place where the promise becomes real, not only at the places where implementation happens to be convenient to test.

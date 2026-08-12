@@ -41,12 +41,12 @@ module JudgeTool =
             |> Option.bind (fun guard -> guard.CurrentBarrierId)
 
     let private received () =
-        ToolHostCodec.tomlObjectWithInstructions [ "# Your judgment has been received." ] []
+        ToolHostCodec.tomlObjectWithInstructions [ "Your judgment has been received." ] []
 
     let private notReceived reason =
         ToolHostCodec.tomlObjectWithInstructions
-            [ "# Your judgment was not received."
-              "# " + reason ]
+            [ "Your judgment was not received."
+              reason ]
             []
 
     let private challengeUnproven () =
@@ -58,9 +58,9 @@ module JudgeTool =
         | VerdictDecision.ChallengeIssued challenge ->
             let instructions =
                 if String.IsNullOrWhiteSpace challenge then
-                    [ "# Your judgment has been received." ]
+                    [ "Your judgment has been received." ]
                 else
-                    [ "# Your judgment has been received."; challenge ]
+                    [ "Your judgment has been received."; challenge ]
 
             ToolHostCodec.tomlObjectWithInstructions instructions []
         | VerdictDecision.Confirmed -> received ()

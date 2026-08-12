@@ -37,13 +37,13 @@ module ChronicleTool =
         EnforcerCatalog.fieldNames (enforcerRules ())
 
     let private remembered () =
-        ToolHostCodec.tomlObjectWithInstructions [ "# The Chronicle remembers this." ] []
+        ToolHostCodec.tomlObjectWithInstructions [ "The Chronicle remembers this." ] []
 
     let private nothingToRemember () =
-        ToolHostCodec.tomlObjectWithInstructions [ "# There is no occurrence here to remember." ] []
+        ToolHostCodec.tomlObjectWithInstructions [ "There is no occurrence here to remember." ] []
 
     let private unknownTip () =
-        ToolHostCodec.tomlObjectWithInstructions [ "# That lesson is not in the Rulebook." ] []
+        ToolHostCodec.tomlObjectWithInstructions [ "That lesson is not in the Rulebook." ] []
 
     let spec
         (factory: HostToolFactory)
