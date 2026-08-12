@@ -166,8 +166,17 @@ module JoinTool =
                                 | JoinInterruptReason.DeadlineExpired ->
                                     return JoinResultRenderer.renderInterrupted JoinInterruptReason.DeadlineExpired
                             | Ok(ResultsAvailable batch) ->
-                                return
+                                // Render before releasing names: this Join result is the
+                                // moment the old terminal ending becomes heard.
+                                let rendered =
                                     JoinResultRenderer.renderJoinItemBatch resolveAgentName batch resolveTerminalLabel
+
+                                NonEmptyBatch.toList batch
+                                |> List.iter (function
+                                    | JoinItem.PtyItem item -> runtime.UntrackPtyRun(PtyJoinItem.ptyId item)
+                                    | JoinItem.AgentItem _ -> ())
+
+                                return rendered
                             | Error joinError -> return JoinResultRenderer.renderForkError joinError resolveAgentName
         }
 
