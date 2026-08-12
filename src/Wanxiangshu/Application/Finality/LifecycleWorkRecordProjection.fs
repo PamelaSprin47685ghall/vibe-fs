@@ -95,8 +95,7 @@ module LifecycleWorkRecordProjection =
                     | None -> { IngestedThrough = { Sequence = blog.Coverage.IngestedThroughSequence } }
 
                 let life =
-                    session.ManagerLife
-                    |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+                    session.ManagerLife |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
 
                 // TODO-001 / COMPANION-014: OpeningBoundary = WorkRecordStart when
                 // Post-T1; else Immediate exclusive end after first XTrace part.
@@ -119,11 +118,7 @@ module LifecycleWorkRecordProjection =
                 // (BlindPlan T1 call/result ∈ OpeningMaterial; not Recent).
                 let constitutiveItems =
                     match trace with
-                    | first :: _ ->
-                        XTrace.sliceBetween
-                            { Sequence = first.Cursor.Sequence + 1L }
-                            openingEnd
-                            trace
+                    | first :: _ -> XTrace.sliceBetween { Sequence = first.Cursor.Sequence + 1L } openingEnd trace
                     | [] -> []
 
                 let openingMaterial = LifecycleWorkRecord.withConstitutive opening constitutiveItems

@@ -500,8 +500,7 @@ module MagicTodo =
             Some { Sequence = xTraceHeadSequence }
         else
             match t1CallCursor, t1ToolCallId with
-            | Some callCursor, Some callId ->
-                Some(blindPlanOpeningBoundary openingCursor callCursor callId parts)
+            | Some callCursor, Some callId -> Some(blindPlanOpeningBoundary openingCursor callCursor callId parts)
             | _ -> Some(workRecordStart openingCursor)
 
     /// Manager Blogger effectiveStart = max(RecordCoverage, Life.WorkRecordStart).

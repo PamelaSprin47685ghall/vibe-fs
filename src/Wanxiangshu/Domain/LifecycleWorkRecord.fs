@@ -83,9 +83,7 @@ module LifecycleWorkRecord =
                         |> List.mapi (fun index text -> sprintf "%d. %s" (index + 1) text)
                         |> String.concat "\n"
 
-                [ record.Opening.AssignmentText
-                  reqText
-                  record.Opening.ConstitutiveBody ]
+                [ record.Opening.AssignmentText; reqText; record.Opening.ConstitutiveBody ]
                 |> List.filter (System.String.IsNullOrWhiteSpace >> not)
                 |> String.concat "\n"
 
@@ -151,10 +149,6 @@ module LifecycleWorkRecord =
 
     /// Build OpeningMaterial with constitutive BlindPlan body from an XTrace slice.
     let withConstitutive (opening: OpeningMaterial) (constitutiveItems: XTraceItem list) : OpeningMaterial =
-        let body =
-            constitutiveItems
-            |> XTrace.forOpening
-            |> XTrace.render
+        let body = constitutiveItems |> XTrace.forOpening |> XTrace.render
 
-        { opening with
-            ConstitutiveBody = body }
+        { opening with ConstitutiveBody = body }

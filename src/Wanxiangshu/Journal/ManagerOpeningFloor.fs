@@ -17,9 +17,7 @@ module ManagerOpeningFloor =
               Kind = part.Kind
               ToolCallId = part.ToolCallId })
 
-    let private t1Anchor
-        (magic: MagicTodoProjection.LifeMagicTodoState)
-        : (XTraceCursor * ToolCallId) option =
+    let private t1Anchor (magic: MagicTodoProjection.LifeMagicTodoState) : (XTraceCursor * ToolCallId) option =
         match magic.AcceptedOrder with
         | [] -> None
         | firstId :: _ ->
@@ -53,6 +51,7 @@ module ManagerOpeningFloor =
         | Some current when current.Completed -> None
         | Some current ->
             let magic = MagicTodoProjection.tryLife current.LifeId magicTodo
+
             let acceptedCount =
                 magic
                 |> Option.map (fun state -> List.length state.AcceptedOrder)
@@ -73,10 +72,7 @@ module ManagerOpeningFloor =
                 (partAnchors xTrace)
 
     /// Session helper: CurrentLife floor sequence for Blogger max(coverage, floor).
-    let floorSequence
-        (sessionId: SessionId)
-        (projections: AgentProjectionSet)
-        : int64 option =
+    let floorSequence (sessionId: SessionId) (projections: AgentProjectionSet) : int64 option =
         let session = AgentProjection.tryFind sessionId projections
 
         let life =
