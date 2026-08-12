@@ -115,7 +115,8 @@ module NeedHelpEventCodec =
             else
                 match
                     sessionIdOf raw properties,
-                    stringField properties?messageID |> Option.orElse (stringField properties?messageId),
+                    stringField properties?messageID
+                    |> Option.orElse (stringField properties?messageId),
                     stringField properties?partID |> Option.orElse (stringField properties?partId),
                     stringField properties?field,
                     stringField properties?delta

@@ -52,19 +52,20 @@ type HostSignalRouter
         let key = SessionId.value sessionId
         ownedSessions.Remove key |> ignore
 
-    /// HOST-027 reasoning deltas and LOOP-009 visible text are disjoint sensor
-    /// streams. NeedHelp gets first refusal because LoopEventCodec's coarse
-    /// message.part.delta predicate intentionally includes every field before its
-    /// own decoder filters to text.
+    /// HOST-027 part classification and LOOP-009 text detection both observe the
+    /// same raw stream events. NeedHelp records part.updated before the matching
+    /// delta; the composition root may then suppress reasoning deltas from the
+    /// LoopSensor. Neither callback owns coarse HostSignal adaptation.
     member _.Observe(raw: obj) =
         match onNeedHelpEvent with
-        | Some observe when NeedHelpEventCodec.isNeedHelpDelta raw -> observe raw
+        | Some observe when NeedHelpEventCodec.isNeedHelpRelevantEvent raw -> observe raw
+        | _ -> ()
+
+        match onLoopEvent with
+        | Some observe when LoopEventCodec.isLoopTextDelta raw -> observe raw
         | _ ->
-            match onLoopEvent with
-            | Some observe when LoopEventCodec.isLoopTextDelta raw -> observe raw
-            | _ ->
-                match HostSignalAdapter.tryAdapt isOwned raw with
-                | Some signal -> onSignal signal
-                | None -> ()
+            match HostSignalAdapter.tryAdapt isOwned raw with
+            | Some signal -> onSignal signal
+            | None -> ()
 
     member this.ObserveLocal(raw: obj) = this.Observe raw

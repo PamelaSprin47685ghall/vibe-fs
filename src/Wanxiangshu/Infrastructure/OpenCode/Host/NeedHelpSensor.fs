@@ -7,20 +7,33 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Kernel.Identity
 
 /// HOST-027: process-local exact-sentinel sensor over reasoning deltas.
-/// It owns only stream suffixes + armed attempt identities; business escalation
-/// begins after the physical abort has reconciled.
+/// It owns only stream part identity, rolling suffixes, and armed attempt
+/// identities; business escalation begins after the physical abort reconciles.
 type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Result<unit, string>>) =
 
     let sentinelText = AssistancePrompt.Sentinel
 
     let gate = obj ()
     let suffixes = Dictionary<string, string>()
+    let reasoningParts = HashSet<string>()
     let armed = HashSet<string>()
 
     let attemptKey (sessionId: SessionId) (providerRun: ProviderRunIdentity) =
         SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun
 
     let sessionPrefix (sessionId: SessionId) = SessionId.value sessionId + "\u001f"
+
+    let partPrefix (sessionId: SessionId) (providerRun: ProviderRunIdentity) =
+        attemptKey sessionId providerRun + "\u001f"
+
+    let partKey (sessionId: SessionId) (providerRun: ProviderRunIdentity) (partId: string) =
+        partPrefix sessionId providerRun + partId
+
+    let removePartsByPrefix prefix =
+        reasoningParts
+        |> Seq.filter (fun key -> key.StartsWith(prefix, StringComparison.Ordinal))
+        |> Seq.toArray
+        |> Array.iter (fun key -> reasoningParts.Remove key |> ignore)
 
     let keepSuffix (text: string) =
         let keep = sentinelText.Length - 1
@@ -39,18 +52,20 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
         lock gate (fun () -> armed.Add(attemptKey sessionId providerRun))
 
     /// Claim an assistance abort exactly once for the reconciled provider run.
-    /// The stream suffix dies with the attempt so detector memory is bounded by
+    /// Stream state dies with the attempt so detector memory is bounded by
     /// currently live provider runs rather than session lifetime.
     member _.TryTake(sessionId: SessionId, providerRun: ProviderRunIdentity) =
         lock gate (fun () ->
             let key = attemptKey sessionId providerRun
             suffixes.Remove key |> ignore
+            removePartsByPrefix (partPrefix sessionId providerRun)
             armed.Remove key)
 
     member _.DropAttempt(sessionId: SessionId, providerRun: ProviderRunIdentity) =
         lock gate (fun () ->
             let key = attemptKey sessionId providerRun
             suffixes.Remove key |> ignore
+            removePartsByPrefix (partPrefix sessionId providerRun)
             armed.Remove key |> ignore)
 
     member _.DropSession(sessionId: SessionId) =
@@ -68,6 +83,7 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
                 |> Seq.toArray
 
             suffixKeys |> Array.iter (fun key -> suffixes.Remove key |> ignore)
+            removePartsByPrefix prefix
             armedKeys |> Array.iter (fun key -> armed.Remove key |> ignore))
 
     member private this.RequestAbort(sessionId: SessionId, providerRun: ProviderRunIdentity) =
@@ -94,12 +110,20 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
             }
             |> ignore
 
-    member this.Observe(raw: obj) =
-        match NeedHelpEventCodec.tryDecodeReasoningDelta raw with
-        | None -> ()
-        | Some delta when not (isOwned delta.SessionId) -> ()
-        | Some delta when this.IsArmed(delta.SessionId, delta.ProviderRun) -> ()
+    member _.IsReasoningDelta(raw: obj) =
+        match NeedHelpEventCodec.tryDecodeDelta raw with
+        | None -> false
         | Some delta ->
+            NeedHelpEventCodec.isNeedHelpDelta raw
+            || lock gate (fun () -> reasoningParts.Contains(partKey delta.SessionId delta.ProviderRun delta.PartId))
+
+    member private this.ObserveDelta(raw: obj, delta: NeedHelpEventCodec.StreamDelta) =
+        if
+            not (isOwned delta.SessionId)
+            || this.IsArmed(delta.SessionId, delta.ProviderRun)
+        then
+            ()
+        elif this.IsReasoningDelta raw then
             let hit =
                 lock gate (fun () ->
                     let key = attemptKey delta.SessionId delta.ProviderRun
@@ -116,3 +140,18 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
 
             if hit then
                 this.RequestAbort(delta.SessionId, delta.ProviderRun)
+
+    member this.Observe(raw: obj) =
+        match NeedHelpEventCodec.tryDecodePartUpdated raw with
+        | Some part when isOwned part.SessionId ->
+            lock gate (fun () ->
+                let key = partKey part.SessionId part.ProviderRun part.PartId
+
+                if String.Equals(part.PartType, "reasoning", StringComparison.OrdinalIgnoreCase) then
+                    reasoningParts.Add key |> ignore
+                else
+                    reasoningParts.Remove key |> ignore)
+        | _ ->
+            match NeedHelpEventCodec.tryDecodeDelta raw with
+            | Some delta -> this.ObserveDelta(raw, delta)
+            | None -> ()
