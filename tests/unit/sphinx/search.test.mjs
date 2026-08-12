@@ -1,13 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { ofArray as listOfArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
-import { ofArray as mapOfArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Map.js'
+import { mapOfEntries, toList } from '../support/domain.mjs'
 import { AStarProblem, GraphEdge, solveGraph } from '../../../dist/Sphinx/Search.js'
 
-const comparer = { Compare: (a, b) => a.localeCompare(b) }
-const map = (entries) => mapOfArray(entries, comparer)
-const edges = (rows) => listOfArray(rows.map(([from, to, cost]) => new GraphEdge(from, to, cost)))
+const map = (entries) => mapOfEntries(entries)
+const edges = (rows) => toList(rows.map(([from, to, cost]) => new GraphEdge(from, to, cost)))
 
 test('graph_astar_degenerates_to_standard_g_plus_h_shortest_path', () => {
   const problem = new AStarProblem(

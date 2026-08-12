@@ -5813,7 +5813,7 @@ Provider World clean break 已落地：正式 `docs/` 五层重写；实现侧�
 
 ```text
 dotnet build src/Wanxiangshu/Wanxiangshu.fsproj  → 0 error
-npm run lint                                      → pass（kolmogorov ratchet 已对齐）
+npm run lint                                      → pass（Kolmogorov size 仅 advisory，不作硬门）
 npm test                                          → 2343 passed / 0 failed
 node --test tests/integration/resources/prompts.test.mjs → pass
 Gate A tool-referential-integrity                 → OK
