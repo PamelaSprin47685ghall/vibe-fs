@@ -12,6 +12,8 @@ const {
   source,
   text,
   stableCallId,
+  stableCursorMessageId,
+  tryInjectWithCursorRole,
 } = await import('../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js')
 
 const inject = (session, raw, markerText = text) => {
@@ -227,54 +229,74 @@ test('PPT_skip_auto_injected_env_keeps_empty_transcript_without_pair', () => {
   }
 })
 
-test('PPT_skip_auto_injected_cursor_provider_blocks_new_pair_but_replays_history', () => {
+test('C_PH_cursor_is_projection_not_skip_and_uses_single_assistant_text', () => {
   const previous = process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
   try {
     delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
     assert.equal(skipAutoInjectedRequested(undefined), false)
-    assert.equal(skipAutoInjectedRequested('cursor'), true)
+    assert.equal(skipAutoInjectedRequested('cursor'), false)
     assert.equal(skipAutoInjectedRequested('anthropic'), false)
 
-    const session = 'ses_skip_cursor'
-    const seeded = inject(session, [userMsg('msg_u1')])
-    assert.equal(pairMessages(seeded).length, 2)
-
-    const raw = [
-      userMsg('msg_u1'),
-      toolCall('msg_c1', 'bash', 'call_1'),
-      toolResult('msg_r1', 'bash', 'call_1'),
-      {
-        info: { id: 'msg_u2', role: 'user', model: { providerID: 'cursor', modelID: 'composer' } },
-        parts: [{ type: 'text', text: 'steer' }],
-      },
-    ]
-    const out = inject(session, raw)
-    assert.equal(pairMessages(out).length, 2)
-    assert.equal(out.length, 6)
-    assert.equal(isPairProgrammingThought(out[0]), true)
-    assert.equal(isPairProgrammingThought(out[1]), true)
-    assert.equal(out[2].info.id, 'msg_u1')
-    assert.equal(out[5].info.id, 'msg_u2')
+    const raw = [{
+      info: { id: 'u1', role: 'user', model: { providerID: 'cursor', modelID: 'composer' } },
+      parts: [{ type: 'text', text: 'steer' }],
+    }]
+    const out = inject('ses_cursor_text', raw)
+    const marker = pairMessages(out)
+    assert.equal(marker.length, 1, 'Cursor occurrence is one text message, not a fake-tool pair')
+    assert.equal(marker[0].info.role, 'assistant')
+    assert.equal(marker[0].parts[0].type, 'text')
+    assert.equal(marker[0].parts[0].text, text)
+    assert.equal(marker[0].info.id, stableCursorMessageId(stableCallId('ses_cursor_text', 1n), 'assistant'))
+    assert.equal(marker[0].parts.some((p) => p.tool === 'auto-injected'), false)
+    assert.equal(out.at(-1).info.id, 'u1')
   } finally {
     if (previous === undefined) delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
     else process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = previous
   }
 })
 
-test('PPT_skip_auto_injected_cursor_provider_keeps_empty_of_cursor_assistant_without_new_pair', () => {
-  const previous = process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
-  try {
-    delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
-    const raw = [{
-      info: { id: 'a1', role: 'assistant', providerID: 'cursor', modelID: 'composer' },
-      parts: [{ type: 'text', text: 'ok' }],
-    }]
-    const out = inject('ses_skip_cursor_assistant', raw)
-    assert.equal(pairMessages(out).length, 0)
-    assert.equal(out.length, 1)
-    assert.deepEqual(out[0], raw[0])
-  } finally {
-    if (previous === undefined) delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
-    else process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = previous
+test('C_PH_three_cursor_encoders_change_only_role_and_stable_id', () => {
+  const raw = [{
+    info: { id: 'u1', role: 'user', model: { providerID: 'cursor', modelID: 'composer' } },
+    parts: [{ type: 'text', text: 'work' }],
+  }]
+  const session = 'ses_cursor_modes'
+  for (const role of ['assistant', 'user', 'system']) {
+    const result = resultOf(tryInjectWithCursorRole(undefined, session, text, toList(raw), role))
+    assert.equal(result.ok, true)
+    const marker = pairMessages(listItems(result.value))
+    assert.equal(marker.length, 1)
+    assert.equal(marker[0].info.role, role)
+    assert.equal(marker[0].parts[0].type, 'text')
+    assert.equal(marker[0].parts[0].text, text)
+    assert.equal(marker[0].info.id, stableCursorMessageId(stableCallId(session, 1n), role))
   }
+})
+
+test('C_PH_ordinary_cursor_ordinary_reprojects_same_occurrence', () => {
+  const session = 'ses_cursor_transition'
+  const ordinary = inject(session, [userMsg('u1')])
+  const ordinaryCallId = stableCallId(session, 1n)
+  assert.equal(pairMessages(ordinary).length, 2)
+
+  const cursorReal = [{
+    info: { id: 'u1', role: 'user', model: { providerID: 'cursor', modelID: 'composer' } },
+    parts: [{ type: 'text', text: 'hello' }],
+  }]
+  const cursor = inject(session, cursorReal)
+  const cursorMarkers = pairMessages(cursor)
+  assert.equal(cursorMarkers.length, 1)
+  assert.equal(cursorMarkers[0].info.id, stableCursorMessageId(ordinaryCallId, 'assistant'))
+
+  const back = inject(session, [userMsg('u1')])
+  assert.equal(pairMessages(back).length, 2)
+  assertPairShape(back[0], back[1], ordinaryCallId, text)
+})
+
+test('PAIR_HINT_canonical_text_encourages_needhelp_and_parallel_wave_without_global_N', () => {
+  assert.match(text, /\[NEEDHELP\]/)
+  assert.match(text, /并行|parallel/i)
+  assert.match(text, /依赖|dependency/i)
+  assert.doesNotMatch(text, /最多\s*\d+|max(?:imum)?\s+\d+/i)
 })

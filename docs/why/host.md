@@ -110,3 +110,15 @@ Transform input 为空对象是 Host 能力现实；绑定必须用「已创建�
 - **被拒方案**：每个 provider attempt 或每个 child 再读一次全局语言偏好。fallback / Strength / restart 后父会话已用旧语，子会话或下一轮突然换语 → Opening、Office Library、tool 后果与历史 marker 不再同一世界；前缀缓存与身份连续性同时碎。
 - **被拒方案**：把语言绑在 Role 或 EffectiveAgent 上。换 Peer 会误换世界语言。
 - **选择方案**：创建时绑定一次 `SessionProviderLanguage`（不可变）；child / attached / StrengthReplica 等继承 owner/commissioner；全局偏好变更只作用于此后新建 session。protocol 标识符（tool 名、字段名、enum literal、路径、命令）不翻译——翻译改的是世界的语言，不是机器的标识。
+
+### 22. Cursor Pair Hint：删 marker vs provider-specific projection
+- **被拒方案**：provider=`cursor` 时停止新增 HOST-013。它让同一个语义约束因 provider 消失，也让 ordinary→Cursor→ordinary 历史不可逆。
+- **选择方案**：durable occurrence 与 provider wire 分离。普通 provider 继续 fake-tool pair；Cursor 在同一 `ResultGap` 投影一条 text。Assistant/User/System 三 encoder 只改变 provider role；受控 strict-validator + authority canary 后生产固定 assistant role。语义正文只来自一个 canonical markerText。
+
+### 23. Pair 工具协作：顺序默认 vs bounded parallel wave
+- **被拒方案**：只写“可以并行”，让模型逐个 call 再逐个等待；也拒绝 Host 自动猜依赖或固定全局并发 N。
+- **选择方案**：Pair Hint 明确要求每个工具 turn 先找完整当前 wave；独立 read/search/verification 默认同 turn，只有真实 dependency/共享 mutable state/协议顺序/破坏性风险/明确容量才切 wave。这样优化的是 provider↔tool RTT，不是 tool 内部微秒。
+
+### 24. NEEDHELP：fallback failure vs assistance interrupt
+- **被拒方案**：复用 LoopSensor/ProviderFailure/FallbackCursor。那会把“主动求第二视角”惩罚成失败，污染 AABB 与 retry budget。
+- **选择方案**：独立 reasoning-delta sensor + assistance armed occasion；abort 只作为物理中断，reconcile 后走 fast→deep continuation 或 deep→真实 consultation child，不触碰 fallback。

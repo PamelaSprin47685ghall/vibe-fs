@@ -66,6 +66,8 @@ Gate C 静态门与跨域清单见 `proof/architecture.md` ARCH-016；Host 绑�
 Continuation 不得改 SelectedAgent / 新 Run / 重置 Fallback（PROMPT-003、PROMPT-010）。  
 UnknownOrigin fail-closed（PROMPT-004）。
 
+Assistance 专项：`NeedHelpEscalation`/`NeedHelpAdvice` codec+durable claim roundtrip；explicit agent 必须是同-role pair；fast→deep 不改 FallbackCursor，advice 精确回原 deep；system prompt / Persona byte-identical。Cursor User/System 试验 encoder 不能产生 HumanRoot/Opening，生产 Assistant encoder 也不能成为 semantic completion（PROMPT-018、HOST-013）。
+
 ## Student / Teacher — G3 已删除；证明迁 SyncDelegate
 
 `StudentLearn` / `StudentCompile` / `StudentCompileNudge` / `TeacherIdleNudge` / QA bootstrap /

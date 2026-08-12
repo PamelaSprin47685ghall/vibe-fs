@@ -58,4 +58,10 @@ Catalog / Role DU 基线随 GrandRewrite 重命名后对齐；旧名 fail closed
 拒内嵌：闭包与 Agent domain 缠死，认识内核无法独立证明。拒无状态：无法表达 yield/resume 与 handle 会话。选 `src/Wanxiangshu/Sphinx` F# Kernel + `mcp.sphinx` 自动注入；仅 Inquiry allow `sphinx_*`；测试默认 disabled / fixture（AGENT-030、SPHINX-005）。Sphinx 仅在 `McpServer.fs` wire 边界允许 `@modelcontextprotocol/sdk` / zod；Semble 仍禁止（AGENT-027）。
 
 **内部 Semble：能力保留 vs Host 接线 / Strength 注入。**  
-拒 Host mcp：语义搜索会漏进所有角色 schema。拒 Strength 注入：STRENGTH-004 Replica 只允许真实 `read/glob/grep`；假 read 污染 primary 可见历史。选进程内 stdio client：调用方显式 `search`，当前无调用者。测试默认 Disabled，避免 `uvx` 打真实 git。不引入 MCP SDK。
+拒 Host mcp：语义搜索会漏进所有角色 schema。拒 Strength 注入：STRENGTH-004 Replica 只允许真实 `read/glob/grep`；假 read 污染 primary 可见历史。选进程内 stdio client：只由显式 RepositoryWarmStart keywords 调用。结果作为 low-trust prompt data，不伪造 read/history，不进入 Casebook。测试默认 Disabled，避免 `uvx` 打真实 git。不引入 MCP SDK。
+
+**Warm start：自动从 charge 猜词 vs caller explicit keywords。**  
+拒 tokenizer/noun picker/LLM generator 与 cross-call cache：它们会把优化变成第二 assignment/memory。选 newline-separated explicit keywords；只给本来就允许直接生活在 repository evidence 中的 Coder/Inspector/DevOps 看 snippets。Manager/Inquiry 等只能委派关键词，不能借 side channel 获得仓库证据。
+
+**NEEDHELP：同会话换强模型 vs 独立 consultation。**  
+fast 求助用同 LogicalRun 的 deep continuation，因为问题仍属于同一 office；deep 已经是强 binding，再“换一次模型”没有独立视角，因此创建真实 consultation child，并把冻结的 LifecycleWorkRecord 当 commissioner context。两者都不改 Persona，也不把求助记成 provider failure。

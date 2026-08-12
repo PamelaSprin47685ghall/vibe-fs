@@ -95,6 +95,11 @@
 | Fixture search | stdio roundtrip 命中确定性 Hit，转发 query/repo/`top_k`/`max_snippet_lines` | AGENT-027 |
 | 不进 Host mcp | `configureFromHostConfig` 后 `config.mcp.semble` 不存在；stealth 仍注入 | AGENT-027 |
 | 不进 Strength / AGENT-006 | permission 无 `semble` / `semble_*` 键 | AGENT-027、STRENGTH-004 |
+| warm-start normalization | CRLF/LF、trim、blank、stable case-sensitive dedupe；8-keyword cap → `tests/unit/agent/repository-warm-start.test.mjs` | AGENT-032 |
+| bounded parallel search | 独立 queries 同一 wave；每 query top_k=4；失败独立 fail-open；merge 恢复 keyword ordinal/local rank → `tests/unit/agent/repository-warm-start.test.mjs` | AGENT-032 |
+| prompt safety/bounds | ≤24 unique hints；≤64KiB；只删完整 entry；hostile strings 仍解析为 data；zero-keyword byte-exact Charge → `tests/unit/agent/repository-warm-start.test.mjs` | AGENT-032 |
+| role gate | snippets 只到 Coder/Inspector/DevOps；其它 role 非空 keywords fail；commission 无 keywords → warm-start + `tests/unit/tools/fork-tool.test.mjs` | AGENT-032 |
+| NEEDHELP collaboration | exact Host run binding；fast→deep 同 Life；deep→真实 `deep-inquiry` consultation child；finite/single-flight/no-recursion/cancel-no-resurrection → `tests/unit/host/needhelp-sensor.test.mjs` + `tests/unit/host/assistance-host.test.mjs` | AGENT-031 |
 
 代表测试：`tests/unit/agent/catalog.test.mjs`、`tests/unit/plugin/agent-permission-gate.test.mjs`、
 `tests/unit/agent/stealth-browser-mcp.test.mjs`、`tests/unit/agent/semble-mcp.test.mjs`、

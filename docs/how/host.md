@@ -312,7 +312,8 @@ markerText = concat(optional nudge, wallClock, guideline)
 - ReviewSeal 覆盖恢复后的全部历史 pair、本次新 pair与所有 Strength provider-visible bytes；历史 pair 原位不变，以保持 Prefix Cache。Reviewer 路径 Strength 恒 K0。Blogger 跳过注入时 ReviewSeal 只覆盖无 auto-injected 的消息视图。
 - tip nudge 查找：`latestTipNudge` 仅在非 Companion 路径调用；不得以当前 session 是 Blogger 为由把 tip 写进 Blogger transcript。
 - 实现点：`SpikePlugin` transform 在 `PairProgrammingThoughtTransform.tryInject` 之前用 association 门禁短路。
-- 注入旁路：`WANXIANGSHU_SKIP_AUTO_INJECTED=1` 或 transcript provider 为 `cursor` 时，`tryInject` 仍 strip + replay 历史 pair，但跳过「本轮 placement 尚不存在 → append 新 fact」分支（`PairProgrammingThoughtTransform.skipAutoInjectedRequested`；provider 由 `providerIdFromMessages` 读取）。
+- 注入旁路：只有 `WANXIANGSHU_SKIP_AUTO_INJECTED=1` 跳过新 occurrence。provider=`cursor` 不旁路：仍按相同 placement/ordinal append durable occurrence，然后由 Cursor renderer 在 `ResultGap` 输出 single synthetic text；ordinary renderer 仍输出 fake-tool call/result。renderer 选择只读 provider id，不改 durable history。
+- Cursor text stable id = deterministic digest(`CallId`, Cursor role)，禁止 GUID/时间戳。生产 role=`assistant`；user/system encoder 仅测试 controlled comparison。
 
 ---
 
@@ -490,3 +491,20 @@ derive assistant message / provider run / ordinal / XTrace range
 membrane 挂在 tool hooks，**不**插入 messages.transform 链。  
 Manager-only guideline / BlindPlan 文案（TODO-013/015）在 projection/prompt 层叠加，与 HOST-013 pair replay 正交：HOST-013 仍按 Work session 通用规则、按 `SessionProviderLanguage` 注入双语 + wall-clock；Magic / BlindPlan 文案不得写入 `PairProgrammingGuidelineText`。  
 T1 关闭 Opening 属 TODO-015 / COMPANION-014；Host membrane **不**拥有 OpeningPolicy / OpeningMaterial。
+
+## NEEDHELP sensor / reconcile（HOST-027 / AGENT-031）
+
+```text
+message.part.delta(reasoning|thinking)
+→ NeedHelpEventCodec
+→ NeedHelpSensor rolling suffix + exact sentinel
+→ arm (SessionId, ProviderRun) exactly once
+→ AbortSession
+→ reconciled TurnAborted
+→ assistance owner consumes arm BEFORE loop/fallback/ordinary abort
+→ Host snapshot 精确找 assistant.id = ProviderRun，并读取 message.Agent
+→ fast: explicit deep NeedHelpEscalation continuation
+→ deep: one hidden durable consultation handle → real deep-inquiry child → NeedHelpAdvice to exact original deep binding
+```
+
+Sensor 不读 visible text；rolling suffix 最长只需 sentinel 长度减一。Streaming callback 不直接 SendPrompt/CreateChild。reconcile 消费 arm 后立即清理 attempt state；若 LoopKill 也曾 arm，则 assistance claim 同步清除 LoopKillArmed。session drop/cancel 同样清理。StrengthReplica / Companion / InternalLeaf 不进入 sensor admission。Assistance continuation 使用 PromptDispatcher typed claim，但绕过 `agentForActiveCursor`，由触发 ProviderRun 的 Host `SessionMessage.Agent` 冻结 explicit binding 决定。XTrace capture 对 reasoning 做 exact sentinel strip，控制字节不进入 Chronicle/LWR；provider transcript 本身不据此重写。

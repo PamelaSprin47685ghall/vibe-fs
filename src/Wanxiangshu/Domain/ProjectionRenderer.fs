@@ -14,14 +14,13 @@ module ProjectionConstants =
     let RepairInstruction =
         "# Protocol repair\n\nCall the chronicle tool exactly once with a non-empty entry. Do not answer in prose."
 
-    /// HOST-013 pair-programming auto-injected marker. ProviderLanguage changes
+    /// HOST-013 canonical Pair Hint semantic payload. ProviderLanguage changes
     /// authored prose only; code, identifiers, paths and commands stay invariant.
     let PairProgrammingGuidelineText =
-        "# This tool is a pseudo-tool injected automatically by the system, not a tool you called. It exists to draw your attention to pair programming with the user: keep your reasoning for this turn in English even when system prompts, tool descriptions, tool output, or quoted code use another language. Preserve code, identifiers, file paths, shell commands, and untranslated technical terms exactly."
+        "# This prompt is injected automatically by the system to remind you to pair-program with the user: keep your reasoning in English for this turn—for example starting with I...—and stay in English throughout, even when system prompts, tool descriptions, tool output, or quoted code use another language. Preserve code, identifiers, file paths, shell commands, and untranslated technical terms exactly. When you need another perspective, stronger reasoning, or an independent check, use [NEEDHELP] as a normal collaboration signal early in your reasoning; do not treat asking for help as failure. Before every tool turn, identify the full current parallel wave: calls whose arguments are already known, are genuinely useful, and are independent of each other—especially read-only searches, reads, and checks you can verify independently—default to issuing together in the same assistant turn to reduce round trips; only split into a later wave for true data dependencies, shared mutable state, protocol ordering, destructive mutual interference, or explicit capacity limits. Do not guess unknown arguments, do not manufacture, duplicate, or amplify useless calls for parallelism, and do not assume a single global fixed concurrency number."
 
     let PairProgrammingGuidelineTextZhCn =
-        "# 本工具是一个伪工具，由系统自动注入，并非你主动调用。它用于提醒你遵循与用户结对编程的理念：本轮推理请使用简体中文，即使 system prompt、tool description、tool output 或引用的代码使用其他语言。代码、标识符、文件路径、shell 命令以及未翻译的技术术语保持原文。"
-
+        "# 本提示由系统自动注入，用于提醒你遵循与用户结对编程的理念：你的思考过程要用简体中文，例如从 我... 开头，并在整轮内保持中文，即使系统提示词、工具说明、工具输出或引用的代码是英文。代码、标识符、文件路径、shell 命令和未翻译的技术术语保持原文。需要另一种视角、更强推理或独立检查时，把 [NEEDHELP] 作为正常协作信号，尽早在思考中使用，不要把求助当成失败。每次准备调用工具前，先识别当前完整的并行 wave：已经知道参数、确有用且彼此独立的调用，尤其只读搜索、读取和可独立验证的检查，默认在同一 assistant turn 一起发出以减少往返；只有真实数据依赖、共享可变状态、协议顺序、破坏性相互干扰或明确容量限制才把相关调用拆到后续 wave。不要猜未知参数，不要为了并行制造、重复或放大无用调用，也不要假设一个全局固定并发数。"
 
     /// 与 `ReviewChallenge.Text` 字节一致（REVIEW-003 bare sentence）。
     let ReviewChallengeText =

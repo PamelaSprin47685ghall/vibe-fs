@@ -145,18 +145,63 @@ module HostSignalBootstrap =
                         "$0"
                     : unit)
 
-            // LOOP-002/006: edge sensor shares the same event subscription, aborts via
-            // the session port, and leaves AABB to OrdinaryTurnWorkflow on TurnAborted.
+            // LOOP-002/006 and HOST-027 share one raw Host subscription but own
+            // disjoint stream fields. Both abort physically; only their typed armed
+            // marks decide the later reconciled-turn meaning.
+            let isOwned sessionId =
+                scope.Sessions.OwnedSessions.Contains(SessionId.value sessionId)
+
+            let isNeedHelpEligible sessionId =
+                if not (isOwned sessionId) then
+                    false
+                elif scope.Strength.StrengthRuntime.TryFindByReplica sessionId |> Option.isSome then
+                    false
+                else
+                    let companion =
+                        journal
+                        |> Option.exists (fun durable ->
+                            SessionAssociationProjection.isCompanion
+                                sessionId
+                                (AgentJournal.snapshot durable).AgentProjections.Associations)
+
+                    if companion then
+                        false
+                    else
+                        match HostSessionNudge.tryActiveProfile journal sessionId with
+                        | Some profile ->
+                            match profile.CanonicalRole with
+                            | Role.Blogger
+                            | Role.Distiller -> false
+                            | _ -> true
+                        | None -> false
+
             let loopSensor =
-                LoopSensor(
-                    (fun sessionId -> scope.Sessions.OwnedSessions.Contains(SessionId.value sessionId)),
-                    (fun sessionId -> sessionPort.AbortSession sessionId)
-                )
+                LoopSensor(isOwned, (fun sessionId -> sessionPort.AbortSession sessionId))
+
+            let needHelpSensor =
+                NeedHelpSensor(isNeedHelpEligible, (fun sessionId -> sessionPort.AbortSession sessionId))
 
             do scope.AttachLoopSensor loopSensor
+            do scope.AttachNeedHelpSensor needHelpSensor
+
+            let assistance =
+                AssistanceHost(
+                    sessionPort,
+                    journal,
+                    needHelpSensor,
+                    snapshot,
+                    (fun childId -> scope.Sessions.OwnedSessions.Add(SessionId.value childId) |> ignore)
+                )
+
+            do scope.AttachAssistance(assistance.HandleTurn, assistance.DropSession)
 
             let signalRouter =
-                HostSignalRouter(scope.Sessions.OwnedSessions, onSignal, onLoopEvent = loopSensor.Observe)
+                HostSignalRouter(
+                    scope.Sessions.OwnedSessions,
+                    onSignal,
+                    onLoopEvent = loopSensor.Observe,
+                    onNeedHelpEvent = needHelpSensor.Observe
+                )
 
             let! subscriptionResult = HostSignalSubscribe.trySubscribe input signalRouter.Observe None
 
@@ -175,6 +220,7 @@ module HostSignalBootstrap =
                             member _.Dispose() = s.Dispose() })
 
             do scope.TrackSubscription subscription
+            do! assistance.Recover()
 
             let registerOwned (sessionId: string) =
                 if not (String.IsNullOrWhiteSpace sessionId) then
@@ -279,6 +325,8 @@ module HostSignalBootstrap =
                 ids
                 |> Seq.iter (fun id ->
                     scope.LoopSensor.DropSession id
+                    scope.NeedHelpSensor.DropSession id
+                    scope.DropAssistanceSession id
                     signalRouter.UnregisterOwned id)
 
             return

@@ -14,13 +14,14 @@ const {
 const {
   HostSignalAdapter_sessionIdOf: sessionIdOf,
   HostSignalAdapter_tryAdapt: tryAdapt,
-  HostSignalRouter_$ctor_3DF87E56: makeRouter,
+  HostSignalRouter,
   HostSignalRouter__RegisterOwned_Z31B28506: RegisterOwned,
   HostSignalRouter__UnregisterOwned_Z31B28506: UnregisterOwned,
   HostSignalRouter__Observe_4E60E31B: Observe,
   HostSignalRouter__ObserveLocal_4E60E31B: ObserveLocal,
   HostSignalRouter__isOwned_Z31B28506: isOwned,
 } = await import('../../../dist/Infrastructure/OpenCode/Signals/HostSignalAdapter.js')
+const makeRouter = (...args) => new HostSignalRouter(...args)
 const { trySubscribe } = await import('../../../dist/Infrastructure/OpenCode/Signals/HostSignalSubscribe.js')
 
 

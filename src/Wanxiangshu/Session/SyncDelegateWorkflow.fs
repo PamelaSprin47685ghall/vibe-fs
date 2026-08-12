@@ -2,6 +2,7 @@
 module internal SyncDelegateWorkflow
 
 open System.Threading.Tasks
+open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Session
@@ -17,7 +18,7 @@ type Dependencies =
       NoteInspectorPrompt: string -> string -> unit
       CleanupInspectorDraft: string -> unit
       Directory: string option
-      SendPrompt: SyncDelegateCall -> string -> Task<Result<unit, string>>
+      SendPrompt: SyncDelegateCall -> SyncDelegatePromptRequest -> Task<Result<unit, string>>
       DescribeWait: SyncDelegateWait -> DiagnosticWait }
 
 /// EXEC-026 / EXEC-031: reusable SyncDelegate CE (Acquire → GetOrCreate → Send →
@@ -27,7 +28,8 @@ let invoke
     (deps: Dependencies)
     (ownerSessionKey: string)
     (role: SyncDelegateRole)
-    (message: string)
+    (charge: string)
+    (prepareProviderPrompt: unit -> Task<string>)
     : Task<Result<string, string>> =
     task {
         let owner = SessionId.create ownerSessionKey
@@ -70,7 +72,21 @@ let invoke
 
                         use _registration = registration
 
-                        match! deps.SendPrompt call message with
+                        // EXEC-032: search/prompt preparation starts only after the
+                        // one-in-flight admission and child ownership are secured.
+                        let! providerPrompt =
+                            task {
+                                try
+                                    return! prepareProviderPrompt ()
+                                with _ ->
+                                    // Warm-start optimization is fail-open; authority
+                                    // text itself is never discarded.
+                                    return charge
+                            }
+
+                        let request = SyncDelegatePrompt.withProviderPrompt charge providerPrompt
+
+                        match! deps.SendPrompt call request with
                         | Error error ->
                             store.FailCall(call, error)
                             store.RemoveCall call
@@ -78,7 +94,9 @@ let invoke
                             return Error error
                         | Ok _ ->
                             if role = SyncDelegateRole.Inspector then
-                                deps.NoteInspectorPrompt (SessionId.value delegateSession) message
+                                // Casebook Q remains the semantic assignment, never
+                                // the rendered warm-start TOML envelope.
+                                deps.NoteInspectorPrompt (SessionId.value delegateSession) request.Charge
 
                             let! answered =
                                 CausalAwait.awaitTask

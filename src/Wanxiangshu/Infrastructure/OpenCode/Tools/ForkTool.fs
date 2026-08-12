@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open Wanxiangshu.Domain
+open Wanxiangshu.Infrastructure
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
@@ -11,11 +12,15 @@ open Wanxiangshu.Session
 /// request and schema; PTY is intentionally absent.
 module ForkTool =
 
-    type Request = { Name: string; Charge: string }
+    type Request =
+        { Name: string
+          Charge: string
+          Keywords: string }
 
     let private decode (args: HostToolArguments) =
         { Name = args.Text "name"
-          Charge = args.Text "charge" }
+          Charge = args.Text "charge"
+          Keywords = args.Text "keywords" }
 
     let private consequence (message: string) =
         ToolHostCodec.tomlObjectWithInstructions [ message ] []
@@ -45,6 +50,25 @@ module ForkTool =
         | Role.Manager
         | Role.Reviewer -> true
         | _ -> false
+
+    let private hasKeywords (request: Request) =
+        not (String.IsNullOrWhiteSpace request.Keywords)
+
+    let private warmStartAllowed role =
+        RepositoryWarmStartPrompt.isDirectConsumer role
+
+    let private warmStartError =
+        "repository warm-start keywords are only available when fork targets Coder, Inspector, or DevOps"
+
+    let private prepareForkPrompt (scope: ToolRuntimeScope) (runtime: HostForkRuntime) (role: Role) (request: Request) =
+        task {
+            let basePrompt =
+                ForkChildPayload.relay request.Charge (runtime.ParentWorkRecordOf runtime.ParentId) [] None
+
+            match! RepositoryWarmStart.appendToBase role scope.WorkspaceDirectory request.Keywords basePrompt with
+            | Ok prompt -> return prompt
+            | Error _ -> return basePrompt
+        }
 
     let private bynameOf (request: Request) (fallback: string) =
         if String.IsNullOrWhiteSpace request.Name then
@@ -83,8 +107,22 @@ module ForkTool =
                     | _, None, Some record ->
                         match managedForRecord record with
                         | Some managed when forbiddenManagerRole managed -> return consequence HiddenTargetDeniedText
+                        | _ when hasKeywords request && not (warmStartAllowed record.Role) ->
+                            return consequence warmStartError
                         | _ ->
-                            match! runtime.Reuse(request.Name, assignment) with
+                            let activeRun =
+                                lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey request.Name)
+
+                            let! reuseResult =
+                                if hasKeywords request && not activeRun then
+                                    task {
+                                        let! rendered = prepareForkPrompt scope runtime record.Role request
+                                        return! runtime.Reuse(request.Name, assignment, renderedPrompt = rendered)
+                                    }
+                                else
+                                    runtime.Reuse(request.Name, assignment)
+
+                            match reuseResult with
                             | Error _ -> return consequence "That person cannot take another charge yet."
                             | Ok _ ->
                                 let label =
@@ -102,14 +140,34 @@ module ForkTool =
                             ->
                             let role = AgentRoleIdentity.ofManaged managed.Role
 
-                            match! runtime.Fork(ToolHostCodec.newHandleId (), role, managed.Name, assignment, None) with
-                            | Ok _ ->
-                                return
-                                    successInstruction (
-                                        sprintf "%s carries this charge now." (bynameOf request managed.Name)
-                                    )
-                            | Error _ -> return consequence "The charge could not be placed."
-                        | Some managed when forbiddenManagerRole managed -> return consequence HiddenTargetDeniedText
+                            if hasKeywords request && not (warmStartAllowed role) then
+                                return consequence warmStartError
+                            else
+                                let! forkResult =
+                                    if hasKeywords request then
+                                        task {
+                                            let! rendered = prepareForkPrompt scope runtime role request
+
+                                            return!
+                                                runtime.Fork(
+                                                    ToolHostCodec.newHandleId (),
+                                                    role,
+                                                    managed.Name,
+                                                    assignment,
+                                                    None,
+                                                    renderedPrompt = rendered
+                                                )
+                                        }
+                                    else
+                                        runtime.Fork(ToolHostCodec.newHandleId (), role, managed.Name, assignment, None)
+
+                                match forkResult with
+                                | Ok _ ->
+                                    return
+                                        successInstruction (
+                                            sprintf "%s carries this charge now." (bynameOf request managed.Name)
+                                        )
+                                | Error _ -> return consequence "The charge could not be placed."
                         | Some _ -> return consequence HiddenTargetDeniedText
                         | None when ToolHostCodec.looksLikeHandleId request.Name ->
                             return consequence "No continuing person is known by that name."
@@ -159,7 +217,8 @@ module ForkTool =
             "Commission another witness within a mission. Pass name + charge; reuse by the same name when the existing sub-session has compatible context."
           Arguments =
             [ "name", ToolHostCodec.managedOrHandleSchema ManagedAgent.managerForkableNames factory
-              "charge", ToolHostCodec.optionalStringSchema factory ]
+              "charge", ToolHostCodec.optionalStringSchema factory
+              "keywords", ToolHostCodec.optionalStringSchema factory ]
           Execute = fun args context -> executeManager scope (decode args) context }
 
     let orchestratorSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
@@ -170,3 +229,28 @@ module ForkTool =
             [ "name", ToolHostCodec.managedOrHandleSchema ManagedAgent.orchestratorForkableNames factory
               "charge", ToolHostCodec.stringSchema factory ]
           Execute = fun args context -> executeOrchestrator scope (decode args) context }
+⚠ 1 unresolved conflict detected
+- ours = HEAD
+- theirs = master
+NOTICE: Inspect a block by reading `conflict://<N>` (add `/ours` / `/theirs` / `/base` to render a single side). Resolve with `write({ path: "conflict://<N>", content })`, or bulk-resolve every registered conflict with `write({ path: "conflict://*", content })`. Writes replace ONLY the marker block (markers + all sides) — never repeat the lines before/after it; they stay in place.
+`content` shorthand: a line that is exactly `@ours` / `@theirs` / `@base` / `@both` expands to that recorded section. `@both` is ours-then-theirs with no separator — only for additive conflicts where each side adds something different; NEVER for competing edits of the same lines (pick a side or write the combined text). Lines that are not a token pass through verbatim, so `"// keep both\n@ours\n@theirs"` literally writes the comment, then ours, then theirs.
+Per-id bulk: `write({ path: "conflict://*", content: "1: @ours\n2: @theirs\n…" })` resolves each listed id with that side in ONE call — the cheapest way through many pick-one conflicts; unlisted ids stay registered.
+Resolve each block faithfully: keep one side (`@ours`/`@theirs`), or combine them when both intents apply — never invent content beyond the recorded sides, and never stack both sides of competing edits. Resolve several conflicts in a single turn by issuing multiple `write` calls at once; ids stay valid as earlier blocks are resolved.
+
+──── #3  L143-181 ────
+<<< ours
+                            if hasKeywords request && not (warmStartAllowed role) then
+                                return consequence warmStartError
+                            else
+                                let! forkResult =
+                                    if hasKeywords request then
+                                        task {
+… (22 more lines)
+>>> theirs
+                            match! runtime.Fork(ToolHostCodec.newHandleId (), role, managed.Name, assignment, None) with
+                            | Ok _ ->
+                                return
+                                    successInstruction (
+                                        sprintf "%s carries this charge now." (bynameOf request managed.Name)
+                                    )
+… (2 more lines)
