@@ -1,3 +1,6 @@
+> 本文件是历史变更记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
+
 # Repository Warm Start — Explicit Keywords + Internal Semble
 
 > Proposed Change. This Change introduces a reusable repository-orientation capability for selected repository-facing managed roles.  
@@ -1252,3 +1255,34 @@ The discussion's recommended construction order across the four sibling proposal
    tool-heavy work, NEEDHELP fast→deep, deep→Meditator,
    warm-start — then decide the default Cursor encoder
 ```
+
+---
+
+# Final outcome
+
+## Outcome
+
+Repository Warm Start V1 闭环：显式 newline-separated `keywords` → bounded parallel internal Semble → deterministic low-trust TOML `repository_search` / `repository_hint` → 仅 Coder/Inspector/DevOps direct consumer 的起始 provider prompt。`Charge` 与 `ProviderPrompt` typed 分离；Casebook Q 保持原始 charge；无 keywords 时 byte-exact 兼容；Semble fail-open。
+
+## Final specification
+
+正式语义：`docs/proof/agent.md` AGENT-032 — MaxKeywords=8、TopKPerKeyword=4、MaxHintsTotal=24、MaxWarmStartBytes=64KiB；parallel search wave；merge 按 keyword ordinal + local rank；role gate；hostile strings 仍为 TOML data。
+
+## Implementation result
+
+- `RepositoryWarmStart.fs`：normalization、bounded `Parallel.mapBounded` multi-query Semble、deterministic merge/dedupe/bounds、fail-open。
+- `RepositoryWarmStartPrompt.fs`：Domain DTO + SyntheticToml rendering；direct-consumer gate。
+- Tool surfaces：`inspect` / `establish-behavior` / `repair-behavior` / `fork` optional `keywords`；SyncDelegate `Charge` vs `ProviderPrompt` split。
+
+## Verification
+
+- `tests/unit/agent/repository-warm-start.test.mjs`：normalization、parallel、bounds、trust containment、Charge/ProviderPrompt split。
+- `tests/unit/tools/fork-tool.test.mjs` role gate。
+- 唯一 Long Stroke 含 keywords→warm-start→callee 代表 phase 且后续 phase 全绿。
+- `npm run check` 全量门禁通过（unit 2385/2385；integration；harness 275/275）。
+
+## References
+
+- `docs/proof/agent.md` AGENT-032 table
+- `src/Wanxiangshu/Infrastructure/RepositoryWarmStart.fs`
+- `src/Wanxiangshu/Domain/RepositoryWarmStartPrompt.fs`

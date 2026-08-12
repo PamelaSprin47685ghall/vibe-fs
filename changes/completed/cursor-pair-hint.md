@@ -1,3 +1,6 @@
+> 本文件是历史变更记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
+
 # Cursor Pair Programming Hint Projection Experiment
 
 > Proposed Change. This Change owns provider-specific encoding of the canonical Pair Programming Hint.  
@@ -948,3 +951,34 @@ The discussion's recommended construction order across the four sibling proposal
    tool-heavy work, NEEDHELP fast→deep, deep→Meditator,
    warm-start — then decide the default Cursor encoder (this Change)
 ```
+
+---
+
+# Final outcome
+
+## Outcome
+
+Canonical Pair Programming Hint 保持单一语义源；Cursor 不再接收 auto-injected fake tool wire。三种 text-role 投影（Assistant / User / System）均已实现并 byte-identical 正文；controlled canary 与 strict-validator 证据后，生产固定 **Assistant Output**（`tryInject` → `assistant` role）。历史 durable occurrence 在 ordinary→Cursor→ordinary 间可逆 replay。
+
+## Final specification
+
+正式语义：`docs/proof/host.md` HOST-013、PROMPT-018 — Cursor 新 placement 仍 append 同一 durable occurrence；provider wire 为 `ResultGap` 处一条 stable-id assistant text；UserOutput 不得成为 HumanRoot；SystemOutput 不得替换 Persona；AssistantOutput 不得成为 semantic work/completion evidence。
+
+## Implementation result
+
+- `PairProgrammingThoughtTransform.fs`：durable `PairProgrammingGuidelineAnchored` occurrence 与 provider-specific renderer 分离；`tryInjectCore cursorRole` 支持三 encoder 对比；生产 `tryInject` 固定 `assistant`。
+- `GuidelineProjection.fs` / journal fold 保留 CallGap+ResultGap 双 anchor，供非 Cursor FakeToolPair replay。
+- `WANXIANGSHU_SKIP_AUTO_INJECTED=1` 紧急 fuse 与 Cursor safe projection 正交保留。
+
+## Verification
+
+- C-PH 系列 pure/authority/replay 测试全绿。
+- Real-Cursor strict-validator canary：三 mode 对照后 production 选定 Assistant。
+- 唯一 Long Stroke 含 winning Cursor projection 阶段且后续 adversity spine 继续全绿。
+- `npm run check` 全量门禁通过（unit 2385/2385；integration；harness 275/275）。
+
+## References
+
+- `docs/proof/host.md` Cursor Pair Hint row
+- `src/Wanxiangshu/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.fs`
+- `src/Wanxiangshu/Journal/GuidelineProjection.fs`

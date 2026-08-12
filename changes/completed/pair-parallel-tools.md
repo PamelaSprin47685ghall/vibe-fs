@@ -1,3 +1,6 @@
+> 本文件是历史变更记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
+
 # Pair Programming Hint — Parallel Tool Waves and RTT Minimization
 
 > Proposed Change. This Change strengthens the canonical Pair Programming Hint so agents actively execute the real dependency graph instead of serializing independent tool I/O by habit.
@@ -870,3 +873,32 @@ The discussion's recommended construction order across the four sibling proposal
 ```
 
 This Change's canonical fragment is part of step 1's semantic Pair Hint and rides every provider projection thereafter.
+
+---
+
+# Final outcome
+
+## Outcome
+
+Canonical Pair Programming Hint 已升级 parallel-tool-wave 语义：已知、有用、彼此独立的调用默认同一 assistant turn 并发；真实依赖、共享可变状态、协议顺序、破坏性干扰与有限容量为硬例外。无新 runtime scheduler；Enforcer 既有 `serial-investigation` / `serial-when-parallel` 规则保持 authoritative corrective 层。
+
+## Final specification
+
+`ProjectionConstants.PairProgrammingGuidelineText` / `PairProgrammingGuidelineTextZhCn` 为唯一语义 owner；`docs/proof/host.md` HOST-013 行登记 parallel-wave Hint 与三 renderer 同字节要求。
+
+## Implementation result
+
+- Domain 单源：`src/Wanxiangshu/Domain/ProjectionRenderer.fs` `ProjectionConstants` 英文/简体中文 canonical marker text 含 bounded current-wave、独立 read-only 默认并行、不得猜参数/制造调用等强语义。
+- 无 `ParallelToolRuntime` / Host 预测重排；与 NEEDHELP、Cursor projection、Repository Warm Start 通过同一 Pair occurrence 组合。
+
+## Verification
+
+- Pair Hint content proof 与 behavioral canary 全绿。
+- 唯一 Long Stroke 含 representative multi-tool parallel batch 且 bracket/ReviewSeal/后续 phase 继续全绿。
+- Enforcer 现有 serial/unbounded-fanout 测试保持 authoritative 且全绿。
+- `npm run check` 全量门禁通过。
+
+## References
+
+- `docs/proof/host.md` Pair parallel-wave Hint
+- `src/Wanxiangshu/Domain/ProjectionRenderer.fs`

@@ -1,3 +1,6 @@
+> 本文件是历史变更记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
+
 # Increase Strength — `[NEEDHELP]` Assistance Escalation
 
 > Proposed Change. This file describes intended behavior and proof obligations.  
@@ -1028,3 +1031,37 @@ The discussion's recommended construction order across the four sibling proposal
    tool-heavy work, NEEDHELP fast→deep, deep→Meditator,
    warm-start — then decide the default Cursor encoder
 ```
+
+---
+
+# Final outcome
+
+## Outcome
+
+`[NEEDHELP]` 协作升级已在真实 OpenCode Host 路径闭环：reasoning PartId 关联 → exact `[NEEDHELP]` abort → fast→deep → deep abort → fresh SessionIdle transport fence → 单个 deep-inquiry consultation → canonical terminal capture → child LWR → `NeedHelpAdvice` 回到原 deep binding。修复了两个真实生命周期 bug：AbortWake 内过早创建 child 会被 OpenCode parent-abort sweep 0-token abort；特殊 assistance 路由跳过普通 TerminalReporter 导致 child LWR 缺本轮 terminal。
+
+## Final specification
+
+正式语义已进入 `docs/{what,shape,how,proof}/agent.md`、`docs/how/host.md`（HOST-027 / AGENT-031 / PROMPT-018）：reasoning delta 精确检测；visible text 不命中；fast→deep 同 Session/Life 且 fallback 不动；deep AbortWake 只 claim owner、不创建 child；fresh `IdleRevisit` transport fence 后才创建唯一 consultation child；child `TurnCompleted` 先 canonical XTrace terminal capture 再物化 child LWR；控制 sentinel exact-strip 后不进 XTrace evidence。
+
+## Implementation result
+
+- Domain：`AssistancePrompt.fs`；Application：`AssistanceWorkflow.fs`（如存在）；Infrastructure：`NeedHelpEventCodec.fs`、`NeedHelpSensor.fs`、`AssistanceHost.fs`。
+- `PromptAuthority` 新增 `NeedHelpEscalation` / `NeedHelpAdvice` typed continuation。
+- Pair Hint canonical text 已含 shame-free `[NEEDHELP]` 协作片段（`ProjectionConstants.PairProgrammingGuidelineText`）。
+- 生命周期修复：deep AbortWake 延迟 child 创建至 fresh idle；assistance owner 路由显式复用 `XTraceCapture.captureTerminal` 再进 child LWR。
+
+## Verification
+
+- `npm run lint` hard gates 全绿；Fantomas 全绿。
+- `npm run check`：unit **2385/2385**、全部 integration 全绿、harness **275/275**。
+- 唯一 Long Stroke 全绿（**63 steps**；journal **581/620**；SSE **2719/2900**），NEEDHELP 完整路径后继续通过 fallback、REVISE、finality、publish conflict 与 reconciliation。
+- 代表测试：`tests/unit/host/needhelp-sensor.test.mjs`、`tests/unit/host/assistance-host.test.mjs`、`tests/e2e/entry.test.mjs`。
+
+## References
+
+- `docs/how/host.md` § NEEDHELP sensor / reconcile
+- `docs/proof/agent.md` AGENT-031 canaries
+- `docs/proof/host.md` HOST-027
+- `src/Wanxiangshu/Infrastructure/OpenCode/Host/NeedHelpSensor.fs`
+- `src/Wanxiangshu/Infrastructure/OpenCode/Host/AssistanceHost.fs`

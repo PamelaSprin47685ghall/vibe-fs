@@ -54,7 +54,10 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
     /// an abort that this sensor itself requested.
     member _.HasArmedSession(sessionId: SessionId) =
         let prefix = sessionPrefix sessionId
-        lock gate (fun () -> armed |> Seq.exists (fun key -> key.StartsWith(prefix, StringComparison.Ordinal)))
+
+        lock gate (fun () ->
+            armed
+            |> Seq.exists (fun key -> key.StartsWith(prefix, StringComparison.Ordinal)))
 
     member _.TryArm(sessionId: SessionId, providerRun: ProviderRunIdentity) =
         lock gate (fun () -> armed.Add(attemptKey sessionId providerRun))
