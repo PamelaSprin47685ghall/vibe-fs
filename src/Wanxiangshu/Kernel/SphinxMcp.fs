@@ -1,0 +1,19 @@
+namespace Wanxiangshu.Kernel
+
+open System
+
+/// AGENT-028: Sphinx MCP identity and local launch command.
+/// No env, no Host objects.
+module SphinxMcp =
+
+    let serverName = "sphinx"
+    let permissionKey = "sphinx_*"
+    let toolPrefix = "sphinx_"
+    let relativeServerEntry = "dist/sphinx/mcp-server.js"
+
+    let isTool (name: string) =
+        not (String.IsNullOrWhiteSpace name) && name.StartsWith toolPrefix
+
+    let localCommand (entryPath: string) : string array = [| "node"; entryPath |]
+
+    let fixtureCommand (fixturePath: string) : string array = [| "node"; fixturePath |]

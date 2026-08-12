@@ -27,7 +27,7 @@
 
 | 证明 | 落点 / 形态 | 条款 |
 |------|-------------|------|
-| 工具面仅 `inspector` | Host schema + ToolRegistry 均无 read/glob/grep/write/edit/executor/coder/fork/join/list/PTY/`stealth-browser-mcp_*` | AGENT-006、AGENT-025 |
+| 工具面 = `inspector` + `sphinx_*` | Host schema + ToolRegistry 均无 read/glob/grep/write/edit/executor/coder/fork/join/list/PTY/`stealth-browser-mcp_*`；Meditator allow `sphinx_*` | AGENT-006、AGENT-025、AGENT-028 |
 | SyncDelegate 边 | 仅 `Meditator → Inspector`；无反向 | AGENT-024 |
 | Epistemic style 在 prompt | meditator system prompt 含形成理解 / 反例 / 证据vs推论 / 综合 Inspector；无 LearningState/QA/Compile/return 协议 | AGENT-025 |
 | 无 Student workflow 移植 | 无 MeditatorLearn/Compile RequestKind；终端为普通 Assistant completion | AGENT-025 |
@@ -40,7 +40,7 @@
 | mv/rm 仅 Coder；非空目录 rm 拒绝 | AGENT-016…018 |
 | bash-honeypot 仅 Coder；调用不跑 shell | AGENT-023 |
 | DevOps 独占 PTY；Reviewer 只读 | AGENT-013、AGENT-014 |
-| Meditator inspector-only | AGENT-025 |
+| Meditator = inspector + Sphinx MCP | AGENT-025、AGENT-028 |
 | Browser stealth-browser MCP | AGENT-026 |
 | 内部 Semble MCP | AGENT-027 |
 
@@ -53,6 +53,17 @@
 | config 注入 | `configureFromHostConfig` 写入 `mcp.stealth-browser-mcp`；不删其它 MCP | AGENT-026 |
 | 启动判定 | disabled / fixture / test / uvx ref 四分支确定性 | AGENT-026 |
 | 不进 ToolRegistry / js-* | plugin `tool` 注册表无 stealth-browser 名；js-browser 仍仅 fs 投影 | AGENT-026、JS-001 |
+
+## Sphinx MCP
+
+| 证明 | 期望 | 条款 |
+|------|------|------|
+| Host schema 键 | Meditator allow `sphinx_*`；其它 role deny | AGENT-006、AGENT-028 |
+| wildcard 求值 | Meditator 对 `sphinx_start` / `sphinx_resume` = allow；Coder/Browser = deny | AGENT-007、AGENT-028 |
+| config 注入 | `configureFromHostConfig` 写入 `mcp.sphinx`；不删其它 MCP | AGENT-028 |
+| 启动判定 | disabled / fixture / test / 生产 node 四分支确定性 | AGENT-028 |
+| 不进 ToolRegistry / js-* | plugin `tool` 注册表无 sphinx 名 | AGENT-028、SPHINX-005 |
+| 正交 | 万象术无 Closure 副本；Sphinx 无万象术 domain import | SPHINX-005 |
 
 ## 内部 Semble MCP
 
@@ -67,5 +78,6 @@
 
 代表测试：`tests/unit/agent/catalog.test.mjs`、`tests/unit/plugin/agent-permission-gate.test.mjs`、
 `tests/unit/agent/stealth-browser-mcp.test.mjs`、`tests/unit/agent/semble-mcp.test.mjs`、
+`tests/unit/agent/sphinx-mcp.test.mjs`、`tests/unit/sphinx/*.test.mjs`、
 `tests/integration/plugin/manager-tool-contract.test.mjs`、`file-mutation-tools.test.mjs`；
-Meditator inspector-only / Student-Teacher absence ratchet 随 G3 落地。
+Meditator inspector + Sphinx / Student-Teacher absence ratchet 随落地。

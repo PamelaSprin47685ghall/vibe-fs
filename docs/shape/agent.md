@@ -65,15 +65,18 @@ SyncDelegate 工具（`inspector` / `coder` 作为 dedicated callee）的 Sessio
 4. Teacher leaf / no-Companion 拓扑**不**套到 Dedicated Inspector/Coder（后者是 Work + Attached，HOST-008）。
    Student/Teacher 角色已删除（AGENT-020 空缺）。
 
-## Meditator 边界（见 AGENT-025）
+## Meditator 边界（见 AGENT-025 / AGENT-028）
 
-Meditator 正式工具面只有 SyncDelegate `inspector`。所有权边界：
+Meditator 正式工具面 = SyncDelegate `inspector` + Host MCP `sphinx_*`。所有权边界：
 
 1. Host-final permission 与 ToolRegistry 两层都必须拒绝 Meditator 的 `read` / `glob` / `grep` /
    write/edit/executor/coder/fork/join/list/PTY/`stealth-browser-mcp_*`（与 AGENT-006/025 同集）。
+   `sphinx_*` 仅经 `ToolPermission.Sphinx` 放行（AGENT-028）；仍禁止 filesystem 直读。
 2. Epistemic style 只属于 Meditator system prompt / prompt ownership，**不是** LearningState、QA、
    Compile、RequestKind 或 final `return` 协议；禁止为 Meditator 新造 Student 式双门 profile。
 3. 不得把 `student`/`teacher` 旧名 alias 到 Meditator（AGENT-004）。
+4. Sphinx 认识状态 / Closure / Canonical Answer 的 writer 在 `src/sphinx`（SPHINX-005）；
+   万象术只写 identity / launch / permission。
 
 ## stealth-browser MCP 所有权（见 AGENT-026）
 
@@ -84,6 +87,17 @@ Meditator 正式工具面只有 SyncDelegate `inspector`。所有权边界：
 | Host schema `stealth-browser-mcp_*` allow/deny | `StaticTools.permissionObj` ← `ToolPermission.Network` | 第二套 role→MCP 表 |
 
 禁止第二处注入 `mcp.stealth-browser-mcp`。禁止把 MCP 工具名写进 `Roles.permissions` 字符串集；域能力只留 `ToolPermission.Network`。
+
+## Sphinx MCP 所有权（见 AGENT-028）
+
+| 面 | writer | 不可写 |
+|----|--------|--------|
+| 服务器名 / 工具前缀 `sphinx_` / 生产 node 入口 / `isTool` | `Kernel/SphinxMcp` identity | env、Host 对象、Sphinx 闭包副本 |
+| 启动判定（disabled / fixture / test / 生产）+ `config.mcp.sphinx` 写入 | `SphinxMcpConfig` ← `ManagedAgentConfig.applyOwnedFields` | agent permission 矩阵 |
+| Host schema `sphinx_*` allow/deny | `StaticTools.permissionObj` ← `ToolPermission.Sphinx` | 第二套 role→MCP 表 |
+| EpistemicState / Closure / Canonical Answer | `src/sphinx` Inquiry Kernel | 万象术 domain、Meditator prompt |
+
+禁止第二处注入 `mcp.sphinx`。禁止把 MCP 工具名写进 `Roles.permissions` 字符串集；域能力只留 `ToolPermission.Sphinx`。禁止万象术内嵌闭包逻辑。
 
 ## Semble MCP 所有权（见 AGENT-027）
 

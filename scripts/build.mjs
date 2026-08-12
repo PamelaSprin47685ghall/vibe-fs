@@ -88,4 +88,11 @@ for (const name of prompts) {
   if (!fs.existsSync(promptPath)) fail(`missing prompt: ${promptPath}`)
 }
 
+const sphinxSrc = path.join(root, 'src/sphinx')
+const sphinxDist = path.join(dist, 'sphinx')
+if (!fs.existsSync(sphinxSrc)) fail(`missing sphinx source: ${sphinxSrc}`)
+fs.cpSync(sphinxSrc, sphinxDist, { recursive: true })
+const sphinxEntry = path.join(sphinxDist, 'mcp-server.js')
+if (!fs.existsSync(sphinxEntry)) fail(`missing sphinx entry: ${sphinxEntry}`)
+
 console.log('build ok')

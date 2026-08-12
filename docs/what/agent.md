@@ -77,7 +77,7 @@ fast, deep, reviewer-fast, fast_reviewer
 | Inspector | `read`, `glob`, `grep`, `executor` |
 | DevOps | `fork-pty`, `executor`, `read`, `glob`, `grep`, `inspector`, `coder`, `join`, `list` |
 | Browser | `read`, `glob`, `grep`, stealth-browser MCP（AGENT-026） |
-| Meditator | `inspector` only（见 AGENT-025） |
+| Meditator | `inspector` + Sphinx MCP（AGENT-025、AGENT-028） |
 | Reviewer | `read`, `glob`, `grep`, `verdict` |
 | Blogger | `blog` |
 | Executor | 无工具 |
@@ -176,19 +176,22 @@ DevOps    → Coder
 本条只宣布 SyncDelegate DAG 与 `InvocationMode`。不得把 Teacher leaf / no-Companion 拓扑套到
 Dedicated Inspector/Coder（后者是 Work + Attached，HOST-008）。
 
-## AGENT-025：Meditator 能力（inspector-only + epistemic style）
+## AGENT-025：Meditator 能力（inspector + Sphinx MCP + epistemic style）
 
-正式工具面（普通 Work Session；事实调查只经 SyncDelegate）：
+正式工具面（普通 Work Session；事实调查只经 SyncDelegate；认识求解经 Sphinx MCP）：
 
 ```text
-Meditator → { inspector }
+Meditator → { inspector, sphinx MCP }
 ```
+
+`sphinx MCP` = Host MCP `sphinx` 的工具面（AGENT-028 / SPHINX-003）。仍禁止 filesystem 直读。
 
 禁止再持有：`read` / `glob` / `grep` / `write` / `edit` / `executor` / `coder` /
 `fork-agent` / `fork-manager` / `fork-pty` / `join` / `list` / stealth-browser MCP，以及任何 filesystem 直读面。
 
-职责只有：reason / question / compare / challenge / synthesize。分层固定为
-`Meditator = reasoning`，`Inspector = evidence acquisition`（AGENT-024 边 `Meditator → Inspector`）。
+职责：reason / question / compare / challenge / synthesize；经 Sphinx co-yield 推进认识状态。
+分层固定为 `Meditator = reasoning`，`Inspector = evidence acquisition`
+（AGENT-024 边 `Meditator → Inspector`）；Sphinx = 认识状态求解器（SPHINX-001），不是证据扫库。
 
 Prompt discipline 吸收原 Student **epistemic style**（不是 workflow protocol）：
 
@@ -271,4 +274,48 @@ WANXIANGSHU_TEST 为真且无 fixture   → Disabled
 2. 把 search 结果伪装成 provider-visible `read`（历史 injection 已废止）
 3. Strength Replica 工具面加入 Semble
 4. 在 `WANXIANGSHU_TEST` 且无 fixture 时 spawn 真实 `uvx`
-5. 新增 `@modelcontextprotocol/sdk` 依赖
+5. 新增 `@modelcontextprotocol/sdk` 依赖（本条只约束 Semble；Sphinx 路径见 SPHINX-005 / AGENT-028）
+
+## AGENT-028：Host Sphinx MCP 自动注入
+
+Meditator 的认识求解面 = Host MCP `sphinx` 的工具面。不是插件 ToolRegistry 工具，不是虚构 `sphinx` 业务工具名。内核行为见 SPHINX-001..005。
+
+Host-final `opencode.json` 必须由 config hook 注入：
+
+```text
+mcp.sphinx = {
+  type = "local"
+  command = node <packageRoot>/dist/sphinx/mcp-server.js
+  enabled = true
+}
+```
+
+测试 / 运维启动（环境前缀 `SPHINX_MCP_*`）：
+
+```text
+SPHINX_MCP_DISABLED 为真            → enabled = false，不 spawn
+SPHINX_MCP_FIXTURE 非空             → command = node <fixture>，enabled = true
+WANXIANGSHU_TEST 为真且无 fixture   → enabled = false
+否则                                → command = node <packageRoot>/dist/sphinx/mcp-server.js，enabled = true
+```
+
+权限（AGENT-007 第一层；fast/deep 相同，AGENT-010）：
+
+```text
+CanonicalRole.Meditator → allow  sphinx_*
+其它 managed role       → deny   sphinx_*
+```
+
+域能力是 `ToolPermission.Sphinx`。Host schema 键是 `sphinx_*`。OpenCode 把该 MCP 的每个工具暴露为 `sphinx_<tool>`（服务器内名 `start` / `resume`）。
+
+Sphinx MCP 与 stealth-browser MCP 同类：Host-native，不进 ToolRegistry，不进 `js-*` 投影。第二层 execution gate 不适用于本 MCP 面。
+
+Sphinx 服务器实现允许 `@modelcontextprotocol/sdk`（及 zod）。AGENT-027 第 5 款仍禁止 Semble 路径引入该 SDK。
+
+禁止：
+
+1. 把 Sphinx MCP 编入 ToolRegistry / `js-*`
+2. 给非 Meditator 角色 allow `sphinx_*`
+3. 依赖用户手工在 `opencode.json` 配置该 MCP
+4. 在 `WANXIANGSHU_TEST` 且无 fixture 时 spawn 生产 `mcp-server.js`
+5. 万象术内嵌 Sphinx Closure / EpistemicState / Canonical Answer 逻辑

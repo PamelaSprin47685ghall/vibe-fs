@@ -151,6 +151,7 @@ module ManagedAgentConfig =
     /// agents stay untouched (no invented agents).
     let applyOwnedFields (config: obj) (inventory: ManagedAgentInventory) : unit =
         StealthBrowserMcpConfig.apply config (StealthBrowserMcpConfig.launchFromEnvironment ())
+        SphinxMcpConfig.apply config (SphinxMcpConfig.launchFromEnvironment ())
 
         if isNull config then
             ()

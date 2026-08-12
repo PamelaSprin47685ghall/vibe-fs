@@ -1213,3 +1213,72 @@ LLM 每给一次新东西，数学内核先全局收敛，再问下一句。
 **5. Search algorithms are degenerations, not foundations.**
 
 A*、Bayesian inference、MCTS 不是 Sphinx 的组成定义，而是统一认识状态模型在不同约束与求解策略下必须能够得到的退化形式。
+---
+
+> 本文件是变更工作记录，不是当前产品规范。
+> 当前产品语义仅以 `docs/` 正式层为准。
+
+## Active work
+
+**Specification impact**
+
+- 新前缀 `SPHINX-`：Phase 0 认识内核 + MCP co-yield（含 handle 有状态会话）
+- `AGENT-028`：万象术 Host 自动注入 `mcp.sphinx`；Meditator allow `sphinx_*`
+- 实现正交：`src/sphinx/` 独立 Node MCP（可用 `@modelcontextprotocol/sdk`）；万象术仅 identity / launch / permission
+- 不触碰 `GrandRewrite.md` 范围
+
+**Remaining work**
+
+1. 正式 why/what/shape/how/proof + 导航 / PREFIX
+2. `src/sphinx` Phase 0 内核 + MCP `start`/`resume`（每次回传 handle）
+3. 万象术 thin auto-load（类 stealth；本地 `node` 入口，非 uvx）
+4. Meditator 权限面纳入 Sphinx MCP
+5. proof 测试 + 门禁绿
+6. Final outcome → `changes/completed/`
+
+**Completion criteria**
+
+- Phase 0 十二条能力可执行且有回归
+- Host 自动注入；测试默认不 spawn 生产入口
+- Sphinx 不 import 万象术 domain；万象术不内嵌 Kernel 闭包逻辑
+- `node scripts/checks/spec.mjs` 与相关 unit 绿
+
+**Blockers**
+
+- 无
+
+**Out of scope（本 Change）**
+
+- Phase 1–5（A* / Bayes / MCTS / 表示优化 / 方法库扩张）
+- GrandRewrite provider surface
+
+## Final outcome
+
+**Outcome**
+
+Phase 0 Sphinx 已落地：正交 Node MCP（handle 有状态 co-yield）+ 万象术 Host 薄自动注入；Meditator 独占 `sphinx_*`。
+
+**Final specification**
+
+- `SPHINX-001`…`005`（`docs/{why,what,shape,how,proof}/sphinx.md`）
+- `AGENT-028` 及 AGENT-006/025 增量（Meditator = inspector + Sphinx MCP）
+- 导航 / `scripts/checks/spec.mjs` PREFIX 已注册
+
+**Implementation result**
+
+- `src/sphinx/`：内核 + `mcp-server.js`（`@modelcontextprotocol/sdk`）；工具 `start`/`resume`；不透明 handle
+- `scripts/build.mjs` 复制至 `dist/sphinx/`
+- 万象术：`SphinxMcp` / `SphinxMcpConfig` → `config.mcp.sphinx`；`ToolPermission.Sphinx` → Meditator allow
+- 未改 GrandRewrite 范围；Semble 仍禁 MCP SDK（AGENT-027）
+
+**Verification**
+
+- `node scripts/checks/spec.mjs` OK
+- `npm run format:check` OK
+- unit：`tests/unit/sphinx/*` + `sphinx-mcp` + `meditator-permissions` + stealth/semble 回归共 32 pass
+
+**References**
+
+- `docs/what/sphinx.md`、`docs/what/agent.md`（AGENT-028）
+- `src/sphinx/mcp-server.js`、`src/Wanxiangshu/Kernel/SphinxMcp.fs`
+- `tests/unit/sphinx/`、`tests/unit/agent/sphinx-mcp.test.mjs`

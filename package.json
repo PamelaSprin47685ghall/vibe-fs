@@ -40,8 +40,10 @@
   },
   "dependencies": {
     "@fable-org/fable-library-js": "^2.5.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "bun-pty": "^0.4.8",
-    "proper-lockfile": "^4.1.2"
+    "proper-lockfile": "^4.1.2",
+    "zod": "^4.4.3"
   },
   "overrides": {
     "bun-pty": "$bun-pty"

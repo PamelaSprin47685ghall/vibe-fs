@@ -59,6 +59,7 @@ what → shape → how → code/resources → proof
 | `JS-` JS Tools | [what](what/js-tools.md) · [shape](shape/js-tools.md) · [how](how/js-tools.md) · [proof](proof/js-tools.md) · [why](why/js-tools.md) |
 | `CASE-` Casebook | [what](what/casebook.md) · [shape](shape/casebook.md) · [how](how/casebook.md) · [proof](proof/casebook.md) · [why](why/casebook.md) |
 | `STRENGTH-` Predict & Reduce Strength | [what](what/strength.md) · [shape](shape/strength.md) · [how](how/strength.md) · [proof](proof/strength.md) · [why](why/strength.md) |
+| `SPHINX-` Sphinx 认识求解器 | [what](what/sphinx.md) · [shape](shape/sphinx.md) · [how](how/sphinx.md) · [proof](proof/sphinx.md) · [why](why/sphinx.md) |
 | Synthetic TOML（`ARCH-010` / `ARCH-011`） | [what](what/synthetic-toml.md) · [shape](shape/synthetic-toml.md) · [how](how/synthetic-toml.md) · [proof](proof/synthetic-toml.md) · [why](why/synthetic-toml.md) |
 | Security 边界 | [shape](shape/security.md) |
 

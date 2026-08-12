@@ -30,6 +30,7 @@
 | 术语 | 指向 |
 |------|------|
 | Canonical Projection | COMPANION-007：Semantic 投影是 canonical digest 的唯一来源 |
+| Canonical Answer | SPHINX-001/004：Kernel 写出的终局答案；非 LLM 自由文 |
 | Canonical Role | AGENT-001：不变角色，与 fast/deep 无关，不决定 Companion |
 | Circuit Breaker | FALLBACK-005：达到有限正整数自动恢复预算时熔断；默认预算 12 |
 | Clean Gate | ORCH-002：工作区 dirty 拒绝用户消息 |
@@ -57,6 +58,7 @@
 | 术语 | 指向 |
 |------|------|
 | EffectiveAgent | FALLBACK-002：由 Fallback cursor 决定的当前 Agent |
+| EpistemicState | SPHINX-004：`S=(R,B,E,D,A,C)`；handle 绑定的认识状态充分统计量 |
 | Epoch | COMPANION-009：PrefixEpoch 内 append-only |
 | external_directory | AGENT-019：Host 路径边界元权限；managed agent 固定 allow，非角色工具 |
 | FamilyRecoveryPermit | EXEC-023：恢复闭合后签发；Join / JoinWithPermit 唯一凭据 |
@@ -179,6 +181,9 @@
 | Semble MCP | AGENT-027：内部 stdio 语义搜索；非 Host MCP；Strength 当前不消费 |
 | SessionExecutionClass | HOST-008：Work / InternalLeaf |
 | SessionOwnership | HOST-008：Root / Attached(ownerSessionId, AttachmentKind) |
+| Sphinx | SPHINX-001：生成式认识状态求解器；Kernel↔LLM co-yield |
+| Sphinx handle | SPHINX-002：不透明 inquiry 钥匙；进程内绑定 EpistemicState；非 EXEC HandleId |
+| Sphinx MCP | AGENT-028 / SPHINX-003：Host MCP `sphinx`；schema 键 `sphinx_*`；域能力 `ToolPermission.Sphinx`；仅 Meditator |
 | stealth-browser MCP | AGENT-026：Browser 专用 Host MCP；schema 键 `stealth-browser-mcp_*`；域能力 `ToolPermission.Network` |
 | StrengthCandidate | STRENGTH-006：已 durable 准备且仅绑定一个 TargetProviderRun、尚未成为语义历史的只读 frame bundle |
 | StrengthCandidatePrepared | STRENGTH-006/017：Candidate 已 commit 到 EventStore 并绑定 TargetProviderRun 的 durable 事实 |

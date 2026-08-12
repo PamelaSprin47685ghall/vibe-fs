@@ -47,6 +47,8 @@ type ToolPermission =
     | Finality
     /// Coder-only honeypot: visible as `bash-honeypot`, never a real shell.
     | BashHoneypot
+    /// AGENT-028: Meditator-only Sphinx MCP wildcard (`sphinx_*`).
+    | Sphinx
 
 module Roles =
 
@@ -84,7 +86,7 @@ module Roles =
                   ToolPermission.Glob
                   ToolPermission.Grep
                   ToolPermission.Network ]
-        | Role.Meditator -> set [ ToolPermission.Inspector ]
+        | Role.Meditator -> set [ ToolPermission.Inspector; ToolPermission.Sphinx ]
         | Role.Reviewer ->
             set
                 [ ToolPermission.Read

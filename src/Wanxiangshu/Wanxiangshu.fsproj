@@ -18,6 +18,7 @@
     <Compile Include="Kernel/Roles.fs"/>
     <Compile Include="Kernel/McpLaunch.fs"/>
     <Compile Include="Kernel/StealthBrowserMcp.fs"/>
+    <Compile Include="Kernel/SphinxMcp.fs"/>
     <Compile Include="Kernel/SembleMcp.fs"/>
     <Compile Include="Kernel/Parallel.fs"/>
     <Compile Include="Kernel/DomainFlow.fs"/>
@@ -215,6 +216,7 @@
     <Compile Include="Tools/FileTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/OpencodeTypes.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/StealthBrowserMcpConfig.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Host/SphinxMcpConfig.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/ManagedAgentConfig.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/CanonicalJson.fs"/>
     <Compile Include="Infrastructure/OpenCode/Codec/PromptMetadataCodec.fs"/>

@@ -1,7 +1,7 @@
 // tests/unit/agent/meditator-permissions.test.mjs — G3 Meditator capability matrix.
 //
-// Meditator is an Inspector-only reasoner: Roles.permissions carries Inspector
-// and must not carry Read/Glob/Grep. Host schema, PromptAuthority.toolCapabilitiesFor,
+// Meditator is Inspector + Sphinx MCP: Roles.permissions carries Inspector and
+// Sphinx; must not carry Read/Glob/Grep. Host schema, PromptAuthority.toolCapabilitiesFor,
 // and ToolRegistry.rolePredicate all derive from that set (or deny when the
 // capability is absent).
 
@@ -26,16 +26,17 @@ test.before(() => {
   runtimeResources.installFromPackage()
 })
 
-test('G3_Meditator_permissions_are_inspector_only', () => {
+test('G3_Meditator_permissions_are_inspector_and_sphinx', () => {
   const allowed = roles.permissions(roles.of('Meditator'))
-  assert.deepEqual(allowed, ['Inspector'])
+  assert.deepEqual(allowed, ['Inspector', 'Sphinx'])
   assert.equal(allowed.includes('Read'), false)
   assert.equal(allowed.includes('Glob'), false)
   assert.equal(allowed.includes('Grep'), false)
 })
 
-test('G3_Meditator_isAllowed_denies_read_glob_grep_and_allows_inspector', () => {
+test('G3_Meditator_isAllowed_denies_read_glob_grep_and_allows_inspector_sphinx', () => {
   assert.equal(isAllowed(Role.Meditator, ToolPermission.Inspector), true)
+  assert.equal(isAllowed(Role.Meditator, ToolPermission.Sphinx), true)
   for (const permission of READ_PERMISSIONS) {
     assert.equal(isAllowed(Role.Meditator, permission), false, `Meditator must lack ${permission}`)
   }
@@ -43,7 +44,7 @@ test('G3_Meditator_isAllowed_denies_read_glob_grep_and_allows_inspector', () => 
 
 test('G3_Meditator_toolCapabilitiesFor_WorkMain_matches_Roles_permissions', () => {
   const caps = names(toolCapabilitiesFor(Role.Meditator, ProviderRequestKind.WorkMain))
-  assert.deepEqual(caps, ['inspector'])
+  assert.deepEqual(caps, ['inspector', 'sphinx_*'])
   for (const tool of READ_TOOLS) {
     assert.equal(caps.includes(tool), false, `toolCapabilitiesFor must omit ${tool}`)
   }
@@ -66,7 +67,7 @@ test('G3_Meditator_rolePredicate_inspector_allow_and_host_native_read_gap', () =
   assert.equal(inspector(Role.Meditator), true, 'rolePredicate(inspector) must allow Meditator')
 })
 
-test('G3_Meditator_host_schema_allow_list_is_inspector_only', () => {
+test('G3_Meditator_host_schema_allow_list_is_inspector_and_sphinx', () => {
   const config = {
     agent: {
       'fast-meditator': { model: 'fast-meditator-model' },
@@ -98,6 +99,7 @@ test('G3_Meditator_host_schema_allow_list_is_inspector_only', () => {
     const permission = config.agent[name].permission
     assert.equal(permission['*'], 'deny')
     assert.equal(permission.inspector, 'allow')
+    assert.equal(permission['sphinx_*'], 'allow')
     for (const tool of READ_TOOLS) {
       assert.notEqual(permission[tool], 'allow', `${name} must not allow ${tool}`)
     }
