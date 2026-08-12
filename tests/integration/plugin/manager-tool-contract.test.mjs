@@ -79,8 +79,8 @@ const EXPECTED_ARGUMENTS = {
   'query-shell': {
     command: 'required',
   },
-  fork: { name: 'required', charge: 'optional', keywords: 'optional' },
-  commission: { name: 'required', charge: 'required' },
+  fork: { calling: 'optional', name: 'required', charge: 'required', keywords: 'optional' },
+  commission: { calling: 'optional', name: 'required', charge: 'required' },
   'open-terminal': { name: 'required', command: 'required' },
   'send-terminal': { name: 'required', input: 'required' },
   'read-terminal': { name: 'required' },
@@ -112,18 +112,18 @@ const EXPECTED_ARGUMENTS = {
  */
 const EXPECTED_AGENT_ENUMS = {
   fork: [
-    'deep-browser',
-    'deep-coder',
-    'deep-devops',
-    'deep-inquiry',
-    'deep-inspector',
-    'fast-browser',
-    'fast-coder',
-    'fast-devops',
-    'fast-inquiry',
-    'fast-inspector',
+    'analyst',
+    'coder',
+    'engineer',
+    'inquirer',
+    'investigator',
+    'navigator',
+    'operator',
+    'researcher',
+    'scout',
+    'technician',
   ],
-  commission: ['deep-manager', 'fast-manager'],
+  commission: ['coordinator', 'lead'],
 }
 
 /**
@@ -137,13 +137,17 @@ const EXPECTED_AGENT_ENUMS = {
  * recorded as a pending defect rather than migrated.
  */
 const agentEnumEntries = (schema) => {
-  const def = schema.def ?? schema._def
-  const arms = def.type === 'union' ? def.options : [schema]
-  return arms
-    .map((arm) => arm.def ?? arm._def)
-    .filter((armDef) => armDef.type === 'enum')
-    .flatMap((armDef) => Object.keys(armDef.entries))
-    .sort()
+  const visit = (node) => {
+    if (!node) return []
+    const def = node.def ?? node._def
+    if (!def) return []
+    if (def.type === 'enum') return Object.keys(def.entries)
+    if (def.type === 'union') return def.options.flatMap(visit)
+    if (def.type === 'optional') return visit(def.innerType)
+    return []
+  }
+
+  return visit(schema).sort()
 }
 
 // ── the permission matrix ────────────────────────────────────────────────────
@@ -513,7 +517,7 @@ test('AGENT_008_009_every_agent_argument_offers_exactly_its_declared_agents', as
     const observed = Object.fromEntries(
       Object.keys(EXPECTED_AGENT_ENUMS).map((toolName) => [
         toolName,
-        agentEnumEntries(hooks.tool[toolName].args.name),
+        agentEnumEntries(hooks.tool[toolName].args.calling),
       ]),
     )
 
@@ -533,14 +537,12 @@ test('AGENT_008_009_every_agent_argument_offers_exactly_its_declared_agents', as
     // REVIEW-002: a verdict is a tool argument with exactly two values.
     assert.deepEqual(agentEnumEntries(hooks.tool.judge.args.verdict), ['PERFECT', 'REVISE'])
 
-    // AGENT-005: omitting the agent is not a defaultable choice.
-    const omitted = Object.fromEntries(
-      Object.keys(EXPECTED_AGENT_ENUMS).map((toolName) => [
-        toolName,
-        hooks.tool[toolName].args.name.safeParse(undefined).success,
-      ]),
-    )
-    assert.deepEqual(omitted, { fork: false, commission: false })
+    // Clean break: calling is omitted only for continuation; Byname itself is
+    // always required and carries the stable provider identity.
+    for (const toolName of Object.keys(EXPECTED_AGENT_ENUMS)) {
+      assert.equal(hooks.tool[toolName].args.calling.safeParse(undefined).success, true)
+      assert.equal(hooks.tool[toolName].args.name.safeParse(undefined).success, false)
+    }
   })
 })
 
@@ -887,7 +889,7 @@ test('AGENT_007_unresolved_role_denies_all_tools', async () => {
     ]) {
       const result = await hooks.tool[toolName].execute(args, context)
       assert.doesNotMatch(result, /^error\s*=/m, `${toolName} must reject without generic DTO`)
-      assert.match(result, /no Authority Root fixes this session's role/)
+      assert.match(result, /unavailable until the caller's authority is established/i)
     }
   })
 })
@@ -902,15 +904,15 @@ test('EXEC_002_sync_delegate_inspector_coder_refuse_invalid_args_via_plugin', as
 
     for (const args of [{}, { charge: '   ' }]) {
       const refused = await hooks.tool.inspect.execute(args, inquiry)
-      assert.match(refused, /inspect charge required/)
+      assert.match(refused, /inspect needs a charge/)
       assert.doesNotMatch(refused, /^error\s*=/m)
     }
 
     const missingCharge = await hooks.tool['establish-behavior'].execute({}, devops)
-    assert.match(missingCharge, /establish-behavior charge required/)
+    assert.match(missingCharge, /establish-behavior needs a charge/)
 
     const repairMissing = await hooks.tool['repair-behavior'].execute({}, devops)
-    assert.match(repairMissing, /repair-behavior charge required/)
+    assert.match(repairMissing, /repair-behavior needs a charge/)
   })
 })
 test('GLORY_031_manager_fork_of_a_reviewer_is_denied_role_based', async () => {
@@ -919,23 +921,20 @@ test('GLORY_031_manager_fork_of_a_reviewer_is_denied_role_based', async () => {
 
     // GLORY-002/031: a Manager must never create, reuse or nudge a Reviewer;
     // the Reviewer is Host-owned. Denied by durable role, before any prompt.
-    const result = parseToml(
-      await hooks.tool.fork.execute(
-        { name: 'fast-reviewer', charge: 'Review the current tree.' },
-        { sessionID: 'manager-reverted-root', agent: 'fast-manager' },
-      ),
+    const result = await hooks.tool.fork.execute(
+      { calling: 'examiner', name: 'Rhea', charge: 'Review the current tree.' },
+      { sessionID: 'manager-reverted-root', agent: 'fast-manager' },
     )
 
-    assert.equal(result.error, 'Unknown or unavailable managed agent.')
+    assert.match(result, /Unknown or unavailable calling/)
+    assert.doesNotMatch(result, /Reviewer|fast-reviewer|\berror\s*=/i)
     assert.equal(runtime.prompts.length, 0)
 
-    const deepResult = parseToml(
-      await hooks.tool.fork.execute(
-        { name: 'deep-reviewer', charge: 'Review the same current tree.' },
-        { sessionID: 'manager-reverted-root', agent: 'fast-manager' },
-      ),
+    const deepResult = await hooks.tool.fork.execute(
+      { calling: 'auditor', name: 'Rhea', charge: 'Review the same current tree.' },
+      { sessionID: 'manager-reverted-root', agent: 'fast-manager' },
     )
-    assert.equal(deepResult.error, 'Unknown or unavailable managed agent.')
+    assert.match(deepResult, /Unknown or unavailable calling/)
     assert.equal(runtime.prompts.length, 0)
   })
 })
@@ -945,13 +944,12 @@ test('EXEC_002_EXEC_004_fork_join_and_horizon_carry_natural_language_identity', 
     acceptAuthorityRoot(runtime, 'manager-contract', 'fast-manager')
     const context = { sessionID: 'manager-contract', agent: 'fast-manager' }
 
-    const unknown = parseToml(await hooks.tool.fork.execute({ name: 'deep-inspecter', charge: 'work' }, context))
-    assert.deepEqual(Object.keys(unknown), ['error'])
-    assert.match(unknown.error, /Legacy agent name|Unknown managed agent 'deep-inspecter'/)
-    assert.match(unknown.error, /fast-inspector|deep-inspector/)
+    const unknown = await hooks.tool.fork.execute({ calling: 'wizard', name: 'Ada', charge: 'work' }, context)
+    assert.match(unknown, /Unknown or unavailable calling/)
+    assert.doesNotMatch(unknown, /fast-|deep-|\berror\s*=/i)
 
-    const forkText = await hooks.tool.fork.execute({ name: 'fast-coder', charge: 'work' }, context)
-    assert.match(forkText, /# fast-coder carries this charge now\./)
+    const forkText = await hooks.tool.fork.execute({ calling: 'coder', name: 'Ada', charge: 'work' }, context)
+    assert.match(forkText, /# Ada carries this charge now\./)
     assert.equal(parseToml(forkText).error, undefined)
 
     runtime.recordFork('manager-contract', agentHandleForChild(runtime, 'manager-contract', createdIds[0]), createdIds[0])
@@ -960,7 +958,8 @@ test('EXEC_002_EXEC_004_fork_join_and_horizon_carry_natural_language_identity', 
     notifyCompleted(runtime, createdIds[0], 'forked coder session-wide A', 'forked coder turn formal report')
     const joinText = await joinResultP
 
-    assert.match(joinText, /# fast-coder has returned\./)
+    assert.match(joinText, /# Ada has returned\./)
+    assert.doesNotMatch(joinText, /fast-coder/)
     assert.ok(!/\b(status|count|ordinal|kind|agent_id)\s*=/.test(joinText))
 
     const horizonText = await hooks.tool.horizon.execute({}, context)
@@ -977,8 +976,8 @@ test('EXEC_017_blocked_join_wakes_on_user_message_from_chat_message', async () =
     acceptAuthorityRoot(runtime, 'manager-user-wake', 'fast-manager')
     const context = { sessionID: 'manager-user-wake', agent: 'fast-manager' }
 
-    const forkText = await hooks.tool.fork.execute({ name: 'fast-coder', charge: 'work' }, context)
-    assert.match(forkText, /# fast-coder carries this charge now\./)
+    const forkText = await hooks.tool.fork.execute({ calling: 'coder', name: 'Ada', charge: 'work' }, context)
+    assert.match(forkText, /# Ada carries this charge now\./)
     assert.equal(parseToml(forkText).error, undefined, `fork failed: ${forkText}`)
     const agentId = agentHandleForChild(runtime, 'manager-user-wake', createdIds[0])
     runtime.recordFork('manager-user-wake', agentId, createdIds[0])
@@ -1039,21 +1038,24 @@ test('EXEC_017_blocked_join_wakes_on_user_message_from_chat_message', async () =
     // Late terminal still claims the completion cell for a subsequent join.
     notifyCompleted(runtime, createdIds[0], 'late session-wide A', 'late turn formal report')
     const join2Text = await hooks.tool.join.execute({}, context)
-    assert.match(join2Text, /# fast-coder has returned\./, `late join after user_message must harvest child: ${join2Text}`)
+    assert.match(join2Text, /# Ada has returned\./, `late join after user_message must harvest child: ${join2Text}`)
     assert.ok(!/\b(status|count|ordinal|kind|agent_id)\s*=/.test(join2Text))
     assert.equal(runtime.abortedIds.includes(createdIds[0]), false, 'user_message must not abort the child session')
   })
 })
 
-test('EXEC_002_fork_reuse_by_handle_and_create_by_managed_name', async () => {
+test('EXEC_002_fork_reuse_by_byname_and_create_by_calling', async () => {
   await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'manager-reuse', 'fast-manager')
     const context = { sessionID: 'manager-reuse', agent: 'fast-manager' }
 
-    const createdText = await hooks.tool.fork.execute({ name: 'fast-coder', charge: 'first assignment' }, context)
-    assert.match(createdText, /# fast-coder carries this charge now\./)
+    const createdText = await hooks.tool.fork.execute(
+      { calling: 'coder', name: 'Ada', charge: 'first assignment' },
+      context,
+    )
+    assert.match(createdText, /# Ada carries this charge now\./)
     assert.equal(parseToml(createdText).error, undefined, `create fork failed: ${createdText}`)
-    assert.equal(createdIds.length, 1, 'managed name creates exactly one child session')
+    assert.equal(createdIds.length, 1, 'calling + Byname creates exactly one child session')
     const agentId = agentHandleForChild(runtime, 'manager-reuse', createdIds[0])
     assert.match(agentId, /^[a-z0-9]{6}$/)
     const promptsAfterCreate = runtime.prompts.length
@@ -1075,9 +1077,10 @@ test('EXEC_002_fork_reuse_by_handle_and_create_by_managed_name', async () => {
     assert.equal(typeof promptKey, 'string', 'child prompt must carry PromptKey metadata')
     acceptChildAgentOwnerRoot(runtime, childSessionId, promptKey)
 
-    // Busy reuse: pass handle as name. No session.create.
-    const nudgedText = await hooks.tool.fork.execute({ name: agentId, charge: 'nudge: add one constraint' }, context)
-    assert.match(nudgedText, /carries this charge now\./)
+    // Busy reuse: continue by Byname. Internal handle remains wall-internal.
+    const nudgedText = await hooks.tool.fork.execute({ name: 'Ada', charge: 'nudge: add one constraint' }, context)
+    assert.match(nudgedText, /Ada carries this charge now\./)
+    assert.doesNotMatch(nudgedText, new RegExp(agentId))
     assert.equal(parseToml(nudgedText).error, undefined, `reuse/nudge failed: ${nudgedText}`)
     assert.equal(createdIds.length, 1, 'reuse must not create a second child session')
     assert.ok(
@@ -1085,27 +1088,32 @@ test('EXEC_002_fork_reuse_by_handle_and_create_by_managed_name', async () => {
       'busy reuse must deliver a nudge prompt to the existing child',
     )
 
-    // Managed name again is always create — not silent reuse of the first child.
-    const twinText = await hooks.tool.fork.execute({ name: 'fast-coder', charge: 'parallel twin work' }, context)
-    assert.match(twinText, /# fast-coder carries this charge now\./)
+    // A second person needs a distinct Byname even when the calling is the same.
+    const twinText = await hooks.tool.fork.execute(
+      { calling: 'coder', name: 'Grace', charge: 'parallel twin work' },
+      context,
+    )
+    assert.match(twinText, /# Grace carries this charge now\./)
     assert.equal(parseToml(twinText).error, undefined, `second create failed: ${twinText}`)
-    assert.equal(createdIds.length, 2, 'managed name create adds a second child record')
+    assert.equal(createdIds.length, 2, 'distinct Byname creates a second child record')
     assert.notEqual(
       agentHandleForChild(runtime, 'manager-reuse', createdIds[1]),
       agentId,
-      'managed name creates a distinct handle',
+      'distinct Byname creates a distinct internal handle',
     )
   })
 })
 
-test('EXEC_002_fork_tool_description_states_create_or_reuse_by_name', async () => {
+test('EXEC_002_fork_tool_description_states_calling_create_and_byname_reuse', async () => {
   await withPlugin(async (hooks) => {
     const description = hooks.tool.fork?.description
     assert.equal(typeof description, 'string', 'fork tool must expose description')
-    assert.match(description, /Commission another witness|name \+ charge|reuse by the same name/i)
+    assert.match(description, /calling \+ name \+ charge|same name/i)
+    assert.doesNotMatch(description, /fast-|deep-|handle/i)
     const commission = hooks.tool.commission?.description
     assert.equal(typeof commission, 'string')
-    assert.match(commission, /Entrust an independent road|reuse an existing road|handle as name/i)
+    assert.match(commission, /calling \+ name \+ charge|known road/i)
+    assert.doesNotMatch(commission, /job id|handle as name|fast-|deep-/i)
   })
 })
 
@@ -1155,8 +1163,8 @@ test('GLORY_038_suicide_with_outstanding_child_prompts_to_join', async () => {
     activateLife(runtime, 'manager-suicide-outstanding')
     const context = { sessionID: 'manager-suicide-outstanding', agent: 'fast-manager', callID: 'call_suicide_1', messageID: 'msg_1' }
 
-    // Fork a child agent so there is an active child handle
-    await hooks.tool.fork.execute({ name: 'fast-coder', charge: 'Do work' }, context)
+    // Fork a child agent so there is an active child handle.
+    await hooks.tool.fork.execute({ calling: 'coder', name: 'Ada', charge: 'Do work' }, context)
 
     const resultText = await hooks.tool.suicide.execute({ last_words: 'Finished.' }, context)
     assert.match(resultText, /# Call join before seeking your end\./)

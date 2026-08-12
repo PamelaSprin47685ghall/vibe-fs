@@ -386,7 +386,7 @@ user = "Ship publish_proof.txt to the target branch through the long stroke."
 tools = ["commission", "join"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "commission", args = { name = "fast-manager", charge = "Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept REVISE then reach a blessed ending so publish can reconcile." } }
+  respond = { type = "tool-call", tool = "commission", args = { calling = "coordinator", name = "Long Stroke Road", charge = "Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept REVISE then reach a blessed ending so publish can reconcile." } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
@@ -416,7 +416,7 @@ user = "# Run the long stroke: ship publish_proof.txt — join-wake, provider fa
 tools = ["fork", "join", "horizon", "suicide"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { name = "fast-coder", charge = "Write publish_proof.txt." } }
+  respond = { type = "tool-call", tool = "fork", args = { calling = "coder", name = "Proof Writer", charge = "Write publish_proof.txt." } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }
@@ -464,7 +464,7 @@ tools = ["fork", "join", "horizon", "fission", "todowrite", "suicide"]
   respond = { type = "tool-call", tool = "suicide", args = { last_words = "first ending" } }
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { name = "fast-coder", charge = "Ensure publish_proof.txt contains exactly: Published by long-stroke canary" } }
+  respond = { type = "tool-call", tool = "fork", args = { calling = "coder", name = "Proof Finisher", charge = "Ensure publish_proof.txt contains exactly: Published by long-stroke canary" } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join", args = {} }
@@ -496,7 +496,7 @@ tools = ["write"]
   # dedicated proof-only root/Companion/title session. It is still a new Host
   # session after CaseFinalize and therefore proves the same persisted read path.
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fetch", args = { session_id = "$inspector" } }
+  respond = { type = "tool-call", tool = "fetch", args = { shelfmark = "$inspector-case" } }
 
   [[turn.step]]
   respond = { type = "text", text = "Coder finished." }
@@ -550,7 +550,7 @@ user = "[CONFLICT RESUMPTION] An in-progress rebase hit conflicts. Conflicted fi
 tools = ["fork", "join", "horizon", "suicide"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "fork", args = { name = "fast-coder", charge = "Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary" } }
+  respond = { type = "tool-call", tool = "fork", args = { calling = "coder", name = "Conflict Resolver", charge = "Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary" } }
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "join" }

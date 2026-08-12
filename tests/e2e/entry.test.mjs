@@ -30,6 +30,7 @@ import {
   ADVERSITY_CHECKLIST,
   G2_INSPECTOR_CANARY_PROMPT,
   G6_CANONICAL_A,
+  G6_CANONICAL_Q,
   NEEDHELP_CANARY_PROMPT,
   armNeedHelpCausalHolds,
   assertNeedHelpAssistance,
@@ -38,6 +39,7 @@ import {
   extractInspectorIdFromOwnerRequests,
 } from './support/long-stroke-oracles.mjs';
 import { countFactCase, factPayloads, readJournal } from './support/journal-observer.js';
+import { shelfmarkFor as casebookShelfmarkFor } from '../../dist/Infrastructure/CasebookIndex.js';
 import { WAIT_FACT_WINDOW_MS } from './support/time-budget.js';
 import {
   getOpencodeSpawnCount,
@@ -151,10 +153,10 @@ const preFlowCanaries = async (scenario) => {
   await runNeedHelpPreFlow(scenario);
 
   scenario.provider._state.rewriteToolArgs = (entry, args) => {
-    if (entry?.turnId === 'coder' && args?.session_id === '$inspector') {
+    if (entry?.turnId === 'coder' && args?.shelfmark === '$inspector-case') {
       const inspectorId = extractInspectorIdFromOwnerRequests(scenario.provider.requests);
-      assert.ok(inspectorId, 'G6 fetch rewrite needs inspector_id from InspectorTool result');
-      return { session_id: inspectorId };
+      assert.ok(inspectorId, 'G6 fetch rewrite needs the Inspector durable identity to derive its shelfmark');
+      return { shelfmark: casebookShelfmarkFor(inspectorId, G6_CANONICAL_Q) };
     }
     return undefined;
   };
