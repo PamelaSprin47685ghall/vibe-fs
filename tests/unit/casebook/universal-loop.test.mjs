@@ -79,7 +79,7 @@ test('G6_G_lifecycle_note_finalize_fetch_and_cleanup', async () => {
     mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     setEnabled(dir)
-    const { port, createCalls, editQaCalls } = scriptedBookkeeperPort()
+    const { port, createCalls, programCalls } = scriptedBookkeeperPort()
     setSessionPort(port)
 
     const sessionId = 'reuse-insp-1'
@@ -101,7 +101,7 @@ test('G6_G_lifecycle_note_finalize_fetch_and_cleanup', async () => {
     assert.equal(fetched.value.A, CANONICAL_A)
     assert.equal(fetched.value.A.includes('evidence:'), false)
     assert.equal(createCalls.length, 1, 'exactly one Bookkeeper child on finalize')
-    assert.equal(editQaCalls.length >= 2, true)
+    assert.equal(programCalls.length >= 1, true)
     assert.equal(listItems(fetched.value.Observations).length, 1)
 
     const publishedA = fetched.value.A

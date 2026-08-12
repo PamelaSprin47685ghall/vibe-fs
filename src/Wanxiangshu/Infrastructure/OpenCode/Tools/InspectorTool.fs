@@ -11,6 +11,9 @@ open ToolHostCodec
 /// Ordinary assistant completion → bounded WorkRecord (EXEC-031).
 module InspectorTool =
 
+    let private consequence message =
+        tomlObjectWithInstructions [ "# " + message ] []
+
     let private execute
         (syncDelegate: SyncDelegateRuntime option)
         (args: HostToolArguments)
@@ -18,15 +21,15 @@ module InspectorTool =
         =
         task {
             match syncDelegate with
-            | None -> return tomlObject [ "error", TString "SyncDelegate runtime unavailable" ]
+            | None -> return consequence "No Inspector is available from this execution context."
             | Some sd ->
                 if String.IsNullOrWhiteSpace context.SessionId then
-                    return tomlObject [ "error", TString "Missing sessionID" ]
+                    return consequence "An Inspector cannot be charged before the caller's authority is established."
                 else
                     let charge = args.Text "charge"
 
                     if String.IsNullOrWhiteSpace charge then
-                        return tomlObject [ "error", TString "inspect charge required" ]
+                        return consequence "inspect needs a charge."
                     else
                         match! sd.Invoke(context.SessionId, SyncDelegateRole.Inspector, charge) with
                         | Ok workRecord ->
@@ -37,7 +40,7 @@ module InspectorTool =
                                     [ workRecord ]
 
                             return tomlObjectWithInstructions instructions []
-                        | Error error -> return tomlObject [ "error", TString error ]
+                        | Error _ -> return consequence "The Inspector could not complete this charge."
         }
 
     let spec

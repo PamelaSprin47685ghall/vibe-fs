@@ -1,30 +1,43 @@
 # race-first-wins-semantics — Enforcer
 
-## Definition
-Race-first-wins semantics arise when scheduler timing or whichever concurrent operation finishes first determines a business result even though the competing operations carry different information. The root-cause is that scheduler arrival order is treated as domain meaning, so identical logical inputs can yield different business results under different timing.
+Race-first-wins semantics appear when the scheduler, network, or runtime accidentally gets to answer a business question.
 
-## Governing Principle
-Scheduling order is usually an accident of load, network, and runtime, not a domain fact. If “first completion” chooses truth, identical logical inputs can produce different outcomes under different timing. The system has then delegated business semantics to the scheduler. Determinism requires either an explicit first-writer rule with stable identity or a merge function over the complete relevant information.
+The signature defect is this:
 
-## Trigger When
-Trigger when concurrent requests/results race and the first observed completion becomes authoritative despite no domain rule saying temporal arrival order should decide.
+> Keep the logical inputs the same. Change only which concurrent result arrives first. The business answer changes.
 
-## Do Not Trigger When
-- First-writer-wins, lowest-latency replica, election timeout, or another timing rule is itself the documented protocol and carries the necessary identity/quorum semantics.
-- Concurrency is used only to fetch inputs, then a deterministic join/merge decides after all required results arrive.
-- A single-owner queue serializes commands so completion order cannot choose among competing payloads.
-- The “winner” is selected by an explicit domain key (version, timestamp field, priority), not by which future resolved first.
+If no domain rule says arrival order is meaningful, the system has outsourced semantics to latency.
 
-## Distinguish From
-shared-mutable-concurrency concerns coordination through shared state. lost-update concerns overwrite conflicts. This rule concerns scheduler order becoming domain meaning. Tie-break: fire here when arrival order invents the answer; fire shared-mutable-concurrency when several writers share mutation authority; fire lost-update when a later write silently overwrites without merge.
+This often hides behind performance code that “takes the first successful result,” `Promise.race`, `Task.WhenAny`, competing callbacks, redundant requests, speculative execution, or parallel workers. Those mechanisms are not inherently wrong. They become wrong when **physical completion order substitutes for a declared selection rule**.
 
-## Decision Procedure
-Ask whether swapping completion order while keeping logical inputs identical should change the result. If not, collect required results and merge using a deterministic rule independent of timing.
+Examples of accidental semantics:
 
-## Examples
-- positive: two price quotes race and the first HTTP response becomes the booked price even though both quotes are valid inputs to a documented min/max merge.
-- near-miss: a leader-election timeout is specified as the protocol; the first heartbeat after the timeout is the documented winner.
-- counterexample: a map-reduce job waits for every shard, then folds with an associative reducer; scheduler order does not change the result.
+- two replicas return different versions and the first response becomes truth;
+- two candidate fixes race and the first completed patch is published without comparing correctness;
+- concurrent discoveries compete to initialize shared state, and the first caller silently defines the canonical value;
+- a fallback path and primary path race; whichever finishes first wins even though one result is semantically preferred;
+- an asynchronous cache fill races a fresher source, and “first visible” becomes “authoritative.”
 
-## Nudge
-Do not let the scheduler invent business truth. Either make arrival order an explicit domain rule or derive the result from complete information with deterministic merge semantics.
+Do not fire when timing is genuinely part of the protocol. Leader election, lease acquisition, auction close, explicit first-writer-wins registers, lowest-latency replica selection, or hedged reads can all use time/order legitimately **if the protocol defines identity, freshness, quorum, cancellation, and tie behavior**. In that case timing is not an accident; it is one of the inputs.
+
+Also do not confuse this with “concurrency exists.” Parallel work can finish in any order while a deterministic join later applies the real rule. Concurrency is fine. Undeclared scheduler sovereignty is not.
+
+Nearby rules:
+
+- `lost-update` — stale write erases an accepted update;
+- `shared-mutable-concurrency` — several actors share mutation authority;
+- `serial-when-parallel` — independent work is needlessly serialized;
+- `flaky-test-tolerated` — unstable verdicts have been normalized.
+
+Use this rule when the sharpest statement is: **arrival order is choosing an outcome that should be chosen by domain facts.**
+
+A decisive test is to force permutations. Hold result A, let B arrive first, record the outcome. Then reverse the schedule with identical logical inputs. If the business result changes, ask whether the specification can defend that change without referring to runtime timing. If it cannot, the race has become policy by accident.
+
+The repair is one of two things:
+
+1. remove arrival order from the decision and apply a deterministic merge/selection law over the required information; or
+2. admit that first-wins is truly the protocol and make that law explicit, including stable identity, freshness, cancellation of losers, and conflict/tie behavior.
+
+Do not paper over the race with tiny sleeps, task priorities, “primary usually finishes first,” or retries. Those merely tune the probability distribution of an undeclared policy.
+
+> The scheduler may decide **when** facts arrive. It should not decide **what those facts mean** unless the domain explicitly gave it that authority.

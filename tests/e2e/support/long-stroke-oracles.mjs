@@ -618,12 +618,7 @@ export function assertG6BookkeeperFinalize(scenario) {
   assert.equal(
     scenario.provider.matchCount('g6-bookkeeper-finalize.0') >= 1,
     true,
-    'G6: js-bookkeeper Q.md step must run',
-  );
-  assert.equal(
-    scenario.provider.matchCount('g6-bookkeeper-finalize.1') >= 1,
-    true,
-    'G6: js-bookkeeper A.md step must run',
+    'G6: one atomic js-bookkeeper program must reshape the staged Case',
   );
   const captured = countFactCase(scenario.host.workDir, 'InspectorCaseCaptured');
   const named = readJournal(scenario.host.workDir, 'InspectorCaseCaptured').named;

@@ -222,7 +222,7 @@ test('G6_G_host_reusable_inspector_one_finalize_then_cold_fetch', async () => {
     const first = resultOf(await tryFinalizeInspector(dir, delegateId))
     assert.equal(first.ok, true, `exactly one finalize ok: ${JSON.stringify(first.error)}`)
     assert.equal(bookkeeper.createCalls.length, 1, 'exactly one Bookkeeper CreateChildSession')
-    assert.equal(bookkeeper.editQaCalls.length >= 2, true, 'js-bookkeeper invoked')
+    assert.equal(bookkeeper.programCalls.length >= 1, true, 'js-bookkeeper invoked')
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)

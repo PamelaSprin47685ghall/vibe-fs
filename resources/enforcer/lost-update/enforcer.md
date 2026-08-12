@@ -1,29 +1,40 @@
 # lost-update — Enforcer
 
-## Definition
-A lost update occurs when concurrent writers derive new state from the same old version and later writes can overwrite earlier committed changes without detecting the conflict.
+A lost update is not merely “two writes happened near each other.” It is a specific corruption of history: two writers both make a decision from version N, one decision is accepted, and a later stale write commits as though version N were still current — erasing an already-accepted fact without anyone explicitly choosing to discard it.
 
-## Governing Principle
-Read-modify-write contains an unstated premise: “the state I read is still the state I am modifying.” Concurrency invalidates that premise unless a protocol proves it. Locks, compare-and-swap, versions, or a single writer are not implementation decorations; they are mechanisms for preserving the causal link between the premise and the commit.
+The smell hides inside innocent read/modify/write code:
 
-## Trigger When
-Trigger when multiple writers can read the same mutable record/state, compute independent updates, and write back without version checking, serialization, or a merge law.
+```text
+read current
+compute next from current
+write next
+```
 
-## Do Not Trigger When
-- Do not trigger when ownership guarantees one writer, or the storage operation is an atomic commutative update whose semantics do not depend on a stale read.
-- Do not trigger for append-only logs where concurrent writes are distinct facts and reads never overwrite.
-- Do not trigger when production already serializes writers by construction and the overlapping path cannot exist.
+That sequence contains an unstated promise: **the state used to justify this write is still the state being updated**. Under concurrency, that promise is false unless a protocol proves it.
 
-## Distinguish From
-shared-mutable-concurrency concerns coordination architecture broadly. optimistic-retry-assumption concerns unknown external effects. This rule is specifically stale-read overwrite of another writer’s accepted update. Tie-break: if the defect is a missing concurrency protocol in general, use shared-mutable-concurrency; if a committed update can be silently erased by a stale write, use this rule.
+The dangerous part is not that “last writer wins.” Last-writer-wins can be a valid domain rule when the domain really says later authority supersedes earlier authority. Lost update is different: scheduler timing silently decides that an older premise may overwrite a newer accepted consequence.
 
-## Decision Procedure
-For each read-modify-write ask what proves the read version is still current at commit time. If nothing does, the root-cause is a stale premise that can erase another writer’s accepted update: serialize ownership or include the version in an atomic compare-and-swap. Prefer this over a generic missing-lock smell when a committed change can vanish silently.
+Fire this rule when:
 
-## Examples
-- positive: Two workers load the same counter, each add one, both write the result; one increment vanishes.
-- near-miss: An atomic increment or single-writer queue makes the update independent of a stale snapshot.
-- counterexample: Each write carries the read version; CAS rejects the stale writer, who recomputes.
+- two writers can read the same version and later replace the same state;
+- update logic derives a whole replacement object from a snapshot and writes it unconditionally;
+- a write API returns success even though another accepted change disappeared;
+- retrying after conflict simply repeats the stale replacement;
+- version/etag/CAS exists in storage but the application does not carry the read version into commit;
+- “merge” really means choosing one whole object and dropping fields changed by the other writer.
 
-## Nudge
-A write derived from version N is valid only against version N. Enforce that fact with a single writer, CAS/version check, or a true merge operation.
+Do **not** fire merely because two operations are concurrent. Atomic commutative updates, append-only facts, a true single-writer owner, or a mathematically valid merge law may all allow concurrency without lost updates.
+
+Nearby failures are different. `shared-mutable-concurrency` is about distributed write authority and lock choreography as architecture. `race-first-wins-semantics` is about arrival order choosing business truth. `optimistic-retry-assumption` is about retrying when the previous effect has unknown outcome. Use `lost-update` when the sharp fact is: **an accepted update can vanish because another writer committed from a stale premise**.
+
+A useful test is brutally simple. Start two writers from the same version. Let A commit. Then let B attempt to commit what it computed from the old version. One of only three things should happen:
+
+1. B is rejected as stale and must re-read;
+2. a single writer serialized the operations, so B never truly wrote from stale state;
+3. a declared merge law preserves both intents.
+
+If B can return success while A's accepted information disappears, the system has rewritten history without admitting it.
+
+The repair mechanism is not “add some locking.” A lock that covers only the final write is useless; the stale premise was created at read time. The protocol must bind **read identity to commit identity** across the whole logical update.
+
+> A write derived from version N has no right to commit against N+1 unless a merge law explicitly grants that right.

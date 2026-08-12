@@ -12,6 +12,9 @@ open ToolHostCodec
 /// Ordinary assistant completion → bounded WorkRecord (EXEC-031).
 module CoderTool =
 
+    let private consequence message =
+        tomlObjectWithInstructions [ "# " + message ] []
+
     let private execute
         (roleVerb: string)
         (syncDelegate: SyncDelegateRuntime option)
@@ -20,15 +23,15 @@ module CoderTool =
         =
         task {
             match syncDelegate with
-            | None -> return tomlObject [ "error", TString "SyncDelegate runtime unavailable" ]
+            | None -> return consequence "No Coder is available from this execution context."
             | Some sd ->
                 if String.IsNullOrWhiteSpace context.SessionId then
-                    return tomlObject [ "error", TString "Missing sessionID" ]
+                    return consequence "A Coder cannot be charged before the caller's authority is established."
                 else
                     let charge = args.Text "charge"
 
                     if String.IsNullOrWhiteSpace charge then
-                        return tomlObject [ "error", TString(sprintf "%s charge required" roleVerb) ]
+                        return consequence (sprintf "%s needs a charge." roleVerb)
                     else
                         match! sd.Invoke(context.SessionId, SyncDelegateRole.Coder, charge) with
                         | Ok workRecord ->
@@ -39,7 +42,7 @@ module CoderTool =
                                     [ workRecord ]
 
                             return tomlObjectWithInstructions instructions []
-                        | Error error -> return tomlObject [ "error", TString error ]
+                        | Error _ -> return consequence "The Coder could not complete this charge."
         }
 
     let private behaviorSpec
@@ -75,6 +78,3 @@ module CoderTool =
             factory
             syncDelegate
 
-    /// Back-compat alias used by older call sites that registered a single coder tool.
-    let spec factory scope syncDelegate =
-        establishSpec factory scope syncDelegate

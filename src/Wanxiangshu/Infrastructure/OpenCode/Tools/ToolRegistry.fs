@@ -77,7 +77,7 @@ module ToolRegistry =
         | "bash-honeypot" -> fun r -> Roles.isAllowed r ToolPermission.BashHoneypot
         | "establish-behavior"
         | "repair-behavior" -> fun r -> r = Role.DevOps
-        | "chronicle" -> fun r -> r = Role.Blogger && BlogTool.hasLiveCycle parkedHost sessionId
+        | "chronicle" -> fun r -> r = Role.Blogger && ChronicleTool.hasLiveCycle parkedHost sessionId
         // CASE-009: fetch is the next-session Casebook read. Inspector/Coder
         // consume reusable Q/A; Bookkeeper is js-bookkeeper only (gateExecute).
         | "fetch" -> fun r -> r = Role.Inspector || r = Role.Coder
@@ -148,9 +148,9 @@ module ToolRegistry =
               yield! PtyTool.specs factory runtime
               yield ForkTool.orchestratorSpec factory runtime
               yield JoinTool.spec runtime
-              yield ListTool.spec runtime
+              yield HorizonTool.spec runtime
               yield FissionTool.spec factory
-              yield VerdictTool.spec factory runtime
+              yield JudgeTool.spec factory runtime
               // GLORY-034/036: the Manager's end-of-life tool.
               yield FinalityTool.spec factory runtime
               yield ExecutorTool.runSpec factory runtime
@@ -165,7 +165,7 @@ module ToolRegistry =
               yield BashHoneypotTool.spec
               // ENFORCER-010: Blogger's tool set is exactly { chronicle }.
               // parkedHost + CurrentRequest gate request-scoped execute (InFlight).
-              yield BlogTool.spec factory runtime parkedHost
+              yield ChronicleTool.spec factory runtime parkedHost
               // CASE-009: the conditional fetch / js-bookkeeper tools.
               yield! casebookToolSpecs
               // JS-001/JS-073: the capability-projected js-* tools. The surface
@@ -182,11 +182,12 @@ module ToolRegistry =
         // CurrentRequest must not complete as a soft tool error (Host step loop).
         let gateExecute (spec: ToolSpec) =
             let original = spec.Execute
-            let tString = ToolHostCodec.TString
+
+            let denied message =
+                ToolHostCodec.tomlObjectWithInstructions [ "# " + message ] []
 
             let denyRole (role: Role) =
-                ToolHostCodec.tomlObject
-                    [ "error", tString (sprintf "Tool '%s' is not permitted for role '%A'" spec.Name role) ]
+                denied (sprintf "%s is not available to %A." spec.Name role)
 
             let stopChronicleNoLiveCycle (ctx: HostToolContext) =
                 task {
@@ -196,7 +197,7 @@ module ToolRegistry =
                         let! _ = runtime.Sessions.AbortSession(SessionId.create ctx.SessionId)
                         ()
 
-                    return raise (InvalidOperationException(BlogTool.NoLiveCycleError))
+                    return raise (InvalidOperationException(ChronicleTool.NoLiveCycleError))
                 }
 
             fun args (ctx: HostToolContext) ->
@@ -217,21 +218,15 @@ module ToolRegistry =
                         // STRENGTH-004: Host-native read/glob/grep are the entire
                         // replica tool surface. Every plugin-registered tool is
                         // therefore a forged/hidden path and fails closed here.
-                        return
-                            ToolHostCodec.tomlObject
-                                [ "error", tString (sprintf "Tool '%s' is not permitted for StrengthReplica" spec.Name) ]
+                        return denied "This tool is not available in this execution context."
                     elif isBookkeeper then
                         // Bookkeeper may run js-bookkeeper only. No Role.Bookkeeper.
                         if spec.Name = "js-bookkeeper" then
                             return! original args ctx
                         else
-                            return
-                                ToolHostCodec.tomlObject
-                                    [ "error", tString (sprintf "Tool '%s' is not permitted for Bookkeeper" spec.Name) ]
+                            return denied "Only js-bookkeeper is available while reshaping a staged Case."
                     elif spec.Name = "js-bookkeeper" then
-                        return
-                            ToolHostCodec.tomlObject
-                                [ "error", tString "Tool 'js-bookkeeper' is only permitted for Bookkeeper attachment" ]
+                        return denied "There is no staged Case to reshape in this execution context."
                     else
                         match runtime.RoleFor ctx with
                         | Some role when allowed role -> return! original args ctx
@@ -247,14 +242,7 @@ module ToolRegistry =
                             | None ->
                                 // AGENT-007: an unresolved Role means an empty tool set.
                                 // Executing under an unknown role is unauthorised.
-                                return
-                                    ToolHostCodec.tomlObject
-                                        [ "error",
-                                          tString (
-                                              sprintf
-                                                  "Tool '%s' rejected: no Authority Root fixes this session's role"
-                                                  spec.Name
-                                          ) ]
+                                return denied "This tool is unavailable until the caller's authority is established."
                 }
 
         let providerLanguage = ProviderLanguageBinding.readGlobalPreference ()

@@ -1,16 +1,26 @@
 namespace Wanxiangshu.Infrastructure
 
+open System
 open Wanxiangshu.Domain
 open Wanxiangshu.Infrastructure.Persist
+open Wanxiangshu.OpenCode
 
-/// Process-local CasebookIndexSnapshot — frozen session-id view for the current
-/// index epoch. Not durable; rebuilt from the unified EventStore projection.
-/// No feature ref / second authority.
+/// Process-local Casebook index frozen for the current provider epoch.
+/// Provider entries expose only a shelfmark plus canonical Q; durable session
+/// identity remains an internal lookup key and never crosses the Casebook wire.
 module CasebookIndex =
+
+    type Entry =
+        { Shelfmark: string
+          Question: string }
 
     type Snapshot =
         { Epoch: int64
-          SessionIds: string list }
+          Cases: Entry list }
+
+    type private ResolvedEntry =
+        { Public: Entry
+          Case: Case }
 
     let private gate = obj ()
     // DSL-MUTABLE: resource
@@ -23,33 +33,92 @@ module CasebookIndex =
     /// Force the next successful refresh to advance epoch (Captured/Refreshed/Evicted).
     let invalidate () : unit = lock gate (fun () -> dirty <- true)
 
-    let private sessionIdsOf (cases: Map<string, Case>) : string list =
-        cases |> Map.toList |> List.map fst |> List.sort
+    let private compactTitle (question: string) =
+        let firstLine =
+            if String.IsNullOrWhiteSpace question then
+                "Untitled case"
+            else
+                question.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n')
+                |> Array.tryFind (String.IsNullOrWhiteSpace >> not)
+                |> Option.defaultValue "Untitled case"
 
-    /// Rebuild from store projection. Epoch advances when the session-id set
-    /// changes or invalidate was called; otherwise the freeze is reused.
+        let cleaned =
+            firstLine
+                .Trim()
+                .TrimStart([| '#'; '-'; '*'; ' '; '\t' |])
+                .Trim()
+
+        let words =
+            cleaned.Split([| ' '; '\t' |], StringSplitOptions.RemoveEmptyEntries)
+            |> String.concat " "
+
+        let title = if String.IsNullOrWhiteSpace words then "Untitled case" else words
+        if title.Length <= 72 then title else title.Substring(0, 71).TrimEnd() + "…"
+
+    /// Stable public locator. The suffix is a one-way catalog discriminator,
+    /// never the durable session identity itself.
+    let shelfmarkFor (sessionId: string) (canonicalQuestion: string) : string =
+        let digest = ToolHostCodec.digest sessionId
+        let discriminator =
+            let colon = digest.IndexOf(':')
+            if colon >= 0 && colon + 1 < digest.Length then digest.Substring(colon + 1) else digest
+
+        sprintf "%s · %s" (compactTitle canonicalQuestion) discriminator
+
+    let private resolvedEntries (cases: Map<string, Case>) : ResolvedEntry list =
+        cases
+        |> Map.toList
+        |> List.map (fun (sessionId, case) ->
+            { Public =
+                { Shelfmark = shelfmarkFor sessionId case.Q
+                  Question = case.Q }
+              Case = case })
+        |> List.sortBy (fun entry -> entry.Public.Shelfmark)
+
+    let private publicEntries (cases: Map<string, Case>) =
+        resolvedEntries cases |> List.map (fun entry -> entry.Public)
+
+    let private project (store: IEventStore) (raw: IGitRawStore) (capacity: int) =
+        match CasebookStore.loadEvents raw (store.OpenSnapshot()) with
+        | Error error -> Error error
+        | Ok events -> Ok(CasebookStore.project capacity events)
+
+    /// Resolve a public shelfmark to its internal Case without exposing the
+    /// durable session key. The generated shelfmark is collision-free for the
+    /// process identity inputs because it carries the full 32-bit discriminator.
+    let resolve
+        (store: IEventStore)
+        (raw: IGitRawStore)
+        (capacity: int)
+        (shelfmark: string)
+        : Result<Case option, string> =
+        project store raw capacity
+        |> Result.map (fun cases ->
+            resolvedEntries cases
+            |> List.tryFind (fun entry -> entry.Public.Shelfmark = shelfmark)
+            |> Option.map (fun entry -> entry.Case))
+
+    /// Rebuild from the unified EventStore projection. Epoch advances when the
+    /// provider-visible index changes or an explicit invalidation occurred.
     let refresh (store: IEventStore) (raw: IGitRawStore) (capacity: int) : Snapshot =
         lock gate (fun () ->
-            match CasebookStore.loadEvents raw (store.OpenSnapshot()) with
+            match project store raw capacity with
             | Error _ ->
                 match frozen with
-                | Some s -> s
-                | None -> { Epoch = 0L; SessionIds = [] }
-            | Ok events ->
-                let ids = CasebookStore.project capacity events |> sessionIdsOf
+                | Some snapshot -> snapshot
+                | None -> { Epoch = 0L; Cases = [] }
+            | Ok cases ->
+                let entries = publicEntries cases
+                let previousEpoch = frozen |> Option.map (fun snapshot -> snapshot.Epoch) |> Option.defaultValue -1L
 
-                let prevEpoch = frozen |> Option.map (fun s -> s.Epoch) |> Option.defaultValue -1L
-
-                let setChanged =
+                let visibleChanged =
                     match frozen with
                     | None -> true
-                    | Some s -> s.SessionIds <> ids
+                    | Some snapshot -> snapshot.Cases <> entries
 
-                let epoch = if dirty || setChanged then prevEpoch + 1L else prevEpoch
-
+                let epoch = if dirty || visibleChanged then previousEpoch + 1L else previousEpoch
                 dirty <- false
 
-                let snap = { Epoch = epoch; SessionIds = ids }
-
-                frozen <- Some snap
-                snap)
+                let snapshot = { Epoch = epoch; Cases = entries }
+                frozen <- Some snapshot
+                snapshot)

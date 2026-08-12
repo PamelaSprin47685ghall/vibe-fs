@@ -1,30 +1,43 @@
 # cancellation-not-propagated — Enforcer
 
-## Definition
-Cancellation is broken when an operation acknowledges that its owner no longer wants the result but leaves owned child work running beyond that decision. The root-cause is that cancellation is treated as an outer return rather than a statement about ownership, so owned child effects keep running after the principal has ceased.
+Cancellation is broken when the outer operation says “this work is over” while work that still belongs to that operation keeps running.
 
-## Governing Principle
-Cancellation is a statement about ownership, not a cosmetic early return. If a parent may abandon its result while children continue consuming sockets, processes, permits, or money, the runtime lifetime has escaped the logical lifetime. The system then contains work with no remaining principal—effects whose owner has ceased to exist.
+That is not merely a resource leak. It is a lie about ownership.
 
-## Trigger When
-Trigger when an abort signal, cancellation token, timeout, disconnect, or supersession stops at an outer layer while inner network calls, processes, tools, agents, streams, or workers continue.
+A request timeout, user abort, superseding command, session shutdown, or cancelled task means some principal has withdrawn authority for the work it owns. If child processes, network calls, agent runs, streams, database operations, timers, or callbacks continue after that point without an explicit ownership transfer, the runtime lifetime has escaped the logical lifetime.
 
-## Do Not Trigger When
-- The work is deliberately detached, with independent ownership, durability, and completion semantics explicit before the parent exits.
-- Cancellation is fully threaded and child effects stop, with cleanup guaranteed, when the parent aborts.
-- A completed child whose result is already durable is not “still running” merely because the parent later cancels a later stage.
-- Observability logs that outlive the request are not owned child work.
+The result is orphan work: effects with no remaining principal that is entitled to want them.
 
-## Distinguish From
-`resource-not-scoped` concerns acquire/release lifetime generally. `permit-leak` concerns concurrency capacity. This rule concerns propagation of the parent’s decision that owned work should cease. Tie-break: if the parent has cancelled but owned children still run, this rule owns the case even when resources would eventually be released.
+This is where some of the nastiest “impossible” incidents come from:
 
-## Decision Procedure
-Trace the ownership tree from the cancelled operation to every child effect. For each child, identify how cancellation reaches it and what cleanup is guaranteed afterward.
+- the UI says Cancelled, then a stale request writes state thirty seconds later;
+- a timed-out tool process keeps holding a file or port;
+- a superseded background computation publishes its result after a newer computation already won;
+- a client disconnect stops response handling but downstream billing/API work continues;
+- a parent agent is aborted while child sessions keep consuming tokens and later report into a world that no longer expects them;
+- cleanup runs for the outer scope, but a detached callback retained enough capability to mutate afterward.
 
-## Examples
-- positive: an HTTP timeout returns cancelled while an inner tool process and outbound request keep running.
-- near-miss: a durable outbox job is explicitly transferred to a background owner before the request ends.
-- counterexample: the abort signal is threaded through every owned child, and those children stop with cleanup when cancellation wins.
+Fire this rule when cancellation/abort is observed at one layer but an owned child effect has no causal path to that signal.
 
-## Nudge
-Cancellation must follow ownership all the way down. Either propagate it through every owned effect or explicitly transfer ownership before detaching the work.
+Do not fire for truly detached work whose ownership was transferred **before** the parent returned. A durable outbox job, queue item, scheduler task, or independently owned workflow may legitimately outlive the initiating request. But detachment is not “we stopped awaiting it.” Real transfer answers: who owns it now, where is that ownership durable, who can cancel it, and who receives its completion.
+
+Also do not confuse “result ignored” with “work cancelled.” Dropping the future/promise only stops *you* from listening. It says nothing about whether the external work stopped.
+
+Nearby rules:
+
+- `resource-not-scoped` — acquire/release lifetime is structurally unsafe;
+- `permit-leak` — bounded concurrency capacity is never returned;
+- `race-first-wins-semantics` — stale/losing work may continue, but the central defect is timing choosing truth;
+- `partial-write-assumption` — cancellation may interrupt a write, but that rule concerns assuming no partial effect occurred.
+
+The key diagnostic is an ownership tree. Start at the cancelled operation and enumerate every child effect it caused. For each one, ask:
+
+1. does the child still belong to this parent at cancellation time?
+2. if yes, how does the cancellation signal reach it?
+3. what proves its physical effect stopped or reached a defined cancellation boundary?
+4. what cleanup is guaranteed?
+5. if no, where exactly was ownership transferred?
+
+If any answer is “we just stop awaiting it,” the work is not cancelled. It is abandoned while still armed.
+
+> Cancellation is not an early return. It is a withdrawal of authority that must travel through the ownership graph.

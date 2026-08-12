@@ -76,12 +76,20 @@ module ExecutorTool =
                   OutputBudgetBytes = 65536L
                   WorldLock = false }
 
-    let private error (message: string) = tomlObject [ "error", TString message ]
+    let private consequence (message: string) = tomlObjectWithInstructions [ "# " + message ] []
+
+    let private processConsequence (processError: ProcessError) =
+        match processError with
+        | ProcessError.TimeoutExceeded _ ->
+            consequence "The command was still running when its allowed time ended, so it was stopped."
+        | ProcessError.SpawnFailed _ -> consequence "The command could not be started."
+        | ProcessError.ProcessCancelled _ -> consequence "The command stopped before it could finish."
+        | ProcessError.ExecutionFailed _ -> consequence "The command could not be completed."
 
     let private execute (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
         task {
             match scope.RuntimeFor context with
-            | Error runtimeError -> return error runtimeError
+            | Error _ -> return consequence "The command cannot run from this execution context."
             | Ok _ ->
                 let directory =
                     if String.IsNullOrWhiteSpace context.SessionId then
@@ -121,7 +129,7 @@ module ExecutorTool =
                         detachAbort ()
 
                 match result with
-                | Error processError -> return error (processError.ToString())
+                | Error processError -> return processConsequence processError
                 | Ok(ProcessOutcome.Completed(exitCode, stdout, stderr, _)) ->
                     let fields =
                         [ yield "exit_code", TInt exitCode
@@ -134,7 +142,7 @@ module ExecutorTool =
                 | Ok(ProcessOutcome.Spooled(exitCode, spoolPath, _totalBytes, _chunkCount)) ->
                     try
                         if String.IsNullOrWhiteSpace context.SessionId then
-                            return error "Missing sessionID"
+                            return consequence "The command output cannot be condensed until the caller's authority is established."
                         else
                             let root = SessionId.create context.SessionId
 
@@ -152,7 +160,7 @@ module ExecutorTool =
 
                             match! requirePermit () with
                             | Error msg when msg.StartsWith("RECOVERY_BLOCKED:", System.StringComparison.Ordinal) ->
-                                return error msg
+                                return consequence "The command finished, but its large output cannot be reconciled while recovery is blocked."
                             | Error _
                             | Ok _ ->
                                 let runtime =
@@ -190,7 +198,7 @@ module ExecutorTool =
             fun args context ->
                 match decodeRun args with
                 | Ok request -> execute scope request context
-                | Error decodeError -> task { return error decodeError } }
+                | Error decodeError -> task { return consequence decodeError } }
 
     let queryShellSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "query-shell"
@@ -201,7 +209,4 @@ module ExecutorTool =
             fun args context ->
                 match decodeQueryShell args with
                 | Ok request -> execute scope request context
-                | Error decodeError -> task { return error decodeError } }
-
-    /// Legacy alias — prefer runSpec / queryShellSpec.
-    let spec factory scope = runSpec factory scope
+                | Error decodeError -> task { return consequence decodeError } }

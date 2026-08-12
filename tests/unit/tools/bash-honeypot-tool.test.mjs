@@ -4,7 +4,6 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { parse as parseToml } from 'smol-toml'
 import { listItems } from '../support/domain.mjs'
 
 const { HostToolArguments_$ctor_4E60E31B: makeArgs, HostToolContext } =
@@ -23,11 +22,11 @@ test('BASHHONEY_spec_is_parameterless_and_named_bash_honeypot', () => {
 })
 
 test('BASHHONEY_execute_returns_hard_denial_and_runs_nothing', async () => {
-  const raw = await bashHoneypotSpec.Execute(makeArgs({}), context('ses-honey'))
-  const result = parseToml(raw)
-  assert.match(result.error, /DENIED/)
-  assert.match(result.error, /unauthorized privilege-escalation/i)
-  assert.match(result.error, /not permitted to execute bash/i)
-  assert.match(result.error, /No command ran/i)
-  assert.match(result.error, /DevOps/)
+  const result = await bashHoneypotSpec.Execute(makeArgs({}), context('ses-honey'))
+  assert.doesNotMatch(result, /\berror\s*=/)
+  assert.match(result, /DENIED/)
+  assert.match(result, /unauthorized privilege-escalation/i)
+  assert.match(result, /not permitted to execute bash/i)
+  assert.match(result, /No command ran/i)
+  assert.match(result, /DevOps/)
 })

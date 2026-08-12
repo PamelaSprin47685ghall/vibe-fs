@@ -6,7 +6,7 @@ import test from 'node:test'
 import { completionKind, handleId, handleProjection, roles, sessionId, toList } from '../support/domain.mjs'
 
 const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
-const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/ListTool.js')
+const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/HorizonTool.js')
 const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
 const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
 const { SessionAgentProjection } = await import('../../../dist/Journal/AgentProjection.js')
@@ -121,14 +121,16 @@ const run = async (runtimeScope, session = 'ses_list') => spec(runtimeScope).Exe
 test('HORIZON_no_journal_reports_projection_unavailable', async () => {
   const scope = scopeFor(undefined, liveRuntime())
   const text = await run(scope)
-  assert.match(text, /HandleProjection unavailable/)
+  assert.match(text, /horizon is unavailable/i)
+  assert.ok(!/\berror\s*=/.test(text))
 })
 
 test('HORIZON_runtime_error_is_surfaced', async () => {
   const scope = scopeFor(fakeJournal(handleProjection.empty), liveRuntime())
   scope.disposed = true
   const text = await run(scope)
-  assert.match(text, /Tool runtime scope is disposed/)
+  assert.match(text, /horizon cannot be seen/i)
+  assert.ok(!/\berror\s*=/.test(text))
 })
 
 test('HORIZON_lists_active_agent_and_open_terminals_in_natural_language', async () => {

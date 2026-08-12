@@ -1,27 +1,46 @@
 # sleep-based-synchronization — Main
 
-## What To Do Now
-Replace fixed sleeps with a wait on the real readiness, completion, notification, lock release, or observable state transition that the next step requires. That causal event or state is who owns the join; clocks only own how long the system is willing to wait for it.
+Replace the duration with the fact.
 
-## Why This Matters
-A sleep is simultaneously too long when the system is fast and too short when it is slow. It sacrifices latency without buying certainty. Causal signals adapt naturally because they encode the condition itself rather than an estimate of how long the condition usually takes.
+First write down what the sleep is pretending to establish. If the answer is readiness, completion, visibility, shutdown, propagation, lock release, or ownership transfer, expose an observation that can actually prove that condition.
 
-## Repair Strategy
-Expose an awaitable completion, poll a real state under a bounded timeout when no event exists, or use synchronization primitives whose semantics match the dependency. Keep timeout only as failure policy, never as success evidence.
+Preferred mechanisms, in descending honesty:
 
-## Decision Branches
-- If a completion or readiness event can be exposed, wait on that event.
-- If only state is observable, poll that state with a timeout that fails rather than succeeding on expiry.
-- If the sleep is backoff or rate limiting, keep it and ensure success still depends on a causal signal.
+1. await the operation's own completion/result;
+2. subscribe to the event that establishes the condition;
+3. await a readiness/termination primitive owned by the subsystem;
+4. poll an authoritative state/version with a bounded timeout when no event can be exposed.
 
-## Common Wrong Fixes
-- Do not increase the delay until the flake becomes rare.
-- Do not replace `sleep` with a busy loop of the same duration.
-- Do not keep the sleep and add a retry “just in case.”
-- Do not use a longer CI timeout as a substitute for a readiness probe.
+In every case, timeout has one job: **bound how long uncertainty may persist**. It does not turn uncertainty into success when the clock expires.
 
-## Verification
-Vary machine speed and inject long scheduling delays. The flow should advance immediately after the causal condition and never before it. The invariant is that progress is licensed by an observable cause; clocks only bound wait, they never prove success.
+For process startup, wait for a real readiness signal, health endpoint with the right semantics, bound port + protocol handshake, or emitted ready event — not “the process has existed for two seconds.”
 
-## Done When
-Progress is licensed by an observable cause, while clocks only bound how long the system is willing to wait for that cause.
+For process shutdown, await exit/termination and resource release — not “we sent SIGTERM and slept a little.”
+
+For storage/replication, wait for a generation/version/commit identity that proves the required fact is visible — not “eventual consistency probably settled.”
+
+For tests, prefer deterministic fakes/controllable schedulers when the timing source itself is not what is under test. A test that needs 30 seconds of wall-clock patience to prove a local state transition is usually testing the scheduler as much as the product.
+
+Common fake repairs:
+
+- increase 500 ms to 5 s;
+- replace one long sleep with ten short sleeps but never inspect a causal state;
+- busy-loop until the same wall-clock duration expires;
+- keep the sleep “for stability” after adding a readiness signal;
+- add retry after the sleep, so flakiness becomes less frequent but the missing synchronization remains;
+- use a timeout callback that marks the operation successful because “nothing bad happened yet.”
+
+Verification should attack scheduler assumptions. Artificially delay the producer well beyond the old sleep: the consumer must not advance early. Then make the producer complete immediately: the consumer should proceed immediately rather than paying the old fixed latency.
+
+For polling, verify two sides:
+
+- the condition becoming true wakes progress promptly;
+- timeout expiry produces an explicit failure/unknown outcome, never a counterfeit success.
+
+For event-based waits, test missed-event races: establish whether subscription happens before the event can fire, or whether current state is checked in a way that closes the gap. Replacing sleep with a callback while introducing “subscribe-after-complete” is not an improvement.
+
+You are done when the code can explain every wait as:
+
+> I cannot proceed until **this observable fact** becomes true; the clock only limits how long I am willing to remain uncertain.
+
+That sentence is synchronization. “We wait because this is usually enough time” is probability wearing a causal costume.

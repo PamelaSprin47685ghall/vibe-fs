@@ -1,27 +1,43 @@
 # race-first-wins-semantics — Main
 
-## What To Do Now
-Remove scheduler order from the business decision. Gather the information the rule actually needs and apply a deterministic merge, or explicitly define first-writer semantics if timing truly belongs to the domain. The documented merge law, or an explicit first-writer protocol, is who owns the outcome; the scheduler is not who owns business truth.
+First decide whether timing belongs to the product rule at all.
 
-## Why This Matters
-“Whichever finishes first” makes load and latency part of the product model without admitting it. Replays, tests, and retries can then produce different answers from the same logical inputs because execution timing—not data—decides truth.
+If it does not, remove scheduler order from the outcome. Let concurrency gather information, then decide using stable domain facts: version, priority, quorum, freshness, score, explicit precedence, or a merge law that gives the same result under every permitted arrival permutation.
 
-## Repair Strategy
-Define stable identities and the domain merge law. Use concurrency only to obtain inputs faster; join before deciding unless the protocol intentionally elects a winner by time/order.
+If first-wins really *is* the protocol, stop treating it as an implementation shortcut. Specify it like a protocol:
 
-## Decision Branches
-- If the domain merge is independent of arrival, collect all required results and apply the merge after the join.
-- If first-writer or election-by-time is the real protocol, document identity, quorum, and tie-break so timing is an explicit rule, not an accident.
-- If only one owner should decide, serialize through that owner and stop racing writers.
+- what stable identity is competing;
+- what makes a candidate eligible;
+- whether stale candidates may win;
+- whether success/failure races are equivalent;
+- how losers are cancelled or ignored;
+- what happens on ties / simultaneous observation;
+- whether replay must reproduce the original winner;
+- which durable fact records the winner so restart does not rerun the election by accident.
 
-## Common Wrong Fixes
-- Add tiny delays to make one branch usually win.
-- Depend on current task scheduling or thread priority as a substitute for a merge law.
-- Keep first-completion as the result while adding retries that sample a different winner.
-- Treat flaky tests as noise instead of evidence that timing is still choosing truth.
+The repair owner is the layer that owns the business choice. A scheduler API such as `race`, `WhenAny`, callback order, or completion queue should never become the hidden owner merely because it is convenient to call.
 
-## Verification
-Permute completion order across the same logical inputs. Results must remain identical unless the documented domain semantics explicitly say otherwise. The invariant is: logical inputs plus declared merge/identity determine the outcome, not scheduler order.
+Prefer deterministic join when all relevant information is required. Parallelism can still buy latency: fetch in parallel, compute in parallel, inspect in parallel. The important point is that **completion order only affects when the decision can be made, not what decision is correct**.
 
-## Done When
-Business outcomes depend on declared facts and merge rules, not on incidental scheduler timing.
+Where a subset is sufficient, make sufficiency explicit. “First two of three matching quorum” is a rule. “Whichever two happen to return first” is only safe if quorum semantics prove all eligible subsets equivalent for the decision being made.
+
+Common fake repairs:
+
+- add `sleep(10)` so the preferred branch tends to finish first;
+- raise thread/task priority for the intended winner;
+- launch the primary a few milliseconds earlier and rely on head start;
+- retry when the “wrong” branch wins, effectively sampling schedules until a preferred answer appears;
+- cancel losers before confirming the first result is semantically admissible;
+- sort by completion timestamp after the fact and call that deterministic — the timestamp is still scheduler output unless the domain owns it;
+- hide the race behind a facade whose result type no longer reveals how the winner was chosen.
+
+Verification should control schedule deliberately. For each set of logical inputs, enumerate meaningful arrival orders and assert either:
+
+- every permutation yields the same outcome; or
+- the documented first-wins law predicts the different outcomes exactly.
+
+Then test restart/replay if the decision persists. Once a winner becomes a durable fact, recovery must restore that fact rather than re-running a race whose timing cannot be reproduced.
+
+A useful completion criterion is that a reviewer can answer “why did X win?” without saying “because its future resolved first” unless **that sentence itself is the documented domain law**.
+
+> Performance may choose the fastest route to the facts. It must not smuggle latency in as a substitute for judgment.

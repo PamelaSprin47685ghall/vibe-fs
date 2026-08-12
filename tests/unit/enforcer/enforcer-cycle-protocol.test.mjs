@@ -54,7 +54,7 @@ const FallbackLedger = await import('../../../dist/Application/Recovery/Fallback
 const AgentPairCursor = await import('../../../dist/Domain/AgentPairCursor.js')
 const BloggerRecoveryProbe = await import('../../../dist/Application/Reconciliation/BloggerRecoveryProbe.js')
 const { lastAssistantStep } = await import('../../../dist/Session/EnforcerCycleDecode.js')
-const BlogTool = await import('../../../dist/Infrastructure/OpenCode/Tools/BlogTool.js')
+const BlogTool = await import('../../../dist/Infrastructure/OpenCode/Tools/ChronicleTool.js')
 
 /**
  * Production wiring: close sessionPort into InteractionRepairNudge (ENFORCER-066).

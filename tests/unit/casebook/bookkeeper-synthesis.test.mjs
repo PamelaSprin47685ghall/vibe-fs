@@ -100,7 +100,7 @@ test('CASE006_injected_synthesizer_error_keeps_old_case', async () => {
 
 test('CASE006_synthesizer_runs_once_per_stale_refresh', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-once-'))
-  const { port, createCalls, editQaCalls } = scriptedBookkeeperPort()
+  const { port, createCalls, programCalls } = scriptedBookkeeperPort()
   try {
     const raw = createRaw()
     const store = createStore(raw)
@@ -120,7 +120,7 @@ test('CASE006_synthesizer_runs_once_per_stale_refresh', async () => {
     assert.equal(refreshed.ok, true)
     assert.equal(refreshed.value, true)
     assert.equal(createCalls.length, 1, 'exactly one child session per refresh')
-    assert.equal(editQaCalls.length >= 2, true, 'js-bookkeeper invoked')
+    assert.equal(programCalls.length >= 1, true, 'js-bookkeeper invoked')
   } finally {
     resetSessionPort()
     rmSync(dir, { recursive: true, force: true })
@@ -129,7 +129,7 @@ test('CASE006_synthesizer_runs_once_per_stale_refresh', async () => {
 
 test('CASE010_finalize_uses_synthesizer_not_raw_noteAnswer', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-fin-'))
-  const { port, createCalls, editQaCalls } = scriptedBookkeeperPort()
+  const { port, createCalls, programCalls } = scriptedBookkeeperPort()
   try {
     execFileSync('git', ['init', '--quiet', dir])
     mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
@@ -145,7 +145,7 @@ test('CASE010_finalize_uses_synthesizer_not_raw_noteAnswer', async () => {
     const first = resultOf(await tryFinalizeInspector(dir, sessionIdKey))
     assert.equal(first.ok, true, `first finalize ok, got ${JSON.stringify(first.error)}`)
     assert.equal(createCalls.length, 1)
-    assert.equal(editQaCalls.length >= 2, true)
+    assert.equal(programCalls.length >= 1, true)
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)
@@ -176,7 +176,7 @@ test('CASE010_finalize_uses_synthesizer_not_raw_noteAnswer', async () => {
 
 test('CASE010_cleanup_never_synthesizes', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-cleanup-'))
-  const { port, createCalls, editQaCalls } = scriptedBookkeeperPort()
+  const { port, createCalls, programCalls } = scriptedBookkeeperPort()
   try {
     execFileSync('git', ['init', '--quiet', dir])
     mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
@@ -190,7 +190,7 @@ test('CASE010_cleanup_never_synthesizes', async () => {
     cleanupInspector(sessionIdKey)
 
     assert.equal(createCalls.length, 0, 'unexpected cleanup must not CreateChildSession')
-    assert.equal(editQaCalls.length, 0, 'unexpected cleanup must not run js-bookkeeper')
+    assert.equal(programCalls.length, 0, 'unexpected cleanup must not run js-bookkeeper')
 
     const common = gitCommonDir(dir)
     const [raw, store] = acquire(common)

@@ -1,27 +1,52 @@
 # shared-mutable-concurrency — Main
 
-## What To Do Now
-Choose a single owner for mutable domain state and move concurrent participants to message passing, immutable snapshots, or serialized commands. That owner is who owns mutation; other workers own only the messages or snapshots they send and receive.
+Do not begin by choosing a cleverer lock. Begin by choosing who owns mutation.
 
-## Why This Matters
-Locks distribute the proof of correctness across every access path: which lock, in what order, around which compound invariant. Ownership concentrates that proof. The owner sees one change at a time; everyone else communicates intent rather than reaching into the state directly.
+The repair target is a semantic invariant, not a synchronization primitive. Identify the state that must remain coherent, the operations allowed to change it, and the single authority that can decide those transitions. Then make every other concurrent participant communicate **intent** across that boundary rather than directly editing the same state.
 
-## Repair Strategy
-Place mutation behind an actor, queue, or single-writer boundary, send typed commands inward, and publish immutable results outward. Keep unavoidable shared concurrent structures narrow and limited to semantics they natively guarantee.
+A strong shape is:
 
-## Decision Branches
-- If several workers mutate one domain object, introduce a single writer and turn others into command senders.
-- If a standard concurrent structure already matches the needed atomic, keep it narrow and do not expose compound fields around it.
-- If the sharing is only reads of immutable snapshots, leave it; this rule is about write authority.
+```text
+many concurrent callers
+        ↓ commands / immutable facts
+one mutation owner
+        ↓ serialized transition law
+owned mutable state
+        ↓ immutable observations / events
+many concurrent readers
+```
 
-## Common Wrong Fixes
-- Do not add a larger global lock around the same shared object.
-- Do not sprinkle more synchronized blocks without naming an owner.
-- Do not make every field atomic and hope compound invariants hold.
-- Do not document “remember to take the lock” as the architecture.
+The owner may be an actor, queue consumer, aggregate, workflow state machine, or process-local coordinator. The name matters less than the property: only that owner performs mutation; callers cannot bypass it by holding a reference to the underlying state.
 
-## Verification
-Concurrent callers should be unable to mutate owned state directly, and varying scheduler order must preserve declared command semantics. The invariant is that mutation authority is singular; concurrency communicates across that boundary.
+Prefer one writer when:
 
-## Done When
-Concurrency exists between owners, not inside one shared mutable object, and synchronization follows the domain’s authority boundaries rather than ad hoc lock placement.
+- several fields participate in one invariant;
+- transition legality depends on current state;
+- cancellation/supersession changes who is still entitled to commit;
+- order matters semantically but should be decided by the owner, not by lock arrival;
+- recovery must replay one authoritative history.
+
+Keep a concurrent primitive directly when its semantics already match the whole problem. An atomic monotonic counter may need no actor. A concurrent set may be correct if membership operations are independent. A lock around one short-lived OS handle can be cleaner than inventing a service around it. Do not build ownership theater around a primitive whose native atomic law is already the desired domain law.
+
+Common fake repairs:
+
+- one enormous global mutex around all state;
+- converting every field to atomic while cross-field invariants remain non-atomic;
+- wrapping a shared object in a “thread-safe” facade while callers still own sequencing decisions;
+- documenting lock order instead of shrinking the number of writers;
+- moving shared mutable state into a singleton and calling that “centralized ownership” even though every caller can still mutate it;
+- using a database transaction as a universal excuse while application-level ownership remains ambiguous.
+
+Verification should attack authority, not just races. Try to mutate the state from a non-owner path; the API should make that impossible or clearly unauthorized. Permute scheduler order of concurrent commands and verify outcomes follow declared command semantics. Inject cancellation and stale callbacks and prove they cannot write once ownership has moved on.
+
+Measure success by the shape of reasoning after the refactor. A maintainer should be able to answer:
+
+- who may mutate this state;
+- how commands reach that owner;
+- where transition legality lives;
+- what readers are allowed to observe;
+- how ownership ends or transfers.
+
+If the answer still begins with “take lock X, unless...”, the architecture is still paying synchronization folklore instead of expressing ownership.
+
+> Concurrency should multiply progress, not multiply authorities over the same fact.

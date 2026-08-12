@@ -1,27 +1,62 @@
 # framework-tax — Main
 
 ## What To Do Now
-Strip away framework mechanisms that do not carry real domain or operational value and expose the underlying operation through the simplest native construct that fits. The domain operation is who owns the design’s dominant structure; container, hook, and config machinery own only the complexity they actually remove.
+Strip the operation down to the native language and domain concepts that actually matter, then reintroduce framework machinery only where it buys a concrete boundary capability.
+
+Do not create another wrapper whose sole job is hiding the framework tax from callers. Pay off the tax by removing unnecessary framework ownership.
 
 ## Why This Matters
-Every framework concept consumes reader attention before business reasoning begins. When that cost is not repaid by eliminated complexity, the architecture becomes a tutorial for the framework rather than a model of the system.
+Framework tax is dangerous because every individual piece looks locally reasonable.
+
+One interface seems harmless. One provider is idiomatic. One decorator is convenient. One config entry is standard. One generated class is “free.” But architecture cost is cumulative: behavior becomes the emergent result of constructs that were each added for consistency rather than necessity.
+
+The system then becomes easy to operate through the framework and hard to understand without it. That is dependency at the level that matters most — the problem model itself.
+
+Framework churn makes the debt visible, but churn is not the only cost. Debugging, testing, onboarding, static reasoning, and refactoring all pay the tax every day.
 
 ## Repair Strategy
-Identify what the framework is actually buying—lifecycle, discovery, interception, resource management, portability. Retain only benefits the product needs, replacing the rest with direct functions, modules, language features, or small explicit boundaries.
+Find the framework boundary and push it outward:
+
+1. express the core operation as ordinary domain inputs, outputs, and explicit effects;
+2. identify which framework features carry real semantics: transaction, request cancellation, host lifecycle, plugin discovery, authentication context, etc.;
+3. keep those semantics in narrow adapters/ports;
+4. remove registrations/interfaces/providers that exist only because a convention expected them;
+5. replace ambient framework context with explicit values when only a small subset is needed;
+6. keep framework exceptions/entities/DTOs from leaking into the domain;
+7. write core tests without booting the framework wherever the decision itself does not depend on it.
+
+When dynamic substitution is real, keep the abstraction. When there is exactly one implementation and no independent consumer, a named function/module may be the better abstraction.
 
 ## Decision Branches
-- If ceremony exceeds the domain operation and buys little, remove the ritual and call the operation directly.
-- If the framework owns real cross-cutting risk (auth, transactions, resource lifetime), keep that slice and drop the rest.
-- If the mistake was importing the ecosystem at all, unwind under `dependency-bloat`.
+- **Framework owns a real protocol/lifecycle:** retain the adapter and make that boundary explicit.
+- **Framework object leaks inward for convenience:** translate/extract at ingress and pass only semantic values.
+- **DI abstraction has one implementation and no runtime substitution need:** collapse to direct construction/reference unless test isolation requires a smaller explicit port.
+- **Cross-cutting behavior is scattered across hooks/middleware:** choose one semantic owner or make ordering/interaction explicit instead of relying on framework invocation folklore.
+- **Generated code mirrors declarations exactly:** treat it as build artifact, not as another domain layer engineers must reason through.
+- **Removing framework code would recreate substantial correct machinery:** keep it. Tax is not the same as framework presence.
 
 ## Common Wrong Fixes
-- Do not build a custom micro-framework that recreates the same ceremony under local names.
-- Do not add another layer of “simplifying” annotations on top of the container.
-- Do not keep unused lifecycle hooks “for consistency.”
-- Do not replace config files with equivalent code generation that still dominates the operation.
+- Add a “service layer” over framework-heavy code while all real decisions remain inside hooks/entities/controllers.
+- Introduce your own mini-framework to abstract the existing framework.
+- Wrap every framework type in a one-to-one project type with no semantic translation.
+- Create interfaces solely for mocking. Prefer testing stable behavior or injecting the actual effect boundary.
+- Ban framework APIs categorically and rebuild mature platform functionality badly. The goal is proportional ownership, not purity theater.
+- Move registration/configuration into a different directory and call the tax reduced.
 
 ## Verification
-A reader should be able to reach the domain operation without traversing configuration or lifecycle machinery unrelated to its semantics. The invariant is that framework concepts stay proportional to the complexity they remove.
+A core behavior change should now be explainable and testable mostly in domain terms.
+
+Check that:
+
+- framework types stop at intentional edges;
+- removing/replacing the framework adapter would not require rewriting domain decisions;
+- each remaining registration/hook/config item can name the capability it buys;
+- behavior ordering no longer depends on undocumented framework magic where that ordering matters;
+- end-to-end/integration tests remain at the boundaries where framework behavior is genuinely part of the contract.
+
+Invariant:
+
+> Framework machinery carries framework responsibilities; domain machinery carries domain meaning.
 
 ## Done When
-Framework concepts are proportional to the complexity they remove, and the dominant structure of the code is the domain rather than the framework.
+The framework is again a tool the system uses, not the language in which the system must explain itself.

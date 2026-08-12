@@ -11,18 +11,18 @@ Inspector 调用（复用或非复用 scope）
 → Append InspectorCaseCaptured（大正文 PayloadRef → store payloads）
 → CasebookProjection fold 更新 index
 
-后续 fetch(session_id)：
-→ CasebookIndexSnapshot（当前 epoch 冻结）
-→ lookup Case
+后续 fetch(shelfmark)：
+→ CasebookIndexSnapshot（当前 epoch 冻结；provider 只含 shelfmark + canonical Q）
+→ shelfmark 解析到内部 Case
 → 对当前 worktree replay observations（只读，不写）
-→ no-delta → 返回 exact A（freshness hint，非正确性证明）
-→ delta → 旧 A stale；启动 Bookkeeper CaseRefresh
+→ no-delta → Fresh consequence + exact canonical A（freshness hint，非正确性证明）
+→ delta → 启动 Bookkeeper CaseRefresh
 → Bookkeeper js-bookkeeper*（0..N，一个 provider transaction）→ stability verify
-→ Append InspectorCaseRefreshed → 返回新 A
-→ 失败 → 保留旧 Case，返回旧 A
+→ Append InspectorCaseRefreshed → Refreshed consequence + 新 canonical A
+→ 失败 → Stale consequence + 保留旧 canonical A
 ```
 
-旧名 `edit-qa` 非法、无 alias。provider index / fetch 后果不得泄漏 session/status/freshness 机器字段（ARCH-014）。
+旧名 `edit-qa` 非法、无 alias。provider index / fetch 后果不得泄漏 session/status/freshness 机器字段（ARCH-014）；内部 durable session identity 只用于 EventStore lookup / refresh，不进入 wire。
 
 ## CasebookProjection fold
 

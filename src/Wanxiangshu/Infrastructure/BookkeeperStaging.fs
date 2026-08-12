@@ -1,76 +1,49 @@
 namespace Wanxiangshu.Infrastructure
 
-open System
 open System.Collections.Generic
 
-/// Process-local staged Q/A bytes for one Bookkeeper transaction.
-/// edit-qa is the only mutation path; there is no filesystem path.
+/// Process-local staged Case for one Bookkeeper transaction.
+/// The provider sees one atomic question/answer object through js-bookkeeper;
+/// no filesystem-shaped Q.md/A.md surface exists here.
 module BookkeeperStaging =
 
-    type private Slot = { Q: string; A: string }
+    type private Slot = { Question: string; Answer: string }
 
     let private gate = obj ()
     let private slots = Dictionary<string, Slot>()
+    let private missingTransaction = "js-bookkeeper: no staged transaction"
 
-    let private parseDocument (document: string) : Result<bool, string> =
-        match document with
-        | "Q.md" -> Ok true
-        | "A.md" -> Ok false
-        | _ -> Error "edit-qa: document must be Q.md or A.md"
+    let beginTransaction (txId: string) (question: string) (answer: string) : unit =
+        lock gate (fun () -> slots.[txId] <- { Question = question; Answer = answer })
 
-    let private uniqueReplace (source: string) (oldText: string) (newText: string) : Result<string, string> =
-        if String.IsNullOrEmpty oldText then
-            Error "edit-qa: old_text must be non-empty"
-        else
-            let first = source.IndexOf oldText
-
-            if first < 0 then
-                Error "edit-qa: old_text not found"
-            else
-                let second = source.IndexOf(oldText, first + oldText.Length)
-
-                if second >= 0 then
-                    Error "edit-qa: old_text is ambiguous"
-                else
-                    Ok(source.Substring(0, first) + newText + source.Substring(first + oldText.Length))
-
-    let beginTransaction (txId: string) (q: string) (a: string) : unit =
-        lock gate (fun () -> slots.[txId] <- { Q = q; A = a })
-
-    let read (txId: string) (document: string) : Result<string, string> =
+    let snapshot (txId: string) : Result<string * string, string> =
         lock gate (fun () ->
-            match parseDocument document, slots.TryGetValue txId with
-            | Error err, _ -> Error err
-            | Ok _, (false, _) -> Error "edit-qa: no staged transaction"
-            | Ok true, (true, slot) -> Ok slot.Q
-            | Ok false, (true, slot) -> Ok slot.A)
+            match slots.TryGetValue txId with
+            | false, _ -> Error missingTransaction
+            | true, slot -> Ok(slot.Question, slot.Answer))
 
-    let replace (txId: string) (document: string) (oldText: string) (newText: string) : Result<unit, string> =
+    let apply
+        (txId: string)
+        (question: string option)
+        (answer: string option)
+        : Result<unit, string> =
         lock gate (fun () ->
-            match parseDocument document, slots.TryGetValue txId with
-            | Error err, _ -> Error err
-            | Ok _, (false, _) -> Error "edit-qa: no staged transaction"
-            | Ok isQ, (true, slot) ->
-                let source = if isQ then slot.Q else slot.A
+            match slots.TryGetValue txId with
+            | false, _ -> Error missingTransaction
+            | true, slot ->
+                slots.[txId] <-
+                    { Question = Option.defaultValue slot.Question question
+                      Answer = Option.defaultValue slot.Answer answer }
 
-                match uniqueReplace source oldText newText with
-                | Error err -> Error err
-                | Ok next ->
-                    slots.[txId] <-
-                        if isQ then
-                            { slot with Q = next }
-                        else
-                            { slot with A = next }
-
-                    Ok())
+                Ok())
 
     let take (txId: string) : Result<string * string, string> =
         lock gate (fun () ->
             match slots.TryGetValue txId with
-            | false, _ -> Error "edit-qa: no staged transaction"
+            | false, _ -> Error missingTransaction
             | true, slot ->
                 slots.Remove txId |> ignore
-                Ok(slot.Q, slot.A))
+                Ok(slot.Question, slot.Answer))
 
     let abort (txId: string) : unit =
         lock gate (fun () -> slots.Remove txId |> ignore)

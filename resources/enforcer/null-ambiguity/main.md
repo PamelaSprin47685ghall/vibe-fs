@@ -1,25 +1,68 @@
 # null-ambiguity — Main
 
 ## What To Do Now
-Replace ambiguous null/optional results with explicit alternatives for every absence reason that changes caller behavior. The producer that still knows why the value is absent is who owns the distinction; do not ask downstream to reconstruct it from flags or status.
+Restore the absence distinctions at the last point that still knows them.
+
+Return a closed result with one case per **behaviorally relevant** outcome, and let callers match the result instead of reconstructing cause from null checks plus side channels.
+
+Keep plain `Option` where one notion of absence is genuinely enough. Rich result types are not a virtue when they name distinctions nobody is allowed or required to use.
 
 ## Why This Matters
-Once distinct outcomes are collapsed into "no value," information is irreversibly lost. Downstream layers compensate with flags, status inspection, retries, or prose parsing, creating a web of heuristics around a distinction the producer already knew and failed to preserve.
+Collapsing outcomes into null is a one-way compression.
+
+The producer knows whether an object was missing, forbidden, unavailable, malformed, cancelled, or simply not applicable. If it exports only “no value,” downstream layers cannot recover that knowledge honestly. They compensate with flags, status inspection, retries, timing assumptions, string parsing, and comments — all weaker than preserving the original fact.
+
+This often creates secondary bugs far from the source. A cache outage becomes a cache miss. A permission failure becomes a 404 accidentally. A loading state flashes “no results.” A decode error quietly becomes “optional field absent.”
+
+The return type should carry enough information for the next rightful decision and no more.
 
 ## Repair Strategy
-Name the domain outcomes, return them as a closed result type, and let adapters translate them to transport/UI representations. Keep a plain option only where one notion of absence is truly sufficient.
+Work from caller behavior backward:
+
+1. enumerate absence causes at the producer;
+2. enumerate the caller actions each cause should permit/require;
+3. merge causes only when callers intentionally treat them identically;
+4. create a closed result for the remaining semantic groups;
+5. attach structured data only to cases that need it;
+6. translate to HTTP/UI/logging representations at their own boundaries;
+7. remove sibling flags/status/prose parsing that previously reconstructed the result;
+8. keep security-motivated indistinguishability explicit when callers must not learn the difference.
+
+Do not expose lower-level implementation errors one-for-one if the caller does not own those distinctions. Preserve **semantic** information, not every diagnostic detail.
 
 ## Decision Branches
-- If callers must act differently for different absences, return a closed result that names each reason.
-- If there is one notion of optionality, keep `Option` and do not invent extra cases.
+- **One absence meaning:** keep `Option`/nullable representation and stop there.
+- **Different caller actions:** return named cases.
+- **Security requires missing/forbidden indistinguishable:** return one intentionally opaque case and keep richer cause internal/audited if appropriate.
+- **Infrastructure failure vs domain absence:** keep them distinct so retry/fallback policy cannot confuse outage with normal miss.
+- **Loading vs loaded-empty vs failed:** model lifecycle state explicitly rather than `value? + flags`.
+- **Wire format uses null:** decode null into the domain result at ingress; do not let wire ambiguity become domain ambiguity.
 
 ## Common Wrong Fixes
-- Add another boolean such as `wasUnauthorized` beside a nullable value, recreating contradictory product states.
-- Encode the reason in an error string that callers must parse.
-- Map every absence to a generic exception and lose the distinction again.
+- Add `wasFound`, `wasAuthorized`, `didFail`, or `isLoaded` booleans beside the nullable value. This recreates a larger illegal state space.
+- Return `(value option, error option)` and rely on convention about which combinations are legal.
+- Throw one generic exception for every absence reason. Information is still collapsed, just into a different channel.
+- Encode absence reason in a string/status field that callers parse.
+- Create ten result cases because ten low-level errors exist, even though callers intentionally handle nine of them identically. Preserve useful distinctions, not implementation trivia.
+- Expose “not found vs forbidden” when security policy intentionally requires them to be indistinguishable.
 
 ## Verification
-Every caller should choose behavior by matching a named outcome, not by combining null checks with contextual clues. The invariant is that every semantically distinct absence remains distinguishable at the boundary.
+For each modeled outcome, prove callers can make the required decision from the result alone.
+
+Then attempt former ambiguous cases:
+
+- backend unavailable must not look like normal miss;
+- forbidden must not accidentally look like success/absence unless policy intentionally requires opacity;
+- loading must not look like loaded-empty;
+- malformed persisted data must not silently become optional absence.
+
+Search for side-channel flags, status peeking, and prose parsing that are no longer needed.
+
+Invariant:
+
+> Every absence distinction that changes authorized caller behavior survives until that decision is made.
 
 ## Done When
-The return type preserves all semantically relevant absence information at the point where it is still known, and no downstream code has to infer why the value is missing.
+No downstream layer needs to ask “why is this null?” using evidence the producer already possessed.
+
+And no result type carries distinctions that exist only to make the type look sophisticated.

@@ -15,7 +15,7 @@ import {
 } from '../../../scripts/checks/provider-leak-gate.mjs'
 
 const CLEAN_HORIZON = `
-module ListTool =
+module HorizonTool =
     let private lineForHandle handle _ =
         sprintf "# %s is still away." "Coder"
 
@@ -41,7 +41,7 @@ test('gate_b_documents_forbidden_vocabulary', () => {
 })
 
 test('gate_b_clean_horizon_fixture_is_green', () => {
-  assert.equal(scanText('ListTool.fs', CLEAN_HORIZON).length, 0)
+  assert.equal(scanText('HorizonTool.fs', CLEAN_HORIZON).length, 0)
 })
 
 test('gate_b_leaky_renderer_fixture_is_red', () => {
@@ -52,7 +52,7 @@ test('gate_b_leaky_renderer_fixture_is_red', () => {
 
 test('gate_b_scan_entries_aggregates', () => {
   const hits = scanEntries([
-    { file: 'ListTool.fs', text: CLEAN_HORIZON },
+    { file: 'HorizonTool.fs', text: CLEAN_HORIZON },
     { file: 'JoinResultRenderer.fs', text: LEAKY_JOIN },
   ])
   assert.ok(hits.length >= 2)
@@ -73,8 +73,8 @@ test('gate_b_repo_scan_with_baseline_is_green', () => {
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
 })
 
-test('gate_b_new_leak_without_baseline_is_red', () => {
+test('gate_b_repo_scan_without_baseline_is_zero', () => {
   const result = scanRepo(process.cwd())
-  assert.equal(result.ok, false, 'Join migration debt must remain visible without baseline')
-  assert.ok(result.violations.length > 0)
+  assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
+  assert.deepEqual(result.counts, {})
 })

@@ -18,7 +18,7 @@ module ForkTool =
           Charge = args.Text "charge" }
 
     let private error (message: string) =
-        ToolHostCodec.tomlObject [ "error", ToolHostCodec.TString message ]
+        ToolHostCodec.tomlObjectWithInstructions [ "# " + message ] []
 
     let private successInstruction (text: string) =
         ToolHostCodec.tomlObjectWithInstructions [ text ] []

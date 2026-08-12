@@ -1,27 +1,51 @@
 # runtime-checked-builder — Main
 
 ## What To Do Now
-Replace post-hoc mutable construction with one validated constructor or a staged API whose type makes required steps explicit. The constructor or staged type that admits the domain value is who owns the construction invariant that no escaped object is incomplete or contradictory.
+Collapse ceremonial mutable construction into one atomic constructor or a staged API whose types expose only legitimate next operations. Required facts that are already knowable should be required up front; genuinely dynamic constraints may remain runtime validation.
+
+The owner is the construction boundary. A late `validate()` should not be compensating for an API that deliberately manufactured invalid intermediate states.
 
 ## Why This Matters
-A builder that can be incomplete enlarges the program with temporary worlds nobody wants. Callers need runtime checks, reuse becomes hazardous, and error handling grows around omissions the API itself invited. Strong construction narrows the state space before a domain value ever exists.
+A builder that can be “not ready yet” without that incompleteness having domain meaning creates temporary worlds the rest of the program must guard against. The API turns omissions into runtime events:
+
+- forgotten setter;
+- duplicated setter;
+- invalid ordering;
+- reuse after failed build;
+- contradictory fields accumulated before validation.
+
+Tests then grow around mistakes the type surface itself invited.
+
+The right goal is not “zero runtime validation.” That would be fantasy. The goal is to reserve runtime checks for facts that **cannot be known earlier**, while removing procedural rituals whose only purpose is to assemble already-known required data.
 
 ## Repair Strategy
-Collect mandatory data in constructor parameters or encode stages so each method returns the next valid construction type. Keep dynamic business validation as a typed constructor result rather than as an exception at the end of a setter chain. Confine any internal accumulator so it cannot leak as the domain value.
+1. Mark every builder field as required, optional-with-default, stage-dependent, or dynamically validated.
+2. Put required data into constructor/function parameters.
+3. If stages represent real semantic phases, encode them as explicit states/types with only legal transitions.
+4. Keep optional configuration truly optional and supply explicit defaults.
+5. Keep dynamic validation in one constructor/result boundary.
+6. Make any mutable accumulator private and non-escaping.
+7. Delete “call these methods in this order” documentation once the API makes bad order impossible.
 
 ## Decision Branches
-- If required fields are known statically, encode them as constructor arguments or staged types so omission is unrepresentable.
-- If some constraints are truly dynamic, keep one atomic constructor or result type and do not expose a mutable incomplete object.
-- If an internal accumulator is unavoidable, confine it so it cannot masquerade as the domain value.
+- If all required data is available at one call site, prefer one constructor/function.
+- If different facts become available at real semantic stages, use staged types or explicit state rather than a mutable maybe-valid bag.
+- If the constraint depends on runtime data, return a typed validation failure; do not contort the type system into pretending the fact was statically knowable.
+- If the intermediate object is itself meaningful business state (for example a draft form), model it honestly as that state rather than calling it a half-built final object.
 
 ## Common Wrong Fixes
-- Do not add more `isValid` checks to the same mutable builder.
-- Do not throw from every setter while still allowing `build` on a reused instance.
-- Do not freeze the object after `build` but leave incomplete instances publicly constructible.
-- Do not document “call these setters in order” instead of making order and type the API.
+- Add more `isValid` checks to the same builder.
+- Throw earlier from each setter while keeping the same invalid public state space.
+- Freeze the object after `build()` but still allow arbitrary incomplete instances before it.
+- Encode method ordering only in docs/comments.
+- Use a phantom/staged type so complicated that understanding construction costs more than the impossible states it removes. Types must buy clarity, not ceremony.
 
 ## Verification
-Attempt to omit or reorder required stages and construct contradictory combinations. Static structure or the single constructor boundary should reject them before an invalid domain instance escapes. The invariant is that no escaped value is incomplete or contradictory relative to the construction contract.
+Try to omit required facts, call operations in the wrong order, repeat incompatible stages, and reuse failed construction state. The public API should make those mistakes impossible or reject them at the single honest dynamic boundary before a domain value escapes.
+
+Also test a genuinely dynamic invalid value to prove runtime validation still exists where reality requires it.
+
+Invariant: **no escaped object is incomplete merely because the caller has not yet finished an API ritual.**
 
 ## Done When
-Every produced object is valid by construction, and incomplete builder state is either unrepresentable or confined to an internal scope that cannot masquerade as the domain value.
+Required construction facts are explicit, real stages are modeled as real stages, dynamic validation remains where necessary, and callers no longer need procedural memory to create a valid value.

@@ -307,10 +307,7 @@ tools = ["js-bookkeeper"]
 forbiddenTools = ["inspect", "write", "edit", "bash-honeypot"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "js-bookkeeper", args = { document = "Q.md", old_text = "G2Q3: when does CaseFinalize run?", new_text = "What is the Inspector reuse contract?" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "js-bookkeeper", args = { document = "A.md", old_text = "G2A3: On owner ReuseScope close.", new_text = "One Inspector child, serial Q/A, finalize on owner close." } }
+  respond = { type = "tool-call", tool = "js-bookkeeper", args = { program = "class Js extends JsProgram { async run() { this.setQuestion(\"What is the Inspector reuse contract?\"); this.setAnswer(\"One Inspector child, serial Q/A, finalize on owner close.\"); return { changed: true }; } }" } }
 
   [[turn.step]]
   respond = { type = "text", text = "Bookkeeper CaseFinalize idle." }

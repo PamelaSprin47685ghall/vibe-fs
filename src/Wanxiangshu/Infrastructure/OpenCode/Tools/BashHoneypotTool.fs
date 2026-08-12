@@ -25,7 +25,7 @@ module BashHoneypotTool =
               "Finish the assigned source edits. Leave execution to DevOps. Do not try this again." ]
 
     let private execute (_args: HostToolArguments) (_context: HostToolContext) =
-        task { return tomlObject [ "error", TString Denial ] }
+        task { return tomlObjectWithInstructions (Denial.Split('\n') |> Array.toList) [] }
 
     let spec: ToolSpec =
         { Name = "bash-honeypot"

@@ -1,25 +1,51 @@
 # overwrite-history — Main
 
-## What To Do Now
-Stop editing committed historical facts. Append a correction, compensation, revocation, or superseding event that preserves both what happened and how understanding changed. The append-only historical log (events/journal/audit) is who owns the history invariant that committed facts remain queryable as recorded and corrections appear as new facts.
+Stop correcting the past by replacing it.
 
-## Why This Matters
-An overwrite gives the present power to forge the past. Even when the new value is "more correct," the system loses when and why the correction occurred, which decisions were made under the earlier fact, and whether replay would reproduce the same historical trajectory.
+Preserve the original committed fact and append a new fact that states what changed: correction, compensation, revocation, supersession, reclassification, reversal, redaction marker, or another domain-specific transition.
 
-## Repair Strategy
-Keep the event/journal append-only. Derive current views by folding original facts plus corrections. If privacy or legal deletion requirements exist, handle them through an explicitly designed redaction/cryptographic policy rather than casual mutation.
+The goal is to make two questions answerable at the same time:
 
-## Decision Branches
-- If the record answers "what did we know/do then?", append a compensating fact and leave the original intact.
-- If the record is a derived projection, rebuild it from history instead of treating edits there as historical correction.
+- **What was recorded/believed/done at time T?**
+- **What is the current interpretation now?**
 
-## Common Wrong Fixes
-- Copy the latest truth back into old records to simplify reads.
-- Delete the original event and insert a replacement with the same id.
-- "Fix" history in a migration that rewrites past rows without a compensating fact.
+If one answer requires destroying the other, the history model is too weak.
 
-## Verification
-Replay history before and after the correction point. Earlier states must remain historically faithful; later current views must reflect the compensating fact. The invariant is that committed facts stay queryable as they were recorded.
+For event/journal systems, fold current state from original facts plus correcting facts. A correction event should normally identify what it corrects and carry enough reason/provenance to explain the transition without modifying the earlier event.
 
-## Done When
-The system can answer both "what was recorded then?" and "what is believed now?" without forcing one question to erase the other.
+For ledgers/accounting, prefer compensating entries over rewriting balances that were already posted. For audit records, append who/what/why changed the interpretation. For migrations, distinguish “repair malformed storage representation without changing semantic history” from “rewrite what the system claims happened.” The latter requires explicit semantic migration policy, not a silent SQL update.
+
+Common fake repairs:
+
+- update old event rows in place and preserve the same event ID;
+- delete the original and insert a replacement so replay sees only the corrected story;
+- run a migration that normalizes historical values without recording which semantic facts changed;
+- copy current truth backward into every old snapshot/record to “make reports consistent”;
+- mutate history because current-state queries are inconvenient; fix the query/projection instead;
+- keep an audit log of the overwrite while the authoritative event itself is still rewritten — the audit log cannot restore causal replay if the source fact changed;
+- use “soft delete” flags on historical events without modeling what deletion means to replay.
+
+Verification should prove temporal fidelity. Replay/query history just before the correction: it must still expose the old recorded fact. Replay after the correction: current interpretation must reflect the new fact. Both views must be derivable without lying about what happened at either point.
+
+Also test downstream causality. If earlier effects were triggered by the old fact, they should remain explainable. A correction may require compensation, but it must not make those effects appear causeless.
+
+For redaction, test the policy separately: sensitive content becomes unavailable as required, while permitted metadata still demonstrates that a redaction occurred and replay has a deterministic rule for the redacted fact.
+
+You are done when the system can tell a truthful story of change:
+
+```text
+we believed/recorded X
+then evidence/authority Y arrived
+therefore X was corrected by Z
+current interpretation is W
+```
+
+not:
+
+```text
+we have always believed W
+```
+
+when that second sentence is false.
+
+> Auditability is not keeping old rows forever. It is preserving the causal difference between “was true to the system then” and “is believed now.”

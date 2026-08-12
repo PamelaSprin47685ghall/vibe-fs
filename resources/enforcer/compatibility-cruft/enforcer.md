@@ -1,30 +1,63 @@
 # compatibility-cruft — Enforcer
 
 ## Definition
-Compatibility cruft is a second representation, alias, adapter, or execution path preserved without a concrete external contract that still requires it. The root-cause is that a second path is retained without a named consumer and end condition, so fear of breakage becomes permanent dual architecture.
+Compatibility cruft is a second way of representing, calling, configuring, storing, or executing the same capability that survives without a concrete external obligation still requiring it.
+
+It is architecture governed by an unnamed ghost consumer.
 
 ## Governing Principle
-Compatibility is not free kindness; it is a promise to support two histories at once. Every retained surface multiplies states the system must understand, test, document, migrate, and eventually remove. Without an identified consumer and retirement condition, “just in case” compatibility converts uncertainty into permanent architecture.
+Compatibility is a debt instrument. It can be worth taking on, but the debt must have a creditor.
+
+A real compatibility obligation names who would break, which old contract they still possess, how long overlap must exist, and what event permits removal. Without those facts, “backward compatibility” becomes a moral incantation that prevents simplification indefinitely.
+
+The cost is not only extra code. Two live paths create two ontologies, two sets of tests, two failure modes, routing rules, migration ambiguity, and a permanent question in every future change: “which world am I changing?”
 
 ## Trigger When
-Trigger when aliases, old formats, dual writes, fallback parsers, adapters, or parallel code paths are added or retained solely to reduce fear of breaking an unspecified caller.
+Trigger when legacy aliases/adapters/formats/paths remain live primarily from unspecified fear rather than a named supported contract. Common forms:
+
+- old and new API/tool names both remain after every repository-owned caller migrated;
+- an old config key is accepted forever because “someone might still have it,” with no supported-version policy;
+- dual read/write formats persist after migration, even though no durable old data or external producer still exists;
+- compatibility adapters route between two internal models that are both repository-owned;
+- a deprecated branch has no telemetry, consumer list, removal date/condition, or version boundary;
+- “temporary” normalization accepts malformed historical shapes never observed in real data;
+- new code must update both legacy and current representations to keep them synchronized;
+- a clean-break product decision is undermined by hidden decode/alias fallbacks that preserve the old provider-facing ontology anyway.
 
 ## Do Not Trigger When
-- A named external consumer, version contract, rollout plan, or data migration genuinely requires overlap for a bounded period.
-- The second path is the current canonical interface, not a leftover alias.
-- A translator that exists only at an external version boundary with a written expiry is justified compatibility.
-- Internal renaming already completed with no remaining producers of the old form is not cruft to keep.
+- A named external consumer/version still requires the old contract and removing it would violate a supported promise.
+- Historical durable data genuinely requires old decode for recovery, while new writes use only the current format and legacy decode is quarantined at persistence ingress.
+- A migration has an explicit overlap window, telemetry/consumer tracking, and concrete removal criterion.
+- Standards/protocols require accepting multiple versions or representations as part of the actual current contract.
+- Compatibility is itself the product requirement, not an implementation superstition.
 
 ## Distinguish From
-`legacy-cruft-retained` violates an explicit clean-break decision. `half-finished-refactor` leaves migration incomplete. This rule is compatibility machinery whose obligation was never established. Tie-break: if no named consumer and no end condition exist, this rule owns the duplicate surface.
+`half-finished-refactor` concerns old/new ownership models both remaining authoritative inside the system. `compatibility-cruft` can exist even when ownership is clear, simply because obsolete external shapes are still accepted.
+
+`legacy-cruft-retained` is broader historical debris. This rule specifically targets duplicate interfaces/representations justified as compatibility.
+
+`guessed-migration` may create unnecessary compatibility because historical data was never inspected. Use that rule when the central failure is inventing a migration target; use this one when the duplicate path remains without a creditor.
 
 ## Decision Procedure
-Name the consumer, the exact old contract it still exercises, and the condition that ends support. If any of those cannot be named, treat the duplicate surface as unjustified.
+For each legacy path, demand four answers:
+
+1. **Consumer:** who still uses it?
+2. **Contract:** what supported promise requires it?
+3. **Overlap:** why must old and new be live simultaneously?
+4. **Exit:** what observable condition permits deletion?
+
+If nobody can answer #1 or #2 concretely, the compatibility path is not protecting a contract. It is protecting anxiety.
+
+If #1–#3 are real but #4 is missing, the migration has no mechanism for ever finishing.
 
 ## Examples
-- positive: keep both JSON shapes and a dual-write “in case someone still sends v1,” with no named consumer or removal date.
-- near-miss: a documented v1 consumer with a rollout window and a removal ticket.
-- counterexample: one canonical interface; keep a bridge only for a named external obligation with an expiry.
+- positive: both `oldTool()` and `newTool()` remain indefinitely after all first-party callers moved; no external API exists.
+- positive: decoder accepts three speculative legacy JSON shapes copied from old code comments, but no persisted sample or supported version contains them.
+- positive: every write updates both v1 and v2 tables “for rollback safety” six months after rollback became impossible.
+- near-miss: a public API supports clients on v1 for six months; usage telemetry and published deprecation date define the overlap.
+- counterexample: current writes are v2-only, but recovery can still read real v1 durable records until the retention horizon expires.
 
 ## Nudge
-Compatibility is a contract, not a superstition. Keep a second path only for a named consumer and a bounded migration; otherwise preserve one canonical interface.
+Compatibility without a named consumer is fear with an API.
+
+Name the creditor, name the exit, or delete the debt.

@@ -10,7 +10,7 @@ const {
   HostToolContext,
   ToolHostCodec_factory,
 } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
-const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/VerdictTool.js')
+const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/JudgeTool.js')
 const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
 
 const fakeSchema = {
@@ -67,46 +67,51 @@ test('JUDGE_spec_exposes_the_verdict_input_and_public_tool_identity', () => {
   assert.deepEqual(payloadOf(args[0][1]).values, ['PERFECT', 'REVISE'])
 })
 
-test('JUDGE_invalid_input_is_rejected_as_a_public_error_result', async () => {
+test('JUDGE_invalid_input_is_rejected_as_a_natural_consequence', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
 
-    const result = parseToml(await hooks.tool.judge.execute({ verdict: 'APPROVE' }, hostContext()))
+    const result = await hooks.tool.judge.execute({ verdict: 'APPROVE' }, hostContext())
 
-    assert.equal(result.error, 'Judgment rejected: verdict must be exactly PERFECT or REVISE.')
+    assert.match(result, /judgment was not received/i)
+    assert.match(result, /PERFECT or REVISE/)
+    assert.doesNotMatch(result, /\berror\s*=/)
   })
 })
 
-test('JUDGE_missing_input_is_rejected_as_a_public_error_result', async () => {
+test('JUDGE_missing_input_is_rejected_as_a_natural_consequence', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
 
-    const result = parseToml(await hooks.tool.judge.execute({}, hostContext()))
+    const result = await hooks.tool.judge.execute({}, hostContext())
 
-    assert.equal(result.error, 'Judgment rejected: verdict must be exactly PERFECT or REVISE.')
+    assert.match(result, /judgment was not received/i)
+    assert.match(result, /PERFECT or REVISE/)
+    assert.doesNotMatch(result, /\berror\s*=/)
   })
 })
 
 test('JUDGE_is_unavailable_to_non_reviewer_sessions', async () => {
-  const result = parseToml(
-    await spec(factory, emptyScope()).Execute(
-      makeArgs({ verdict: 'REVISE' }),
-      context({ sessionId: 'ses-manager' }),
-    ),
+  const result = await spec(factory, emptyScope()).Execute(
+    makeArgs({ verdict: 'REVISE' }),
+    context({ sessionId: 'ses-manager' }),
   )
 
-  assert.equal(result.error, 'Judgment rejected: the judge tool is available only to reviewer sessions.')
+  assert.match(result, /did not come from a Reviewer/i)
+  assert.doesNotMatch(result, /\berror\s*=/)
 })
 
 test('JUDGE_empty_session_is_rejected_before_role_resolution', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
 
-    const result = parseToml(
-      await hooks.tool.judge.execute({ verdict: 'REVISE' }, hostContext({ sessionId: '' })),
+    const result = await hooks.tool.judge.execute(
+      { verdict: 'REVISE' },
+      hostContext({ sessionId: '' }),
     )
 
-    assert.equal(result.error, "Tool 'judge' rejected: no Authority Root fixes this session's role")
+    assert.match(result, /authority is established/i)
+    assert.doesNotMatch(result, /\berror\s*=/)
   })
 })
 
@@ -114,10 +119,12 @@ test('JUDGE_reviewer_requires_a_tool_call_id_before_review_submission', async ()
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
 
-    const result = parseToml(
-      await hooks.tool.judge.execute({ verdict: 'REVISE' }, hostContext({ providerRunId: 'run-1' })),
+    const result = await hooks.tool.judge.execute(
+      { verdict: 'REVISE' },
+      hostContext({ providerRunId: 'run-1' }),
     )
 
-    assert.equal(result.error, 'Judgment rejected: missing tool call id.')
+    assert.match(result, /could not be bound to the current review turn/i)
+    assert.doesNotMatch(result, /\berror\s*=/)
   })
 })

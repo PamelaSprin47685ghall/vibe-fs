@@ -35,8 +35,7 @@ import {
 const { HostToolArguments_$ctor_4E60E31B: makeArgs, HostToolContext } = await import(
   '../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js'
 )
-const { execute } = await import('../../../dist/Infrastructure/OpenCode/Tools/EditQaTool.js')
-const { read } = await import('../../../dist/Infrastructure/BookkeeperStaging.js')
+const { execute } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsBookkeeperTool.js')
 const { TerminalOutcome } = await import('../../../dist/Infrastructure/OpenCode/Host/Events.js')
 const { AgentRunResult } = await import('../../../dist/Kernel/Outcome.js')
 const { Role } = await import('../../../dist/Kernel/Roles.js')
@@ -58,7 +57,7 @@ const completedTerminal = (child) =>
 export const scriptedBookkeeperPort = () => {
   const createCalls = []
   const prompts = []
-  const editQaCalls = []
+  const programCalls = []
   const terminals = new Set()
   let seq = 0
 
@@ -88,31 +87,31 @@ export const scriptedBookkeeperPort = () => {
       const sid = idValue.session(childSession)
       const tx = txIdFor(sid)
       assert.equal(Boolean(tx), true, 'SendPrompt must run against a bound Bookkeeper tx')
-      const stagedQ = resultOf(read(tx, 'Q.md')).value
-      const stagedA = resultOf(read(tx, 'A.md')).value
-      const qOut = await execute(
-        makeArgs({ document: 'Q.md', old_text: stagedQ, new_text: CANONICAL_Q }),
+      const out = await execute(
+        makeArgs({
+          program: `class Js extends JsProgram {
+            async run() {
+              this.setQuestion(${JSON.stringify(CANONICAL_Q)});
+              this.setAnswer(${JSON.stringify(CANONICAL_A)});
+              return { changed: true };
+            }
+          }`,
+        }),
         context(sid),
       )
-      assert.equal(String(qOut).includes('rewritten'), true, qOut)
-      editQaCalls.push('Q.md')
-      const aOut = await execute(
-        makeArgs({ document: 'A.md', old_text: stagedA, new_text: CANONICAL_A }),
-        context(sid),
-      )
-      assert.equal(String(aOut).includes('rewritten'), true, aOut)
-      editQaCalls.push('A.md')
+      assert.equal(String(out).includes('changed = true'), true, out)
+      programCalls.push(tx)
       for (const callback of terminals) callback(childSession, completedTerminal(childSession))
       return { tag: 0, fields: [] }
     },
   }
 
-  return { port, createCalls, prompts, editQaCalls }
+  return { port, createCalls, prompts, programCalls }
 }
 
-test('CASE006_create_child_once_per_refresh_via_edit_qa', async () => {
+test('CASE006_create_child_once_per_refresh_via_js_bookkeeper', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-session-refresh-'))
-  const { port, createCalls, editQaCalls, prompts } = scriptedBookkeeperPort()
+  const { port, createCalls, programCalls, prompts } = scriptedBookkeeperPort()
   try {
     const raw = createRaw()
     const store = createStore(raw)
@@ -136,7 +135,7 @@ test('CASE006_create_child_once_per_refresh_via_edit_qa', async () => {
     assert.equal(refreshed.ok, true, JSON.stringify(refreshed.error))
     assert.equal(refreshed.value, true)
     assert.equal(createCalls.length, 1, 'exactly one CreateChildSession per refresh')
-    assert.equal(editQaCalls.length >= 2, true, 'js-bookkeeper must write Q and A')
+    assert.equal(programCalls.length >= 1, true, 'js-bookkeeper must reshape Q and A in one program')
     assert.equal(prompts.some((text) => String(text).includes('CaseRefresh')), true)
 
     const fetched = resultOf(fetchCase(store, raw, 10, 's-session-refresh'))
@@ -152,7 +151,7 @@ test('CASE006_create_child_once_per_refresh_via_edit_qa', async () => {
 
 test('CASE010_finalize_create_child_once_and_cleanup_never_runs_bookkeeper', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-session-fin-'))
-  const { port, createCalls, editQaCalls, prompts } = scriptedBookkeeperPort()
+  const { port, createCalls, programCalls, prompts } = scriptedBookkeeperPort()
   try {
     execFileSync('git', ['init', '--quiet', dir])
     mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
@@ -169,7 +168,7 @@ test('CASE010_finalize_create_child_once_and_cleanup_never_runs_bookkeeper', asy
     const first = resultOf(await tryFinalizeInspector(dir, sessionIdKey))
     assert.equal(first.ok, true, JSON.stringify(first.error))
     assert.equal(createCalls.length, 1, 'exactly one CreateChildSession per finalize')
-    assert.equal(editQaCalls.length >= 2, true)
+    assert.equal(programCalls.length >= 1, true)
     assert.equal(prompts.some((text) => String(text).includes('CaseFinalize')), true)
     assert.equal(prompts.some((text) => String(text).includes('Q1')), true)
     assert.equal(prompts.some((text) => String(text).includes('Q2')), true)
@@ -183,12 +182,12 @@ test('CASE010_finalize_create_child_once_and_cleanup_never_runs_bookkeeper', asy
     assert.equal(fetched.value.A.includes('evidence:'), false)
 
     const beforeCleanup = createCalls.length
-    const beforeEdits = editQaCalls.length
+    const beforeEdits = programCalls.length
     notePrompt(sessionIdKey, 'cleanup Q')
     noteAnswer(sessionIdKey, 'cleanup A')
     cleanupInspector(sessionIdKey)
     assert.equal(createCalls.length, beforeCleanup, 'unexpected cleanup must not CreateChildSession')
-    assert.equal(editQaCalls.length, beforeEdits, 'unexpected cleanup must not call js-bookkeeper')
+    assert.equal(programCalls.length, beforeEdits, 'unexpected cleanup must not call js-bookkeeper')
   } finally {
     resetSessionPort()
     setEnabled(undefined)

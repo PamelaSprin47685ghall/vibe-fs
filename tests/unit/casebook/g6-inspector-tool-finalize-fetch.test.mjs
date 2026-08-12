@@ -63,8 +63,7 @@ const {
 } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
 const { spec: inspectorSpec } = await import('../../../dist/Infrastructure/OpenCode/Tools/InspectorTool.js')
 const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
-const { execute } = await import('../../../dist/Infrastructure/OpenCode/Tools/EditQaTool.js')
-const { read } = await import('../../../dist/Infrastructure/BookkeeperStaging.js')
+const { execute } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsBookkeeperTool.js')
 const { TerminalOutcome } = await import('../../../dist/Infrastructure/OpenCode/Host/Events.js')
 const { AgentRunResult } = await import('../../../dist/Kernel/Outcome.js')
 const { Role } = await import('../../../dist/Kernel/Roles.js')
@@ -152,7 +151,7 @@ const completedTerminal = (child) =>
 const scriptedBookkeeperPort = () => {
   const createCalls = []
   const prompts = []
-  const editQaCalls = []
+  const programCalls = []
   const terminals = new Set()
   let seq = 0
 
@@ -182,26 +181,26 @@ const scriptedBookkeeperPort = () => {
       const sid = idValue.session(childSession)
       const tx = txIdFor(sid)
       assert.equal(Boolean(tx), true, 'SendPrompt must run against a bound Bookkeeper tx')
-      const stagedQ = resultOf(read(tx, 'Q.md')).value
-      const stagedA = resultOf(read(tx, 'A.md')).value
-      const qOut = await execute(
-        makeArgs({ document: 'Q.md', old_text: stagedQ, new_text: CANONICAL_Q }),
+      const out = await execute(
+        makeArgs({
+          program: `class Js extends JsProgram {
+            async run() {
+              this.setQuestion(${JSON.stringify(CANONICAL_Q)});
+              this.setAnswer(${JSON.stringify(CANONICAL_A)});
+              return { changed: true };
+            }
+          }`,
+        }),
         context(sid),
       )
-      assert.equal(String(qOut).includes('rewritten'), true, qOut)
-      editQaCalls.push('Q.md')
-      const aOut = await execute(
-        makeArgs({ document: 'A.md', old_text: stagedA, new_text: CANONICAL_A }),
-        context(sid),
-      )
-      assert.equal(String(aOut).includes('rewritten'), true, aOut)
-      editQaCalls.push('A.md')
+      assert.equal(String(out).includes('changed = true'), true, out)
+      programCalls.push(tx)
       for (const callback of terminals) callback(childSession, completedTerminal(childSession))
       return { tag: 0, fields: [] }
     },
   }
 
-  return { port, createCalls, prompts, editQaCalls }
+  return { port, createCalls, prompts, programCalls }
 }
 
 const withHarness = async (fn) => {
@@ -335,7 +334,7 @@ test('G6_inspector_tool_sync_delegate_lifecycle_bookkeeper_fetch', async () => {
     const first = resultOf(await tryFinalizeInspector(dir, delegateId))
     assert.equal(first.ok, true, `tryFinalizeInspector ok: ${JSON.stringify(first.error)}`)
     assert.equal(bookkeeper.createCalls.length, 1, 'Bookkeeper CreateChildSession once')
-    assert.equal(bookkeeper.editQaCalls.length >= 2, true, 'js-bookkeeper must write Q and A')
+    assert.equal(bookkeeper.programCalls.length >= 1, true, 'js-bookkeeper must reshape Q and A in one program')
     assert.equal(bookkeeper.prompts.some((text) => String(text).includes('CaseFinalize')), true)
     assert.equal(bookkeeper.prompts.some((text) => String(text).includes('Q1')), true)
     assert.equal(bookkeeper.prompts.some((text) => String(text).includes('Q3')), true)

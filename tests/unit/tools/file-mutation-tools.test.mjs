@@ -97,13 +97,12 @@ test('FILEMUT_mv_renames_a_directory_with_contents', async () => {
 
 test('FILEMUT_mv_missing_source_returns_error', async () => {
   const { dir, cleanup } = sandbox()
-  const result = parseTomlFields(
-    await mvSpec(factory).Execute(
-      makeArgs({ source: join(dir, 'nope.txt'), destination: join(dir, 'x.txt') }),
-      context('ses-mv-missing'),
-    ),
+  const result = await mvSpec(factory).Execute(
+    makeArgs({ source: join(dir, 'nope.txt'), destination: join(dir, 'x.txt') }),
+    context('ses-mv-missing'),
   )
-  assert.match(result.error, /No such file or directory/)
+  assert.doesNotMatch(result, /\berror\s*=/)
+  assert.match(result, /No such file or directory/)
   cleanup()
 })
 
@@ -111,13 +110,14 @@ test('FILEMUT_mv_requires_source_and_destination', async () => {
   const { dir, cleanup } = sandbox()
   const spec = mvSpec(factory)
 
-  const missingBoth = parseTomlFields(await spec.Execute(makeArgs({}), context('ses-mv-req')))
-  assert.match(missingBoth.error, /source and destination are required/)
+  const missingBoth = await spec.Execute(makeArgs({}), context('ses-mv-req'))
+  assert.match(missingBoth, /source and destination are required/)
 
-  const missingDestination = parseTomlFields(
-    await spec.Execute(makeArgs({ source: join(dir, 'a.txt') }), context('ses-mv-req2')),
+  const missingDestination = await spec.Execute(
+    makeArgs({ source: join(dir, 'a.txt') }),
+    context('ses-mv-req2'),
   )
-  assert.match(missingDestination.error, /source and destination are required/)
+  assert.match(missingDestination, /source and destination are required/)
   cleanup()
 })
 
@@ -151,9 +151,10 @@ test('FILEMUT_rm_refuses_a_non_empty_directory', async () => {
   mkdirSync(path)
   writeFileSync(join(path, 'inner.txt'), 'payload')
 
-  const result = parseTomlFields(await rmSpec(factory).Execute(makeArgs({ path }), context('ses-rm-nonempty')))
+  const result = await rmSpec(factory).Execute(makeArgs({ path }), context('ses-rm-nonempty'))
 
-  assert.match(result.error, /directory not empty/)
+  assert.doesNotMatch(result, /\berror\s*=/)
+  assert.match(result, /directory not empty/)
   assert.equal(isDirectory(path), true)
   assert.equal(existsSync(join(path, 'inner.txt')), true)
   cleanup()
@@ -161,17 +162,18 @@ test('FILEMUT_rm_refuses_a_non_empty_directory', async () => {
 
 test('FILEMUT_rm_missing_path_returns_error', async () => {
   const { dir, cleanup } = sandbox()
-  const result = parseTomlFields(
-    await rmSpec(factory).Execute(makeArgs({ path: join(dir, 'nope.txt') }), context('ses-rm-missing')),
+  const result = await rmSpec(factory).Execute(
+    makeArgs({ path: join(dir, 'nope.txt') }),
+    context('ses-rm-missing'),
   )
-  assert.match(result.error, /No such file or directory/)
+  assert.match(result, /No such file or directory/)
   cleanup()
 })
 
 test('FILEMUT_rm_requires_a_path', async () => {
   const { dir, cleanup } = sandbox()
-  const result = parseTomlFields(await rmSpec(factory).Execute(makeArgs({}), context('ses-rm-req')))
-  assert.match(result.error, /path is required/)
+  const result = await rmSpec(factory).Execute(makeArgs({}), context('ses-rm-req'))
+  assert.match(result, /path is required/)
   cleanup()
 })
 
@@ -184,10 +186,11 @@ test('FILEMUT_mv_rename_failure_surfaces_os_message', async () => {
   mkdirSync(blockedDir)
   writeFileSync(join(blockedDir, 'inner.txt'), 'payload')
 
-  const result = parseTomlFields(
-    await mvSpec(factory).Execute(makeArgs({ source, destination: blockedDir }), context('ses-mv-fail')),
+  const result = await mvSpec(factory).Execute(
+    makeArgs({ source, destination: blockedDir }),
+    context('ses-mv-fail'),
   )
 
-  assert.match(result.error, /mv: .+ -> .+: /)
+  assert.match(result, /mv: .+ -> .+: /)
   cleanup()
 })

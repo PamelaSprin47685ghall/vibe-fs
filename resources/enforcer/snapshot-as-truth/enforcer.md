@@ -1,33 +1,39 @@
 # snapshot-as-truth — Enforcer
 
-## Definition
-A snapshot becomes false authority when a cache, projection, summary, or checkpoint is treated as the original fact source rather than as a disposable acceleration of facts owned elsewhere. The root-cause is that a derived compression is promoted to truth, so staleness or corruption becomes indistinguishable from legitimate state and the independent evidence needed to challenge it is lost.
+A snapshot becomes dangerous when a representation created **from** history is later allowed to overrule the history that created it.
 
-## Governing Principle
-A snapshot compresses history by forgetting how the current value was derived. That is why it is useful and why it is weaker evidence. If the projection is promoted to truth, the system loses the independent facts needed to rebuild or reject it. A bookmark may accelerate reading; it must not rewrite the book.
+Snapshots, checkpoints, materialized views, caches, summaries, indexes, and projections are useful precisely because they forget information. They compress a longer derivation into a cheaper present. That lossiness is not a flaw when the source facts remain authoritative. It becomes a flaw when the compression is promoted into testimony.
 
-## Trigger When
-Trigger when recovery or business decisions trust a snapshot or projection even when it disagrees with or cannot be validated against the authoritative facts from which it should derive.
+The central question is provenance:
 
-## Do Not Trigger When
-- The snapshot is explicitly the system of record by contract and no stronger underlying fact history exists.
-- The projection is used only as a cache and is discarded or rebuilt on mismatch with the source.
-- Read models are clearly labeled derived and writes always go to the source facts.
-- A test inspects a snapshot as an observation of a rebuild, not as an independent authority.
+> If this snapshot disagrees with its source, which one has the right to call the other wrong?
 
-## Distinguish From
-`duplicated-truth` allows several writable authorities for one present fact. `recovery-by-filesystem-state` infers progress from residue. This rule specifically elevates a derived representation over its source facts. Tie-break: if a checkpoint or projection outranks its source, this rule owns the case.
+If the answer is “the snapshot, because it is newer/faster/easier to load,” the optimization has become a competing source of truth.
 
-## Decision Procedure
-1. Ask whether the snapshot can be deleted and rebuilt without losing semantic information.
-2. If yes, it is derivative and must remain subordinate to the facts that reconstruct it.
-3. Record enough identity—count, version, digest, source position—to prove which fact prefix it represents.
-4. On mismatch, reject the snapshot and replay from a trusted point.
+Fire this rule when:
 
-## Examples
-- positive: crash recovery loads `checkpoint.bin` even when its digest disagrees with the event log, and that checkpoint becomes current state.
-- near-miss: a materialized view is the documented system of record with no event log behind it.
-- counterexample: on digest mismatch the snapshot is deleted and state is replayed from the log.
+- recovery loads a checkpoint even when its digest/version/source position cannot be proven against the underlying fact stream;
+- a materialized read model is edited directly and later used to reconstruct supposedly authoritative history;
+- “current state” is copied from a cache while the fact log says something else;
+- snapshot timestamps or file modification times are used as freshness proof instead of source identity;
+- corruption in a projection becomes indistinguishable from a legitimate state transition;
+- deleting a snapshot would lose semantic information that supposedly exists in a stronger history elsewhere.
 
-## Nudge
-A snapshot is a bookmark, not testimony. Validate or rebuild it from authoritative facts and never let an optimization become a competing source of history.
+Do not fire merely because a system has no event log. A database row can legitimately be the system of record. A materialized view can legitimately be authoritative if that is the actual contract. In that case, stop pretending there is a stronger hidden history behind it.
+
+Also do not fire when snapshots are disposable acceleration: they carry enough provenance to prove which source prefix they represent, are rejected on mismatch, and can be rebuilt without semantic loss.
+
+Nearby rules:
+
+- `duplicated-truth` — two writable owners both claim authority over the same fact;
+- `recovery-by-filesystem-state` — incidental path residue is used as lifecycle truth;
+- `overwrite-history` — committed historical facts are mutated;
+- `memory-before-disk` — volatile state outruns durable commitment.
+
+Use this rule when the sharp defect is: **a derivative representation has been granted authority over the source it should only summarize.**
+
+A decisive test is deletion. Remove every snapshot/checkpoint/cache and rebuild from the purported source facts. If semantic information disappears, either the source was never authoritative or the snapshot has quietly become a second owner. Both deserve an explicit architectural decision.
+
+The repair is to make provenance mechanical. Record source position, event count, version, digest, schema, or other identity that proves exactly what fact prefix the snapshot represents. On mismatch, discard/rebuild. Never “repair” the source from the projection unless the projection is explicitly the true system of record.
+
+> A snapshot is allowed to make history cheaper to read. It is not allowed to make history answerable to the shortcut.

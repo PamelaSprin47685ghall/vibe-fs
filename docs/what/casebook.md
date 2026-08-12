@@ -11,7 +11,7 @@ Inspector Casebook 是 best-effort semantic cache：每个 Inspector Session 保
 - Q：逐字等于完整 Inspector initial prompt（不经过摘要）。
 - A：逐字等于实际 Inspector ToolResult body（oversized 先走现有 ToolResultBound，再作为 Captured payload）。
 - Observations：该答案依据的、可重放的 repository observations（能捕获多少捕获多少，缺失允许）。
-- Bookkeeper 可改 Q、可改 A、可连续多次 `js-bookkeeper`；零 edit idle 合法；`js-bookkeeper` 不能写第三个文件；最终 A 仍满足 ToolResultBound。
+- Bookkeeper 可改 Q、可改 A、可连续多次 `js-bookkeeper`；zero mutation 合法；`js-bookkeeper` 不拥有 filesystem capability；最终 A 仍满足 ToolResultBound。
 
 ## CASE-003 Observation capture
 
@@ -19,7 +19,7 @@ Observation 从工具执行的 typed 结果捕获，从不从 transcript 文本�
 
 ## CASE-004 fetch 语义
 
-`fetch(session_id)` 不直接信任旧答案：先针对当前 worktree 重放 observations。未检测到变化 → 直接复用旧 A（no-delta 只是 freshness hint，不构成正确性证明）；检测到变化 → 旧 A 标记 stale，进入 refresh 意图。fetch 对 Inspector 免费（低开销热路径）。
+`fetch(shelfmark)` 只接受 provider-visible shelfmark，不暴露 durable session identity。它先针对当前 worktree 重放 observations：未检测到变化 → 返回 exact canonical A，并说明未发现 evidence 变化（no-delta 只是 freshness hint，不构成正确性证明）；检测到变化 → 进入 Bookkeeper refresh，成功则返回 revised canonical A，失败则返回旧 A 并明确它是 older account。fetch 对 Inspector 免费（低开销热路径）。
 
 ## CASE-005 freshness 不是正确性证明
 
@@ -55,4 +55,4 @@ marker absent → Inspector 无 fetch schema、ToolRegistry execute fetch 也拒
 
 ## CASE-012 低信任数据
 
-CasebookIndexSnapshot 是低信任数据：Q list containment 受控（fetch 只按 session_id 查找，index 不引入不可信路径）；同 epoch 字节稳定；Casebook 更新不制造新 epoch；probe promotion 继承 frozen index。
+CasebookIndexSnapshot 是低信任数据：provider 只看到 `{ shelfmark, canonical question }`；shelfmark 是稳定公开 locator，内部再解析到 durable Case identity，绝不把 session/status/freshness 机器字段带到 provider。相同 provider-visible index 在同一 epoch 字节稳定；invalidate 或可见 index 变化推进 epoch；probe promotion 继承 frozen index。

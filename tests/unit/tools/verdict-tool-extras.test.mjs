@@ -1,13 +1,9 @@
-// tests/unit/tools/verdict-tool-extras.test.mjs — VerdictTool fail-closed branches past the role gate.
-//
+// Judge fail-closed branches past the role gate.
 // The scope's fake journal serves an authority profile (RoleFor = Reviewer),
-// so spec.Execute reaches the owner/tree/barrier resolution. Everything below
-// the role gate in VerdictTool.execute is production code.
+// so spec.Execute reaches the owner/tree/barrier resolution.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { parse as parseToml } from 'smol-toml'
-
 import { sessionId, toList } from '../support/domain.mjs'
 
 const {
@@ -15,7 +11,7 @@ const {
   HostToolContext,
   ToolHostCodec_factory,
 } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
-const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/VerdictTool.js')
+const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/JudgeTool.js')
 const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
 const { SessionAgentProjection } = await import('../../../dist/Journal/AgentProjection.js')
 const { ofList: mapOfList } = await import('../../../dist/fable_modules/fable-library-js.5.13.0/Map.js')
@@ -76,23 +72,24 @@ const scopeFor = ({ journal, sessionParents = sessionMap([]), gitTreePort } = {}
     undefined,
   )
 
-const run = async (tool, args, ctx) => parseToml(await tool.Execute(makeArgs(args), ctx))
+const run = async (tool, args, ctx) => tool.Execute(makeArgs(args), ctx)
 
-test('VERDICT_unknown_manager_session_fails_closed', async () => {
-  // sessionParents has no entry for the reviewer: owner resolution fails.
+test('JUDGE_unknown_owner_fails_closed_without_internal_vocabulary', async () => {
   const tool = spec(factory, scopeFor({ journal: fakeJournal({ CurrentBarrierId: 'bar-1' }) }))
   const result = await run(tool, { verdict: 'REVISE' }, context())
-  assert.equal(result.error, 'Judgment rejected because the manager session is unknown.')
+  assert.match(result, /review context is incomplete/i)
+  assert.doesNotMatch(result, /\berror\s*=/)
 })
 
-test('VERDICT_missing_git_tree_fails_closed', async () => {
+test('JUDGE_missing_tree_fails_closed_without_internal_vocabulary', async () => {
   const parents = sessionMap([['ses-reviewer', 'ses-manager']])
   const tool = spec(factory, scopeFor({ journal: fakeJournal({ CurrentBarrierId: 'bar-1' }), sessionParents: parents }))
   const result = await run(tool, { verdict: 'REVISE' }, context())
-  assert.equal(result.error, 'Judgment rejected because the Git tree is unavailable.')
+  assert.match(result, /review context is incomplete/i)
+  assert.doesNotMatch(result, /\berror\s*=/)
 })
 
-test('VERDICT_no_open_review_barrier_fails_closed', async () => {
+test('JUDGE_no_open_review_barrier_fails_closed_without_internal_vocabulary', async () => {
   const parents = sessionMap([['ses-reviewer', 'ses-manager']])
   const tool = spec(
     factory,
@@ -103,11 +100,13 @@ test('VERDICT_no_open_review_barrier_fails_closed', async () => {
     }),
   )
   const result = await run(tool, { verdict: 'PERFECT' }, context())
-  assert.equal(result.error, 'Judgment rejected because no review barrier is open for this tree.')
+  assert.match(result, /review context is incomplete/i)
+  assert.doesNotMatch(result, /\berror\s*=/)
 })
 
-test('VERDICT_non_reviewer_role_is_refused_before_identity_checks', async () => {
+test('JUDGE_non_reviewer_role_is_refused_before_identity_checks', async () => {
   const tool = spec(factory, scopeFor())
   const result = await run(tool, { verdict: 'PERFECT' }, context({ sessionId: 'ses-coder' }))
-  assert.equal(result.error, 'Judgment rejected: the judge tool is available only to reviewer sessions.')
+  assert.match(result, /did not come from a Reviewer/i)
+  assert.doesNotMatch(result, /\berror\s*=/)
 })

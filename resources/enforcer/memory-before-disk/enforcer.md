@@ -1,29 +1,53 @@
 # memory-before-disk — Enforcer
 
-## Definition
-Memory is updated before disk when authoritative runtime state begins reflecting a fact before the durable record that justifies that fact has committed.
+Memory-before-disk is a durability ordering defect: authoritative runtime state advances before the durable fact that is supposed to justify that advance has committed.
 
-## Governing Principle
-Volatile state may be fast, but after a crash only durable history gets to testify about what happened. If memory moves first, the running process can observe a future that recovery cannot reconstruct. Correct ordering therefore follows epistemic authority: durable commitment establishes the fact; memory is merely a projection permitted to advance afterward.
+The subtle danger is not merely crash loss. It is **epistemic split-brain inside one process lifetime**.
 
-## Trigger When
-Trigger when command handling mutates authoritative in-memory state, publishes the new state, or performs dependent work before the event/journal/transaction establishing that transition is durably committed.
+Once memory moves first, later work in the same process may observe and act on a state that recovery cannot reconstruct. The system has temporarily created a world whose consequences are real while its evidence is not.
 
-## Do Not Trigger When
-- Do not trigger when memory is explicitly speculative and cannot escape or influence authoritative behavior before the durable commit succeeds.
-- Do not trigger for caches explicitly derived from durable state and discarded on restart.
-- Do not trigger when a write-ahead buffer is itself the durable medium (fsync’d WAL) and recovery reads it.
+Typical sequence:
 
-## Distinguish From
-blob-after-event orders durable references and content. overwrite-history mutates committed past facts. This rule concerns volatile authority outrunning durable evidence. Tie-break: if memory is treated as truth before commit, use this rule; if a durable past fact is rewritten, use overwrite-history.
+```text
+compute transition
+mutate in-memory aggregate
+publish / answer / launch dependent work
+append event or persist record
+```
 
-## Decision Procedure
-Crash the process at every boundary. If any externally visible or authoritative memory state can survive long enough to influence behavior while its justifying fact would vanish on restart, the root-cause is volatile authority outrunning durable evidence. Prefer this over log-as-recovery-protocol when memory itself moved before commit, even if logs later look consistent.
+If persistence fails or the process dies in that gap, several impossible histories can result:
 
-## Examples
-- positive: The in-memory aggregate is updated, then the journal write is attempted; a crash leaves observers ahead of recovery.
-- near-miss: A speculative buffer is held privately and dropped if commit fails; nothing authoritative escaped.
-- counterexample: The journal commits first; memory advances only from the committed result.
+- callers were told the command succeeded, but restart forgets it;
+- a dependent command acted on state that no durable history contains;
+- an event was emitted from memory, then the journal append failed;
+- a child effect was launched because memory said “accepted,” but recovery returns to “not accepted”;
+- a cache/projection becomes the de facto authority because the durable owner lagged behind it.
 
-## Nudge
-Memory may project history; it must not precede history. Commit the fact first, then advance authoritative runtime state from the committed result.
+The core law is:
+
+> **Durable commitment establishes the fact. Authoritative memory may project that fact afterward; it must not outrun it.**
+
+Do not confuse this with “every byte must hit spinning disk before memory changes.” The relevant durability boundary is whatever the recovery protocol treats as committed: transactional database commit, fsynced WAL, replicated quorum, append acknowledged by the durable journal, etc. A write-ahead log can legitimately be the durable authority even if final materialization happens later.
+
+Also do not fire for private speculative state that cannot escape. Computing a candidate aggregate in memory before commit is fine if nobody can observe it, no effect depends on it, and it is discarded on commit failure. The smell begins when speculative memory acquires authoritative consequences.
+
+Nearby rules:
+
+- `blob-after-event` — durable event references content that was not durably present first;
+- `snapshot-as-truth` — a derived snapshot is treated as canonical history;
+- `overwrite-history` — already committed past facts are mutated;
+- `partial-write-assumption` — interrupted persistence is assumed all-or-nothing;
+- `unverified-completion-claim` — prose overclaims evidence; here the runtime itself overclaims durable reality.
+
+A decisive crash test is to stop execution at every boundary between “memory changed” and “durable fact committed.” Ask what externally visible behavior could already have happened. Then restart from durable state. If recovery cannot reconstruct the state that those effects assumed, memory had authority it had not earned.
+
+The right implementation shape is usually:
+
+1. derive the intended transition without mutating shared authority;
+2. commit the durable fact atomically;
+3. fold/apply the committed fact to authoritative memory;
+4. only then expose success or launch consequences that rely on the new state.
+
+If step 3 fails after commit, recovery can rebuild. If step 2 fails, the command did not happen. That asymmetry is the point.
+
+> Memory is allowed to be fast. It is not allowed to testify about a future that durable history has not yet admitted.

@@ -11,7 +11,7 @@ module PtyTool =
     let private tString = ToolHostCodec.TString
 
     let private error (message: string) =
-        ToolHostCodec.tomlObject [ "error", tString message ]
+        ToolHostCodec.tomlObjectWithInstructions [ "# " + message ] []
 
     let private instruction (text: string) =
         ToolHostCodec.tomlObjectWithInstructions [ text ] []
@@ -171,5 +171,3 @@ module PtyTool =
           readSpec factory scope
           signalSpec factory scope ]
 
-    /// Legacy single-spec entry — prefer `specs`.
-    let spec factory scope = openSpec factory scope

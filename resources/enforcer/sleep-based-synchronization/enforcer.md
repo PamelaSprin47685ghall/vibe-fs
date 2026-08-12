@@ -1,33 +1,55 @@
 # sleep-based-synchronization — Enforcer
 
-## Definition
-Sleep-based synchronization substitutes elapsed wall time for a causal fact such as readiness, completion, visibility, ownership transfer, or propagation. The root-cause is that duration is treated as evidence that a cause occurred, so correctness is a probability coupled to machine load rather than a wait on the event itself.
+Sleep-based synchronization confuses **time passing** with **a prerequisite becoming true**.
 
-## Governing Principle
-Time passing does not imply the event being awaited occurred. A fixed delay merely chooses a probability that the cause will have happened by then. Causal synchronization waits on evidence produced by the event itself, so the program advances because the prerequisite became true rather than because a clock expired.
+The code means “wait until X is ready,” but it implements “wait 500 ms and hope X is ready by then.” That substitution is the entire defect.
 
-## Trigger When
-Trigger when fixed sleeps or delays are used to make tests or production flows wait for another operation to become ready, complete, release, or propagate.
+A fixed delay never proves readiness, completion, visibility, ownership transfer, lock release, process startup, replication, or event delivery. It only changes the probability that those things may have happened before the next line runs.
 
-## Do Not Trigger When
-- The delay is rate limiting, protocol backoff, or a deliberate human-facing pause.
-- A timeout budget only bounds waiting while an actual causal signal remains the success condition.
-- `sleep` is used in a demo or script with no correctness claim.
-- The wait is on an awaitable or condition, and any remaining timeout is failure policy only.
+This is why sleep-based tests and production flows have the same two bad modes:
 
-## Distinguish From
-`time-dependent-test` concerns tests depending on wall time broadly. `timeout-inflated-to-pass` lengthens a budget to hide failure. `blocking-event-loop` monopolizes the shared executor while waiting. This rule specifically confuses duration with causation. Tie-break: if sleep is the success signal, this rule owns the case.
+- on fast machines they waste time after the cause already happened;
+- on slow or contended machines they advance before the cause happened.
 
-## Decision Procedure
-1. Name the fact the code hopes will become true during the sleep.
-2. Identify an observable event, state, or awaitable that proves that fact directly.
-3. Wait on that evidence instead.
-4. Keep any timeout only as failure policy, never as success evidence.
+The delay is simultaneously too long and too short.
 
-## Examples
-- positive: a test `sleep(500)` then asserts a file exists, treating elapsed time as “the writer finished.”
-- near-miss: a retry backoff sleeps between attempts but success is still an HTTP 200, not the sleep itself.
-- counterexample: the test awaits a completion callback or polls a documented ready state under a failure timeout.
+Fire this rule when correctness depends on `sleep`, fixed delay, arbitrary timer, or “give it a moment” before observing another asynchronous effect. Common forms:
 
-## Nudge
-Do not wait for time when you mean to wait for cause. Synchronize on the event or state transition that makes progress legitimate.
+- `sleep(500); assert file exists` after starting a writer;
+- “wait two seconds for the server to start” instead of observing readiness;
+- delaying before reading eventual state because “replication usually settles by then”;
+- test teardown sleeping so child processes “have time to exit”;
+- retry loops whose only success condition is surviving a delay rather than observing a real state;
+- UI or agent workflows that insert pauses to avoid races instead of waiting on ownership/completion signals.
+
+Do not fire for every use of sleep. Rate limiting, protocol backoff, jitter, scheduled cadence, animation/human pacing, deliberate fault injection, or time-domain product behavior may legitimately depend on elapsed time. A timeout can also bound a causal wait without becoming the success signal.
+
+The distinction is precise:
+
+> **If the next step is allowed because the clock expired, ask whether what you really needed was a fact.**
+
+If success still depends on an event/state and the clock only says “give up after N seconds,” the clock is policy, not synchronization.
+
+Nearby rules:
+
+- `timeout-inflated-to-pass` — an existing uncertainty budget is enlarged to hide failure;
+- `time-dependent-test` — a test depends on real wall-clock/calendar behavior more generally;
+- `blocking-event-loop` — waiting blocks shared execution capacity;
+- `repeat-until-pass` — inconsistent evidence is sampled until green.
+
+Use this rule specifically when elapsed duration is impersonating causality.
+
+The decisive repair starts by naming the hoped-for fact. Not “wait 500 ms,” but:
+
+- process emitted ready;
+- file appeared with expected generation;
+- callback completed;
+- session reached idle;
+- lock/lease released;
+- replication observed version V;
+- child terminated;
+- event with identity X committed.
+
+Then wait on **that** fact. If no event exists, polling can be legitimate provided it polls an authoritative observable condition and has a timeout that fails rather than treating timeout expiry as success.
+
+> Do not wait for time when you mean to wait for cause.

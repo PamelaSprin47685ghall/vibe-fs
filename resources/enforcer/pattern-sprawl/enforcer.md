@@ -1,29 +1,66 @@
 # pattern-sprawl — Enforcer
 
 ## Definition
-Pattern sprawl occurs when factories, visitors, strategy classes, interface hierarchies, builders, or other pattern machinery simulate distinctions the language can express more directly with closed data and first-class functions. The root-cause is that pattern machinery continues to simulate a language capability that is now native, so ceremony remains after the original limitation has disappeared.
+Pattern sprawl occurs when design-pattern machinery becomes a second programming language layered over a host language that already expresses the required distinction more directly.
+
+Factories, visitors, strategies, builders, command classes, registries, interface hierarchies, mediators, and template-method scaffolding are not inherently wrong. The defect is **ceremony without purchased capability**: objects and indirection remain after the original language/platform limitation that justified them no longer exists — or never existed here at all.
 
 ## Governing Principle
-A design pattern is historically a compensation mechanism: it encodes a missing language capability as a convention of objects and indirection. When the language already has sum types, exhaustive matching, closures, modules, and immutable values, keeping the simulation preserves ceremony after the original limitation has disappeared. Abstraction should collapse when the host language can state the same law directly.
+A pattern is a solution to a constraint, not a collectible architecture shape.
+
+Patterns historically encode real ideas: closed variation, late binding, traversal, construction invariants, effect substitution, protocol dispatch. If the language now offers algebraic data types, pattern matching, first-class functions, modules, records, iterators, closures, traits/interfaces, or ordinary constructors that state the same law directly, reproducing the old object choreography can obscure rather than clarify the design.
+
+The question is never “is this a known pattern?” The question is “what semantic capability does this pattern buy that the direct language form does not?”
 
 ## Trigger When
-Trigger when class/interface scaffolding primarily exists to select among finite cases, inject behavior, traverse closed data, construct values, or compose functions that native language features can express with less indirection.
+Trigger when pattern machinery simulates a capability already available more directly and its indirection now dominates understanding/change cost. Common forms:
+
+- a closed set of cases is represented as many subclasses + visitor rather than data + exhaustive match;
+- stateless one-method strategy classes exist where first-class functions would preserve the same contract;
+- factories only choose among constructors already statically known, with no runtime discovery/configuration requirement;
+- builders carry dozens of mutable flags for objects that could be constructed as validated immutable data;
+- command objects merely wrap function calls and add no persistence/queuing/serialization/undo semantics;
+- mediator/event bus routes ordinary synchronous calls solely to avoid direct dependency names;
+- interface-per-class architecture creates one implementation for each interface with no independent substitution boundary;
+- new “pattern” layers are introduced to make code look enterprise/clean/hexagonal despite no corresponding semantic boundary.
 
 ## Do Not Trigger When
-- Runtime extensibility across independently deployed components or open-world substitution is a real requirement that closed algebraic data cannot satisfy.
-- The pattern encodes a lifecycle or ownership boundary the language does not provide.
-- The "pattern" is already the native form (a function, a union, a module).
+- Runtime plugin discovery, open extension, serialization, distributed dispatch, undo/history, or independent substitution genuinely requires the pattern machinery.
+- The host language lacks a safer/directer representation for the needed variation.
+- A visitor intentionally separates many operations from a stable externally-owned object hierarchy that cannot be modified.
+- A builder enforces nontrivial staged construction or validation that the language's ordinary constructor/type system cannot express cleanly.
+- A command object is a durable message/event with identity, replay, queueing, auditing, or other first-class semantics beyond “call this function.”
+- The pattern creates a real capability/authority boundary, not merely indirection.
 
 ## Distinguish From
-incidental-complexity-dominates is broader design weight. premature-unification concerns false abstraction. Tie-break: if pattern machinery's semantic job is now native syntax, this rule; if complexity is high for many reasons, incidental-complexity-dominates; if one abstraction falsely merges different knowledge, premature-unification.
+`framework-tax` comes from a framework's ontology. `pattern-sprawl` may be entirely hand-written and dependency-free.
+
+`premature-unification` invents a common abstraction before semantics justify it. `pattern-sprawl` may also affect a once-justified abstraction that has become obsolete as the language/system evolved.
+
+`implicit-control-flow` can be caused by mediator/event pattern overuse; use it when invisibility of execution order is the sharper defect.
 
 ## Decision Procedure
-State what variability the pattern represents. If the set is closed, use data + exhaustive match; if behavior is the variable, pass a function; if both are simple, prefer composition over hierarchy.
+For each pattern layer, state the semantic job without naming the pattern:
+
+- “choose one behavior at runtime”;
+- “represent one of these closed states”;
+- “construct only valid values”;
+- “traverse a structure without modifying its owner”;
+- “queue/replay an operation.”
+
+Then implement the same job mentally using the host language's direct constructs. What capability is lost?
+
+If the answer is only “the classes make the pattern explicit,” “this is how OO does it,” or “we may add implementations later,” the machinery has not earned its cost.
 
 ## Examples
-- positive: A five-class visitor hierarchy exists only to switch on a closed AST the language can match exhaustively.
-- near-miss: A plugin interface is loaded from independently deployed packages; closed data cannot name those types.
-- counterexample: Closed variants are a union with exhaustive match and behavior is passed as functions.
+- positive: twelve AST node subclasses each implement `accept(visitor)` for a hierarchy entirely controlled by the repository; an F# discriminated union + match would be closed, exhaustive, and direct.
+- positive: three classes implement `IRetryStrategy.Execute()` with no state; each simply calls one function and is selected by a local match.
+- positive: `FooFactoryFactory` constructs the only `FooFactory` implementation so everything “goes through abstractions.”
+- near-miss: external third parties register plugins at runtime, so a registry/factory boundary is genuinely open.
+- near-miss: command objects are persisted and replayed across process restart; they carry durable identity beyond a function call.
+- counterexample: a closed workflow is modeled as algebraic states with exhaustive transitions and ordinary functions.
 
 ## Nudge
-Do not preserve a simulation after the language gains the thing being simulated. Express closed data as data and variable behavior as functions; keep class machinery only for genuinely open-world contracts.
+Patterns are fossils of solved constraints.
+
+Keep the constraint. Throw away the fossil when the language can state the law directly.

@@ -84,36 +84,39 @@ test('RUN_spec_exposes_command_and_budget_arguments', () => {
 })
 
 test('RUN_missing_command_is_rejected_before_spawn', async () => {
-  const result = parseToml(await run(scope(), {}))
-  assert.equal(result.error, 'Missing command')
+  const result = await run(scope(), {})
+  assert.doesNotMatch(result, /\berror\s*=/)
+  assert.match(result, /# Missing command/)
 })
 
 test('RUN_blank_command_is_rejected_before_spawn', async () => {
-  const result = parseToml(await run(scope(), { command: '   ' }))
-  assert.equal(result.error, 'Missing command')
+  const result = await run(scope(), { command: '   ' })
+  assert.doesNotMatch(result, /\berror\s*=/)
+  assert.match(result, /# Missing command/)
 })
 
 test('RUN_non_positive_deadline_is_rejected', async () => {
   for (const value of [0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
-    const result = parseToml(await run(scope(), { command: 'true', deadline_seconds: value }))
-    assert.equal(result.error, 'deadline_seconds must be a finite positive number', `value=${value}`)
+    const result = await run(scope(), { command: 'true', deadline_seconds: value })
+    assert.match(result, /deadline_seconds must be a finite positive number/, `value=${value}`)
   }
 })
 
 test('RUN_invalid_output_budget_is_rejected', async () => {
-  const negative = parseToml(await run(scope(), { command: 'true', output_budget_bytes: -1 }))
-  assert.equal(negative.error, 'output_budget_bytes must be a finite non-negative integer')
+  const negative = await run(scope(), { command: 'true', output_budget_bytes: -1 })
+  assert.match(negative, /output_budget_bytes must be a finite non-negative integer/)
 
-  const fractional = parseToml(await run(scope(), { command: 'true', output_budget_bytes: 1.5 }))
-  assert.equal(fractional.error, 'output_budget_bytes must be an integer')
+  const fractional = await run(scope(), { command: 'true', output_budget_bytes: 1.5 })
+  assert.match(fractional, /output_budget_bytes must be an integer/)
 
-  const nan = parseToml(await run(scope(), { command: 'true', output_budget_bytes: Number.NaN }))
-  assert.equal(nan.error, 'output_budget_bytes must be a finite non-negative integer')
+  const nan = await run(scope(), { command: 'true', output_budget_bytes: Number.NaN })
+  assert.match(nan, /output_budget_bytes must be a finite non-negative integer/)
 })
 
-test('RUN_blank_session_surfaces_runtime_error_before_spawn', async () => {
-  const result = parseToml(await run(scope(), { command: 'true' }, context('')))
-  assert.equal(result.error, 'Missing sessionID')
+test('RUN_blank_session_surfaces_natural_execution_consequence_before_spawn', async () => {
+  const result = await run(scope(), { command: 'true' }, context(''))
+  assert.doesNotMatch(result, /sessionID|\berror\s*=/i)
+  assert.match(result, /cannot run from this execution context/i)
 })
 
 test('RUN_completed_command_reports_exit_code_and_streams', async () => {
@@ -130,12 +133,10 @@ test('RUN_nonzero_exit_is_reported_not_thrown', async () => {
   assert.equal(result.exit_code, '3')
 })
 
-test('RUN_deadline_overrun_surfaces_process_error', async () => {
-  const result = parseToml(
-    await run(scope(), { command: 'sleep 5', deadline_seconds: 0.01, output_budget_bytes: 16 }),
-  )
-  assert.ok(result.error, `a killed process must surface an error, got: ${JSON.stringify(result)}`)
-  assert.match(result.error, /timed out|deadline|TimedOut|exceeded/i)
+test('RUN_deadline_overrun_returns_the_fixed_timeout_consequence', async () => {
+  const result = await run(scope(), { command: 'sleep 5', deadline_seconds: 0.01, output_budget_bytes: 16 })
+  assert.doesNotMatch(result, /TimeoutExceeded|\berror\s*=/)
+  assert.match(result, /The command was still running when its allowed time ended, so it was stopped\./)
 })
 
 test('RUN_world_lock_is_accepted', async () => {
@@ -149,20 +150,22 @@ test('RUN_world_lock_is_accepted', async () => {
 const SPOOL_COMMAND = "printf 'abcdefghijklmnopqrstuvwxyz0123456789'"
 const SPOOL_BUDGET = { command: SPOOL_COMMAND, output_budget_bytes: 4 }
 
-test('RUN_spooled_output_without_session_fails_closed', async () => {
-  const result = parseToml(await run(scope(), SPOOL_BUDGET, context('')))
-  assert.equal(result.error, 'Missing sessionID')
+test('RUN_spooled_output_without_session_fails_closed_without_identity_leak', async () => {
+  const result = await run(scope(), SPOOL_BUDGET, context(''))
+  assert.doesNotMatch(result, /sessionID|\berror\s*=/i)
+  assert.match(result, /cannot be condensed until the caller's authority is established/i)
 })
 
-test('RUN_spooled_output_family_blocked_surfaces_recovery_error', async () => {
+test('RUN_spooled_output_family_blocked_surfaces_recovery_consequence', async () => {
   const runtimeScope = scope()
   attachFamilyRecovery(
     runtimeScope,
     async () => new FamilyRecovery(2, [nonEmptyOne(new RecoveryBlock(6, [sessionId('ses-exec')]))]),
   )
 
-  const result = parseToml(await run(runtimeScope, SPOOL_BUDGET))
-  assert.equal(result.error, 'RECOVERY_BLOCKED: family recovery blocked before run join')
+  const result = await run(runtimeScope, SPOOL_BUDGET)
+  assert.doesNotMatch(result, /RECOVERY_BLOCKED|\berror\s*=/)
+  assert.match(result, /large output cannot be reconciled while recovery is blocked/i)
 })
 
 test('RUN_spooled_output_runs_distillation_without_chunk_statistics', async () => {

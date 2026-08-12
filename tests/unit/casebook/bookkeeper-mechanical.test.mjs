@@ -34,7 +34,7 @@ const sandbox = () => {
 
 test('CASE006_synthesis_refresh_publishes_refreshed_with_revised_a', async () => {
   const { dir, cleanup } = sandbox()
-  const { port, createCalls, editQaCalls } = scriptedBookkeeperPort()
+  const { port, createCalls, programCalls } = scriptedBookkeeperPort()
   try {
     const raw = createRaw()
     const store = createStore(raw)
@@ -60,7 +60,7 @@ test('CASE006_synthesis_refresh_publishes_refreshed_with_revised_a', async () =>
     assert.equal(refreshed.ok, true, `refreshStale ok, got ${JSON.stringify(refreshed.error)}`)
     assert.equal(refreshed.value, true, 'bookkeeper refresh must publish')
     assert.equal(createCalls.length, 1)
-    assert.equal(editQaCalls.length >= 2, true, 'js-bookkeeper must be invoked')
+    assert.equal(programCalls.length >= 1, true, 'js-bookkeeper must be invoked')
 
     const fetched = resultOf(fetchCase(store, raw, 10, 's-mech-1'))
     assert.equal(fetched.ok, true)
@@ -100,7 +100,7 @@ test('CASE006_mechanical_refresh_no_case_is_noop', async () => {
 
 test('CASE006_mechanical_refresh_missing_file_still_publishes', async () => {
   const { dir, cleanup } = sandbox()
-  const { port, createCalls, editQaCalls } = scriptedBookkeeperPort()
+  const { port, createCalls, programCalls } = scriptedBookkeeperPort()
   try {
     const raw = createRaw()
     const store = createStore(raw)
@@ -120,7 +120,7 @@ test('CASE006_mechanical_refresh_missing_file_still_publishes', async () => {
     assert.equal(r.ok, true)
     assert.equal(r.value, true)
     assert.equal(createCalls.length, 1)
-    assert.equal(editQaCalls.length >= 2, true)
+    assert.equal(programCalls.length >= 1, true)
 
     const fetched = resultOf(fetchCase(store, raw, 10, 's-gone'))
     assert.equal(fetched.value.Q, CANONICAL_Q)

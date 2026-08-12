@@ -1,25 +1,54 @@
 # memory-before-disk — Main
 
-## What To Do Now
-Reorder at the root-cause owner: who owns the write path must commit the durable fact first; only after success may authoritative memory advance and downstream observers see the new state.
+Move authority behind the durability boundary.
 
-## Why This Matters
-A process can lie to itself before it crashes. If memory changes first, subsequent commands may act on a state that restart cannot recover, creating a split between the world that influenced behavior and the world that left evidence.
+Compute the candidate transition in memory if useful, but do not publish it, return success from it, launch dependent effects from it, or swap it into authoritative shared state until the durable commit that justifies the transition has succeeded.
 
-## Repair Strategy
-Compute the intended transition without mutating authority, append/commit the durable fact, then derive and swap the new in-memory state. Treat durable failure as “the command did not happen.”
+The target sequence is:
 
-## Decision Branches
-- If the state is authoritative or observable, it must not advance before durable commit succeeds.
-- If the state is speculative and unescaped, it may exist only until commit, then must be dropped on failure.
+```text
+old authoritative state
+        ↓ pure/isolated decision
+candidate transition / fact
+        ↓ durable commit
+committed fact
+        ↓ fold/apply
+new authoritative memory
+        ↓ consequences / success
+```
 
-## Common Wrong Fixes
-- Do not mutate memory and attempt to roll it back if persistence fails; rollback itself becomes another failure path and cannot erase effects already observed by other work.
-- Do not publish events from memory and persist “soon after.”
-- Do not treat a successful in-process write buffer as durable without the commit/fsync the recovery protocol requires.
+This ordering creates the recovery asymmetry you want:
 
-## Verification
-Inject failure before and during durable commit. Memory and observers must remain at the old state. After successful commit, crash/restart replay must reconstruct exactly the state that was exposed. The invariant: no authoritative runtime state outruns the durable evidence recovery uses.
+- persistence fails → the command did not happen, authoritative memory stays old;
+- persistence succeeds but process dies before memory updates → restart can replay the committed fact and recover the new state.
 
-## Done When
-No authoritative runtime state can get ahead of the durable evidence from which recovery derives it.
+The inverse ordering has no such safe interpretation. If memory advanced and influenced anything before persistence, a crash can erase the evidence while keeping consequences that were caused by the erased state.
+
+Keep private speculative objects genuinely private. It is fine to compute `nextState` before commit, hash it, validate it, or prepare derived artifacts. The line you must not cross is **authoritative escape**: no other command, callback, provider response, child effect, publication, or shared reader may treat the candidate as true until commit succeeds.
+
+Common fake repairs:
+
+- mutate memory first, then “roll back” if persistence fails;
+- publish success and persist asynchronously “for latency”;
+- append to a process-local buffer and call that durable even though recovery cannot read it after crash;
+- update cache/projection first because database commit is “expected to succeed”;
+- perform external effects from candidate state, then persist the state afterward;
+- catch persistence failure and leave memory advanced because “the process is still alive”;
+- rely on graceful shutdown to flush pending facts when hard crash/power loss is within the durability contract.
+
+Rollback is especially deceptive. Once advanced memory has been observed, rollback cannot retract the decisions those observers already made. It can only create another transition and hope every escaped consequence is reversible.
+
+Verification needs fault injection around the exact ordering boundary:
+
+1. fail before durable commit — no authoritative memory change and no dependent effect may escape;
+2. fail during commit — outcome follows the storage protocol's explicit committed/not-committed/unknown semantics;
+3. commit successfully, crash before memory apply — restart must reconstruct the new state;
+4. commit + apply — observers see exactly what replay would reconstruct.
+
+If durability is asynchronous or replicated, define precisely what “commit succeeded” means for recovery. Do not let one code path treat local write as committed while restart requires quorum/fsync.
+
+Also test concurrent readers. They must not see candidate state before durable success merely because it has already been assigned to a mutable field.
+
+You are done when every authoritative state transition has a durable witness that precedes its visibility, and every visible state can be reconstructed from the same durability boundary after restart.
+
+> Durable history earns authority first. Memory is its fast projection, not its impatient predecessor.

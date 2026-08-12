@@ -1,25 +1,43 @@
 # optimistic-retry-assumption — Main
 
-## What To Do Now
-Treat an unknown external outcome as its own state. Resolve it through idempotency identity, status lookup, deduplication, or an explicit at-most-once protocol before repeating the effect. The recovery protocol that can prove whether the original attempt committed is who owns retry after uncertainty.
+Give `UnknownOutcome` first-class status.
 
-## Why This Matters
-A timeout removes knowledge, not history. If the remote side committed before the response vanished, an unqualified retry can duplicate charges, prompts, publications, resource creation, or writes while both attempts appear individually successful.
+Do not let timeout/disconnect/crash paths fall through the same branch as a known pre-effect failure. Separate them in the type/control flow and require a recovery protocol before another externally visible effect may be issued.
 
-## Repair Strategy
-Assign stable operation identity before the first attempt and carry it through retries. Where the provider lacks idempotency, design recovery around querying authoritative state or refusing automatic retry when duplication cannot be ruled out.
+The recovery order should be:
 
-## Decision Branches
-- If the outcome is unknown and the effect may have committed, resolve via identity or status lookup before any repeat.
-- If failure is known to precede the effect, or the op is read-only/idempotent, retry is not this defect.
+1. preserve the original logical operation identity;
+2. ask an authoritative source whether that identity committed;
+3. if committed, recover/use that outcome;
+4. if known not committed, retry if policy allows;
+5. if still unknown, either retry under a protocol that guarantees same-intent idempotency or keep the outcome unknown and escalate/reconcile later.
 
-## Common Wrong Fixes
-- Assume "no response = no effect."
-- Add exponential backoff as if delay changed duplication semantics.
-- Retry with a fresh identity, guaranteeing a second logical effect.
+Possible resolving mechanisms include provider idempotency lookup, transaction status, business-key query, durable command inbox, externally observable state, or a domain-specific reconciliation operation.
 
-## Verification
-Simulate "effect committed, acknowledgement lost." Recovery must converge to one logical effect rather than issue an indistinguishable second one. The invariant is that unknown is not treated as failure-before-effect.
+If the provider gives no way to identify or query an attempt and duplicate effect is unacceptable, automatic retry is not safe. That limitation belongs in the product/operation contract, not behind “best effort” optimism.
 
-## Done When
-Every retry after uncertainty is semantically safe because the system can prove whether repeated execution denotes the same logical operation.
+Common fake repairs:
+
+- exponential backoff with a fresh request identity;
+- retrying only once and calling duplication unlikely;
+- assuming a timeout shorter than the provider's normal latency means the request never reached it;
+- checking only local state after restart while the uncertain effect happened remotely;
+- generating a compensation for the first attempt and also retrying, when the system does not know whether there is anything to compensate;
+- marking the command failed in local DB before reconciling remote state;
+- catching `Cancelled`/`Timeout` and mapping both to `NotExecuted`;
+- querying a stale cache and treating absence there as proof of remote non-commit.
+
+Verification must make uncertainty real. Build a fault where the remote effect commits but the acknowledgement is lost. Recovery must not create a second logical effect. Then test known pre-effect rejection separately and prove that it can retry without unnecessary reconciliation.
+
+Also test the unresolved case: status lookup fails or provider is unavailable. The system should remain in an honest unknown state rather than inventing success or failure merely to make the state machine terminal.
+
+This matters for operator UX too. “Failed” invites users to repeat an action. If the real state is “we do not yet know whether your payment/order/publication committed,” say that. A false failure label can itself trigger the duplicate effect the backend was trying to avoid.
+
+You are done when every retry decision can cite evidence for one of two claims:
+
+- the previous effect definitely did not commit; or
+- repeating under the same logical identity cannot create another business effect.
+
+If neither claim can be established, do not manufacture certainty.
+
+> Recovery after uncertainty is an epistemology problem before it is a retry-policy problem.

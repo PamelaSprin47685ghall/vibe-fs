@@ -15,7 +15,7 @@ import {
 } from '../support/domain.mjs'
 
 const { HostToolContext } = await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
-const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/ListTool.js')
+const { spec } = await import('../../../dist/Infrastructure/OpenCode/Tools/HorizonTool.js')
 const { ToolRuntimeScope } = await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRuntimeScope.js')
 const { HostForkRuntime } = await import('../../../dist/Session/HostForkRuntime.js')
 const { SessionAgentProjection } = await import('../../../dist/Journal/AgentProjection.js')

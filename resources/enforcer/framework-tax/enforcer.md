@@ -1,30 +1,62 @@
 # framework-tax — Enforcer
 
 ## Definition
-Framework tax is the accidental complexity paid when lifecycle, configuration, registration, indirection, and generated structure occupy more of the design than the domain operation they are meant to support. The root-cause is that framework lifecycle, configuration, and registration become the dominant ontology for a smaller domain operation, so readers pay ceremony before they can see the problem.
+Framework tax is the accidental complexity paid when a framework's lifecycle, registration model, configuration vocabulary, extension points, generated artifacts, or indirection becomes more prominent than the domain operation it exists to support.
+
+The framework has stopped being infrastructure and started demanding that the problem be restated in its ontology.
 
 ## Governing Principle
-A framework is justified when it compresses recurring complexity the application truly has. When the problem is smaller than the framework’s ceremony, the abstraction expands rather than compresses: readers must learn container lifecycles, hook order, annotations, configuration dialects, and extension rules before they can see a simple operation. The tool has become the problem’s dominant ontology.
+A framework is justified by complexity it removes, not by architecture it visibly introduces.
+
+Useful frameworks absorb hard cross-cutting work: transport, scheduling, rendering, persistence drivers, protocol compliance, dependency construction, platform integration. The tax becomes pathological when simple operations require ceremonies whose only consumer is the framework itself.
+
+“Standard pattern” is not free. Every container registration, decorator, provider, middleware layer, hook adapter, generated binding, config key, abstract base, and lifecycle callback becomes another place where behavior can hide.
+
+The question is not whether the framework is popular or idiomatic. The question is whether its machinery is buying a real capability at this boundary.
 
 ## Trigger When
-Trigger when configuration, DI wiring, lifecycle hooks, generated layers, or framework conventions materially exceed the essential domain logic and are not buying corresponding capability.
+Trigger when framework mechanics dominate understanding/change cost without protecting an independent contract. Common forms:
+
+- a direct function call becomes interface → implementation → provider → container registration → resolver for no real runtime substitution need;
+- business control flow is distributed across annotations, middleware, hooks, interceptors, decorators, and config rather than visible in one semantic owner;
+- adding one domain field requires updating multiple framework metadata/schema/registration representations of the same fact;
+- generated scaffolding is treated as architecture even though it only mirrors source declarations;
+- a tiny component cannot be tested without booting a large application/container because domain decisions are fused to framework lifecycle;
+- internal modules adopt transport DTOs, ORM entities, request contexts, framework exceptions, or plugin shapes as their domain vocabulary;
+- a generic framework abstraction is introduced before there are genuinely distinct implementations/consumers;
+- migration away from a framework would require rewriting core domain logic rather than replacing boundary adapters.
 
 ## Do Not Trigger When
-- The framework genuinely centralizes difficult cross-cutting behavior whose local reimplementation would create more complexity or risk.
-- The ceremony is the acquisition of an unneeded library; that decision is `dependency-bloat` before the framework is the ontology.
-- A small amount of registration exists to gain real lifecycle, security, or resource management the product needs.
-- Generated code is the published contract of a standard (OpenAPI, protobuf) rather than a local ritual around a simple function.
+- The framework machinery directly enforces a real external protocol, lifecycle, transaction, security, or isolation boundary.
+- Dynamic discovery/substitution is an actual runtime requirement with multiple independent implementations or deployment contexts.
+- Boilerplate is localized at an adapter edge while core decisions remain framework-agnostic.
+- A framework feature removes substantial bespoke machinery and its semantics are simpler than the alternative.
+- The project deliberately adopts a framework convention as part of its public integration contract; the convention itself may then be real boundary knowledge.
 
 ## Distinguish From
-`dependency-bloat` is the decision to import excessive machinery. `incidental-complexity-dominates` is the broad symptom. This rule focuses on framework ceremony specifically. Tie-break: if readers must learn container/hook/config ontology to see a small domain operation, this rule owns the case.
+`incidental-complexity-dominates` is broader. `framework-tax` specifically identifies the framework's ontology as the source of the accidental burden.
+
+`pattern-sprawl` concerns hand-built or inherited design-pattern machinery that the language can express more directly. `dependency-bloat` concerns unnecessary packages even when their local integration is simple. `facade-hides-mess` puts a clean front over tangled internals.
 
 ## Decision Procedure
-Describe the domain operation without framework nouns. Then count the additional concepts required only to make the framework perform that operation. If those concepts dominate, expose the operation more directly.
+Describe the desired operation without framework nouns.
+
+Then list each framework construct on the path and ask:
+
+> What capability would be lost if this were replaced by the host language's direct construct or a narrow adapter?
+
+Valid answers include transaction scope, host hook contract, runtime plugin discovery, request isolation, protocol decoding. Invalid answers include “that's how the framework wants it,” “it may be useful later,” and “it makes the architecture look consistent.”
+
+If most constructs exist to satisfy each other rather than the problem, the tax dominates.
 
 ## Examples
-- positive: a one-function feature requires a module, provider, interceptor, config file, and generated stub before the function is reachable.
-- near-miss: a DI container owns request-scoped resources and auth filters that would be riskier to reimplement ad hoc.
-- counterexample: strip unused ceremony and expose the operation through the simplest native construct that fits.
+- positive: one repository implementation is hidden behind an interface, provider class, token string, container module, factory, and resolver solely because “everything should use DI.”
+- positive: a domain validation rule is scattered through request decorator metadata, middleware, ORM hooks, and serializer config, with no single semantic owner.
+- positive: core domain functions accept a web framework request object because threading a small explicit context would require fewer annotations.
+- near-miss: a plugin host requires a specific hook object; one adapter translates that hook into domain commands while the rest of the system ignores host types.
+- counterexample: a transaction framework owns real commit/rollback semantics across multiple persistence operations and removes bespoke failure machinery.
 
 ## Nudge
-An abstraction should make the problem smaller. If framework ritual is larger than the domain operation, remove the ritual until the problem is visible again.
+A framework should make the problem smaller.
+
+If engineers must first learn the framework's mythology before they can see a simple domain action, you are paying interest on the tool.
