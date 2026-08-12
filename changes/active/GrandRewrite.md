@@ -5717,17 +5717,33 @@ Manager **不**拥有 `inspect`（已冻结）：Manager 永远不能亲手触�
 
 ## Remaining work
 
-1. **e2e**：`long-stroke.toml` 已按新 wire 迁移；需 `npm run test:e2e` 全绿或文档化客观 blocker。
-2. **Phase 17 i18n（续）**：Role Law 已迁至 `resources/provider/role/<name>/{en.md,zh-CN.md}` + Gate C 绿；仍缺 `world.*` / `library.*` 分层拆分、tool description / HOST-013 marker 双语、zh-CN 译文质量（非英中混杂）。
-3. **Phase 20 删 legacy 符号**：`TddPhase.fs` 已删；`BlogTool.fs`/`VerdictTool.fs`/`ListTool.fs`/`EditQaTool.fs` 等模块文件名仍待重命名。
-4. **Gate B baseline**：Join 迁移债务 ratchet 应随 leak 修复逐步清零。
-5. **§19 Acceptance**：逐项可观察关闭（尤其 Byname/calling wire、js-bookkeeper 完整 program SDK、TerminalName closure 占用）。
-6. **§20 Non-Goals**：Steward 仍不得伪装已交付；Sphinx MCP 已 merge（Inquiry `sphinx_*`），非 GrandRewrite V1 Inquiry prompt 层。
+1. **e2e**：`long-stroke.toml` 已部分迁移新 wire；preflow 已过，主流程卡在 `mgr-labor.2` watchdog（见 Blockers）。需 `npm run test:e2e` 全绿。
+2. **integration prompts**：`tests/integration/resources/prompts.test.mjs` 1 败（Inquiry system prompt 未含 `sphinx_start|sphinx_resume` 子串——Sphinx merge 后 prompt 与契约未对齐）。
+3. **Phase 17 i18n（续）**：Role Law 已迁至 `resources/provider/role/<name>/{en.md,zh-CN.md}` + Gate C 绿；仍缺 `world.*` / `library.*` 分层拆分、tool description / HOST-013 marker 双语、zh-CN 译文质量（非英中混杂）。
+4. **Phase 20 删 legacy 符号**：`TddPhase.fs` 已删；`BlogTool.fs`/`VerdictTool.fs`/`ListTool.fs`/`EditQaTool.fs` 等模块文件名仍待重命名。
+5. **Gate B baseline**：Join 迁移债务 ratchet 应随 leak 修复逐步清零。
+6. **§19 Acceptance**：逐项可观察关闭（尤其 Byname/calling wire、js-bookkeeper 完整 program SDK、TerminalName closure 占用）。
+7. **§20 Non-Goals**：Steward 仍不得伪装已交付；Sphinx MCP 已 merge（Inquiry `sphinx_*` 权限），Inquiry **prompt 层** Sphinx 工具说明未写入 Role Law（与 integration prompts 败一致）。
 
 ## Done since Amendment（2026-08-12）
 
-- `manager-tool-contract` 22/22；Gate D 实装；`TddPhase` 删除；`npm test` 2358/2358。
+- `manager-tool-contract` 22/22；Gate D 实装；`TddPhase` 删除。
 - i18n 目录纠正为 semantic path + `en.md`/`zh-CN.md` 叶子（§4.7.8）。
+- **ARCH-010 / ForkChildPayload**：commissioner 历史移入 instruction 注释区；`arch010-cases` injection 期望对齐 basic-string 语义；integration harness **273/273**。
+- **HOST-026**：`ProviderLanguageBinding.readGlobalPreference` 用 `Option.ofObj` 处理 Fable `undefined`；e2e `isolated-env.js` 显式 `WANXIANGSHU_PROVIDER_LANGUAGE=en`；单元 `HOST_026_readGlobalPreference_defaults_when_env_unset`。
+- **long-stroke e2e 迁移（未全绿）**：`blog`→`chronicle`、`inspector`→`inspect`、SyncDelegate 子会话删 `return`；新增 `protocol-repair`、`manager-blind-plan` internal turn；Strength K2 owner `runtimeStep=2`；G2 oracle `startsWith` + 无 `return` 过滤。
+- **Sphinx merge 后**：`agent-permission-gate` / `js-surface` 对齐 `sphinx_*`。
+- `npm test` **2379/2379**（2026-08-12 收工时点）。
+
+## Verification snapshot（2026-08-12 收工）
+
+```text
+npm run build                                      → ok
+npm test                                           → 2379 passed / 0 failed
+npm run test:integration                           → harness 273/273；suite 含 prompts.test.mjs 1 failed（见 Remaining #2）
+npm run test:e2e                                   → 未绿；preflow 绿；主流程 ~100+ mock 请求后 mgr-labor.2 watchdog
+Gate A–D                                           → 绿（Gate D 见 prompt-stability.test.mjs）
+```
 
 ## Completion criteria
 
@@ -5739,7 +5755,22 @@ Manager **不**拥有 `inspect`（已冻结）：Manager 永远不能亲手触�
 
 ## Blockers
 
-（无）
+### e2e — `mgr-labor.2`（2026-08-12）
+
+- **症状**：`npm run test:e2e` 在 `mgr-labor.2` 处 watchdog 静默（~5s）；`expectation=none`。
+- **已越过**：preflow（native-todo、Strength K2 dry-run、G2 PREFIX LAW、G6 bookkeeper finalize）；主流程至 manager blind-plan、manager fork/join、mgr-labor.0–1。
+- **因果诊断（watchdog dump）**：`BrokenCausalEdge` — `OrchestratorJob:{job=…}` 等 `ManagerWorkflow:agent=…` 的 `manager-job-completion`，但 producer 无 active wait。
+- **下一手**：对齐 `mgr-labor` TOML mock 步序与 hold-child / join-harvest 链；核对 `long-stroke-oracles.mjs` `holdChildC1UntilLabor` 与 flow `wait` 声明是否仍匹配 GrandRewrite join/horizon wire。
+
+### integration — Inquiry prompt vs Sphinx（2026-08-12）
+
+- `tests/integration/resources/prompts.test.mjs`：Inquiry `en` system prompt 不含 `sphinx_start|sphinx_resume`（权限已 merge，Role Law 文案未更新）。
+
+## Amendment — 2026-08-12（session 收工）
+
+- **Recorded by**：Agent（用户指令「写入当前状态，并下班了」）
+- **Change**：Verification snapshot + Blockers 落盘；**不**移入 `completed/`（e2e 与 integration prompts 未绿）。
+- **Reason**：收工交接；避免 premature close 重演。
 
 ## Amendment — 2026-08-12
 

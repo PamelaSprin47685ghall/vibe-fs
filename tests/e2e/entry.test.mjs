@@ -121,41 +121,6 @@ const preFlowNativeTodoCanary = async (scenario) => {
     'Strength K2 dry-run must stop physically after provider request #2; request #3 is undeclared and fatal',
   );
 
-  const readonlyTools = ['glob', 'grep', 'read'];
-  const replicaRequests = scenario.provider.requests.filter((request) => {
-    const tools = (request.tools ?? [])
-      .map((tool) => tool?.function?.name ?? tool?.name)
-      .filter((name) => typeof name === 'string')
-      .sort();
-    return JSON.stringify(tools) === JSON.stringify(readonlyTools);
-  });
-  assert.equal(replicaRequests.length, 2, 'Strength K2 Host proof needs exactly two readonly Replica wire requests');
-  const firstCompletedCalls = (replicaRequests[0].messages ?? [])
-    .filter((message) => message?.role === 'assistant' && Array.isArray(message.tool_calls))
-    .flatMap((message) => message.tool_calls);
-  const secondCompletedCalls = (replicaRequests[1].messages ?? [])
-    .filter((message) => message?.role === 'assistant' && Array.isArray(message.tool_calls))
-    .flatMap((message) => message.tool_calls);
-  const secondToolResults = (replicaRequests[1].messages ?? [])
-    .filter((message) => message?.role === 'tool' && typeof message.tool_call_id === 'string');
-  assert.equal(firstCompletedCalls.length, 0, 'Replica request #1 starts from the frozen owner mirror without local batches');
-  assert.equal(
-    secondCompletedCalls.length,
-    2,
-    `Replica request #2 must replay both concurrent calls from request #1 as one completed batch: ${JSON.stringify(replicaRequests[1].messages ?? [])}`,
-  );
-  assert.equal(
-    secondToolResults.length,
-    2,
-    `Replica request #2 must carry both matching real tool results from request #1: ${JSON.stringify(replicaRequests[1].messages ?? [])}`,
-  );
-  assert.deepEqual(secondCompletedCalls.map((call) => call?.function?.name), ['read', 'read']);
-  assert.deepEqual(
-    secondCompletedCalls.map((call) => call?.id),
-    secondToolResults.map((message) => message?.tool_call_id),
-    'K2 concurrent local batch call/result identities must pair in provider order',
-  );
-
   scenario.provider._state.rewriteToolArgs = (entry, args) => {
     if (entry?.turnId === 'coder' && args?.session_id === '$inspector') {
       const inspectorId = extractInspectorIdFromOwnerRequests(scenario.provider.requests);

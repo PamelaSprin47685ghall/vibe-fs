@@ -577,9 +577,9 @@ export function extractInspectorIdFromOwnerRequests(requests) {
  */
 export function assertG2InspectorPrefixLaw(scenario) {
   const requests = chatRequests(scenario.provider.requests);
-  const q1 = requests.filter((body) => lastUserText(body).includes(G2_Q1));
-  const q2 = requests.filter((body) => lastUserText(body).includes(G2_Q2));
-  const q3 = requests.filter((body) => lastUserText(body).includes(G2_Q3));
+  const q1 = requests.filter((body) => lastUserText(body).startsWith(G2_Q1));
+  const q2 = requests.filter((body) => lastUserText(body).startsWith(G2_Q2));
+  const q3 = requests.filter((body) => lastUserText(body).startsWith(G2_Q3));
   // Each Inspector question begins with the SyncDelegate SendPrompt wire pinned by
   // g2-inspector-qN.0. After EXEC-031 the child completes with ordinary assistant
   // text — no return tool on the wire.

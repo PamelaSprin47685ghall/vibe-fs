@@ -363,6 +363,17 @@ tools = ["commission", "join"]
 # stays blocked while holdChild keeps coder incomplete for user_message wake.
 # tools MUST match the real Manager provider surface (no todowrite — see flow note).
 [[turn]]
+id = "manager-blind-plan"
+internal = true
+user = "# The account is not yet ready to entrust."
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "todowrite", args = { obligations = [{ name = "long-stroke", work = "Run the long stroke through publish_proof.txt." }] } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Blind plan obligations recorded." }
+
+[[turn]]
 id = "manager"
 lane = "fast-manager"
 user = "# Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept REVISE then reach a blessed ending so publish can reconcile."
