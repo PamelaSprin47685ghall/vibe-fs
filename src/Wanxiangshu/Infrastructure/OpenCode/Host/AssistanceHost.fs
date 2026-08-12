@@ -40,7 +40,9 @@ type AssistanceHost
     let claimedOwnerAttempts = HashSet<string>()
 
     let ownerAttemptKey (turn: ReconciledTurn) =
-        SessionId.value turn.SessionId + "\u001f" + ProviderRunIdentity.value turn.ProviderRun
+        SessionId.value turn.SessionId
+        + "\u001f"
+        + ProviderRunIdentity.value turn.ProviderRun
 
     let sessionClaimPrefix (sessionId: SessionId) = SessionId.value sessionId + "\u001f"
 
@@ -501,8 +503,7 @@ type AssistanceHost
                             if not (sensor.TryTake(turn.SessionId, turn.ProviderRun)) then
                                 return AssistanceTurnDisposition.Handled
                             else
-                                return!
-                                    beginConsultation turn.SessionId profile.LogicalRunId requester turn.Directory
+                                return! beginConsultation turn.SessionId profile.LogicalRunId requester turn.Directory
         }
 
     let handleConsultationTurn

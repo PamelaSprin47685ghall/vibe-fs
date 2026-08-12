@@ -189,8 +189,12 @@ const assertG6ColdFetch = async (scenario) => {
     .filter((message) => message?.role === 'tool' || message?.role === 'toolResult')
     .map((message) => String(message?.content ?? ''));
   assert.ok(
-    fetchResults.some((text) => text.includes('fresh') && text.includes(G6_CANONICAL_A)),
-    `G6 fetch must return fresh canonical A from the later Coder session; inspector=${scenario.g6InspectorSessionId ?? 'unknown'} results=${JSON.stringify(fetchResults).slice(0, 800)}`,
+    fetchResults.some(
+      (text) =>
+        text.includes('No change was found in the evidence this answer depended on.')
+        && text.includes(G6_CANONICAL_A),
+    ),
+    `G6 fetch must return the current canonical A from the later Coder session; inspector=${scenario.g6InspectorSessionId ?? 'unknown'} results=${JSON.stringify(fetchResults).slice(0, 800)}`,
   );
 };
 
