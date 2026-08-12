@@ -1,7 +1,7 @@
 /**
  * scenario-paths.js — Resolves the on-disk Plugin.js path for a given
  * variant. Extracted from scenario.js so the main file stays under
- * the 200-line Kolmogorov line budget.
+ * the 200-line Kolmogorov advisory target.
  */
 
 import fs from 'node:fs';

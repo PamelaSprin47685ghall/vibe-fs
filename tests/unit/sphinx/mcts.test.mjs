@@ -1,14 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { ofArray as listOfArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
-import { ofArray as mapOfArray } from '../../../dist/fable_modules/fable-library-js.5.13.0/Map.js'
+import { mapOfEntries, toList } from '../support/domain.mjs'
 import { Model, run, uct } from '../../../dist/Sphinx/MonteCarlo.js'
 import { MonteCarloNode } from '../../../dist/Sphinx/RuntimeTypes.js'
 
-const comparer = { Compare: (a, b) => a.localeCompare(b) }
-const map = (entries) => mapOfArray(entries, comparer)
-const childMap = (entries) => map(entries.map(([key, children]) => [key, listOfArray(children)]))
+const map = (entries) => mapOfEntries(entries)
+const childMap = (entries) => map(entries.map(([key, children]) => [key, toList(children)]))
 
 test('mcts_selection_expansion_rollout_backup_prefers_high_value_branch', () => {
   const model = new Model(

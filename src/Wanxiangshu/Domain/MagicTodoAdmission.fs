@@ -47,14 +47,11 @@ module MagicTodoAdmission =
           TodoWriteId: TodoWriteId }
 
     /// Result of Magic before admission prior to mutating Host args / appending Prepared.
-    type AdmissionOutcome =
-        | FreshPrepare of PrepareSuccess
-        | IdempotentReplay of TodoWriteId
-        | Rejected of MagicTodoReject
-
+    /// The control algebra is identical for historical and clean-break plans; only
+    /// the successful prepare payload differs.
     [<RequireQualifiedAccess>]
-    type ObligationAdmissionOutcome =
-        | FreshPrepare of ObligationPrepareSuccess
+    type AdmissionOutcome<'Prepare> =
+        | FreshPrepare of 'Prepare
         | IdempotentReplay of TodoWriteId
         | Rejected of MagicTodoReject
 
@@ -68,7 +65,7 @@ module MagicTodoAdmission =
         (existingPrepared: ExistingPrepared option)
         (localized: LocalizedToolCall)
         (rawInputs: MagicTodoInputItem list)
-        : AdmissionOutcome =
+        : AdmissionOutcome<PrepareSuccess> =
         match MagicTodo.admitTodowriteBatch localized.TodowriteCallIdsInMessage with
         | Error e -> AdmissionOutcome.Rejected e
         | Ok() ->
@@ -117,9 +114,9 @@ module MagicTodoAdmission =
         (existingPrepared: ExistingPrepared option)
         (localized: LocalizedToolCall)
         (submitted: ObligationList)
-        : ObligationAdmissionOutcome =
+        : AdmissionOutcome<ObligationPrepareSuccess> =
         match MagicTodo.admitTodowriteBatch localized.TodowriteCallIdsInMessage with
-        | Error e -> ObligationAdmissionOutcome.Rejected e
+        | Error e -> AdmissionOutcome.Rejected e
         | Ok() ->
             let writeId = MagicTodo.todoWriteId sha256 lifeId localized.ToolCallId
 
@@ -132,17 +129,17 @@ module MagicTodoAdmission =
                       ToolPartOrdinal = localized.ToolPartOrdinal }
 
                 match MagicTodo.checkPreparedReplay existing.Identity observed with
-                | Error e -> ObligationAdmissionOutcome.Rejected e
-                | Ok() -> ObligationAdmissionOutcome.IdempotentReplay writeId
-            | Some _ -> ObligationAdmissionOutcome.Rejected(MagicTodoReject.IdentityCorruption "TodoWriteId")
+                | Error e -> AdmissionOutcome.Rejected e
+                | Ok() -> AdmissionOutcome.IdempotentReplay writeId
+            | Some _ -> AdmissionOutcome.Rejected(MagicTodoReject.IdentityCorruption "TodoWriteId")
             | None ->
                 match mayProceedPastLag1 with
-                | Error e -> ObligationAdmissionOutcome.Rejected e
+                | Error e -> AdmissionOutcome.Rejected e
                 | Ok() ->
                     match MagicTodo.validateObligations submitted with
-                    | Error e -> ObligationAdmissionOutcome.Rejected e
+                    | Error e -> AdmissionOutcome.Rejected e
                     | Ok proposed ->
-                        ObligationAdmissionOutcome.FreshPrepare
+                        AdmissionOutcome.FreshPrepare
                             { TodoWriteId = writeId
                               Proposed = proposed
                               Base = settledCurrent

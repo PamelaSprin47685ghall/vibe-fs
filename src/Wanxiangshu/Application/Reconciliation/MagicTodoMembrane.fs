@@ -199,8 +199,8 @@ module MagicTodoMembrane =
                             submitted
 
                     match admission with
-                    | ObligationAdmissionOutcome.Rejected rejection -> Error(PrepareRejection.Admission rejection)
-                    | ObligationAdmissionOutcome.IdempotentReplay replayWriteId ->
+                    | AdmissionOutcome.Rejected rejection -> Error(PrepareRejection.Admission rejection)
+                    | AdmissionOutcome.IdempotentReplay replayWriteId ->
                         match Map.tryFind (TodoWriteId.value replayWriteId) life.Checkpoints with
                         | None -> Error(PrepareRejection.ProjectionInconsistent "replayed Prepared is absent")
                         | Some checkpoint ->
@@ -220,7 +220,7 @@ module MagicTodoMembrane =
                                         checkpoint.Accepted
                                         checkpoint.OutputDigest
                                 )
-                    | ObligationAdmissionOutcome.FreshPrepare preparedPlan ->
+                    | AdmissionOutcome.FreshPrepare preparedPlan ->
                         match
                             writeList journal "BaseTodo" preparedPlan.Base,
                             writeList journal "ProposedTodo" preparedPlan.Proposed

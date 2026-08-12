@@ -7,8 +7,8 @@
 //
 // Existing violations (imports of dist/fable_modules/** in *.test.mjs that
 // predate this check) are grandfathered in EMBEDDED_BASELINE and tolerated;
-// NEW violations fail. This mirrors the kolmogorov-size ratchet: legacy debt is
-// reported, not blocked, and it must never grow.
+// NEW violations fail. Unlike Kolmogorov size (which is advisory only), this
+// is a semantic anti-corruption boundary: compiler-runtime imports must not spread.
 //
 // Modes:
 //   node scripts/checks/test-boundary.mjs

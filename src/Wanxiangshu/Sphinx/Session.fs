@@ -3,6 +3,28 @@ namespace Wanxiangshu.Sphinx
 open System
 open System.Collections.Generic
 open Fable.Core
+open Fable.Core.JsInterop
+
+module private SessionWire =
+
+    let result (handle: string option) (inquiryResult: InquiryResult) =
+        let handleField =
+            match handle with
+            | Some value -> [ "handle" ==> value ]
+            | None -> []
+
+        match inquiryResult with
+        | InquiryResult.Yield request ->
+            createObj (
+                handleField
+                @ [ "status" ==> "yield"; "request" ==> Codec.requestObject request ]
+            )
+        | InquiryResult.Answered answer ->
+            createObj (
+                handleField
+                @ [ "status" ==> "answered"; "answer" ==> Codec.answerObject answer ]
+            )
+        | InquiryResult.Error error -> createObj (handleField @ [ "status" ==> "error"; "error" ==> error ])
 
 module private SessionInterop =
 
@@ -23,21 +45,21 @@ type SessionStore() =
         let state, result = Policy.start question
 
         match result with
-        | InquiryResult.Error _ -> Codec.inquiryResultObject None result
+        | InquiryResult.Error _ -> SessionWire.result None result
         | _ ->
             let handle = SessionInterop.randomUUID ()
             sessions[handle] <- state
-            Codec.inquiryResultObject (Some handle) result
+            SessionWire.result (Some handle) result
 
     member _.Resume(handle: string, rawObservation: obj) : obj =
         if String.IsNullOrWhiteSpace handle then
-            Codec.inquiryResultObject None (InquiryResult.Error "missing handle")
+            SessionWire.result None (InquiryResult.Error "missing handle")
         else
             match sessions.TryGetValue handle with
-            | false, _ -> Codec.inquiryResultObject (Some handle) (InquiryResult.Error "unknown handle")
+            | false, _ -> SessionWire.result (Some handle) (InquiryResult.Error "unknown handle")
             | true, state ->
                 match Codec.decodeObservation rawObservation with
-                | Error error -> Codec.inquiryResultObject (Some handle) (InquiryResult.Error error)
+                | Error error -> SessionWire.result (Some handle) (InquiryResult.Error error)
                 | Ok observation ->
                     let next, result = Policy.resume state observation
 
@@ -45,7 +67,7 @@ type SessionStore() =
                     | InquiryResult.Error _ -> ()
                     | _ -> sessions[handle] <- next
 
-                    Codec.inquiryResultObject (Some handle) result
+                    SessionWire.result (Some handle) result
 
 module Session =
 

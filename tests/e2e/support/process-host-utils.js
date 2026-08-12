@@ -3,7 +3,7 @@
  * socket/PID/process-tree checks, listen-port parsing.
  *
  * Side-effect-free functions live here so the main class file stays under
- * the 200-line Kolmogorov line budget.
+ * the 200-line Kolmogorov advisory target.
  */
 
 import { spawn } from "node:child_process";

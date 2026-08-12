@@ -78,7 +78,7 @@ Codec → Session → McpServer
 
 Sphinx 源文件可以同处 `Wanxiangshu.fsproj`，但内核依赖不得反向指向 `Wanxiangshu.Domain`、Agent、Host、Journal、Session runtime。namespace 同属 `Wanxiangshu` 不等于语义所有权共享。
 
-MCP SDK / zod 是最外壳依赖，只能出现在 `McpServer.fs`。Node crypto UUID 只在 `Session.fs`。其余认识逻辑保持纯函数或不可变状态变换。
+MCP SDK / zod 是最外壳依赖，只能出现在 `McpServer.fs`。Node crypto UUID 与 `handle/status` response envelope 只在 `Session.fs`；`Codec.fs` 刻意保持很小，作为 Observation decode / Request encode / Answer encode 三个公共入口的合法 seam，而不是第二层业务实现。其余认识逻辑保持纯函数或不可变状态变换。
 
 ## 不变量
 

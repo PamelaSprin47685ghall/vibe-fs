@@ -307,7 +307,15 @@ export function deriveRequests(scenario) {
           ? [user(TITLE_MARKER), user(text)]
           : [systemMessage(), user(text)];
 
+    let derivedStep = 0;
     for (const entry of entries) {
+      // `runtimeStep` may deliberately pin a sparse measured Host cursor. Fill
+      // only the missing assistant positions so the derived request reaches the
+      // exact declared step without inventing another scenario edge.
+      while (derivedStep < entry.step) {
+        messages.push(assistant(`derived sparse cursor ${derivedStep} of ${entry.turnId}`));
+        derivedStep += 1;
+      }
       for (let delivery = 0; delivery < deliveryCount(scenario, entry); delivery += 1) {
         requests.push({
           expectedEntryId: entry.id,
@@ -321,6 +329,7 @@ export function deriveRequests(scenario) {
         });
       }
       messages.push(assistant(`declared step ${entry.step} of ${entry.turnId}`));
+      derivedStep += 1;
     }
     previousMessages = messages;
   });
