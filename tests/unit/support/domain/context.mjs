@@ -1288,7 +1288,7 @@ export const projectionAlgebra = (() => {
  * pair / challenge text; Host modules must reference these rather than literals.
  */
 export const projectionConstants = (() => {
-  const names = ['RepairInstruction', 'PairProgrammingGuidelineText', 'ReviewChallengeText', 'ReviewChallengePrompt']
+  const names = ['RepairInstruction', 'ReviewChallengeText', 'ReviewChallengePrompt']
   const out = {}
   for (const name of names) {
     try {

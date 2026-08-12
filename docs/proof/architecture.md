@@ -10,7 +10,7 @@
 |------|--------|----------|--------|
 | A Tool Referential Integrity | 同名工具 → 唯一 schema owner + 唯一 semantic contract；异硬语义不得同名 | 静态扫描 / capability isomorphism；同名双合同红 | ARCH-007；工具 rename 面见 execution/agent proof |
 | B Provider Leak | provider 输出禁 SessionId / AgentId / ManagerJobId / PtyId / FissionGroupId / lane / worktree / fallback offset / `fast-`·`deep-` / spool | 扫描 schema / fixed prose / join·horizon 后果；泄漏必红 | EXEC-030；projection / join proof |
-| C Language Parity | 每个 provider semantic resource：EN + zh-CN 皆存在；叶对 + `{{placeholder}}` 集合一致为现行；semantic-anchor parity 后续（PROMPT-019） | 资源成对存在；缺语言 fail；invariant 标识不译；占位符集合不一致红 | HOST-026、PROMPT-017/019；`proof/host.md`、`proof/prompt.md` |
+| C Language Parity | 每个 provider semantic resource：EN + zh-CN 皆存在；叶对 + `{{placeholder}}` 集合一致；Role Law semantic-anchor 同 ID 双语命中（PROMPT-019） | 资源成对存在；缺语言 fail；invariant 标识不译；占位符集合不一致红；Role Law 缺锚点红 | HOST-026、PROMPT-017/019；`proof/host.md`、`proof/prompt.md` |
 | D Prompt Stability | 同 session：Fallback / T1 / review / reanchor / Strength → system prompt 字节相同；只允许改 EffectiveAgent | before/after 字节相等；Persona / SessionProviderLanguage 不重绑 | PROMPT-014、FALLBACK-014、AGENT-029；`proof/prompt.md` |
 | E Provider Prose Ownership | 已知 provider-surface owner 不得新增 NL literal；baseline ratchet 只减不增 | `scripts/checks/provider-prose-ownership.mjs` + `tests/unit/verify/provider-prose-ownership.test.mjs`；per-file 计数 > baseline → 红 | PROMPT-019；`proof/prompt.md`、`proof/verify.md` |
 

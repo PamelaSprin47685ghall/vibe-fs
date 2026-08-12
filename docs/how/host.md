@@ -293,7 +293,7 @@ Start 组（ordinal 升序）
 
 ```text
 lang = SessionProviderLanguage(session)   // HOST-026；禁读全局
-guideline = loadLocalized(PairProgrammingGuidelineText, lang)
+guideline = ProviderProse.render lang host/pair-programming-guideline
 nudge     = if priorTip then loadLocalized(TipNudge(priorTip), lang) else None
 elapsed   = humanScale(SessionStartedAt → now via IClockPort)
             // EN: "N minutes M seconds"；ZH: "N 分 M 秒"
@@ -304,7 +304,7 @@ markerText = concat(optional nudge, wallClock, guideline)
 
   `SessionStartedAt` 在 session 创建时绑定一次并 durable；restart / fallback / Strength **不得**改写。  
   prior tip 由 owner RecentTips 解析（主 session），不是 Blogger 自身 tip。  
-  MagicTodoManagerGuideline **不**写入 `PairProgrammingGuidelineText`（TODO-013）。
+  MagicTodoManagerGuideline **不**写入 `host/pair-programming-guideline`（TODO-013）。
 - pair 的 synthetic side-channel 标识为 `source = "pair-programming-auto-injected"`；两侧均按 source 排除于 XTrace 等非 provider 投影，禁止按正文识别或过滤。
 - `CallId = digest(transcript identity + source + Ordinal)`；禁止随机、时间、anchor 或 tip 文本参与身份。正文与 source 单点定义。
 - 不变量校验至少：全部历史 anchor 已解析、无重复 placement、call/result 同 callID、synthetic 字节确定（同输入同输出）、当前 placement 与决策算法一致。
@@ -489,7 +489,7 @@ derive assistant message / provider run / ordinal / XTrace range
 ### 8. 与 HOST-013 / BlindPlan / transform 的相对顺序
 
 membrane 挂在 tool hooks，**不**插入 messages.transform 链。  
-Manager-only guideline / BlindPlan 文案（TODO-013/015）在 projection/prompt 层叠加，与 HOST-013 pair replay 正交：HOST-013 仍按 Work session 通用规则、按 `SessionProviderLanguage` 注入双语 + wall-clock；Magic / BlindPlan 文案不得写入 `PairProgrammingGuidelineText`。  
+Manager-only guideline / BlindPlan 文案（TODO-013/015）在 projection/prompt 层叠加，与 HOST-013 pair replay 正交：HOST-013 仍按 Work session 通用规则、按 `SessionProviderLanguage` 注入双语 + wall-clock；Magic / BlindPlan 文案不得写入 `host/pair-programming-guideline`。  
 T1 关闭 Opening 属 TODO-015 / COMPANION-014；Host membrane **不**拥有 OpeningPolicy / OpeningMaterial。
 
 ## NEEDHELP sensor / reconcile（HOST-027 / AGENT-031）

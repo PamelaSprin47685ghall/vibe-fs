@@ -238,3 +238,8 @@ test('JS004_lying_generator_counterexample_is_rejected', () => {
   }
   assert.equal(names.includes('rewrite'), false)
 })
+
+test('JS_description_retains_no_unsubstituted_placeholders', () => {
+  const result = generate('Coder', caps(ToolPermission.Read, ToolPermission.Edit, ToolPermission.Write), jsProse())
+  assert.equal(result.Description.includes('{{'), false)
+})

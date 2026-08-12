@@ -15,6 +15,7 @@ open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Recovery
+open Wanxiangshu.Resources
 open Wanxiangshu.Session
 open PluginHostInterop
 
@@ -281,12 +282,12 @@ module PluginTransforms =
                     let messages = unbox<obj array> outObj?messages |> Array.toList
 
                     let guideline =
-                        match projectionSessionIdOpt with
-                        | Some sessionId ->
-                            match ProviderLanguageBinding.ensureRoot (SessionId.create sessionId) with
-                            | ProviderLanguage.English -> ProjectionConstants.PairProgrammingGuidelineText
-                            | ProviderLanguage.SimplifiedChinese -> ProjectionConstants.PairProgrammingGuidelineTextZhCn
-                        | None -> ProjectionConstants.PairProgrammingGuidelineText
+                        let lang =
+                            match projectionSessionIdOpt with
+                            | Some sessionId -> ProviderLanguageBinding.ensureRoot (SessionId.create sessionId)
+                            | None -> ProviderLanguage.English
+
+                        ProviderProse.render lang ProjectionConstants.PairProgrammingGuidelinePath Map.empty
 
                     let markerText =
                         match journal, projectionSessionIdOpt with

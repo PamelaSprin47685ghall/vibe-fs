@@ -107,7 +107,7 @@ SyntheticToml / ToolHostCodec
 
 Bound session：缺 localization ≠ 许可换语言；fail closed（禁 silent English fallback）。
 
-Gate 0 / Batch 迁文属 Change 工作；本条立法，不定批次日程。装载见 `how/prompt.md`；所有权门禁见 ARCH-016 Gate E；成对资源与 `{{placeholder}}` 结构 parity 见 ARCH-016 Gate C；semantic-anchor parity 仍为后续。
+Gate 0 / Batch 迁文属 Change 工作；本条立法，不定批次日程。装载见 `how/prompt.md`；所有权门禁见 ARCH-016 Gate E；成对资源、`{{placeholder}}` 结构 parity 与 Role Law semantic-anchor parity 见 ARCH-016 Gate C。
 
 ## PROMPT-004：来源类型
 
@@ -201,7 +201,7 @@ if CanonicalRole = Manager
 then MagicTodoManagerGuideline
 ```
 
-禁止把 Magic Todo 文案并入 `ProjectionConstants.PairProgrammingGuidelineText` 或对其它角色投影。
+禁止把 Magic Todo 文案并入 `resources/provider/host/pair-programming-guideline` 或对其它角色投影。
 
 `MagicTodoManagerGuideline` 冻结语义（全文 owner 见 TODO-013/015；协议本体见 TODO-001/002）：
 

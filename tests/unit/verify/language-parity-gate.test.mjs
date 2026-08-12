@@ -18,6 +18,8 @@ import {
   scanPlaceholderParity,
   scanProviderResourcesHook,
   scanRepo,
+  scanSemanticAnchorCatalog,
+  scanSemanticAnchorParity,
 } from '../../../scripts/checks/language-parity-gate.mjs'
 
 const GOOD_HOOK = `
@@ -183,4 +185,30 @@ test('gate_c_extract_placeholders', () => {
     'charge',
   ])
   assert.deepEqual([...extractPlaceholders('no holes')].sort(), [])
+})
+
+test('gate_c_semantic_anchor_parity_detects_missing_zh_id', () => {
+  const fx = makeProviderFixture()
+  try {
+    fx.writePair('role/demo', 'Waiting is justified by dependency.', '等待是一种习惯。')
+    const catalog = {
+      demo: [{ id: 'waiting-by-dependency', en: /justified by dependency/i, zh: /等待由依赖证明/ }],
+    }
+    const violations = scanSemanticAnchorParity(fx.providerAbs, catalog)
+    assert.equal(violations.length, 1)
+    assert.equal(violations[0].code, 'semantic-anchor')
+    assert.match(violations[0].path, /zh-CN\.md$/)
+    assert.match(violations[0].detail ?? '', /waiting-by-dependency/)
+  } finally {
+    fx.dispose()
+  }
+})
+
+test('gate_c_semantic_anchor_catalog_requires_every_role_law', () => {
+  const violations = scanSemanticAnchorCatalog(['role/manager', 'role/unknown-office'])
+  assert.ok(violations.some((v) => v.code === 'semantic-anchor-catalog' && /unknown-office/.test(v.path)))
+  assert.equal(
+    violations.filter((v) => /role\/manager$/.test(v.path)).length,
+    0,
+  )
 })

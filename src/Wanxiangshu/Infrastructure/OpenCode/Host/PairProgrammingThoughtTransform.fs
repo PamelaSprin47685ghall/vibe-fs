@@ -10,6 +10,7 @@ open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Resources
 
 /// HOST-013：永久 pair-programming auto-injected pairs。
 ///
@@ -20,8 +21,9 @@ open Wanxiangshu.Kernel.Identity
 /// 不再新增。同 epoch 内前次 provider wire 必须是后次 wire 的字节前缀（ARCH-004）。
 module PairProgrammingThoughtTransform =
 
-    /// HOST-013 auto-injected 正文。Domain 单源。
-    let text = ProjectionConstants.PairProgrammingGuidelineText
+    /// HOST-013 English canonical used by tests; production loads via session language.
+    let text =
+        ProviderProse.render ProviderLanguage.English ProjectionConstants.PairProgrammingGuidelinePath Map.empty
 
     /// Provider id on a Host message (`info.providerID` or `info.model.providerID`).
     let providerIdOfMessage (rawMsg: obj) : string option =

@@ -19,7 +19,7 @@
 | `WorkRecordStart` / Opening Blogger floor | 自 `LifeOpened` / Opening cursor **纯推导**（TODO-001） | 禁止绑回 `WorkActivated`；禁止平行 stage floor（TODO-012） |
 | BlindPlan T1 commitment + entrustment revelation | TODO-015（first `TodoWriteAccepted` → canonical T1 result） | 交托只经 conversation tool result；禁止 system prompt / Persona / Role Law 切换（PROMPT-014；GLORY-075） |
 | Pre-T1 / T1 / Post-T1 冻结文案 | TODO-015 分段 owner（Planning Table / T1 revelation / Living Mission / idle） | SURFACE-004；不得并入全局 pair guideline 或 Role Law |
-| `MagicTodoManagerGuideline` | TODO-013（Manager-only fragment） | 禁止并入 `ProjectionConstants.PairProgrammingGuidelineText` |
+| `MagicTodoManagerGuideline` | TODO-013（Manager-only fragment） | 禁止并入 `host/pair-programming-guideline` |
 | Process-review 工作证据 | 既有 canonical LWR + `RecordCoverage` | 四段标题 COMPANION-003；禁止第二 renderer / session-head LWR（TODO-008、TODO-012） |
 | Lag-1 prefix 可替换性 | 既有 `PrefixCoverage` + `PrefixRebaseCommitted`（`EvidenceKind=TodoCheckpoint`）→ `ActivePrefixEpoch` | 禁止 todo-only 第二套 ActivePrefixEpoch；禁止 RawGap 做 prefix replacement（TODO-008/009/012） |
 | Desired lag-1 cutoff 事实源 | Accepted checkpoint 链纯推导 | 禁止 `NeedRebase` Stage；Accepted **不**直接 commit epoch（TODO-006/009/012） |

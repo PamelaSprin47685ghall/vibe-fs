@@ -319,7 +319,7 @@ MagicTodo Manager Attempt
 ### 与 HOST-013 / BlindPlan 的交界
 
 HOST-013 pair-programming 仍是 **Work session 通用** marker，不专属 Manager；正文语言读 `SessionProviderLanguage`（HOST-026）。  
-Manager-only 持续 todowrite / BlindPlan 文案是 TODO-013/015 表面片段，在 role=Manager 且 `todowrite` provider-visible 时叠加；禁止并入全局 `PairProgrammingGuidelineText`。  
+Manager-only 持续 todowrite / BlindPlan 文案是 TODO-013/015 表面片段，在 role=Manager 且 `todowrite` provider-visible 时叠加；禁止并入 `host/pair-programming-guideline`。  
 Host membrane **不**拥有 OpeningPolicy / OpeningMaterial；T1 关闭 Opening 属 TODO-015 / COMPANION-014。
 
 ## NEEDHELP Host shape（HOST-027）

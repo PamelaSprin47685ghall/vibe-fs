@@ -152,7 +152,7 @@ export function assertNeedHelpAssistance(scenario) {
   assert.equal(hiddenInquiryLinks.length, 1, 'NEEDHELP: deep request must create exactly one hidden deep-inquiry consultation');
 
   const requests = scenario.provider.requests ?? [];
-  const consultation = requests.filter((request) => lastUserText(request).startsWith('# 如何解决这个 agent 的当前困难？'));
+  const consultation = requests.filter((request) => lastUserText(request).startsWith('# How should this agent resolve its current difficulty?'));
   assert.equal(consultation.length, 1, 'NEEDHELP: consultation provider request must occur exactly once');
   assert.match(
     lastUserText(consultation[0]),
@@ -161,7 +161,7 @@ export function assertNeedHelpAssistance(scenario) {
   );
 
   const advice = requests.filter((request) =>
-    lastUserText(request).startsWith('# 下面是一次独立 consultation 的 canonical child→parent LifecycleWorkRecord。'),
+    lastUserText(request).startsWith('# Below is the canonical child→parent LifecycleWorkRecord from an independent consultation.'),
   );
   assert.equal(advice.length, 1, 'NEEDHELP: child→parent advice request must occur exactly once');
   const adviceText = lastUserText(advice[0]);
@@ -172,7 +172,7 @@ export function assertNeedHelpAssistance(scenario) {
   );
   assert.doesNotMatch(
     adviceText,
-    /如何解决这个 agent 的当前困难？/,
+    /How should this agent resolve its current difficulty\?/,
     'NEEDHELP: child→parent LifecycleWorkRecord must exclude the consultation child Opening',
   );
 }

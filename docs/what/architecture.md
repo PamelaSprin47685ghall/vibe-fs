@@ -202,6 +202,6 @@ machine-semantic 结构只留在协议真需处（如 `exit_code`、`verdict`、
 |------|--------|
 | A Tool Referential Integrity | same tool name → 唯一 schema owner + 唯一 semantic contract owner（ARCH-007） |
 | B Provider Leak | provider 输出不得含 SessionId / AgentId / ManagerJobId / PtyId / FissionGroupId / lane_index / worktree / fallback offset / `fast-`·`deep-` binding / spool path |
-| C Language Parity | 每个 provider semantic resource：EN 与 zh-CN 皆存在（HOST-026）。叶对成对 + `{{placeholder}}` 集合一致为现行义务；semantic-anchor parity 为后续义务（PROMPT-019） |
+| C Language Parity | 每个 provider semantic resource：EN 与 zh-CN 皆存在（HOST-026）。叶对成对 + `{{placeholder}}` 集合一致 + Role Law semantic-anchor 同 ID 双语命中为现行义务（PROMPT-019） |
 | D Prompt Stability | 同 session：fallback / T1 / review / reanchor / Strength → system prompt 字节相同（AGENT-029、FALLBACK-014） |
 | E Provider Prose Ownership | 已知 provider-surface owner 不得新增自然语言字面量；baseline ratchet 只减不增（PROMPT-019） |

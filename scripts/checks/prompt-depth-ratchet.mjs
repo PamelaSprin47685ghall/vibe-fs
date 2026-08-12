@@ -15,20 +15,10 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { ROLE_ANCHOR_DIRS } from './semantic-anchors.mjs'
+
 const SHRINK_LIMIT = 0.2
-const ROLE_DIRS = Object.freeze([
-  'manager',
-  'coder',
-  'inspector',
-  'devops',
-  'inquiry',
-  'reviewer',
-  'orchestrator',
-  'browser',
-  'blogger',
-  'distiller',
-  'bookkeeper',
-])
+const ROLE_DIRS = ROLE_ANCHOR_DIRS
 const LOCALES = Object.freeze(['en.md', 'zh-CN.md'])
 
 const root = resolve(process.argv.includes('--root')

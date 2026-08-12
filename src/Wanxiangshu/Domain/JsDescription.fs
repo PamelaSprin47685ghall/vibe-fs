@@ -176,8 +176,14 @@ module JsCanonicalDescription =
           UltraBrowserTruncated: string }
 
     let private fill (template: string) (pairs: (string * string) list) =
-        (template, pairs)
-        ||> List.fold (fun acc (key, value) -> acc.Replace("{{" + key + "}}", value))
+        let replaced =
+            (template, pairs)
+            ||> List.fold (fun acc (key, value) -> acc.Replace("{{" + key + "}}", value))
+
+        if replaced.Contains("{{") then
+            invalidOp "PROMPT-019:unsubstituted-placeholder"
+
+        replaced
 
     let private fileReasons (prose: Prose) =
         [ "reason_empty_string_pattern", prose.ReasonEmptyStringPattern

@@ -12,6 +12,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
+import { ROLE_SEMANTIC_ANCHORS } from './semantic-anchors.mjs'
 
 export const PROVIDER_ROOT = 'resources/provider'
 export const ENFORCER_ROOT = 'resources/enforcer'
@@ -193,6 +194,64 @@ export const scanPlaceholderParity = (semanticDirs, providerAbs) => {
 }
 
 /**
+ * Role Law EN/zh-CN must hit the same semantic-anchor ids (PROMPT-019).
+ * @param {string} providerAbs
+ * @param {typeof ROLE_SEMANTIC_ANCHORS} [catalog]
+ * @returns {Violation[]}
+ */
+export const scanSemanticAnchorParity = (providerAbs, catalog = ROLE_SEMANTIC_ANCHORS) => {
+  /** @type {Violation[]} */
+  const violations = []
+  for (const [role, anchors] of Object.entries(catalog)) {
+    const enAbs = join(providerAbs, 'role', role, 'en.md')
+    const zhAbs = join(providerAbs, 'role', role, 'zh-CN.md')
+    if (!existsSync(enAbs) || !existsSync(zhAbs)) continue
+    const enText = readFileSync(enAbs, 'utf8')
+    const zhText = readFileSync(zhAbs, 'utf8')
+    for (const { id, en, zh } of anchors) {
+      if (!en.test(enText)) {
+        violations.push({
+          code: 'semantic-anchor',
+          path: norm(join(PROVIDER_ROOT, 'role', role, 'en.md')),
+          detail: `missing ${id}`,
+        })
+      }
+      if (!zh.test(zhText)) {
+        violations.push({
+          code: 'semantic-anchor',
+          path: norm(join(PROVIDER_ROOT, 'role', role, 'zh-CN.md')),
+          detail: `missing ${id}`,
+        })
+      }
+    }
+  }
+  return violations
+}
+
+/**
+ * Every Role Law directory with locale leaves must appear in the catalog.
+ * @param {string[]} semanticDirs
+ * @param {typeof ROLE_SEMANTIC_ANCHORS} [catalog]
+ * @returns {Violation[]}
+ */
+export const scanSemanticAnchorCatalog = (semanticDirs, catalog = ROLE_SEMANTIC_ANCHORS) => {
+  /** @type {Violation[]} */
+  const violations = []
+  for (const semantic of semanticDirs) {
+    const parts = semantic.split('/')
+    if (parts.length !== 2 || parts[0] !== 'role') continue
+    const role = parts[1]
+    if (catalog[role]) continue
+    violations.push({
+      code: 'semantic-anchor-catalog',
+      path: norm(join(PROVIDER_ROOT, semantic)),
+      detail: 'Role Law missing semantic-anchor catalog',
+    })
+  }
+  return violations
+}
+
+/**
  * EN/zh-CN protocol identifier sets must be equal (AC20).
  * @param {string[]} semanticDirs
  * @param {string} providerAbs
@@ -290,6 +349,8 @@ export const scanRepo = (repoRoot = process.cwd(), catalogOverrides) => {
   if (semanticDirs.length > 0) {
     violations.push(...scanIdentifierParity(semanticDirs, providerAbs, { tipIdentities, toolNames }))
     violations.push(...scanPlaceholderParity(semanticDirs, providerAbs))
+    violations.push(...scanSemanticAnchorParity(providerAbs))
+    violations.push(...scanSemanticAnchorCatalog(semanticDirs))
   }
 
   const hookAbs = resolve(repoRoot, PROVIDER_RESOURCES_REL)
@@ -313,7 +374,8 @@ const runCli = () => {
     console.log(
       `language-parity-gate: OK — ${result.semanticDirs.length} semantic resource(s); ` +
         'each has en.md + zh-CN.md; protocol identifiers match; ' +
-        'placeholders match; ProviderResources.requireLanguagePair present',
+        'placeholders match; Role Law semantic anchors match; ' +
+        'ProviderResources.requireLanguagePair present',
     )
     process.exit(0)
   }

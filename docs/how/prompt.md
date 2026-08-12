@@ -164,7 +164,7 @@ T1 entrustment revelation 只走 conversation tool result（TODO-015）。
 | child / attached / InternalLeaf | 继承 owner/commissioner 已绑语言；不得各自再绑 |
 | SyntheticToml / ToolHostCodec | 只收 already-localized 串；不拥有 prose、不读语言偏好 |
 
-MagicTodoManagerGuideline = HOST-013 通用 guideline **加法片段**（PROMPT-013）；禁止并入 `PairProgrammingGuidelineText`。
+MagicTodoManagerGuideline = HOST-013 通用 guideline **加法片段**（PROMPT-013）；禁止并入 `host/pair-programming-guideline`。
 
 ### Assistance continuation（PROMPT-018）
 

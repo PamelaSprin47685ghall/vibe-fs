@@ -270,7 +270,7 @@ then MagicTodoManagerGuideline
 ```
 
 `MagicTodoManagerGuideline` 是 **Manager-only** fragment：要求持续用 `todowrite` 保持 obligations 真实；Post-T1 规划与执行同一连续活动；前序评审进行时继续独立下一阶段工作。Pre-T1 / T1 / Post-T1 文案分属 TODO-015。  
-**禁止**把 Magic Todo 文案并入全局 `ProjectionConstants.PairProgrammingGuidelineText`。
+**禁止**把 Magic Todo 文案并入全局 `host/pair-programming-guideline`。
 
 **隐藏 reviewer 表面（窄例外）**：Manager **可以**看到过程 review 的 outcome 与 canonical ProcessReviewLWR 报告正文（checkpoint tool result / suicide drain 回传）。  
 Manager **不可**知道：隐藏 dedicated reviewer 身份、session/barrier/witness、2N 编排、assignment 内部细节。  

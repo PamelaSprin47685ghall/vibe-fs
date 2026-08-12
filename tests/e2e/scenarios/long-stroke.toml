@@ -258,7 +258,7 @@ user = "NEEDHELP_LONG_STROKE_CANARY: ask for help as fast, then deep, then finis
 [[turn]]
 id = "needhelp-owner-deep"
 lane = "needhelp-owner"
-user = "# 你刚刚主动请求了协作。现在以同一角色的更强推理继续原来的 charge。"
+user = "# You just requested collaboration. Continue the same charge now with stronger reasoning in the same role."
 
   [[turn.step]]
   respond = { type = "text", reasoningOnly = "[NEEDHELP]" }
@@ -272,7 +272,7 @@ reason = "assistance-side"
 id = "needhelp-consult-title"
 internal = true
 kind = "title"
-user = "# 如何解决这个 agent 的当前困难？"
+user = "# How should this agent resolve its current difficulty?"
 
   [[turn.step]]
   respond = { type = "title", text = "NEEDHELP Consultation" }
@@ -280,7 +280,7 @@ user = "# 如何解决这个 agent 的当前困难？"
 [[turn]]
 id = "needhelp-consult"
 internal = true
-user = "# 如何解决这个 agent 的当前困难？"
+user = "# How should this agent resolve its current difficulty?"
 
   [[turn.step]]
   respond = { type = "text", text = "Independent NEEDHELP perspective: preserve the original charge, verify the strongest assumption, then continue." }
@@ -288,7 +288,7 @@ user = "# 如何解决这个 agent 的当前困难？"
 [[turn]]
 id = "needhelp-owner-advice"
 lane = "needhelp-owner"
-user = "# 下面是一次独立 consultation 的 canonical child→parent LifecycleWorkRecord。"
+user = "# Below is the canonical child→parent LifecycleWorkRecord from an independent consultation."
 
   [[turn.step]]
   respond = { type = "text", text = "NEEDHELP Long Stroke canary resumed on the original deep binding and completed." }
