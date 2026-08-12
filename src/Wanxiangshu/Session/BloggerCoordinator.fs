@@ -320,20 +320,14 @@ module BloggerCoordinator =
         task {
             let key = SessionId.value bloggerSessionId
 
-            // GLORY-023: the Manager Life compression floor. `None` for every
-            // non-Manager session and for Managers without a Life.
+            // GLORY-023 / TODO-001: Manager Opening floor from effectiveOpeningFloor
+            // (BlindPlan Pre-T1 dynamic head / Post-T1 WorkRecordStart). Never
+            // legacy activation prefix end.
             let floorSequence =
                 match journal with
                 | None -> None
                 | Some durable ->
-                    let floor =
-                        AgentProjection.tryFind mainSessionId (AgentJournal.snapshot durable).AgentProjections
-                        |> Option.bind (fun session -> session.ManagerLife)
-                        |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
-                        |> Option.bind (fun life -> life.ProtectedPrefixEnd)
-                        |> Option.map (fun cursor -> cursor.Sequence)
-
-                    floor
+                    ManagerOpeningFloor.floorSequence mainSessionId (AgentJournal.snapshot durable).AgentProjections
 
             if blocksNew journal mainSessionId scope key then
                 forceSealRuntime scope key
@@ -388,16 +382,12 @@ module BloggerCoordinator =
         if blocksNew journal mainSessionId scope key then
             None
         else
-            // GLORY-023: same Manager Life floor as onMainMaterial.
+            // GLORY-023 / TODO-001: same Opening floor as onMainMaterial.
             let floorSequence =
                 match journal with
                 | None -> None
                 | Some durable ->
-                    AgentProjection.tryFind mainSessionId (AgentJournal.snapshot durable).AgentProjections
-                    |> Option.bind (fun session -> session.ManagerLife)
-                    |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
-                    |> Option.bind (fun life -> life.ProtectedPrefixEnd)
-                    |> Option.map (fun cursor -> cursor.Sequence)
+                    ManagerOpeningFloor.floorSequence mainSessionId (AgentJournal.snapshot durable).AgentProjections
 
             let blog, xTrace, observedEpoch = loadProjections journal mainSessionId host
             nextMainContext mainSessionId bloggerSessionId observedEpoch blog xTrace floorSequence projection

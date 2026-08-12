@@ -185,19 +185,15 @@ module CompanionTransform =
                              |> Option.defaultValue XTraceProjection.empty)
                         | None -> companion.Memory.Blog, companion.Memory.XTrace
 
-                    // GLORY-023: the Manager Life floor also gates the cheap
-                    // prefilter, so Birth material never even reaches EnsureBlogger.
+                    // GLORY-023 / TODO-001: Opening floor also gates the cheap
+                    // prefilter (BlindPlan Pre-T1 dynamic / Post-T1 WorkRecordStart).
                     let floorSequence =
                         match journal with
                         | None -> None
                         | Some durable ->
-                            AgentProjection.tryFind
+                            ManagerOpeningFloor.floorSequence
                                 (SessionId.create sessionId)
                                 (AgentJournal.snapshot durable).AgentProjections
-                            |> Option.bind (fun s -> s.ManagerLife)
-                            |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
-                            |> Option.bind (fun life -> life.ProtectedPrefixEnd)
-                            |> Option.map (fun cursor -> cursor.Sequence)
 
                     let effectiveIngested =
                         floorSequence

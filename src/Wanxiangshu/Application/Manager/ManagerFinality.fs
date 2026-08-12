@@ -31,11 +31,14 @@ module ManagerFinality =
         | Some request when ManagerLifecycleProjection.isOpen request -> LaborAdmission.FinalityOwnsLife
         | _ -> LaborAdmission.LaborMayContinue
 
-    /// Interpret one suicide call against the durable Life. This is a pure
-    /// business classification; Tool adapters do not inspect Finality projection
-    /// shape or infer replay/recovery semantics themselves.
-    let classifyEnding (toolCallId: ToolCallId option) (life: LifeProjection) : EndingDisposition =
-        if life.ProtectedPrefixEnd.IsNone then
+    /// Interpret one suicide call against the durable Life. Pre-T1 BlindPlan
+    /// (zero TodoWriteAccepted) stays at the Planning Table — not Activation.
+    let classifyEnding
+        (toolCallId: ToolCallId option)
+        (life: LifeProjection)
+        (hasTodoWriteAccepted: bool)
+        : EndingDisposition =
+        if not hasTodoWriteAccepted then
             EndingDisposition.ContinuePlanning
         elif life.Completed then
             EndingDisposition.AlreadyCompleted

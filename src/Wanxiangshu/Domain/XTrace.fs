@@ -83,10 +83,14 @@ module XTrace =
     let forWorkRecord (items: XTraceItem list) : XTraceItem list =
         items |> List.filter (fun item -> isWorkRecordPart item.Part)
 
+    /// COMPANION-014 Opening 区间投影：保留 constitutive commitment（含 BlindPlan T1
+    /// call/result）。区间本身已是 OpeningMaterial；不过滤 tool。
+    let forOpening (items: XTraceItem list) : XTraceItem list = items
+
     // ── canonical rendering ────────────────────────────────────────────────
     //
-    // XTrace 诊断/全量渲染可含 tool；LWR 调用方必须先 `forWorkRecord`。
-    // 同一输入 items 必须产生相同文本（COMPANION-012）。
+    // XTrace 诊断/全量渲染可含 tool；LWR Recent/gap 调用方必须先 `forWorkRecord`。
+    // Opening 调用方用 `forOpening`。同一输入 items 必须产生相同文本（COMPANION-012）。
 
     let private rolePrefix (role: string) =
         match role with

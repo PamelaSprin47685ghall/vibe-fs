@@ -11,12 +11,45 @@ import * as PersonaCatalog from '../../../dist/Domain/PersonaCatalog.js'
 import {
   attemptPlanner as planner,
   cursor,
+  projectionAlgebra,
+  projectionIntent,
+  projectionSnapshot,
+  promptOrigin,
   promptResources,
+  providerProjection,
   requestKind,
   resultOf,
+  reviewChallenge,
+  rootKind,
   sessionId,
+  toList,
   unwrapOption,
 } from '../support/domain.mjs'
+
+const roleCatalogBytes = (catalog) => ({
+  ManagerSystemPrompt: catalog.ManagerSystemPrompt,
+  CoderSystemPrompt: catalog.CoderSystemPrompt,
+  DevopsSystemPrompt: catalog.DevopsSystemPrompt,
+  InspectorSystemPrompt: catalog.InspectorSystemPrompt,
+  ReviewerSystemPrompt: catalog.ReviewerSystemPrompt,
+  BrowserSystemPrompt: catalog.BrowserSystemPrompt,
+  InquirySystemPrompt: catalog.InquirySystemPrompt,
+  OrchestratorSystemPrompt: catalog.OrchestratorSystemPrompt,
+  DistillerSystemPrompt: catalog.DistillerSystemPrompt,
+  BloggerSystemPrompt: catalog.BloggerSystemPrompt,
+})
+
+const assertGateDFrozen = ({ owner, persona, catalog, managerPromptId, reviewerPromptId }) => {
+  assert.deepEqual(roleCatalogBytes(promptResources.load()), catalog)
+  assert.equal(promptIdValue(systemPromptIdFor(Role.Manager)), managerPromptId)
+  assert.equal(promptIdValue(systemPromptIdFor(Role.Reviewer)), reviewerPromptId)
+  assert.equal(unwrapOption(PersonaCatalog.SessionPersona_tryGet(owner)), persona)
+  const replay = resultOf(PersonaCatalog.SessionPersona_bindOnce(owner, persona))
+  assert.equal(replay.ok, true)
+  const rewrite = resultOf(PersonaCatalog.SessionPersona_bindOnce(owner, 'Engineer'))
+  assert.equal(rewrite.ok, false)
+  assert.match(rewrite.error, /already bound/)
+}
 
 test('PROMPT_STABILITY_gate_d_is_wired_in_verify_contract', () => {
   const verify = readFileSync(new URL('../../../docs/proof/verify.md', import.meta.url), 'utf8')
@@ -101,4 +134,136 @@ test('PROMPT_STABILITY_fallback_peer_switch_keeps_persona_and_system_prompt_byte
   )
   assert.equal(coderProfiles[0].systemPromptId, coderProfiles[1].systemPromptId)
   assert.notEqual(coderProfiles[0].effectiveAgent, coderProfiles[1].effectiveAgent)
+})
+
+test('PROMPT_STABILITY_t1_review_reanchor_keep_system_prompt_id_persona_and_catalog_bytes', async () => {
+  const { managerNarrative } = await import('../support/glory.mjs')
+
+  PersonaCatalog.SessionPersona_clearAllForTests()
+  const owner = sessionId('ses_gate_d_t1_review_reanchor')
+  const bound = resultOf(PersonaCatalog.SessionPersona_bindOnce(owner, 'Coordinator'))
+  assert.equal(bound.ok, true)
+
+  const catalogBefore = roleCatalogBytes(promptResources.load())
+  assert.ok(catalogBefore.ManagerSystemPrompt.length > 0)
+  assert.ok(catalogBefore.ReviewerSystemPrompt.length > 0)
+  const managerPromptId = promptIdValue(systemPromptIdFor(Role.Manager))
+  const reviewerPromptId = promptIdValue(systemPromptIdFor(Role.Reviewer))
+  assert.equal(managerPromptId, 'manager')
+  assert.equal(reviewerPromptId, 'reviewer')
+  const persona = unwrapOption(PersonaCatalog.SessionPersona_tryGet(owner))
+  assert.equal(persona, 'Coordinator')
+
+  const managerAuthority = planner.authority({
+    role: 'Manager',
+    selected: 'fast-manager',
+    peer: 'deep-manager',
+  })
+  const profileBefore = planner.plan({
+    authorityProfile: managerAuthority,
+    cursor: cursor.atOffset(0),
+    kind: requestKind.workMain,
+  })
+  assert.equal(profileBefore.systemPromptId, managerPromptId)
+
+  // T1 — entrustment rides conversation tool result only (TODO-015 / GLORY-075).
+  const t1Conversation = managerNarrative.wrapT1AcceptedResult('checkpoint body')
+  assert.match(t1Conversation, /The account has been accepted/)
+  assert.match(t1Conversation, /The Manager who will carry it is you/)
+  assert.ok(t1Conversation.includes('checkpoint body'))
+  assert.notEqual(t1Conversation, catalogBefore.ManagerSystemPrompt)
+  assert.doesNotMatch(catalogBefore.ManagerSystemPrompt, /The account has been accepted/)
+  assert.doesNotMatch(catalogBefore.ManagerSystemPrompt, /checkpoint body/)
+  assertGateDFrozen({
+    owner,
+    persona,
+    catalog: catalogBefore,
+    managerPromptId,
+    reviewerPromptId,
+  })
+
+  // review — AppendReviewChallenge injects conversation bytes; system catalog untouched.
+  const raw = [{ info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] }]
+  const wire = providerProjection.decodeMessageView(toList(raw)).Messages
+  const reviewSnapshot = projectionSnapshot.of({
+    currentProjection: providerProjection.toSemantic(providerProjection.decodeMessageView(toList(raw))),
+    blogFrames: [],
+    transportMessages: [],
+  })
+  const reviewIntent = projectionIntent.appendReviewChallenge({ TextVersion: reviewChallenge.textVersion })
+  const reviewPlan = projectionAlgebra.plan([reviewIntent])
+  assert.equal(reviewPlan.ok, true)
+  assert.deepEqual(reviewPlan.intents, ['AppendReviewChallenge'])
+  const reviewView = projectionAlgebra.renderMessagesWithIntents(reviewSnapshot, wire, [reviewIntent])
+  const reviewTexts = reviewView.flatMap((m) => m.parts.map((p) => p.text)).filter(Boolean)
+  assert.equal(
+    reviewTexts.some((t) => t === reviewChallenge.prompt || t.includes(reviewChallenge.text)),
+    true,
+    'review must append challenge conversation bytes',
+  )
+  assert.equal(
+    reviewTexts.includes(catalogBefore.ManagerSystemPrompt),
+    false,
+    'review must not swap Manager system catalog into conversation',
+  )
+  assert.equal(
+    reviewTexts.includes(catalogBefore.ReviewerSystemPrompt),
+    false,
+    'review must not swap Reviewer system catalog into conversation',
+  )
+  const reviewProfile = planner.plan({
+    authorityProfile: planner.authority({
+      role: 'Reviewer',
+      selected: 'fast-reviewer',
+      peer: 'deep-reviewer',
+    }),
+    cursor: cursor.atOffset(0),
+    kind: requestKind.workMain,
+    origin: promptOrigin.continuation('ReviewConfirmation'),
+  })
+  assert.equal(reviewProfile.systemPromptId, reviewerPromptId)
+  assertGateDFrozen({
+    owner,
+    persona,
+    catalog: catalogBefore,
+    managerPromptId,
+    reviewerPromptId,
+  })
+
+  // reanchor — Host compaction intent is a wire no-op; catalog / persona / prompt id stay.
+  const reanchorRaw = [
+    { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'before' }] },
+    { info: { id: 'm2', role: 'assistant' }, parts: [{ type: 'text', text: 'after' }] },
+  ]
+  const reanchorWire = providerProjection.decodeMessageView(toList(reanchorRaw)).Messages
+  const reanchorSnapshot = projectionSnapshot.of({
+    currentProjection: providerProjection.toSemantic(providerProjection.decodeMessageView(toList(reanchorRaw))),
+    blogFrames: [],
+    transportMessages: [],
+    hostReanchor: projectionSnapshot.hostReanchor(),
+  })
+  const reanchorIntent = projectionIntent.reanchorAfterCompaction
+  const reanchorPlan = projectionAlgebra.plan([reanchorIntent])
+  assert.equal(reanchorPlan.ok, true)
+  assert.deepEqual(reanchorPlan.intents, ['ReanchorAfterCompaction'])
+  const reanchorView = projectionAlgebra.renderMessagesWithIntents(reanchorSnapshot, reanchorWire, [reanchorIntent])
+  assert.deepEqual(
+    reanchorView.map((m) => m.parts[0]?.text),
+    ['before', 'after'],
+    'reanchor must not rewrite conversation wire bytes',
+  )
+  const profileAfter = planner.plan({
+    authorityProfile: managerAuthority,
+    cursor: cursor.atOffset(0),
+    kind: requestKind.workMain,
+    origin: promptOrigin.authorityRoot(rootKind.human),
+  })
+  assert.equal(profileAfter.systemPromptId, profileBefore.systemPromptId)
+  assertGateDFrozen({
+    owner,
+    persona,
+    catalog: catalogBefore,
+    managerPromptId,
+    reviewerPromptId,
+  })
 })

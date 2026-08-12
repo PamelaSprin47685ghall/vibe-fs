@@ -66,7 +66,8 @@ module XWire =
                 |> Option.bind (fun trace -> trace.Opening)
                 |> Option.defaultValue
                     { AssignmentText = ""
-                      AuthoritativeRequirements = [] }
+                      AuthoritativeRequirements = []
+                      ConstitutiveBody = "" }
 
             // Opening + frames only. Gap/terminal are live X material and must not
             // enter a frozen replacement (COMPANION-009).

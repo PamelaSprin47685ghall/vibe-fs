@@ -94,14 +94,39 @@ module LifecycleWorkRecordProjection =
                     | Some forced -> forced
                     | None -> { IngestedThrough = { Sequence = blog.Coverage.IngestedThroughSequence } }
 
-                // The opening is the first XTrace part (turn:0/part:0, captured
-                // at the first transform), so the gap must start AFTER it —
-                // otherwise the opening renders twice: once in the Opening
-                // section and again as the gap's first item (COMPANION-003).
+                let life =
+                    session.ManagerLife
+                    |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+
+                // TODO-001 / COMPANION-014: OpeningBoundary = WorkRecordStart when
+                // Post-T1; else Immediate exclusive end after first XTrace part.
                 let openingEnd =
+                    match
+                        life
+                        |> Option.bind (fun current ->
+                            ManagerOpeningFloor.workRecordStart
+                                current
+                                (MagicTodoProjection.tryLife current.LifeId snapshot.AgentProjections.MagicTodo)
+                                xTrace)
+                    with
+                    | Some boundary -> boundary
+                    | None ->
+                        match trace with
+                        | first :: _ -> { Sequence = first.Cursor.Sequence + 1L }
+                        | [] -> XTrace.originCursor
+
+                // Constitutive Opening interval after InitialCharge through Boundary
+                // (BlindPlan T1 call/result ∈ OpeningMaterial; not Recent).
+                let constitutiveItems =
                     match trace with
-                    | first :: _ -> { Sequence = first.Cursor.Sequence + 1L }
-                    | [] -> XTrace.originCursor
+                    | first :: _ ->
+                        XTrace.sliceBetween
+                            { Sequence = first.Cursor.Sequence + 1L }
+                            openingEnd
+                            trace
+                    | [] -> []
+
+                let openingMaterial = LifecycleWorkRecord.withConstitutive opening constitutiveItems
 
                 // Terminal lives outside the trace parts; a head cursor keeps
                 // materialize's terminal-exclusion filter from touching any gap
@@ -118,7 +143,7 @@ module LifecycleWorkRecordProjection =
 
                 Some(
                     LifecycleWorkRecord.materialize
-                        opening
+                        openingMaterial
                         frames
                         trace
                         coverage

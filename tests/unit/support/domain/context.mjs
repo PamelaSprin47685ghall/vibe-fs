@@ -134,6 +134,8 @@ export const magicTodo = (() => {
     'checkPreparedReplay',
     'desiredLag1Cutoff',
     'workRecordStart',
+    'blindPlanOpeningBoundary',
+    'effectiveOpeningFloor',
     'bloggerEffectiveStart',
     'requireCheckpointBeforeFirstSuicide',
   ])
@@ -156,6 +158,55 @@ export const magicTodo = (() => {
     item: (id, content, status, priority) => new MagicTodoModule.MagicTodoItem(id, content, status, priority),
     perfect: MagicTodoModule.ProcessReviewVerdict.Perfect,
     revise: MagicTodoModule.ProcessReviewVerdict.Revise,
+    workRecordStart: (openingSequence) => Number(m.workRecordStart({ Sequence: BigInt(openingSequence) }).Sequence),
+    blindPlanOpeningBoundary: (openingSequence, t1CallSequence, t1CallIdValue, parts) =>
+      Number(
+        m.blindPlanOpeningBoundary(
+          { Sequence: BigInt(openingSequence) },
+          { Sequence: BigInt(t1CallSequence) },
+          toolCallId(t1CallIdValue),
+          toList(
+            parts.map((part) => ({
+              Cursor: { Sequence: BigInt(part.sequence) },
+              Kind: part.kind,
+              ToolCallId: part.toolCallId == null ? undefined : toolCallId(part.toolCallId),
+            })),
+          ),
+        ).Sequence,
+      ),
+    effectiveOpeningFloor: (
+      hasOpenLife,
+      acceptedCount,
+      openingSequence,
+      t1CallSequence,
+      t1CallIdValue,
+      xTraceHeadSequence,
+      parts = [],
+    ) => {
+      const floor = m.effectiveOpeningFloor(
+        hasOpenLife,
+        acceptedCount,
+        { Sequence: BigInt(openingSequence) },
+        t1CallSequence == null ? undefined : { Sequence: BigInt(t1CallSequence) },
+        t1CallIdValue == null ? undefined : toolCallId(t1CallIdValue),
+        BigInt(xTraceHeadSequence),
+        toList(
+          parts.map((part) => ({
+            Cursor: { Sequence: BigInt(part.sequence) },
+            Kind: part.kind,
+            ToolCallId: part.toolCallId == null ? undefined : toolCallId(part.toolCallId),
+          })),
+        ),
+      )
+      return floor == null ? undefined : Number(floor.Sequence)
+    },
+    bloggerEffectiveStart: (ingestedThrough, workRecordStartSequence) =>
+      Number(
+        m.bloggerEffectiveStart(
+          { IngestedThrough: { Sequence: BigInt(ingestedThrough) } },
+          { Sequence: BigInt(workRecordStartSequence) },
+        ).Sequence,
+      ),
   }
 })()
 
@@ -263,6 +314,7 @@ export const toolResultBound = (() => {
     'flatten',
     'isWorkRecordPart',
     'forWorkRecord',
+    'forOpening',
     'renderItem',
     'render',
   ])
@@ -306,6 +358,8 @@ export const toolResultBound = (() => {
     render: m.render,
     /** COMPANION-003: LWR projection — drop raw tool call/result. */
     forWorkRecord: (items) => fromCursorList(m.forWorkRecord(toCursorList(items))),
+    /** COMPANION-014: Opening interval — keep constitutive T1 tools. */
+    forOpening: (items) => fromCursorList(m.forOpening(toCursorList(items))),
     isWorkRecordPart: (partValue) => m.isWorkRecordPart(partValue),
     toItems: (items) => toList(items),
   }
@@ -389,15 +443,18 @@ export const lifecycleWorkRecordProjection = (() => {
 })()
 
 /** COMPANION-003: LWR — 唯一跨 Session 工作记录。 */export const lifecycleWorkRecord = (() => {
-  const m = bind(LifecycleWorkRecordModule, 'LifecycleWorkRecord', ['render', 'materialize'])
-  const opening = ({ assignment = '', requirements = [] } = {}) => ({
+  const m = bind(LifecycleWorkRecordModule, 'LifecycleWorkRecord', ['render', 'materialize', 'withConstitutive'])
+  const opening = ({ assignment = '', requirements = [], constitutive = '' } = {}) => ({
     AssignmentText: assignment,
     AuthoritativeRequirements: toList(requirements),
+    ConstitutiveBody: constitutive,
   })
 
   return {
     opening,
     render: (record, includeOpening = true) => m.render(includeOpening, record),
+    withConstitutive: (openingValue, constitutiveItems) =>
+      m.withConstitutive(openingValue, toList(constitutiveItems)),
     // Default includeOpening=true (parent→child / same-session). Pass false for join.
     materialize: (
       openingValue,

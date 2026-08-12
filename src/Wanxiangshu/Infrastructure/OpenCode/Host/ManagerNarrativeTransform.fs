@@ -384,16 +384,9 @@ module ManagerNarrativeTransform =
 
                                     Some(rewriteMessage rawMessages messageIndex narrative)
 
-    /// GLORY-021: after the Activation continuation's physical acceptance, write
-    /// `WorkActivated` with the protected prefix end.
-    ///
-    /// Runs at the transform boundary: the Activation message has already entered
-    /// the XTrace (captureProjection ran first), so the protected prefix end is
-    /// the XTrace head — the cursor just after the Activation prompt. Idempotent:
-    /// a Life with `ProtectedPrefixEnd` set is left alone. The activation prompt
-    /// key is read from the message's PROMPT-011 metadata when present; a message
-    /// without it is skipped (the next transform re-checks).
-
+    /// GLORY-021 legacy: if a historical Activation message is still in the wire,
+    /// append inert WorkActivated. Production BlindPlan never sends Activation;
+    /// Opening floor is effectiveOpeningFloor / T1 (TODO-001).
     let applyAcceptedActivation
         (journal: AgentJournal option)
         (sessionId: string option)

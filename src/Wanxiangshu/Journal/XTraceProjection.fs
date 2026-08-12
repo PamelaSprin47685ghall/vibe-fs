@@ -94,7 +94,8 @@ module XTraceProjection =
                     Opening =
                         Some
                             { AssignmentText = assignment
-                              AuthoritativeRequirements = requirements } }
+                              AuthoritativeRequirements = requirements
+                              ConstitutiveBody = "" } }
 
     /// COMPANION-003 / HOST-005: append one semantic part reference. Strictly
     /// monotonic; a duplicate cursor or a retreat is refused (PERSIST-010).

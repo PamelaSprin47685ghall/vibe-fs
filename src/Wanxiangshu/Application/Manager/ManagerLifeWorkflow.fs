@@ -44,7 +44,8 @@ module ManagerLifeWorkflow =
                        OpeningCursorSequence = openingCursorSequence |})
             |> Result.mapError (fun failure -> sprintf "Life opening append failed: %s" failure)
 
-    /// GLORY-069 HumanRoot upgrade: WriteBlob → LifeOpened → WorkActivated.
+    /// GLORY-069 HumanRoot upgrade: WriteBlob → LifeOpened → legacy WorkActivated
+    /// (inert decode only; production floor uses effectiveOpeningFloor / T1).
     let ensureMigrated
         (journal: AgentJournal)
         (sessionId: SessionId)
@@ -78,7 +79,8 @@ module ManagerLifeWorkflow =
                            ProtectedPrefixEndSequence = protectedPrefixEndSequence |})
                 |> Result.mapError (fun failure -> sprintf "Life migration activation failed: %s" failure))
 
-    /// GLORY-021: WorkActivated after Activation acceptance.
+    /// GLORY-021 legacy: WorkActivated after historical Activation acceptance.
+    /// Inert for production floor (TODO-001); BlindPlan nails WorkRecordStart at T1.
     let acceptActivation
         (journal: AgentJournal)
         (sessionId: SessionId)

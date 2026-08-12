@@ -442,8 +442,67 @@ module MagicTodo =
             // Before latest = the previous Accepted id (covered-before trigger).
             xs |> List.rev |> List.skip 1 |> List.tryHead
 
-    /// WorkRecordStart = Opening exclusive end (structural Blogger floor, not a Stage).
+    /// Immediate-policy WorkRecordStart = Opening exclusive end after InitialCharge.
     let workRecordStart (openingCursor: XTraceCursor) : XTraceCursor = XTrace.nextCursor openingCursor
+
+    /// One XTrace part locator for BlindPlan OpeningBoundary derivation.
+    type TracePartAnchor =
+        { Cursor: XTraceCursor
+          Kind: string
+          ToolCallId: ToolCallId option }
+
+    /// BlindPlan OpeningBoundary = exclusive end after constitutive T1 call+result.
+    /// Minimal correct nail: max(OpeningCursor+1, end after T1 result when present,
+    /// else end after T1 call). Never reads ProtectedPrefixEnd.
+    let blindPlanOpeningBoundary
+        (openingCursor: XTraceCursor)
+        (t1CallCursor: XTraceCursor)
+        (t1ToolCallId: ToolCallId)
+        (parts: TracePartAnchor list)
+        : XTraceCursor =
+        let afterResult =
+            parts
+            |> List.tryFind (fun part ->
+                part.Kind = "tool_result"
+                && part.Cursor.Sequence > t1CallCursor.Sequence
+                && part.ToolCallId = Some t1ToolCallId)
+            |> Option.map (fun part -> XTrace.nextCursor part.Cursor)
+
+        let candidate =
+            match afterResult with
+            | Some boundary -> boundary
+            | None -> XTrace.nextCursor t1CallCursor
+
+        let minimum = workRecordStart openingCursor
+
+        if candidate.Sequence > minimum.Sequence then
+            candidate
+        else
+            minimum
+
+    /// Production Blogger / Companion Opening floor (TODO-001 / GLORY-074).
+    ///
+    /// Pre-T1: dynamic head — protect the whole unclosed Opening; no durable nail.
+    /// Post-T1: WorkRecordStart = OpeningBoundary after T1 call+result.
+    /// No CurrentLife → None. Never reads ProtectedPrefixEnd / WorkActivated.
+    let effectiveOpeningFloor
+        (hasOpenLife: bool)
+        (todoWriteAcceptedCount: int)
+        (openingCursor: XTraceCursor)
+        (t1CallCursor: XTraceCursor option)
+        (t1ToolCallId: ToolCallId option)
+        (xTraceHeadSequence: int64)
+        (parts: TracePartAnchor list)
+        : XTraceCursor option =
+        if not hasOpenLife then
+            None
+        elif todoWriteAcceptedCount < 1 then
+            Some { Sequence = xTraceHeadSequence }
+        else
+            match t1CallCursor, t1ToolCallId with
+            | Some callCursor, Some callId ->
+                Some(blindPlanOpeningBoundary openingCursor callCursor callId parts)
+            | _ -> Some(workRecordStart openingCursor)
 
     /// Manager Blogger effectiveStart = max(RecordCoverage, Life.WorkRecordStart).
     let bloggerEffectiveStart (recordCoverage: RecordCoverage) (workRecordStartCursor: XTraceCursor) : XTraceCursor =
