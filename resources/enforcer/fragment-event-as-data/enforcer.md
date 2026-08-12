@@ -1,30 +1,56 @@
 # fragment-event-as-data — Enforcer
 
-## Definition
-A transport fragment is mistaken for domain data when partial stream updates, deltas, callback order, or notification payloads are assembled as though they were the authoritative business fact. The root-cause is that transport fragments that may drop, coalesce, or reorder are assembled as domain truth, so the client believes a world the source never promised.
+A transport fragment is mistaken for domain data when the client starts treating **delivery choreography** as though it were the authoritative business fact.
 
-## Governing Principle
-Notification and state answer different questions. A notification says “something changed”; authoritative state says “what is true now.” Transport systems may coalesce, reorder, duplicate, or omit intermediate fragments while still honoring their contract. Building domain truth from those fragments silently strengthens the transport guarantee into one it never promised.
+Notifications, patches, partial stream chunks, callbacks, deltas, progress events, websocket frames, and provider-specific updates often answer a narrow question:
 
-## Trigger When
-Trigger when business state is reconstructed from incremental provider/stream events even though a complete authoritative snapshot is available and event delivery is not itself the durable source of truth.
+> Something changed, or some partial observation became available.
 
-## Do Not Trigger When
-- The protocol is true event sourcing: each event is an ordered durable domain fact and replay is the specified authority.
-- Notifications only wake a reader that then fetches the authoritative snapshot.
-- A local UI hint is explicitly ephemeral and never written as domain state.
-- Duplicate/coalesce behavior is tested against a documented durability and ordering contract the provider actually gives.
+They do not automatically answer:
 
-## Distinguish From
-`log-as-recovery-protocol` elevates diagnostics to facts. `snapshot-as-truth` elevates a derived projection. This rule concerns ephemeral transport deltas being promoted into domain truth. Tie-break: if fragments may be dropped, coalesced, or reordered and yet are assembled as the business fact, this rule owns the case.
+> What is the complete authoritative state now?
 
-## Decision Procedure
-Classify the stream: fact log or wake-up signal? If the contract permits missing/coalesced/reordered fragments, it cannot safely define domain state. React to it, then read the authoritative snapshot.
+That distinction matters because many transport contracts legitimately coalesce, duplicate, reorder, omit intermediate updates, reconnect from a later point, or change patch granularity while still preserving their intended semantics. If domain state is reconstructed by folding such fragments as though every fragment were a durable ordered fact, the client has silently strengthened the transport contract into one the source never promised.
 
-## Examples
-- positive: a client folds websocket patches into an `Order` record and never re-reads the server snapshot.
-- near-miss: the websocket only triggers `GET /orders/:id`, and domain logic uses that complete payload.
-- counterexample: treat fragments as signals and read authoritative state for meaning, unless the protocol makes events durable ordered facts.
+Fire this rule when:
 
-## Nudge
-Do not infer truth from notification choreography. Treat fragments as signals unless the protocol explicitly makes them durable ordered facts; read the authoritative state for meaning.
+- websocket/SSE/provider deltas are folded into canonical domain state with no authoritative refresh path;
+- reconnect resumes from “now” and the client assumes missing intermediate fragments never mattered;
+- duplicate or reordered notifications can create states the source never had;
+- a progress/update stream is persisted as business history even though the provider calls it ephemeral;
+- callback order is interpreted as state transition order without sequence/commit identity;
+- a patch says “field X changed,” but the client applies it to an old base version and treats the result as current truth;
+- tests assume one notification per source mutation despite a contract that allows coalescing.
+
+Do not fire when the stream **is** the real event source: durable ordered domain facts with stable identity, replay semantics, retention, and an explicit contract that those events are authoritative. Event sourcing is not “fragments as data”; the events are the data by design.
+
+Also do not fire when fragments are used only as wake-up signals: notification arrives, client reads the authoritative snapshot/version, then domain behavior depends on that complete state.
+
+Nearby rules:
+
+- `snapshot-as-truth` — a derived projection outranks its source;
+- `log-as-recovery-protocol` — diagnostic output becomes durable truth;
+- `race-first-wins-semantics` — arrival order chooses business outcome;
+- `stale-documentation` is unrelated even if provider docs failed to explain the stream contract.
+
+The decisive question is contract classification:
+
+> Is this channel a **fact log** or a **notification channel**?
+
+If the provider may drop/coalesce/reorder fragments and still consider itself correct, the channel cannot safely define domain history. It can tell you **when to look**, not **what to believe**.
+
+A robust client often treats fragments as invalidation hints:
+
+```text
+notification arrives
+        ↓
+identify affected object/version
+        ↓
+read authoritative state
+        ↓
+replace/derive local view
+```
+
+When complete refresh is expensive, sequence-aware incremental protocols can still be correct — but only if the provider exposes the missing guarantees: base version, event identity, total/causal order as needed, gap detection, replay/resume, and authoritative semantics for each delta.
+
+> Do not promote the shape of transport into the shape of truth. A notification may tell you where to look; only the authoritative contract tells you what happened.
