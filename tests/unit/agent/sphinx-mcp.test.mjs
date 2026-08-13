@@ -1,7 +1,7 @@
 // tests/unit/agent/sphinx-mcp.test.mjs — AGENT-030
 //
 // Kernel identity + Host mcp.sphinx injection + Inquiry-only schema wildcard.
-// Requires: npm run build (dist/Kernel/SphinxMcp.js + SphinxMcpConfig.js).
+// Requires: node scripts/build.mjs (dist/Kernel/SphinxMcp.js + SphinxMcpConfig.js).
 
 import assert from 'node:assert/strict'
 import test from 'node:test'

@@ -28,11 +28,11 @@ module RecoveryClosureProjection =
         |> Option.bind (fun session -> session.Handles)
         |> Option.defaultValue HandleProjection.empty
 
+    /// Discover durable recovery dependency closure for a parent session.
     let discover (root: SessionId) (projection: AgentProjectionSet) (journalSequence: int64) : RecoveryClosure =
         let nodes = ResizeArray<RecoveryNode>()
         let seen = System.Collections.Generic.HashSet<string>()
         let linkedChildIds = System.Collections.Generic.HashSet<string>()
-
 
         let add (node: RecoveryNode) =
             let key = sortKey node
@@ -42,9 +42,8 @@ module RecoveryClosureProjection =
 
         add (RecoveryNode.WorkSession root)
 
-        for record in HandleProjection.linkedChildren
+        for record in HandleProjection.linkedChildren (rootHandles root projection) do
             ignore (linkedChildIds.Add(SessionId.value record.ChildSessionId))
- (rootHandles root projection) do
             // GLORY-002 / SURFACE-006: the hidden Finality Reviewer is not part
             // of the parent's recovery family; the Host-owned workflow owns it.
             match record.Ownership, record.Lifecycle, HandleId.tryAgent record.Handle with

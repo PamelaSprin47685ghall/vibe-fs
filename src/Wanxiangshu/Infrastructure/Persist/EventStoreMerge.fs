@@ -62,12 +62,12 @@ module EventStoreMerge =
         let byName =
             sources
             |> List.collect id
-            |> List.groupBy (fun entry -> entry.Name)
+            |> List.groupBy (fun (entry: TreeEntry) -> entry.Name)
             |> List.sortBy fst
 
         let acc = ResizeArray<TreeEntry>()
 
-        let rec mergeGroups remaining =
+        let rec mergeGroups (remaining: (string * TreeEntry list) list) =
             match remaining with
             | [] -> Ok(Seq.toList acc)
             | (name, group) :: rest ->
@@ -75,16 +75,16 @@ module EventStoreMerge =
 
                 let normalized =
                     group
-                    |> List.map (fun entry ->
+                    |> List.map (fun (entry: TreeEntry) ->
                         { entry with
                             Mode = StoreTree.normalizeMode entry.Mode })
 
-                let modes = normalized |> List.map (fun e -> e.Mode) |> List.distinct
+                let modes = normalized |> List.map (fun (entry: TreeEntry) -> entry.Mode) |> List.distinct
 
                 match modes with
                 | [ mode ] when StoreTree.isTreeMode mode ->
                     let childOids =
-                        normalized |> List.map (fun e -> e.Oid) |> List.distinctBy GitObjectId.value
+                        normalized |> List.map (fun (entry: TreeEntry) -> entry.Oid) |> List.distinctBy GitObjectId.value
 
                     match childOids with
                     | [ oid ] ->
@@ -116,7 +116,7 @@ module EventStoreMerge =
                 | [ mode ] ->
                     let oids =
                         normalized
-                        |> List.map (fun e -> e.Oid)
+                        |> List.map (fun (entry: TreeEntry) -> entry.Oid)
                         |> List.distinctBy GitObjectId.value
                         |> List.sortWith GitObjectId.compare
 

@@ -270,6 +270,8 @@ test('TODO-006 T1 accept succeeds then T2 prepare is a lag-1 wait, not a fail-cl
       const checkpoints = mapEntries(lifeState.Checkpoints)
       assert.equal(checkpoints.length, 1)
       assert.equal(checkpoints[0][1].Accepted, true)
+      assert.equal(lifeState.CurrentObligationsRef[0].fields[0], t1.result.value.Prepared.ProposedTodoRef.fields[0])
+      assert.equal(lifeState.CurrentObligationsRef[1].fields[0], t1.result.value.Prepared.ProposedTodoDigest.fields[0])
       assert.equal(checkpoints[0][1].Assignment == null, true)
       assert.equal(checkpoints[0][1].Concluded == null, true)
 
@@ -346,8 +348,9 @@ test('TODO-006 T2 prepare succeeds once T1 process review is Concluded (lag-1 wa
         cursor(8),
         cursor(7),
       )
-      // PERFECT settlement is the already-encoded ProposedTodo blob (list wire, not account JSON).
       const proposed = t1.result.value.Prepared
+      const reviewRecord = agentJournal.writeBlob('R1 found no material issue.', journal)
+      assert.equal(reviewRecord.ok, true, reviewRecord.ok ? '' : String(reviewRecord.error))
       const concluded = new magicTodoJournal.TodoReviewConcluded(
         life,
         write,
@@ -355,8 +358,8 @@ test('TODO-006 T2 prepare succeeds once T1 process review is Concluded (lag-1 wa
         reviewer,
         reviewerSession,
         magicTodo.perfect,
-        blobRef('lwr-r1'),
-        blobDigest('lwr-r1-digest'),
+        reviewRecord.value.BlobRef,
+        reviewRecord.value.BlobDigest,
         proposed.ProposedTodoRef,
         proposed.ProposedTodoDigest,
         cursor(10),
@@ -379,11 +382,144 @@ test('TODO-006 T2 prepare succeeds once T1 process review is Concluded (lag-1 wa
       }
 
       // T2 now proceeds: the lag-1 wait resolved because ConsumableReview is durable.
+      // PERFECT is silent; it does not gate or rewrite CurrentObligations.
       const t2 = checkpoint(journal, session, 'call-magic-todo-t2', [
         { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
         { name: 'fix', work: 'Keep later todowrite calls from failing red.' },
       ])
       assert.equal(t2.result.ok, true, t2.result.ok ? '' : t2.result.error.cases()[t2.result.error.tag])
+
+      const t2Accepted = magicTodoMembrane.accept(
+        journal,
+        t2.result.value,
+        magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
+        t2.digest,
+        sha256Hex('t2-physical-output'),
+      )
+      assert.equal(t2Accepted.ok, true, t2Accepted.ok ? '' : t2Accepted.error.cases()[t2Accepted.error.tag])
+      assert.match(t2Accepted.value.EnrichedResult, /Keep working/)
+      assert.doesNotMatch(t2Accepted.value.EnrichedResult, /Previous checkpoint review|R1 found no material issue/)
+
+      const afterT2 = agentJournal.snapshot(journal).AgentProjections.MagicTodo.ByLife.get(
+        'life-magic-todo-t1-t2-resolve',
+      )
+      assert.equal(afterT2.CurrentObligationsRef[0].fields[0], t2.result.value.Prepared.ProposedTodoRef.fields[0])
+    } finally {
+      providerLanguage.clearAllForTests()
+    }
+  })
+})
+
+test('TODO-005 REVISE is feedback only: next checkpoint sees the report and Current never rolls back', () => {
+  withJournal((journal) => {
+    const session = sessionId('ses-magic-todo-revise-feedback')
+    const life = managerLifeId('life-magic-todo-revise-feedback')
+    const callText = 'call-revise-t1'
+    openLife(journal, session, life)
+    providerLanguage.clearAllForTests()
+    const bound = providerLanguage.bindOnce(session, providerLanguage.english)
+    assert.equal(bound.ok, true, bound.ok ? '' : String(bound.error))
+
+    try {
+      const t1 = checkpoint(journal, session, callText, [
+        { name: 'implementation', work: 'Implement the requested behavior.' },
+      ])
+      assert.equal(t1.result.ok, true)
+      const accepted = magicTodoMembrane.accept(
+        journal,
+        t1.result.value,
+        magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
+        t1.digest,
+        sha256Hex('revise-t1-output'),
+      )
+      assert.equal(accepted.ok, true)
+
+      const write = magicTodo.todoWriteId(sha256Hex, life, toolCallId(callText))
+      const review = magicTodo.todoReviewId(sha256Hex, life, write)
+      const reviewer = magicTodo.dedicatedReviewerId(sha256Hex, life)
+      const reviewerSession = sessionId('ses-revise-reviewer')
+      const cursor = (n) => new magicTodoJournal.XTraceCursor(BigInt(n))
+      const reviewText = 'The account omitted the required runtime verification.'
+      const reviewRecord = agentJournal.writeBlob(reviewText, journal)
+      assert.equal(reviewRecord.ok, true, reviewRecord.ok ? '' : String(reviewRecord.error))
+
+      const facts = [
+        [
+          'DedicatedTodoReviewerEnlisted',
+          new magicTodoJournal.DedicatedTodoReviewerEnlisted(life, reviewer, reviewerSession),
+        ],
+        [
+          'TodoProcessReviewAssigned',
+          new magicTodoJournal.TodoProcessReviewAssigned(
+            life,
+            write,
+            review,
+            reviewer,
+            reviewerSession,
+            cursor(8),
+            cursor(7),
+          ),
+        ],
+        [
+          'TodoReviewConcluded',
+          new magicTodoJournal.TodoReviewConcluded(
+            life,
+            write,
+            review,
+            reviewer,
+            reviewerSession,
+            magicTodo.revise,
+            reviewRecord.value.BlobRef,
+            reviewRecord.value.BlobDigest,
+            // Historical settlement fields deliberately point at the old base.
+            // TODO-005 requires projection to ignore them as Current writers.
+            t1.result.value.Prepared.BaseTodoRef,
+            t1.result.value.Prepared.BaseTodoDigest,
+            cursor(10),
+            providerRun('revise-review-provider-run'),
+            toolCallId('revise-review-judge'),
+          ),
+        ],
+      ]
+
+      for (const [caseName, payload] of facts) {
+        const appended = agentJournal.appendMagicTodo(
+          stream.session(session),
+          undefined,
+          magicTodoJournal.MagicTodoFact(caseName, [payload]),
+          journal,
+        )
+        assert.equal(appended.ok, true, appended.ok ? '' : String(appended.error))
+      }
+
+      const afterRevise = agentJournal.snapshot(journal).AgentProjections.MagicTodo.ByLife.get(
+        'life-magic-todo-revise-feedback',
+      )
+      assert.equal(afterRevise.CurrentObligationsRef[0].fields[0], t1.result.value.Prepared.ProposedTodoRef.fields[0])
+
+      const t2 = checkpoint(journal, session, 'call-revise-t2', [
+        { name: 'implementation', work: 'Implement the requested behavior.' },
+        { name: 'verification', work: 'Run the required runtime verification and preserve evidence.' },
+      ])
+      assert.equal(t2.result.ok, true, t2.result.ok ? '' : t2.result.error.cases()[t2.result.error.tag])
+
+      const t2Accepted = magicTodoMembrane.accept(
+        journal,
+        t2.result.value,
+        magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
+        t2.digest,
+        sha256Hex('revise-t2-output'),
+      )
+      assert.equal(t2Accepted.ok, true, t2Accepted.ok ? '' : t2Accepted.error.cases()[t2Accepted.error.tag])
+      assert.match(t2Accepted.value.EnrichedResult, /An earlier account of the work left something unresolved/)
+      assert.match(t2Accepted.value.EnrichedResult, /omitted the required runtime verification/)
+      assert.match(t2Accepted.value.EnrichedResult, /Keep working/)
+      assert.doesNotMatch(t2Accepted.value.EnrichedResult, /settled|preview|reviewing/i)
+
+      const afterT2 = agentJournal.snapshot(journal).AgentProjections.MagicTodo.ByLife.get(
+        'life-magic-todo-revise-feedback',
+      )
+      assert.equal(afterT2.CurrentObligationsRef[0].fields[0], t2.result.value.Prepared.ProposedTodoRef.fields[0])
     } finally {
       providerLanguage.clearAllForTests()
     }

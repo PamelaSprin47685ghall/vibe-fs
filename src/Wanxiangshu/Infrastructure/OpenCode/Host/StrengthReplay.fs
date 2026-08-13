@@ -85,12 +85,7 @@ module StrengthReplay =
                             HostMessageProjection.replaceMessagesInPlace outObj replayed
                             plans
 
-    /// Close Promoted → Traced after XTrace capture for plans that lacked a
-    /// prior trace range. Stable Host ids recover the exact range; legacy
-    /// positional traces fall back to unique canonical match (fail closed).
-        /// Stable capture writes `g:N/msg:{hostId}/part:P`. Extract the Host id
-    /// so Promoted→Traced close can HashSet-lookup instead of scanning
-    /// expectedIds per part.
+    /// Host id inside stable provenance g:N/msg:{id}/part:P.
     let private stableHostIdOfProvenance (provenance: string) =
         let marker = "/msg:"
         let start = provenance.IndexOf(marker, StringComparison.Ordinal)
@@ -106,7 +101,10 @@ module StrengthReplay =
             else
                 Some(provenance.Substring(idStart, stop - idStart))
 
-let commitTracedAfterCapture
+    /// Close Promoted → Traced after XTrace capture for plans that lacked a
+    /// prior trace range. Stable Host ids recover the exact range; legacy
+    /// positional traces fall back to unique canonical match (fail closed).
+    let commitTracedAfterCapture
         (journal: AgentJournal option)
         (strengthDurability: StrengthDurabilityPort option)
         (strengthFailClosed: string -> unit)

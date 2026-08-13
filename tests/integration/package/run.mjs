@@ -1,7 +1,7 @@
 // tests/integration/package/run.mjs — sequential package integration under 3s silence.
 //
 //   node tests/integration/package/run.mjs
-// Requires dist/ built (npm run build) before pack/install/import checks.
+// Requires dist/ built (node scripts/build.mjs) before pack/install/import checks.
 //
 // Silence = WATCHDOG_TIMEOUT_MS, same dog as e2e canary. Sequential: pack/install share
 // npm cache; concurrent npm pack is not under test.

@@ -7,7 +7,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.MagicTodo
 open Wanxiangshu.Domain.MagicTodoAdmission
-open Wanxiangshu.Domain.MagicTodoAfter
 open Wanxiangshu.Domain.MagicTodoFacts
 open Wanxiangshu.Domain.MagicTodoSurface
 open Wanxiangshu.Host
@@ -63,7 +62,6 @@ module MagicTodoMembrane =
     type AcceptRejection =
         | InputDigestMismatch
         | OutputDigestMismatch
-        | Planner of AcceptReject
         | JournalAppend of reason: string
 
     let private managerLife (sessionId: SessionId) (projection: ProjectionSet) =

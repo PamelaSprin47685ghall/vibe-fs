@@ -50,7 +50,7 @@ module MagicTodo =
 
     /// Protocol semantic version frozen into Prepared / Accepted facts.
     [<Literal>]
-    let SemanticVersion = "magic-todo.v1"
+    let SemanticVersion = "magic-todo.v2"
 
     // ── Status algebra (§8) ────────────────────────────────────────────────
 
@@ -254,18 +254,6 @@ module MagicTodo =
             | head :: tail -> loop (ordinal + 1) (Set.add head.Name seen) tail
 
         loop 0 Set.empty items
-
-    /// CurrentObligations settlement (TODO-005): PERFECT promotes the submitted
-    /// account exactly; REVISE keeps the prior settled account until the Manager
-    /// rewrites it after consuming the canonical process-review report.
-    let settleObligations
-        (old: ObligationList)
-        (proposed: ObligationList)
-        (verdict: ProcessReviewVerdict)
-        : ObligationList =
-        match verdict with
-        | ProcessReviewVerdict.Perfect -> proposed
-        | ProcessReviewVerdict.Revise -> old
 
     // ── Completed gate (§8.1) — historical compatibility model ─────────────
 

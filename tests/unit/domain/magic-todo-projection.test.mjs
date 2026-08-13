@@ -96,17 +96,22 @@ const foldMagic = (state, magicFact, envelopeEventId = undefined) => {
   return magicTodoJournal.fold(ref, state, magicFact)
 }
 
-test('TODO-006 concludes only after matching durable assignment and stores settled locator', () => {
+test('TODO-005 Accepted supersedes Current immediately and REVISE conclusion cannot roll it back', () => {
   let state = magicTodoJournal.empty
   state = ok(foldMagic(state, fact('TodoWritePrepared', prepared)))
   state = ok(foldMagic(state, fact('TodoWriteAccepted', accepted)))
+
+  let lifeState = state.ByLife.get('manager-life')
+  assert.equal(lifeState.CurrentObligationsRef[0].fields[0], 'proposal-list')
+  assert.equal(lifeState.CurrentObligationsRef[1].fields[0], 'proposal-digest')
+
   state = ok(foldMagic(state, fact('DedicatedTodoReviewerEnlisted', enlisted)))
   state = ok(foldMagic(state, fact('TodoProcessReviewAssigned', assigned)))
   state = ok(foldMagic(state, fact('TodoReviewConcluded', concluded)))
 
-  const lifeState = state.ByLife.get('manager-life')
-  assert.equal(lifeState.SettledCurrentRef[0].fields[0], 'settled-list')
-  assert.equal(lifeState.SettledCurrentRef[1].fields[0], 'settled-list-digest')
+  lifeState = state.ByLife.get('manager-life')
+  assert.equal(lifeState.CurrentObligationsRef[0].fields[0], 'proposal-list')
+  assert.equal(lifeState.CurrentObligationsRef[1].fields[0], 'proposal-digest')
   assert.equal(lifeState.Checkpoints.get(magicTodo.todoWriteIdValue(write)).Concluded.Verdict, magicTodo.revise)
 })
 
@@ -153,7 +158,7 @@ test('TODO-006 treats an exact durable conclusion replay as idempotent', () => {
   state = ok(foldMagic(state, fact('TodoReviewConcluded', concluded)))
 
   const replayed = ok(foldMagic(state, fact('TodoReviewConcluded', concluded)))
-  assert.equal(replayed.ByLife.get('manager-life').SettledCurrentRef[0].fields[0], 'settled-list')
+  assert.equal(replayed.ByLife.get('manager-life').CurrentObligationsRef[0].fields[0], 'proposal-list')
 })
 
 test('TODO-006 rejects a new prepare until the preceding review concludes', () => {
@@ -165,8 +170,8 @@ test('TODO-006 rejects a new prepare until the preceding review concludes', () =
     nextWrite,
     nextCall,
     1,
-    blobRef('settled-list'),
-    blobDigest('settled-list-digest'),
+    blobRef('proposal-list'),
+    blobDigest('proposal-digest'),
     blobRef('next-proposal-list'),
     blobDigest('next-proposal-digest'),
     'next-provider-input-digest',
@@ -194,13 +199,20 @@ test('TODO-011 rejects a legacy seed after the first Magic provider request', ()
   assert.equal(rejected.cases()[rejected.tag], 'LegacySeedAfterCheckpoint')
 })
 
-test('TODO-012 codec preserves settled locator for deterministic replay', () => {
+test('TODO-012 legacy conclusion locator remains replayable but is not a Current writer', () => {
   const encoded = magicTodoJournal.encode(fact('TodoReviewConcluded', concluded))
   const decoded = ok(magicTodoJournal.tryDecode(encoded))
   const payload = decoded.fields[0]
 
   assert.equal(payload.SettledTodoRef.fields[0], 'settled-list')
   assert.equal(payload.SettledTodoDigest.fields[0], 'settled-list-digest')
+
+  let state = ok(foldMagic(magicTodoJournal.empty, fact('TodoWritePrepared', prepared)))
+  state = ok(foldMagic(state, fact('TodoWriteAccepted', accepted)))
+  state = ok(foldMagic(state, fact('DedicatedTodoReviewerEnlisted', enlisted)))
+  state = ok(foldMagic(state, fact('TodoProcessReviewAssigned', assigned)))
+  state = ok(foldMagic(state, fact('TodoReviewConcluded', payload)))
+  assert.equal(state.ByLife.get('manager-life').CurrentObligationsRef[0].fields[0], 'proposal-list')
 })
 
 test('TODO-012 stores typed Magic Todo bytes in the canonical Fact envelope', () => {

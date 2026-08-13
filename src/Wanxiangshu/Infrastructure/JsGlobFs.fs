@@ -115,13 +115,13 @@ module JsGlobFs =
 
             wildmatchRegex body
 
-    let private compileUserPatterns (pattern: string) : Result<obj list, JsFailure> =
+    let private compileUserPatterns (pattern: string) : Result<obj array, JsFailure> =
         if System.String.IsNullOrEmpty pattern then
             Error JsFailure.AnchorInvalidPattern
         else
             let rec go remaining acc =
                 match remaining with
-                | [] -> Ok(List.rev acc)
+                | [] -> Ok(List.rev acc |> List.toArray)
                 | piece :: rest ->
                     match compilePathPattern piece with
                     | Error failure -> Error failure
@@ -169,13 +169,15 @@ module JsGlobFs =
         | Error _ -> []
         | Ok text -> text.Split([| '\n' |]) |> Array.toList |> List.choose (parseIgnoreLine baseRel)
 
-    let private isIgnored (rules: IgnoreRule list) (rel: string) (isDir: bool) : bool =
-        let rec go remaining ignored =
-            match remaining with
-            | [] -> ignored
-            | rule :: rest ->
+    let private isIgnored (rules: ResizeArray<IgnoreRule>) (rel: string) (isDir: bool) : bool =
+        let rec go i ignored =
+            if i >= rules.Count then
+                ignored
+            else
+                let rule = rules.[i]
+
                 if rule.DirectoryOnly && not isDir then
-                    go rest ignored
+                    go (i + 1) ignored
                 else
                     let local =
                         if rule.Base = "" then
@@ -189,19 +191,20 @@ module JsGlobFs =
 
                     match local with
                     | None
-                    | Some "" -> go rest ignored
-                    | Some path when regexTest rule.Regex path -> go rest (not rule.Negated)
-                    | Some _ -> go rest ignored
+                    | Some "" -> go (i + 1) ignored
+                    | Some path when regexTest rule.Regex path -> go (i + 1) (not rule.Negated)
+                    | Some _ -> go (i + 1) ignored
 
-        go rules false
+        go 0 false
 
     let private collectVisibleFiles (root: string) (collectCap: int) (visitCap: int) : string list * bool =
         let files = ResizeArray<string>()
+        let rules = ResizeArray<IgnoreRule>()
         // DSL-MUTABLE: resource — file collector truncation and visit counters
         let mutable truncated = false
         let mutable visits = 0
 
-        let rec walk (dir: string) (rel: string) (rules: IgnoreRule list) =
+        let rec walk (dir: string) (rel: string) =
             if truncated then
                 ()
             elif visits >= visitCap then
@@ -210,43 +213,46 @@ module JsGlobFs =
                 visits <- visits + 1
 
                 let nested = loadIgnoreFile (pathJoin dir ".gitignore") rel
+                let mark = rules.Count
 
-                let extra =
-                    if rel = "" then
-                        loadIgnoreFile (pathJoin root ".git/info/exclude") "" @ nested
-                    else
-                        nested
+                if rel = "" then
+                    for rule in loadIgnoreFile (pathJoin root ".git/info/exclude") "" do
+                        rules.Add(rule)
 
-                let rules' = rules @ extra
+                for rule in nested do
+                    rules.Add(rule)
 
                 try
-                    let entries = readdirSync dir |> Array.toList |> List.sort
+                    try
+                        let entries = readdirSync dir |> Array.toList |> List.sort
 
-                    for entry in entries do
-                        if not truncated && entry <> ".git" then
-                            let full = pathJoin dir entry
-                            let childRel = if rel = "" then entry else rel + "/" + entry
+                        for entry in entries do
+                            if not truncated && entry <> ".git" then
+                                let full = pathJoin dir entry
+                                let childRel = if rel = "" then entry else rel + "/" + entry
 
-                            try
-                                let st = lstatSync full
+                                try
+                                    let st = lstatSync full
 
-                                if isSymbolicLink st then
+                                    if isSymbolicLink st then
+                                        ()
+                                    elif isDirectory st then
+                                        if not (isIgnored rules childRel true) then
+                                            walk full childRel
+                                    elif isFile st then
+                                        if not (isIgnored rules childRel false) then
+                                            if files.Count >= collectCap then
+                                                truncated <- true
+                                            else
+                                                files.Add(childRel.Replace('\\', '/'))
+                                with _ ->
                                     ()
-                                elif isDirectory st then
-                                    if not (isIgnored rules' childRel true) then
-                                        walk full childRel rules'
-                                elif isFile st then
-                                    if not (isIgnored rules' childRel false) then
-                                        if files.Count >= collectCap then
-                                            truncated <- true
-                                        else
-                                            files.Add(childRel.Replace('\\', '/'))
-                            with _ ->
-                                ()
-                with _ ->
-                    ()
+                    with _ ->
+                        ()
+                finally
+                    rules.RemoveRange(mark, rules.Count - mark)
 
-        walk root "" []
+        walk root ""
         List.ofSeq files, truncated
 
     /// JS-007: gitignore-style glob. maxEntries bounds the returned match
@@ -258,14 +264,15 @@ module JsGlobFs =
             let cap = max maxEntries 0
             let collectCap = min 8192 (max cap (cap * 8 + 8))
             let files, walkTruncated = collectVisibleFiles root collectCap 100000
+            let matched = ResizeArray<string>()
 
-            let matched =
-                files
-                |> List.filter (fun rel -> List.exists (fun re -> regexTest re rel) matchers)
-                |> List.sort
+            for rel in files do
+                if Array.exists (fun re -> regexTest re rel) matchers then
+                    matched.Add(rel)
 
-            let truncated = walkTruncated || matched.Length > cap
+            let sorted = matched |> Seq.toList |> List.sort
+            let truncated = walkTruncated || sorted.Length > cap
 
             Ok
-                { Paths = List.truncate cap matched
+                { Paths = List.truncate cap sorted
                   Truncated = truncated }
