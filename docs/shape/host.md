@@ -70,8 +70,8 @@ Work + Root
   = 普通主会话；恰好一个 Companion（InternalLeaf + Attached Companion）
 ```
 
-SyncDelegate（SyncInspector / SyncCoder）使用 Returned→Completion 调用代数
-（send prompt → await Returned → await Completion），**不是** InternalLeaf / no-Companion Satellite。
+SyncDelegate（SyncInspector / SyncCoder）使用 ProviderRun semantic batch → one Send → ordinary Completion 调用代数；
+同一 batch 只物化一份 bounded WorkRecord，siblings 引用 canonical result。**不是** InternalLeaf / no-Companion Satellite。
 禁止把 dedicated Sync* 实现成历史 Teacher-style InternalLeaf。
 
 G3 clean-break：`Role.Student` / `Role.Teacher`、Student↔Teacher 绑定、HOST-014 canary 与

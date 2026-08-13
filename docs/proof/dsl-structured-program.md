@@ -10,7 +10,7 @@
 | `scripts/checks/dsl-ownership.mjs --threshold=0` | 业务 Interpreter/Command-Reply 第二运行时、程序计数字段、未声明 mutable、record `ref` 可变存储、跨文件同构 DU、未分类的大 DU、未登记 Infrastructure leak、record 中≥2 个独立状态轴且无 `DSL-state-combination` 分类、无结构化理由的 `ControlState`、目录级整体豁免（Infrastructure/Journal/Process 以「不在扫描范围」不报告）、两个 declared registry 的 direct/try probe 联合选择 effect branch |
 | adversarial fixture（`FinalityController` 形） | 裸/未分类 `mutable`、程序计数 scratch（含并发 `ref`/`ResizeArray` 若未 structured-physical 分类）在 dsl-ownership / state-product 下必须 RED；目录级 Infrastructure 豁免不得掩盖 |
 | adversarial fixture（`ExecutorSummarize` 形） | 裸/未分类 `mutable` 在 dsl-ownership 下必须 RED；fixture 可含 `timerTask`→re-probe 文本作形状上下文，但静态判红触发是未分类 mutable（B 类零轮询由行为证明闭合，非此静态门禁，见下）；不得因文件落在 Infrastructure/ 而逃逸 |
-| `SyncDelegateRuntime.fs` registries | **已人工分类证明（classified）**：`callsByOwnerScope` / `callsByDelegate` / `pendingCompletionTexts` / `inFlightScopes` 各为一物理 lifetime/resource mailbox（见下节 manual-proof）；`StudentTeacherRuntime` **G3 已删除**，证明义务迁到本 SyncDelegate 节；`registry-joint-branch` 只抓同 match 联合 probe，分散 presence 不在 auto 范围、由本 proof 闭合 |
+| `SyncDelegateRuntime.fs` registries | **已人工分类证明（classified）**：`pendingBatches` = 未收齐 ProviderRun semantic batch，`activeBatches` = 当前 `(ReuseScope, role)` reservation，`callsByOwnerScope` / `callsByDelegate` = 一次真实 Send→Completion lifetime（见下节 manual-proof）；`StudentTeacherRuntime` **G3 已删除**；`registry-joint-branch` 只抓同 match 联合 probe，分散 presence 由本 proof 闭合 |
 | `scripts/checks/architecture.mjs` | Domain 向上层依赖、源码根/fsproj 不一致、资源越界读取 |
 | `scripts/checks/spec.mjs` | DSL Clause 重复、悬空或 Change 影子定义 |
 | `scripts/checks/causal-wait-boundary.mjs` | Domain 引用 CausalWait 实现、Application 读 `IWaitSnapshotReader`、Fact/Journal 编码 wait、关键路径裸 `TCS.Task` await、Registry mutable 缺 DSL-MUTABLE |
@@ -71,24 +71,22 @@ declared registry 的 direct/try probe 联合选择 effect branch 这一语法�
 `src/Wanxiangshu/Session/SyncDelegateRuntime.fs` 承接（EXEC-026/028）。
 
 参照上表 Blogger 正交物理槽位风格：SyncDelegate registries **各拥有单一物理 lifetime /
-投递地址**，且**不存在**任何函数同时 probe 两个 registry 的 presence 来选择 effect branch：
+投递地址**，且批次边界来自 Host 已知事实，不从 registry presence 或调度时机推断：
 
 | registry | 物理归属 | 消费方式 |
 |---|---|---|
-| `callsByOwnerScope` / `callsByDelegate` | 在途 SyncDelegate 调用（Returned + Completion 双 await） | `tryCallByOwnerScope` / `tryCallByDelegate`；`HandleTurn` 只在 Inspector/Coder + 活跃 call 上投递 |
-| `pendingCompletionTexts` | TextComplete 改写武装 | 仅 `TextComplete` / `Return` 重复拒绝；**不得**驱动 `HandleTurn` 阶段选择 |
-| `inFlightScopes` | immediate caller `ReuseScope` 单飞闩 | `Invoke` 并发第二路拒绝；Completion 后释放 |
+| `pendingBatches` | `(ReuseScope, role, ProviderRun)` 尚未收齐的 semantic batch；expected `ToolCallId` 顺序由 Host assistant message 固定 | 每个 tool invocation 只填自己的已知 slot；收齐 expected members 后一次性转 active，禁止 timer/microtask drain |
+| `activeBatches` | `(ReuseScope, role)` 当前唯一已 admission batch reservation | batch completion / cancel / dispose 释放；另一 ProviderRun overlap fail closed，不排队 |
+| `callsByOwnerScope` / `callsByDelegate` | semantic batch 对 dedicated Session 的一次真实 Send→ordinary Completion | `HandleTurn` 只按 delegate Session 找当前 active call；完成后只写一份 bounded WorkRecord |
 
-`Invoke` 为单一 CE 栈：Acquire(ReuseScope) → GetOrCreate → Send → await `Returned` → await
-`Completion`。固定 completion 判据是 normalize 后的 turn payload 是否等于
-`SyncDelegatePrompt.SyncDelegateReturnCompletion`，不是 registry presence。自动恢复 nudge 受
-`AgentPairCursor.DefaultAutoRecoveryBudget` 有界。`return` 只 resolve Returned，不 dispose dedicated
-Session。
+`Invoke` 为单一 CE 栈：Admit current `ToolCallId` against ProviderRun expected members → batch complete 后
+GetOrCreate → ordered prepare/concat → one Send → await ordinary Completion → materialize one bounded
+WorkRecord。provider 顺序第一项是 canonical invocation；siblings 只得到 `MergedInto canonicalCall`。
+不存在 `Returned`、`pendingCompletionTexts`、`SyncDelegateReturnCompletion` 或 `return` 工具。
 
-结构性证明目标：`HandleTurn` 对 SyncDelegate 只 probe call mailbox + turn payload；
-`TextComplete` 只 probe `pendingCompletionTexts`。joint-branch 判据在结构上不可能成立。诚实边界：
-`registry-joint-branch` 自动门禁仍只拦截同 match 内 direct/try 联合；本小节以结构消除替代跨 helper
-detector。
+结构性证明目标：batch membership 只由 `(ProviderRunIdentity, ToolCallId order)` 决定；`HandleTurn`
+只消费一个 active call。无 joint-registry PC、无到达时序分支、无 queue-on-session，因此“批次尚未收齐”与
+“callee 正在执行”是两个互斥物理 lifetime，而不是隐式业务阶段。
 
 举一反三（同仓联合 presence / park→bind 对照，2026-08 复审）：
 `BloggerRuntime.decideMaterial`、`PluginRuntimeScope` parked∩pendingOffer、`Reconciler` active∩queued、

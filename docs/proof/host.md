@@ -77,7 +77,7 @@ G2 PREFIX LAW / `promptModel` 证据见下表与上节「绑定与身份」。**
 | StrengthReplica 分类 | owner 最多一个 active StrengthReplica；非 SatelliteKind；retire 后不跨 decision 复用 | HOST-008、STRENGTH-004/014 |
 | Host children 恢复 | journal id 匹配复用、id 丢失 Replacement、无关联新建不收养、冲突/查询失败 fail closed；物理 parent 恒为 family root | HOST-008、HOST-015 |
 | G3 absence | `scripts/checks/student-teacher-absence.mjs` 与 capability/store ratchet 证明生产 Role、Agent、request kind、tool、QA storage、Satellite kind 均无 Student/Teacher 复活 | HOST-014、AGENT-020、PROMPT-012 |
-| SyncDelegate 非兼容壳 | Inspector/Coder 使用 Work+Attached 与 Returned→Completion；不存在 Student/Teacher fallthrough、alias 或 legacy recovery | HOST-008、EXEC-026/028、HOST-014 |
+| SyncDelegate 非兼容壳 | Inspector/Coder 使用 Work+Attached；ProviderRun semantic batch → one Send → ordinary Completion；不存在 Student/Teacher fallthrough、alias 或 legacy recovery | HOST-008、EXEC-026/028/031、HOST-014 |
 | G2 Inspector PREFIX LAW | Q1→Q2→Q3 same SessionId + same model + `ProviderProjection.isAppendOnlyPrefix` / `wireOf`/`sealHolds`；unit + 唯一 Long Stroke（mock LLM + 本机 OpenCode）。**G2 Product Exit DONE** | HOST-008、HOST-013 → tests/unit/session/g2-inspector-provider-wire-prefix.test.mjs（`G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix`）；Host：tests/e2e/support/long-stroke-oracles.mjs `assertG2InspectorPrefixLaw`（经 `tests/e2e/entry.test.mjs`） |
 | Strength leaf 隔离 | StrengthReplica 只走 InternalLeaf+Attached，Session deletion / attempt abort 级联取消；不借 Student/Teacher 身份或 Satellite kind | HOST-008、STRENGTH-004/011/014 |
 

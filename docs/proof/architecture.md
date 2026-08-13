@@ -23,7 +23,7 @@
 |------|------|
 | `scripts/checks/student-teacher-absence.mjs` 证明生产源码无 Student/Teacher Agent、Role、request kind、tool、Satellite kind 与 QA runtime | ARCH-013、HOST-014、AGENT-020、PROMPT-012 |
 | unified-store gate 的 `student-qa-revival` fixture 必须能红，生产扫描保持绿；禁止隐藏 QA storage/feature ref 复活 | ARCH-013、PERSIST-007 |
-| SyncInspector/SyncCoder 只走 Work+Attached 与 EXEC Returned→Completion，不存在 legacy Student/Teacher fallthrough | ARCH-013、HOST-008、EXEC-026/028 |
+| SyncInspector/SyncCoder 只走 Work+Attached 与 EXEC ProviderRun semantic batch → ordinary Completion，不存在 legacy Student/Teacher fallthrough | ARCH-013、HOST-008、EXEC-026/028/031 |
 | Host 仍只用公开 hook/SDK；Student/Teacher absence 不以 Host patch 或 alias 实现 | ARCH-003、ARCH-013 |
 
 ## G9 ratchets（Playbook §24）

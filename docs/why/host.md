@@ -80,7 +80,7 @@ Transform input 为空对象是 Host 能力现实；绑定必须用「已创建�
   多个 owner，崩溃恢复与级联取消必然分叉。
 - **选择方案**：分离 `SessionExecutionClass`（Work | InternalLeaf）与 `SessionOwnership`
   （Root | Attached of AttachmentKind）。Dedicated SyncInspector/SyncCoder = Work+Attached（MAY Companion）；
-  Companion/Bookkeeper/StrengthReplica = InternalLeaf+Attached。SyncDelegate 的 Returned→Completion 只是调用代数，
+  Companion/Bookkeeper/StrengthReplica = InternalLeaf+Attached。SyncDelegate 的 ProviderRun semantic batch → one Send → ordinary Completion 只是调用代数，
   不定义 Session 分类。G3 已 clean-break 删除 Student/Teacher；HOST-014/ARCH-013 保留空号作为 absence ratchet。
   HOST-015 物理扁平与恢复 fail-closed 不变：逻辑可嵌套 Attached，物理一律挂 family root。
 

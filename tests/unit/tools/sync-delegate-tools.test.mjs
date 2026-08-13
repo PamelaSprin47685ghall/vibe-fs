@@ -19,6 +19,7 @@ import {
   SnapshotToolPartState,
 } from '../../../dist/Infrastructure/OpenCode/Host/SessionSnapshotPort.js'
 import { SessionQuiescenceGate_$ctor as createQuiescenceGate } from '../../../dist/Infrastructure/OpenCode/Host/SessionQuiescenceGate.js'
+import { SessionPersona_clearAllForTests } from '../../../dist/Domain/PersonaCatalog.js'
 import { TurnOutcome } from '../../../dist/Domain/ReconcileProgram.js'
 import { ReconciledTurn } from '../../../dist/Application/Reconciliation/ReconciledTurn.js'
 import { SyncDelegateRole } from '../../../dist/Kernel/SyncDelegate.js'
@@ -168,6 +169,7 @@ const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = '
 }
 
 const withHarness = async (fn, { tier = 'Fast', snapshotMessages } = {}) => {
+  SessionPersona_clearAllForTests()
   const base = mkdtempSync(join(tmpdir(), 'wxs-sync-delegate-tools-'))
   const opened = agentJournal.create({ directory: base })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
