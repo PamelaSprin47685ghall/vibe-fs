@@ -228,7 +228,7 @@ test('ESTABLISH_AND_REPAIR_specs_expose_charge_plus_optional_keywords', () => {
 
 test('INSPECT_missing_sync_delegate_runtime_is_a_natural_consequence', async () => {
   const { text, fields } = await runToml(inspectSpec(factory, bareScope(), undefined), { charge: 'look' }, context())
-  assert.match(text, /No Inspector is available from this execution context\./)
+  assert.match(text, /当前执行语境中没有可用的 Inspector。/)
   assert.equal(fields.error, undefined)
 })
 
@@ -238,13 +238,13 @@ test('ESTABLISH_missing_sync_delegate_runtime_is_a_natural_consequence', async (
     { charge: 'establish failing test' },
     context(),
   )
-  assert.match(text, /No Coder is available from this execution context\./)
+  assert.match(text, /当前执行语境中没有可用的 Coder。/)
   assert.equal(fields.error, undefined)
 })
 
 test('INSPECT_missing_charge_is_refused_as_a_natural_consequence', async () => {
   const { text, fields } = await runToml(inspectSpec(factory, bareScope(), sentinelRuntime), {}, context())
-  assert.match(text, /inspect needs a charge\./)
+  assert.match(text, /inspect 需要一项 charge。/)
   assert.equal(fields.error, undefined)
 })
 
@@ -254,13 +254,13 @@ test('INSPECT_blank_charge_is_refused_as_a_natural_consequence', async () => {
     { charge: '   ' },
     context(),
   )
-  assert.match(text, /inspect needs a charge\./)
+  assert.match(text, /inspect 需要一项 charge。/)
   assert.equal(fields.error, undefined)
 })
 
 test('ESTABLISH_missing_charge_is_refused_as_a_natural_consequence', async () => {
   const { text, fields } = await runToml(establishSpec(factory, bareScope(), sentinelRuntime), {}, context())
-  assert.match(text, /establish-behavior needs a charge\./)
+  assert.match(text, /establish-behavior 需要一项 charge。/)
   assert.equal(fields.error, undefined)
 })
 
