@@ -40,7 +40,7 @@ module LifecycleWorkRecordProjection =
     /// Resolve XTrace part bodies into semantic items (single mapper; a part
     /// that fails its digest check is dropped, matching the canonical path).
     let private resolveTrace (durable: AgentJournal) (xTrace: XTraceProjectionState) : XTraceItem list =
-        xTrace.Parts
+        XTraceProjection.parts xTrace
         |> List.choose (fun part ->
             durable.Writer.BlobWriter.Read part.TextRef
             |> Result.toOption
@@ -80,7 +80,7 @@ module LifecycleWorkRecordProjection =
             let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
             let blog = session.Blog |> Option.defaultValue BlogProjection.empty
 
-            let frames = resolveFrames durable blog.Frames
+            let frames = resolveFrames durable (BlogProjection.frames blog)
 
             let trace = resolveTrace durable xTrace
 
@@ -152,7 +152,7 @@ module LifecycleWorkRecordProjection =
 
             // COMPANION-015 ④/⑩: Chronicle = Y frames overlapping this invocation.
             let frames =
-                blog.Frames
+                BlogProjection.frames blog
                 |> framesOverlappingRange range
                 |> resolveFrames durable
 

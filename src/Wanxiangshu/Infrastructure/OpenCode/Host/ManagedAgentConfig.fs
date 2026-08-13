@@ -327,3 +327,12 @@ module ManagedAgentConfig =
                                 modelID = text }
                     | _ -> None
 
+    /// PROMPT-006 Host resolution: Dispatcher sends `Model = None`; the transport
+    /// binds `config.agent[effectiveAgent].model` before prompt_async. OpenCode
+    /// otherwise treats an agent-less / history-inferred request as the default
+    /// Fast model and overwrites a Deep child mid-conversation.
+    let tryBoundModel (agent: string) : OpencodeModel option =
+        match !liveInventory with
+        | Some inventory -> tryOpencodeModel inventory agent None
+        | None -> None
+

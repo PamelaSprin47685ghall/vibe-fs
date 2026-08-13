@@ -42,6 +42,20 @@ test('TODO-005 provider wording says Accepted becomes Current without reviewer s
   }
 })
 
+test('TODO-004 failure triage keeps red for syntax and kills OpenCode on infrastructure faults', () => {
+  const membrane = read('src/Wanxiangshu/Application/Reconciliation/MagicTodoMembrane.fs')
+  const hostCodec = read('src/Wanxiangshu/Infrastructure/OpenCode/Codec/MagicTodoHostCodec.fs')
+
+  assert.match(membrane, /Diagnostic\.fatal "magic-todo-infrastructure-failed"/)
+  assert.match(membrane, /\| Error reason -> invalidOp reason/, 'schema decode is allowed to reject the tool call')
+  assert.match(membrane, /\| Error syntaxReason -> invalidOp syntaxReason/, 'deferred Error is syntax-only')
+  assert.match(membrane, /await ConsumableReview failed:[\s\S]*fatalInfrastructure/)
+  assert.match(membrane, /ensureReview infrastructure failed:/)
+  assert.doesNotMatch(membrane, /Magic Todo deferred prepare failed/)
+  assert.doesNotMatch(membrane, /ensureReview failed:[^\n]*invalidOp/)
+  assert.match(hostCodec, /output\.args is required[\s\S]*Diagnostic\.fatal|Diagnostic\.fatal[\s\S]*output\.args is required/)
+})
+
 test('TODO-005 production checkpoint path has no reviewer settlement owner', () => {
   for (const path of [
     'src/Wanxiangshu/Application/Reconciliation/MagicTodoMembrane.fs',

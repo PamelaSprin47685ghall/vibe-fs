@@ -206,7 +206,7 @@ module EnforcerCycleCommit =
                     elif blog.FrameEpochId <> squash.FrameEpochId then
                         CycleCommitOutcome.KnownNotCommitted "BlogObservationsSquashed frame epoch mismatch"
                     else
-                        let selected = List.truncate k blog.Frames
+                        let selected = List.truncate k (BlogProjection.frames blog)
                         let digests = selected |> List.map (fun f -> f.Digest)
 
                         if digests <> squash.FrameDigests then

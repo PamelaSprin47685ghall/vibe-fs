@@ -32,7 +32,7 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
                 | Ok _ -> Error(sprintf "blob digest mismatch: %s" (BlobDigest.value frame.Digest))
                 | Error error -> Error error
 
-        readFrames blog.Frames []
+        readFrames (BlogProjection.frames blog) []
 
     interface ICompanionDurablePort with
         member _.Load(sessionId: SessionId) : Result<CompanionMemory option, string> =

@@ -109,7 +109,7 @@ module ManagerNarrativeTransform =
 
                 provenances.Contains messageId
 
-let private hasSuicideAfter (rawMessages: obj list) (messageIndex: int) =
+    let private hasSuicideAfter (rawMessages: obj list) (messageIndex: int) =
         if messageIndex >= List.length rawMessages - 1 then
             false
         else

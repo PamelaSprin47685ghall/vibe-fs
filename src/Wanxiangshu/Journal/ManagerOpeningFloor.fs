@@ -11,14 +11,14 @@ open Wanxiangshu.Kernel.Identity
 module ManagerOpeningFloor =
 
     let private partAnchors (xTrace: XTraceProjectionState) : MagicTodo.TracePartAnchor list =
-        xTrace.Parts
+        XTraceProjection.parts xTrace
         |> List.map (fun part ->
             { Cursor = part.Cursor
               Kind = part.Kind
               ToolCallId = part.ToolCallId })
 
     let private t1Anchor (magic: MagicTodoProjection.LifeMagicTodoState) : (XTraceCursor * ToolCallId) option =
-        match magic.AcceptedOrder with
+        match MagicTodoProjection.acceptedOrder magic with
         | [] -> None
         | firstId :: _ ->
             match Map.tryFind (TodoWriteId.value firstId) magic.Checkpoints with

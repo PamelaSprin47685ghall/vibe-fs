@@ -148,6 +148,9 @@ export const magicTodo = (() => {
     'todoReviewId',
     'dedicatedReviewerId',
     'listDigest',
+    'canonicalObligationListWire',
+    'obligationListDigest',
+    'validateObligations',
     'validateCompletedGate',
     'normalizeProposed',
     'semanticMerge',
@@ -171,6 +174,7 @@ export const magicTodo = (() => {
     MagicTodoItem: MagicTodoModule.MagicTodoItem,
     ProcessReviewVerdict: MagicTodoModule.ProcessReviewVerdict,
     PreparedIdentity: MagicTodoModule.PreparedIdentity,
+    Obligation: MagicTodoModule.Obligation,
     todoItemIdCreate: MagicTodoModule.TodoItemIdModule_create,
     todoItemIdValue: MagicTodoModule.TodoItemIdModule_value,
     todoWriteIdCreate: MagicTodoModule.TodoWriteIdModule_create,
@@ -233,15 +237,22 @@ export const magicTodo = (() => {
 })()
 
 export const magicTodoAdmission = (() => {
-  const m = bind(MagicTodoAdmissionModule, 'MagicTodoAdmission', ['admit'])
+  const m = bind(MagicTodoAdmissionModule, 'MagicTodoAdmission', ['admitObligations'])
 
   return {
-    admit: (sha256, life, settled, lagAdmission, existingPrepared, localized, inputs) =>
-      m.admit(sha256, life, toList(settled), lagAdmission, existingPrepared, localized, toList(inputs)),
+    admitObligations: (sha256, life, current, lagAdmission, existingPrepared, localized, submitted) =>
+      m.admitObligations(
+        sha256,
+        life,
+        toList(current),
+        lagAdmission,
+        existingPrepared,
+        localized,
+        toList(submitted),
+      ),
     LocalizedToolCall: MagicTodoAdmissionModule.LocalizedToolCall,
     ExistingPrepared: MagicTodoAdmissionModule.ExistingPrepared,
-    PrepareSuccess: MagicTodoAdmissionModule.PrepareSuccess,
-
+    ObligationPrepareSuccess: MagicTodoAdmissionModule.ObligationPrepareSuccess,
   }
 })()
 

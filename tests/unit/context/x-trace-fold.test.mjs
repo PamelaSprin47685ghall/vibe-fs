@@ -8,6 +8,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { envelope, fact, fold, sessionId, stream, providerRun, blobRef, blobDigest, listItems } from '../support/domain.mjs'
 
+const { XTraceProjection_parts: xTraceParts } = await import('../../../dist/Journal/XTraceProjection.js')
+
 const SESSION = 'ses_x'
 const session = sessionId(SESSION)
 
@@ -85,7 +87,7 @@ test('PERSIST_010_parts_append_in_strict_cursor_order', () => {
     partFact({ sequence: 3, turn: 1, partIndex: 0 }),
   ])
 
-  const parts = listItems(s.XTrace.Parts)
+  const parts = listItems(xTraceParts(s.XTrace))
   assert.equal(parts.length, 3)
   assert.deepEqual(
     parts.map((part) => Number(part.Cursor.Sequence)),
@@ -116,7 +118,7 @@ test('PERSIST_010_parts_carry_turn_part_and_tool_name', () => {
     partFact({ sequence: 1, kind: 'tool_call', toolName: 'read', turn: 2, partIndex: 3 }),
   ])
 
-  const parts = listItems(s.XTrace.Parts)
+  const parts = listItems(xTraceParts(s.XTrace))
   assert.equal(parts[0].ToolName, 'read')
   assert.equal(parts[0].Turn, 2)
   assert.equal(parts[0].PartIndex, 3)
@@ -149,7 +151,7 @@ test('PERSIST_010_xtrace_facts_survive_NDJSON_and_still_fold', () => {
   const s = fold.session(result.value, SESSION)
 
   assert.equal(s.XTrace.Opening.AssignmentText, 'first task')
-  const parts = listItems(s.XTrace.Parts)
+  const parts = listItems(xTraceParts(s.XTrace))
   assert.equal(parts.length, 2)
   assert.equal(parts[1].Kind, 'reasoning')
   assert.deepEqual(s.XTrace.Terminal[0].fields[0], 'blob-term')

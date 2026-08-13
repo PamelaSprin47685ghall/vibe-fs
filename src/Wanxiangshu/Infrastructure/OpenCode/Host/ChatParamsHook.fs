@@ -72,7 +72,10 @@ module ChatParamsHook =
     let private selectedAgent (journal: AgentJournal option) (sessionId: SessionId option) =
         match journal, sessionId with
         | Some durable, Some sid ->
-            PromptAuthorityLedger.activeProfile sid (AgentJournal.snapshot durable).AgentProjections
+            let projections = (AgentJournal.snapshot durable).AgentProjections
+
+            PromptAuthorityLedger.activeProfile sid projections
+            |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile sid projections)
             |> Option.map (fun profile -> profile.SelectedAgent)
         | _ -> None
 

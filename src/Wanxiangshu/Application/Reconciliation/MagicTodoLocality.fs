@@ -93,7 +93,7 @@ module MagicTodoLocality =
             | None -> Error LocalityRejection.XTraceUnavailable
             | Some trace ->
                 let matches =
-                    trace.Parts
+                    XTraceProjection.parts trace
                     |> List.filter (fun part ->
                         part.ProviderRun = Some located.ProviderRun
                         && part.ToolCallId = Some located.ToolCallId
@@ -173,7 +173,7 @@ module MagicTodoLocality =
                         )
                 | [ part ] ->
                     let toolPartOrdinal =
-                        trace.Parts
+                        XTraceProjection.parts trace
                         |> List.filter (fun candidate ->
                             candidate.ProviderRun = Some located.ProviderRun
                             && candidate.Kind = "tool_call"
@@ -181,7 +181,7 @@ module MagicTodoLocality =
                         |> List.length
 
                     let todowriteCallIds =
-                        trace.Parts
+                        XTraceProjection.parts trace
                         |> List.filter (fun candidate ->
                             candidate.ProviderRun = Some located.ProviderRun
                             && candidate.Kind = "tool_call"

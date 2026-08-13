@@ -43,6 +43,11 @@ type IOpenCodePort =
 
 module OpenCodePort =
 
+    let private boundModel (opts: OpenCodePromptOptions) =
+        match opts.Model with
+        | Some model -> Some model
+        | None -> opts.Agent |> Option.bind ManagedAgentConfig.tryBoundModel
+
     [<Emit("fetch($0, $1)")>]
     let private jsFetch (url: string) (init: obj) : Task<obj> = jsNative
 
@@ -66,10 +71,12 @@ module OpenCodePort =
                             [| createObj [ "type", box "text"; "text", box text; "metadata", metadata ] |]
                         | None -> [| createObj [ "type", box "text"; "text", box text ] |]
 
+                    let model = boundModel opts
+
                     let bodyFields =
                         [ "parts", box parts ]
-                        @ (opts.Model
-                           |> Option.map (fun model -> [ "model", box model ])
+                        @ (model
+                           |> Option.map (fun bound -> [ "model", box bound ])
                            |> Option.defaultValue [])
                         @ (opts.Agent
                            |> Option.map (fun agent -> [ "agent", box agent ])
@@ -88,11 +95,23 @@ module OpenCodePort =
                                  ) ])
                            |> Option.defaultValue [])
 
+                    // v1 SDK: { path.id, body.agent }. v2 SDK: top-level sessionID/agent/model/parts.
+                    // A nested-only payload drops agent on v2, and OpenCode then
+                    // defaultInfo()s a Deep child onto Fast.
                     let payload =
-                        createObj
+                        createObj (
                             [ "path", box (createObj [ "id", box sId ])
                               "body", box (createObj bodyFields)
-                              "headers", box (headersObj opts.Directory) ]
+                              "headers", box (headersObj opts.Directory)
+                              "sessionID", box sId
+                              "parts", box parts ]
+                            @ (model
+                               |> Option.map (fun bound -> [ "model", box bound ])
+                               |> Option.defaultValue [])
+                            @ (opts.Agent
+                               |> Option.map (fun agent -> [ "agent", box agent ])
+                               |> Option.defaultValue [])
+                        )
 
                     try
                         let sessObj = client?session
@@ -134,7 +153,10 @@ module OpenCodePort =
                                   {| parentID = pId
                                      title = opts.Title
                                      agent = opts.Agent |}
-                              "headers", box (headersObj opts.Directory) ]
+                              "headers", box (headersObj opts.Directory)
+                              "parentID", box pId
+                              "title", box opts.Title
+                              "agent", box opts.Agent ]
 
                     try
                         let sessObj = client?session
@@ -297,10 +319,12 @@ module OpenCodePort =
                             [| createObj [ "type", box "text"; "text", box text; "metadata", metadata ] |]
                         | None -> [| createObj [ "type", box "text"; "text", box text ] |]
 
+                    let model = boundModel opts
+
                     let bodyFields =
                         [ "parts", box parts ]
-                        @ (opts.Model
-                           |> Option.map (fun model -> [ "model", box model ])
+                        @ (model
+                           |> Option.map (fun bound -> [ "model", box bound ])
                            |> Option.defaultValue [])
                         @ (opts.Agent
                            |> Option.map (fun agent -> [ "agent", box agent ])

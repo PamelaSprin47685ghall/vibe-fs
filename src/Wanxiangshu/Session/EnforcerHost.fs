@@ -94,7 +94,7 @@ module EnforcerHost =
         (xTrace: XTraceProjectionState)
         : ProviderProjection.ProviderSemanticProjection =
         let byTurn =
-            XTraceProjection.currentGenerationParts xTrace.Parts
+            XTraceProjection.currentGenerationParts (XTraceProjection.parts xTrace)
             |> List.groupBy (fun part -> part.Turn)
             |> List.sortBy fst
 

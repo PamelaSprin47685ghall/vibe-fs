@@ -21,7 +21,7 @@ import {
 } from '../support/domain.mjs'
 
 const { mainContextFromChunk } = await import('../../../dist/Session/EnforcerHost.js')
-const { XTraceProjection_empty, XTraceProjection_semanticCursorFor } = await import(
+const { XTraceProjection_empty, XTraceProjection_semanticCursorFor, XTraceProjection_parts: xTraceParts } = await import(
   '../../../dist/Journal/XTraceProjection.js'
 )
 const { PrefixEpochIdModule_initial } = await import('../../../dist/Kernel/Identity.js')
@@ -51,8 +51,8 @@ test('ENFORCER_045_mainContext_refuses_when_next_sequence_cannot_advance', () =>
       { role: 'assistant', parts: [xTraceCapture.text('work')] },
     ]
     const xTrace = xTraceCapture.captureProjection(journal, MAIN, semantic(messages))
-    assert.equal(listItems(xTrace.Parts).length, 2)
-    const headSeq = Number(listItems(xTrace.Parts).at(-1).Cursor.Sequence)
+    assert.equal(listItems(xTraceParts(xTrace)).length, 2)
+    const headSeq = Number(listItems(xTraceParts(xTrace)).at(-1).Cursor.Sequence)
     assert.equal(headSeq, 2)
 
     // Force RecordCoverage to the head: nothing left can strictly advance.
@@ -100,7 +100,7 @@ test('ENFORCER_045_mainContext_refuses_unmapped_next_cursor', () => {
   withJournal((journal) => {
     const messages = [{ role: 'user', parts: [xTraceCapture.text('only')] }]
     const xTrace = xTraceCapture.captureProjection(journal, MAIN, semantic(messages))
-    assert.equal(listItems(xTrace.Parts).length, 1)
+    assert.equal(listItems(xTraceParts(xTrace)).length, 1)
 
     const blog = blogProjection.empty
     const projection = semantic(messages)

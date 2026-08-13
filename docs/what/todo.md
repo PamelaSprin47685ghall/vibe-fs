@@ -202,7 +202,7 @@ Evidence SSOT：process review input / reviewer report / Finality work record �
 二者不得互转：禁止用 RecordCoverage 证 prefix 可替换；禁止用 PrefixCoverage 填 LWR gap。  
 Process 与 Finality 的 dedicated LWR 均 **request-range bounded**，不得取 session head。  
 Y 未覆盖 frontier ≠ review 不可开始：合法 canonical RawGap 已是完整 process evidence。  
-PERFECT 与 REVISE 在 verdict 前都必须产生本 request 的 canonical ProcessReviewLWR（无 prose 的 PERFECT fail closed）。
+PERFECT 与 REVISE 在 verdict 前都必须产生本 request 的 canonical ProcessReviewLWR。无 prose 的 verdict 不得形成 Concluded；若 hidden reviewer 已结束而仍无法物化合法 prose/LWR，这是 reviewer infrastructure/protocol 不变量失败 → `Diagnostic.fatal` kill OpenCode，不得变成 Manager 的 todowrite 红字。
 
 三段标题固定 `Opening / Chronicle / Recent work`（COMPANION-003）。正式陈述 = Recent work 最后一条助手文本（散文 claim；无 Closing report 段）。
 
@@ -304,7 +304,7 @@ then MagicTodoManagerGuideline
 
 **隐藏 reviewer 表面（窄例外）**：Manager **可以**看到过程 review 的 outcome 与 canonical ProcessReviewLWR 报告正文（checkpoint tool result / suicide drain 回传）。  
 Manager **不可**知道：隐藏 dedicated reviewer 身份、session/barrier/witness、2N 编排、assignment 内部细节。  
-ProcessReviewLWR 复用既有 Finality safety-seal：canonical LWR **不** regex 清洗；无法证明 Manager-facing safety → fail closed；不得伪造「洗过的报告」。  
+ProcessReviewLWR 复用既有 Finality safety-seal：canonical LWR **不** regex 清洗；无法证明 Manager-facing safety 说明内部 projection/safety 不变量无法成立 → `Diagnostic.fatal` kill OpenCode；不得伪造「洗过的报告」，也不得作为 todowrite 红字甩给 Manager。  
 Glory/Prompt 表面交叉时，本条是 Manager 可见面的语义锚（含对 GLORY-030 / SURFACE-005 等的窄例外指向），不是 reviewer 编排向 Manager 泄漏的许可证。
 
 ## TODO-014：治理与证明指针

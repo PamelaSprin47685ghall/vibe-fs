@@ -66,7 +66,7 @@ module EnforcerFrameRecovery =
 
                                     load rest (resolved :: acc)
 
-                    load blog.Frames []
+                    load (BlogProjection.frames blog) []
 
     /// ENFORCER-051 / PROJ-008 step 3b: rebuild via Projection Algebra.
     /// Snapshot → InsertBlogFrames → Planner → Builder-shaped Host messages.
@@ -217,7 +217,7 @@ module EnforcerFrameRecovery =
     /// `None` = mapping failed (empty trace, or Host cursor not present on XTrace).
     /// NEVER default to 0: silent 0 with Prev>0 stages Next≤Prev and dies at commit.
     let lastCoveredSequence (xTrace: XTraceProjectionState) (nextCursor: SemanticCursor) : int64 option =
-        XTraceProjection.currentGenerationParts xTrace.Parts
+        XTraceProjection.currentGenerationParts (XTraceProjection.parts xTrace)
         |> List.tryFindBack (fun part ->
             part.Turn < nextCursor.TurnIndex
             || (part.Turn = nextCursor.TurnIndex && part.PartIndex < nextCursor.PartIndex))

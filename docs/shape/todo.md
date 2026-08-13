@@ -11,7 +11,7 @@
 | Provider-visible `todowrite` wire（`obligations: [{ name, work }]`；schema / description / decoder / result renderer 同源） | Magic Todo definition / codec module | 禁止 `kind`/`id`/`status`/`priority`/`reviewing` 回流；禁止 before/after/test 另写 schema（TODO-002、TODO-012） |
 | `CurrentObligations` | `MagicTodoProjection`（Journal fold；**last `TodoWriteAccepted` → matching Prepared.Submitted**） | Reviewer verdict / Host `TodoTable` **都不是** writer；不得反向 adopt 或 rollback（TODO-005/007） |
 | Checkpoint + process-review obligation SSOT | `TodoWriteAccepted` | `Prepared` alone 不派生 Rk；Host store 已写 ≠ Accepted（TODO-004、TODO-006） |
-| ProviderInput / BaseObligations / Proposed / ReviewFrontier 冻结 | `TodoWritePrepared` | `ProviderInputDigest` = tagged provider arguments canonical digest；禁止事后重猜 frontier（TODO-004、TODO-006） |
+| ProviderInput / BaseObligations / Submitted / ReviewFrontier 冻结 | `TodoWritePrepared` | `ProviderInputDigest` = canonical `{obligations:[{name,work}]}` digest；禁止事后重猜 frontier（TODO-004、TODO-006） |
 | Accepted supersession | `MagicTodoProjection.foldAccepted`：Current ← matching Prepared.Proposed | `TodoReviewConcluded` 只封口 review；禁止 reviewer settlement / semanticMerge / accepted-but-not-current（TODO-005） |
 | ConsumableReview | `TodoReviewConcluded`（≡ ConsumableReview） | `VerdictKnown` 属 Reviewer 域，不得冒充可消费；禁止 AwaitingReport Stage（TODO-006、TODO-012） |
 | Process-review assignment range | `TodoProcessReviewAssigned.ReviewWorkStartCursor` | exclusive end after assignment authority；禁止 session head / Opening 冒充（TODO-006、TODO-008） |
@@ -27,9 +27,9 @@
 | Finality drain 入口 | Manager `suicide` 前序（GLORY Finality CE 扩展） | 零 `TodoWriteAccepted` 的 first unblessed path fail closed；不另造 mechanical todo-completeness gate（TODO-010） |
 | Manager-visible process surface | enriched `todowrite` tool result + safety-sealed ProcessReviewLWR | 允许 outcome / report；禁止泄漏 reviewer session / barrier / witness / 2N（TODO-013） |
 | Compatibility sink | Host `TodoTable` writer（membrane projection + drift repair） | 只投影；REVISE 不 rollback；repair **不**产生 checkpoint/review（TODO-007） |
-| V1 membrane 执行路径 | Host tool hooks（definition / before / after）；细节 HOST-* | V2 runner 无 hook parity → Attempt fail closed（TODO-004） |
+| V1 membrane 执行路径 | Host tool hooks（definition / before / after）；细节 HOST-* | V2 runner 无 hook parity 应在启动/构造 gate 阻止；若运行时仍错入则 `Diagnostic.fatal`，不得 tool red（TODO-004） |
 | Legacy seed | 一次性 `LegacyTodoSeedAdopted`（仅升级瞬间 legacy open Life） | 正常新 Life canonical 空；禁止同 session 后续 Life 再 adopt Host table（TODO-011） |
-| Todo-list / checkpoint settlement projection | Domain checkpoint projection module（路径随仓库；建议名 `TodoCheckpointProjection`） | **只** obligations / settlement；**不是**工作记录 renderer（TODO-007/008） |
+| Obligation checkpoint projection | `MagicTodoProjection` | **只** Accepted→Current + review obligation；没有 settlement writer / semanticMerge；**不是**工作记录 renderer（TODO-005/007/008） |
 | Process-review / Finality 证据物化 | `LifecycleWorkRecordProjection`（既有 `lifecycleWorkRecord` range API） | 禁止在 Todo 树新增平行 work-record module（TODO-008） |
 | Journal durable facts | 既有 EventStore / fact owner | 禁止另造 JSON 状态文件或 ephemeral 当 durable（TODO-004/012） |
 
@@ -72,7 +72,7 @@ PrefixCoverage + ActivePrefixEpoch(TodoCheckpoint) → lag-1 Y 替换（TODO-009
 | provider 冷状态机（kind/id/status/priority/reviewing/semanticMerge） | `obligations: [{name, work}]` only；account 只描述 mission debt，不描述“计划/分析/写 todo”这类 meta-work（TODO-002/003/015） |
 | Host TodoTable 作 canonical / recovery SSOT | Journal projection only（TODO-007） |
 | ephemeral JS bridge 作 durable truth | Journal Prepared/Accepted only（TODO-004/012） |
-| ordinal winner 仲裁同 message 多 todowrite | 全部 fail closed（TODO-004） |
+| ordinal winner 仲裁同 message 多 todowrite | 全部作为 syntax/protocol error 拒绝；这是允许 provider 红字的类别（TODO-004） |
 | process PERFECT 计入 terminal dual-PERFECT | 分型保留；enlist 后 fresh 2N（TODO-010） |
 | Sphinx Kernel / MCP observation 假装 Magic Todo 层 | Sphinx 独立认识状态 owner；不得写入 Todo owner 表（SPHINX-005） |
 

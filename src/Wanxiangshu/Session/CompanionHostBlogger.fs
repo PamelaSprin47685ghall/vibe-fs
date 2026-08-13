@@ -49,7 +49,7 @@ module internal CompanionHostBlogger =
         if k < 1 then
             None
         else
-            let selected = List.truncate k blog.Frames
+            let selected = List.truncate k (BlogProjection.frames blog)
 
             if List.length selected <> k then
                 None

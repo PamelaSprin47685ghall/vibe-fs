@@ -209,7 +209,7 @@ awaitConsumableReview(checkpoint):
 
 - PERFECT 与 REVISE **都必须**有 prose work record；无 prose 不得 Concluded（TODO-008）。
 - 禁止提前 append 空壳 Concluded；禁止 raw terminal/summary 顶替 WorkRecordRef（TODO-012）。
-- Manager-facing LWR：复用 Finality safety-seal；不 regex 清洗；无法证明安全 → fail closed；仅放宽 process 协议允许的 PERFECT/REVISE/review 词面（TODO-013）。
+- Manager-facing LWR：复用 Finality safety-seal；不 regex 清洗；无法证明安全 → `Diagnostic.fatal` kill OpenCode；不得作为 todowrite 红字；仅放宽 process 协议允许的 PERFECT/REVISE/review 词面（TODO-013）。
 
 Process Rk 输入（TODO-008）：
 

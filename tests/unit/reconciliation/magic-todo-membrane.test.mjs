@@ -100,7 +100,7 @@ test('HOST-019 before returns without waiting for snapshot or Journal IO', async
   }
 
   try {
-    const hooks = MagicTodoHostHooks_create(created.journal, snapshot, undefined)
+    const hooks = MagicTodoHostHooks_create(created.journal, snapshot, reviewRuntimeStub)
     const output = {
       args: {
         obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }],
@@ -121,7 +121,75 @@ test('HOST-019 before returns without waiting for snapshot or Journal IO', async
     assert.equal(Object.prototype.propertyIsEnumerable.call(output.args, 'todos'), false)
     assert.equal(output.args.todos[0].content, 'diagnose: Fix the todowrite snapshot race.')
   } finally {
-    releaseSnapshot?.({ tag: 1, fields: ['test cleanup'] })
+    // Leave the deferred snapshot promise unresolved: this test proves Before
+    // does not wait for it. Resolving it as an Error would intentionally take
+    // the new infrastructure-fatal path after the test has already finished.
+    created.dispose()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('TODO-004 malformed obligation shape is the provider-red class', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-magic-todo-syntax-red-'))
+  const created = agentJournal.create({ directory, runtime: 'rt_magic_todo_syntax_red' })
+  assert.equal(created.ok, true, created.ok ? '' : String(created.error))
+
+  const snapshot = { GetMessages: () => Promise.resolve({ tag: 1, fields: ['must not be reached'] }) }
+
+  try {
+    const hooks = MagicTodoHostHooks_create(created.journal, snapshot, reviewRuntimeStub)
+    await assert.rejects(
+      () =>
+        hooks.Before(
+          { tool: 'todowrite', sessionID: 'ses-syntax-red', callID: 'call-syntax-red' },
+          {
+            args: {
+              obligations: [
+                { name: 'same', work: 'first' },
+                { name: 'same', work: 'second' },
+              ],
+            },
+          },
+        ),
+      (error) => {
+        const message = String(error && error.message ? error.message : error)
+        assert.match(message, /duplicate obligation name/i)
+        assert.doesNotMatch(message, /Diagnostic\.fatal|infrastructure/i)
+        return true
+      },
+    )
+  } finally {
+    created.dispose()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('TODO-004 missing process-review runtime is infrastructure-fatal, not provider red', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-magic-todo-runtime-fatal-'))
+  const created = agentJournal.create({ directory, runtime: 'rt_magic_todo_runtime_fatal' })
+  assert.equal(created.ok, true, created.ok ? '' : String(created.error))
+
+  try {
+    const hooks = MagicTodoHostHooks_create(
+      created.journal,
+      { GetMessages: () => Promise.resolve({ tag: 1, fields: ['unused'] }) },
+      undefined,
+    )
+
+    await assert.rejects(
+      () =>
+        hooks.Before(
+          { tool: 'todowrite', sessionID: 'ses-runtime-fatal', callID: 'call-runtime-fatal' },
+          { args: { obligations: [{ name: 'work', work: 'Do real mission work.' }] } },
+        ),
+      (error) => {
+        const message = String(error && error.message ? error.message : error)
+        assert.match(message, /unreachable after Diagnostic\.fatal/)
+        assert.match(message, /process review runtime/)
+        return true
+      },
+    )
+  } finally {
     created.dispose()
     rmSync(directory, { recursive: true, force: true })
   }
@@ -531,7 +599,7 @@ test('TODO-005 REVISE is feedback only: next checkpoint sees the report and Curr
   })
 })
 
-test('HOST-021 after fail-closes deferred prepare rejection as invalidOp', async () => {
+test('HOST-021 snapshot infrastructure failure takes the process-fatal path, never a todowrite red path', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-magic-todo-after-failclose-'))
   const created = agentJournal.create({ directory, runtime: 'rt_magic_todo_after_failclose' })
   assert.equal(created.ok, true, created.ok ? '' : String(created.error))
@@ -545,7 +613,7 @@ test('HOST-021 after fail-closes deferred prepare rejection as invalidOp', async
   }
 
   try {
-    const hooks = MagicTodoHostHooks_create(created.journal, snapshot, undefined)
+    const hooks = MagicTodoHostHooks_create(created.journal, snapshot, reviewRuntimeStub)
     const output = {
       args: {
         obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }],
@@ -565,9 +633,12 @@ test('HOST-021 after fail-closes deferred prepare rejection as invalidOp', async
           output,
         ),
       (error) => {
+        // Diagnostic.fatal suppresses SIGKILL under node:test, then the helper's
+        // unreachable guard throws so the fatal branch remains assertable.
         const message = String(error && error.message ? error.message : error)
-        assert.match(message, /Magic Todo deferred prepare failed/)
+        assert.match(message, /unreachable after Diagnostic\.fatal/)
         assert.match(message, /snapshot unavailable/)
+        assert.doesNotMatch(message, /deferred prepare failed/)
         return true
       },
     )

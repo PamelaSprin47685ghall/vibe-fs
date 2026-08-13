@@ -325,5 +325,5 @@ module AgentJournal =
         | Some value ->
             AgentProjection.tryFind sessionId (snapshot value).AgentProjections
             |> Option.bind (fun session -> session.ReviewRequirements)
-            |> Option.map (fun requirements -> requirements.HumanPromptInputs)
+            |> Option.map ReviewRequirementProjection.inputs
             |> Option.defaultValue []

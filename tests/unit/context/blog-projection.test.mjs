@@ -70,7 +70,7 @@ test('COMPANION_008_entry_appends_frame_and_advances_coverage_together', () => {
   // FrozenRecordPrefix from it.
   assert.deepEqual(blog.coverableFrameKinds(result.value), ['Entry'])
 
-  const [stamped] = listItems(result.value.Frames)
+  const [stamped] = listItems(blog.frames(result.value))
   assert.equal(stamped.CoveredFromSequence, 0n)
   assert.equal(stamped.CoveredThroughSequence, 1n)
 })
@@ -194,7 +194,7 @@ test('CTX_012_squash_replaces_the_oldest_frames_and_leaves_the_covered_range_alo
   assert.equal(after.coverableFrames, 3)
   assert.deepEqual(blog.coverableFrameKinds(result.value), ['Squash', 'Entry', 'Entry'])
 
-  const [merged] = listItems(result.value.Frames)
+  const [merged] = listItems(blog.frames(result.value))
   assert.equal(merged.CoveredFromSequence, 0n)
   assert.equal(merged.CoveredThroughSequence, 2n, 'squash unions the replaced frames\' coverage interval')
 })

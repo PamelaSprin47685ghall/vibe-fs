@@ -1,9 +1,17 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { caseOf, errorResult, magicTodo, magicTodoAdmission, managerLifeId, toList, toolCallId } from '../support/domain.mjs'
+import {
+  caseOf,
+  errorResult,
+  magicTodo,
+  magicTodoAdmission,
+  managerLifeId,
+  okResult,
+  toList,
+  toolCallId,
+} from '../support/domain.mjs'
 
 const sha256 = (value) => `digest:${value}`
-const values = (list) => Array.from(list)
 const ok = (result) => {
   assert.equal(result.tag, 0, `expected Ok, got ${result.fields?.[0]?.cases?.()[result.fields?.[0]?.tag]}`)
   return result.fields[0]
@@ -12,80 +20,43 @@ const error = (result) => {
   assert.equal(result.tag, 1, 'expected Error')
   return result.fields[0]
 }
+const obligation = (name, work) => new magicTodo.Obligation(name, work)
 
 const life = managerLifeId('manager-life')
 const firstCall = toolCallId('first-call')
 const secondCall = toolCallId('second-call')
-const pending = magicTodo.TodoStatus.Pending
-const inProgress = magicTodo.TodoStatus.InProgress
-const reviewing = magicTodo.TodoStatus.Reviewing
-const completed = magicTodo.TodoStatus.Completed
-const cancelled = magicTodo.TodoStatus.Cancelled
 
-const normalize = (old, call, input) =>
-  magicTodo.normalizeProposed(sha256, life, call, toList(old), toList(input))
+test('TODO-002 canonical obligation wire has only name/work and stable digest input', () => {
+  const items = toList([
+    obligation('implementation', 'Implement the requested behavior.'),
+    obligation('verification', 'Verify the behavior with evidence.'),
+  ])
 
-test('TODO-002 allocates replay-stable identities only for tagged new items', () => {
-  const first = values(ok(normalize([], firstCall, [magicTodo.new('Implement bridge', pending, 'high')])))[0]
-  const replay = values(ok(normalize([], firstCall, [magicTodo.new('Implement bridge', pending, 'high')])))[0]
-  const next = values(ok(normalize([], secondCall, [magicTodo.new('Implement bridge', pending, 'high')])))[0]
-
-  assert.equal(magicTodo.todoItemIdValue(first.Id), magicTodo.todoItemIdValue(replay.Id))
-  assert.notEqual(magicTodo.todoItemIdValue(first.Id), magicTodo.todoItemIdValue(next.Id))
+  const wire = magicTodo.canonicalObligationListWire(items)
+  assert.equal(
+    wire,
+    '[{"name":"implementation","work":"Implement the requested behavior."},{"name":"verification","work":"Verify the behavior with evidence."}]',
+  )
+  assert.equal(magicTodo.obligationListDigest(sha256, items), `digest:${wire}`)
+  assert.doesNotMatch(wire, /"id"|"status"|"priority"|reviewing/)
 })
 
-test('TODO-012 round-trips canonical settled todo bodies and rejects unknown statuses', () => {
-  const item = magicTodo.item(magicTodo.todoItemIdCreate('persisted'), 'Persist checkpoint', reviewing, 'high')
-  const encoded = magicTodo.encodeList([item])
-  const decoded = magicTodo.decodeList(encoded)
+test('TODO-002 rejects blank and duplicate obligation names as call syntax', () => {
+  const blank = error(magicTodo.validateObligations(toList([obligation('   ', 'work')])))
+  const duplicate = error(
+    magicTodo.validateObligations(
+      toList([
+        obligation('same', 'first'),
+        obligation('same', 'second'),
+      ]),
+    ),
+  )
 
-  assert.equal(encoded, '[{"id":"persisted","content":"Persist checkpoint","status":"reviewing","priority":"high"}]')
-  assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
-  assert.equal(values(decoded.value)[0].Content, 'Persist checkpoint')
-  assert.equal(values(decoded.value)[0].Status, reviewing)
-
-  const unknown = magicTodo.decodeList('[{"id":"persisted","content":"Persist checkpoint","status":"invented","priority":"high"}]')
-  assert.equal(unknown.ok, false)
+  assert.equal(blank.cases()[blank.tag], 'EmptyObligationName')
+  assert.equal(duplicate.cases()[duplicate.tag], 'DuplicateObligationName')
 })
 
-test('TODO-003 rejects direct completed transitions and completed new items', () => {
-  const existingId = magicTodo.todoItemIdCreate('existing')
-  const old = [magicTodo.item(existingId, 'Review implementation', inProgress, 'high')]
-  const direct = error(normalize(old, firstCall, [magicTodo.existing(existingId, 'Review implementation', completed, 'high')]))
-  const fresh = error(normalize([], firstCall, [magicTodo.new('Already done', completed, 'low')]))
-
-  assert.equal(direct.cases()[direct.tag], 'IllegalCompletedTransition')
-  assert.equal(fresh.cases()[fresh.tag], 'NewItemCompleted')
-  assert.equal(magicTodo.validateCompletedGate(reviewing, completed), true)
-  assert.equal(magicTodo.validateCompletedGate(inProgress, completed), false)
-})
-
-test('TODO-005 REVISE conservatively merges progress but PERFECT fully replaces', () => {
-  const id = magicTodo.todoItemIdCreate('same-task')
-  const old = [magicTodo.item(id, 'Old wording', inProgress, 'low')]
-  const proposed = [magicTodo.item(id, 'New wording', completed, 'high')]
-
-  const revised = values(magicTodo.settle(toList(old), toList(proposed), magicTodo.revise))[0]
-  const perfect = values(magicTodo.settle(toList(old), toList(proposed), magicTodo.perfect))[0]
-
-  assert.equal(revised.Content, 'New wording')
-  assert.equal(revised.Priority, 'high')
-  assert.equal(revised.Status, inProgress)
-  assert.equal(perfect.Status, completed)
-})
-
-test('TODO-005 REVISE preserves unilateral cancellation and resurrection', () => {
-  const id = magicTodo.todoItemIdCreate('disposition')
-  const active = [magicTodo.item(id, 'Task', pending, 'medium')]
-  const cancelledProposal = [magicTodo.item(id, 'Task', cancelled, 'medium')]
-  const cancelledOld = [magicTodo.item(id, 'Task', cancelled, 'medium')]
-  const activeProposal = [magicTodo.item(id, 'Task', reviewing, 'medium')]
-
-  assert.equal(values(magicTodo.semanticMerge(toList(active), toList(cancelledProposal)))[0].Status, pending)
-  assert.equal(values(magicTodo.semanticMerge(toList(cancelledOld), toList(activeProposal)))[0].Status, cancelled)
-})
-
-test('TODO-004 rejects different todowrite calls in one assistant message', () => {
+test('TODO-004 rejects different todowrite calls in one assistant message as syntax/protocol error', () => {
   const rejected = error(magicTodo.admitTodowriteBatch(toList([firstCall, secondCall])))
   const replay = ok(magicTodo.admitTodowriteBatch(toList([firstCall, firstCall])))
 
@@ -93,7 +64,7 @@ test('TODO-004 rejects different todowrite calls in one assistant message', () =
   assert.equal(replay, undefined)
 })
 
-test('TODO-004 rejects replay identity corruption', () => {
+test('TODO-004 pure replay identity checker detects corruption for the Host fatal boundary', () => {
   const expected = new magicTodo.PreparedIdentity(life, 'provider-a', 'base-a', 3)
   const matching = new magicTodo.PreparedIdentity(life, 'provider-a', 'base-a', 3)
   const changed = new magicTodo.PreparedIdentity(life, 'provider-b', 'base-a', 3)
@@ -104,10 +75,11 @@ test('TODO-004 rejects replay identity corruption', () => {
   assert.equal(rejected.fields[0], 'ProviderInputDigest')
 })
 
-test('TODO-004 replays an identical prepared call even while its review is outstanding', () => {
+test('TODO-004 replays an identical obligation checkpoint even while its review is outstanding', () => {
+  const current = toList([obligation('implementation', 'Implement the requested behavior.')])
   const write = magicTodo.todoWriteId(sha256, life, firstCall)
   const existing = new magicTodoAdmission.ExistingPrepared(
-    new magicTodo.PreparedIdentity(life, 'provider-input', magicTodo.listDigest(sha256, toList([])), 1),
+    new magicTodo.PreparedIdentity(life, 'provider-input', magicTodo.obligationListDigest(sha256, current), 1),
     write,
   )
   const localized = new magicTodoAdmission.LocalizedToolCall(
@@ -118,16 +90,48 @@ test('TODO-004 replays an identical prepared call even while its review is outst
     'provider-input',
   )
 
-  const outcome = magicTodoAdmission.admit(
+  const outcome = magicTodoAdmission.admitObligations(
     sha256,
     life,
-    [],
+    current,
     errorResult(undefined),
     existing,
     localized,
-    [],
+    current,
   )
   assert.equal(caseOf(outcome), 'IdempotentReplay')
+})
+
+test('TODO-005 fresh admission freezes Base and Submitted without a merge preview', () => {
+  const current = toList([obligation('implementation', 'Implement the requested behavior.')])
+  const submitted = toList([
+    obligation('implementation', 'Implement the requested behavior.'),
+    obligation('verification', 'Verify the behavior with evidence.'),
+  ])
+  const localized = new magicTodoAdmission.LocalizedToolCall(
+    secondCall,
+    2,
+    toList([secondCall]),
+    { Sequence: 8n },
+    'provider-input-2',
+  )
+
+  const outcome = magicTodoAdmission.admitObligations(
+    sha256,
+    life,
+    current,
+    okResult(undefined),
+    undefined,
+    localized,
+    submitted,
+  )
+  assert.equal(caseOf(outcome), 'FreshPrepare')
+  const prepared = outcome.fields[0]
+  assert.equal(Array.from(prepared.Base).length, 1)
+  assert.equal(Array.from(prepared.Proposed).length, 2)
+  assert.equal('RevisePreview' in prepared, false)
+  assert.equal(prepared.BaseDigest, magicTodo.obligationListDigest(sha256, current))
+  assert.equal(prepared.ProposedDigest, magicTodo.obligationListDigest(sha256, submitted))
 })
 
 test('TODO-014 blocks first unblessed suicide without an accepted checkpoint', () => {

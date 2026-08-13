@@ -21,6 +21,8 @@ import {
   xTraceCapture,
 } from '../support/domain.mjs'
 
+const { XTraceProjection_parts: xTraceParts } = await import('../../../dist/Journal/XTraceProjection.js')
+
 const SEM = sessionId('ses_bounded_lwr')
 
 const withJournal = (fn) => {
@@ -35,7 +37,7 @@ const withJournal = (fn) => {
   }
 }
 
-const lastSequence = (trace) => Number(listItems(trace.Parts).at(-1).Cursor.Sequence)
+const lastSequence = (trace) => Number(listItems(xTraceParts(trace)).at(-1).Cursor.Sequence)
 
 const commitY = (journal, { from, to, body, n }) => {
   const written = agentJournal.writeBlob(body, journal)

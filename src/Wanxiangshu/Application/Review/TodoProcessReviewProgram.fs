@@ -40,7 +40,7 @@ module TodoProcessReviewProgram =
             Some ProcessReviewVerdict.Perfect
 
     let private judgeIdentity (trace: XTraceProjectionState) =
-        trace.Parts
+        XTraceProjection.parts trace
         |> List.tryFindBack (fun part -> part.Kind = "tool_call" && part.ToolName = Some "judge")
         |> Option.bind (fun part ->
             match part.ProviderRun, part.ToolCallId with

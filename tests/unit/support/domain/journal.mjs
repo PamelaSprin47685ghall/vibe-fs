@@ -335,6 +335,7 @@ export const blogProjection = (() => {
   const m = bind(BlogProj, 'BlogProjection', [
     'empty',
     'frameCount',
+    'frames',
     'coverableFrames',
     'squashWidth',
     'applyEntry',
@@ -359,7 +360,8 @@ export const blogProjection = (() => {
       CoveredThroughSequence: BigInt(coveredThrough),
     }),
 
-    frameKinds: (state) => listItems(state.Frames).map((f) => caseOf(f.Kind)),
+    frames: (state) => m.frames(state),
+    frameKinds: (state) => listItems(m.frames(state)).map((f) => caseOf(f.Kind)),
 
     cursor: (turn, part) => ({ TurnIndex: turn, PartIndex: part }),
 

@@ -78,6 +78,7 @@ module MagicTodoProjection =
         { LifeId = lifeId
           CurrentObligationsRef = None
           AcceptedOrder = []
+          AcceptedIds = Set.empty
           Checkpoints = Map.empty
           Dedicated = None
           LegacySeed = None }
@@ -245,17 +246,18 @@ module MagicTodoProjection =
                     InputDigest = Some payload.InputDigest
                     OutputDigest = Some payload.OutputDigest }
 
-            let acceptedOrder =
-                if List.exists (fun id -> TodoWriteId.value id = key) life.AcceptedOrder then
-                    life.AcceptedOrder
+            let nextOrder, nextIds =
+                if Set.contains key life.AcceptedIds then
+                    life.AcceptedOrder, life.AcceptedIds
                 else
-                    life.AcceptedOrder @ [ payload.TodoWriteId ]
+                    payload.TodoWriteId :: life.AcceptedOrder, Set.add key life.AcceptedIds
 
             Ok(
                 putLife
                     { life with
                         Checkpoints = Map.add key cp life.Checkpoints
-                        AcceptedOrder = acceptedOrder
+                        AcceptedOrder = nextOrder
+                        AcceptedIds = nextIds
                         CurrentObligationsRef = Some(cp.ProposedTodoRef, cp.ProposedTodoDigest) }
                     state
             )

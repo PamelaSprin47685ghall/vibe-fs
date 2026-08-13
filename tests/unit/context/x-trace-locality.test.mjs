@@ -22,6 +22,8 @@ import {
   lifecycleWorkRecordProjection,
 } from '../support/domain.mjs'
 
+const { XTraceProjection_parts: xTraceParts } = await import('../../../dist/Journal/XTraceProjection.js')
+
 const managerSession = sessionId('ses_xtrace_locality')
 
 test('TODO-004 preserves a captured tool call identity on its durable XTrace range', () => {
@@ -80,7 +82,7 @@ test('TODO-004 captures the SDK-visible assistant run and Host ToolPart without 
     ])
 
     const trace = xTraceCapture.captureMessageView(created.journal, managerSession, captured)
-    const parts = listItems(trace.Parts)
+    const parts = listItems(xTraceParts(trace))
     assert.equal(parts.length, 2)
 
     const todoPart = parts[1]
@@ -274,7 +276,7 @@ test('TODO-008 ManagerCheckpointLWR range includes last assistant text before to
       },
     ])
     const trace = xTraceCapture.captureMessageView(created.journal, managerSession, captured)
-    const parts = listItems(trace.Parts)
+    const parts = listItems(xTraceParts(trace))
     assert.equal(parts.length, 2)
     assert.equal(Number(parts[0].Cursor.Sequence), 1)
     assert.equal(Number(parts[1].Cursor.Sequence), 2)
