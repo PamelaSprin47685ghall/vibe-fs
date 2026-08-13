@@ -127,8 +127,8 @@ module ContextFactFold =
                         { Kind = BlogFrameKind.Entry
                           Digest = payload.TextDigest
                           TextRef = payload.TextRef
-                          CoveredFromSequence = 0L
-                          CoveredThroughSequence = 0L })
+                          CoveredFromSequence = payload.PreviousIngestedThroughSequence
+                          CoveredThroughSequence = payload.NextIngestedThroughSequence })
                     updated
                 |> blogOutcome "BlogObservationCommitted"
 

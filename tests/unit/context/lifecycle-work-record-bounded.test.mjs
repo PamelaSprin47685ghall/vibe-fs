@@ -68,38 +68,46 @@ const commitY = (journal, { from, to, body, n }) => {
   assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
 }
 
+const seedTwoInvocations = (journal) => {
+  xTraceCapture.captureOpening(journal, SEM, 'first charge', [])
+
+  const inv1 = xTraceCapture.captureProjection(
+    journal,
+    SEM,
+    xTraceCapture.semantic({
+      messages: [
+        { role: 'user', parts: [xTraceCapture.text('first charge')] },
+        { role: 'assistant', parts: [xTraceCapture.text('inv1 work')] },
+      ],
+    }),
+  )
+  const inv1Through = lastSequence(inv1)
+  // S1 = XTrace.head after inv1 (one-past last part). inv2 range is [S1, S2).
+  const s1 = inv1Through + 1
+  // Production Next is inclusive-through last ingested part. Exclusive ingest
+  // end is Next+1 == S1 == inv2.Start — the charge's no-overlap boundary.
+  commitY(journal, { from: 0, to: inv1Through, body: 'PRIOR_Y_INV1', n: 1 })
+
+  const inv2 = xTraceCapture.captureProjection(
+    journal,
+    SEM,
+    xTraceCapture.semantic({
+      messages: [
+        { role: 'user', parts: [xTraceCapture.text('first charge')] },
+        { role: 'assistant', parts: [xTraceCapture.text('inv1 work')] },
+        { role: 'user', parts: [xTraceCapture.text('second charge')] },
+        { role: 'assistant', parts: [xTraceCapture.text('inv2 work')] },
+      ],
+    }),
+  )
+  const inv2Through = lastSequence(inv2)
+  const s2 = inv2Through + 1
+  return { s1, s2, inv1Through, inv2Through }
+}
+
 test('COMPANION_015_bounded_chronicle_excludes_prior_invocation_y_frames', () => {
   withJournal((journal) => {
-    xTraceCapture.captureOpening(journal, SEM, 'first charge', [])
-
-    const inv1 = xTraceCapture.captureProjection(
-      journal,
-      SEM,
-      xTraceCapture.semantic({
-        messages: [
-          { role: 'user', parts: [xTraceCapture.text('first charge')] },
-          { role: 'assistant', parts: [xTraceCapture.text('inv1 work')] },
-        ],
-      }),
-    )
-    const inv1Through = lastSequence(inv1)
-    const inv2Start = inv1Through + 1
-    commitY(journal, { from: 0, to: inv1Through, body: 'PRIOR_Y_INV1', n: 1 })
-
-    const inv2 = xTraceCapture.captureProjection(
-      journal,
-      SEM,
-      xTraceCapture.semantic({
-        messages: [
-          { role: 'user', parts: [xTraceCapture.text('first charge')] },
-          { role: 'assistant', parts: [xTraceCapture.text('inv1 work')] },
-          { role: 'user', parts: [xTraceCapture.text('second charge')] },
-          { role: 'assistant', parts: [xTraceCapture.text('inv2 work')] },
-        ],
-      }),
-    )
-    const inv2Through = lastSequence(inv2)
-    const inv2End = inv2Through + 1
+    const { s1, s2, inv1Through, inv2Through } = seedTwoInvocations(journal)
     commitY(journal, { from: inv1Through, to: inv2Through, body: 'CURRENT_Y_INV2', n: 2 })
 
     const full = lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, false)
@@ -108,13 +116,29 @@ test('COMPANION_015_bounded_chronicle_excludes_prior_invocation_y_frames', () =>
     assert.match(full, /CURRENT_Y_INV2/)
 
     const bounded = lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(journal, SEM, {
-      StartInclusive: { Sequence: inv2Start },
-      EndExclusive: { Sequence: inv2End },
+      StartInclusive: { Sequence: s1 },
+      EndExclusive: { Sequence: s2 },
     })
     assert.equal(typeof bounded, 'string')
     assert.match(bounded, /Chronicle\nCURRENT_Y_INV2/)
     assert.doesNotMatch(bounded, /PRIOR_Y_INV1/)
     assert.doesNotMatch(bounded, /inv1 work/)
+    assert.match(bounded, /inv2 work/)
+    assert.doesNotMatch(bounded, /^Opening\n/m)
+  })
+})
+
+test('COMPANION_015_bounded_chronicle_heading_omitted_when_invocation_has_no_y', () => {
+  withJournal((journal) => {
+    const { s1, s2 } = seedTwoInvocations(journal)
+
+    const bounded = lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(journal, SEM, {
+      StartInclusive: { Sequence: s1 },
+      EndExclusive: { Sequence: s2 },
+    })
+    assert.equal(typeof bounded, 'string')
+    assert.doesNotMatch(bounded, /PRIOR_Y_INV1/)
+    assert.doesNotMatch(bounded, /^Chronicle\n/m)
     assert.match(bounded, /inv2 work/)
     assert.doesNotMatch(bounded, /^Opening\n/m)
   })

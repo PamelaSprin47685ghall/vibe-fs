@@ -30,6 +30,13 @@ module LifecycleWorkRecordProjection =
             | Ok text when HostDigest.sha256Hex text = BlobDigest.value frame.Digest -> Some text
             | _ -> None)
 
+    /// COMPANION-015: (Previous, Next] overlaps [Start, End); Next is inclusive-through.
+    let private framesOverlappingRange (range: MagicTodoLwr.BoundedRange) (frames: BlogFrame list) =
+        frames
+        |> List.filter (fun frame ->
+            frame.CoveredFromSequence < range.EndExclusive.Sequence
+            && frame.CoveredThroughSequence >= range.StartInclusive.Sequence)
+
     /// Resolve XTrace part bodies into semantic items (single mapper; a part
     /// that fails its digest check is dropped, matching the canonical path).
     let private resolveTrace (durable: AgentJournal) (xTrace: XTraceProjectionState) : XTraceItem list =
@@ -152,11 +159,10 @@ module LifecycleWorkRecordProjection =
             let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
             let blog = session.Blog |> Option.defaultValue BlogProjection.empty
 
-            // COMPANION-015 ④/⑩: Chronicle is Y frames whose coverage interval
-            // overlaps this invocation. Prior-invocation frames must not leak.
+            // COMPANION-015 ④/⑩: Chronicle = Y frames overlapping this invocation.
             let frames =
                 blog.Frames
-                |> BlogProjection.overlapping range.StartInclusive.Sequence range.EndExclusive.Sequence
+                |> framesOverlappingRange range
                 |> resolveFrames durable
 
             // Recent-work TRACE sliced to the invocation's range so prior

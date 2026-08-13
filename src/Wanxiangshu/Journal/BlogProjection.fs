@@ -113,14 +113,6 @@ module BlogProjection =
 
     let frameCount (state: BlogProjectionState) = List.length state.Frames
 
-    /// COMPANION-015: Y frames whose coverage `(CoveredFrom, CoveredThrough]`
-    /// overlaps invocation `[startInclusive, endExclusive)`.
-    let overlapping (startInclusive: int64) (endExclusive: int64) (frames: BlogFrame list) =
-        frames
-        |> List.filter (fun frame ->
-            frame.CoveredFromSequence < endExclusive
-            && frame.CoveredThroughSequence >= startInclusive)
-
     /// CTX-011: the frames a probe may build FrozenRecordPrefix from.
     ///
     /// Derived from `CoverableFrameCount` rather than stored as a second blob. The
@@ -233,6 +225,9 @@ module BlogProjection =
 
             let replaced = List.truncate count state.Frames
 
+            // Squash unions replaced frames' coverage (min from, max through).
+            // A merged interval can span two invocations; overlap decides
+            // Chronicle membership — do not invent a splitter.
             let storedFrame =
                 { frame with
                     CoveredFromSequence = replaced |> List.map (fun item -> item.CoveredFromSequence) |> List.min
