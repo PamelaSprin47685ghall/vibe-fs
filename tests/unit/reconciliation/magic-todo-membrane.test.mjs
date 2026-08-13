@@ -330,9 +330,9 @@ test('TODO-006 T2 prepare succeeds once T1 process review is Concluded (lag-1 wa
 
       // Complete the process review: enlist the dedicated reviewer, assign R1,
       // and append ConsumableReview ≡ TodoReviewConcluded with a PERFECT verdict.
-      const write = magicTodo.todoWriteId(sha256, life, toolCallId(callText))
-      const review = magicTodo.todoReviewId(sha256, life, write)
-      const reviewer = magicTodo.dedicatedReviewerId(sha256, life)
+      const write = magicTodo.todoWriteId(sha256Hex, life, toolCallId(callText))
+      const review = magicTodo.todoReviewId(sha256Hex, life, write)
+      const reviewer = magicTodo.dedicatedReviewerId(sha256Hex, life)
       const reviewerSession = sessionId('ses-todo-reviewer-t1-t2-resolve')
       const cursor = (n) => new magicTodoJournal.XTraceCursor(BigInt(n))
 
@@ -346,9 +346,8 @@ test('TODO-006 T2 prepare succeeds once T1 process review is Concluded (lag-1 wa
         cursor(8),
         cursor(7),
       )
-      const settledBody = '{"obligations":[{"name":"diagnose","work":"Establish why the first todowrite succeeds."}]}'
-      const settledBlob = agentJournal.writeBlob(settledBody, journal)
-      assert.equal(settledBlob.ok, true, settledBlob.ok ? '' : String(settledBlob.error))
+      // PERFECT settlement is the already-encoded ProposedTodo blob (list wire, not account JSON).
+      const proposed = t1.result.value.Prepared
       const concluded = new magicTodoJournal.TodoReviewConcluded(
         life,
         write,
@@ -358,8 +357,8 @@ test('TODO-006 T2 prepare succeeds once T1 process review is Concluded (lag-1 wa
         magicTodo.perfect,
         blobRef('lwr-r1'),
         blobDigest('lwr-r1-digest'),
-        settledBlob.value.BlobRef,
-        settledBlob.value.BlobDigest,
+        proposed.ProposedTodoRef,
+        proposed.ProposedTodoDigest,
         cursor(10),
         providerRun('reviewer-provider-run'),
         toolCallId('reviewer-judge-call'),
