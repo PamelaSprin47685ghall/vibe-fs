@@ -61,7 +61,8 @@ test('JUDGE_spec_exposes_the_verdict_input_and_public_tool_identity', () => {
   const tool = spec(factory, emptyScope())
 
   assert.equal(tool.Name, 'judge')
-  assert.equal(tool.Description, 'Speak your review judgment')
+  assert.match(tool.Description, /PERFECT or REVISE/)
+  assert.match(tool.Description, /does not mutate source/)
   const args = listItems(tool.Arguments)
   assert.deepEqual(args[0][0], 'verdict')
   assert.deepEqual(payloadOf(args[0][1]).values, ['PERFECT', 'REVISE'])

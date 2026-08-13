@@ -135,8 +135,39 @@ module TodoProcessReviewProgram =
                         | _ -> ConcludeOutcome.Pending "process-review LWR not record-ready"
             | _ -> ConcludeOutcome.Pending "assignment missing"
 
+    [<RequireQualifiedAccess>]
+    type ProducerPresence =
+        | Present
+        | Absent of reason: string
+
+    /// REVIEW-017/018: Journal wait is legal only while a process-review producer exists.
+    let producerPresence (journal: AgentJournal) (lifeId: ManagerLifeId) (writeId: TodoWriteId) : ProducerPresence =
+        let snapshot = AgentJournal.snapshot journal
+
+        match MagicTodoProjection.tryLife lifeId snapshot.AgentProjections.MagicTodo with
+        | None -> ProducerPresence.Absent "life missing"
+        | Some life ->
+            match Map.tryFind (writeKey writeId) life.Checkpoints with
+            | Some { Concluded = Some _ } -> ProducerPresence.Present
+            | Some checkpoint when checkpoint.Assignment.IsSome ->
+                let assignment = Option.get checkpoint.Assignment
+
+                match AgentProjection.tryFind assignment.ReviewerSessionId snapshot.AgentProjections with
+                | None -> ProducerPresence.Absent "reviewer session missing"
+                | Some _ ->
+                    match Map.tryFind assignment.ReviewerSessionId snapshot.AgentProjections.HandleByChildSession with
+                    | Some record ->
+                        match record.Lifecycle with
+                        | HandleLifecycle.Active -> ProducerPresence.Present
+                        | HandleLifecycle.CompletedAwaitingJoin _
+                        | HandleLifecycle.Abandoned _
+                        | HandleLifecycle.Retired -> ProducerPresence.Absent "reviewer handle is not Active"
+                    | None -> ProducerPresence.Present
+            | _ -> ProducerPresence.Absent "assignment missing"
+
     /// REVIEW-017 / TODO-006: event-driven wait until ConsumableReview is durable.
-    /// Pending is a wait, not a provider-visible reject.
+    /// Wait only while a producer exists; otherwise fail closed (REVIEW-018).
+    /// No total-review deadline — a live reviewer may take as long as it writes.
     let rec awaitConsumableReview
         (journal: AgentJournal)
         (lifeId: ManagerLifeId)
@@ -147,7 +178,11 @@ module TodoProcessReviewProgram =
             | ConcludeOutcome.Concluded -> return Ok()
             | ConcludeOutcome.Failed reason -> return Error reason
             | ConcludeOutcome.Pending _ ->
-                let revision = AgentJournal.revision journal
-                let! _ = AgentJournal.awaitChangeFrom revision journal
-                return! awaitConsumableReview journal lifeId writeId
+                match producerPresence journal lifeId writeId with
+                | ProducerPresence.Absent detail ->
+                    return Error("process review cannot progress: " + detail)
+                | ProducerPresence.Present ->
+                    let revision = AgentJournal.revision journal
+                    let! _ = AgentJournal.awaitChangeFrom revision journal
+                    return! awaitConsumableReview journal lifeId writeId
         }

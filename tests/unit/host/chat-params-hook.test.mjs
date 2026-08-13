@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname } from 'node:path'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const { agentFact, agentJournal, authorityRoot, logicalRunId, resultOf, sessionId, stream } = await import(
+const { agentFact, agentJournal, authorityRoot, logicalRunId, mapOf, resultOf, sessionId, stream } = await import(
   '../support/domain.mjs'
 )
 
@@ -114,7 +114,7 @@ test('CHAT_PARAMS_unknown_agent_does_not_invent_fast', () => {
 })
 
 test('CHAT_PARAMS_empty_inventory_is_a_noop', () => {
-  const hook = create(undefined, () => ({ Bindings: {} }))
+  const hook = create(undefined, () => ({ Bindings: mapOf({}) }))
   const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
   applyHook(hook, { sessionID: 'ses_empty', agent: 'deep-coder' }, output)
   assert.equal(output.model.modelID, 'fast-haiku')

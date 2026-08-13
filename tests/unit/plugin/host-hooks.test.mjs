@@ -294,7 +294,7 @@ const triggeredHooks = (hooks) =>
 
 test('CHAT_PARAMS_pins_deep_request_model_over_host_fast_default', async () => {
   await withPlugin(async (hooks) => {
-    hooks.config(hostFinalConfig())
+    await hooks.config(hostFinalConfig())
     const output = { model: { providerID: 'provider', modelID: 'fast-coder-model' } }
     await hooks['chat.params']({ sessionID: SESSION, agent: 'deep-coder' }, output)
     assert.equal(output.model.providerID, 'provider')

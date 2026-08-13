@@ -15,6 +15,7 @@ open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Resources
 open Wanxiangshu.Review
+open Wanxiangshu.Process
 open Wanxiangshu.Session
 
 /// HOST-021 / TODO-006/008 / REVIEW-013..017: Host-owned dedicated process reviewer.
@@ -37,20 +38,61 @@ module DedicatedTodoReviewerRuntime =
         |> Option.map XTraceProjection.head
         |> Option.defaultValue 0L
 
-    let rec private waitHeadAdvanced
+    /// Same slice as ProviderRecoveryWorkflow.awaitRecoveryMaterial (Delay 2000).
+    /// Assignment delivery is a local Journal fold, not reviewer runtime.
+    let AssignmentHeadDeadlineMs = 2000
+
+    let private timerPort: ITimerPort = PtyTiming.nodeTimerPort()
+
+    let private waitHeadAdvanced
         (journal: AgentJournal)
         (reviewerSessionId: SessionId)
         (fromHead: int64)
         : Task<Result<XTraceCursor, string>> =
         task {
-            let head = reviewerHead journal reviewerSessionId
+            let tryRead () =
+                let head = reviewerHead journal reviewerSessionId
 
-            if head > fromHead then
-                return Ok { Sequence = head }
-            else
-                let revision = AgentJournal.revision journal
-                let! _ = AgentJournal.awaitChangeFrom revision journal
-                return! waitHeadAdvanced journal reviewerSessionId fromHead
+                if head > fromHead then
+                    Some { Sequence = head }
+                else
+                    None
+
+            match tryRead () with
+            | Some cursor -> return Ok cursor
+            | None ->
+                let sessionKey = SessionId.value reviewerSessionId
+
+                let descriptor =
+                    DiagnosticWait.create
+                        "todo-reviewer-assignment-head"
+                        (CausalOwner.create "DedicatedTodoReviewerRuntime" [ "session", sessionKey ])
+                        [ "session", sessionKey ]
+                        (ExternalProducer("AgentJournal", [ "kind", "assignment-head" ]))
+                        [ WaitEscape.ProcessLifetime ]
+                        "DedicatedTodoReviewerRuntime.waitHeadAdvanced"
+
+                let deadline = timerPort.Delay AssignmentHeadDeadlineMs
+
+                let awaitSignal () =
+                    task {
+                        let! _ = AgentJournal.awaitChangeFrom (AgentJournal.revision journal) journal
+                        return ()
+                    }
+
+                match!
+                    CausalAwait.untilSignalOrDeadline
+                        CausalWaitHub.observer
+                        descriptor
+                        deadline
+                        tryRead
+                        awaitSignal
+                with
+                | Ok cursor -> return Ok cursor
+                | Error DiagnosticWaitExit.WaitTimedOut ->
+                    return Error "reviewer XTrace head did not advance after assignment send (REVIEW-018)"
+                | Error exit ->
+                    return Error("reviewer XTrace head wait failed: " + string exit)
         }
 
     let private readObligations

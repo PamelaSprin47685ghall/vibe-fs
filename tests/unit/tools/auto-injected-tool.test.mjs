@@ -11,7 +11,7 @@ const { HostToolArguments_$ctor_4E60E31B: makeArgs, HostToolContext } =
   await import('../../../dist/Infrastructure/OpenCode/Codec/ToolHostCodec.js')
 const { spec: autoInjectedSpec } =
   await import('../../../dist/Infrastructure/OpenCode/Tools/AutoInjectedTool.js')
-const { ToolRegistry_rolePredicate as rolePredicate } =
+const { ToolRegistry_rolePredicate: rolePredicate } =
   await import('../../../dist/Infrastructure/OpenCode/Tools/ToolRegistry.js')
 const { Role } = await import('../../../dist/Kernel/Roles.js')
 

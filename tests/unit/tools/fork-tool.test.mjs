@@ -32,15 +32,16 @@ const { Orchestrator_$ctor_2E3EDB2: createOrchestrator } = await import(
 )
 const { targetRef, commitHash, managerJobId, sessionId: makeSessionId, fact, stream } = await import('../support/domain.mjs')
 
+const chain = (kind, extra = {}) => ({
+  kind,
+  ...extra,
+  describe: (description) => chain(`${kind}-described`, { ...extra, description }),
+  optional: () => chain(`${kind}-optional`, extra),
+})
 const fakeSchema = {
-  string: () => ({ kind: 'string', optional: () => ({ kind: 'string-optional' }) }),
-  enum: (values) => ({
-    describe: (description) => ({
-      optional: () => ({ kind: 'enum-described-optional', values, description }),
-    }),
-    optional: () => ({ kind: 'enum-optional', values }),
-  }),
-  union: (parts) => ({ kind: 'union', parts }),
+  string: () => chain('string'),
+  enum: (values) => chain('enum', { values }),
+  union: (parts) => chain('union', { parts }),
 }
 const factory = ToolHostCodec_factory({ tool: { schema: fakeSchema } })
 
