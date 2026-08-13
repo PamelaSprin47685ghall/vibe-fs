@@ -61,13 +61,22 @@ test('MAGIC_TODO_CANARY_H_journal_xtrace_uniquely_completes_host_carrier', () =>
       HostToolPartId: ['HostToolPartId', 'prt_tool_1'],
       ProviderRun: ['ProviderRunIdentity', 'msg_provider_run_1'],
       CursorSequence: '7',
+      Kind: 'tool_call',
+    },
+    {
+      SessionId: ['SessionId', SESSION],
+      ToolCallId: ['ToolCallId', CALL],
+      HostToolPartId: ['HostToolPartId', 'prt_tool_1'],
+      ProviderRun: ['ProviderRunIdentity', 'msg_provider_run_1'],
+      CursorSequence: '11',
       Kind: 'tool_result',
     },
   ])
 
   assert.equal(carrier.journalMappingAvailable, true)
+  assert.equal(carrier.journalMappingMatchCount, 2)
   assert.equal(carrier.journalProviderRun, 'msg_provider_run_1')
-  assert.deepEqual(carrier.journalXTraceRange, { start: 7, endExclusive: 8 })
+  assert.deepEqual(carrier.journalXTraceRange, { start: 7, endExclusive: 12 })
   assert.equal(carrier.carrierMappingComplete, true)
 })
 

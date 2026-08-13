@@ -18,6 +18,7 @@ test('TODO-002/TODO-015 first todowrite is a finished mission account, never a m
     const text = read(path)
     assert.match(text, /first|第一次|首次/, `${label}: must identify the first todowrite boundary`)
     assert.match(text, /complete|finished|完整|完成/, `${label}: first call must be a completed account`)
+    assert.match(text, /irreversible|不可逆|second first submission|第二次第一次提交/i, `${label}: T1 must feel like a one-shot initial commitment`)
     assert.match(
       text,
       /make a plan|plan of the plan|meta-|先做计划|计划的计划|meta-item|meta-obligation/i,
@@ -35,6 +36,31 @@ test('TODO-002 Manager Role Law rejects meta-work without owning tool timing', (
     assert.match(text, /obligation|mission|债务/i)
     assert.doesNotMatch(text, /\btodowrite\b/i, `${path}: lifecycle/tool timing must not leak into Role Law`)
   }
+})
+
+test('TODO-002 placeholder obligation is rejected by handoff completeness, not just meta-work wording', () => {
+  const surfaces = [
+    ...firstCheckpointSurfaces,
+    ['obligation-name/en', 'resources/provider/lifecycle/magic-todo/obligation-name-description/en.md'],
+    ['obligation-name/zh-CN', 'resources/provider/lifecycle/magic-todo/obligation-name-description/zh-CN.md'],
+    ['obligation-work/en', 'resources/provider/lifecycle/magic-todo/obligation-work-description/en.md'],
+    ['obligation-work/zh-CN', 'resources/provider/lifecycle/magic-todo/obligation-work-description/zh-CN.md'],
+  ]
+
+  for (const [label, path] of surfaces) {
+    const text = read(path)
+    assert.match(text, /handoff|可托付/i, `${label}: must require an obligation to be executable by handoff`)
+    assert.match(text, /placeholder|占位/i, `${label}: must reject slot-reserving entries`)
+    assert.match(text, /TBD|deferred|延后|推迟/i, `${label}: must reject deferred substance`)
+  }
+
+  for (const [label, path] of firstCheckpointSurfaces) {
+    const text = read(path)
+    assert.match(text, /placeholder:\s*planning/i, `${label}: observed placeholder escape must be covered verbatim`)
+  }
+
+  const host = read('src/Wanxiangshu/Infrastructure/OpenCode/Codec/MagicTodoHostCodec.fs')
+  assert.doesNotMatch(host, /placeholder:\s*planning|\bTBD\b/, 'Host must not classify natural-language placeholder keywords')
 })
 
 test('TODO-002 disguised investigative meta-todo is explicitly rejected before first checkpoint', () => {

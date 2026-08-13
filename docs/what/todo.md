@@ -61,9 +61,11 @@ CurrentObligations = last accepted obligations list
 
 Keep while owed；remove when earned by work。不得仅为让路看起来更短而删除仍欠义务；不得在已真正 discharge 后仅为「曾出现在计划中」而保留。
 
-**Obligation 层级**：每一项必须描述「为了让用户请求真正满足，仍需成为真的工作 / 证据 / 条件」。禁止把形成这份账本身写成 obligation：`make a plan`、`analyze the request`、`write todos`、`decide next steps`、`先规划`、`先分析` 等 meta-work 不是 mission obligation。需要这些认知动作时直接完成它们；不要把它们占成 todo。
+**Obligation 层级**：每一项必须描述「为了让用户请求真正满足，仍需成为真的工作 / 证据 / 条件」。禁止把形成这份账本身写成 obligation：`make a plan`、`analyze the request`、`write todos`、`decide next steps`、`先规划`、`先分析` 等 meta-work 不是 mission obligation。需要这些认知动作时直接完成它们；不要把它们占成 todo。对候选项同时做 completion counterfactual：若该项被完美完成而用户要求的世界状态/交付物仍未改变，只是 Manager 更理解、有清单、有计划或知道下一步，则它只是规划认知。
 
-**T1 特例不是新状态机**：第一次 `todowrite` 是 Planning Table 已完成后的整份 obligation account 提交。`todowrite([{name="plan", work="make a plan"}])` 之类调用等于尚未完成 T1 前置认知，不应发出。Host 不用关键词分类器猜语义；该边界由 Planning Table、tool description、Manager Role Law 三个 provider decision boundary 同时表达，并由 golden/static proof 守住（TODO-015）。
+**可托付完整性**：每项 obligation 必须单独写清楚「欠的结果是什么」以及「什么证据足以闭环」，达到另一位称职 Manager 无需替提交者发明缺失内容即可执行和验收的程度。`placeholder: planning`、`TBD`、裸阶段名、仅占槽位的 label、或把内容推迟到未来的 name/work 都不是较小的 obligation，而是尚未完成的 Planning Table 认知。该判定是语义形状，不是 Host 关键词黑名单；Host 不得按这些字符串分类或拒绝。
+
+**T1 特例不是新状态机**：第一次 `todowrite` 是 Planning Table 已完成后的整份 obligation account 提交。`todowrite([{name="plan", work="make a plan"}])` 或 `[•] placeholder: planning` 之类调用都等于尚未完成 T1 前置认知，不应发出。Provider guidance 应把 T1 表达成「对初始判断的一次不可逆承诺 / 没有第二次第一次提交」：后续 living account 仍可因现实变化、新证据或纠偏而更新，但不得用这种可更新性为 T1 的遗漏、placeholder 或延后决定开后门。这里是规范性 commitment pressure，不得伪造成 Host 事实上禁止后续更新。该边界由 Planning Table、tool description、Manager Role Law 三个 provider decision boundary 同时表达，并由 golden/static proof 守住（TODO-015）。
 
 `tool.definition` 是 provider-visible schema 的语义合同锚点；membrane 投影细节见 Host / `how/todo.md`。
 

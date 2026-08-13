@@ -111,27 +111,45 @@ module ToolResultBound =
 
     /// Tail under ContentMaxLines / ContentMaxBytes. Host-compatible accounting:
     /// `split('\n')` keeps empties; inter-line newline costs 1 byte.
+    /// Single backward walk from the end — never allocates a full line array.
     let private takeTail (text: string) : string =
-        let lines = text.Split('\n')
+        // DSL-MUTABLE: algorithm-scratch — tail lines in forward text order
+        let mutable segments = []
+        // DSL-MUTABLE: algorithm-scratch — accumulated bytes of the joined tail
+        let mutable accBytes = 0
+        // DSL-MUTABLE: algorithm-scratch — count of lines collected so far
+        let mutable count = 0
+        // DSL-MUTABLE: algorithm-scratch — end-exclusive of the segment being read
+        let mutable segEnd = text.Length
+        // DSL-MUTABLE: algorithm-scratch — stop flag for the backward walk
+        let mutable stop = false
 
-        let rec collect index acc bytes =
-            if index < 0 || List.length acc >= ContentMaxLines then
-                acc
+        while not stop do
+            // Locate this segment's start: one past the previous '\n'.
+            let mutable p = segEnd - 1
+            while p >= 0 && text.[p] <> '\n' do
+                p <- p - 1
+            let segStart = p + 1
+
+            let lineBytes = SyntheticToml.byteCount (text.Substring(segStart, segEnd - segStart))
+            let size = lineBytes + (if count = 0 then 0 else 1)
+
+            if count >= ContentMaxLines || accBytes + size > ContentMaxBytes then
+                if count = 0 then
+                    // The single line overflows bytes on its own: UTF-8-safe tail.
+                    let tail = utf8Tail (text.Substring(segStart, segEnd - segStart)) ContentMaxBytes
+                    if tail = "" then segments <- [] else segments <- [ tail ]
+                stop <- true
             else
-                let line = lines.[index]
-                let lineBytes = SyntheticToml.byteCount line
-                let size = lineBytes + (if List.isEmpty acc then 0 else 1)
-
-                if bytes + size > ContentMaxBytes then
-                    if List.isEmpty acc then
-                        let tail = utf8Tail line ContentMaxBytes
-                        if tail = "" then [] else [ tail ]
-                    else
-                        acc
+                accBytes <- accBytes + size
+                segments <- text.Substring(segStart, segEnd - segStart) :: segments
+                count <- count + 1
+                if p < 0 then
+                    stop <- true
                 else
-                    collect (index - 1) (line :: acc) (bytes + size)
+                    segEnd <- p
 
-        collect (lines.Length - 1) [] 0 |> String.concat "\n"
+        String.concat "\n" segments
 
     /// Bound a custom tool result. Under Host limits → identity.
     /// Over → `Marker + tail`, sized so Host does not re-truncate.
@@ -140,7 +158,12 @@ module ToolResultBound =
             text
         else
             let totalBytes = SyntheticToml.byteCount text
-            let totalLines = text.Split('\n').Length
+            // split('\n').length == newline count + 1 (trailing empty counts).
+            let totalLines =
+                let mutable n = 1
+                for c in text do
+                    if c = '\n' then n <- n + 1
+                n
 
             if totalLines <= HostMaxLines && totalBytes <= HostMaxBytes then
                 text

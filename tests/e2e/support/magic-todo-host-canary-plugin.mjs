@@ -105,20 +105,34 @@ const journalCarrierFor = (locate, xTraceParts) => {
     if (partID && taggedValue(payload.HostToolPartId) !== partID) return false;
     return true;
   });
-  if (matches.length !== 1) return { available: false, matchCount: matches.length };
+  const calls = matches.filter((payload) => payload.Kind === 'tool_call');
+  const results = matches.filter((payload) => payload.Kind === 'tool_result');
+  if (calls.length !== 1 || results.length > 1 || calls.length + results.length !== matches.length) {
+    return { available: false, matchCount: matches.length };
+  }
 
-  const payload = matches[0];
-  const providerRun = taggedValue(payload.ProviderRun);
-  const cursor = Number(taggedValue(payload.CursorSequence));
-  if (typeof providerRun !== 'string' || providerRun.length === 0 || !Number.isSafeInteger(cursor)) {
-    return { available: false, matchCount: 1 };
+  const call = calls[0];
+  const result = results[0] ?? null;
+  const providerRun = taggedValue(call.ProviderRun);
+  const resultProviderRun = result == null ? providerRun : taggedValue(result.ProviderRun);
+  const callCursor = Number(taggedValue(call.CursorSequence));
+  const resultCursor = result == null ? callCursor : Number(taggedValue(result.CursorSequence));
+  if (
+    typeof providerRun !== 'string'
+    || providerRun.length === 0
+    || resultProviderRun !== providerRun
+    || !Number.isSafeInteger(callCursor)
+    || !Number.isSafeInteger(resultCursor)
+    || resultCursor < callCursor
+  ) {
+    return { available: false, matchCount: matches.length };
   }
   return {
     available: true,
-    matchCount: 1,
+    matchCount: matches.length,
     providerRun,
-    xTraceRange: { start: cursor, endExclusive: cursor + 1 },
-    hostToolPartID: taggedValue(payload.HostToolPartId) ?? null,
+    xTraceRange: { start: callCursor, endExclusive: resultCursor + 1 },
+    hostToolPartID: taggedValue(call.HostToolPartId) ?? null,
   };
 };
 
@@ -448,8 +462,11 @@ export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
   if (after.enrichedOutput === after.originalOutput) {
     throw new Error('HOST_CANARY_E: production after did not enrich the builtin todowrite result');
   }
-  if (!after.enrichedOutput.includes('Current obligations:')) {
-    throw new Error(`HOST_CANARY_E: enriched result lacks the canonical obligation account: ${JSON.stringify(after.enrichedOutput)}`);
+  if (!after.enrichedOutput.includes('Keep working.')) {
+    throw new Error(`HOST_CANARY_E: accepted result must keep the Manager moving without echoing the account: ${JSON.stringify(after.enrichedOutput)}`);
+  }
+  if (/Current obligations:|proposed|settled|preview|reviewing/i.test(after.enrichedOutput)) {
+    throw new Error(`HOST_CANARY_E: accepted result leaked canonical/legacy account DTO vocabulary: ${JSON.stringify(after.enrichedOutput)}`);
   }
   // Settled snapshot is best-effort; when present it must show the same enriched bytes.
   if (settled?.locate?.match?.output != null && settled.locate.match.output !== after.enrichedOutput) {

@@ -64,13 +64,31 @@ module JsAnchorFs =
         { Matches: JsGrepHit list
           Truncated: bool }
 
-    let private lineColumn (text: string) (index: int) : int * int =
-        let rec loop i line col =
-            if i >= index || i >= text.Length then line, col
-            elif text.[i] = '\n' then loop (i + 1) (line + 1) 1
-            else loop (i + 1) line (col + 1)
+    /// 每行起始偏移索引。lineOffsets[0]=0；每个 '\n' 之后紧跟下一行起始。
+    /// 只认 '\n'（不做 CRLF 修正），与历史 lineColumn 计法一致。
+    let private lineOffsets (text: string) : int array =
+        let offsets = ResizeArray<int>()
+        offsets.Add 0
 
-        loop 0 1 1
+        for i in 0 .. text.Length - 1 do
+            if text.[i] = '\n' then offsets.Add(i + 1)
+
+        offsets.ToArray()
+
+    /// (line, column) 均 1-based，从 lineOffsets 二分定位 index 所在行。
+    /// index 落在 '\n' 上时，该换行属于当前行（line 不递增），与旧逐字扫描等价。
+    let private lineColumn (offsets: int array) (index: int) : int * int =
+        // 二分找最后一个 lineStart <= index
+        let mutable lo = 0
+        let mutable hi = offsets.Length - 1
+
+        while lo < hi do
+            let mid = (lo + hi + 1) / 2
+
+            if offsets.[mid] <= index then lo <- mid
+            else hi <- mid - 1
+
+        lo + 1, index - offsets.[lo] + 1
 
     let private exactHits (text: string) (needle: string) : (int * string) list =
         let rec go fromIndex =
@@ -115,6 +133,8 @@ module JsAnchorFs =
                     match JsUtf8Fs.readUtf8Classified (pathJoin root rel) with
                     | Error _ -> ()
                     | Ok text ->
+                        let offsets = lineOffsets text
+
                         let hits =
                             match spec with
                             | AnchorSpec.Exact needle -> exactHits text needle
@@ -124,7 +144,7 @@ module JsAnchorFs =
                             if acc.Count >= cap then
                                 truncated <- true
                             else
-                                let line, column = lineColumn text index
+                                let line, column = lineColumn offsets index
 
                                 acc.Add
                                     { Path = rel

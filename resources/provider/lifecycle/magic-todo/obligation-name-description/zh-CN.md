@@ -1,1 +1,1 @@
-命名那项仍欠的最终状态、用户可接收的交付物，或必须成为真的外部有意义条件。不要把仅用于发现真正计划的规划、调查、理解、盘点或决定下一步的动作当作名称。对于实现类 mission，像「survey-startup-and-complexity」这样的名称只是伪装后的 meta-todo，不是 obligation。
+命名那项仍欠的最终状态、用户可接收的交付物，或必须成为真的外部有意义条件。名称必须承载真实的可托付含义，而不是仅仅占一个槽位或标记阶段；`placeholder`、`planning`、`TBD` 或同类延后内容的名称都不是 obligation。不要把仅用于发现真正计划的规划、调查、理解、盘点或决定下一步的动作当作名称。对于实现类 mission，像「survey-startup-and-complexity」这样的名称只是伪装后的 meta-todo，不是 obligation。

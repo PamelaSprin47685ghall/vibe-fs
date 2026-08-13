@@ -157,11 +157,12 @@ module CasebookStore =
                     |> List.filter (fun p -> Map.containsKey p byId)
                     |> List.fold (fun (v, a) p -> visit byId[p] v a) (visited, acc)
 
-                Set.add e.EventId visitedAfterParents, accAfterParents @ [ e ]
+                Set.add e.EventId visitedAfterParents, e :: accAfterParents
 
         (Set.empty, [])
         |> fun (v, a) -> List.fold (fun (v, a) e -> visit e v a) (v, a) envelopes
         |> snd
+        |> List.rev
 
     let loadEnvelopes (raw: IGitRawStore) (snapshot: StoreSnapshot) : Result<EventEnvelope list, string> =
         match EventStoreMergeSpec.merge raw (MergeInput.ofList [ snapshot ]) with

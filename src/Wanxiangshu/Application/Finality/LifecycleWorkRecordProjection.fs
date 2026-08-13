@@ -66,13 +66,13 @@ module LifecycleWorkRecordProjection =
                 let alreadyCaptured =
                     latestNaturalAssistant
                     |> Option.exists (fun latest ->
-                        let latestGeneration = XTraceProjection.provenanceGeneration latest.Provenance
+                        let latestGeneration = latest.Generation
 
                         ordered
                         |> List.filter (fun part ->
                             part.Role = "assistant"
                             && part.Turn = latest.Turn
-                            && XTraceProjection.provenanceGeneration part.Provenance = latestGeneration
+                            && part.Generation = latestGeneration
                             && (part.Kind = "text" || part.Kind = "reasoning"))
                         |> List.choose (tryReadPartBody durable)
                         |> String.concat "\n\n"

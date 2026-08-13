@@ -152,19 +152,30 @@ module LoopDetector =
         detector.Step <- detector.Step + 1
         detector.LastStep.[bucket] <- detector.Step
 
+    /// Mutate detector state for one non-ignored char: slide/append the
+    /// 4-gram prefix, then emit one gram when the window is full. No evaluation.
+    let private pushGram (detector: Detector) (ch: char) : unit =
+        if detector.PrefixLength < NgramSize then
+            detector.Prefix.[detector.PrefixLength] <- ch
+            detector.PrefixLength <- detector.PrefixLength + 1
+        else
+            // Slide: drop oldest, shift left, append.
+            for i = 0 to NgramSize - 2 do
+                detector.Prefix.[i] <- detector.Prefix.[i + 1]
+
+            detector.Prefix.[NgramSize - 1] <- ch
+
+        if detector.PrefixLength >= NgramSize then
+            let bucket =
+                bucketOfGram detector.Prefix.[0] detector.Prefix.[1] detector.Prefix.[2] detector.Prefix.[3]
+
+            updateGram detector bucket
+
     let pushCharacter (detector: Detector) (ch: char) : Evaluation =
         if isIgnored ch then
             evaluate detector
         else
-            if detector.PrefixLength < NgramSize then
-                detector.Prefix.[detector.PrefixLength] <- ch
-                detector.PrefixLength <- detector.PrefixLength + 1
-            else
-                // Slide: drop oldest, shift left, append.
-                for i = 0 to NgramSize - 2 do
-                    detector.Prefix.[i] <- detector.Prefix.[i + 1]
-
-                detector.Prefix.[NgramSize - 1] <- ch
+            pushGram detector ch
 
             if detector.PrefixLength < NgramSize then
                 // Innocent prior until the first filtered 4-gram exists.
@@ -174,21 +185,16 @@ module LoopDetector =
                   Hhi = NormalHhi
                   Step = detector.Step }
             else
-                let bucket =
-                    bucketOfGram detector.Prefix.[0] detector.Prefix.[1] detector.Prefix.[2] detector.Prefix.[3]
-
-                updateGram detector bucket
                 evaluate detector
 
     /// Push UTF-16 code units. Space/tab/CR/LF/minus are ignored (LOOP-003/004).
+    /// Batch path: update grams per character, evaluate once after the whole text.
     let pushText (detector: Detector) (text: string) : Evaluation =
         if isNull text || text.Length = 0 then
             evaluate detector
         else
-            // DSL-MUTABLE: algorithm-scratch — rolling evaluation accumulator
-            let mutable latest = evaluate detector
-
             for c in text do
-                latest <- pushCharacter detector c
+                if not (isIgnored c) then
+                    pushGram detector c
 
-            latest
+            evaluate detector

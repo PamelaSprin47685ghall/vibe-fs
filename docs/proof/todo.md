@@ -11,7 +11,7 @@
 | 条款 | 证明焦点 | 义务类型 | 期望 |
 |------|------|------|------|
 | TODO-001 | BlindPlan Opening；无 Activation；LifeOpened 后立即工作；WorkRecordStart = OpeningBoundary（含 T1） | unit + property + e2e + static | 0 新 `ManagerWorkActivation` / 新业务 `WorkActivated`；OpeningMaterial byte-identical；Blogger/Y 不吞 Opening；不绑回 `WorkActivated`；Pre-T1 不钉死 WorkRecordStart |
-| TODO-002 | clean-break obligations wire + mission-debt level | unit + golden + canary B | schema 仅 `{name,work}`；duplicate/blank name 拒；Planning Table + tool description + Role Law 都明确 first call = finished full account，禁止 meta-plan todo；definition 与 codec 同源 |
+| TODO-002 | clean-break obligations wire + mission-debt level | unit + golden + canary B | schema 仅 `{name,work}`；duplicate/blank name 拒；Planning Table + tool description + Role Law 都明确 first call = finished full account，禁止 meta-plan todo；completion-counterfactual + handoff-completeness 同时成立；`placeholder: planning` / `TBD` / 裸阶段名不得作为 obligation；definition 与 codec 同源 |
 | TODO-003 | 无 provider progress state machine | static + unit | provider schema/result/prompt 无 `kind/id/status/priority/reviewing/completed/cancelled` todo ontology；真实性由 account + process review 表达 |
 | TODO-004 | 单 admission；failure triage；replay；V2 parity | unit + canary A/G/H + static + integration | 同 message 多 ToolCallId = syntax red；同 call 幂等；digest/identity 冲突 = Diagnostic.fatal；不同 call 同 list 新 checkpoint；无 hook parity 的 V2 错入路径 fatal OpenCode |
 | TODO-005 | Accepted 即 supersession | unit + property + replay | Prepared 不改 Current；Accepted 后 Current=Pk；PERFECT/REVISE Concluded 均不改 Current；无 semanticMerge / reviewer writer / accepted-but-not-current |
@@ -24,7 +24,7 @@
 | TODO-012 | facts-only recovery；禁止 PC / 平行证据 | unit + static | crash matrix 全可恢复；无 TodoStage/Awaiting*/NeedRebase；无第二 LWR/epoch owner |
 | TODO-013 | Manager surface / guideline；隐藏 reviewer | static + e2e + golden | MagicTodo guidance Manager-only；Manager 无 reviewer/session/barrier/witness/2N；可见 PERFECT/REVISE/report；ProcessReviewLWR safety-seal 不 regex；GLORY-030/SURFACE-005 窄例外锚本条 |
 | TODO-014 | 跨层 ownership / §47 关闭 | static + release | 语义仅 what；shape/how/proof 不改合同；§47 37 项全绿 |
-| TODO-015 | BlindPlan T1 commitment | unit + property + e2e + golden | 本 Life 首次 `TodoWriteAccepted` = T1；canonical result 含 entrustment；T1 call/result ∈ OpeningMaterial；Opening 关闭 → WorkRecordStart；system prompt / Persona / Role Law **字节不变**（Gate D）；每新 Life 再入 BlindPlan |
+| TODO-015 | BlindPlan T1 commitment | unit + property + e2e + golden | 本 Life 首次 `TodoWriteAccepted` = T1；canonical result 含 entrustment；T1 call/result ∈ OpeningMaterial；Opening 关闭 → WorkRecordStart；Pre-T1 guidance 以 one-shot initial-commitment framing 施压（没有第二次第一次提交），但后续 Accepted update 仍合法；system prompt / Persona / Role Law **字节不变**（Gate D）；每新 Life 再入 BlindPlan |
 
 ---
 
@@ -70,6 +70,8 @@
 
 - `{obligations:[{name,work}]}` 是唯一新 provider wire；blank/duplicate name 拒；无 optional id / status / priority（TODO-002/003）
 - 三个 decision boundary 同时含 first-call 约束：Planning Table、`todowrite` description、Manager Role Law；都明确 first todowrite = finished full mission account，`plan/analyze/write todos` 这类 meta-work 不得占 obligation（TODO-002/015）
+- completion-counterfactual 与 handoff-completeness 是两个独立 gate：用户结果不变的认知工作不是 debt；无法由另一 Manager 直接判断 outcome + closure evidence 的 `placeholder: planning` / `TBD` / phase-only entry 也不是 debt。Host 源码不得出现这些自然语言样本作为 classifier（TODO-002/015）
+- Planning Table + tool description 明确 T1 是 one-shot initial judgment：后续 living account 可因现实/证据变化纠偏，但不把可更新性描述成「可以先占位以后补」；同时回归证明 Host 仍接受后续合法 checkpoint（TODO-005/015）
 - Prepared 不改 Current；Accepted 原子把 Current 指向 matching Proposed；Concluded(PERFECT/REVISE) 均保持 Current 不变（TODO-005）
 - 源码 production path 不含 `semanticMerge` / `RevisePreview` / reviewer settlement writer；历史 decoder 若保留必须被静态白名单限定在 compatibility boundary（TODO-003/005/012）
 

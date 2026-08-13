@@ -86,6 +86,9 @@ todoCheckpointBefore:
   6. 读 provider input → decode obligations: [{ name, work }]（TODO-002）
        - blank/duplicate name → syntax reject，可红字；禁止靠 work 文本猜 identity（TODO-003）
        - provider account 必须描述 mission debt，不得用 `plan/analyze/write todos` meta-work 代替 T1 完整道路账
+       - provider guidance 对每项同时施加 completion-counterfactual + handoff-completeness：必须已有可托付的 owed outcome 与 closure evidence；`placeholder: planning` / `TBD` / 裸阶段名 / deferred-content entry 属未完成规划，不属于 obligation
+       - 该语义只在 provider decision surface 表达；Host decode/admission **不**用关键词或自然语言分类器拒绝这些字符串，避免重新制造隐藏 phase machine
+       - T1 guidance 采用 one-shot initial-commitment framing：后续 account 可因新事实纠偏，但「没有第二次第一次提交」；不得把该 framing 实现成 Host 禁止后续 accepted update
        - 禁止 kind/id/status/priority/reviewing 回流 provider 真值
   7. Pk = normalized submitted obligations
   8. append TodoWritePrepared

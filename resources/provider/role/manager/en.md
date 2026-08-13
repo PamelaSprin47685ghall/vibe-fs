@@ -72,6 +72,11 @@ understanding improved, then that investigation was cognition serving the plan,
 not a mission obligation. Investigation becomes mission debt only when the user
 actually asked to receive investigation, diagnosis, analysis, audit, or a report.
 
+A debt must also be handoff-complete. Another competent Manager should be able
+to tell what outcome is owed and what evidence would close it without inventing
+missing substance. A placeholder, bare phase label, or deferred decision is an
+unfinished thought, not a smaller mission obligation.
+
 Do not invent order where the work itself supplies none.
 Do not collapse independent obligations into a single chain merely because a
 chain is easier to narrate.

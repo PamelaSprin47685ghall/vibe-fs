@@ -12,6 +12,17 @@ type GitRawSyncRunner = string list * byte[] option -> int * byte[] * string
 module private ProcessGitTree =
     let sortEntries (entries: TreeEntry list) : TreeEntry list = StoreTree.canonicalOrder entries
 
+module private ProcessGitTreeHash =
+    [<Import("createHash", "node:crypto")>]
+    let private createHash (algorithm: string) : obj = jsNative
+
+    /// Content digest of a tree entry list — the writtenTreeCache key, not an oid.
+    /// Same bytes in, same digest out; a cache key must be small and deterministic.
+    let sha256Hex (data: byte[]) : string =
+        let hash = createHash "sha256"
+        hash?update (box data) |> ignore
+        unbox<string> (hash?digest (box "hex"))
+
 /// Where a repository keeps its objects and refs: immutable facts about a path, so they are
 /// resolved once per repository per process. Asking `git rev-parse` per store instance meant one
 /// process spawn every time a session opened the store — measured 27 `--git-common-dir` spawns in
@@ -137,7 +148,9 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawSyncRunner) =
                     sprintf "%s %s %s\t%s" mode objectType (GitObjectId.value entry.Oid) entry.Name)
                 |> String.concat "\n"
 
-            match writtenTreeCache.TryGetValue lines with
+            let cacheKey = ProcessGitTreeHash.sha256Hex (Encoding.UTF8.GetBytes lines)
+
+            match writtenTreeCache.TryGetValue cacheKey with
             | true, oid -> oid
             | _ ->
                 let written =
@@ -151,7 +164,7 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawSyncRunner) =
 
                 match written with
                 | Some oid ->
-                    writtenTreeCache.[lines] <- oid
+                    writtenTreeCache.[cacheKey] <- oid
                     treeCache.[GitObjectId.value oid] <- sorted
                     oid
                 | None -> failwith "tree write returned an invalid oid"

@@ -34,6 +34,8 @@ and XTracePartRef =
     {
         Cursor: XTraceCursor
         Provenance: string
+        /// Parsed once at fold from Provenance (`g:N/...`; legacy → 0).
+        Generation: int
         Role: string
         /// Host semantic coordinates, kept so the writer can map a BlogEntry's
         /// SemanticCursor (turn/part) back to the XTrace cursor sequence it
@@ -108,6 +110,19 @@ module XTraceProjection =
                               AuthoritativeRequirements = requirements
                               ConstitutiveBody = "" } }
 
+    /// Provenance generation: `g:N/...` after HOST-006 reanchor; legacy `turn:N/part:M` → 0.
+    let provenanceGeneration (provenance: string) : int =
+        if provenance.StartsWith("g:") then
+            let rest = provenance.Substring(2)
+            let slash = rest.IndexOf('/')
+            let token = if slash < 0 then rest else rest.Substring(0, slash)
+
+            match System.Int32.TryParse token with
+            | true, n when n >= 0 -> n
+            | _ -> 0
+        else
+            0
+
     /// COMPANION-003 / HOST-005: append one semantic part reference. Strictly
     /// monotonic; a duplicate cursor or a retreat is refused (PERSIST-010).
     let applyPart
@@ -135,6 +150,7 @@ module XTraceProjection =
                     Parts =
                         { Cursor = { Sequence = cursorSequence }
                           Provenance = provenance
+                          Generation = provenanceGeneration provenance
                           Role = role
                           Turn = turn
                           PartIndex = partIndex
@@ -163,29 +179,20 @@ module XTraceProjection =
                 { state with
                     Terminal = Some(textRef, textDigest) }
 
-    /// Provenance generation: `g:N/...` after HOST-006 reanchor; legacy `turn:N/part:M` → 0.
-    let provenanceGeneration (provenance: string) : int =
-        if provenance.StartsWith("g:") then
-            let rest = provenance.Substring(2)
-            let slash = rest.IndexOf('/')
-            let token = if slash < 0 then rest else rest.Substring(0, slash)
-
-            match System.Int32.TryParse token with
-            | true, n when n >= 0 -> n
-            | _ -> 0
-        else
-            0
-
     /// Host turn indices restart per reanchor generation; XTrace Sequence does not.
     /// Turn/Part labels are only comparable within one generation.
     let currentGenerationParts (parts: XTracePartRef list) : XTracePartRef list =
         match parts with
         | [] -> []
-        | _ ->
-            let maxGen =
-                parts |> List.map (fun part -> provenanceGeneration part.Provenance) |> List.max
+        | first :: rest ->
+            let rec collect maxGen acc remaining =
+                match remaining with
+                | [] -> List.rev acc
+                | part :: tail when part.Generation > maxGen -> collect part.Generation [ part ] tail
+                | part :: tail when part.Generation = maxGen -> collect maxGen (part :: acc) tail
+                | _ :: tail -> collect maxGen acc tail
 
-            parts |> List.filter (fun part -> provenanceGeneration part.Provenance = maxGen)
+            collect first.Generation [ first ] rest
 
     /// Map an ingest cursor (sequence of the last COVERED part) to the semantic
     /// cursor of the first UNCOVERED part. `>` not `>=`: the coverage sequence
