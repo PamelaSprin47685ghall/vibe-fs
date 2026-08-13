@@ -96,10 +96,15 @@ module BloggerDelta =
     /// one-item document then exceeds by exactly that byte — a limit violation small
     /// enough to pass every eyeball review and still be a limit violation.
     ///
-    /// Truncation happens on CHARACTERS of the already-normalised text, then the
-    /// result is re-rendered and re-measured. Cutting the rendered UTF-8 bytes
-    /// directly would split a multi-byte sequence and produce invalid TOML — the
-    /// failure CTX-013 names explicitly.
+    /// Truncation happens on CHARACTERS of the already-normalised text. Cutting
+    /// the rendered UTF-8 bytes directly would split a multi-byte sequence and
+    /// produce invalid TOML — the failure CTX-013 names explicitly.
+    ///
+    /// The cut is measured against the rendered document, not the source. Escaping
+    /// and string-form choice make that size non-linear, so each candidate is
+    /// counted with the same arithmetic `renderString` uses — never a character/byte
+    /// ratio. Scaffolding is rendered once; the search itself does not allocate a
+    /// near-budget document on every step.
     ///
     /// The tail is discarded, never carried to the next chunk. A part that is always
     /// over the limit would otherwise be re-sent forever.
@@ -130,37 +135,46 @@ module BloggerDelta =
                 | BloggerDeltaPart.ToolResultPart _ -> BloggerDeltaPart.ToolResultPart replacement
                 | other -> other
 
+            let suffix = "\n" + BloggerToml.TruncationMarker
+
             let rendered length =
                 let kept = normalized.Substring(0, length)
 
                 { item with
-                    Part = withBody (kept + "\n" + BloggerToml.TruncationMarker)
+                    Part = withBody (kept + suffix)
                     Truncated = true }
 
-            let documentBytes candidate =
-                SyntheticToml.byteCount (renderChunk [ candidate ])
+            let overhead =
+                let dummyDoc = renderChunk [ rendered 0 ]
+                SyntheticToml.byteCount dummyDoc - SyntheticToml.byteCount (SyntheticToml.renderString suffix)
+
+            let documentBytes prefixLength =
+                overhead
+                + SyntheticToml.renderStringByteCountPrefix normalized prefixLength suffix
 
             // Largest prefix length whose rendered document fits. Binary search rather
             // than byte arithmetic: the escaping and the string-form choice both
-            // change the rendered size non-linearly, so only rendering can measure it.
+            // change the rendered size non-linearly, so only the same arithmetic
+            // `renderString` uses can measure it. The scaffolding is rendered once;
+            // each step counts a prefix of `normalized` without allocating a
+            // near-budget candidate document.
             // DSL-MUTABLE: algorithm-scratch — binary-search low bound
             let mutable low = 0
             // DSL-MUTABLE: algorithm-scratch — binary-search high bound
             let mutable high = normalized.Length
             // DSL-MUTABLE: algorithm-scratch — binary-search best-so-far bound
-            let mutable best = rendered 0
+            let mutable bestLength = 0
 
             while low <= high do
                 let mid = low + (high - low) / 2
-                let candidate = rendered mid
 
-                if documentBytes candidate <= budget then
-                    best <- candidate
+                if documentBytes mid <= budget then
+                    bestLength <- mid
                     low <- mid + 1
                 else
                     high <- mid - 1
 
-            best
+            rendered bestLength
 
     /// CTX-013: the next chunk to send, or `None` when nothing is left to consume.
     ///

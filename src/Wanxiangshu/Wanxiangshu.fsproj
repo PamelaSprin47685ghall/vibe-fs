@@ -402,6 +402,7 @@
     <Compile Include="Infrastructure/OpenCode/Tools/JoinTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/HorizonTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ExecutorTool.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Tools/SyncDelegateBatching.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/InspectorTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/CoderTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/ChronicleTool.fs"/>

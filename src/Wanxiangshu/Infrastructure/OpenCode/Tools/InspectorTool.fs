@@ -79,15 +79,35 @@ module InspectorTool =
                                 | Error _ -> return charge
                             }
 
-                        match!
-                            sd.InvokePrepared(
-                                context.SessionId,
-                                SyncDelegateRole.Inspector,
-                                charge,
-                                prepareProviderPrompt
-                            )
-                        with
-                        | Ok workRecord ->
+                        let! batch = SyncDelegateBatching.resolve scope SyncDelegateRole.Inspector context
+
+                        let! result =
+                            match batch with
+                            | Some semanticBatch ->
+                                sd.InvokeBatchPrepared(
+                                    context.SessionId,
+                                    SyncDelegateRole.Inspector,
+                                    charge,
+                                    semanticBatch,
+                                    prepareProviderPrompt
+                                )
+                            | None ->
+                                task {
+                                    match!
+                                        sd.InvokePrepared(
+                                            context.SessionId,
+                                            SyncDelegateRole.Inspector,
+                                            charge,
+                                            prepareProviderPrompt
+                                        )
+                                    with
+                                    | Ok workRecord ->
+                                        return Ok(SyncDelegateInvocationResult.WorkRecord workRecord)
+                                    | Error error -> return Error error
+                                }
+
+                        match result with
+                        | Ok(SyncDelegateInvocationResult.WorkRecord workRecord) ->
                             let instructions =
                                 if String.IsNullOrWhiteSpace workRecord then
                                     []
@@ -95,6 +115,11 @@ module InspectorTool =
                                     [ workRecord ]
 
                             return tomlObjectWithInstructions instructions []
+                        | Ok(SyncDelegateInvocationResult.MergedInto canonicalCall) ->
+                            return
+                                tomlObjectWithInstructions
+                                    [ SyncDelegateBatching.mergedInstruction (lang context) canonicalCall ]
+                                    []
                         | Error _ -> return consequence context Path.Incomplete Map.empty
         }
 

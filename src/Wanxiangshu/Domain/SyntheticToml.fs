@@ -56,9 +56,34 @@ module SyntheticToml =
     /// the last content character formed `''''`. ARCH-010 puts the delimiter on its own line, so
     /// that case cannot arise and the check is gone rather than kept "for safety" — a predicate
     /// nothing can fail is indistinguishable from one that is wrong.
+    let private literalSafeRange (text: string) (origin: int) (stop: int) =
+        // DSL-MUTABLE: algorithm-scratch — literal-safe index cursor
+        let mutable index = origin
+        // DSL-MUTABLE: algorithm-scratch — consecutive single-quote run
+        let mutable quoteRun = 0
+        // DSL-MUTABLE: algorithm-scratch — still-safe flag
+        let mutable safe = true
+
+        while safe && index < stop do
+            let c = text.[index]
+
+            if c = '\'' then
+                quoteRun <- quoteRun + 1
+
+                if quoteRun >= 3 then
+                    safe <- false
+            else
+                quoteRun <- 0
+
+                if c <> '\n' && c <> '\t' && Char.IsControl c then
+                    safe <- false
+
+            index <- index + 1
+
+        safe
+
     let private literalSafe (text: string) =
-        not (text.Contains "'''")
-        && text |> Seq.forall (fun c -> c = '\n' || c = '\t' || not (Char.IsControl c))
+        literalSafeRange text 0 text.Length
 
     /// ARCH-010 string selection. Deterministic, and genuinely parseable:
     ///
@@ -358,6 +383,141 @@ module SyntheticToml =
         | [], _ -> String.concat "\n" ordered + "\n"
         | _, _ -> String.concat "\n" header + "\n\n" + String.concat "\n" ordered + "\n"
 
+    let private byteCountRange (text: string) (origin: int) (stop: int) : int =
+        // DSL-MUTABLE: algorithm-scratch — span byte-count total accumulator
+        let mutable total = 0
+        // DSL-MUTABLE: algorithm-scratch — span byte-count index cursor
+        let mutable index = origin
+
+        while index < stop do
+            let code = int text.[index]
+
+            if code < 0x80 then
+                total <- total + 1
+            elif code < 0x800 then
+                total <- total + 2
+            elif code >= 0xD800 && code <= 0xDBFF && index + 1 < stop then
+                let low = int text.[index + 1]
+
+                if low >= 0xDC00 && low <= 0xDFFF then
+                    total <- total + 4
+                    index <- index + 1
+                else
+                    total <- total + 3
+            else
+                total <- total + 3
+
+            index <- index + 1
+
+        total
+
+    /// Byte length of `escapeBasic` over `[origin, stop)` without allocating the
+    /// escaped string. Arms and UTF-8 pairing must stay in lockstep with `escapeBasic`.
+    let private escapeBasicByteCountRange (text: string) (origin: int) (stop: int) : int =
+        // DSL-MUTABLE: algorithm-scratch — escaped-byte total accumulator
+        let mutable total = 0
+        // DSL-MUTABLE: algorithm-scratch — escaped-byte index cursor
+        let mutable index = origin
+
+        while index < stop do
+            let code = int text.[index]
+
+            if
+                code = 0x22
+                || code = 0x5C
+                || code = 0x08
+                || code = 0x09
+                || code = 0x0A
+                || code = 0x0C
+                || code = 0x0D
+            then
+                total <- total + 2
+                index <- index + 1
+            elif code < 0x20 || code = 0x7F then
+                total <- total + 6
+                index <- index + 1
+            elif code < 0x80 then
+                total <- total + 1
+                index <- index + 1
+            elif code < 0x800 then
+                total <- total + 2
+                index <- index + 1
+            elif code >= 0xD800 && code <= 0xDBFF && index + 1 < stop then
+                let low = int text.[index + 1]
+
+                if low >= 0xDC00 && low <= 0xDFFF then
+                    total <- total + 4
+                    index <- index + 2
+                else
+                    total <- total + 3
+                    index <- index + 1
+            else
+                total <- total + 3
+                index <- index + 1
+
+        total
+
+    let private rangeContainsNewline (text: string) (origin: int) (stop: int) =
+        // DSL-MUTABLE: algorithm-scratch — newline-scan index
+        let mutable index = origin
+        // DSL-MUTABLE: algorithm-scratch — newline-scan found flag
+        let mutable found = false
+
+        while (not found) && index < stop do
+            if text.[index] = '\n' then
+                found <- true
+
+            index <- index + 1
+
+        found
+
+    let private tripleQuoteJoins (head: string) (headLen: int) (tail: string) =
+        let total = headLen + tail.Length
+
+        let charAt i =
+            if i < 0 || i >= total then
+                Char.MinValue
+            elif i < headLen then
+                head.[i]
+            else
+                tail.[i - headLen]
+
+        let startsAt i =
+            charAt i = '\'' && charAt (i + 1) = '\'' && charAt (i + 2) = '\''
+
+        (headLen >= 2 && startsAt (headLen - 2))
+        || (headLen >= 1 && startsAt (headLen - 1))
+
+    /// UTF-8 byte length of `renderString (text.Substring(0, length) + suffix)`
+    /// without allocating the concatenation or the rendered form.
+    ///
+    /// `text` and `suffix` must already be newline-normalised. `renderString` would
+    /// normalise first; doing it here would desynchronise `length` from the source
+    /// the caller is searching.
+    let renderStringByteCountPrefix (text: string) (length: int) (suffix: string) : int =
+        let text = if isNull text then "" else text
+        let suffix = if isNull suffix then "" else suffix
+
+        let headLen =
+            if length < 0 then 0
+            elif length > text.Length then text.Length
+            else length
+
+        let hasNewline =
+            suffix.Contains "\n" || rangeContainsNewline text 0 headLen
+
+        let safe =
+            literalSafeRange text 0 headLen
+            && literalSafeRange suffix 0 suffix.Length
+            && not (tripleQuoteJoins text headLen suffix)
+
+        if not hasNewline then
+            2 + escapeBasicByteCountRange text 0 headLen + escapeBasicByteCountRange suffix 0 suffix.Length
+        elif safe then
+            8 + byteCountRange text 0 headLen + byteCountRange suffix 0 suffix.Length
+        else
+            2 + escapeBasicByteCountRange text 0 headLen + escapeBasicByteCountRange suffix 0 suffix.Length
+
     /// UTF-8 byte count of rendered text.
     ///
     /// The limits every synthetic surface is measured against are byte limits, not character counts:
@@ -374,29 +534,4 @@ module SyntheticToml =
         if isNull text then
             0
         else
-            // DSL-MUTABLE: algorithm-scratch — byte-count total accumulator
-            let mutable total = 0
-            // DSL-MUTABLE: algorithm-scratch — byte-count index cursor
-            let mutable index = 0
-
-            while index < text.Length do
-                let code = int text.[index]
-
-                if code < 0x80 then
-                    total <- total + 1
-                elif code < 0x800 then
-                    total <- total + 2
-                elif code >= 0xD800 && code <= 0xDBFF && index + 1 < text.Length then
-                    let low = int text.[index + 1]
-
-                    if low >= 0xDC00 && low <= 0xDFFF then
-                        total <- total + 4
-                        index <- index + 1
-                    else
-                        total <- total + 3
-                else
-                    total <- total + 3
-
-                index <- index + 1
-
-            total
+            byteCountRange text 0 text.Length

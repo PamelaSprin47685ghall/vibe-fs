@@ -145,6 +145,15 @@ type SyncDelegateRuntime
                 |> Option.filter (String.IsNullOrWhiteSpace >> not)
           DescribeWait = SyncDelegateWait.describe }
 
+    let singletonResult taskResult =
+        task {
+            match! taskResult with
+            | Ok(SyncDelegateInvocationResult.WorkRecord workRecord) -> return Ok workRecord
+            | Ok(SyncDelegateInvocationResult.MergedInto _) ->
+                return Error "sync delegate protocol defect: singleton invocation was merged"
+            | Error error -> return Error error
+        }
+
     member _.Attached = attached
 
     member _.TryFind(ownerSessionId: SessionId, role: SyncDelegateRole) = attached.TryFind(ownerSessionId, role)
@@ -183,10 +192,11 @@ type SyncDelegateRuntime
         | _ -> false
 
     member _.Invoke(ownerSessionKey: string, role: SyncDelegateRole, charge: string) : Task<Result<string, string>> =
-        SyncDelegateWorkflow.invoke store deps ownerSessionKey role charge (fun () -> Task.FromResult charge)
+        SyncDelegateWorkflow.invoke store deps ownerSessionKey role charge None (fun () -> Task.FromResult charge)
+        |> singletonResult
 
     /// EXEC-032 composition seam: caller supplies a low-trust provider prompt
-    /// producer; workflow invokes it only after single-flight admission.
+    /// producer; workflow invokes it only after semantic batch admission.
     member _.InvokePrepared
         (ownerSessionKey: string, role: SyncDelegateRole, charge: string, prepareProviderPrompt: unit -> Task<string>) : Task<
                                                                                                                              Result<
@@ -195,7 +205,18 @@ type SyncDelegateRuntime
                                                                                                                               >
                                                                                                                           >
         =
-        SyncDelegateWorkflow.invoke store deps ownerSessionKey role charge prepareProviderPrompt
+        SyncDelegateWorkflow.invoke store deps ownerSessionKey role charge None prepareProviderPrompt
+        |> singletonResult
+
+    member _.InvokeBatchPrepared
+        (
+            ownerSessionKey: string,
+            role: SyncDelegateRole,
+            charge: string,
+            batch: SyncDelegateBatch,
+            prepareProviderPrompt: unit -> Task<string>
+        ) : Task<Result<SyncDelegateInvocationResult, string>> =
+        SyncDelegateWorkflow.invoke store deps ownerSessionKey role charge (Some batch) prepareProviderPrompt
 
     member _.HandleTurn(turn: ReconciledTurn, permit: QuiescencePermit option) : Task<bool> =
         task {
@@ -229,10 +250,6 @@ type SyncDelegateRuntime
                                 noteInspectorAnswer (sessionKey turn.SessionId) record
 
                             AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
-
-                            for inv in call.Invocations do
-                                AsyncSupport.trySetResult inv.Completion (Ok record) |> ignore
-
                             return true
                         | _ ->
                             // EXEC-031 / EXEC-026: fail closed. A Completed turn

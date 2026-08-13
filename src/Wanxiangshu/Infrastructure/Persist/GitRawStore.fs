@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Infrastructure.Persist
 
 open System.Collections.Generic
+open System.Threading.Tasks
 open System.Text
 open Fable.Core
 open Fable.Core.JsInterop
@@ -9,13 +10,16 @@ open Wanxiangshu.Kernel.Identity
 
 /// Capability port over content-addressed Git objects + ref CAS (§2.3 / §9).
 /// No CreateRef: first publication is CompareAndSwapRef(expectedOld=None).
+/// Capability port over content-addressed Git objects + ref CAS (§2.3 / §9).
+/// No CreateRef: first publication is CompareAndSwapRef(expectedOld=None).
+/// Members return Task so EventStore write/CAS can yield the Node event loop.
 type IGitRawStore =
-    abstract WriteBlob: content: byte[] -> GitObjectId
-    abstract WriteTree: entries: TreeEntry list -> GitObjectId
-    abstract ReadObject: oid: GitObjectId -> byte[] option
-    abstract ReadTree: oid: GitObjectId -> TreeEntry list option
-    abstract ReadRef: refName: string -> GitObjectId option
-    abstract CompareAndSwapRef: refName: string * expectedOld: GitObjectId option * newOid: GitObjectId -> bool
+    abstract WriteBlob: content: byte[] -> Task<GitObjectId>
+    abstract WriteTree: entries: TreeEntry list -> Task<GitObjectId>
+    abstract ReadObject: oid: GitObjectId -> Task<byte[] option>
+    abstract ReadTree: oid: GitObjectId -> Task<TreeEntry list option>
+    abstract ReadRef: refName: string -> Task<GitObjectId option>
+    abstract CompareAndSwapRef: refName: string * expectedOld: GitObjectId option * newOid: GitObjectId -> Task<bool>
 
 /// EventId path sharding: events/<2-hex>/<EventId>.jsonl (§6).
 [<RequireQualifiedAccess>]
@@ -106,14 +110,17 @@ module PayloadClosure =
         |> List.sortWith GitObjectId.compare
 
     /// Fail closed when any payload_ref is missing from the object database.
-    let validatePresent (store: IGitRawStore) (refs: GitObjectId list) : Result<unit, StorageInvalid> =
+    let validatePresent (store: IGitRawStore) (refs: GitObjectId list) : Task<Result<unit, StorageInvalid>> =
         let rec loop remaining =
-            match remaining with
-            | [] -> Ok()
-            | head :: tail ->
-                match store.ReadObject head with
-                | None -> Error(StorageInvalid.MissingPayload(PayloadRef.create (GitObjectId.value head)))
-                | Some _ -> loop tail
+            task {
+                match remaining with
+                | [] -> return Ok()
+                | head :: tail ->
+                    match! store.ReadObject head with
+                    | None ->
+                        return Error(StorageInvalid.MissingPayload(PayloadRef.create (GitObjectId.value head)))
+                    | Some _ -> return! loop tail
+            }
 
         loop refs
 
@@ -258,49 +265,57 @@ type InMemoryGitRawStore() =
 
     interface IGitRawStore with
         member _.WriteBlob(content) =
-            lock gate (fun () -> writeBlobUnlocked content)
+            Task.FromResult(lock gate (fun () -> writeBlobUnlocked content))
 
         member _.WriteTree(entries) =
-            lock gate (fun () -> writeTreeUnlocked entries)
+            Task.FromResult(lock gate (fun () -> writeTreeUnlocked entries))
 
         member _.ReadObject(oid) =
-            lock gate (fun () ->
-                match objects.TryGetValue(GitObjectId.value oid) with
-                | true, Blob bytes -> Some bytes
-                | true, Tree(body, _) -> Some body
-                | _ -> None)
+            Task.FromResult(
+                lock gate (fun () ->
+                    match objects.TryGetValue(GitObjectId.value oid) with
+                    | true, Blob bytes -> Some bytes
+                    | true, Tree(body, _) -> Some body
+                    | _ -> None)
+            )
 
         member _.ReadTree(oid) =
-            lock gate (fun () ->
-                match objects.TryGetValue(GitObjectId.value oid) with
-                | true, Tree(_, entries) -> Some entries
-                | true, Blob body -> GitObjectCodec.parseTreeBody body
-                | _ -> None)
+            Task.FromResult(
+                lock gate (fun () ->
+                    match objects.TryGetValue(GitObjectId.value oid) with
+                    | true, Tree(_, entries) -> Some entries
+                    | true, Blob body -> GitObjectCodec.parseTreeBody body
+                    | _ -> None)
+            )
 
         member _.ReadRef(refName) =
-            lock gate (fun () ->
-                match refs.TryGetValue refName with
-                | true, value -> Some(GitObjectId.create value)
-                | _ -> None)
+            Task.FromResult(
+                lock gate (fun () ->
+                    match refs.TryGetValue refName with
+                    | true, value -> Some(GitObjectId.create value)
+                    | _ -> None)
+            )
 
         member _.CompareAndSwapRef(refName, expectedOld, newOid) =
-            lock gate (fun () ->
-                let current =
-                    match refs.TryGetValue refName with
-                    | true, value -> Some value
-                    | _ -> None
+            Task.FromResult(
+                lock gate (fun () ->
+                    let current =
+                        match refs.TryGetValue refName with
+                        | true, value -> Some value
+                        | _ -> None
 
-                let expected = expectedOld |> Option.map GitObjectId.value
-                let next = GitObjectId.value newOid
+                    let expected = expectedOld |> Option.map GitObjectId.value
+                    let next = GitObjectId.value newOid
 
-                match expected, current with
-                | None, None ->
-                    refs.[refName] <- next
-                    true
-                | Some exp, Some cur when exp = cur ->
-                    refs.[refName] <- next
-                    true
-                | _ -> false)
+                    match expected, current with
+                    | None, None ->
+                        refs.[refName] <- next
+                        true
+                    | Some exp, Some cur when exp = cur ->
+                        refs.[refName] <- next
+                        true
+                    | _ -> false)
+            )
 
 [<RequireQualifiedAccess>]
 module GitRawStore =
@@ -312,18 +327,23 @@ module GitRawStore =
     let preparePayload (content: byte[]) : GitObjectId * byte[] = GitObjectCodec.hashBlob content
     let createInMemory () : IGitRawStore = InMemoryGitRawStore() :> IGitRawStore
 
-    let private buildEventsTree (store: IGitRawStore) (events: EventEnvelope list) : GitObjectId =
-        let byPrefix =
-            events
-            |> List.map (fun envelope ->
-                let normalized = EventEnvelope.normalize envelope
-                let oid = store.WriteBlob(CanonicalEventCodec.encodeUtf8 normalized)
-                EventIdShard.prefix normalized.EventId, EventIdShard.fileName normalized.EventId, oid)
-            |> List.groupBy (fun (shard, _, _) -> shard)
+    let private buildEventsTree (store: IGitRawStore) (events: EventEnvelope list) : Task<GitObjectId> =
+        task {
+            let written = ResizeArray<string * string * GitObjectId>()
 
-        let prefixEntries =
-            byPrefix
-            |> List.map (fun (shard, items) ->
+            for envelope in events do
+                let normalized = EventEnvelope.normalize envelope
+                let! oid = store.WriteBlob(CanonicalEventCodec.encodeUtf8 normalized)
+                written.Add((EventIdShard.prefix normalized.EventId, EventIdShard.fileName normalized.EventId, oid))
+
+            let byPrefix =
+                written
+                |> Seq.toList
+                |> List.groupBy (fun (shard, _, _) -> shard)
+
+            let prefixEntries = ResizeArray<TreeEntry>()
+
+            for shard, items in byPrefix do
                 let fileEntries =
                     items
                     |> List.map (fun (_, name, oid) ->
@@ -331,15 +351,18 @@ module GitRawStore =
                           Name = name
                           Oid = oid })
 
-                let leaf = store.WriteTree fileEntries
+                let! leaf = store.WriteTree fileEntries
 
-                { Mode = StoreTree.TreeMode
-                  Name = shard
-                  Oid = leaf })
+                prefixEntries.Add(
+                    { Mode = StoreTree.TreeMode
+                      Name = shard
+                      Oid = leaf }
+                )
 
-        store.WriteTree prefixEntries
+            return! store.WriteTree (Seq.toList prefixEntries)
+        }
 
-    let private buildPayloadsTree (store: IGitRawStore) (refs: GitObjectId list) : GitObjectId =
+    let private buildPayloadsTree (store: IGitRawStore) (refs: GitObjectId list) : Task<GitObjectId> =
         let entries =
             refs
             |> List.map (fun oid ->
@@ -351,28 +374,33 @@ module GitRawStore =
 
     /// Write a canonical root for the event set. payloads/ = §7.1 closure.
     /// Does not CAS refs/wanxiang/store — caller decides publication.
-    let materializeSnapshot (store: IGitRawStore) (events: EventEnvelope list) : Result<StoreSnapshot, StorageInvalid> =
-        match CanonicalEventCodec.mergeByIdentity events with
-        | Error err -> Error err
-        | Ok normalized ->
-            let closure = PayloadClosure.ofEvents normalized
+    let materializeSnapshot
+        (store: IGitRawStore)
+        (events: EventEnvelope list)
+        : Task<Result<StoreSnapshot, StorageInvalid>> =
+        task {
+            match CanonicalEventCodec.mergeByIdentity events with
+            | Error err -> return Error err
+            | Ok normalized ->
+                let closure = PayloadClosure.ofEvents normalized
 
-            match PayloadClosure.validatePresent store closure with
-            | Error err -> Error err
-            | Ok() ->
-                let eventsOid = buildEventsTree store normalized
-                let payloadsOid = buildPayloadsTree store closure
+                match! PayloadClosure.validatePresent store closure with
+                | Error err -> return Error err
+                | Ok() ->
+                    let! eventsOid = buildEventsTree store normalized
+                    let! payloadsOid = buildPayloadsTree store closure
 
-                let rootOid =
-                    store.WriteTree
-                        [ { Mode = StoreTree.TreeMode
-                            Name = StoreTree.EventsDir
-                            Oid = eventsOid }
-                          { Mode = StoreTree.TreeMode
-                            Name = StoreTree.PayloadsDir
-                            Oid = payloadsOid } ]
+                    let! rootOid =
+                        store.WriteTree
+                            [ { Mode = StoreTree.TreeMode
+                                Name = StoreTree.EventsDir
+                                Oid = eventsOid }
+                              { Mode = StoreTree.TreeMode
+                                Name = StoreTree.PayloadsDir
+                                Oid = payloadsOid } ]
 
-                Ok { RootOid = RootOid.create rootOid }
+                    return Ok { RootOid = RootOid.create rootOid }
+        }
 
     /// Walk events/ recursively → (relativePath * blobOid) pairs.
     ///
@@ -380,140 +408,164 @@ module GitRawStore =
     /// accumulating prefix at every file and directory, so listing a snapshot
     /// was O(|events|²). Boot, converge validate, and feature loaders all
     /// walk this tree; keep the walk O(|events|).
-    let listEventBlobs (store: IGitRawStore) (root: RootOid) : Result<(string * GitObjectId) list, StorageInvalid> =
+    let listEventBlobs
+        (store: IGitRawStore)
+        (root: RootOid)
+        : Task<Result<(string * GitObjectId) list, StorageInvalid>> =
         let rec walk
             (dirOid: GitObjectId)
             (prefix: string)
             (acc: ResizeArray<string * GitObjectId>)
-            : Result<unit, StorageInvalid> =
-            match store.ReadTree dirOid with
-            | None -> Error(StorageInvalid.MalformedEnvelope(sprintf "missing tree at %s" prefix))
-            | Some entries ->
-                let rec loop (remaining: TreeEntry list) =
-                    match remaining with
-                    | [] -> Ok()
-                    | entry :: rest ->
-                        let path =
-                            if prefix = "" then
-                                entry.Name
-                            else
-                                prefix + "/" + entry.Name
+            : Task<Result<unit, StorageInvalid>> =
+            task {
+                match! store.ReadTree dirOid with
+                | None -> return Error(StorageInvalid.MalformedEnvelope(sprintf "missing tree at %s" prefix))
+                | Some entries ->
+                    let rec loop (remaining: TreeEntry list) =
+                        task {
+                            match remaining with
+                            | [] -> return Ok()
+                            | entry :: rest ->
+                                let path =
+                                    if prefix = "" then
+                                        entry.Name
+                                    else
+                                        prefix + "/" + entry.Name
 
-                        if StoreTree.isTreeMode entry.Mode then
-                            match walk entry.Oid path acc with
-                            | Error e -> Error e
-                            | Ok() -> loop rest
-                        else
-                            acc.Add((path, entry.Oid))
-                            loop rest
+                                if StoreTree.isTreeMode entry.Mode then
+                                    match! walk entry.Oid path acc with
+                                    | Error e -> return Error e
+                                    | Ok() -> return! loop rest
+                                else
+                                    acc.Add((path, entry.Oid))
+                                    return! loop rest
+                        }
 
-                loop entries
+                    return! loop entries
+            }
 
-        match store.ReadTree(RootOid.value root) with
-        | None -> Error(StorageInvalid.MalformedEnvelope "missing store root tree")
-        | Some rootEntries ->
-            match
-                rootEntries
-                |> List.tryFind (fun (e: TreeEntry) -> e.Name = StoreTree.EventsDir && StoreTree.isTreeMode e.Mode)
-            with
-            | None -> Ok []
-            | Some eventsEntry ->
-                let acc = ResizeArray<string * GitObjectId>()
+        task {
+            match! store.ReadTree(RootOid.value root) with
+            | None -> return Error(StorageInvalid.MalformedEnvelope "missing store root tree")
+            | Some rootEntries ->
+                match
+                    rootEntries
+                    |> List.tryFind (fun (e: TreeEntry) -> e.Name = StoreTree.EventsDir && StoreTree.isTreeMode e.Mode)
+                with
+                | None -> return Ok []
+                | Some eventsEntry ->
+                    let acc = ResizeArray<string * GitObjectId>()
 
-                match walk eventsEntry.Oid StoreTree.EventsDir acc with
-                | Error e -> Error e
-                | Ok() -> Ok(Seq.toList acc)
+                    match! walk eventsEntry.Oid StoreTree.EventsDir acc with
+                    | Error e -> return Error e
+                    | Ok() -> return Ok(Seq.toList acc)
+        }
 
     /// Decode every event blob under a snapshot root.
     ///
     /// Production loaders (journal boot, feature adapters, converge validate)
     /// must use this walk — O(|events|) tree + blob reads — not
     /// EventStoreMergeSpec, which is the contract-test set-union oracle.
-    let loadEventEnvelopes (store: IGitRawStore) (root: RootOid) : Result<EventEnvelope list, StorageInvalid> =
-        match listEventBlobs store root with
-        | Error err -> Error err
-        | Ok blobs ->
-            let rec decode remaining acc =
-                match remaining with
-                | [] -> Ok(List.rev acc)
-                | (path, oid) :: tail ->
-                    match store.ReadObject oid with
-                    | None -> Error(StorageInvalid.MalformedEnvelope(sprintf "missing event blob at %s" path))
-                    | Some bytes ->
-                        match CanonicalEventCodec.tryDecodeUtf8 bytes with
-                        | Error err -> Error err
-                        | Ok envelope ->
-                            match EventIdShard.tryParseEventId path with
-                            | Some pathId when pathId <> envelope.EventId ->
-                                Error(StorageInvalid.NonCanonical "event path EventId mismatch")
-                            | _ -> decode tail (envelope :: acc)
+    let loadEventEnvelopes
+        (store: IGitRawStore)
+        (root: RootOid)
+        : Task<Result<EventEnvelope list, StorageInvalid>> =
+        task {
+            match! listEventBlobs store root with
+            | Error err -> return Error err
+            | Ok blobs ->
+                let rec decode remaining acc =
+                    task {
+                        match remaining with
+                        | [] -> return Ok(List.rev acc)
+                        | (path, oid) :: tail ->
+                            match! store.ReadObject oid with
+                            | None ->
+                                return Error(StorageInvalid.MalformedEnvelope(sprintf "missing event blob at %s" path))
+                            | Some bytes ->
+                                match CanonicalEventCodec.tryDecodeUtf8 bytes with
+                                | Error err -> return Error err
+                                | Ok envelope ->
+                                    match EventIdShard.tryParseEventId path with
+                                    | Some pathId when pathId <> envelope.EventId ->
+                                        return Error(StorageInvalid.NonCanonical "event path EventId mismatch")
+                                    | _ -> return! decode tail (envelope :: acc)
+                    }
 
-            decode blobs []
+                return! decode blobs []
+        }
 
-    let listPayloadNames (store: IGitRawStore) (root: RootOid) : Result<string list, StorageInvalid> =
-        match store.ReadTree(RootOid.value root) with
-        | None -> Error(StorageInvalid.MalformedEnvelope "missing store root tree")
-        | Some rootEntries ->
-            match
-                rootEntries
-                |> List.tryFind (fun e -> e.Name = StoreTree.PayloadsDir && StoreTree.isTreeMode e.Mode)
-            with
-            | None -> Ok []
-            | Some payloadsEntry ->
-                match store.ReadTree payloadsEntry.Oid with
-                | None -> Error(StorageInvalid.MalformedEnvelope "missing payloads/ tree")
-                | Some entries ->
-                    entries
-                    |> List.filter (fun e -> not (StoreTree.isTreeMode e.Mode))
-                    |> List.map (fun e -> e.Name)
-                    |> List.sort
-                    |> Ok
+    let listPayloadNames (store: IGitRawStore) (root: RootOid) : Task<Result<string list, StorageInvalid>> =
+        task {
+            match! store.ReadTree(RootOid.value root) with
+            | None -> return Error(StorageInvalid.MalformedEnvelope "missing store root tree")
+            | Some rootEntries ->
+                match
+                    rootEntries
+                    |> List.tryFind (fun e -> e.Name = StoreTree.PayloadsDir && StoreTree.isTreeMode e.Mode)
+                with
+                | None -> return Ok []
+                | Some payloadsEntry ->
+                    match! store.ReadTree payloadsEntry.Oid with
+                    | None -> return Error(StorageInvalid.MalformedEnvelope "missing payloads/ tree")
+                    | Some entries ->
+                        return
+                            entries
+                            |> List.filter (fun e -> not (StoreTree.isTreeMode e.Mode))
+                            |> List.map (fun e -> e.Name)
+                            |> List.sort
+                            |> Ok
+        }
 
     /// Navigate events/<shard>/<EventId>.jsonl under a store root, if present.
     let tryReadEvent
         (store: IGitRawStore)
         (root: RootOid)
         (eventId: EventId)
-        : Result<EventEnvelope option, StorageInvalid> =
-        match store.ReadTree(RootOid.value root) with
-        | None -> Error(StorageInvalid.MalformedEnvelope "missing store root tree")
-        | Some rootEntries ->
-            match
-                rootEntries
-                |> List.tryFind (fun e -> e.Name = StoreTree.EventsDir && StoreTree.isTreeMode e.Mode)
-            with
-            | None -> Ok None
-            | Some eventsEntry ->
-                match store.ReadTree eventsEntry.Oid with
-                | None -> Error(StorageInvalid.MalformedEnvelope "missing events/ tree")
-                | Some shardEntries ->
-                    let shard = EventIdShard.prefix eventId
+        : Task<Result<EventEnvelope option, StorageInvalid>> =
+        task {
+            match! store.ReadTree(RootOid.value root) with
+            | None -> return Error(StorageInvalid.MalformedEnvelope "missing store root tree")
+            | Some rootEntries ->
+                match
+                    rootEntries
+                    |> List.tryFind (fun e -> e.Name = StoreTree.EventsDir && StoreTree.isTreeMode e.Mode)
+                with
+                | None -> return Ok None
+                | Some eventsEntry ->
+                    match! store.ReadTree eventsEntry.Oid with
+                    | None -> return Error(StorageInvalid.MalformedEnvelope "missing events/ tree")
+                    | Some shardEntries ->
+                        let shard = EventIdShard.prefix eventId
 
-                    match
-                        shardEntries
-                        |> List.tryFind (fun e -> e.Name = shard && StoreTree.isTreeMode e.Mode)
-                    with
-                    | None -> Ok None
-                    | Some shardEntry ->
-                        match store.ReadTree shardEntry.Oid with
-                        | None -> Error(StorageInvalid.MalformedEnvelope(sprintf "missing events/%s tree" shard))
-                        | Some fileEntries ->
-                            let fileName = EventIdShard.fileName eventId
+                        match
+                            shardEntries
+                            |> List.tryFind (fun e -> e.Name = shard && StoreTree.isTreeMode e.Mode)
+                        with
+                        | None -> return Ok None
+                        | Some shardEntry ->
+                            match! store.ReadTree shardEntry.Oid with
+                            | None ->
+                                return Error(StorageInvalid.MalformedEnvelope(sprintf "missing events/%s tree" shard))
+                            | Some fileEntries ->
+                                let fileName = EventIdShard.fileName eventId
 
-                            match
-                                fileEntries
-                                |> List.tryFind (fun e -> e.Name = fileName && not (StoreTree.isTreeMode e.Mode))
-                            with
-                            | None -> Ok None
-                            | Some fileEntry ->
-                                match store.ReadObject fileEntry.Oid with
-                                | None ->
-                                    Error(
-                                        StorageInvalid.MalformedEnvelope(
-                                            sprintf "missing event blob %s" (EventIdShard.relativePath eventId)
-                                        )
-                                    )
-                                | Some bytes ->
-                                    match CanonicalEventCodec.tryDecodeUtf8 bytes with
-                                    | Error err -> Error err
-                                    | Ok envelope -> Ok(Some envelope)
+                                match
+                                    fileEntries
+                                    |> List.tryFind (fun e -> e.Name = fileName && not (StoreTree.isTreeMode e.Mode))
+                                with
+                                | None -> return Ok None
+                                | Some fileEntry ->
+                                    match! store.ReadObject fileEntry.Oid with
+                                    | None ->
+                                        return
+                                            Error(
+                                                StorageInvalid.MalformedEnvelope(
+                                                    sprintf "missing event blob %s" (EventIdShard.relativePath eventId)
+                                                )
+                                            )
+                                    | Some bytes ->
+                                        match CanonicalEventCodec.tryDecodeUtf8 bytes with
+                                        | Error err -> return Error err
+                                        | Ok envelope -> return Ok(Some envelope)
+        }

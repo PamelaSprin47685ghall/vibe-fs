@@ -22,21 +22,52 @@ type Dependencies =
       ResolveBoundAgent: SessionId -> string option
       DescribeWait: SyncDelegateWait -> DiagnosticWait }
 
-/// EXEC-026 / EXEC-031: reusable SyncDelegate CE with concurrent batch coalescing and direct in-flight dispatch.
+let private completeError (invocations: SyncDelegateInvocation list) error =
+    for invocation in invocations do
+        AsyncSupport.trySetResult invocation.Completion (Error error) |> ignore
+
+let private completeBatch (invocations: SyncDelegateInvocation list) answered =
+    match answered, invocations with
+    | Error error, _ -> completeError invocations error
+    | Ok _, [] -> ()
+    | Ok workRecord, canonical :: siblings ->
+        AsyncSupport.trySetResult canonical.Completion (Ok(SyncDelegateInvocationResult.WorkRecord workRecord))
+        |> ignore
+
+        match canonical.Batch with
+        | Some batch ->
+            let canonicalCall = List.head batch.CallOrder
+
+            for sibling in siblings do
+                AsyncSupport.trySetResult sibling.Completion (Ok(SyncDelegateInvocationResult.MergedInto canonicalCall))
+                |> ignore
+        | None ->
+            for sibling in siblings do
+                AsyncSupport.trySetResult
+                    sibling.Completion
+                    (Error "sync delegate protocol defect: ungrouped invocation has siblings")
+                |> ignore
+
+/// EXEC-026 / EXEC-031: reusable SyncDelegate CE. A semantic batch is fixed by
+/// ProviderRun tool-call membership before dispatch; scheduler timing never
+/// changes which invocations are concatenated.
 let invoke
     (store: SyncDelegateCallStore)
     (deps: Dependencies)
     (ownerSessionKey: string)
     (role: SyncDelegateRole)
     (charge: string)
+    (batch: SyncDelegateBatch option)
     (prepareProviderPrompt: unit -> Task<string>)
-    : Task<Result<string, string>> =
+    : Task<Result<SyncDelegateInvocationResult, string>> =
     task {
         let owner = SessionId.create ownerSessionKey
         let ownerScope = ReuseScope.ofSession owner
 
         let completion =
-            TaskCompletionSource<Result<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
+            TaskCompletionSource<Result<SyncDelegateInvocationResult, string>>(
+                TaskCreationOptions.RunContinuationsAsynchronously
+            )
 
         let invocation: SyncDelegateInvocation =
             { Owner = owner
@@ -44,114 +75,108 @@ let invoke
               Role = role
               Charge = charge
               PrepareProviderPrompt = prepareProviderPrompt
+              Batch = batch
               Completion = completion
               StartCursor = None }
 
-        let isLeader = store.EnqueueForBatch invocation
+        match store.Admit invocation with
+        | SyncDelegateAdmission.Rejected error ->
+            AsyncSupport.trySetResult completion (Error error) |> ignore
+        | SyncDelegateAdmission.Waiting -> ()
+        | SyncDelegateAdmission.Ready invocations ->
+            let first = List.head invocations
+            let batchOwner = first.Owner
 
-        if isLeader then
-            let initialBatch = store.DrainBatch(ownerScope, role)
+            if role = SyncDelegateRole.Inspector then
+                store.TryTakeDeletedInspector ownerScope
+                |> Option.iter (fun sessionId -> deps.CleanupInspectorDraft(SessionId.value sessionId))
 
-            if List.isEmpty initialBatch then
-                store.CompleteBatchPreparation(ownerScope, role)
-            else
-                let first = List.head initialBatch
-                let batchOwner = first.Owner
+            match deps.ResolveOwnerTier batchOwner with
+            | None ->
+                store.ReleaseAdmission(ownerScope, role)
+                completeError invocations "sync delegate rejected: owner tier unknown"
+            | Some ownerTier ->
+                let tier = SyncDelegate.tierForOwner ownerTier
+                let agentName = SyncDelegate.agentNameFor role tier
 
-                if role = SyncDelegateRole.Inspector then
-                    let staleDeletedInspector = store.TryTakeDeletedInspector ownerScope
+                try
+                    match!
+                        deps.Attached.GetOrCreate(
+                            batchOwner,
+                            role,
+                            agentName,
+                            deps.Directory,
+                            deps.CreateChild,
+                            deps.OnDelegateReady
+                        )
+                    with
+                    | Error error ->
+                        store.ReleaseAdmission(ownerScope, role)
+                        completeError invocations error
+                    | Ok(delegateSession, attachedAgent) ->
+                        let! preparedPrompts =
+                            task {
+                                let results = ResizeArray<string>()
 
-                    staleDeletedInspector
-                    |> Option.iter (fun sessionId -> deps.CleanupInspectorDraft(SessionId.value sessionId))
+                                for item in invocations do
+                                    try
+                                        let! prompt = item.PrepareProviderPrompt()
+                                        results.Add prompt
+                                    with _ ->
+                                        results.Add item.Charge
 
-                match deps.ResolveOwnerTier batchOwner with
-                | None ->
-                    store.CompleteBatchPreparation(ownerScope, role)
+                                return results |> Seq.toList
+                            }
 
-                    for item in initialBatch do
-                        AsyncSupport.trySetResult item.Completion (Error "sync delegate rejected: owner tier unknown")
-                        |> ignore
-                | Some ownerTier ->
-                    let tier = SyncDelegate.tierForOwner ownerTier
-                    let agentName = SyncDelegate.agentNameFor role tier
+                        let combinedCharge =
+                            invocations |> List.map (fun item -> item.Charge) |> String.concat "\n\n"
 
-                    try
-                        match!
-                            deps.Attached.GetOrCreate(
+                        let combinedProviderPrompt = preparedPrompts |> String.concat "\n\n"
+
+                        let sendAgent =
+                            deps.ResolveBoundAgent delegateSession
+                            |> Option.defaultValue attachedAgent
+
+                        match
+                            store.BeginCall(
                                 batchOwner,
+                                ownerScope,
                                 role,
-                                agentName,
-                                deps.Directory,
-                                deps.CreateChild,
-                                deps.OnDelegateReady
+                                delegateSession,
+                                sendAgent,
+                                invocations
                             )
                         with
                         | Error error ->
-                            store.CompleteBatchPreparation(ownerScope, role)
-
-                            for item in initialBatch do
-                                AsyncSupport.trySetResult item.Completion (Error error) |> ignore
-                        | Ok(delegateSession, attachedAgent) ->
-                            let extraBatch = store.DrainBatch(ownerScope, role)
-                            let batch = initialBatch @ extraBatch
-
-                            let! preparedPrompts =
-                                task {
-                                    let results = ResizeArray<string>()
-
-                                    for item in batch do
-                                        try
-                                            let! p = item.PrepareProviderPrompt()
-                                            results.Add p
-                                        with _ ->
-                                            results.Add item.Charge
-
-                                    return results |> Seq.toList
-                                }
-
-                            let extraBatch2 = store.DrainBatch(ownerScope, role)
-                            let fullBatch = batch @ extraBatch2
-
-                            let fullPrompts = preparedPrompts @ (extraBatch2 |> List.map (fun i -> i.Charge))
-
-                            let combinedCharge =
-                                fullBatch |> List.map (fun i -> i.Charge) |> String.concat "\n\n"
-
-                            let combinedProviderPrompt = fullPrompts |> String.concat "\n\n"
-
-                            let sendAgent =
-                                deps.ResolveBoundAgent delegateSession
-                                |> Option.defaultValue attachedAgent
-
-                            let call, registration =
-                                store.BeginCall(batchOwner, ownerScope, role, delegateSession, sendAgent, fullBatch)
-
+                            store.ReleaseAdmission(ownerScope, role)
+                            completeError invocations error
+                        | Ok(call, registration) ->
                             use _registration = registration
-
-                            store.CompleteBatchPreparation(ownerScope, role)
 
                             let request =
                                 SyncDelegatePrompt.withProviderPrompt combinedCharge combinedProviderPrompt
 
-                            match! deps.SendPrompt call request with
-                            | Error error -> store.FailCall(call, error)
-                            | Ok _ ->
-                                if role = SyncDelegateRole.Inspector then
-                                    deps.NoteInspectorPrompt (SessionId.value delegateSession) request.Charge
+                            let! answered =
+                                task {
+                                    match! deps.SendPrompt call request with
+                                    | Error error -> return Error error
+                                    | Ok _ ->
+                                        if role = SyncDelegateRole.Inspector then
+                                            deps.NoteInspectorPrompt (SessionId.value delegateSession) request.Charge
 
-                                let! answered =
-                                    CausalAwait.awaitTask
-                                        CausalWaitHub.observer
-                                        (deps.DescribeWait(DelegateCompletion(batchOwner, delegateSession, role)))
-                                        call.Answer.Task
+                                        return!
+                                            CausalAwait.awaitTask
+                                                CausalWaitHub.observer
+                                                (deps.DescribeWait(
+                                                    DelegateCompletion(batchOwner, delegateSession, role)
+                                                ))
+                                                call.Answer.Task
+                                }
 
-                                for item in fullBatch do
-                                    AsyncSupport.trySetResult item.Completion answered |> ignore
-                    with ex ->
-                        store.CompleteBatchPreparation(ownerScope, role)
-
-                        for item in initialBatch do
-                            AsyncSupport.trySetResult item.Completion (Error ex.Message) |> ignore
+                            completeBatch invocations answered
+                with ex ->
+                    store.ReleaseAdmission(ownerScope, role)
+                    completeError invocations ex.Message
 
         return! completion.Task
     }

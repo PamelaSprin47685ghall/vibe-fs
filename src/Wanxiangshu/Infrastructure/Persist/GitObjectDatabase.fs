@@ -2,6 +2,7 @@ namespace Wanxiangshu.Infrastructure.Persist
 
 open System
 open System.Text
+open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 
@@ -9,26 +10,29 @@ open Fable.Core.JsInterop
 ///
 /// ── why this exists ─────────────────────────────────────────────────────────
 ///
-/// `ProcessGitRawStore` reaches the ODB through one synchronous `git` child process per
-/// primitive. Measured: a single-event append cost **24 spawns / ~60ms** (11 / ~29ms once
-/// immutable reads and trees were memoized) against **0.5ms** for the identical EventStore
-/// logic over the in-memory raw store, and one `fallback-aabb-trace` canary spawned 1197 git
-/// processes totalling 2.4s of its 5.3s wall. Because `execFileSync` blocks the Node event
-/// loop, those spawns also serialize every other session in the Host behind whichever one is
-/// appending — cost that is neither CPU- nor IO-bound, just process-creation latency taken
-/// under a global lock.
+/// `ProcessGitRawStore` used to reach the ODB through one synchronous `git` child
+/// process per primitive. Measured: a single-event append cost **24 spawns / ~60ms**
+/// (11 / ~29ms once immutable reads and trees were memoized) against **0.5ms** for
+/// the identical EventStore logic over the in-memory raw store, and one
+/// `fallback-aabb-trace` canary spawned 1197 git processes totalling 2.4s of its
+/// 5.3s wall. Because `execFileSync` blocked the Node event loop, those spawns also
+/// serialized every other session in the Host behind whichever one was appending.
 ///
-/// A loose object is `zlib(<type> <length>\0<body>)` at `objects/<oid[0..1]>/<oid[2..]>`, and
-/// the oid is `sha1` of the same uncompressed bytes. Both are stable, documented Git formats,
-/// so computing them here writes exactly the object `hash-object` / `mktree` would write —
-/// `objects-identity.test.mjs` pins that equality against the real binary rather than trusting
-/// this comment. Nothing about the store's semantics changes: same oids, same on-disk layout,
-/// same `git cat-file` readability.
+/// A loose object is `zlib(<type> <length>\0<body>)` at `objects/<oid[0..1]>/<oid[2..]>`,
+/// and the oid is `sha1` of the same uncompressed bytes. Both are stable, documented
+/// Git formats, so computing them here writes exactly the object `hash-object` /
+/// `mktree` would write — `objects-identity.test.mjs` pins that equality against the
+/// real binary rather than trusting this comment. Nothing about the store's semantics
+/// changes: same oids, same on-disk layout, same `git cat-file` readability.
 ///
-/// Packed objects are the one shape this cannot read: a pack is a delta-compressed archive, and
-/// re-implementing its reader would be a second Git. A miss therefore delegates to the injected
-/// CLI runner — the physical fallback for a repository someone has `gc`'d, not a compatibility
-/// shim for a retired format.
+/// File I/O goes through `fs.promises` so EventStore write/CAS yields the Node event
+/// loop. zlib inflate/deflate stay synchronous: they are CPU on an already-loaded
+/// buffer, not a filesystem wait.
+///
+/// Packed objects are the one shape this cannot read: a pack is a delta-compressed
+/// archive, and re-implementing its reader would be a second Git. A miss therefore
+/// delegates to the injected CLI runner — the physical fallback for a repository
+/// someone has `gc`'d, not a compatibility shim for a retired format.
 module GitObjectDatabase =
 
     [<Import("createHash", "node:crypto")>]
@@ -40,20 +44,35 @@ module GitObjectDatabase =
     [<Import("inflateSync", "node:zlib")>]
     let private inflateSync (buffer: obj) : obj = jsNative
 
-    [<Import("existsSync", "node:fs")>]
-    let private existsSync (path: string) : bool = jsNative
+    [<Import("access", "node:fs/promises")>]
+    let private access (path: string) : Task<unit> = jsNative
 
-    [<Import("mkdirSync", "node:fs")>]
-    let private mkdirSync (path: string) (options: obj) : unit = jsNative
+    [<Import("mkdir", "node:fs/promises")>]
+    let private mkdir (path: string) (options: obj) : Task<obj> = jsNative
 
-    [<Import("readFileSync", "node:fs")>]
-    let private readFileSyncBinary (path: string) : obj = jsNative
+    [<Import("readFile", "node:fs/promises")>]
+    let private readFileBinary (path: string) : Task<obj> = jsNative
 
-    [<Import("writeFileSync", "node:fs")>]
-    let private writeFileSyncBinary (path: string) (content: obj) : unit = jsNative
+    [<Import("readFile", "node:fs/promises")>]
+    let private readFileText (path: string) (encoding: string) : Task<string> = jsNative
 
-    [<Import("renameSync", "node:fs")>]
-    let private renameSync (oldPath: string) (newPath: string) : unit = jsNative
+    [<Import("writeFile", "node:fs/promises")>]
+    let private writeFile (path: string) (content: obj) : Task<unit> = jsNative
+
+    [<Import("rename", "node:fs/promises")>]
+    let private rename (oldPath: string) (newPath: string) : Task<unit> = jsNative
+
+    [<Import("unlink", "node:fs/promises")>]
+    let private unlink (path: string) : Task<unit> = jsNative
+
+    [<Import("open", "node:fs/promises")>]
+    let private fsOpen (path: string) (flags: string) : Task<obj> = jsNative
+
+    [<Emit("$0.write($1)")>]
+    let private handleWrite (handle: obj) (data: obj) : Task<obj> = jsNative
+
+    [<Emit("$0.close()")>]
+    let private handleClose (handle: obj) : Task<unit> = jsNative
 
     [<Emit("Buffer.concat($0)")>]
     let private bufferConcat (parts: obj array) : byte[] = jsNative
@@ -75,12 +94,29 @@ module GitObjectDatabase =
     [<Emit("$0 + '.tmp-' + process.pid + '-' + Math.random().toString(36).slice(2)")>]
     let private tempSibling (file: string) : string = jsNative
 
-    let private ensureDirectory (directory: string) =
-        if not (existsSync directory) then
-            mkdirSync directory (createObj [ "recursive", box true ])
+    let private exists (path: string) : Task<bool> =
+        task {
+            try
+                do! access path
+                return true
+            with _ ->
+                return false
+        }
 
-    let private readBytes (file: string) : byte[] =
-        emitJsExpr (readFileSyncBinary file) "Buffer.from($0)"
+    let private ensureDirectory (directory: string) : Task<unit> =
+        task {
+            let! present = exists directory
+
+            if not present then
+                let! _ = mkdir directory (createObj [ "recursive", box true ])
+                return ()
+        }
+
+    let private readBytes (file: string) : Task<byte[]> =
+        task {
+            let! raw = readFileBinary file
+            return emitJsExpr raw "Buffer.from($0)"
+        }
 
     /// Write via temp + rename, the way Git writes a loose object: a reader either sees the
     /// complete object or no file at all, never a truncated prefix.
@@ -90,20 +126,27 @@ module GitObjectDatabase =
     /// object is content-addressed, so one bounded retry is deterministic: if a
     /// competing writer already installed `file`, the desired effect exists;
     /// otherwise recreate the prefix directory and retry with a fresh sibling.
-    let private writeBytesAtomic (file: string) (bytes: byte[]) =
+    let private writeBytesAtomic (file: string) (bytes: byte[]) : Task<unit> =
         let directory = file.Substring(0, file.LastIndexOf '/')
 
         let rec write remaining =
-            ensureDirectory directory
-            let temp = tempSibling file
+            task {
+                do! ensureDirectory directory
+                let temp = tempSibling file
 
-            try
-                writeFileSyncBinary temp (asBuffer bytes)
-                renameSync temp file
-            with error ->
-                if existsSync file then ()
-                elif remaining > 0 then write (remaining - 1)
-                else raise error
+                try
+                    do! writeFile temp (asBuffer bytes)
+                    do! rename temp file
+                with error ->
+                    let! already = exists file
+
+                    if already then
+                        return ()
+                    elif remaining > 0 then
+                        return! write (remaining - 1)
+                    else
+                        return raise error
+            }
 
         write 1
 
@@ -118,45 +161,54 @@ module GitObjectDatabase =
         bufferConcat [| header; asBuffer body |]
 
     /// Object body plus its Git type, or None when the loose object is absent.
-    let private tryReadLoose (objectsDir: string) (oid: string) : (string * byte[]) option =
-        let file = objectsDir + "/" + oid.Substring(0, 2) + "/" + oid.Substring(2)
+    let private tryReadLoose (objectsDir: string) (oid: string) : Task<(string * byte[]) option> =
+        task {
+            let file = objectsDir + "/" + oid.Substring(0, 2) + "/" + oid.Substring(2)
+            let! present = exists file
 
-        if not (existsSync file) then
-            None
-        else
-            let framed: byte[] =
-                emitJsExpr (inflateSync (asBuffer (readBytes file))) "Buffer.from($0)"
-
-            let separator = Array.IndexOf(framed, 0uy)
-
-            if separator < 0 then
-                None
+            if not present then
+                return None
             else
-                let header = Encoding.UTF8.GetString(framed, 0, separator)
-                let body = framed.[separator + 1 ..]
+                let! fileBytes = readBytes file
 
-                match header.Split(' ') with
-                | [| objectType; _ |] -> Some(objectType, body)
-                | _ -> None
+                let framed: byte[] =
+                    emitJsExpr (inflateSync (asBuffer fileBytes)) "Buffer.from($0)"
+
+                let separator = Array.IndexOf(framed, 0uy)
+
+                if separator < 0 then
+                    return None
+                else
+                    let header = Encoding.UTF8.GetString(framed, 0, separator)
+                    let body = framed.[separator + 1 ..]
+
+                    match header.Split(' ') with
+                    | [| objectType; _ |] -> return Some(objectType, body)
+                    | _ -> return None
+        }
 
     /// Write the framed object unless the oid already exists. Returns the oid either way.
-    let private writeLoose (objectsDir: string) (objectType: string) (body: byte[]) : string =
-        let framed = frame objectType body
-        let oid = sha1Hex framed
-        let directory = objectsDir + "/" + oid.Substring(0, 2)
-        let file = directory + "/" + oid.Substring(2)
+    let private writeLoose (objectsDir: string) (objectType: string) (body: byte[]) : Task<string> =
+        task {
+            let framed = frame objectType body
+            let oid = sha1Hex framed
+            let directory = objectsDir + "/" + oid.Substring(0, 2)
+            let file = directory + "/" + oid.Substring(2)
+            let! present = exists file
 
-        if not (existsSync file) then
-            ensureDirectory directory
+            if not present then
+                do! ensureDirectory directory
 
-            let compressed: byte[] =
-                emitJsExpr (deflateSync (asBuffer framed)) "Buffer.from($0)"
+                let compressed: byte[] =
+                    emitJsExpr (deflateSync (asBuffer framed)) "Buffer.from($0)"
 
-            writeBytesAtomic file compressed
+                do! writeBytesAtomic file compressed
 
-        oid
+            return oid
+        }
 
-    let writeBlob (objectsDir: string) (content: byte[]) : string = writeLoose objectsDir "blob" content
+    let writeBlob (objectsDir: string) (content: byte[]) : Task<string> =
+        writeLoose objectsDir "blob" content
 
     /// Canonical tree body: `<mode> <name>\0<20-byte oid>` records in Git's own entry order,
     /// no separators. Git writes tree modes without the leading zero (`40000`, not `040000`).
@@ -175,7 +227,7 @@ module GitObjectDatabase =
         |> List.toArray
         |> bufferConcat
 
-    let writeTree (objectsDir: string) (entries: TreeEntry list) : string =
+    let writeTree (objectsDir: string) (entries: TreeEntry list) : Task<string> =
         writeLoose objectsDir "tree" (treeBody entries)
 
     /// Parse a tree body back into entries. Modes are normalized by the caller's store rules.
@@ -208,14 +260,20 @@ module GitObjectDatabase =
         loop 0 []
 
     /// Loose object bytes for `oid`, or None when it is packed / absent.
-    let tryReadObject (objectsDir: string) (oid: string) : byte[] option =
-        tryReadLoose objectsDir oid |> Option.map snd
+    let tryReadObject (objectsDir: string) (oid: string) : Task<byte[] option> =
+        task {
+            match! tryReadLoose objectsDir oid with
+            | Some(_, body) -> return Some body
+            | None -> return None
+        }
 
     /// Loose tree entries for `oid`, or None when it is packed / absent / not a tree.
-    let tryReadTree (objectsDir: string) (oid: string) : TreeEntry list option =
-        match tryReadLoose objectsDir oid with
-        | Some("tree", body) -> Some(parseTree body)
-        | _ -> None
+    let tryReadTree (objectsDir: string) (oid: string) : Task<TreeEntry list option> =
+        task {
+            match! tryReadLoose objectsDir oid with
+            | Some("tree", body) -> return Some(parseTree body)
+            | _ -> return None
+        }
 
     // ── refs ────────────────────────────────────────────────────────────────
     //
@@ -224,90 +282,112 @@ module GitObjectDatabase =
     // documented and both used verbatim here — so a concurrent `git` process, another plugin
     // instance and this code all serialize through the same `<ref>.lock`, exactly as before.
 
-    [<Import("openSync", "node:fs")>]
-    let private openSync (path: string) (flags: string) : int = jsNative
-
-    [<Import("writeSync", "node:fs")>]
-    let private writeSync (fd: int) (data: obj) : int = jsNative
-
-    [<Import("closeSync", "node:fs")>]
-    let private closeSync (fd: int) : unit = jsNative
-
-    [<Import("unlinkSync", "node:fs")>]
-    let private unlinkSync (path: string) : unit = jsNative
-
-    [<Import("readFileSync", "node:fs")>]
-    let private readFileText (path: string) (encoding: string) : string = jsNative
-
-    [<Emit("(() => { try { return $0(); } catch { return null; } })()")>]
-    let private tryOrNull (thunk: unit -> 'T) : 'T = jsNative
-
     let private isOid (text: string) =
         text.Length = 40
         && text |> Seq.forall (fun c -> Char.IsDigit c || (c >= 'a' && c <= 'f'))
 
     /// The ref's value: the loose ref file first, then `packed-refs` (a `gc`/`pack-refs` may have
     /// moved it there). Symrefs are not a store shape and are not followed.
-    let tryReadRef (gitDir: string) (refName: string) : string option =
-        let loose = gitDir + "/" + refName
+    let tryReadRef (gitDir: string) (refName: string) : Task<string option> =
+        task {
+            let loose = gitDir + "/" + refName
+            let! loosePresent = exists loose
 
-        let fromLoose =
-            if existsSync loose then
-                let text = (readFileText loose "utf8").Trim()
-                if isOid text then Some text else None
-            else
-                None
-
-        match fromLoose with
-        | Some oid -> Some oid
-        | None ->
-            let packed = gitDir + "/packed-refs"
-
-            if not (existsSync packed) then
-                None
-            else
-                (readFileText packed "utf8").Split('\n')
-                |> Array.tryPick (fun line ->
-                    let row = line.Trim()
-
-                    if row = "" || row.StartsWith "#" || row.StartsWith "^" then
-                        None
+            let! fromLoose =
+                task {
+                    if not loosePresent then
+                        return None
                     else
-                        match row.Split(' ') with
-                        | [| oid; name |] when name = refName && isOid oid -> Some oid
-                        | _ -> None)
+                        let! text = readFileText loose "utf8"
+                        let trimmed = text.Trim()
+                        if isOid trimmed then return Some trimmed else return None
+                }
+
+            match fromLoose with
+            | Some oid -> return Some oid
+            | None ->
+                let packed = gitDir + "/packed-refs"
+                let! packedPresent = exists packed
+
+                if not packedPresent then
+                    return None
+                else
+                    let! packedText = readFileText packed "utf8"
+
+                    return
+                        packedText.Split('\n')
+                        |> Array.tryPick (fun line ->
+                            let row = line.Trim()
+
+                            if row = "" || row.StartsWith "#" || row.StartsWith "^" then
+                                None
+                            else
+                                match row.Split(' ') with
+                                | [| oid; name |] when name = refName && isOid oid -> Some oid
+                                | _ -> None)
+        }
+
+    let private closeQuietly (handle: obj) : Task<unit> =
+        task {
+            try
+                do! handleClose handle
+            with _ ->
+                ()
+        }
+
+    let private unlinkQuietly (path: string) : Task<unit> =
+        task {
+            try
+                do! unlink path
+            with _ ->
+                ()
+        }
 
     /// Git's own lockfile protocol: create `<ref>.lock` exclusively, verify the current value is
     /// still what the caller expected, write the new value into the lock, rename it over the ref.
     /// A lost race — lock taken, or the ref moved — returns false, which is the CAS answer.
-    let compareAndSwapRef (gitDir: string) (refName: string) (expectedOld: string option) (newOid: string) : bool =
-        let refPath = gitDir + "/" + refName
-        let lockPath = refPath + ".lock"
-        ensureDirectory (refPath.Substring(0, refPath.LastIndexOf '/'))
+    let compareAndSwapRef (gitDir: string) (refName: string) (expectedOld: string option) (newOid: string) : Task<bool> =
+        task {
+            let refPath = gitDir + "/" + refName
+            let lockPath = refPath + ".lock"
+            do! ensureDirectory (refPath.Substring(0, refPath.LastIndexOf '/'))
 
-        let fd = tryOrNull (fun () -> box (openSync lockPath "wx"))
+            let! handleOpt =
+                task {
+                    try
+                        let! handle = fsOpen lockPath "wx"
+                        return Some handle
+                    with _ ->
+                        return None
+                }
 
-        if isNull fd then
-            false
-        else
-            let descriptor = unbox<int> fd
+            match handleOpt with
+            | None -> return false
+            | Some handle ->
+                try
+                    let! current = tryReadRef gitDir refName
 
-            let release () =
-                closeSync descriptor
-                tryOrNull (fun () -> box (unlinkSync lockPath)) |> ignore
+                    if current <> expectedOld then
+                        do! closeQuietly handle
+                        do! unlinkQuietly lockPath
+                        return false
+                    else
+                        let! _ = handleWrite handle (latin1Buffer (newOid + "\n"))
+                        do! handleClose handle
 
-            let current = tryReadRef gitDir refName
+                        try
+                            do! rename lockPath refPath
+                            return true
+                        with _ ->
+                            let! present = exists refPath
 
-            if current <> expectedOld then
-                release ()
-                false
-            else
-                writeSync descriptor (latin1Buffer (newOid + "\n")) |> ignore
-                closeSync descriptor
-                let renamed = tryOrNull (fun () -> box (renameSync lockPath refPath))
-
-                if isNull renamed && not (existsSync refPath) then
-                    tryOrNull (fun () -> box (unlinkSync lockPath)) |> ignore
-                    false
-                else
-                    true
+                            if not present then
+                                do! unlinkQuietly lockPath
+                                return false
+                            else
+                                return true
+                with error ->
+                    do! closeQuietly handle
+                    do! unlinkQuietly lockPath
+                    return raise error
+        }

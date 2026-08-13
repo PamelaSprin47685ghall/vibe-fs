@@ -1,0 +1,1 @@
+Combined with synchronous call {{call}} in this assistant batch; use that call's result.

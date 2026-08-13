@@ -284,6 +284,25 @@ test('CTX_013_truncated_output_is_still_valid_TOML_and_ends_at_a_character_bound
   assert.equal(syn.byteCount('中'.repeat(retained)), retained * 3)
 })
 
+test('CTX_013_hard_truncation_of_an_escaped_multiline_body_still_fits', () => {
+  // A body containing both a newline and `'''` has no legal multi-line form, so
+  // renderString falls back to a basic string. That expansion is the non-linearity
+  // the search must measure; a character/byte ratio would undershoot the budget.
+  const huge = ("keep ''' inside\n").repeat(3000)
+  const messages = delta.messages([{ role: 'user', parts: [delta.text(huge)] }])
+
+  const limit = 4000
+  const chunk = delta.nextChunk({ limit, cursor: origin, messages })
+
+  assert.equal(chunk.bytes <= limit, true, `truncated chunk of ${chunk.bytes} bytes exceeds ${limit}`)
+  assert.equal(syn.byteCount(chunk.toml), chunk.bytes)
+  assert.equal(chunk.toml.includes(toml.truncationMarker), true)
+
+  const parsed = parseToml(chunk.toml)
+  assert.equal(parsed.new_work_to_record.length, 1)
+  assert.equal(parsed.new_work_to_record[0].truncated, true)
+})
+
 test('CTX_013_an_omission_marker_is_never_truncated', () => {
   // It has no body to cut. A limit it cannot meet means the limit is below the
   // fixed item scaffolding — a configuration error, not something to repair by
