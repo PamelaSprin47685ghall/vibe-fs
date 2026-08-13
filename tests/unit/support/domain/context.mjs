@@ -393,7 +393,7 @@ export const toolResultBound = (() => {
  * MessagePart → SemanticPart。Activity 是 transport bookkeeping，被丢弃。
  */
 export const xTraceCapture = (() => {
-  const m = bind(XTraceCaptureModule, 'XTraceCapture', ['semanticPart', 'captureProjection', 'captureMessageView', 'captureOpening', 'captureLastWords'])
+  const m = bind(XTraceCaptureModule, 'XTraceCapture', ['semanticPart', 'captureProjection', 'captureMessageView', 'captureOpening', 'captureLastWords', 'captureSessionMessages'])
   const semanticPart = unionCase(ProviderProj.SemanticPart, 'SemanticPart')
   const messagePart = unionCase(HostMessageCodecModule.MessagePart, 'MessagePart')
 
@@ -446,6 +446,9 @@ export const xTraceCapture = (() => {
       const result = m.captureMessageView(journal, sessionIdValue, toList(capturedMessages))
       return isNone(result) ? undefined : result
     },
+
+    captureSessionMessages: (journal, sessionIdValue, messages) =>
+      resultOf(m.captureSessionMessages(journal, sessionIdValue, toList(messages))),
 
     /** COMPANION-003: capture the opening; requirements are a JS array. */
     captureOpening: (journal, sessionIdValue, text, requirements = []) =>

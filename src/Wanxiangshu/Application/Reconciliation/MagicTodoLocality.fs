@@ -46,6 +46,36 @@ module MagicTodoLocality =
         | CarrierChanged
         | InputMismatch
 
+    /// Capturable XTrace parts in this Host message before `toolCallId`.
+    /// Activity is transport-only and does not occupy an XTrace cursor.
+    let private capturablePartsBeforeTool (parts: MessagePart array) (toolCallId: ToolCallId) : int =
+        let callId = ToolCallId.value toolCallId
+
+        let rec loop index count =
+            if index >= parts.Length then
+                0
+            else
+                match parts.[index] with
+                | MessagePart.Activity _ -> loop (index + 1) count
+                | MessagePart.ToolCall(id, _, _) when id = callId -> count
+                | MessagePart.ToolResult(id, _) when id = callId -> count
+                | _ -> loop (index + 1) (count + 1)
+
+        loop 0 0
+
+    /// Exclusive cursor immediately before this pending tool-call.
+    /// Next-assigned alone is the last assistant text when that text is still
+    /// uncaptured — Before(Tk) must skip those preceding capturable parts.
+    let private pendingReviewFrontier
+        (trace: XTraceProjectionState)
+        (message: SessionMessage)
+        (toolCallId: ToolCallId)
+        =
+        { Sequence =
+            XTraceProjection.headSequence trace
+            + 1L
+            + int64 (capturablePartsBeforeTool message.Parts toolCallId) }
+
     let resolve
         (sessionId: SessionId)
         (messages: SessionMessage list)
@@ -71,12 +101,10 @@ module MagicTodoLocality =
 
                 match matches with
                 | [] ->
-                    // The Host invokes tool.execute.before after persisting the
-                    // pending ToolPart but before the event observer appends that
-                    // same part to XTrace. In that narrow window the full SDK
-                    // snapshot is already authoritative for provider-run / part /
-                    // call identity. The XTrace head is therefore exactly the
-                    // exclusive frontier immediately before this call.
+                    // before-hook: ToolPart is persisted, this call is not yet in
+                    // XTrace. SDK snapshot is the identity source. Before(Tk) is
+                    // the cursor the tool-call will occupy, not next-assigned
+                    // (that cursor belongs to preceding uncaptured text).
                     match located.State with
                     | SnapshotToolPartState.Pending ->
                         let providerRunText = ProviderRunIdentity.value located.ProviderRun
@@ -96,7 +124,7 @@ module MagicTodoLocality =
 
                             match Array.toList partMatches with
                             | [ (index, _) ] ->
-                                let frontier = { Sequence = XTraceProjection.headSequence trace + 1L }
+                                let frontier = pendingReviewFrontier trace message located.ToolCallId
 
                                 let todowriteCallIds =
                                     message.ToolParts

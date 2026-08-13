@@ -328,6 +328,7 @@ module XTraceCapture =
             let existing = xTraceOf durable sessionId
             let generation = captureGeneration durable sessionId
             let provenance = sprintf "g:%d/last_words" generation
+
             let recorded =
                 existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
 
@@ -438,3 +439,58 @@ module XTraceCapture =
                       ToolCallId = toolCallId
                       HostToolPartId = captured.HostToolPartId }) })
         |> captureSourcesStable journal sessionId messageIds
+
+    let private toCapturedWire (message: SessionMessage) : ProviderWireCapture.CapturedWireMessage =
+        let hostToolByCall =
+            message.ToolParts
+            |> Array.fold (fun acc part -> Map.add (ToolCallId.value part.ToolCallId) part.HostToolPartId acc) Map.empty
+
+        { Role = message.Role
+          ProviderRun =
+            if message.Role = "assistant" && not (String.IsNullOrWhiteSpace message.Id) then
+                Some(ProviderRunIdentity.create message.Id)
+            else
+                None
+          Parts =
+            message.Parts
+            |> Array.toList
+            |> List.choose (fun part ->
+                match part with
+                | MessagePart.Text text ->
+                    Some
+                        { WirePart = WireText text
+                          HostToolPartId = None }
+                | MessagePart.Reasoning text ->
+                    Some
+                        { WirePart = WireReasoning text
+                          HostToolPartId = None }
+                | MessagePart.ToolCall(callId, name, args) ->
+                    Some
+                        { WirePart = WireToolCall(ToolCallId.create callId, name, args)
+                          HostToolPartId = Map.tryFind callId hostToolByCall }
+                | MessagePart.ToolResult(callId, result) ->
+                    Some
+                        { WirePart = WireToolResult(ToolCallId.create callId, result)
+                          HostToolPartId = Map.tryFind callId hostToolByCall }
+                | MessagePart.Activity _ -> None) }
+
+    /// Synchronise XTrace with the Host snapshot (after-hook / ensureReview).
+    /// Idempotent with messages.transform via the same stable or positional provenance.
+    let captureSessionMessages
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (messages: SessionMessage list)
+        : Result<unit, string> =
+        let captured = messages |> List.map toCapturedWire
+        let ids = messages |> List.map (fun message -> message.Id)
+
+        if
+            supportsStableInsertion journal sessionId
+            && ids |> List.forall (fun id -> not (String.IsNullOrWhiteSpace id))
+            && (Set.ofList ids |> Set.count) = List.length ids
+            && List.length ids = List.length captured
+        then
+            captureMessageViewStable journal sessionId ids captured |> Result.map ignore
+        else
+            captureMessageView journal sessionId captured |> ignore
+            Ok()

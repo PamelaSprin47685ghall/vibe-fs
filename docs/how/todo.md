@@ -90,6 +90,8 @@ todoCheckpointBefore:
          与 BaseObligations / Proposed digests
        - 返回真实 Journal `EventId`；after/recovery 仅以它填 `TodoWriteAccepted.PreparedFactRef`
        - ReviewFrontier = 本 tool-call 前 exclusive cursor（绑 ManagerLifeId）
+         pending before-hook：= next-assigned + 同 message 中本 call 之前的可捕获 part 数
+         （不得把 frontier 冻在最后一条助手文本将占用的 cursor）
   9. install ephemeral bridge（process-local Map + hidden Symbol；非 durable）
  10. mutateArgsInPlace → Host TodoTable V1 compatibility sink only
        （content/status/priority 投影；canonical 仍是 obligations；reviewing sink 策略见 HOST canary）

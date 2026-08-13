@@ -128,6 +128,20 @@ module DedicatedTodoReviewerRuntime =
         LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) managerSessionId range
         |> Option.defaultValue ""
 
+    let private captureManagerSnapshot
+        (snapshot: ISessionSnapshotPort option)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        : Task<Result<unit, string>> =
+        match snapshot with
+        | None -> Task.FromResult(Ok())
+        | Some port ->
+            task {
+                match! port.GetMessages managerSessionId with
+                | Error reason -> return Error("snapshot unavailable: " + reason)
+                | Ok messages -> return XTraceCapture.captureSessionMessages (Some journal) managerSessionId messages
+            }
+
     let private treeHash (gitTree: GitTreePort option) (reviewId: TodoReviewId) =
         let fallback =
             GitTreeHash.create (HostDigest.sha256Hex (TodoReviewId.value reviewId))
@@ -317,109 +331,113 @@ module DedicatedTodoReviewerRuntime =
                                     | Error reason, _
                                     | _, Error reason -> return Error reason
                                     | Ok oldItems, Ok proposed ->
-                                        let request: ProcessReviewRequest =
-                                            { TodoReviewId = reviewId
-                                              TodoWriteId = writeId
-                                              ManagerLifeId = lifeId
-                                              OpeningRaw = openingRaw journal managerLife
-                                              ManagerCheckpointLwr =
-                                                managerCheckpointLwr
-                                                    journal
-                                                    managerSessionId
-                                                    managerLife
-                                                    checkpoint.ReviewFrontier
-                                              OldTodo = oldItems
-                                              ProposedTodo = proposed }
-
-                                        let preamble =
-                                            ProviderProse.render
-                                                (ProviderProse.languageOf managerSessionId)
-                                                MagicTodoSurface.Path.ProcessReviewerPreamble
-                                                Map.empty
-
-                                        let assignmentText =
-                                            MagicTodoProcessReview.renderAssignmentUserMessage preamble request
-
-                                        let beforeHead = reviewerHead journal enlisted.ReviewerSessionId
-
-                                        let hasActiveProfile =
-                                            PromptAuthorityLedger.activeProfile
-                                                enlisted.ReviewerSessionId
-                                                (AgentJournal.snapshot journal).AgentProjections
-                                            |> Option.isSome
-
-                                        let isFirstAcceptedWrite =
-                                            match life.AcceptedOrder with
-                                            | [ only ] when only = writeId -> true
-                                            | _ -> false
-
-                                        let delivery =
-                                            MagicTodoAfter.assignmentDelivery hasActiveProfile isFirstAcceptedWrite
-
-                                        let assignmentDirectory = directoryOf enlisted.ReviewerSessionId
-
-                                        let! sent =
-                                            match delivery with
-                                            | MagicTodoAfter.AssignmentDelivery.OwnerRoot ->
-                                                runtime.DiscardDeferredFirstPrompt handleId
-
-                                                task {
-                                                    match!
-                                                        HostForkAgentOwner.sendFirstPrompt
-                                                            sessions
-                                                            (Some journal)
-                                                            enlisted.ReviewerSessionId
-                                                            agentName
-                                                            assignmentDirectory
-                                                            assignmentText
-                                                    with
-                                                    | Ok _ -> return Ok()
-                                                    | Error reason -> return Error reason
-                                                }
-                                            | MagicTodoAfter.AssignmentDelivery.Continuation ->
-                                                task {
-                                                    match!
-                                                        HostSessionNudge.sendContinuation
-                                                            sessions
-                                                            enlisted.ReviewerSessionId
-                                                            assignmentText
-                                                            PromptAuthority.ContinuationKind.ReviewerGuard
-                                                            assignmentDirectory
-                                                            (Some journal)
-                                                    with
-                                                    | Ok _ -> return Ok()
-                                                    | Error reason -> return Error reason
-                                                }
-                                            | MagicTodoAfter.AssignmentDelivery.AwaitHead -> Task.FromResult(Ok())
-
-                                        match sent with
+                                        match! captureManagerSnapshot snapshot journal managerSessionId with
                                         | Error reason -> return Error reason
                                         | Ok() ->
-                                            let! reviewWorkStart =
-                                                match delivery with
-                                                | MagicTodoAfter.AssignmentDelivery.AwaitHead when beforeHead > 0L ->
-                                                    Task.FromResult(Ok { Sequence = beforeHead })
-                                                | _ -> waitHeadAdvanced journal enlisted.ReviewerSessionId beforeHead
-
-                                            match reviewWorkStart with
-                                            | Error reason -> return Error reason
-                                            | Ok reviewWorkStart ->
-                                                match
-                                                    appendAssigned
+                                            let request: ProcessReviewRequest =
+                                                { TodoReviewId = reviewId
+                                                  TodoWriteId = writeId
+                                                  ManagerLifeId = lifeId
+                                                  OpeningRaw = openingRaw journal managerLife
+                                                  ManagerCheckpointLwr =
+                                                    managerCheckpointLwr
                                                         journal
                                                         managerSessionId
-                                                        prepared
-                                                        enlisted
-                                                        reviewWorkStart
-                                                with
+                                                        managerLife
+                                                        checkpoint.ReviewFrontier
+                                                  OldTodo = oldItems
+                                                  ProposedTodo = proposed }
+
+                                            let preamble =
+                                                ProviderProse.render
+                                                    (ProviderProse.languageOf managerSessionId)
+                                                    MagicTodoSurface.Path.ProcessReviewerPreamble
+                                                    Map.empty
+
+                                            let assignmentText =
+                                                MagicTodoProcessReview.renderAssignmentUserMessage preamble request
+
+                                            let beforeHead = reviewerHead journal enlisted.ReviewerSessionId
+
+                                            let hasActiveProfile =
+                                                PromptAuthorityLedger.activeProfile
+                                                    enlisted.ReviewerSessionId
+                                                    (AgentJournal.snapshot journal).AgentProjections
+                                                |> Option.isSome
+
+                                            let isFirstAcceptedWrite =
+                                                match life.AcceptedOrder with
+                                                | [ only ] when only = writeId -> true
+                                                | _ -> false
+
+                                            let delivery =
+                                                MagicTodoAfter.assignmentDelivery hasActiveProfile isFirstAcceptedWrite
+
+                                            let assignmentDirectory = directoryOf enlisted.ReviewerSessionId
+
+                                            let! sent =
+                                                match delivery with
+                                                | MagicTodoAfter.AssignmentDelivery.OwnerRoot ->
+                                                    runtime.DiscardDeferredFirstPrompt handleId
+
+                                                    task {
+                                                        match!
+                                                            HostForkAgentOwner.sendFirstPrompt
+                                                                sessions
+                                                                (Some journal)
+                                                                enlisted.ReviewerSessionId
+                                                                agentName
+                                                                assignmentDirectory
+                                                                assignmentText
+                                                        with
+                                                        | Ok _ -> return Ok()
+                                                        | Error reason -> return Error reason
+                                                    }
+                                                | MagicTodoAfter.AssignmentDelivery.Continuation ->
+                                                    task {
+                                                        match!
+                                                            HostSessionNudge.sendContinuation
+                                                                sessions
+                                                                enlisted.ReviewerSessionId
+                                                                assignmentText
+                                                                PromptAuthority.ContinuationKind.ReviewerGuard
+                                                                assignmentDirectory
+                                                                (Some journal)
+                                                        with
+                                                        | Ok _ -> return Ok()
+                                                        | Error reason -> return Error reason
+                                                    }
+                                                | MagicTodoAfter.AssignmentDelivery.AwaitHead -> Task.FromResult(Ok())
+
+                                            match sent with
+                                            | Error reason -> return Error reason
+                                            | Ok() ->
+                                                let! reviewWorkStart =
+                                                    match delivery with
+                                                    | MagicTodoAfter.AssignmentDelivery.AwaitHead when beforeHead > 0L ->
+                                                        Task.FromResult(Ok { Sequence = beforeHead })
+                                                    | _ ->
+                                                        waitHeadAdvanced journal enlisted.ReviewerSessionId beforeHead
+
+                                                match reviewWorkStart with
                                                 | Error reason -> return Error reason
-                                                | Ok() ->
+                                                | Ok reviewWorkStart ->
                                                     match
-                                                        TodoProcessReviewProgram.tryConclude journal lifeId writeId
+                                                        appendAssigned
+                                                            journal
+                                                            managerSessionId
+                                                            prepared
+                                                            enlisted
+                                                            reviewWorkStart
                                                     with
-                                                    | TodoProcessReviewProgram.ConcludeOutcome.Failed reason ->
-                                                        return Error reason
-                                                    | _ -> return Ok()
+                                                    | Error reason -> return Error reason
+                                                    | Ok() ->
+                                                        match
+                                                            TodoProcessReviewProgram.tryConclude journal lifeId writeId
+                                                        with
+                                                        | TodoProcessReviewProgram.ConcludeOutcome.Failed reason ->
+                                                            return Error reason
+                                                        | _ -> return Ok()
         }
 
     let awaitConsumableReview

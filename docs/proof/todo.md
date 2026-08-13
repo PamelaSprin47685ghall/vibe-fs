@@ -87,7 +87,7 @@
 - desired cutoff 无 Requested fact；commit 在下一 seal 前；EvidenceKind=TodoCheckpoint 进既有 SSOT；失败不回滚（TODO-009）
 - Tk cutoff = before T(k-1)；最新 interval 保持 raw X；restart 同投影（TODO-009）
 - RecordCoverage ⇏ PrefixCoverage；RawGap ⇏ prefix replacement（TODO-008/009/012）
-- ManagerCheckpointLWR 不越 ReviewFrontier；并发 post-Tk 工作不漏进 Rk；ProcessReviewLWR 排除 assignment prompt 与 R(k-1) history；dedicated reviewer head 不作 report；includeOpening=false；Rk 可在 Y 落后时启动（TODO-008）
+- ManagerCheckpointLWR 不越 ReviewFrontier；同 message 最后一条助手文本 ∈ [start, ReviewFrontier)；pending before-hook 计入前置未捕获 part；并发 post-Tk 工作不漏进 Rk；ProcessReviewLWR 排除 assignment prompt 与 R(k-1) history；dedicated reviewer head 不作 report；includeOpening=false；Rk 可在 Y 落后时启动（TODO-008）
 - ReviewWorkStartCursor = assignment authority 落地后 exclusive end（TODO-006/008）
 - Manager-facing LWR safety-seal，无 regex wash（TODO-013）
 - 三段标题仅 Opening / Chronicle / Recent work（COMPANION-003；TODO-001）

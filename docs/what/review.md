@@ -171,7 +171,7 @@ ProcessReviewLWR(k)      → ReviewWorkStartCursor(k) .. ReviewerRecordFrontier(
 Finality reviewer LWR    → FinalityReviewWorkStartCursor .. FinalityVerdictFrontier
 ```
 
-`ReviewWorkStartCursor` / Finality 对应 cursor = 本次 assignment authority 完整落 XTrace 后的 exclusive end，**不含** assignment prompt 自身。禁止取 session 当前 head 冒充任一条有界 LWR。
+`ReviewWorkStartCursor` / Finality 对应 cursor = 本次 assignment authority 完整落 XTrace 后的 exclusive end，**不含** assignment prompt 自身。`ReviewFrontier(k)=Before(Tk)` 含同 message 中 tool-call 之前的最后一条助手文本；pending before-hook 不得把该文本的未来 cursor 当成 frontier。禁止取 session 当前 head 冒充任一条有界 LWR。
 
 Process 输入 LWR 使用 **RecordCoverage**（Y 主体 + 未覆盖 frontier 的 canonical RawGap）。Manager Y 未追到 frontier ≠ 不可开始 Rk。Prefix 可替换性仍只认 **PrefixCoverage** / proven Y（TODO-009）；LWR RawGap 永不得直接做 prefix replacement（TODO-008）。
 
