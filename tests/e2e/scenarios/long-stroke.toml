@@ -445,7 +445,7 @@ tools = ["fork", "join", "horizon", "suicide"]
 [[turn]]
 id = "continue"
 internal = true
-user = "# The previous attempt did not complete."
+user = "# The previous physical attempt did not complete."
 
   [[turn.step]]
   respond = { type = "text", text = "long-stroke fallback continuation completed." }

@@ -5733,7 +5733,7 @@ Manager **不**拥有 `inspect`（已冻结）：Manager 永远不能亲手触�
 3. **§20 Non-Goals 诚实声明**：Steward / 完整 Sphinx Kernel / Fission V2 / 其他 locale / Coder BlindPlan **不得**写入 Final outcome 为已交付。
 4. **移入 `completed/`**：仅在 AC15/16 闭环（及 AC1/20 处理）后追加正式 `Final outcome`；**本 session 不移入**。
 5. **Phase 17 完整 provider-prose 迁移**：移交独立 Active Change `changes/active/PromptRestoration.md`（Gate 0 prose-ownership + Batch 1–5）。本 Change 不再以「半 i18n / 仅 Role+Library」宣称 Phase 17 收口。
-6. **Provider Surface Grand Repair（2026-08-13 Amendment）**：ARCH-017 / PROMPT-020 / PROMPT-021 已立法。剩余关闭：五 Office 投影进 Manager Role Law + `fork`；`inspect`/`establish-behavior`/`repair-behavior`/`run`/`query-shell` 完整 affordance；Gate C 高风险 verb + Gate F；eval corpus；HOST-026 tool prose 跟 session 语言（Host 设计可另做，混语不得假装已闭合）。
+6. **Provider Surface Grand Repair（2026-08-13 Amendment）**：ARCH-017 / PROMPT-020 / PROMPT-021 已立法。Wave 1–5 静态面已落地：五 Office 投影进 Manager Role Law + `fork`；`inspect`/`establish-behavior`/`repair-behavior`/`run`/`query-shell` 完整 affordance；Gate C 高风险 verb + Gate F；合成 eval corpus（`tests/eval/provider-office-boundary`）。剩余关闭：HOST-026 tool prose 跟 session 语言（OpenCode `tool.definition` 无 session；Host 设计可另做，混语不得假装已闭合）；live LLM behavior eval runner（当前 corpus 是结构 oracle，不是真模型）。
 
 ## Done since Amendment（2026-08-12 → 08-13 续作）
 

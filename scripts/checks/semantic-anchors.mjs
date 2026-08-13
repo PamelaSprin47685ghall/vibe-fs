@@ -62,6 +62,11 @@ export const ROLE_SEMANTIC_ANCHORS = Object.freeze({
       en: /what kind of truth or change must come back/i,
       zh: /必须回来的是哪一种真相或改变/,
     },
+    {
+      id: 'no-omnipotent-charge',
+      en: /Do not compress several kinds of consequence into one person's charge/i,
+      zh: /不要仅仅因为一条很长的 charge 更好写，就把几种不同的后果压进同一个人的 charge/,
+    },
   ]),
   coder: Object.freeze([
     { id: 'written-world', en: /written world/i, zh: /书写出来的世界|书写世界/ },

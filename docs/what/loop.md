@@ -59,13 +59,18 @@ reconcile 得到 TurnAborted
 
 ### Continuation 文本
 
-固定 instruction-only Synthetic TOML（ARCH-010），经 PromptDispatcher 发送：
+固定 instruction-only Synthetic TOML（ARCH-010），经 PromptDispatcher 发送。语义叶子为 `runtime/loop-continue`（PROMPT-019）；英文 canonical：
 
 ```text
-Continue from the interruption without repeating already produced content.
+Continue from the interruption.
+
+Do not repeat content already produced unless correcting it is necessary.
+The interruption does not change the charge.
 ```
 
 ContinuationKind = `ProviderRetryAttempt`。不新增 Origin 种类。
+
+普通 provider failure 的 continuation 是另一片叶子（`runtime/provider-retry`），不得与本条混用。
 
 ### 预算
 

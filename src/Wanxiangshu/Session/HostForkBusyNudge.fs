@@ -7,7 +7,6 @@ open Wanxiangshu.Domain
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Journal
-open Wanxiangshu.Recovery
 
 /// EXEC-002 busy-agent nudge, as a PROMPT-003 Continuation.
 module HostForkBusyNudge =
@@ -42,17 +41,15 @@ module HostForkBusyNudge =
                     // In-flight nudge must keep the handle's managed agent.
                     // Replacing it with the fallback Peer would switch Deep → Fast
                     // mid-conversation (prefix break + unjustified downgrade).
-                    // Empty / unknown names fall back to the cursor; they never
-                    // invent fast-ROLE.
+                    // Empty / unknown names keep SelectedAgent; they never follow
+                    // the cursor and never invent fast-ROLE.
                     let busyAgent =
                         let trimmed = if String.IsNullOrWhiteSpace agent then "" else agent.Trim()
 
-                        if String.IsNullOrWhiteSpace trimmed then
-                            FallbackEvidence.effectiveAgent childId snapshot profile
-                        elif trimmed = profile.SelectedAgent || trimmed = profile.PeerAgent then
+                        if trimmed = profile.SelectedAgent || trimmed = profile.PeerAgent then
                             trimmed
                         else
-                            FallbackEvidence.effectiveAgent childId snapshot profile
+                            profile.SelectedAgent
 
                     let rt = PromptDispatcher.forJournal j
 

@@ -100,7 +100,11 @@ const openaiToolsFromDispatcher = (options) => {
 
 let activeJournal
 
-const withHarness = async (fn, { tier = 'Fast' } = {}) => {
+const withHarness = async (fn, options = {}) => {
+  const { tier = 'Fast', promptModelFor } = options
+  const promptModel = Object.prototype.hasOwnProperty.call(options, 'promptModel')
+    ? options.promptModel
+    : INSPECTOR_MODEL
   const base = mkdtempSync(join(tmpdir(), 'wxs-g2-inspector-wire-'))
   const opened = agentJournal.create({ directory: base })
   activeJournal = opened.journal
@@ -184,9 +188,10 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
     undefined,
     undefined,
     undefined,
-    INSPECTOR_MODEL,
+    promptModel,
     // EXEC-031: bounded WorkRecord via the real journal projector.
     (_sid, range) => lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(opened.journal, _sid, range),
+    promptModelFor,
   )
 
   try {
@@ -362,4 +367,42 @@ test('G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix', async () => {
       'prefix must be directional: Q2 is not a prefix of Q1',
     )
   })
+})
+
+test('G2_inspector_promptModelFor_keeps_deep_and_fast_owners_on_their_own_models', async () => {
+  const FAST_MODEL = new OpencodeModel('g2-test-provider', 'g2-fast-inspector', undefined)
+  const DEEP_MODEL = new OpencodeModel('g2-test-provider', 'g2-deep-inspector', undefined)
+  const lookup = (agent) => {
+    if (agent === 'fast-inspector') return FAST_MODEL
+    if (agent === 'deep-inspector') return DEEP_MODEL
+    return undefined
+  }
+
+  const runOnce = async (tier, expectedAgent, expectedModelId) => {
+    await withHarness(
+      async (harness) => {
+        const { runtime, prompts, createCalls, captures } = harness
+        const inspector = roles.of('Inspector')
+        const q1 = invoke(runtime, 'ses_owner_model_for', SyncDelegateRole.Inspector, 'Q1')
+        await waitFor(() => createCalls.length === 1 && captures.length === 1, 'create/send missing')
+        assert.equal(createCalls[0].agent, expectedAgent)
+        assert.equal(prompts[0].agent, expectedAgent)
+        assert.equal(captures[0].agent, expectedAgent)
+        assert.equal(captures[0].modelId, expectedModelId)
+        assert.notEqual(
+          captures[0].modelId,
+          expectedModelId === 'g2-deep-inspector' ? 'g2-fast-inspector' : 'g2-deep-inspector',
+          'mixed Deep/Fast owners must not collapse onto the other tier\'s model',
+        )
+
+        await settlePendingInvoke(runtime, harness, createCalls[0].child, inspector, 'answer Q1', 'asst_q1')
+        const done = resultOf(await q1)
+        assert.equal(done.ok, true, done.error)
+      },
+      { tier, promptModel: undefined, promptModelFor: lookup },
+    )
+  }
+
+  await runOnce('Fast', 'fast-inspector', 'g2-fast-inspector')
+  await runOnce('Deep', 'deep-inspector', 'g2-deep-inspector')
 })

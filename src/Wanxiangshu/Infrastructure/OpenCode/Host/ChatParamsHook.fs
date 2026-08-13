@@ -99,6 +99,15 @@ module ChatParamsHook =
                         currentModel outputObj
                         |> Option.orElseWith (fun () -> currentModel inputObj)
 
-                    match ManagedAgentConfig.tryOpencodeModel (inventoryOf ()) agent current with
-                    | None -> ()
-                    | Some model -> outputObj?model <- box model)
+                    let inventory = inventoryOf ()
+
+                    match ManagedAgentConfig.tryOpencodeModel inventory agent current with
+                    | Some model -> outputObj?model <- box model
+                    | None ->
+                        // Bare model ids cannot invent a provider (tryOpencodeModel).
+                        // Still pin the bound id as a string so Host cannot keep a
+                        // Fast default when the request agent is Deep.
+                        match Map.tryFind (agent.Trim()) inventory.Bindings with
+                        | Some binding when not (String.IsNullOrWhiteSpace binding.Model) ->
+                            outputObj?model <- box (binding.Model.Trim())
+                        | _ -> ())

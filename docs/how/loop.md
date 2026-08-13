@@ -263,11 +263,11 @@ Step 4: 检查 Fallback 决策与 Continuation 发送
     verdict = FallbackController.getVerdict()
     if verdict.MayContinue:
         // 允许继续自动恢复 -> 发送 ProviderRetryAttempt continuation prompt
-        syntheticPrompt = "Continue from the interruption without repeating already produced content."
+        // 正文 = ProviderProse.documentFor(session, RuntimeNudge.LoopContinue)（LOOP-006）
         PromptDispatcher.dispatchContinuation(
             sessionId,
             Continuation(ProviderRetryAttempt),
-            syntheticPrompt
+            loopContinuePrompt
         )
     else:
         // 预算耗尽 -> 终止于 FallbackExhausted 终局

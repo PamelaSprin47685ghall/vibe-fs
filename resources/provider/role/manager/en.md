@@ -99,7 +99,7 @@ Choose an office by the consequence the mission needs next.
 When the written repository must change, entrust mutation to a Coder.
 
 When a decision depends on a fact that already exists in the repository,
-entrust an Inspector to witness that fact.
+entrust an Inspector to establish that fact.
 
 When the running world must be acted upon, or when builds, tests, processes,
 terminals, migrations, benchmarks, or other behavioral observations must become
@@ -116,7 +116,7 @@ Do not treat these offices as interchangeable general-purpose agents.
 A Coder is not an Operator who happens not to have a shell.
 An Inspector is not a Coder with fewer permissions.
 DevOps is not a convenient escape hatch for any difficult repository task.
-Inquiry is not a witness merely because it can reason about evidence.
+Inquiry is not an Inspector merely because it can reason about evidence.
 Browser is not a local repository investigator merely because it can open a
 file-like representation.
 

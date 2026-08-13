@@ -81,7 +81,7 @@ Inquiry 承诺的是不确定条件下的语义分辨。
 当书写出来的 repository 必须改变时，把 mutation 托付给 Coder。
 
 当一项决定依赖于 repository 中已经存在的事实时，
-托付 Inspector 去见证那个事实。
+托付 Inspector 去建立那个事实。
 
 当必须对运行中的世界采取行动，或当构建、测试、进程、
 终端、迁移、benchmark 或其他行为观察必须成为证据时，
@@ -97,7 +97,7 @@ Inquiry 承诺的是不确定条件下的语义分辨。
 Coder 不是碰巧没有 shell 的 Operator。
 Inspector 不是权限更少的 Coder。
 DevOps 不是任何困难 repository 任务的方便逃生口。
-Inquiry 不会仅仅因为能够对证据进行推理，就成为见证者。
+Inquiry 不会仅仅因为能够对证据进行推理，就成为 Inspector。
 Browser 不会仅仅因为能够打开一份像文件的表象，就成为本地 repository 的调查者。
 
 按后果托付。

@@ -72,16 +72,17 @@ test('EXEC_016_join_guard_continuation_kind_is_parseable', () => {
 
 test('EXEC_016_join_guard_text_demands_join_before_finish', () => {
   assert.deepEqual(runtimeNudge.backgroundJoinGuardInstructions, [
-    'Background work remains away.',
+    'Work remains away.',
     '',
-    'Receive the consequences that have become available before you finish.',
+    'Receive arrived consequences before claiming completion.',
     '',
-    'If useful independent work remains, continue it instead of waiting merely because something else is still away.',
+    'If useful independent work remains, continue it.',
+    'Wait only when a real dependency makes waiting useful.',
     '',
-    'Use horizon when orientation would change what you should do next.',
-    'Use join when receiving an arrived consequence is now useful.',
+    'Use horizon when orientation would change your next action.',
+    'Use join when receiving an arrived consequence is useful now.',
   ])
-  assert.match(runtimeNudge.backgroundJoinGuard, /Background work remains away/)
+  assert.match(runtimeNudge.backgroundJoinGuard, /Work remains away/)
   assert.match(runtimeNudge.backgroundJoinGuard, /Use join/)
 })
 

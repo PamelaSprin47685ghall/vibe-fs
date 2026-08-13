@@ -292,6 +292,16 @@ const triggeredHooks = (hooks) =>
     ([name, value]) => typeof value === 'function' && name !== 'event' && name !== 'dispose',
   )
 
+test('CHAT_PARAMS_pins_deep_request_model_over_host_fast_default', async () => {
+  await withPlugin(async (hooks) => {
+    hooks.config(hostFinalConfig())
+    const output = { model: { providerID: 'provider', modelID: 'fast-coder-model' } }
+    await hooks['chat.params']({ sessionID: SESSION, agent: 'deep-coder' }, output)
+    assert.equal(output.model.providerID, 'provider')
+    assert.equal(output.model.modelID, 'deep-coder-model')
+  })
+})
+
 test('HOST_009_every_registered_hook_has_a_fixture_here', async () => {
   // The completeness gate. Without it a newly registered hook would be silently
   // uncovered, which is exactly how the transform family went unchecked.
