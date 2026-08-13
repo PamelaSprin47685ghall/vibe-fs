@@ -71,7 +71,6 @@ test('AC16: T1 constitutive body renders in Opening, not Recent', () => {
     [],
     trace,
     { Sequence: 0 },
-    [],
     { Sequence: 7 },
     true,
   )

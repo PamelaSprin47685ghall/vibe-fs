@@ -84,8 +84,13 @@ const seedTwoInvocations = (journal) => {
   const inv1Through = lastSequence(inv1)
   // S1 = XTrace.head after inv1 (one-past last part). inv2 range is [S1, S2).
   const s1 = inv1Through + 1
-  // Production Next is inclusive-through last ingested part. Exclusive ingest
-  // end is Next+1 == S1 == inv2.Start — the charge's no-overlap boundary.
+  // CoveredThroughSequence is inclusive-through. Adjacent to inv2 means
+  // through == StartInclusive - 1. A gap (through < Start-1) would let a
+  // wrong predicate pass; treating Next as exclusive would drop a frame
+  // whose through == StartInclusive. This pin is the leak boundary:
+  // through >= StartInclusive - 1 would admit PRIOR_Y_INV1 into inv2.
+  assert.equal(inv1Through, 2, `inv1 last part must be 2, got ${inv1Through}`)
+  assert.equal(s1, 3, `inv2 StartInclusive must be one-past inv1 (3), got ${s1}`)
   commitY(journal, { from: 0, to: inv1Through, body: 'PRIOR_Y_INV1', n: 1 })
 
   const inv2 = xTraceCapture.captureProjection(
@@ -102,13 +107,19 @@ const seedTwoInvocations = (journal) => {
   )
   const inv2Through = lastSequence(inv2)
   const s2 = inv2Through + 1
+  assert.equal(inv2Through, 4, `inv2 last part must be 4, got ${inv2Through}`)
+  assert.equal(s2, 5, `EndExclusive must be one-past last part (5), got ${s2}`)
+  assert.equal(inv1Through, s1 - 1, 'inv1 Y CoveredThroughSequence must equal inv2 StartInclusive - 1')
   return { s1, s2, inv1Through, inv2Through }
 }
 
 test('COMPANION_015_bounded_chronicle_excludes_prior_invocation_y_frames', () => {
   withJournal((journal) => {
     const { s1, s2, inv1Through, inv2Through } = seedTwoInvocations(journal)
-    commitY(journal, { from: inv1Through, to: inv2Through, body: 'CURRENT_Y_INV2', n: 2 })
+    // CURRENT Y through == inv2 StartInclusive. Inclusive-through keeps it;
+    // treating Next as exclusive (through > Start) would drop CURRENT_Y_INV2.
+    assert.equal(s1, inv1Through + 1, 'CURRENT Y through must equal StartInclusive')
+    commitY(journal, { from: inv1Through, to: s1, body: 'CURRENT_Y_INV2', n: 2 })
 
     const full = lifecycleWorkRecordProjection.lifecycleWorkRecord(journal, SEM, false)
     assert.equal(typeof full, 'string')

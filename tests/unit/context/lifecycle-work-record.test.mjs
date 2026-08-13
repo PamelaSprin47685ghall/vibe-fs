@@ -18,7 +18,7 @@ test('LWR_opening_prompt_is_byte_exact_and_appears_exactly_once', () => {
   const assignment = 'Rewrite the fallback controller.\nKeep it typed.'
   const trace = [xTrace.item({ sequence: 0, role: 'user', part: xTrace.text(assignment) })]
 
-  const rendered = lifecycleWorkRecord.materialize(opening(assignment), [], trace, { Sequence: 1 }, [], OPENING_END)
+  const rendered = lifecycleWorkRecord.materialize(opening(assignment), [], trace, { Sequence: 1 }, OPENING_END)
 
   assert.equal(rendered.includes('Opening'), true)
   assert.equal(rendered.includes('Opening task'), false)
@@ -37,7 +37,7 @@ test('LWR_y_frames_cover_prefix_and_x_supplies_only_suffix', () => {
   ]
 
   // Y 已消化到 cursor 3：gap 只剩 [3, 4)
-  const rendered = lifecycleWorkRecord.materialize(opening('task'), ['frame one'], trace, { Sequence: 3 }, [], OPENING_END)
+  const rendered = lifecycleWorkRecord.materialize(opening('task'), ['frame one'], trace, { Sequence: 3 }, OPENING_END)
 
   assert.match(rendered, /Chronicle\nframe one/)
   assert.match(rendered, /Recent work\nassistant: work c/)
@@ -56,7 +56,7 @@ test('LWR_no_y_frames_means_opening_plus_raw_gap_not_alternate_A_path', () => {
 
   // Y 从未成功：coverage 在 origin(0)，但 gap 仍从 openingEnd 开始——同一物化
   // 算法，无「无 B 则整个 A」的旁路分支（EXEC-008、方案 4.4）
-  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 0 }, [], OPENING_END)
+  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 0 }, OPENING_END)
 
   assert.match(rendered, /Recent work\nassistant: work a/)
   assert.equal(rendered.includes('Chronicle'), false)
@@ -70,7 +70,7 @@ test('LWR_last_assistant_text_is_in_recent_work_not_a_closing_report', () => {
     xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('Final summary with detail') }),
   ]
 
-  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 1 }, [], OPENING_END)
+  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 1 }, OPENING_END)
 
   assert.match(rendered, /Recent work\nassistant: Final summary with detail/)
   assert.equal(rendered.includes('Closing report'), false)
@@ -78,15 +78,6 @@ test('LWR_last_assistant_text_is_in_recent_work_not_a_closing_report', () => {
   assert.equal(rendered.includes('final_text'), false)
 })
 
-test('LWR_terminal_items_argument_does_not_render', () => {
-  const trace = [xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') })]
-  const terminal = [xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('Final summary with detail') })]
-
-  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 1 }, terminal, OPENING_END)
-
-  assert.equal(rendered.includes('Closing report'), false)
-  assert.equal(rendered.includes('Final summary with detail'), false)
-})
 
 test('LWR_materialization_is_deterministic', () => {
   const trace = [
@@ -94,16 +85,16 @@ test('LWR_materialization_is_deterministic', () => {
     xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('work') }),
   ]
 
-  const first = lifecycleWorkRecord.materialize(opening('task'), ['f1'], trace, { Sequence: 1 }, [], OPENING_END)
-  const second = lifecycleWorkRecord.materialize(opening('task'), ['f1'], trace, { Sequence: 1 }, [], OPENING_END)
+  const first = lifecycleWorkRecord.materialize(opening('task'), ['f1'], trace, { Sequence: 1 }, OPENING_END)
+  const second = lifecycleWorkRecord.materialize(opening('task'), ['f1'], trace, { Sequence: 1 }, OPENING_END)
   assert.equal(first, second)
 })
 
 test('LWR_empty_sections_are_omitted', () => {
   const trace = [xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') })]
 
-  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 1 }, [], OPENING_END)
-  // gap 空、无 frames、无 terminal → 只有 Opening
+  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 1 }, OPENING_END)
+  // gap 空、无 frames → 只有 Opening
   assert.equal(rendered.includes('Chronicle'), false)
   assert.equal(rendered.includes('Recent work'), false)
   assert.equal(rendered.includes('Closing report'), false)
@@ -116,7 +107,7 @@ test('LWR_child_opening_excludes_parent_work_record_envelope', () => {
   const assignment = 'child task'
   const parentEnvelope = '# commissioner_record ...'
 
-  const rendered = lifecycleWorkRecord.materialize(opening(assignment), [], [], { Sequence: 0 }, [], OPENING_END)
+  const rendered = lifecycleWorkRecord.materialize(opening(assignment), [], [], { Sequence: 0 }, OPENING_END)
 
   assert.equal(rendered.includes(parentEnvelope), false)
   assert.equal(rendered.includes(assignment), true)
@@ -125,7 +116,7 @@ test('LWR_child_opening_excludes_parent_work_record_envelope', () => {
 test('LWR_reviewer_opening_preserves_authoritative_requirement_order', () => {
   const requirements = ['requirement one', 'requirement two', 'requirement three']
 
-  const rendered = lifecycleWorkRecord.materialize(opening('review task', requirements), [], [], { Sequence: 0 }, [], OPENING_END)
+  const rendered = lifecycleWorkRecord.materialize(opening('review task', requirements), [], [], { Sequence: 0 }, OPENING_END)
 
   const oneIndex = rendered.indexOf('1. requirement one')
   const twoIndex = rendered.indexOf('2. requirement two')
@@ -143,7 +134,7 @@ test('LWR_gap_starts_at_record_coverage_not_prefix_cutoff', () => {
   ]
 
   // IngestedThrough 可落在 turn 中间（cursor 2）；gap 从 2 起，不含 work a
-  const rendered = lifecycleWorkRecord.materialize(opening('task'), ['f1'], trace, { Sequence: 2 }, [], OPENING_END)
+  const rendered = lifecycleWorkRecord.materialize(opening('task'), ['f1'], trace, { Sequence: 2 }, OPENING_END)
   assert.match(rendered, /assistant: work b/)
   assert.equal(rendered.includes('work a'), false)
 })
@@ -159,7 +150,7 @@ test('LWR_gap_excludes_raw_tool_call_and_result_but_keeps_text_and_reasoning', (
     xTrace.item({ sequence: 4, role: 'assistant', part: xTrace.text('summarized outcome') }),
   ]
 
-  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 0 }, [], OPENING_END)
+  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 0 }, OPENING_END)
 
   assert.match(rendered, /plan next step/)
   assert.match(rendered, /assistant: summarized outcome/)
@@ -179,7 +170,7 @@ test('LWR_recent_work_excludes_raw_tool_parts_and_keeps_last_assistant_text', ()
     xTrace.item({ sequence: 4, role: 'assistant', part: xTrace.reasoning('closing thought') }),
   ]
 
-  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 1 }, [], OPENING_END)
+  const rendered = lifecycleWorkRecord.materialize(opening('task'), [], trace, { Sequence: 1 }, OPENING_END)
 
   assert.match(rendered, /Recent work/)
   assert.match(rendered, /Final summary with detail/)
@@ -198,7 +189,6 @@ test('LWR_parent_to_child_includes_opening', () => {
     ['did work'],
     [],
     { Sequence: 0 },
-    [],
     OPENING_END,
     true,
   )
@@ -216,7 +206,6 @@ test('LWR_child_to_parent_omits_opening', () => {
     ['did work'],
     [xTrace.item({ sequence: 1, role: 'assistant', part: xTrace.text('Final summary') })],
     { Sequence: 0 },
-    [],
     OPENING_END,
     false,
   )

@@ -79,8 +79,7 @@ module XWire =
                     true
                     { Opening = opening
                       Frames = frameBodies
-                      Gap = []
-                      Terminal = None }
+                      Gap = [] }
             )
 
     let private candidate

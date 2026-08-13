@@ -51,22 +51,16 @@ module RecordWorkflow =
         (journal: AgentJournal)
         (snapshot: ProjectionSet)
         (reviewerSessionId: SessionId)
-        (terminalFrontier: ReviewTerminalFrontier option)
         (requiresChronicle: bool)
         =
-        let terminalOverride =
-            terminalFrontier
-            |> Option.map (fun frontier -> frontier.TerminalRef, frontier.TerminalDigest)
-
         let fullCanonicalCoverage = Some { IngestedThrough = XTrace.originCursor }
 
         match
-            LifecycleWorkRecordProjection.lifecycleWorkRecordFromSnapshotWithTerminal
+            LifecycleWorkRecordProjection.lifecycleWorkRecordFromSnapshot
                 journal
                 snapshot
                 reviewerSessionId
                 false
-                terminalOverride
                 fullCanonicalCoverage
         with
         | Some record when
@@ -105,13 +99,13 @@ module RecordWorkflow =
                 | Some frontier when frontier.BarrierId <> barrierId ->
                     RecordReadiness.Unavailable "terminal frontier no longer matches the finality barrier"
                 | Some frontier ->
-                    match materialize journal snapshot reviewerSessionId (Some frontier) true with
+                    match materialize journal snapshot reviewerSessionId true with
                     | RecordReadiness.Ready record -> RecordReadiness.Ready record
                     | RecordReadiness.Unavailable _ when coverageCanAdvance snapshot reviewerSessionId ->
                         RecordReadiness.AwaitJournal
                     | other -> other
                 | None when requiresTerminalFrontier -> RecordReadiness.AwaitJournal
-                | None -> materialize journal snapshot reviewerSessionId None false
+                | None -> materialize journal snapshot reviewerSessionId false
 
     let awaitCanonicalWorkRecord
         (journal: AgentJournal)

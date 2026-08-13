@@ -14,7 +14,7 @@ open Wanxiangshu.Kernel.Identity
 /// - child → parent: false（布置者已知任务，Opening 不回传）
 ///
 /// Opening 必须仍已 captured（否则 LWR 未定义 → None）；标志只控制渲染。
-/// Same materialiser for frames/gap/terminal; no B-else-A branch.
+/// Same materialiser for frames/gap; no B-else-A branch.
 ///
 /// `coverageOverride`:
 /// - None → use blog.Coverage (incremental / compressed-frames gap).
@@ -67,12 +67,11 @@ module LifecycleWorkRecordProjection =
                       Role = part.Role
                       Part = partValue })))
 
-    let lifecycleWorkRecordFromSnapshotWithTerminal
+    let lifecycleWorkRecordFromSnapshot
         (durable: AgentJournal)
         (snapshot: ProjectionSet)
         (sessionId: SessionId)
         (includeOpening: bool)
-        (_terminalOverride: (BlobRef * BlobDigest) option)
         (coverageOverride: RecordCoverage option)
         : string option =
         match AgentProjection.tryFind sessionId snapshot.AgentProjections with
@@ -122,15 +121,7 @@ module LifecycleWorkRecordProjection =
 
                 let openingMaterial = LifecycleWorkRecord.withConstitutive opening constitutiveItems
 
-                Some(LifecycleWorkRecord.materialize openingMaterial frames trace coverage openingEnd [] includeOpening)
-
-    let lifecycleWorkRecordFromSnapshot
-        (durable: AgentJournal)
-        (snapshot: ProjectionSet)
-        (sessionId: SessionId)
-        (includeOpening: bool)
-        : string option =
-        lifecycleWorkRecordFromSnapshotWithTerminal durable snapshot sessionId includeOpening None None
+                Some(LifecycleWorkRecord.materialize openingMaterial frames trace coverage openingEnd includeOpening)
 
     let lifecycleWorkRecord
         (journal: AgentJournal option)
@@ -140,7 +131,7 @@ module LifecycleWorkRecordProjection =
         match journal with
         | None -> None
         | Some durable ->
-            lifecycleWorkRecordFromSnapshot durable (AgentJournal.snapshot durable) sessionId includeOpening
+            lifecycleWorkRecordFromSnapshot durable (AgentJournal.snapshot durable) sessionId includeOpening None
 
     /// EXEC-031: per-invocation bounded LWR for reusable SyncDelegate children
     /// (includeOpening=false). Chronicle frames (interval overlap) + Recent-work
@@ -194,7 +185,6 @@ module LifecycleWorkRecordProjection =
                         trace
                         coverageClamped
                         range.StartInclusive
-                        []
                         (* includeOpening = *) false
                 )
 

@@ -498,7 +498,6 @@ export const lifecycleWorkRecordProjection = (() => {
       frames,
       traceItems,
       ingestedThrough,
-      terminalItems,
       openingEnd = { Sequence: 0 },
       includeOpening = true,
     ) =>
@@ -508,7 +507,6 @@ export const lifecycleWorkRecordProjection = (() => {
         toList(traceItems),
         { IngestedThrough: { Sequence: BigInt(ingestedThrough.Sequence) } },
         { Sequence: BigInt(openingEnd.Sequence) },
-        toList(terminalItems),
         includeOpening,
       ),
   }

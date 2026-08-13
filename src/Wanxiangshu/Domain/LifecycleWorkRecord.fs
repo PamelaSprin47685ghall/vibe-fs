@@ -48,8 +48,7 @@ type OpeningMaterial =
 type LifecycleWorkRecord =
     { Opening: OpeningMaterial
       Frames: string list
-      Gap: XTraceItem list
-      Terminal: string option }
+      Gap: XTraceItem list }
 
 [<RequireQualifiedAccess>]
 module LifecycleWorkRecord =
@@ -65,7 +64,6 @@ module LifecycleWorkRecord =
     /// 仅由 `SyntheticToml.comment` 在 wire 注入，避免 `# # Chronicle`。
     /// `includeOpening=false` 时省略 Opening（子→父）。
     /// `Gap` 须已 `forWorkRecord`；render 再次过滤 fail-closed。
-    /// `Terminal` 保留在记录类型上但不渲染（完成标记，不是 LWR 段）。
     let render (includeOpening: bool) (record: LifecycleWorkRecord) : string =
         let openingBody =
             if not includeOpening then
@@ -105,14 +103,12 @@ module LifecycleWorkRecord =
     /// 确定性物化。gap 经 `forWorkRecord`；Opening constitutive 经 `forOpening`。
     /// `includeOpening`：父→子 true，子→父 false（EXEC-006）。
     /// `openingEnd` = WorkRecordStart / OpeningBoundary（exclusive）。
-    /// `terminalItems` 不再识别或排除；不从 Terminal 合成 Closing。
     let materialize
         (opening: OpeningMaterial)
         (frames: string list)
         (trace: XTraceItem list)
         (coverage: RecordCoverage)
         (openingEnd: XTraceCursor)
-        (_terminalItems: XTraceItem list)
         (includeOpening: bool)
         : string =
         let gapStart =
@@ -126,8 +122,7 @@ module LifecycleWorkRecord =
             includeOpening
             { Opening = opening
               Frames = frames
-              Gap = gap
-              Terminal = None }
+              Gap = gap }
 
     /// Build OpeningMaterial with constitutive BlindPlan body from an XTrace slice.
     let withConstitutive (opening: OpeningMaterial) (constitutiveItems: XTraceItem list) : OpeningMaterial =
