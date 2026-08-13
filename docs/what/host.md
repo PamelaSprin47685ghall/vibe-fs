@@ -74,7 +74,7 @@ Host compaction **不得删除** XTrace：否则 Y 落后补缺口与 LWR 自包
 
 对**非 Companion / 非 Blogger** 的 provider transcript，每个尚未存在 HOST-013 occurrence 的真实 provider/tool exchange（placement occasion）恰好产生一个 durable `PairProgrammingGuideline` occurrence。Occurrence 的语义正文、稳定 `callID`、`CallGap` 与 `ResultGap` 与 provider 无关；provider renderer 只决定同一 occurrence 在 wire 上采用何种合法形状。
 
-普通 provider 仍把 occurrence 渲染为 synthetic `auto-injected` pair：assistant tool-call + 使用同一 `callID` 的 completed tool-result，tool-call 输入为 `{}`。
+普通 provider 把 occurrence 渲染为一条 Host assistant 消息：completed `auto-injected` tool part（输入 `{}`、输出 `MarkerText`）。OpenCode `MessageV2.toModelMessagesEffect` 把一条 completed `type=tool` 展开成 provider 可见的 tool-call + tool-result。禁止用 `pending`/`running` 表示 FakeReq：Host 会把它收成 `[Tool execution was interrupted]`。
 
 **可执行 entity**：名为 `auto-injected` 的工具必须作为真实 OpenCode `Tool.Def` 存在（空参数）。非 Blogger / 非 Distiller 的 Work 角色 Host permission 对其 allow。模型若发出 live call，execute 恒返回 `OK`，不得因缺 entity 把 LLM 请求打失败。HOST-013 synthetic pair 仍是注入时已 completed 的历史，不经过 execute。Strength replica 与 Bookkeeper 保持既有全拒 / 仅 `js-bookkeeper` 闸门。
 
@@ -87,46 +87,38 @@ tool-result 正文语言由不可变 `SessionProviderLanguage`（HOST-026）决�
 每条**新** marker 携带一次 wall-clock 采样：`SessionStartedAt → now` 转为人类尺度（`N minutes M seconds` / `N 分 M 秒`），写入 durable `MarkerText`。  
 历史 marker **永不**因 replay / compaction / reanchor 重算 elapsed——只重放已存字节，以保持 append-only 前缀缓存（ARCH-004）。新 marker 只携带当下一次采样。
 
-**Bracket 结构**（规范，不是示意图）。synthetic pair 不是相邻的两条消息，而是跨越真实 response batch 的 temporal bracket。规范序列：
+**Host 编码**。ordinary wire 每个 occurrence 恰好一条 completed Host 行，落在 `ResultGap`。`CallGap` 仍写入 durable placement identity（并供 Cursor → ordinary 可逆），但不另渲染 pending/running 行。OpenCode 将该 completed 行展开为 FakeReq + FakeResp。
+
+**Provider 可见序列**（completed Host 行被 OpenCode 展开后）：
 
 ```text
 LLM -> Local:
 Req1 Req2
 
 Local -> LLM:
-Req1 Req2 FakeReq1 Resp1 Resp2 FakeResp1
+Req1 Req2 Resp1 Resp2 FakeReq1 FakeResp1
 
 LLM -> Local:
-Req1 Req2 FakeReq1 Resp1 Resp2 FakeResp1 Req3
+Req1 Req2 Resp1 Resp2 FakeReq1 FakeResp1 Req3
 
 Local -> LLM:
-Req1 Req2 FakeReq1 Resp1 Resp2 FakeResp1 Req3 FakeReq2 Resp3 FakeResp2
+Req1 Req2 Resp1 Resp2 FakeReq1 FakeResp1 Req3 Resp3 FakeReq2 FakeResp2
 ```
 
-其中 `ReqN` / `RespN` 为真实 tool-call / tool-result，`FakeReqN` / `FakeRespN` 为同一 `callID` 的 synthetic call / result。局部结构恒为：
+其中 `ReqN` / `RespN` 为真实 tool-call / tool-result，`FakeReqN` / `FakeRespN` 为同一 `callID` 的 synthetic call / result。局部结构恒为真实 batch 之后紧跟一对 FakeReq+FakeResp。禁止用 Host `pending` 把 FakeReq 插进真实 call 批。
 
-```text
-real calls → synthetic call → real results → synthetic result
-```
-
-禁止：
-
-```text
-real history → synthetic call → synthetic result
-```
-
-更禁止每次 transform 删除全部历史 synthetic 后把历史 pair 整块重建到当前 insertion point。
+禁止每次 transform 删除全部历史 synthetic 后把历史 pair 整块重建到当前 insertion point。
 
 **位置**：新 pair 的 `CallGap` / `ResultGap` 只由当前**真实**消息末端结构决定（synthetic 消息不参与判断）。trailing user = 最后一条消息是 user message：
 
-- 末端存在同轮 tool batch（`Req1 Req2 Resp1 Resp2` 或 `Req1 Req2 Resp1 Resp2 [User]`）：`CallGap = After(Req2)`、`ResultGap = After(Resp2)`，渲染 `Req1 Req2 FakeReq Resp1 Resp2 FakeResp [User]`；
+- 末端存在同轮 tool batch（`Req1 Req2 Resp1 Resp2` 或 `Req1 Req2 Resp1 Resp2 [User]`）：`CallGap = After(Req2)`、`ResultGap = After(Resp2)`，ordinary 渲染 `Req1 Req2 Resp1 Resp2 FakePair [User]`（FakePair = 一条 completed Host 行 → FakeReq+FakeResp）；
 - 无 tool batch 且有 trailing user：`CallGap = Before(U1)`、`ResultGap = Before(U1)`；
 - 空 transcript：`Start` / `Start`；
 - 无 trailing user（含末尾为 assistant 文本的 continuation transcript）：`After(lastReal)` / `After(lastReal)`。
 
 新 pair 的 gap 必须落在本次追加区（末尾）。旧「pair 总在最后一条 user 任意位置之前」规则在 continuation transcript 上会把新 pair 插进已发送 wire 的中间，破坏 append-only prefix——已废弃。
 
-同一 gap 内排序固定：pair ordinal 升序，同 ordinal 时 call 先于 result。禁止依赖 Map 枚举顺序。
+同一 gap 内排序固定：pair ordinal 升序。禁止依赖 Map 枚举顺序。
 
 **幂等**：同一 placement occasion 的重复 transform 只 replay 既有 bracket，不 append 新事实、不新增 pair。同一 placement identity（SessionId + CallGap + ResultGap）最多一个 `PairProgrammingGuideline`。
 

@@ -14,4 +14,6 @@ resources/provider/
 Invariant identifiers (tool names, argument names, wire fields, enum literals, paths,
 commands, `exit_code`) stay untranslated inside localized prose.
 
-Gate C (`language-parity-gate.mjs`) requires both locale files for every semantic directory.
+Gate C (`language-parity-gate.mjs`) requires both locale files for every semantic directory,
+identical `{{placeholder}}` sets, Role Law semantic-anchor hits, and inspect/fork tool-description
+semantic-anchor hits.

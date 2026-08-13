@@ -52,24 +52,18 @@ const toolResult = (id, tool, callID, output = 'ok') => ({
 
 const pairMessages = (messages) => messages.filter((m) => isPairProgrammingThought(m))
 
-const assertPairShape = (callMsg, resultMsg, callId, markerText) => {
-  assert.equal(callMsg.info.role, 'assistant')
-  assert.equal(callMsg.info.source, source)
-  assert.equal(callMsg.info.synthetic, true)
-  assert.equal(callMsg.parts.length, 1)
-  assert.equal(callMsg.parts[0].type, 'tool')
-  assert.equal(callMsg.parts[0].tool, 'auto-injected')
-  assert.equal(callMsg.parts[0].callID, callId)
-  assert.equal(callMsg.parts[0].state.status, 'pending')
-
-  assert.equal(resultMsg.info.role, 'assistant')
-  assert.equal(resultMsg.info.source, source)
-  assert.equal(resultMsg.info.synthetic, true)
-  assert.equal(resultMsg.parts[0].type, 'tool')
-  assert.equal(resultMsg.parts[0].tool, 'auto-injected')
-  assert.equal(resultMsg.parts[0].callID, callId)
-  assert.equal(resultMsg.parts[0].state.status, 'completed')
-  assert.equal(resultMsg.parts[0].state.output, markerText)
+const assertPairShape = (msg, callId, markerText) => {
+  assert.equal(msg.info.role, 'assistant')
+  assert.equal(msg.info.source, source)
+  assert.equal(msg.info.synthetic, true)
+  assert.equal(msg.parts.length, 1)
+  assert.equal(msg.parts[0].type, 'tool')
+  assert.equal(msg.parts[0].tool, 'auto-injected')
+  assert.equal(msg.parts[0].callID, callId)
+  assert.equal(msg.parts[0].state.status, 'completed')
+  assert.notEqual(msg.parts[0].state.status, 'pending')
+  assert.notEqual(msg.parts[0].state.status, 'running')
+  assert.equal(msg.parts[0].state.output, markerText)
 }
 
 test('PPT_source_is_the_frozen_side_channel_identity', () => {
@@ -85,31 +79,31 @@ test('PPT_source_is_the_frozen_side_channel_identity', () => {
 test('PPT_tryInject_appends_pair_on_empty_history_at_start_gap', () => {
   const out = inject('ses_empty', [])
   assert.ok(out, 'empty history must still append one pair')
-  assert.equal(out.length, 2)
+  assert.equal(out.length, 1)
   const callId = stableCallId('ses_empty', 1n)
-  assertPairShape(out[0], out[1], callId, text)
+  assertPairShape(out[0], callId, text)
 })
 
 test('PPT_tryInject_places_pair_before_trailing_user', () => {
   const raw = [userMsg('msg_1')]
   const out = inject('ses_1', raw)
   assert.ok(out)
-  assert.equal(out.length, 3)
+  assert.equal(out.length, 2)
   const callId = stableCallId('ses_1', 1n)
-  assertPairShape(out[0], out[1], callId, text)
-  assert.deepEqual(out[2], raw[0], 'trailing user stays last')
+  assertPairShape(out[0], callId, text)
+  assert.deepEqual(out[1], raw[0], 'trailing user stays last')
 })
 
 test('PPT_tryInject_places_pair_before_trailing_user_with_prior_assistant', () => {
   const raw = [userMsg('u1'), assistantText('a1'), userMsg('u2', 'steer')]
   const out = inject('ses_assistant', raw)
   assert.ok(out)
-  assert.equal(out.length, 5)
+  assert.equal(out.length, 4)
   assert.deepEqual(out[0], raw[0])
   assert.deepEqual(out[1], raw[1])
   const callId = stableCallId('ses_assistant', 1n)
-  assertPairShape(out[2], out[3], callId, text)
-  assert.deepEqual(out[4], raw[2], 'steer user remains after pair')
+  assertPairShape(out[2], callId, text)
+  assert.deepEqual(out[3], raw[2], 'steer user remains after pair')
 })
 
 test('PPT_tryInject_merges_into_tool_batches_before_user', () => {
@@ -122,40 +116,37 @@ test('PPT_tryInject_merges_into_tool_batches_before_user', () => {
   ]
   const out = inject('ses_tools', raw)
   assert.ok(out)
-  assert.equal(out.length, 7)
+  assert.equal(out.length, 6)
   const callId = stableCallId('ses_tools', 1n)
 
   assert.equal(out[0].parts[0].tool, 'bash')
   assert.equal(out[1].parts[0].tool, 'read')
-  assert.equal(out[2].parts[0].tool, 'auto-injected')
-  assert.equal(out[2].parts[0].state.status, 'pending')
-  assert.equal(out[2].parts[0].callID, callId)
-  assert.equal(out[3].parts[0].tool, 'bash')
+  assert.equal(out[2].parts[0].tool, 'bash')
+  assert.equal(out[2].parts[0].state.status, 'completed')
+  assert.equal(out[3].parts[0].tool, 'read')
   assert.equal(out[3].parts[0].state.status, 'completed')
-  assert.equal(out[4].parts[0].tool, 'read')
+  assert.equal(out[4].parts[0].tool, 'auto-injected')
   assert.equal(out[4].parts[0].state.status, 'completed')
-  assert.equal(out[5].parts[0].tool, 'auto-injected')
-  assert.equal(out[5].parts[0].state.status, 'completed')
-  assert.equal(out[5].parts[0].callID, callId)
-  assert.equal(out[5].parts[0].state.output, text)
-  assert.deepEqual(out[6], raw[4])
+  assert.equal(out[4].parts[0].callID, callId)
+  assert.equal(out[4].parts[0].state.output, text)
+  assert.deepEqual(out[5], raw[4])
 })
 
 test('PPT_tryInject_second_pass_of_same_placement_replays_existing_pair', () => {
   const once = inject('ses_append', [userMsg('msg_1')])
   assert.ok(once)
-  assert.equal(once.length, 3)
+  assert.equal(once.length, 2)
 
   // Same real transcript again (production raw carries the previous wire's
   // synthetic messages): same placement → replay only, no new pair.
   const twice = inject('ses_append', once)
   assert.ok(twice)
-  assert.equal(twice.length, 3, 'same placement must not append a second pair')
-  assert.equal(pairMessages(twice).length, 2)
+  assert.equal(twice.length, 2, 'same placement must not append a second pair')
+  assert.equal(pairMessages(twice).length, 1)
 
   const firstCall = stableCallId('ses_append', 1n)
-  assertPairShape(twice[0], twice[1], firstCall, text)
-  assert.equal(twice[2].info.role, 'user')
+  assertPairShape(twice[0], firstCall, text)
+  assert.equal(twice[1].info.role, 'user')
   assert.deepEqual(twice, once, 'replay must be byte-identical')
 })
 
@@ -168,17 +159,17 @@ test('PPT_tryInject_call_id_is_stable_per_session_and_ordinal', () => {
 test('PPT_tryInject_without_session_id_still_appends_stable_pair', () => {
   const out = inject(undefined, [])
   assert.ok(out)
-  assert.equal(out.length, 2)
+  assert.equal(out.length, 1)
   const callId = stableCallId(undefined, 1n)
-  assertPairShape(out[0], out[1], callId, text)
+  assertPairShape(out[0], callId, text)
 })
 
 test('PPT_tryInject_user_quoting_the_thought_text_is_not_a_marker', () => {
   const raw = [userMsg('msg_1', text)]
   const out = inject('ses_quote', raw)
-  assert.equal(isPairProgrammingThought(out[2]), false, 'matching text alone must not classify as marker')
-  assert.equal(out.length, 3)
-  assert.equal(out[2].info.role, 'user')
+  assert.equal(isPairProgrammingThought(out[1]), false, 'matching text alone must not classify as marker')
+  assert.equal(out.length, 2)
+  assert.equal(out[1].info.role, 'user')
 })
 
 test('PPT_skip_auto_injected_env_blocks_new_pair_but_replays_history', () => {
@@ -189,7 +180,7 @@ test('PPT_skip_auto_injected_env_blocks_new_pair_but_replays_history', () => {
 
     const session = 'ses_skip_env'
     const seeded = inject(session, [userMsg('msg_u1')])
-    assert.equal(pairMessages(seeded).length, 2)
+    assert.equal(pairMessages(seeded).length, 1)
 
     process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = '1'
     assert.equal(skipAutoInjectedRequested(undefined), true)
@@ -202,12 +193,11 @@ test('PPT_skip_auto_injected_env_blocks_new_pair_but_replays_history', () => {
     ]
     const out = inject(session, raw)
     // Historical pair for placement Before(msg_u1) still replays; no new pair for Before(msg_u2).
-    assert.equal(pairMessages(out).length, 2)
-    assert.equal(out.length, 6)
+    assert.equal(pairMessages(out).length, 1)
+    assert.equal(out.length, 5)
     assert.equal(isPairProgrammingThought(out[0]), true)
-    assert.equal(isPairProgrammingThought(out[1]), true)
-    assert.equal(out[2].info.id, 'msg_u1')
-    assert.equal(out[5].info.id, 'msg_u2')
+    assert.equal(out[1].info.id, 'msg_u1')
+    assert.equal(out[4].info.id, 'msg_u2')
   } finally {
     if (previous === undefined) delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
     else process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = previous
@@ -245,8 +235,8 @@ test('C_PH_cursor_keeps_durable_occurrence_without_synthetic_message', () => {
     assert.deepEqual(cursor, raw)
 
     const ordinary = inject(session, [userMsg('u1', 'steer')])
-    assert.equal(pairMessages(ordinary).length, 2, 'Cursor still durably records the provider-independent occurrence')
-    assertPairShape(ordinary[0], ordinary[1], stableCallId(session, 1n), text)
+    assert.equal(pairMessages(ordinary).length, 1, 'Cursor still durably records the provider-independent occurrence')
+    assertPairShape(ordinary[0], stableCallId(session, 1n), text)
   } finally {
     if (previous === undefined) delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
     else process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = previous
@@ -310,7 +300,7 @@ test('C_PH_ordinary_cursor_ordinary_suppresses_then_restores_same_occurrence', (
   const session = 'ses_cursor_transition'
   const ordinary = inject(session, [userMsg('u1')])
   const ordinaryCallId = stableCallId(session, 1n)
-  assert.equal(pairMessages(ordinary).length, 2)
+  assert.equal(pairMessages(ordinary).length, 1)
 
   const cursorReal = [{
     info: { id: 'u1', role: 'user', model: { providerID: 'cursor', modelID: 'composer' } },
@@ -321,8 +311,8 @@ test('C_PH_ordinary_cursor_ordinary_suppresses_then_restores_same_occurrence', (
   assert.deepEqual(cursor, cursorReal)
 
   const back = inject(session, [userMsg('u1')])
-  assert.equal(pairMessages(back).length, 2)
-  assertPairShape(back[0], back[1], ordinaryCallId, text)
+  assert.equal(pairMessages(back).length, 1)
+  assertPairShape(back[0], ordinaryCallId, text)
 })
 
 test('PAIR_HINT_canonical_text_encourages_needhelp_and_parallel_wave_without_global_N', () => {

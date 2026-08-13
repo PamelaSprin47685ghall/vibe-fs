@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -20,11 +21,14 @@ import {
   blobDigest,
   blobRef,
   hostToolPartId,
+  magicTodoHost,
   magicTodoJournal,
   magicTodoMembrane,
+  mapEntries,
   managerLifeId,
   managerLifecycle,
   physicalUser,
+  providerLanguage,
   providerRun,
   sessionId,
   stream,
@@ -211,4 +215,119 @@ test('HOST-019 materialized snapshot input must still match tool.execute.before 
     assert.equal(result.ok, false)
     assert.equal(result.error.cases()[result.error.tag], 'SnapshotInputMismatch')
   })
+})
+
+
+const sha256Hex = (value) => createHash('sha256').update(value).digest('hex')
+
+const checkpoint = (journal, session, callText, obligations) => {
+  const call = toolCallId(callText)
+  const args = { obligations }
+  const inputCanonical = magicTodoHost.canonicalInput(args)
+  const digest = magicTodoHost.canonicalInputDigest(sha256Hex, args)
+  const submitted = obligations.map((row) => new Obligation(row.name, row.work))
+  return {
+    digest,
+    result: magicTodoMembrane.prepare(
+      journal,
+      session,
+      locality({ call, inputCanonical }),
+      digest,
+      submitted,
+    ),
+  }
+}
+
+test('TODO-006 T1 accept succeeds then T2 prepare is Admission(AwaitingConsumableReview)', () => {
+  withJournal((journal) => {
+    const session = sessionId('ses-magic-todo-t1-t2-lag1')
+    const life = managerLifeId('life-magic-todo-t1-t2-lag1')
+    openLife(journal, session, life)
+    providerLanguage.clearAllForTests()
+    const bound = providerLanguage.bindOnce(session, providerLanguage.english)
+    assert.equal(bound.ok, true, bound.ok ? '' : String(bound.error))
+
+    try {
+      const t1 = checkpoint(journal, session, 'call-magic-todo-t1', [
+        { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
+      ])
+      assert.equal(t1.result.ok, true, t1.result.ok ? '' : t1.result.error.cases()[t1.result.error.tag])
+
+      const accepted = magicTodoMembrane.accept(
+        journal,
+        t1.result.value,
+        magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
+        t1.digest,
+        sha256Hex('t1-physical-output'),
+      )
+      assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error.cases()[accepted.error.tag])
+      assert.equal(accepted.value.NeedsEnsureReview, true)
+      assert.equal(accepted.value.NeedsDedicatedEnlist, true)
+
+      const snap = agentJournal.snapshot(journal)
+      const lifeState = snap.AgentProjections.MagicTodo.ByLife.get('life-magic-todo-t1-t2-lag1')
+      const checkpoints = mapEntries(lifeState.Checkpoints)
+      assert.equal(checkpoints.length, 1)
+      assert.equal(checkpoints[0][1].Accepted, true)
+      assert.equal(checkpoints[0][1].Assignment == null, true)
+      assert.equal(checkpoints[0][1].Concluded == null, true)
+
+      const t2 = checkpoint(journal, session, 'call-magic-todo-t2', [
+        { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
+        { name: 'fix', work: 'Keep later todowrite calls from failing red.' },
+      ])
+      assert.equal(t2.result.ok, false)
+      assert.equal(t2.result.error.cases()[t2.result.error.tag], 'Admission')
+      const reject = t2.result.error.fields[0]
+      assert.equal(reject.cases()[reject.tag], 'AwaitingConsumableReview')
+    } finally {
+      providerLanguage.clearAllForTests()
+    }
+  })
+})
+
+test('HOST-021 after fail-closes deferred prepare rejection as invalidOp', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-magic-todo-after-failclose-'))
+  const created = agentJournal.create({ directory, runtime: 'rt_magic_todo_after_failclose' })
+  assert.equal(created.ok, true, created.ok ? '' : String(created.error))
+
+  let releaseSnapshot
+  const snapshot = {
+    GetMessages: () =>
+      new Promise((resolve) => {
+        releaseSnapshot = resolve
+      }),
+  }
+
+  try {
+    const hooks = MagicTodoHostHooks_create(created.journal, snapshot)
+    const output = {
+      args: {
+        obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }],
+      },
+      output: 'builtin executor succeeded',
+    }
+    await hooks.Before(
+      { tool: 'todowrite', sessionID: 'ses-after-failclose', callID: 'call-after-failclose' },
+      output,
+    )
+    releaseSnapshot({ tag: 1, fields: ['forced snapshot miss'] })
+
+    await assert.rejects(
+      () =>
+        hooks.After(
+          { tool: 'todowrite', sessionID: 'ses-after-failclose', callID: 'call-after-failclose' },
+          output,
+        ),
+      (error) => {
+        const message = String(error && error.message ? error.message : error)
+        assert.match(message, /Magic Todo deferred prepare failed/)
+        assert.match(message, /snapshot unavailable/)
+        return true
+      },
+    )
+  } finally {
+    created.dispose()
+    rmSync(directory, { recursive: true, force: true })
+  }
 })

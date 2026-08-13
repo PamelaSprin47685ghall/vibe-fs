@@ -20,6 +20,12 @@ module InspectorTool =
         let Description = "tool/inspect/description"
 
         [<Literal>]
+        let ArgCharge = "tool/inspect/arg-charge"
+
+        [<Literal>]
+        let ArgKeywords = "tool/inspect/arg-keywords"
+
+        [<Literal>]
         let Unavailable = "tool/inspect/unavailable"
 
         [<Literal>]
@@ -97,10 +103,17 @@ module InspectorTool =
         (scope: ToolRuntimeScope)
         (syncDelegate: SyncDelegateRuntime option)
         : ToolSpec =
+        let language = ProviderLanguageBinding.readGlobalPreference ()
+
         { Name = "inspect"
-          Description =
-            ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
+          Description = ProviderProse.render language Path.Description Map.empty
           Arguments =
-            [ "charge", ToolHostCodec.stringSchema factory
-              "keywords", ToolHostCodec.optionalStringSchema factory ]
+            [ "charge",
+              ToolHostCodec.stringSchemaDescribed
+                  (ProviderProse.render language Path.ArgCharge Map.empty)
+                  factory
+              "keywords",
+              ToolHostCodec.optionalStringSchemaDescribed
+                  (ProviderProse.render language Path.ArgKeywords Map.empty)
+                  factory ]
           Execute = execute scope syncDelegate }

@@ -129,17 +129,16 @@ test('H13_01_canonical_multi_tool_sequence_is_an_append_only_prefix', () => {
     toolResult('r2', 'read', 't2'),
   ]
 
-  // round 1: Req1 Req2 → FakeReq1; Resp1 Resp2 → FakeResp1
+  // round 1: Req1 Req2 Resp1 Resp2 → FakePair1 (one completed Host row)
   const round1Wire = inject(undefined, session, round1Real)
-  assert.deepEqual(toolNames(round1Wire), ['bash', 'read', 'auto-injected', 'bash', 'read', 'auto-injected'])
+  assert.deepEqual(toolNames(round1Wire), ['bash', 'read', 'bash', 'read', 'auto-injected'])
   const call1 = stableCallId(session, 1n)
-  assert.equal(round1Wire[2].parts[0].state.status, 'pending')
-  assert.equal(round1Wire[5].parts[0].state.status, 'completed')
-  assert.equal(callIdOf(round1Wire, 2), call1)
-  assert.equal(callIdOf(round1Wire, 5), call1)
+  assert.equal(round1Wire[4].parts[0].state.status, 'completed')
+  assert.notEqual(round1Wire[4].parts[0].state.status, 'pending')
+  assert.equal(callIdOf(round1Wire, 4), call1)
 
   // round 2 input carries the previous wire's synthetic messages (Host persists
-  // them): Req1 Req2 FakeReq1 Resp1 Resp2 FakeResp1 Req3 Resp3
+  // them): Req1 Req2 Resp1 Resp2 FakePair1 Req3 Resp3
   const round2Real = [
     ...round1Wire,
     toolCall('c3', 'write', 't3'),
@@ -147,12 +146,11 @@ test('H13_01_canonical_multi_tool_sequence_is_an_append_only_prefix', () => {
   ]
   const round2Wire = inject(undefined, session, round2Real)
   assert.deepEqual(toolNames(round2Wire), [
-    'bash', 'read', 'auto-injected', 'bash', 'read', 'auto-injected',
-    'write', 'auto-injected', 'write', 'auto-injected',
+    'bash', 'read', 'bash', 'read', 'auto-injected',
+    'write', 'write', 'auto-injected',
   ])
   const call2 = stableCallId(session, 2n)
   assert.equal(callIdOf(round2Wire, 7), call2)
-  assert.equal(callIdOf(round2Wire, 9), call2)
   assert.notEqual(call1, call2)
 
   assertPrefixLaw(round1Wire, round2Wire, 'H13-01 canonical sequence')
@@ -165,16 +163,16 @@ test('H13_02_historical_pair_never_relocates_to_current_batch', () => {
 
   const round1 = [toolCall('c1', 'bash', 't1'), toolResult('r1', 'bash', 't1')]
   const wire1 = inject(undefined, session, round1)
-  // Req1 FakeReq1 Resp1 FakeResp1
-  assert.deepEqual(toolNames(wire1), ['bash', 'auto-injected', 'bash', 'auto-injected'])
+  // Req1 Resp1 FakePair1
+  assert.deepEqual(toolNames(wire1), ['bash', 'bash', 'auto-injected'])
 
   const round2 = [...wire1, toolCall('c2', 'read', 't2'), toolResult('r2', 'read', 't2')]
   const wire2 = inject(undefined, session, round2)
-  // Req1 FakeReq1 Resp1 FakeResp1 Req2 FakeReq2 Resp2 FakeResp2
+  // Req1 Resp1 FakePair1 Req2 Resp2 FakePair2
   // A historyBlock implementation would move pair1 next to the current batch.
   assert.deepEqual(toolNames(wire2), [
-    'bash', 'auto-injected', 'bash', 'auto-injected',
-    'read', 'auto-injected', 'read', 'auto-injected',
+    'bash', 'bash', 'auto-injected',
+    'read', 'read', 'auto-injected',
   ])
   assertPrefixLaw(wire1, wire2, 'H13-02 no historical relocation')
 })
@@ -189,12 +187,12 @@ test('H13_03_same_placement_reentry_appends_no_pair', () => {
     const raw = [userMsg('msg_1')]
 
     const once = inject(opened.journal, session, raw)
-    assert.equal(once.length, 3)
+    assert.equal(once.length, 2)
     assert.equal(durablePairCount(opened.journal, session), 1)
 
     const twice = inject(opened.journal, session, [...once])
-    assert.equal(twice.length, 3, 'same placement must replay, not append')
-    assert.equal(pairMessages(twice).length, 2)
+    assert.equal(twice.length, 2, 'same placement must replay, not append')
+    assert.equal(pairMessages(twice).length, 1)
     assert.deepEqual(twice, once)
     assert.equal(durablePairCount(opened.journal, session), 1, 'journal must hold exactly one anchored fact')
   } finally {
@@ -289,7 +287,7 @@ test('H13_05_missing_anchor_pair_is_omitted_not_relocated', () => {
     const durable = durablePairCount(opened.journal, session)
     assert.ok(durable === 1 || durable === 2, `durable pairs 1..2, got ${durable}`)
     const pairs = pairMessages(wire)
-    assert.ok(pairs.length === 0 || pairs.length === 2, 'at most one new pair on the rewritten view')
+    assert.ok(pairs.length === 0 || pairs.length === 1, 'at most one new pair on the rewritten view')
     assert.equal(
       pairs.some((m) => m.parts?.[0]?.callID === call1),
       false,
@@ -352,7 +350,7 @@ test('H13_06_prior_tip_only_affects_the_new_pair', () => {
   const wire1 = inject(undefined, session, [userMsg('u1')], 'guideline')
   const call1 = stableCallId(session, 1n)
   assert.equal(wire1[0].parts[0].callID, call1)
-  assert.equal(wire1[1].parts[0].state.output, 'guideline')
+  assert.equal(wire1[0].parts[0].state.output, 'guideline')
 
   const wire2 = inject(
     undefined,
@@ -361,10 +359,9 @@ test('H13_06_prior_tip_only_affects_the_new_pair', () => {
     'tip2\n\nguideline',
   )
   const call2 = stableCallId(session, 2n)
-  assert.equal(wire2[1].parts[0].state.output, 'guideline', 'pair1 marker bytes must never change')
-  assert.equal(wire2[5].parts[0].state.output, 'tip2\n\nguideline')
-  assert.equal(wire2[4].parts[0].callID, call2)
-  assert.equal(wire2[5].parts[0].callID, call2)
+  assert.equal(wire2[0].parts[0].state.output, 'guideline', 'pair1 marker bytes must never change')
+  assert.equal(wire2[3].parts[0].state.output, 'tip2\n\nguideline')
+  assert.equal(wire2[3].parts[0].callID, call2)
   assert.notEqual(call1, call2)
 
   assertPrefixLaw(wire1, wire2, 'H13-06 prior tip isolation')
@@ -411,7 +408,7 @@ test('H13_08_n_round_property_prefix_law_holds', () => {
 
     // One round can create at most one new pair; a round whose terminal shape
     // repeats an existing placement (HOST-013 §8 dedupe) creates none.
-    const pairCount = pairMessages(wire).length / 2
+    const pairCount = pairMessages(wire).length
     assert.ok(pairCount >= previousPairCount, `round ${n}: pair count must never shrink`)
     assert.ok(pairCount <= previousPairCount + 1, `round ${n}: at most one new pair per round`)
 

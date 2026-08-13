@@ -281,17 +281,17 @@ Start 组（ordinal 升序）
     Before(id) 组（ordinal 升序）→ 消息 → After(id) 组（ordinal 升序）
 ```
 
-组内排序唯一合法：`Ordinal` 升序，同 ordinal 时 call 先于 result。历史 synthetic 位置只由它自己 durable 的 gap anchor 决定；当前 transcript 长什么样不得改变历史 pair 的位置。
+组内排序唯一合法：`Ordinal` 升序。历史 synthetic 位置只由它自己 durable 的 gap anchor 决定；当前 transcript 长什么样不得改变历史 pair 的位置。
 
 - 本轮新 pair 的 placement 决策（只读当前**真实**消息，不含 synthetic；trailing user = 最后一条消息是 user）：
-  - 末端存在同轮 tool batch（`Req1 Req2 Resp1 Resp2`，或紧跟 trailing user 之前）：`CallGap = After(Req2)`、`ResultGap = After(Resp2)`；
+  - 末端存在同轮 tool batch（`Req1 Req2 Resp1 Resp2`，或紧跟 trailing user 之前）：`CallGap = After(Req2)`、`ResultGap = After(Resp2)`；ordinary 只在 ResultGap 渲染。
   - 无 tool batch 且最后一条是 user：`CallGap = Before(trailingUser)`、`ResultGap = Before(trailingUser)`；
   - 空 transcript：`Start` / `Start`；
   - 无 trailing user（含末尾为 assistant 文本的 continuation transcript）：`After(lastReal)` / `After(lastReal)`。
   新 pair 的 gap 必须落在本次追加区；旧「pair 总在最后一条 user 任意位置之前」在 continuation transcript 上会中途插入新 pair 破坏 prefix，已废弃。
   查同一 placement identity（SessionId + CallGap + ResultGap）是否已存在：存在 → 只 replay 既有 pair，不 append 新 fact；不存在 → 走上述 commit 顺序。
-- 一个 pair 的 ordinary wire：assistant `tool-call`（工具名 `auto-injected`、输入 `{}`）与对应 `tool-result`（同一 `callID`、`status = completed`、输出 `markerText`）。
-- `auto-injected` 必须作为真实 `ToolSpec` 注册（`AutoInjectedTool`，空参数，`Execute` 恒返回 `OK`），并进入 Work 角色的 Host permission / `rolePredicate`。否则普通 provider 历史里的 fake-tool 名在 `prepared.tools` 中无 entity，模型再调用会失败。该 execute 路径与 HOST-013 synthetic pair 正交：pair 在注入时已是 completed 历史。Blogger / Distiller deny；Strength replica / Bookkeeper 仍被 `gateExecute` 拒绝。有同批 tool 时 call / result 分别挂 call 批末 / result 批末；无同批 tool 时二者同 gap 相邻。Cursor wire 不创建 synthetic message/part：仅当 `ResultGap` 紧跟真实 terminal tool result 时，克隆该真实 message/part/state，并把终态文本投影为 `original + "\0" + "\uFEFF" + markerText`；Host raw input 保持不变。无可附着 result 时零字节投影，禁止改挂其它 message。
+- 一个 pair 的 ordinary Host wire：一条 assistant `type=tool`（工具名 `auto-injected`、`status = completed`、输入 `{}`、输出 `markerText`）。OpenCode `toModelMessagesEffect` 将其展开为 provider tool-call + tool-result。禁止 pending/running。
+- `auto-injected` 必须作为真实 `ToolSpec` 注册（`AutoInjectedTool`，空参数，`Execute` 恒返回 `OK`），并进入 Work 角色的 Host permission / `rolePredicate`。否则普通 provider 历史里的 fake-tool 名在 `prepared.tools` 中无 entity，模型再调用会失败。该 execute 路径与 HOST-013 synthetic pair 正交：pair 在注入时已是 completed 历史。Blogger / Distiller deny；Strength replica / Bookkeeper 仍被 `gateExecute` 拒绝。有同批 tool 时 completed 行挂 result 批末；无同批 tool 时挂与 CallGap 相同的 gap。Cursor wire 不创建 synthetic message/part：仅当 `ResultGap` 紧跟真实 terminal tool result 时，克隆该真实 message/part/state，并把终态文本投影为 `original + "\0" + "\uFEFF" + markerText`；Host raw input 保持不变。无可附着 result 时零字节投影，禁止改挂其它 message。
 - `markerText` 只对**本次新** pair 构造一次并 durable 冻结；历史 pair **只重放**已存 `MarkerText`，永不因 replay / compaction / reanchor / 语言偏好变更重算：
 
 ```text

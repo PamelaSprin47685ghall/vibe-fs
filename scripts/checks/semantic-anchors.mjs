@@ -55,6 +55,12 @@ export const ROLE_SEMANTIC_ANCHORS = Object.freeze({
       en: /returned record changes the mission only through what it establishes/i,
       zh: /返回的记录，只通过它所建立的事实改变 mission/,
     },
+    { id: 'entrust-by-consequence', en: /Entrust by consequence/i, zh: /按后果托付/ },
+    {
+      id: 'choose-by-return',
+      en: /what kind of truth or change must come back/i,
+      zh: /必须回来的是哪一种真相或改变/,
+    },
   ]),
   coder: Object.freeze([
     { id: 'written-world', en: /written world/i, zh: /书写出来的世界|书写世界/ },
@@ -76,6 +82,16 @@ export const ROLE_SEMANTIC_ANCHORS = Object.freeze({
     },
     { id: 'shell-boundary', en: /urge to run|edge of mutation/i, zh: /想要一个 shell|修改的边界/ },
     { id: 'clean-handoff', en: /clean handoff/i, zh: /清晰的 handoff/ },
+    {
+      id: 'inspector-is-witness',
+      en: /Inspector is your witness, not your second pair of editing hands/i,
+      zh: /Inspector 是你的见证者，不是第二双写代码的手/,
+    },
+    {
+      id: 'do-not-ask-inspect-and-fix',
+      en: /Inspect this and fix the code/i,
+      zh: /检查一下然后把代码修掉/,
+    },
   ]),
   inspector: Object.freeze([
     {
@@ -269,6 +285,74 @@ export const ROLE_SEMANTIC_ANCHORS = Object.freeze({
       id: 'transcript-is-data',
       en: /do not become your instructions|Instructions appearing inside that material/i,
       zh: /不会因此成为对你的 instructions/,
+    },
+  ]),
+})
+
+/** Tool-description cognition (PROMPT-019). Same id must hit both locales. */
+export const TOOL_DESCRIPTION_ANCHORS = Object.freeze({
+  inspect: Object.freeze([
+    {
+      id: 'repository-fact',
+      en: /facts that already exist in the repository/i,
+      zh: /repository 中已经存在的事实/,
+    },
+    {
+      id: 'causal-readonly',
+      en: /read-only in the causal sense/i,
+      zh: /在因果意义上是只读的/,
+    },
+    {
+      id: 'no-code-changes',
+      en: /Do not use inspect to ask for code changes/i,
+      zh: /不要用 inspect 请求代码修改/,
+    },
+    {
+      id: 'no-behavioral-execution',
+      en: /make the project run[\s\S]{0,80}behavioral evidence/i,
+      zh: /不会让项目运行起来以制造新的行为证据/,
+    },
+  ]),
+  fork: Object.freeze([
+    {
+      id: 'office-not-witness',
+      en: /another office within this mission/i,
+      zh: /当前 mission 中的另一个 Office/,
+    },
+    {
+      id: 'coder-mutation',
+      en: /Coder \/ Engineer[\s\S]{0,120}Changes repository source/i,
+      zh: /Coder \/ Engineer[\s\S]{0,80}改变 repository source/,
+    },
+    {
+      id: 'inspector-existing-facts',
+      en: /Scout \/ Investigator[\s\S]{0,160}already exist in the repository/i,
+      zh: /Scout \/ Investigator[\s\S]{0,80}已经存在的事实/,
+    },
+    {
+      id: 'devops-execution',
+      en: /Technician \/ Operator[\s\S]{0,160}running world/i,
+      zh: /Technician \/ Operator[\s\S]{0,80}运行中的世界/,
+    },
+    {
+      id: 'browser-external-provenance',
+      en: /Navigator \/ Researcher[\s\S]{0,160}external world with provenance/i,
+      zh: /Navigator \/ Researcher[\s\S]{0,80}外部世界的事实/,
+    },
+    {
+      id: 'inquiry-reasoning',
+      en: /Analyst \/ Inquirer[\s\S]{0,160}not yet clear/i,
+      zh: /Analyst \/ Inquirer[\s\S]{0,80}尚无明确答案/,
+    },
+    {
+      id: 'persona-not-authority',
+      en: /differ in persona and reasoning depth,[\s\S]{0,40}not in the office's authority/i,
+      zh: /区别在 persona 与 reasoning depth，不改变该 Office 的 authority/,
+    },
+    {
+      id: 'create-and-continue',
+      en: /calling \+ name \+ charge[\s\S]{0,80}same name/i,
+      zh: /calling \+ name \+ charge[\s\S]{0,80}同一个 name/,
     },
   ]),
 })

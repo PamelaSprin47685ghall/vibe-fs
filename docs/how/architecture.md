@@ -72,7 +72,7 @@ Does the participant need the value itself
 |------|----------|
 | A Tool Referential Integrity | 同名工具 → 唯一 schema owner + 唯一 semantic contract；不同硬语义不得同名（`commission`≠`fork`；`judge`≠旧 `verdict` 工具名） |
 | B Provider Leak | 扫描 provider 输出 / schema / fixed prose：禁 SessionId/AgentId/ManagerJobId/PtyId/Fission/lane/worktree/offset/`fast-`·`deep-`/spool |
-| C Language Parity | 每个 provider semantic resource：EN 与 zh-CN 皆存在（HOST-026）；缺语言 fail。现行：叶对成对 + `{{placeholder}}` 集合一致 + Role Law semantic-anchor 同 ID 双语命中（PROMPT-019） |
+| C Language Parity | 每个 provider semantic resource：EN 与 zh-CN 皆存在（HOST-026）；缺语言 fail。现行：叶对成对 + `{{placeholder}}` 集合一致 + Role Law semantic-anchor 同 ID 双语命中 + inspect/fork tool description semantic-anchor 同 ID 双语命中（PROMPT-019） |
 | D Prompt Stability | 同 session 上 Fallback / T1 / review / reanchor / Strength 后 system prompt 字节相同；只允许改 EffectiveAgent |
 | E Provider Prose Ownership | 见下节算法 |
 
@@ -91,6 +91,20 @@ for each catalog role:
 ```
 
 与 `prompt-depth-ratchet` 共用 `ROLE_ANCHOR_DIRS`。Word-count 不是质量；缺锚点才红。
+
+### Gate C — tool description semantic-anchor（PROMPT-019）
+
+```text
+TOOL_DESCRIPTION_ANCHORS = inspect / fork
+  → [{ id, en regex, zh regex }]
+
+for each catalogued tool:
+  resources/provider/tool/<tool>/description must exist
+  en.md must match every id's en regex
+  zh-CN.md must match the same id's zh regex
+```
+
+`fork` 必须按后果区分五个 Office；不得把被委托者一律写成 witness。
 
 ### Gate E — Provider Prose Ownership（PROMPT-019）
 

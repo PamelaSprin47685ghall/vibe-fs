@@ -12,7 +12,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
-import { ROLE_SEMANTIC_ANCHORS } from './semantic-anchors.mjs'
+import { ROLE_SEMANTIC_ANCHORS, TOOL_DESCRIPTION_ANCHORS } from './semantic-anchors.mjs'
 
 export const PROVIDER_ROOT = 'resources/provider'
 export const ENFORCER_ROOT = 'resources/enforcer'
@@ -252,6 +252,62 @@ export const scanSemanticAnchorCatalog = (semanticDirs, catalog = ROLE_SEMANTIC_
 }
 
 /**
+ * inspect / fork tool descriptions must hit the same semantic-anchor ids (PROMPT-019).
+ * @param {string} providerAbs
+ * @param {typeof TOOL_DESCRIPTION_ANCHORS} [catalog]
+ * @returns {Violation[]}
+ */
+export const scanToolDescriptionAnchorParity = (providerAbs, catalog = TOOL_DESCRIPTION_ANCHORS) => {
+  /** @type {Violation[]} */
+  const violations = []
+  for (const [tool, anchors] of Object.entries(catalog)) {
+    const enAbs = join(providerAbs, 'tool', tool, 'description', 'en.md')
+    const zhAbs = join(providerAbs, 'tool', tool, 'description', 'zh-CN.md')
+    if (!existsSync(enAbs) || !existsSync(zhAbs)) continue
+    const enText = readFileSync(enAbs, 'utf8')
+    const zhText = readFileSync(zhAbs, 'utf8')
+    for (const { id, en, zh } of anchors) {
+      if (!en.test(enText)) {
+        violations.push({
+          code: 'tool-description-anchor',
+          path: norm(join(PROVIDER_ROOT, 'tool', tool, 'description', 'en.md')),
+          detail: `missing ${id}`,
+        })
+      }
+      if (!zh.test(zhText)) {
+        violations.push({
+          code: 'tool-description-anchor',
+          path: norm(join(PROVIDER_ROOT, 'tool', tool, 'description', 'zh-CN.md')),
+          detail: `missing ${id}`,
+        })
+      }
+    }
+  }
+  return violations
+}
+
+/**
+ * Catalogued tool descriptions must exist as locale-pair directories.
+ * @param {string[]} semanticDirs
+ * @param {typeof TOOL_DESCRIPTION_ANCHORS} [catalog]
+ * @returns {Violation[]}
+ */
+export const scanToolDescriptionAnchorCatalog = (semanticDirs, catalog = TOOL_DESCRIPTION_ANCHORS) => {
+  /** @type {Violation[]} */
+  const violations = []
+  for (const tool of Object.keys(catalog)) {
+    const semantic = `tool/${tool}/description`
+    if (semanticDirs.includes(semantic)) continue
+    violations.push({
+      code: 'tool-description-anchor-catalog',
+      path: norm(join(PROVIDER_ROOT, semantic)),
+      detail: 'tool description missing from resources',
+    })
+  }
+  return violations
+}
+
+/**
  * EN/zh-CN protocol identifier sets must be equal (AC20).
  * @param {string[]} semanticDirs
  * @param {string} providerAbs
@@ -351,6 +407,8 @@ export const scanRepo = (repoRoot = process.cwd(), catalogOverrides) => {
     violations.push(...scanPlaceholderParity(semanticDirs, providerAbs))
     violations.push(...scanSemanticAnchorParity(providerAbs))
     violations.push(...scanSemanticAnchorCatalog(semanticDirs))
+    violations.push(...scanToolDescriptionAnchorParity(providerAbs))
+    violations.push(...scanToolDescriptionAnchorCatalog(semanticDirs))
   }
 
   const hookAbs = resolve(repoRoot, PROVIDER_RESOURCES_REL)
@@ -375,6 +433,7 @@ const runCli = () => {
       `language-parity-gate: OK — ${result.semanticDirs.length} semantic resource(s); ` +
         'each has en.md + zh-CN.md; protocol identifiers match; ' +
         'placeholders match; Role Law semantic anchors match; ' +
+        'tool description semantic anchors match; ' +
         'ProviderResources.requireLanguagePair present',
     )
     process.exit(0)

@@ -50,6 +50,7 @@
 | 双语资源 | 每个 provider semantic resource：EN 与 zh-CN 皆存在 | PROMPT-017、ARCH-016 C、HOST-026 |
 | placeholder 结构 | EN/zh-CN `{{name}}` 集合一致 | PROMPT-019、ARCH-016 C |
 | Role Law semantic-anchor | 同一 id 双语命中；每个 `role/` 目录在 catalog | PROMPT-019、ARCH-016 C |
+| inspect/fork tool description semantic-anchor | 同一 id 双语命中；`fork` 不得把所有 Office 称作 witness | PROMPT-019、ARCH-016 C |
 | localizable vs invariant | prose 按已绑语言；tool 名 / argument / wire / enum / path / command / `exit_code` **原样** | PROMPT-017 |
 | child 继承 | attached / InternalLeaf 继承 owner/commissioner；不得再读全局 | PROMPT-017、HOST-026 |
 

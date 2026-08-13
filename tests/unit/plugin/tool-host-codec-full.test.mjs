@@ -45,6 +45,7 @@ const {
   ToolHostCodec_optionalNumberSchema: optionalNumberSchema,
   ToolHostCodec_optionalStringArraySchema: optionalStringArraySchema,
   ToolHostCodec_optionalStringSchema: optionalStringSchema,
+  ToolHostCodec_optionalStringSchemaDescribed: optionalStringSchemaDescribed,
   ToolHostCodec_register: register,
   ToolHostCodec_registry: registry,
   ToolHostCodec_stringSchema: stringSchema,
@@ -104,7 +105,11 @@ test('CODEC_schema_dsl_builds_each_shape', () => {
       schema: {
         string: () => ({
           schema: 'string',
-          describe: (description) => ({ schema: 'string-described', description }),
+          describe: (description) => ({
+            schema: 'string-described',
+            description,
+            optional: () => ({ schema: 'string-described-optional', description }),
+          }),
           optional: () => ({ schema: 'string-optional' }),
         }),
         number: () => ({ schema: 'number', optional: () => ({ schema: 'number-optional' }) }),
@@ -126,10 +131,13 @@ test('CODEC_schema_dsl_builds_each_shape', () => {
   const unwrap = (hostSchema) => hostSchema.fields[0]
 
   assert.equal(unwrap(stringSchema(factory)).schema, 'string')
-  assert.deepEqual(unwrap(stringSchemaDescribed('program source', factory)), {
-    schema: 'string-described',
-    description: 'program source',
-  })
+  const describedString = unwrap(stringSchemaDescribed('program source', factory))
+  assert.equal(describedString.schema, 'string-described')
+  assert.equal(describedString.description, 'program source')
+
+  const optStringDescribed = unwrap(optionalStringSchemaDescribed('hints', factory))
+  assert.equal(optStringDescribed.schema, 'string-described-optional')
+  assert.equal(optStringDescribed.description, 'hints')
   assert.equal(unwrap(numberSchema(factory)).schema, 'number')
 
   const described = unwrap(enumSchemaDescribed(toList(['a', 'b']), 'pick one', factory))

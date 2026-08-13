@@ -23,6 +23,15 @@ module ForkTool =
             let Description = "tool/fork/description"
 
             [<Literal>]
+            let ArgCalling = "tool/fork/arg-calling"
+
+            [<Literal>]
+            let ArgCharge = "tool/fork/arg-charge"
+
+            [<Literal>]
+            let ArgKeywords = "tool/fork/arg-keywords"
+
+            [<Literal>]
             let NameRequired = "tool/fork/name-required"
 
             [<Literal>]
@@ -366,14 +375,20 @@ module ForkTool =
         }
 
     let managerSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
+        let language = ProviderLanguageBinding.readGlobalPreference ()
+
         { Name = "fork"
-          Description =
-            ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Fork.Description Map.empty
+          Description = prose language Path.Fork.Description
           Arguments =
-            [ "calling", ToolHostCodec.optionalEnumSchema (callingNames managerCallingBindings) factory
+            [ "calling",
+              ToolHostCodec.optionalEnumSchemaDescribed
+                  (callingNames managerCallingBindings)
+                  (prose language Path.Fork.ArgCalling)
+                  factory
               "name", ToolHostCodec.stringSchema factory
-              "charge", ToolHostCodec.stringSchema factory
-              "keywords", ToolHostCodec.optionalStringSchema factory ]
+              "charge", ToolHostCodec.stringSchemaDescribed (prose language Path.Fork.ArgCharge) factory
+              "keywords",
+              ToolHostCodec.optionalStringSchemaDescribed (prose language Path.Fork.ArgKeywords) factory ]
           Execute = fun args context -> executeManager scope (decode args) context }
 
     let orchestratorSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

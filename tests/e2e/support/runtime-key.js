@@ -157,14 +157,14 @@ const isAssistant = (message) => {
   // assistant step; it never enters the scenario step cursor.
   //
   // Measured shapes: Host raw message may keep `info.source`. Provider wire often
-  // strips it and instead carries auto-injected tool parts — FakeReq half is
-  // `status: pending` (no output), FakeResp half is completed with the guideline
-  // text. Both halves must be skipped or they shift `stepOf` after real tool batches.
+  // strips it and instead carries auto-injected tool parts. Ordinary Host encoding
+  // is one completed row; legacy FakeReq used `status: pending`. Both must be skipped
+  // or they shift `stepOf` after real tool batches.
   const source = message?.info?.source;
   if (source === pairProgrammingThoughtSource || source === 'pair-programming-thought') return false;
   // Any auto-injected tool part is synthetic regardless of status/output: production
   // uses that tool name only for HOST-013, and requiring completed+output would miss
-  // the pending FakeReq half.
+  // a legacy pending FakeReq row.
   const isGuidelineToolPart = (part) =>
     part?.type === 'tool'
     && part?.tool === 'auto-injected';

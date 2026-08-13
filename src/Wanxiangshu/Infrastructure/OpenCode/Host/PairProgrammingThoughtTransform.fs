@@ -14,9 +14,10 @@ open Wanxiangshu.Resources
 
 /// HOST-013：永久 pair-programming auto-injected pairs。
 ///
-/// Synthetic pair 是跨越真实 tool batch 的 temporal bracket：
-/// `real calls → synthetic call → real results → synthetic result`。
-/// 每个 half 的 transcript 位置只由它自己 durable 的 gap anchor 决定；同一 placement
+/// Ordinary Host 编码是 ResultGap 上的一条 completed `auto-injected` tool part。
+/// OpenCode `toModelMessagesEffect` 把它展开成 provider tool-call + tool-result。
+/// 禁止 pending/running：Host 会把它们收成 "[Tool execution was interrupted]"。
+/// 每个 occurrence 的 transcript 位置由 durable CallGap/ResultGap 决定；同一 placement
 /// occasion（SessionId + CallGap + ResultGap）最多一个 pair，重复 transform 只 replay、
 /// 不再新增。同 epoch 内前次 provider wire 必须是后次 wire 的字节前缀（ARCH-004）。
 module PairProgrammingThoughtTransform =
@@ -96,39 +97,26 @@ module PairProgrammingThoughtTransform =
 
         idPrefix + digest.Substring(0, 24)
 
-    let private buildPairMessage (callId: string) (markerText: string) (isCall: bool) : obj =
+    let private buildPairMessage (callId: string) (markerText: string) : obj =
         let part =
-            if isCall then
-                createObj
-                    [ "type", box "tool"
-                      "tool", box "auto-injected" // must match AutoInjectedTool.spec.Name
-                      "callID", box callId
-                      "state",
-                      box (
-                          createObj
-                              [ "status", box "pending"
-                                "input", box (createObj [])
-                                "time", box (createObj [ "start", box 0 ]) ]
-                      ) ]
-            else
-                createObj
-                    [ "type", box "tool"
-                      "tool", box "auto-injected" // must match AutoInjectedTool.spec.Name
-                      "callID", box callId
-                      "state",
-                      box (
-                          createObj
-                              [ "status", box "completed"
-                                "input", box (createObj [])
-                                "output", box markerText
-                                "time", box (createObj [ "start", box 0; "end", box 0 ]) ]
-                      ) ]
+            createObj
+                [ "type", box "tool"
+                  "tool", box "auto-injected" // must match AutoInjectedTool.spec.Name
+                  "callID", box callId
+                  "state",
+                  box (
+                      createObj
+                          [ "status", box "completed"
+                            "input", box (createObj [])
+                            "output", box markerText
+                            "time", box (createObj [ "start", box 0; "end", box 0 ]) ]
+                  ) ]
 
         createObj
             [ "info",
               box (
                   createObj
-                      [ "id", box (if isCall then callId + "-call" else callId)
+                      [ "id", box callId
                         "role", box "assistant"
                         "source", box source
                         "synthetic", box true ]
@@ -259,20 +247,16 @@ module PairProgrammingThoughtTransform =
     // ── replay：唯一合法渲染路径 ─────────────────────────────────────────────
 
     /// The one and only HOST-013 renderer: real messages + durable anchored
-    /// pairs → the exact provider wire. Historical halves sit at their own
-    /// durable gaps; nothing re-decides their position (`historyBlock` 禁止).
+    /// pairs → the exact provider wire. Historical completed rows sit at their
+    /// own durable ResultGap; nothing re-decides their position (`historyBlock` 禁止).
     ///
-    /// 组内排序唯一合法：`Ordinal` 升序，同 ordinal 时 call 先于 result。
+    /// 组内排序唯一合法：`Ordinal` 升序。
     ///
     /// Anchor 不在当前真实消息里的 historical pair **不重放、不报错**。
     /// XWire prefix probe 用 FrozenRecordPrefix 替换已覆盖前缀时会 drop 那些
     /// 消息（CTX-010 `DropLeading`）；被覆盖区里的 pair 属于被替换的前缀，
     /// 不应再注入 rewritten view，更不能因此 AbortSession 杀死 recovery slot。
     /// Durable fact 仍保留；完整 transcript 回来时 anchor 在场即可再 replay。
-    type private OccurrenceProjection =
-        | PairCall
-        | PairResult
-
     let private cursorGuidanceSeparator = "\u0000\uFEFF"
 
     let private isString (value: obj) : bool =
@@ -343,39 +327,37 @@ module PairProgrammingThoughtTransform =
                 | TranscriptGap.Before address
                 | TranscriptGap.After address -> Set.contains (TranscriptMessageAddress.value address) addressSet
 
-            // Both durable anchors must remain present even though Cursor can
-            // only attach bytes to a terminal tool result at ResultGap. CallGap
-            // stays durable for reversible Cursor → ordinary replay.
+            // Both durable anchors must remain present even though ordinary and
+            // Cursor only render at ResultGap. CallGap stays durable for placement
+            // identity and reversible Cursor → ordinary replay.
             let placeable =
                 pairs
                 |> List.filter (fun pair -> gapPresent pair.CallGap && gapPresent pair.ResultGap)
 
-            let starts = ResizeArray<PairProgrammingGuidelineWire * OccurrenceProjection>()
+            let starts = ResizeArray<PairProgrammingGuidelineWire>()
 
-            let before =
-                Dictionary<string, ResizeArray<PairProgrammingGuidelineWire * OccurrenceProjection>>()
+            let before = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>()
 
-            let after =
-                Dictionary<string, ResizeArray<PairProgrammingGuidelineWire * OccurrenceProjection>>()
+            let after = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>()
 
             let cursorAfter = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>()
 
-            let addAtGap pair projection gap =
+            let addAtGap pair gap =
                 let bucket
-                    (table: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire * OccurrenceProjection>>)
+                    (table: Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>)
                     (address: TranscriptMessageAddress)
                     =
                     let key = TranscriptMessageAddress.value address
 
                     match table.TryGetValue key with
-                    | true, entries -> entries.Add(pair, projection)
+                    | true, entries -> entries.Add pair
                     | false, _ ->
-                        let entries = ResizeArray<PairProgrammingGuidelineWire * OccurrenceProjection>()
-                        entries.Add(pair, projection)
+                        let entries = ResizeArray<PairProgrammingGuidelineWire>()
+                        entries.Add pair
                         table.[key] <- entries
 
                 match gap with
-                | TranscriptGap.Start -> starts.Add(pair, projection)
+                | TranscriptGap.Start -> starts.Add pair
                 | TranscriptGap.Before address -> bucket before address
                 | TranscriptGap.After address -> bucket after address
 
@@ -393,34 +375,21 @@ module PairProgrammingThoughtTransform =
                             cursorAfter.[key] <- entries
                     | _ -> ()
                 else
-                    addAtGap pair PairCall pair.CallGap
-                    addAtGap pair PairResult pair.ResultGap
+                    addAtGap pair pair.ResultGap
 
-            let projectionOrder =
-                function
-                | PairCall -> 0
-                | PairResult -> 1
-
-            let ordered (entries: ResizeArray<PairProgrammingGuidelineWire * OccurrenceProjection>) =
-                entries
-                |> Seq.sortBy (fun (pair, projection) -> pair.Ordinal, projectionOrder projection)
-                |> Seq.toList
-
-            let render pair projection =
-                match projection with
-                | PairCall -> buildPairMessage pair.CallId pair.MarkerText true
-                | PairResult -> buildPairMessage pair.CallId pair.MarkerText false
+            let ordered (entries: ResizeArray<PairProgrammingGuidelineWire>) =
+                entries |> Seq.sortBy (fun pair -> pair.Ordinal) |> Seq.toList
 
             let output = ResizeArray<obj>()
 
-            for pair, projection in ordered starts do
-                output.Add(render pair projection)
+            for pair in ordered starts do
+                output.Add(buildPairMessage pair.CallId pair.MarkerText)
 
             for address, message in addressed do
                 match before.TryGetValue address with
                 | true, entries ->
-                    for pair, projection in ordered entries do
-                        output.Add(render pair projection)
+                    for pair in ordered entries do
+                        output.Add(buildPairMessage pair.CallId pair.MarkerText)
                 | _ -> ()
 
                 let projectedMessage =
@@ -439,8 +408,8 @@ module PairProgrammingThoughtTransform =
 
                 match after.TryGetValue address with
                 | true, entries ->
-                    for pair, projection in ordered entries do
-                        output.Add(render pair projection)
+                    for pair in ordered entries do
+                        output.Add(buildPairMessage pair.CallId pair.MarkerText)
                 | _ -> ()
 
             Ok(Seq.toList output)
@@ -450,7 +419,8 @@ module PairProgrammingThoughtTransform =
     /// 末端结构 → gap：
     ///
     /// - 末端存在同轮 tool batch（`Req1 Req2 Resp1 Resp2 [User]`，或 batch 直接
-    ///   结尾）：`After(last call)` / `After(last result)` —— HOST-013 核心 bracket。
+    ///   结尾）：`After(last call)` / `After(last result)` —— placement identity。
+    ///   ordinary 只在 ResultGap 渲染一条 completed Host 行。
     /// - 无 batch 且最后一条消息是 user（trailing user）：`Before(user)` / `Before(user)`。
     /// - 无 batch、无 trailing user：`After(last real)` / `After(last real)`。
     /// - 空 transcript：`Start` / `Start`。

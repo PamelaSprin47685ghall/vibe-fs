@@ -161,6 +161,12 @@ Never show a path to something that no longer exists.
 
 People are nouns. Tools are verbs.
 
+An office must be known by the consequence it is entitled to produce.
+    职位以其有权产生的后果被认识。
+
+Delegation requires a capability model, not a list of names.
+    委托需要能力模型，而不是一份名称清单。
+
 Failure is a fact in the world, not an `error` object handed to a person.
 
 Errors belong to machinery. Consequences belong to experience.

@@ -88,22 +88,21 @@ const HOOK_FIXTURES = {
     output: {},
   },
 
-  // HOST-013: every non-Companion session gets one unconditional synthetic pair
-  // injected at transform time, empty history included. A tool-call and a
-  // tool-result share one callID and carry source = "pair-programming-auto-injected";
-  // with no user message the pair lands at the global end.
+  // HOST-013: every non-Companion session gets one completed auto-injected
+  // Host row at transform time, empty history included. OpenCode expands that
+  // completed tool part into provider tool-call + tool-result.
   'experimental.chat.messages.transform': {
     input: { sessionID: SESSION },
     output: { messages: [] },
     assert: (output) => {
       const messages = output.messages
-      assert.equal(messages.length, 2, 'HOST-013 injects one pair into an empty non-Companion history')
-      const [call, result] = messages
-      assert.equal(call.info.source, 'pair-programming-auto-injected', 'HOST-013 pair source')
-      assert.equal(result.info.source, 'pair-programming-auto-injected', 'HOST-013 pair source')
-      assert.equal(call.parts[0].type, 'tool', 'HOST-013 pair opens with a tool-call')
-      assert.equal(result.parts[0].state.status, 'completed', 'HOST-013 pair closes with a tool-result')
-      assert.equal(result.parts[0].callID, call.parts[0].callID, 'HOST-013 call and result share one callID')
+      assert.equal(messages.length, 1, 'HOST-013 injects one completed auto-injected into an empty non-Companion history')
+      const [pair] = messages
+      assert.equal(pair.info.source, 'pair-programming-auto-injected', 'HOST-013 pair source')
+      assert.equal(pair.parts[0].type, 'tool', 'HOST-013 Host row is a tool part')
+      assert.equal(pair.parts[0].tool, 'auto-injected')
+      assert.equal(pair.parts[0].state.status, 'completed', 'HOST-013 never uses pending')
+      assert.ok(pair.parts[0].state.output, 'HOST-013 completed row carries marker text')
     },
   },
 

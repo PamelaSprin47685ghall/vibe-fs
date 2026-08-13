@@ -20,6 +20,8 @@ import {
   scanRepo,
   scanSemanticAnchorCatalog,
   scanSemanticAnchorParity,
+  scanToolDescriptionAnchorCatalog,
+  scanToolDescriptionAnchorParity,
 } from '../../../scripts/checks/language-parity-gate.mjs'
 
 const GOOD_HOOK = `
@@ -209,6 +211,36 @@ test('gate_c_semantic_anchor_catalog_requires_every_role_law', () => {
   assert.ok(violations.some((v) => v.code === 'semantic-anchor-catalog' && /unknown-office/.test(v.path)))
   assert.equal(
     violations.filter((v) => /role\/manager$/.test(v.path)).length,
+    0,
+  )
+})
+
+test('gate_c_tool_description_anchor_parity_detects_missing_zh_id', () => {
+  const fx = makeProviderFixture()
+  try {
+    fx.writePair(
+      'tool/fork/description',
+      'Entrust bounded work to another office within this mission. Coder / Engineer Changes repository source.',
+      '把工作交给另一个职位。',
+    )
+    const catalog = {
+      fork: [{ id: 'coder-mutation', en: /Changes repository source/i, zh: /改变 repository source/ }],
+    }
+    const violations = scanToolDescriptionAnchorParity(fx.providerAbs, catalog)
+    assert.equal(violations.length, 1)
+    assert.equal(violations[0].code, 'tool-description-anchor')
+    assert.match(violations[0].path, /zh-CN\.md$/)
+    assert.match(violations[0].detail ?? '', /coder-mutation/)
+  } finally {
+    fx.dispose()
+  }
+})
+
+test('gate_c_tool_description_anchor_catalog_requires_inspect_and_fork', () => {
+  const violations = scanToolDescriptionAnchorCatalog(['tool/inspect/description'])
+  assert.ok(violations.some((v) => v.code === 'tool-description-anchor-catalog' && /tool\/fork\/description/.test(v.path)))
+  assert.equal(
+    violations.filter((v) => /tool\/inspect\/description$/.test(v.path)).length,
     0,
   )
 })

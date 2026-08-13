@@ -529,22 +529,20 @@ const withSession = (messages, sessionID = 'ses-host-013') =>
 
 test('CTX_002_transform_appends_one_pair_programming_pair', async () => {
   await withPlugin(async (hooks) => {
-    // HOST-013: every transform inserts one tool-call + tool-result pair before trailing user.
+    // HOST-013: every transform inserts one completed auto-injected row before trailing user.
     const transformed = { messages: withSession([{ role: 'user', text: 'hello' }]) }
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
-    assert.equal(transformed.messages.length, 3)
-    assert.equal(markerCount(transformed.messages), 2)
+    assert.equal(transformed.messages.length, 2)
+    assert.equal(markerCount(transformed.messages), 1)
 
-    const call = transformed.messages[0]
-    const result = transformed.messages[1]
-    const user = transformed.messages[2]
-    assert.equal(call.info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-    assert.equal(call.parts[0].tool, 'auto-injected')
-    assert.equal(call.parts[0].state.status, 'pending')
-    assert.equal(result.parts[0].state.status, 'completed')
-    assert.equal(result.parts[0].state.output, PAIR_PROGRAMMING_THOUGHT_TEXT)
-    assert.equal(call.parts[0].callID, result.parts[0].callID)
+    const pair = transformed.messages[0]
+    const user = transformed.messages[1]
+    assert.equal(pair.info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
+    assert.equal(pair.parts[0].tool, 'auto-injected')
+    assert.equal(pair.parts[0].state.status, 'completed')
+    assert.notEqual(pair.parts[0].state.status, 'pending')
+    assert.equal(pair.parts[0].state.output, PAIR_PROGRAMMING_THOUGHT_TEXT)
     assert.equal(user.role ?? user.info?.role, 'user')
 
     const markerRe = /\[(CAPS|REVIEW|HINT):/
@@ -573,12 +571,11 @@ test('HOST_013_pair_lands_at_end_when_transcript_ends_with_assistant_tail', asyn
     }
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
-    assert.equal(transformed.messages.length, 4)
-    assert.equal(markerCount(transformed.messages), 2)
+    assert.equal(transformed.messages.length, 3)
+    assert.equal(markerCount(transformed.messages), 1)
     assert.equal(transformed.messages[0].role ?? transformed.messages[0].info?.role, 'user')
     assert.equal(transformed.messages[1].role ?? transformed.messages[1].info?.role, 'assistant')
     assert.equal(transformed.messages[2].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-    assert.equal(transformed.messages[3].info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
   })
 })
 
@@ -598,7 +595,7 @@ test('HOST_013_empty_messages_still_append_pair', async () => {
     ]
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
-    assert.equal(markerCount(transformed.messages) >= 2, true)
+    assert.equal(markerCount(transformed.messages) >= 1, true)
     // no trailing user → pair at end
     assert.equal(transformed.messages.at(-1).parts[0].tool, 'auto-injected')
   })
@@ -614,7 +611,7 @@ test('HOST_013_system_and_assistant_history_still_appends_pair', async () => {
     }
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
-    assert.equal(markerCount(transformed.messages), 2)
+    assert.equal(markerCount(transformed.messages), 1)
     // no user → pair at end
     assert.equal(transformed.messages.at(-1).info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
   })
@@ -636,10 +633,9 @@ test('HOST_013_pair_before_trailing_user_in_mixed_history', async () => {
     }
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
-    assert.equal(markerCount(transformed.messages), 2)
+    assert.equal(markerCount(transformed.messages), 1)
     assert.equal(transformed.messages.at(-1).role ?? transformed.messages.at(-1).info?.role, 'user')
     assert.equal(transformed.messages.at(-2).info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
-    assert.equal(transformed.messages.at(-3).info.source, PAIR_PROGRAMMING_THOUGHT_SOURCE)
   })
 })
 
@@ -650,12 +646,12 @@ test('HOST_013_repeated_transform_of_same_placement_replays_only', async () => {
     // Use non-synthetic base so history is re-hydrated from durable/memory ledger.
     const first = { messages: withSession([{ role: 'user', text: 'hello' }], 'ses-repeat') }
     await hooks['experimental.chat.messages.transform']({}, first)
-    assert.equal(markerCount(first.messages), 2)
+    assert.equal(markerCount(first.messages), 1)
     assert.equal(first.messages.at(-1).role ?? first.messages.at(-1).info?.role, 'user')
 
     const second = { messages: withSession([{ role: 'user', text: 'hello' }], 'ses-repeat') }
     await hooks['experimental.chat.messages.transform']({}, second)
-    assert.equal(markerCount(second.messages), 2, 'same placement must replay, not append a second pair')
+    assert.equal(markerCount(second.messages), 1, 'same placement must replay, not append a second pair')
     assert.equal(second.messages.at(-1).role ?? second.messages.at(-1).info?.role, 'user')
   })
 })
@@ -666,7 +662,7 @@ test('HOST_013_new_user_turn_keeps_history_and_appends_new_pair', async () => {
       messages: withSession([{ role: 'user', text: 'hello' }], 'ses-turn'),
     }
     await hooks['experimental.chat.messages.transform']({}, first)
-    // first: [call, result, user]
+    // first: [pair, user]
     const firstCallId = first.messages[0].parts[0].callID
 
     const second = {
@@ -680,10 +676,10 @@ test('HOST_013_new_user_turn_keeps_history_and_appends_new_pair', async () => {
     }
     await hooks['experimental.chat.messages.transform']({}, second)
 
-    // second: [user hello, hist-call, hist-result, next-call, next-result, user second]
-    assert.equal(markerCount(second.messages), 4)
-    assert.equal(second.messages[1].parts[0].callID, firstCallId)
-    assert.notEqual(second.messages[3].parts[0].callID, firstCallId)
+    // second: [hist-pair, user hello, next-pair, user second]
+    assert.equal(markerCount(second.messages), 2)
+    assert.equal(second.messages[0].parts[0].callID, firstCallId)
+    assert.notEqual(second.messages[2].parts[0].callID, firstCallId)
     assert.equal(second.messages.at(-1).role ?? second.messages.at(-1).info?.role, 'user')
   })
 })
@@ -988,20 +984,66 @@ test('EXEC_002_fork_reuse_by_byname_and_create_by_calling', async () => {
   })
 })
 
-test('EXEC_002_fork_tool_description_states_calling_create_and_byname_reuse', async () => {
+const schemaDescription = (schema) => {
+  const seen = new Set()
+  const visit = (node) => {
+    if (!node || typeof node !== 'object' || seen.has(node)) return ''
+    seen.add(node)
+    if (typeof node.description === 'string' && node.description.trim()) return node.description
+    const meta = typeof node.meta === 'function' ? node.meta() : node.meta
+    if (typeof meta?.description === 'string' && meta.description.trim()) return meta.description
+    const def = node.def ?? node._def
+    if (typeof def?.description === 'string' && def.description.trim()) return def.description
+    for (const inner of [def?.innerType, def?.inner, node.innerType]) {
+      const found = visit(inner)
+      if (found) return found
+    }
+    return ''
+  }
+  return visit(schema)
+}
+
+test('EXEC_002_fork_tool_description_is_an_office_capability_map', async () => {
   await withPlugin(async (hooks) => {
     const description = hooks.tool.fork?.description
     assert.equal(typeof description, 'string', 'fork tool must expose description')
-    assert.match(description, /calling \+ name \+ charge|same name/i)
-    assert.match(description, /navigator \(Fast Browser\)/)
-    assert.match(description, /researcher \(Deep Browser\)/)
-    assert.match(description, /public web only/)
-    assert.match(description, /never from local files or the repository/)
+    assert.match(description, /another office within this mission/i)
+    assert.match(description, /Coder \/ Engineer[\s\S]{0,120}Changes repository source/i)
+    assert.match(description, /Scout \/ Investigator[\s\S]{0,160}already exist in the repository/i)
+    assert.match(description, /Technician \/ Operator[\s\S]{0,160}running world/i)
+    assert.match(description, /Navigator \/ Researcher[\s\S]{0,160}external world with provenance/i)
+    assert.match(description, /Analyst \/ Inquirer[\s\S]{0,160}not yet clear/i)
+    assert.match(description, /differ in persona and reasoning depth,[\s\S]{0,40}not in the office's authority/i)
+    assert.match(description, /calling \+ name \+ charge[\s\S]{0,80}same name/i)
+    assert.doesNotMatch(description, /another witness/i)
+    assert.doesNotMatch(description, /\bwitnesses\b/i)
     assert.doesNotMatch(description, /fast-|deep-|handle/i)
     const commission = hooks.tool.commission?.description
     assert.equal(typeof commission, 'string')
     assert.match(commission, /calling \+ name \+ charge|known road/i)
     assert.doesNotMatch(commission, /job id|handle as name|fast-|deep-/i)
+  })
+})
+
+test('EXEC_002_inspect_tool_description_forbids_mutation_and_execution', async () => {
+  await withPlugin(async (hooks) => {
+    const description = hooks.tool.inspect?.description
+    assert.equal(typeof description, 'string', 'inspect tool must expose description')
+    assert.match(description, /facts that already exist in the repository/i)
+    assert.match(description, /read-only in the causal sense/i)
+    assert.match(description, /Do not use inspect to ask for code changes/i)
+    assert.match(description, /make the project run[\s\S]{0,80}behavioral evidence/i)
+    assert.match(description, /evidence from a witness, not a mutation/i)
+  })
+})
+
+test('EXEC_002_fork_and_inspect_argument_descriptions_state_parameter_meaning', async () => {
+  await withPlugin(async (hooks) => {
+    assert.match(schemaDescription(hooks.tool.fork.args.calling), /office\/persona|Omit when continuing/i)
+    assert.match(schemaDescription(hooks.tool.fork.args.charge), /bounded consequence|Do not prescribe hidden tools/i)
+    assert.match(schemaDescription(hooks.tool.fork.args.keywords), /retrieval hints|do not enlarge/i)
+    assert.match(schemaDescription(hooks.tool.inspect.args.charge), /repository fact|Do not ask for code changes/i)
+    assert.match(schemaDescription(hooks.tool.inspect.args.keywords), /retrieval hints|Inspector/i)
   })
 })
 

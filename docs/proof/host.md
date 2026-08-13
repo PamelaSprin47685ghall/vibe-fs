@@ -31,7 +31,7 @@
 | journal 代理等式 canary | HOST-010 |
 | Tool 身份仅 ToolContext 双半边 | HOST-011 |
 | 跨实例共享表 vs 每实例 Journal；共享表操作不跨 await | HOST-012 |
-| 永久 auto-injected pair | 用户 canonical multi-tool 序列逐字成立（`Req1 Req2 FakeReq1 Resp1 Resp2 FakeResp1` → `… Req3 FakeReq2 Resp3 FakeResp2`）；历史 pair 不随 current placement 搬家；same placement 重入不新增 pair（journal append 数 = 1、wire bytes exactly equal）；restart replay byte-identical；anchor 不在当前真实 view 时 pair 不重放（不重定位）；XWire DropLeading continue 不 AbortSession；N 轮 property：同 epoch `isAppendOnlyPrefix(wire[n], wire[n+1])` 恒 true | HOST-013 |
+| 永久 auto-injected pair | 用户 canonical multi-tool 序列逐字成立（`Req1 Req2 Resp1 Resp2 FakeReq1 FakeResp1` → `… Req3 Resp3 FakeReq2 FakeResp2`，ordinary Host 为 ResultGap 上一条 completed 行）；历史 pair 不随 current placement 搬家；same placement 重入不新增 pair（journal append 数 = 1、wire bytes exactly equal）；restart replay byte-identical；anchor 不在当前真实 view 时 pair 不重放（不重定位）；XWire DropLeading continue 不 AbortSession；N 轮 property：同 epoch `isAppendOnlyPrefix(wire[n], wire[n+1])` 恒 true；ordinary Host 行 `status=completed`，从不写 pending/running | HOST-013 |
 | Companion / Blogger 不注入 auto-injected | durable `isCompanion=true` 的 session transform 后 `markerCount=0`、消息字节与注入前相等；不为该 session append `PairProgrammingGuidelineAnchored` | HOST-013 |
 | `auto-injected` 真实 Tool.Def | Work 角色 Host permission allow；`hooks.tool` 含空参 entity；live execute 返回 `OK`；Blogger/Distiller deny；Strength/Bookkeeper 既有闸门不变 → `tests/unit/tools/auto-injected-tool.test.mjs`、`tests/integration/plugin/auto-injected-tool.test.mjs` | HOST-013 |
 | `WANXIANGSHU_SKIP_AUTO_INJECTED=1` | 不追加新 occurrence；已有 durable history 仍按当前 provider renderer replay | HOST-013 |

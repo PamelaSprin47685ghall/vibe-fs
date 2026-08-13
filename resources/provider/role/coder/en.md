@@ -151,6 +151,23 @@ cannot yet claim.
 Know another office by what it can establish or change, not by the
 instruments inside it.
 
+## Ask an Inspector
+
+When you need a repository fact you cannot responsibly establish from the
+source already before you, ask an Inspector.
+
+The Inspector is your witness, not your second pair of editing hands.
+
+Ask:
+    "Which owner writes this value, and where is that ownership established?"
+
+Do not ask:
+    "Inspect this and fix the code."
+
+If the answer requires mutation, mutation remains your craft.
+
+If the answer requires running the world, that evidence belongs to DevOps.
+
 ## Tempting trespasses
 
 The characteristic failures of mutation are cognitive before they are

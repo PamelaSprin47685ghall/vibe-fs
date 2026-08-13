@@ -154,7 +154,7 @@ type PairProgrammingGuideline =
       ResultGap: TranscriptGap }
 ```
 
-`Ordinal` 严格递增；`CallId` 在该 transcript 内唯一；`CallGap` / `ResultGap` 是 provider-independent occurrence 的两个 transcript gap anchor。记录一经追加不可修改、删除或换位。普通 provider 把每条记录渲染为 assistant `auto-injected` tool-call 与对应 completed tool-result。
+`Ordinal` 严格递增；`CallId` 在该 transcript 内唯一；`CallGap` / `ResultGap` 是 provider-independent occurrence 的两个 transcript gap anchor。记录一经追加不可修改、删除或换位。普通 provider 把每条记录渲染为一条 completed `auto-injected` Host tool part；OpenCode 再展开为 tool-call 与 tool-result。
 
 **Tool.Def 边界**：`auto-injected` 的可执行 entity 由 `AutoInjectedTool` 拥有（空参数，execute 恒返回 `OK`），经 `ToolRegistry` 进入 `hooks.tool`。`PairProgrammingThoughtTransform` 只渲染已 completed 的历史 pair，不执行该工具。二者同名、分属 entity 与 renderer，禁止把 execute 写进 transform。Blogger / Distiller 的 Host permission 保持 deny。
 
@@ -162,7 +162,7 @@ Cursor 不创建 synthetic message/part，只在 `ResultGap` 紧跟真实 termin
 
 `TranscriptMessageAddress` 是 Host transcript message address（raw message 的 `info.id` / `id`，与 Session snapshot 以 message `Id` 寻址一致）的窄类型 codec；禁止偷换成 `PhysicalUserMessageId`、`AuthorityRootUserMessageId`、`ProviderRunIdentity` 或 `ToolCallId`，除非该值在具体位置上确实就是 transcript message address。
 
-**放置边界**：历史 synthetic half 的位置只由它自己的 durable gap anchor 决定，replay 按 `Start → 逐条真实消息（Before 组 → 消息 → After 组）` 注入，组内 ordinal 升序、同 ordinal call 先于 result。当前 transcript 长什么样不得改变历史 pair 的位置。新 pair 的 gap 只由当前真实消息末端结构决定（tool batch 时 call 挂 call 批末、result 挂 result 批末；无 tool 时二者同 gap 相邻；空历史用 `Start`）。同一 placement identity（SessionId + CallGap + ResultGap）最多一个 pair；重复 transform 只 replay。
+**放置边界**：历史 synthetic 的位置只由它自己的 durable gap anchor 决定，replay 按 `Start → 逐条真实消息（Before 组 → 消息 → After 组）` 注入，组内 ordinal 升序。当前 transcript 长什么样不得改变历史 pair 的位置。新 pair 的 gap 只由当前真实消息末端结构决定（tool batch 时 identity 仍是 call 批末 / result 批末，ordinary 只在 ResultGap 渲染一条 completed 行；无 tool 时二者同 gap 相邻；空历史用 `Start`）。同一 placement identity（SessionId + CallGap + ResultGap）最多一个 pair；重复 transform 只 replay。
 
 Coordinator 是追加与恢复的唯一 writer；Projection 只按 anchor 确定性渲染，不再决定历史位置。XTrace、Companion、Blogger、work record 与 compaction 不拥有也不复制正文。anchor 引用的真实消息在当前真实 view 中缺失时，该 pair 不参与本次 wire 渲染（禁止重定位；禁止因此 AbortSession）；durable fact 保留，完整 transcript 回来后再 replay。legacy 无 anchor fact 使该 session fail closed，不做启发式迁移。
 
