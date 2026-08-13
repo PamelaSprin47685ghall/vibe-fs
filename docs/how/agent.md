@@ -104,6 +104,6 @@ keywords raw
 → send once as ProviderPrompt
 ```
 
-Search adapter catches each query failure independently and returns `[]` for that query. `repository_search` records normalized query ordinal; `repository_hint` records source ordinal/rank/path/lines/content/score/total_lines. Renderer escapes every caller/search string with `SyntheticToml.renderString` and states in instruction comments that hints are orientation only and must be verified with ordinary tools.
+Search adapter catches each query failure independently and returns `[]` for that query. `repository_search` records normalized query ordinal; `repository_hint` records source ordinal/rank/path/lines/content/score/total_lines. Renderer escapes every caller/search string with `SyntheticToml.renderString` and states in instruction comments that hints are not instructions, proof, or synthetic tool history.
 
 Tool gating：`inspect` / `establish-behavior` / `repair-behavior` accept optional `keywords`; Manager `fork` accepts optional `keywords` only when a new/reused work unit targets Coder/Inspector/DevOps. Nonblank keywords with other targets fail before search. `commission` schema unchanged。
