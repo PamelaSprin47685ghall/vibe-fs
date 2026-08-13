@@ -5734,6 +5734,7 @@ Manager **不**拥有 `inspect`（已冻结）：Manager 永远不能亲手触�
 4. **移入 `completed/`**：仅在 AC15/16 闭环（及 AC1/20 处理）后追加正式 `Final outcome`；**本 session 不移入**。
 5. **Phase 17 完整 provider-prose 迁移**：移交独立 Active Change `changes/active/PromptRestoration.md`（Gate 0 prose-ownership + Batch 1–5）。本 Change 不再以「半 i18n / 仅 Role+Library」宣称 Phase 17 收口。
 6. **Provider Surface Grand Repair（2026-08-13 Amendment）**：ARCH-017 / PROMPT-020 / PROMPT-021 已立法。Wave 1–5 静态面已落地：五 Office 投影进 Manager Role Law + `fork`；`inspect`/`establish-behavior`/`repair-behavior`/`run`/`query-shell` 完整 affordance；Gate C 高风险 verb + Gate F；合成 eval corpus（`tests/eval/provider-office-boundary`）。剩余关闭：HOST-026 tool prose 跟 session 语言（OpenCode `tool.definition` 无 session；Host 设计可另做，混语不得假装已闭合）；live LLM behavior eval runner（当前 corpus 是结构 oracle，不是真模型）。
+7. **Magic Todo process review runtime（todowrite 后续红字）**：源码与 HEAD `9a4f83dd` 已含 HOST-021 `ensureReview`、lag-1 合法等待、`processReview=None` fail-closed、`waitHeadAdvanced` 有界、`producerPresence` fail-closed。剩余关闭：`producerPresence` / `waitHeadAdvanced` 尚无 targeted 测试；真实 Host 派生 DedicatedReviewer + JudgeTool 端到端未在本 session 观察。本 Manager 会话 `todowrite` 仍见 `AwaitingConsumableReview`——可能是未加载 HEAD 的旧宿主，不得据此宣称代码未修，也不得据此宣称 live 已绿。本条不关闭 GrandRewrite。
 
 ## Done since Amendment（2026-08-12 → 08-13 续作）
 
@@ -5750,6 +5751,7 @@ Manager **不**拥有 `inspect`（已冻结）：Manager 永远不能亲手触�
 - **Gate B**：Provider Leak baseline ratchet **0 violations**。
 - **格式**：`RuntimeResources.fs` Fantomas 收口；`format:check` 绿。
 - **§19 终审（只读）**：PASS 26 / FAIL 2（AC15、AC16）/ WEAK 2（AC1、AC20）→ **§19 未全部满足**。
+- **Magic Todo process review（todowrite 红字）**：`after` 补 HOST-021 `ensureReview`；`AwaitingConsumableReview` 改为 deferred prepare 合法等待，不再 `invalidOp`；`PluginHooks` 注入 `DedicatedTodoReviewerRuntime.port`。提交链：`3ee2fcff`（review process）→ `d3dda385`（T2 conclude fixture）→ `0b0eda27`（runtime 缺失 fail-closed）→ HEAD `9a4f83dd`（assignment head deadline + producer presence）。本轮写入进度时只核对源码与 `.git/logs/HEAD`，**未**重跑 `npm test` / e2e。
 
 ## Verification snapshot（2026-08-13 — Phase 17/20 收口后全栈绿）
 
@@ -5778,6 +5780,27 @@ Gate D prompt-stability                            → OK（2/2；0 todo）
 ## Blockers
 
 无运行时红点。关闭语义 blocker = **AC15/AC16 WorkRecordStart / BlindPlan Opening 生产接线缺口**（docs 已定，实现仍走 `ProtectedPrefixEnd`）。
+
+Magic Todo live 宿主：本 Manager 会话后续 `todowrite` 仍返回 `Admission (AwaitingConsumableReview)`。这是**未观察的 live 闭环**，不是源码缺失的证明（HEAD 已含等待语义与 `ensureReview`）。不得把它写成实现 blocker，也不得把它写成已验证通过。
+
+## Amendment — 2026-08-13（Magic Todo process review / todowrite 红字 — 写入进度）
+
+- **Requested by**：用户（「写入进度到盘」；本使命原请求为调查并修复 Manager 第一次 `todowrite` 成功、后续红字失败）
+- **HEAD**：`9a4f83dd feat: enhance dedicated reviewer runtime with assignment head deadline and producer presence checks`
+- **根因（源码已对齐 docs）**：T1 无前置 pending review 故成功。T2 命中 TODO-006 lag-1：须等 `ConsumableReview ≡ TodoReviewConcluded`。旧路径把 `AwaitingConsumableReview` 当失败抛 `invalidOp`（界面红字），且 `after` 缺 HOST-021 `ensureReview`，review 永不推进。
+- **已落盘（只读核对工作树 + git log，不是新的测试跑出）**：
+  - `MagicTodoHostHooks.before`：`AwaitingConsumableReview` → `port.AwaitConsumableReview` 合法等待；`processReview=None` 且仍有 pending → `"process review runtime unavailable while ConsumableReview outstanding"` fail-closed，禁止无界 `awaitChangeFrom`。
+  - `MagicTodoHostHooks.after`：`NeedsEnsureReview` / `NeedsDedicatedEnlist` → `port.EnsureReview`；port 缺失 → HOST-021 typed infrastructure failure。
+  - `PluginHooks.fs`：生产注入 `Some(DedicatedTodoReviewerRuntime.port …)`。
+  - `DedicatedTodoReviewerRuntime.waitHeadAdvanced`：`CausalAwait.untilSignalOrDeadline` + `AssignmentHeadDeadlineMs = 2000`。
+  - `TodoProcessReviewProgram.awaitConsumableReview`：`producerPresence`；无生产者 fail-closed（`"process review cannot progress: …"`）；有生产者才 `awaitChangeFrom`（REVIEW-017 合法等待，无总审查时限）。
+  - 回归测试源码存在：`tests/unit/reconciliation/magic-todo-membrane.test.mjs` 含 TODO-006 T1 后 T2 为 lag-1 wait、Concluded 后 T2 prepare 成功。
+- **未观察 / 未关闭**：
+  - `producerPresence` / `waitHeadAdvanced` 无 targeted 测试（`tests/` 无这两符号）。
+  - 真实 Host 派生 DedicatedReviewer 会话 + JudgeTool 提交的端到端未在本 session 观察。
+  - 本 Manager 会话 live `todowrite` 仍红字；宿主是否已加载 HEAD 未知。
+  - 本轮**未**重跑 `npm test` / `npm run check` / e2e；不得把旧 Verification snapshot 或对话中的「43 pass」当作本写入时刻的运行证据。
+- **关闭状态**：保持 `changes/active/GrandRewrite.md`，**不移入 `completed/`**。AC15/AC16 仍是 GrandRewrite 关闭前提。本 Amendment 不把 Magic Todo live 闭环伪装成已完成。
 
 ## Amendment — 2026-08-13（Provider Surface Grand Repair）
 
