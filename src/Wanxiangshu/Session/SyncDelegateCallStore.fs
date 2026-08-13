@@ -23,7 +23,13 @@ and internal SyncDelegateInvocation =
       Role: SyncDelegateRole
       Charge: string
       PrepareProviderPrompt: unit -> Task<string>
-      Completion: TaskCompletionSource<Result<string, string>> }
+      Completion: TaskCompletionSource<Result<string, string>>
+      /// EXEC-031: XTrace head (cursor of the next-to-append part) captured at
+      /// send. This is the inclusive start of the per-invocation WorkRecord
+      /// range; the exclusive end is captured at completion after the terminal.
+      /// Mutable because the delegate session (and therefore its head) is not
+      /// known when the invocation is admitted — it is set in sendDelegatePrompt.
+      mutable StartCursor: int64 option }
 
 /// EXEC-026/031: process-local SyncDelegateRuntime state. Gate-locked.
 type internal SyncDelegateCallStore() as this =

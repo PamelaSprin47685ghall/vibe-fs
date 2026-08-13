@@ -38,7 +38,7 @@
 
 | 证明 | 落点 / 形态 | 条款 |
 |------|-------------|------|
-| 工具面 = `inspect` + `sphinx_*` | Host schema + ToolRegistry 均无 read/glob/grep/write/edit/run/fork/commission/join/horizon/终端/`stealth-browser-mcp_*`；Inquiry allow `sphinx_*` | AGENT-006、AGENT-025、AGENT-030 |
+| 工具面 = `inspect` + `sphinx_*` + HOST-013 `auto-injected` no-op | Host schema + ToolRegistry 均无 read/glob/grep/write/edit/run/fork/commission/join/horizon/终端/`stealth-browser-mcp_*`；Inquiry allow `sphinx_*` 与 `auto-injected` | AGENT-006、AGENT-025、AGENT-030、HOST-013 |
 | SyncDelegate 边 | 仅 `Inquiry → Inspector`；无反向；无独立 `return` | AGENT-024 |
 | Epistemic style 在 prompt | inquiry system prompt 含形成理解 / 反例 / 证据vs推论 / 综合 Inspector；无 LearningState/QA/Compile/return 协议 | AGENT-025 |
 | 无 Student workflow 移植 | 无 MeditatorLearn/Compile RequestKind；终端为普通 Assistant completion | AGENT-025 |
@@ -51,6 +51,7 @@
 | Manager 无普通工具；Orchestrator 只 `commission` Manager | AGENT-011、AGENT-015 |
 | mv/rm 仅 Coder；非空目录 rm 拒绝 | AGENT-016…018 |
 | bash-honeypot 仅 Coder；调用不跑 shell；instruction-only 无 error 字段 | AGENT-023 |
+| `auto-injected` Work 角色 no-op entity；Blogger/Distiller deny；execute 恒 `OK` | HOST-013、AGENT-006 |
 | DevOps 独占终端/`run`；Reviewer 只读 + `judge` | AGENT-013、AGENT-014 |
 | Inquiry = inspect + Sphinx MCP | AGENT-025、AGENT-030 |
 | Distiller 无工具且不可见 | AGENT-006、AGENT-008 |

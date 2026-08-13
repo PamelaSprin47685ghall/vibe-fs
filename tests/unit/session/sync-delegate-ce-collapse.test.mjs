@@ -25,6 +25,7 @@ import {
   agentJournal,
   authorityRoot,
   idValue,
+  lifecycleWorkRecordProjection,
   okResult,
   physicalUser,
   promptDispatcher,
@@ -103,6 +104,12 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
     (_delegateSession, _agent) => {},
     quiescence,
     undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    // EXEC-031: bounded WorkRecord via the real journal projector.
+    (_sid, range) => lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(opened.journal, _sid, range),
   )
 
   try {
@@ -169,7 +176,10 @@ test('EXEC_031_whitespace_normalized_completion_resolves_invoke', async () => {
     assert.equal(handled, true)
 
     const done = resultOf(await pending)
-    assert.equal(done.ok, true)
-    assert.equal(done.value, 'normalized answer')
+    assert.equal(done.ok, true, done.error)
+    // The answer travels inside the bounded WorkRecord's Closing report, not as
+    // a trimmed raw last-message payload (EXEC-031).
+    assert.match(done.value, /normalized answer/)
+    assert.match(done.value, /Closing report/)
   })
 })

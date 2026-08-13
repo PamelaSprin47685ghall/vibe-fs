@@ -29,10 +29,11 @@
 3. `external_directory="allow"` 仅经 `StaticTools.permissionObj` → `ManagedAgentConfig.applyOwnedFields` 写入每个 managed agent（AGENT-019）。
 4. 禁止全局 permission 顶替 agent 级写入。
 5. `InvocationMode = SynchronousDelegate` 时：callee 普通 Assistant completion 结束；Host 物化 bounded WorkRecord（`includeOpening=false`）投影给 caller。**无**独立 `return` 工具、**无** return 投影写入口（AGENT-024；EXEC-028/031）。
-6. Inquiry 工具集为 `{ inspect, sphinx MCP }`（AGENT-025、AGENT-030）。装配不得把 `read`/`glob`/`grep` 或其它
+6. Inquiry 能力面为 `{ inspect, sphinx MCP }`（AGENT-025、AGENT-030）；另有 HOST-013 `auto-injected` no-op。装配不得把 `read`/`glob`/`grep` 或其它
    filesystem / `run` / `fork` / `commission` / 终端 / `join` / `horizon` / stealth-browser MCP 面写回 Inquiry。
 7. `ToolPermission.Network` → Host schema 键 `stealth-browser-mcp_*`（AGENT-026）。仅 Browser allow。
 8. `ToolPermission.Sphinx` → Host schema 键 `sphinx_*`（AGENT-030）。仅 Inquiry allow。
+9. `ToolPermission.AutoInjected` → Host schema 键 `auto-injected`。非 Blogger / 非 Distiller 的 Work 角色 allow；空参数；execute 恒返回 `OK`（HOST-013 entity）。不生成 `js-*` 成员。
 
 ---
 

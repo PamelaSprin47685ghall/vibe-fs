@@ -51,6 +51,7 @@ module StaticTools =
         | ToolPermission.Move -> [ "mv" ]
         | ToolPermission.Remove -> [ "rm" ]
         | ToolPermission.BashHoneypot -> [ "bash-honeypot" ]
+        | ToolPermission.AutoInjected -> [ "auto-injected" ]
         | ToolPermission.Inspect -> [ "inspect" ]
         | ToolPermission.Behavior -> [ "establish-behavior"; "repair-behavior" ]
         | ToolPermission.Exec -> [ "run"; "query-shell" ]
@@ -107,6 +108,7 @@ module StaticTools =
           "mv"
           "rm"
           "bash-honeypot"
+          "auto-injected"
           "inspect"
           "establish-behavior"
           "repair-behavior"

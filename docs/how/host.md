@@ -290,7 +290,8 @@ Start 组（ordinal 升序）
   - 无 trailing user（含末尾为 assistant 文本的 continuation transcript）：`After(lastReal)` / `After(lastReal)`。
   新 pair 的 gap 必须落在本次追加区；旧「pair 总在最后一条 user 任意位置之前」在 continuation transcript 上会中途插入新 pair 破坏 prefix，已废弃。
   查同一 placement identity（SessionId + CallGap + ResultGap）是否已存在：存在 → 只 replay 既有 pair，不 append 新 fact；不存在 → 走上述 commit 顺序。
-- 一个 pair 的 wire：assistant `tool-call`（工具名 `auto-injected`、输入 `{}`）与对应 `tool-result`（同一 `callID`、`status = completed`、输出 `markerText`）。有同批 tool 时 call / result 分别挂 call 批末 / result 批末；无同批 tool 时二者同 gap 相邻。
+- 一个 pair 的 ordinary wire：assistant `tool-call`（工具名 `auto-injected`、输入 `{}`）与对应 `tool-result`（同一 `callID`、`status = completed`、输出 `markerText`）。
+- `auto-injected` 必须作为真实 `ToolSpec` 注册（`AutoInjectedTool`，空参数，`Execute` 恒返回 `OK`），并进入 Work 角色的 Host permission / `rolePredicate`。否则普通 provider 历史里的 fake-tool 名在 `prepared.tools` 中无 entity，模型再调用会失败。该 execute 路径与 HOST-013 synthetic pair 正交：pair 在注入时已是 completed 历史。Blogger / Distiller deny；Strength replica / Bookkeeper 仍被 `gateExecute` 拒绝。有同批 tool 时 call / result 分别挂 call 批末 / result 批末；无同批 tool 时二者同 gap 相邻。Cursor wire 不创建 synthetic message/part：仅当 `ResultGap` 紧跟真实 terminal tool result 时，克隆该真实 message/part/state，并把终态文本投影为 `original + "\0" + "\uFEFF" + markerText`；Host raw input 保持不变。无可附着 result 时零字节投影，禁止改挂其它 message。
 - `markerText` 只对**本次新** pair 构造一次并 durable 冻结；历史 pair **只重放**已存 `MarkerText`，永不因 replay / compaction / reanchor / 语言偏好变更重算：
 
 ```text
@@ -314,8 +315,8 @@ markerText = concat(optional nudge, wallClock, guideline)
 - ReviewSeal 覆盖恢复后的全部历史 pair、本次新 pair与所有 Strength provider-visible bytes；历史 pair 原位不变，以保持 Prefix Cache。Reviewer 路径 Strength 恒 K0。Blogger 跳过注入时 ReviewSeal 只覆盖无 auto-injected 的消息视图。
 - tip nudge 查找：`latestTipNudge` 仅在非 Companion 路径调用；不得以当前 session 是 Blogger 为由把 tip 写进 Blogger transcript。
 - 实现点：`SpikePlugin` transform 在 `PairProgrammingThoughtTransform.tryInject` 之前用 association 门禁短路。
-- 注入旁路：只有 `WANXIANGSHU_SKIP_AUTO_INJECTED=1` 跳过新 occurrence。provider=`cursor` 不旁路：仍按相同 placement/ordinal append durable occurrence，然后由 Cursor renderer 在 `ResultGap` 输出 single synthetic text；ordinary renderer 仍输出 fake-tool call/result。renderer 选择只读 provider id，不改 durable history。
-- Cursor text stable id = deterministic digest(`CallId`, Cursor role)，禁止 GUID/时间戳。生产 role=`assistant`；user/system encoder 仅测试 controlled comparison。
+- 注入旁路：只有 `WANXIANGSHU_SKIP_AUTO_INJECTED=1` 跳过新 occurrence。provider=`cursor` 不旁路：仍按相同 placement/ordinal append durable occurrence；ordinary renderer 输出 fake-tool call/result，Cursor renderer 只把 `NUL + BOM + markerText` suffix 附着到其 `ResultGap` 对应真实 terminal tool result。renderer 选择只读 provider id，不改 durable history。
+- Cursor suffix 分隔符固定为两个 Unicode code point：NUL (`U+0000`) 后紧跟 BOM (`U+FEFF`)。禁止额外 frame/header/footer；replay 必须逐字节复现同一 suffix。
 
 ---
 

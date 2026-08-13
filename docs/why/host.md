@@ -111,9 +111,10 @@ Transform input 为空对象是 Host 能力现实；绑定必须用「已创建�
 - **被拒方案**：把语言绑在 Role 或 EffectiveAgent 上。换 Peer 会误换世界语言。
 - **选择方案**：创建时绑定一次 `SessionProviderLanguage`（不可变）；child / attached / StrengthReplica 等继承 owner/commissioner；全局偏好变更只作用于此后新建 session。protocol 标识符（tool 名、字段名、enum literal、路径、命令）不翻译——翻译改的是世界的语言，不是机器的标识。
 
-### 22. Cursor Pair Hint：删 marker vs provider-specific projection
+### 22. Cursor Pair Hint：synthetic role vs 真实 tool-result suffix
 - **被拒方案**：provider=`cursor` 时停止新增 HOST-013。它让同一个语义约束因 provider 消失，也让 ordinary→Cursor→ordinary 历史不可逆。
-- **选择方案**：durable occurrence 与 provider wire 分离。普通 provider 继续 fake-tool pair；Cursor 在同一 `ResultGap` 投影一条 text。Assistant/User/System 三 encoder 只改变 provider role；受控 strict-validator + authority canary 后生产固定 assistant role。语义正文只来自一个 canonical markerText。
+- **被拒方案**：在 `ResultGap` 新造 assistant/user/system text message。真实 Cursor canary 证明 assistant 会破坏 tool-result 连续性并把已完成结果解释成 interrupt；user 改写 authority/history；system 在该 transform 边界不可见。
+- **选择方案**：durable occurrence 与 provider wire 分离。普通 provider 继续 fake-tool pair；Cursor 不新增任何 message/part，只在 `ResultGap = After(real terminal tool result)` 时克隆该真实 result，并把其终态文本投影为 `original + U+0000 + U+FEFF + MarkerText`。无可附着真实 result 时该 occurrence 本轮零字节投影，但 durable anchor 不删除、不重定位；后续 ordinary replay 仍恢复原 fake-tool pair。语义正文只来自 canonical `MarkerText`。
 
 ### 23. Pair 工具协作：顺序默认 vs bounded parallel wave
 - **被拒方案**：只写“可以并行”，让模型逐个 call 再逐个等待；也拒绝 Host 自动猜依赖或固定全局并发 N。
@@ -122,3 +123,7 @@ Transform input 为空对象是 Host 能力现实；绑定必须用「已创建�
 ### 24. NEEDHELP：fallback failure vs assistance interrupt
 - **被拒方案**：复用 LoopSensor/ProviderFailure/FallbackCursor。那会把“主动求第二视角”惩罚成失败，污染 AABB 与 retry budget。
 - **选择方案**：独立 reasoning-delta sensor + assistance armed occasion；abort 只作为物理中断，reconcile 后走 fast→deep continuation 或 deep→真实 consultation child，不触碰 fallback。
+
+### 25. HOST-013 entity：真实 no-op vs 仅历史伪工具
+- **被拒方案**：只在 transcript 里写 `auto-injected` 历史 pair，不注册 `Tool.Def`。模型偶发模仿调用时 OpenCode 找不到 entity，整次 LLM 请求失败。
+- **选择方案**：`AutoInjectedTool` 注册同名空参工具；非 Blogger / 非 Distiller 的 Work 角色 allow；live execute 恒返回 `OK`。Synthetic pair 仍是已 completed 历史，不走 execute。Strength replica / Bookkeeper 既有闸门不变。

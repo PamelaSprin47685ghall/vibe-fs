@@ -455,10 +455,21 @@ export const xTraceCapture = (() => {
 
 /** Journal-backed LWR projection (COMPANION-003 / EXEC-006). Not domain materialize. */
 export const lifecycleWorkRecordProjection = (() => {
-  const m = bind(LifecycleWorkRecordProjectionModule, 'LifecycleWorkRecordProjection', ['lifecycleWorkRecord'])
+  const m = bind(LifecycleWorkRecordProjectionModule, 'LifecycleWorkRecordProjection', [
+    'lifecycleWorkRecord',
+    'lifecycleWorkRecordBounded',
+  ])
   return {
     lifecycleWorkRecord: (journal, sessionIdValue, includeOpening = true) => {
       const result = m.lifecycleWorkRecord(journal, sessionIdValue, includeOpening)
+      return isNone(result) ? undefined : result
+    },
+    /** EXEC-031: per-invocation bounded LWR. `range` = { StartInclusive, EndExclusive } with `Sequence` number. */
+    lifecycleWorkRecordBounded: (journal, sessionIdValue, range) => {
+      const result = m.lifecycleWorkRecordBounded(journal, sessionIdValue, {
+        StartInclusive: { Sequence: BigInt(range.StartInclusive.Sequence) },
+        EndExclusive: { Sequence: BigInt(range.EndExclusive.Sequence) },
+      })
       return isNone(result) ? undefined : result
     },
   }

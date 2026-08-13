@@ -372,6 +372,8 @@ test('GLORY_014_first_birth_golden_bytes', async () => {
   assert.equal(birth.parts[1].synthetic, true)
   assert.ok(birth.parts[1].text.includes('# The Planning Table'))
   assert.ok(birth.parts[1].text.includes('write it with todowrite'))
+  assert.ok(birth.parts[1].text.includes('Your first todowrite is the complete submission of that plan.'))
+  assert.ok(birth.parts[1].text.includes('If you need a plan of the plan, write it as text.'))
   assert.equal(managerNarrative.planningTail().includes('Do not perform any actual work'), true)
 })
 

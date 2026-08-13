@@ -31,6 +31,7 @@ import {
   agentJournal,
   authorityRoot,
   idValue,
+  lifecycleWorkRecordProjection,
   okResult,
   physicalUser,
   promptDispatcher,
@@ -39,6 +40,7 @@ import {
   resultOf,
   roles,
   sessionId,
+  xTraceCapture,
 } from '../support/domain.mjs'
 
 const completionTurn = (delegateKey, role, answer, runId = 'asst_turn') =>
@@ -57,7 +59,7 @@ const completionTurn = (delegateKey, role, answer, runId = 'asst_turn') =>
     undefined,
   )
 
-const withHarness = async (fn, { tier = 'Fast' } = {}) => {
+const withHarness = async (fn, { tier = 'Fast', project = true } = {}) => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-sync-delegate-'))
   const opened = agentJournal.create({ directory: base })
   assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
@@ -103,6 +105,16 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
     },
     createQuiescenceGate(),
     undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    // EXEC-031: per-invocation bounded WorkRecord via the real journal
+    // projector. Session-mechanics tests must assert the answer flows through
+    // the bounded record's Closing report — never re-encode partsText.
+    project
+      ? (_sid, range) => lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(opened.journal, _sid, range)
+      : undefined,
   )
 
   try {
@@ -112,6 +124,7 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
       prompts,
       ready,
       sessions,
+      journal: opened.journal,
     })
   } finally {
     disposeRuntime(runtime)
@@ -147,10 +160,11 @@ test('EXEC_026_sync_delegate_concurrent_invokes_are_coalesced_into_single_prompt
     await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), 'combined answer')
     const firstDone = resultOf(await first)
     const secondDone = resultOf(await second)
-    assert.equal(firstDone.ok, true)
-    assert.equal(firstDone.value, 'combined answer')
-    assert.equal(secondDone.ok, true)
-    assert.equal(secondDone.value, 'combined answer')
+    assert.equal(firstDone.ok, true, firstDone.error)
+    assert.match(firstDone.value, /combined answer/)
+    assert.match(firstDone.value, /Closing report/)
+    assert.equal(secondDone.ok, true, secondDone.error)
+    assert.match(secondDone.value, /combined answer/)
   })
 })
 
@@ -170,13 +184,13 @@ test('EXEC_026_sync_delegate_in_flight_invoke_prompts_directly_and_queues_on_ses
 
     await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), 'first answer', 'asst_turn1')
     const firstDone = resultOf(await first)
-    assert.equal(firstDone.ok, true)
-    assert.equal(firstDone.value, 'first answer')
+    assert.equal(firstDone.ok, true, firstDone.error)
+    assert.match(firstDone.value, /first answer/)
 
     await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), 'second answer', 'asst_turn2')
     const secondDone = resultOf(await second)
-    assert.equal(secondDone.ok, true)
-    assert.equal(secondDone.value, 'second answer')
+    assert.equal(secondDone.ok, true, secondDone.error)
+    assert.match(secondDone.value, /second answer/)
   })
 })
 
@@ -212,8 +226,8 @@ test('EXEC_026_sync_delegate_reuses_session_after_full_completion', async () => 
 
     await settlePendingInvoke(runtime, delegateId, roles.of('Inspector'), 'answer one', 'asst_one')
     const firstDone = resultOf(await first)
-    assert.equal(firstDone.ok, true)
-    assert.equal(firstDone.value, 'answer one')
+    assert.equal(firstDone.ok, true, firstDone.error)
+    assert.match(firstDone.value, /answer one/)
 
     const second = invoke(runtime, owner, SyncDelegateRole.Inspector, 'pass two')
     await waitFor(() => prompts.length === 2, 'second send missing')
@@ -221,8 +235,8 @@ test('EXEC_026_sync_delegate_reuses_session_after_full_completion', async () => 
 
     await settlePendingInvoke(runtime, delegateId, roles.of('Inspector'), 'answer two', 'asst_two')
     const secondDone = resultOf(await second)
-    assert.equal(secondDone.ok, true)
-    assert.equal(secondDone.value, 'answer two')
+    assert.equal(secondDone.ok, true, secondDone.error)
+    assert.match(secondDone.value, /answer two/)
     assert.equal(createCalls[0].child, delegateId)
   })
 })
@@ -248,8 +262,9 @@ test('G2_inspector_Q1_Q2_Q3_same_session_serial_reuse', async () => {
 
     await settlePendingInvoke(runtime, delegateId, inspector, answers[0], 'asst_q1')
     const q1Done = resultOf(await q1)
-    assert.equal(q1Done.ok, true)
-    assert.equal(q1Done.value, answers[0])
+    assert.equal(q1Done.ok, true, q1Done.error)
+    assert.match(q1Done.value, /answer Q1/)
+    assert.match(q1Done.value, /Closing report/)
 
     const q2 = invoke(runtime, owner, SyncDelegateRole.Inspector, 'Q2')
     await waitFor(() => prompts.length === 2, 'Q2 send missing')
@@ -262,8 +277,11 @@ test('G2_inspector_Q1_Q2_Q3_same_session_serial_reuse', async () => {
     const handled = await handleTurn(runtime, completionTurn(delegateId, inspector, answers[1], 'asst_q2'), undefined)
     assert.equal(handled, true)
     const q2Done = resultOf(await q2)
-    assert.equal(q2Done.ok, true)
-    assert.equal(q2Done.value, answers[1])
+    assert.equal(q2Done.ok, true, q2Done.error)
+    assert.match(q2Done.value, /answer Q2/)
+    // EXEC-031 / COMPANION-015: a reused child's second record must be bounded
+    // to its own invocation — it must not leak the first invocation's body.
+    assert.doesNotMatch(q2Done.value, /answer Q1/)
 
     const q3 = invoke(runtime, owner, SyncDelegateRole.Inspector, 'Q3')
     await waitFor(() => prompts.length === 3, 'Q3 send missing')
@@ -275,15 +293,17 @@ test('G2_inspector_Q1_Q2_Q3_same_session_serial_reuse', async () => {
 
     await settlePendingInvoke(runtime, delegateId, inspector, answers[2], 'asst_q3')
     const q3Done = resultOf(await q3)
-    assert.equal(q3Done.ok, true)
-    assert.equal(q3Done.value, answers[2])
+    assert.equal(q3Done.ok, true, q3Done.error)
+    assert.match(q3Done.value, /answer Q3/)
+    assert.doesNotMatch(q3Done.value, /answer Q1/)
+    assert.doesNotMatch(q3Done.value, /answer Q2/)
 
     assert.deepEqual(
       prompts.map((p) => p.agent),
       ['fast-inspector', 'fast-inspector', 'fast-inspector'],
     )
     assert.deepEqual(
-      [q1Done.value, q2Done.value, q3Done.value],
+      [q1Done.value, q2Done.value, q3Done.value].map((value) => value.match(/answer Q[123]/)?.[0]),
       answers,
     )
     assert.equal(new Set(answers).size, 3)
@@ -350,5 +370,56 @@ test('G2_inspector_cancel_owner_fails_pending_invoke_no_extra_child', async () =
     assert.equal(done.ok, false)
     assert.match(done.error, /cancelled/i)
     assert.equal(createCalls.length, 1, 'cancel must not CreateChildSession again')
+  })
+})
+
+// EXEC-031: a Completed turn without a bounded WorkRecord fails closed — the
+// last-message fallback must not count as success (residual OneShot analog).
+test('EXEC_031_completed_without_bounded_work_record_fails_closed', async () => {
+  await withHarness(async ({ runtime, createCalls }) => {
+    const owner = 'ses_owner_failclosed'
+    const pending = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect without projector')
+    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'Invoke did not send')
+
+    await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), 'some answer', 'asst_fc')
+
+    const done = resultOf(await pending)
+    assert.equal(done.ok, false, 'last-message fallback must not count as success')
+    assert.match(done.error, /EXEC-031|WorkRecord/)
+  }, { project: false })
+})
+
+// EXEC-031: a Completed turn's success payload is the bounded WorkRecord, not the
+// raw last message. Recent work holds this invocation's XTrace parts, the answer
+// lives in the Closing report, and Opening is not echoed back (includeOpening=false).
+// The Chronicle heading (frames) is a render-level property owned by the domain
+// materialize/render tests; this SyncDelegate boundary proves the bounded slice
+// and the Closing report flow through the runtime.
+test('EXEC_031_bounded_work_record_answers_in_closing_report_not_raw_message', async () => {
+  await withHarness(async ({ runtime, createCalls, journal }) => {
+    const owner = 'ses_owner_bounded'
+    const pending = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect module')
+    await waitFor(() => prompts.length === 1 && createCalls.length === 1, 'Invoke did not send')
+    const delegateId = createCalls[0].child
+
+    // Append this invocation's trace parts to the delegate session (Recent work).
+    xTraceCapture.captureProjection(
+      journal,
+      delegateId,
+      xTraceCapture.semantic({
+        messages: [{ role: 'assistant', parts: [xTraceCapture.text('inspector working body')] }],
+      }),
+    )
+
+    await settlePendingInvoke(runtime, delegateId, roles.of('Inspector'), 'formal inspector answer', 'asst_bounded')
+    const done = resultOf(await pending)
+    assert.equal(done.ok, true, done.error)
+
+    assert.match(done.value, /Recent work/)
+    assert.match(done.value, /inspector working body/)
+    assert.match(done.value, /Closing report/)
+    assert.match(done.value, /formal inspector answer/)
+    assert.doesNotMatch(done.value, /^Opening\n/m, 'includeOpening=false must not echo the charge')
+    assert.doesNotMatch(done.value, /# # /)
   })
 })

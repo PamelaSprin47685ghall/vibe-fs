@@ -26,6 +26,7 @@ import {
   agentJournal,
   authorityRoot,
   idValue,
+  lifecycleWorkRecordProjection,
   listItems,
   okResult,
   physicalUser,
@@ -162,6 +163,11 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
     createQuiescenceGate(),
     undefined,
     (_session, charge) => inspectorPrompts.push(charge),
+    undefined,
+    undefined,
+    undefined,
+    // EXEC-031: bounded WorkRecord via the real journal projector.
+    (_sid, range) => lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(opened.journal, _sid, range),
   )
 
   const scope = new ToolRuntimeScope(
@@ -285,7 +291,12 @@ test('INSPECT_happy_path_invokes_inspector_and_returns_work_record', async () =>
 
     await settlePendingInvoke(runtime, createCalls[0].child, roles.of('Inspector'), answer, 'asst_insp')
     const text = await pending
+    // EXEC-031: the tool payload is the bounded WorkRecord — the answer lives
+    // inside the Closing report (not the raw last message as the whole payload),
+    // and Opening is not echoed back (includeOpening=false).
+    assert.match(text, /Closing report/)
     assert.match(text, /inspector formal answer/)
+    assert.doesNotMatch(text, /^Opening\n/m)
     assert.equal(parseToml(text).error, undefined)
   })
 })

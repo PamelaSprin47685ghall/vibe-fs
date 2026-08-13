@@ -33,8 +33,9 @@
 | 跨实例共享表 vs 每实例 Journal；共享表操作不跨 await | HOST-012 |
 | 永久 auto-injected pair | 用户 canonical multi-tool 序列逐字成立（`Req1 Req2 FakeReq1 Resp1 Resp2 FakeResp1` → `… Req3 FakeReq2 Resp3 FakeResp2`）；历史 pair 不随 current placement 搬家；same placement 重入不新增 pair（journal append 数 = 1、wire bytes exactly equal）；restart replay byte-identical；anchor 不在当前真实 view 时 pair 不重放（不重定位）；XWire DropLeading continue 不 AbortSession；N 轮 property：同 epoch `isAppendOnlyPrefix(wire[n], wire[n+1])` 恒 true | HOST-013 |
 | Companion / Blogger 不注入 auto-injected | durable `isCompanion=true` 的 session transform 后 `markerCount=0`、消息字节与注入前相等；不为该 session append `PairProgrammingGuidelineAnchored` | HOST-013 |
+| `auto-injected` 真实 Tool.Def | Work 角色 Host permission allow；`hooks.tool` 含空参 entity；live execute 返回 `OK`；Blogger/Distiller deny；Strength/Bookkeeper 既有闸门不变 → `tests/unit/tools/auto-injected-tool.test.mjs`、`tests/integration/plugin/auto-injected-tool.test.mjs` | HOST-013 |
 | `WANXIANGSHU_SKIP_AUTO_INJECTED=1` | 不追加新 occurrence；已有 durable history 仍按当前 provider renderer replay | HOST-013 |
-| Cursor Pair Hint | Cursor 新 placement 仍 append同一 durable occurrence；provider wire 无 `auto-injected` fake tool，只有 `ResultGap` 的一条 stable-id assistant text；普通→Cursor→普通 replay 可逆；Assistant/User/System controlled encoder 三者正文 byte-identical，strict-validator/authority canary 后生产固定 Assistant | HOST-013、PROMPT-018 |
+| Cursor Pair Hint | Cursor 新 placement 仍 append 同一 durable occurrence；provider wire 无 `auto-injected` fake tool、无 synthetic role/message/part；当 `ResultGap` 紧跟真实 terminal tool result 时，其终态文本精确为 `original + NUL + BOM + MarkerText`，Host raw 不变，重复 replay byte-identical；无可附着 result 时零字节且不重定位；普通→Cursor→普通 replay 可逆；真实 Cursor canary 证明 completed result 不再被解释成 interrupt | HOST-013 |
 | Pair parallel-wave Hint | canonical MarkerText 同时含 bounded current-wave、独立 read-only 默认并行、真实依赖才分 wave、不得猜参数/制造调用；三 renderer 同字节 | HOST-013 |
 | NEEDHELP reasoning sensor | fragmented reasoning delta 精确命中；visible text/tool output 不命中；同 ProviderRun exactly-once arm；control sentinel exact-strip 后不进 XTrace evidence → `tests/unit/host/needhelp-sensor.test.mjs` | HOST-027、AGENT-031、PROMPT-018 |
 | NEEDHELP reconcile / binding | fast→deep 同 Session 且 fallback 不动；请求 binding 从 exact Host `SessionMessage.Agent` 取；fast-root 下 later deep request 正确转 consultation；deep AbortWake 不创建 child，fresh IdleRevisit 才创建单个 `deep-inquiry` child；child terminal 先 canonical XTrace capture 再物化 child LWR；duplicate/recovery exactly-once、owner cancel no resurrection、finite guard；唯一 Long Stroke 真 Host 路径全绿 → `tests/unit/host/assistance-host.test.mjs` + `tests/e2e/entry.test.mjs` | HOST-027、AGENT-031、PROMPT-018 |
@@ -54,7 +55,7 @@
 
 Gate C 跨域门禁见 `proof/architecture.md`；Prompt 侧冻结见 `proof/prompt.md` Gate D / PROMPT-017。
 
-代表：`tests/unit/host/pair-thought-transform.test.mjs`、`tests/integration/plugin/manager-tool-contract.test.mjs`（`HOST_013_*`）、`tests/unit/enforcer/latest-tip-nudge.test.mjs`、HOST-013 replay property / restart / fail-closed 单测、Quiescence gate 单测（`tests/unit/host/`）。
+代表：`tests/unit/host/pair-thought-transform.test.mjs`、`tests/unit/tools/auto-injected-tool.test.mjs`、`tests/integration/plugin/auto-injected-tool.test.mjs`、`tests/integration/plugin/manager-tool-contract.test.mjs`（`HOST_013_*`）、`tests/unit/enforcer/latest-tip-nudge.test.mjs`、HOST-013 replay property / restart / fail-closed 单测、Quiescence gate 单测（`tests/unit/host/`）。
 
 ## Session 关联
 

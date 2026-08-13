@@ -96,41 +96,12 @@ module PairProgrammingThoughtTransform =
 
         idPrefix + digest.Substring(0, 24)
 
-    /// Stable identity for a Cursor text projection. The role participates in
-    /// the id so the controlled three-encoder experiment cannot alias messages.
-    let stableCursorMessageId (callId: string) (role: string) : string =
-        let normalizedRole = role.Trim().ToLowerInvariant()
-        let digest = HostDigest.sha256Hex (callId + "\n" + normalizedRole)
-        "pair-programming-hint-" + digest.Substring(0, 24)
-
-    let private buildCursorMessage (callId: string) (markerText: string) (role: string) : obj =
-        let normalizedRole = role.Trim().ToLowerInvariant()
-
-        if
-            normalizedRole <> "assistant"
-            && normalizedRole <> "user"
-            && normalizedRole <> "system"
-        then
-            invalidArg "role" "Cursor Pair Hint role must be assistant, user, or system"
-
-        createObj
-            [ "info",
-              box (
-                  createObj
-                      [ "id", box (stableCursorMessageId callId normalizedRole)
-                        "role", box normalizedRole
-                        "source", box source
-                        "pairCallID", box callId
-                        "synthetic", box true ]
-              )
-              "parts", box [| createObj [ "type", box "text"; "text", box markerText ] |] ]
-
     let private buildPairMessage (callId: string) (markerText: string) (isCall: bool) : obj =
         let part =
             if isCall then
                 createObj
                     [ "type", box "tool"
-                      "tool", box "auto-injected"
+                      "tool", box "auto-injected" // must match AutoInjectedTool.spec.Name
                       "callID", box callId
                       "state",
                       box (
@@ -142,7 +113,7 @@ module PairProgrammingThoughtTransform =
             else
                 createObj
                     [ "type", box "tool"
-                      "tool", box "auto-injected"
+                      "tool", box "auto-injected" // must match AutoInjectedTool.spec.Name
                       "callID", box callId
                       "state",
                       box (
@@ -301,11 +272,63 @@ module PairProgrammingThoughtTransform =
     type private OccurrenceProjection =
         | PairCall
         | PairResult
-        | CursorText of string
+
+    let private cursorGuidanceSeparator = "\u0000\uFEFF"
+
+    let private isString (value: obj) : bool =
+        not (isNull value) && emitJsExpr value "typeof $0 === 'string'"
+
+    let private appendCursorGuidanceToTerminalToolResult
+        (markerTexts: string list)
+        (rawMsg: obj)
+        : obj option =
+        let parts = rawParts rawMsg
+
+        let targetIndex =
+            parts
+            |> Array.mapi (fun index part ->
+                if not (isToolPart part) then
+                    None
+                else
+                    match partStatus part with
+                    | Some "completed" when not (isNull part?state) && isString part?state?output -> Some index
+                    | Some "error" when not (isNull part?state) && isString part?state?error -> Some index
+                    | Some "error" when not (isNull part?state) && isString part?state?output -> Some index
+                    | _ -> None)
+            |> Array.choose id
+            |> Array.tryLast
+
+        match targetIndex with
+        | None -> None
+        | Some index ->
+            let suffix =
+                markerTexts
+                |> List.map (fun markerText -> cursorGuidanceSeparator + markerText)
+                |> String.concat ""
+
+            let originalPart = parts.[index]
+            let originalState = originalPart?state
+            let clonedState = emitJsExpr originalState "Object.assign({}, $0)"
+
+            match partStatus originalPart with
+            | Some "completed" ->
+                clonedState?output <- box ((unbox<string> originalState?output) + suffix)
+            | Some "error" when isString originalState?error ->
+                clonedState?error <- box ((unbox<string> originalState?error) + suffix)
+            | Some "error" ->
+                clonedState?output <- box ((unbox<string> originalState?output) + suffix)
+            | _ -> ()
+
+            let clonedPart = emitJsExpr originalPart "Object.assign({}, $0)"
+            clonedPart?state <- clonedState
+            let clonedParts = Array.copy parts
+            clonedParts.[index] <- clonedPart
+            let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
+            clonedMessage?parts <- box clonedParts
+            Some clonedMessage
 
     let private replay
         (providerId: string option)
-        (cursorRole: string)
         (realMessages: obj list)
         (pairs: PairProgrammingGuidelineWire list)
         : Result<obj list, string> =
@@ -320,9 +343,9 @@ module PairProgrammingThoughtTransform =
                 | TranscriptGap.Before address
                 | TranscriptGap.After address -> Set.contains (TranscriptMessageAddress.value address) addressSet
 
-            // Both durable anchors must remain present even though Cursor renders
-            // only at ResultGap. CallGap is intentionally retained for reversible
-            // Cursor → ordinary replay of the same occurrence.
+            // Both durable anchors must remain present even though Cursor can
+            // only attach bytes to a terminal tool result at ResultGap. CallGap
+            // stays durable for reversible Cursor → ordinary replay.
             let placeable =
                 pairs
                 |> List.filter (fun pair -> gapPresent pair.CallGap && gapPresent pair.ResultGap)
@@ -334,6 +357,8 @@ module PairProgrammingThoughtTransform =
 
             let after =
                 Dictionary<string, ResizeArray<PairProgrammingGuidelineWire * OccurrenceProjection>>()
+
+            let cursorAfter = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>()
 
             let addAtGap pair projection gap =
                 let bucket
@@ -356,7 +381,17 @@ module PairProgrammingThoughtTransform =
 
             for pair in placeable do
                 if isCursorProvider providerId then
-                    addAtGap pair (CursorText cursorRole) pair.ResultGap
+                    match pair.ResultGap with
+                    | TranscriptGap.After address ->
+                        let key = TranscriptMessageAddress.value address
+
+                        match cursorAfter.TryGetValue key with
+                        | true, entries -> entries.Add pair
+                        | false, _ ->
+                            let entries = ResizeArray<PairProgrammingGuidelineWire>()
+                            entries.Add pair
+                            cursorAfter.[key] <- entries
+                    | _ -> ()
                 else
                     addAtGap pair PairCall pair.CallGap
                     addAtGap pair PairResult pair.ResultGap
@@ -365,7 +400,6 @@ module PairProgrammingThoughtTransform =
                 function
                 | PairCall -> 0
                 | PairResult -> 1
-                | CursorText _ -> 1
 
             let ordered (entries: ResizeArray<PairProgrammingGuidelineWire * OccurrenceProjection>) =
                 entries
@@ -376,7 +410,6 @@ module PairProgrammingThoughtTransform =
                 match projection with
                 | PairCall -> buildPairMessage pair.CallId pair.MarkerText true
                 | PairResult -> buildPairMessage pair.CallId pair.MarkerText false
-                | CursorText role -> buildCursorMessage pair.CallId pair.MarkerText role
 
             let output = ResizeArray<obj>()
 
@@ -390,7 +423,19 @@ module PairProgrammingThoughtTransform =
                         output.Add(render pair projection)
                 | _ -> ()
 
-                output.Add message
+                let projectedMessage =
+                    match cursorAfter.TryGetValue address with
+                    | true, entries ->
+                        entries
+                        |> Seq.sortBy (fun pair -> pair.Ordinal)
+                        |> Seq.map (fun pair -> pair.MarkerText)
+                        |> Seq.toList
+                        |> fun markerTexts ->
+                            appendCursorGuidanceToTerminalToolResult markerTexts message
+                            |> Option.defaultValue message
+                    | _ -> message
+
+                output.Add projectedMessage
 
                 match after.TryGetValue address with
                 | true, entries ->
@@ -519,7 +564,6 @@ module PairProgrammingThoughtTransform =
     ///
     /// 同一 placement 重复进入只 replay，不 append 新 fact。
     let private tryInjectCore
-        (cursorRole: string)
         (journal: AgentJournal option)
         (sessionId: string option)
         (markerText: string)
@@ -535,16 +579,6 @@ module PairProgrammingThoughtTransform =
         let realMessages = rawMessages |> List.filter (isPairProgrammingThought >> not)
         let providerId = providerIdFromMessages realMessages
 
-        if isCursorProvider providerId then
-            let normalizedRole = cursorRole.Trim().ToLowerInvariant()
-
-            if
-                normalizedRole <> "assistant"
-                && normalizedRole <> "user"
-                && normalizedRole <> "system"
-            then
-                invalidArg "cursorRole" "Cursor Pair Hint role must be assistant, user, or system"
-
         let history, append =
             match journal, sessionId with
             | Some durable, Some sid when not (String.IsNullOrWhiteSpace sid) ->
@@ -552,8 +586,8 @@ module PairProgrammingThoughtTransform =
                 readDurableHistory durable session, appendDurable durable session
             | _ -> readMemoryHistory key, appendMemory key
 
-        // Strip is legal only when durable identity explains the synthetic. Cursor
-        // text carries pairCallID because its stable wire id is role-specific.
+        // Strip is legal only when durable identity explains the synthetic.
+        // This also accepts historical Cursor text projections from older builds.
         let knownCallIds = history |> List.map (fun pair -> pair.CallId) |> Set.ofList
 
         let orphaned =
@@ -575,8 +609,8 @@ module PairProgrammingThoughtTransform =
                     |> List.tryFind (fun pair -> pair.CallGap = callGap && pair.ResultGap = resultGap)
 
                 match existing with
-                | Some _ -> replay providerId cursorRole realMessages history
-                | None when skipAutoInjectedRequested providerId -> replay providerId cursorRole realMessages history
+                | Some _ -> replay providerId realMessages history
+                | None when skipAutoInjectedRequested providerId -> replay providerId realMessages history
                 | None ->
                     let ordinal =
                         match history with
@@ -590,23 +624,12 @@ module PairProgrammingThoughtTransform =
                           CallGap = callGap
                           ResultGap = resultGap }
 
-                    match replay providerId cursorRole realMessages (history @ [ candidate ]) with
+                    match replay providerId realMessages (history @ [ candidate ]) with
                     | Error error -> Error error
                     | Ok rendered ->
                         match append candidate with
                         | Ok() -> Ok rendered
                         | Error error -> Error error
-
-    /// Controlled C-PH encoder seam. Production uses `tryInject`, which fixes
-    /// Cursor to assistant role; tests may compare user/system with identical bytes.
-    let tryInjectWithCursorRole
-        (journal: AgentJournal option)
-        (sessionId: string option)
-        (markerText: string)
-        (rawMessages: obj list)
-        (cursorRole: string)
-        : Result<obj list, string> =
-        tryInjectCore cursorRole journal sessionId markerText rawMessages
 
     let tryInject
         (journal: AgentJournal option)
@@ -614,4 +637,4 @@ module PairProgrammingThoughtTransform =
         (markerText: string)
         (rawMessages: obj list)
         : Result<obj list, string> =
-        tryInjectCore "assistant" journal sessionId markerText rawMessages
+        tryInjectCore journal sessionId markerText rawMessages

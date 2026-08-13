@@ -43,7 +43,8 @@ let invoke
               Role = role
               Charge = charge
               PrepareProviderPrompt = prepareProviderPrompt
-              Completion = completion }
+              Completion = completion
+              StartCursor = None }
 
         let isLeader = store.EnqueueForBatch invocation
 

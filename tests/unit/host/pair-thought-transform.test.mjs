@@ -12,8 +12,6 @@ const {
   source,
   text,
   stableCallId,
-  stableCursorMessageId,
-  tryInjectWithCursorRole,
 } = await import('../../../dist/Infrastructure/OpenCode/Host/PairProgrammingThoughtTransform.js')
 
 const inject = (session, raw, markerText = text) => {
@@ -229,7 +227,7 @@ test('PPT_skip_auto_injected_env_keeps_empty_transcript_without_pair', () => {
   }
 })
 
-test('C_PH_cursor_is_projection_not_skip_and_uses_single_assistant_text', () => {
+test('C_PH_cursor_keeps_durable_occurrence_without_synthetic_message', () => {
   const previous = process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
   try {
     delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
@@ -237,44 +235,78 @@ test('C_PH_cursor_is_projection_not_skip_and_uses_single_assistant_text', () => 
     assert.equal(skipAutoInjectedRequested('cursor'), false)
     assert.equal(skipAutoInjectedRequested('anthropic'), false)
 
+    const session = 'ses_cursor_no_synthetic'
     const raw = [{
       info: { id: 'u1', role: 'user', model: { providerID: 'cursor', modelID: 'composer' } },
       parts: [{ type: 'text', text: 'steer' }],
     }]
-    const out = inject('ses_cursor_text', raw)
-    const marker = pairMessages(out)
-    assert.equal(marker.length, 1, 'Cursor occurrence is one text message, not a fake-tool pair')
-    assert.equal(marker[0].info.role, 'assistant')
-    assert.equal(marker[0].parts[0].type, 'text')
-    assert.equal(marker[0].parts[0].text, text)
-    assert.equal(marker[0].info.id, stableCursorMessageId(stableCallId('ses_cursor_text', 1n), 'assistant'))
-    assert.equal(marker[0].parts.some((p) => p.tool === 'auto-injected'), false)
-    assert.equal(out.at(-1).info.id, 'u1')
+    const cursor = inject(session, raw)
+    assert.equal(pairMessages(cursor).length, 0)
+    assert.deepEqual(cursor, raw)
+
+    const ordinary = inject(session, [userMsg('u1', 'steer')])
+    assert.equal(pairMessages(ordinary).length, 2, 'Cursor still durably records the provider-independent occurrence')
+    assertPairShape(ordinary[0], ordinary[1], stableCallId(session, 1n), text)
   } finally {
     if (previous === undefined) delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
     else process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = previous
   }
 })
 
-test('C_PH_three_cursor_encoders_change_only_role_and_stable_id', () => {
-  const raw = [{
-    info: { id: 'u1', role: 'user', model: { providerID: 'cursor', modelID: 'composer' } },
-    parts: [{ type: 'text', text: 'work' }],
-  }]
-  const session = 'ses_cursor_modes'
-  for (const role of ['assistant', 'user', 'system']) {
-    const result = resultOf(tryInjectWithCursorRole(undefined, session, text, toList(raw), role))
-    assert.equal(result.ok, true)
-    const marker = pairMessages(listItems(result.value))
-    assert.equal(marker.length, 1)
-    assert.equal(marker[0].info.role, role)
-    assert.equal(marker[0].parts[0].type, 'text')
-    assert.equal(marker[0].parts[0].text, text)
-    assert.equal(marker[0].info.id, stableCursorMessageId(stableCallId(session, 1n), role))
-  }
+test('C_PH_cursor_appends_NUL_BOM_guidance_inside_real_completed_tool_result', () => {
+  const raw = [
+    {
+      info: { id: 'u1', role: 'user', model: { providerID: 'cursor', modelID: 'default' } },
+      parts: [{ type: 'text', text: 'read it' }],
+    },
+    toolCall('c1', 'read', 'call_read'),
+    {
+      info: { id: 'r1', role: 'assistant', providerID: 'cursor', modelID: 'default' },
+      parts: [{
+        type: 'tool',
+        tool: 'read',
+        callID: 'call_read',
+        state: { status: 'completed', input: { filePath: 'AGENTS.md' }, output: 'success' },
+      }],
+    },
+  ]
+  const out = inject('ses_cursor_completed_tool', raw)
+  assert.equal(pairMessages(out).length, 0)
+  assert.equal(out.length, raw.length)
+  assert.equal(out.at(-1).info.id, 'r1')
+  assert.equal(out.at(-1).parts[0].state.status, 'completed')
+  assert.equal(out.at(-1).parts[0].state.output, `success\0\uFEFF${text}`)
+  assert.equal(raw.at(-1).parts[0].state.output, 'success', 'provider projection must not mutate Host transcript input')
+
+  const replayed = inject('ses_cursor_completed_tool', raw)
+  assert.deepEqual(replayed, out, 'Cursor replay must reproduce identical NUL+BOM guidance bytes')
 })
 
-test('C_PH_ordinary_cursor_ordinary_reprojects_same_occurrence', () => {
+test('C_PH_cursor_appends_NUL_BOM_guidance_inside_real_error_tool_result', () => {
+  const raw = [
+    {
+      info: { id: 'u1', role: 'user', model: { providerID: 'cursor', modelID: 'default' } },
+      parts: [{ type: 'text', text: 'read it' }],
+    },
+    toolCall('c1', 'read', 'call_read'),
+    {
+      info: { id: 'r1', role: 'assistant', providerID: 'cursor', modelID: 'default' },
+      parts: [{
+        type: 'tool',
+        tool: 'read',
+        callID: 'call_read',
+        state: { status: 'error', input: { filePath: 'missing' }, error: 'not found' },
+      }],
+    },
+  ]
+  const out = inject('ses_cursor_error_tool', raw)
+  assert.equal(pairMessages(out).length, 0)
+  assert.equal(out.at(-1).parts[0].state.status, 'error')
+  assert.equal(out.at(-1).parts[0].state.error, `not found\0\uFEFF${text}`)
+  assert.equal(raw.at(-1).parts[0].state.error, 'not found')
+})
+
+test('C_PH_ordinary_cursor_ordinary_suppresses_then_restores_same_occurrence', () => {
   const session = 'ses_cursor_transition'
   const ordinary = inject(session, [userMsg('u1')])
   const ordinaryCallId = stableCallId(session, 1n)
@@ -285,9 +317,8 @@ test('C_PH_ordinary_cursor_ordinary_reprojects_same_occurrence', () => {
     parts: [{ type: 'text', text: 'hello' }],
   }]
   const cursor = inject(session, cursorReal)
-  const cursorMarkers = pairMessages(cursor)
-  assert.equal(cursorMarkers.length, 1)
-  assert.equal(cursorMarkers[0].info.id, stableCursorMessageId(ordinaryCallId, 'assistant'))
+  assert.equal(pairMessages(cursor).length, 0)
+  assert.deepEqual(cursor, cursorReal)
 
   const back = inject(session, [userMsg('u1')])
   assert.equal(pairMessages(back).length, 2)

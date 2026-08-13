@@ -30,4 +30,8 @@ Do not begin carrying out the work you are planning.
 
 When the account is complete enough that another Manager could receive it without having to guess what you omitted, write it with todowrite.
 
+Your first todowrite is the complete submission of that plan.
+If you need a plan of the plan, write it as text.
+Do not call todowrite except with the finished plan itself.
+
 Write the plan you would be willing to hand to someone else and then hold them to.

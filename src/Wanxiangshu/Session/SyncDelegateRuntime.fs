@@ -36,9 +36,11 @@ type SyncDelegateRuntime
         /// SendPrompt. ChatParamsHook leaves Model=None; Host agent config is not
         /// visible here, so the caller supplies the bound OpencodeModel.
         ?promptModel: OpencodeModel,
-        /// EXEC-031: bounded WorkRecord projector (includeOpening=false). Injected
-        /// from plugin wiring so Session does not depend on Finality compile order.
-        ?workRecordFor: SessionId -> string option
+        /// EXEC-031: per-invocation bounded WorkRecord projector
+        /// (includeOpening=false). Injected from plugin wiring so Session does
+        /// not depend on Finality compile order; range = the invocation's
+        /// XTrace [StartInclusive, EndExclusive).
+        ?workRecordFor: SessionId -> MagicTodoLwr.BoundedRange -> string option
     ) =
     let store = SyncDelegateCallStore()
     let directory = workspaceDirectory
@@ -46,7 +48,7 @@ type SyncDelegateRuntime
     let noteInspectorAnswer = defaultArg onInspectorAnswer (fun _ _ -> ())
     let cleanupInspectorDraft = defaultArg onInspectorCleanup (fun _ -> ())
     let boundPromptModel = promptModel
-    let projectWorkRecord = defaultArg workRecordFor (fun _ -> None)
+    let projectWorkRecord = defaultArg workRecordFor (fun _ _ -> None)
 
     let sessionKey (sessionId: SessionId) = SessionId.value sessionId
 
@@ -56,8 +58,6 @@ type SyncDelegateRuntime
         function
         | SyncDelegateRole.Inspector -> Role.Inspector
         | SyncDelegateRole.Coder -> Role.Coder
-
-    let normalizePayload (text: string) = if isNull text then "" else text.Trim()
 
     // EXEC-031: SyncDelegate uses ordinary WorkMain tools — no Return permission.
     let toolMap role =
@@ -72,9 +72,32 @@ type SyncDelegateRuntime
               Directory = childDirectory }
         )
 
+    let xTraceHead (sessionId: SessionId) : int64 =
+        AgentJournal.snapshot journal
+        |> fun snapshot -> AgentProjection.tryFind sessionId snapshot.AgentProjections
+        |> Option.bind (fun session -> session.XTrace)
+        |> Option.map XTraceProjection.headSequence
+        |> Option.defaultValue 0L
+
     let sendDelegatePrompt (call: SyncDelegateCall) (request: SyncDelegatePromptRequest) =
         task {
             let tools = toolMap (canonicalRole call.Role)
+
+            // EXEC-031: capture the Opening from the raw Charge (not the
+            // provider envelope), matching OneShotAgentTool. PromptIngress omits
+            // Opening for AgentOwnerRoot, so the LWR projector would otherwise
+            // return None and the bounded record would be undefined. Idempotent:
+            // a reused child keeps its first invocation's Opening (PERSIST-010).
+            XTraceCapture.captureOpening (Some journal) call.Delegate request.Charge []
+
+            // EXEC-031: snapshot the child's XTrace head at send. This is the
+            // per-invocation range start; the exclusive end is captured at
+            // completion after the terminal. All coalesced invocations in this
+            // call share the same head and thus the same bounded record.
+            let startCursor = xTraceHead call.Delegate
+
+            for inv in call.Invocations do
+                inv.StartCursor <- Some startCursor
 
             return!
                 dispatcher.SendAgentOwnerRootWithTools
@@ -88,11 +111,6 @@ type SyncDelegateRuntime
                     tools
                     boundPromptModel
         }
-
-    let materializeWorkRecord (delegateSession: SessionId) (fallback: string) =
-        match projectWorkRecord delegateSession with
-        | Some record when not (String.IsNullOrWhiteSpace record) -> record
-        | _ -> fallback
 
     let deps: SyncDelegateWorkflow.Dependencies =
         { Attached = attached
@@ -170,18 +188,48 @@ type SyncDelegateRuntime
                 | Some call ->
                     match turn.Outcome with
                     | ReconcileProgram.TurnCompleted ->
-                        let payload = normalizePayload (CompletedTurnClassifier.partsText turn.Parts)
-                        let workRecord = materializeWorkRecord turn.SessionId payload
+                        // EXEC-031 / COMPANION-015: persist this turn's terminal
+                        // segment BEFORE projecting, mirroring AssistanceHost.
+                        // HandleTurn claims the turn and returns true, so
+                        // TurnWorkflow never reaches TerminalReporter; without this
+                        // the child XTrace would carry no Closing report. applyTerminal
+                        // overwrites per work unit, so a reused child gets a fresh
+                        // Closing for each invocation.
+                        XTraceCapture.captureTerminal (Some journal) turn
 
-                        if call.Role = SyncDelegateRole.Inspector then
-                            noteInspectorAnswer (sessionKey turn.SessionId) workRecord
+                        // Exclusive range end = the child's XTrace head after the
+                        // terminal (terminal lives outside Parts, so head is the
+                        // parts frontier this invocation advanced to).
+                        let endCursor = xTraceHead turn.SessionId
 
-                        AsyncSupport.trySetResult call.Answer (Ok workRecord) |> ignore
+                        let workRecord =
+                            call.Invocations
+                            |> List.tryHead
+                            |> Option.bind (fun inv -> inv.StartCursor)
+                            |> Option.bind (fun startCursor ->
+                                projectWorkRecord
+                                    turn.SessionId
+                                    { StartInclusive = { Sequence = startCursor }
+                                      EndExclusive = { Sequence = endCursor } })
 
-                        for inv in call.Invocations do
-                            AsyncSupport.trySetResult inv.Completion (Ok workRecord) |> ignore
+                        match workRecord with
+                        | Some record when not (String.IsNullOrWhiteSpace record) ->
+                            if call.Role = SyncDelegateRole.Inspector then
+                                noteInspectorAnswer (sessionKey turn.SessionId) record
 
-                        return true
+                            AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
+
+                            for inv in call.Invocations do
+                                AsyncSupport.trySetResult inv.Completion (Ok record) |> ignore
+
+                            return true
+                        | _ ->
+                            // EXEC-031 / EXEC-026: fail closed. A Completed turn
+                            // without a bounded WorkRecord is a protocol defect, not
+                            // a licence to fall back to the last message (EXEC-028
+                            // residual OneShot analog). The session stays reusable.
+                            store.FailCall(call, "EXEC-031: Completed without bounded WorkRecord")
+                            return true
                     | ReconcileProgram.TurnFailed error
                     | ReconcileProgram.TurnAborted error ->
                         store.FailCall(call, (sprintf "SyncDelegate run failed: %s" error))

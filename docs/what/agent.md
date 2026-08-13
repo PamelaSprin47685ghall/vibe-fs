@@ -80,17 +80,19 @@ fast, deep, reviewer-fast, fast_reviewer
 
 | 角色 | 工具 |
 |------|------|
-| Orchestrator | `commission`, `join`, `horizon` |
-| Manager | `fork`, `join`, `horizon`, `todowrite`, `fission`, `suicide` |
-| Coder | `read`, `write`, `edit`, `glob`, `grep`, `inspect`, `mv`, `rm`, `bash-honeypot`, `js-coder` |
-| Inspector | `read`, `glob`, `grep`, `query-shell`, `fetch`, `js-inspector` |
-| DevOps | `read`, `glob`, `grep`, `js-devops`, `inspect`, `establish-behavior`, `repair-behavior`, `run`, `open-terminal`, `send-terminal`, `read-terminal`, `signal-terminal`, `horizon`, `join` |
-| Browser | `read`, `glob`, `grep`, `js-browser`, stealth-browser MCP（AGENT-026） |
-| Inquiry | `inspect` + Sphinx MCP（AGENT-025、AGENT-030） |
-| Reviewer | `read`, `glob`, `grep`, `judge`, `js-reviewer` |
+| Orchestrator | `commission`, `join`, `horizon`, `auto-injected` |
+| Manager | `fork`, `join`, `horizon`, `todowrite`, `fission`, `suicide`, `auto-injected` |
+| Coder | `read`, `write`, `edit`, `glob`, `grep`, `inspect`, `mv`, `rm`, `bash-honeypot`, `js-coder`, `auto-injected` |
+| Inspector | `read`, `glob`, `grep`, `query-shell`, `fetch`, `js-inspector`, `auto-injected` |
+| DevOps | `read`, `glob`, `grep`, `js-devops`, `inspect`, `establish-behavior`, `repair-behavior`, `run`, `open-terminal`, `send-terminal`, `read-terminal`, `signal-terminal`, `horizon`, `join`, `auto-injected` |
+| Browser | `read`, `glob`, `grep`, `js-browser`, stealth-browser MCP（AGENT-026）、`auto-injected` |
+| Inquiry | `inspect` + Sphinx MCP（AGENT-025、AGENT-030）、`auto-injected` |
+| Reviewer | `read`, `glob`, `grep`, `judge`, `js-reviewer`, `auto-injected` |
 | Blogger | `chronicle` |
 | Distiller | 无工具 |
 | Bookkeeper（内部） | `js-bookkeeper` |
+
+`auto-injected` 是 HOST-013 的真实 no-op entity（空参数，live execute 恒返回 `OK`），不是业务能力。Blogger / Distiller / Bookkeeper 不含此项。
 
 已删除（不得再出现于矩阵）：`list`、`verdict`、`blog`、`executor`（工具）、`fork-pty`、`edit-qa`、`return`、`fork-manager`、`fork-agent`、`inspector`（工具名）、`coder`（同步委派工具名）。
 
@@ -120,7 +122,7 @@ permissions(fast-ROLE) = permissions(deep-ROLE)
 
 ## AGENT-011：Manager 无普通工具
 
-Manager 只有 `fork` / `join` / `horizon` / `todowrite` / `fission` / `suicide`。  
+Manager 只有 `fork` / `join` / `horizon` / `todowrite` / `fission` / `suicide`，外加 HOST-013 `auto-injected` no-op。  
 不能直接读文件、跑终端、改仓库，也不能 `inspect`。
 
 ## AGENT-012：Coder 的 Inspector 不透明
@@ -194,10 +196,10 @@ Dedicated Inspector/Coder（后者是 Work + Attached，HOST-008）。
 正式工具面（普通 Work Session；事实调查只经 SyncDelegate；认识求解经 Sphinx MCP）：
 
 ```text
-Inquiry → { inspect, sphinx MCP }
+Inquiry → { inspect, sphinx MCP, auto-injected }
 ```
 
-`sphinx MCP` = Host MCP `sphinx` 的工具面（AGENT-030 / SPHINX-003）。仍禁止 filesystem 直读。
+`auto-injected` 是 HOST-013 空参 no-op entity，不是 Inquiry 业务能力。`sphinx MCP` = Host MCP `sphinx` 的工具面（AGENT-030 / SPHINX-003）。仍禁止 filesystem 直读。
 
 禁止再持有：`read` / `glob` / `grep` / `write` / `edit` / `run` / `establish-behavior` /
 `repair-behavior` / `fork` / `commission` / 终端动词 / `join` / `horizon` / stealth-browser MCP，以及任何 filesystem 直读面。

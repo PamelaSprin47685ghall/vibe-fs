@@ -46,7 +46,7 @@ test('PROMPT_008_the_profile_derives_role_prompt_and_tools_from_the_authority', 
 
   assert.equal(plan.canonicalRole, 'Coder')
   assert.equal(plan.systemPromptId, 'coder', 'AGENT-001: derived from the role alone')
-  assert.deepEqual(plan.toolCapabilities, ['BashHoneypot', 'Edit', 'Fetch', 'Glob', 'Grep', 'Inspect', 'Move', 'Read', 'Remove', 'Write'])
+  assert.deepEqual(plan.toolCapabilities, ['AutoInjected', 'BashHoneypot', 'Edit', 'Fetch', 'Glob', 'Grep', 'Inspect', 'Move', 'Read', 'Remove', 'Write'])
 })
 
 test('AGENT_010_the_tier_does_not_reach_the_system_prompt_or_the_tool_set', () => {

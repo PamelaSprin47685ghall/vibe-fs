@@ -74,7 +74,11 @@ Host compaction **不得删除** XTrace：否则 Y 落后补缺口与 LWR 自包
 
 对**非 Companion / 非 Blogger** 的 provider transcript，每个尚未存在 HOST-013 occurrence 的真实 provider/tool exchange（placement occasion）恰好产生一个 durable `PairProgrammingGuideline` occurrence。Occurrence 的语义正文、稳定 `callID`、`CallGap` 与 `ResultGap` 与 provider 无关；provider renderer 只决定同一 occurrence 在 wire 上采用何种合法形状。
 
-普通 provider 仍把 occurrence 渲染为 synthetic `auto-injected` pair：assistant tool-call + 使用同一 `callID` 的 completed tool-result，tool-call 输入为 `{}`。Cursor **不得**发送 fake tool；同一 occurrence 改为在 `ResultGap` 渲染一条 synthetic text message。生产 Cursor renderer 固定为 assistant-role text；user/system 两种同正文 encoder 只保留在受控比较测试中，不作为用户设置或第二语义源。普通→Cursor→普通 provider transition 必须重用同一 durable occurrence：Cursor 不删除 `CallGap`，反向投影仍可恢复原 fake-tool pair。
+普通 provider 仍把 occurrence 渲染为 synthetic `auto-injected` pair：assistant tool-call + 使用同一 `callID` 的 completed tool-result，tool-call 输入为 `{}`。
+
+**可执行 entity**：名为 `auto-injected` 的工具必须作为真实 OpenCode `Tool.Def` 存在（空参数）。非 Blogger / 非 Distiller 的 Work 角色 Host permission 对其 allow。模型若发出 live call，execute 恒返回 `OK`，不得因缺 entity 把 LLM 请求打失败。HOST-013 synthetic pair 仍是注入时已 completed 的历史，不经过 execute。Strength replica 与 Bookkeeper 保持既有全拒 / 仅 `js-bookkeeper` 闸门。
+
+Cursor **不得**发送 fake tool，也不得新增 synthetic message/part。仅当同一 occurrence 的 `ResultGap` 位于真实 terminal tool result 之后时，Cursor renderer 克隆该真实 result，把 provider-visible 终态文本精确投影为 `original + NUL + BOM + MarkerText`；不加 frame/header/footer。无真实 terminal result 可附着时该 occurrence 在 Cursor wire 上零字节投影，但 durable occurrence 仍存在。普通→Cursor→普通 provider transition 必须重用同一 durable occurrence：Cursor 不删除 `CallGap`，也不修改 Host raw transcript，反向投影仍可恢复原 fake-tool pair。
 
 Pair Hint 正文是一个 canonical semantic payload，至少同时要求：简体中文思考纪律；把 `[NEEDHELP]` 视为正常、可早用的协作请求；以及在每次工具 turn 前寻找完整 parallel wave——当前已知、确有用且彼此独立的调用默认在同一 assistant turn 一起发出，以最小化 provider↔tool RTT。仅真实数据依赖、共享可变 owner、协议顺序、破坏性干扰或明确有限容量可以序列化相应边；不得猜未知参数、制造/重复无用调用，也不得写死全局并发数字。此语义不按 provider 复制。
 
@@ -134,12 +138,12 @@ provider-facing 历史。判断依据是 durable SessionAssociation（`Ownership
 `isCompanion`），禁止按 agent 名字猜测。`SessionExecutionClass.Work`（含 Attached SyncInspector/SyncCoder）
 仍进入 HOST-013；InternalLeaf Bookkeeper 同 Companion 排除。
 
-**注入旁路**：仅当进程环境 `WANXIANGSHU_SKIP_AUTO_INJECTED=1` 时，非 Companion session 不再追加新的 occurrence；已落盘历史仍按当前 provider 的 renderer replay，以保持可逆历史。Cursor 不是旁路：Cursor 仍创建/恢复同一 durable occurrence，只使用 strict-validator 可接受的 text projection。
+**注入旁路**：仅当进程环境 `WANXIANGSHU_SKIP_AUTO_INJECTED=1` 时，非 Companion session 不再追加新的 occurrence；已落盘历史仍按当前 provider 的 renderer replay，以保持可逆历史。Cursor 不是旁路：Cursor 仍创建/恢复同一 durable occurrence；其 renderer 只允许真实 terminal tool-result suffix 投影，禁止 synthetic role/message/part。
 
 行为约束：
 
 1. 每个尚未存在 HOST-013 synthetic bracket 的真实 placement occasion 恰好产生一组 pair；同一 occasion 的重复 transform 只 replay，不再新增。Companion / Blogger session 整段跳过，消息序列字节不变。
-2. pair 一经加入即永久有效。后续每次 transform 必须按 durable gap anchor 原位置、原字节恢复全部既有 synthetic half，再把本次 pair 按其 gap anchor 渲染；禁止删除、过滤、去重、改写历史 pair，禁止复用既有 `callID`。历史 synthetic half 的位置只由它自己 durable 的 gap anchor 决定，不得由当前 trailing user 或当前 tool batch 重新决定。
+2. pair 一经加入即永久有效。普通 provider 后续每次 transform 必须按 durable gap anchor 原位置、原字节恢复全部既有 synthetic half，再把本次 pair 按其 gap anchor 渲染；Cursor 对每个可附着 occurrence 重放完全相同的 `NUL + BOM + MarkerText` suffix。禁止删除、过滤、去重、改写历史 pair，禁止复用既有 `callID`。历史位置只由 durable gap anchor 决定，不得由当前 trailing user 或当前 tool batch 重新决定；Cursor 无可附着 result 时只能零字节，不得重定位。
 3. 同一 pair 共享 `callID`，但两个 half 各自拥有独立 transcript placement（共同 identity ≠ 相邻存储）。不同 pair 的 `callID` 唯一且可稳定重建。恢复顺序与字节必须来自 durable append-only 事实，不得依赖文本识别。
 4. pair 正文不得进入 XTrace / Companion decode / Blogger delta / work record / compaction input；仅 pair 的 durable 投影事实参与 HOST-013 恢复。
 5. 同一 epoch 内，前次 provider-visible wire 必须是后次 wire 的稳定字节前缀，权威判定为 `ProviderProjection.isAppendOnlyPrefix`；历史 pair 保留原位，不读 limit、不做 token 估算（CTX-002）。禁止用 PrefixEpoch 切换掩盖 HOST-013 自己造成的前缀漂移。

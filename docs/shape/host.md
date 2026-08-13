@@ -154,7 +154,11 @@ type PairProgrammingGuideline =
       ResultGap: TranscriptGap }
 ```
 
-`Ordinal` 严格递增；`CallId` 在该 transcript 内唯一；`CallGap` / `ResultGap` 是 provider-independent occurrence 的两个 transcript gap anchor。记录一经追加不可修改、删除或换位。普通 provider 把每条记录渲染为 assistant `auto-injected` tool-call 与对应 completed tool-result；Cursor 把同一记录渲染为 `ResultGap` 上的一条 synthetic assistant text。所有投影都共享 canonical `MarkerText`，并用 `source = "pair-programming-auto-injected"` + stable synthetic id 做 identity；不得按正文过滤。
+`Ordinal` 严格递增；`CallId` 在该 transcript 内唯一；`CallGap` / `ResultGap` 是 provider-independent occurrence 的两个 transcript gap anchor。记录一经追加不可修改、删除或换位。普通 provider 把每条记录渲染为 assistant `auto-injected` tool-call 与对应 completed tool-result。
+
+**Tool.Def 边界**：`auto-injected` 的可执行 entity 由 `AutoInjectedTool` 拥有（空参数，execute 恒返回 `OK`），经 `ToolRegistry` 进入 `hooks.tool`。`PairProgrammingThoughtTransform` 只渲染已 completed 的历史 pair，不执行该工具。二者同名、分属 entity 与 renderer，禁止把 execute 写进 transform。Blogger / Distiller 的 Host permission 保持 deny。
+
+Cursor 不创建 synthetic message/part，只在 `ResultGap` 紧跟真实 terminal tool result 时，把该真实 result 的 provider-visible 终态文本投影为 `original + NUL + BOM + MarkerText`。所有投影共享 canonical `MarkerText`；ordinary synthetic identity 继续由 `source = "pair-programming-auto-injected"` + stable id 标识，Cursor suffix identity 只来自 durable occurrence 与 anchor，不按正文识别。
 
 `TranscriptMessageAddress` 是 Host transcript message address（raw message 的 `info.id` / `id`，与 Session snapshot 以 message `Id` 寻址一致）的窄类型 codec；禁止偷换成 `PhysicalUserMessageId`、`AuthorityRootUserMessageId`、`ProviderRunIdentity` 或 `ToolCallId`，除非该值在具体位置上确实就是 transcript message address。
 

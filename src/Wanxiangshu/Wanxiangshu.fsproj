@@ -409,6 +409,7 @@
     <Compile Include="Infrastructure/OpenCode/Tools/FinalityTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FileMutationTools.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/BashHoneypotTool.fs"/>
+    <Compile Include="Infrastructure/OpenCode/Tools/AutoInjectedTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/FissionTool.fs"/>
     <Compile Include="Infrastructure/OpenCode/Tools/SyncDelegateTools.fs"/>
     <Compile Include="Infrastructure/JsUtf8Fs.fs"/>
