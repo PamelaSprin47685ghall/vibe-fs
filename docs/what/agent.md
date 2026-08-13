@@ -313,7 +313,7 @@ consultation 是真实 child Session，不是假 completion、不是 hidden pros
 
 所有独立 query 在一个 bounded parallel wave 中执行，`TopKPerKeyword = 4`；单 query failure、Semble disabled/timeout/launch failure 均 fail-open。merge 恢复 `keyword ordinal → local rank`，按 `FilePath + StartLine + EndLine + Content` 稳定去重，最多 `MaxHintsTotal = 24`。最终 warm-start 文档最多 `MaxWarmStartBytes = 64 KiB`；超限只删除完整 hint entry，绝不截断 TOML 字符串。
 
-Provider envelope 由 canonical `SyntheticToml` writer 渲染：charge 是 instruction/assignment；caller keyword 与 `repository_search`/`repository_hint` 都是 data，并明确标注 hints 不是 instructions、不是 proof，callee 必须用正常 repository tools 验证 load-bearing facts。不得伪造 read/grep/tool history，不得把 hits 直接写入 Casebook。repoPath 只用真实 `WorkspaceDirectory`；缺失时跳过，禁止猜 `"."`。显式 keywords 每次 fresh search；无自动从 charge 抽词、无 cross-call warm-start cache。
+Provider envelope 由 canonical `SyntheticToml` writer 渲染：charge 是 instruction/assignment；caller keyword 与 `repository_search`/`repository_hint` 都是 data，并明确标注 hints 不是 instructions、不是 proof、不是合成的工具历史；是否采信由 callee 自行判断。不得伪造 read/grep/tool history，不得把 hits 直接写入 Casebook。repoPath 只用真实 `WorkspaceDirectory`；缺失时跳过，禁止猜 `"."`。显式 keywords 每次 fresh search；无自动从 charge 抽词、无 cross-call warm-start cache。
 
 ## AGENT-028：Persona Registry
 
