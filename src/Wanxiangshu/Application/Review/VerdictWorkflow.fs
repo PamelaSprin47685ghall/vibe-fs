@@ -26,6 +26,9 @@ type VerdictDecision =
     | Confirmed
     | ChallengeUnproven
     | AlreadyCounted
+    /// REVIEW-013: TodoProcessReview one durable judge is terminal VerdictKnown.
+    /// No PerfectChallengeIssued / dual-PERFECT witness.
+    | ProcessTerminal
 
 /// REVIEW-003/006/010: single writer for PerfectChallengeIssued and
 /// ConfirmedReviewWitness. This is Application judgement, not Session runtime.
@@ -78,8 +81,19 @@ module VerdictWorkflow =
               ProviderRun = submission.ProviderRun
               ToolCallId = submission.ToolCallId }
 
+        let processReview =
+            MagicTodoProjection.pendingProcessReviewForReviewer
+                submission.ReviewerSessionId
+                (AgentJournal.snapshot journal).AgentProjections.MagicTodo
+            |> Option.isSome
+
         if ReviewProjection.hasObservedAttempt attempt guard then
             Ok VerdictDecision.AlreadyCounted
+        elif processReview then
+            // REVIEW-013/004: one durable judge is VerdictKnown. ConsumableReview
+            // waits on record-ready LWR (REVIEW-014/017), not challenge seal.
+            append submission.ReviewerSessionId submission.ProviderRun (verdictFact submission) journal
+            |> Result.map (fun _ -> VerdictDecision.ProcessTerminal)
         else
             match submission.Verdict with
             | ReviewGuardVerdict.Revise ->

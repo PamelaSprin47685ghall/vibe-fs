@@ -50,8 +50,9 @@
 | child 继承 | Companion / SyncDelegate / Bookkeeper / StrengthReplica / Attached 继承 owner\|commissioner；不得各自绑全局 | HOST-026 |
 | 事件不改语 | Fallback / Strength / restart / reanchor / BlindPlan T1 **不**改写已绑语言 | HOST-026、ARCH-016 D |
 | 全局后改 | 只影响此后新建 session；已开 Life Opening / Library / consequence / HOST-013 marker 字节连续 | HOST-026 |
-| 翻译边界 | localizable = system / Role Law / Common Law / Library / tool prose / WorkRecord headings；invariant = tool 名 / argument / wire / enum / path / command / `exit_code` | HOST-026、ARCH-016 C |
+| 翻译边界 | localizable = system / Role Law / Common Law / Library / tool prose / argument prose / WorkRecord headings；invariant = tool 名 / argument / wire / enum / path / command / `exit_code` | HOST-026、ARCH-016 C |
 | EN/ZH 资源 | 每份 provider semantic resource EN + zh-CN 成对；缺语言 fail（Gate C） | HOST-026、ARCH-016 C |
+| tool prose 跟 session 语言 | 同一 participant 的 system 与 tool contract 不得混语；进程级冻结 ≠ 已闭合 | HOST-026、PROMPT-019 |
 
 Gate C 跨域门禁见 `proof/architecture.md`；Prompt 侧冻结见 `proof/prompt.md` Gate D / PROMPT-017。
 

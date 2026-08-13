@@ -108,6 +108,7 @@ module JudgeTool =
         | VerdictDecision.Confirmed -> received ctx
         | VerdictDecision.ChallengeUnproven -> challengeUnproven ctx
         | VerdictDecision.AlreadyCounted -> received ctx
+        | VerdictDecision.ProcessTerminal -> received ctx
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {

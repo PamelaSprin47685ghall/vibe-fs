@@ -327,4 +327,12 @@ child / attached / InternalLeaf（含 Companion、SyncDelegate、Bookkeeper、St
 用户事后改全局偏好 → 只影响此后新建 session；已开 Life 的 Opening / Office Library / tool 后果 / HOST-013 marker 世界语保持字节连续。
 
 Fallback / Strength / restart / reanchor **不得**改写 `SessionProviderLanguage`。  
-翻译边界：localizable = system / Role Law / Common Law / Library / tool description / consequence / hints / WorkRecord headings；invariant = tool 名、argument 名、wire field、enum literal、路径、命令、`exit_code` 等技术标识（ARCH-016 Gate C）。
+翻译边界：localizable = system / Role Law / Common Law / Library / tool description / argument meaning / consequence / hints / WorkRecord headings；invariant = tool 名、argument 名、wire field、enum literal、路径、命令、`exit_code` 等技术标识（ARCH-016 Gate C）。
+
+一个 participant 看见的 tool description 与 argument prose **必须**与该 session 已绑 `SessionProviderLanguage` 一致。禁止：
+
+```text
+zh-CN system prompt + English tool contract
+```
+
+OpenCode `tool.definition` 现行 input 只有 `toolID`、无 session。进程级 `readGlobalPreference` 冻结 description **不**闭合本条。本条冻结 acceptance criterion；按 session 投影 tool prose 的 Host 设计可另做，但不得把混语合同当成已解决。

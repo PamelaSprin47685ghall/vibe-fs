@@ -49,10 +49,14 @@ module MagicTodoAdmission =
     /// Result of Magic before admission prior to mutating Host args / appending Prepared.
     /// The control algebra is identical for historical and clean-break plans; only
     /// the successful prepare payload differs.
+    ///
+    /// `AwaitingConsumableReview` is a legal lag-1 wait (TODO-006 / HOST-019 deferred
+    /// prepare), not a fail-closed reject.
     [<RequireQualifiedAccess>]
     type AdmissionOutcome<'Prepare> =
         | FreshPrepare of 'Prepare
         | IdempotentReplay of TodoWriteId
+        | AwaitingConsumableReview of pendingTodoWriteId: string
         | Rejected of MagicTodoReject
 
     /// Full Magic validation path for a todowrite before-hook.
@@ -85,6 +89,8 @@ module MagicTodoAdmission =
             | Some _ -> AdmissionOutcome.Rejected(MagicTodoReject.IdentityCorruption "TodoWriteId")
             | None ->
                 match mayProceedPastLag1 with
+                | Error(MagicTodoReject.AwaitingConsumableReview pending) ->
+                    AdmissionOutcome.AwaitingConsumableReview pending
                 | Error e -> AdmissionOutcome.Rejected e
                 | Ok() ->
                     match MagicTodo.normalizeProposed sha256 lifeId localized.ToolCallId settledCurrent rawInputs with
@@ -134,6 +140,8 @@ module MagicTodoAdmission =
             | Some _ -> AdmissionOutcome.Rejected(MagicTodoReject.IdentityCorruption "TodoWriteId")
             | None ->
                 match mayProceedPastLag1 with
+                | Error(MagicTodoReject.AwaitingConsumableReview pending) ->
+                    AdmissionOutcome.AwaitingConsumableReview pending
                 | Error e -> AdmissionOutcome.Rejected e
                 | Ok() ->
                     match MagicTodo.validateObligations submitted with

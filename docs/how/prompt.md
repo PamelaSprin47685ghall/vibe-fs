@@ -118,6 +118,7 @@ assembleOfficeSystemPrompt(session):
 ```
 
 Tools surface **不**并入 system 串；capability 变化不改人格（PROMPT-015）。  
+Tool description 是调用合同（PROMPT-020），按已绑 `SessionProviderLanguage` 装载；不得与 system 混语（HOST-026）。  
 Lifecycle orient（Activation / Reawakening / Continuation / Handoff / Fission / Departure）只注入 conversation/runtime，不替换 system 字节。  
 generic Activation ≠ Manager BlindPlan；不得触发 system prompt 切换（TODO-015）。
 

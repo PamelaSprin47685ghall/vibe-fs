@@ -116,10 +116,28 @@ module MagicTodoProjection =
             | _ -> None
 
     /// True when a new TodoWritePrepared may proceed past lag-1 await.
+    /// `AwaitingConsumableReview` is the wait signal for deferred prepare / suicide
+    /// drain (TODO-006), not a provider-visible reject.
     let mayAdmitNewCheckpoint (life: LifeMagicTodoState) : Result<unit, MagicTodoReject> =
         match pendingReviewObligation life with
         | None -> Ok()
         | Some cp -> Error(MagicTodoReject.AwaitingConsumableReview(TodoWriteId.value cp.TodoWriteId))
+
+    /// REVIEW-013: typed process-review authority for a dedicated reviewer session.
+    /// Presence of Accepted ∧ Assigned ∧ ¬Concluded on this reviewer is RequestKind
+    /// TodoProcessReview — not a pendingChallenge guess.
+    let pendingProcessReviewForReviewer
+        (reviewerSessionId: SessionId)
+        (state: MagicTodoProjectionState)
+        : CheckpointRecord option =
+        state.ByLife
+        |> Map.tryPick (fun _ life ->
+            match life.Dedicated with
+            | Some dedicated when dedicated.ReviewerSessionId = reviewerSessionId ->
+                // Accepted ∧ ¬Concluded on this Life's dedicated reviewer is
+                // typed TodoProcessReview authority even before Assigned lands.
+                pendingReviewObligation life
+            | _ -> None)
 
     /// Desired lag-1 cutoff from Accepted chain (no Requested fact).
     let desiredLag1 (life: LifeMagicTodoState) : TodoWriteId option =

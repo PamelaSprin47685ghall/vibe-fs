@@ -15,5 +15,6 @@ Invariant identifiers (tool names, argument names, wire fields, enum literals, p
 commands, `exit_code`) stay untranslated inside localized prose.
 
 Gate C (`language-parity-gate.mjs`) requires both locale files for every semantic directory,
-identical `{{placeholder}}` sets, Role Law semantic-anchor hits, and inspect/fork tool-description
-semantic-anchor hits.
+identical `{{placeholder}}` sets, Role Law semantic-anchor hits, and high-risk tool-description
+semantic-anchor hits (PROMPT-020). Gate F requires the five Manager-forkable office consequences
+to hit both Manager Role Law and `fork` description (ARCH-017).

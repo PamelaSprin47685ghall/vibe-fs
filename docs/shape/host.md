@@ -227,7 +227,7 @@ idle-derived continuation（missing-final-report、interaction-repair、ManagerI
 | 全局语言偏好 → `SessionProviderLanguage` | **session 创建瞬间**唯一绑定写（Host session 装配路径） | 创建后不可变；Fallback / Strength / restart / reanchor / BlindPlan T1 **不得**改写 |
 | child / attached / InternalLeaf（Companion、SyncDelegate、Bookkeeper、StrengthReplica） | **继承** owner 或 commissioner 的已绑语言 | 禁止各自再读全局偏好 |
 | HOST-013 marker 正文语言 | 只读 `SessionProviderLanguage` 选 EN/ZH guideline + Nudge | 禁止 transform 现场读全局；历史 marker 永不因语言偏好变更重算 |
-| Opening / Office Library / tool consequence / WorkRecord headings | 各文本 owner 按已绑语言取 localized representation（PROMPT-016/017） | Host 不拥有文案 SSOT；只保证绑定字节连续 |
+| Opening / Office Library / tool description / argument prose / tool consequence / WorkRecord headings | 各文本 owner 按已绑语言取 localized representation（PROMPT-016/017/020） | Host 不拥有文案 SSOT；只保证绑定字节连续；**禁** system 与 tool contract 混语 |
 | protocol identifiers | — | tool 名 / argument / wire field / enum / path / command / `exit_code` **永不翻译**（ARCH-016 Gate C） |
 
 ```text

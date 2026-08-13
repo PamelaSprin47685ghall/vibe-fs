@@ -3,9 +3,9 @@ namespace Wanxiangshu.Domain
 open Wanxiangshu.Domain.MagicTodo
 open Wanxiangshu.Kernel.Identity
 
-/// Process-review prompt assembly (protocol §18 / §20).
-/// Speculative: does not fork reviewer sessions; only shapes the typed request body
-/// once Host-owned dedicated reviewer runtime is wired.
+/// Process-review prompt assembly and RequestKind (REVIEW-013 / TODO-006/008).
+/// Host-owned dedicated reviewer runtime consumes this typed body; it does not
+/// guess process vs Finality from pendingChallenge.
 module MagicTodoProcessReview =
 
     [<RequireQualifiedAccess>]
@@ -24,8 +24,8 @@ module MagicTodoProcessReview =
             OpeningRaw: string
             /// Frontier-bounded ManagerCheckpointLWR text (Y + canonical RawGap).
             ManagerCheckpointLwr: string
-            OldTodo: MagicTodoList
-            ProposedTodo: MagicTodoList
+            OldTodo: ObligationList
+            ProposedTodo: ObligationList
         }
 
     /// `preamble` is already-localized ProcessReviewer prose (PROMPT-019).
@@ -37,10 +37,10 @@ module MagicTodoProcessReview =
               "=== ManagerCheckpointLWR (includeOpening=false; frontier-bounded) ==="
               req.ManagerCheckpointLwr
               "=== OLD TODO LIST (Ck) ==="
-              MagicTodoSurface.renderListWire req.OldTodo
+              MagicTodoSurface.renderObligationListWire req.OldTodo
               "=== PROPOSED TODO LIST (Pk) ==="
-              MagicTodoSurface.renderListWire req.ProposedTodo ]
+              MagicTodoSurface.renderObligationListWire req.ProposedTodo ]
 
-    /// ensureReview obligation predicate (protocol §15):
+    /// ensureReview obligation predicate (HOST-021 / TODO-006):
     /// Accepted ∧ ¬TodoReviewConcluded → Rk must be ensure-able from any reentry site.
     let needsEnsureReview (accepted: bool) (concluded: bool) : bool = accepted && not concluded

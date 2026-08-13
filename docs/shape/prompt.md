@@ -105,7 +105,8 @@ Host 在当前 provider assistant id 产生后才暴露 `ProviderRunIdentity`。
 | Composition 层权威 | PROMPT-015 五层：World / Role / Library / Runtime / Mission | 层可互告知，不得互冒充；冲突按语义所有权裁决，**不**设「更靠近 system 者胜」全序 |
 | Common Law / Role Law 资源 | `resources/provider/<semantic>/{en,zh-CN}.md`（SURFACE-004；PROMPT-017/019） | 文件名只存 localized representation；semantic identity 稳定；旧 `resources/prompts/*-system.md` 已删除 |
 | Office Library | PROMPT-016 + canonical volumes | 知识≠权威；不扩 Role 权；fast/deep 同书；他处已有 SSOT 则组合引用，不造第二真源 |
-| Tools surface | 当前 generated tool schema（Attempt profile） | Tools **不是** Role Prompt 章节；capability 变化不改人格 |
+| Tools surface | 当前 generated tool schema（Attempt profile）+ PROMPT-020 affordance | Tools **不是** Role Prompt 章节；capability 变化不改人格；description 是调用合同 |
+| Critical distinction 投影 | PROMPT-021：每个会改变行动的决策面 | 禁止「别处写过就删调用方合同」 |
 | Lifecycle orient 文本 | Activation / Reawakening / Continuation / Handoff / Fission / Departure 各 owner | 只 orient；generic Activation ≠ Manager BlindPlan；不得触发 system prompt 替换（TODO-015） |
 | `ProviderLanguage` 类型 | PROMPT-017（`English` \| `SimplifiedChinese`） | protocol id / tool 名 / wire field / enum / path / command **永不翻译** |
 | Provider-visible prose（Class A） | 各 semantic owner + `ProviderResources`（PROMPT-019） | 禁巨型 `TranslationRegistry`；禁 feature `match lang` prose；bound 缺 locale → fail closed |

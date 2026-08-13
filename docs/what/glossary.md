@@ -96,7 +96,7 @@
 
 | 术语 | 指向 |
 |------|------|
-| Gates A–E | ARCH-016：Tool Referential Integrity / Provider Leak / Language Parity / Prompt Stability / Provider Prose Ownership |
+| Gates A–F | ARCH-016：Tool Referential Integrity / Provider Leak / Language Parity / Prompt Stability / Provider Prose Ownership / Office Capability Integrity |
 
 ## H
 
@@ -114,7 +114,7 @@
 |------|------|
 | IngestCursor | CTX-011：Y 实际已消化到哪个 part（RecordCoverage.IngestedThrough） |
 | Inquiry | AGENT-001 / AGENT-025 / AGENT-030：`inspect` + Sphinx MCP 认识角色；旧 Role `Meditator` 非法，无 alias |
-| `inspect` | AGENT-006 / EXEC-031：同步委派 Inspector → bounded WorkRecord；旧工具名 `inspector` 非法 |
+| `inspect` | AGENT-006 / EXEC-031 / PROMPT-020：同步委派 Inspector → bounded WorkRecord；旧工具名 `inspector` 非法 |
 | InsertStrengthFrames | STRENGTH-009/016 / PROJ-005：Candidate / Promoted / Replica-local frame insertion intent |
 | Integration Gate | ORCH-005：短 CAS，只保护 ref mutation |
 | Inspector | AGENT-006：证据获取角色（`query-shell` 等）；非「执行」角色 |
@@ -176,6 +176,7 @@
 | 术语 | 指向 |
 |------|------|
 | Office Library | PROMPT-016：角色继承技术书集合；≠ Common Law，不定义 authority |
+| Office capability | ARCH-017：职位由其有权产生的后果被认识；委托要能力模型，不要名单 |
 | OpeningMaterial | COMPANION-014：preserved XTrace `[work start, OpeningBoundary)`；禁止重建；旧 `OpeningPromptRaw` 拼接已删 |
 | OpeningPolicy | GLORY-074：`Immediate` \| `BlindPlan of CommitmentContract` |
 | OpeningPromptRaw | （历史）已删除拼接重建；现由 OpeningMaterial（COMPANION-014）取代 |
@@ -193,13 +194,13 @@
 | PrefixProbe | CTX-010：attempt-local 候选前缀，失败不成为事实 |
 | PrefixRebaseCommitted | CTX-012：probe 提升的唯一持久事实；TODO-009：`EvidenceKind=TodoCheckpoint` 的 lag-1 rebase commit |
 | ProcessReviewLWR | TODO-008：process / Finality 复用的 request-range bounded canonical LWR（`includeOpening=false`） |
-| Prompt Composition Protocol | PROMPT-015：World / Role / Library / Runtime / Mission 分层；层可告知，不得冒充 |
+| Prompt Composition Protocol | PROMPT-015：World / Role / Library / Runtime / Mission 分层；Horizon 四层各答一问；层可告知，不得冒充 |
 | PromptDispatcher | PROMPT-005：四阶段（Claimed/Submitted/PhysicalAccepted/Abandoned） |
 | Provider Horizon | ARCH-014：provider 可见面决策滤镜；无状态机 / UUID / 机器 DTO |
 | Provider leak | EXEC-030 / ARCH-016 Gate B：SessionId/AgentId/PtyId/worktree/fallback offset 等不得穿 horizon |
-| ProviderLanguage | PROMPT-017：`English` \| `SimplifiedChinese`；见 SessionProviderLanguage |
 | Provider prose | PROMPT-019 Class A：进入 participant horizon 的自然语言；须经 ProviderResources |
 | ProviderLanguage ownership | PROMPT-019：Language=session；Meaning=semantic owner；Rendering=machinery；Gate E 守散落 |
+| ProviderLanguage | PROMPT-017：`English` \| `SimplifiedChinese`；见 SessionProviderLanguage |
 | ProviderRequestKind | PROMPT-008：WorkMain / BloggerMain / BloggerSquash / InteractionRepair / StrengthReplica |
 | Provider-visible projection | COMPANION-012：正进入模型的字段排除非模型 metadata |
 | ParentJoinCorrectionRequested | EXEC-022：已退休假 abort 的确定性 replacement 后通知父侧作废 |
@@ -270,6 +271,7 @@
 | TodoStatus | TODO-003：`pending \| in_progress \| reviewing \| completed \| cancelled`；completed 仅自 reviewing |
 | TodoWriteAccepted | TODO-004 / TODO-006：checkpoint + 派生 Rk obligation 的 SSOT fact |
 | T1 commitment | TODO-015 / GLORY-074：本 Life 第一次 accepted `todowrite`；关闭 BlindPlan Opening |
+| Tool Affordance | PROMPT-020：tool description 是调用合同（act / fit / not / return / argument） |
 | ToolResultBound | ARCH-012：自定义 tool result 抢先留尾截断；≤2000 行 / ≤51200 字节 |
 | TurnUnknown | HOST-004：reconciliation 私有 `SnapshotObservation`（finish=None），不是 `TurnOutcome` case |
 

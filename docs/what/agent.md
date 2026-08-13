@@ -112,7 +112,7 @@ Blogger、Distiller、Bookkeeper（含 `fast-bookkeeper` / `deep-bookkeeper`）�
 
 不可 fork：reviewer、blogger、distiller、bookkeeper。
 
-`fork` 工具描述必须写明：`navigator`（Fast Browser）与 `researcher`（Deep Browser）只从 public web 建立事实，不得用于本地文件或仓库。描述不得出现 `fast-` / `deep-` 机器名。
+`fork` 工具描述必须按 ARCH-017 写明五个 Office 的 entitled consequence，并写明：`navigator`（Fast Browser）与 `researcher`（Deep Browser）只从 public web 建立事实，不得用于本地文件或仓库。描述不得出现 `fast-` / `deep-` 机器名。两个 calling 名只差 persona / 深度，不差 authority。
 
 ## AGENT-010：fast/deep 权限一致
 
@@ -129,8 +129,8 @@ Manager 只有 `fork` / `join` / `horizon` / `todowrite` / `fission` / `suicide`
 
 ## AGENT-012：Coder 的 Inspector 不透明
 
-Coder 可见 `inspect` 工具，但 prompt 只能把它描述为不透明只读调查服务。  
-不得泄露 Inspector 的 `query-shell` / 取证权限，不得把 Inspector 当常规验证代理。
+Coder 可见 `inspect` 工具。Role Law 与 `inspect` description 都必须把 Inspector 写成见证者，不是第二双编辑的手（PROMPT-021）。  
+不得泄露 Inspector 的 `query-shell` / 取证权限，不得把 Inspector 当常规验证代理，不得请 Inspector 实现或修复代码。
 
 ## AGENT-013：DevOps 独占终端与有界执行
 

@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Review
 
 open System.Threading.Tasks
+open Wanxiangshu.Domain.MagicTodo
+open Wanxiangshu.Journal
 open Wanxiangshu.Kernel.Identity
 
 /// Review-facing tree capability. Infrastructure owns the physical Git adapter;
@@ -19,3 +21,10 @@ type ReviewHostPort =
 type ReviewerContinuationPort =
     { NudgeMissingVerdict: SessionId -> ProviderRunIdentity -> Task<Result<unit, string>>
       SendPerfectChallenge: SessionId -> ProviderRunIdentity -> Task<Result<unit, string>> }
+
+/// HOST-021 / TODO-006: Host-owned process-review ensure and lag-1 wait.
+/// After starts EnsureReview without waiting for ConsumableReview; T(k+1) /
+/// suicide drain uses AwaitConsumableReview (Journal change, no wall-clock poll).
+type ProcessReviewPort =
+    { EnsureReview: AgentJournal -> SessionId -> ManagerLifeId -> TodoWriteId -> Task<Result<unit, string>>
+      AwaitConsumableReview: AgentJournal -> SessionId -> ManagerLifeId -> TodoWriteId -> Task<Result<unit, string>> }

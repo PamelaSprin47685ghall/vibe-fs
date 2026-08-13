@@ -107,7 +107,9 @@ SyntheticToml / ToolHostCodec
 
 Bound session：缺 localization ≠ 许可换语言；fail closed（禁 silent English fallback）。
 
-Gate 0 / Batch 迁文属 Change 工作；本条立法，不定批次日程。装载见 `how/prompt.md`；所有权门禁见 ARCH-016 Gate E；成对资源、`{{placeholder}}` 结构 parity、Role Law semantic-anchor parity 与 inspect/fork tool description semantic-anchor parity 见 ARCH-016 Gate C。
+一个 participant 看见的 tool prose **必须**与其 `SessionProviderLanguage` 一致（HOST-026）。禁止 `zh-CN` system + English tool contract。
+
+Gate 0 / Batch 迁文属 Change 工作；本条立法，不定批次日程。装载见 `how/prompt.md`；所有权门禁见 ARCH-016 Gate E；成对资源、`{{placeholder}}` 结构 parity、Role Law 与高风险 tool description semantic-anchor parity 见 ARCH-016 Gate C；Office 后果投影一致性见 ARCH-016 Gate F / ARCH-017。
 
 ## PROMPT-004：来源类型
 
@@ -288,8 +290,19 @@ RUNTIME / CONVERSATION: lifecycle and event-driven injections
 USER / ASSIGNMENT: current mission
 ```
 
-层可互相告知，不得互相冒充。冲突按语义所有权边界裁决，**不**设「更靠近 system 者胜」全序。  
-Tools 不是 Role Prompt 章节：capability 变化不改人格；拥有 tool ≠ 获 authority。
+Participant Horizon 四层各答一问（层可告知，不得冒充）：
+
+```text
+System Prompt     我是什么样的参与者？
+Tool Surface      这个 verb 做什么 / 何时做 / 绝对不做什么？
+Runtime prose     刚刚发生了什么，现在为什么需要我行动？
+Assignment        当前 charge 要成为什么？
+```
+
+System Prompt 含责任、认识论、authority boundary、craft、易犯认知错误、与相邻 Office 的关系。  
+它**不得**枚举当前 runtime 的全部工具。Tools 不是 Role Prompt 章节：capability 变化不改人格；拥有 tool ≠ 获 authority。
+
+冲突按语义所有权边界裁决，**不**设「更靠近 system 者胜」全序。
 
 六种生命周期文本只 orient，不 educate，不叠第二套 envelope：
 
@@ -354,3 +367,54 @@ child / attached / internal
 `A translation changes the language of the world, not the identifiers of its machinery.`  
 Synthetic TOML：Comments ≈ instruction；Fields ≈ operands；每个 provider text owner 独立负责 EN + ZH（SURFACE-004）。  
 进入 horizon 的 prose 所有权、三类字符串与装载路径见 PROMPT-019；本条只定 `ProviderLanguage` 类型与 session 绑定。
+
+## PROMPT-020：Tool Affordance Law
+
+Tool description 是**调用时的局部 contract**，不是 tooltip。
+
+每个非平凡 verb 必须使调用方能回答：
+
+```text
+1. What act happens?
+2. When does this act fit?
+3. What tempting nearby act does this NOT perform?
+4. What does a successful return establish?
+5. What does each non-obvious argument mean?
+```
+
+必须包含足够的：positive affordance、negative affordance、boundary mirror、returned consequence、argument semantics。
+
+`fork` / `commission` 还须回答：**我把工作交给什么样的人？**  
+`calling` 不是普通 enum；它是 authority / capability 选择（ARCH-017）。
+
+高风险 verb（现行最低集合）：
+
+```text
+fork, commission, inspect, run, query-shell,
+establish-behavior, repair-behavior, fetch, join, horizon,
+judge, suicide, fission, chronicle, js-*
+```
+
+`inspect` 必须出现「does not implement or repair code」这一认知区别，不只写 `read-only`。  
+`repair-behavior` 必须说明 mechanical = 含义已被决定，不是物理上很小。  
+Coder 完成 ≠ 测试通过；DevOps 仍须观察运行中的世界。
+
+## PROMPT-021：Critical Semantic Redundancy
+
+> **A critical distinction belongs at every decision boundary where forgetting it can change the action.**
+> **Single semantic ownership does not require single presentation.**
+
+Role Law 教「我是谁」。Tool Law 教「这个动作意味着什么」。Delegation Law 教「另一个人能成为什么」。
+
+同一事实可以、并且常常必须，出现在多个决策面：
+
+| 区别 | 必须可见之处 |
+|------|------|
+| Inspector 因果只读 | Inspector Role Law；`inspect` description（调用方） |
+| Coder 不执行 | Coder Role Law；`establish-behavior` / `repair-behavior`；DevOps Role Law |
+| 五 Office 按后果选择 | Manager Role Law；`fork` description |
+
+这不是复制文档。各投影承担不同认知功能。canonical 后果仍只有 ARCH-017 一处。
+
+禁止：因为某边界已在被调用方 Role Law 写过，就从调用方 tool contract 删掉。  
+禁止：让模型从词汇（persona 名、工具名、「看起来能干」）推断 authority；世界已经知道合同时，必须把合同送到做决定的模型面前。

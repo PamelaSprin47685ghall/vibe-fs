@@ -64,7 +64,7 @@ Does the participant need the value itself
 
 ---
 
-## Gates A–E 检查算法（ARCH-016）
+## Gates A–F 检查算法（ARCH-016）
 
 静态/契约门禁（可失败；不是业务状态机字段）：
 
@@ -72,9 +72,10 @@ Does the participant need the value itself
 |------|----------|
 | A Tool Referential Integrity | 同名工具 → 唯一 schema owner + 唯一 semantic contract；不同硬语义不得同名（`commission`≠`fork`；`judge`≠旧 `verdict` 工具名） |
 | B Provider Leak | 扫描 provider 输出 / schema / fixed prose：禁 SessionId/AgentId/ManagerJobId/PtyId/Fission/lane/worktree/offset/`fast-`·`deep-`/spool |
-| C Language Parity | 每个 provider semantic resource：EN 与 zh-CN 皆存在（HOST-026）；缺语言 fail。现行：叶对成对 + `{{placeholder}}` 集合一致 + Role Law semantic-anchor 同 ID 双语命中 + inspect/fork tool description semantic-anchor 同 ID 双语命中（PROMPT-019） |
+| C Language Parity | 每个 provider semantic resource：EN 与 zh-CN 皆存在（HOST-026）；缺语言 fail。现行：叶对成对 + `{{placeholder}}` 集合一致 + Role Law semantic-anchor 同 ID 双语命中 + 高风险 tool description semantic-anchor 同 ID 双语命中（PROMPT-019/020） |
 | D Prompt Stability | 同 session 上 Fallback / T1 / review / reanchor / Strength 后 system prompt 字节相同；只允许改 EffectiveAgent |
 | E Provider Prose Ownership | 见下节算法 |
+| F Office Capability Integrity | 见下节；ARCH-017 五 Office 后果必须同时命中 Manager Role Law 与 `fork` description（PROMPT-021） |
 
 ### Gate C — Role Law semantic-anchor（PROMPT-019）
 
@@ -92,10 +93,10 @@ for each catalog role:
 
 与 `prompt-depth-ratchet` 共用 `ROLE_ANCHOR_DIRS`。Word-count 不是质量；缺锚点才红。
 
-### Gate C — tool description semantic-anchor（PROMPT-019）
+### Gate C — tool description semantic-anchor（PROMPT-019/020）
 
 ```text
-TOOL_DESCRIPTION_ANCHORS = inspect / fork
+TOOL_DESCRIPTION_ANCHORS catalogs high-risk verbs
   → [{ id, en regex, zh regex }]
 
 for each catalogued tool:
@@ -104,7 +105,24 @@ for each catalogued tool:
   zh-CN.md must match the same id's zh regex
 ```
 
-`fork` 必须按后果区分五个 Office；不得把被委托者一律写成 witness。
+`fork` 必须按后果区分五个 Office；不得把被委托者一律写成 witness。  
+`inspect` 必须禁止 implement / repair / behavioral execution。  
+`establish-behavior` / `repair-behavior` 必须区分 Coder 完成与执行证据。  
+`run` / `query-shell` 必须互为镜像：行动 vs 静态观察。
+
+### Gate F — Office Capability Integrity（ARCH-017）
+
+```text
+OFFICE_CAPABILITY_ANCHORS = five forkable offices
+  → entitled-consequence ids (mutation / existing-local / execution /
+     external-provenance / unresolved-meaning) plus corresponding negatives
+
+for each office id:
+  resources/provider/role/manager/{en,zh-CN}.md must hit
+  resources/provider/tool/fork/description/{en,zh-CN}.md must hit
+```
+
+投影文案可以不同；缺一个 entitled consequence 或把 Inspector 写成可写 Office 则红。
 
 ### Gate E — Provider Prose Ownership（PROMPT-019）
 

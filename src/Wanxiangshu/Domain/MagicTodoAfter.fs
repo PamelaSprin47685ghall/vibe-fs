@@ -5,9 +5,9 @@ open Wanxiangshu.Domain.MagicTodoFacts
 open Wanxiangshu.Domain.MagicTodoSurface
 open Wanxiangshu.Kernel.Identity
 
-/// Pure after-hook / recovery orchestration sketch (protocol §15).
-/// Speculative / unwired — Host membrane calls these after live after or
-/// RecoveredCompletedToolPart proof; Journal append stays at the call site.
+/// Pure after-hook / recovery orchestration (HOST-021 / TODO-006).
+/// Host membrane calls these after live after or RecoveredCompletedToolPart
+/// proof; Journal append and dedicated reviewer runtime stay at the call site.
 module MagicTodoAfter =
 
     [<RequireQualifiedAccess>]

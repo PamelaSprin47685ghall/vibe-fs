@@ -197,7 +197,7 @@ LWR **无** `Closing report` 段。本次 invocation 的正式陈述是 Recent w
 machine-semantic 结构只留在协议真需处（如 `exit_code`、`verdict`、`root_requirement`）。  
 禁止再造 per-role fixed report DTO（`### Summary` / `### Files Changed` / …）。
 
-## ARCH-016：静态架构 Gates A–E
+## ARCH-016：静态架构 Gates A–F
 
 可观察门禁锚点（实现与 proof 须能失败）：
 
@@ -205,6 +205,51 @@ machine-semantic 结构只留在协议真需处（如 `exit_code`、`verdict`、
 |------|--------|
 | A Tool Referential Integrity | same tool name → 唯一 schema owner + 唯一 semantic contract owner（ARCH-007） |
 | B Provider Leak | provider 输出不得含 SessionId / AgentId / ManagerJobId / PtyId / FissionGroupId / lane_index / worktree / fallback offset / `fast-`·`deep-` binding / spool path |
-| C Language Parity | 每个 provider semantic resource：EN 与 zh-CN 皆存在（HOST-026）。叶对成对 + `{{placeholder}}` 集合一致 + Role Law semantic-anchor 同 ID 双语命中 + inspect/fork tool description semantic-anchor 同 ID 双语命中为现行义务（PROMPT-019） |
+| C Language Parity | 每个 provider semantic resource：EN 与 zh-CN 皆存在（HOST-026）。叶对成对 + `{{placeholder}}` 集合一致 + Role Law semantic-anchor 同 ID 双语命中 + 高风险 tool description semantic-anchor 同 ID 双语命中为现行义务（PROMPT-019/020） |
 | D Prompt Stability | 同 session：fallback / T1 / review / reanchor / Strength → system prompt 字节相同（AGENT-029、FALLBACK-014） |
 | E Provider Prose Ownership | 已知 provider-surface owner 不得新增自然语言字面量；baseline ratchet 只减不增（PROMPT-019） |
+| F Office Capability Integrity | Manager forkable 五 Office 的 entitled consequence，在所有相关 projection 上同 ID 命中（ARCH-017） |
+
+Gate C 现行高风险 verb：`fork` / `inspect` / `commission` / `establish-behavior` / `repair-behavior` / `run` / `query-shell`。  
+Gate E 对应「生产 prose 不得散落业务代码」；Gate F 对应「能力模型不得在投影间漂移」。字数不是质量。
+
+## ARCH-017：Office Capability Model
+
+> **An office must be known by the consequence it is entitled to produce.**
+> **Delegation requires a capability model, not a list of names.**
+
+Office capability = 该职位有权产生的后果，不是 persona 名、不是工具名、不是权限清单的口语转写。
+
+Manager 当前可 `fork` 的五类 Office 构成唯一 canonical 五分法（AGENT-009）。权限矩阵仍由 AGENT-006 拥有；本条拥有**认知面**：参与者据以选择委托对象的后果模型。
+
+| Office（Role / Persona） | 有权产生 | 不做 |
+|------|------|------|
+| Coder / Engineer | repository source mutation（实现、修复、重构、tests-as-source、受托含义所要求的 docs/source/config） | 运行项目；执行测试/构建；铸造或认证 runtime evidence；作出未被托付的产品/架构决定 |
+| Inspector / Scout·Investigator | 关于本地已存在事实的证据 | 修改 source；实现修复；跑测试/构建/应用；创造新的行为证据 |
+| DevOps / Technician·Operator | 运维行动与行为证据 | 发明产品含义；在若干实质不同的合法行为之间作产品选择 |
+| Browser / Navigator·Researcher | 带 provenance 的外部事实 | 实现仓库工作；把外部可能性变成仓库义务 |
+| Inquiry / Analyst·Inquirer | 对未决问题的语义理解 | 改变 source；执行世界；把思想变成证据 |
+
+同一 Office 的两个 calling 名只差 persona 与推理深度，不差 authority。
+
+禁止把这些 Office 当成可互换的通用 agent：
+
+```text
+A Coder is not an Operator who happens not to have a shell.
+An Inspector is not a Coder with fewer permissions.
+DevOps is not a convenient escape hatch for any difficult repository task.
+Inquiry is not a witness merely because it can reason about evidence.
+Browser is not a local repository investigator merely because it can open a file-like representation.
+```
+
+单一语义所有权，多处投影（PROMPT-021）：
+
+| Projection | 认知功能 |
+|------|------|
+| 本条 + Gate F catalog | canonical fact |
+| Manager Role Law | worldview：按后果选择 Office |
+| `fork` description | 调用瞬间的可行动选择 |
+| 各 Office 自己的 Role Law | 自我模型 |
+| caller-facing tool（如 `inspect`） | 调用方必须看见的边界镜 |
+
+禁止手工维护五份互不相干的能力清单而后漂移。投影文案可以不同；entitled consequence 不得不同。

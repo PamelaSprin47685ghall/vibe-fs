@@ -39,3 +39,9 @@ Dispatcher 四阶段切开「我打算发」与「Host 真留下了 `msg_*`」�
 
 **生命周期文本：orient-only vs 教育 Host 实现 / Manager Activation phase。**  
 拒把 generic Activation 写成 Manager Planning/Working stage 或触发 system prompt 替换。六种生命周期文本（Activation/Reawakening/Continuation/Handoff/Fission/Departure）只 orient，不 educate，不叠第二套 envelope。
+
+**Tool description：tooltip vs 调用合同（PROMPT-020）。**  
+拒一句正向描述。调用方看不见被调用方 Role Law；`inspect` 若只说 "Ask an Inspector to establish a repository fact"，Coder 会把修复写进 charge。选 positive + negative affordance + 返回后果 + 参数语义。`calling` 是 authority 选择，不是裸 enum。
+
+**关键区别呈现：单点 vs 每个决策面（PROMPT-021）。**  
+拒 DRY 掉调用方合同。Single semantic ownership ≠ single presentation。机器已知的 office ontology 必须完整成为 participant 能够据以行动的世界知识。

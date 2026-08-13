@@ -14,7 +14,7 @@
 | VERIFY-002 | 晋级阶梯，禁止跨级；禁止语义分支直跳 E2E |
 | VERIFY-003 | Canary mock 剧本：键、匹配、幂等、故障轴、冷边界 |
 | VERIFY-004 | 因果推进门禁、One Physical World 与**禁止退化清单**（机器解析锚点） |
-| VERIFY-005 | Architecture gates / 单一写入口 / Host 边界 / Gates A–E |
+| VERIFY-005 | Architecture gates / 单一写入口 / Host 边界 / Gates A–F |
 | VERIFY-006 | No-Go 发布否决 |
 | VERIFY-007 | Wire / Semantic / BloggerDelta 三种投影 |
 | VERIFY-008 | 测试语言边界（`.fs` 生产 / `.mjs` 契约面） |
@@ -507,9 +507,10 @@ Review confirmed                           → 只能派生，不能赋值
 | `scripts/checks/enforcer-rulebook-gate.mjs` | mechanical A37/A38（`check.mjs` 以 `--require-headings --strict` 接线）= G7 machine Exit；HUMAN_ONLY（paired-history 120 / A39 / A40）为目录质量过程，不伪造、不阻断 Gate |
 | `scripts/checks/tool-referential-integrity.mjs` | **Gate A**（ARCH-016）：same tool name → 唯一 schema + 唯一 semantic contract；pin `tests/unit/verify/tool-referential-integrity.test.mjs`（code phase 新建） |
 | `scripts/checks/provider-leak-gate.mjs` | **Gate B**（ARCH-016）：provider 输出禁 leak vocabulary；pin `tests/unit/verify/provider-leak-gate.test.mjs`（code phase 新建） |
-| `scripts/checks/language-parity-gate.mjs` | **Gate C**（ARCH-016 / HOST-026 / PROMPT-019）：∀ provider semantic resource EN + zh-CN；`{{placeholder}}` 集合一致；Role Law 与 inspect/fork tool description semantic-anchor 同 ID 双语命中；pin `tests/unit/verify/language-parity-gate.test.mjs` |
+| `scripts/checks/language-parity-gate.mjs` | **Gate C**（ARCH-016 / HOST-026 / PROMPT-019/020）：∀ provider semantic resource EN + zh-CN；`{{placeholder}}` 集合一致；Role Law 与高风险 tool description semantic-anchor 同 ID 双语命中；pin `tests/unit/verify/language-parity-gate.test.mjs` |
 | `tests/unit/invariants/prompt-stability.test.mjs` | **Gate D**（ARCH-016 / FALLBACK-014）：同 session fallback/T1/review/reanchor/Strength → system prompt 字节相同（无静态宿主；code phase 新建） |
 | `scripts/checks/provider-prose-ownership.mjs` | **Gate E**（ARCH-016 / PROMPT-019）：已知 provider-surface owner 禁新增 NL literal；baseline ratchet 只减不增；pin `tests/unit/verify/provider-prose-ownership.test.mjs`（code phase 新建） |
+| `scripts/checks/semantic-anchors.mjs` OFFICE_CAPABILITY_ANCHORS | **Gate F**（ARCH-016 / ARCH-017）：五 Office 后果在 Manager Role Law 与 `fork` description 同 ID 命中；pin `tests/unit/verify/language-parity-gate.test.mjs` |
 | `tests/unit/**` | Fallback/Prompt/PTY/Review 的可达构造、唯一入口与完整行为 |
 
 ### Gate B leak vocabulary（权威禁令表）

@@ -105,11 +105,25 @@ module ReviewerEvidence =
         | CompleteRevision
 
     let classifyNeed journal reviewerKey =
-        match guard journal reviewerKey with
-        | None -> Need.EnsureVerdictSubmitted
-        | Some reviewGuard ->
-            let reviewerId = SessionId.create reviewerKey
+        let reviewerId = SessionId.create reviewerKey
 
+        let processReviewPending =
+            match journal with
+            | None -> None
+            | Some durable ->
+                MagicTodoProjection.pendingProcessReviewForReviewer
+                    reviewerId
+                    (AgentJournal.snapshot durable).AgentProjections.MagicTodo
+
+        match processReviewPending, guard journal reviewerKey with
+        | Some _, None -> Need.EnsureVerdictSubmitted
+        | Some _, Some reviewGuard when List.isEmpty reviewGuard.ObservedAttemptKeys ->
+            Need.EnsureVerdictSubmitted
+        | Some _, Some _ ->
+            // REVIEW-013: process PERFECT/REVISE is terminal. No confirmation nudge.
+            Need.CompleteRevision
+        | None, None -> Need.EnsureVerdictSubmitted
+        | None, Some reviewGuard ->
             match ReviewWitness.confirmedReviewer reviewGuard.Witness with
             | Some id when id = reviewerId -> Need.CompleteConfirmed
             | _ ->

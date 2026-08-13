@@ -152,6 +152,9 @@ module MagicTodo =
         | DuplicateObligationName of name: string
         | IdentityCorruption of field: string
         | NoOpenManagerLife
+        /// Lag-1 wait signal (TODO-006): T(k+1) / suicide must block until
+        /// ConsumableReview ≡ TodoReviewConcluded is durable. Not a fail-closed
+        /// provider reject and not invalidOp red text.
         | AwaitingConsumableReview of pendingTodoWriteId: string
         | FirstSuicideWithoutCheckpoint
 

@@ -15,6 +15,7 @@ open Wanxiangshu.Resources
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Identity
+open Wanxiangshu.Review
 
 /// Durable half of the GrandRewrite Magic Todo membrane.
 ///
@@ -47,6 +48,9 @@ module MagicTodoMembrane =
         | UnexpectedToolName of actual: string
         | SnapshotInputMismatch
         | Admission of MagicTodoReject
+        /// TODO-006 lag-1 wait: T(k+1) blocks until ConsumableReview is durable.
+        /// Host deferred prepare awaits this; it is not invalidOp red text.
+        | AwaitingConsumableReview of pendingTodoWriteId: string
         | BlobRead of reason: string
         | BlobWrite of reason: string
         | BlobDigestMismatch of label: string
@@ -200,6 +204,8 @@ module MagicTodoMembrane =
                             submitted
 
                     match admission with
+                    | AdmissionOutcome.AwaitingConsumableReview pending ->
+                        Error(PrepareRejection.AwaitingConsumableReview pending)
                     | AdmissionOutcome.Rejected rejection -> Error(PrepareRejection.Admission rejection)
                     | AdmissionOutcome.IdempotentReplay replayWriteId ->
                         match Map.tryFind (TodoWriteId.value replayWriteId) life.Checkpoints with
@@ -378,7 +384,11 @@ module MagicTodoHostHooks =
         else
             CanonicalJson.canonicalJson output?output
 
-    let create (journal: AgentJournal option) (snapshot: ISessionSnapshotPort option) : HookSet =
+    let create
+        (journal: AgentJournal option)
+        (snapshot: ISessionSnapshotPort option)
+        (processReview: ProcessReviewPort option)
+        : HookSet =
         let bridges =
             Dictionary<string, Task<Result<MagicTodoMembrane.PreparedBridge, string>>>()
 
@@ -451,17 +461,58 @@ module MagicTodoHostHooks =
                                         | Ok locality ->
                                             let providerInputDigest = HostDigest.sha256Hex locality.InputCanonical
 
-                                            return
-                                                match
-                                                    MagicTodoMembrane.prepare
-                                                        durable
-                                                        sessionId
-                                                        locality
-                                                        providerInputDigest
-                                                        obligations
-                                                with
-                                                | Ok value -> Ok value
-                                                | Error reason -> Error(sprintf "prepare failed: %A" reason)
+                                            let rec admitAfterLag1 () =
+                                                task {
+                                                    let snapshotNow = AgentJournal.snapshot durable
+
+                                                    let pending =
+                                                        AgentProjection.tryFind sessionId snapshotNow.AgentProjections
+                                                        |> Option.bind (fun session -> session.ManagerLife)
+                                                        |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+                                                        |> Option.bind (fun mlife ->
+                                                            MagicTodoProjection.tryLife
+                                                                mlife.LifeId
+                                                                snapshotNow.AgentProjections.MagicTodo
+                                                            |> Option.bind MagicTodoProjection.pendingReviewObligation
+                                                            |> Option.map (fun cp -> mlife.LifeId, cp.TodoWriteId))
+
+                                                    match pending, processReview with
+                                                    | Some(lifeId, writeId), Some port ->
+                                                        match!
+                                                            port.AwaitConsumableReview
+                                                                durable
+                                                                sessionId
+                                                                lifeId
+                                                                writeId
+                                                        with
+                                                        | Error reason ->
+                                                            return Error("await ConsumableReview failed: " + reason)
+                                                        | Ok() -> ()
+                                                    | Some _, None ->
+                                                        let! _ =
+                                                            AgentJournal.awaitChangeFrom
+                                                                (AgentJournal.revision durable)
+                                                                durable
+
+                                                        return! admitAfterLag1 ()
+                                                    | None, _ -> ()
+
+                                                    match
+                                                        MagicTodoMembrane.prepare
+                                                            durable
+                                                            sessionId
+                                                            locality
+                                                            providerInputDigest
+                                                            obligations
+                                                    with
+                                                    | Ok value -> return Ok value
+                                                    | Error(MagicTodoMembrane.PrepareRejection.AwaitingConsumableReview _) ->
+                                                        return! admitAfterLag1 ()
+                                                    | Error reason ->
+                                                        return Error(sprintf "prepare failed: %A" reason)
+                                                }
+
+                                            return! admitAfterLag1 ()
                             }
 
                         bridges[bridgeKey sessionText callText] <- prepared
@@ -504,6 +555,21 @@ module MagicTodoHostHooks =
                             | Ok accepted ->
                                 if not (String.IsNullOrEmpty accepted.EnrichedResult) then
                                     MagicTodoHostCodec.replaceEnrichedResult output accepted.EnrichedResult
+
+                                if accepted.NeedsEnsureReview || accepted.NeedsDedicatedEnlist then
+                                    match processReview with
+                                    | None -> ()
+                                    | Some port ->
+                                        match!
+                                            port.EnsureReview
+                                                durable
+                                                prepared.ManagerSessionId
+                                                prepared.ManagerLifeId
+                                                prepared.Prepared.TodoWriteId
+                                        with
+                                        | Error reason ->
+                                            invalidOp ("Magic Todo ensureReview failed: " + reason)
+                                        | Ok() -> ()
                         finally
                             bridges.Remove key |> ignore
             }

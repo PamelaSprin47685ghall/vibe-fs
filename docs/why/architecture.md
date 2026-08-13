@@ -25,3 +25,7 @@
 **前缀：失败驱动冷边界 vs 估算压缩。** 拒估算：吞 KV-cache 收益且违背 CTX（ARCH-004）。边界由已提交事实驱动（epoch/probe/reanchor）。
 
 **Provider surface：状态机/UUID/DTO vs 后果叙述。** 拒把内部拓扑投影成 `status/code/message/error` 或 UUID 相关字段：LLM 被迫当 union decoder，下一步行动不因字段取值改变时仍在烧注意力。拒 `spool_path` 指向已删 spool：不可达路径不是测量，是谎言。选「已发生的事实 + 可行动后果」；机器态、相关 ID、dedup 标志、cursor 全部 behind horizon。
+
+**Office 认知：名单 vs 有权产生的后果（ARCH-017）。** 拒「fork 枚举 calling 名即足够」。权限矩阵已经精确，但调用方看不到被调用方 Role Law 时，会把 Inspector 当成「另一个能处理 repository 的 agent」。选单一 capability model、多处投影：Manager Role Law 教世界观，`fork`/`inspect` 教调用瞬间的合同。
+
+**关键区别：单点陈述 vs 每个会改变行动的决策面（PROMPT-021）。** 拒「Inspector Role Law 写过只读，就不要在 inspect description 再写」。真实事故：Coder 按 inspect tooltip 把修复交给 Inspector。选有意义的冗余：Role Law 修自我模型，tool contract 修 affordance。

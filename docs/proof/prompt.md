@@ -50,7 +50,10 @@
 | 双语资源 | 每个 provider semantic resource：EN 与 zh-CN 皆存在 | PROMPT-017、ARCH-016 C、HOST-026 |
 | placeholder 结构 | EN/zh-CN `{{name}}` 集合一致 | PROMPT-019、ARCH-016 C |
 | Role Law semantic-anchor | 同一 id 双语命中；每个 `role/` 目录在 catalog | PROMPT-019、ARCH-016 C |
-| inspect/fork tool description semantic-anchor | 同一 id 双语命中；`fork` 不得把所有 Office 称作 witness | PROMPT-019、ARCH-016 C |
+| 高风险 tool description semantic-anchor | 同一 id 双语命中；`fork` 不得把所有 Office 称作 witness；`inspect` 禁止 implement/repair | PROMPT-020、ARCH-016 C |
+| Office capability projections | Manager Role Law 与 `fork` description 同 ID 命中五 Office 后果 | ARCH-017、ARCH-016 F、PROMPT-021 |
+| Tool affordance | 高风险 verb 具备 act / fit / not / return / argument 五问 | PROMPT-020 |
+| Critical redundancy | Inspector 只读同时出现在 Role Law 与 `inspect`；Coder 不执行同时出现在 Role Law 与 DevOps 委托工具 | PROMPT-021 |
 | localizable vs invariant | prose 按已绑语言；tool 名 / argument / wire / enum / path / command / `exit_code` **原样** | PROMPT-017 |
 | child 继承 | attached / InternalLeaf 继承 owner/commissioner；不得再读全局 | PROMPT-017、HOST-026 |
 

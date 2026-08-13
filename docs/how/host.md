@@ -340,8 +340,11 @@ onGlobalPreferenceChange:
   → only future new sessions
 ```
 
-localizable prose（Opening / Office Library / tool consequence / WorkRecord headings / HOST-013 marker）只读已绑语言。  
+localizable prose（Opening / Office Library / tool description / argument prose / tool consequence / WorkRecord headings / HOST-013 marker）只读已绑语言。  
 invariant identifiers（tool 名 / argument / wire field / enum / path / command / `exit_code`）永不翻译（PROMPT-017；ARCH-016 Gate C）。
+
+tool description 与 system prompt 必须同属该 session 的 `SessionProviderLanguage`（HOST-026）。  
+现行 OpenCode `tool.definition` 无 session id，进程级冻结 **不**满足本条；Host 设计可另做，混语合同不得当作已闭合。
 
 ## 空 Content 预防（归属 HOST-016）
 

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Review
 
 open System
+open System.Threading.Tasks
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.MagicTodo
 open Wanxiangshu.Domain.MagicTodoFacts
@@ -133,3 +134,20 @@ module TodoProcessReviewProgram =
                                     | Ok _ -> ConcludeOutcome.Concluded
                         | _ -> ConcludeOutcome.Pending "process-review LWR not record-ready"
             | _ -> ConcludeOutcome.Pending "assignment missing"
+
+    /// REVIEW-017 / TODO-006: event-driven wait until ConsumableReview is durable.
+    /// Pending is a wait, not a provider-visible reject.
+    let rec awaitConsumableReview
+        (journal: AgentJournal)
+        (lifeId: ManagerLifeId)
+        (writeId: TodoWriteId)
+        : Task<Result<unit, string>> =
+        task {
+            match tryConclude journal lifeId writeId with
+            | ConcludeOutcome.Concluded -> return Ok()
+            | ConcludeOutcome.Failed reason -> return Error reason
+            | ConcludeOutcome.Pending _ ->
+                let revision = AgentJournal.revision journal
+                let! _ = AgentJournal.awaitChangeFrom revision journal
+                return! awaitConsumableReview journal lifeId writeId
+        }

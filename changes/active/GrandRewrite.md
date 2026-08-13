@@ -5733,6 +5733,7 @@ Manager **不**拥有 `inspect`（已冻结）：Manager 永远不能亲手触�
 3. **§20 Non-Goals 诚实声明**：Steward / 完整 Sphinx Kernel / Fission V2 / 其他 locale / Coder BlindPlan **不得**写入 Final outcome 为已交付。
 4. **移入 `completed/`**：仅在 AC15/16 闭环（及 AC1/20 处理）后追加正式 `Final outcome`；**本 session 不移入**。
 5. **Phase 17 完整 provider-prose 迁移**：移交独立 Active Change `changes/active/PromptRestoration.md`（Gate 0 prose-ownership + Batch 1–5）。本 Change 不再以「半 i18n / 仅 Role+Library」宣称 Phase 17 收口。
+6. **Provider Surface Grand Repair（2026-08-13 Amendment）**：ARCH-017 / PROMPT-020 / PROMPT-021 已立法。剩余关闭：五 Office 投影进 Manager Role Law + `fork`；`inspect`/`establish-behavior`/`repair-behavior`/`run`/`query-shell` 完整 affordance；Gate C 高风险 verb + Gate F；eval corpus；HOST-026 tool prose 跟 session 语言（Host 设计可另做，混语不得假装已闭合）。
 
 ## Done since Amendment（2026-08-12 → 08-13 续作）
 
@@ -5777,6 +5778,16 @@ Gate D prompt-stability                            → OK（2/2；0 todo）
 ## Blockers
 
 无运行时红点。关闭语义 blocker = **AC15/AC16 WorkRecordStart / BlindPlan Opening 生产接线缺口**（docs 已定，实现仍走 `ProtectedPrefixEnd`）。
+
+## Amendment — 2026-08-13（Provider Surface Grand Repair）
+
+- **Requested by**：用户（把问题从「某个 tool description 写得不够清楚」提升为 Provider Surface 认知环境大修）
+- **Change**：正式层新增 ARCH-017 / PROMPT-020 / PROMPT-021；ARCH-016 增 Gate F；HOST-026 冻结「tool prose 必须跟 SessionProviderLanguage」。Remaining work 增第 6 条。不改 AC15/AC16 关闭前提。
+- **Laws frozen**：
+  - Role Law teaches who you are. Tool Law teaches what an act means. Delegation Law teaches who another person can be for you.
+  - A critical distinction belongs at every decision boundary where forgetting it can change the action.
+  - Do not make the model infer authority from vocabulary when the world already knows the contract.
+- **关闭状态**：保持 `active/`。本 Amendment 不把 GrandRewrite 移入 `completed/`。
 
 ## Amendment — 2026-08-12（Prompt Restoration 移交）
 
