@@ -1033,13 +1033,16 @@ test('EXEC_002_inspect_tool_description_forbids_mutation_and_execution', async (
     assert.match(description, /read-only in the causal sense/i)
     assert.match(description, /Do not use inspect to ask for code changes/i)
     assert.match(description, /make the project run[\s\S]{0,80}behavioral evidence/i)
-    assert.match(description, /evidence from a witness, not a mutation/i)
+    assert.match(description, /does not implement or repair code/i)
+    assert.match(description, /evidence from a witness/i)
+    assert.match(description, /not a mutation/i)
   })
 })
 
 test('EXEC_002_fork_and_inspect_argument_descriptions_state_parameter_meaning', async () => {
   await withPlugin(async (hooks) => {
     assert.match(schemaDescription(hooks.tool.fork.args.calling), /office\/persona|Omit when continuing/i)
+    assert.match(schemaDescription(hooks.tool.fork.args.name), /byname|not a session identifier/i)
     assert.match(schemaDescription(hooks.tool.fork.args.charge), /bounded consequence|Do not prescribe hidden tools/i)
     assert.match(schemaDescription(hooks.tool.fork.args.keywords), /retrieval hints|do not enlarge/i)
     assert.match(schemaDescription(hooks.tool.inspect.args.charge), /repository fact|Do not ask for code changes/i)

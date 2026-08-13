@@ -1,6 +1,7 @@
 /**
- * ARCH-016 Gate C — Role Law semantic-anchor catalog (PROMPT-019).
- * Same id must hit both locales. Regexes lock cognition, not wording.
+ * ARCH-016 Gate C — Role Law + high-risk tool semantic-anchor catalog (PROMPT-019/020).
+ * Gate F — OFFICE_CAPABILITY_ANCHORS (ARCH-017). Same id must hit both locales.
+ * Regexes lock cognition, not wording.
  */
 
 export const ROLE_ANCHOR_DIRS = Object.freeze([
@@ -312,6 +313,11 @@ export const TOOL_DESCRIPTION_ANCHORS = Object.freeze({
       en: /make the project run[\s\S]{0,80}behavioral evidence/i,
       zh: /不会让项目运行起来以制造新的行为证据/,
     },
+    {
+      id: 'no-implement-or-repair',
+      en: /does not implement or repair code/i,
+      zh: /不会实现或修复代码|不实现或修复代码/,
+    },
   ]),
   fork: Object.freeze([
     {
@@ -355,4 +361,123 @@ export const TOOL_DESCRIPTION_ANCHORS = Object.freeze({
       zh: /calling \+ name \+ charge[\s\S]{0,80}同一个 name/,
     },
   ]),
+  'establish-behavior': Object.freeze([
+    {
+      id: 'coder-writes-source',
+      en: /Coder writes source|Entrust a Coder to change source/i,
+      zh: /Coder[\s\S]{0,24}(?:写入|修改|写|改变) source|托付 Coder|交给 Coder/,
+    },
+    {
+      id: 'not-execution-evidence',
+      en: /Coder completion is not execution evidence|does not run those tests/i,
+      zh: /不是执行证据|不运行这些测试/,
+    },
+  ]),
+  'repair-behavior': Object.freeze([
+    {
+      id: 'meaning-decided',
+      en: /already determine what the correction means|meaning is already decided|already determines/i,
+      zh: /含义已经被决定|已经决定.*含义|correction means/,
+    },
+    {
+      id: 'not-passing-proof',
+      en: /not[\s\S]{0,80}proof that the repair passes|WorkRecord as proof/i,
+      zh: /不是[\s\S]{0,40}通过的证明|不要把返回的 WorkRecord 当[成作][\s\S]{0,40}通过/,
+    },
+  ]),
+  'query-shell': Object.freeze([
+    {
+      id: 'observation-not-execution',
+      en: /observation, not execution/i,
+      zh: /观察[\s\S]{0,40}不是执行/,
+    },
+    {
+      id: 'not-build-test',
+      en: /Not appropriate:[\s\S]{0,80}build[\s\S]{0,40}test|build[\s\S]{0,80}test[\s\S]{0,80}lint/i,
+      zh: /不适当[\s\S]{0,160}build[\s\S]{0,80}test|不适宜[\s\S]{0,160}build[\s\S]{0,80}test|build[\s\S]{0,40}test[\s\S]{0,40}lint/,
+    },
+  ]),
+  run: Object.freeze([
+    {
+      id: 'command-is-act',
+      en: /command is an act/i,
+      zh: /命令是一种行动|command 是一次行动|命令是一次行动/,
+    },
+    {
+      id: 'economic-commitment',
+      en: /economic commitments, not runtime predictions/i,
+      zh: /经济承诺|不是运行时预测/,
+    },
+  ]),
+  commission: Object.freeze([
+    {
+      id: 'independent-road',
+      en: /independent road to a Manager/i,
+      zh: /独立[\s\S]{0,20}道路/,
+    },
+    {
+      id: 'not-lifecycle-stage',
+      en: /not size of labor|not position in a lifecycle|later stage of the same destination/i,
+      zh: /生命周期|下一阶段/,
+    },
+  ]),
+})
+
+/**
+ * ARCH-016 Gate F / ARCH-017 — five forkable offices.
+ * Manager Role Law and fork description must both hit each id (projections may differ).
+ *
+ * @typedef {{
+ *   id: string,
+ *   managerEn: RegExp,
+ *   managerZh: RegExp,
+ *   forkEn: RegExp,
+ *   forkZh: RegExp,
+ * }} OfficeCapabilityAnchor
+ */
+
+/** @type {Readonly<Record<string, OfficeCapabilityAnchor>>} */
+export const OFFICE_CAPABILITY_ANCHORS = Object.freeze({
+  coder: Object.freeze({
+    id: 'coder-mutation',
+    managerEn: /entrust mutation to a Coder/i,
+    managerZh: /交给 Coder|托付.*Coder/,
+    forkEn: /Coder \/ Engineer[\s\S]{0,120}Changes repository source/i,
+    forkZh: /Coder \/ Engineer[\s\S]{0,80}改变 repository source/,
+  }),
+  inspector: Object.freeze({
+    id: 'inspector-existing-facts',
+    managerEn: /entrust an Inspector/i,
+    managerZh: /Inspector/,
+    forkEn: /Scout \/ Investigator[\s\S]{0,160}already exist in the repository/i,
+    forkZh: /Scout \/ Investigator[\s\S]{0,80}已经存在的事实/,
+  }),
+  devops: Object.freeze({
+    id: 'devops-execution',
+    managerEn: /entrust DevOps/i,
+    managerZh: /DevOps/,
+    forkEn: /Technician \/ Operator[\s\S]{0,160}running world/i,
+    forkZh: /Technician \/ Operator[\s\S]{0,80}运行中的世界/,
+  }),
+  browser: Object.freeze({
+    id: 'browser-external-provenance',
+    managerEn: /entrust a Browser/i,
+    managerZh: /Browser/,
+    forkEn: /Navigator \/ Researcher[\s\S]{0,160}external world with provenance/i,
+    forkZh: /Navigator \/ Researcher[\s\S]{0,80}外部世界的事实/,
+  }),
+  inquiry: Object.freeze({
+    id: 'inquiry-reasoning',
+    managerEn: /entrust Inquiry/i,
+    managerZh: /Inquiry/,
+    forkEn: /Analyst \/ Inquirer[\s\S]{0,160}not yet clear/i,
+    forkZh: /Analyst \/ Inquirer[\s\S]{0,80}尚无明确答案/,
+  }),
+})
+
+/** Gate F negatives: offices are not interchangeable; fork is not “commission a witness”. */
+export const OFFICE_CAPABILITY_NEGATIVES = Object.freeze({
+  managerEnRequired: /not interchangeable|A Coder is not an Operator/i,
+  managerZhRequired: /可互换|碰巧没有 shell/,
+  forkForbidden: /Commission another witness/i,
 })

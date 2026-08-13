@@ -9,7 +9,7 @@
 //   2. Supervise a child that runs node:test, with a silence window fed by test VERDICTS.
 //   3. Own the authoritative counts, because the reporter's are wrong (see supervise helper).
 //
-// Discovery is *.test.mjs under tests/unit/. No compile step, no export scanning: node:test owns
+// Discovery is *.test.mjs under tests/unit/ plus structural eval oracles under tests/eval/.
 // registration.
 //
 //   node tests/unit/run.mjs
@@ -27,6 +27,7 @@ import { superviseNodeTest } from '../e2e/support/supervise-node-test.mjs'
 import { walk } from '../../scripts/lib/walk.mjs'
 
 const TESTS_ROOT = 'tests/unit'
+const EVAL_ROOT = 'tests/eval'
 const PRODUCTION_ROOT = 'src/Wanxiangshu'
 const BUILD_ROOT = 'dist'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -116,7 +117,7 @@ const files = override
       .split(',')
       .map((file) => file.trim())
       .filter(Boolean)
-  : walk(TESTS_ROOT, ['.test.mjs'])
+  : [...walk(TESTS_ROOT, ['.test.mjs']), ...walk(EVAL_ROOT, ['.test.mjs'])]
 
 if (override) console.error(`runner: discovery OVERRIDDEN by TESTS_MJS_FILES (${files.length} file(s))`)
 

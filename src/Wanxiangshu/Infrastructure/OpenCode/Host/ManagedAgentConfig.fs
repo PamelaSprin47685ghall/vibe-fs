@@ -291,3 +291,37 @@ module ManagedAgentConfig =
                 printfn "Legacy model environment variables are ignored."
 
             Ok inventory
+    /// Parse Host-final agent model binding into an OpencodeModel.
+    ///
+    /// `provider/modelID` is the ordinary opencode.json form. A bare model id
+    /// keeps the current request's provider when one is already present, so a
+    /// Host default of the cheap id can be overwritten without inventing a
+    /// provider. Incomplete bindings (bare id, no current provider) are refused
+    /// rather than filled with a Fast default.
+    let tryOpencodeModel
+        (inventory: ManagedAgentInventory)
+        (agent: string)
+        (current: OpencodeModel option)
+        : OpencodeModel option =
+        if String.IsNullOrWhiteSpace agent then
+            None
+        else
+            match Map.tryFind (agent.Trim()) inventory.Bindings with
+            | None -> None
+            | Some binding when String.IsNullOrWhiteSpace binding.Model -> None
+            | Some binding ->
+                let text = binding.Model.Trim()
+                match text.IndexOf '/' with
+                | index when index > 0 && index < text.Length - 1 ->
+                    Some
+                        { providerID = text.Substring(0, index)
+                          modelID = text.Substring(index + 1)
+                          variant = current |> Option.bind (fun model -> model.variant) }
+                | _ ->
+                    match current with
+                    | Some existing when not (String.IsNullOrWhiteSpace existing.providerID) ->
+                        Some
+                            { existing with
+                                modelID = text }
+                    | _ -> None
+

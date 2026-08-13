@@ -26,6 +26,9 @@ module ForkTool =
             let ArgCalling = "tool/fork/arg-calling"
 
             [<Literal>]
+            let ArgName = "tool/fork/arg-name"
+
+            [<Literal>]
             let ArgCharge = "tool/fork/arg-charge"
 
             [<Literal>]
@@ -71,6 +74,15 @@ module ForkTool =
         module Commission =
             [<Literal>]
             let Description = "tool/commission/description"
+
+            [<Literal>]
+            let ArgCalling = "tool/commission/arg-calling"
+
+            [<Literal>]
+            let ArgName = "tool/commission/arg-name"
+
+            [<Literal>]
+            let ArgCharge = "tool/commission/arg-charge"
 
             [<Literal>]
             let AuthorityRequired = "tool/commission/authority-required"
@@ -385,18 +397,22 @@ module ForkTool =
                   (callingNames managerCallingBindings)
                   (prose language Path.Fork.ArgCalling)
                   factory
-              "name", ToolHostCodec.stringSchema factory
+              "name", ToolHostCodec.stringSchemaDescribed (prose language Path.Fork.ArgName) factory
               "charge", ToolHostCodec.stringSchemaDescribed (prose language Path.Fork.ArgCharge) factory
-              "keywords",
-              ToolHostCodec.optionalStringSchemaDescribed (prose language Path.Fork.ArgKeywords) factory ]
+              "keywords", ToolHostCodec.optionalStringSchemaDescribed (prose language Path.Fork.ArgKeywords) factory ]
           Execute = fun args context -> executeManager scope (decode args) context }
 
     let orchestratorSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
+        let language = ProviderLanguageBinding.readGlobalPreference ()
+
         { Name = "commission"
-          Description =
-            ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Commission.Description Map.empty
+          Description = prose language Path.Commission.Description
           Arguments =
-            [ "calling", ToolHostCodec.optionalEnumSchema (callingNames orchestratorCallingBindings) factory
-              "name", ToolHostCodec.stringSchema factory
-              "charge", ToolHostCodec.stringSchema factory ]
+            [ "calling",
+              ToolHostCodec.optionalEnumSchemaDescribed
+                  (callingNames orchestratorCallingBindings)
+                  (prose language Path.Commission.ArgCalling)
+                  factory
+              "name", ToolHostCodec.stringSchemaDescribed (prose language Path.Commission.ArgName) factory
+              "charge", ToolHostCodec.stringSchemaDescribed (prose language Path.Commission.ArgCharge) factory ]
           Execute = fun args context -> executeOrchestrator scope (decode args) context }

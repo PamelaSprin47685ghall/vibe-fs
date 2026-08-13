@@ -21,6 +21,7 @@ import {
   blobDigest,
   blobRef,
   hostToolPartId,
+  magicTodo,
   magicTodoHost,
   magicTodoJournal,
   magicTodoMembrane,
@@ -94,7 +95,7 @@ test('HOST-019 before returns without waiting for snapshot or Journal IO', async
   }
 
   try {
-    const hooks = MagicTodoHostHooks_create(created.journal, snapshot)
+    const hooks = MagicTodoHostHooks_create(created.journal, snapshot, undefined)
     const output = {
       args: {
         obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }],
@@ -238,7 +239,7 @@ const checkpoint = (journal, session, callText, obligations) => {
   }
 }
 
-test('TODO-006 T1 accept succeeds then T2 prepare is Admission(AwaitingConsumableReview)', () => {
+test('TODO-006 T1 accept succeeds then T2 prepare is a lag-1 wait, not a fail-closed Admission', () => {
   withJournal((journal) => {
     const session = sessionId('ses-magic-todo-t1-t2-lag1')
     const life = managerLifeId('life-magic-todo-t1-t2-lag1')
@@ -277,9 +278,113 @@ test('TODO-006 T1 accept succeeds then T2 prepare is Admission(AwaitingConsumabl
         { name: 'fix', work: 'Keep later todowrite calls from failing red.' },
       ])
       assert.equal(t2.result.ok, false)
-      assert.equal(t2.result.error.cases()[t2.result.error.tag], 'Admission')
-      const reject = t2.result.error.fields[0]
-      assert.equal(reject.cases()[reject.tag], 'AwaitingConsumableReview')
+      assert.equal(
+        t2.result.error.cases()[t2.result.error.tag],
+        'AwaitingConsumableReview',
+        'T2 must wait for ConsumableReview rather than fail-closed Admission/invalidOp',
+      )
+    } finally {
+      providerLanguage.clearAllForTests()
+    }
+  })
+})
+
+
+test('TODO-006 T2 prepare succeeds once T1 process review is Concluded (lag-1 wait resolves, no invalidOp)', () => {
+  withJournal((journal) => {
+    const session = sessionId('ses-magic-todo-t1-t2-resolve')
+    const life = managerLifeId('life-magic-todo-t1-t2-resolve')
+    const callText = 'call-magic-todo-t1'
+    openLife(journal, session, life)
+    providerLanguage.clearAllForTests()
+    const bound = providerLanguage.bindOnce(session, providerLanguage.english)
+    assert.equal(bound.ok, true, bound.ok ? '' : String(bound.error))
+
+    try {
+      // T1 accepted.
+      const t1 = checkpoint(journal, session, callText, [
+        { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
+      ])
+      assert.equal(t1.result.ok, true, t1.result.ok ? '' : t1.result.error.cases()[t1.result.error.tag])
+
+      const accepted = magicTodoMembrane.accept(
+        journal,
+        t1.result.value,
+        magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
+        t1.digest,
+        sha256Hex('t1-physical-output'),
+      )
+      assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error.cases()[accepted.error.tag])
+
+      // T2 before the review concludes is a legal lag-1 wait, not invalidOp.
+      const t2Early = checkpoint(journal, session, 'call-magic-todo-t2', [
+        { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
+        { name: 'fix', work: 'Keep later todowrite calls from failing red.' },
+      ])
+      assert.equal(t2Early.result.ok, false)
+      assert.equal(
+        t2Early.result.error.cases()[t2Early.result.error.tag],
+        'AwaitingConsumableReview',
+        'T2 blocks on ConsumableReview while R1 is outstanding',
+      )
+
+      // Complete the process review: enlist the dedicated reviewer, assign R1,
+      // and append ConsumableReview ≡ TodoReviewConcluded with a PERFECT verdict.
+      const write = magicTodo.todoWriteId(sha256, life, toolCallId(callText))
+      const review = magicTodo.todoReviewId(sha256, life, write)
+      const reviewer = magicTodo.dedicatedReviewerId(sha256, life)
+      const reviewerSession = sessionId('ses-todo-reviewer-t1-t2-resolve')
+      const cursor = (n) => new magicTodoJournal.XTraceCursor(BigInt(n))
+
+      const enlisted = new magicTodoJournal.DedicatedTodoReviewerEnlisted(life, reviewer, reviewerSession)
+      const assigned = new magicTodoJournal.TodoProcessReviewAssigned(
+        life,
+        write,
+        review,
+        reviewer,
+        reviewerSession,
+        cursor(8),
+        cursor(7),
+      )
+      const settledBody = '{"obligations":[{"name":"diagnose","work":"Establish why the first todowrite succeeds."}]}'
+      const settledBlob = agentJournal.writeBlob(settledBody, journal)
+      assert.equal(settledBlob.ok, true, settledBlob.ok ? '' : String(settledBlob.error))
+      const concluded = new magicTodoJournal.TodoReviewConcluded(
+        life,
+        write,
+        review,
+        reviewer,
+        reviewerSession,
+        magicTodo.perfect,
+        blobRef('lwr-r1'),
+        blobDigest('lwr-r1-digest'),
+        settledBlob.value.BlobRef,
+        settledBlob.value.BlobDigest,
+        cursor(10),
+        providerRun('reviewer-provider-run'),
+        toolCallId('reviewer-judge-call'),
+      )
+
+      for (const [caseName, payload] of [
+        ['DedicatedTodoReviewerEnlisted', enlisted],
+        ['TodoProcessReviewAssigned', assigned],
+        ['TodoReviewConcluded', concluded],
+      ]) {
+        const appended = agentJournal.appendMagicTodo(
+          stream.session(session),
+          undefined,
+          magicTodoJournal.MagicTodoFact(caseName, [payload]),
+          journal,
+        )
+        assert.equal(appended.ok, true, appended.ok ? '' : String(appended.error))
+      }
+
+      // T2 now proceeds: the lag-1 wait resolved because ConsumableReview is durable.
+      const t2 = checkpoint(journal, session, 'call-magic-todo-t2', [
+        { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
+        { name: 'fix', work: 'Keep later todowrite calls from failing red.' },
+      ])
+      assert.equal(t2.result.ok, true, t2.result.ok ? '' : t2.result.error.cases()[t2.result.error.tag])
     } finally {
       providerLanguage.clearAllForTests()
     }
@@ -300,7 +405,7 @@ test('HOST-021 after fail-closes deferred prepare rejection as invalidOp', async
   }
 
   try {
-    const hooks = MagicTodoHostHooks_create(created.journal, snapshot)
+    const hooks = MagicTodoHostHooks_create(created.journal, snapshot, undefined)
     const output = {
       args: {
         obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }],

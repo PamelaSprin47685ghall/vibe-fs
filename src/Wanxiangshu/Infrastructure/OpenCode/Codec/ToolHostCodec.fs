@@ -115,8 +115,14 @@ module ToolHostCodec =
     [<Emit("$0.schema.number()")>]
     let private rawNumberSchema (tool: obj) : obj = jsNative
 
+    [<Emit("$0.schema.number().describe($1)")>]
+    let private rawNumberSchemaDescribed (tool: obj) (description: string) : obj = jsNative
+
     [<Emit("$0.schema.boolean()")>]
     let private rawBooleanSchema (tool: obj) : obj = jsNative
+
+    [<Emit("$0.schema.boolean().describe($1)")>]
+    let private rawBooleanSchemaDescribed (tool: obj) (description: string) : obj = jsNative
 
     [<Emit("$0.schema.enum($1)")>]
     let private rawEnumSchema (tool: obj) (values: string array) : obj = jsNative
@@ -236,7 +242,13 @@ module ToolHostCodec =
 
     let numberSchema (HostToolFactory factory) = HostSchema(rawNumberSchema factory)
 
+    let numberSchemaDescribed description (HostToolFactory factory) =
+        HostSchema(rawNumberSchemaDescribed factory description)
+
     let boolSchema (HostToolFactory factory) = HostSchema(rawBooleanSchema factory)
+
+    let boolSchemaDescribed description (HostToolFactory factory) =
+        HostSchema(rawBooleanSchemaDescribed factory description)
 
     let enumSchema values (HostToolFactory factory) =
         HostSchema(rawEnumSchema factory (List.toArray values))

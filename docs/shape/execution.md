@@ -11,6 +11,10 @@ tombstone 与 abandon **均不可回退**。
 Distiller 映射子会话是私有 runtime，不暴露为公开 fork / `horizon` 目标（配合 AGENT-008）。  
 map/reduce、chunk、session id 属机器 Assignment，不进 provider 工具面。
 
+Distiller child 的 durable handle = `HandleOwnership.HostOwnedHidden`（GLORY-002 / SURFACE-006）：对父 session 的 `list` / `join` / `horizon` / EXEC-016 background guard / 父恢复（RestoreHandles）全部不可见；记录仍持久，仅供 Host-owned workflow 审计与自身恢复。
+
+`run` 工具同步掌控 Distiller 生命周期：fork → permit-gated await → 摘要 → 返回。调用方不 join、不承担生命周期，退出（suicide）不被 distiller handle 阻塞。
+
 ## 工具面所有权（EXEC-001..005 / 029）
 
 | 面 | owner 角色 | 边界 |

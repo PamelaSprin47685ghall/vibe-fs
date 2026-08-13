@@ -4,8 +4,8 @@ open Wanxiangshu.Domain.MagicTodo
 open Wanxiangshu.Kernel.Identity
 
 /// Pure before-hook admission pipeline (protocol §11.3).
-/// Speculative / unwired: Host callID→ToolPart localization and Journal append
-/// remain at the membrane boundary; this module owns only fail-closed Magic checks.
+/// Host callID→ToolPart localization and Journal append remain at the membrane
+/// boundary; this module owns only fail-closed Magic checks.
 module MagicTodoAdmission =
 
     type LocalizedToolCall =

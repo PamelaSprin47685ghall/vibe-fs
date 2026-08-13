@@ -52,7 +52,8 @@ type StrengthReplicaRuntime
         registerReplica: SessionId -> SessionId -> string -> unit,
         ?workspaceDirectory: string,
         ?maxLatencyMs: int,
-        ?maxFrameBytes: int
+        ?maxFrameBytes: int,
+        ?promptModelFor: (string -> OpencodeModel option)
     ) =
 
     let gate = obj ()
@@ -311,7 +312,7 @@ type StrengthReplicaRuntime
                                                 PromptDispatcher.AwaitMode.Detached
                                                 None
                                                 StrengthReplicaTools.exactReadonlyHostToolMap
-                                                None
+                                                (promptModelFor |> Option.bind (fun lookup -> lookup fastAgent))
                                         with
                                         | Error error -> complete (StrengthReplicaTerminal.Failed error) state
                                         | Ok _ -> ()

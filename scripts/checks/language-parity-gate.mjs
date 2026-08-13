@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * ARCH-016 Gate C — Language Parity (HOST-026 / PROMPT-017).
+ * ARCH-016 Gate C — Language Parity (HOST-026 / PROMPT-017/019/020).
+ * Gate F — Office Capability Integrity (ARCH-017).
  * Every provider semantic directory must contain en.md + zh-CN.md locale leaves.
  * Protocol identifiers (code spans + TipIdentity / hyphenated tool names) must
  * be the same form in both locales.
@@ -12,7 +13,12 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
-import { ROLE_SEMANTIC_ANCHORS, TOOL_DESCRIPTION_ANCHORS } from './semantic-anchors.mjs'
+import {
+  OFFICE_CAPABILITY_ANCHORS,
+  OFFICE_CAPABILITY_NEGATIVES,
+  ROLE_SEMANTIC_ANCHORS,
+  TOOL_DESCRIPTION_ANCHORS,
+} from './semantic-anchors.mjs'
 
 export const PROVIDER_ROOT = 'resources/provider'
 export const ENFORCER_ROOT = 'resources/enforcer'
@@ -307,6 +313,84 @@ export const scanToolDescriptionAnchorCatalog = (semanticDirs, catalog = TOOL_DE
   return violations
 }
 
+const OFFICE_SURFACES = Object.freeze([
+  ['managerEn', 'role/manager/en.md'],
+  ['managerZh', 'role/manager/zh-CN.md'],
+  ['forkEn', 'tool/fork/description/en.md'],
+  ['forkZh', 'tool/fork/description/zh-CN.md'],
+])
+
+/**
+ * Gate F — five office consequences must hit Manager Role Law and fork description.
+ * @param {string} providerAbs
+ * @param {typeof OFFICE_CAPABILITY_ANCHORS} [catalog]
+ * @param {typeof OFFICE_CAPABILITY_NEGATIVES} [negatives]
+ * @returns {Violation[]}
+ */
+export const scanOfficeCapabilityIntegrity = (
+  providerAbs,
+  catalog = OFFICE_CAPABILITY_ANCHORS,
+  negatives = OFFICE_CAPABILITY_NEGATIVES,
+) => {
+  /** @type {Violation[]} */
+  const violations = []
+  /** @type {Record<string, string | undefined>} */
+  const texts = {}
+  for (const [key, rel] of OFFICE_SURFACES) {
+    const abs = join(providerAbs, rel)
+    const path = norm(join(PROVIDER_ROOT, rel))
+    if (!existsSync(abs)) {
+      violations.push({
+        code: 'office-capability',
+        path,
+        detail: 'missing locale leaf',
+      })
+      continue
+    }
+    texts[key] = readFileSync(abs, 'utf8')
+  }
+  for (const spec of Object.values(catalog)) {
+    for (const [key, rel] of OFFICE_SURFACES) {
+      const text = texts[key]
+      if (text === undefined) continue
+      if (!spec[key].test(text)) {
+        violations.push({
+          code: 'office-capability',
+          path: norm(join(PROVIDER_ROOT, rel)),
+          detail: `missing ${spec.id}`,
+        })
+      }
+    }
+  }
+  if (texts.managerEn !== undefined && !negatives.managerEnRequired.test(texts.managerEn)) {
+    violations.push({
+      code: 'office-capability',
+      path: norm(join(PROVIDER_ROOT, 'role/manager/en.md')),
+      detail: 'missing not-interchangeable',
+    })
+  }
+  if (texts.managerZh !== undefined && !negatives.managerZhRequired.test(texts.managerZh)) {
+    violations.push({
+      code: 'office-capability',
+      path: norm(join(PROVIDER_ROOT, 'role/manager/zh-CN.md')),
+      detail: 'missing not-interchangeable',
+    })
+  }
+  for (const key of ['forkEn', 'forkZh']) {
+    const text = texts[key]
+    if (text === undefined) continue
+    if (negatives.forkForbidden.test(text)) {
+      const rel = key === 'forkEn' ? 'tool/fork/description/en.md' : 'tool/fork/description/zh-CN.md'
+      violations.push({
+        code: 'office-capability',
+        path: norm(join(PROVIDER_ROOT, rel)),
+        detail: 'fork must not match Commission another witness',
+      })
+    }
+  }
+  return violations
+}
+
 /**
  * EN/zh-CN protocol identifier sets must be equal (AC20).
  * @param {string[]} semanticDirs
@@ -409,6 +493,7 @@ export const scanRepo = (repoRoot = process.cwd(), catalogOverrides) => {
     violations.push(...scanSemanticAnchorCatalog(semanticDirs))
     violations.push(...scanToolDescriptionAnchorParity(providerAbs))
     violations.push(...scanToolDescriptionAnchorCatalog(semanticDirs))
+    violations.push(...scanOfficeCapabilityIntegrity(providerAbs))
   }
 
   const hookAbs = resolve(repoRoot, PROVIDER_RESOURCES_REL)
@@ -434,6 +519,7 @@ const runCli = () => {
         'each has en.md + zh-CN.md; protocol identifiers match; ' +
         'placeholders match; Role Law semantic anchors match; ' +
         'tool description semantic anchors match; ' +
+        'office capability projections match; ' +
         'ProviderResources.requireLanguagePair present',
     )
     process.exit(0)

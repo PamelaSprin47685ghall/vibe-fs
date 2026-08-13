@@ -31,7 +31,9 @@ module PluginHooks =
             let snapshotOpt = host.SnapshotOpt
             let gitTreePort = host.GitTreePort
             let eventPort = host.EventPort
-            let chatParams = ChatParamsHook.create journal
+            let chatParams =
+                ChatParamsHook.create journal (fun () ->
+                    defaultArg scope.Strength.ManagedAgentInventory { Bindings = Map.empty })
             let systemTransform = ProviderSystemTransform.create journal
 
             // CASE-003: typed capture at the tool boundary — shared
@@ -47,7 +49,11 @@ module PluginHooks =
             // TODO-002 / HOST-017..025: the builtin todowrite stays the physical
             // executor while this three-hook membrane owns provider schema,
             // durable checkpoint admission, and accepted-result enrichment.
-            let magicTodo = MagicTodoHostHooks.create journal snapshotOpt
+            let magicTodo =
+                MagicTodoHostHooks.create
+                    journal
+                    snapshotOpt
+                    (Some(DedicatedTodoReviewerRuntime.port sessionPort snapshotOpt gitTreePort))
 
             let toolDefinition (toolInput: obj) (toolOutput: obj) =
                 magicTodo.Definition toolInput toolOutput
@@ -84,8 +90,9 @@ module PluginHooks =
             let hooks =
                 createObj
                     [ "chat.message", box (curriedHook wired.ChatMessageHook)
-                      // Host built-in retry reuses the same user message;
-                      // 0.5.0 relies on Agent bindings — chat.params is a no-op.
+                      // Pin the request agent's bound model. Host retry reuses
+                      // the same user message; without this pin an agent-less
+                      // retry can resolve to the default build / Fast model.
                       "chat.params", box (curriedHook chatParams)
                       // ONE transform registration.
                       //

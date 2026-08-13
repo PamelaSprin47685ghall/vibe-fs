@@ -4,7 +4,7 @@ open Wanxiangshu.Domain.MagicTodo
 open Wanxiangshu.Kernel.Fact
 
 /// Provider-facing surfaces for Magic Todo (guideline, schema, compatibility,
-/// enriched tool result). Speculative / unwired — Host hooks not attached yet.
+/// enriched tool result). Rendered by MagicTodoHostCodec via the membrane hooks.
 /// Prose meaning lives in `resources/provider/lifecycle/magic-todo/**` (PROMPT-019).
 module MagicTodoSurface =
 

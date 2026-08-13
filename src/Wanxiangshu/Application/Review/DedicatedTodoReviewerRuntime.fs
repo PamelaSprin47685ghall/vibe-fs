@@ -108,7 +108,7 @@ module DedicatedTodoReviewerRuntime =
                     fallback
                 else
                     GitTreeHash.create value
-            with _ ->
+            with _ex ->
                 fallback
 
     let private reviewerAgentName (journal: AgentJournal) (managerSessionId: SessionId) =
@@ -327,23 +327,23 @@ module DedicatedTodoReviewerRuntime =
                                                 }
                                             else
                                                 task {
-                                                    match! runtime.SendDeferredFirstPrompt handleId with
-                                                    | Ok() -> return Ok()
-                                                    | Error _ ->
-                                                        match!
-                                                            runtime.Fork(
-                                                                handleId,
-                                                                Role.Reviewer,
-                                                                agentName,
-                                                                assignmentText,
-                                                                None,
-                                                                firstPrompt = true,
-                                                                renderedPrompt = assignmentText,
-                                                                ownership = HandleOwnership.HostOwnedHidden
-                                                            )
-                                                        with
-                                                        | Error forkError -> return Error forkError
-                                                        | Ok _ -> return Ok()
+                                                    // Opening capture used the preamble; the first sent
+                                                    // user message must be the typed assignment body.
+                                                    match!
+                                                        runtime.Fork(
+                                                            handleId,
+                                                            Role.Reviewer,
+                                                            agentName,
+                                                            preamble,
+                                                            None,
+                                                            firstPrompt = true,
+                                                            renderedPrompt = assignmentText,
+                                                            ownership = HandleOwnership.HostOwnedHidden,
+                                                            deferSend = false
+                                                        )
+                                                    with
+                                                    | Error forkError -> return Error forkError
+                                                    | Ok _ -> return Ok()
                                                 }
 
                                         match sent with

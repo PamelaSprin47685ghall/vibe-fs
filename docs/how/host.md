@@ -400,7 +400,7 @@ schema 锚 = `todowrite(obligations: [{ name, work }])`（TODO-002）；descript
 3. deferred prepare 内执行 admitSingleCheckpoint（TODO-004：
    同 message 多不同 ToolCallId → 全部拒绝；
    同 ToolCallId replay → 校验 digest，不新开）
-3. await ConsumableReview(k-1) 若存在未消费义务（TODO-006）
+3. await ConsumableReview(k-1) 若存在未消费义务（TODO-006）。`AwaitingConsumableReview` 是 deferred prepare 的合法阻塞等待，不得变成 after `invalidOp` 红字。
 4. decodeObligations([{name, work}]) + validate（TODO-002/003；duplicate name fail closed）
 5. append TodoWritePrepared（冻结 BaseObligations / Proposed / ReviewFrontier）
 6. installEphemeralBridge(sessionID, callID, payload)   // HOST-021

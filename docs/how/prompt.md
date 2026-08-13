@@ -22,7 +22,13 @@ Authority、PromptKey 和发送 writer 边界见 `shape/prompt.md`。
   Tools = requestToolOverride }
 ```
 
-禁止设置 `Model`。Host 按 `config.agent[effectiveAgent].model` 解析。  
+Dispatcher 默认 `Model = None`：Host 按 `config.agent[effectiveAgent].model` 解析。  
+有意换档只改 Agent（Fallback EffectiveAgent、Strength replica `fast-*`、NeedHelpEscalation `deep-*`），禁止从 Role 发明 `fast-ROLE`。
+
+`chat.params` 必须把请求 Agent（缺省时为 Authority Root `SelectedAgent`）的绑定写成 `OpencodeModel` 钉死，防止 Host 把 agent-less / 历史推断请求落到默认 build/Fast。不得回退到 Peer，不得发明 Fast。
+
+SyncDelegate Inspector/Coder 的 SendPrompt 额外带上同一绑定（G2 PREFIX LAW）；生产按 agent 名逐次查找，禁止进程级单一 ModelId。
+
 PromptKey 必须写入 metadata（PROMPT-011）。
 
 `Tools=None` 是普通请求。StudentLearn / StudentCompile 的完整 allow/deny map、`teacher` 工具面与

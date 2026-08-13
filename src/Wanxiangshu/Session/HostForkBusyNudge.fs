@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Session
 
+open System
 open System.Threading.Tasks
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Domain
@@ -24,7 +25,7 @@ module HostForkBusyNudge =
         (journal: AgentJournal option)
         (childId: SessionId)
         (_role: Role)
-        (_agent: string)
+        (agent: string)
         (directory: string option)
         (prompt: string)
         : Task<Result<unit, string>> =
@@ -38,7 +39,20 @@ module HostForkBusyNudge =
                 match PromptAuthorityLedger.activeProfile childId snapshot.AgentProjections with
                 | None -> return Error "Busy nudge requires ActiveLogicalRun on child session"
                 | Some profile ->
-                    let busyAgent = FallbackEvidence.effectiveAgent childId snapshot profile
+                    // In-flight nudge must keep the handle's managed agent.
+                    // Replacing it with the fallback Peer would switch Deep → Fast
+                    // mid-conversation (prefix break + unjustified downgrade).
+                    // Empty / unknown names fall back to the cursor; they never
+                    // invent fast-ROLE.
+                    let busyAgent =
+                        let trimmed = if String.IsNullOrWhiteSpace agent then "" else agent.Trim()
+
+                        if String.IsNullOrWhiteSpace trimmed then
+                            FallbackEvidence.effectiveAgent childId snapshot profile
+                        elif trimmed = profile.SelectedAgent || trimmed = profile.PeerAgent then
+                            trimmed
+                        else
+                            FallbackEvidence.effectiveAgent childId snapshot profile
 
                     let rt = PromptDispatcher.forJournal j
 

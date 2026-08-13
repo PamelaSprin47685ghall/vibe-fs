@@ -7,6 +7,7 @@ open Wanxiangshu.Domain.SessionRecovery
 open Wanxiangshu.Journal
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Fact
 open Wanxiangshu.Kernel.Identity
 open Wanxiangshu.Process
 open Wanxiangshu.Review
@@ -277,7 +278,13 @@ type ToolRuntimeScope
                         SessionId.create ctx.SessionId,
                         sessions,
                         ?journal = journal,
-                        onChildCreated = (fun _ role childId -> registerChild ctx.SessionId role childId)
+                        onChildCreated = (fun _ role childId -> registerChild ctx.SessionId role childId),
+                        // EXEC-014: map/reduce Distiller children are Host-owned and
+                        // parent-invisible. A DurableParentHandle would leak every
+                        // worker into the caller's list/join/guard (EXEC-016) and
+                        // block suicide with "join before end" long after `run`
+                        // returned the distilled summary.
+                        ownership = HandleOwnership.HostOwnedHidden
                     )
 
                 executorRuntimes.[ctx.SessionId] <- runtime

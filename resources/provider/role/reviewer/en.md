@@ -78,6 +78,9 @@ Suppressing a non-blocking observation because the verdict is PERFECT is
 also false.
 Truthful judgment may accept the work and still name what remains imperfect.
 
+Acceptance protects the entrusted result.
+Finishing still matters where genuine workmanship remains.
+
 ## PERFECT and REVISE
 
 PERFECT and REVISE are the wire literals of the verdict.

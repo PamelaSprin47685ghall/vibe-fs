@@ -368,6 +368,8 @@
     <Compile Include="Application/Finality/Types.fs"/>
     <Compile Include="Application/Finality/Ports.fs"/>
     <Compile Include="Application/Finality/LifecycleWorkRecordProjection.fs"/>
+    <Compile Include="Application/Review/TodoProcessReviewProgram.fs"/>
+    <Compile Include="Application/Review/DedicatedTodoReviewerRuntime.fs"/>
     <Compile Include="Infrastructure/OpenCode/Host/AssistanceHost.fs"/>
     <Compile Include="Application/Finality/RecordWorkflow.fs"/>
     <Compile Include="Application/Finality/CohortWorkflow.fs"/>

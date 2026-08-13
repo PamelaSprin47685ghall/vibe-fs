@@ -461,6 +461,20 @@ module MagicTodoHostHooks =
                                         | Ok locality ->
                                             let providerInputDigest = HostDigest.sha256Hex locality.InputCanonical
 
+                                            let admitNow () =
+                                                match
+                                                    MagicTodoMembrane.prepare
+                                                        durable
+                                                        sessionId
+                                                        locality
+                                                        providerInputDigest
+                                                        obligations
+                                                with
+                                                | Ok value -> Ok value
+                                                | Error(MagicTodoMembrane.PrepareRejection.AwaitingConsumableReview _) ->
+                                                    Error "lag-1-retry"
+                                                | Error reason -> Error(sprintf "prepare failed: %A" reason)
+
                                             let rec admitAfterLag1 () =
                                                 task {
                                                     let snapshotNow = AgentJournal.snapshot durable
@@ -487,7 +501,11 @@ module MagicTodoHostHooks =
                                                         with
                                                         | Error reason ->
                                                             return Error("await ConsumableReview failed: " + reason)
-                                                        | Ok() -> ()
+                                                        | Ok() ->
+                                                            match admitNow () with
+                                                            | Ok value -> return Ok value
+                                                            | Error "lag-1-retry" -> return! admitAfterLag1 ()
+                                                            | Error reason -> return Error reason
                                                     | Some _, None ->
                                                         let! _ =
                                                             AgentJournal.awaitChangeFrom
@@ -495,21 +513,11 @@ module MagicTodoHostHooks =
                                                                 durable
 
                                                         return! admitAfterLag1 ()
-                                                    | None, _ -> ()
-
-                                                    match
-                                                        MagicTodoMembrane.prepare
-                                                            durable
-                                                            sessionId
-                                                            locality
-                                                            providerInputDigest
-                                                            obligations
-                                                    with
-                                                    | Ok value -> return Ok value
-                                                    | Error(MagicTodoMembrane.PrepareRejection.AwaitingConsumableReview _) ->
-                                                        return! admitAfterLag1 ()
-                                                    | Error reason ->
-                                                        return Error(sprintf "prepare failed: %A" reason)
+                                                    | None, _ ->
+                                                        match admitNow () with
+                                                        | Ok value -> return Ok value
+                                                        | Error "lag-1-retry" -> return! admitAfterLag1 ()
+                                                        | Error reason -> return Error reason
                                                 }
 
                                             return! admitAfterLag1 ()

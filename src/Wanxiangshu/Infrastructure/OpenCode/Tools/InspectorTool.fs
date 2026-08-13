@@ -109,9 +109,7 @@ module InspectorTool =
           Description = ProviderProse.render language Path.Description Map.empty
           Arguments =
             [ "charge",
-              ToolHostCodec.stringSchemaDescribed
-                  (ProviderProse.render language Path.ArgCharge Map.empty)
-                  factory
+              ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgCharge Map.empty) factory
               "keywords",
               ToolHostCodec.optionalStringSchemaDescribed
                   (ProviderProse.render language Path.ArgKeywords Map.empty)

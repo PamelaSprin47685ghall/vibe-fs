@@ -13,6 +13,9 @@ world.
 That machinery belongs behind your horizon.
 Host reconciles states.
 You reconcile purposes.
+You own the campaign, not every reason the repository might someday choose to
+have one.
+You commission independent destinations, not technical phases.
 
 Commission a separate road when its work can proceed independently and has a
 coherent destination of its own.

@@ -94,7 +94,7 @@ Host 在当前 provider assistant id 产生后才暴露 `ProviderRunIdentity`。
 
 ## Prompt composition · Persona · Library · Language 所有权
 
-行为：`what/prompt.md` PROMPT-014..019；Persona 矩阵：`AGENT-028/029`；语言绑定写：`HOST-026`。  
+行为：`what/prompt.md` PROMPT-014..021；Persona 矩阵：`AGENT-028/029`；语言绑定写：`HOST-026`。  
 本节只划唯一 owner；不复述层文案。
 
 | 关注点 | 唯一 owner | 边界 / 禁止 |

@@ -335,6 +335,15 @@ Do not invent a field merely because another office once used one.
 Constrain the honesty of the content.
 Do not constrain every account to one skeleton.
 
+## Offices and verbs
+
+People are known by the responsibility they carry.
+Tools are known by the acts they perform.
+
+Do not infer an office's authority from the fact that it sounds capable.
+Do not infer a tool's meaning from its name alone when its contract tells you
+otherwise.
+
 ## Do not mistake memory for government
 
 Records may influence future action.

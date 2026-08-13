@@ -15,8 +15,11 @@ const bindingsOf = (inventory) => Object.fromEntries(mapEntries(inventory.Bindin
 // Production installs resources at plugin init.
 runtimeResources.installFromPackage()
 
-const { validate, applyOwnedFields, configureFromHostConfig } = await import(
+const { validate, applyOwnedFields, configureFromHostConfig, tryOpencodeModel } = await import(
   join(here, '../../../dist/Infrastructure/OpenCode/Host/ManagedAgentConfig.js')
+)
+const { OpencodeModel } = await import(
+  join(here, '../../../dist/Infrastructure/OpenCode/Codec/OpencodeTypes.js')
 )
 
 const okOf = (r) => resultOf(r)
@@ -159,4 +162,38 @@ test('MACFG_configureFromHostConfig_error_path_still_writes_role_fields', () => 
   assert.match(err, /resolves to the same model/)
   assert.equal(cfg.compaction.auto, false, 'fail-closed: owned fields still applied')
   assert.ok(cfg.agent['fast-manager'].mode !== undefined)
+})
+
+test('MACFG_tryOpencodeModel_parses_provider_slash_model_and_refuses_to_invent_fast', () => {
+  const cfg = fullConfig()
+  cfg.agent['deep-coder'] = { model: 'anthropic/deep-opus' }
+  cfg.agent['fast-coder'] = { model: 'anthropic/fast-haiku' }
+  const inventory = okOf(validate(cfg)).value
+
+  const deep = tryOpencodeModel(inventory, 'deep-coder', undefined)
+  assert.equal(isSome(deep), true)
+  assert.equal(deep.providerID, 'anthropic')
+  assert.equal(deep.modelID, 'deep-opus')
+
+  const fast = tryOpencodeModel(inventory, 'fast-coder', undefined)
+  assert.equal(fast.modelID, 'fast-haiku')
+  assert.notEqual(fast.modelID, deep.modelID)
+
+  assert.equal(isNone(tryOpencodeModel(inventory, 'unknown-agent', undefined)), true)
+  assert.equal(isNone(tryOpencodeModel(inventory, '', undefined)), true)
+
+  const current = new OpencodeModel('anthropic', 'fast-haiku', undefined)
+  const corrected = tryOpencodeModel(inventory, 'deep-coder', current)
+  assert.equal(corrected.providerID, 'anthropic')
+  assert.equal(corrected.modelID, 'deep-opus')
+})
+
+test('MACFG_tryOpencodeModel_bare_id_keeps_current_provider_and_refuses_without_one', () => {
+  const inventory = okOf(validate(fullConfig())).value
+  assert.equal(isNone(tryOpencodeModel(inventory, 'deep-coder', undefined)), true, 'bare id must not invent a provider')
+
+  const current = new OpencodeModel('anthropic', 'fast-model', undefined)
+  const corrected = tryOpencodeModel(inventory, 'deep-coder', current)
+  assert.equal(corrected.providerID, 'anthropic')
+  assert.equal(corrected.modelID, 'deep-model')
 })

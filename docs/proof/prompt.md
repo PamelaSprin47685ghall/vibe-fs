@@ -54,6 +54,7 @@
 | Office capability projections | Manager Role Law 与 `fork` description 同 ID 命中五 Office 后果 | ARCH-017、ARCH-016 F、PROMPT-021 |
 | Tool affordance | 高风险 verb 具备 act / fit / not / return / argument 五问 | PROMPT-020 |
 | Critical redundancy | Inspector 只读同时出现在 Role Law 与 `inspect`；Coder 不执行同时出现在 Role Law 与 DevOps 委托工具 | PROMPT-021 |
+| Office-boundary eval corpus | 四条合成 trace oracle；非生产 charge 过滤器；非 live LLM | ARCH-017；`tests/eval/provider-office-boundary/` |
 | localizable vs invariant | prose 按已绑语言；tool 名 / argument / wire / enum / path / command / `exit_code` **原样** | PROMPT-017 |
 | child 继承 | attached / InternalLeaf 继承 owner/commissioner；不得再读全局 | PROMPT-017、HOST-026 |
 

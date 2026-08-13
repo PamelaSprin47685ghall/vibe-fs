@@ -76,6 +76,7 @@ todoCheckpointBefore:
   4. settlePreviousCheckpointIfAny：
        - 若存在 Accepted(k-1) 且尚无 TodoReviewConcluded(k-1)
          → 阻塞至 ConsumableReview(k-1) durable（TODO-006）
+         → 该阻塞是合法等待，不是 `MagicTodoReject` 对 Manager 的 fail-closed 红字
        - 仅 VerdictKnown 不足
        - Ck = settle(C(k-1), P(k-1), verdict)（TODO-005）
        - 若 REVISE 改变 canonical → Host TodoTable sink reconciliation（§下方；TODO-007）

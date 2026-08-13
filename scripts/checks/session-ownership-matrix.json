@@ -77,9 +77,9 @@
       "reusable": "No. Agent ids are content-addressed per spool chunk (exec- + digest); one-shot map/reduce workers.",
       "cancel": "IDistillerRuntime.CancelAgent → HostForkRuntime.CancelAgent. Cancels one owned map/reduce agent without tearing down the runtime.",
       "retire": "JoinWithPermit / AwaitAgentWithPermit completion then Handle retire on the fork path; cancel retires or abandons that agent handle.",
-      "handle": "Yes. Private Distiller mailbox handles on HostForkRuntime. Never Manager Join — only permit-gated JoinWithPermit / AwaitAgentWithPermit.",
+      "handle": "Yes, HostOwnedHidden. The handle exists for EXEC-009 identity and permit-gated AwaitAgentWithPermit, but never enters the parent list/join/guard or parent RestoreHandles.",
       "companion": "No. Distiller is an internal Role (AGENT-008); not a Work+Companion path.",
-      "crashReconcile": "FamilyRecoveryPermit required before join. FamilyBlocked fail closed; FamilyWaiting retries inside awaitAgent timeout. HostForkRestart restores DurableParentHandle children on the same fork path.",
+      "crashReconcile": "FamilyRecoveryPermit required before join. FamilyBlocked fail closed; FamilyWaiting retries inside awaitAgent timeout. HostForkRestart RestoreHandles skips HostOwnedHidden so a distiller is never resurrected into the parent runtime.",
       "evidencePath": "src/Wanxiangshu/Infrastructure/OpenCode/Tools/DistillationRuntime.fs"
     }
   }

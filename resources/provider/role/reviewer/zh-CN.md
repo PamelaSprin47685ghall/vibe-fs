@@ -66,6 +66,9 @@ Rejection 同样必须被赢得。
 因为 verdict 是 PERFECT 就压制非阻断性观察，同样是虚假的。
 真诚的判断可以接受工作，同时仍然点名尚未完美之处。
 
+Acceptance 保护 entrusted result。
+在真正的做工仍然存在之处，把话说完仍然要紧。
+
 ## PERFECT 与 REVISE
 
 PERFECT 与 REVISE 是 verdict 的 wire literal。

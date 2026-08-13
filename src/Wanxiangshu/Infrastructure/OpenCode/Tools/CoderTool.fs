@@ -23,6 +23,12 @@ module CoderTool =
             let Description = "tool/establish-behavior/description"
 
             [<Literal>]
+            let ArgCharge = "tool/establish-behavior/arg-charge"
+
+            [<Literal>]
+            let ArgKeywords = "tool/establish-behavior/arg-keywords"
+
+            [<Literal>]
             let Unavailable = "tool/establish-behavior/unavailable"
 
             [<Literal>]
@@ -40,6 +46,12 @@ module CoderTool =
             let Description = "tool/repair-behavior/description"
 
             [<Literal>]
+            let ArgCharge = "tool/repair-behavior/arg-charge"
+
+            [<Literal>]
+            let ArgKeywords = "tool/repair-behavior/arg-keywords"
+
+            [<Literal>]
             let Unavailable = "tool/repair-behavior/unavailable"
 
             [<Literal>]
@@ -53,6 +65,8 @@ module CoderTool =
 
     type private Surface =
         { Description: string
+          ArgCharge: string
+          ArgKeywords: string
           Unavailable: string
           AuthorityRequired: string
           NeedsCharge: string
@@ -60,6 +74,8 @@ module CoderTool =
 
     let private establishSurface =
         { Description = Path.Establish.Description
+          ArgCharge = Path.Establish.ArgCharge
+          ArgKeywords = Path.Establish.ArgKeywords
           Unavailable = Path.Establish.Unavailable
           AuthorityRequired = Path.Establish.AuthorityRequired
           NeedsCharge = Path.Establish.NeedsCharge
@@ -67,6 +83,8 @@ module CoderTool =
 
     let private repairSurface =
         { Description = Path.Repair.Description
+          ArgCharge = Path.Repair.ArgCharge
+          ArgKeywords = Path.Repair.ArgKeywords
           Unavailable = Path.Repair.Unavailable
           AuthorityRequired = Path.Repair.AuthorityRequired
           NeedsCharge = Path.Repair.NeedsCharge
@@ -137,12 +155,17 @@ module CoderTool =
         (scope: ToolRuntimeScope)
         (syncDelegate: SyncDelegateRuntime option)
         : ToolSpec =
+        let language = ProviderLanguageBinding.readGlobalPreference ()
+
         { Name = name
-          Description =
-            ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) surface.Description Map.empty
+          Description = ProviderProse.render language surface.Description Map.empty
           Arguments =
-            [ "charge", ToolHostCodec.stringSchema factory
-              "keywords", ToolHostCodec.optionalStringSchema factory ]
+            [ "charge",
+              ToolHostCodec.stringSchemaDescribed (ProviderProse.render language surface.ArgCharge Map.empty) factory
+              "keywords",
+              ToolHostCodec.optionalStringSchemaDescribed
+                  (ProviderProse.render language surface.ArgKeywords Map.empty)
+                  factory ]
           Execute = execute name surface scope syncDelegate }
 
     let establishSpec

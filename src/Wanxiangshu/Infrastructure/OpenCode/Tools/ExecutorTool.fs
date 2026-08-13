@@ -24,6 +24,18 @@ module ExecutorTool =
             let Description = "tool/run/description"
 
             [<Literal>]
+            let ArgCommand = "tool/run/arg-command"
+
+            [<Literal>]
+            let ArgDeadlineSeconds = "tool/run/arg-deadline_seconds"
+
+            [<Literal>]
+            let ArgOutputBudgetBytes = "tool/run/arg-output_budget_bytes"
+
+            [<Literal>]
+            let ArgWorldLock = "tool/run/arg-world_lock"
+
+            [<Literal>]
             let MissingCommand = "tool/run/missing-command"
 
             [<Literal>]
@@ -60,6 +72,9 @@ module ExecutorTool =
         module QueryShell =
             [<Literal>]
             let Description = "tool/query-shell/description"
+
+            [<Literal>]
+            let ArgCommand = "tool/query-shell/arg-command"
 
             [<Literal>]
             let MissingCommand = "tool/query-shell/missing-command"
@@ -253,14 +268,17 @@ module ExecutorTool =
         }
 
     let runSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
+        let language = ProviderLanguageBinding.readGlobalPreference ()
+
         { Name = "run"
-          Description =
-            ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Run.Description Map.empty
+          Description = prose language Path.Run.Description
           Arguments =
-            [ "command", ToolHostCodec.stringSchema factory
-              "deadline_seconds", ToolHostCodec.numberSchema factory
-              "output_budget_bytes", ToolHostCodec.numberSchema factory
-              "world_lock", ToolHostCodec.boolSchema factory ]
+            [ "command", ToolHostCodec.stringSchemaDescribed (prose language Path.Run.ArgCommand) factory
+              "deadline_seconds",
+              ToolHostCodec.numberSchemaDescribed (prose language Path.Run.ArgDeadlineSeconds) factory
+              "output_budget_bytes",
+              ToolHostCodec.numberSchemaDescribed (prose language Path.Run.ArgOutputBudgetBytes) factory
+              "world_lock", ToolHostCodec.boolSchemaDescribed (prose language Path.Run.ArgWorldLock) factory ]
           Execute =
             fun args context ->
                 match decodeRun (lang context) args with
@@ -268,10 +286,12 @@ module ExecutorTool =
                 | Error decodeError -> task { return consequence decodeError } }
 
     let queryShellSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
+        let language = ProviderLanguageBinding.readGlobalPreference ()
+
         { Name = "query-shell"
-          Description =
-            ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.QueryShell.Description Map.empty
-          Arguments = [ "command", ToolHostCodec.stringSchema factory ]
+          Description = prose language Path.QueryShell.Description
+          Arguments =
+            [ "command", ToolHostCodec.stringSchemaDescribed (prose language Path.QueryShell.ArgCommand) factory ]
           Execute =
             fun args context ->
                 match decodeQueryShell (lang context) args with

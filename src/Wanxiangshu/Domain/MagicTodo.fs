@@ -8,9 +8,10 @@ open Wanxiangshu.Kernel.Identity
 
 /// Magic Todo Checkpoint Protocol — pure algebra (see Magic Todo change proposal).
 ///
-/// Speculative / unwired: not yet hooked into tool.execute.before/after or Manager
-/// lifecycle. Keep illegal states unrepresentable; recovery reads durable facts, not
-/// Stages / bools / wall-clock (ARCH-001, protocol §17).
+/// Consumed by the Host membrane (MagicTodoMembrane.prepare/accept) and the
+/// dedicated process-review runtime. Keep illegal states unrepresentable;
+/// recovery reads durable facts, not Stages / bools / wall-clock
+/// (ARCH-001, protocol §17).
 ///
 /// Coverage split (protocol SSOT):
 ///   Process review → RecordCoverage / LWR (RawGap allowed)

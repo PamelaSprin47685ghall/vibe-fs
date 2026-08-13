@@ -35,6 +35,10 @@ module PluginSessionWiring =
                 )
 
             let dispatcher = PromptDispatcher.forJournal durable
+            let promptModelFor agent =
+                scope.Strength.ManagedAgentInventory
+                |> Option.bind (fun inventory -> ManagedAgentConfig.tryOpencodeModel inventory agent None)
+
 
             let registerDelegate (delegateId: SessionId) (agent: string) =
                 wired.RegisterOwned(SessionId.value delegateId)
@@ -62,7 +66,8 @@ module PluginSessionWiring =
                     ?onInspectorCleanup = Some CasebookLifecycle.cleanupInspector,
                     ?workRecordFor =
                         Some(fun sessionId range ->
-                            LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some durable) sessionId range)
+                            LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some durable) sessionId range),
+                    ?promptModelFor = Some promptModelFor
                 )
 
             scope.AttachSyncDelegateRuntime syncDelegate
@@ -85,7 +90,8 @@ module PluginSessionWiring =
                     Wanxiangshu.Process.PtyTiming.nodeTimerPort (),
                     scope.Strength.StrengthRuntime,
                     registerStrengthReplica,
-                    ?workspaceDirectory = workspaceDirectory
+                    ?workspaceDirectory = workspaceDirectory,
+                    ?promptModelFor = Some promptModelFor
                 )
 
             scope.Strength.AttachStrengthReplicaRuntime strengthReplicaRuntime
