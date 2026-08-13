@@ -62,6 +62,26 @@ module MagicTodoAfter =
                   EnrichedResult = enrichedResult
                   CompatibilityRows = toCompatibilityRows reviewingSink submitted }
 
+    /// How to deliver one process-review assignment (HOST-021 / TODO-006).
+    ///
+    /// `deferSend` Fork installs a pending run before any Authority Root exists.
+    /// A second Fork would take sendToExistingChild's busy-nudge path and fail
+    /// closed with "Busy nudge requires ActiveLogicalRun" — that is T1 red text.
+    [<RequireQualifiedAccess>]
+    type AssignmentDelivery =
+        /// No Authority Root yet: first prompt is AgentOwnerRoot.
+        | OwnerRoot
+        /// T1 assignment already claimed; wait for XTrace head, do not send again.
+        | AwaitHead
+        /// Later checkpoint: assignment continues the dedicated session.
+        | Continuation
+
+    let assignmentDelivery (hasActiveProfile: bool) (isFirstAcceptedWrite: bool) : AssignmentDelivery =
+        match hasActiveProfile, isFirstAcceptedWrite with
+        | false, _ -> AssignmentDelivery.OwnerRoot
+        | true, true -> AssignmentDelivery.AwaitHead
+        | true, false -> AssignmentDelivery.Continuation
+
     /// ensureReview plan: Assignment payload when obligation pending.
     let planEnsureReview
         (sha256: string -> string)

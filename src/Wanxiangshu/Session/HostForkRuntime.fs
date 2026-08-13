@@ -152,6 +152,11 @@ type HostForkRuntime
                 | Error err -> return Error err
         }
 
+    /// Drop a deferSend preamble so process-review assignment can go out as
+    /// AgentOwnerRoot instead of a busy nudge against a session with no profile.
+    member _.DiscardDeferredFirstPrompt(agentId: string) : unit =
+        lock gate (fun () -> deferredFirstPrompts.Remove agentId |> ignore)
+
     member internal _.Gate = gate
     member internal _.TerminalByName = terminalByName
     member internal _.Sessions = sessions

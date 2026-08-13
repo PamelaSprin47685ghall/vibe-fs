@@ -42,7 +42,7 @@ module DedicatedTodoReviewerRuntime =
     /// Assignment delivery is a local Journal fold, not reviewer runtime.
     let AssignmentHeadDeadlineMs = 2000
 
-    let private timerPort: ITimerPort = PtyTiming.nodeTimerPort()
+    let private timerPort: ITimerPort = PtyTiming.nodeTimerPort ()
 
     let private waitHeadAdvanced
         (journal: AgentJournal)
@@ -53,10 +53,7 @@ module DedicatedTodoReviewerRuntime =
             let tryRead () =
                 let head = reviewerHead journal reviewerSessionId
 
-                if head > fromHead then
-                    Some { Sequence = head }
-                else
-                    None
+                if head > fromHead then Some { Sequence = head } else None
 
             match tryRead () with
             | Some cursor -> return Ok cursor
@@ -81,18 +78,12 @@ module DedicatedTodoReviewerRuntime =
                     }
 
                 match!
-                    CausalAwait.untilSignalOrDeadline
-                        CausalWaitHub.observer
-                        descriptor
-                        deadline
-                        tryRead
-                        awaitSignal
+                    CausalAwait.untilSignalOrDeadline CausalWaitHub.observer descriptor deadline tryRead awaitSignal
                 with
                 | Ok cursor -> return Ok cursor
                 | Error DiagnosticWaitExit.WaitTimedOut ->
                     return Error "reviewer XTrace head did not advance after assignment send (REVIEW-018)"
-                | Error exit ->
-                    return Error("reviewer XTrace head wait failed: " + string exit)
+                | Error exit -> return Error("reviewer XTrace head wait failed: " + string exit)
         }
 
     let private readObligations
@@ -138,7 +129,8 @@ module DedicatedTodoReviewerRuntime =
         |> Option.defaultValue ""
 
     let private treeHash (gitTree: GitTreePort option) (reviewId: TodoReviewId) =
-        let fallback = GitTreeHash.create (HostDigest.sha256Hex (TodoReviewId.value reviewId))
+        let fallback =
+            GitTreeHash.create (HostDigest.sha256Hex (TodoReviewId.value reviewId))
 
         match gitTree with
         | None -> fallback
@@ -279,8 +271,7 @@ module DedicatedTodoReviewerRuntime =
                                                     (MagicTodoFact.DedicatedTodoReviewerEnlisted enlisted)
                                                     journal
                                             with
-                                            | Error failure ->
-                                                return Error(JournalAppendFailure.describe failure)
+                                            | Error failure -> return Error(JournalAppendFailure.describe failure)
                                             | Ok _ -> return Ok enlisted
                             }
 
@@ -307,8 +298,7 @@ module DedicatedTodoReviewerRuntime =
                                       ReviewFrontier = checkpoint.ReviewFrontier
                                       SemanticVersion = checkpoint.SemanticVersion }
 
-                                let reviewId =
-                                    MagicTodo.todoReviewId HostDigest.sha256Hex lifeId writeId
+                                let reviewId = MagicTodo.todoReviewId HostDigest.sha256Hex lifeId writeId
 
                                 match
                                     ReviewBarrier.openBarrier
@@ -352,8 +342,41 @@ module DedicatedTodoReviewerRuntime =
 
                                         let beforeHead = reviewerHead journal enlisted.ReviewerSessionId
 
+                                        let hasActiveProfile =
+                                            PromptAuthorityLedger.activeProfile
+                                                enlisted.ReviewerSessionId
+                                                (AgentJournal.snapshot journal).AgentProjections
+                                            |> Option.isSome
+
+                                        let isFirstAcceptedWrite =
+                                            match life.AcceptedOrder with
+                                            | [ only ] when only = writeId -> true
+                                            | _ -> false
+
+                                        let delivery =
+                                            MagicTodoAfter.assignmentDelivery hasActiveProfile isFirstAcceptedWrite
+
+                                        let assignmentDirectory = directoryOf enlisted.ReviewerSessionId
+
                                         let! sent =
-                                            if beforeHead > 0L then
+                                            match delivery with
+                                            | MagicTodoAfter.AssignmentDelivery.OwnerRoot ->
+                                                runtime.DiscardDeferredFirstPrompt handleId
+
+                                                task {
+                                                    match!
+                                                        HostForkAgentOwner.sendFirstPrompt
+                                                            sessions
+                                                            (Some journal)
+                                                            enlisted.ReviewerSessionId
+                                                            agentName
+                                                            assignmentDirectory
+                                                            assignmentText
+                                                    with
+                                                    | Ok _ -> return Ok()
+                                                    | Error reason -> return Error reason
+                                                }
+                                            | MagicTodoAfter.AssignmentDelivery.Continuation ->
                                                 task {
                                                     match!
                                                         HostSessionNudge.sendContinuation
@@ -361,37 +384,24 @@ module DedicatedTodoReviewerRuntime =
                                                             enlisted.ReviewerSessionId
                                                             assignmentText
                                                             PromptAuthority.ContinuationKind.ReviewerGuard
-                                                            (directoryOf enlisted.ReviewerSessionId)
+                                                            assignmentDirectory
                                                             (Some journal)
                                                     with
                                                     | Ok _ -> return Ok()
                                                     | Error reason -> return Error reason
                                                 }
-                                            else
-                                                task {
-                                                    // Opening capture used the preamble; the first sent
-                                                    // user message must be the typed assignment body.
-                                                    match!
-                                                        runtime.Fork(
-                                                            handleId,
-                                                            Role.Reviewer,
-                                                            agentName,
-                                                            preamble,
-                                                            None,
-                                                            firstPrompt = true,
-                                                            renderedPrompt = assignmentText,
-                                                            ownership = HandleOwnership.HostOwnedHidden,
-                                                            deferSend = false
-                                                        )
-                                                    with
-                                                    | Error forkError -> return Error forkError
-                                                    | Ok _ -> return Ok()
-                                                }
+                                            | MagicTodoAfter.AssignmentDelivery.AwaitHead -> Task.FromResult(Ok())
 
                                         match sent with
                                         | Error reason -> return Error reason
                                         | Ok() ->
-                                            match! waitHeadAdvanced journal enlisted.ReviewerSessionId beforeHead with
+                                            let! reviewWorkStart =
+                                                match delivery with
+                                                | MagicTodoAfter.AssignmentDelivery.AwaitHead when beforeHead > 0L ->
+                                                    Task.FromResult(Ok { Sequence = beforeHead })
+                                                | _ -> waitHeadAdvanced journal enlisted.ReviewerSessionId beforeHead
+
+                                            match reviewWorkStart with
                                             | Error reason -> return Error reason
                                             | Ok reviewWorkStart ->
                                                 match
