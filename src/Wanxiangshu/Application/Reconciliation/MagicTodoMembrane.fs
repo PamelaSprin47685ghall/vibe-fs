@@ -507,16 +507,19 @@ module MagicTodoHostHooks =
                                                             | Error "lag-1-retry" -> return! admitAfterLag1 ()
                                                             | Error reason -> return Error reason
                                                     | Some _, None ->
-                                                        let! _ =
-                                                            AgentJournal.awaitChangeFrom
-                                                                (AgentJournal.revision durable)
-                                                                durable
-
-                                                        return! admitAfterLag1 ()
+                                                        // HOST-021 / REVIEW-017/018: no ProcessReviewPort means
+                                                        // no producer of TodoReviewConcluded. Waiting on Journal
+                                                        // would hang forever. Fail closed; do not awaitChangeFrom.
+                                                        return
+                                                            Error
+                                                                "process review runtime unavailable while ConsumableReview outstanding"
                                                     | None, _ ->
                                                         match admitNow () with
                                                         | Ok value -> return Ok value
-                                                        | Error "lag-1-retry" -> return! admitAfterLag1 ()
+                                                        | Error "lag-1-retry" ->
+                                                            return
+                                                                Error
+                                                                    "lag-1 wait without pending ConsumableReview (projection inconsistent)"
                                                         | Error reason -> return Error reason
                                                 }
 
@@ -566,7 +569,9 @@ module MagicTodoHostHooks =
 
                                 if accepted.NeedsEnsureReview || accepted.NeedsDedicatedEnlist then
                                     match processReview with
-                                    | None -> ()
+                                    | None ->
+                                        invalidOp
+                                            "Magic Todo process review runtime unavailable (HOST-021 ensureReview)"
                                     | Some port ->
                                         match!
                                             port.EnsureReview
