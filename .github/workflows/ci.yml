@@ -19,6 +19,4 @@ jobs:
           dotnet-version-file: global.json
       - run: npm ci
       - run: dotnet tool restore
-      # First opencode launch pays cold binary/package costs; warm before timed tests.
-      - run: npm run warmup:opencode
-      - run: npm run check
+      - run: npm run format-build-test

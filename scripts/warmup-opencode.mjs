@@ -4,7 +4,7 @@
  *
  * First launch on a machine (or fresh CI runner) pays package resolution /
  * native binary extract / OS page-cache costs. Later ProcessHost.serve starts
- * then compete with per-test timeouts. Call this before npm run check / e2e.
+ * then compete with per-test timeouts. Invoked from npm run format-build-test before e2e.
  *
  * Exit 0 on success; non-zero if the binary is missing or version fails.
  */

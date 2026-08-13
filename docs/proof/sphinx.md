@@ -104,12 +104,8 @@
 ## 标准门禁
 
 ```text
-npm run build
+npm run format-build-test
 node --test tests/unit/sphinx/*.test.mjs
-node scripts/checks/spec.mjs
-npm run format:check
-npm test
-npm run test:integration
 ```
 
 完成声明以标准门禁实际结果为准；一次性脚本或手工 transcript 不构成 proof。

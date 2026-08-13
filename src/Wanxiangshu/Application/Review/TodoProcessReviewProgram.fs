@@ -23,16 +23,6 @@ module TodoProcessReviewProgram =
 
     let private writeKey (writeId: TodoWriteId) = TodoWriteId.value writeId
 
-    let private readObligations
-        (journal: AgentJournal)
-        (blobRef: BlobRef)
-        (expected: BlobDigest)
-        : Result<ObligationList, string> =
-        match journal.Writer.BlobWriter.Read blobRef with
-        | Error reason -> Error reason
-        | Ok body when HostDigest.sha256Hex body <> BlobDigest.value expected -> Error "obligation blob digest mismatch"
-        | Ok body -> MagicTodoObligationCodec.tryDecode body
-
     let private writeBlob (journal: AgentJournal) (body: string) : Result<BlobWriteReceipt, string> =
         journal.WriteBlob body
 
@@ -95,43 +85,35 @@ module TodoProcessReviewProgram =
                             judgeIdentity trace
                         with
                         | Some report, Some(providerRun, toolCallId) when not (String.IsNullOrWhiteSpace report) ->
-                            match
-                                readObligations journal cp.BaseTodoRef cp.BaseTodoDigest,
-                                readObligations journal cp.ProposedTodoRef cp.ProposedTodoDigest
-                            with
-                            | Error reason, _
-                            | _, Error reason -> ConcludeOutcome.Failed reason
-                            | Ok oldItems, Ok proposed ->
-                                let settled = MagicTodo.settleObligations oldItems proposed verdict
+                            match writeBlob journal report with
+                            | Error reason -> ConcludeOutcome.Failed reason
+                            | Ok workRecord ->
+                                let concluded =
+                                    { ManagerLifeId = lifeId
+                                      TodoWriteId = writeId
+                                      TodoReviewId = assignment.TodoReviewId
+                                      DedicatedReviewerId = assignment.DedicatedReviewerId
+                                      ReviewerSessionId = assignment.ReviewerSessionId
+                                      Verdict = verdict
+                                      WorkRecordRef = workRecord.BlobRef
+                                      WorkRecordDigest = workRecord.BlobDigest
+                                      // Persisted wire compatibility only. CurrentObligations
+                                      // moved at TodoWriteAccepted and never rolls back on verdict.
+                                      SettledTodoRef = cp.ProposedTodoRef
+                                      SettledTodoDigest = cp.ProposedTodoDigest
+                                      ReviewerRecordFrontier = endExclusive
+                                      ProviderRunId = providerRun
+                                      ToolCallId = toolCallId }
 
-                                match writeBlob journal report, writeBlob journal (MagicTodoObligationCodec.encode settled) with
-                                | Error reason, _
-                                | _, Error reason -> ConcludeOutcome.Failed reason
-                                | Ok workRecord, Ok settledBlob ->
-                                    let concluded =
-                                        { ManagerLifeId = lifeId
-                                          TodoWriteId = writeId
-                                          TodoReviewId = assignment.TodoReviewId
-                                          DedicatedReviewerId = assignment.DedicatedReviewerId
-                                          ReviewerSessionId = assignment.ReviewerSessionId
-                                          Verdict = verdict
-                                          WorkRecordRef = workRecord.BlobRef
-                                          WorkRecordDigest = workRecord.BlobDigest
-                                          SettledTodoRef = settledBlob.BlobRef
-                                          SettledTodoDigest = settledBlob.BlobDigest
-                                          ReviewerRecordFrontier = endExclusive
-                                          ProviderRunId = providerRun
-                                          ToolCallId = toolCallId }
-
-                                    match
-                                        AgentJournal.appendMagicTodo
-                                            (StreamId.Session assignment.ReviewerSessionId)
-                                            (Some providerRun)
-                                            (MagicTodoFact.TodoReviewConcluded concluded)
-                                            journal
-                                    with
-                                    | Error failure -> ConcludeOutcome.Failed(JournalAppendFailure.describe failure)
-                                    | Ok _ -> ConcludeOutcome.Concluded
+                                match
+                                    AgentJournal.appendMagicTodo
+                                        (StreamId.Session assignment.ReviewerSessionId)
+                                        (Some providerRun)
+                                        (MagicTodoFact.TodoReviewConcluded concluded)
+                                        journal
+                                with
+                                | Error failure -> ConcludeOutcome.Failed(JournalAppendFailure.describe failure)
+                                | Ok _ -> ConcludeOutcome.Concluded
                         | _ -> ConcludeOutcome.Pending "process-review LWR not record-ready"
             | _ -> ConcludeOutcome.Pending "assignment missing"
 

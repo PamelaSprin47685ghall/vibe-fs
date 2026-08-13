@@ -24,7 +24,7 @@ git checkout -- \
   src/Wanxiangshu/Infrastructure/OpenCode/Plugin/SpikePlugin.fs
 
 set +e
-npm run build
+node scripts/build.mjs
 echo BUILD_EXIT:$?
 set -e
 

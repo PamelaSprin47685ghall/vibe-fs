@@ -86,5 +86,5 @@ Change 文件只引用正式 Clause；`CHG-NNN` 不进入产品前缀表。
 
 ## Verification
 
-先运行 `node scripts/checks/spec.mjs`，再运行 `npm run lint`。新增门禁必须有永久回归，并用受控反例
+运行 `npm run format-build-test`。新增门禁必须有永久回归，并用受控反例
 证明仓库入口会判红；恢复反例后重新执行正式检查。

@@ -161,8 +161,7 @@ Node.js ≥ 20，`npm@11.12.1`；.NET SDK（`global.json`）；本地工具 `.co
 ```bash
 npm ci
 dotnet tool restore
-npm run build
-npm test
+npm run format-build-test
 ```
 
 请用 `npm ci`。`bun-pty` 经 `overrides` 固定（见 `package.json` / `AGENTS.md`）。
@@ -172,27 +171,18 @@ npm test
 ```bash
 npm ci
 dotnet tool restore
-npm run build
-npm test
-npm run test:integration
-npm run test:e2e
-npm run check
-npm run check:release
+npm run format-build-test
 ```
 
 | 命令 | 作用 |
 |------|------|
-| `npm run format` / `format:check` | Fantomas 写/检 F# |
-| `npm run lint` | `format:check` + `scripts/check.mjs` |
-| `npm run gate:dsl-ownership` | DSL 结构门禁检查（`threshold=0`） |
-| `npm run test:package` | tarball 内容、隔离安装、import、资源 |
-| `npm run test:e2e` | e2e 单次连续 OpenCode 生命周期（`tests/e2e/entry.test.mjs`） |
+| `npm run format-build-test` | Fantomas 写盘 → `scripts/check.mjs` → 编译 → unit → integration → package → warmup → Long Stroke e2e → `npm pack --dry-run` |
 
 ### 测试分层
 
 | 层 | 入口 | 范围 |
 |----|------|------|
-| unit | `tests/unit/run.mjs`（`npm test`） | 对 `dist/` 的契约；经 `tests/unit/support/domain.mjs` |
+| unit | `tests/unit/run.mjs` | 对 `dist/` 的契约；经 `tests/unit/support/domain.mjs` |
 | integration | `tests/integration/run.mjs` | resources、journal、plugin、package、harness |
 | e2e | `tests/e2e/entry.test.mjs` | `scenarios/long-stroke.toml` + `support/` oracles；单次连续生命周期 |
 
@@ -224,26 +214,24 @@ resources/enforcer/<TipName>/{enforcer.md,main.md}
 
 ### 构建与打包
 
-- **构建**：`npm run build` → `scripts/build.mjs`（清空 `dist/` → Fable → 校验入口与资源）。不把 `resources/` 复制进 `dist/`。
+- **构建**：`scripts/build.mjs`（清空 `dist/` → Fable → 校验入口与资源）。不把 `resources/` 复制进 `dist/`。
 - **打包**：仓库根 `npm pack`（或 `--pack-destination artifacts/package`）。tarball = `dist/` + `resources/` + metadata（`package.json`、`README.md`、`LICENSE`）。不得含 `src/`、`tests/`、`scripts/`、`docs/`、`artifacts/`。
 
-发布预检：`npm run check:release`（干净工作树；验证日志进 CI artifact）。
+发布预检：`npm run format-build-test`（干净工作树；验证日志进 CI artifact）。
 
 ### 提交要求
 
-1. 源码变更后通过 `format:check`（或先 `npm run format`）。
-2. 至少 `npm run check`（lint → build → unit → integration）。
-3. 触及 Host / e2e 时再跑 `test:e2e` 或 `check:release`。
-4. 优先 stage 具体路径；保留 hooks；不用 `--no-verify`。
-5. 用户可见变化写入 [CHANGELOG.md](CHANGELOG.md)。
-6. 不推送对 `main`/`master` 的破坏性历史改写；force push 等需显式许可。
+1. 源码变更后运行 `npm run format-build-test`。
+2. 优先 stage 具体路径；保留 hooks；不用 `--no-verify`。
+3. 用户可见变化写入 [CHANGELOG.md](CHANGELOG.md)。
+4. 不推送对 `main`/`master` 的破坏性历史改写；force push 等需显式许可。
 
 ### 发布
 
 ```bash
 npm ci
 dotnet tool restore
-npm run check:release
+npm run format-build-test
 npm pack --pack-destination artifacts/package
 ```
 

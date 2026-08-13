@@ -46,7 +46,7 @@ G5 Amendment C-3：builtin `read`/`edit`/`write`/`glob`/`grep`/`patch` 保留，
 
 | 检查 | 命令 / 位置 | 守住的条款 |
 |------|-------------|------------|
-| 条款唯一与引用 | `scripts/checks/spec.mjs`（经 `npm run lint`） | GOV-005；全文 `## ID` 定义 |
+| 条款唯一与引用 | `scripts/checks/spec.mjs`（经 `npm run format-build-test`） | GOV-005；全文 `## ID` 定义 |
 | 源码根 / fsproj / 分层 | `scripts/checks/architecture.mjs` | ARCH-001 分层；资源读取位置；无旧路径 |
 | DSL 所有权 | `scripts/checks/dsl-ownership.mjs`（threshold=0） | ARCH-001、FLOW-001/006 |
 

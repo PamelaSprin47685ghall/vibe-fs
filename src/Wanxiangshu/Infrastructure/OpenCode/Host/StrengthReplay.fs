@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open System.Collections.Generic
 open Wanxiangshu.Domain
 open Wanxiangshu.Domain.ProviderProjection
 open Wanxiangshu.Host
@@ -87,7 +88,25 @@ module StrengthReplay =
     /// Close Promoted → Traced after XTrace capture for plans that lacked a
     /// prior trace range. Stable Host ids recover the exact range; legacy
     /// positional traces fall back to unique canonical match (fail closed).
-    let commitTracedAfterCapture
+        /// Stable capture writes `g:N/msg:{hostId}/part:P`. Extract the Host id
+    /// so Promoted→Traced close can HashSet-lookup instead of scanning
+    /// expectedIds per part.
+    let private stableHostIdOfProvenance (provenance: string) =
+        let marker = "/msg:"
+        let start = provenance.IndexOf(marker, StringComparison.Ordinal)
+
+        if start < 0 then
+            None
+        else
+            let idStart = start + marker.Length
+            let stop = provenance.IndexOf("/part:", idStart, StringComparison.Ordinal)
+
+            if stop < 0 then
+                None
+            else
+                Some(provenance.Substring(idStart, stop - idStart))
+
+let commitTracedAfterCapture
         (journal: AgentJournal option)
         (strengthDurability: StrengthDurabilityPort option)
         (strengthFailClosed: string -> unit)
@@ -131,12 +150,17 @@ module StrengthReplay =
                                   "result"
                                   plan.Bundle.Digest ])
 
+                    let expectedIdSet = HashSet<string>()
+
+                    for id in expectedIds do
+                        ignore (expectedIdSet.Add id)
+
                     let byStableId =
                         updated.Parts
                         |> List.filter (fun part ->
-                            expectedIds
-                            |> List.exists (fun id ->
-                                part.Provenance.Contains("/msg:" + id + "/part:", StringComparison.Ordinal)))
+                            match stableHostIdOfProvenance part.Provenance with
+                            | Some id -> expectedIdSet.Contains id
+                            | None -> false)
 
                     let expectedCount = StrengthLifecycle.framePartCount plan.Bundle
 

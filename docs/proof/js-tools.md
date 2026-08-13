@@ -26,15 +26,7 @@
 ## 门禁
 
 ```text
-node scripts/checks/spec.mjs
-node scripts/checks/architecture.mjs
-node scripts/checks/unified-store-gate.mjs
-npm run build
-node tests/unit/run.mjs
-node tests/integration/run.mjs
-npm run test:e2e（Long Stroke 单一入口）
-npm run check
-环境允许时：npm run check:release
+npm run format-build-test
 ```
 
 Long Stroke 不得因 G5 注册新工具而提升超时（G4R 时间边界）；js-* 相关回归走 unit + Long Stroke 受影响路径。

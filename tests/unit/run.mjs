@@ -70,7 +70,7 @@ const checkBuildFreshness = () => {
   // comparing against it would mask a stale project build.
   const artifacts = walk(BUILD_ROOT, ['.js']).filter((file) => !file.includes('fable_modules'))
   if (artifacts.length === 0) {
-    return { ok: false, reason: `${BUILD_ROOT}/ has no compiled output — run: npm run build` }
+    return { ok: false, reason: `${BUILD_ROOT}/ has no compiled output — run: npm run format-build-test` }
   }
 
   const newestSource = newestFile(sources)
@@ -81,7 +81,7 @@ const checkBuildFreshness = () => {
     return {
       ok: false,
       reason: [
-        `${BUILD_ROOT}/ is stale by ${staleBy}s — run: npm run build`,
+        `${BUILD_ROOT}/ is stale by ${staleBy}s — run: npm run format-build-test`,
         `  newest source:   ${relative('.', newestSource.file)}`,
         `  newest artifact: ${relative('.', newestArtifact.file)}`,
       ].join('\n'),

@@ -20,20 +20,7 @@
     "access": "restricted"
   },
   "scripts": {
-    "build": "node scripts/build.mjs",
-    "format": "dotnet tool run fantomas src/Wanxiangshu",
-    "format:check": "dotnet tool run fantomas --check src/Wanxiangshu",
-    "lint": "npm run format:check && node scripts/check.mjs",
-    "test": "node tests/unit/run.mjs",
-    "test:unit": "node tests/unit/run.mjs",
-    "test:coverage": "node tests/unit/run.mjs --coverage",
-    "test:integration": "node tests/integration/run.mjs",
-    "test:package": "node tests/integration/package/run.mjs",
-    "test:e2e": "node tests/e2e/entry.test.mjs",
-    "warmup:opencode": "node scripts/warmup-opencode.mjs",
-    "check": "npm run lint && npm run build && npm test && npm run test:integration",
-    "check:release": "npm run warmup:opencode && npm run check && npm run test:e2e && npm run test:package && npm pack --dry-run",
-    "gate:dsl-ownership": "node scripts/checks/dsl-ownership.mjs"
+    "format-build-test": "dotnet tool run fantomas src/Wanxiangshu && node scripts/check.mjs && node scripts/build.mjs && node tests/unit/run.mjs && node tests/integration/run.mjs && node tests/integration/package/run.mjs && node scripts/warmup-opencode.mjs && node tests/e2e/entry.test.mjs && npm pack --dry-run"
   },
   "peerDependencies": {
     "@opencode-ai/plugin": ">=1.17.4"

@@ -1,4 +1,4 @@
-Verdict: {{verdict}}
+# An earlier account of the work left something unresolved.
 
-Report:
 {{report}}
+

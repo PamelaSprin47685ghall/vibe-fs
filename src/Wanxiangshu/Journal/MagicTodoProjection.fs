@@ -41,8 +41,9 @@ module MagicTodoProjection =
     type LifeMagicTodoState =
         {
             LifeId: ManagerLifeId
-            /// Settled current (Ck for the next prepare). None means normal new Life.
-            SettledCurrentRef: (BlobRef * BlobDigest) option
+            /// Canonical provider account: the latest Accepted checkpoint's Submitted account.
+            /// None means a normal new Life before T1 (or no legacy seed).
+            CurrentObligationsRef: (BlobRef * BlobDigest) option
             /// Accepted chain in order (lag-1 desired cutoff source).
             AcceptedOrder: TodoWriteId list
             Checkpoints: Map<string, CheckpointRecord>
@@ -74,7 +75,7 @@ module MagicTodoProjection =
 
     let emptyLife (lifeId: ManagerLifeId) : LifeMagicTodoState =
         { LifeId = lifeId
-          SettledCurrentRef = None
+          CurrentObligationsRef = None
           AcceptedOrder = []
           Checkpoints = Map.empty
           Dedicated = None
@@ -143,11 +144,11 @@ module MagicTodoProjection =
     let desiredLag1 (life: LifeMagicTodoState) : TodoWriteId option =
         MagicTodo.desiredLag1Cutoff life.AcceptedOrder
 
-    let materializeSettledCurrent
+    let materializeCurrentObligations
         (decodeList: BlobRef -> BlobDigest -> MagicTodoList)
         (life: LifeMagicTodoState)
         : MagicTodoList =
-        match life.SettledCurrentRef with
+        match life.CurrentObligationsRef with
         | Some(blobRef, digest) -> decodeList blobRef digest
         | None -> []
 
@@ -256,7 +257,8 @@ module MagicTodoProjection =
                 putLife
                     { life with
                         Checkpoints = Map.add key cp life.Checkpoints
-                        AcceptedOrder = acceptedOrder }
+                        AcceptedOrder = acceptedOrder
+                        CurrentObligationsRef = Some(cp.ProposedTodoRef, cp.ProposedTodoDigest) }
                     state
             )
 
@@ -321,8 +323,7 @@ module MagicTodoProjection =
                     Ok(
                         putLife
                             { life with
-                                Checkpoints = Map.add key cp life.Checkpoints
-                                SettledCurrentRef = Some(payload.SettledTodoRef, payload.SettledTodoDigest) }
+                                Checkpoints = Map.add key cp life.Checkpoints }
                             state
                     )
 
@@ -389,7 +390,7 @@ module MagicTodoProjection =
             Ok(
                 putLife
                     { life with
-                        SettledCurrentRef = Some(payload.SeedTodoRef, payload.SeedTodoDigest)
+                        CurrentObligationsRef = Some(payload.SeedTodoRef, payload.SeedTodoDigest)
                         LegacySeed = Some(payload.SeedTodoRef, payload.SeedTodoDigest, payload.SeedItemIds) }
                     state
             )

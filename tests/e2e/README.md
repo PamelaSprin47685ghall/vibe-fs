@@ -1,6 +1,6 @@
 # E2E — One World / The Long Stroke
 
-Sole entry: `node tests/e2e/entry.test.mjs` (`npm run test:e2e`).
+Sole entry: `node tests/e2e/entry.test.mjs`（经 `npm run format-build-test`）。
 
 | File | Role |
 |------|------|

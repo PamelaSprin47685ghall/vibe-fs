@@ -100,11 +100,7 @@ Host/OpenCode 版本门禁必须机械验证。默认生产路径 canary 不健�
 修改完成后执行：
 
 ```text
-node scripts/checks/spec.mjs
-npm run lint
-npm run build
-npm test
-npm run test:integration
+npm run format-build-test
 ```
 
-涉及 Host canary / package boundary 时继续执行对应 integration/e2e/package 正式入口。禁止临时 probe 代替永久测试；任何发现的回归必须落入仓库测试。
+禁止临时 probe 代替永久测试；任何发现的回归必须落入仓库测试。

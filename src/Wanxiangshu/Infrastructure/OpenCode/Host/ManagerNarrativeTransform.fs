@@ -101,9 +101,15 @@ module ManagerNarrativeTransform =
         | Some state ->
             match state.Terminal with
             | None -> false
-            | Some _ -> state.Parts |> List.exists (fun part -> part.Provenance = messageId)
+            | Some _ ->
+                let provenances = HashSet<string>()
 
-    let private hasSuicideAfter (rawMessages: obj list) (messageIndex: int) =
+                for part in state.Parts do
+                    ignore (provenances.Add part.Provenance)
+
+                provenances.Contains messageId
+
+let private hasSuicideAfter (rawMessages: obj list) (messageIndex: int) =
         if messageIndex >= List.length rawMessages - 1 then
             false
         else

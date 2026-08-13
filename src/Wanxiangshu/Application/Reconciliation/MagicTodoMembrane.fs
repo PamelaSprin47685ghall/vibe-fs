@@ -30,8 +30,9 @@ module MagicTodoMembrane =
           ManagerLifeId: ManagerLifeId
           Prepared: TodoWritePrepared
           PreparedFactRef: EventId
-          SettledOld: ObligationList
-          NormalizedProposal: ObligationList
+          BaseObligations: ObligationList
+          SubmittedObligations: ObligationList
+          PreviousReview: PreviousReviewView option
           CompatibilityRows: CompatibilityTodoRow list
           AlreadyAccepted: bool
           AcceptedOutputDigest: string option }
@@ -84,6 +85,18 @@ module MagicTodoMembrane =
             MagicTodoObligationCodec.tryDecode body
             |> Result.mapError PrepareRejection.BlobDecode
 
+    let private readText
+        (journal: AgentJournal)
+        (label: string)
+        (blobRef: BlobRef)
+        (expectedDigest: BlobDigest)
+        : Result<string, PrepareRejection> =
+        match journal.Writer.BlobWriter.Read blobRef with
+        | Error reason -> Error(PrepareRejection.BlobRead reason)
+        | Ok body when HostDigest.sha256Hex body <> BlobDigest.value expectedDigest ->
+            Error(PrepareRejection.BlobDigestMismatch label)
+        | Ok body -> Ok body
+
     let private writeList
         (journal: AgentJournal)
         (label: string)
@@ -134,8 +147,9 @@ module MagicTodoMembrane =
         (lifeId: ManagerLifeId)
         (prepared: TodoWritePrepared)
         (preparedFactRef: EventId)
-        (settledOld: ObligationList)
+        (baseObligations: ObligationList)
         (proposal: ObligationList)
+        (previousReview: PreviousReviewView option)
         (alreadyAccepted: bool)
         (acceptedOutputDigest: string option)
         =
@@ -143,8 +157,9 @@ module MagicTodoMembrane =
           ManagerLifeId = lifeId
           Prepared = prepared
           PreparedFactRef = preparedFactRef
-          SettledOld = settledOld
-          NormalizedProposal = proposal
+          BaseObligations = baseObligations
+          SubmittedObligations = proposal
+          PreviousReview = previousReview
           CompatibilityRows = obligationsToCompatibilityRows proposal
           AlreadyAccepted = alreadyAccepted
           AcceptedOutputDigest = acceptedOutputDigest }
@@ -178,14 +193,25 @@ module MagicTodoMembrane =
                     Map.tryFind (ManagerLifeId.value lifeId) todoProjection.ByLife
                     |> Option.defaultValue (MagicTodoProjection.emptyLife lifeId)
 
-                let settledResult =
-                    match life.SettledCurrentRef with
+                let currentResult =
+                    match life.CurrentObligationsRef with
                     | None -> Ok []
-                    | Some(blobRef, digest) -> readList journal "SettledCurrent" blobRef digest
+                    | Some(blobRef, digest) -> readList journal "CurrentObligations" blobRef digest
 
-                match settledResult with
-                | Error error -> Error error
-                | Ok settledOld ->
+                let previousReviewResult =
+                    match MagicTodoProjection.consumablePreviousReview life with
+                    | None -> Ok None
+                    | Some concluded ->
+                        readText journal "ProcessReviewLWR" concluded.WorkRecordRef concluded.WorkRecordDigest
+                        |> Result.map (fun report ->
+                            Some
+                                { Verdict = concluded.Verdict
+                                  ReportText = report })
+
+                match currentResult, previousReviewResult with
+                | Error error, _
+                | _, Error error -> Error error
+                | Ok currentObligations, Ok previousReview ->
                     let writeId = MagicTodo.todoWriteId HostDigest.sha256Hex lifeId locality.ToolCallId
                     let prior = existingPrepared lifeId writeId life
 
@@ -193,7 +219,7 @@ module MagicTodoMembrane =
                         MagicTodoAdmission.admitObligations
                             HostDigest.sha256Hex
                             lifeId
-                            settledOld
+                            currentObligations
                             (MagicTodoProjection.mayAdmitNewCheckpoint life)
                             prior
                             { ToolCallId = locality.ToolCallId
@@ -222,8 +248,9 @@ module MagicTodoMembrane =
                                         lifeId
                                         (preparedFromCheckpoint lifeId checkpoint)
                                         checkpoint.PreparedFactRef
-                                        settledOld
+                                        currentObligations
                                         proposal
+                                        previousReview
                                         checkpoint.Accepted
                                         checkpoint.OutputDigest
                                 )
@@ -265,8 +292,9 @@ module MagicTodoMembrane =
                                         lifeId
                                         prepared
                                         receipt.EventId
-                                        settledOld
+                                        currentObligations
                                         preparedPlan.Proposed
+                                        previousReview
                                         false
                                         None
                                 )
@@ -313,7 +341,15 @@ module MagicTodoMembrane =
             let lang = ProviderProse.languageOf bridge.ManagerSessionId
 
             let previousBody =
-                ProviderProse.render lang MagicTodoSurface.Path.PreviousNone Map.empty
+                match bridge.PreviousReview with
+                | Some previous when previous.Verdict = ProcessReviewVerdict.Revise ->
+                    ProviderProse.render
+                        lang
+                        MagicTodoSurface.Path.PreviousReviewBody
+                        (MagicTodoSurface.previousReviewSubs
+                            (ProcessReviewVerdict.wire previous.Verdict)
+                            previous.ReportText)
+                | _ -> ""
 
             let acceptedEpilogue =
                 ProviderProse.render lang MagicTodoSurface.Path.ObligationAcceptedEpilogue Map.empty
@@ -324,8 +360,8 @@ module MagicTodoMembrane =
                     MagicTodoSurface.Path.ObligationWriteResult
                     (MagicTodoSurface.obligationWriteSubs
                         previousBody
-                        (MagicTodoSurface.renderObligationListWire bridge.NormalizedProposal)
-                        (MagicTodoSurface.renderObligationListWire bridge.NormalizedProposal)
+                        (MagicTodoSurface.renderObligationListWire bridge.SubmittedObligations)
+                        (MagicTodoSurface.renderObligationListWire bridge.SubmittedObligations)
                         acceptedEpilogue)
 
             let enrichedResult =

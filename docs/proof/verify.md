@@ -2,7 +2,7 @@
 
 条款前缀：`VERIFY-`。  
 本文件是 **proof 唯一权威**：应运行什么、证明什么、失败意味着什么。  
-运行证据在 CI artifact，不进 Git 工作树。实现命令入口见 `AGENTS.md` / `npm run check*`。
+运行证据在 CI artifact，不进 Git 工作树。实现命令入口见 `npm run format-build-test`。
 
 `VERIFY-*` 定义不得迁出本文件（检查器与测试锚点依赖）。
 
@@ -547,7 +547,7 @@ edit-qa / Meditator / Role.Executor 作为现行表面
 
 替代：上表 Gate A–E + `tests/unit/invariants/*` 语义不变量。禁止用新的宽松 substring 清单假装覆盖。
 
-`npm run lint` 绿色只证明上述静态覆盖，不得宣称已经证明跨文件语义一致、所有 `Result` 穷尽处理或所有算法 owner 唯一。新增静态门禁必须有故意破坏后变红的 fixture；新增行为门禁必须走发布产物测试。
+`node scripts/check.mjs` 绿色只证明上述静态覆盖，不得宣称已经证明跨文件语义一致、所有 `Result` 穷尽处理或所有算法 owner 唯一。新增静态门禁必须有故意破坏后变红的 fixture；新增行为门禁必须走发布产物测试。
 
 ## Fail-Closed 校验与破坏性回归测试指南
 
@@ -744,7 +744,7 @@ ORCH_007_changed_target_requires_rereview
 
 ```text
 门槛：整体行覆盖率 ≥ 80%（dist 全部生产模块，排除 fable_modules）
-入口：npm run test:coverage（= node tests/unit/run.mjs --coverage）
+入口：node tests/unit/run.mjs --coverage
 产物：artifacts/coverage/coverage-summary.json
 ```
 

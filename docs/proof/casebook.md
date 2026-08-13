@@ -32,16 +32,7 @@
 ## 门禁
 
 ```text
-node scripts/checks/spec.mjs
-node scripts/checks/architecture.mjs
-node scripts/checks/unified-store-gate.mjs
-node scripts/checks/js-surface-gate.mjs
-npm run build
-node tests/unit/run.mjs
-node tests/integration/run.mjs
-npm run test:e2e（Long Stroke 单一入口；不得因 G6 提升超时）
-npm run check
-环境允许时：npm run check:release
+npm run format-build-test
 ```
 
 唯一 e2e = Long Stroke（mock LLM + 本机 OpenCode）；G6 不得另开第二条、不得提升超时。Long Stroke 时间边界（G4R）持续生效；Casebook 相关回归走 unit + Long Stroke 受影响路径。

@@ -471,15 +471,15 @@ export const cancelledToken = () => new AsyncBuilder.CancellationToken(true)
 export const processWait = (() => {
   const waitForExitFn = NodeProcessWaitModule.waitForExit
   if (typeof waitForExitFn !== 'function') {
-    throw new Error('NodeProcessWait.waitForExit missing from dist — run npm run build')
+    throw new Error('NodeProcessWait.waitForExit missing from dist — run npm run format-build-test')
   }
   const notifyExitedFn = NodeProcessHostModule.notifyExited
   if (typeof notifyExitedFn !== 'function') {
-    throw new Error('NodeProcessHost.notifyExited missing from dist — run npm run build')
+    throw new Error('NodeProcessHost.notifyExited missing from dist — run npm run format-build-test')
   }
   const ChildProcess = NodeProcessHostModule.ChildProcess
   if (typeof ChildProcess !== 'function') {
-    throw new Error('NodeProcessHost.ChildProcess missing from dist — run npm run build')
+    throw new Error('NodeProcessHost.ChildProcess missing from dist — run npm run format-build-test')
   }
 
   return {

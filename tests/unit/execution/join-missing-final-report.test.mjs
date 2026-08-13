@@ -24,7 +24,7 @@ async function loadDictionary() {
   const fableLibDir = (() => {
     const root = join(BUILD_ROOT, 'fable_modules')
     const name = readdirSync(root).find((e) => e.startsWith('fable-library-js.'))
-    if (!name) throw new Error(`no fable-library-js.* under dist; run npm run build`)
+    if (!name) throw new Error(`no fable-library-js.* under dist; run npm run format-build-test`)
     return join(root, name)
   })()
   const candidates = ['MutableMap.js', 'System.Collections.Generic.js', 'MapUtil.js']

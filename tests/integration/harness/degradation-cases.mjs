@@ -142,25 +142,32 @@ export const degradationCases = [
       );
 
       const pkg = JSON.parse(readSource('package.json'));
+      const pipeline = pkg.scripts?.['format-build-test'];
       assertTrue(
-        typeof pkg.scripts?.['test:e2e'] === 'string' && pkg.scripts['test:e2e'].includes('entry.test.mjs'),
-        'package.json test:e2e must point at entry.test.mjs',
+        typeof pipeline === 'string' && pipeline.includes('tests/e2e/entry.test.mjs'),
+        'package.json format-build-test must point at tests/e2e/entry.test.mjs',
       );
       assertTrue(
-        typeof pkg.scripts?.['test:e2e'] === 'string' && !pkg.scripts['test:e2e'].includes('run.mjs'),
-        'package.json test:e2e must not target the retired multi-canary launcher',
+        typeof pipeline === 'string' && !pipeline.includes('tests/e2e/run.mjs'),
+        'package.json format-build-test must not target the retired multi-canary launcher',
       );
       assertTrue(
-        typeof pkg.scripts?.['check:release'] === 'string' && !pkg.scripts['check:release'].includes('--repeat'),
-        'check:release must not reintroduce a --repeat release-gate pool',
+        typeof pipeline === 'string' && !pipeline.includes('--repeat'),
+        'format-build-test must not reintroduce a --repeat release-gate pool',
+      );
+      const warmupAt = typeof pipeline === 'string' ? pipeline.indexOf('warmup-opencode.mjs') : -1;
+      const e2eAt = typeof pipeline === 'string' ? pipeline.indexOf('tests/e2e/entry.test.mjs') : -1;
+      assertTrue(
+        warmupAt >= 0 && e2eAt >= 0 && warmupAt < e2eAt,
+        'format-build-test must warm opencode before Long Stroke e2e',
       );
 
       const entry = readSource(SOLE_ENTRY);
       // Pin absence when G4R-4 has already deleted the pool artifacts. Soft during cutover:
       // sole-entry scripts above already refuse to wire them.
       assertTrue(
-        !existsSync(`${REPO_ROOT}tests/e2e/run.mjs`) || !pkg.scripts['test:e2e'].includes('run.mjs'),
-        'multi-canary run.mjs must be gone, or at least unused by test:e2e',
+        !existsSync(`${REPO_ROOT}tests/e2e/run.mjs`) || !pipeline.includes('tests/e2e/run.mjs'),
+        'multi-canary run.mjs must be gone, or at least unused by format-build-test',
       );
       assertTrue(
         !existsSync(`${REPO_ROOT}tests/e2e/support/manifest.mjs`) || !/from\s*['"][^'"]*manifest/.test(entry),

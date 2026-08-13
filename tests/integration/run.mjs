@@ -4,7 +4,7 @@
 // Order: resources ×2 → journal/boot → plugin/manager-tool-contract
 //        → package/run.mjs → harness/run.mjs
 // Any non-zero exit stops with exit 1.
-// package suite remains independently invocable via test:package.
+// package suite remains independently invocable via node tests/integration/package/run.mjs.
 //
 // Silence = WATCHDOG_TIMEOUT_MS (3s), same dog as e2e canary. package/harness own
 // the same 3s criterion inside their entrypoints.
