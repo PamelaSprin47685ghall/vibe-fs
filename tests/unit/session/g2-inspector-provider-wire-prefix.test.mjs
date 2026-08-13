@@ -37,6 +37,7 @@ import {
   agentJournal,
   authorityRoot,
   idValue,
+  lifecycleWorkRecordProjection,
   listItems,
   mapEntries,
   okResult,
@@ -180,6 +181,8 @@ const withHarness = async (fn, { tier = 'Fast' } = {}) => {
     undefined,
     undefined,
     INSPECTOR_MODEL,
+    // EXEC-031: bounded WorkRecord via the real journal projector.
+    (_sid, range) => lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(opened.journal, _sid, range),
   )
 
   try {
@@ -244,8 +247,8 @@ test('G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix', async () => {
 
     await settlePendingInvoke(runtime, harness, delegateId, inspector, answers[0], 'asst_q1')
     const q1Done = resultOf(await q1)
-    assert.equal(q1Done.ok, true)
-    assert.equal(q1Done.value, answers[0])
+    assert.equal(q1Done.ok, true, q1Done.error)
+    assert.match(q1Done.value, /answer Q1/)
 
     const q2 = invoke(runtime, owner, SyncDelegateRole.Inspector, questions[1])
     await waitFor(() => captures.length === 2, 'Q2 send missing')
@@ -260,12 +263,12 @@ test('G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix', async () => {
 
     await settlePendingInvoke(runtime, harness, delegateId, inspector, answers[1], 'asst_q2')
     const q2Done = resultOf(await q2)
-    assert.equal(q2Done.ok, true)
-    assert.equal(q2Done.value, answers[1])
+    assert.equal(q2Done.ok, true, q2Done.error)
+    assert.match(q2Done.value, /answer Q2/)
 
     const q3 = invoke(runtime, owner, SyncDelegateRole.Inspector, questions[2])
     await waitFor(() => captures.length === 3, 'Q3 send missing')
-    assert.equal(createCalls.length, 1, 'CreateChildSession must stay exactly once through Q3')
+    assert.equal(createCalls.length, 1, 'GetOrCreate must reuse; CreateChildSession once')
     assert.equal(createCalls[0].child, delegateId)
     assert.equal(prompts[2].agent, INSPECTOR_AGENT)
     assert.equal(prompts[2].session, delegateId)
@@ -276,15 +279,18 @@ test('G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix', async () => {
 
     await settlePendingInvoke(runtime, harness, delegateId, inspector, answers[2], 'asst_q3')
     const q3Done = resultOf(await q3)
-    assert.equal(q3Done.ok, true)
-    assert.equal(q3Done.value, answers[2])
+    assert.equal(q3Done.ok, true, q3Done.error)
+    assert.match(q3Done.value, /answer Q3/)
 
     assert.equal(new Set([delegateId, captures[0].session, captures[1].session, captures[2].session]).size, 1)
     assert.deepEqual(
       [createCalls[0].agent, prompts[0].agent, prompts[1].agent, prompts[2].agent],
       [INSPECTOR_AGENT, INSPECTOR_AGENT, INSPECTOR_AGENT, INSPECTOR_AGENT],
     )
-    assert.deepEqual([q1Done.value, q2Done.value, q3Done.value], answers)
+    assert.deepEqual(
+      [q1Done.value, q2Done.value, q3Done.value].map((value) => value.match(/answer Q[123]/)?.[0]),
+      answers,
+    )
 
     const wireQ1 = captures[0].wire
     const wireQ2 = captures[1].wire

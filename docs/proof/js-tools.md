@@ -7,9 +7,9 @@
 | **Generator equivalence** | 枚举所有 canonical profile（capability 子集 × 角色），证明生成 surface 与 profile 完全同构；fast/deep 相同；deterministic（同 profile 同字节） |
 | **Lying generator counterexample** | 构造"说谎生成器"（生成方法但 runtime 无绑定 / 描述含不存在方法），证明 gate 拒绝 |
 | **Four-layer exactness** | capability absent → member absent → description absent → example absent → runtime gate fail closed（每层独立测试） |
-| **Description golden** | `js-ROLE` description 含 header、公开 `class JsProgram`（Read 时含 `HOST_READ_IMMUTABLE_UTF8_SNAPSHOT` 与 `text(from, to)`）、§47.1 workflow、filtered canonical examples（含 standard replace）、footer；不含 `_api` / binding key；无 Edit 时无 `rewrite(path`；schema 字段名为 `program` |
+| **Description golden** | `js-ROLE` description 含 header、公开 `class JsProgram`（Read 时含 `HOST_READ_IMMUTABLE_UTF8_SNAPSHOT` 与 `text(from, to)`）、§47.1 workflow、filtered canonical examples（含 standard replace）、footer；Read rules 写明 `name±N` 的 N 不是行号；不含 `_api` / binding key；无 Edit 时无 `rewrite(path`；schema 字段名为 `program` |
 | **Builtin coexistence + hook** | read/edit/write/glob/grep/patch 原 schema/实现可执行；hook 文案只改 description；js-ROLE 名同时 provider-visible；无 alias takeover |
-| **Anchor/regex** | 有序匹配、消歧、零宽、`^`/`$` 绝对语义、5 类拒绝；`name±N` clip 到 `[0, file_len]`；只读多锚点 `text(from,to)` |
+| **Anchor/regex** | 有序匹配、消歧、零宽、`^`/`$` 绝对语义、5 类拒绝；`name±N` 的 N 是字符串下标增量（非行号、非 UTF-8 字节）且 clip 到 `[0, file_len]`；只读多锚点 `text(from,to)` |
 | **read/glob/grep** | 快照隔离；UTF-8 拒绝；gitignore glob（含零段 `**`、跳过 `.git`、应用 ignore、匹配计数有界、`truncated` 可见）；Host `grep()` 返回 path+line+column；非 UTF-8 跳过；capability 边界外不可见 |
 | **write/rewrite 区分** | 目标缺失/存在的双向失败 |
 | **Structured return** | JS-016 golden：成功 `# ok` + `[data]`/`data =`，有改盘则文末 `[fs]` 路径数组；失败 `# failed` + `code`/`reason`；无 `status`/`result`/`written`/`created`；query 零 mutation；TOML 可 parse；缺失文件为 `FILE_NOT_FOUND`；锚点未找到为 `ANCHOR_NOT_FOUND` 且 reason 含 pattern；`throw new Error('boom')` 的 reason 含 `boom` |

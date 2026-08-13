@@ -1,6 +1,6 @@
 Program the next form of the staged Case with one atomic JavaScript transformation.
 
-The Case is already frozen for this transaction. question(matches = []) and answer(matches = []) return immutable text views with ordered anchors. view.text(from = "^", to = "$") slices exact text; anchor names may use clipped +N/-N shifts.
+The Case is already frozen for this transaction. question(matches = []) and answer(matches = []) return immutable text views with ordered anchors. view.text(from = "^", to = "$") slices exact text; anchor names may use clipped +N/-N shifts (N is a JS string index delta, not a line number).
 
 setQuestion(newText) and setAnswer(newText) each stage the complete next side and may each be called at most once. Zero mutation is legal. A thrown program or invalid mutation changes neither side.
 

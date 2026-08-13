@@ -44,7 +44,7 @@ profile.ToolCapabilitySet
 - RegExp 锚点：按 RegExp 语义匹配；`^` / `$` = 文件绝对首/尾（非行锚）。
 - 零宽 RegExp：位置有效，可表达插入点。
 - 5 类拒绝（`ANCHOR_*`）：不唯一且未指定序 / 不匹配 / 正则非法 / 跨文件混用 / 空锚点。按序找不到：`ANCHOR_NOT_FOUND`，reason 含声明序号、path、cursor、pattern 预览。
-- `text(from, to)` 位移名：`name+N` / `name-N`。全名已在 Map 则用声明；否则最后一个 `[+-]digits` 为 delta，基名递归解析。caret clip 到 `[0, file_len]`（含 EOF）。位移是临时 caret，不写入 Map。
+- `text(from, to)` 位移名：`name+N` / `name-N`。N 与 `source.slice` 同一单位（已解码 JS 字符串下标 / UTF-16 code unit），不是行号，也不是 UTF-8 字节；`file_len` = `source.length`。全名已在 Map 则用声明；否则最后一个 `[+-]digits` 为 delta，基名递归解析。caret clip 到 `[0, file_len]`（含 EOF）。位移是临时 caret，不写入 Map。
 
 ## glob（JS-007）
 
@@ -72,7 +72,7 @@ JS-007 glob(pattern) 选文件（文件上限宽于返回给模型的 glob 上�
 
 ## FileView
 
-`file(path, matches = [])` 读取时快照不可变视图并按序解析 anchors。read 路径：strict UTF-8 校验 → 快照缓存 → FileView.text(from, to)。N 个锚点可只用于阅读：一次 `file()` 钉多节标题，再用 `text("h1end", "h2")` 或 `text("h1", "h1+200")` 取窗。同一 program 内 mutation 不改变先前取得的 FileView（快照隔离）。
+`file(path, matches = [])` 读取时快照不可变视图并按序解析 anchors。read 路径：strict UTF-8 校验 → 快照缓存 → FileView.text(from, to)。多个锚点可只用于阅读：一次 `file()` 钉多节标题，再用 `text("h1end", "h2")` 或 `text("h1", "h1+200")` 取窗（`+200` 是 200 个字符串下标，不是 200 行）。同一 program 内 mutation 不改变先前取得的 FileView（快照隔离）。
 
 ## Transaction
 

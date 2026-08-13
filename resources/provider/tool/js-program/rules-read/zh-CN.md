@@ -21,7 +21,9 @@ anchor 之间的精确原文 substring。字符串 pattern 内容必须非空。
 返回的视图。
 
 from/to 可以是已声明名、^、$，或临时位移 name+N / name-N
-（例：h1+200、h1-40、$+0）。位移不入库。若整串已是
+（例：h1+200、h1-40、$+0）。N 是已解码 JS 字符串上的下标增量，
+与 String.length / slice 同一单位，不是行号，也不是 UTF-8 字节数。
+file_len 即 source.length。位移不入库。若整串已是
 已声明名，则该精确名获胜。否则最后一个 [+-]digits 是 delta；
 基名递归解析。结果 caret 裁剪到闭区间
 [0, file_len]，因此 $+N 与 ^-N 停在 EOF / 文件首。
@@ -30,7 +32,8 @@ from/to 可以是已声明名、^、$，或临时位移 name+N / name-N
 1. 只声明定位 span 所需的最少 begin/end anchor（读或编辑）。
 2. 让 Host 解析这些位置。
 3. 用 text(from, to) 读取。相邻标题可切出正文：
-   text("h1end", "h2")。命中附近窗口是 text("h1", "h1+200")。
+   text("h1end", "h2")。命中附近窗口是 text("h1", "h1+200")
+   （200 是字符串下标，不是 200 行）。
 4. 编辑时，用 text(...) 切片加上新内容拼出完整的结果文件。
 5. 只有在 anchor-and-splice 确实不便时才使用 indexOf / replaceAll。
 

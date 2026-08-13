@@ -32,4 +32,6 @@
 
 **锚点只能切声明 span vs `name±N` 临时 caret。** 拒只能声明：读一窗正文时不该再钉一个假 pattern。位移 clip 到闭区间 `[0, file_len]`，EOF 与 `$` 对齐（JS-005）。
 
+**行号位移 vs 字符串下标位移。** 拒行号：`grep()` 的 `line` 是 1-based 行坐标，`text()` 切的是 `source.slice`。两套单位并存时，`h1+200` 会被读成「往下 200 行」。N 必须与 `String.length` 同单位，这样 `'hello world'` 上 `h+6` 得到 `'hello '`，而不是整文件（JS-005）。
+
 **数组 `null` / 异构对象数组放行 vs commit 前 `INVALID_RETURN_VALUE`。** 拒放行：TOML 不能诚实表示 `null` 元素，对象与原始值混列也无法用一种 array 记法。对象字段 `null` 省略；顶层 `null` 无 data 体（JS-010）。

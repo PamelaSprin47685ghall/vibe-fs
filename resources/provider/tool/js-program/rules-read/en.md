@@ -21,7 +21,9 @@ Reverse slices fail. FileView is immutable: rewrite() does not change a previous
 returned view.
 
 from/to may be a declared name, ^, $, or a temporary shift name+N / name-N
-(example: h1+200, h1-40, $+0). Shifts are not stored. If the full string is a
+(example: h1+200, h1-40, $+0). N is a JS string index delta — the same unit as
+String.length / slice — not a line number and not a UTF-8 byte count.
+file_len is source.length. Shifts are not stored. If the full string is a
 declared name, that exact name wins. Otherwise the last [+-]digits is the delta;
 the base name is resolved recursively. The resulting caret is clipped to
 [0, file_len] inclusive, so $+N and ^-N stay at EOF / start.
@@ -30,7 +32,8 @@ Recommended workflow:
 1. Declare the minimal begin/end anchors needed to locate spans (read or edit).
 2. Let Host resolve those positions.
 3. Read with text(from, to). Adjacent headers make a body slice:
-   text("h1end", "h2"). A window around a hit is text("h1", "h1+200").
+   text("h1end", "h2"). A window around a hit is text("h1", "h1+200")
+   (200 string indices, not 200 lines).
 4. For edits, build the complete resulting file from text(...) slices plus new content.
 5. Use indexOf / replaceAll only when anchor-and-splice is genuinely inconvenient.
 

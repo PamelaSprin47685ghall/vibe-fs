@@ -104,6 +104,7 @@ test('JS004_capability_exactness_plus_one_ultra_example_coder', () => {
   }
   assert.equal(result.Description.includes('HOST_READ_IMMUTABLE_UTF8_SNAPSHOT'), true)
   assert.match(result.Description, /name\+N \/ name-N/)
+  assert.match(result.Description, /not a line number/)
   assert.match(result.Description, /text\(from = "\^", to = "\$"\)/)
   assert.equal(result.Description.includes('_api'), false)
   assert.equal(result.Description.includes('__jsFailure'), false)
@@ -175,6 +176,7 @@ test('JS002_description_embeds_spec_base_class_rules_and_one_ultra_example', () 
     'class Js extends JsProgram',
     'HOST_READ_IMMUTABLE_UTF8_SNAPSHOT',
     'text(from = "^", to = "$")',
+    'not a line number',
     'ordered',
     'begin',
     'end',

@@ -22,7 +22,7 @@ Clause 前缀 `JS-`。本页只冻结 observable semantics，不规定内部模�
 
 ## JS-005 file() / FileView
 
-`file(path, matches = [])` 读取本事务 immutable UTF-8 快照，按声明顺序解析 begin/end anchors，返回不可变 FileView。`text(from, to)`（默认 `^`/`$`）切出原文 substring。锚点可用于只读切片，不必 `rewrite`。`from`/`to` 可以是已声明名、`^`、`$`，或临时位移 `name+N` / `name-N`（例：`h1+200`）。位移不入库；全名已声明则用声明；否则取最后一个 `[+-]digits` 为 delta，基名递归解析。结果 caret clip 到闭区间 `[0, file_len]`，故 `$+N` / `^-N` 停在 EOF / 文件首。后续 rewrite 不影响已取得的视图。strict UTF-8：非法 UTF-8 拒绝，不以替换字符静默清洗。
+`file(path, matches = [])` 读取本事务 immutable UTF-8 快照，按声明顺序解析 begin/end anchors，返回不可变 FileView。`text(from, to)`（默认 `^`/`$`）切出原文 substring。锚点可用于只读切片，不必 `rewrite`。`from`/`to` 可以是已声明名、`^`、`$`，或临时位移 `name+N` / `name-N`（例：`h1+200`）。N 是已解码 JS 字符串上的下标增量（与 `String.length` / `source.slice` 同一单位：UTF-16 code unit），不是行号，也不是 UTF-8 字节数；`file_len` 即 `source.length`。位移不入库；全名已声明则用声明；否则取最后一个 `[+-]digits` 为 delta，基名递归解析。结果 caret clip 到闭区间 `[0, file_len]`，故 `$+N` / `^-N` 停在 EOF / 文件首。后续 rewrite 不影响已取得的视图。strict UTF-8：非法 UTF-8 拒绝，不以替换字符静默清洗。
 
 ## JS-006 Ordered string/RegExp anchors
 

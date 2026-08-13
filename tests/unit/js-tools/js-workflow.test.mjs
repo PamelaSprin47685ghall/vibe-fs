@@ -340,3 +340,27 @@ test('JS005_offset_anchor_clips_to_closed_file_range', async () => {
     cleanup()
   }
 })
+
+test('JS005_offset_N_is_string_index_not_line_number', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'ab\ncd\nef', 'utf8')
+    const surface = generate('Coder', coderCaps, jsProse())
+    const program = `class Js extends JsProgram {
+  async run() {
+    const file = await this.file('a.txt');
+    return {
+      twoUnits: file.text('^', '^+2'),
+      threeLen: file.text('^', '^+3').length,
+    };
+  }
+}`
+    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+    const { JsToolsResult_render: render } = await import('../../../dist/Infrastructure/OpenCode/Tools/JsToolWorkflow.js')
+    const doc = parseToml(render(outcome))
+    assert.equal(doc.data.twoUnits, 'ab')
+    assert.equal(doc.data.threeLen, 3)
+  } finally {
+    cleanup()
+  }
+})

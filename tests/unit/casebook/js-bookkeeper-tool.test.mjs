@@ -46,6 +46,7 @@ test('js_bookkeeper_surface_is_program_only_and_has_case_sdk', () => {
   assert.match(tool.Description, /answer\(matches = \[\]\)/)
   assert.match(tool.Description, /setQuestion\(newText\)/)
   assert.match(tool.Description, /setAnswer\(newText\)/)
+  assert.match(tool.Description, /not a line number|不是行号/)
   assert.doesNotMatch(tool.Description, /Q\.md|A\.md|old_text|new_text|filesystem/i)
 })
 

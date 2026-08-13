@@ -40,6 +40,7 @@ import {
   agentJournal,
   authorityRoot,
   idValue,
+  lifecycleWorkRecordProjection,
   listItems,
   okResult,
   physicalUser,
@@ -162,6 +163,12 @@ const withHarness = async (fn) => {
     (_delegateSession, _agent) => {},
     createQuiescenceGate(),
     undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    // EXEC-031: bounded WorkRecord via the real journal projector.
+    (_sid, range) => lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(opened.journal, _sid, range),
   )
 
   setEnabled(dir)
@@ -206,7 +213,8 @@ test('G6_G_host_reusable_inspector_one_finalize_then_cold_fetch', async () => {
       await settlePendingInvoke(runtime, delegateId, inspectorRole, a, `asst_q${i + 1}`)
       const done = resultOf(await pending)
       assert.equal(done.ok, true, done.ok ? '' : done.error)
-      assert.equal(done.value, a)
+      // EXEC-031: the answer travels inside the bounded WorkRecord's Closing report.
+      assert.match(done.value, new RegExp(a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
       noteAnswer(delegateId, a)
     }
 
